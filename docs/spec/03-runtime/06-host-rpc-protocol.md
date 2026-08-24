@@ -226,7 +226,13 @@ reach this protocol — see [14-secrets-storage](14-secrets-storage.md) §10.
   `AGENT_BUSY` before forwarding and normalizes the host's persisted
   running-turn `CONFLICT` fallback to `AGENT_BUSY`; an unknown source or
   `throughMessageId` returns `NOT_FOUND`
-- `session.get`
+- `session.get` — accepts an optional renderer read window:
+  `messageBefore` is the exclusive zero-based end offset, `messageLimit` is
+  the positive page size, and `contentLimit` is the positive character budget
+  for the derived display projection. The response includes
+  `messageStart` and `hasMoreBefore` when a window is requested. Omitting all
+  three options returns the complete lossless UI projection for sidecar and
+  mutation callers.
 - `session.delete`
 - `session.rename`
 - `session.configure` — atomically persists `mode`, `providerId`, `modelId`,

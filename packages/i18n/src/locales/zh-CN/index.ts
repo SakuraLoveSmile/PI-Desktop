@@ -204,6 +204,7 @@ export const zhCN = {
     sendNowPending: "即将发送",
     abort: "停止",
     running: "正在处理…",
+    loadingEarlierMessages: "正在加载更早的消息…",
     copy: "复制",
     copied: "已复制",
     copyDiagramSource: "复制图表源码",

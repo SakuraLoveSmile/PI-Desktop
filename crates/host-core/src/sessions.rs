@@ -200,6 +200,13 @@ pub struct SessionDetail {
     #[serde(flatten)]
     pub summary: SessionSummary,
     pub messages: Vec<UiMessage>,
+    /// Zero-based offset of the first returned message when the caller asked
+    /// for a window. Omitted for the full-history form.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_start: Option<i64>,
+    /// True when older messages exist outside the returned window.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_more_before: Option<bool>,
     /// The checkpoint that governs the next model request, i.e. the last of
     /// `compactions`. Kept as its own field because that is what the runtime
     /// restores on load.
@@ -209,6 +216,17 @@ pub struct SessionDetail {
     /// row per compaction.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub compactions: Vec<CompactionRecord>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SessionReadOptions {
+    /// Exclusive message sequence before which the window ends. When omitted,
+    /// the window is taken from the end of the canonical transcript.
+    pub message_before: Option<i64>,
+    pub message_limit: Option<i64>,
+    /// Maximum characters per UI text/value field. This is a presentation cap;
+    /// the full transcript remains available to the sidecar's uncapped read.
+    pub content_limit: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -525,6 +543,145 @@ fn record_to_ui(record: MessageRecord) -> UiMessage {
             agent_name,
         }
     }
+}
+
+const DISPLAY_TRUNCATION_MARKER: &str =
+    "\n\n[truncated for display; the full content remains in the transcript]";
+
+fn truncate_display_text(text: String, limit: usize) -> (String, bool) {
+    if text.chars().count() <= limit {
+        return (text, false);
+    }
+    let marker_len = DISPLAY_TRUNCATION_MARKER.chars().count();
+    if limit <= marker_len {
+        return (
+            DISPLAY_TRUNCATION_MARKER.chars().take(limit).collect(),
+            true,
+        );
+    }
+    let head = limit - marker_len;
+    (
+        format!(
+            "{}{}",
+            text.chars().take(head).collect::<String>(),
+            DISPLAY_TRUNCATION_MARKER
+        ),
+        true,
+    )
+}
+
+fn preview_value(value: Value, limit: usize) -> Value {
+    fn walk(value: Value, budget: &mut usize) -> Value {
+        if *budget == 0 {
+            return Value::String("[truncated for display]".into());
+        }
+        match value {
+            Value::String(text) => {
+                let (clipped, _) = truncate_display_text(text, *budget);
+                *budget = (*budget).saturating_sub(clipped.chars().count());
+                Value::String(clipped)
+            }
+            Value::Array(items) => {
+                let mut output = Vec::with_capacity(items.len().min(32));
+                for item in items {
+                    if *budget == 0 || output.len() >= 256 {
+                        output.push(Value::String("[truncated for display]".into()));
+                        break;
+                    }
+                    output.push(walk(item, budget));
+                }
+                Value::Array(output)
+            }
+            Value::Object(object) => {
+                let mut output = serde_json::Map::new();
+                for (key, item) in object {
+                    if *budget == 0 || output.len() >= 256 {
+                        output.insert("_truncated".into(), Value::Bool(true));
+                        break;
+                    }
+                    output.insert(key, walk(item, budget));
+                }
+                Value::Object(output)
+            }
+            other => other,
+        }
+    }
+
+    let mut budget = limit.max(1);
+    walk(value, &mut budget)
+}
+
+fn cap_record_block_value(value: &mut Value, budget: &mut usize) {
+    let original = std::mem::take(value);
+    *value = match original {
+        Value::String(text) if *budget > 0 => {
+            let (clipped, _) = truncate_display_text(text, *budget);
+            *budget = budget.saturating_sub(clipped.chars().count());
+            Value::String(clipped)
+        }
+        Value::String(_) => Value::String(String::new()),
+        other => other,
+    };
+}
+
+fn cap_record_blocks_for_display(record: &mut MessageRecord, limit: usize) {
+    let Some(blocks) = record.blocks.as_array_mut() else {
+        return;
+    };
+    let mut text_budget = limit.max(1);
+    let mut thinking_budget = limit.max(1);
+    for block in blocks {
+        let Some(object) = block.as_object_mut() else {
+            continue;
+        };
+        match object.get("type").and_then(Value::as_str) {
+            Some("text") => {
+                if let Some(text) = object.get_mut("text") {
+                    cap_record_block_value(text, &mut text_budget);
+                }
+            }
+            Some("thinking") => {
+                if let Some(text) = object.get_mut("text") {
+                    cap_record_block_value(text, &mut thinking_budget);
+                }
+            }
+            Some("tool_call") => {
+                for key in ["args", "result"] {
+                    if let Some(value) = object.get_mut(key) {
+                        *value = preview_value(std::mem::take(value), limit);
+                    }
+                }
+                if let Some(text) = object.get_mut("text") {
+                    cap_record_block_value(text, &mut text_budget);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn record_to_ui_for_display(mut record: MessageRecord, limit: usize) -> UiMessage {
+    // Bound the canonical block values before record_to_ui concatenates text
+    // blocks or clones tool payloads. This keeps a 50 MB selected line from
+    // producing another 50 MB temporary UI string on the host.
+    cap_record_blocks_for_display(&mut record, limit);
+    let mut message = record_to_ui(record);
+    let (content, _) = truncate_display_text(message.content, limit);
+    message.content = content;
+    if let Some(thinking) = message.thinking.take() {
+        let (thinking, _) = truncate_display_text(thinking, limit);
+        message.thinking = Some(thinking);
+    }
+    if let Some(args) = message.tool_args.take() {
+        message.tool_args = Some(preview_value(args, limit));
+    }
+    if let Some(result) = message.tool_result.take() {
+        message.tool_result = Some(preview_value(result, limit));
+    }
+    if let Some(error) = message.error.take() {
+        message.error = Some(preview_value(error, limit));
+    }
+    message
 }
 
 fn dedupe_records(records: Vec<MessageRecord>) -> Vec<MessageRecord> {
@@ -887,6 +1044,18 @@ pub fn session_mode(db: &Database, id: &str) -> Result<Option<String>> {
 }
 
 pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
+    get_session_with_options(db, id, SessionReadOptions::default())
+}
+
+/// Load a session detail with an optional renderer-facing message window.
+/// The uncapped default is intentionally retained for the sidecar and for
+/// mutation paths that need the canonical transcript. Renderer callers should
+/// request a bounded tail and a display content limit.
+pub fn get_session_with_options(
+    db: &Database,
+    id: &str,
+    options: SessionReadOptions,
+) -> Result<Option<SessionDetail>> {
     let sql = format!("{SUMMARY_SELECT} WHERE s.id = ?1");
     let summary = db
         .conn()
@@ -897,14 +1066,46 @@ pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
         return Ok(None);
     };
 
-    // Content comes from the transcript file; SQLite only indexes it.
-    // Keep-last dedupe by message id absorbs a retried append whose earlier
-    // file line lost its index transaction to a crash.
-    let records = dedupe_records(transcripts::read_transcript(db.data_dir(), id)?);
-    let messages = records.into_iter().map(record_to_ui).collect();
-    let compactions = transcripts::read_compactions(db.data_dir(), id)?;
+    let (records, compactions, message_start, has_more_before) =
+        if let Some(raw_limit) = options.message_limit.filter(|limit| *limit > 0) {
+            let limit = raw_limit.min(1_000) as usize;
+            let total = summary.message_count.max(0) as usize;
+            let before = options
+                .message_before
+                .unwrap_or(summary.message_count)
+                .clamp(0, summary.message_count) as usize;
+            let start = before.saturating_sub(limit);
+            let read = transcripts::read_transcript_window(
+                db.data_dir(),
+                id,
+                start,
+                Some(before.saturating_sub(start)),
+            )?;
+            (
+                dedupe_records(read.messages),
+                read.compactions,
+                Some(start as i64),
+                Some(start > 0 && total > 0),
+            )
+        } else {
+            let read = transcripts::read_transcript_with_compactions(db.data_dir(), id)?;
+            (dedupe_records(read.messages), read.compactions, None, None)
+        };
+    // Content comes from the transcript file; SQLite only indexes it. A
+    // renderer window may additionally request a display cap so a single
+    // pasted or tool-produced multi-megabyte message never crosses the UI IPC
+    // boundary. The uncapped path remains lossless for model reconstruction.
+    let messages = match options.content_limit {
+        Some(limit) => records
+            .into_iter()
+            .map(|record| record_to_ui_for_display(record, limit))
+            .collect(),
+        None => records.into_iter().map(record_to_ui).collect(),
+    };
     Ok(Some(SessionDetail {
         summary,
+        message_start,
+        has_more_before,
         messages,
         compaction: compactions.last().cloned(),
         compactions,
@@ -1024,6 +1225,8 @@ pub fn fork_session_through(
     let messages = records.into_iter().map(record_to_ui).collect();
     Ok(ForkSessionResult::Created(Box::new(SessionDetail {
         summary,
+        message_start: None,
+        has_more_before: None,
         messages,
         compaction: compactions.last().cloned(),
         compactions,
@@ -2384,6 +2587,46 @@ mod tests {
         assert_eq!(blocks[1]["type"], "attachment");
         assert_eq!(blocks[1]["ref"], "attachments/abc123");
         assert!(blocks[1].get("data").is_none());
+    }
+
+    #[test]
+    fn bounded_session_reads_page_history_and_cap_display_content() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m1", "old", "2025-05-01T00:00:00Z"),
+            None,
+        )
+        .unwrap();
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m2", &"x".repeat(80_000), "2025-05-01T00:00:01Z"),
+            None,
+        )
+        .unwrap();
+
+        let page = get_session_with_options(
+            &db,
+            &session.id,
+            SessionReadOptions {
+                message_before: None,
+                message_limit: Some(1),
+                content_limit: Some(128),
+            },
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(page.message_start, Some(1));
+        assert_eq!(page.has_more_before, Some(true));
+        assert_eq!(page.messages.len(), 1);
+        assert!(page.messages[0].content.len() < 256);
+        assert!(page.messages[0].content.contains("truncated for display"));
+
+        let full = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(full.messages[1].content.len(), 80_000);
     }
 
     #[test]

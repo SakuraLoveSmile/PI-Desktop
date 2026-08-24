@@ -19,7 +19,7 @@
 //! their session, never by an age or orphan sweep.
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
@@ -89,6 +89,21 @@ struct SessionHeader {
     schema: i64,
     session_id: String,
     created_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LineTag {
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+/// The portions of one transcript read that callers commonly need together.
+/// Keeping this as one pass matters for long sessions: the old session loader
+/// read the same JSONL file once for messages and once for compactions.
+#[derive(Debug, Default)]
+pub struct TranscriptRead {
+    pub messages: Vec<MessageRecord>,
+    pub compactions: Vec<CompactionRecord>,
 }
 
 fn tagged(tag: &str, body: &impl Serialize) -> Result<String> {
@@ -199,62 +214,84 @@ pub fn append_compaction(
 /// Load the live transcript. A missing file is an empty transcript; unknown
 /// line types and a torn trailing line are skipped, not errors.
 pub fn read_transcript(data_dir: &Path, session_id: &str) -> Result<Vec<MessageRecord>> {
+    Ok(read_transcript_window(data_dir, session_id, 0, None)?.messages)
+}
+
+/// Read a message window without materializing the whole JSONL file. Message
+/// positions are zero-based and count message lines in file order. A `None`
+/// limit reads through the end, which is the full-history path used by the
+/// sidecar when it reconstructs model context.
+pub fn read_transcript_window(
+    data_dir: &Path,
+    session_id: &str,
+    message_start: usize,
+    message_limit: Option<usize>,
+) -> Result<TranscriptRead> {
     let path = transcript_path(data_dir, session_id)?;
-    let raw = match fs::read_to_string(&path) {
-        Ok(raw) => raw,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+    let file = match File::open(&path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(TranscriptRead::default()),
         Err(e) => return Err(e).with_context(|| format!("read {}", path.display())),
     };
-    let mut out = Vec::new();
-    for line in raw.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    let end = message_limit.map(|limit| message_start.saturating_add(limit));
+    let mut message_index = 0usize;
+    let mut out = TranscriptRead::default();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line)? == 0 {
+            break;
         }
-        let Ok(value) = serde_json::from_str::<Value>(line) else {
+        let Some(tag) = serde_json::from_str::<LineTag>(line.trim()).ok() else {
             tracing::warn!(path = %path.display(), "skipping unparseable transcript line");
             continue;
         };
-        if value.get("type").and_then(|t| t.as_str()) != Some("message") {
-            continue;
-        }
-        match serde_json::from_value::<MessageRecord>(value) {
-            Ok(record) => out.push(record),
-            Err(error) => {
-                tracing::warn!(path = %path.display(), %error, "skipping invalid message line");
+        match tag.kind.as_str() {
+            "message" => {
+                let index = message_index;
+                message_index += 1;
+                let selected = index >= message_start && end.map_or(true, |limit| index < limit);
+                if selected {
+                    match serde_json::from_str::<MessageRecord>(line.trim()) {
+                        Ok(record) => out.messages.push(record),
+                        Err(error) => {
+                            tracing::warn!(path = %path.display(), %error, "skipping invalid message line");
+                        }
+                    }
+                }
             }
+            "compaction" => match serde_json::from_str::<CompactionRecord>(line.trim()) {
+                Ok(record) => out.compactions.push(record),
+                Err(error) => {
+                    tracing::warn!(path = %path.display(), %error, "skipping invalid compaction line");
+                }
+            },
+            _ => {}
+        }
+        // A skipped 50 MB line must not leave its capacity attached to every
+        // following read. The selected full-history path intentionally keeps
+        // the buffer reusable because it is already paying for every record.
+        if message_limit.is_some() && line.capacity() > 1024 * 1024 {
+            line = String::new();
         }
     }
     Ok(out)
 }
 
-/// Return every valid compaction checkpoint in append order. The renderer
-/// shows one transcript row per checkpoint, so the whole chain is durable, not
-/// just the newest one. Unknown/torn records are ignored using the same
-/// forward-compatible policy as message reads.
+/// Read the full transcript and checkpoints in one pass. This is kept as a
+/// separate helper so callers that need both do not accidentally regress to
+/// two complete file reads.
+pub fn read_transcript_with_compactions(
+    data_dir: &Path,
+    session_id: &str,
+) -> Result<TranscriptRead> {
+    read_transcript_window(data_dir, session_id, 0, None)
+}
+
+/// Return every valid compaction checkpoint in append order.
 pub fn read_compactions(data_dir: &Path, session_id: &str) -> Result<Vec<CompactionRecord>> {
-    let path = transcript_path(data_dir, session_id)?;
-    let raw = match fs::read_to_string(&path) {
-        Ok(raw) => raw,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(e).with_context(|| format!("read {}", path.display())),
-    };
-    let mut out = Vec::new();
-    for line in raw.lines() {
-        let Ok(value) = serde_json::from_str::<Value>(line.trim()) else {
-            continue;
-        };
-        if value.get("type").and_then(Value::as_str) != Some("compaction") {
-            continue;
-        }
-        match serde_json::from_value::<CompactionRecord>(value) {
-            Ok(record) => out.push(record),
-            Err(error) => {
-                tracing::warn!(path = %path.display(), %error, "skipping invalid compaction line");
-            }
-        }
-    }
-    Ok(out)
+    Ok(read_transcript_with_compactions(data_dir, session_id)?.compactions)
 }
 
 /// Atomically replace the live transcript (compaction, revision switch,
@@ -525,6 +562,44 @@ mod tests {
         let loaded = read_transcript(dir.path(), "s1").unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].id, "m1");
+    }
+
+    #[test]
+    fn window_read_keeps_only_requested_messages_but_returns_checkpoints() {
+        let dir = tempdir().unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("m1", "one"),
+        )
+        .unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("m2", "two"),
+        )
+        .unwrap();
+        append_compaction(dir.path(), "s1", "2026-07-26T00:00:00Z", &compaction()).unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("m3", "three"),
+        )
+        .unwrap();
+
+        let window = read_transcript_window(dir.path(), "s1", 1, Some(1)).unwrap();
+        assert_eq!(
+            window
+                .messages
+                .iter()
+                .map(|item| item.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["m2"]
+        );
+        assert_eq!(window.compactions.len(), 1);
     }
 
     #[test]

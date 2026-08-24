@@ -1263,9 +1263,43 @@ async fn handle_request(
                 .get("id")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let message_before = params.get("messageBefore").and_then(|v| v.as_i64());
+            let message_limit = params.get("messageLimit").and_then(|v| v.as_i64());
+            if message_before.is_some_and(|value| value < 0)
+                || message_limit.is_some_and(|value| value <= 0)
+            {
+                return Err(rpc_err(
+                    1002,
+                    "session read window must use non-negative messageBefore and positive messageLimit",
+                    "INVALID_PARAMS",
+                ));
+            }
+            let content_limit = params
+                .get("contentLimit")
+                .and_then(|v| v.as_u64())
+                .map(|limit| limit.min(256 * 1024) as usize);
+            if params
+                .get("contentLimit")
+                .and_then(|value| value.as_u64())
+                .is_some_and(|value| value == 0)
+            {
+                return Err(rpc_err(
+                    1002,
+                    "session contentLimit must be positive",
+                    "INVALID_PARAMS",
+                ));
+            }
             let st = state.lock().await;
-            let session = sessions::get_session(&st.db, id)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let session = sessions::get_session_with_options(
+                &st.db,
+                id,
+                sessions::SessionReadOptions {
+                    message_before,
+                    message_limit,
+                    content_limit,
+                },
+            )
+            .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "session": session }))
         }
         "session.configure" => {

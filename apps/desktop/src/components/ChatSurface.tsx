@@ -40,6 +40,8 @@ export const ChatSurface = memo(function ChatSurface() {
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const selectingSessionId = useAppStore((state) => state.selectingSessionId);
   const messages = useAppStore((state) => state.messages);
+  const sessionHistory = useAppStore((state) => state.sessionHistory);
+  const loadOlderMessages = useAppStore((state) => state.loadOlderMessages);
   const isRunning = useAppStore((state) => state.isRunning);
   const workspace = useAppStore((state) => state.workspace);
   const openProject = useAppStore((state) => state.openProject);
@@ -196,6 +198,15 @@ export const ChatSurface = memo(function ChatSurface() {
           <ChatTranscript
             sessionId={transcriptView.sessionId}
             messages={transcriptView.messages}
+            hasMoreBefore={Boolean(
+              transcriptView.sessionId &&
+                sessionHistory[transcriptView.sessionId]?.hasMoreBefore,
+            )}
+            onLoadOlder={() =>
+              transcriptView.sessionId
+                ? loadOlderMessages(transcriptView.sessionId)
+                : Promise.resolve()
+            }
             isRunning={transcriptView.isRunning}
             pendingPermission={transcriptView.pendingPermission}
             queuedPermissions={transcriptView.queuedPermissions}

@@ -2130,6 +2130,8 @@ function CompactionRow({ mark }: { mark: ContextCompactionMark }) {
 export const ChatTranscript = memo(function ChatTranscript({
   sessionId,
   messages,
+  hasMoreBefore = false,
+  onLoadOlder,
   isRunning,
   pendingPermission,
   queuedPermissions = 0,
@@ -2138,6 +2140,8 @@ export const ChatTranscript = memo(function ChatTranscript({
 }: {
   sessionId: string | undefined;
   messages: UiMessage[];
+  hasMoreBefore?: boolean;
+  onLoadOlder?: () => Promise<void>;
   isRunning: boolean;
   pendingPermission?: PendingPermission;
   /** Requests waiting behind this one, from other delegates (ADR 0062). */
@@ -2174,6 +2178,8 @@ export const ChatTranscript = memo(function ChatTranscript({
   const lastScrollGestureAtRef = useRef(-Infinity);
   const wasRunningRef = useRef(isRunning);
   const followFrameRef = useRef(0);
+  const prependHeightRef = useRef<number | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [showJump, setShowJump] = useState(false);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
@@ -2264,11 +2270,41 @@ export const ChatTranscript = memo(function ChatTranscript({
 
   useEffect(() => cancelFollowScroll, [cancelFollowScroll]);
 
+  const loadOlder = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !hasMoreBefore || loadingOlder || !onLoadOlder) {
+      return;
+    }
+    // Prepending rows changes scrollHeight. Capture the old height so the
+    // user's viewport stays anchored to the same message after the page lands.
+    prependHeightRef.current = el.scrollHeight;
+    setLoadingOlder(true);
+    void onLoadOlder().finally(() => setLoadingOlder(false));
+  }, [hasMoreBefore, loadingOlder, onLoadOlder]);
+
+  useLayoutEffect(() => {
+    const previousHeight = prependHeightRef.current;
+    if (previousHeight === null) return;
+    const el = scrollRef.current;
+    prependHeightRef.current = null;
+    if (!el) return;
+    const delta = el.scrollHeight - previousHeight;
+    if (delta <= 0) return;
+    el.scrollTop += delta;
+    lastScrollTopRef.current = el.scrollTop;
+  }, [messages.length]);
+
+  useEffect(() => {
+    prependHeightRef.current = null;
+    setLoadingOlder(false);
+  }, [sessionId]);
+
   // Follow the stream only while the user is pinned to the bottom; a manual
   // scroll up pauses following and surfaces the jump-to-latest pill.
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    if (el.scrollTop <= 120) loadOlder();
     const wasPinned = pinnedRef.current;
     const transition = reduceTranscriptScroll({
       previousScrollTop: lastScrollTopRef.current,
@@ -2305,7 +2341,7 @@ export const ChatTranscript = memo(function ChatTranscript({
       pinnedRef.current = transition.pinned;
       setShowJump(transition.showJump);
     }
-  }, [cancelFollowScroll, scheduleFollowScroll]);
+  }, [cancelFollowScroll, loadOlder, scheduleFollowScroll]);
 
   // Send / retry / regenerate always re-pins follow mode so the new prompt and
   // its stream stay in view, even if the user had scrolled up through history.
@@ -2427,6 +2463,14 @@ export const ChatTranscript = memo(function ChatTranscript({
         aria-live="polite"
       >
         <div className="thread-content" ref={contentRef}>
+          <div
+            className="transcript-history-loading"
+            role="status"
+            aria-live="polite"
+            aria-hidden={!loadingOlder}
+          >
+            {loadingOlder ? t("chat.loadingEarlierMessages") : null}
+          </div>
           {!hydrated && allHistoryEntries.length > INITIAL_RENDER_BUDGET ? (
             <div
               className="transcript-hydration-spacer"

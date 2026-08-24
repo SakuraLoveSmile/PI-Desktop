@@ -25,7 +25,9 @@ schema v7, v8, and v11:
    greppable, copyable, and the database stays small no matter how much is
    chatted.
 3. **High performance** — O(1) file appends, covering indexes for every hot
-   query, integer times, single-writer WAL, no JSON scans on hot paths.
+   query, integer times, single-writer WAL, no JSON scans on hot paths, and
+   bounded renderer transcript reads even when a session contains very large
+   message content.
 4. **Extensible without migrations** where cheap (block vocabulary, JSONL line
    types, kv namespaces, `config_json` columns), **with migrations** where
    structural (new entities), versioned by `PRAGMA user_version`.
@@ -860,12 +862,27 @@ A crash between file append and index commit leaves the message readable
 (transcript loads from the file) with only its search row missing until the
 next rewrite; transcript reads dedupe repeated ids keep-last.
 
+The renderer never needs the whole JSONL file to open a session. Its
+`session.get` request may specify a zero-based exclusive `messageBefore`, a
+positive `messageLimit`, and a positive `contentLimit`. Host-core streams the
+JSONL file once, returns only that message window, and applies the content cap
+only to the derived `UiMessage` projection. The full transcript remains
+lossless on disk and the sidecar's uncapped `session.get` path is unchanged for
+model context, edits, revisions, and other host-owned mutations. The renderer
+opens with the newest window and requests older windows on demand; the
+response's `messageStart` and `hasMoreBefore` fields are the only pagination
+state it needs.
+
 ## 6. Performance notes
 
 - Single writer + WAL: readers never block; no lock contention by design.
 - All timestamps INTEGER Unix ms — smaller rows, integer compares, index-friendly.
 - Hot queries and their indexes:
-  - transcript load → one sequential read of `sessions/<id>.jsonl` (no DB)
+  - renderer transcript open → one sequential streaming read of the JSONL file
+    for the requested window; only the bounded page and capped display values
+    cross the host/Electron/renderer boundary
+  - full transcript consumers → one sequential read of
+    `sessions/<id>.jsonl` (no DB), retained for sidecar context and mutations
   - session list → `idx_sessions_updated`
   - group-by-project → `idx_sessions_project`
   - badges/cost rollup → `idx_turns_session` (latest turn per session)

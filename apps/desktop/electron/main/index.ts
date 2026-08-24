@@ -5211,16 +5211,42 @@ function registerIpc() {
       };
     },
   );
-  handle(IPC.invoke.sessionGet, async (id: string) => {
-    if (!host) throw new Error("host unavailable");
-    const [result, providers] = await Promise.all([
-      host.call<{ session?: RuntimeSession | null }>("session.get", { id }),
-      listRuntimeProviders(),
-    ]);
-    return result.session
-      ? { ...result, session: enrichSession(result.session, providers) }
-      : result;
-  });
+  handle(
+    IPC.invoke.sessionGet,
+    async (
+      input:
+        | string
+        | {
+            id?: string;
+            messageBefore?: number;
+            messageLimit?: number;
+            contentLimit?: number;
+          },
+    ) => {
+      if (!host) throw new Error("host unavailable");
+      const request = typeof input === "string" ? { id: input } : input ?? {};
+      const id = String(request.id ?? "").trim();
+      if (!id) throw new Error("session id required");
+      const [result, providers] = await Promise.all([
+        host.call<{ session?: RuntimeSession | null }>("session.get", {
+          id,
+          ...(Number.isInteger(request.messageBefore) && request.messageBefore! >= 0
+            ? { messageBefore: request.messageBefore }
+            : {}),
+          ...(Number.isInteger(request.messageLimit) && request.messageLimit! > 0
+            ? { messageLimit: request.messageLimit }
+            : {}),
+          ...(Number.isInteger(request.contentLimit) && request.contentLimit! > 0
+            ? { contentLimit: request.contentLimit }
+            : {}),
+        }),
+        listRuntimeProviders(),
+      ]);
+      return result.session
+        ? { ...result, session: enrichSession(result.session, providers) }
+        : result;
+    },
+  );
   handle(IPC.invoke.sessionDelete, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     const res = await host.call("session.delete", { id });

@@ -205,6 +205,8 @@ export type PendingPlanRefreshResult = "pending" | "terminal" | "unavailable";
 
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
 const SESSION_TRANSCRIPT_CACHE_LIMIT = 20;
+export const SESSION_TRANSCRIPT_PAGE_SIZE = 100;
+export const SESSION_TRANSCRIPT_CONTENT_LIMIT = 64 * 1024;
 // Preserve the original 320px tool-content minimum beside the 44px activity rail.
 export { WORK_PANEL_DEFAULT_WIDTH, WORK_PANEL_MIN_WIDTH };
 
@@ -214,6 +216,11 @@ let pendingSessionSelection: { id: string; intent: number } | null = null;
 let sessionWorkspaceQueue: Promise<void> = Promise.resolve();
 const pendingNewSessionRequests = new Map<string, Promise<void>>();
 const sessionTranscriptCache = new Map<string, UiMessage[]>();
+type SessionHistoryWindow = {
+  messageStart: number;
+  hasMoreBefore: boolean;
+};
+const sessionHistoryCache = new Map<string, SessionHistoryWindow>();
 const planResolutionRequests = new Map<string, Promise<PlanResolutionResult>>();
 const planSyncGenerations = new Map<string, number>();
 type SubmittedComposerDraft = {
@@ -240,6 +247,7 @@ const sessionDetailLoads = new Map<
   string,
   ReturnType<typeof api.getSession>
 >();
+const sessionOlderLoads = new Map<string, Promise<void>>();
 
 type NavigationOptions = {
   /** Reuse an owning navigation's generation across nested async operations. */
@@ -275,29 +283,60 @@ function latestSessionInScope(
     .find((session) => !sessionIsArchived(session.id, sessionMeta));
 }
 
-function cacheSessionTranscript(id: string, messages: UiMessage[]) {
+function cacheSessionTranscript(
+  id: string,
+  messages: UiMessage[],
+  window?: SessionHistoryWindow,
+) {
   sessionTranscriptCache.delete(id);
   sessionTranscriptCache.set(id, messages);
+  if (window) sessionHistoryCache.set(id, window);
   while (sessionTranscriptCache.size > SESSION_TRANSCRIPT_CACHE_LIMIT) {
     const oldestId = sessionTranscriptCache.keys().next().value;
     if (typeof oldestId !== "string") break;
     sessionTranscriptCache.delete(oldestId);
+    sessionHistoryCache.delete(oldestId);
   }
 }
 
-function loadSessionDetail(id: string) {
+function loadSessionDetail(
+  id: string,
+  options?: {
+    messageBefore?: number;
+    messageLimit?: number;
+    contentLimit?: number;
+  },
+) {
   const active = sessionDetailLoads.get(id);
-  if (active) return active;
-  const request = api.getSession(id).then((detail) => {
-    if (detail.session) cacheSessionTranscript(id, detail.session.messages ?? []);
+  if (active && options?.messageBefore === undefined) return active;
+  const request = api.getSession(id, options).then((detail) => {
+    if (detail.session && options?.messageBefore === undefined) {
+      cacheSessionTranscript(id, detail.session.messages ?? [], {
+        messageStart: detail.session.messageStart ?? 0,
+        hasMoreBefore: detail.session.hasMoreBefore === true,
+      });
+    }
     return detail;
   });
-  sessionDetailLoads.set(id, request);
+  if (options?.messageBefore === undefined) sessionDetailLoads.set(id, request);
   const clear = () => {
-    if (sessionDetailLoads.get(id) === request) sessionDetailLoads.delete(id);
+    if (
+      options?.messageBefore === undefined &&
+      sessionDetailLoads.get(id) === request
+    ) {
+      sessionDetailLoads.delete(id);
+    }
   };
   void request.then(clear, clear);
   return request;
+}
+
+async function loadFullSessionMessages(id: string): Promise<UiMessage[] | null> {
+  const detail = await api.getSession(id);
+  if (!detail.session) return null;
+  const messages = detail.session.messages ?? [];
+  cacheSessionTranscript(id, messages, { messageStart: 0, hasMoreBefore: false });
+  return messages;
 }
 
 function nextPlanSyncGeneration(sessionId: string): number {
@@ -446,6 +485,8 @@ export type AppState = {
   /** Latest user-selected session while its transcript/workspace is resolving. */
   selectingSessionId?: string;
   messages: UiMessage[];
+  /** Renderer-owned range metadata for the lazily loaded active transcript. */
+  sessionHistory: Record<string, SessionHistoryWindow>;
   isRunning: boolean;
   /** Run state per session id — sessions run independent agents. */
   runningSessions: Record<string, boolean>;
@@ -499,6 +540,7 @@ export type AppState = {
   bootstrap: () => Promise<void>;
   refreshSessions: () => Promise<void>;
   prefetchSession: (id: string) => Promise<void>;
+  loadOlderMessages: (sessionId: string) => Promise<void>;
   selectSession: (
     id: string,
     opts?: { record?: boolean } & NavigationOptions,
@@ -841,6 +883,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workPanelFileRequest: null,
   projectSort: initialSidebarPreferences.projectSort,
   messages: [],
+  sessionHistory: {},
   draftConfiguration: null,
   isRunning: false,
   runningSessions: {},
@@ -1134,7 +1177,60 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   prefetchSession: async (id) => {
     if (!id || sessionTranscriptCache.has(id)) return;
-    await loadSessionDetail(id);
+    await loadSessionDetail(id, {
+      messageLimit: SESSION_TRANSCRIPT_PAGE_SIZE,
+      contentLimit: SESSION_TRANSCRIPT_CONTENT_LIMIT,
+    });
+  },
+
+  loadOlderMessages: async (sessionId) => {
+    const window = get().sessionHistory[sessionId];
+    if (!window?.hasMoreBefore || sessionOlderLoads.has(sessionId)) return;
+    const before = window.messageStart;
+    const request = api
+      .getSession(sessionId, {
+        messageBefore: before,
+        messageLimit: SESSION_TRANSCRIPT_PAGE_SIZE,
+        contentLimit: SESSION_TRANSCRIPT_CONTENT_LIMIT,
+      })
+      .then((detail) => {
+        const page = detail.session;
+        if (!page) return;
+        const nextWindow = {
+          messageStart: page.messageStart ?? Math.max(0, before - page.messages.length),
+          hasMoreBefore: page.hasMoreBefore === true,
+        };
+        const cached = sessionTranscriptCache.get(sessionId) ?? [];
+        const cachedStart = sessionHistoryCache.get(sessionId)?.messageStart ?? before;
+        // A newer navigation or another prepend wins; never duplicate a page
+        // after a stale response arrives.
+        if (cachedStart !== before && cached.length > 0) return;
+        const merged = [...page.messages, ...cached];
+        cacheSessionTranscript(sessionId, merged, nextWindow);
+        set((state) =>
+          state.activeSessionId === sessionId
+            ? {
+                messages: [...page.messages, ...state.messages],
+                sessionHistory: {
+                  ...state.sessionHistory,
+                  [sessionId]: nextWindow,
+                },
+              }
+            : {
+                sessionHistory: {
+                  ...state.sessionHistory,
+                  [sessionId]: nextWindow,
+                },
+              },
+        );
+      })
+      .finally(() => {
+        if (sessionOlderLoads.get(sessionId) === request) {
+          sessionOlderLoads.delete(sessionId);
+        }
+      });
+    sessionOlderLoads.set(sessionId, request);
+    await request;
   },
 
   selectSession: async (id, opts) => {
@@ -1143,11 +1239,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     pendingSessionSelection = selection;
     const stateAtStart = get();
     if (stateAtStart.activeSessionId) {
-      cacheSessionTranscript(stateAtStart.activeSessionId, stateAtStart.messages);
+      cacheSessionTranscript(
+        stateAtStart.activeSessionId,
+        stateAtStart.messages,
+        stateAtStart.sessionHistory[stateAtStart.activeSessionId],
+      );
     }
     set({ selectingSessionId: id, page: "chat" });
 
-    const commitSelection = (messages: UiMessage[], revalidating: boolean) => {
+    const commitSelection = (
+      messages: UiMessage[],
+      revalidating: boolean,
+      historyWindow: SessionHistoryWindow =
+        sessionHistoryCache.get(id) ?? { messageStart: 0, hasMoreBefore: false },
+    ) => {
       const record = opts?.record !== false;
       if (!record) {
         set((s) => ({
@@ -1155,6 +1260,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           activeSessionId: id,
           selectingSessionId: revalidating ? id : undefined,
           messages,
+          sessionHistory: { ...s.sessionHistory, [id]: historyWindow },
           page: "chat",
           isRunning: s.runningSessions[id] ?? false,
         }));
@@ -1171,6 +1277,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           activeSessionId: id,
           selectingSessionId: revalidating ? id : undefined,
           messages,
+          sessionHistory: { ...s.sessionHistory, [id]: historyWindow },
           page: "chat" as const,
           isRunning: s.runningSessions[id] ?? false,
           navStack: nextStack,
@@ -1217,7 +1324,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const summary = get().sessions.find((session) => session.id === id);
       // Start transcript IO immediately. When summary metadata is available,
       // workspace alignment runs beside it instead of adding another round trip.
-      const detailPromise = loadSessionDetail(id);
+      const detailPromise = loadSessionDetail(id, {
+        messageLimit: SESSION_TRANSCRIPT_PAGE_SIZE,
+        contentLimit: SESSION_TRANSCRIPT_CONTENT_LIMIT,
+      });
       let detail: Awaited<typeof detailPromise> | undefined;
       if (summary) {
         if (!(await alignWorkspaceLatest(summary.projectPath))) return;
@@ -1229,13 +1339,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const cachedMessages = sessionTranscriptCache.get(id);
       if (cachedMessages && navigationIntentIsCurrent(intent)) {
-        cacheSessionTranscript(id, cachedMessages);
-        commitSelection(cachedMessages, true);
+        cacheSessionTranscript(id, cachedMessages, sessionHistoryCache.get(id));
+        commitSelection(cachedMessages, true, sessionHistoryCache.get(id));
       }
 
       detail ??= await detailPromise;
       if (!navigationIntentIsCurrent(intent)) return;
-      commitSelection(detail.session?.messages ?? [], false);
+      const historyWindow = detail.session
+        ? {
+            messageStart: detail.session.messageStart ?? 0,
+            hasMoreBefore: detail.session.hasMoreBefore === true,
+          }
+        : { messageStart: 0, hasMoreBefore: false };
+      if (detail.session) {
+        cacheSessionTranscript(id, detail.session.messages ?? [], historyWindow);
+      }
+      commitSelection(detail.session?.messages ?? [], false, historyWindow);
       rememberSessionCompactions(id, detail.session);
       void get().restorePendingPlan(id);
       void get().acknowledgeSessionOutcome(id);
@@ -1778,6 +1897,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       attachments ?? state.messages[userIndex].attachments,
     );
     const kept = state.messages.slice(0, userIndex);
+    const transcriptOffset = state.sessionHistory[sessionId]?.messageStart ?? 0;
 
     set((s) => ({
       messages: kept,
@@ -1796,7 +1916,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         content: prompt,
         viewingSessionId: viewingSessionIdForPrompt(get(), sessionId),
         attachments: promptAttachments,
-        truncateBefore: userIndex,
+        truncateBefore: transcriptOffset + userIndex,
       });
       return true;
     } catch (e) {
@@ -1872,6 +1992,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       state.messages[userIndex].attachments,
     );
     const kept = state.messages.slice(0, userIndex);
+    const transcriptOffset = state.sessionHistory[sessionId]?.messageStart ?? 0;
     set((s) => ({
       messages: kept,
       isRunning: true,
@@ -1888,7 +2009,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         content: prompt,
         viewingSessionId: viewingSessionIdForPrompt(get(), sessionId),
         attachments: promptAttachments,
-        truncateBefore: userIndex,
+        truncateBefore: transcriptOffset + userIndex,
       });
     } catch (e) {
       set((s) => ({
@@ -1914,10 +2035,26 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearError: () => set({ error: null, errorCode: null, errorRetriable: null }),
 
   activateMessageRevision: async (rootUserId, revisionIndex) => {
-    const state = get();
+    let state = get();
     if (state.isRunning) return;
     const sessionId = state.activeSessionId;
     if (!sessionId) return;
+    if (state.sessionHistory[sessionId]?.hasMoreBefore) {
+      const fullMessages = await loadFullSessionMessages(sessionId);
+      if (!fullMessages || get().activeSessionId !== sessionId) return;
+      set((current) =>
+        current.activeSessionId === sessionId
+          ? {
+              messages: fullMessages,
+              sessionHistory: {
+                ...current.sessionHistory,
+                [sessionId]: { messageStart: 0, hasMoreBefore: false },
+              },
+            }
+          : {},
+      );
+      state = get();
+    }
     const rootIndex = state.messages.findIndex((message) => message.id === rootUserId);
     if (rootIndex < 0) return;
     const root = state.messages[rootIndex];
@@ -1935,6 +2072,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((s) => ({
         messages:
           s.activeSessionId === sessionId ? result.messages ?? prefix : s.messages,
+        sessionHistory:
+          s.activeSessionId === sessionId
+            ? {
+                ...s.sessionHistory,
+                [sessionId]: { messageStart: 0, hasMoreBefore: false },
+              }
+            : s.sessionHistory,
         error: null,
         errorCode: null,
       }));
@@ -1947,9 +2091,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   deleteMessage: async (messageId) => {
-    const state = get();
+    let state = get();
     const sessionId = state.activeSessionId;
     if (!sessionId || state.isRunning) return;
+    if (state.sessionHistory[sessionId]?.hasMoreBefore) {
+      const fullMessages = await loadFullSessionMessages(sessionId);
+      if (!fullMessages || get().activeSessionId !== sessionId) return;
+      set((current) =>
+        current.activeSessionId === sessionId
+          ? {
+              messages: fullMessages,
+              sessionHistory: {
+                ...current.sessionHistory,
+                [sessionId]: { messageStart: 0, hasMoreBefore: false },
+              },
+            }
+          : {},
+      );
+      state = get();
+    }
     const index = state.messages.findIndex((message) => message.id === messageId);
     if (index < 0) return;
     const target = state.messages[index];
@@ -1964,10 +2124,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     const previous = state.messages;
     const next = [...previous.slice(0, index), ...previous.slice(end)];
-    set({ messages: next, error: null, errorCode: null });
+    const fullWindow = { messageStart: 0, hasMoreBefore: false };
+    cacheSessionTranscript(sessionId, next, fullWindow);
+    set((current) => ({
+      messages: next,
+      sessionHistory: { ...current.sessionHistory, [sessionId]: fullWindow },
+      error: null,
+      errorCode: null,
+    }));
     try {
       await api.replaceSessionMessages(sessionId, next);
     } catch (e) {
+      cacheSessionTranscript(sessionId, previous, fullWindow);
       set((s) => ({
         messages: s.activeSessionId === sessionId ? previous : s.messages,
         error: e instanceof Error ? e.message : String(e),
@@ -2054,7 +2222,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         sessionId,
       ),
     }));
-    const state = get();
+    let state = get();
     if (state.activeSessionId !== sessionId) {
       submittedDraft?.resolveAbort?.(false);
       submittedComposerDrafts.delete(sessionId);
@@ -2063,7 +2231,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
       return;
     }
-    const messages = state.messages;
+    let messages = state.messages;
+    if (state.sessionHistory[sessionId]?.hasMoreBefore) {
+      const fullMessages = await loadFullSessionMessages(sessionId);
+      if (!fullMessages || get().activeSessionId !== sessionId) {
+        submittedDraft?.resolveAbort?.(false);
+        submittedComposerDrafts.delete(sessionId);
+        return;
+      }
+      set((current) =>
+        current.activeSessionId === sessionId
+          ? {
+              messages: fullMessages,
+              sessionHistory: {
+                ...current.sessionHistory,
+                [sessionId]: { messageStart: 0, hasMoreBefore: false },
+              },
+            }
+          : {},
+      );
+      state = get();
+      messages = state.messages;
+    }
     const smartStop = resolveComposerSmartStop(messages, submittedDraft);
     if (smartStop.kind === "restore") {
       // Nothing came back yet — undo the send: pull the prompt into the
@@ -2342,6 +2531,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     await api.deleteSession(id);
     pendingSessionConfigurations.delete(id);
     sessionTranscriptCache.delete(id);
+    sessionHistoryCache.delete(id);
+    sessionOlderLoads.delete(id);
     if (get().activeSessionId === id) get().resetWorkPanelContext();
     set((state) => {
       const sessionMeta = { ...state.sessionMeta };
@@ -2363,6 +2554,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const pendingPlans = withoutRecordKey(state.pendingPlans, id);
       const planCheckpoints = withoutRecordKey(state.planCheckpoints, id);
       const sessionCompactions = withoutRecordKey(state.sessionCompactions, id);
+      const sessionHistory = withoutRecordKey(state.sessionHistory, id);
       const retainedNav = state.navStack.filter(
         (entry) => entry.sessionId !== id,
       );
@@ -2388,6 +2580,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         pendingPlans,
         planCheckpoints,
         sessionCompactions,
+        sessionHistory,
         navStack,
         navIndex: Math.min(state.navIndex, navStack.length - 1),
       };
@@ -3708,6 +3901,9 @@ async function persistSessionAndSelect(
   const detail = await api.getSession(created.session.id);
   if (!navigationIntentIsCurrent(active)) return null;
   const sessionId = created.session.id;
+  const initialMessages = detail.session?.messages ?? [];
+  const initialHistoryWindow = { messageStart: 0, hasMoreBefore: false };
+  cacheSessionTranscript(sessionId, initialMessages, initialHistoryWindow);
   useAppStore.setState((s) => {
     const stack = s.navStack.slice(0, s.navIndex + 1);
     const entry = { page: "chat" as const, sessionId };
@@ -3716,7 +3912,11 @@ async function persistSessionAndSelect(
       ...switchWorkPanelSession(s, sessionId),
       activeSessionId: sessionId,
       draftConfiguration: null,
-      messages: detail.session?.messages ?? [],
+      messages: initialMessages,
+      sessionHistory: {
+        ...s.sessionHistory,
+        [sessionId]: initialHistoryWindow,
+      },
       page: "chat" as const,
       planningStates: {
         ...s.planningStates,

@@ -146,6 +146,15 @@ function normalizeSessionDetail(detail: SessionDetail | null): SessionDetail | n
     : null;
 }
 
+export type SessionHistoryReadOptions = {
+  /** Return the newest page ending before this zero-based message offset. */
+  messageBefore?: number;
+  /** Maximum number of messages in the returned page. */
+  messageLimit?: number;
+  /** Maximum characters per displayed message/value field. */
+  contentLimit?: number;
+};
+
 export function normalizeSettings(settings: AppSettings): AppSettings {
   return {
     ...settings,
@@ -259,8 +268,11 @@ export const api = {
       title,
       throughMessageId,
     }).then((result) => ({ ...result, session: normalizeSessionDetail(result.session)! })),
-  getSession: (id: string) =>
-    invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, id).then((result) => ({
+  getSession: (id: string, options?: SessionHistoryReadOptions) =>
+    invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, {
+      id,
+      ...(options ?? {}),
+    }).then((result) => ({
       ...result,
       session: normalizeSessionDetail(result.session),
     })),

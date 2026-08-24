@@ -354,6 +354,33 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Source-level regression covered; full visual scenario Draft
 
+#### E2E-011g: Open large and long sessions through bounded transcript windows
+
+- **Preconditions**: A session contains a message with at least 50 MB of text
+  or tool output and enough additional messages to span several transcript
+  pages; a second session contains a long ordinary conversation.
+- **Steps**: 1) Open each session from the sidebar while recording the first
+  visible transcript frame and renderer responsiveness. 2) Scroll to the top
+  of the transcript. 3) Repeat the open/close cycle after the session has been
+  cached. 4) Inspect the host request/response or test fixture for the session
+  read window.
+- **Expected**: Opening paints the newest bounded page without transferring
+  the complete 50 MB value to the renderer. The large value is visibly marked
+  as truncated for display while the transcript and model-facing read remain
+  lossless. Reaching the top loads older pages incrementally and preserves the
+  viewport position; the final page reports no older history. Reopening a long
+  session reuses the bounded cache and does not synchronously construct every
+  historical row before the latest messages become usable. Edit, delete,
+  revision, and Stop operations rehydrate the full transcript before any
+  rewrite, so older messages are never lost because only a window was visible.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/04-data-storage.md`, `03-runtime/06-host-rpc-protocol.md`,
+  ADR 0120
+- **Acceptance**: C (session open and scroll), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Source-level regression covered; full large-fixture Electron
+  journey Draft
+
 #### E2E-011a: New session while another session is still streaming
 
 - **Preconditions**: Provider configured; session A is streaming a long

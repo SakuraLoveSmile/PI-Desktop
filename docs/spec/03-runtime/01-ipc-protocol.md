@@ -596,7 +596,11 @@ type ToolTokenUsage = {
 };
 
 type SessionDetail = SessionSummary & {
- messages: UiMessage[];
+  messages: UiMessage[];
+  /** Zero-based start offset when the renderer received a bounded page. */
+  messageStart?: number;
+  /** True when an older page can be requested with session.get. */
+  hasMoreBefore?: boolean;
 };
 ```
 
@@ -647,7 +651,11 @@ Minimal interface:
 - `session/list`
 - `session/create`
 - `session/fork({ sessionId, title?, throughMessageId? }) -> { session: SessionDetail }`
-- `session/get`
+- `session/get({ id, messageBefore?, messageLimit?, contentLimit? })` — without
+  read-window options returns the complete UI projection; with them returns a
+  bounded newest/older page plus `messageStart` and `hasMoreBefore`. The
+  content limit applies only to display values and never changes the lossless
+  transcript or model context.
 - `session/delete`
 - `session/rename`
 - `session/importScan`

@@ -209,6 +209,7 @@ export const en = {
     sendNowPending: "Sending next",
     abort: "Stop",
     running: "Working…",
+    loadingEarlierMessages: "Loading earlier messages…",
     copy: "Copy",
     copied: "Copied",
     copyDiagramSource: "Copy diagram source",

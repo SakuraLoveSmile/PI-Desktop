@@ -134,3 +134,4 @@ Each ADR includes:
 | 0117 | Preserve the Windows taskbar entry for native minimize | Accepted |
 | 0118 | Keep queued prompts renderer-owned and stop runs at turn boundaries | Accepted |
 | 0119 | Event-driven subagent timeouts | Accepted for implementation |
+| 0120 | Bounded session history windows | Accepted |

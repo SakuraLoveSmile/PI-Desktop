@@ -207,6 +207,15 @@
   padding: 20px 28px calc(var(--composer-dock-height, 228px) + 16px);
 }
 
+.transcript-history-loading {
+  min-height: 26px;
+  box-sizing: border-box;
+  color: var(--ds-text-tertiary);
+  font-size: var(--text-sm);
+  text-align: center;
+  padding: 2px 0 12px;
+}
+
 /* Frameless Windows/Linux controls occupy the 46px titlebar band. macOS keeps
  * the absolute conversation top bar there too, so all three platforms reserve
  * the band so the first transcript row never paints under it. */
