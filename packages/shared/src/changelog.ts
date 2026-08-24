@@ -23,6 +23,14 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.10.2",
+    date: "2026-08-24",
+    highlights: [
+      "Keep chat content and the composer comfortably centered when the sidebar is collapsed.",
+      "Prepare large image attachments without loading the whole file into memory, including when replaying history.",
+    ],
+  },
+  {
     version: "0.10.1",
     date: "2026-08-24",
     highlights: [
@@ -393,6 +401,14 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.10.2",
+    date: "2026-08-24",
+    highlights: [
+      "收起侧边栏时，让聊天内容和输入框保持舒适的居中宽度。",
+      "准备大尺寸图片附件时无需将整个文件载入内存，重新加载历史记录时同样适用。",
+    ],
+  },
   {
     version: "0.10.1",
     date: "2026-08-24",
