@@ -22,7 +22,7 @@ import {
 import { createNavigationIntentController } from "../src/lib/navigation-intent.ts";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [appSource, chatSurfaceSource, composerSource, transcriptSource, cardSource, askCardSource, storeSource, browserSource] =
+const [appSource, chatSurfaceSource, composerSource, transcriptSource, cardSource, askCardSource, storeSource, browserSource, messageStyleSource] =
   await Promise.all([
     read("../src/App.tsx"),
     read("../src/components/ChatSurface.tsx"),
@@ -32,6 +32,7 @@ const [appSource, chatSurfaceSource, composerSource, transcriptSource, cardSourc
     read("../src/components/AskToolCard.tsx"),
     read("../src/stores/app-store.ts"),
     read("../src/components/workpanel/BrowserTab.tsx"),
+    read("../src/styles/messages.css"),
   ]);
 
 function permission(sessionId, requestId, extra = {}) {
@@ -155,6 +156,9 @@ test("asktool card is a stepwise, non-expiring composer question surface", () =>
   assert.match(askCardSource, /Decline all|askTool\.decline/);
   assert.match(askCardSource, /draft\.skipped/);
   assert.doesNotMatch(askCardSource, /permissionSecondsLeft|setInterval/);
+  assert.match(messageStyleSource, /\.asktool-options[\s\S]*?overflow-y:\s*auto/);
+  assert.match(messageStyleSource, /\.asktool-options[\s\S]*?max-height:\s*min\(320px,\s*36dvh\)/);
+  assert.match(messageStyleSource, /\.asktool-options[\s\S]*?overscroll-behavior-y:\s*contain/);
 });
 
 test("permission countdown uses its absolute receipt time", () => {
