@@ -145,7 +145,12 @@ transcript-file line first, index transaction second.
 - turn run row: on start + terminal `session.endTurn` update
 - notification row: same transaction as an unseen completed/error terminal
   update; never for a visible-current result or abort
-- assistant/tool messages: on message_end/tool_end
+- assistant/tool messages: on message_end/tool_end. Electron retains each
+  in-flight tool's metadata with its owning turn until the terminal event is
+  persisted; delayed cleanup is scoped to that turn so a later turn's long
+  `TaskWait` cannot lose its name, args, or duration. A completed tool row is
+  replayed through `message_end` as a renderer recovery path, allowing a
+  reload that dropped the running row to append the terminal message.
 - unanswered smart Stop: mark the turn aborted through the existing lifecycle,
   then atomically rewrite the transcript to the prefix before its root user row;
   the structured composer snapshot remains renderer-memory-only

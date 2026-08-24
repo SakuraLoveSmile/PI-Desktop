@@ -737,9 +737,19 @@ function switchWorkPanelSession(
   };
 }
 
-// tool_end events carry no tool name, and cross-session tool calls never
-// enter `messages`, so remember names from tool_start envelopes here.
-const toolNamesByCallId = new Map<string, string>();
+// Cross-session tool calls never enter `messages`, and a renderer reload can
+// lose the running row before tool_end arrives, so retain the start metadata
+// long enough to build a complete terminal row when needed.
+const toolStartsByCallId = new Map<
+  string,
+  {
+    toolName: string;
+    args: unknown;
+    createdAt: string;
+    parentToolCallId?: string;
+    agentName?: string;
+  }
+>();
 const TOOL_NAME_CACHE_LIMIT = 512;
 const providerModelLoads = new Map<string, Promise<void>>();
 const refreshedProviderModels = new Set<string>();
@@ -3126,14 +3136,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Observe tool lifecycle events before the cross-session early return so
     // review artifacts remain scoped to their originating session.
     if (event.type === "tool_start") {
-      if (toolNamesByCallId.size >= TOOL_NAME_CACHE_LIMIT) {
-        const oldest = toolNamesByCallId.keys().next().value;
-        if (oldest !== undefined) toolNamesByCallId.delete(oldest);
+      if (toolStartsByCallId.size >= TOOL_NAME_CACHE_LIMIT) {
+        const oldest = toolStartsByCallId.keys().next().value;
+        if (oldest !== undefined) toolStartsByCallId.delete(oldest);
       }
-      toolNamesByCallId.set(event.toolCallId, event.toolName);
+      toolStartsByCallId.set(event.toolCallId, {
+        toolName: event.toolName,
+        args: event.args,
+        createdAt: new Date(envelope.ts).toISOString(),
+        ...(envelope.parentToolCallId
+          ? { parentToolCallId: envelope.parentToolCallId }
+          : {}),
+        ...(envelope.agentName ? { agentName: envelope.agentName } : {}),
+      });
     } else if (event.type === "tool_end") {
-      const toolName = toolNamesByCallId.get(event.toolCallId);
-      toolNamesByCallId.delete(event.toolCallId);
+      const toolStart = toolStartsByCallId.get(event.toolCallId);
+      const toolName = toolStart?.toolName;
       set((state) => {
         const pendingPermissions = removePermissionForToolCall(
           state.pendingPermissions,
@@ -3180,6 +3198,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (envelope.sessionId !== get().activeSessionId) {
       // Cross-session events update only their scoped state. They never
       // replace the visible transcript, page, project, or focus.
+      if (event.type === "tool_end") {
+        toolStartsByCallId.delete(event.toolCallId);
+      }
       if (event.type === "tool_permission_request") {
         set((state) => ({
           pendingPermissions: enqueuePermission(state.pendingPermissions, {
@@ -3301,7 +3322,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               id: event.toolCallId,
               role: "tool",
               content: "",
-              createdAt: new Date().toISOString(),
+              createdAt: new Date(envelope.ts).toISOString(),
               toolCallId: event.toolCallId,
               toolName: event.toolName,
               toolArgs: event.args,
@@ -3336,29 +3357,56 @@ export const useAppStore = create<AppState>((set, get) => ({
         }));
         break;
       case "tool_end":
-        set((s) => ({
-          messages: s.messages.map((m) =>
-            m.toolCallId === event.toolCallId
-              ? {
-                  ...m,
-                  toolCompletedAt: new Date(envelope.ts).toISOString(),
-                  toolDurationMs: Math.max(
-                    0,
-                    envelope.ts - (Date.parse(m.createdAt) || envelope.ts),
-                  ),
-                  toolStatus: event.isError ? "error" : "success",
-                  toolResult: event.result,
-                  ...(event.toolUsage ? { toolUsage: event.toolUsage } : {}),
-                  content:
-                    typeof event.result === "string"
-                      ? event.result
-                      : JSON.stringify(event.result, null, 2),
-                  status: "complete",
-                  isError: event.isError,
-                }
-              : m,
-          ),
-        }));
+        set((s) => {
+          const toolStart = toolStartsByCallId.get(event.toolCallId);
+          toolStartsByCallId.delete(event.toolCallId);
+          const completedAt = new Date(envelope.ts).toISOString();
+          const existing = s.messages.some(
+            (message) => message.toolCallId === event.toolCallId,
+          );
+          const completed = {
+            id: event.toolCallId,
+            role: "tool" as const,
+            content:
+              typeof event.result === "string"
+                ? event.result
+                : JSON.stringify(event.result, null, 2),
+            createdAt: toolStart?.createdAt ?? completedAt,
+            toolCallId: event.toolCallId,
+            ...(toolStart?.toolName
+              ? { toolName: toolStart.toolName }
+              : {}),
+            ...(toolStart ? { toolArgs: toolStart.args } : {}),
+            ...(toolStart?.parentToolCallId
+              ? { parentToolCallId: toolStart.parentToolCallId }
+              : {}),
+            ...(toolStart?.agentName ? { agentName: toolStart.agentName } : {}),
+            toolCompletedAt: completedAt,
+            toolDurationMs: toolStart
+              ? Math.max(0, envelope.ts - Date.parse(toolStart.createdAt))
+              : 0,
+            toolStatus: event.isError ? ("error" as const) : ("success" as const),
+            toolResult: event.result,
+            ...(event.toolUsage ? { toolUsage: event.toolUsage } : {}),
+            status: "complete" as const,
+            isError: event.isError,
+          } satisfies UiMessage;
+          return {
+            messages: existing
+              ? s.messages.map((message) =>
+                  message.toolCallId === event.toolCallId
+                    ? {
+                        ...message,
+                        ...completed,
+                        toolName: message.toolName ?? completed.toolName,
+                        toolArgs: message.toolArgs ?? completed.toolArgs,
+                        createdAt: message.createdAt || completed.createdAt,
+                      }
+                    : message,
+                )
+              : [...s.messages, completed],
+          };
+        });
         break;
       case "tool_permission_request":
         set((state) => ({

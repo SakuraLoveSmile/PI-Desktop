@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const {
+  collectDelegationStatuses,
   collectDelegationTimings,
   isDelegationActivityItem,
   subagentOutcome,
@@ -130,6 +131,28 @@ test("uses delegation lifecycle timestamps instead of the immediate Task duratio
     startedAt: 1_000,
     completedAt: 4_250,
   });
+});
+
+test("reads settled delegation status from a persisted TaskWait result", () => {
+  const statuses = collectDelegationStatuses([
+    task("running", "success", "running"),
+    lifecycle("TaskWait", {
+      delegations: [
+        {
+          delegationId: "running",
+          status: "completed",
+          startedAt: 1_000,
+          completedAt: 4_250,
+        },
+      ],
+    }),
+  ]);
+
+  assert.equal(statuses.get("running"), "completed");
+  assert.equal(
+    subagentOutcome(task("running", "success", "running").message, statuses),
+    "completed",
+  );
 });
 
 test("summarizes partial fan-out without deduplicating repeated agent names", () => {

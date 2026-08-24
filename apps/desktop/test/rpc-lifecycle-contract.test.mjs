@@ -114,6 +114,27 @@ test("turn ownership and execution queue wake only after durable turn settlement
   assert.match(finishSource, /for \(const resolve of waiters\) resolve\(\)/);
 });
 
+test("late tool metadata cleanup is scoped to the turn that started the call", () => {
+  const finishStart = mainSource.indexOf("function finishTurn(");
+  const finishEnd = mainSource.indexOf("function isRecord", finishStart);
+  const finishSource = mainSource.slice(finishStart, finishEnd);
+
+  assert.match(mainSource, /turnId\?: string;/);
+  assert.match(mainSource, /turnId: envelope\.turnId \?\? turnId/);
+  assert.match(
+    finishSource,
+    /key\.startsWith\(toolPrefix\) && call\.turnId === turnId/,
+  );
+  assert.match(
+    mainSource,
+    /turnId: started\?\.turnId \?\? envelope\.turnId \?\? turnId/,
+  );
+  assert.match(
+    mainSource,
+    /event: \{ type: "message_end", message: persistedMessage \}/,
+  );
+});
+
 test("app quit waits for one idempotent teardown before allowing the follow-up quit", () => {
   const shutdownStart = mainSource.indexOf('app.on("before-quit"');
   const shutdownSource = mainSource.slice(shutdownStart);

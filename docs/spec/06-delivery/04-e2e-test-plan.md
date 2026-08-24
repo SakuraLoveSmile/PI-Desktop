@@ -6073,7 +6073,14 @@ This test plan spec is accepted when:
      both nodes once TaskWait returns, not stuck at "running", and that each
      node shows a non-zero runtime duration derived from the delegation
      lifecycle timestamps rather than the immediate `Task` start call.
-  9. Edit `~/.agents/subagents/readonly.md` to declare `permission: auto` and reload the
+  9. Complete one turn, start a second turn within the delayed tool-metadata
+     cleanup window, and keep its `TaskWait` open across that window in the
+     deterministic fixture; confirm the completed row still has `TaskWait`,
+     its arguments, and a non-zero duration, and that both delegation nodes
+     settle to "completed". Reload the session before the terminal event and
+     confirm the terminal event appends the missing row instead of leaving a
+     permanent running card.
+  10. Edit `~/.agents/subagents/readonly.md` to declare `permission: auto` and reload the
      catalog; confirm the definition still loads but carries a warning, and
      that its delegate still resolves under the session's effective mode (a
      `Write` inside the workspace still raises a permission card).
@@ -6084,17 +6091,19 @@ This test plan spec is accepted when:
   paths without a duplicate authorization prompt while `ask` and
   `accept-edits` retain their approval boundaries; a global definition's
   declared scope is dropped; the per-session running cap of 10 is enforced; no
-  delegate outlives its turn; reloaded transcripts keep their delegation
-  topology.
+  delegate outlives its turn; a cross-turn `TaskWait` keeps its persisted tool
+  metadata; a renderer reload cannot drop its terminal row; reloaded
+  transcripts keep their delegation topology.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f/§5f.1/§7.1,
+  `03-runtime/10-session-state-machine.md` §4,
   `03-runtime/03-tools-and-permissions.md` §10.2, `08-meta/decisions-log.md`
   (D242 amends D231), ADR 0089 and ADR 0100
 - **Acceptance**: C (conversation), E (tools & permissions), F (persistence),
   Security, Quality
 - **Milestone**: M6+
 - **Status**: Draft (unit coverage in `packages/agent-runtime`
-  `runtime.test.ts` subagent suite and host-core `rpc/mod.rs` delegate-scope
-  tests; desktop journey pending)
+  `runtime.test.ts` subagent suite, desktop lifecycle contracts, and host-core
+  `rpc/mod.rs` delegate-scope tests; full desktop journey pending)
 
 #### E2E-155: Subagent timeout policy preserves active work and reports expiry
 

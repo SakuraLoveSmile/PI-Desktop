@@ -1823,6 +1823,7 @@ const activeToolCalls = new Map<
     toolName: string;
     args: unknown;
     createdAt: string;
+    turnId?: string;
     parentToolCallId?: string;
     agentName?: string;
   }
@@ -4062,7 +4063,17 @@ function wireSidecar(s: AgentSidecar) {
         });
       }
       sendToRenderer(IPC.event.agentMessage, params);
-      persistAgentEvent(envelope);
+      const persistedMessage = persistAgentEvent(envelope);
+      if (persistedMessage) {
+        // The renderer may have reloaded while a long-running tool was open.
+        // Replay the completed row through the existing message_end contract so
+        // it can append the row when the original tool_start is no longer in
+        // the in-memory transcript.
+        sendToRenderer(IPC.event.agentMessage, {
+          ...envelope,
+          event: { type: "message_end", message: persistedMessage },
+        } satisfies AgentEventEnvelope);
+      }
     }
     // permissions.request reaches the renderer once, via wireHost; the
     // sidecar no longer relays it (agent-sidecar.setHost filters it out).
@@ -4326,14 +4337,20 @@ function finishTurn(
       }
     }
 
-    const toolPrefix = `${sessionId}:`;
-    // A host tool can finish shortly after the turn is aborted. Keep metadata
-    // long enough for a late tool_end to persist a readable historical row.
-    setTimeout(() => {
-      for (const key of activeToolCalls.keys()) {
-        if (key.startsWith(toolPrefix)) activeToolCalls.delete(key);
-      }
-    }, 5 * 60 * 1000).unref();
+    if (turnId) {
+      const toolPrefix = `${sessionId}:`;
+      // A host tool can finish shortly after the turn is aborted. Keep metadata
+      // long enough for a late tool_end to persist a readable historical row,
+      // but never clear a newer turn's long-running tools (TaskWait may span
+      // this window).
+      setTimeout(() => {
+        for (const [key, call] of activeToolCalls) {
+          if (key.startsWith(toolPrefix) && call.turnId === turnId) {
+            activeToolCalls.delete(key);
+          }
+        }
+      }, 5 * 60 * 1000).unref();
+    }
   })();
 
   turnFinalizations.set(sessionId, finalization);
@@ -4636,7 +4653,7 @@ function subagentTagged(message: UiMessage, envelope: AgentEventEnvelope): UiMes
   };
 }
 
-function persistAgentEvent(envelope: AgentEventEnvelope) {
+function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined {
   const event = envelope.event;
   const turnId = activeTurns.get(envelope.sessionId);
   const executionId = (() => {
@@ -4664,6 +4681,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
       toolName: event.toolName,
       args: event.args,
       createdAt: new Date(envelope.ts).toISOString(),
+      turnId: envelope.turnId ?? turnId,
       ...(envelope.parentToolCallId
         ? { parentToolCallId: envelope.parentToolCallId }
         : {}),
@@ -4787,37 +4805,40 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
     const key = activeToolCallKey(envelope.sessionId, event.toolCallId);
     const started = activeToolCalls.get(key);
     activeToolCalls.delete(key);
+    const message: UiMessage = {
+      id: event.toolCallId,
+      role: "tool",
+      content:
+        typeof event.result === "string"
+          ? event.result
+          : JSON.stringify(event.result),
+      createdAt: started?.createdAt ?? new Date(envelope.ts).toISOString(),
+      toolCallId: event.toolCallId,
+      toolName: started?.toolName,
+      toolArgs: started?.args,
+      toolStatus: event.isError ? "error" : "success",
+      toolResult: event.result,
+      ...(event.toolUsage ? { toolUsage: event.toolUsage } : {}),
+      toolCompletedAt: new Date(envelope.ts).toISOString(),
+      toolDurationMs: started
+        ? Math.max(0, envelope.ts - Date.parse(started.createdAt))
+        : undefined,
+      isError: event.isError,
+      status: "complete",
+      ...(started?.parentToolCallId
+        ? { parentToolCallId: started.parentToolCallId }
+        : {}),
+      ...(started?.agentName ? { agentName: started.agentName } : {}),
+    };
     void persistenceOutbox
       .enqueue(
         {
           key: `message:${envelope.sessionId}:${event.toolCallId}`,
           sessionId: envelope.sessionId,
-          message: {
-            id: event.toolCallId,
-            role: "tool",
-            content:
-              typeof event.result === "string"
-                ? event.result
-                : JSON.stringify(event.result),
-            createdAt: started?.createdAt ?? new Date(envelope.ts).toISOString(),
-            toolCallId: event.toolCallId,
-            toolName: started?.toolName,
-            toolArgs: started?.args,
-            toolStatus: event.isError ? "error" : "success",
-            toolResult: event.result,
-            ...(event.toolUsage ? { toolUsage: event.toolUsage } : {}),
-            toolCompletedAt: new Date(envelope.ts).toISOString(),
-            toolDurationMs: started
-              ? Math.max(0, envelope.ts - Date.parse(started.createdAt))
-              : undefined,
-            isError: event.isError,
-            status: "complete",
-            ...(started?.parentToolCallId
-              ? { parentToolCallId: started.parentToolCallId }
-              : {}),
-            ...(started?.agentName ? { agentName: started.agentName } : {}),
-          },
-          turnId,
+          message,
+          // A late tool_end belongs to the turn that started the tool, even if
+          // another prompt has already opened a newer turn for this session.
+          turnId: started?.turnId ?? envelope.turnId ?? turnId,
         },
         () => host,
       )
@@ -4828,6 +4849,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
           data: String(e),
         }),
       );
+    return message;
   }
 }
 

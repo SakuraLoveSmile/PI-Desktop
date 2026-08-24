@@ -65,6 +65,17 @@ test("a live delegate row keeps the attribution its stream carried", () => {
   assert.match(storeSource, /envelope\.agentName \? \{ agentName: envelope\.agentName \}/);
 });
 
+test("a terminal tool event repairs a row lost during renderer reload", () => {
+  assert.match(storeSource, /const toolStartsByCallId = new Map/);
+  assert.match(storeSource, /const existing = s\.messages\.some\(/);
+  assert.match(
+    storeSource,
+    /messages: existing\s*\? s\.messages\.map\([\s\S]*?: \[\.\.\.s\.messages, completed\]/,
+  );
+  assert.match(storeSource, /toolDurationMs: toolStart\s*\n\s*\? Math\.max/);
+  assert.match(storeSource, /toolName: message\.toolName \?\? completed\.toolName/);
+});
+
 test("delegate rows render under their Task row, one level in", () => {
   assert.match(transcriptSource, /delegate\?: SubagentRun/);
   assert.match(
