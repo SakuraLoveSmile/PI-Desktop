@@ -457,6 +457,30 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Source-level regression covered; full UI scenario Draft
 
+#### E2E-011f: Send while running queues per-session prompts and supports Send now
+
+- **Preconditions**: Provider configured; session A can produce a delayed
+  response with at least one completed tool batch; session B exists and is
+  idle.
+- **Steps**: 1) Send a long-running prompt in A. 2) While A is running, send
+  two more prompts and inspect the queue above the composer. 3) Remove the
+  second queued row and switch to B. 4) Send a prompt in B, then return to A
+  before either run completes. 5) Choose Send now on A's remaining queued row.
+  6) Observe A through the current tool/reply boundary and then the next turn.
+  7) Start another run in A, queue a prompt, press Stop, and inspect the queue.
+- **Expected**: Send and Stop coexist while a run is active. A's two prompts
+  appear in FIFO order, the removed row never sends, and B's queue remains
+  independent. Send now requests a graceful stop: the current batch completes
+  with a normal `agent_end`/completed turn, then the selected row starts before
+  any remaining A rows without `AGENT_BUSY`. Immediate Stop aborts the current
+  reply and preserves A's queued row; switching sessions preserves both queues.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.2),
+  `04-ux/08-component-spec.md` (§11),
+  `04-ux/09-interaction-patterns.md` (§3.4), ADR 0118
+- **Acceptance**: C (chat, stream, and session isolation), Quality
+- **Milestone**: M6+
+- **Status**: Source-level regression covered; full UI scenario Draft
+
 ### Conversation Top Bar
 
 #### E2E-087: Conversation top bar renders on the chat route

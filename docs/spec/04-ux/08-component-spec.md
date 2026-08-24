@@ -1650,7 +1650,7 @@ reasoning-level control.
 ```text
 +----------------------------------------------------------+
 | [Agent/Plan/Goal] [permission mode]          | [model · reasoning ▾] |
-| ──────────────────────────────────────────── | [⏹ Abort / → Send]    |
+| queued messages (optional; one row per item) | [⏹ Stop] [→ Send]     |
 | textarea (auto-growing, 1 line → max 7)                         |
 | placeholder: welcome ↔ "Type / to invoke a command"            |
 | (EN/zh-CN welcome + hint pairs; home uses its own welcome key)   |
@@ -1683,7 +1683,7 @@ reasoning-level control.
   Goal displays the localized Auto label as a disabled, non-opening chip while
   the approval card remains the separate place for choosing execution policy.
 - The right toolbar owns one combined model × reasoning-level chip immediately
-  before Send/Abort. It shows Sparkles, the current model name, and the current
+  before Stop/Send. It shows Sparkles, the current model name, and the current
   reasoning level separated by `·`; `off` dims Sparkles and omits the level text.
 - The combined chip opens one anchored menu above itself. The menu starts with
   only Model and Reasoning level entries, each showing its current value and a
@@ -1715,6 +1715,10 @@ reasoning-level control.
   first, then the hint copy every 4 seconds in a loop. The visible copy is a
   keyed opacity fade while the native `placeholder` value remains in the
   textarea for assistive technology.
+- Queue rows: while a session is running, each accepted prompt is held in a
+  renderer-owned FIFO list above the shell. Rows show the visible prompt (or
+  file-reference names), expose independent Remove and Send now actions, and
+  increase the dock height measured by `--composer-dock-height`.
 
 ### 11.4 States
 
@@ -1725,12 +1729,12 @@ reasoning-level control.
 | Home/new-session initialization | textarea and mode/model × reasoning/permission triggers remain available while the durable empty session is loading; the session row is already present and the first configuration selection applies to that session | Configure the session, then send |
 | New session (reasoning model) | Combined model × reasoning chip shows the model and its highest published level | User may select any published level, including Off when supported |
 | New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Abort hidden unless the destination session itself is running |
-| Running | textarea and mode/model × reasoning/permission controls remain editable for the next turn; abort button visible | Abort active, Send hidden; configuration is queued |
-| Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Abort active, Send hidden |
+| Running | textarea and mode/model × reasoning/permission controls remain editable for the next turn; Stop and Send buttons are both visible | Stop active, Send active; submitted prompts become queued |
+| Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Stop active, Send active |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible | inspect, send, or submit a contract |
 | Plan / Goal / awaiting approval | approval surface shows only the title and artifact opener for the exact `.pi/<kind>/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
-| Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | abort; Send hidden; no replay control |
+| Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | Stop; Send queues the next prompt; no replay control |
 | Plan / Goal / planning after rejected, expired, or interrupted proposal | contract chip remains visible and editable | send a later prompt; submit a new contract; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
@@ -1744,12 +1748,21 @@ reasoning-level control.
   releases the pause so rotation resumes even if focus remains after send;
   switching between home and session views resets to that view's welcome copy.
 - Escape: when textarea focused, clears input or blurs (not abort)
-- Abort: stops the running turn and cancels pending permission. Before any
+- Send while running: clears the current draft and appends one FIFO row to the
+  active session's in-memory queue. The row is sent as a new normal prompt only
+  after the current run reaches `agent_end`; a different session's queue is not
+  affected by switching sessions.
+- Send now: moves the selected row to the head, requests `agent/stop`, and
+  releases it after the current reply/tool batch completes normally. It then
+  starts before the remaining FIFO rows. When idle, Send now sends immediately.
+- Stop: stops the running turn and cancels pending permission. Before any
   assistant text, thinking, or tool row begins, it also removes the just-sent
   user row and restores the pre-serialization composer draft. Ordinary text
   returns to the textarea and file references return as leaf-name chips; their
   canonical paths never become textarea text. After a reply begins, Abort keeps
   the partial transcript and restores no draft.
+- Stop never clears queued prompts. Removing a row is explicit, and queue state
+  is renderer-local and intentionally not persisted across restart.
 - `turn_end` is not an idle signal. Send and host persistence remain blocked
   through subsequent tool turns and blocking automatic checkpoint generation
   until `agent_end` or `error`; the draft and runtime selectors stay editable
@@ -1828,6 +1841,8 @@ reasoning-level control.
 - Editable text controls never enable browser spellcheck or autocorrect (D145)
 - Send button: `aria-label="Send message"`
 - Abort button: `aria-label="Abort active turn"`
+- Queued prompt list: `aria-label="Queued messages"`; each row has an
+  accessible Remove button and a Send now button.
 - Disabled send: `aria-disabled="true"` with tooltip explanation
 - The combined model × reasoning chip exposes `aria-haspopup="menu"` and
   `aria-expanded`. Its root entries use `role="menuitem"`; model and reasoning

@@ -46,12 +46,20 @@ crates/host-core (tool execution + permissions)
 ```ts
 interface AgentRuntime {
  prompt(input: PromptInput): Promise<{ turnId: string }>
+ requestGracefulStop(): { requested: boolean }
  abort(turnId?: string): Promise<void>
  getStatus(): RuntimeStatus
  dispose(): Promise<void>
  subscribe(handler: (event: NormalizedAgentEvent) => void): () => void
 }
 ```
+
+`requestGracefulStop()` is a one-shot request for the active runtime. The pi
+loop evaluates it after `turn_end`, once the current assistant response and
+tool batch have completed, and emits a normal `agent_end` before another model
+request. It does not cancel an active provider stream or running tool. An idle
+runtime returns `{ requested: false }`; immediate `abort()` remains the
+separate cancellation path.
 
 ## 5. Prompt flow
 
@@ -62,7 +70,8 @@ interface AgentRuntime {
    clamp the durable session thinking level to pi's nearest supported value;
    an unknown free-form id uses the explicit generic fallback
 4. validate model/secret availability
-5. reject if session busy
+5. reject if session busy; the renderer queues a user-facing next prompt and
+   does not call this path until the current session reaches `agent_end`
 6. validate structured attachments at Electron main's session-bound path
    boundary, persist image bytes by SHA-256, and retain only attachment refs in
    the durable user message

@@ -16,7 +16,7 @@ Principles:
 | Domain | Description |
 |---|---|
 | `app` | App info, health checks |
-| `agent` | Conversation, abort, status, and interactive asktool resolution |
+| `agent` | Conversation, queued-send stop/abort, status, and interactive asktool resolution |
 | `plan` | Plan proposal listing, resolution, and change events |
 | `session` | Session CRUD / history |
 | `settings` | Config read/write |
@@ -44,6 +44,7 @@ event: pi-desktop/<domain>/event/<name>
 Examples:
 
 - `pi-desktop/agent/prompt`
+- `pi-desktop/agent/stop`
 - `pi-desktop/agent/abort`
 - `pi-desktop/agent/event/message`
 - `pi-desktop/agent/askTool/resolve`
@@ -165,7 +166,32 @@ session-bound attachment/scratch roots when history is rebuilt; oversized or
 unavailable images remain path fallbacks. This keeps renderer, main, sidecar,
 pi-ai, and host persistence on one capability-aware contract.
 
-### 5.2 abort
+### 5.2 stop at the next turn boundary
+
+```ts
+type AgentStopRequest = {
+ sessionId: string;
+ turnId?: string;
+};
+
+type AgentStopResponse = {
+ requested: boolean;
+};
+```
+
+`pi-desktop/agent/stop` requests a graceful stop for the active runtime. The
+sidecar evaluates the one-shot request after the current assistant response and
+completed tool batch, at the same boundary where it would otherwise start the
+next model request. The current durable turn then emits `agent_end` and is
+finalized as `completed`; the request does not abort the provider stream,
+cancel running tools, or open a second concurrent turn. An idle session returns
+`requested: false`.
+
+The renderer owns the removable, in-memory queued-prompt list per session. It
+calls this channel only for a queued item's **Send now** action and releases
+that item through the ordinary `agent/prompt` flow after the terminal event.
+
+### 5.3 abort
 
 ```ts
 type AgentAbortRequest = {
@@ -179,7 +205,7 @@ If renderer smart Stop undoes an unanswered user turn, restoration comes from
 the renderer's session/turn-scoped pre-serialization snapshot; the existing
 transcript rewrite removes the sent row without changing protocol version.
 
-### 5.3 compact (protocol v9)
+### 5.4 compact (protocol v9)
 
 ```ts
 type AgentCompactRequest = { sessionId: string };
@@ -191,7 +217,7 @@ session. It is available even when automatic context protection is disabled.
 Missing provider/session configuration fails through the normal `AppError`
 envelope; an active turn or compaction returns `AGENT_BUSY`.
 
-### 5.4 Plan and Goal checkpoint approval
+### 5.5 Plan and Goal checkpoint approval
 
 Contract approval is separate from a tool permission. Plan and Goal share this
 whole surface; `kind` is the only discriminator (**D198**). The renderer receives

@@ -544,6 +544,21 @@ may be retained while exactly one workspace supplies the visible shell context.
 - A partial aborted message gets a muted "(aborted)" suffix. Only the
   unanswered smart-stop branch deletes its just-sent user row.
 
+### 3.4 Queued send
+
+- While a session is running, Send remains enabled alongside Abort. Accepted
+  prompts clear the composer and append to that session's renderer-local FIFO
+  queue; session switching never moves or clears another session's queue.
+- The queue renders above the composer. Each row has an independently
+  keyboard-reachable Remove action and a Send now action.
+- Send now moves its row to the head and requests the new `agent/stop` channel.
+  The current assistant response and completed tool batch finish normally;
+  after `agent_end`, the promoted row is dispatched through the normal
+  `agent/prompt` flow before the remaining rows. An idle Send now dispatches
+  immediately.
+- Abort remains immediate and never clears the queue. Queued prompts are
+  intentionally lost on application restart because the queue is not durable.
+
 ## 3A. Context checkpoint lifecycle
 
 - `turn_end` marks one completed model/tool turn and may be followed by another
@@ -1019,6 +1034,8 @@ This does not prevent state changes — it makes them instant.
 1. All keyboard shortcuts in §1 are functional and do not conflict with system shortcuts
 2. Enter sends message; Shift+Enter inserts newline in composer
 3. Abort immediately cancels running turn and pending permissions without confirmation dialog
+3a. Send stays enabled while running, queues prompts per session, and Send now
+    finishes the current boundary before releasing its prioritized prompt
 4. Long content (>50 lines for messages, >10 for args, >20 for results) is collapsed by default with expand link
 5. Tool results exceeding 256KB/4000 lines show truncation marker per D033
 6. Permission interrupt inserts inline card, disables composer, shows countdown, and re-enables after resolution
