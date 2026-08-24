@@ -15,6 +15,14 @@ const hookSource = await readFile(
   new URL("../src/components/settings/useProviderModels.ts", import.meta.url),
   "utf8",
 );
+const formSource = await readFile(
+  new URL("../src/components/settings/provider-form.ts", import.meta.url),
+  "utf8",
+);
+const dialogSource = await readFile(
+  new URL("../src/components/settings/ProviderDialog.tsx", import.meta.url),
+  "utf8",
+);
 const styles = await loadStyles();
 
 test("model configuration surfaces pi-ai vision and reasoning state per model", () => {
@@ -30,6 +38,15 @@ test("model discovery also probes no-auth and local endpoints", () => {
   assert.match(hookSource, /new URL\(baseUrl\.trim\(\)\)/);
   assert.match(hookSource, /Discovery is also useful for local\/no-auth gateways/);
   assert.doesNotMatch(hookSource, /apiKey\.trim\(\)\.length > 0/);
+});
+
+test("OpenCode Go keeps the provider identity fixed while accepting a key", () => {
+  assert.match(formSource, /OPENCODE_GO_API_STYLE/);
+  assert.match(formSource, /OPENCODE_GO_BASE_URL/);
+  assert.match(formSource, /OPENCODE_GO_NAME/);
+  assert.match(dialogSource, /readOnly=\{isOpenCodeGo\}/);
+  assert.match(dialogSource, /apiStyleOpenCodeGoFixed/);
+  assert.match(dialogSource, /autoFocus=\{isOpenCodeGo\}/);
 });
 
 test("model picker stays open while its option list scrolls", () => {

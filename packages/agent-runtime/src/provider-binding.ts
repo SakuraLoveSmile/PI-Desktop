@@ -22,7 +22,11 @@ import { openAICodexResponsesApi } from "@earendil-works/pi-ai/api/openai-codex-
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
 import { piMessagesApi } from "@earendil-works/pi-ai/api/pi-messages.lazy";
-import type { ThinkingLevel } from "@pi-desktop/shared";
+import {
+  OPENCODE_GO_API_STYLE,
+  OPENCODE_GO_BASE_URL,
+  type ThinkingLevel,
+} from "@pi-desktop/shared";
 import type { PiModelConfig } from "./thinking-level.js";
 
 export type RuntimeProviderConfig = {
@@ -62,6 +66,12 @@ export type ApiBinding = {
  * back to OpenAI Chat Completions, the pre-apiStyle behavior. */
 export function apiBindingForStyle(apiStyle?: string): ApiBinding {
   switch (apiStyle) {
+    case OPENCODE_GO_API_STYLE:
+      return {
+        api: "openai-completions",
+        adapter: openAICompletionsApi,
+        defaultBaseUrl: OPENCODE_GO_BASE_URL,
+      };
     case "responses":
       return {
         api: "openai-responses",

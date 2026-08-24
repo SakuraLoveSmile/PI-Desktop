@@ -1,4 +1,4 @@
-import type { ThinkingLevel } from "@pi-desktop/shared";
+import { OPENCODE_GO_API_STYLE, type ThinkingLevel } from "@pi-desktop/shared";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 export {
@@ -37,6 +37,8 @@ function getBuiltinCatalog() {
 /** Map a stored provider apiStyle onto the pi-ai wire api (runtime binding). */
 function wireApiForStyle(apiStyle?: string): string {
   switch (apiStyle) {
+    case OPENCODE_GO_API_STYLE:
+      return "openai-completions";
     case "responses":
       return "openai-responses";
     case "openai_codex_responses":

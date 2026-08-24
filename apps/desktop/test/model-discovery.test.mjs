@@ -77,3 +77,13 @@ test("requests use per-style endpoints and auth headers", () => {
   assert.match(google.url, /key=g-key/);
   assert.deepEqual(google.headers, {});
 });
+
+test("OpenCode Go uses its fixed OpenAI-compatible model endpoint", () => {
+  const request = modelListRequest({
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    apiKey: "go-key",
+    apiStyle: "opencode_go",
+  });
+  assert.equal(request.url, "https://opencode.ai/zen/go/v1/models");
+  assert.equal(request.headers.Authorization, "Bearer go-key");
+});

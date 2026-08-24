@@ -684,6 +684,8 @@ export const en = {
     apiStyle: "API format",
     apiStyleDesc: "The request format this service expects.",
     apiStyleChatCompletions: "OpenAI Chat Completions",
+    apiStyleOpenCodeGo: "OpenCode Go",
+    apiStyleOpenCodeGoFixed: "OpenCode Go uses a fixed name and endpoint; enter an API key to continue.",
     apiStyleResponses: "OpenAI Responses",
     apiStyleAnthropic: "Anthropic Messages",
     apiStyleGoogle: "Google Generative AI",

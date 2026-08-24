@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ModelInfo, ProviderPublic, ThinkingLevel } from "@pi-desktop/shared";
-import { THINKING_LEVELS } from "@pi-desktop/shared";
+import {
+  OPENCODE_GO_API_STYLE,
+  THINKING_LEVELS,
+  type ModelInfo,
+  type ProviderPublic,
+  type ThinkingLevel,
+} from "@pi-desktop/shared";
 import { Button, Field, Input, Select } from "../ui";
 import { IconClose, IconPlus } from "../icons";
 import { ModelConfigCard } from "./ModelConfigCard";
@@ -9,6 +14,7 @@ import { ModelMultiSelect } from "./ModelMultiSelect";
 import {
   CUSTOM_API_STYLE_OPTIONS,
   fallbackModelDraft,
+  fixedProviderFieldsForApiStyle,
   modelDraftFromInfo,
   type ApiStyle,
   type ProviderForm,
@@ -150,6 +156,16 @@ export function ProviderDialog({
 
   const modelsStatusHint =
     models.status === "error" ? t("settings.modelsFetchHint") : undefined;
+  const isOpenCodeGo = form.apiStyle === OPENCODE_GO_API_STYLE;
+
+  const changeApiStyle = (apiStyle: ApiStyle) => {
+    setField("apiStyle", apiStyle);
+    const fixedFields = fixedProviderFieldsForApiStyle(apiStyle);
+    if (fixedFields) {
+      setField("name", fixedFields.name);
+      setField("baseUrl", fixedFields.baseUrl);
+    }
+  };
 
   return (
     <div
@@ -187,13 +203,18 @@ export function ProviderDialog({
             <Input
               value={form.name}
               onChange={(event) => setField("name", event.target.value)}
-              autoFocus
+              readOnly={isOpenCodeGo}
+              aria-readonly={isOpenCodeGo}
+              autoFocus={!isOpenCodeGo}
             />
           </Field>
-          <Field label={t("settings.apiStyle")}>
+          <Field
+            label={t("settings.apiStyle")}
+            hint={isOpenCodeGo ? t("settings.apiStyleOpenCodeGoFixed") : undefined}
+          >
             <Select
               value={form.apiStyle}
-              onChange={(event) => setField("apiStyle", event.target.value as ApiStyle)}
+              onChange={(event) => changeApiStyle(event.target.value as ApiStyle)}
             >
               {CUSTOM_API_STYLE_OPTIONS.map(([value, labelKey]) => (
                 <option key={value} value={value}>
@@ -206,6 +227,8 @@ export function ProviderDialog({
             <Input
               value={form.baseUrl}
               onChange={(event) => setField("baseUrl", event.target.value)}
+              readOnly={isOpenCodeGo}
+              aria-readonly={isOpenCodeGo}
               className="font-mono text-sm-plus"
               placeholder="https://api.example.com/v1"
             />
@@ -218,6 +241,7 @@ export function ProviderDialog({
               placeholder="sk-…"
               className="font-mono text-sm-plus"
               autoComplete="off"
+              autoFocus={isOpenCodeGo}
             />
           </Field>
           <Field label={t("settings.selectModels")} hint={modelsStatusHint}>

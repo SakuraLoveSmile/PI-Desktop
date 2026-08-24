@@ -19,6 +19,12 @@ const keyedProvider: RuntimeProviderConfig = {
 };
 
 describe("apiBindingForStyle", () => {
+  it("binds OpenCode Go to its fixed OpenAI-compatible endpoint", () => {
+    const opencode = apiBindingForStyle("opencode_go");
+    expect(opencode.api).toBe("openai-completions");
+    expect(opencode.defaultBaseUrl).toBe("https://opencode.ai/zen/go/v1");
+  });
+
   it("binds the two vendor-account wire APIs", () => {
     const codex = apiBindingForStyle("openai_codex_responses");
     expect(codex.api).toBe("openai-codex-responses");

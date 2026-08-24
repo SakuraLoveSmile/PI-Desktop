@@ -1,4 +1,12 @@
-import type { ModelBinding, ModelInfo, ProviderPublic, ThinkingLevel } from "@pi-desktop/shared";
+import {
+  OPENCODE_GO_API_STYLE,
+  OPENCODE_GO_BASE_URL,
+  OPENCODE_GO_NAME,
+  type ModelBinding,
+  type ModelInfo,
+  type ProviderPublic,
+  type ThinkingLevel,
+} from "@pi-desktop/shared";
 
 export function hostFromBaseUrl(baseUrl?: string | null): string {
   if (!baseUrl) return "—";
@@ -11,6 +19,7 @@ export function hostFromBaseUrl(baseUrl?: string | null): string {
 
 export const API_STYLE_OPTIONS = [
   ["chat_completions", "settings.apiStyleChatCompletions"],
+  [OPENCODE_GO_API_STYLE, "settings.apiStyleOpenCodeGo"],
   ["responses", "settings.apiStyleResponses"],
   ["anthropic_messages", "settings.apiStyleAnthropic"],
   ["google_generative_ai", "settings.apiStyleGoogle"],
@@ -29,6 +38,14 @@ export const CUSTOM_API_STYLE_OPTIONS = API_STYLE_OPTIONS.filter(
 );
 
 export type ApiStyle = (typeof API_STYLE_OPTIONS)[number][0];
+
+export function fixedProviderFieldsForApiStyle(
+  apiStyle?: string | null,
+): { name: string; baseUrl: string } | null {
+  return apiStyle === OPENCODE_GO_API_STYLE
+    ? { name: OPENCODE_GO_NAME, baseUrl: OPENCODE_GO_BASE_URL }
+    : null;
+}
 
 export type ProviderModelDraft = ModelBinding & {
   source: "catalog" | "custom" | "unknown";
@@ -121,11 +138,13 @@ export function formFromProvider(provider: ProviderPublic): ProviderForm {
           },
         ]
       : [];
+  const apiStyle = normalizeApiStyle(provider.apiStyle);
+  const fixedFields = fixedProviderFieldsForApiStyle(apiStyle);
   return {
-    name: provider.name,
-    baseUrl: provider.baseUrl ?? "",
+    name: fixedFields?.name ?? provider.name,
+    baseUrl: fixedFields?.baseUrl ?? provider.baseUrl ?? "",
     models: models.map((model) => ({ ...model, source: "unknown" as const })),
     apiKey: "",
-    apiStyle: normalizeApiStyle(provider.apiStyle),
+    apiStyle,
   };
 }

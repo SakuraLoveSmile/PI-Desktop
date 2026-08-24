@@ -14,6 +14,7 @@ import {
 import {
   API_STYLE_OPTIONS,
   EMPTY_PROVIDER_FORM,
+  fixedProviderFieldsForApiStyle,
   formFromProvider,
   hostFromBaseUrl,
   normalizeApiStyle,
@@ -96,7 +97,10 @@ export function ProvidersSection() {
   };
 
   const saveProvider = async () => {
-    if (!form.name.trim()) return;
+    const fixedFields = fixedProviderFieldsForApiStyle(form.apiStyle);
+    const providerName = fixedFields?.name ?? form.name.trim();
+    const providerBaseUrl = fixedFields?.baseUrl ?? form.baseUrl.trim();
+    if (!providerName || !providerBaseUrl) return;
     const models = form.models.map(({ source: _source, ...binding }) => binding);
     const defaultModelId = models[0]?.id;
     if (!defaultModelId) return;
@@ -105,8 +109,8 @@ export function ProvidersSection() {
       if (editingProvider) {
         await api.updateProvider({
           id: editingProvider.id,
-          name: form.name.trim(),
-          baseUrl: form.baseUrl.trim(),
+          name: providerName,
+          baseUrl: providerBaseUrl,
           defaultModelId,
           models,
           apiStyle: form.apiStyle,
@@ -122,11 +126,11 @@ export function ProvidersSection() {
         showToast(t("settings.providerUpdated"), { variant: "success" });
       } else {
         const created = await api.createProvider({
-          name: form.name.trim(),
+          name: providerName,
           vendorKey: "custom",
           type: "openai_compatible",
           protocol: "openai_compatible",
-          baseUrl: form.baseUrl.trim(),
+          baseUrl: providerBaseUrl,
           authKind: "api_key_and_base_url",
           defaultModelId,
           models,

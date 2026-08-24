@@ -16,6 +16,7 @@ export type DiscoveredModel = {
 
 const DISCOVERY_TIMEOUT_MS = 10_000;
 const MAX_MODELS = 500;
+const OPENCODE_GO_API_STYLE = "opencode_go";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -98,6 +99,14 @@ export function modelListRequest(opts: {
         ...(apiKey ? { "x-api-key": apiKey } : {}),
         "anthropic-version": "2023-06-01",
       },
+    };
+  }
+  // OpenCode Go exposes the same authenticated OpenAI-compatible /models
+  // endpoint as generic Chat Completions, but keeps a distinct UI style.
+  if (opts.apiStyle === OPENCODE_GO_API_STYLE) {
+    return {
+      url: `${base}/models`,
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
     };
   }
   return {

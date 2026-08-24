@@ -677,6 +677,8 @@ export const zhCN = {
     apiStyle: "接口格式",
     apiStyleDesc: "接口格式决定请求协议，需与服务商实际 API 一致。",
     apiStyleChatCompletions: "OpenAI Chat Completions",
+    apiStyleOpenCodeGo: "OpenCode Go",
+    apiStyleOpenCodeGoFixed: "OpenCode Go 使用固定名称和地址；请输入 API 密钥继续。",
     apiStyleResponses: "OpenAI Responses",
     apiStyleAnthropic: "Anthropic Messages",
     apiStyleGoogle: "Google Generative AI",
