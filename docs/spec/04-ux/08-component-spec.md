@@ -1450,7 +1450,7 @@ argument. The row hint is the call's short `description`.
   `startedAt`/`completedAt` timestamps (and ticks live while the node is
   running), not the immediate `Task` tool-call duration. Outcome prefers the
   structured `Task` result
-  (`completed`, `truncated`, `aborted`, `failed`) and falls back to transport
+  (`completed`, `truncated`, `timed_out`, `aborted`, `failed`) and falls back to transport
   state (`running`, `error`, `denied`, `success`). Clicking the node expands the
   existing brief/report/counters and nested rows; the report remains printed
   exactly once.

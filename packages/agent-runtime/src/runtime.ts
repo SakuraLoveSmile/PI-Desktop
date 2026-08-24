@@ -58,6 +58,7 @@ import type {
   PlanningState,
   Risk,
   SubagentDefinition,
+  SubagentRunStatus,
   ThinkingLevel,
   ToolTokenUsage,
   UiMessage,
@@ -236,10 +237,7 @@ const MAX_TASKWAIT_RESULT_CHARS = 50_000;
 
 export type DelegationStatus =
   | "running"
-  | "completed"
-  | "truncated"
-  | "failed"
-  | "aborted"
+  | SubagentRunStatus
   | "stopped";
 
 /**
@@ -2802,6 +2800,7 @@ Delegation rules:
           status: record.status,
           startedAt: record.startedAt,
           ...(record.completedAt ? { completedAt: record.completedAt } : {}),
+          ...(record.result?.error ? { error: record.result.error } : {}),
           report:
             record.result?.report ?? `(${record.status} without a report)`,
         }));

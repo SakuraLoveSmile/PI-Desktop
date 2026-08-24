@@ -46,8 +46,12 @@ export type SubagentDefinition = {
    * (a delegate never unlocks paths outside the workspace and scratch roots).
    */
   permission?: SubagentPermission;
-  /** Hard cap on delegate turns; keeps a runaway delegate bounded. */
-  maxTurns: number;
+  /** Optional hard cap on delegate turns; omitted means unlimited turns. */
+  maxTurns?: number;
+  /** Idle watchdog in seconds; parser materializes the default for documents. */
+  idleTimeoutSeconds?: number;
+  /** Total runtime watchdog in seconds; parser materializes the default. */
+  maxDurationSeconds?: number;
   /** Markdown body used as the delegate's system prompt. */
   prompt: string;
   source: SubagentSource;
@@ -81,8 +85,13 @@ export const DEFAULT_SUBAGENT_TOOLS: readonly SubagentAssignableTool[] = [
   "Grep",
 ];
 
-export const DEFAULT_SUBAGENT_MAX_TURNS = 24;
 export const MAX_SUBAGENT_MAX_TURNS = 80;
+export const DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS = 600;
+export const MIN_SUBAGENT_IDLE_TIMEOUT_SECONDS = 10;
+export const MAX_SUBAGENT_IDLE_TIMEOUT_SECONDS = 21_600;
+export const DEFAULT_SUBAGENT_MAX_DURATION_SECONDS = 21_600;
+export const MIN_SUBAGENT_MAX_DURATION_SECONDS = 60;
+export const MAX_SUBAGENT_MAX_DURATION_SECONDS = 21_600;
 
 /**
  * Permission scope a delegate's tool calls resolve under, when its definition
@@ -313,6 +322,24 @@ export function parseSubagentDefinition(
   }
 
   const maxTurns = parseMaxTurns(asScalar(frontmatter.get("maxturns")), warnings);
+  const idleTimeoutSeconds = parseTimeoutSeconds(
+    asScalar(frontmatter.get("idletimeout")) ??
+      asScalar(frontmatter.get("idletimeoutseconds")),
+    "idle-timeout",
+    DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+    MIN_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+    MAX_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+    warnings,
+  );
+  const maxDurationSeconds = parseTimeoutSeconds(
+    asScalar(frontmatter.get("maxduration")) ??
+      asScalar(frontmatter.get("maxdurationseconds")),
+    "max-duration",
+    DEFAULT_SUBAGENT_MAX_DURATION_SECONDS,
+    MIN_SUBAGENT_MAX_DURATION_SECONDS,
+    MAX_SUBAGENT_MAX_DURATION_SECONDS,
+    warnings,
+  );
 
   const prompt = body.trim();
   if (!prompt) errors.push("document body is empty (nothing to instruct)");
@@ -327,7 +354,9 @@ export function parseSubagentDefinition(
       ...(model ? { model } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
       ...(permission ? { permission } : {}),
-      maxTurns,
+      ...(maxTurns !== undefined ? { maxTurns } : {}),
+      idleTimeoutSeconds,
+      maxDurationSeconds,
       prompt,
       source: options.source,
       ...(options.filePath ? { filePath: options.filePath } : {}),
@@ -371,12 +400,15 @@ function parseModelPin(
 function parseMaxTurns(
   value: string | undefined,
   warnings: string[],
-): number {
-  if (!value) return DEFAULT_SUBAGENT_MAX_TURNS;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    warnings.push(`ignoring invalid \`maxTurns\` "${value}"`);
-    return DEFAULT_SUBAGENT_MAX_TURNS;
+): number | undefined {
+  if (!value || value.trim().toLowerCase() === "none") {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (parsed === 0) return undefined;
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    warnings.push(`ignoring invalid \`maxTurns\` "${value}" (unlimited)`);
+    return undefined;
   }
   if (parsed > MAX_SUBAGENT_MAX_TURNS) {
     warnings.push(
@@ -385,6 +417,27 @@ function parseMaxTurns(
     return MAX_SUBAGENT_MAX_TURNS;
   }
   return parsed;
+}
+
+function parseTimeoutSeconds(
+  value: string | undefined,
+  key: "idle-timeout" | "max-duration",
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  warnings: string[],
+): number {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
+    warnings.push(`ignoring invalid \`${key}\` "${value}" (using ${fallback})`);
+    return fallback;
+  }
+  const clamped = Math.min(maximum, Math.max(minimum, parsed));
+  if (clamped !== parsed) {
+    warnings.push(`clamping \`${key}\` ${parsed} to ${clamped}`);
+  }
+  return clamped;
 }
 
 /**

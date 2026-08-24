@@ -12,6 +12,7 @@ export type SubagentOutcome =
   | "running"
   | "completed"
   | "truncated"
+  | "timed_out"
   | "aborted"
   | "failed"
   | "stopped"
@@ -39,6 +40,7 @@ const DELEGATION_STATUSES = new Set<SubagentOutcome>([
   "running",
   "completed",
   "truncated",
+  "timed_out",
   "aborted",
   "failed",
   "stopped",
@@ -180,6 +182,7 @@ export function summarizeSubagentActivity(
     warnings: outcomes.filter(
       (outcome) =>
         outcome === "truncated" ||
+        outcome === "timed_out" ||
         outcome === "aborted" ||
         outcome === "stopped",
     ).length,

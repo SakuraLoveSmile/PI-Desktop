@@ -15,7 +15,7 @@
  * - A delegate's lifecycle never reaches Electron main's turn handling. It
  *   runs in the background under the session runtime (ADR 0089): `Task`
  *   starts it and returns, `TaskWait` converges on it, and its termination —
- *   success, failure, cap, abort — collapses into the `TaskWait` result, so
+ *   success, failure, cap, abort, or timeout — collapses into the `TaskWait` result, so
  *   the parent turn stays the only thing that can end a turn.
  */
 
@@ -30,8 +30,11 @@ import {
 } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import {
+  DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+  DEFAULT_SUBAGENT_MAX_DURATION_SECONDS,
   subagentCanMutate,
   type SubagentDefinition,
+  type SubagentRunStatus as SharedSubagentRunStatus,
 } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
@@ -73,11 +76,7 @@ const PROVIDER_REQUEST_MAX_RETRIES = 0;
  * from becoming the context problem delegation was supposed to avoid. */
 export const MAX_SUBAGENT_REPORT_CHARS = 12_000;
 
-export type SubagentRunStatus =
-  | "completed"
-  | "truncated"
-  | "failed"
-  | "aborted";
+export type SubagentRunStatus = SharedSubagentRunStatus;
 
 export type SubagentRunResult = {
   agentName: string;
@@ -208,6 +207,7 @@ export class SubagentRun {
   private toolCalls = 0;
   private usage?: MessageUsage;
   private cappedTurns = false;
+  private timedOut?: { code: string; message: string };
   private streamError?: { code: string; message: string };
   private pendingProviderRetry?: ReturnType<typeof classifyAgentError>;
   private providerRetryInProgress = false;
@@ -215,6 +215,11 @@ export class SubagentRun {
   private providerRateLimitRetryAttempt = 0;
   private providerRetryHeaders?: Record<string, string>;
   private providerResponseStatus?: number;
+  private readonly runAbortController = new AbortController();
+  private idleTimer?: ReturnType<typeof setTimeout>;
+  private durationTimer?: ReturnType<typeof setTimeout>;
+  private activeToolExecutions = new Set<string>();
+  private watchdogsStarted = false;
 
   constructor(opts: SubagentRunOptions) {
     this.opts = opts;
@@ -269,30 +274,41 @@ export class SubagentRun {
     if (signal?.aborted) {
       return this.result("aborted", "The delegated task was aborted before it started.");
     }
-    const onAbort = () => this.agent.abort();
+    const onAbort = () => {
+      this.runAbortController.abort();
+      this.agent.abort();
+    };
     signal?.addEventListener("abort", onAbort, { once: true });
+    this.startWatchdogs();
+    let caughtError: ReturnType<typeof classifyAgentError> | undefined;
     try {
       await this.agent.prompt(this.opts.task);
       await this.agent.waitForIdle();
-      while (this.pendingProviderRetry && !signal?.aborted) {
+      while (this.pendingProviderRetry && !signal?.aborted && !this.timedOut) {
         await this.retryPendingProviderFailure();
       }
     } catch (error) {
-      const classified = classifyAgentError(error);
-      if (classified.code === "TURN_ABORTED" || signal?.aborted) {
-        return this.result("aborted", "The delegated task was aborted.");
-      }
-      return this.result("failed", "", {
-        code: classified.code,
-        message: classified.message,
-      });
+      caughtError = classifyAgentError(error);
     } finally {
       signal?.removeEventListener("abort", onAbort);
+      this.stopWatchdogs();
       this.finalizeCurrentAssistant();
     }
 
     if (signal?.aborted) {
       return this.result("aborted", "The delegated task was aborted.");
+    }
+    if (this.timedOut) {
+      return this.result("timed_out", this.latestReportText(), this.timedOut);
+    }
+    if (caughtError) {
+      if (caughtError.code === "TURN_ABORTED") {
+        return this.result("aborted", "The delegated task was aborted.");
+      }
+      return this.result("failed", "", {
+        code: caughtError.code,
+        message: caughtError.message,
+      });
     }
     if (this.streamError) {
       return this.result("failed", "", this.streamError);
@@ -351,7 +367,7 @@ export class SubagentRun {
           this.providerRateLimitRetryAttempt,
           this.providerRetryHeaders,
         ),
-        this.opts.signal,
+        this.runSignal(),
       );
       if (this.opts.signal?.aborted) return;
       await this.agent.continue();
@@ -373,11 +389,16 @@ export class SubagentRun {
         ? body
         : status === "truncated"
           ? [
-              `The ${name} subagent hit its ${this.opts.definition.maxTurns}-turn limit before finishing.`,
+              `The ${name} subagent hit its ${this.opts.definition.maxTurns ?? "configured"}-turn limit before finishing.`,
               ...(body ? ["Its last report was:", body] : []),
             ].join("\n\n")
           : status === "aborted"
             ? `The ${name} subagent was aborted after ${this.turns} turn(s).`
+            : status === "timed_out"
+              ? [
+                  `The ${name} subagent timed out after ${this.turns} turn(s).`,
+                  ...(body ? ["Its last output was:", body] : []),
+                ].join("\n\n")
             : [
                 `The ${name} subagent failed after ${this.turns} turn(s): ${error?.message ?? "unknown error"}.`,
                 ...(body ? ["Its last output was:", body] : []),
@@ -399,7 +420,9 @@ export class SubagentRun {
     context: AfterToolCallContext,
   ): Promise<AfterToolCallResult | undefined> {
     const parent = this.opts.resolveToolOutcome?.(context);
-    const capped = this.turns >= this.opts.definition.maxTurns;
+    const capped =
+      this.opts.definition.maxTurns !== undefined &&
+      this.turns >= this.opts.definition.maxTurns;
     if (capped) this.cappedTurns = true;
     const terminate = parent?.terminate === true || capped;
     if (!parent?.isError && !terminate) return undefined;
@@ -418,6 +441,99 @@ export class SubagentRun {
       parentToolCallId: this.opts.parentToolCallId,
       agentName: this.opts.definition.name,
     });
+  }
+
+  private startWatchdogs(): void {
+    if (this.watchdogsStarted) return;
+    this.watchdogsStarted = true;
+    this.durationTimer = setTimeout(
+      () =>
+        this.timeout(
+          "SUBAGENT_DURATION_TIMEOUT",
+          `The subagent exceeded its ${this.maxDurationSeconds()}-second total duration limit.`,
+        ),
+      this.maxDurationSeconds() * 1000,
+    );
+    this.armIdleTimer();
+  }
+
+  private stopWatchdogs(): void {
+    if (!this.watchdogsStarted) return;
+    this.watchdogsStarted = false;
+    if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
+    if (this.durationTimer !== undefined) clearTimeout(this.durationTimer);
+    this.idleTimer = undefined;
+    this.durationTimer = undefined;
+  }
+
+  private idleTimeoutSeconds(): number {
+    return this.opts.definition.idleTimeoutSeconds ??
+      DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS;
+  }
+
+  private maxDurationSeconds(): number {
+    return this.opts.definition.maxDurationSeconds ??
+      DEFAULT_SUBAGENT_MAX_DURATION_SECONDS;
+  }
+
+  private armIdleTimer(): void {
+    if (!this.watchdogsStarted || this.activeToolExecutions.size > 0) return;
+    if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(
+      () =>
+        this.timeout(
+          "SUBAGENT_IDLE_TIMEOUT",
+          `The subagent produced no activity for ${this.idleTimeoutSeconds()} seconds.`,
+        ),
+      this.idleTimeoutSeconds() * 1000,
+    );
+  }
+
+  private timeout(code: string, message: string): void {
+    if (this.timedOut) return;
+    this.timedOut = { code, message };
+    this.runAbortController.abort();
+    this.agent.abort();
+  }
+
+  private runSignal(): AbortSignal {
+    return AbortSignal.any(
+      this.opts.signal
+        ? [this.opts.signal, this.runAbortController.signal]
+        : [this.runAbortController.signal],
+    );
+  }
+
+  private noteActivity(event: AgentEvent): void {
+    if (!this.watchdogsStarted) return;
+    if (event.type === "tool_execution_start") {
+      this.activeToolExecutions.add(event.toolCallId);
+      if (this.idleTimer !== undefined) clearTimeout(this.idleTimer);
+      this.idleTimer = undefined;
+      return;
+    }
+    if (event.type === "tool_execution_end") {
+      this.activeToolExecutions.delete(event.toolCallId);
+      this.armIdleTimer();
+      return;
+    }
+    if (
+      event.type !== "turn_start" &&
+      event.type !== "message_start" &&
+      event.type !== "message_update" &&
+      event.type !== "message_end" &&
+      event.type !== "tool_execution_update"
+    ) {
+      return;
+    }
+    // Tool updates count as activity, but the timer remains paused until the
+    // corresponding execution_end. All listed model lifecycle events reset
+    // idle time.
+    if (this.activeToolExecutions.size === 0) this.armIdleTimer();
+  }
+
+  private latestReportText(): string {
+    return this.lastReportText || this.currentAssistant?.content || "";
   }
 
   private newAssistantRow(): UiMessage {
@@ -442,6 +558,7 @@ export class SubagentRun {
    * and a delegate finishing must never end the parent's turn.
    */
   private handleEvent(event: AgentEvent): void {
+    this.noteActivity(event);
     switch (event.type) {
       case "turn_start":
         this.turns += 1;
@@ -595,6 +712,9 @@ export class SubagentRun {
   /** Close a bubble left streaming when the run died without a message_end. */
   private finalizeCurrentAssistant(): void {
     if (!this.currentAssistant) return;
+    if (this.currentAssistant.content.trim()) {
+      this.lastReportText = this.currentAssistant.content;
+    }
     const row: UiMessage = { ...this.currentAssistant, status: "aborted" };
     this.currentAssistant = undefined;
     this.emit({ type: "message_end", message: row });

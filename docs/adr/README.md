@@ -133,3 +133,4 @@ Each ADR includes:
 | 0116 | Add OpenCode Go as a fixed provider preset | Accepted |
 | 0117 | Preserve the Windows taskbar entry for native minimize | Accepted |
 | 0118 | Keep queued prompts renderer-owned and stop runs at turn boundaries | Accepted |
+| 0119 | Event-driven subagent timeouts | Accepted for implementation |

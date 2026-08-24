@@ -4436,6 +4436,36 @@ describe("DesktopAgentRuntime subagents", () => {
       delegations: [{ delegationId: secondId, status: "truncated" }],
     });
 
+    subagentRuns.result = {
+      agentName: "explorer",
+      status: "timed_out",
+      report: "The explorer subagent timed out after 2 turn(s).",
+      turns: 2,
+      toolCalls: 1,
+      error: {
+        code: "SUBAGENT_IDLE_TIMEOUT",
+        message: "The subagent produced no activity for 600 seconds.",
+      },
+    };
+    const third = await task.execute("task-3", {
+      agent: "explorer",
+      task: "Find it one more time.",
+    });
+    const thirdId = (third.details as any).delegationId as string;
+    const timedOut = await wait.execute("wait-3", {
+      delegationIds: [thirdId],
+    });
+    expect(timedOut.content[0].text).toContain("timed out");
+    expect(timedOut.details).toMatchObject({
+      delegations: [
+        {
+          delegationId: thirdId,
+          status: "timed_out",
+          error: { code: "SUBAGENT_IDLE_TIMEOUT" },
+        },
+      ],
+    });
+
     await runtime.dispose();
   });
 

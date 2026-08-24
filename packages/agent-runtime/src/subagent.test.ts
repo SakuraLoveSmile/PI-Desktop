@@ -320,3 +320,142 @@ describe("SubagentRun turn cap", () => {
     ).resolves.toEqual({ isError: true });
   });
 });
+
+describe("SubagentRun watchdogs", () => {
+  function holdAgent(
+    run: Record<string, any>,
+    onPrompt: () => void,
+  ): { abort: ReturnType<typeof vi.fn> } {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const abort = vi.fn(() => release());
+    run.agent = {
+      prompt: vi.fn(async () => {
+        onPrompt();
+        await pending;
+      }),
+      waitForIdle: vi.fn(async () => undefined),
+      abort,
+    };
+    return { abort };
+  }
+
+  it("times out after inactivity and keeps the partial report", async () => {
+    vi.useFakeTimers();
+    try {
+      const { run } = createRun({
+        definition: definition({
+          idleTimeoutSeconds: 10,
+          maxDurationSeconds: 60,
+        }),
+      });
+      const { abort } = holdAgent(run, () => {
+        run.handleEvent({ type: "turn_start" });
+        run.handleEvent({
+          type: "message_start",
+          message: assistantMessage({
+            content: [{ type: "text", text: "Partial findings" }],
+          }),
+        });
+      });
+
+      const resultPromise = run.run();
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(abort).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      const result = await resultPromise;
+
+      expect(result.status).toBe("timed_out");
+      expect(result.error).toEqual({
+        code: "SUBAGENT_IDLE_TIMEOUT",
+        message: "The subagent produced no activity for 10 seconds.",
+      });
+      expect(result.report).toContain("Partial findings");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("pauses the idle watchdog while a tool is executing", async () => {
+    vi.useFakeTimers();
+    try {
+      const { run } = createRun({
+        definition: definition({
+          idleTimeoutSeconds: 10,
+          maxDurationSeconds: 60,
+        }),
+      });
+      const { abort } = holdAgent(run, () => {
+        run.handleEvent({ type: "turn_start" });
+        run.handleEvent({
+          type: "tool_execution_start",
+          toolCallId: "long-tool",
+          toolName: "Bash",
+          args: { command: "long-running" },
+        });
+      });
+
+      const resultPromise = run.run();
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(abort).not.toHaveBeenCalled();
+
+      run.handleEvent({
+        type: "tool_execution_end",
+        toolCallId: "long-tool",
+        result: { content: [{ type: "text", text: "done" }] },
+        isError: false,
+      });
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(abort).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      const result = await resultPromise;
+
+      expect(result.status).toBe("timed_out");
+      expect(result.error?.code).toBe("SUBAGENT_IDLE_TIMEOUT");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("enforces the total duration limit during tool execution", async () => {
+    vi.useFakeTimers();
+    try {
+      const { run } = createRun({
+        definition: definition({
+          idleTimeoutSeconds: 10,
+          maxDurationSeconds: 20,
+        }),
+      });
+      const { abort } = holdAgent(run, () => {
+        run.handleEvent({ type: "turn_start" });
+        run.handleEvent({
+          type: "tool_execution_start",
+          toolCallId: "long-tool",
+          toolName: "Bash",
+          args: { command: "long-running" },
+        });
+      });
+
+      const resultPromise = run.run();
+      await vi.advanceTimersByTimeAsync(19_999);
+      expect(abort).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      const result = await resultPromise;
+
+      expect(result.status).toBe("timed_out");
+      expect(result.error?.code).toBe("SUBAGENT_DURATION_TIMEOUT");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not impose a turn cap when maxTurns is omitted", async () => {
+    const { run } = createRun({ definition: definition({ maxTurns: undefined }) });
+    run.turns = 21;
+
+    await expect(run.afterToolCall({ toolCall: { id: "child-1" } })).resolves.toBeUndefined();
+    expect(run.cappedTurns).toBe(false);
+  });
+});

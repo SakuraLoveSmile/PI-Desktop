@@ -145,6 +145,7 @@ test("the topology uses semantic low-noise surfaces and responsive connectors", 
   assert.match(messagesCss, /\.subagent-topology-node \{[^}]*var\(--ds-border-default\)/);
   assert.match(messagesCss, /\.subagent-topology-node\.outcome-completed/);
   assert.match(messagesCss, /\.subagent-topology-node\.outcome-failed/);
+  assert.match(messagesCss, /\.subagent-topology-node\.outcome-timed-out/);
   assert.match(
     messagesCss,
     /@container subagent-activity \(max-width: 520px\)[\s\S]*?\.subagent-topology/,

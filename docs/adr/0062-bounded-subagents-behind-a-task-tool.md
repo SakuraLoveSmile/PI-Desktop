@@ -1,12 +1,14 @@
 # ADR 0062: Bounded Subagents Behind a Task Tool
 
-- Status: Accepted for implementation (definition roots amended by ADR 0112)
+- Status: Accepted for implementation (definition roots amended by ADR 0112;
+  timeout policy amended by ADR 0119)
 - Date: 2026-08-06
 - Deciders: PI-Desktop core
 - Related: D201, ADR 0041 (persistence outbox), ADR 0048 (lazy per-turn tool
   activation), ADR 0053 (plan checkpoint and execution epoch), D123 (prompt
   template documents), D138 (session-scoped inline permission requests),
-  D198 (contract modes), ADR 0112 (capability roots and Settings IA)
+  D198 (contract modes), ADR 0112 (capability roots and Settings IA), ADR 0119
+  (event-driven subagent timeouts)
 
 ## Context
 
@@ -44,8 +46,10 @@ malformed document degrades to a launch diagnostic — it never costs the sessio
 its other delegates or its turn.
 
 Frontmatter keys: `name`, `description`, `tools`, `model`, `thinkingLevel`,
-`maxTurns`. Key spelling is matched loosely (`max-turns`, `max_turns`,
-`maxTurns`).
+`maxTurns`, `idle-timeout`, and `max-duration`. Key spelling is matched
+loosely (`max-turns`, `max_turns`, `maxTurns`). `maxTurns` is optional;
+omission, `none`, and `0` mean unlimited turns. The timeout defaults and
+bounds are defined by ADR 0119.
 
 ### 2. A definition declares its tools, and is read-only when it does not
 
@@ -91,8 +95,9 @@ with `toolExecution: "parallel"`, every catalog tool carries
 batch sequentially as soon as it contains one sequential tool, so the only batch
 that fans out is a batch of nothing but `Task` calls. Existing tool ordering
 guarantees are untouched. Fan-out is capped at `MAX_SUBAGENT_CONCURRENCY` (4)
-by a semaphore, and each delegate is capped at its own `maxTurns`
-(default 24, hard maximum 80).
+by a semaphore. Delegate runtime bounds are the event-driven idle and
+total-duration watchdogs in ADR 0119; an explicit per-definition `maxTurns`
+remains an optional hard backstop with a maximum of 80.
 
 Fan-out makes one same-process ordering problem real, and the sidecar owns it.
 host-core admits one mutation per session at a time, so concurrent writes cannot
@@ -118,9 +123,10 @@ makes a delegation reviewable — but every row carries `parentToolCallId` and
 Replaying them would both contradict what the parent actually saw and reintroduce
 the context cost delegation exists to avoid.
 
-A delegate's termination — success, cap, failure, abort — collapses into the
-tool result. It never reaches Electron main's turn handling, so the parent turn
-remains the only thing that can end a turn.
+A delegate's termination — success, cap, timeout, failure, abort — collapses
+into the tool result. It never reaches Electron main's turn handling, so the
+parent turn remains the only thing that can end a turn. See ADR 0119 for the
+timeout policy and `timed_out` outcome.
 
 ### 6. Attribution is persisted, and the transcript derives its topology from it
 

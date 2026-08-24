@@ -1788,6 +1788,10 @@
   background: var(--ds-warning);
 }
 
+.subagent-topology-node.outcome-timed-out .subagent-topology-status-icon {
+  background: var(--ds-warning);
+}
+
 .subagent-topology-node.outcome-failed .subagent-topology-status-icon {
   background: var(--ds-error);
 }

@@ -454,8 +454,10 @@ a malformed or unreadable document becomes a launch diagnostic and never fails
 the launch.
 
 Frontmatter adds `permission: inherit | ask | accept-edits | auto` (default
-`inherit`): a scope the delegate's tool calls resolve under instead of the
-session mode (§5f.1). Only builtin and user definitions may declare one —
+`inherit`), which controls the scope the delegate's tool calls resolve under
+instead of the session mode (§5f.1). It also accepts `idle-timeout` and
+`max-duration` watchdog overrides. Only builtin and user definitions may
+declare a permission scope —
 both express a choice the user already made, whereas a project definition
 arrives with the repository, so honoring its scope would let cloned code grant
 itself `auto`. A project document that declares a non-`inherit` scope keeps
@@ -493,15 +495,33 @@ core set rather than the on-demand catalog of §7.1:
 **Delegate loop.** A `SubagentRun` is a second pi `Agent` in the same sidecar
 process with the definition's system prompt, its (possibly pinned)
 provider/model, its declared tools, and the same host connection. It runs under
-`maxTurns` (default 24, maximum 80) and the same bounded provider retry policy
-as the parent. Its statuses are `completed`, `truncated`, `failed`, `aborted`
-and `stopped`; the four terminal ones surface through `TaskWait`, whose text is
+the same bounded provider retry policy as the parent. `maxTurns` is an optional
+per-definition backstop (maximum 80); omitted, `none`, or `0` means unlimited
+turns. The built-in `explorer` declares `Read`, `Glob`, `Grep`, and `Bash`,
+while `code-reviewer` remains read-only. Its statuses are `completed`,
+`truncated`, `failed`, `aborted`, `timed_out` and the registry-only `stopped`;
+the terminal ones surface through `TaskWait`, whose text is
 the report (bounded to `MAX_SUBAGENT_REPORT_CHARS`, 12k) and whose details
 carry `delegationId`, `agent`, `status`, `startedAt`, `completedAt` when
-settled, `turns`, `toolCalls` and, on failure, `error`. `startedAt` and
+settled, `turns`, `toolCalls` and, on failure or timeout, `error`. `startedAt` and
 `completedAt` are runtime timestamps in milliseconds and are the source of
 truth for renderer delegation duration; the immediate `Task` tool-call
 duration only covers starting the background work.
+
+**Delegate watchdogs.** Every run has a 600-second idle timeout and a
+21,600-second (6-hour) total duration limit. A definition may override them
+with `idle-timeout` (clamped to 10–21,600 seconds) and `max-duration` (clamped
+to 60–21,600 seconds); non-numeric values warn and use the defaults. Activity
+is any `turn_start`, `message_start`, `message_update`, `message_end`,
+`tool_execution_start`, `tool_execution_update`, or `tool_execution_end`
+event. The idle timer is paused from `tool_execution_start` until its matching
+`tool_execution_end`, while the duration timer continues through tool
+execution. Idle expiry returns `timed_out` with `SUBAGENT_IDLE_TIMEOUT`, and
+duration expiry returns `timed_out` with `SUBAGENT_DURATION_TIMEOUT`; both
+include the latest partial assistant output when available and abort the
+delegate immediately. Fatal provider/stream errors, parent aborts, and
+explicit `maxTurns` retain their existing `failed`, `aborted`, and `truncated`
+outcomes.
 
 **Model pins.** `model: <provider>/<model>` in the frontmatter is resolved once
 per launch in Electron main, where credentials and the pi catalog live, against

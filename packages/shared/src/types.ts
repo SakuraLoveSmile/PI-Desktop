@@ -300,6 +300,15 @@ export type UiMessage = {
   agentName?: string;
 };
 
+/** Terminal outcome of one background subagent run. TaskStop adds its own
+ * `stopped` projection at the delegation registry layer. */
+export type SubagentRunStatus =
+  | "completed"
+  | "truncated"
+  | "failed"
+  | "aborted"
+  | "timed_out";
+
 export type SessionSummary = {
   id: string;
   title: string;

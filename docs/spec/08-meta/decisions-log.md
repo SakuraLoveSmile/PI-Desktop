@@ -2206,3 +2206,24 @@ D193, and D194.
 - This changes renderer state ownership and adds a public Electron IPC channel,
   but does not change host-core protocol v9, storage schema v11, or the
   one-running-turn constraint. See ADR 0118 and E2E-011f.
+
+## 2026-08-24 — Subagents use event-driven idle and duration timeouts
+
+- Decision D254 replaces the default subagent turn cap with a 600-second idle
+  watchdog and a 21,600-second total-duration ceiling. The idle timer resets
+  for turn, message, and tool lifecycle events and pauses during tool
+  execution; the duration timer includes tool execution.
+- A timeout returns `timed_out` with `SUBAGENT_IDLE_TIMEOUT` or
+  `SUBAGENT_DURATION_TIMEOUT`, preserving the latest partial assistant output
+  where available. Fatal provider errors, parent aborts, and explicit
+  per-definition `maxTurns` remain unchanged.
+- `maxTurns` is now optional (`none`, `0`, and omission mean unlimited), with
+  explicit values capped at 80. Definitions may override the watchdogs via
+  `idle-timeout` and `max-duration` within their documented bounds; invalid
+  values warn and fall back to defaults.
+- Builtin `explorer` gains `Bash` for bounded repository inspection while
+  `code-reviewer` remains read-only. Shared status types, runtime timing,
+  delegation topology, i18n, and E2E coverage expose the new timeout outcome.
+- See ADR 0119, `03-runtime/02-agent-runtime.md` §5f,
+  `03-runtime/08-error-codes.md`, `03-runtime/09-logging-and-observability.md`,
+  and E2E-155.

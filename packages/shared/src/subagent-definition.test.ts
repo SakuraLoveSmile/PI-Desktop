@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_SUBAGENT_MAX_TURNS,
+  DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+  DEFAULT_SUBAGENT_MAX_DURATION_SECONDS,
   DEFAULT_SUBAGENT_TOOLS,
   MAX_SUBAGENT_DEFINITIONS,
   MAX_SUBAGENT_MAX_TURNS,
@@ -23,7 +24,6 @@ function definition(
     name: "reviewer",
     description: "Reviews a diff.",
     tools: ["Read"],
-    maxTurns: DEFAULT_SUBAGENT_MAX_TURNS,
     prompt: "Review it.",
     source: "user",
     ...overrides,
@@ -53,6 +53,8 @@ Review the diff and report only defects you can point at a line for.
       model: { providerId: "anthropic", modelId: "claude-opus-5" },
       thinkingLevel: "high",
       maxTurns: 12,
+      idleTimeoutSeconds: DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+      maxDurationSeconds: DEFAULT_SUBAGENT_MAX_DURATION_SECONDS,
       prompt:
         "Review the diff and report only defects you can point at a line for.",
       source: "user",
@@ -71,7 +73,13 @@ Explain it.`);
     expect(result.definition.tools).toEqual([...DEFAULT_SUBAGENT_TOOLS]);
     expect(subagentCanMutate(result.definition)).toBe(false);
     expect(result.definition.name).toBe("reviewer");
-    expect(result.definition.maxTurns).toBe(DEFAULT_SUBAGENT_MAX_TURNS);
+    expect(result.definition.maxTurns).toBeUndefined();
+    expect(result.definition.idleTimeoutSeconds).toBe(
+      DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+    );
+    expect(result.definition.maxDurationSeconds).toBe(
+      DEFAULT_SUBAGENT_MAX_DURATION_SECONDS,
+    );
     expect(result.definition.permission).toBeUndefined();
   });
 
@@ -268,7 +276,7 @@ description: Reviews a diff.
     }
   });
 
-  it("clamps and normalizes maxTurns", () => {
+  it("clamps timeout overrides and keeps maxTurns optional", () => {
     const tooMany = parse(`---
 description: Reads code.
 max-turns: 500
@@ -289,7 +297,58 @@ max_turns: soon
 Read it.`);
     expect(nonsense.ok).toBe(true);
     if (nonsense.ok) {
-      expect(nonsense.definition.maxTurns).toBe(DEFAULT_SUBAGENT_MAX_TURNS);
+      expect(nonsense.definition.maxTurns).toBeUndefined();
+      expect(nonsense.warnings).toContain(
+        'ignoring invalid `maxTurns` "soon" (unlimited)',
+      );
+    }
+
+    const timeouts = parse(`---
+description: Reads code.
+idle-timeout: 5
+max-duration: 50000
+---
+Read it.`);
+    expect(timeouts.ok).toBe(true);
+    if (timeouts.ok) {
+      expect(timeouts.definition.idleTimeoutSeconds).toBe(10);
+      expect(timeouts.definition.maxDurationSeconds).toBe(21_600);
+      expect(timeouts.warnings).toEqual([
+        "clamping `idle-timeout` 5 to 10",
+        "clamping `max-duration` 50000 to 21600",
+      ]);
+    }
+
+    const invalidTimeouts = parse(`---
+description: Reads code.
+idle-timeout: never
+max-duration: 1.5h
+---
+Read it.`);
+    expect(invalidTimeouts.ok).toBe(true);
+    if (invalidTimeouts.ok) {
+      expect(invalidTimeouts.definition.idleTimeoutSeconds).toBe(
+        DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
+      );
+      expect(invalidTimeouts.definition.maxDurationSeconds).toBe(
+        DEFAULT_SUBAGENT_MAX_DURATION_SECONDS,
+      );
+      expect(invalidTimeouts.warnings).toEqual([
+        'ignoring invalid `idle-timeout` "never" (using 600)',
+        'ignoring invalid `max-duration` "1.5h" (using 21600)',
+      ]);
+    }
+  });
+
+  it("accepts none and zero as an unlimited turn cap", () => {
+    for (const value of ["none", "0", "0.0"]) {
+      const result = parse(`---
+description: Reads code.
+maxTurns: ${value}
+---
+Read it.`);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.definition.maxTurns).toBeUndefined();
     }
   });
 

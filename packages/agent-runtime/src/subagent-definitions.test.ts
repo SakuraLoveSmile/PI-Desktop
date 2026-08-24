@@ -2,7 +2,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_SUBAGENT_PROVIDERS, type SubagentDefinition } from "@pi-desktop/shared";
+import {
+  MAX_SUBAGENT_PROVIDERS,
+  subagentCanMutate,
+  type SubagentDefinition,
+} from "@pi-desktop/shared";
 import {
   BUILTIN_SUBAGENT_DOCUMENTS,
   loadSubagentDefinitions,
@@ -38,6 +42,12 @@ describe("builtin subagent documents", () => {
     );
     expect(mutating.map((d) => d.name)).toEqual(["fixer"]);
     expect(mutating[0]?.permission ?? "inherit").toBe("inherit");
+    const explorer = definitions.find((definition) => definition.name === "explorer")!;
+    expect(explorer.tools).toEqual(["Read", "Glob", "Grep", "Bash"]);
+    expect(subagentCanMutate(explorer)).toBe(true);
+    expect(explorer.maxTurns).toBeUndefined();
+    expect(explorer.idleTimeoutSeconds).toBe(600);
+    expect(explorer.maxDurationSeconds).toBe(21_600);
     expect(definitions[2].tools).toContain("Bash");
   });
 });

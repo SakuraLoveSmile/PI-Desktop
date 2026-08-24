@@ -342,6 +342,7 @@ export const zhCN = {
       running: "运行中",
       completed: "已完成",
       truncated: "达到轮次上限",
+      timed_out: "已超时",
       aborted: "已停止",
       stopped: "已按请求停止",
       failed: "失败",

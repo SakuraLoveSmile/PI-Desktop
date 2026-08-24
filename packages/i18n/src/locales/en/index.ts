@@ -347,6 +347,7 @@ export const en = {
       running: "Running",
       completed: "Completed",
       truncated: "Turn limit reached",
+      timed_out: "Timed out",
       aborted: "Stopped",
       stopped: "Stopped by request",
       failed: "Failed",
