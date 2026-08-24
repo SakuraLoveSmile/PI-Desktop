@@ -193,7 +193,10 @@ test("editing a user prompt regenerates it and keeps the old branch reachable", 
   // Same branch mechanics as regenerate, so main archives the replaced turn
   // as a revision the pager can walk back to.
   assert.match(storeSource, /editUserMessage:\s*async \(messageId, content, attachments\)/);
-  assert.match(storeSource, /truncateBefore:\s*userIndex/);
+  assert.match(
+    storeSource,
+    /truncateBefore:\s*(?:transcriptOffset\s*\+\s*)?userIndex/,
+  );
   assert.match(
     storeSource,
     /editUserMessage\(root\.id, root\.content, root\.attachments\)/,
@@ -317,7 +320,10 @@ test("regenerate rewrites the current turn instead of appending", async () => {
     new URL("../../../packages/shared/src/protocol.ts", import.meta.url),
     "utf8",
   );
-  assert.match(storeSource, /truncateBefore:\s*userIndex/);
+  assert.match(
+    storeSource,
+    /truncateBefore:\s*(?:transcriptOffset\s*\+\s*)?userIndex/,
+  );
   assert.match(storeSource, /messages:\s*kept/);
   assert.match(mainSource, /session\.replaceMessages/);
   assert.match(mainSource, /agent\.disposeSession/);
