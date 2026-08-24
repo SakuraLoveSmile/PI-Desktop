@@ -270,7 +270,10 @@ test("session and page navigation share the latest-intent guard", () => {
   assert.match(storeSource, /createNavigationIntentController/);
   assert.doesNotMatch(storeSource, /sessionSelectionQueue/);
   assert.match(storeSource, /let sessionWorkspaceQueue: Promise<void>/);
-  assert.match(storeSource, /const detailPromise = loadSessionDetail\(id\)/);
+  assert.match(
+    storeSource,
+    /const detailPromise = loadSessionDetail\(id,\s*\{/,
+  );
   assert.match(storeSource, /opts\?\.navigationIntent \?\? beginNavigationIntent\(\)/);
   assert.match(storeSource, /sessionWorkspaceQueue\.then/);
   assert.ok(
