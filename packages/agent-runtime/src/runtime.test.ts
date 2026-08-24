@@ -228,6 +228,20 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await runtime.dispose();
   });
 
+  it("stops once at the next completed turn boundary", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+    agent.state.isStreaming = true;
+
+    expect(runtime.requestGracefulStop()).toEqual({ requested: true });
+    expect(await agent.shouldStopAfterTurn({})).toBe(true);
+    expect(await agent.shouldStopAfterTurn({})).toBe(false);
+
+    agent.state.isStreaming = false;
+    expect(runtime.requestGracefulStop()).toEqual({ requested: false });
+    await runtime.dispose();
+  });
+
   it("keeps a vendor-account runtime across turns despite a fresh auth resolver", async () => {
     // The sidecar injects a new `resolveAuth` closure on every launch. If that
     // counted as a configuration change, an OAuth session would rebuild its

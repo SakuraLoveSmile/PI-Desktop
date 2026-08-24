@@ -68,6 +68,7 @@ export const IPC = {
     agentPrompt: "pi-desktop/agent/prompt",
     agentCompact: "pi-desktop/agent/compact",
     agentAbort: "pi-desktop/agent/abort",
+    agentStop: "pi-desktop/agent/stop",
     agentGetStatus: "pi-desktop/agent/getStatus",
     agentInstructionsGet: "pi-desktop/agent/instructions/get",
     agentInstructionsSave: "pi-desktop/agent/instructions/save",

@@ -8,6 +8,7 @@ import type {
   UiMessage,
   MessageRevisionSummary,
   AgentPromptResponse,
+  AgentStopResponse,
   AgentStatus,
   AskToolResolution,
   AgentInstructionFile,
@@ -394,6 +395,8 @@ export const api = {
     invoke<AgentCompactResponse>(IPC.invoke.agentCompact, req),
   abort: (sessionId: string) =>
     invoke(IPC.invoke.agentAbort, { sessionId }),
+  stop: (sessionId: string) =>
+    invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId }),
   getStatus: (sessionId: string) =>
     invoke<{ status: AgentStatus }>(IPC.invoke.agentGetStatus, sessionId),
   getAgentInstructions: (projectPath?: string) =>

@@ -87,11 +87,11 @@ test("reject or interruption returns editable planning without changing durable 
   // The contract kind, not the projected state, decides which mode is shown.
   assert.match(hostPlanEventBlock, /event\.kind \?\? checkpoint\?\.kind/);
   assert.match(hostPlanEventBlock, /planExecutionWasActive/);
-  assert.match(storeSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
-  assert.match(storeSource, /pendingPlans\[sessionId\]\?\.status === "pending"\) return;/);
+  assert.match(storeSource, /get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"/);
+  assert.match(storeSource, /get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"\) return;/);
   const sendPromptBlock =
-    storeSource.match(/sendPrompt: async \(content, draft\)[\s\S]*?\n  compactContext:/)?.[0] ?? "";
-  assert.match(sendPromptBlock, /pendingPlans\[sessionId\]\?\.status === "pending"/);
+    storeSource.match(/sendPrompt: async \(content, draft, requestedSessionId\)[\s\S]*?\n  compactContext:/)?.[0] ?? "";
+  assert.match(sendPromptBlock, /get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.match(sendPromptBlock, /await api\.prompt\(\{/);
   assert.match(sendPromptBlock, /sessionId,\s*content,/);
   assert.match(
@@ -189,7 +189,7 @@ test("pending approval keeps the draft while gating every composer control", () 
   assert.match(composerSource, /enabled: !inputBlocked/);
   assert.match(composerSource, /disabled=\{controlsBlocked\}/);
   assert.match(composerSource, /const controlsBlocked = approvalPending;/);
-  assert.match(composerSource, /const sendBlocked = runActive \|\| approvalPending \|\| pasting;/);
+  assert.match(composerSource, /const sendBlocked = approvalPending \|\| pasting;/);
   assert.match(storeSource, /if \(get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"\) return/);
 });
 

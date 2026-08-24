@@ -1133,6 +1133,8 @@ export class DesktopAgentRuntime {
   private compactionInProgress = false;
   /** Set by the `new_context` tool, consumed at the next turn boundary. */
   private pendingModelCompaction = false;
+  /** One-shot request to finish the current turn at the next boundary. */
+  private gracefulStopRequested = false;
   /** Codex's `claim_*` flags: one of each reminder per context window. */
   private contextReminderClaimed = false;
   private contextFallbackReminderClaimed = false;
@@ -1309,6 +1311,15 @@ Delegation rules:
       // `Task` calls — subagent fan-out (ADR 0062) — and every existing tool
       // ordering guarantee is untouched.
       toolExecution: "parallel",
+      // A queued renderer prompt asks the current run to finish normally at
+      // the next turn boundary. pi-agent-core evaluates this after the
+      // assistant response and completed tool batch, before another provider
+      // request, so no second concurrent durable turn is created.
+      shouldStopAfterTurn: async () => {
+        if (!this.gracefulStopRequested) return false;
+        this.gracefulStopRequested = false;
+        return true;
+      },
     });
 
     this.agent.subscribe((event) => this.handleAgentEvent(event));
@@ -4855,6 +4866,7 @@ Delegation rules:
     this.hostTurnId = durableTurnId;
     this.turnId = durableTurnId;
     this.pendingUserMessageId = undefined;
+    this.gracefulStopRequested = false;
     this.resetRunRecoveryState();
     this.currentAssistant = undefined;
     this.requestStartedAt = Date.now();
@@ -4915,6 +4927,7 @@ Delegation rules:
     const nextTurnId = durableTurnId?.trim() || randomUUID();
     this.hostTurnId = nextTurnId;
     this.turnId = nextTurnId;
+    this.gracefulStopRequested = false;
     // Capabilities and path-scoped instruction claims belong to one prompt.
     this.resetDeferredToolsForPrompt();
     this.pathInstructionClaims.clear();
@@ -4983,11 +4996,21 @@ Delegation rules:
   }
 
   async abort(): Promise<void> {
+    this.gracefulStopRequested = false;
     this.resolvePendingAskTools();
     this.abortRunningDelegations();
     this.agent.abort();
     this.providerRetryAbort?.abort();
     this.compactionAbort?.abort();
+  }
+
+  /** Ask pi-agent-core to stop after the current assistant/tool turn. */
+  requestGracefulStop(): { requested: boolean } {
+    if (this.disposed || !this.agent.state.isStreaming) {
+      return { requested: false };
+    }
+    this.gracefulStopRequested = true;
+    return { requested: true };
   }
 
   getStatus(): AgentStatus {
@@ -5012,6 +5035,7 @@ Delegation rules:
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
     this.terminatingToolCalls.clear();
+    this.gracefulStopRequested = false;
     this.hostCloseUnsubscribe?.();
     this.hostCloseUnsubscribe = undefined;
     this.agent.abort();

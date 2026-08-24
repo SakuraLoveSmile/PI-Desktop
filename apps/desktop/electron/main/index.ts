@@ -59,6 +59,7 @@ import {
   type AgentEventEnvelope,
   type AgentPromptAttachment,
   type AgentPromptRequest,
+  type AgentStopRequest,
   type AskToolResolution,
   type AppMenuCommand,
   type AppNotification,
@@ -6663,6 +6664,17 @@ function registerIpc() {
       }
     }
     return result;
+  });
+
+  handle(IPC.invoke.agentStop, async (req: AgentStopRequest) => {
+    if (!sidecar) throw new Error("sidecar unavailable");
+    logger.app("session", "info", "prompt graceful stop requested", {
+      sessionId: req.sessionId,
+    });
+    // The runtime owns the boundary decision. Do not close the durable turn
+    // here: agent_end must arrive after the current reply/tool batch completes
+    // and finish it as a normal completed turn.
+    return sidecar.call("agent.stop", req);
   });
 
   handle(IPC.invoke.agentGetStatus, async (sessionId: string) => {

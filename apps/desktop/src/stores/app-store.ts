@@ -115,6 +115,15 @@ import {
   type ComposerDraftSnapshot,
   type ComposerPrefill,
 } from "../lib/composer-smart-stop";
+import {
+  clearQueuedPromptSendNow,
+  enqueueQueuedPrompt,
+  prioritizeQueuedPrompt,
+  queuedPromptForSession,
+  removeQueuedPrompt,
+  type QueuedPrompt,
+  type QueuedPrompts,
+} from "../lib/queued-prompts";
 
 const ErrorCodes = {
   ...SharedErrorCodes,
@@ -226,6 +235,7 @@ type SessionConfiguration = Pick<
  */
 const pendingSessionConfigurations = new Map<string, SessionConfiguration>();
 const sessionConfigurationFlushes = new Map<string, Promise<void>>();
+const queuedPromptDrains = new Map<string, Promise<void>>();
 const sessionDetailLoads = new Map<
   string,
   ReturnType<typeof api.getSession>
@@ -463,6 +473,8 @@ export type AppState = {
   pendingPermissions: PermissionQueues;
   /** Inline asktool requests, queued per session without an expiry. */
   pendingAsks: AskQueues;
+  /** Renderer-owned, in-memory prompt queue, isolated by session. */
+  queuedPrompts: QueuedPrompts;
   /** Planning state is durable per session, including sessions outside view. */
   planningStates: Record<string, PlanningState>;
   /** Live host approval rows keyed by session; only pending rows form the gate. */
@@ -505,7 +517,15 @@ export type AppState = {
   sendPrompt: (
     content: string,
     draft?: ComposerDraftSnapshot,
+    targetSessionId?: string,
   ) => Promise<boolean>;
+  enqueuePrompt: (
+    content: string,
+    draft?: ComposerDraftSnapshot,
+    sessionId?: string,
+  ) => void;
+  removeQueuedPrompt: (promptId: string) => void;
+  sendQueuedNow: (promptId: string) => Promise<void>;
   compactContext: () => Promise<void>;
   retryAssistantMessage: (messageId: string) => Promise<void>;
   /** Replace a user prompt and regenerate from it; the old branch stays in the revision pager. */
@@ -834,6 +854,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   pluginViews: [],
   pendingPermissions: {},
   pendingAsks: {},
+  queuedPrompts: {},
   planningStates: {},
   pendingPlans: {},
   planCheckpoints: {},
@@ -1463,8 +1484,107 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
-  sendPrompt: async (content, draft) => {
-    let sessionId = get().activeSessionId;
+  enqueuePrompt: (content, draft, requestedSessionId) => {
+    const sessionId = requestedSessionId ?? get().activeSessionId;
+    if (!sessionId) return;
+    const queuedDraft: ComposerDraftSnapshot = draft
+      ? {
+          text: draft.text,
+          fileReferences: draft.fileReferences.map((reference) => ({
+            ...reference,
+          })),
+        }
+      : { text: content, fileReferences: [] };
+    const item: QueuedPrompt = {
+      id: crypto.randomUUID(),
+      sessionId,
+      content,
+      draft: queuedDraft,
+      createdAt: Date.now(),
+    };
+    set((state) => ({
+      queuedPrompts: enqueueQueuedPrompt(state.queuedPrompts, item),
+    }));
+  },
+
+  removeQueuedPrompt: (promptId) => {
+    const sessionId = get().activeSessionId;
+    if (!sessionId) return;
+    set((state) => ({
+      queuedPrompts: removeQueuedPrompt(
+        state.queuedPrompts,
+        sessionId,
+        promptId,
+      ),
+    }));
+  },
+
+  sendQueuedNow: async (promptId) => {
+    const sessionId = get().activeSessionId;
+    if (!sessionId) return;
+    const item = queuedPromptForSession(
+      get().queuedPrompts,
+      sessionId,
+      promptId,
+    );
+    if (!item) return;
+    if (get().runningSessions[sessionId]) {
+      if (item.sendNowRequested) return;
+      set((state) => ({
+        queuedPrompts: prioritizeQueuedPrompt(
+          state.queuedPrompts,
+          sessionId,
+          promptId,
+        ),
+      }));
+      try {
+        const result = await api.stop(sessionId);
+        if (!result.requested) {
+          set((state) => ({
+            queuedPrompts: clearQueuedPromptSendNow(
+              state.queuedPrompts,
+              sessionId,
+            ),
+          }));
+          if (!get().runningSessions[sessionId]) {
+            void drainQueuedPrompts(sessionId);
+          }
+        }
+      } catch (error) {
+        set((state) => ({
+          queuedPrompts: clearQueuedPromptSendNow(
+            state.queuedPrompts,
+            sessionId,
+          ),
+        }));
+        get().showToast(
+          error instanceof Error ? error.message : String(error),
+          { variant: "error" },
+        );
+      }
+      return;
+    }
+
+    set((state) => ({
+      queuedPrompts: removeQueuedPrompt(
+        state.queuedPrompts,
+        sessionId,
+        promptId,
+      ),
+    }));
+    const accepted = await get().sendPrompt(item.content, item.draft, sessionId);
+    if (!accepted) {
+      set((state) => ({
+        queuedPrompts: enqueueQueuedPrompt(state.queuedPrompts, {
+          ...item,
+          sendNowRequested: undefined,
+        }),
+      }));
+    }
+  },
+
+  sendPrompt: async (content, draft, requestedSessionId) => {
+    let sessionId = requestedSessionId ?? get().activeSessionId;
     if (sessionId && get().pendingPlans[sessionId]?.status === "pending") {
       return false;
     }
@@ -1478,9 +1598,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (!sessionId) throw new Error("No active session");
     if (get().pendingPlans[sessionId]?.status === "pending") return false;
+    if (get().runningSessions[sessionId]) {
+      get().enqueuePrompt(content, draft, sessionId);
+      return true;
+    }
     const startedIn = sessionId;
+    const messageCountBeforeSend =
+      startedIn === get().activeSessionId
+        ? get().messages.length
+        : sessionTranscriptCache.get(startedIn)?.length ?? 0;
     const submission: SubmittedComposerDraft = {
-      messageCountBeforeSend: get().messages.length,
+      messageCountBeforeSend,
       draft: draft
         ? {
             text: draft.text,
@@ -1492,7 +1620,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     submittedComposerDrafts.set(startedIn, submission);
     set((s) => ({
-      isRunning: true,
+      isRunning: s.activeSessionId === startedIn ? true : s.isRunning,
       error: null,
       errorCode: null,
       errorRetriable: null,
@@ -2223,6 +2351,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       delete runningSessions[id];
       const sessionOutcomes = { ...state.sessionOutcomes };
       delete sessionOutcomes[id];
+      const queuedPrompts = withoutRecordKey(state.queuedPrompts, id);
       const workPanelContexts = withoutRecordKey(state.workPanelContexts, id);
       const pendingPermissions = clearSessionPermissions(
         state.pendingPermissions,
@@ -2244,6 +2373,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         sessions,
         runningSessions,
         sessionOutcomes,
+        queuedPrompts,
         workPanelContexts,
         activeSessionId:
           state.activeSessionId === id ? undefined : state.activeSessionId,
@@ -2678,6 +2808,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (event.state === "inactive") {
       void get().refreshSessions();
     }
+    if (event.state !== "awaiting_approval") {
+      void drainQueuedPrompts(event.sessionId);
+    }
   },
 
   handleAgentEvent: (envelope) => {
@@ -2724,6 +2857,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
       }));
       void flushPendingSessionConfiguration(envelope.sessionId);
+      void drainQueuedPrompts(envelope.sessionId);
     } else if (
       event.type === "agent_end" ||
       event.type === "error"
@@ -2755,6 +2889,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               },
       }));
       void flushPendingSessionConfiguration(envelope.sessionId);
+      if (event.type === "agent_end") {
+        void drainQueuedPrompts(envelope.sessionId);
+      }
     }
     if (event.type === "planning_state") {
       nextPlanSyncGeneration(envelope.sessionId);
@@ -2786,6 +2923,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           openPlanArtifact(checkpoint, get().openWorkPanelTabForSession);
         }
         void get().restorePendingPlan(envelope.sessionId);
+      }
+      if (event.state !== "awaiting_approval") {
+        void drainQueuedPrompts(envelope.sessionId);
       }
     }
     // Any session's workspace mutation invalidates the review diff; this
@@ -3424,6 +3564,43 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearComposerPrefill: () => set({ composerPrefill: null }),
 }));
+
+function drainQueuedPrompts(sessionId: string): Promise<void> {
+  const active = queuedPromptDrains.get(sessionId);
+  if (active) return active;
+  const drain = (async () => {
+    while (!useAppStore.getState().runningSessions[sessionId]) {
+      const item = useAppStore.getState().queuedPrompts[sessionId]?.[0];
+      if (!item) break;
+      useAppStore.setState((state) => ({
+        queuedPrompts: removeQueuedPrompt(
+          state.queuedPrompts,
+          sessionId,
+          item.id,
+        ),
+      }));
+      const accepted = await useAppStore
+        .getState()
+        .sendPrompt(item.content, item.draft, sessionId);
+      if (!accepted) {
+        useAppStore.setState((state) => ({
+          queuedPrompts: enqueueQueuedPrompt(state.queuedPrompts, {
+            ...item,
+            sendNowRequested: undefined,
+          }),
+        }));
+        break;
+      }
+    }
+  })();
+  queuedPromptDrains.set(sessionId, drain);
+  void drain.finally(() => {
+    if (queuedPromptDrains.get(sessionId) === drain) {
+      queuedPromptDrains.delete(sessionId);
+    }
+  });
+  return drain;
+}
 
 function flushPendingSessionConfiguration(sessionId: string): Promise<void> {
   const active = sessionConfigurationFlushes.get(sessionId);

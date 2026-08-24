@@ -76,55 +76,60 @@ accept_prompt
 ## 3. Transition rules
 
 1. Only one active turn per session
-2. New prompt rejected with `AGENT_BUSY` while running/waiting_permission
-3. Abort from running or waiting_permission is allowed. Renderer smart Stop
+2. A direct host prompt is rejected with `AGENT_BUSY` while
+   running/waiting_permission. The renderer's Send-while-running path stores
+   the next prompt in its per-session in-memory queue instead and releases it
+   only after `agent_end`, so normal user sends do not surface `AGENT_BUSY`.
+3. A graceful stop completes the current assistant/tool boundary as a normal
+   `completed` turn before the renderer releases a queued prompt.
+4. Abort from running or waiting_permission is allowed. Renderer smart Stop
    removes an unanswered root user row and restores its session/turn-scoped
    pre-serialization composer snapshot; once assistant text, thinking, or any
    tool row begins, abort preserves the partial transcript and restores no
    draft. The snapshot keeps structured file/image references and is never
    reconstructed by parsing model-facing `@path` text.
-4. Permission timeout moves to tool denied, then agent may continue or end based on runtime handling
-5. Session status returns to idle after terminal turn states are persisted
-6. Changing the renderer's active project/session does not transition or abort
+5. Permission timeout moves to tool denied, then agent may continue or end based on runtime handling
+6. Session status returns to idle after terminal turn states are persisted
+7. Changing the renderer's active project/session does not transition or abort
    any background session
-7. A tool transition retains the originating session's persisted project root;
+8. A tool transition retains the originating session's persisted project root;
    it never adopts the newly active project's root
-8. `session.endTurn` moves only a `running` turn to terminal. In that same
+9. `session.endTurn` moves only a `running` turn to terminal. In that same
    transaction, unseen `completed` inserts `task.completed`, unseen `error`
    inserts `task.failed`, and a result already visible in the focused current
    chat or any `aborted` turn inserts no notification (D117). Repeated terminal
    calls are no-ops. Renderer terminal lifecycle events update the transcript
    and turn result card; the sidebar terminal mark is derived only from the
    corresponding unread notification, never from `agent_end` alone.
-9. Fork is allowed only while the source is idle. The child begins idle with
+10. Fork is allowed only while the source is idle. The child begins idle with
    no turn or waiting-permission state. Electron returns `AGENT_BUSY` for its
    active runtime guard and normalizes the host's persisted running-turn
    `CONFLICT` fallback to the same IPC error. Neither path produces a partial
    child.
-10. Supplying `throughMessageId` changes only the snapshot boundary. Assistant
+11. Supplying `throughMessageId` changes only the snapshot boundary. Assistant
     Fork/Edit still creates a new idle session id with no shared turn,
     permission wait, runtime, or provider-cache state (D134).
-11. `EnterPlanMode`, `EnterGoalMode`, `SubmitPlan`, and `SubmitGoal` must be the
+12. `EnterPlanMode`, `EnterGoalMode`, `SubmitPlan`, and `SubmitGoal` must be the
     only tool call in their
     assistant batch. A submit tool preserves exact Markdown bytes in a new
     host-owned `.pi/<kind>/*.md` artifact and creates one pending
     `plan_approvals` row with its `kind` plus structured title/question and
     artifact fields. A submit tool called against the other kind's mode fails
     with `PLAN_KIND_MISMATCH` and writes nothing.
-12. Only a matching `plans.resolve` can settle a pending proposal. Approval
+13. Only a matching `plans.resolve` can settle a pending proposal. Approval
     atomically changes the durable mode to Agent, stores the selected explicit
     permission mode, assigns an execution ID, and changes the row's
     `execution_state` to `queued`.
-13. Approve and reject are the only resolution actions. Rejection and expiry
+14. Approve and reject are the only resolution actions. Rejection and expiry
     close the pending row, then return the live state to the editable
     planning state of the same contract mode
     and grant no execution tools. A pending interruption does the same; a
     queued/running interruption after approval stays Agent.
-14. A second prompt, Plan or Goal submission, configuration change, or execution
+15. A second prompt, Plan or Goal submission, configuration change, or execution
     is
     rejected while the session has an active turn, pending approval, or
     queued/running execution. Configuration is accepted only while idle.
-15. A later turn in the same contract mode may revise a
+16. A later turn in the same contract mode may revise a
     rejected/expired/interrupted checkpoint and
     must create a new immutable artifact rather than overwrite the earlier
     snapshot.
@@ -174,22 +179,25 @@ transcript-file line first, index transaction second.
    produce a child
 7. a message-scoped fork excludes later rows and begins with no source runtime
    or provider-cache state
-8. Plan, Goal, and Agent use one pi Agent; the Composer-left mode chip, UI
+8. a running session can queue removable FIFO prompts per session; Send now
+   completes the current turn at the next boundary, while immediate Abort
+   leaves the queue intact
+9. Plan, Goal, and Agent use one pi Agent; the Composer-left mode chip, UI
    entry, and
    `EnterPlanMode`/`EnterGoalMode` converge on the same planning state, and
    approval resumes
    that Agent in Agent mode
-9. Contract-mode policy permits Bash only through the selected permission mode
+10. Contract-mode policy permits Bash only through the selected permission mode
    and
    denies Write/Edit/plugins regardless of `auto` or session grants, in Goal
    exactly as in Plan
-10. SubmitPlan/SubmitGoal writes an exact unique `.pi/<kind>/*.md` artifact with
+11. SubmitPlan/SubmitGoal writes an exact unique `.pi/<kind>/*.md` artifact with
     hash/size,
     keeps title/question structured, and only approve/reject can resolve its
     `plan_approvals` row
-11. Expiry uses `PLAN_APPROVAL_TIMEOUT`; startup interruption, shell failure,
+12. Expiry uses `PLAN_APPROVAL_TIMEOUT`; startup interruption, shell failure,
     and process recovery are fail closed, and restart does not replay pending,
     queued, or running work
-12. A Goal execution reports each acceptance criterion's outcome before ending
+13. A Goal execution reports each acceptance criterion's outcome before ending
     the turn, and a scheduled/unattended Goal run is rejected with
     `PLAN_REQUIRES_INTERACTIVE_SESSION` exactly like Plan

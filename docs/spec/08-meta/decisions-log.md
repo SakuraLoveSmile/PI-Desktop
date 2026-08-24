@@ -2188,3 +2188,21 @@ D193, and D194.
   window bounds, IPC, and storage contracts are unchanged.
 - See ADR 0117, `03-runtime/07-process-model.md`,
   `04-ux/09-interaction-patterns.md`, and E2E-124.
+
+## 2026-08-24 — Renderer-owned queued prompts and graceful Send now
+
+- Decision D253 adds a per-session, renderer-local FIFO queue for prompts sent
+  while an agent is running. The queue holds the visible prompt and its draft
+  snapshot, supports independent removal, survives session switches, and is
+  intentionally not persisted or replayed after restart.
+- Send and Stop coexist. Normal Send appends to the queue; after the owning
+  session's `agent_end`, the renderer drains one item through the existing
+  `agent/prompt` path. Send now promotes one item and calls additive
+  `pi-desktop/agent/stop`; the sidecar sets pi-agent-core's one-shot
+  `shouldStopAfterTurn` flag, so the current assistant response/tool batch
+  completes and the durable turn closes normally before the prioritized prompt
+  starts. Immediate abort keeps its current behavior and never clears the
+  queue.
+- This changes renderer state ownership and adds a public Electron IPC channel,
+  but does not change host-core protocol v9, storage schema v11, or the
+  one-running-turn constraint. See ADR 0118 and E2E-011f.
