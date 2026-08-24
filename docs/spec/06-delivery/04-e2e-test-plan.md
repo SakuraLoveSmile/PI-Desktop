@@ -5350,7 +5350,11 @@ This test plan spec is accepted when:
   use the app's compact control density (30 px rows, 15 px marks, 8 px row
   gaps, compact buttons), and the card keeps a relaxed internal rhythm
   (12/14 px indicator margins, `--leading-normal` question line-height). The
-  tool output is ordered as
+  question's option list is bounded to the available viewport height; when a
+  fixture contains enough options to overflow, only that list scrolls and the
+  question header, custom-answer input, and Skip / Next / Submit actions remain
+  reachable. Scrolling the list does not move the conversation page or hide the
+  action row. The tool output is ordered as
   `question：answer`, uses `、` between multiple answers and `\n---\n`
   between questions, and
   keeps `question：` for the skipped question. Decline all produces empty

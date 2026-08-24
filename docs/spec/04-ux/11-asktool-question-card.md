@@ -58,3 +58,12 @@ blocks: 30 px min-height, 4 px × 8 px padding, 8 px row gaps, and the same
 15 px radio/checkbox mark used by the sidebar checkboxes. The Skip / Next /
 Submit buttons use the app's compact button size (4 px × 10 px padding,
 12 px text); Decline remains a quiet text link in the header.
+
+When a question has enough options to exceed the available dock height, the
+option list becomes the scroll container instead of allowing the composer dock
+to grow beyond the viewport. The list uses a dynamic viewport cap of
+`min(320px, 36dvh)` (with a `vh` fallback), keeps a stable scrollbar gutter,
+contains scroll chaining, and preserves keyboard scroll padding. The question
+header, question text, custom-answer input, and Skip / Next / Submit actions
+remain visible while the user scrolls through the options. This behavior also
+applies on narrow screens; the card does not rely on page-level scrolling.

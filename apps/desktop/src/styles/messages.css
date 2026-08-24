@@ -149,7 +149,16 @@
 .asktool-options {
   display: grid;
   gap: 8px;
+  max-height: min(320px, 36vh);
+  max-height: min(320px, 36dvh);
   margin-top: 12px;
+  padding: 2px 4px 2px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scroll-padding-block: 2px;
 }
 
 .asktool-option {
