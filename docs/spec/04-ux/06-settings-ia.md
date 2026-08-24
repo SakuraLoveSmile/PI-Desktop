@@ -164,6 +164,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - thinking chips follow canonical order. Removing the current default falls
     back to the first enabled level; no enabled levels disable the default
     selector and show the model's thinking-disabled hint
+  - selecting the **OpenCode Go** API style applies the fixed name
+    **OpenCode Go** and endpoint `https://opencode.ai/zen/go/v1`; those two
+    fields remain visible but read-only, the API key remains editable, and
+    model discovery continues through the fixed endpoint
   - helper copy stays out of the model cards; labels, status badges, and the
     empty/error state carry the necessary context without explanatory
     paragraphs

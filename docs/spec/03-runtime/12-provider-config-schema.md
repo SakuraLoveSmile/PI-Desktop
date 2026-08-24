@@ -48,6 +48,7 @@ Tables (canonical DDL in [04-data-storage](04-data-storage.md) §4.3–4.4, §4.
     "apiStyle": {
       "enum": [
         "chat_completions",
+        "opencode_go",
         "responses",
         "anthropic_messages",
         "google_generative_ai",
@@ -134,6 +135,15 @@ materializes one binding on read with a 128,000 context window, 8,192 max
 output, no enabled thinking levels, and a null default. The next write stores
 the binding array in `config_json.models`.
 
+`apiStyle: "opencode_go"` is a first-class OpenCode Go preset layered on the
+OpenAI-compatible provider type. It persists as its own style so the UI can
+identify the service, but runtime requests use the OpenAI Chat Completions
+wire adapter. The preset always uses `name: "OpenCode Go"` and
+`baseUrl: "https://opencode.ai/zen/go/v1"`; the settings dialog displays both
+fields as read-only and accepts only the API key as connection input. Model
+discovery calls the fixed `/models` endpoint with a Bearer key, and the raw key
+continues to follow the normal secret-store path.
+
 ## 3. Built-in vendor presets
 
 Presets only prefill form defaults; they are not a closed world.
@@ -155,6 +165,12 @@ Presets only prefill form defaults; they are not a closed world.
 | ollama | openai_compatible | none | yes |
 | lmstudio | openai_compatible | none | yes |
 | custom | openai_compatible | api_key_and_base_url | yes |
+
+### Fixed API-style presets
+
+| apiStyle | provider type | authKind | name | baseUrl |
+|---|---|---|---|---|
+| `opencode_go` | `openai_compatible` | `api_key_and_base_url` | `OpenCode Go` | `https://opencode.ai/zen/go/v1` |
 
 ### Vendor-account presets
 
@@ -304,15 +320,16 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
    OAuth rows may share a vendor display name because `providerId` is their
    account identity
 2. `openai_compatible` / local gateways require absolute `baseUrl` unless preset says optional
-3. `authKind=none` forbidden for cloud presets that require keys
-4. headers keys are case-insensitive unique
-5. secretValue max length enforced (e.g. 8KB)
-6. modelId must be non-empty trimmed string; allow `/`, `.`, `:`, `-`
-7. unknown protocol on older clients => provider shown disabled with warning, not crash
-8. Legacy `supportsReasoning`, when present, must still validate as boolean but
+3. `apiStyle=opencode_go` requires the fixed OpenCode Go name and endpoint; clients must not accept overrides
+4. `authKind=none` forbidden for cloud presets that require keys
+5. headers keys are case-insensitive unique
+6. secretValue max length enforced (e.g. 8KB)
+7. modelId must be non-empty trimmed string; allow `/`, `.`, `:`, `-`
+8. unknown protocol on older clients => provider shown disabled with warning, not crash
+9. Legacy `supportsReasoning`, when present, must still validate as boolean but
    has no runtime effect
-9. Legacy `supportedThinkingLevels`, when present, must still validate as an
-   array of canonical thinking levels but has no runtime effect
+10. Legacy `supportedThinkingLevels`, when present, must still validate as an
+  array of canonical thinking levels but has no runtime effect
 
 ## 11. Secret ref format
 

@@ -198,6 +198,29 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Unit-covered host migration; manual UI journey
 
+#### E2E-005B: Configure the fixed OpenCode Go API-style preset
+
+- **Preconditions**: App running; no OpenCode Go provider configured; the
+  OpenCode Go endpoint is reachable with a test API key.
+- **Steps**: 1) Open Settings → Model configuration and open the add-provider
+  dialog. 2) Select **OpenCode Go** in API format. 3) Inspect the name and base
+  URL fields, enter an API key, and wait for model discovery. 4) Select a
+  discovered model and save the provider. 5) Reopen the provider and switch
+  the API format away from OpenCode Go.
+- **Expected**: Selecting the preset fills **OpenCode Go** and
+  `https://opencode.ai/zen/go/v1`, keeps both fields read-only, focuses the API
+  key field, and leaves model selection available. Discovery requests
+  `https://opencode.ai/zen/go/v1/models` with `Authorization: Bearer <key>`;
+  the saved row persists `apiStyle: "opencode_go"` and the key is stored via
+  the secret store. Reopening preserves the fixed identity, and switching to
+  another API style makes the name and endpoint editable again.
+- **Specs linked**: `03-runtime/11-provider-model-system.md`,
+  `03-runtime/12-provider-config-schema.md`, `04-ux/06-settings-ia.md`,
+  ADR 0116
+- **Acceptance**: B (model configuration and key storage), Security
+- **Milestone**: M2
+- **Status**: Unit-covered (form and discovery contracts); rendered UI scenario Draft
+
 #### E2E-006: Key survives restart
 
 - **Preconditions**: Provider + key configured.

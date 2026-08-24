@@ -62,6 +62,13 @@ Protocol profiles (MVP):
 5. `bedrock` (if enabled by runtime support)
 6. `custom_http` (advanced/experimental later)
 
+OpenCode Go is exposed as a named `opencode_go` API-style preset. It remains
+inside the `openai_compatible` provider path: the preset fixes the endpoint to
+`https://opencode.ai/zen/go/v1`, uses Bearer API-key authentication, discovers
+models from `/models`, and sends chat turns through pi-ai's OpenAI Chat
+Completions adapter. It does not create a second transport or a closed model
+allowlist.
+
 ## 5. Built-in vendor matrix (ship intent)
 
 > Exact availability depends on pi-ai support at pin version; product must expose all supported ones and keep OpenAI-compatible path open for the rest.
@@ -169,6 +176,7 @@ type ProviderConfig = {
   headers?: Record<string, string> // non-secret headers only
   apiStyle?:
     | "chat_completions"
+    | "opencode_go"
     | "responses"
     | "anthropic_messages"
     | "google_generative_ai"
@@ -446,7 +454,7 @@ Required fields:
 - model id (catalog or free-form)
 
 Optional:
-- `apiStyle` (`chat_completions` | `responses` | `auto`)
+- `apiStyle` (`chat_completions` | `opencode_go` | `responses` | `auto`)
 - compatibility flags
 - custom headers (non-secret)
 
