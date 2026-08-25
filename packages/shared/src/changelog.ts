@@ -23,6 +23,14 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.10.6",
+    date: "2026-08-25",
+    highlights: [
+      "Show Thinking capabilities for the exact model selected in the Composer, including before a new session is created.",
+      "Start new sessions at the selected reasoning model's strongest published level.",
+    ],
+  },
+  {
     version: "0.10.5",
     date: "2026-08-25",
     highlights: [
@@ -429,6 +437,14 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.10.6",
+    date: "2026-08-25",
+    highlights: [
+      "根据输入框中精确选中的模型显示 Thinking 能力，即使新会话尚未创建也能立即生效。",
+      "新会话会以所选推理模型发布的最高强度开始。",
+    ],
+  },
   {
     version: "0.10.5",
     date: "2026-08-25",
