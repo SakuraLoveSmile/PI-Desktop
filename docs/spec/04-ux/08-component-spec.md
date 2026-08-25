@@ -909,7 +909,10 @@ SESSIONS                                      [msg+][↕]
 - The standalone Sessions body shows at most five compact 28px rows and
   scrolls internally when more rows exist. The Projects list uses the remaining
   sidebar height and scrolls independently; neither region scrolls the footer
-  or primary navigation.
+  or primary navigation. Both list scrollbars remain 6px, trackless, and
+  low-contrast at rest; the semantic-ink thumb strengthens on hover or drag so
+  the independent regions stay available without becoming persistent visual
+  rails.
 
 ---
 
