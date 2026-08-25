@@ -53,3 +53,42 @@ test("session fork labels are localized", () => {
   assert.match(chinese, /createBranch:\s*"从此处分支"/);
   assert.match(chinese, /branchTitle:\s*"\{\{title\}\}（分支）"/);
 });
+
+test("fork actions populate sessionHistory and cache transcript (D-fork-msg-loss)", () => {
+  const store = read("../src/stores/app-store.ts");
+
+  // forkSession must set sessionHistory for the new session
+  assert.match(
+    store,
+    /forkSession[\s\S]*?set\(\(current\)[\s\S]*?sessionHistory:\s*\{[\s\S]*?\[summary\.id\]:\s*\{\s*messageStart:\s*0,\s*hasMoreBefore:\s*false\s*\}/,
+    "forkSession must set sessionHistory[summary.id] = { messageStart: 0, hasMoreBefore: false }",
+  );
+
+  // forkAssistantMessage must set sessionHistory for the new session
+  assert.match(
+    store,
+    /forkAssistantMessage[\s\S]*?set\(\(current\)[\s\S]*?sessionHistory:\s*\{[\s\S]*?\[summary\.id\]:\s*\{\s*messageStart:\s*0,\s*hasMoreBefore:\s*false\s*\}/,
+    "forkAssistantMessage must set sessionHistory[summary.id] = { messageStart: 0, hasMoreBefore: false }",
+  );
+
+  // Both must cache the forked transcript so re-selection uses it immediately
+  const forkSessionBlock = store.slice(
+    store.indexOf("forkSession: async (id)"),
+    store.indexOf("forkAssistantMessage: async"),
+  );
+  assert.match(
+    forkSessionBlock,
+    /cacheSessionTranscript\(summary\.id,\s*messages/,
+    "forkSession must call cacheSessionTranscript after set()",
+  );
+
+  const forkAssistantBlock = store.slice(
+    store.indexOf("forkAssistantMessage: async"),
+    store.indexOf("configureActiveSession", store.indexOf("forkAssistantMessage: async")),
+  );
+  assert.match(
+    forkAssistantBlock,
+    /cacheSessionTranscript\(summary\.id,\s*messages/,
+    "forkAssistantMessage must call cacheSessionTranscript after set()",
+  );
+});

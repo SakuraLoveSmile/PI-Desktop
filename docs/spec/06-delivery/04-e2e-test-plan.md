@@ -309,18 +309,13 @@ Each scenario is documented in this format:
 
 - **Preconditions**: A session can produce both a deliberately delayed first
   token and a streaming response.
-- **Steps**: 1) Send ordinary text and, before assistant text, thinking, or a
-  tool row begins, confirm the cleared draft exposes the single Stop control.
-  2) Type another draft while the turn is running and confirm the same slot
-  becomes an enabled Send control; send it to queue the prompt, then confirm
-  the empty draft exposes Stop again. 3) Stop before assistant output begins
-  and confirm the user row is undone and the text returns to the composer. 4)
-  Send again, wait for partial output, then stop during the stream. 5) Observe
-  the transcript and composer.
-- **Expected**: The running/non-empty state uses Send and queues the prompt;
-  the running/empty state uses Stop. The unanswered send is undone and its
-  draft restored. The streaming send stops with its partial response preserved
-  and no draft restoration or duplicate user turn. The session remains usable.
+- **Steps**: 1) Send ordinary text and stop before assistant text, thinking, or
+  a tool row begins. 2) Confirm the user row is undone and the text returns to
+  the composer. 3) Send again, wait for partial output, then stop during the
+  stream. 4) Observe the transcript and composer.
+- **Expected**: The unanswered send is undone and its draft restored. The
+  streaming send stops with its partial response preserved and no draft
+  restoration or duplicate user turn. The session remains usable.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`
 - **Acceptance**: C (abort)
 - **Milestone**: M2
@@ -389,7 +384,7 @@ Each scenario is documented in this format:
 #### E2E-011a: New session while another session is still streaming
 
 - **Preconditions**: Provider configured; session A is streaming a long
-  response with an empty composer draft (the single submit slot shows Stop).
+  response (composer shows the stop/abort control).
 - **Steps**: 1) While A is still streaming, click New task / New chat. 2)
   Observe the fresh session's composer. 3) Type a prompt and send it while A
   continues streaming in the background. 4) Let A finish and observe the
@@ -500,10 +495,9 @@ Each scenario is documented in this format:
   before either run completes. 5) Choose Send now on A's remaining queued row.
   6) Observe A through the current tool/reply boundary and then the next turn.
   7) Start another run in A, queue a prompt, press Stop, and inspect the queue.
-- **Expected**: The single submit slot shows Send while the running draft has
-  content and queues that prompt on click; after the draft is empty it shows
-  Stop. A's two prompts appear in FIFO order, the removed row never sends, and
-  B's queue remains independent. Send now requests a graceful stop: the current batch completes
+- **Expected**: Send and Stop coexist while a run is active. A's two prompts
+  appear in FIFO order, the removed row never sends, and B's queue remains
+  independent. Send now requests a graceful stop: the current batch completes
   with a normal `agent_end`/completed turn, then the selected row starts before
   any remaining A rows without `AGENT_BUSY`. Immediate Stop aborts the current
   reply and preserves A's queued row; switching sessions preserves both queues.
@@ -1434,10 +1428,8 @@ Each scenario is documented in this format:
   `MODEL_NOT_CONFIGURED` or `PROVIDER_UNAUTHORIZED` code. Details expose the
   redacted provider response plus provider/model IDs and can be copied; no API
   key or Authorization value appears. The configuration failure links to
-  settings, the assistant error card exposes no Retry action, the composer
-  becomes usable again, and reload preserves the error message. The
-  session-scoped failed-turn recovery card remains the manual retry surface.
-  The development launch executes a
+  settings, retriable failures offer Retry, the composer becomes usable again,
+  and reload preserves the error message. The development launch executes a
   sidecar rebuilt from current runtime source.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`,
   `03-runtime/07-process-model.md`, `03-runtime/08-error-codes.md`
@@ -2562,6 +2554,24 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`sessions::tests::message_scoped_fork_stops_at_selected_assistant_response`,
   `session-fork.test.mjs`, `transcript-style.test.mjs`); full restart UI scenario Draft
+
+#### E2E-071b: Forked session retains messages after the first AI turn completes
+
+- **Preconditions**: A completed conversation with at least two user/assistant
+  exchanges. The session history window feature is active (bounded loading).
+- **Steps**: 1) Fork the conversation from the sidebar overflow menu. 2) In the
+  forked session, send a new prompt and wait for the AI to finish responding.
+  3) Observe the transcript after agent_end fires. 4) Click the forked session
+  entry in the sidebar (re-select). 5) Restart the app and reopen the fork.
+- **Expected**: All forked messages plus the new user prompt and AI response
+  remain visible after agent_end. Re-selecting the session from the sidebar
+  shows the same messages (no flash of empty state). After restart, messages
+  persist. The session history window is `{ messageStart: 0, hasMoreBefore: false }`.
+- **Specs linked**: `03-runtime/04-data-storage.md`, `04-ux/01-ui-ia.md`
+- **Acceptance**: C (chat stream), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`session-fork.test.mjs`
+  `fork actions populate sessionHistory and cache transcript`); UI scenario Draft
 
 #### E2E-073: Icon-only message toolbars and editing a user prompt
 
@@ -4377,8 +4387,7 @@ Each scenario is documented in this format:
      survives the restart.
   4. Start an Agent answer. While it streams, type the next draft and change
      Thinking, permission mode, and Agent/Plan/Goal. Confirm every selection is
-     editable; with a non-empty draft the single submit slot is Send and queues
-     the next prompt, while clearing the draft changes it to Stop.
+     editable, Stop remains present, and Send cannot dispatch.
   5. Stop after partial output. Confirm the partial answer remains, the queued
      configuration becomes durable only after termination, and the next turn
      uses the final selection rather than any intermediate selection.
@@ -4670,61 +4679,11 @@ Each scenario is documented in this format:
 - **Status**: Unit/source-contract covered; full provider-dialog journey Draft
   (do not run E2E locally unless explicitly requested)
 
-#### E2E-156: Composer enhances the visible draft and supports one-level undo
-
-- **Preconditions**: The Composer has a configured provider/model and a
-  session or home draft is visible.
-- **Steps**: 1) Enter a non-empty ordinary draft. 2) Confirm the sparkle
-  action is enabled and click it. 3) Observe the loading state while the
-  mocked completion is pending. 4) Resolve the completion with rewritten text.
-  5) Confirm the draft text is replaced, file-reference chips remain, and the
-  caret is at the end. 6) Click `Undo enhancement`. 7) Edit the restored text,
-  enhance again, send, and switch sessions while another request is pending.
-- **Expected**: The action uses the displayed provider/model/thinking level,
-  becomes disabled with the spinner and localized loading text, replaces only
-  text on success, and restores exactly one previous text snapshot. Editing,
-  sending, or switching sessions hides undo; a late response after any of
-  those changes is discarded.
-- **Specs linked**: `04-ux/12-prompt-enhancement.md`,
-  `03-runtime/01-ipc-protocol.md`, `03-runtime/02-agent-runtime.md`
-- **Acceptance**: B (model selection), C (conversation), F (persistence), Quality
-- **Milestone**: M6+
-- **Status**: Documented; agent-runtime unit and desktop source-contract tests
-  cover the protocol/flow, full UI automation pending
-
-#### E2E-157: Composer enhancement gates invalid drafts and preserves failures
-
-- **Preconditions**: The Composer can display configured and unconfigured
-  provider states; the provider stream can return classified failures and an
-  empty response.
-- **Steps**: 1) Check an empty draft, a `/command` draft, and a draft with no
-  available model. 2) Trigger enhancement with a valid draft and return
-  `PROVIDER_UNAUTHORIZED`, `NETWORK_ERROR`, `TIMEOUT`, and whitespace-only
-  responses in separate attempts. 3) Dismiss each error bar. 4) Inspect the
-  renderer bridge and process logs for credentials.
-- **Expected**: Invalid drafts keep the action disabled. Every failure leaves
-  the original text and chips untouched, shows a dismissible message with the
-  classified error code, and allows another attempt. The UI and logs contain
-  no API key or refresh token; only main resolves credentials.
-- **Specs linked**: `04-ux/12-prompt-enhancement.md`,
-  `03-runtime/01-ipc-protocol.md`, `03-runtime/08-error-codes.md`,
-  `05-security/01-security.md`
-- **Acceptance**: B (model config), C (conversation), H (diagnostics), Security, Quality
-- **Milestone**: M6+
-- **Status**: Documented; agent-runtime failure tests and desktop source-contract
-  tests cover the narrow path, full UI automation pending
-
 ## 8. Traceability Matrix
 
 
 
 
-
-> Prompt enhancement traceability: E2E-156 covers the successful rewrite,
-> loading, undo, edit/send/session-switch race guards, and current-model
-> forwarding; E2E-157 covers availability gates, classified failures, empty
-> output, dismissible error UI, and the main-process secret boundary. Both are
-> Acceptance B/C/Quality scenarios; E2E-157 also covers H and Security.
 
 | Acceptance | Scenarios |
 |---|---|
@@ -5307,10 +5266,10 @@ This test plan spec is accepted when:
 
 ### US-UI-60c Compact assistant error card
 - Trigger a retriable provider/model failure in the transcript in light and dark themes.
-- Expect the assistant error to use a restrained inline surface with a thin error rail. The localized summary, stable code, and details disclosure share one compact header; the card does not render a Retry or Continue action, and it does not render a second bottom action row.
+- Expect the assistant error to use a restrained inline surface with a thin error rail. The localized summary, stable code, details disclosure, and Retry action share one compact header; the card does not render a second bottom action row.
 - Confirm the details remain expanded on first render, keep the redacted provider response and provider/model IDs, and expose an icon-only copy control with an accessible label/tooltip. On a narrow window, the header actions wrap without horizontal overflow.
-- For a terminal `PROVIDER_RATE_LIMITED` (including HTTP 429), expect the same diagnostic card without a manual retry action.
-- Inspect the session-scoped failed-turn recovery card separately and expect it to retain the existing path that resends the latest prompt.
+- For a terminal `PROVIDER_RATE_LIMITED` (including HTTP 429), expect the action label to be localized as **Continue** while retaining the existing path that resends the latest prompt.
+- Click the action and expect the existing retry path to resend the latest prompt.
 
 
 ### US-UI-61 Assistant context summary + retry (D103, D184, D244)
@@ -6125,14 +6084,7 @@ This test plan spec is accepted when:
      both nodes once TaskWait returns, not stuck at "running", and that each
      node shows a non-zero runtime duration derived from the delegation
      lifecycle timestamps rather than the immediate `Task` start call.
-  9. Complete one turn, start a second turn within the delayed tool-metadata
-     cleanup window, and keep its `TaskWait` open across that window in the
-     deterministic fixture; confirm the completed row still has `TaskWait`,
-     its arguments, and a non-zero duration, and that both delegation nodes
-     settle to "completed". Reload the session before the terminal event and
-     confirm the terminal event appends the missing row instead of leaving a
-     permanent running card.
-  10. Edit `~/.agents/subagents/readonly.md` to declare `permission: auto` and reload the
+  9. Edit `~/.agents/subagents/readonly.md` to declare `permission: auto` and reload the
      catalog; confirm the definition still loads but carries a warning, and
      that its delegate still resolves under the session's effective mode (a
      `Write` inside the workspace still raises a permission card).
@@ -6143,19 +6095,17 @@ This test plan spec is accepted when:
   paths without a duplicate authorization prompt while `ask` and
   `accept-edits` retain their approval boundaries; a global definition's
   declared scope is dropped; the per-session running cap of 10 is enforced; no
-  delegate outlives its turn; a cross-turn `TaskWait` keeps its persisted tool
-  metadata; a renderer reload cannot drop its terminal row; reloaded
-  transcripts keep their delegation topology.
+  delegate outlives its turn; reloaded transcripts keep their delegation
+  topology.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f/§5f.1/§7.1,
-  `03-runtime/10-session-state-machine.md` §4,
   `03-runtime/03-tools-and-permissions.md` §10.2, `08-meta/decisions-log.md`
   (D242 amends D231), ADR 0089 and ADR 0100
 - **Acceptance**: C (conversation), E (tools & permissions), F (persistence),
   Security, Quality
 - **Milestone**: M6+
 - **Status**: Draft (unit coverage in `packages/agent-runtime`
-  `runtime.test.ts` subagent suite, desktop lifecycle contracts, and host-core
-  `rpc/mod.rs` delegate-scope tests; full desktop journey pending)
+  `runtime.test.ts` subagent suite and host-core `rpc/mod.rs` delegate-scope
+  tests; desktop journey pending)
 
 #### E2E-155: Subagent timeout policy preserves active work and reports expiry
 
