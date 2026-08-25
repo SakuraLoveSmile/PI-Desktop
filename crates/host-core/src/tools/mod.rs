@@ -1337,7 +1337,18 @@ fn tool_edit(
             .map_err(|e| (e.clone(), e))?;
     let original = std::fs::read_to_string(&resolved)
         .map_err(|e| ("TOOL_FAILED".into(), format!("read failed: {e}")))?;
-    let match_count = original.match_indices(old_str).count();
+
+    // CRLF normalization: Read tool strips \r before returning content to the
+    // model, so old_str/new_str always use LF-only line endings.  When the file
+    // on disk uses CRLF we must normalize before matching and restore afterwards.
+    let has_crlf = original.contains("\r\n");
+    let normalized = if has_crlf {
+        original.replace("\r\n", "\n")
+    } else {
+        original.clone()
+    };
+
+    let match_count = normalized.match_indices(old_str).count();
     if match_count == 0 {
         return Err((
             "TOOL_FAILED".into(),
@@ -1352,7 +1363,13 @@ fn tool_edit(
             ),
         ));
     }
-    let updated = original.replacen(old_str, new_str, 1);
+    let updated = normalized.replacen(old_str, new_str, 1);
+    // Restore CRLF line endings if the original file used them.
+    let updated = if has_crlf {
+        updated.replace("\n", "\r\n")
+    } else {
+        updated
+    };
     std::fs::write(&resolved, &updated)
         .map_err(|e| ("TOOL_FAILED".into(), format!("write failed: {e}")))?;
     Ok(json!({
@@ -3604,4 +3621,31 @@ mod tests {
         .await;
         assert_eq!(native.content["exitCode"], 7);
     }
+    #[tokio::test]
+    async fn edit_normalizes_crlf_before_matching() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("crlf.txt");
+        // Write a file with CRLF line endings
+        std::fs::write(&target, "line one\r\nline two\r\nline three\r\n").unwrap();
+
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Edit",
+            &serde_json::json!({
+                "path": "crlf.txt",
+                "old_string": "line two\n",
+                "new_string": "line TWO replaced\n"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(result.ok, "Edit failed on CRLF file: {:?}", result.content);
+        assert_eq!(result.content["replacements"], 1);
+
+        // Verify the file still has CRLF endings and the replacement was applied
+        let written = std::fs::read_to_string(&target).unwrap();
+        assert_eq!(written, "line one\r\nline TWO replaced\r\nline three\r\n");
+    }
+
 }
