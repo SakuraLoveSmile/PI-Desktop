@@ -532,7 +532,7 @@ Each scenario is documented in this format:
   band renders instead (no top-bar controls). The bar is draggable to move the
   window; interactive controls do not start a window drag.
   macOS leaves the left ~76px clear for traffic lights only while the sidebar is
-  collapsed (8px in fullscreen); Windows/Linux leave the right 112px clear for
+  collapsed (8px in fullscreen); Windows/Linux leave the right 120px clear for
   native window controls.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2 Topbar)
 - **Acceptance**: C (send/UI), Quality
@@ -2367,7 +2367,7 @@ Each scenario is documented in this format:
   Verify one window and one delivery per command. 4) On Windows/Linux, repeat
   from the main chat, Settings, and an open work panel. With the work panel
   open, confirm the panel collapse button is flush with the main-pane right
-  divider and does not retain the 112px outer-window control clearance. In the
+  divider and does not retain the 120px outer-window control clearance. In the
   main chat, send a first user message and confirm its full bubble starts below
   the 46px titlebar control band. Open the Extensions page and confirm its header
   actions, then the detail sheet's close button, also start below that band and
@@ -2392,8 +2392,9 @@ Each scenario is documented in this format:
   Settings surface and shows the resulting up-to-date state. Replacement-window
   commands wait for renderer readiness without
   creating duplicate windows or losing events. No Main, Settings, or work-panel
-  drag rectangle overlaps the reserved control zone. The 112px control band is
-  an opaque `bg-primary` surface in both light and dark themes, so destination
+  drag rectangle overlaps the reserved control zone. The 120px control band is
+  an opaque `bg-secondary` surface in both light and dark themes, with an 8px
+  visual buffer separating it from adjacent work-panel actions, so destination
   content never bleeds through it. Window controls remain clickable across
   their full 46px-high hit targets, match native state, and
   have accessible names; the first user or assistant transcript row never

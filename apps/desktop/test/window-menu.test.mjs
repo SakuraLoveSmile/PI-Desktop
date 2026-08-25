@@ -158,19 +158,20 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   );
   assert.match(
     stylesSource,
-    /\.window-controls\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;[^}]*width:\s*112px;/s,
+    /\.window-controls\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;[^}]*width:\s*var\(--ds-window-controls-width\);/s,
   );
   assert.match(
     stylesSource,
-    /\.window-controls\s*\{[^}]*height:\s*46px[^}]*background:\s*var\(--ds-bg-primary\);/s,
+    /\.window-controls\s*\{[^}]*height:\s*46px[^}]*padding-left:\s*8px;[^}]*background:\s*var\(--ds-bg-secondary\);[^}]*border-left:\s*1px solid var\(--ds-border-default\);/s,
+  );
+  assert.match(stylesSource, /--ds-window-controls-width:\s*120px;/);
+  assert.match(
+    stylesSource,
+    /:root\[data-platform="win32"\] \.main-titlebar,[\s\S]*:root\[data-platform="linux"\] \.settings-titlebar\s*\{[^}]*right:\s*var\(--ds-window-controls-width\);/,
   );
   assert.match(
     stylesSource,
-    /:root\[data-platform="win32"\] \.main-titlebar,[\s\S]*:root\[data-platform="linux"\] \.settings-titlebar\s*\{[^}]*right:\s*112px;/,
-  );
-  assert.match(
-    stylesSource,
-    /:root\[data-platform="win32"\] \.work-panel-header,[\s\S]*:root\[data-platform="linux"\] \.work-panel-header\s*\{[^}]*margin-right:\s*112px;/,
+    /:root\[data-platform="win32"\] \.work-panel-header,[\s\S]*:root\[data-platform="linux"\] \.work-panel-header\s*\{[^}]*margin-right:\s*var\(--ds-window-controls-width\);/,
   );
   assert.match(
     stylesSource,

@@ -185,7 +185,8 @@ combined model × reasoning selection (§11).
 - Position: absolute 46px frameless band; `-webkit-app-region: drag` with
   `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
-  112px for native window controls
+  120px for native window controls (112px hit targets plus an 8px visual
+  buffer from adjacent work-panel actions)
 - Title cluster (task title) flexes and shows at most the first 10 Unicode
   characters plus an ellipsis; the full title remains in the native tooltip.
   The right cluster (action icons) is `flex: 0 0 auto`

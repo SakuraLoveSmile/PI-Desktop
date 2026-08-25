@@ -87,6 +87,8 @@
   --ds-bg-elevated-primary: color-mix(in oklab, var(--gray-800) 96%, transparent);
   --ds-sidebar-width: clamp(240px, 275px, min(520px, calc(100vw - 320px)));
   --ds-toolbar-height: 46px;
+  /* Keep an 8px visual buffer between work-panel actions and window chrome. */
+  --ds-window-controls-width: 120px;
   --ds-composer-radius: var(--radius-xl);
   --ds-composer-radius-lg: var(--radius-xl);
 

@@ -515,10 +515,11 @@
   flex: 0 0 28px;
 }
 
-/* Frameless Windows/Linux controls occupy the top-right 112px band. */
+/* Frameless Windows/Linux controls own a 120px band: 112px of controls plus
+ * an 8px visual buffer that keeps panel actions distinct from app chrome. */
 :root[data-platform="win32"] .conversation-topbar,
 :root[data-platform="linux"] .conversation-topbar {
-  right: 112px;
+  right: var(--ds-window-controls-width);
 }
 
 :root[data-platform="win32"] .conversation-topbar.ct-work-panel-open,
@@ -804,10 +805,14 @@
   z-index: 200; /* above titlebar (10) and work panel chrome */
   display: flex;
   align-items: center;
-  width: 112px;
+  width: var(--ds-window-controls-width);
   height: 46px; /* matches .main-titlebar band */
-  /* Paint the full hit band so page content cannot show through the controls. */
-  background: var(--ds-bg-primary);
+  box-sizing: border-box;
+  padding-left: 8px;
+  /* Paint a separate full hit band so page content cannot show through the
+   * controls and panel actions cannot read as part of the same button group. */
+  background: var(--ds-bg-secondary);
+  border-left: 1px solid var(--ds-border-default);
 }
 
 .window-control-btn {
@@ -842,7 +847,7 @@
 :root[data-platform="linux"] .main-titlebar,
 :root[data-platform="win32"] .settings-titlebar,
 :root[data-platform="linux"] .settings-titlebar {
-  right: 112px;
+  right: var(--ds-window-controls-width);
 }
 
 :root[data-platform="win32"] .main-titlebar.work-panel-open,
@@ -852,7 +857,7 @@
 
 :root[data-platform="win32"] .work-panel-header,
 :root[data-platform="linux"] .work-panel-header {
-  margin-right: 112px;
+  margin-right: var(--ds-window-controls-width);
 }
 
 .sidebar-header {

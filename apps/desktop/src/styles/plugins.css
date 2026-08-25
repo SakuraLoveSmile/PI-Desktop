@@ -1327,7 +1327,7 @@
   app-region: no-drag;
 }
 
-/* On Windows/Linux the window controls own the top-right 112px of that band —
+/* On Windows/Linux the window controls own the top-right 120px of that band —
    exactly where the sheet's close button lands. Drop the sheet below the band
    so the two close targets never stack. */
 :root[data-platform="win32"] .plugins-sheet,
