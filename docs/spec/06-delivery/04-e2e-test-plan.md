@@ -6050,6 +6050,24 @@ This test plan spec is accepted when:
 - **Acceptance**: E (tools & permissions), C (chat & stream)
 - **Milestone**: M5+
 - **Status**: Documented
+#### E2E-156: Edit tool succeeds on files with CRLF line endings
+
+- **Preconditions**: A workspace containing a file with Windows-style CRLF
+  (`\r\n`) line endings.
+- **Steps**:
+  1. Use Read to display the file content (Read strips `\r` before returning).
+  2. Issue an Edit with `old_string` and `new_string` using LF-only endings
+     (as the model always produces from Read output).
+  3. Inspect the file on disk after the edit.
+- **Expected**: The Edit succeeds with `replacements: 1`. The written file
+  preserves CRLF line endings throughout — both in modified and unmodified
+  lines. No `MUTATION_RETRY_BUDGET_EXHAUSTED` error occurs.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §3.1,
+  `03-runtime/03-tools-and-permissions.md`
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5
+- **Status**: Documented
+
 #### E2E-142: Background delegation converges through TaskWait and honors permission scopes
 
 - **Preconditions**: A project-bound Agent session whose permission mode can be
