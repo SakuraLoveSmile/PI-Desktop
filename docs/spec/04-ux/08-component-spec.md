@@ -1692,8 +1692,10 @@ reasoning-level control.
   Goal displays the localized Auto label as a disabled, non-opening chip while
   the approval card remains the separate place for choosing execution policy.
 - The right toolbar owns one combined model × reasoning-level chip immediately
-  before the single Stop/Send submit slot. It shows Sparkles, the current model name, and the current
-  reasoning level separated by `·`; `off` dims Sparkles and omits the level text.
+  before the single Stop/Send submit slot. It shows Sparkles, the current model
+  name, and the current reasoning level separated by `·`; `off` dims Sparkles
+  and omits the level text. No standalone prompt-enhancement icon is rendered
+  between this chip and the submit slot.
 - The combined chip opens one anchored menu above itself. The menu starts with
   only Model and Reasoning level entries, each showing its current value and a
   chevron. Selecting an entry replaces the menu contents in place with a back

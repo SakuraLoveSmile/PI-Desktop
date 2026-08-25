@@ -1539,7 +1539,9 @@ Each scenario is documented in this format:
   sidebar renders the canonical `build/icon_1024.png` asset through `BrandLogo`
   and the docked composer prompt row has no leading
   brand icon or reserved icon slot and its text aligns directly with the input
-  gutter. The footer Settings and Plugins actions are compact icon buttons;
+  gutter. The right Composer toolbar has no standalone prompt-enhancement
+  sparkle button between the model × reasoning chip and the single submit
+  slot. The footer Settings and Plugins actions are compact icon buttons;
   Plugins sits immediately to the right of Settings and exposes a localized
   accessible name. Every scoped session-creation control uses the dedicated
   message-plus icon with localized labels and accessible names. `Codex` remains visible only as

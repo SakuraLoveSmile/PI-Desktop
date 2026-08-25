@@ -33,6 +33,11 @@ test("composer send/stop button follows draft content and the visible session's 
   assert.doesNotMatch(composerRight, /\{runActive \? \(/);
   assert.doesNotMatch(
     composerRight,
+    /composer-enhance-btn/,
+    "The standalone prompt-enhancement icon must not sit beside Send/Stop",
+  );
+  assert.doesNotMatch(
+    composerRight,
     /className="stop-btn"[\s\S]*?\) : null\}[\s\S]*?className="send-btn"/,
     "Stop must not render beside an always-present Send button",
   );

@@ -29,8 +29,11 @@ test("Composer gates enhancement, preserves file references, and guards stale re
   assert.match(composer, /const \[enhancingPrompt, setEnhancingPrompt\]/);
   assert.match(composer, /sourceText\.trim\(\)\.startsWith\("\/"\)/);
   assert.match(composer, /!modelReady/);
-  assert.match(composer, /aria-busy=\{enhancingPrompt\}/);
-  assert.match(composer, /className="tool-spinner"/);
+  assert.doesNotMatch(
+    composer,
+    /composer-enhance-btn/,
+    "Composer must not render a standalone prompt-enhancement toolbar button",
+  );
   assert.match(composer, /IconUndo2/);
   assert.match(composer, /setEnhancementUndoText\(sourceText\)/);
   assert.match(composer, /enhancementVersionRef\.current !== sourceVersion/);
