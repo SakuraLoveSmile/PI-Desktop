@@ -1815,7 +1815,10 @@ reasoning-level control.
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
   an existing session preserves its durable selection.
-- The model menu lists only enabled, runnable providers with a default model.
+- The model menu lists only enabled, runnable providers with configured model
+  bindings. Cached or freshly discovered rows may enrich those configured
+  models, but unconfigured discovery results never appear in the conversation
+  list; configured IDs remain visible when discovery is unavailable.
 - The combined model × reasoning menu opens at `bottom: calc(100% + 8px)` with
   `role="menu"`. Its root has exactly two `role="menuitem"` entries. The Model
   submenu has a search input and sticky provider headings, while the Reasoning
@@ -2007,7 +2010,9 @@ there is no separate top-bar model selector.
 
 - No model favorites/pinning
 - No custom model creation from selector (use settings)
-- Dropdown shows models from configured providers only
+- Dropdown shows model bindings configured for enabled providers only;
+  provider discovery enriches those rows but does not expose additional
+  conversation models.
 
 ---
 

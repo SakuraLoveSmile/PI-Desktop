@@ -141,6 +141,17 @@ type ModelCatalogItem = {
 通过 `(providerId, modelId)` 优先进行重复数据删除：
 `user > discovered > bundled > recent-only`。
 
+### 9.1 对话 Composer 范围
+
+对话 Composer 是已配置模型选择器，而不是原始发现目录。对于每个已启用且
+可运行的提供商，它只渲染该提供商持久化 `models` 绑定中的模型 ID（或旧版
+`defaultModelId` 回退值）。缓存或实时发现的记录可以为这些行补充显示名称和
+元数据，但未配置的发现模型不会出现在对话区列表中。发现不可用时，已配置的
+模型 ID 仍会单独显示。
+
+设置中的提供商对话框仍使用发现结果添加和配置模型；保存模型绑定后，该模型才
+有资格出现在 Composer 中。
+
 ## 10. 默认模型策略
 
 应用程序级默认值：

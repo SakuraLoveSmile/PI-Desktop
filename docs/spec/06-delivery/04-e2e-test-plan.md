@@ -613,14 +613,17 @@ Each scenario is documented in this format:
   provider/model, and return to the root. 4) Enter Reasoning level and select a
   supported level. 5) Open Settings from the command palette or application menu.
 - **Expected**: The root shows only Model and Reasoning level entries; the Model
-  submenu lists enabled runnable providers with a default model, with each
-  model row visibly indented beneath its provider heading, and the
-  Reasoning level submenu lists only the selected model's published levels.
-  Selecting updates the active session model/reasoning configuration without
-  dismissing the menu; Settings opens from the command palette/menu. The
-  Composer model trigger ellipsizes long IDs. Each option shows one display name
-  only, and hovering a long option exposes its complete display name in the
-  tooltip without changing the menu layout or adding a visible model ID.
+  submenu lists enabled runnable providers and only the model bindings saved
+  for each provider, with each model row visibly indented beneath its provider
+  heading. Cached or freshly discovered models may supply display names and
+  metadata for those bindings, but unconfigured discovery results are absent;
+  configured IDs remain available when discovery is unavailable. The Reasoning
+  level submenu lists only the selected model's published levels. Selecting
+  updates the active session model/reasoning configuration without dismissing
+  the menu; Settings opens from the command palette/menu. The Composer model
+  trigger ellipsizes long IDs. Each option shows one display name only, and
+  hovering a long option exposes its complete display name in the tooltip
+  without changing the menu layout or adding a visible model ID.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11, model menu),
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance**: C

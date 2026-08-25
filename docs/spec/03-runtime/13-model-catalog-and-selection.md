@@ -141,6 +141,19 @@ When UI/search requests models for picker:
 Deduplicate by `(providerId, modelId)` with priority:
 `user > discovered > bundled > recent-only`.
 
+### 9.1 Conversation Composer scope
+
+The conversation Composer is a configured-model picker, not a raw discovery
+catalog. For each enabled, runnable provider it renders only the model IDs in
+that provider's persisted `models` bindings (or the legacy
+`defaultModelId` fallback). Cached or freshly discovered records may enrich
+those rows with display names and metadata, but a discovered model that is not
+configured is not shown in the conversation list. When discovery is missing,
+the configured IDs remain visible by themselves.
+
+The Settings provider dialog continues to use discovery to add and configure
+models; saving a model binding is what makes it eligible for the Composer.
+
 ## 10. Default model policy
 
 App-level default:

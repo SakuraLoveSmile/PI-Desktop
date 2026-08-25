@@ -27,6 +27,7 @@ import { isActivePlanExecution } from "../lib/plan-mode-state";
 import { headAsk, queuedAskCount } from "../lib/pending-asks";
 import type { QueuedPrompt } from "../lib/queued-prompts";
 import { runPaletteCommand } from "../lib/commands";
+import { composerModelsForProvider } from "../lib/composer-models";
 import {
   resolveComposerCommand,
   useComposerAutocomplete,
@@ -613,7 +614,9 @@ export function Composer({
     defaultValue: THINKING_LEVEL_LABELS[thinkingLevel],
   });
   const selectedModel = provider?.id
-    ? providerModels[provider.id]?.find((model) => model.modelId === modelId)
+    ? composerModelsForProvider(provider, providerModels[provider.id]).find(
+        (model) => model.modelId === modelId,
+      )
     : undefined;
   const modelLabel = selectedModel?.displayName || modelId || t("chat.model");
   const thinkingMenuLevels: ThinkingLevel[] = availableThinkingLevels.length
@@ -626,27 +629,16 @@ export function Composer({
         (candidate.hasSecret || candidate.authKind === "none"),
     )
     .map((candidate) => {
-      const discovered = providerModels[candidate.id];
-      const fallbackModelId =
-        candidate.id === provider?.id ? modelId : candidate.defaultModelId;
-      const models =
-        discovered && discovered.length > 0
-          ? discovered
-          : fallbackModelId
-            ? [{ modelId: fallbackModelId, displayName: fallbackModelId }]
-            : [];
-      const hasSelectedModel = models.some(
-        (model) => candidate.id === provider?.id && model.modelId === modelId,
+      const models = composerModelsForProvider(
+        candidate,
+        providerModels[candidate.id],
       );
       return {
         provider: candidate,
-        models:
-          hasSelectedModel || !modelId || candidate.id !== provider?.id
-            ? models
-            : [...models, { modelId, displayName: modelId }],
+        models,
       };
     })
-    .filter((group) => group.models.length > 0), [providers, providerModels, provider?.id, modelId]);
+    .filter((group) => group.models.length > 0), [providers, providerModels]);
   const modelQueryNeedle = modelQuery.trim().toLowerCase();
   const filteredModelGroups = useMemo(() => modelQueryNeedle
     ? modelGroups
