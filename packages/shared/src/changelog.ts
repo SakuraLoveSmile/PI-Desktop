@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.10.5",
+    date: "2026-08-25",
+    highlights: [
+      "Keep Windows window controls isolated from panel actions across the frameless shell.",
+      "Open Windows project folders and files reliably, including paths with the extended-length prefix.",
+      "Edit CRLF files without changing their original line-ending style.",
+    ],
+  },
+  {
     version: "0.10.4",
     date: "2026-08-25",
     highlights: [
@@ -420,6 +429,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.10.5",
+    date: "2026-08-25",
+    highlights: [
+      "让无边框窗口中的 Windows 控件与面板操作保持隔离。",
+      "可靠打开 Windows 项目文件夹和文件，包括带扩展长度前缀的路径。",
+      "编辑 CRLF 文件时保持原有换行风格不变。",
+    ],
+  },
   {
     version: "0.10.4",
     date: "2026-08-25",
