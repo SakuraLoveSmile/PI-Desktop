@@ -455,18 +455,17 @@ the expanded sidebar's Search and Collapse sidebar icon buttons right-aligned
 in that same row. The macOS row omits the sidebar logo/title, reserves `76px`
 on the left for native chrome in windowed mode, and reclaims that padding in
 fullscreen. Windows/Linux keep the identity and sidebar actions in their first
-row and reserve the conversation pane's rightmost 120px for three
-frameless-window controls. The controls retain 112px of full-height hit
-targets, while the outer band adds an 8px visual buffer. When the work panel is
-open, the controls move with the conversation pane; the panel header owns its
-full width and never inherits the window-control reservation. The band paints
-an opaque `bg-secondary` surface so page content never shows through the
-controls. Main and Settings drag regions must terminate before this reservation
-rather than overlap it and rely only on descendant `no-drag`, so every visible
-control pixel remains clickable. The band floats over destination pages, so on
-Windows/Linux a page frame and any right-edge detail sheet start below it
-instead of placing their own header actions or close control under the window
-controls. No application menu is rendered inside the window.
+row and reserve the rightmost 120px for three frameless-window controls. The
+controls retain 112px of full-height hit targets, while the outer band adds an
+8px visual buffer and a divider before adjacent work-panel actions. The band
+paints an opaque `bg-secondary` surface so page content never shows through the
+controls. Main, Settings, and work-panel drag regions must terminate before
+this reservation rather than overlap it and rely only on descendant `no-drag`,
+so every visible control pixel remains clickable. The band floats over the
+destination pages, so on Windows/Linux a page frame and any right-edge detail
+sheet start below it instead of placing their own header actions or close
+control under the window controls. No application menu is rendered inside the
+window.
 Other menu popovers use the standard opaque elevated-menu surface, `radius-sm`,
 subtle border, and dialog shadow; they are never translucent over readable
 content.

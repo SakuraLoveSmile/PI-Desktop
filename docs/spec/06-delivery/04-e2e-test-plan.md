@@ -532,8 +532,8 @@ Each scenario is documented in this format:
   band renders instead (no top-bar controls). The bar is draggable to move the
   window; interactive controls do not start a window drag.
   macOS leaves the left ~76px clear for traffic lights only while the sidebar is
-  collapsed (8px in fullscreen); Windows/Linux leave the conversation pane's
-  right 120px clear for native window controls.
+  collapsed (8px in fullscreen); Windows/Linux leave the right 120px clear for
+  native window controls.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2 Topbar)
 - **Acceptance**: C (send/UI), Quality
 - **Milestone**: M2
@@ -2366,10 +2366,8 @@ Each scenario is documented in this format:
   commands, and acknowledge renderer readiness after the replacement loads.
   Verify one window and one delivery per command. 4) On Windows/Linux, repeat
   from the main chat, Settings, and an open work panel. With the work panel
-  open, confirm the minimize/maximize/close controls remain at the conversation
-  pane's right edge while the panel header uses its full width for resource and
-  collapse actions; the panel does not retain the 120px conversation-pane
-  control clearance. In the
+  open, confirm the panel collapse button is flush with the main-pane right
+  divider and does not retain the 120px outer-window control clearance. In the
   main chat, send a first user message and confirm its full bubble starts below
   the 46px titlebar control band. Open the Extensions page and confirm its header
   actions, then the detail sheet's close button, also start below that band and
@@ -2394,11 +2392,11 @@ Each scenario is documented in this format:
   Settings surface and shows the resulting up-to-date state. Replacement-window
   commands wait for renderer readiness without
   creating duplicate windows or losing events. No Main, Settings, or work-panel
-  drag rectangle overlaps the reserved control zone. The conversation pane's
-  120px control band is an opaque `bg-secondary` surface in both light and dark
-  themes, with an 8px visual buffer inside the pane, so destination content
-  never bleeds through it. Window controls remain clickable across their full
-  46px-high hit targets, match native state, and
+  drag rectangle overlaps the reserved control zone. The 120px control band is
+  an opaque `bg-secondary` surface in both light and dark themes, with an 8px
+  visual buffer separating it from adjacent work-panel actions, so destination
+  content never bleeds through it. Window controls remain clickable across
+  their full 46px-high hit targets, match native state, and
   have accessible names; the first user or assistant transcript row never
   paints beneath them, and neither do the Extensions page header actions or the
   plugin detail sheet close button. Unknown actions fail closed. Each package contains
