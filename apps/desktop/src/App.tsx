@@ -1573,7 +1573,6 @@ function AppShell() {
     } else {
       shell = (
         <>
-          <WindowControls />
           {!sidebarCollapsed || sidebarExiting ? (
             <Sidebar
               className={sidebarExiting ? "is-exiting" : undefined}
@@ -1585,6 +1584,7 @@ function AppShell() {
           ) : null}
 
           <section className="main-pane">
+            <WindowControls contained />
             {page === "chat" ? (
               <ConversationTopbar
                 sidebarCollapsed={sidebarCollapsed}

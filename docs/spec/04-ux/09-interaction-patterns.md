@@ -89,9 +89,10 @@ recency only breaks ties between equally relevant matches.
   platform text-editing, zoom, fullscreen, hide, and quit behavior.
 - Windows/Linux render no application menu in the window. Their frameless
   titlebar keeps sidebar actions at the left edge and native window controls at
-  the right edge. While the work panel is open, its sole collapse control sits
-  in the session pane top-right ahead of those window controls rather than in
-  the work-panel content header. Destination history has no visible back/forward
+  the conversation pane's right edge. While the work panel is open, the
+  controls remain in the conversation pane and the panel header uses its full
+  width for resource actions; its collapse control no longer sits ahead of the
+  window controls. Destination history has no visible back/forward
   controls and remains available through the renderer shortcuts. The first
   transcript row starts below the 46px titlebar control band so user and
   assistant content cannot overlap the minimize, maximize/restore, or close

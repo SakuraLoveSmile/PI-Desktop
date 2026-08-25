@@ -101,8 +101,8 @@ test("installed row controls share one aligned rail and explain icon actions", (
 });
 
 // The 46px titlebar band floats over the destination pages: it is a native drag
-// rectangle, and on Windows/Linux the renderer-drawn window controls own its
-// rightmost 120px. The plugins page is the one destination page with controls in
+// rectangle, and on Windows/Linux the renderer-drawn window controls own the
+// conversation pane's rightmost 120px. The plugins page is the one destination page with controls in
 // that corner (header actions, detail-sheet close), so both must clear the band.
 test("plugins page keeps its top-right controls clear of the window controls", () => {
   assert.match(

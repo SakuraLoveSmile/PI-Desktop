@@ -1327,9 +1327,9 @@
   app-region: no-drag;
 }
 
-/* On Windows/Linux the window controls own the top-right 120px of that band —
-   exactly where the sheet's close button lands. Drop the sheet below the band
-   so the two close targets never stack. */
+/* On Windows/Linux the conversation pane owns the top-right 120px of that
+   band — exactly where the sheet's close button lands. Drop the sheet below
+   the band so the two close targets never stack. */
 :root[data-platform="win32"] .plugins-sheet,
 :root[data-platform="linux"] .plugins-sheet {
   padding-top: var(--ds-toolbar-height);

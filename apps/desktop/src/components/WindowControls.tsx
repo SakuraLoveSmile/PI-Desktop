@@ -8,9 +8,15 @@ import { api } from "../lib/api";
  *
  * macOS keeps native inset traffic lights; other platforms run a frameless
  * window, so minimize/maximize/close live here — flat Codex-style glyph
- * buttons pinned to the top-right of the 46px titlebar band.
+ * buttons pinned to the top-right of the 46px titlebar band. The main shell
+ * can contain the controls in the conversation pane while Settings keeps them
+ * fixed to the full window.
  */
-export function WindowControls() {
+export function WindowControls({
+  contained = false,
+}: {
+  contained?: boolean;
+} = {}) {
   const { t } = useTranslation();
   const platform = window.piDesktop?.platform ?? "darwin";
   const [maximized, setMaximized] = useState(false);
@@ -33,7 +39,11 @@ export function WindowControls() {
   if (platform === "darwin") return null;
 
   return (
-    <div className="window-controls no-drag">
+    <div
+      className={`window-controls no-drag${
+        contained ? " window-controls-in-pane" : ""
+      }`}
+    >
       <button
         type="button"
         className="window-control-btn"

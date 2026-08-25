@@ -62,12 +62,14 @@ destination, chat as the home surface, tools and permissions inline.
   `hiddenInset` traffic lights and the system application menu. The expanded
   sidebar keeps Search and Collapse sidebar in the same 46px row, aligned to
   the right outside the traffic-light safety area; no logo/title is rendered
-  there, including in fullscreen. While the work panel is open, the session
-  pane titlebar hosts its collapse control at the top-right so the panel tab
-  header remains focused on the active resource.
+  there, including in fullscreen. When the work panel is open, the native
+  window controls stay at the conversation pane's right edge while the panel
+  header uses its full width for the active resource.
   Windows/Linux use a menu-free frameless 46px row with sidebar actions on the
-  left and accessible minimize / maximize-or-restore / close controls on the
-  right (D129). Destination history is shortcut-only (`Cmd/Ctrl+[` and
+  left and accessible minimize / maximize-or-restore / close controls at the
+  right edge of the conversation pane (D129). When the work panel is open, the
+  controls stay with the conversation pane and the panel header uses its full
+  width for resource actions. Destination history is shortcut-only (`Cmd/Ctrl+[` and
   `Cmd/Ctrl+]`); no back/forward buttons are rendered. The main titlebar has no
   notification action; the durable local inbox opens from the sidebar footer
   bell instead (D130/D117).

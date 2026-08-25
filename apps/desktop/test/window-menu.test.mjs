@@ -152,6 +152,15 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   assert.match(controlsSource, /windowControl\("getState"\)/);
   assert.match(controlsSource, /aria-label=\{t\("window\.minimize"/);
   assert.match(controlsSource, /aria-label=\{t\("window\.close"/);
+  assert.match(controlsSource, /window-controls-in-pane/);
+  assert.match(
+    appSource,
+    /<section className="main-pane">[\s\S]*?<WindowControls contained \/>/,
+  );
+  assert.match(
+    stylesSource,
+    /\.window-controls\.window-controls-in-pane\s*\{[^}]*position:\s*absolute;/s,
+  );
   assert.match(
     stylesSource,
     /\.window-control-btn\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;/s,
@@ -171,8 +180,9 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   );
   assert.match(
     stylesSource,
-    /:root\[data-platform="win32"\] \.work-panel-header,[\s\S]*:root\[data-platform="linux"\] \.work-panel-header\s*\{[^}]*margin-right:\s*var\(--ds-window-controls-width\);/,
+    /:root\[data-platform="win32"\] \.main-titlebar\.work-panel-open,[\s\S]*:root\[data-platform="linux"\] \.main-titlebar\.work-panel-open\s*\{[^}]*right:\s*var\(--ds-window-controls-width\);/,
   );
+  assert.doesNotMatch(stylesSource, /\.work-panel-header\s*\{[^}]*margin-right:/s);
   assert.match(
     stylesSource,
     /:root\[data-platform="(win32|linux)"\] \.thread-content[\s\S]*?padding-top:\s*46px;/,

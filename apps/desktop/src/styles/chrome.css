@@ -515,8 +515,8 @@
   flex: 0 0 28px;
 }
 
-/* Frameless Windows/Linux controls own a 120px band: 112px of controls plus
- * an 8px visual buffer that keeps panel actions distinct from app chrome. */
+/* Frameless Windows/Linux controls own a 120px band at the conversation pane's
+ * right edge: 112px of controls plus an 8px visual buffer. */
 :root[data-platform="win32"] .conversation-topbar,
 :root[data-platform="linux"] .conversation-topbar {
   right: var(--ds-window-controls-width);
@@ -524,7 +524,7 @@
 
 :root[data-platform="win32"] .conversation-topbar.ct-work-panel-open,
 :root[data-platform="linux"] .conversation-topbar.ct-work-panel-open {
-  right: 0;
+  right: var(--ds-window-controls-width);
 }
 
 .notification-center {
@@ -815,6 +815,12 @@
   border-left: 1px solid var(--ds-border-default);
 }
 
+/* The main shell puts the controls inside the conversation pane so the right
+ * work panel can use its own complete header without inheriting app chrome. */
+.window-controls.window-controls-in-pane {
+  position: absolute;
+}
+
 .window-control-btn {
   -webkit-app-region: no-drag;
   app-region: no-drag;
@@ -852,12 +858,7 @@
 
 :root[data-platform="win32"] .main-titlebar.work-panel-open,
 :root[data-platform="linux"] .main-titlebar.work-panel-open {
-  right: 0;
-}
-
-:root[data-platform="win32"] .work-panel-header,
-:root[data-platform="linux"] .work-panel-header {
-  margin-right: var(--ds-window-controls-width);
+  right: var(--ds-window-controls-width);
 }
 
 .sidebar-header {
