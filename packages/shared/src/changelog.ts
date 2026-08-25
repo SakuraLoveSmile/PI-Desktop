@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.10.7",
+    date: "2026-08-25",
+    highlights: [
+      "Keep the Composer send and stop controls in one stable slot so drafts and running turns stay aligned.",
+      "Keep prompt enhancement available from the command launcher without a standalone toolbar icon.",
+      "Make sidebar scrollbars quieter at rest while keeping them discoverable during navigation.",
+    ],
+  },
+  {
     version: "0.10.6",
     date: "2026-08-25",
     highlights: [
@@ -437,6 +446,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.10.7",
+    date: "2026-08-25",
+    highlights: [
+      "让输入框的发送和停止控件保持在同一稳定位置，确保草稿与运行中的回合始终对齐。",
+      "通过命令启动器继续使用提示增强功能，不再显示独立的工具栏图标。",
+      "让侧边栏滚动条在静止时更低调，同时在导航时保持易于发现。",
+    ],
+  },
   {
     version: "0.10.6",
     date: "2026-08-25",
