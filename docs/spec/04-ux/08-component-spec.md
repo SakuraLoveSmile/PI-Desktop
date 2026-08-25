@@ -121,7 +121,9 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   glyph reflects the initial native state plus later maximize/unmaximize
   events. Each Windows/Linux button is an explicit non-drag pointer target so
   the surrounding titlebar drag region cannot consume minimize, maximize,
-  restore, or close clicks.
+  restore, or close clicks. Their shared 112×46px control band is opaque
+  `bg-primary`, preventing destination content from bleeding through the
+  reserved titlebar surface.
 - Minimize is a resident-shell action: the renderer button hides the main
   window to the PI-Desktop tray, as do the Windows native-menu action and the
   macOS native traffic light/Window menu role. On Windows, clicking the

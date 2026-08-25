@@ -456,8 +456,9 @@ in that same row. The macOS row omits the sidebar logo/title, reserves `76px`
 on the left for native chrome in windowed mode, and reclaims that padding in
 fullscreen. Windows/Linux keep the identity and sidebar actions in their first
 row and reserve the rightmost 112px for three frameless-window controls. Each
-control owns its full share of the 46px-high reserved band. Main, Settings, and
-work-panel drag regions must terminate before this reservation rather than
+control owns its full share of the 46px-high reserved band, and the band paints
+an opaque `bg-primary` surface so page content never shows through the controls.
+Main, Settings, and work-panel drag regions must terminate before this reservation rather than
 overlap it and rely only on descendant `no-drag`, so every visible control
 pixel remains clickable. The band floats over the destination pages, so on
 Windows/Linux a page frame and any right-edge detail sheet start below it

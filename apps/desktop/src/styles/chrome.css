@@ -806,6 +806,8 @@
   align-items: center;
   width: 112px;
   height: 46px; /* matches .main-titlebar band */
+  /* Paint the full hit band so page content cannot show through the controls. */
+  background: var(--ds-bg-primary);
 }
 
 .window-control-btn {
