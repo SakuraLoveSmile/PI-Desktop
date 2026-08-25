@@ -14,14 +14,28 @@ test("composer send/stop button follows draft content and the visible session's 
   // Plan mode widens the running condition: `runActive` folds an in-flight
   // plan execution into the session's own `isRunning`. The submit slot then
   // switches to Stop only when that session is running and the draft is empty.
-  assert.match(composerRight, /\{runActive && !hasDraftContent \? \(/);
+  const submitSlot =
+    composerRight.match(
+      /\{runActive && !hasDraftContent \? \([\s\S]*?\) : \([\s\S]*?\)\}/,
+    )?.[0] ?? "";
+  assert.ok(submitSlot.length > 0, "single submit slot implementation not found");
+  assert.match(submitSlot, /className="stop-btn"/);
+  assert.match(submitSlot, /className="send-btn"/);
+  assert.equal(
+    (submitSlot.match(/className="(?:stop|send)-btn"/g) ?? []).length,
+    2,
+    "Stop and Send should be the two mutually exclusive branches of one slot",
+  );
   assert.match(composer, /const runActive = isRunning \|\| executionActive;/);
   assert.match(composer, /const isRunning = useAppStore\(\(s\) => s\.isRunning\);/);
-  assert.match(composerRight, /stop-btn/);
-  assert.match(composerRight, /send-btn/);
-  assert.match(composerRight, /stopGenerating/);
-  assert.match(composerRight, /onClick=\{\(\) => void abort\(\)\}/);
+  assert.match(submitSlot, /stopGenerating/);
+  assert.match(submitSlot, /onClick=\{\(\) => void abort\(\)\}/);
   assert.doesNotMatch(composerRight, /\{runActive \? \(/);
+  assert.doesNotMatch(
+    composerRight,
+    /className="stop-btn"[\s\S]*?\) : null\}[\s\S]*?className="send-btn"/,
+    "Stop must not render beside an always-present Send button",
+  );
   assert.match(composer, /const inputBlocked = approvalPending \|\| pasting;/);
   assert.match(composer, /const controlsBlocked = approvalPending;/);
   assert.match(composer, /readOnly=\{inputBlocked\}/);

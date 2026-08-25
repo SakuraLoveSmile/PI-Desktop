@@ -1729,17 +1729,6 @@ export function Composer({
                   </div>
                 ) : null}
               </div>
-              {runActive && !hasDraftContent ? (
-                <button
-                  type="button"
-                  className="stop-btn"
-                  title={t("chat.stopGenerating")}
-                  aria-label={t("chat.stopGenerating")}
-                  onClick={() => void abort()}
-                >
-                  <IconStop size={14} />
-                </button>
-              ) : null}
               <button
                 type="button"
                 className={`icon-btn composer-enhance-btn${enhancingPrompt ? " is-loading" : ""}`}
@@ -1780,22 +1769,34 @@ export function Composer({
                   <IconUndo2 size={15} aria-hidden="true" />
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="send-btn"
-                aria-label={modelReady ? t("chat.send") : t("settings.addProvider")}
-                title={
-                  modelReady ? t("chat.send") : t("settings.addProvider")
-                }
-                disabled={
-                  !hasDraftContent ||
-                  sendBlocked ||
-                  (!modelReady && !value.trim().startsWith("/"))
-                }
-                onClick={() => void submit()}
-              >
-                <IconArrowUp size={15} />
-              </button>
+              {runActive && !hasDraftContent ? (
+                <button
+                  type="button"
+                  className="stop-btn"
+                  title={t("chat.stopGenerating")}
+                  aria-label={t("chat.stopGenerating")}
+                  onClick={() => void abort()}
+                >
+                  <IconStop size={14} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="send-btn"
+                  aria-label={modelReady ? t("chat.send") : t("settings.addProvider")}
+                  title={
+                    modelReady ? t("chat.send") : t("settings.addProvider")
+                  }
+                  disabled={
+                    !hasDraftContent ||
+                    sendBlocked ||
+                    (!modelReady && !value.trim().startsWith("/"))
+                  }
+                  onClick={() => void submit()}
+                >
+                  <IconArrowUp size={15} />
+                </button>
+              )}
             </div>
           </div>
         </div>
