@@ -6169,3 +6169,24 @@ This test plan spec is accepted when:
 - **Acceptance**: C (conversation), E (tools & permissions), H (diagnostics), Quality
 - **Milestone**: M6+
 - **Status**: Covered by unit tests; full desktop journey pending
+
+#### E2E-157: Sidebar scrollbars stay quiet while remaining discoverable
+
+- **Preconditions**: PI-Desktop is open with the expanded sidebar, more
+  temporary sessions than the five-row cap, and enough retained project
+  sessions to overflow the Projects region.
+- **Steps**: 1) Inspect the idle Sessions and Projects scrollbars in light and
+  dark themes. 2) Move the pointer over each thumb and drag it through its
+  region. 3) Scroll the list with the wheel or trackpad after moving the
+  pointer away from the thumb.
+- **Expected**: Both regions remain independently scrollable and the footer
+  stays fixed. At rest each scrollbar is trackless, 6px wide, and low contrast;
+  hovering or dragging strengthens only the active thumb so navigation remains
+  visually quiet without hiding the scroll affordance. Chat, code, and Settings
+  scrollbars keep their existing treatments.
+- **Specs linked**: `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md`
+- **Acceptance**: Quality (sidebar polish and independent navigation)
+- **Milestone**: M6+
+- **Status**: Unit-covered (`interaction-polish.test.mjs`); rendered scenario
+  pending

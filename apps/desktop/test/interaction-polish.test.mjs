@@ -38,3 +38,20 @@ test("scrollbars expose a hover-strengthened thumb", () => {
     /::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;/,
   );
 });
+
+test("sidebar scrollbars stay quiet until pointer interaction", () => {
+  assert.match(
+    styles,
+    /\.sidebar-session-groups,\s*\.sidebar-session-group-body\.standalone\s*\{[\s\S]*?scrollbar-color:\s*var\(--sidebar-scrollbar-thumb\) transparent;/,
+  );
+  assert.match(
+    styles,
+    /\.sidebar-session-groups::-webkit-scrollbar\s*,[\s\S]*?\.sidebar-session-group-body\.standalone::-webkit-scrollbar\s*\{[\s\S]*?width:\s*6px;[\s\S]*?height:\s*6px;/,
+  );
+  assert.match(styles, /--sidebar-scrollbar-thumb: color-mix\([^;]*10%/);
+  assert.match(styles, /--sidebar-scrollbar-thumb-hover: color-mix\([^;]*20%/);
+  assert.match(
+    styles,
+    /\.sidebar-session-groups::-webkit-scrollbar-thumb:hover,[\s\S]*?background:\s*var\(--sidebar-scrollbar-thumb-hover\);/,
+  );
+});

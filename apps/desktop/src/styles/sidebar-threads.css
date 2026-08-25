@@ -63,6 +63,43 @@
   scrollbar-width: thin;
 }
 
+/* Keep sidebar scrolling available without turning the navigation tree into a
+   second visual rail. The thumb gets a small, low-contrast resting state and
+   only gains emphasis while the pointer is over the control. */
+.sidebar-session-groups,
+.sidebar-session-group-body.standalone {
+  --sidebar-scrollbar-thumb: color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
+  --sidebar-scrollbar-thumb-hover: color-mix(in oklab, var(--ds-text-primary) 20%, transparent);
+  scrollbar-color: var(--sidebar-scrollbar-thumb) transparent;
+}
+
+.sidebar-session-groups::-webkit-scrollbar,
+.sidebar-session-group-body.standalone::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.sidebar-session-groups::-webkit-scrollbar-thumb,
+.sidebar-session-group-body.standalone::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: var(--sidebar-scrollbar-thumb);
+  background-clip: content-box;
+}
+
+.sidebar-session-groups::-webkit-scrollbar-thumb:hover,
+.sidebar-session-groups::-webkit-scrollbar-thumb:active,
+.sidebar-session-group-body.standalone::-webkit-scrollbar-thumb:hover,
+.sidebar-session-group-body.standalone::-webkit-scrollbar-thumb:active {
+  background: var(--sidebar-scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+.sidebar-session-groups::-webkit-scrollbar-track,
+.sidebar-session-group-body.standalone::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .sidebar-session-group {
   min-width: 0;
 }

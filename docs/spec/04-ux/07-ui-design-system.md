@@ -445,6 +445,12 @@ build/version chip is right-aligned and remains the update check/release entry
 point. Hover and active states use semantic sidebar surfaces; neither side adds
 a persistent card fill.
 
+Sidebar list scrollers keep their native scroll affordance but use a 6px
+trackless scrollbar with a 10% semantic-ink thumb at rest and a 20% thumb on
+hover/drag. This keeps the navigation tree visually quiet while preserving a
+discoverable control for pointer and keyboard users; chat, code, and settings
+scroll containers keep their own scrollbar treatments.
+
 The profile menu is `280px` wide, opens `8px` above the footer, and uses the
 standard opaque elevated-menu surface, subtle border, and dialog shadow. Its
 first block repeats the local identity with the same glyph and two-line text,
