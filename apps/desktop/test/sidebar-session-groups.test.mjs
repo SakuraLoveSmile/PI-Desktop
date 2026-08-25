@@ -46,6 +46,19 @@ test("normalizes separators and trailing slashes for project matching", () => {
   );
 });
 
+test("strips Windows extended-length path prefix", () => {
+  // Forward-slash variant stored by older DB versions
+  assert.equal(normalizeProjectPath("//?/C:/Users/mi/project"), "C:/Users/mi/project");
+  assert.equal(normalizeProjectPath("//?/D:/work/app"), "D:/work/app");
+  // Backslash variant from canonicalize
+  assert.equal(normalizeProjectPath("\\\\?\\C:\\Users\\mi\\project"), "C:/Users/mi/project");
+  // Drive-root path (trailing slash preserved as single slash)
+  assert.equal(normalizeProjectPath("//?/C:/"), "C:/");
+  assert.equal(normalizeProjectPath("\\\\?\\C:\\"), "C:/");
+  // Non-drive UNC paths are left intact (stripped of leading slashes by the normalize logic)
+  assert.equal(normalizeProjectPath("//?/UNC/server/share"), "//?/UNC/server/share");
+});
+
 test("treats blank project paths as temporary", () => {
   const groups = groupSidebarSessions(
     [session({ id: "blank", projectPath: "   " }), session({ id: "missing" })],

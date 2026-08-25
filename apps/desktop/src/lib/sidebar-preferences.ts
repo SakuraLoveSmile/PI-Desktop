@@ -4,7 +4,13 @@ import type { ProjectWorkspace, SessionSummary } from "@pi-desktop/shared";
 export function normalizeProjectPath(projectPath?: string | null): string | null {
   const value = projectPath?.trim();
   if (!value) return null;
-  const normalized = value.replace(/\\/g, "/").replace(/\/+$/, "");
+  let normalized = value.replace(/\\/g, "/");
+  // Strip the Windows extended-length prefix (`//?/C:/...` → `C:/...`)
+  if (/^\/\/\?\/[A-Za-z]:\//.test(normalized)) {
+    normalized = normalized.slice(4);
+  }
+  // Remove trailing slashes but keep the one after a drive letter (e.g. `C:/`)
+  normalized = normalized.replace(/(?<![A-Za-z]:)\/+$/, "");
   return normalized || "/";
 }
 

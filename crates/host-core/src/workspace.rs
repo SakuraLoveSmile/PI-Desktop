@@ -1,6 +1,24 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Component, Path, PathBuf};
 
+/// Canonicalize a path, stripping the Windows extended-length prefix (`\\?\`)
+/// when the result is a simple drive-letter path (e.g. `C:\...`). This keeps
+/// paths compatible with shell APIs (`ShellExecuteW`) that reject `\\?\`.
+fn simple_canonicalize(path: &Path) -> std::io::Result<PathBuf> {
+    let canonical = path.canonicalize()?;
+    #[cfg(windows)]
+    {
+        let s = canonical.to_string_lossy();
+        // Strip `\\?\X:\...` → `X:\...` but keep true UNC paths like `\\?\UNC\...`
+        if let Some(rest) = s.strip_prefix(r"\\?\") {
+            if rest.len() >= 3 && rest.as_bytes()[1] == b':' && rest.as_bytes()[2] == b'\\' {
+                return Ok(PathBuf::from(rest));
+            }
+        }
+    }
+    Ok(canonical)
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct WorkspaceState {
     pub path: Option<String>,
@@ -25,9 +43,7 @@ impl WorkspaceState {
     }
 
     pub fn set(&mut self, path: impl AsRef<Path>) -> ProjectWorkspace {
-        let path = path
-            .as_ref()
-            .canonicalize()
+        let path = simple_canonicalize(path.as_ref())
             .unwrap_or_else(|_| path.as_ref().to_path_buf());
         let name = path
             .file_name()
@@ -112,8 +128,7 @@ fn resolve_with_existing_ancestor(normalized: PathBuf) -> Result<PathBuf, String
             _ => break,
         }
     }
-    let mut resolved = existing
-        .canonicalize()
+    let mut resolved = simple_canonicalize(&existing)
         .map_err(|e| format!("path canonicalize failed: {e}"))?;
     for part in tail.iter().rev() {
         resolved.push(part);
@@ -129,8 +144,7 @@ fn resolve_with_existing_ancestor(normalized: PathBuf) -> Result<PathBuf, String
 /// 2. Canonicalization of the deepest existing ancestor, so symlinks inside
 ///    the workspace cannot smuggle a target outside it.
 pub fn resolve_in_workspace(workspace_root: &Path, input: &str) -> Result<PathBuf, String> {
-    let root = workspace_root
-        .canonicalize()
+    let root = simple_canonicalize(workspace_root)
         .map_err(|e| format!("workspace canonicalize failed: {e}"))?;
     let candidate = if Path::new(input).is_absolute() {
         PathBuf::from(input)
@@ -157,8 +171,7 @@ pub fn resolve_in_workspace(workspace_root: &Path, input: &str) -> Result<PathBu
 /// containment. Relative paths still use the session workspace as their base;
 /// only the permission decision can opt a tool into this resolver.
 pub fn resolve_external_path(workspace_root: &Path, input: &str) -> Result<PathBuf, String> {
-    let root = workspace_root
-        .canonicalize()
+    let root = simple_canonicalize(workspace_root)
         .map_err(|e| format!("workspace canonicalize failed: {e}"))?;
     let candidate = if Path::new(input).is_absolute() {
         PathBuf::from(input)

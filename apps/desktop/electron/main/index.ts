@@ -180,6 +180,25 @@ const ErrorCodes = {
   PLAN_PERMISSION_MODE_REQUIRED: "PLAN_PERMISSION_MODE_REQUIRED",
 } as const;
 
+/**
+ * Strip the Windows extended-length path prefix (`\\?\`) so that shell APIs
+ * like `ShellExecuteW` (used by Electron's `shell.openPath`) work correctly.
+ * Also handles the forward-slash variant (`//?/`) stored by older versions.
+ * On non-Windows or for UNC paths (`\\?\UNC\...`) the input is returned as-is.
+ */
+function stripWinLongPrefix(p: string): string {
+  if (process.platform !== "win32") return p;
+  // Matches `\\?\X:\...` (verbatim drive-letter paths)
+  if (p.startsWith("\\\\?\\") && p.length >= 7 && p[5] === ":" && p[6] === "\\") {
+    return p.slice(4);
+  }
+  // Matches `//?/X:/...` (forward-slash variant from DB normalization)
+  if (p.startsWith("//?/") && p.length >= 7 && p[5] === ":" && p[6] === "/") {
+    return p.slice(4);
+  }
+  return p;
+}
+
 app.setName(APP_NAME);
 if (process.platform === "win32") {
   app.setAppUserModelId(APP_ID);
@@ -368,11 +387,11 @@ const plugins = new PluginRuntime({
     await shell.openExternal(url);
   },
   openPath: async (fullPath) => {
-    const error = await shell.openPath(fullPath);
+    const error = await shell.openPath(stripWinLongPrefix(fullPath));
     if (error) throw new Error(error);
   },
   revealPath: async (fullPath) => {
-    shell.showItemInFolder(fullPath);
+    shell.showItemInFolder(stripWinLongPrefix(fullPath));
   },
   readClipboard: async () => {
     const { clipboard } = await import("electron");
@@ -5949,7 +5968,7 @@ function registerIpc() {
         errorCode: ErrorCodes.NOT_FOUND,
       });
     }
-    const openError = await shell.openPath(projectPath);
+    const openError = await shell.openPath(stripWinLongPrefix(projectPath));
     if (openError) throw new Error(openError);
     return { ok: true, path: projectPath };
   });
@@ -6140,7 +6159,7 @@ function registerIpc() {
         errorCode: ErrorCodes.INVALID_ARGUMENT,
       });
     }
-    shell.showItemInFolder(target);
+    shell.showItemInFolder(stripWinLongPrefix(target));
     return { ok: true };
   });
 
@@ -7360,7 +7379,7 @@ function registerIpc() {
     const res = await host.call<{ skill: UserSkillRecord | null }>("skills.read", { id });
     const path = res.skill?.path;
     if (!path) throw new Error("skill not found");
-    shell.showItemInFolder(path);
+    shell.showItemInFolder(stripWinLongPrefix(path));
     return { ok: true };
   });
 
@@ -7451,7 +7470,7 @@ function registerIpc() {
       path = res.subagent?.path;
     }
     if (!path) throw new Error("subagent not found");
-    shell.showItemInFolder(path);
+    shell.showItemInFolder(stripWinLongPrefix(path));
     return { ok: true };
   });
 
@@ -7699,7 +7718,7 @@ function registerIpc() {
   handle(IPC.invoke.logOpenFolder, async () => {
     const logs = join(dataDir, "logs");
     mkdirSync(logs, { recursive: true });
-    await shell.openPath(logs);
+    await shell.openPath(stripWinLongPrefix(logs));
     return { ok: true, path: logs };
   });
 

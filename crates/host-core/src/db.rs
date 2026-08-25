@@ -45,6 +45,15 @@ fn normalize_project_path(path: &str) -> Option<String> {
         return None;
     }
     let mut normalized = trimmed.replace('\\', "/");
+    // Strip the forward-slash form of the Windows extended-length prefix
+    // (`//?/C:/...` → `C:/...`) which older versions stored in the DB.
+    if normalized.starts_with("//?/")
+        && normalized.len() >= 7
+        && normalized.as_bytes()[5] == b':'
+        && normalized.as_bytes()[6] == b'/'
+    {
+        normalized = normalized[4..].to_string();
+    }
     while normalized.len() > 1
         && normalized.ends_with('/')
         && !normalized
@@ -63,7 +72,22 @@ fn canonical_project_path(path: &str) -> Option<String> {
     let canonical = std::path::Path::new(path)
         .canonicalize()
         .ok()
-        .map(|p| p.to_string_lossy().to_string());
+        .map(|p| {
+            let s = p.to_string_lossy().to_string();
+            // Strip Windows extended-length prefix `\\?\X:\...` → `X:\...`
+            #[cfg(windows)]
+            {
+                if let Some(rest) = s.strip_prefix(r"\\?\") {
+                    if rest.len() >= 3
+                        && rest.as_bytes()[1] == b':'
+                        && rest.as_bytes()[2] == b'\\'
+                    {
+                        return rest.to_string();
+                    }
+                }
+            }
+            s
+        });
     normalize_project_path(canonical.as_deref().unwrap_or(path))
 }
 
@@ -589,6 +613,57 @@ impl Database {
             params![NOTIFICATION_KEEP],
         )?;
         let _ = self.conn.execute_batch("PRAGMA incremental_vacuum;");
+        // One-time repair: strip the Windows extended-length path prefix
+        // (`//?/X:/...` → `X:/...`) from project paths stored by older versions.
+        self.fix_extended_length_project_paths()?;
+        Ok(())
+    }
+
+    /// Repair project paths that were stored with the Windows extended-length
+    /// prefix (`//?/X:/...`). Idempotent: rows already in normal form are
+    /// skipped, and duplicates are merged by keeping the most-recently-opened.
+    fn fix_extended_length_project_paths(&self) -> Result<()> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, path FROM projects WHERE path LIKE '//?/%'",
+        )?;
+        let rows: Vec<(i64, String)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        for (id, old_path) in rows {
+            let Some(fixed) = normalize_project_path(&old_path) else {
+                continue;
+            };
+            if fixed == old_path {
+                continue;
+            }
+            // Check if a row with the fixed path already exists.
+            let existing: Option<i64> = self
+                .conn
+                .query_row(
+                    "SELECT id FROM projects WHERE path = ?1",
+                    params![fixed],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            if let Some(keep_id) = existing {
+                // Merge: reassign FKs pointing to old id, then delete the old row.
+                self.conn.execute(
+                    "UPDATE sessions SET project_id = ?1 WHERE project_id = ?2",
+                    params![keep_id, id],
+                )?;
+                self.conn.execute(
+                    "UPDATE scheduled_tasks SET project_id = ?1 WHERE project_id = ?2",
+                    params![keep_id, id],
+                )?;
+                self.conn
+                    .execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+            } else {
+                self.conn.execute(
+                    "UPDATE projects SET path = ?1 WHERE id = ?2",
+                    params![fixed, id],
+                )?;
+            }
+        }
         Ok(())
     }
 
@@ -2095,5 +2170,37 @@ mod tests {
         let b = db.ensure_project(&link.to_string_lossy(), true).unwrap();
         assert_eq!(a, b, "symlinked path spellings must share one project row");
         assert_eq!(db.list_projects().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn normalize_project_path_strips_extended_length_prefix() {
+        // Forward-slash variant stored by older DB versions on Windows
+        assert_eq!(
+            normalize_project_path("//?/C:/Users/mi/project"),
+            Some("C:/Users/mi/project".to_string()),
+        );
+        assert_eq!(
+            normalize_project_path("//?/D:/work/app"),
+            Some("D:/work/app".to_string()),
+        );
+        // Backslash variant coming directly from canonicalize on Windows
+        assert_eq!(
+            normalize_project_path(r"\\?\C:\Users\mi\project"),
+            Some("C:/Users/mi/project".to_string()),
+        );
+        // Non-drive UNC paths should NOT be stripped
+        assert_eq!(
+            normalize_project_path("//?/UNC/server/share"),
+            Some("//?/UNC/server/share".to_string()),
+        );
+        // Normal paths remain unchanged
+        assert_eq!(
+            normalize_project_path("C:/Users/mi/project"),
+            Some("C:/Users/mi/project".to_string()),
+        );
+        assert_eq!(
+            normalize_project_path("/home/user/project"),
+            Some("/home/user/project".to_string()),
+        );
     }
 }
