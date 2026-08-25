@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.10.4",
+    date: "2026-08-25",
+    highlights: [
+      "Show only configured provider models in the conversation picker, while keeping saved models available when discovery is unavailable.",
+      "Keep the frameless window control band opaque so page content never shows through native controls.",
+      "Keep chat width stable while the work panel is open and restore chat-only window bounds after it collapses.",
+    ],
+  },
+  {
     version: "0.10.3",
     date: "2026-08-25",
     highlights: [
@@ -411,6 +420,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.10.4",
+    date: "2026-08-25",
+    highlights: [
+      "对话模型选择器只显示已配置的供应商模型，发现不可用时仍保留已保存的模型。",
+      "为无边框窗口控制区绘制不透明背景，避免页面内容穿透原生控件区域。",
+      "打开工作面板时保持聊天宽度稳定，收起后恢复仅聊天窗口边界。",
+    ],
+  },
   {
     version: "0.10.3",
     date: "2026-08-25",
