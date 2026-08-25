@@ -120,6 +120,27 @@ test("switching to a provider without reasoning resets the session level", () =>
   assert.match(composerSource, /thinkingLevel:\s*level/);
 });
 
+test("draft Composer thinking follows the exact model selected in its menu", () => {
+  assert.match(
+    composerSource,
+    /const providerModels = useAppStore\(\(s\) => s\.providerModels\)/,
+  );
+  assert.match(composerSource, /thinkingProviderForModel\(/);
+  assert.match(
+    composerSource,
+    /const selectedModelCatalog = provider \? providerModels\[provider\.id\]/,
+  );
+  assert.match(composerSource, /const catalogThinkingProvider = thinkingProviderForModel\(/);
+  assert.match(
+    composerSource,
+    /const nextModelProvider = thinkingProviderForModel\([\s\S]*?providerModels\[candidate\.id\]/,
+  );
+  assert.match(
+    composerSource,
+    /const nextThinkingLevel = activeSession[\s\S]*?thinkingLevelForProvider\(nextModelProvider, thinkingLevel\)[\s\S]*?highestSupportedThinkingLevel\(nextModelProvider\.supportedThinkingLevels\)/,
+  );
+});
+
 test("new sessions default to the strongest level of a reasoning model", () => {
   const materializeSource =
     storeSource.match(

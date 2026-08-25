@@ -22,7 +22,7 @@ test("Composer uses one model × reasoning popover with a root and in-place subm
 });
 
 test("model and reasoning selection return to the root without closing", () => {
-  assert.match(composerSource, /await configureActiveSession\(\{[\s\S]*?thinkingLevel: thinkingLevelForProvider/);
+  assert.match(composerSource, /await configureActiveSession\(\{[\s\S]*?thinkingLevel: nextThinkingLevel/);
   assert.match(composerSource, /setModelQuery\(""\);[\s\S]*?setModelThinkingView\("root"\)/);
   assert.match(composerSource, /const selectThinkingLevel = async/);
   assert.match(composerSource, /setModelThinkingView\("root"\);[\s\S]*?setThinkingHighlight\(-1\)/);

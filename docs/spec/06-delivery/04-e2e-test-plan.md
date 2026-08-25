@@ -1682,7 +1682,10 @@ Each scenario is documented in this format:
   clears model filtering, and keeps the menu open. A non-reasoning provider
   clamps the durable level to `off` and does not expose an unsupported level.
   Refreshing discovered model data cannot invent capabilities for the unknown
-  model.
+  model. Before the first message creates a session, the Composer uses the
+  exact model selected in its model menu rather than the provider's default
+  model; after materialization, the same exact-model capability remains in
+  effect.
 - **Specs linked**: `03-runtime/11-provider-model-system.md`,
   `03-runtime/12-provider-config-schema.md`,
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0018, ADR 0027

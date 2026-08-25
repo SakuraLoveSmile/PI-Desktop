@@ -1812,6 +1812,12 @@ reasoning-level control.
   configuration applies directly to that session. A new task appears in the
   sidebar before it carries input, and a running turn or pending approval still
   gates those controls.
+- While the home composer has no active session, its Thinking trigger resolves
+  capabilities from the exact model selected in the model menu (using the
+  cached catalog record), not from that provider's default model. Selecting a
+  model therefore updates the draft Composer's available levels and strongest
+  initial level immediately; the persisted session keeps the same exact-model
+  capability after materialization.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
@@ -1994,6 +2000,9 @@ there is no separate top-bar model selector.
 - Cached provider models are available on the first open after restart; a
   background refresh updates the list without clearing it first
 - Select: switches model for current session
+- On the home/new-session draft, selecting a model also updates the Composer's
+  Thinking capability and level from that exact catalog model before the first
+  message creates the session.
 - Keyboard: up/down arrow in dropdown, Enter to select, Escape to close
 - Long option labels may ellipsize inside the compact menu; each option renders
   one display name only, falling back to the model ID when no display name is

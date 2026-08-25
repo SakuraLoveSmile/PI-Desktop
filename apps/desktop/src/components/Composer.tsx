@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+  ModelInfo,
   Mode,
   PermissionMode,
   ProviderPublic,
@@ -208,6 +209,32 @@ export function thinkingLevelForProvider(
     if (available.includes(candidate)) return candidate;
   }
   return "off";
+}
+
+/**
+ * Project the selected catalog model onto a provider for draft sessions.
+ *
+ * Persisted sessions receive these exact capabilities from Electron main.
+ * Before the first message creates a session, the provider row only describes
+ * its default model, so use the selected catalog record when one is available.
+ */
+export function thinkingProviderForModel(
+  provider: ProviderPublic | null | undefined,
+  modelId: string | undefined,
+  modelCatalog: readonly ModelInfo[] | undefined,
+): ProviderPublic | null | undefined {
+  if (!provider || !modelId) return provider;
+  const model = modelCatalog?.find((candidate) => candidate.modelId === modelId);
+  if (!model) return provider;
+
+  const supportsReasoning = model.capabilities.includes("reasoning");
+  return {
+    ...provider,
+    supportsReasoning,
+    supportedThinkingLevels: supportsReasoning
+      ? (model.supportedThinkingLevels ?? provider.supportedThinkingLevels)
+      : ["off"],
+  };
 }
 
 function cssPixels(value: string) {
@@ -581,6 +608,12 @@ export function Composer({
     (!activeSession ? draftConfiguration?.modelId : undefined) ??
     settings?.defaultModelId ??
     provider?.defaultModelId;
+  const selectedModelCatalog = provider ? providerModels[provider.id] : undefined;
+  const catalogThinkingProvider = thinkingProviderForModel(
+    provider,
+    modelId,
+    selectedModelCatalog,
+  );
   const thinkingProvider =
     provider &&
     activeSession?.providerId === provider.id &&
@@ -592,11 +625,11 @@ export function Composer({
           supportedThinkingLevels:
             activeSession.supportedThinkingLevels ?? (["off"] as ThinkingLevel[]),
         }
-      : provider;
+      : catalogThinkingProvider;
   // A draft without a session starts at the strongest level its inherited
   // default model publishes, matching a freshly created reasoning session.
-  const draftThinkingLevel = provider?.supportsReasoning
-    ? highestSupportedThinkingLevel(provider.supportedThinkingLevels)
+  const draftThinkingLevel = thinkingProvider?.supportsReasoning
+    ? highestSupportedThinkingLevel(thinkingProvider.supportedThinkingLevels)
     : "off";
   const sessionThinkingLevel =
     activeSession?.thinkingLevel ??
@@ -748,11 +781,21 @@ export function Composer({
     nextModelId: string,
   ) => {
     try {
+      const nextModelProvider = thinkingProviderForModel(
+        candidate,
+        nextModelId,
+        providerModels[candidate.id],
+      );
+      const nextThinkingLevel = activeSession
+        ? thinkingLevelForProvider(nextModelProvider, thinkingLevel)
+        : nextModelProvider?.supportsReasoning
+          ? highestSupportedThinkingLevel(nextModelProvider.supportedThinkingLevels)
+          : "off";
       await configureActiveSession({
         mode,
         providerId: candidate.id,
         modelId: nextModelId,
-        thinkingLevel: thinkingLevelForProvider(candidate, thinkingLevel),
+        thinkingLevel: nextThinkingLevel,
       });
       setModelQuery("");
       setModelThinkingView("root");
