@@ -23,6 +23,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.10.3",
+    date: "2026-08-25",
+    highlights: [
+      "Improve one-shot prompt enhancement so it keeps the current draft and file references intact.",
+      "Keep the composer send and stop actions aligned with the visible draft and running session.",
+      "Preserve background delegation metadata across TaskWait turns and renderer reloads.",
+      "Keep forked sessions' history and transcript available immediately after branching.",
+    ],
+  },
+  {
     version: "0.10.2",
     date: "2026-08-24",
     highlights: [
@@ -401,6 +411,16 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.10.3",
+    date: "2026-08-25",
+    highlights: [
+      "优化一次性提示增强功能，保留当前草稿和文件引用。",
+      "让输入框的发送和停止操作始终与当前草稿及运行中的会话保持一致。",
+      "跨 TaskWait 轮次和渲染器重新加载继续保留后台代理的关联信息。",
+      "分支会话创建后立即保留其历史记录和对话内容。",
+    ],
+  },
   {
     version: "0.10.2",
     date: "2026-08-24",
