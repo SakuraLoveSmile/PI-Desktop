@@ -5,6 +5,7 @@
 - Deciders: PI-Desktop core
 - Related: [ADR 0019](0019-work-panel-subsystems.md) ·
   [ADR 0033](0033-internal-dock-work-panel.md) ·
+  [ADR 0122](0122-reserve-native-width-while-work-panel-visible.md) ·
   [ADR 0081](0081-host-owned-plugin-panel-chrome.md) ·
   [ADR 0092](0092-plugin-owned-panel-surface.md) ·
   [ADR 0105](0105-files-as-a-bundled-plugin.md) ·
@@ -30,8 +31,8 @@ window that competes with the app for screen space, or do not exist.
 
 The work panel is the natural home for those surfaces. It is already the
 "inspect and steer the workspace" column, it is already session-scoped
-(ADR 0028), and it is already an in-flow part of the client area rather than a
-window that grows (ADR 0033).
+(ADR 0028), and it is an in-flow part of the client area with a temporary
+native reservation while visible (ADR 0122).
 
 ## Decision
 

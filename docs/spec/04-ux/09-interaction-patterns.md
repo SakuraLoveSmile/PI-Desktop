@@ -813,20 +813,21 @@ Work-panel width resizing is implemented in MVP:
 - Opening and closing animate the dock's `width` and `flex-basis` together with
   the bounded opacity/transform feedback, so MainChat reflows continuously
   instead of changing width before the first motion frame.
-- The renderer always requests a native reservation width of 0, so the OS window
-  never expands (ADR 0033). Opening, collapse, and final close change only the
-  committed preferred width. Repeating a target is idempotent.
+- Opening requests a native reservation equal to the committed panel width;
+  collapse and final close request zero after the exit animation (ADR 0122).
+  Repeating a target is idempotent.
 - MainChat reflows continuously while the panel flex allocation opens or
-  closes, then remains at the settled client width; the window does not change.
-  When the fixed window is too narrow for both panel and a readable chat, chat
+  closes. When the display work area can supply the reservation, the chat
+  width stays stable and the window returns to its base bounds after collapse.
+  When the work area is too narrow, chat absorbs the unavoidable shortfall and
   may reflow below its 360px target.
 - Native window and sidebar resize never clamp or rewrite the panel. Native
   edges resize MainChat by reflow only.
 - Maximized/fullscreen is unaffected; display/work-area changes reconcile the
-  window bounds normally. Ordinary movement within one unchanged work area does
-  not reapply geometry. Persisted base bounds are the user's window size
-  (reservation is always 0).
-- Background-session artifacts never update the visible panel.
+  reservation against the current bounds. Ordinary movement within one
+  unchanged work area does not reapply geometry. Persisted base bounds exclude
+  temporary reservation width and its x shift.
+- Background-session artifacts never update the visible panel or reservation.
 
 The following gestures remain reserved for future milestones:
 
@@ -1071,5 +1072,6 @@ This does not prevent state changes — it makes them instant.
     navigation, composer, completed rows, and work-panel content do not rerender
     solely because the current assistant message appended content
 21. Native window-edge resize changes MainChat by reflow without compressing the
-    fixed work panel; divider commit updates the committed preferred width,
-    while divider cancellation restores the prior width (ADR 0033)
+    fixed work panel; divider commit updates the committed preferred width and
+    active reservation, while divider cancellation restores the prior width and
+    reservation (ADR 0122)

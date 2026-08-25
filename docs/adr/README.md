@@ -51,8 +51,8 @@ Each ADR includes:
 | 0029 | Separate native-window and work-panel resize ownership | Superseded in part by 0032 |
 | 0030 | Turn-boundary context checkpoint compaction | Accepted |
 | 0031 | Keep composer prompt rows free of brand icons | Accepted |
-| 0032 | Reserve native width for the docked work panel | Accepted (superseded in part by 0033) |
-| 0033 | Internal-dock work panel (no native window expansion) | Accepted |
+| 0032 | Reserve native width for the docked work panel | Accepted (amended by 0033 and 0122) |
+| 0033 | Internal-dock work panel (no native window expansion) | Superseded by 0122 |
 | 0034 | Merge command palette into global search | Accepted |
 | 0035 | Surface the OS locale through the preload bridge | Accepted |
 | 0036 | Split Settings into AI and Shortcuts destinations | Accepted |
@@ -136,3 +136,4 @@ Each ADR includes:
 | 0119 | Event-driven subagent timeouts | Accepted for implementation |
 | 0120 | Bounded session history windows | Accepted |
 | 0121 | Keep Composer prompt enhancement one-shot and main-owned | Accepted |
+| 0122 | Reserve native width while the work panel is visible | Accepted |

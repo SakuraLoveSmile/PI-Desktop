@@ -65,13 +65,13 @@ test("the work panel shortcut closes the panel it opened", () => {
   assert.match(toggleBody, /openWorkPanel\(\)/);
 });
 
-test("work panel is an internal dock that never expands the OS window", () => {
+test("work panel reserves native width and releases it after collapse", () => {
   assert.match(appSource, /presentedWorkPanelOpen/);
   assert.match(appSource, /setPresentedWorkPanelOpen/);
   assert.match(appSource, /workPanelExiting/);
-  // Internal-dock redesign (ADR 0033): the panel occupies client-area space
-  // and never reserves native window width, so the reservation target is 0.
-  assert.match(appSource, /requestedWidth\s*=\s*0/);
+  // The panel remains an in-flow sibling, but the native window reserves its
+  // committed width before presentation so the chat column stays stable.
+  assert.match(appSource, /requestedWidth\s*=\s*Math\.round\(workPanelWidth\)/);
   assert.match(appSource, /setWorkPanelReservation\(requestedWidth\)/);
   assert.ok(
     appSource.indexOf("setWorkPanelReservation(requestedWidth)") <

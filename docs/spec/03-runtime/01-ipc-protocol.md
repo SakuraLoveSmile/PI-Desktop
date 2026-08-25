@@ -1201,7 +1201,7 @@ but the handler resolves the target strictly from the sender's live panel
 window. The preload consumes this channel internally for its closed-Shadow-DOM
 titlebar; it is not added to `window.pluginBridge` or the shared host protocol.
 The one geometry-specific capability is a target-state work-panel reservation
-(D163, ADR 0032):
+(D163, D255, ADR 0032/0122):
 
 ```ts
 window/setWorkPanelReservation({ width: 0 | number })

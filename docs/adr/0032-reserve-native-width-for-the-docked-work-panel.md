@@ -1,6 +1,6 @@
 # ADR 0032: Reserve native width for the docked work panel
 
-- Status: Accepted (superseded in part by ADR 0033)
+- Status: Accepted (amended by ADR 0033 and ADR 0122)
 - Date: 2026-07-29
 - Related: [01-ui-ia](../spec/04-ux/01-ui-ia.md) ·
   [08-component-spec §5](../spec/04-ux/08-component-spec.md) ·

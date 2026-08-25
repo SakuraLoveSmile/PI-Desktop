@@ -697,13 +697,13 @@ workflow while rendering entirely inside the plugin's isolated page:
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; startup has no retained tabs. `Cmd/Ctrl + J` reveals the active session's panel context without creating a tab. Inline review cards remain available in the transcript because they are message-scoped and do not require the work panel. |
-| Open | Docked flex row right of the main pane; opened by an artifact or `Cmd/Ctrl + J` at a fixed committed width of 244–720px (default 280px). `Cmd/Ctrl + J` again collapses it, retaining the session context. Its flex allocation eases from zero to the committed width so MainChat reflows continuously. It occupies client-area space and never expands the OS window (ADR 0033). |
+| Open | Docked flex row right of the main pane; opened by an artifact or `Cmd/Ctrl + J` at a fixed committed width of 244–720px (default 280px). `Cmd/Ctrl + J` again collapses it, retaining the session context. Its flex allocation eases from zero to the committed width so MainChat reflows continuously, while a matching native reservation keeps the chat width stable when possible (ADR 0122). |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded menu lists the tools first and then the transcript-opened resources in first-open order, with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
 | No workspace | Each tab renders its own "open a project" empty state |
 | Open with no resource | `Cmd/Ctrl + J` reveals the panel without creating a tab, so the body renders the no-resource empty state: title, one line of copy, and the available Browser/plugin-view entries. Activating an entry creates or selects that singleton view. The body is not a `role="tabpanel"` here because no tab labels it. |
-| Constrained work area | The panel stays at its committed width; MainChat reflows to absorb it and may fall below its 360px target on small windows (ADR 0033) |
+| Constrained work area | The panel stays at its committed width; the native reservation is capped by the work area and MainChat absorbs the shortfall, possibly falling below its 360px target on small windows (ADR 0122) |
 | Plugin view active | The body hosts the plugin's own isolated page as a native `WebContentsView`, positioned from the measured surface rect. It is hidden whenever the tab is inactive, the panel is animating or being resized, or a blocking overlay is open — the same rule the Browser preview follows, since both composite above renderer content. A view whose plugin is disabled, uninstalled, reloaded, or crashed is destroyed; the tab stays and re-opens the page on the next lifecycle event (ADR 0104) |
 | Plugin out of scope | A view contributed by a plugin that is not active in the current project disappears from the menu when the project changes. Unlike contributed themes, which are one global setting and stay unfiltered, a view is scoped work |
 
@@ -781,20 +781,20 @@ workflow while rendering entirely inside the plugin's isolated page:
   The 10px hit area keeps a global column-resize cursor and suppresses text
   selection during the gesture. The live preview changes renderer columns only;
   a successful commit updates the committed preferred width. Native window edges
-  resize MainChat by reflow only, never the panel or its preference (ADR 0033).
+  resize MainChat by reflow only, never the panel or its preference (ADR 0122).
 - Persistence: all session contexts are renderer runtime state only. On app
   startup, open state, tabs, active-tab selection, file requests, and Browser
   resources reset; only the committed preferred `{width}` remains in
-  localStorage `pi.desktop.workPanel`. The renderer always requests a native
-  reservation width of 0, so the OS window never expands (ADR 0033). Collapse
-  and final-tab close and a divider commit update only the committed preferred
-  width. Target updates are idempotent. The panel reflows MainChat inside the
-  fixed window; on constrained work areas chat may fall below its 360px target.
+  localStorage `pi.desktop.workPanel`. Before presenting an open panel the
+  renderer requests a native reservation equal to that width; collapse and
+  final-tab close release the reservation after the exit animation. Target
+  updates are idempotent. The panel reflows MainChat beside its reserved native
+  column; on constrained work areas chat may fall below its 360px target.
   Maximized/fullscreen geometry is unaffected. Background session artifacts
-  never update the visible panel. The renderer changes panel presentation only
-  after the latest (zero-width) reservation request succeeds; a rejected or
-  superseded request keeps the last confirmed presentation state
-  (D163, ADR 0032).
+  never update the visible panel or reservation. The renderer changes panel
+  presentation only after the latest reservation request succeeds; a rejected
+  or superseded request keeps the last confirmed presentation state
+  (D163, D255, ADR 0122).
 
 ### 5.5 Accessibility
 
@@ -2489,7 +2489,8 @@ Sidebar footer                                        Popover (360px max)
     row activation, mark-all-read and clear actions; it is keyboard-operable
     and never treats a visible-current or aborted turn as a notification
 18. Native edges resize MainChat by reflow without compressing the fixed work panel;
-    panel visibility and divider commits update the committed preferred width,
-    and cancelled divider gestures restore the prior width (ADR 0033)
+    panel visibility and divider commits update the committed preferred width and
+    active reservation, and cancelled divider gestures restore the prior width
+    and reservation (ADR 0122)
 19. Expanded sidebar session titles, project/group titles, and empty-state copy
     use the 13px compact token while primary sidebar actions remain at 14px

@@ -271,11 +271,11 @@ function AppShell() {
       workPanelExitClosing.current = false;
       workPanelExitingRef.current = false;
       setWorkPanelExiting(false);
-      // Internal-dock redesign (ADR 0033): the work panel is a flex column
-      // inside the fixed client area, so it never expands the OS window. The
-      // native reservation target is therefore always 0; the native browser
-      // view still follows the renderer-measured panel rect via browserSetBounds.
-      const requestedWidth = 0;
+      // Keep the panel in the renderer's flex layout, but reserve matching
+      // native width before presenting it. This keeps the conversation width
+      // stable while open and lets the close path return the window to its
+      // original bounds after the exit animation releases the reservation.
+      const requestedWidth = Math.round(workPanelWidth);
       void commitWorkPanelPresentation({
         reservation: api.setWorkPanelReservation(requestedWidth),
         isCurrent: () => request === workPanelReservationRequest.current,

@@ -822,33 +822,37 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Titlebar row height | 46px | Codex toolbar rhythm (D034); traffic lights {x:16,y:16} |
 | Sidebar width (collapsed) | 48px | Icon-only rail |
 | Sidebar width (expanded) | ~275px | Codex sidebar width (D034/D070) |
-| Main pane minimum readable width | 360px | Target while the fixed window can fit panel + chat; constrained windows reflow chat below it (D163, ADR 0033) |
+| Main pane minimum readable width | 360px | Target while the native work-panel reservation can fit panel + chat; constrained windows reflow chat below it (D163, D255, ADR 0122) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `244px–720px` (default 280px), fixed at the committed width | the combined create trigger keeps the full panel width on content; the panel is an in-flow column and never expands the OS window (D154/D163, ADR 0033) |
+| Work panel width (open) | `244px–720px` (default 280px), fixed at the committed width | the combined create trigger keeps the full panel width on content; the panel is an in-flow column backed by a matching temporary native reservation (D154/D163/D255, ADR 0122) |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
-| Window min width | 1040px | Enforced by Electron as the base chat-shell minimum; an open work panel reflows chat inside the fixed window and may reduce the chat pane below its 360px readability target |
+| Window min width | 1040px | Enforced by Electron as the base chat-shell minimum; an open work panel grows the normal window when the display can supply the reservation, otherwise the fixed panel may reduce the chat pane below its 360px readability target |
 | Window min height | 700px | Enforced by Electron |
 
-An open work panel is a fixed-width in-flow column; it reflows MainChat and
-never expands the OS window (ADR 0033). The renderer requests a native
-reservation width of 0, so chat width changes by reflow only. The native
-browser view follows the renderer-measured panel rect. Persisted normal bounds
-are the user's window size. Before collapse motion starts, any native Browser
-preview surface is detached because it cannot participate in renderer CSS
-animation. Windows keeps the exiting dock opaque during its bounded slide so a
-frameless native resize never exposes a full-panel background flash; macOS and
-Linux retain the fade-and-slide exit.
+An open work panel is a fixed-width in-flow column backed by a matching native
+reservation (ADR 0122). The renderer requests its committed width before
+presentation, so MainChat keeps its width when the display work area allows
+the reservation. The native browser view follows the renderer-measured panel
+rect. Persisted normal bounds exclude temporary reservation width and its
+display-edge shift. Before collapse motion starts, any native Browser preview
+surface is detached because it cannot participate in renderer CSS animation.
+Windows keeps the exiting dock opaque during its bounded slide so a frameless
+native resize never exposes a full-panel background flash; macOS and Linux
+retain the fade-and-slide exit.
 
 ### 10.1 Responsive collapse
 
 - The work panel never participates in responsive collapse. It keeps its
   committed `244..720px` width (default 280px) while visible.
 - Native window and sidebar changes reflow MainChat. The 360px chat target holds
-  when the fixed window can fit panel + chat; otherwise chat reflows below it.
-- Panel open/collapse/final close and divider commit update the committed
-  preferred width. Native edges resize the window and reflow MainChat.
+  when the native reservation can fit panel + chat; otherwise chat reflows below
+  it.
+- Panel open requests the committed native reservation; collapse/final close
+  release it after the exit animation, and divider commit updates the
+  committed preferred width and active reservation. Native edges resize the
+  window and reflow MainChat.
 - Width < 1040px or height < 700px is unsupported and prevented by Electron.
 
 ## 11. Component foundations

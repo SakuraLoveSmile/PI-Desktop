@@ -96,15 +96,17 @@ destination, chat as the home surface, tools and permissions inline.
   originating session's retained panel context and never open, activate, or
   resize the visible panel. Startup is closed with no retained session
   contexts, and only the preferred panel width persists across launches.
-  The work panel is a fixed-width in-flow column of the fixed client area
-  (ADR 0033). Opening it reflows MainChat to the left and never expands the OS
-  window; collapse and final-resource close release the space, and a divider
-  commit updates the preferred width. On constrained windows chat reflows below
-  its 360px target. Native window edges resize chat by reflow and never the
-  panel. Maximized/fullscreen is unaffected; moving between displays or changing
-  a display work area reconciles the window bounds normally. Persisted base
-  bounds are the user's window size. Background artifacts never change the
-  visible panel (D163, ADR 0033).
+  The work panel remains a fixed-width in-flow column beside MainChat, with a
+  matching native reservation while visible (ADR 0122). Opening it reserves
+  the committed width before presentation so MainChat keeps its width when the
+  display work area allows it; collapse and final-resource close release the
+  reservation after the exit animation and return the window to its base
+  bounds. On constrained windows the panel stays fixed and chat absorbs only
+  the unavoidable shortfall. Native window edges resize chat and never the
+  panel. Maximized/fullscreen is unaffected; moving between displays or
+  changing a display work area reconciles the target normally. Persisted base
+  bounds exclude temporary panel reservation. Background artifacts never
+  change the visible panel or reservation (D163, D255, ADR 0122).
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
 - **Composer**: workspace-agnostic floating pill anchored to the conversation

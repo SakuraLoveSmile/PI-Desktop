@@ -1828,9 +1828,9 @@ Each scenario is documented in this format:
   deduplicate. Opening, collapse, and
   closing animate the panel's width/flex allocation with its bounded
   opacity/slide, so MainChat reflows continuously without a pre-animation jump.
-  Opening the panel, collapsing it, or committing a divider resize never
-  changes the OS window size — only MainChat reflows inside
-  the fixed client area (ADR 0033). Once the panel is open, a single unified
+  Opening the panel, collapsing it, or committing a divider resize updates the
+  target-state native reservation without a presentation jump. Once the panel
+  is open, a single unified
   context trigger opens one dropdown that lists Browser and in-scope plugin
   views, with a fill plus 2px edge marker for the active row and a dot for open
   inactive ones, each open row carrying its own close control in an
@@ -1883,8 +1883,9 @@ Each scenario is documented in this format:
   unchanged work area does not reapply geometry. System compression or
   relocation during a display transition does not overwrite the confirmed base
   bounds, and returning to a roomier display restores the prior chat width.
-  Relaunch restores the user's window size (the native reservation is always 0,
-  ADR 0033). Malformed reservation payloads fail with `INVALID_ARGUMENT` and
+  Relaunch restores the user's window size without the temporary visible-panel
+  reservation (ADR 0122). Malformed reservation payloads fail with
+  `INVALID_ARGUMENT` and
   never coerce. A rejected reservation keeps
   the last confirmed panel presentation until a later successful request; a
   superseded success cannot commit stale presentation. No transition produces
@@ -1892,7 +1893,8 @@ Each scenario is documented in this format:
   The former context-panel overlay no longer exists.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`, `04-ux/01-ui-ia.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
-  `04-ux/09-interaction-patterns.md`, ADR 0032, ADR 0068, D163, D207
+  `04-ux/09-interaction-patterns.md`, ADR 0032, ADR 0068, ADR 0122, D163,
+  D207, D255
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`work-panel-resize.test.mjs`,
