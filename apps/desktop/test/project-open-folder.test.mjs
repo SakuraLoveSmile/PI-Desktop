@@ -35,6 +35,6 @@ test("main opens only a registered project directory", () => {
   assert.match(handler, /ErrorCodes\.INVALID_ARGUMENT/);
   assert.match(handler, /ErrorCodes\.NOT_FOUND/);
   assert.match(handler, /statSync\(projectPath\)\.isDirectory\(\)/);
-  assert.match(handler, /shell\.openPath\(projectPath\)/);
+  assert.match(handler, /shell\.openPath\(stripWinLongPrefix\(projectPath\)\)/);
   assert.match(handler, /return \{ ok: true, path: projectPath \}/);
 });
