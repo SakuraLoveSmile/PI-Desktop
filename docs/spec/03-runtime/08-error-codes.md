@@ -240,21 +240,20 @@ wrong contract, so no artifact is written and no approval row is created.
 |---|---|
 | auth/config (`PROVIDER_SECRET_MISSING`, `MODEL_NOT_CONFIGURED`) | assistant error message with settings CTA |
 | permission denials | inline tool card state |
-| retriable provider/network | assistant error message with retry action |
+| retriable provider/network | assistant error message with diagnostic details; session-scoped failed-turn recovery card provides retry |
 | internal/host unavailable | degraded banner + recovery tip |
 
 Message-bound provider failures never use a toast or floating global banner.
 A `PROVIDER_RATE_LIMITED` failure remains invisible while its bounded retry
 budget is available; only exhaustion renders the assistant error and lifecycle
-error. Its terminal assistant error uses a localized **Continue** action (rather
-than the generic Retry label) while keeping the same action that resends the
-latest prompt. The assistant error message shows a localized summary and stable code,
+error. The assistant error message shows a localized summary and stable code,
 with an accessible details disclosure containing the redacted provider response,
 provider ID, and model ID. Provider detail is capped at 600 characters and
 common credential/header values are redacted before event emission or
 persistence. When available, the details disclosure and timing logs may also
 show bounded `phase`, `providerStatus`, `providerCode`, `providerWaitMs`,
-`streamMs`, and `retryAttempt` fields.
+`streamMs`, and `retryAttempt` fields. Manual retry remains available from the
+session-scoped failed-turn recovery card rather than the assistant error card.
 
 ## 6. i18n key convention
 

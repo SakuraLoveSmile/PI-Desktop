@@ -21,20 +21,21 @@ test("provider failures stay in the transcript as structured assistant messages"
   assert.match(main, /failed && empty && !event\.message\.error/);
 });
 
-test("assistant error messages expose readable provider details and actions", async () => {
+test("assistant error messages expose readable provider details without retry actions", async () => {
   const transcript = await read("src/components/ChatTranscript.tsx");
-
-  assert.match(transcript, /function AssistantErrorMessage/);
-  assert.match(transcript, /aria-expanded=\{open\}/);
-  assert.match(transcript, /error\.message/);
-  assert.match(transcript, /message\.providerId/);
-  assert.match(transcript, /message\.modelId/);
-  assert.match(transcript, /copyErrorDetails/);
-  assert.match(transcript, /retryLastPrompt/);
-  assert.match(transcript, /const continueAction = error\.code === "PROVIDER_RATE_LIMITED"/);
-  assert.match(
-    transcript,
-    /continueAction \? "errors\.action\.continue" : "errors\.action\.retry"/,
+  const component = transcript.slice(
+    transcript.indexOf("function AssistantErrorMessage"),
+    transcript.indexOf("const TOOL_ACTION_KEYS"),
   );
-  assert.match(transcript, /setSettingsTab\("agent"\)/);
+
+  assert.match(component, /function AssistantErrorMessage/);
+  assert.match(component, /aria-expanded=\{open\}/);
+  assert.match(component, /error\.message/);
+  assert.match(component, /message\.providerId/);
+  assert.match(component, /message\.modelId/);
+  assert.match(component, /copyErrorDetails/);
+  assert.doesNotMatch(component, /retryLastPrompt/);
+  assert.doesNotMatch(component, /error\.retriable/);
+  assert.doesNotMatch(component, /errors\.action\.(continue|retry)/);
+  assert.match(component, /setSettingsTab\("agent"\)/);
 });

@@ -570,7 +570,6 @@ function AssistantErrorMessage({ message }: { message: UiMessage }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   const detailsId = useId();
-  const retryLastPrompt = useAppStore((state) => state.retryLastPrompt);
   const error = message.error;
   if (!error) return null;
   const localizedKey = `errors.${error.code}`;
@@ -581,7 +580,6 @@ function AssistantErrorMessage({ message }: { message: UiMessage }) {
     "PROVIDER_SECRET_MISSING",
     "PROVIDER_UNAUTHORIZED",
   ].includes(error.code);
-  const continueAction = error.code === "PROVIDER_RATE_LIMITED";
 
   return (
     <section className="message-error" aria-label={t("chat.responseError")}>
@@ -614,17 +612,6 @@ function AssistantErrorMessage({ message }: { message: UiMessage }) {
               }}
             >
               {t("errors.action.openSettings")}
-            </button>
-          ) : null}
-          {error.retriable ? (
-            <button
-              type="button"
-              className="copy-btn primary"
-              onClick={() => void retryLastPrompt()}
-            >
-              {t(
-                continueAction ? "errors.action.continue" : "errors.action.retry",
-              )}
             </button>
           ) : null}
         </div>

@@ -1434,8 +1434,10 @@ Each scenario is documented in this format:
   `MODEL_NOT_CONFIGURED` or `PROVIDER_UNAUTHORIZED` code. Details expose the
   redacted provider response plus provider/model IDs and can be copied; no API
   key or Authorization value appears. The configuration failure links to
-  settings, retriable failures offer Retry, the composer becomes usable again,
-  and reload preserves the error message. The development launch executes a
+  settings, the assistant error card exposes no Retry action, the composer
+  becomes usable again, and reload preserves the error message. The
+  session-scoped failed-turn recovery card remains the manual retry surface.
+  The development launch executes a
   sidecar rebuilt from current runtime source.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`,
   `03-runtime/07-process-model.md`, `03-runtime/08-error-codes.md`
@@ -5305,10 +5307,10 @@ This test plan spec is accepted when:
 
 ### US-UI-60c Compact assistant error card
 - Trigger a retriable provider/model failure in the transcript in light and dark themes.
-- Expect the assistant error to use a restrained inline surface with a thin error rail. The localized summary, stable code, details disclosure, and Retry action share one compact header; the card does not render a second bottom action row.
+- Expect the assistant error to use a restrained inline surface with a thin error rail. The localized summary, stable code, and details disclosure share one compact header; the card does not render a Retry or Continue action, and it does not render a second bottom action row.
 - Confirm the details remain expanded on first render, keep the redacted provider response and provider/model IDs, and expose an icon-only copy control with an accessible label/tooltip. On a narrow window, the header actions wrap without horizontal overflow.
-- For a terminal `PROVIDER_RATE_LIMITED` (including HTTP 429), expect the action label to be localized as **Continue** while retaining the existing path that resends the latest prompt.
-- Click the action and expect the existing retry path to resend the latest prompt.
+- For a terminal `PROVIDER_RATE_LIMITED` (including HTTP 429), expect the same diagnostic card without a manual retry action.
+- Inspect the session-scoped failed-turn recovery card separately and expect it to retain the existing path that resends the latest prompt.
 
 
 ### US-UI-61 Assistant context summary + retry (D103, D184, D244)
