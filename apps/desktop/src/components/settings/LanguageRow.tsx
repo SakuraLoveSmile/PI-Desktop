@@ -1,10 +1,10 @@
 /**
  * Language picker for Settings → General → Appearance.
  *
- * Theme stays a three-card grid because those options are visual and fixed.
- * Language is a growing named list, so it uses the same searchable anchored
- * menu as Service: Auto pinned at the top, then shipped locales with native
- * names (endonyms, never translated) and English names for search/sort.
+ * Theme and language both use this searchable anchored-menu pattern.
+ * Language is a growing named list: Auto pinned at the top, then shipped
+ * locales with native names (endonyms, never translated) and English names
+ * for search/sort.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
