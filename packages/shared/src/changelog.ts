@@ -23,6 +23,13 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.13.10",
+    date: "2026-09-07",
+    highlights: [
+      "Confirm before quitting (Cmd+Q, tray, or menu) to prevent accidental data loss.",
+    ],
+  },
+  {
     version: "0.13.9",
     date: "2026-09-06",
     highlights: [
@@ -651,6 +658,13 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.13.10",
+    date: "2026-09-07",
+    highlights: [
+      "退出前弹出确认对话框（快捷键、托盘或菜单退出），防止意外丢失数据。",
+    ],
+  },
   {
     version: "0.13.9",
     date: "2026-09-06",
