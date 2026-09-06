@@ -23,6 +23,13 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.13.9",
+    date: "2026-09-06",
+    highlights: [
+      "Version bump for release infrastructure.",
+    ],
+  },
+  {
     version: "0.13.8",
     date: "2026-09-06",
     highlights: [
@@ -644,6 +651,13 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.13.9",
+    date: "2026-09-06",
+    highlights: [
+      "版本号更新，用于发布基础设施。",
+    ],
+  },
   {
     version: "0.13.8",
     date: "2026-09-06",
