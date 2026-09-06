@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.13.7",
+    date: "2026-09-06",
+    highlights: [
+      "Keep completed AI replies after restart, instead of showing only the user messages.",
+      "Keep background subagents running until you stop them or the parent stops them.",
+      "Let the agent choose a Bash timeout up to six hours so long jobs are not killed at 60 seconds.",
+    ],
+  },
+  {
     version: "0.13.6",
     date: "2026-09-06",
     highlights: [
@@ -625,6 +634,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.13.7",
+    date: "2026-09-06",
+    highlights: [
+      "重启后保留已完成的 AI 回复，不再只显示用户消息。",
+      "后台子智能体一直运行到你或父智能体停止它们。",
+      "智能体可将 Bash 超时设为最长六小时，长时间任务不会在 60 秒被杀掉。",
+    ],
+  },
   {
     version: "0.13.6",
     date: "2026-09-06",
