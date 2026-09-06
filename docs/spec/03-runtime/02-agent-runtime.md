@@ -508,8 +508,8 @@ the launch.
 
 Frontmatter adds `permission: inherit | ask | accept-edits | auto` (default
 `inherit`), which controls the scope the delegate's tool calls resolve under
-instead of the session mode (§5f.1). It also accepts `idle-timeout` and
-`max-duration` watchdog overrides. Only builtin and user definitions may
+instead of the session mode (§5f.1). `idle-timeout` and `max-duration` still
+parse for compatibility but no longer kill a run (D328). Only builtin and user definitions may
 declare a permission scope —
 both express a choice the user already made, whereas a project definition
 arrives with the repository, so honoring its scope would let cloned code grant
@@ -547,12 +547,13 @@ core set rather than the on-demand catalog of §7.1:
   cheap. The joined result is bounded to `MAX_TASKWAIT_RESULT_CHARS` (50k).
   `timeoutSeconds` defaults to 600 and is clamped to 900: the wait blocks the
   turn, so the ceiling is what bounds how long a session can look hung. Expiry
-  is not a failure — the delegates keep running and the wait returns the
-  finished reports plus a note saying so and to call again — so a low ceiling
-  costs one round-trip and keeps Stop responsive. Detecting a hung delegate is
-  the idle watchdog's job, not this timeout's, which is why the idle default is
-  deliberately shorter than this one.
-- `TaskList()` — reports every delegation of the session with status.
+  is not a failure and does not stop the delegates (D328) — the wait returns a
+  heartbeat (agent, status, elapsed, turns, last tool) plus any finished
+  reports. The runtime keeps the parent turn open and delivers remaining
+  reports when they finish, even if the parent already stopped calling tools.
+  Only `TaskStop` or user Stop aborts a delegate.
+- `TaskList()` — reports every delegation of the session with status and a
+  running heartbeat.
 - `TaskStop(delegationIds?)` — stops running delegations (defaults to all);
   waits for each abort to settle, then persists `status: "stopped"` with
   `completedAt` on `details.stopped[]`. Stopped delegations read as `stopped`.
@@ -576,33 +577,21 @@ settled, `turns`, `toolCalls` and, on failure or timeout, `error`. `startedAt` a
 truth for renderer delegation duration; the immediate `Task` tool-call
 duration only covers starting the background work.
 
-**Delegate watchdogs.** Every run has a 300-second idle timeout and a
-21,600-second (6-hour) total duration limit. A definition may override them
-with `idle-timeout` (clamped to 10–21,600 seconds) and `max-duration` (clamped
-to 60–21,600 seconds); non-numeric values warn and use the defaults.
+**Delegate lifetime (D328).** The runtime does not idle-timeout or
+duration-timeout a delegate. `idle-timeout` / `max-duration` frontmatter still
+parses so old documents load, but those values are not armed. A delegate runs
+until it finishes, hits an explicit `maxTurns`, fails, is `TaskStop`'d, or the
+user Stops / the runtime is disposed. The parent agent judges whether to
+cancel via `TaskStop`; a one-line heartbeat (who, status, elapsed, turns, last
+tool) is what it has to go on while the delegate is running.
 
-The idle timeout bounds *silence*, not slowness. Every agent event counts as
-activity, down to one streamed token arriving as `message_update`, so a
-delegate that keeps producing output never trips it however long its turn runs.
-The idle timer is additionally paused from `tool_execution_start` until its
-matching `tool_execution_end`, so a long build or test command cannot expire it
-either, while the duration timer continues through tool execution. Only a
-delegate that emits nothing at all for the whole window is treated as hung.
-Because the window measures dead air rather than work, the default is sized
-from observed provider latency rather than from how long work may take: a
-delegate is silent from its last streamed token until its next response
-begins, and that wait has been measured at 174 seconds at p99.9. The
-300-second default clears that with margin while staying well below the
-600-second `TaskWait` default, so a stuck delegate settles as `timed_out`
-within a single wait instead of holding the parent for a full window and
-beyond.
+When the parent stops calling tools while delegates are still running, the
+runtime swallows that `agent_end`, keeps the durable turn open, waits for the
+delegates, and prompts the parent with their reports. Ending the parent loop
+does not abort them.
 
-Idle expiry returns `timed_out` with `SUBAGENT_IDLE_TIMEOUT`, and
-duration expiry returns `timed_out` with `SUBAGENT_DURATION_TIMEOUT`; both
-include the latest partial assistant output when available and abort the
-delegate immediately. Fatal provider/stream errors, parent aborts, and
-explicit `maxTurns` retain their existing `failed`, `aborted`, and `truncated`
-outcomes.
+Fatal provider/stream errors, parent aborts, and explicit `maxTurns` retain
+their existing `failed`, `aborted`, and `truncated` outcomes.
 
 **Model pins.** `model: <provider>/<model>` in the frontmatter is resolved once
 per launch in Electron main, where credentials and the models.dev snapshot live, against
@@ -617,15 +606,15 @@ nearest-supported rule as §5c.
 `parentToolCallId` and `agentName` on its envelope, and Electron main copies both
 onto the persisted row. When the runtime rebuilds model context it skips every
 row with `parentToolCallId`: the parent only ever saw reports through
-`TaskWait`, and replaying delegate rows would both contradict that and
-reintroduce the context cost delegation exists to avoid.
+`TaskWait` or the runtime's completion prompt (D328), and replaying delegate
+rows would both contradict that and reintroduce the context cost delegation
+exists to avoid.
 
 **Turn ownership.** A delegate's lifecycle never reaches Electron main's turn
-handling. Delegation is expected to converge inside the turn — the system
-prompt instructs the parent to continue its own work after `Task` and to
-`TaskWait`/`TaskStop` before answering — and the runtime aborts any delegate
-still running when the run ends, when the parent aborts, or when the runtime is
-disposed.
+handling. The parent may keep working or talk to the user after `Task`. If it
+stops calling tools while delegates still run, the runtime keeps the durable
+turn open and delivers the reports when they finish. Only user Stop, `TaskStop`,
+or runtime dispose aborts a still-running delegate.
 
 ### 5f.1 Delegate permission scope (ADR 0089)
 

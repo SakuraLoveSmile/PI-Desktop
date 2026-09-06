@@ -143,7 +143,7 @@ Each ADR includes:
 | 0126 | Agent capability workbench | Accepted |
 | 0127 | Transcript layout index and identity-based truncation | Accepted |
 | 0128 | Share one bounded budget for transient provider failures | Accepted |
-| 0129 | The subagent idle watchdog bounds silence, not slowness | Accepted for implementation |
+| 0129 | The subagent idle watchdog bounds silence, not slowness | Amended by 0166 (watchdogs no longer kill) |
 | 0130 | Bounded mounted transcript window | Accepted |
 | 0131 | Spill large composer text pastes into session scratch | Accepted |
 | 0132 | Attribute cross-display window moves to the user | Accepted |
@@ -178,3 +178,4 @@ Each ADR includes:
 | 0163 | Transcript file references render as previewable chips | Accepted |
 | 0164 | Parent agents collaborate across conversations | Superseded by 0165 |
 | 0165 | Withdraw the A2A / Peer coordination stack | Accepted (supersedes 0147 / 0162 / 0164) |
+| 0166 | Parent-judged subagent lifetime | Accepted (amends 0089 / 0119 / 0129) |

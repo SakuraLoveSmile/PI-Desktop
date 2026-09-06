@@ -87,20 +87,10 @@ export const DEFAULT_SUBAGENT_TOOLS: readonly SubagentAssignableTool[] = [
 
 export const MAX_SUBAGENT_MAX_TURNS = 80;
 /**
- * How long a delegate may be completely silent before it is considered hung.
- *
- * This bounds silence, not work: any agent event re-arms the timer, a single
- * streamed token included, and the timer is paused outright while a tool
- * executes. So a delegate that thinks for twenty minutes while streaming, or
- * runs a five-minute build, never trips it — only one that stops responding
- * does.
- *
- * The value is sized from observed provider latency: a delegate is silent from
- * its last streamed token until the next response begins, and this project's
- * measured pre-token wait reaches 174s at p99.9. 300 seconds clears that with
- * margin while staying well below the 600-second `TaskWait` default, so a
- * genuinely stuck delegate surfaces within one wait instead of holding the
- * parent for a full window and beyond.
+ * Parsed from definition frontmatter for compatibility. Idle and duration
+ * watchdogs are withdrawn (D328): the parent agent decides when to stop a
+ * delegate via TaskStop, and the user via Stop. These constants remain so
+ * existing documents still parse.
  */
 export const DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS = 300;
 export const MIN_SUBAGENT_IDLE_TIMEOUT_SECONDS = 10;

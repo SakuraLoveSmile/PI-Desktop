@@ -4919,7 +4919,7 @@ describe("DesktopAgentRuntime subagents", () => {
     await runtime.dispose();
   });
 
-  it("aborts running delegates when the run ends or the runtime is disposed", async () => {
+  it("keeps running delegates after the parent run ends", async () => {
     const runtime = createRuntime({ subagents: [explorer] });
     subagentRuns.calls.length = 0;
     subagentRuns.instances.length = 0;
@@ -4934,15 +4934,101 @@ describe("DesktopAgentRuntime subagents", () => {
     const delegationId = (started.details as any).delegationId as string;
     expect((runtime as any).runningDelegations()).toHaveLength(1);
 
-    // agent_end (the run finishing) is the safety net: leftover delegates are
-    // stopped rather than left to work without a parent.
     await (runtime as any).handleAgentEvent({ type: "agent_end" });
+    expect((runtime as any).delegations.get(delegationId).status).toBe(
+      "running",
+    );
+    expect((runtime as any).runningDelegations()).toHaveLength(1);
+
+    subagentRuns.deferred = false;
+    await runtime.dispose();
+  });
+
+  it("aborts running delegates on user abort or dispose, not on parent idle", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const tool = taskTool(runtime);
+
+    const started = await tool.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    const delegationId = (started.details as any).delegationId as string;
+
+    await runtime.abort();
     await vi.waitFor(() => {
       expect((runtime as any).delegations.get(delegationId).status).toBe(
         "aborted",
       );
     });
     expect((runtime as any).runningDelegations()).toHaveLength(0);
+
+    subagentRuns.deferred = false;
+    await runtime.dispose();
+  });
+
+  it("feeds finished reports back after the parent run ends", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const tool = taskTool(runtime);
+    const prompt = vi.fn(async () => undefined);
+    const waitForIdle = vi.fn(async () => undefined);
+    (runtime as any).agent.prompt = prompt;
+    (runtime as any).agent.waitForIdle = waitForIdle;
+
+    await tool.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+
+    const resume = (runtime as any).resumeAfterDelegations();
+    subagentRuns.resolveRun!({
+      agentName: "explorer",
+      status: "completed",
+      report: "src/app.ts:12 misses the null check.",
+      turns: 2,
+      toolCalls: 3,
+    });
+    await resume;
+
+    expect(prompt).toHaveBeenCalledTimes(1);
+    const delivered = String(
+      (prompt.mock.calls as unknown as unknown[][])[0]?.[0] ?? "",
+    );
+    expect(delivered).toContain("src/app.ts:12 misses the null check.");
+    expect(delivered).toContain("Integrate their reports");
+
+    subagentRuns.deferred = false;
+    await runtime.dispose();
+  });
+
+  it("lists a heartbeat for a running delegate", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const task = taskTool(runtime);
+    const list = (runtime as any).agent.state.tools.find(
+      (candidate: { name: string }) => candidate.name === "TaskList",
+    );
+
+    const started = await task.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    const listed = await list.execute("list-1", {});
+    expect(listed.content[0].text).toContain("running");
+    expect(listed.content[0].text).toContain("explorer");
+    expect(listed.content[0].text).toContain(
+      (started.details as { delegationId: string }).delegationId,
+    );
 
     subagentRuns.deferred = false;
     await runtime.dispose();

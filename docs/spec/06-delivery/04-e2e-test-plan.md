@@ -6915,39 +6915,28 @@ This test plan spec is accepted when:
   `03-runtime/02-agent-runtime.md` §5f, ADR 0062, ADR 0089, decisions-log D269
 - **Acceptance**: C (conversation), Quality
 
-#### E2E-155: Subagent timeout policy preserves active work and reports expiry
+#### E2E-155: Subagent lifetime is parent-judged; runtime delivers reports
 
-- **Preconditions**: A project-bound Agent session with a delegate definition
-  using short test-only `idle-timeout` and `max-duration` overrides; a mocked
-  provider stream and a Bash-capable `explorer` definition.
-- **Steps**: 1) Run a delegate past 20 turns while it continues emitting
-  lifecycle events and confirm it remains active. 2) Let it go idle past the
-  configured idle window and inspect `TaskWait`, `TaskList`, the timing log and
-  the delegation topology. 3) Run a delegate whose Bash call remains active
-  past the idle window and confirm it is not idle-terminated. 4) Let a tool
-  execution cross the total-duration limit. 5) Repeat with explicit
-  `maxTurns`, invalid timeout frontmatter, and `maxTurns: none`. 6) Stream one
-  `message_update` token per interval longer than the idle window would allow
-  in silence, with no other event between them, and confirm the delegate is
-  never idle-terminated. 7) Let a `TaskWait` expire while its delegate is still
-  streaming and read the note the parent receives.
-- **Expected**: Unlimited delegates run past 20 turns; idle expiry returns
-  `timed_out` with `SUBAGENT_IDLE_TIMEOUT`, duration expiry returns
-  `timed_out` with `SUBAGENT_DURATION_TIMEOUT`, and both preserve the latest
-  partial report. Tool execution pauses only the idle timer, not total
-  duration. Explicit `maxTurns` still returns `truncated`; invalid timeout
-  values warn and use defaults; `none` is unlimited. A delegate that only ever
-  streams tokens keeps running indefinitely: any agent event re-arms the idle
-  timer, so the watchdog fires on silence alone and slow streaming is never
-  mistaken for a hang. `TaskWait` expiry reports “Still running after Ns” and
-  states that this is not a failure and the delegates keep working, and the
-  builtin turn backstops (`explorer` 60, `code-reviewer` 50, `test-runner` 40,
-  `fixer` 80) end a non-converging delegate as `truncated` with its partial
-  report. The UI shows “Timed out” / “已超时” with the warning outcome styling,
-  and Explorer's catalog includes `Bash` while code-reviewer remains read-only.
+- **Preconditions**: A project-bound Agent session with a Bash-capable
+  `explorer` definition and a mocked provider stream.
+- **Steps**: 1) Start a delegate and let the parent stop calling tools while
+  it still runs; confirm the durable turn stays open and the delegate is not
+  aborted. 2) Let the delegate finish and confirm the parent is prompted with
+  its report without the user sending “continue”. 3) Let a `TaskWait` expire
+  while the delegate is still running and read the heartbeat the parent
+  receives. 4) `TaskList` a running delegate and confirm elapsed / last-tool
+  fields. 5) `TaskStop` and user Stop still abort. 6) Explicit `maxTurns`
+  still returns `truncated`; `maxTurns: none` is unlimited.
+- **Expected**: Idle and duration watchdogs never fire. Parent idle does not
+  abort delegates. Completion reports are delivered into the same durable
+  turn. `TaskWait` expiry reports “Still running after Ns”, includes a
+  heartbeat, and states that this is not a failure. Builtin turn backstops
+  (`explorer` 60, `code-reviewer` 50, `test-runner` 40, `fixer` 80) still end
+  a non-converging delegate as `truncated`. Explorer's catalog includes
+  `Bash` while code-reviewer remains read-only.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
   `03-runtime/08-error-codes.md`, `03-runtime/09-logging-and-observability.md`,
-  ADR 0119, decisions-log D254
+  ADR 0166, decisions-log D328
 - **Acceptance**: C (conversation), E (tools & permissions), H (diagnostics), Quality
 - **Milestone**: M6+
 - **Status**: Covered by unit tests; full desktop journey pending
