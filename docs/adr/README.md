@@ -181,3 +181,4 @@ Each ADR includes:
 | 0166 | Parent-judged subagent lifetime | Accepted (amends 0089 / 0119 / 0129) |
 | 0167 | Agent-chosen Bash timeout | Accepted (amends 0054 / D190 / D273) |
 | 0168 | Main-owned http(s)/mailto allowlist for `openExternal` | Accepted (amends 0109) |
+| 0169 | Classified file preview and live workspace events for plugin views | Accepted (amends 0104 / 0105 / 0109 / 0111) |

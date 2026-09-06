@@ -102,6 +102,12 @@ the banner without changing the durable task notification inbox.
 pi.workspace.get(): Promise<{ path: string; name: string } | null>
 
 pi.fs.readText(pathFromRoot: string): Promise<string>
+pi.fs.readPreview(pathFromRoot: string): Promise<{
+  kind: "text" | "image" | "binary" | "tooLarge"
+  content?: string     // UTF-8 when kind is "text"
+  dataUrl?: string     // data URL when kind is "image"
+  size: number
+}>
 pi.fs.openDefault(pathFromRoot: string): Promise<void>
 pi.fs.reveal(pathFromRoot: string): Promise<void>
 pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
@@ -115,6 +121,11 @@ pi.fs.list(pathFromRoot: string): Promise<Array<{
 pi.fs.remove(pathFromRoot: string): Promise<void>
 pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
+
+`fs.readPreview` classifies one existing readable file for in-app display. It
+uses the same `fs.read` checks as `fs.readText`, rejects directories, and
+returns `text` (capped at 512 KiB), `image` (capped at 5 MiB, as a data URL),
+`binary`, or `tooLarge`. The plugin never receives an absolute path.
 
 `fs.openDefault` opens one existing file with the operating system's default
 associated application. It uses the same `fs.read` root, symlink, protected-path,
@@ -284,14 +295,15 @@ The host pushes events to the plugin process as one-way frames. Delivered today:
 - `bus.message` — a bus delivery, with the `PluginBusMessage` as the single
   argument. `pi.bus.subscribe` is the normal way to receive these; `events.on`
   sees the raw stream of every subscription the plugin holds.
+- `workspace:changed` — payload is `{ path: string; name: string } | null`,
+  matching `workspace.get()`, sent when the cached workspace path changes.
+- `plugin:settingsChanged` is delivered after edits from the generated Plugins
+  settings UI.
 
 A throwing handler is logged and does not affect other listeners or the plugin.
 
 Planned events:
-- `workspace:changed`
 - `session:activated`
-- `plugin:settingsChanged` is delivered after edits from the generated Plugins
-  settings UI.
 - `app:themeChanged` — for now, panels follow the palette live through the
   panel event `appearance:changed`; the plugin-process event remains planned.
 
@@ -324,7 +336,7 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`, `workspace.get`, `app.getAppearance` | None |
-| `fs.readText`, `fs.openDefault`, `fs.reveal`, `fs.glob`, `fs.list` | `fs.read` |
+| `fs.readText`, `fs.readPreview`, `fs.openDefault`, `fs.reveal`, `fs.glob`, `fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText`, `clipboard.getHistory` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
@@ -340,11 +352,14 @@ process. The host-supported channels include `skill.list`, `skill.read`,
 
 ### Panel events (host -> panel)
 
-`window.pluginBridge.on(event, handler)` receives host-pushed events. Delivered
-today:
+`window.pluginBridge.on(event, handler)` receives host-pushed events. The host
+sends the same events to detached panel windows and to docked work-panel views.
+Delivered today:
 
 - `appearance:changed` — payload is the `PluginAppearance` above, sent whenever
   the app's palette or language changes, so a panel can restyle and relabel live.
+- `workspace:changed` — payload is `{ path: string; name: string } | null`,
+  matching `workspace.get()`, sent when the open project changes.
 
 ## 7. Call auditing
 
@@ -355,6 +370,7 @@ Any of the following calls must be logged for audit:
   `errorCode`), plus each consent answer and why it was asked (`scope` / `rate`)
 - fs.openDefault (with its root-relative path and whether the OS open succeeded)
 - fs.reveal (with its root-relative path and whether the file manager reveal succeeded)
+- fs.readPreview (with its root-relative path and classified `kind`)
 - execute after agent.registerTool (including tools discovered from a plugin's
   MCP servers)
 - net.fetch
@@ -383,8 +399,9 @@ Log fields:
 The desktop plugin runtime now implements the MVP host API surface used by local and marketplace plugins:
 
 - `app.*`, `plugin.*`, `commands.*`, `ui.*`, `workspace.*`
-- `fs.readText` / `fs.openDefault` / `fs.reveal` / `fs.writeText` / `fs.glob` /
-  `fs.remove` / `fs.requestDirectory`, bounded by `manifest.fs` (ADR 0088)
+- `fs.readText` / `fs.readPreview` / `fs.openDefault` / `fs.reveal` /
+  `fs.writeText` / `fs.glob` / `fs.list` / `fs.remove` / `fs.requestDirectory`,
+  bounded by `manifest.fs` (ADR 0088)
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`

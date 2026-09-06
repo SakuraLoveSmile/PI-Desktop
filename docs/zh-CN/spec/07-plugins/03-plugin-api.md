@@ -100,6 +100,12 @@ type PluginNotificationPermission = "granted" | "denied" | "unknown" | "unsuppor
 pi.workspace.get(): Promise<{ path: string; name: string } | null>
 
 pi.fs.readText(pathFromRoot: string): Promise<string>
+pi.fs.readPreview(pathFromRoot: string): Promise<{
+  kind: "text" | "image" | "binary" | "tooLarge"
+  content?: string     // UTF-8 when kind is "text"
+  dataUrl?: string     // data URL when kind is "image"
+  size: number
+}>
 pi.fs.openDefault(pathFromRoot: string): Promise<void>
 pi.fs.reveal(pathFromRoot: string): Promise<void>
 pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
@@ -113,6 +119,10 @@ pi.fs.list(pathFromRoot: string): Promise<Array<{
 pi.fs.remove(pathFromRoot: string): Promise<void>
 pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
+
+`fs.readPreview` 为一份已存在且可读取的文件做应用内预览分类。它与 `fs.readText`
+使用相同的 `fs.read` 检查，拒绝目录，并返回 `text`（上限 512 KiB）、`image`
+（上限 5 MiB，data URL）、`binary` 或 `tooLarge`。插件不会收到绝对路径。
 
 `fs.openDefault` 使用操作系统默认关联应用打开一个已存在的文件。它与
 `fs.readText` 使用相同的 `fs.read` 根目录、符号链接、受保护路径、拒绝列表和范围检查；
@@ -273,13 +283,14 @@ pi.events.off(event, handler)
 - `bus.message` — 公交车交付，以 `PluginBusMessage` 作为单一
   论点。 `pi.bus.subscribe` 是接收这些信息的正常方式； `events.on`
 查看插件持有的每个订阅的原始流。
+- `workspace:changed` — 载荷为 `{ path: string; name: string } | null`，
+  与 `workspace.get()` 一致，在缓存的工作区路径变化时发送。
+- `plugin:settingsChanged`（由插件设置页面编辑触发）
 
 抛出的处理程序会被记录下来，并且不会影响其他侦听器或插件。
 
 计划活动：
-- `workspace:changed`
 - `session:activated`
-- `plugin:settingsChanged`（由插件设置页面编辑触发）
 - `app:themeChanged` —— 目前面板通过面板事件 `appearance:changed` 实时跟随
   配色；插件进程侧的这个事件仍在规划中。
 
@@ -306,7 +317,7 @@ window.pluginBridge.on(event, handler)
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`、`workspace.get`、`app.getAppearance` | 无 |
-| `fs.readText`、`fs.openDefault`、`fs.reveal`、`fs.glob`、`fs.list` | `fs.read` |
+| `fs.readText`、`fs.readPreview`、`fs.openDefault`、`fs.reveal`、`fs.glob`、`fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText`、`clipboard.getHistory` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
@@ -322,11 +333,13 @@ window.pluginBridge.on(event, handler)
 
 ### 面板事件（主机 -> 面板）
 
-`window.pluginBridge.on(event, handler)` 接收主机推送的事件。今天已投递的
-事件：
+`window.pluginBridge.on(event, handler)` 接收主机推送的事件。宿主会把同样的
+事件发给独立面板窗口和停靠的工作面板视图。今天已投递的事件：
 
 - `appearance:changed` —— 载荷是上面的 `PluginAppearance`，在应用的配色或
   语言发生变化时发送，因此面板可以实时重新着色和重新标注文案。
+- `workspace:changed` —— 载荷为 `{ path: string; name: string } | null`，
+  与 `workspace.get()` 一致，在打开的项目变化时发送。
 
 ## 7. 通话审计
 
@@ -337,6 +350,7 @@ window.pluginBridge.on(event, handler)
   `errorCode`），还有每一次同意的答复及其被问的原因（`scope` / `rate`）
 - fs.openDefault（记录 root-relative 路径以及系统打开是否成功）
 - fs.reveal（记录 root-relative 路径以及文件管理器显示是否成功）
+- fs.readPreview（记录 root-relative 路径以及分类后的 `kind`）
 - 在agent.registerTool之后执行（包括从插件发现的工具）
   MCP 服务器）
 - 网络获取
@@ -365,8 +379,9 @@ window.pluginBridge.on(event, handler)
 桌面插件运行时现在实现本地和市场插件使用的 MVP 主机 API 表面：
 
 - `app.*`、`plugin.*`、`commands.*`、`ui.*`、`workspace.*`
-- `fs.readText` / `fs.openDefault` / `fs.reveal` / `fs.writeText` / `fs.glob` /
-  `fs.remove` / `fs.requestDirectory`，范围由 `manifest.fs` 限定（ADR 0088）
+- `fs.readText` / `fs.readPreview` / `fs.openDefault` / `fs.reveal` /
+  `fs.writeText` / `fs.glob` / `fs.list` / `fs.remove` / `fs.requestDirectory`，
+  范围由 `manifest.fs` 限定（ADR 0088）
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`、`shell.openExternal`、`net.fetch`
 - `services.register` / `unregister`、`bus.publish` / `subscribe`、`events.on` / `off`

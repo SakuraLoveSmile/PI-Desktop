@@ -5271,18 +5271,23 @@ Each scenario is documented in this format:
      Open resources — it is an artifact surface, not a launcher entry.
   3. Open the Files view. Confirm the tree lists the project, expands
      directories lazily, and omits `node_modules`, `.git`, and `.env`.
-  4. Confirm the toolbar shows the project name and Refresh action. Trigger
-     Refresh and confirm the button locks with a restrained spinner until the
-     root and expanded folders finish loading. Expand a directory with the mouse
-     and keyboard; confirm rows expose expanded state, folders appear before
-     files, and a failed directory offers an inline Retry.
-  5. Click a text file. Confirm the focused viewer shows Back, the relative path,
-     file size, line numbers, bounded text, and **Show in folder**. Click that
-     action and confirm the file manager opens with the selected file revealed.
-     Click the binary file and confirm it reports as binary rather than printing
-     replacement characters; the same action still reveals it in the file
-     manager. Switch the app to Simplified Chinese and confirm the Files toolbar,
-     empty/loading/error, viewer, and reveal-action states are localized.
+  4. Confirm the toolbar shows the project name, a search field, and Refresh.
+     Trigger Refresh and confirm the button locks with a restrained spinner until
+     the root and expanded folders finish loading. Expand a directory with the
+     mouse and keyboard; confirm rows expose expanded state, folders appear
+     before files, and a failed directory offers an inline Retry. Type a unique
+     filename into search and confirm matching files appear without walking the
+     whole tree first.
+  5. Click a text file. Confirm the viewer shows Back, the relative path, file
+     size, line numbers, bounded text, **Open with default app**, and **Show in
+     folder**. Click Show in folder and confirm the file manager reveals the
+     file. Click Open with default app and confirm the OS associated application
+     launches. Click the binary file and confirm it reports as binary rather
+     than printing replacement characters. Click an image and confirm an in-app
+     preview, not an unavailable placeholder. Switch the app to Simplified
+     Chinese and confirm the Files toolbar, search, empty/loading/error, viewer,
+     open, and reveal-action states are localized. Switch projects and confirm
+     the tree updates without waiting on a poll.
   6. Click a file path in the conversation. Confirm it still opens a host
      `file:<path>` tab under Open resources — transcript artifacts did not move
      to the plugin.
@@ -5296,13 +5301,17 @@ Each scenario is documented in this format:
   deny-lists.
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
-  `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0105, ADR 0109, ADR 0111
+  `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0105, ADR 0109, ADR 0111,
+  ADR 0169
 - **Acceptance**: G (plugins), D (workspace), Security, Quality
 - **Milestone**: M6+
 - **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`,
-  `apps/desktop/test/plugin-fs-scope.test.mjs` (`fs.list`, `fs.openDefault`, and `fs.reveal` guards), and host-core
-  `bundled_plugins_refresh_from_disk_but_keep_user_state`; the packaged journey
-  is Draft (do not run E2E locally unless explicitly requested)
+  `apps/desktop/test/plugin-fs-scope.test.mjs` (`fs.list`, `fs.readPreview`,
+  `fs.openDefault`, and `fs.reveal` guards),
+  `apps/desktop/test/plugin-work-panel-views.test.mjs` (docked-view event
+  broadcast), `apps/desktop/test/fs-panel-guard.test.mjs` (classified preview),
+  and host-core `bundled_plugins_refresh_from_disk_but_keep_user_state`; the
+  packaged journey is Draft (do not run E2E locally unless explicitly requested)
 
 #### E2E-154: Model additions use models.dev metadata and generic unknown IDs
 

@@ -761,32 +761,33 @@ copy — followed by the same entries the header menu lists, as plain rows:
 The bundled `pi.files` view keeps the former Files tool's focused browsing
 workflow while rendering entirely inside the plugin's isolated page:
 
-- The compact toolbar identifies the active project and offers one explicit
-  refresh action. Refresh disables itself and shows the same restrained spinner
+- The compact toolbar identifies the active project and offers search, collapse,
+  and refresh. Refresh disables itself and shows the same restrained spinner
   language used by the host while the root and expanded folders are reloaded.
   The tree loads one directory at a time, keeps directories
   above files, preserves expanded folders, and shows file sizes without
-  walking the whole workspace up front.
+  walking the whole workspace up front. Search uses `fs.glob` and lists matching
+  files without expanding the whole tree first.
 - Directory rows use `role="treeitem"` with `aria-expanded`; Enter/Space opens
   the row and Arrow/Home/End keys move through visible rows. Hover and active
   fills are neutral theme surfaces, with the caret and folder/file SVGs carrying
-  the hierarchy instead of emoji or text glyphs.
-- Selecting a file switches to a focused viewer with a Back action, the
-  root-relative path, file size, line numbers, and a bounded preview. The viewer
-  also offers **Show in folder**, which reveals the selected existing file in the
-  operating system's file manager through the scoped plugin bridge. Loading,
-  read failures, binary content, image content, empty folders, and folders
-  that fail to load each have a distinct localized state; a failed directory
-  can be retried in place.
+  the hierarchy instead of emoji or text glyphs. A context menu and
+  double-click open the selected file with the OS default app.
+- Selecting a file opens a viewer with a Back action, the root-relative path,
+  file size, line numbers, and a bounded preview. Wider panels keep the tree
+  beside the viewer; a narrow panel still uses the focused viewer. The viewer
+  offers **Open with default app**, **Show in folder**, and copy path through
+  the scoped plugin bridge. Loading, read failures, binary content, image
+  previews, oversized files, empty folders, and folders that fail to load each
+  have a distinct localized state; a failed directory can be retried in place.
 - The page follows `app.getAppearance` and `appearance:changed` for base theme
-  and English/Simplified Chinese copy. Its only data access remains the public
-  `workspace.get`, `fs.list`, `fs.readText`, and `fs.reveal` bridge, so the richer surface
-  does not add host-only capabilities. Text previews are capped at 5,000 lines;
-  images are reported as unavailable rather than sending binary data through a
-  text-only channel. The palette stays monochrome like the main app rather than
-  introducing a plugin-specific blue accent. A long-lived view rechecks
-  `workspace.get` so switching projects cannot leave the previous project's tree
-  visible.
+  and English/Simplified Chinese copy, and `workspace:changed` for the open
+  project. Its only data access remains the public `workspace.get`, `fs.list`,
+  `fs.readPreview`, `fs.glob`, `fs.openDefault`, and `fs.reveal` bridge, so the
+  richer surface does not add host-only capabilities. Text previews are capped
+  at 5,000 lines; images use a bounded data URL from `fs.readPreview`. The
+  palette stays monochrome like the main app rather than introducing a
+  plugin-specific blue accent.
 
 ### 5.3 States
 

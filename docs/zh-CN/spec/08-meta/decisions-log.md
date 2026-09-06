@@ -2678,3 +2678,13 @@ D193 和 D194。
 - 接受文件现在会在光标处插入一个私用区哨兵，并把该哨兵存到引用上，与剪贴板粘贴一致。Enter/Tab 确认菜单且不发送。目录仍插入 `@dir/` 文本。工作区相对芯片在切换项目时仍会丢弃（绝对 scratch 路径保留），其哨兵一并从草稿中剥离。
 - 决策 D331 修订 D209 / D125。见 `04-ux/08-component-spec.md` §11.8、
   `04-ux/09-interaction-patterns.md` §8a.1 与 E2E-102a。
+
+## 2026-09-06 —— 随应用打包的 Files 预览与实时工作区事件（D332）
+
+- Files 插件无法预览图片；Reveal 替换标题操作后不再提供“用默认应用打开”；
+  用轮询检测项目切换；停靠视图收不到主题/语言事件。
+- `fs.readPreview` 在现有 `fs.read` 门控下把一份可读文件分类为 text、image、
+  binary 或 tooLarge。面板事件会同时发给停靠视图。`workspace:changed` 会投递给
+  面板和插件进程。
+- 决策 D332 记录为 ADR 0169。见 `07-plugins/03-plugin-api.md` §3/§5/§6、
+  `04-ux/08-component-spec.md` §5.2.2 与 E2E-153。
