@@ -1036,20 +1036,18 @@ type AgentCapabilityQuery = {
   恢复快照；它返回 `rolledBack`、`alreadyRolledBack`、
   `conflict` 或 `unavailable` 并且永远不会覆盖冲突的后续编辑。
 
-### 浏览器 (D100)
+### 浏览器 (D100, D333)
 
-- `browser/navigate({url, sessionId?})`（方案标准化；http/https 工作
-  没有工作空间，而本地路径需要提供的会话的
-  持久的项目根目录或遗留调用的可见工作区），
-  `browser/action({action: back|forward|reload|stop})`，
-  `browser/setBounds({x,y,width,height})`（渲染器测量的内容矩形），
-  `browser/setVisible({visible})`、`browser/openExternal()`、
-  `browser/getState()`
+Chrome 和代理 CDP 位于随应用打包的 `pi.browser` 插件中，通过 `pi.browser.*` 访问。
+渲染器 IPC 仅保留给 Plan 安全的预览门面和 URL 回退：
+
+- `browser/openExternal({url?})` — 白名单内的 http(s)/mailto，或省略时使用当前访客页 URL
 - 事件：`browser/event/state {url, title, isLoading, canGoBack, canGoForward}`
-- 代理预览活动：`browser/event/preview {sessionId, path}`。 Electron 主要
-  在发出之前验证该会话项目内的 `path`；渲染器
-  将其记录在匹配的运行时面板上下文中，并仅在该情况下进行导航
-  对话可见。
+  （同时以 `browser:state` 推送给插件视图）
+- 代理预览事件：`browser/event/preview {sessionId, path?, url?}`。
+  Electron Main 会校验工作区 `path` 位于该会话项目内，在该对话的插件视图可见时
+  加载访客页，并由渲染器在匹配的运行时面板上下文中打开
+  `plugin:pi.browser/browser`（带 `location`）。后台会话的导航不会抢走可见访客页。
 
 ### fs（只读）
 

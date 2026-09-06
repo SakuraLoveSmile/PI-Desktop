@@ -114,6 +114,7 @@ import {
   DEFAULT_RUNTIME_SYSTEM_PROMPT,
 } from "./mode-prompts.js";
 import { clampThinkingLevel } from "./thinking-level.js";
+import { visionFromModelConfig } from "./model-capabilities.js";
 import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
 import {
@@ -2184,14 +2185,51 @@ Delegation rules:
           ...(grantedRecoveryGrace ? { mutationFailureGrace: true } : {}),
           ...(terminateAfterMutationFailure ? { terminate: true } : {}),
         });
-        const text =
-          typeof result.content === "string"
-            ? result.content
-            : JSON.stringify(result.content, null, 2);
+        const rawContent = result.content;
+        const imageBlocks: Array<{ type: "image"; data: string; mimeType: string }> = [];
+        let text: string;
+        let details: unknown = rawContent;
+        if (typeof rawContent === "string") {
+          text = rawContent;
+        } else if (isRecord(rawContent) && Array.isArray(rawContent.images)) {
+          text =
+            typeof rawContent.text === "string"
+              ? rawContent.text
+              : JSON.stringify(
+                  { ...rawContent, images: undefined },
+                  null,
+                  2,
+                );
+          const vision = visionFromModelConfig(this.provider.modelConfig);
+          for (const image of rawContent.images) {
+            if (
+              !isRecord(image) ||
+              typeof image.data !== "string" ||
+              typeof image.mimeType !== "string"
+            ) {
+              continue;
+            }
+            if (vision) {
+              imageBlocks.push({
+                type: "image",
+                data: image.data,
+                mimeType: image.mimeType,
+              });
+            }
+          }
+          const { images: _images, ...rest } = rawContent;
+          details = {
+            ...rest,
+            ...(typeof rawContent.path === "string" ? { path: rawContent.path } : {}),
+            imageCount: imageBlocks.length,
+          };
+        } else {
+          text = JSON.stringify(rawContent, null, 2);
+        }
         if (!result.ok) this.failedHostToolCalls.add(toolCallId);
         return {
-          content: [{ type: "text", text }],
-          details: result.content,
+          content: [{ type: "text", text }, ...imageBlocks],
+          details,
           ...(terminateAfterMutationFailure ? { terminate: true } : {}),
           isError: result.isError === true || result.ok === false,
         };

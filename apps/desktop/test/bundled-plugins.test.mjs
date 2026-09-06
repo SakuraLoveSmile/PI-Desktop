@@ -101,19 +101,11 @@ test("the Files view keeps the former browser workflow while staying plugin-owne
   assert.doesNotMatch(view, /fsReveal|ipcRenderer|require\(/);
 });
 
-test("the host no longer offers Files as a built-in tool", () => {
-  const tools = panelSource.slice(
-    panelSource.indexOf("const HEADER_TOOLS = ["),
-    panelSource.indexOf("] as const;", panelSource.indexOf("const HEADER_TOOLS = [")),
-  );
-  assert.doesNotMatch(tools, /kind: "file"/);
-  // Review left the launcher too, in the other direction: it is an artifact
-  // panel, opened by the conversation's Write/Edit records rather than picked.
-  assert.doesNotMatch(tools, /kind: "review"/);
-  // The built-in interactive terminal is removed; Browser is the only host tool.
-  assert.doesNotMatch(tools, /kind: "terminal"/);
-  assert.match(tools, /kind: "browser"/);
-  // Both absent kinds still render: they are live tabs, just not launchable.
+test("the host no longer offers Files or Browser as built-in tools", () => {
+  assert.doesNotMatch(panelSource, /const HEADER_TOOLS/);
+  assert.doesNotMatch(panelSource, /kind: "browser"/);
+  assert.doesNotMatch(panelSource, /kind: "terminal"/);
+  // Review and file remain artifact/resource surfaces the conversation opens.
   assert.match(panelSource, /activeTab\?\.kind === "file"/);
   assert.match(panelSource, /activeTab\?\.kind === "review"/);
 });
@@ -123,6 +115,25 @@ test("Review still opens itself from workspace edit artifacts", () => {
   const storeSource = read("src/stores/app-store.ts");
   assert.match(storeSource, /shouldOpenReviewArtifact\(\{/);
   assert.match(storeSource, /toolWorkPanelTab\("review"\)/);
+});
+
+test("Browser ships as an ordinary plugin over the public CDP API", () => {
+  const browserManifest = JSON.parse(read("resources/plugins/pi.browser/manifest.json"));
+  const browserMain = read("resources/plugins/pi.browser/main.js");
+  const browserView = read("resources/plugins/pi.browser/views/browser.html");
+  assert.equal(browserManifest.id, "pi.browser");
+  assert.deepEqual(browserManifest.contributes.views.map((v) => v.id), ["browser"]);
+  assert.deepEqual(
+    [...browserManifest.permissions].sort(),
+    ["agent.tool.register", "browser.cdp", "ui.view"],
+  );
+  assert.equal(typeof browserManifest.contributes.views[0].title.en, "string");
+  assert.equal(typeof browserManifest.contributes.views[0].title["zh-CN"], "string");
+  assert.match(browserMain, /pi\.agent\.registerTool/);
+  assert.match(browserMain, /pi\.browser\.(navigate|snapshot|cdp)/);
+  assert.match(browserView, /pluginBridge/);
+  assert.match(browserView, /browser\.setBounds/);
+  assert.doesNotMatch(browserView, /require\(|ipcRenderer|webview/);
 });
 
 test("bundled plugins are packaged and located at runtime", () => {

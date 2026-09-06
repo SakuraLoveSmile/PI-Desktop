@@ -1,6 +1,5 @@
 export type WorkPanelTabKind =
   | "review"
-  | "browser"
   | "file"
   | "plugin";
 
@@ -8,6 +7,8 @@ export type WorkPanelTab = {
   id: string;
   kind: WorkPanelTabKind;
   resource?: string;
+  /** Guest URL or workspace path for the Browser plugin view (D333). */
+  location?: string;
 };
 
 export type WorkPanelTabsState = {
@@ -79,6 +80,18 @@ export function pluginWorkPanelTab(pluginId: string, viewId: string): WorkPanelT
   return { id: `plugin:${resource}`, kind: "plugin", resource };
 }
 
+export const BROWSER_PLUGIN_TAB = {
+  pluginId: "pi.browser",
+  viewId: "browser",
+} as const;
+
+export function browserPluginTab(location?: string): WorkPanelTab {
+  return {
+    ...pluginWorkPanelTab(BROWSER_PLUGIN_TAB.pluginId, BROWSER_PLUGIN_TAB.viewId),
+    ...(location ? { location } : {}),
+  };
+}
+
 export function parsePluginViewRef(
   resource: string | undefined,
 ): { pluginId: string; viewId: string } | null {
@@ -101,10 +114,7 @@ export function parsePluginViewRef(
 export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
   return (
     Boolean(tab) &&
-    (tab.kind === "review" ||
-      tab.kind === "browser" ||
-      tab.kind === "file" ||
-      tab.kind === "plugin")
+    (tab.kind === "review" || tab.kind === "file" || tab.kind === "plugin")
   );
 }
 
@@ -131,12 +141,12 @@ export function sanitizeWorkPanelTabsState(
 }
 
 /**
- * Only Browser and plugin-contributed views are launchable tools. Review and
- * file tabs are transcript resources even though their tab ids are singleton-
- * shaped, so they remain visible in the opened-resource section.
+ * Only plugin-contributed views are launchable tools. Review and file tabs
+ * are transcript resources even though their tab ids are singleton-shaped, so
+ * they remain visible in the opened-resource section.
  */
 export function isToolWorkPanelTab(tab: WorkPanelTab): boolean {
-  return tab.kind === "browser" || tab.kind === "plugin";
+  return tab.kind === "plugin";
 }
 
 export function normalizeWorkPanelFilePath(path: string): string {

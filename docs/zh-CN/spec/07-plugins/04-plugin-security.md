@@ -23,6 +23,8 @@
 - 禁用插件 = 代码未加载
 - 未经确认的高风险行动=未执行
 - 主机 API 不在允许名单上 = 不存在
+- `pi.browser.cdp` 不在 CDP 白名单上的方法 = `PERMISSION_DENIED`（无
+  cookies、storage、Target 或 Fetch；无 DevTools websocket）
 
 ## 3. 隔离策略
 

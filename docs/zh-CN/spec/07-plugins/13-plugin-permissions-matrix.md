@@ -32,6 +32,7 @@
 | `background.service` | 中等 | 启动 `contributes.services` 并保持插件进程常驻 | 安装时确认 | 受后退监督；在插件页面上可见 |
 | `bus.publish` | 中等 | `bus.publish` 声明的主题 | 安装时确认 | 其他插件可以对消息进行操作 |
 | `bus.subscribe` | 中等 | `bus.subscribe` 到声明的模式 | 安装时确认 | 可以观察另一个插件的消息 |
+| `browser.cdp` | 高 | 对宿主工作面板访客页调用 `pi.browser.*` | 安装时确认 | 访客页边界夹紧到调用插件视图；CDP 走白名单 |
 
 ## 2A. 权限是开关，manifest 承载范围
 
@@ -113,6 +114,7 @@ Agent，在 Plan 中不可见。主机返回 `PLUGIN_DISABLED_IN_PLAN`
 | `background.service` | 保持后台服务运行 | 保持后台服务运行 |
 | `bus.publish` | 向其他插件发送消息 | 向其他插件发送消息 |
 | `bus.subscribe` | 接收来自其他插件的消息 | 接收其他插件的消息 |
+| `browser.cdp` | Control the work-panel browser | 控制工作面板浏览器 |
 
 ## 5. 添加升级权限
 

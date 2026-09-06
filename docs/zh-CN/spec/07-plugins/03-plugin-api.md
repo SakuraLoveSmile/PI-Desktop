@@ -195,6 +195,28 @@ pi.shell.openExternal(url: string): Promise<void>
 `openExternal` 解析 `url`，只打开 `http:`、`https:` 和 `mailto:`（D330 / ADR 0168）。
 其他 scheme 以 `INVALID_ARGUMENT` 失败。
 
+### browser（需要 `browser.cdp`）
+```ts
+pi.browser.navigate(input: { url?: string; path?: string }): Promise<BrowserState | null>
+pi.browser.action(input: { action: "back" | "forward" | "reload" | "stop" }): Promise<void>
+pi.browser.setBounds(hole: { x: number; y: number; width: number; height: number }): Promise<unknown>
+pi.browser.setVisible(visible: boolean | { visible: boolean }): Promise<void>
+pi.browser.getState(): Promise<BrowserState | null>
+pi.browser.openExternal(): Promise<void>
+pi.browser.snapshot(): Promise<{ tree: string; url: string; title: string }>
+pi.browser.screenshot(input?: { fullPage?: boolean }): Promise<{ mimeType: string; data: string; path?: string }>
+pi.browser.click(input: { uid: string }): Promise<void>
+pi.browser.fill(input: { uid: string; text: string }): Promise<void>
+pi.browser.evaluate(input: { expression: string }): Promise<unknown>
+pi.browser.console(input?: { limit?: number }): Promise<{ messages: unknown[] }>
+pi.browser.cdp(input: { method: string; params?: unknown }): Promise<unknown>
+```
+
+访客页是宿主拥有的 `WebContentsView`（`persist:work-browser`）。
+`setBounds` 相对调用插件视图的内容区，并被夹紧，因此访客页不能盖住聊天/输入框。
+`cdp` 默认拒绝；cookie、storage、target 和网络拦截方法以 `PERMISSION_DENIED` 失败。
+代理调用的会话身份来自进行中的 `plugins.execute` `sessionId`，而不是插件参数（D333 / ADR 0170）。
+
 `getHistory` 返回主机在应用运行期间捕获的条目，按最新优先排列，文本和图片按捕获
 时间混排。启动后的第一次采样只建立基线，不会把启动前的内容加入历史；通过
 `writeText` 写入的内容会立即记录。连续相同内容会合并并刷新时间戳。历史只保留在
@@ -358,6 +380,7 @@ window.pluginBridge.on(event, handler)
 - clipboard.read/write（可能是样品）
 - clipboard.getHistory（记录返回的条目数）
 -bus.publish/bus.subscribe/bus.unsubscribe（带有主题和扇出大小）
+- browser.navigate / evaluate / cdp / openExternal
 - 服务启动/停止/重新启动
 
 日志字段：
@@ -384,6 +407,7 @@ window.pluginBridge.on(event, handler)
   范围由 `manifest.fs` 限定（ADR 0088）
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`、`shell.openExternal`、`net.fetch`
+- `browser.*`（访客页 CDP；`browser.cdp`）
 - `services.register` / `unregister`、`bus.publish` / `subscribe`、`events.on` / `off`
 
 本机插件通知使用 Electron 主进程通知界面；

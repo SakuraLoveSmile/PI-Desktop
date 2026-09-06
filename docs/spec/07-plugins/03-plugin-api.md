@@ -203,6 +203,30 @@ pi.shell.openExternal(url: string): Promise<void>
 `openExternal` parses `url` and opens only `http:`, `https:`, and `mailto:`
 hrefs (D330 / ADR 0168). Other schemes fail with `INVALID_ARGUMENT`.
 
+### browser (requires `browser.cdp`)
+```ts
+pi.browser.navigate(input: { url?: string; path?: string }): Promise<BrowserState | null>
+pi.browser.action(input: { action: "back" | "forward" | "reload" | "stop" }): Promise<void>
+pi.browser.setBounds(hole: { x: number; y: number; width: number; height: number }): Promise<unknown>
+pi.browser.setVisible(visible: boolean | { visible: boolean }): Promise<void>
+pi.browser.getState(): Promise<BrowserState | null>
+pi.browser.openExternal(): Promise<void>
+pi.browser.snapshot(): Promise<{ tree: string; url: string; title: string }>
+pi.browser.screenshot(input?: { fullPage?: boolean }): Promise<{ mimeType: string; data: string; path?: string }>
+pi.browser.click(input: { uid: string }): Promise<void>
+pi.browser.fill(input: { uid: string; text: string }): Promise<void>
+pi.browser.evaluate(input: { expression: string }): Promise<unknown>
+pi.browser.console(input?: { limit?: number }): Promise<{ messages: unknown[] }>
+pi.browser.cdp(input: { method: string; params?: unknown }): Promise<unknown>
+```
+
+The guest page is a host-owned `WebContentsView` (`persist:work-browser`).
+`setBounds` is content-relative to the calling plugin view and is clamped so
+the guest cannot cover chat/composer. `cdp` is deny-by-default; cookie,
+storage, target, and network-interception methods fail with
+`PERMISSION_DENIED`. Session identity for agent calls comes from the in-flight
+`plugins.execute` `sessionId`, not from plugin arguments (D333 / ADR 0170).
+
 `getHistory` returns newest-first entries captured by the host while the app is
 running, with text and images interleaved in capture order. The first clipboard
 sample after startup establishes a baseline and is not added; content written
@@ -378,6 +402,7 @@ Any of the following calls must be logged for audit:
 - clipboard.read/write (may be sampled)
 - clipboard.getHistory (with the returned entry count)
 - bus.publish / bus.subscribe / bus.unsubscribe (with the topic and fan-out size)
+- browser.navigate / evaluate / cdp / openExternal
 - service start / stop / restart
 
 Log fields:
@@ -404,6 +429,7 @@ The desktop plugin runtime now implements the MVP host API surface used by local
   bounded by `manifest.fs` (ADR 0088)
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
+- `browser.*` (guest CDP; `browser.cdp`)
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`
 
 Native plugin notifications use the Electron main-process notification surface;

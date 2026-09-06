@@ -29,6 +29,7 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `background.service` | medium | Start `contributes.services` and keep the plugin process resident | Confirm at install | Supervised with backoff; visible on the Plugins page |
 | `bus.publish` | medium | `bus.publish` to declared topics | Confirm at install | Other plugins can act on the message |
 | `bus.subscribe` | medium | `bus.subscribe` to declared patterns | Confirm at install | Can observe another plugin's messages |
+| `browser.cdp` | high | `pi.browser.*` against the host work-panel guest | Confirm at install | Guest bounds are clamped to the calling plugin view; CDP is allowlisted |
 
 ## 2A. A permission is the switch; the manifest carries the range
 
@@ -115,6 +116,7 @@ so "Modify the files it lists" is followed by the list.
 | `background.service` | Keep a background service running | 保持后台服务运行 |
 | `bus.publish` | Send messages to other plugins | 向其他插件发送消息 |
 | `bus.subscribe` | Receive messages from other plugins | 接收其他插件的消息 |
+| `browser.cdp` | Control the work-panel browser | 控制工作面板浏览器 |
 
 ## 5. Adding permissions on upgrade
 

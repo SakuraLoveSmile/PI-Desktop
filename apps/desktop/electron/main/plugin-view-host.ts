@@ -75,6 +75,33 @@ export class PluginViewHost {
     this.onBlockedRequest = onBlockedRequest;
   }
 
+  /**
+   * Fired when the visible plugin view changes. The work-panel browser guest
+   * clamps itself to this rect so it cannot cover chat/composer.
+   */
+  onSurface?: (
+    surface: {
+      pluginId: string;
+      viewId: string;
+      visible: boolean;
+      bounds: PluginViewBounds;
+    } | null,
+  ) => void;
+
+  /**
+   * Push a one-way event to every live docked view. Detached panel windows
+   * are broadcast separately by `PluginPanelHost`; both surfaces share the
+   * preload channel `pi-plugin-panel-event:<event>`.
+   */
+  broadcast(event: string, payload: unknown): void {
+    const channel = `pi-plugin-panel-event:${event}`;
+    for (const entry of this.views.values()) {
+      const wc = entry.view.webContents;
+      if (wc.isDestroyed()) continue;
+      wc.send(channel, payload);
+    }
+  }
+
   setWindow(window: BrowserWindow | null): void {
     if (this.window === window) return;
     this.detachVisible();
@@ -135,6 +162,7 @@ export class PluginViewHost {
     };
     const visible = this.visibleKey ? this.views.get(this.visibleKey) : null;
     visible?.view.setBounds(this.bounds);
+    this.emitSurface();
   }
 
   /**
@@ -161,6 +189,7 @@ export class PluginViewHost {
     }
     entry.view.setBounds(this.bounds);
     this.visibleKey = key;
+    this.emitSurface();
   }
 
   close(pluginId: string, viewId: string): void {
@@ -178,19 +207,6 @@ export class PluginViewHost {
     for (const key of [...this.views.keys()]) this.destroy(key);
   }
 
-  /**
-   * Push a one-way event to every live docked view. Detached panel windows
-   * are broadcast separately by `PluginPanelHost`; both surfaces share the
-   * preload channel `pi-plugin-panel-event:<event>`.
-   */
-  broadcast(event: string, payload: unknown): void {
-    const channel = `pi-plugin-panel-event:${event}`;
-    for (const entry of this.views.values()) {
-      if (entry.view.webContents.isDestroyed()) continue;
-      entry.view.webContents.send(channel, payload);
-    }
-  }
-
   private destroy(key: string): void {
     const entry = this.views.get(key);
     if (!entry) return;
@@ -202,11 +218,32 @@ export class PluginViewHost {
   private detachVisible(): void {
     const entry = this.visibleKey ? this.views.get(this.visibleKey) : null;
     this.visibleKey = null;
-    if (!entry || !this.window || this.window.isDestroyed()) return;
-    const children = this.window.contentView.children;
-    if (children.includes(entry.view)) {
-      this.window.contentView.removeChildView(entry.view);
+    if (entry && this.window && !this.window.isDestroyed()) {
+      const children = this.window.contentView.children;
+      if (children.includes(entry.view)) {
+        this.window.contentView.removeChildView(entry.view);
+      }
     }
+    this.emitSurface();
+  }
+
+  private emitSurface(): void {
+    if (!this.onSurface) return;
+    if (!this.visibleKey) {
+      this.onSurface(null);
+      return;
+    }
+    const separator = this.visibleKey.indexOf("/");
+    if (separator <= 0) {
+      this.onSurface(null);
+      return;
+    }
+    this.onSurface({
+      pluginId: this.visibleKey.slice(0, separator),
+      viewId: this.visibleKey.slice(separator + 1),
+      visible: true,
+      bounds: this.bounds,
+    });
   }
 
   /** Evict least-recently-shown views, never the one currently on screen. */

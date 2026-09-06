@@ -628,8 +628,11 @@ export const api = {
    */
   listPluginViews: () => invoke<PluginViewMeta[]>(IPC.invoke.pluginViews),
   /** Create or reuse the view's web contents. Does not show it. */
-  pluginViewOpen: (pluginId: string, viewId: string) =>
-    invoke(IPC.invoke.pluginViewOpen, { pluginId, viewId }),
+  pluginViewOpen: (
+    pluginId: string,
+    viewId: string,
+    extra?: { sessionId?: string; location?: string },
+  ) => invoke(IPC.invoke.pluginViewOpen, { pluginId, viewId, ...extra }),
   pluginViewClose: (pluginId: string, viewId: string) =>
     invoke(IPC.invoke.pluginViewClose, { pluginId, viewId }),
   pluginViewSetBounds: (bounds: {
@@ -638,8 +641,18 @@ export const api = {
     width: number;
     height: number;
   }) => invoke(IPC.invoke.pluginViewSetBounds, bounds),
-  pluginViewSetVisible: (pluginId: string, viewId: string, visible: boolean) =>
-    invoke(IPC.invoke.pluginViewSetVisible, { pluginId, viewId, visible }),
+  pluginViewSetVisible: (
+    pluginId: string,
+    viewId: string,
+    visible: boolean,
+    sessionId?: string,
+  ) =>
+    invoke(IPC.invoke.pluginViewSetVisible, {
+      pluginId,
+      viewId,
+      visible,
+      sessionId,
+    }),
   marketRefresh: (force = true) =>
     invoke<{
       providerId: string;
@@ -703,7 +716,8 @@ export const api = {
   }) => invoke(IPC.invoke.browserSetBounds, bounds),
   browserSetVisible: (visible: boolean) =>
     invoke(IPC.invoke.browserSetVisible, { visible }),
-  browserOpenExternal: () => invoke(IPC.invoke.browserOpenExternal),
+  browserOpenExternal: (url?: string) =>
+    invoke(IPC.invoke.browserOpenExternal, url ? { url } : {}),
   browserGetState: () =>
     invoke<BrowserState | null>(IPC.invoke.browserGetState),
   fsList: (path?: string) =>
@@ -782,11 +796,11 @@ export const api = {
     );
   },
   onBrowserPreview: (
-    listener: (event: { sessionId: string; path: string }) => void,
+    listener: (event: { sessionId: string; path?: string; url?: string }) => void,
   ) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.browserPreview, (payload) =>
-      listener(payload as { sessionId: string; path: string }),
+      listener(payload as { sessionId: string; path?: string; url?: string }),
     );
   },
   onAgentEvent: (listener: (event: AgentEventEnvelope) => void) => {

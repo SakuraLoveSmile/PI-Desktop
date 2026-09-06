@@ -1414,6 +1414,7 @@ export const zhCN = {
       "background.service": "保持后台服务运行",
       "bus.publish": "向其他插件发送消息",
       "bus.subscribe": "接收其他插件的消息",
+      "browser.cdp": "控制工作面板浏览器",
     },
     permissionHelp: {
       "ui.panel": "允许插件在应用内显示独立面板。",
@@ -1437,6 +1438,8 @@ export const zhCN = {
       "background.service": "插件启用期间保持一个后台工作进程运行。",
       "bus.publish": "可在其声明的主题上发送消息。",
       "bus.subscribe": "可在其声明的主题上接收消息。",
+      "browser.cdp":
+        "可导航工作面板浏览器、读取页面、运行 JavaScript，并发送白名单内的 Chrome DevTools 命令。Cookie 与存储相关方法会被拒绝。",
     },
   },
   extensions: {

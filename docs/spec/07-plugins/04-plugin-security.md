@@ -20,6 +20,8 @@ Main risks:
 - Disabled plugin = code not loaded
 - Unconfirmed high-risk action = not executed
 - Host API not on the allowlist = does not exist
+- `pi.browser.cdp` methods not on the CDP allowlist = `PERMISSION_DENIED` (no
+  cookies, storage, Target, or Fetch; no DevTools websocket)
 
 ## 3. Isolation strategy
 

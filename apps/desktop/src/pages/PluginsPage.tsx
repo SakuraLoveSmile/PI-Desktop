@@ -84,6 +84,7 @@ const PERMISSION_RISK: Record<string, RiskTier> = {
   "fs.delete.workspace": "high",
   "agent.prompt.inject": "high",
   "agent.tool.register": "high",
+  "browser.cdp": "high",
   // Reading is a tier below writing because what makes a read dangerous is
   // where the data can go, and outbound requests are declared separately.
   "fs.read": "medium",

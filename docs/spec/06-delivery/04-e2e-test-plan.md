@@ -349,6 +349,31 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`agent-runtime` deferred-tool tests); live-model
   request capture and full Electron journey pending
 
+#### E2E-008b: Bundled Browser plugin chrome and CDP
+
+- **Preconditions**: Packaged or checkout build with bundled plugins; Agent
+  session with a workspace HTML file; Plan session available.
+- **Steps**: 1) Confirm Plugins lists `pi.browser`, enabled, not uninstallable.
+  2) Open the work panel and launch Browser from plugin views. 3) Ask the
+  agent to preview a workspace HTML file (`BrowserPreview`) then snapshot via
+  ToolSearch `cdp` / `Browser`. 4) Switch to Plan and call the plugin Browser
+  tool. 5) Disable `pi.browser`. 6) Call `BrowserPreview` and click an http(s)
+  transcript link. 7) From a third-party or test caller, send
+  `Network.getAllCookies` through `pi.browser.cdp`.
+- **Expected**: The launcher has no host Browser row. Preview opens the plugin
+  view and live-reloads the file. Plugin tool `plugin_pi_browser_Browser` can
+  snapshot after ToolSearch. Plan denies the plugin tool
+  (`PLUGIN_DISABLED_IN_PLAN`) while `BrowserPreview` remains callable. Disable
+  hides the view and tools; `BrowserPreview` errors; http(s) chips use
+  `openExternal`. Cookie CDP is denied. Guest bounds stay inside the plugin
+  view.
+- **Specs linked**: ADR 0170, D333, `07-plugins/03-plugin-api.md`,
+  `03-runtime/03-tools-and-permissions.md`
+- **Acceptance**: E (plugin view + tool) + security allowlist
+- **Milestone**: M5
+- **Status**: Unit-covered (`bundled-plugins`, `browser-cdp`,
+  `browser-preview-tool`); full Electron journey pending
+
 #### E2E-009: Streamed tokens visible in UI
 
 - **Preconditions**: Session active; message sent.

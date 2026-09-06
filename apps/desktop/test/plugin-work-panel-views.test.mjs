@@ -57,8 +57,9 @@ test("view refs round-trip, and malformed ones are refused", () => {
 test("a plugin view counts as a tool, not a transcript resource", () => {
   // Tools are the panel's stable entry points and live in the upper menu
   // groups; only what the transcript opened belongs under "open resources".
-  assert.equal(isToolWorkPanelTab(toolWorkPanelTab("browser")), true);
+  assert.equal(isToolWorkPanelTab(pluginWorkPanelTab("pi.browser", "browser")), true);
   assert.equal(isToolWorkPanelTab(pluginWorkPanelTab("acme.git", "changes")), true);
+  assert.equal(isToolWorkPanelTab(toolWorkPanelTab("review")), false);
   assert.equal(
     isToolWorkPanelTab({ id: "file:src/a.ts", kind: "file", resource: "src/a.ts" }),
     false,
@@ -78,7 +79,7 @@ test("the panel menu renders plugin views as their own group", () => {
   // include the plugin-view group drawn above it.
   assert.match(
     panelSource,
-    /HEADER_TOOLS\.length \+ pluginViews\.length \+ index/,
+    /pluginViews\.length \+ index/,
   );
 });
 
@@ -226,6 +227,13 @@ test("the view list is filtered by permission, scope, and entry existence", () =
   assert.match(openBody, /PERMISSION_DENIED: ui\.view/);
   assert.match(openBody, /pluginActiveInProject\(pluginId, currentWorkspacePath\(\)\)/);
   assert.match(openBody, /existsSync\(htmlPath\)/);
+  // Opening Files (or any other view) must not rebind the browser guest.
+  assert.match(
+    openBody,
+    /isBrowserView = pluginId === BROWSER_PLUGIN_ID && viewId === BROWSER_VIEW_ID/,
+  );
+  assert.match(openBody, /isBrowserView && sessionId/);
+  assert.match(openBody, /isBrowserView && location/);
 });
 
 test("opening a different project refreshes the scope-filtered view list", () => {

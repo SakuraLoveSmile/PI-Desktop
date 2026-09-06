@@ -1424,6 +1424,7 @@ export const en = {
       "background.service": "Keep a background service running",
       "bus.publish": "Send messages to other plugins",
       "bus.subscribe": "Receive messages from other plugins",
+      "browser.cdp": "Control the work-panel browser",
     },
     permissionHelp: {
       "ui.panel": "Lets the plugin show its own panel inside the app.",
@@ -1453,6 +1454,8 @@ export const en = {
       "background.service": "Keeps a worker running while the plugin is enabled.",
       "bus.publish": "Can send messages on the topics it declared.",
       "bus.subscribe": "Can receive messages on the topics it declared.",
+      "browser.cdp":
+        "Can navigate the work-panel browser, read the page, run JavaScript, and send allowlisted Chrome DevTools commands. Cookie and storage methods are blocked.",
     },
   },
   /**

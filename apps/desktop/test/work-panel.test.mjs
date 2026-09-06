@@ -90,7 +90,12 @@ test("work panel uses the fixed-window internal dock", () => {
   assert.match(appSource, /finishWorkPanelExit/);
   assert.match(appSource, /onExitAnimationEnd=\{\(\) =>/);
   assert.match(appSource, /finishWorkPanelExit\(workPanelExitGeneration\.current\)/);
-  assert.match(panelSource, /browserSetVisible\(false\)/);
+  // Native surfaces hide via `blocked` before work-panel-out starts, so the
+  // guest clamped to the plugin view is gone before the dock CSS animation.
+  assert.match(
+    panelSource,
+    /blocked=\{\s*exiting \|\| panelBlocked \|\| contextOpen \|\| isResizing/,
+  );
   assert.match(panelSource, /nativeSurfaceReadyForExit/);
   assert.match(panelSource, /is-exit-pending/);
   assert.match(panelSource, /exitAnimationReady && "is-exiting"/);
@@ -126,16 +131,15 @@ test("work panel header exposes one unified menu with no duplicated entries", ()
 
   assert.ok(contextIndex > headerIndex);
   assert.ok(actionsIndex > contextIndex && bodyIndex > actionsIndex);
-  assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}, index\)/);
+  assert.match(panelSource, /pluginViews\.map\(\(view, index\) =>/);
   assert.match(panelSource, /aria-expanded=\{contextOpen\}/);
   assert.match(panelSource, /aria-controls="work-panel-context-menu"/);
-  assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
-  assert.match(panelSource, /function headerToolTab\(kind: HeaderToolKind\): WorkPanelTab/);
-  // Browsing the project is the bundled `pi.files` plugin now, so the host's
-  // tool list no longer carries a Files entry. The `file` *kind* remains: a
-  // `file:<path>` tab is a transcript artifact, not a launcher entry.
+  assert.match(panelSource, /data-work-panel-plugin-view=\{view\.ref\}/);
+  assert.doesNotMatch(panelSource, /HEADER_TOOLS|headerToolTab|HeaderToolKind/);
+  // Launchable tools are plugin views (`pi.files`, `pi.browser`, …). The
+  // `file` *kind* remains: a `file:<path>` tab is a transcript artifact.
   assert.doesNotMatch(panelSource, /\{ kind: "file", Icon/);
-  assert.match(panelSource, /openWorkPanelTab\(headerToolTab\(kind\)\)/);
+  assert.match(panelSource, /openPluginView\(view\)/);
   assert.match(panelSource, /className="work-panel-context-menu"/);
   assert.match(panelSource, /id=\{activeTab \? `work-panel-title-\$\{activeTab\.id\}`/);
   assert.match(panelSource, /role="menuitemradio"/);
@@ -155,9 +159,12 @@ test("work panel header exposes one unified menu with no duplicated entries", ()
   assert.match(panelSource, /\{resourceTabs\.length > 0 && \(/);
   assert.match(panelSource, /resourceTabs\.map\(\(tab, index\) =>/);
   assert.doesNotMatch(panelSource, /tabs\.map\(\(tab, index\) =>/);
-  // Reopening an already-open tool must reuse its tab so the browser keeps its
-  // resource instead of being replaced by a blank singleton.
-  assert.match(panelSource, /const existing = tabs\.find\(\(tab\) => tab\.id === kind\)/);
+  // Reopening an already-open plugin view must reuse its tab so the browser
+  // keeps its location instead of being replaced by a blank singleton.
+  assert.match(
+    panelSource,
+    /const existing = tabs\.find\(\(candidate\) => candidate\.id === tab\.id\)/,
+  );
   assert.match(panelSource, /if \(existing\) activateTab\(existing\.id\)/);
   assert.doesNotMatch(panelSource, /collapsePanel/);
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
@@ -347,7 +354,7 @@ test("built-in terminal is absent while the work panel keeps its other surfaces"
   assert.doesNotMatch(panelSource, /TerminalTab|terminalOpen|kind: "terminal"/);
   assert.doesNotMatch(panelSource, /work-panel-surface-terminal|activeTab\?\.kind !== "terminal"/);
   assert.match(panelSource, /activeTab\?\.kind === "review"/);
-  assert.match(panelSource, /activeTab\?\.kind === "browser"/);
+  assert.match(panelSource, /activeTab\?\.kind === "plugin"/);
   assert.match(panelSource, /activeTab\?\.kind === "file"/);
   assert.match(transcriptSource, /action === "run"/);
   assert.doesNotMatch(transcriptSource, /openTerminal|terminalArtifact|chat\.openTerminal/);
@@ -450,9 +457,9 @@ test("revealing the panel with no tab shows the empty body and its tool list", a
   assert.match(panelSource, /panel\.empty\.title/);
   assert.match(panelSource, /panel\.empty\.body/);
   assert.match(panelSource, /className="work-panel-empty-tools"/);
-  assert.match(panelSource, /HEADER_TOOLS\.map[\s\S]*work-panel-empty-tool/);
-  assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
-  assert.match(panelSource, /onClick=\{\(\) => openTool\(kind\)\}/);
+  assert.match(panelSource, /pluginViews\.map[\s\S]*work-panel-empty-tool/);
+  assert.match(panelSource, /data-work-panel-plugin-view=\{view\.ref\}/);
+  assert.match(panelSource, /onClick=\{\(\) => openPluginView\(view\)\}/);
   // No tab exists to label a tabpanel, so the empty body is a plain group.
   const emptyBlock = panelSource.match(/\{!activeTab && \([\s\S]*?\n {10}\)\}/)?.[0] ?? "";
   assert.ok(emptyBlock, "the empty body branch is a single JSX block");

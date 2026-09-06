@@ -20,6 +20,7 @@ export const HIGH_RISK_PERMISSIONS = [
   "fs.delete",
   "agent.prompt.inject",
   "agent.tool.register",
+  "browser.cdp",
 ] as const;
 
 /** Host API surface each permission unlocks, used for the unused-permission hint. */
@@ -47,6 +48,16 @@ const PERMISSION_API_HINTS: Record<string, string[]> = {
   "agent.tool.register": ["agent.registerTool"],
   "net.fetch": ["net.fetch"],
   "shell.openExternal": ["shell.openExternal"],
+  "browser.cdp": [
+    "browser.navigate",
+    "browser.snapshot",
+    "browser.screenshot",
+    "browser.click",
+    "browser.fill",
+    "browser.evaluate",
+    "browser.console",
+    "browser.cdp",
+  ],
 };
 
 export type CheckIssue = {

@@ -1426,6 +1426,7 @@ export const tr = {
       "background.service": "Arka plan servisini çalışır tut",
       "bus.publish": "Diğer eklentilere ileti gönder",
       "bus.subscribe": "Diğer eklentilerden ileti al",
+      "browser.cdp": "Çalışma paneli tarayıcısını kontrol et",
     },
     permissionHelp: {
       "ui.panel": "Eklentinin uygulama içinde kendi panelini göstermesini sağlar.",
@@ -1455,6 +1456,8 @@ export const tr = {
       "background.service": "Eklenti açıkken bir işçiyi çalışır tutar.",
       "bus.publish": "Bildirdiği konularda ileti gönderebilir.",
       "bus.subscribe": "Bildirdiği konularda ileti alabilir.",
+      "browser.cdp":
+        "Çalışma paneli tarayıcısında gezebilir, sayfayı okuyabilir, JavaScript çalıştırabilir ve izin listesindeki Chrome DevTools komutlarını gönderebilir. Çerez ve depolama yöntemleri engellenir.",
     },
   },
   /**

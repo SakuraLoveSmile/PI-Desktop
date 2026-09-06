@@ -35,7 +35,7 @@ import { useAppStore } from "./stores/app-store";
 import type { ToastOptions } from "./stores/app-store";
 import { api } from "./lib/api";
 import { commitWorkPanelPresentation } from "./lib/work-panel-presentation";
-import { toolWorkPanelTab } from "./lib/work-panel-tabs";
+import { browserPluginTab, toolWorkPanelTab } from "./lib/work-panel-tabs";
 import {
   clampSidebarWidth,
   loadSidebarWidth,
@@ -494,8 +494,7 @@ function AppShell() {
       useAppStore
         .getState()
         .openWorkPanelTabForSession(event.sessionId, {
-          ...toolWorkPanelTab("browser"),
-          resource: event.path,
+          ...browserPluginTab(event.path ?? event.url),
         });
     });
     const offHostStatus = api.onHostStatus((status) => {
@@ -694,8 +693,12 @@ function AppShell() {
           useAppStore.getState().openFileInWorkPanel(resource);
           return;
         }
-        if (kind !== "file") {
-          useAppStore.getState().openWorkPanelTab(toolWorkPanelTab(kind));
+        if (kind === "browser") {
+          useAppStore.getState().openWorkPanelTab(browserPluginTab(resource));
+          return;
+        }
+        if (kind === "review") {
+          useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("review"));
         }
       },
       collapseWorkPanel: () => {

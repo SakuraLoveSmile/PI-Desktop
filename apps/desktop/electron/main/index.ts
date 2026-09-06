@@ -53,6 +53,7 @@ import {
   type AgentCapabilityQuery,
   type ComposerPasteFile,
   type PluginViewMeta,
+  type BrowserState,
   normalizeMode,
   type AgentEventEnvelope,
   type AgentPromptRequest,
@@ -138,6 +139,11 @@ import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 import { Logger } from "./logger";
 import { collectWorkspaceDiff } from "./git-diff";
 import { BrowserPane, resolveLocalFile } from "./browser-view";
+import {
+  BrowserHost,
+  BROWSER_PLUGIN_ID,
+  BROWSER_VIEW_ID,
+} from "./browser-host";
 import { discoverProviderModels } from "./model-discovery";
 import {
   ModelsDevCatalog,
@@ -538,6 +544,7 @@ const plugins = new PluginRuntime({
     // surface. Drop it; the renderer re-opens it on the pluginChanged event if
     // the tab is still active and the plugin came back.
     pluginViews.closePlugin(pluginId);
+    if (pluginId === BROWSER_PLUGIN_ID) browserHost.disposeGuest();
     sendToRenderer(IPC.event.pluginChanged, { reason: "crash", pluginId });
   },
   // Supervision state is UI-only: the runtime owns restarts, the renderer just
@@ -564,6 +571,7 @@ const plugins = new PluginRuntime({
     });
     // Views were loaded from the previous revision of the plugin's files.
     pluginViews.closePlugin(pluginId);
+    if (pluginId === BROWSER_PLUGIN_ID) browserHost.disposeGuest();
     sendToRenderer(IPC.event.pluginChanged, { reason: "reload", pluginId });
   },
 });
@@ -589,9 +597,12 @@ const pluginScopes = new Map<string, ActivationScope>();
  * can hold sessions on different projects, so this cannot be a single value.
  */
 const sessionProjects = new Map<string, string | null>();
-const browserPane = new BrowserPane((state) =>
-  sendToRenderer(IPC.event.browserState, state),
-);
+const emitBrowserState = (state: BrowserState) => {
+  sendToRenderer(IPC.event.browserState, state);
+  pluginPanels.broadcast("browser:state", state);
+  pluginViews.broadcast("browser:state", state);
+};
+const browserPane = new BrowserPane(emitBrowserState);
 const pluginViews = new PluginViewHost(({ pluginId, url }) => {
   logger.app("plugin", "warn", "plugin.api", {
     pluginId,
@@ -600,6 +611,55 @@ const pluginViews = new PluginViewHost(({ pluginId, url }) => {
   });
 });
 pluginPanels.addSenderResolver((senderId) => pluginViews.pluginIdForSender(senderId));
+const browserHost = new BrowserHost({
+  pane: browserPane,
+  isPluginLoaded: (pluginId) => Boolean(plugins.getLoaded(pluginId)),
+  getFileRoot: async (sessionId) => {
+    if (sessionId) {
+      try {
+        const res = (await host?.call("session.get", { id: sessionId })) as
+          | { session: { projectPath?: string } | null }
+          | undefined;
+        const path = res?.session?.projectPath?.trim();
+        if (path) return path;
+      } catch {
+        // Fall through to the visible workspace.
+      }
+    }
+    return currentWorkspacePath();
+  },
+  getScratchDir: (sessionId) => {
+    if (!sessionId) return null;
+    const root =
+      process.env.PI_DESKTOP_DATA_DIR?.trim() ||
+      join(homedir(), ".pi-desktop");
+    return join(root, "scratch", sessionId);
+  },
+  onState: emitBrowserState,
+});
+pluginViews.onSurface = (surface) => {
+  browserHost.setChromeSurface(surface);
+};
+plugins.setServices({
+  browser: {
+    navigate: (input, sessionId) => browserHost.navigate(input, sessionId),
+    action: (action) => browserHost.action(action),
+    setBounds: (pluginId, hole) => browserHost.setGuestHole(pluginId, hole),
+    setVisible: (pluginId, visible) => browserHost.setGuestVisible(pluginId, visible),
+    getState: () => browserHost.getState(),
+    openExternal: () => browserHost.openExternal(),
+    snapshot: () => browserHost.snapshot(),
+    screenshot: (input, sessionId) => browserHost.screenshot(input, sessionId),
+    click: (uid) => browserHost.click(uid),
+    fill: (uid, text) => browserHost.fill(uid, text),
+    evaluate: (expression) => browserHost.evaluate(expression),
+    console: (limit) => browserHost.console(limit),
+    cdp: (method, params) => browserHost.cdpCommand(method, params),
+  },
+  onPluginUnload: (pluginId) => {
+    if (pluginId === BROWSER_PLUGIN_ID) browserHost.disposeGuest();
+  },
+});
 let scannedImportSessions = new Map<string, ExternalSessionSummary>();
 
 const IMPORT_SOURCES = new Set<ExternalSource>([
@@ -4044,7 +4104,7 @@ function wireHost(h: HostProcess) {
           };
         } else {
           try {
-            const result = await tool.execute(q.args);
+            const result = await tool.execute(q.args, { sessionId: q.sessionId });
             payload = {
               executionId: q.executionId,
               ok: true,
@@ -4355,13 +4415,21 @@ async function startSidecar(): Promise<void> {
         content: `BrowserPreview: "${raw}" does not resolve to an existing file inside the workspace.`,
       };
     }
+    const preview = await browserHost.previewWorkspaceFile(sessionId, raw, root);
+    if (!preview.ok) {
+      return {
+        ok: false,
+        isError: true,
+        content: preview.content,
+      };
+    }
     sendToRenderer(IPC.event.browserPreview, {
       sessionId,
       path: raw,
     });
     return {
       ok: true,
-      content: `Previewing ${raw} in the built-in browser panel. Live reload is active — subsequent edits to the file or sibling assets re-render automatically.`,
+      content: `Previewing ${raw} in the work-panel Browser plugin. Live reload is active — subsequent edits to the file or sibling assets re-render automatically.`,
     };
   });
   // Plugin skills (D174): the model loads a declared skill document by id.
@@ -6282,29 +6350,24 @@ function registerIpc() {
   handle(
     IPC.invoke.browserNavigate,
     async (input: { url?: string; sessionId?: string } = {}) => {
-      // Workspace root gates file previews (agent-generated HTML); http(s)
-      // navigation works without a workspace.
-      let root: string | null = null;
-      try {
-        if (input.sessionId) {
-          const res = (await host?.call("session.get", { id: input.sessionId })) as
-            | { session: { projectPath?: string } | null }
-            | undefined;
-          root = res?.session?.projectPath?.trim() || null;
-        } else {
-          const res = (await host?.call("workspace.get")) as
-            | { workspace: { path: string } | null }
-            | undefined;
-          root = res?.workspace?.path ?? null;
-        }
-      } catch {
-        root = null;
+      if (!plugins.getLoaded(BROWSER_PLUGIN_ID)) {
+        throw Object.assign(new Error("Browser plugin is disabled"), {
+          errorCode: "UNAVAILABLE",
+        });
       }
-      return browserPane.navigate(String(input.url ?? ""), root);
+      return browserHost.navigate(
+        { url: String(input.url ?? "") },
+        input.sessionId,
+      );
     },
   );
 
   handle(IPC.invoke.browserAction, async (input: { action?: string } = {}) => {
+    if (!plugins.getLoaded(BROWSER_PLUGIN_ID)) {
+      throw Object.assign(new Error("Browser plugin is disabled"), {
+        errorCode: "UNAVAILABLE",
+      });
+    }
     const action = String(input.action ?? "");
     if (
       action === "back" ||
@@ -6312,31 +6375,42 @@ function registerIpc() {
       action === "reload" ||
       action === "stop"
     ) {
-      browserPane.action(action);
+      browserHost.action(action);
     }
     return { ok: true };
   });
 
   handle(
     IPC.invoke.browserSetBounds,
-    async (bounds: { x: number; y: number; width: number; height: number }) => {
-      browserPane.setBounds(bounds ?? { x: 0, y: 0, width: 0, height: 0 });
+    async () => {
+      // Plugin chrome owns the clamped hole. Unclamped renderer bounds must
+      // not place the guest over chat/composer.
       return { ok: true };
     },
   );
 
   handle(IPC.invoke.browserSetVisible, async (input: { visible?: boolean } = {}) => {
-    browserPane.setVisible(input.visible === true);
+    if (!plugins.getLoaded(BROWSER_PLUGIN_ID) || input.visible !== true) {
+      browserHost.setGuestVisible(BROWSER_PLUGIN_ID, false);
+      return { ok: true };
+    }
+    browserHost.setGuestVisible(BROWSER_PLUGIN_ID, true);
     return { ok: true };
   });
 
-  handle(IPC.invoke.browserOpenExternal, async () => {
-    browserPane.openExternal();
+  handle(IPC.invoke.browserOpenExternal, async (input: { url?: string } = {}) => {
+    const raw = String(input.url ?? "").trim();
+    if (raw) {
+      const allowed = parseAllowedExternalUrl(raw);
+      if (allowed) await shell.openExternal(allowed);
+      return { ok: true };
+    }
+    browserHost.openExternal();
     return { ok: true };
   });
 
   handle(IPC.invoke.browserGetState, async () => {
-    return browserPane.getState();
+    return browserHost.getState();
   });
 
   const requireWorkspaceRoot = async () => {
@@ -7372,6 +7446,7 @@ function registerIpc() {
   handle(IPC.invoke.pluginDisable, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     pluginViews.closePlugin(id);
+    if (id === BROWSER_PLUGIN_ID) browserHost.disposeGuest();
     await plugins.unload(id);
     logger.app("plugin", "info", "plugin disabled", { pluginId: id });
     const res = await host.call("plugins.disable", { id });
@@ -7777,9 +7852,21 @@ function registerIpc() {
 
   handle(
     IPC.invoke.pluginViewOpen,
-    async (payload: { pluginId?: string; viewId?: string }) => {
+    async (payload: {
+      pluginId?: string;
+      viewId?: string;
+      sessionId?: string;
+      location?: string;
+    }) => {
       const pluginId = String(payload?.pluginId ?? "");
       const viewId = String(payload?.viewId ?? "");
+      const sessionId = String(payload?.sessionId ?? "").trim();
+      const location = String(payload?.location ?? "").trim();
+      const isBrowserView = pluginId === BROWSER_PLUGIN_ID && viewId === BROWSER_VIEW_ID;
+      if (isBrowserView && sessionId) browserHost.setChromeSession(sessionId);
+      if (isBrowserView && sessionId && location) {
+        browserHost.rememberLocation(sessionId, location);
+      }
       const loaded = plugins.getLoaded(pluginId);
       if (!loaded) throw new Error("plugin not loaded");
       if (!loaded.permissions.has("ui.view")) {
@@ -7802,6 +7889,12 @@ function registerIpc() {
         htmlPath,
         netDomains: loaded.manifest.net?.domains?.map((domain) => String(domain)),
       });
+      if (isBrowserView && location) {
+        void browserHost.navigate(
+          { path: location, url: location },
+          sessionId || undefined,
+        );
+      }
       return { ok: true };
     },
   );
@@ -7824,12 +7917,24 @@ function registerIpc() {
 
   handle(
     IPC.invoke.pluginViewSetVisible,
-    async (payload: { pluginId?: string; viewId?: string; visible?: boolean }) => {
-      pluginViews.setVisible(
-        String(payload?.pluginId ?? ""),
-        String(payload?.viewId ?? ""),
-        payload?.visible === true,
-      );
+    async (payload: {
+      pluginId?: string;
+      viewId?: string;
+      visible?: boolean;
+      sessionId?: string;
+    }) => {
+      const pluginId = String(payload?.pluginId ?? "");
+      const viewId = String(payload?.viewId ?? "");
+      const sessionId = String(payload?.sessionId ?? "").trim();
+      if (
+        payload?.visible === true &&
+        sessionId &&
+        pluginId === BROWSER_PLUGIN_ID &&
+        viewId === BROWSER_VIEW_ID
+      ) {
+        browserHost.setChromeSession(sessionId);
+      }
+      pluginViews.setVisible(pluginId, viewId, payload?.visible === true);
       return { ok: true };
     },
   );

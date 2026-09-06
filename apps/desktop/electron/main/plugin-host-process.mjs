@@ -246,6 +246,21 @@ function buildApi() {
     shell: {
       openExternal: (url) => call("shell.openExternal", [url]),
     },
+    browser: {
+      navigate: (input) => call("browser.navigate", [input ?? {}]),
+      action: (input) => call("browser.action", [input]),
+      setBounds: (hole) => call("browser.setBounds", [hole]),
+      setVisible: (visible) => call("browser.setVisible", [visible]),
+      getState: () => call("browser.getState"),
+      openExternal: () => call("browser.openExternal"),
+      snapshot: () => call("browser.snapshot"),
+      screenshot: (input) => call("browser.screenshot", [input ?? {}]),
+      click: (input) => call("browser.click", [input]),
+      fill: (input) => call("browser.fill", [input]),
+      evaluate: (input) => call("browser.evaluate", [input]),
+      console: (input) => call("browser.console", [input ?? {}]),
+      cdp: (input) => call("browser.cdp", [input]),
+    },
     net: {
       fetch: (input) => call("net.fetch", [input]),
     },

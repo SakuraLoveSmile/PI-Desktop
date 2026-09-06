@@ -106,6 +106,7 @@ import {
   shouldOpenReviewArtifact,
   switchWorkPanelContextState,
   toolWorkPanelTab,
+  browserPluginTab,
   type WorkPanelContext,
   type WorkPanelTab,
 } from "../lib/work-panel-tabs";
@@ -4155,7 +4156,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().openWorkPanelTab(fileWorkPanelTab(path));
   },
   openUrlInWorkPanel: (url) => {
-    get().openWorkPanelTab({ ...toolWorkPanelTab("browser"), resource: url });
+    const hasBrowser = get().pluginViews.some(
+      (view) => view.pluginId === "pi.browser" && view.viewId === "browser",
+    );
+    if (!hasBrowser) {
+      if (/^https?:\/\//i.test(url.trim())) {
+        void api.browserOpenExternal(url.trim());
+      }
+      return;
+    }
+    get().openWorkPanelTab(browserPluginTab(url));
   },
 
   clearComposerPrefill: () => set({ composerPrefill: null }),

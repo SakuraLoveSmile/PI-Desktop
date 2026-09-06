@@ -1114,20 +1114,21 @@ visible session's workspace.
   restoring the snapshot; it returns `rolledBack`, `alreadyRolledBack`,
   `conflict`, or `unavailable` and never overwrites a conflicting later edit.
 
-### browser (D100)
+### browser (D100, D333)
 
-- `browser/navigate({url, sessionId?})` (scheme-normalized; http/https work
-  without a workspace, while a local path requires the supplied session's
-  durable project root or the visible workspace for legacy calls),
-  `browser/action({action: back|forward|reload|stop})`,
-  `browser/setBounds({x,y,width,height})` (renderer-measured content rect),
-  `browser/setVisible({visible})`, `browser/openExternal()`,
-  `browser/getState()`
+Chrome and agent CDP live in bundled plugin `pi.browser` over `pi.browser.*`.
+Renderer IPC kept for the Plan-safe preview facade and URL fallback:
+
+- `browser/openExternal({url?})` — allowlisted http(s)/mailto, or the current
+  guest URL when omitted
 - event: `browser/event/state {url, title, isLoading, canGoBack, canGoForward}`
-- agent preview event: `browser/event/preview {sessionId, path}`. Electron Main
-  validates `path` inside that session's project before emitting; the renderer
-  records it in the matching runtime panel context and navigates only when that
-  conversation is visible.
+  (also pushed to plugin views as `browser:state`)
+- agent preview event: `browser/event/preview {sessionId, path?, url?}`.
+  Electron Main validates a workspace `path` inside that session's project,
+  loads the guest when that conversation's plugin view is visible, and the
+  renderer opens `plugin:pi.browser/browser` with `location` in the matching
+  runtime panel context. Navigation of a background session does not steal the
+  visible guest.
 
 ### fs (read-only)
 

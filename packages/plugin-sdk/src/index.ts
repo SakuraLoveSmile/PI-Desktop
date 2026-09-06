@@ -406,6 +406,25 @@ export type PluginHostApi = {
   shell: {
     openExternal: (url: string) => Promise<void>;
   };
+  browser: {
+    navigate: (input: { url?: string; path?: string }) => Promise<unknown>;
+    action: (input: { action: "back" | "forward" | "reload" | "stop" }) => Promise<void>;
+    setBounds: (hole: { x: number; y: number; width: number; height: number }) => Promise<unknown>;
+    setVisible: (visible: boolean | { visible: boolean }) => Promise<void>;
+    getState: () => Promise<unknown>;
+    openExternal: () => Promise<void>;
+    snapshot: () => Promise<{ tree: string; url: string; title: string }>;
+    screenshot: (input?: { fullPage?: boolean }) => Promise<{
+      mimeType: string;
+      data: string;
+      path?: string;
+    }>;
+    click: (input: { uid: string }) => Promise<void>;
+    fill: (input: { uid: string; text: string }) => Promise<void>;
+    evaluate: (input: { expression: string }) => Promise<unknown>;
+    console: (input?: { limit?: number }) => Promise<{ messages: unknown[] }>;
+    cdp: (input: { method: string; params?: unknown }) => Promise<unknown>;
+  };
   net: {
     fetch: (input: {
       url: string;
@@ -447,6 +466,7 @@ export const PLUGIN_PERMISSIONS = [
   "background.service",
   "bus.publish",
   "bus.subscribe",
+  "browser.cdp",
 ] as const;
 
 export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number];

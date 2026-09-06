@@ -670,9 +670,9 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 ### 5.1 Purpose
 
 Docked right work column for inspecting and steering the agent's workspace.
-One host tool is launchable — Browser (embedded preview) — alongside the
-views installed plugins contribute (ADR 0104), including the bundled `pi.files`
-plugin that browsing the project now goes through. Review and `file:<path>` are
+Launchable surfaces are plugin views (ADR 0104), including bundled `pi.files`
+(project browsing) and bundled `pi.browser` (work-panel browser chrome; the
+guest page stays host-owned, ADR 0170). Review and `file:<path>` are
 *artifact* surfaces: the host renders them, but the conversation opens them, so
 they are absent from the tool list. There is no interactive terminal surface;
 agent Bash output remains in the transcript.
@@ -683,10 +683,8 @@ agent Bash output remains in the transcript.
 +---------------------------------------+
 | ◫ App.tsx ⌄        drag      | [×][>] |  header, 46px
 +---------------------------------------+
-| Tools                       ¦ menu    |
+| Plugin views                ¦ menu    |
 |   ◎ Browser                 ¦         |
-|  ------------------------   ¦         |
-| Plugin views                ¦         |
 |   ▤ Files                   ¦         |
 |   ⑂ GitLens              [×]¦         |
 |  ------------------------   ¦         |
@@ -696,7 +694,7 @@ agent Bash output remains in the transcript.
 +---------------------------------------+
 | Active resource body                  |
 |  Review: recorded changes + diff      |
-|  Browser: URL bar + preview           |
+|  Browser: plugin chrome + host guest  |
 |  File: viewer for a transcript file   |
 |  Plugin view: the plugin's own page   |
 |  no resource: empty state + tool list |
@@ -706,13 +704,13 @@ agent Bash output remains in the transcript.
 ```
 
 The plugin-views group appears only when at least one loaded plugin
-contributes a view that is in scope (ADR 0104). Its rows are structurally
-identical to the tool rows — edge marker, open dot, reserved close slot — so a
-plugin surface does not read as second-class beside a built-in one. A view
-whose `icon` token this build does not know renders a lettered tile instead.
+contributes a view that is in scope (ADR 0104), including bundled `pi.files`
+and `pi.browser`. Its rows use the same edge marker, open dot, and reserved
+close slot. A view whose `icon` token this build does not know renders a
+lettered tile instead.
 
 With no resource the body is an empty state — tiled icon, title, one line of
-copy — followed by the same entries the header menu lists, as plain rows:
+copy — followed by the same plugin views the header menu lists, as plain rows:
 
 ```text
 +---------------------------------------+
@@ -721,7 +719,7 @@ copy — followed by the same entries the header menu lists, as plain rows:
 |   Open a file or link from             |  body
 |   the conversation — or pick a view.   |
 |        ◎ Browser                       |
-|        ▤ Files (plugin view)           |
+|        ▤ Files                         |
 +---------------------------------------+
 ```
 
@@ -729,12 +727,10 @@ copy — followed by the same entries the header menu lists, as plain rows:
 
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
-- The header exposes one unified context trigger. Its menu lists the built-in
-  host tools (Browser) first — each row
-  showing its own open state and, once open, its own close control — then, after
-  a divider, the plugin-contributed views in declared order, and after a second
-  divider only the further resources the transcript opened. No entry appears
-  twice. Rows use a neutral fill with a straight 2px left edge marker for the
+- The header exposes one unified context trigger. Its menu lists plugin
+  views in declared order — each row showing its own open state and, once
+  open, its own close control — then, after a divider, only the further
+  resources the transcript opened. No entry appears twice. Rows use a neutral fill with a straight 2px left edge marker for the
   active row, never color alone; the trailing close slot is always reserved so
   labels and open dots never shift between rows. The menu fades in over ≤4px with
   `--motion-duration-fast` / `--motion-ease-out` and is static under
