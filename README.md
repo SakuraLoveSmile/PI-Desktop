@@ -179,14 +179,14 @@ The agent workspace includes dedicated surfaces for the things that matter while
 <tr>
 <td width="50%">
 
-<img src="docs/image/readme/conversation.webp" alt="PI-Desktop conversation" />
+<img src="docs/image/readme/chat_en.png" alt="PI-Desktop conversation" />
 
 <p align="center"><sub>Long-running conversations with transcript navigation</sub></p>
 
 </td>
 <td width="50%">
 
-<img src="docs/image/readme/models.webp" alt="PI-Desktop model selection" />
+<img src="docs/image/readme/model_en.png" alt="PI-Desktop model selection" />
 
 <p align="center"><sub>Switch providers, models, and reasoning levels per session</sub></p>
 
@@ -195,16 +195,16 @@ The agent workspace includes dedicated surfaces for the things that matter while
 <tr>
 <td width="50%">
 
-<img src="docs/image/readme/marketplace.webp" alt="PI-Desktop plugin marketplace" />
+<img src="docs/image/readme/plugins_en.png" alt="PI-Desktop plugin marketplace" />
 
 <p align="center"><sub>Extend the workspace through the plugin marketplace</sub></p>
 
 </td>
 <td width="50%">
 
-<img src="docs/image/readme/basics.webp" alt="PI-Desktop settings" />
+<img src="docs/image/readme/addmodel_en.png" alt="PI-Desktop model configuration" />
 
-<p align="center"><sub>Light, dark, system, languages, themes, and appearance</sub></p>
+<p align="center"><sub>Add a provider and connect a model</sub></p>
 
 </td>
 </tr>

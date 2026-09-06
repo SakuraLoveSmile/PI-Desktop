@@ -179,14 +179,14 @@ PI-Desktop 不会把智能体运行时锁死在一份硬编码模型名单上。
 <tr>
 <td width="50%">
 
-<img src="docs/image/readme/conversation.zh.webp" alt="PI-Desktop 对话" />
+<img src="docs/image/readme/chat_zh.png" alt="PI-Desktop 对话" />
 
 <p align="center"><sub>带转录导航的长会话</sub></p>
 
 </td>
 <td width="50%">
 
-<img src="docs/image/readme/models.zh.webp" alt="PI-Desktop 模型选择" />
+<img src="docs/image/readme/model_zh.png" alt="PI-Desktop 模型选择" />
 
 <p align="center"><sub>按会话切换服务商、模型和推理级别</sub></p>
 
@@ -195,16 +195,16 @@ PI-Desktop 不会把智能体运行时锁死在一份硬编码模型名单上。
 <tr>
 <td width="50%">
 
-<img src="docs/image/readme/marketplace.zh.webp" alt="PI-Desktop 插件市场" />
+<img src="docs/image/readme/plugins_zh.png" alt="PI-Desktop 插件市场" />
 
 <p align="center"><sub>通过插件市场扩展工作区</sub></p>
 
 </td>
 <td width="50%">
 
-<img src="docs/image/readme/basics.zh.webp" alt="PI-Desktop 设置" />
+<img src="docs/image/readme/addmodel_zh.png" alt="PI-Desktop 模型配置" />
 
-<p align="center"><sub>浅色、深色、跟随系统、语言、主题与外观</sub></p>
+<p align="center"><sub>添加服务商并接入模型</sub></p>
 
 </td>
 </tr>
