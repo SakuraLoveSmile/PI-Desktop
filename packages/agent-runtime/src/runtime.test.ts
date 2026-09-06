@@ -883,9 +883,8 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect((bash.parameters as any).properties.timeout).toMatchObject({
       type: "number",
       minimum: 1,
-      // Accepts a millisecond value so the runtime can read it as seconds; the
-      // honoured ceiling stays 300 seconds (D273).
-      maximum: 3_600_000,
+      // Accepts a millisecond value so the runtime can read it as seconds.
+      maximum: 100_000_000,
     });
     expect(runtimeMatches(runtime, { commandShell: powershell })).toBe(true);
     expect(runtimeMatches(runtime, { commandShell })).toBe(false);
@@ -941,13 +940,18 @@ describe("DesktopAgentRuntime configuration matching", () => {
       "tools.execute",
       expect.objectContaining({ timeoutMs: 1_000 }),
     );
-    await bash.execute("bash-max", { command: "printf max", timeout: 300 });
+    await bash.execute("bash-max", { command: "printf max", timeout: 21_600 });
     expect(host.call).toHaveBeenLastCalledWith(
       "tools.execute",
-      expect.objectContaining({ timeoutMs: 300_000 }),
+      expect.objectContaining({ timeoutMs: 21_600_000 }),
+    );
+    await bash.execute("bash-half-hour", { command: "printf half", timeout: 1_800 });
+    expect(host.call).toHaveBeenLastCalledWith(
+      "tools.execute",
+      expect.objectContaining({ timeoutMs: 1_800_000 }),
     );
 
-    for (const timeout of [Number.NaN, Number.POSITIVE_INFINITY, 0.999, 300.001]) {
+    for (const timeout of [Number.NaN, Number.POSITIVE_INFINITY, 0.999]) {
       await expect(
         bash.execute(`bash-invalid-${String(timeout)}`, {
           command: "printf invalid",
@@ -955,7 +959,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
         }),
       ).rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
     }
-    expect(host.call).toHaveBeenCalledTimes(2);
+    expect(host.call).toHaveBeenCalledTimes(3);
     await runtime.dispose();
   });
 
@@ -974,22 +978,27 @@ describe("DesktopAgentRuntime configuration matching", () => {
       expect.objectContaining({ timeoutMs: 120_000 }),
     );
 
-    // Above the ceiling once converted: honour the intent, apply the cap.
-    await bash.execute("bash-ms-over", {
+    // 30 minutes in milliseconds: honour as 1800 seconds, no longer clamped to 300.
+    await bash.execute("bash-ms-half-hour", {
       command: "printf over",
       timeout: 1_800_000,
     });
     expect(host.call).toHaveBeenLastCalledWith(
       "tools.execute",
-      expect.objectContaining({ timeoutMs: 300_000 }),
+      expect.objectContaining({ timeoutMs: 1_800_000 }),
     );
 
-    // Just over the cap is a seconds value that overshot, not milliseconds.
-    await expect(
-      bash.execute("bash-over-cap", { command: "printf cap", timeout: 301 }),
-    ).rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
+    // Above the honoured seconds ceiling once converted: clamp.
+    await bash.execute("bash-ms-over", {
+      command: "printf over",
+      timeout: 30_000_000,
+    });
+    expect(host.call).toHaveBeenLastCalledWith(
+      "tools.execute",
+      expect.objectContaining({ timeoutMs: 21_600_000 }),
+    );
 
-    expect(host.call).toHaveBeenCalledTimes(2);
+    expect(host.call).toHaveBeenCalledTimes(3);
     await runtime.dispose();
   });
 
@@ -4919,7 +4928,7 @@ describe("DesktopAgentRuntime subagents", () => {
     await runtime.dispose();
   });
 
-  it("aborts running delegates when the run ends or the runtime is disposed", async () => {
+  it("keeps running delegates after the parent run ends", async () => {
     const runtime = createRuntime({ subagents: [explorer] });
     subagentRuns.calls.length = 0;
     subagentRuns.instances.length = 0;
@@ -4934,15 +4943,101 @@ describe("DesktopAgentRuntime subagents", () => {
     const delegationId = (started.details as any).delegationId as string;
     expect((runtime as any).runningDelegations()).toHaveLength(1);
 
-    // agent_end (the run finishing) is the safety net: leftover delegates are
-    // stopped rather than left to work without a parent.
     await (runtime as any).handleAgentEvent({ type: "agent_end" });
+    expect((runtime as any).delegations.get(delegationId).status).toBe(
+      "running",
+    );
+    expect((runtime as any).runningDelegations()).toHaveLength(1);
+
+    subagentRuns.deferred = false;
+    await runtime.dispose();
+  });
+
+  it("aborts running delegates on user abort or dispose, not on parent idle", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const tool = taskTool(runtime);
+
+    const started = await tool.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    const delegationId = (started.details as any).delegationId as string;
+
+    await runtime.abort();
     await vi.waitFor(() => {
       expect((runtime as any).delegations.get(delegationId).status).toBe(
         "aborted",
       );
     });
     expect((runtime as any).runningDelegations()).toHaveLength(0);
+
+    subagentRuns.deferred = false;
+    await runtime.dispose();
+  });
+
+  it("feeds finished reports back after the parent run ends", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const tool = taskTool(runtime);
+    const prompt = vi.fn(async () => undefined);
+    const waitForIdle = vi.fn(async () => undefined);
+    (runtime as any).agent.prompt = prompt;
+    (runtime as any).agent.waitForIdle = waitForIdle;
+
+    await tool.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+
+    const resume = (runtime as any).resumeAfterDelegations();
+    subagentRuns.resolveRun!({
+      agentName: "explorer",
+      status: "completed",
+      report: "src/app.ts:12 misses the null check.",
+      turns: 2,
+      toolCalls: 3,
+    });
+    await resume;
+
+    expect(prompt).toHaveBeenCalledTimes(1);
+    const delivered = String(
+      (prompt.mock.calls as unknown as unknown[][])[0]?.[0] ?? "",
+    );
+    expect(delivered).toContain("src/app.ts:12 misses the null check.");
+    expect(delivered).toContain("Integrate their reports");
+
+    subagentRuns.deferred = false;
+    await runtime.dispose();
+  });
+
+  it("lists a heartbeat for a running delegate", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const task = taskTool(runtime);
+    const list = (runtime as any).agent.state.tools.find(
+      (candidate: { name: string }) => candidate.name === "TaskList",
+    );
+
+    const started = await task.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    const listed = await list.execute("list-1", {});
+    expect(listed.content[0].text).toContain("running");
+    expect(listed.content[0].text).toContain("explorer");
+    expect(listed.content[0].text).toContain(
+      (started.details as { delegationId: string }).delegationId,
+    );
 
     subagentRuns.deferred = false;
     await runtime.dispose();

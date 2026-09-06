@@ -17,7 +17,7 @@
 - [ ] 仅在确认问题存在之后才开始实现。
 - [ ] 若问题不存在：issue 已收到核实评论，结论明确时已关闭，无法定论时保持打开。
 - [ ] 确认的修复合并后：issue 已收到处理结果评论并已关闭。
-- [ ] 评论使用 issue 的原文语言，并以 AI 处理标记结尾（`Handled by AI.` 或 `本回复由 AI 处理。`）。
+- [ ] 评论使用 issue 的原文语言。
 - [ ] 未评论或关闭无关 issue。
 - [ ] 未从 issue 链接推断 git push。
 
@@ -176,6 +176,6 @@
 | 8 | 提交中没有秘密或本地数据 | [§4.4 永不提交](/zh-CN/spec/06-delivery/03-ai-development-workflow#44-never-commit) |
 | 9 | PR/MR 合并为 `main`；请求删除工作树和分支 | [R4 — 请求分支 + 工作树 + 合并门](/zh-CN/spec/06-delivery/03-ai-development-workflow#r4--request-branch--worktree--merge-gate) |
 | 10 | 磁盘上没有留下合并的工作树； `git worktree list` 没有该请求的过时条目 | [§6.1 合并清理清单](#61-merge-cleanup-checklist) |
-| 11 | 若链接了 GitHub issue：实现前已核实；以其原文语言评论并标明 AI 处理；结论明确时已关闭 | [R5 — 先核实链接的 GitHub issue](/zh-CN/spec/06-delivery/03-ai-development-workflow#r5--先核实链接的-github-issue再回复并关闭) |
+| 11 | 若链接了 GitHub issue：实现前已核实；以其原文语言评论；结论明确时已关闭 | [R5 — 先核实链接的 GitHub issue](/zh-CN/spec/06-delivery/03-ai-development-workflow#r5--先核实链接的-github-issue再回复并关闭) |
 
 如果任何一个门失败，则更改**未完成**。

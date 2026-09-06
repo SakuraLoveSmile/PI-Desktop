@@ -108,10 +108,10 @@ before the host sees the call (D273):
 
 Both spellings are optional in the schema and the runtime requires exactly one;
 a call naming neither fails with `INVALID_ARGUMENT`. When a call carries both,
-the canonical name wins. `Bash.timeout` accepts up to 3600000 in the schema so a
-millisecond value validates: a value of at least 1000 is read as milliseconds and
-converted to seconds, then clamped to the honoured 300-second ceiling. A value
-between 301 and 999 is still rejected as an out-of-range seconds value.
+the canonical name wins. `Bash.timeout` accepts up to 100000000 in the schema so a
+millisecond value validates: a value above the honoured 21,600-second ceiling
+is read as milliseconds and converted to seconds, then clamped to 21,600
+seconds (D273 / D329). In-range values, including 600 and 1800, are seconds.
 
 - For a durable `sessionId`, `workspaceRoot` is resolved from that session's
   persisted project binding. A path-less temporary session instead binds its
@@ -317,7 +317,7 @@ Host execution baseline:
 - A project-bound session workspace is required
 - Default cwd = the originating session's `workspaceRoot`
 - Confirmation required by default
-- Set a mandatory 60s timeout; accept only a bounded 1s–300s override
+- Set a mandatory 60s timeout; accept a 1s–21,600s override (D329)
 - Stream stdout and stderr separately, then return bounded final output
 - Truncate large output without mixing the two streams
 - No interactive TTY (MVP)

@@ -452,7 +452,7 @@ type ToolsExecuteParams = {
   expectedCommandShellId?: CommandShellId
   /** Bash only: dialect pinned by the same runtime turn. */
   expectedCommandShellDialect?: "powershell" | "cmd" | "posix"
-  /** Bash only: host default 60000; accepted override 1000..300000. */
+  /** Bash only: host default 60000; accepted override 1000..21600000. */
   timeoutMs?: number
 }
 ```

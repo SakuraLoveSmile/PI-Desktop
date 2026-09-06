@@ -34,7 +34,7 @@ Bash 输出通过了两个独立的上限。 **捕获**层限制了什么
 | Bash 捕获保留 (`CAPTURE_MAX_BYTES` / `CAPTURE_MAX_LINES`) | 512 KB，200000 行 | 停止保留；报告遗漏的字节和行 |
 | 溢出的完整输出（`SPILL_MAX_BYTES`） | 512 KB | 停止保留；标记仍然命名该文件 |
 | Bash 输出流 | 每个流序列 | 保留 stdout/stderr 分离 |
-| 重击超时 | 默认60秒； 1–300 秒覆盖 | 杀死进程树+错误 |
+| Bash 超时 | 默认 60 秒；1–21,600 秒覆盖 | 杀死进程树+错误 |
 | `Edit.ops` 负载 | 256 KB，200 个操作 | `INVALID_ARGUMENT`；更多 Edit 上限见 [18](/zh-CN/spec/03-runtime/18-line-anchored-edit-contract) §12 |
 
 被剪辑的行不是已显示的行。`Read` 会把每一条在 `MAX_LINE_CHARS` 处剪断的行
@@ -191,7 +191,7 @@ type GlobResult = { matches: string[]; count: number; truncated: boolean; notice
 - [x] 捕获上限高于结果预算，因此溢出的副本可以
   比它支持的摘录更完整，并报告它省略的字节和行
 - [ ] stdout 和 stderr 分别使用稳定的每个工具序列值进行流传输
-- [ ] Bash 使用 60 秒默认值并拒绝 1-300 秒之外的覆盖
+- [ ] Bash 使用 60 秒默认值并拒绝 1–21,600 秒之外的覆盖
 - [ ] timeout/abort 停止完整的进程树并且不再发出后续块
 - [ ] 超大并行结果批次压缩为有界标记尾部，
   重新启动后仍然存在，并保持原始成绩单结果不变

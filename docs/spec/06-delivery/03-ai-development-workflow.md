@@ -94,9 +94,6 @@ unambiguous issue number for this repository.
   resolution and close the issue.
 - Write the GitHub comment in the language of the original issue title and
   body. Code, commits, specs, and other repository documentation stay English.
-- End every such comment with an explicit AI-handled marker:
-  - English issues: `Handled by AI.`
-  - Chinese issues: `本回复由 AI 处理。`
 - An issue link authorizes commenting on and closing **that** issue only. It
   does not authorize a git push. Remote publishing remains opt-in per R4 and
   `AGENTS.md`.
@@ -145,7 +142,7 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 
 | Step | Action | Output |
 |---|---|---|
-| **0. Issue verify** | When a GitHub issue is linked, fetch it and independently verify that the reported problem exists. Stop here (comment, and close only if conclusive) when it does not. | Verified issue, or an AI-handled comment and close/leave-open decision. |
+| **0. Issue verify** | When a GitHub issue is linked, fetch it and independently verify that the reported problem exists. Stop here (comment, and close only if conclusive) when it does not. | Verified issue, or a comment and close/leave-open decision. |
 | **1. Branch + worktree** | Preserve existing work, update from `origin/main`, and create a dedicated request branch in a dedicated worktree. Reuse the primary checkout's environment where safe. | Isolated task files on current `main` with a consistent development environment. |
 | **2. Read** | Read `00-baseline.md` and any specs relevant to the change area. | Mental model of constraints. |
 | **3. Plan** | Describe the intended change. List every spec, ADR, and e2e scenario that will need updates, and assess whether local validation is necessary. | Change plan + impact and validation list. |
@@ -370,8 +367,8 @@ A change is **Done** when all of the following are true:
 9. The branch was pushed and its PR/MR was reviewed and merged into `main`.
 10. The request worktree was removed and the merged request branch was deleted.
 11. If a GitHub issue was linked: the claim was verified before implementation;
-    the issue received a comment in its language with the AI-handled marker;
-    and the issue was closed when the outcome was conclusive.
+    the issue received a comment in its language; and the issue was closed when
+    the outcome was conclusive.
 
 ### Release / version-tag gate
 
@@ -408,7 +405,7 @@ D164, and D260. GitHub release notes are not a substitute.
 | Committing generated artifacts that CI should rebuild | Repo bloat, merge conflicts |
 | Mixing multiple logical changes in one commit without clear message | Loss of history granularity |
 | Implementing a linked GitHub issue without verifying the problem exists | Violates R5; wastes work on invalid or already-fixed claims |
-| Closing a linked GitHub issue without an AI-handled comment in the issue language | Violates R5; leaves no public record of the AI outcome |
+| Closing a linked GitHub issue without a comment in the issue language | Violates R5; leaves no public record of the outcome |
 | Tagging a stable app release without updating `packages/shared/src/changelog.ts` (EN + zh-CN) | Violates D164 / release runbook; in-app What's new is empty for that version |
 | Tagging a stable app release while `README.md` / `README.zh-CN.md` still state an older release line, or bypassing `scripts/check-release-docs.mjs` with `--skip-docs-check` | Violates D260 / release runbook; published documentation advertises a version the release no longer matches |
 
@@ -437,6 +434,5 @@ This workflow spec itself is accepted when:
 - [ ] Forbidden practices list covers known risk areas.
 - [ ] `AGENTS.md` points to this doc, `04-e2e-test-plan.md`, and `05-change-checklist.md`.
 - [ ] Linked GitHub issues are verified before implementation, then commented
-      on in the issue language with an AI-handled marker and closed when
-      conclusive.
+      on in the issue language and closed when conclusive.
 - [ ] All indexes updated (NAV, delivery README, spec README, docs README, BOARD).

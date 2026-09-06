@@ -3466,13 +3466,14 @@ IPC 请求无法关闭。
   主机时钟是可观察的。
 - **步骤**：1) 在没有超时覆盖的情况下运行。 2) 观察60秒
   截止日期。 3) 以范围内超驰运行。 4) 提交零、负数和
-  超过 300 秒的覆盖。
+  超过 21,600 秒的覆盖。
 - **预期**：缺少超时正好使用 60 秒并返回
   进程树关闭后的 `TOOL_TIMEOUT`。范围内的值起作用
-  1–300 秒；超出范围的值将无法验证并且永远不会生成。
+  1–21,600 秒；超出范围的值将无法验证并且永远不会生成。
 - **链接规格**：`03-runtime/03-tools-and-permissions.md`，
   `03-runtime/06-host-rpc-protocol.md`、`03-runtime/08-error-codes.md`、
-  `03-runtime/16-tool-result-limits.md`、`05-security/01-security.md`、ADR 0054
+  `03-runtime/16-tool-result-limits.md`、`05-security/01-security.md`、ADR 0054、
+  ADR 0167
 - **验收**：E（工具）、H（诊断）、安全
 - **里程碑**：M6
 - **状态**：自动（2026-08-04 通过）：长时间超时 `test:e2e:plan`

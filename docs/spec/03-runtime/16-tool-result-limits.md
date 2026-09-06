@@ -34,7 +34,7 @@ copy could never be fuller than the excerpt it exists to back.
 | Bash capture retention (`CAPTURE_MAX_BYTES` / `CAPTURE_MAX_LINES`) | 512 KB, 200000 lines | stop retaining; report omitted bytes and lines |
 | spilled full output (`SPILL_MAX_BYTES`) | 512 KB | stop retaining; marker still names the file |
 | Bash output stream | per-stream sequence | preserve stdout/stderr separation |
-| Bash timeout | 60s default; 1–300s override | kill process tree + error |
+| Bash timeout | 60s default; 1–21,600s override | kill process tree + error |
 | `Edit.ops` payload | 256 KB, 200 ops | `INVALID_ARGUMENT`; further Edit caps in [18](18-line-anchored-edit-contract.md) §12 |
 
 A clipped line is not a displayed line. `Read` excludes every line it cut at
@@ -201,7 +201,7 @@ counts are the stable signals. The UI truncated chip follows `truncated`.
 - [x] the capture ceiling sits above the result budget, so a spilled copy can be
   fuller than the excerpt it backs, and reports the bytes and lines it omitted
 - [ ] stdout and stderr stream separately with stable per-tool sequence values
-- [ ] Bash uses the 60s default and rejects an override outside 1–300s
+- [ ] Bash uses the 60s default and rejects an override outside 1–21,600s
 - [ ] timeout/abort stops the complete process tree and emits no later chunks
 - [ ] an oversized parallel result batch compacts to a bounded marked tail,
   survives restart, and leaves the original transcript results unchanged

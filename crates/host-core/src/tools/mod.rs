@@ -33,7 +33,7 @@ pub const CAPTURE_MAX_BYTES: usize = SPILL_MAX_BYTES;
 pub const CAPTURE_MAX_LINES: usize = 200_000;
 pub const MAX_TIMEOUT_MS: u64 = 2_147_483_647;
 pub const MIN_BASH_TIMEOUT_MS: u64 = 1_000;
-pub const MAX_BASH_TIMEOUT_MS: u64 = 300_000;
+pub const MAX_BASH_TIMEOUT_MS: u64 = 21_600_000;
 pub const DEFAULT_BASH_TIMEOUT_MS: u64 = 60_000;
 pub const INTERNAL_TOOL_RUNNER_FLAG: &str = "--internal-tool-runner";
 const PIPE_DRAIN_TIMEOUT: Duration = Duration::from_millis(750);
@@ -2621,7 +2621,7 @@ mod tests {
     }
 
     #[test]
-    fn bash_timeout_accepts_one_through_three_hundred_seconds() {
+    fn bash_timeout_accepts_one_through_six_hour_bound() {
         assert!(validate_bash_timeout_ms(MIN_BASH_TIMEOUT_MS).is_ok());
         assert!(validate_bash_timeout_ms(MAX_BASH_TIMEOUT_MS).is_ok());
         assert!(validate_bash_timeout_ms(MIN_BASH_TIMEOUT_MS - 1).is_err());

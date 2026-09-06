@@ -22,19 +22,15 @@ until the reported problem has been independently verified.
    - Feature or improvement: confirm the requested behavior is actually missing
      or incomplete, and in scope.
 3. If the problem does **not** exist (already fixed, invalid, or a
-   misunderstanding): comment on the issue with the verification evidence, mark
-   the comment as AI-handled, and close the issue when the conclusion is
-   clear. If verification is inconclusive, comment with what was tried and
-   leave the issue open.
+   misunderstanding): comment on the issue with the verification evidence, and
+   close the issue when the conclusion is clear. If verification is
+   inconclusive, comment with what was tried and leave the issue open.
 4. If the problem **does** exist: follow the isolated development workflow,
    implement the smallest coherent fix, merge into local `main`, then comment
    on the issue and close it.
 5. Write the issue comment in the issue's language (the language of the
    original title and body). Repository docs, code, and commits stay English.
-6. End every issue comment with an explicit AI-handled marker:
-   - English issues: `Handled by AI.`
-   - Chinese issues: `本回复由 AI 处理。`
-7. An issue link authorizes commenting on and closing **that** issue. It does
+6. An issue link authorizes commenting on and closing **that** issue. It does
    not authorize a git push. Remote publishing remains opt-in.
 
 Do not comment on or close unrelated issues. Do not reopen a closed issue
@@ -286,8 +282,8 @@ See:
 * [ ] Remote publishing was skipped unless explicitly requested
 * [ ] If pushed, the remote, branch, commit set, and Git identity were verified
 * [ ] If the request included a GitHub issue: the claim was verified before
-      implementation; the issue was commented on in its language, marked as
-      AI-handled, and closed when the outcome was conclusive
+      implementation; the issue was commented on in its language and closed
+      when the outcome was conclusive
 
 ## Final Report
 

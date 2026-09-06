@@ -229,11 +229,9 @@ const MAX_RETAINED_DELEGATIONS = 100;
 /**
  * `TaskWait` blocks the turn, and the model picks the timeout, so the ceiling
  * is what bounds how long a session can look hung with no way to intervene.
- * Expiry is not a failure — the delegates keep running and the wait returns the
- * finished reports plus a note to call again — so a shorter ceiling costs one
- * cheap round-trip and buys the user a responsive Stop. A hung delegate is not
- * this timeout's job: `DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS` is deliberately
- * shorter, so real silence settles as `timed_out` inside one wait.
+ * Expiry is not a failure and does not stop the delegates (D328) — the wait
+ * returns a heartbeat plus any finished reports, and the runtime delivers the
+ * rest when they finish even if the parent already stopped calling tools.
  */
 const TASKWAIT_DEFAULT_TIMEOUT_SECONDS = 600;
 const TASKWAIT_MAX_TIMEOUT_SECONDS = 900;
@@ -265,6 +263,10 @@ export type DelegationRecord = {
   /** True when `TaskStop` asked for this stop, so an aborted run reads as
    * `stopped` rather than `aborted`. */
   stopRequested: boolean;
+  turns: number;
+  toolCalls: number;
+  lastToolName?: string;
+  lastActivityAt: number;
 };
 
 function delegationSummary(record: DelegationRecord): Record<string, unknown> {
@@ -273,16 +275,35 @@ function delegationSummary(record: DelegationRecord): Record<string, unknown> {
     agent: record.agentName,
     status: record.status,
     startedAt: record.startedAt,
+    turns: record.result?.turns ?? record.turns,
+    toolCalls: record.result?.toolCalls ?? record.toolCalls,
+    ...(record.lastToolName ? { lastToolName: record.lastToolName } : {}),
     ...(record.completedAt ? { completedAt: record.completedAt } : {}),
-    ...(record.result
-      ? {
-          turns: record.result.turns,
-          toolCalls: record.result.toolCalls,
-          ...(record.result.error ? { error: record.result.error } : {}),
-        }
-      : {}),
+    ...(record.result?.error ? { error: record.result.error } : {}),
   };
 }
+
+function elapsedSeconds(record: DelegationRecord, now = Date.now()): number {
+  const end = record.completedAt ?? now;
+  return Math.max(1, Math.round((end - record.startedAt) / 1000));
+}
+
+function formatDelegationHeartbeat(record: DelegationRecord): string {
+  const parts = [
+    `${record.agentName} (${record.delegationId})`,
+    record.status,
+    `${elapsedSeconds(record)}s`,
+  ];
+  const turns = record.result?.turns ?? record.turns;
+  const toolCalls = record.result?.toolCalls ?? record.toolCalls;
+  if (turns > 0) parts.push(`${turns} turns`);
+  if (toolCalls > 0) parts.push(`${toolCalls} tool calls`);
+  if (record.lastToolName) parts.push(`last tool ${record.lastToolName}`);
+  return parts.join(", ");
+}
+
+const DELEGATION_RESUME_PROMPT =
+  "The following subagents have finished. Integrate their reports and continue the user's original task. Call TaskStop only if you have decided a still-running delegate should not continue.";
 
 /** Join delegation results into one bounded text block for the model. */
 function formatDelegationResults(
@@ -740,15 +761,14 @@ function safeJson(value: unknown): string {
 }
 
 const MIN_COMMAND_TIMEOUT_SECONDS = 1;
-const MAX_COMMAND_TIMEOUT_SECONDS = 300;
+/** Host safety bound so every spawn still has a finite deadline (D329). */
+const MAX_COMMAND_TIMEOUT_SECONDS = 21_600;
 /**
  * Schema ceiling for `Bash.timeout`, not an honoured duration. It has to admit
- * the millisecond values models actually send — one local month topped out at
- * 1_800_000 — so the runtime can read the intent as seconds and clamp it to
- * {@link MAX_COMMAND_TIMEOUT_SECONDS} (D273). An hour is the round bound above
- * every value observed.
+ * millisecond values models send, then the runtime reads those as seconds and
+ * clamps to {@link MAX_COMMAND_TIMEOUT_SECONDS} (D273 / D329).
  */
-const MAX_ACCEPTED_COMMAND_TIMEOUT = 3_600_000;
+const MAX_ACCEPTED_COMMAND_TIMEOUT = 100_000_000;
 /**
  * Argument names models reach for instead of ours, mapped to the canonical
  * name. Every strong model has `file_path`/`query` burned in from pretraining
@@ -815,7 +835,7 @@ function commandShellToolDescription(
     "The protocol tool remains named Bash for compatibility; write commands for the active shell dialect.",
     shellSyntaxGuidance(shell),
     `The session scratch directory variable is ${shellScratchVariable(shell)}.`,
-    "An optional timeout from 1 to 300 seconds may be supplied; without it, the command defaults to a 60-second timeout.",
+    `An optional timeout from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS} seconds may be supplied; without it, the command defaults to a 60-second timeout.`,
     ...(scratchDir ? [`The session scratch directory is ${scratchDir}.`] : []),
   ].join(" ");
 }
@@ -865,14 +885,13 @@ function requireAliasedParams(toolName: string, params: unknown): void {
 function normalizeToolParams(toolName: string, params: unknown): unknown {
   if (!isRecord(params)) return params;
   const aliases = TOOL_PARAM_ALIASES[toolName];
-  // Only a value of at least 1000 reads as milliseconds. Something like 301 is
-  // far more likely a seconds value that overshot the cap, and rewriting it to
-  // 0.301s would be worse than the error it currently earns.
+  // A value above the honoured seconds ceiling is the millisecond habit (D273 /
+  // D329). In-range values, including 600 and 1800, are seconds the agent chose.
   const timeoutIsMs =
     toolName === "Bash" &&
     typeof params.timeout === "number" &&
     Number.isFinite(params.timeout) &&
-    params.timeout >= 1000;
+    params.timeout > MAX_COMMAND_TIMEOUT_SECONDS;
   const aliased = aliases
     ? Object.keys(aliases).filter((alias) => params[alias] !== undefined)
     : [];
@@ -886,8 +905,7 @@ function normalizeToolParams(toolName: string, params: unknown): unknown {
     delete next[alias];
   }
   if (timeoutIsMs) {
-    // A timeout above the 300-second ceiling is only ever milliseconds: the
-    // schema rejects it as seconds, so there is no reading to preserve.
+    // Above the honoured seconds ceiling is milliseconds (D273 / D329).
     next.timeout = Math.min(
       MAX_COMMAND_TIMEOUT_SECONDS,
       Math.max(
@@ -1162,6 +1180,8 @@ export class DesktopAgentRuntime {
    * returns; `TaskWait`/`TaskList`/`TaskStop` drive it afterwards.
    */
   private delegations = new Map<string, DelegationRecord>();
+  /** Set by `abort` / `dispose` so a finishing delegate cannot restart the parent. */
+  private runCancelled = false;
   /**
    * Permission scope of the delegate currently executing one tool call,
    * keyed by tool call id (ADR 0089). The host reads it on `tools.execute` and
@@ -1330,7 +1350,7 @@ Use the Task tool when:
 Delegation rules:
 - Task returns immediately with a delegation id. Do not sit idle: keep working on your own independent line, then converge with TaskWait (mode="any" + minCompleted to converge early) when you need results, TaskList to check progress, TaskStop to stop.
 - Always fill Task's \`description\` so the user sees what each subagent is doing. Integrate findings and say which subagent produced what.
-- Never end the turn with subagents still running: wait for or stop them.
+- You may talk to the user while subagents run. Do not TaskStop unless you have decided the work should not continue. The runtime keeps them alive and delivers their reports when they finish — ending your turn does not abort them.
 - Never delegate what you can finish in a couple of tool calls, and never delegate anything that needs the user.`,
             ...(this.subagentModelSummary()
               ? [this.subagentModelSummary()!]
@@ -1901,12 +1921,11 @@ Delegation rules:
         timeout: Type.Optional(
           Type.Number({
             minimum: MIN_COMMAND_TIMEOUT_SECONDS,
-            // The honoured ceiling is 300 seconds, but models routinely send
-            // milliseconds; a wider schema bound lets the runtime read the
-            // intent instead of burning the turn (D273).
+            // Models routinely send milliseconds; a wider schema bound lets the
+            // runtime read the intent instead of burning the turn (D273 / D329).
             maximum: MAX_ACCEPTED_COMMAND_TIMEOUT,
             description:
-              "Optional command timeout in seconds from 1 to 300; defaults to 60 seconds.",
+              `Optional command timeout in seconds from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS}; defaults to 60 seconds.`,
           }),
         ),
       },
@@ -2698,7 +2717,7 @@ Delegation rules:
         "Use it when the work is separable: parallel exploration of independent directions (one Task per direction in the same assistant message), a multi-file implementation with a complete spec (fixer), an adversarial read-only review of a change you just made (code-reviewer), or a wide search / long log / multi-file survey whose intermediate output would otherwise fill this context (explorer, test-runner).",
         "Do not delegate what you can finish in a couple of tool calls, and do not delegate anything that needs the user — a subagent cannot ask a question or propose a plan on your behalf.",
         "`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.",
-        "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time. Never end the turn with subagents still running: wait for them with TaskWait or stop them with TaskStop.",
+        "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time. You may keep working or talk to the user while they run; the runtime delivers their reports when they finish. Call TaskStop only to cancel.",
         `Available subagents:\n${catalog}`,
       ].join("\n\n"),
       parameters: Type.Object({
@@ -2725,7 +2744,7 @@ Delegation rules:
       // Set in `rebuildToolCatalog`, which owns every execution mode; repeated
       // here so the intent survives a tool built outside that path.
       executionMode: "parallel",
-      execute: async (toolCallId, params, signal) => {
+      execute: async (toolCallId, params) => {
         const requested = isRecord(params) ? String(params.agent ?? "") : "";
         const definition = this.subagents.find(
           (candidate) => candidate.name === normalizeSubagentName(requested),
@@ -2803,10 +2822,10 @@ Delegation rules:
         // immediately with a delegation id, and TaskWait converges later.
         const delegationId = randomUUID();
         const controller = new AbortController();
-        // Aborts when the parent run aborts OR when TaskStop asks for it.
-        const abortSignal = signal
-          ? AbortSignal.any([signal, controller.signal])
-          : controller.signal;
+        // Only TaskStop, user Stop, and dispose abort a delegate (D328). The
+        // Task tool call returns immediately; tying the background run to that
+        // call's signal would kill it when the parent loop idled.
+        const abortSignal = controller.signal;
         let resolveCompletion: () => void = () => {};
         const completion = new Promise<void>((resolve) => {
           resolveCompletion = resolve;
@@ -2820,6 +2839,9 @@ Delegation rules:
           resolveCompletion,
           abort: () => controller.abort(),
           stopRequested: false,
+          turns: 0,
+          toolCalls: 0,
+          lastActivityAt: startedAt,
         };
         this.delegations.set(delegationId, record);
         const scopedTools = this.scopeDelegateTools(tools, definition);
@@ -2839,7 +2861,10 @@ Delegation rules:
             guidance: this.subagentGuidance(definition),
           }),
           tools: scopedTools,
-          onEvent: this.onEvent,
+          onEvent: (envelope) => {
+            this.noteDelegationActivity(record, envelope);
+            this.onEvent(envelope);
+          },
           // A host failure inside a delegate reaches its tool-error channel
           // through the same bookkeeping the parent uses.
           resolveToolOutcome: (context) => this.afterToolCall(context),
@@ -2964,10 +2989,68 @@ Delegation rules:
     );
   }
 
-  /** Abort every running delegation (turn end, parent abort, dispose). */
+  /** Abort every running delegation (user Stop, dispose, not parent idle). */
   private abortRunningDelegations(): void {
     for (const record of this.runningDelegations()) {
       record.abort();
+    }
+  }
+
+  private noteDelegationActivity(
+    record: DelegationRecord,
+    envelope: AgentEventEnvelope,
+  ): void {
+    record.lastActivityAt = Date.now();
+    const event = envelope.event;
+    if (event.type === "turn_start") {
+      record.turns += 1;
+      return;
+    }
+    if (event.type === "tool_start") {
+      record.toolCalls += 1;
+      record.lastToolName = event.toolName;
+    }
+  }
+
+  /**
+   * Keep the parent turn open until running delegates finish, then feed their
+   * reports back so the main agent can continue (D328). User Stop / dispose
+   * set `runCancelled` and abort the delegates instead.
+   */
+  private async resumeAfterDelegations(): Promise<void> {
+    while (
+      !this.disposed &&
+      !this.runCancelled &&
+      this.runningDelegations().length > 0
+    ) {
+      const targets = this.runningDelegations();
+      await this.waitForDelegations(targets, targets.length, null);
+      if (this.disposed || this.runCancelled) return;
+      const settled = targets.filter((record) => record.status !== "running");
+      if (settled.length === 0) return;
+      const results = settled.map((record) => ({
+        delegationId: record.delegationId,
+        agent: record.agentName,
+        status: record.status,
+        report:
+          record.result?.report ?? `(${record.status} without a report)`,
+      }));
+      const still = this.runningDelegations();
+      const heartbeat =
+        still.length > 0
+          ? `Still running:\n${still.map(formatDelegationHeartbeat).join("\n")}`
+          : "";
+      const text = [
+        DELEGATION_RESUME_PROMPT,
+        formatDelegationResults(results),
+        heartbeat,
+      ]
+        .filter((part) => part.trim())
+        .join("\n\n");
+      this.requestStartedAt = Date.now();
+      await this.agent.prompt(text);
+      await this.agent.waitForIdle();
+      if (!(await this.runPendingRecoveries())) return;
     }
   }
 
@@ -2977,7 +3060,7 @@ Delegation rules:
       name: SUBAGENT_WAIT_TOOL_NAME,
       label: "Task Wait",
       description:
-        "Wait for one or more subagents started by Task and return their reports. `delegationIds` defaults to every running subagent; use mode \"any\" with `minCompleted` to converge as soon as the first (or first N) finish. Settled delegations return immediately, so re-reading a report by id is cheap. Never end the turn with subagents still running: wait for or stop them.",
+        "Wait for one or more subagents started by Task and return their reports. `delegationIds` defaults to every running subagent; use mode \"any\" with `minCompleted` to converge as soon as the first (or first N) finish. Settled delegations return immediately, so re-reading a report by id is cheap. A wait timeout is not a failure: unfinished delegates keep working and the runtime delivers their reports when they finish.",
       parameters: Type.Object({
         delegationIds: Type.Optional(
           Type.Array(
@@ -3057,10 +3140,15 @@ Delegation rules:
           ...(record.completedAt ? { completedAt: record.completedAt } : {}),
           ...(record.result?.error ? { error: record.result.error } : {}),
           report:
-            record.result?.report ?? `(${record.status} without a report)`,
+            record.status === "running"
+              ? formatDelegationHeartbeat(record)
+              : (record.result?.report ?? `(${record.status} without a report)`),
         }));
         const note = timedOut
-          ? `Still running after ${timeoutSeconds}s: ${results.filter((r) => r.status !== "running").length}/${targets.length} finished. This is not a failure and the unfinished delegates keep working — call TaskWait again with the remaining delegationIds, or TaskList to see progress.`
+          ? `Still running after ${timeoutSeconds}s: ${results.filter((r) => r.status !== "running").length}/${targets.length} finished. This is not a failure — unfinished delegates keep working and the runtime will deliver their reports when they finish. Call TaskStop only to cancel.\n${targets
+              .filter((record) => record.status === "running")
+              .map(formatDelegationHeartbeat)
+              .join("\n")}`
           : mode === "any"
             ? `Converged after ${results.filter((r) => r.status !== "running").length} of ${targets.length} finished.`
             : undefined;
@@ -3088,11 +3176,12 @@ Delegation rules:
   /**
    * Resolve once `targetCompleted` of the targets are settled, or the deadline
    * passes, or the calling run aborts. Returns true on timeout/abort.
+   * `deadline` null waits until they settle (D328 auto-resume).
    */
   private waitForDelegations(
     targets: DelegationRecord[],
     targetCompleted: number,
-    deadline: number,
+    deadline: number | null,
     signal?: AbortSignal,
   ): Promise<boolean> {
     const settledCount = () =>
@@ -3103,7 +3192,7 @@ Delegation rules:
       const finish = (timedOut: boolean) => {
         if (done) return;
         done = true;
-        clearTimeout(timer);
+        if (timer !== undefined) clearTimeout(timer);
         signal?.removeEventListener("abort", onAbort);
         resolve(timedOut);
       };
@@ -3117,10 +3206,10 @@ Delegation rules:
       }
       const onAbort = () => finish(true);
       signal?.addEventListener("abort", onAbort, { once: true });
-      const timer = setTimeout(
-        () => finish(true),
-        Math.max(0, deadline - Date.now()),
-      );
+      const timer =
+        deadline === null
+          ? undefined
+          : setTimeout(() => finish(true), Math.max(0, deadline - Date.now()));
     });
   }
 
@@ -3141,10 +3230,7 @@ Delegation rules:
           delegations.length === 0
             ? "No subagents have been started in this session."
             : delegations
-                .map(
-                  (record) =>
-                    `- ${record.delegationId} ${record.agentName}: ${record.status}${record.completedAt ? ` (${Math.round((record.completedAt - record.startedAt) / 1000)}s)` : ""}`,
-                )
+                .map((record) => `- ${formatDelegationHeartbeat(record)}`)
                 .join("\n");
         return {
           content: [{ type: "text", text }],
@@ -5025,7 +5111,8 @@ Delegation rules:
         if (
           this.suppressOverflowRunEnd ||
           this.suppressProviderRetryRunEnd ||
-          this.suppressSilentTurnRunEnd
+          this.suppressSilentTurnRunEnd ||
+          (this.runningDelegations().length > 0 && !this.runCancelled)
         )
           break;
         this.emit({ type: "turn_end" });
@@ -5034,14 +5121,11 @@ Delegation rules:
         if (
           this.suppressOverflowRunEnd ||
           this.suppressProviderRetryRunEnd ||
-          this.suppressSilentTurnRunEnd
+          this.suppressSilentTurnRunEnd ||
+          (this.runningDelegations().length > 0 && !this.runCancelled)
         )
           break;
         this.reportMutationTermination();
-        // Delegation converges inside the turn (ADR 0089): a delegate still
-        // running when the run ends is a prompt violation, and the safety net
-        // is to stop it rather than let it work on without a parent.
-        this.abortRunningDelegations();
         this.emit({
           type: "agent_end",
           messageIds: [],
@@ -5189,6 +5273,7 @@ Delegation rules:
     this.turnId = durableTurnId;
     this.pendingUserMessageId = undefined;
     this.gracefulStopRequested = false;
+    this.runCancelled = false;
     this.resetRunRecoveryState();
     this.currentAssistant = undefined;
     this.requestStartedAt = Date.now();
@@ -5236,7 +5321,8 @@ Delegation rules:
     // Same recovery contract as a user prompt: a plan execution that overflows,
     // hits a retriable stream failure, or comes back silent must not end as a
     // run with no end events at all.
-    await this.runPendingRecoveries();
+    if (!(await this.runPendingRecoveries())) return { turnId: this.turnId };
+    await this.resumeAfterDelegations();
     return { turnId: this.turnId };
   }
 
@@ -5250,6 +5336,7 @@ Delegation rules:
     this.hostTurnId = nextTurnId;
     this.turnId = nextTurnId;
     this.gracefulStopRequested = false;
+    this.runCancelled = false;
     // Capabilities and path-scoped instruction claims belong to one prompt.
     this.resetDeferredToolsForPrompt();
     this.pathInstructionClaims.clear();
@@ -5295,6 +5382,7 @@ Delegation rules:
       await this.agent.waitForIdle();
 
       if (!(await this.runPendingRecoveries())) return { turnId: this.turnId };
+      await this.resumeAfterDelegations();
     } catch (err) {
       const classifiedError = classifyAgentError(err);
       const diagnosticError =
@@ -5319,6 +5407,7 @@ Delegation rules:
 
   async abort(): Promise<void> {
     this.gracefulStopRequested = false;
+    this.runCancelled = true;
     this.resolvePendingAskTools();
     this.abortRunningDelegations();
     this.agent.abort();
@@ -5338,7 +5427,10 @@ Delegation rules:
   getStatus(): AgentStatus {
     return {
       sessionId: this.sessionId,
-      isRunning: this.agent.state.isStreaming || this.compactionInProgress,
+      isRunning:
+        this.agent.state.isStreaming ||
+        this.compactionInProgress ||
+        this.runningDelegations().length > 0,
       currentTurnId: this.turnId,
       modelId: this.provider.modelId,
       pendingToolConfirmations: 0,
@@ -5349,6 +5441,7 @@ Delegation rules:
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.runCancelled = true;
     this.resolvePendingAskTools();
     this.abortRunningDelegations();
     this.pathInstructionClaims.clear();
