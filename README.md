@@ -221,8 +221,8 @@ This project was created by the models below — not by a lone genius, but by a 
 | xAI | `grok-4.6` | 797,233,571 |
 | DeepSeek | `deepseek-v4-flash` | 329,790,234 |
 | OpenAI | `gpt-5.2-codex` | 320,983,170 |
+| Xiaomi | `mimo-v2.5-pro` | 304,822,052 |
 | Anthropic | `claude-fable-5-1` | 302,580,552 |
-| Xiaomi | `mimo-v2.5-pro` | 293,575,842 |
 | OpenAI | `gpt-5.6-terra` | 274,107,085 |
 | OpenAI | `gpt-5.3-codex` | 255,366,945 |
 | OpenAI | `gpt-5.1-codex-max` | 220,947,212 |
@@ -232,7 +232,6 @@ This project was created by the models below — not by a lone genius, but by a 
 | Zhipu | `stealth/ox-alpha` | 22,954,876 |
 | Anthropic | `claude-fable-5` | 16,116,907 |
 | OpenAI | `gpt-5.1-codex-mini` | 12,895,478 |
-| Xiaomi | `mimo-v2.5-pro-think` | 11,246,210 |
 | Xiaohongshu | `dots-3-note-prev` | 10,166,895 |
 | OpenAI | `gpt-5.1-codex` | 3,916,509 |
 | Xiaomi | `mimo-v2.5` | 3,785,071 |
