@@ -93,7 +93,7 @@ replace an artifact.
   unavailable, catalog resolution intentionally falls back to the first
   available platform shell; each turn pins its effective ID/dialect and the
   host rejects a changed pin before spawn with `COMMAND_SHELL_CHANGED`.
-- Timeouts are mandatory: 60s default with a 1–300s bounded override. Output
+- Timeouts are mandatory: 60s default with a 1–21,600s bounded override (D329). Output
   streams as separate stdout/stderr channels and is truncated at 96KB / 4000
   lines with an explicit `[truncated: …]` marker that names which end survived
   (see [16-tool-result-limits](../03-runtime/16-tool-result-limits.md))

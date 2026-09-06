@@ -883,9 +883,8 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect((bash.parameters as any).properties.timeout).toMatchObject({
       type: "number",
       minimum: 1,
-      // Accepts a millisecond value so the runtime can read it as seconds; the
-      // honoured ceiling stays 300 seconds (D273).
-      maximum: 3_600_000,
+      // Accepts a millisecond value so the runtime can read it as seconds.
+      maximum: 100_000_000,
     });
     expect(runtimeMatches(runtime, { commandShell: powershell })).toBe(true);
     expect(runtimeMatches(runtime, { commandShell })).toBe(false);
@@ -941,13 +940,18 @@ describe("DesktopAgentRuntime configuration matching", () => {
       "tools.execute",
       expect.objectContaining({ timeoutMs: 1_000 }),
     );
-    await bash.execute("bash-max", { command: "printf max", timeout: 300 });
+    await bash.execute("bash-max", { command: "printf max", timeout: 21_600 });
     expect(host.call).toHaveBeenLastCalledWith(
       "tools.execute",
-      expect.objectContaining({ timeoutMs: 300_000 }),
+      expect.objectContaining({ timeoutMs: 21_600_000 }),
+    );
+    await bash.execute("bash-half-hour", { command: "printf half", timeout: 1_800 });
+    expect(host.call).toHaveBeenLastCalledWith(
+      "tools.execute",
+      expect.objectContaining({ timeoutMs: 1_800_000 }),
     );
 
-    for (const timeout of [Number.NaN, Number.POSITIVE_INFINITY, 0.999, 300.001]) {
+    for (const timeout of [Number.NaN, Number.POSITIVE_INFINITY, 0.999]) {
       await expect(
         bash.execute(`bash-invalid-${String(timeout)}`, {
           command: "printf invalid",
@@ -955,7 +959,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
         }),
       ).rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
     }
-    expect(host.call).toHaveBeenCalledTimes(2);
+    expect(host.call).toHaveBeenCalledTimes(3);
     await runtime.dispose();
   });
 
@@ -974,22 +978,27 @@ describe("DesktopAgentRuntime configuration matching", () => {
       expect.objectContaining({ timeoutMs: 120_000 }),
     );
 
-    // Above the ceiling once converted: honour the intent, apply the cap.
-    await bash.execute("bash-ms-over", {
+    // 30 minutes in milliseconds: honour as 1800 seconds, no longer clamped to 300.
+    await bash.execute("bash-ms-half-hour", {
       command: "printf over",
       timeout: 1_800_000,
     });
     expect(host.call).toHaveBeenLastCalledWith(
       "tools.execute",
-      expect.objectContaining({ timeoutMs: 300_000 }),
+      expect.objectContaining({ timeoutMs: 1_800_000 }),
     );
 
-    // Just over the cap is a seconds value that overshot, not milliseconds.
-    await expect(
-      bash.execute("bash-over-cap", { command: "printf cap", timeout: 301 }),
-    ).rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
+    // Above the honoured seconds ceiling once converted: clamp.
+    await bash.execute("bash-ms-over", {
+      command: "printf over",
+      timeout: 30_000_000,
+    });
+    expect(host.call).toHaveBeenLastCalledWith(
+      "tools.execute",
+      expect.objectContaining({ timeoutMs: 21_600_000 }),
+    );
 
-    expect(host.call).toHaveBeenCalledTimes(2);
+    expect(host.call).toHaveBeenCalledTimes(3);
     await runtime.dispose();
   });
 

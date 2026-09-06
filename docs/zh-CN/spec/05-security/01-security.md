@@ -96,7 +96,7 @@ Plan 本身并不是工作区安全边界。主机核解决了
   不可用，目录分辨率故意回退到第一个
   可用的平台外壳；每转引脚其有效 ID/dialect 和
   主机在生成前使用 `COMMAND_SHELL_CHANGED` 拒绝更改的引脚。
-- 超时是强制性的：默认为 60 秒，可覆盖 1-300 秒。输出
+- 超时是强制性的：默认为 60 秒，可覆盖 1–21,600 秒（D329）。输出
   作为单独的 stdout/stderr 通道进行流传输，并被截断为 96KB / 4000
   行，带有标明哪一端幸存的显式 `[truncated: …]` 标记
   （见 [16-tool-result-limits](/zh-CN/spec/03-runtime/16-tool-result-limits)）

@@ -4199,14 +4199,15 @@ Each scenario is documented in this format:
 - **Preconditions**: A selected shell can run a command longer than 60 seconds;
   host clock is observable.
 - **Steps**: 1) Run without a timeout override. 2) Observe the 60-second
-  deadline. 3) Run with an in-range override. 4) Submit zero, negative, and
-  over-300-second overrides.
+  deadline. 3) Run with an in-range override including values above 300
+  seconds. 4) Submit zero, negative, and over-21,600-second overrides.
 - **Expected**: Missing timeout uses exactly 60 seconds and returns
   `TOOL_TIMEOUT` after process-tree shutdown. In-range values work within
-  1–300 seconds; out-of-range values fail validation and never spawn.
+  1–21,600 seconds; out-of-range values fail validation and never spawn.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
   `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`,
-  `03-runtime/16-tool-result-limits.md`, `05-security/01-security.md`, ADR 0054
+  `03-runtime/16-tool-result-limits.md`, `05-security/01-security.md`, ADR 0054,
+  ADR 0167
 - **Acceptance**: E (tools), H (diagnostics), Security
 - **Milestone**: M6
 - **Status**: Automated (passed 2026-08-04): long-timeout `test:e2e:plan`

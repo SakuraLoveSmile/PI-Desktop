@@ -761,15 +761,14 @@ function safeJson(value: unknown): string {
 }
 
 const MIN_COMMAND_TIMEOUT_SECONDS = 1;
-const MAX_COMMAND_TIMEOUT_SECONDS = 300;
+/** Host safety bound so every spawn still has a finite deadline (D329). */
+const MAX_COMMAND_TIMEOUT_SECONDS = 21_600;
 /**
  * Schema ceiling for `Bash.timeout`, not an honoured duration. It has to admit
- * the millisecond values models actually send — one local month topped out at
- * 1_800_000 — so the runtime can read the intent as seconds and clamp it to
- * {@link MAX_COMMAND_TIMEOUT_SECONDS} (D273). An hour is the round bound above
- * every value observed.
+ * millisecond values models send, then the runtime reads those as seconds and
+ * clamps to {@link MAX_COMMAND_TIMEOUT_SECONDS} (D273 / D329).
  */
-const MAX_ACCEPTED_COMMAND_TIMEOUT = 3_600_000;
+const MAX_ACCEPTED_COMMAND_TIMEOUT = 100_000_000;
 /**
  * Argument names models reach for instead of ours, mapped to the canonical
  * name. Every strong model has `file_path`/`query` burned in from pretraining
@@ -836,7 +835,7 @@ function commandShellToolDescription(
     "The protocol tool remains named Bash for compatibility; write commands for the active shell dialect.",
     shellSyntaxGuidance(shell),
     `The session scratch directory variable is ${shellScratchVariable(shell)}.`,
-    "An optional timeout from 1 to 300 seconds may be supplied; without it, the command defaults to a 60-second timeout.",
+    `An optional timeout from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS} seconds may be supplied; without it, the command defaults to a 60-second timeout.`,
     ...(scratchDir ? [`The session scratch directory is ${scratchDir}.`] : []),
   ].join(" ");
 }
@@ -886,14 +885,13 @@ function requireAliasedParams(toolName: string, params: unknown): void {
 function normalizeToolParams(toolName: string, params: unknown): unknown {
   if (!isRecord(params)) return params;
   const aliases = TOOL_PARAM_ALIASES[toolName];
-  // Only a value of at least 1000 reads as milliseconds. Something like 301 is
-  // far more likely a seconds value that overshot the cap, and rewriting it to
-  // 0.301s would be worse than the error it currently earns.
+  // A value above the honoured seconds ceiling is the millisecond habit (D273 /
+  // D329). In-range values, including 600 and 1800, are seconds the agent chose.
   const timeoutIsMs =
     toolName === "Bash" &&
     typeof params.timeout === "number" &&
     Number.isFinite(params.timeout) &&
-    params.timeout >= 1000;
+    params.timeout > MAX_COMMAND_TIMEOUT_SECONDS;
   const aliased = aliases
     ? Object.keys(aliases).filter((alias) => params[alias] !== undefined)
     : [];
@@ -907,8 +905,7 @@ function normalizeToolParams(toolName: string, params: unknown): unknown {
     delete next[alias];
   }
   if (timeoutIsMs) {
-    // A timeout above the 300-second ceiling is only ever milliseconds: the
-    // schema rejects it as seconds, so there is no reading to preserve.
+    // Above the honoured seconds ceiling is milliseconds (D273 / D329).
     next.timeout = Math.min(
       MAX_COMMAND_TIMEOUT_SECONDS,
       Math.max(
@@ -1924,12 +1921,11 @@ Delegation rules:
         timeout: Type.Optional(
           Type.Number({
             minimum: MIN_COMMAND_TIMEOUT_SECONDS,
-            // The honoured ceiling is 300 seconds, but models routinely send
-            // milliseconds; a wider schema bound lets the runtime read the
-            // intent instead of burning the turn (D273).
+            // Models routinely send milliseconds; a wider schema bound lets the
+            // runtime read the intent instead of burning the turn (D273 / D329).
             maximum: MAX_ACCEPTED_COMMAND_TIMEOUT,
             description:
-              "Optional command timeout in seconds from 1 to 300; defaults to 60 seconds.",
+              `Optional command timeout in seconds from 1 to ${MAX_COMMAND_TIMEOUT_SECONDS}; defaults to 60 seconds.`,
           }),
         ),
       },
