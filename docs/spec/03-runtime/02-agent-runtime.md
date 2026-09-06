@@ -365,7 +365,10 @@ counts as running state until durable persistence completes.
   `planning`/`inactive` state mid-turn: the renderer keeps the state of the
   in-flight turn and only moves it to the staged contract mode after the
   terminal event flushes the configuration, so `Plan / planning` surfaces
-  when the next prompt starts under the new mode.
+  when the next prompt starts under the new mode. The Composer mode chip
+  pulse and the compact transcript Planning row are that same live
+  projection: the chip label may already show the staged mode, but it does
+  not pulse until the in-flight turn projects `planning`.
 
 The live planning state is derived and projected as:
 

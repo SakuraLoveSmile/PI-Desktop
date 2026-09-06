@@ -4126,9 +4126,12 @@ Each scenario is documented in this format:
 - **Expected**: The staged Plan choice updates the chip immediately, but the
   live planning indicator stays away while the in-flight Agent turn runs; it
   does not show `Plan / planning` until the new prompt starts under the staged
-  mode. After the terminal event flushes the configuration the session is
+  mode, and the Composer chip does not pulse until that live state projects
+  `planning`. After the terminal event flushes the configuration the session is
   durable Plan with editable planning state, and the sent prompt surfaces the
-  `Plan / planning` indicator.
+  `Plan / planning` indicator in the pre-stream slot while the chip pulses.
+  Once tools or an answer exist, the transcript planning row yields and the
+  chip pulse remains the live cue.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`,
   `03-runtime/10-session-state-machine.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: C (conversation/stream), Quality

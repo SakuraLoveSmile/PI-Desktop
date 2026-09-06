@@ -220,7 +220,7 @@
   justify-content: flex-start;
 }
 
-.composer-mode-chip > span {
+.composer-mode-chip-label {
   min-width: 0;
   overflow: hidden;
   text-align: start;
@@ -229,6 +229,7 @@
 }
 
 .mode-chip > span,
+.composer-mode-chip-label,
 .composer-model-thinking-model,
 .composer-model-thinking-level {
   line-height: var(--leading-compact);

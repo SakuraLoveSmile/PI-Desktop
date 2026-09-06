@@ -127,7 +127,6 @@ import {
   IconImage,
   IconSheet,
   IconVideo,
-  IconListChecks,
   IconPencil,
   IconSearch,
   IconReview,
@@ -1827,12 +1826,13 @@ function PlanningIndicator({ kind }: { kind: ProposalKind }) {
       role="status"
       aria-live="polite"
       data-kind={kind}
+      data-testid="planning-indicator"
     >
-      {kind === "goal" ? (
-        <IconTarget size={14} aria-hidden />
-      ) : (
-        <IconListChecks size={14} aria-hidden />
-      )}
+      <span className="working-indicator-mark" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
       <span>{t(`${kind}.planning`)}</span>
     </div>
   );
@@ -3016,12 +3016,17 @@ export const ChatTranscript = memo(function ChatTranscript({
     planningState !== "planning" &&
     !activeToolGroup &&
     !assistantIsAnswering;
+  // Same pre-stream slot as Working: once tools or an answer exist, activity
+  // rows carry the live state so a Planning label does not sit orphaned above
+  // the composer. The Composer mode chip keeps pulsing for the turn.
   const showPlanning =
     isRunning &&
     planningState === "planning" &&
     !approvalPending &&
     !pendingPermission &&
-    !askPending;
+    !askPending &&
+    !activeToolGroup &&
+    !assistantIsAnswering;
 
   return (
     <div

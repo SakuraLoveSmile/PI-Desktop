@@ -303,17 +303,21 @@
 }
 
 .planning-state-indicator {
+  box-sizing: border-box;
   display: flex;
+  width: min(100%, 720px);
   align-items: center;
   gap: 7px;
-  padding: 8px 0 4px;
+  margin: 2px 0 8px;
+  padding: 8px 0 4px 16px;
   color: var(--ds-info);
   font-size: var(--text-sm-plus);
+  animation: planning-state-in var(--motion-duration-fast) var(--motion-ease-out)
+    both;
 }
 
-.planning-state-indicator svg {
-  flex: 0 0 auto;
-  color: var(--ds-purple);
+.planning-state-indicator .working-indicator-mark > span {
+  background: var(--ds-purple);
 }
 
 @keyframes working-indicator-dot {
@@ -356,6 +360,25 @@
   }
   50% {
     opacity: 1;
+  }
+}
+
+@keyframes planning-state-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .working-indicator-mark > span,
+  .planning-state-indicator {
+    animation: none;
   }
 }
 

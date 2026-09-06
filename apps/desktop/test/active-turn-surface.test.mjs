@@ -22,6 +22,27 @@ test("active turns show immediate feedback without a progress card", () => {
   assert.match(transcript, /className="working-indicator-label"/);
   assert.match(transcript, /const showWorking =/);
   assert.match(transcript, /\{showWorking \? <WorkingIndicator \/> : null\}/);
+  assert.match(transcript, /function PlanningIndicator\(/);
+  assert.match(transcript, /data-testid="planning-indicator"/);
+  assert.match(transcript, /const showPlanning =/);
+  assert.match(transcript, /\{showPlanning \? <PlanningIndicator kind=\{planningKind\} \/> : null\}/);
+  assert.match(
+    transcript,
+    /planningState === "planning"[\s\S]*!activeToolGroup[\s\S]*!assistantIsAnswering/,
+  );
+  const planningBlock =
+    transcript.match(/function PlanningIndicator\([\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(planningBlock, /working-indicator-mark/);
+  assert.doesNotMatch(planningBlock, /IconListChecks|IconTarget/);
+  assert.match(messagesStyles, /\.planning-state-indicator\s*\{/);
+  assert.match(
+    messagesStyles,
+    /\.planning-state-indicator[\s\S]*?animation:\s*planning-state-in/,
+  );
+  assert.match(
+    messagesStyles,
+    /\.planning-state-indicator \.working-indicator-mark > span\s*\{[\s\S]*?background:\s*var\(--ds-purple\)/,
+  );
   assert.doesNotMatch(transcript, /AgentProgressTimeline|agent-progress/);
   assert.match(transcript, /<PermissionCard/);
   assert.doesNotMatch(store, /AgentProgress|agentProgress|updateAgentProgress/);

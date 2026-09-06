@@ -599,6 +599,9 @@ export function Composer({
   const sendQueuedNow = useAppStore((s) => s.sendQueuedNow);
   const abort = useAppStore((s) => s.abort);
   const isRunning = useAppStore((s) => s.isRunning);
+  const planningState = useAppStore((s) =>
+    s.activeSessionId ? s.planningStates[s.activeSessionId] : undefined,
+  );
   const settings = useAppStore((s) => s.settings);
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
@@ -1125,6 +1128,10 @@ export function Composer({
   const mode: Mode = activeSession
     ? activeSession.mode
     : (draftConfiguration?.mode ?? settings?.defaultMode ?? "agent");
+  const planningLive =
+    isRunning &&
+    planningState === "planning" &&
+    (mode === "plan" || mode === "goal");
   // Permission mode (D115/D132): inherited sessions still resolve through the
   // global setting, but the composer presents only the effective mode.
   const globalPermissionMode: PermissionMode =
@@ -2101,7 +2108,11 @@ export function Composer({
             <div className="composer-left">
               <button
                 className="icon-btn mode-chip composer-mode-chip"
-                title={t("settings.mode")}
+                data-mode={mode}
+                data-planning={planningLive ? "true" : undefined}
+                title={
+                  planningLive ? t(`${mode}.planning`) : t("settings.mode")
+                }
                 disabled={controlsBlocked}
                 onClick={async () => {
                   setModelThinkingOpen(false);
@@ -2121,8 +2132,12 @@ export function Composer({
                   }
                 }}
               >
-                <ModeIcon mode={mode} />
-                <span className="text-sm">{t(MODE_LABEL_KEYS[mode])}</span>
+                <span className="composer-mode-chip-face" key={mode}>
+                  <ModeIcon mode={mode} />
+                  <span className="composer-mode-chip-label text-sm">
+                    {t(MODE_LABEL_KEYS[mode])}
+                  </span>
+                </span>
               </button>
               {mode === "agent" || mode === "plan" || mode === "goal" ? (
                 <div className="composer-permission" ref={permissionRef}>

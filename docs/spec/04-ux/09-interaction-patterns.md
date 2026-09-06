@@ -729,6 +729,9 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
 2. The Agent investigates with the selected contract tool set. Read/Glob/Grep and
    BrowserPreview are allowed; Bash follows the visible permission mode. A
    contract-mode Bash command may mutate under Auto, so the mode chip remains visible.
+   While that turn is live `planning`, the Composer mode chip pulses and a compact
+   Planning row occupies the same pre-stream slot as Working; tool or answer rows
+   replace that transcript row so it does not sit orphaned above the composer.
 3. The Agent calls `SubmitPlan` or `SubmitGoal` alone in its tool batch.
    Host-core preserves the exact Markdown bytes in a new immutable
    `.pi/plan/*.md` or `.pi/goal/*.md` artifact, records its path/hash/size and structured

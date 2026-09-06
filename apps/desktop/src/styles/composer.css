@@ -184,6 +184,49 @@
   }
 }
 
+.composer-mode-chip-face {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  animation: composer-mode-face-in var(--motion-duration-fast)
+    var(--motion-ease-out) both;
+}
+
+.composer-mode-chip[data-planning="true"] {
+  color: var(--ds-text-primary) !important;
+}
+
+.composer-mode-chip[data-planning="true"] svg {
+  color: var(--ds-purple) !important;
+  animation: composer-mode-planning-pulse 1.2s var(--motion-ease-standard)
+    infinite;
+}
+
+@keyframes composer-mode-face-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes composer-mode-planning-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 .composer-input {
   width: 100%;
   min-height: 3lh;
