@@ -182,6 +182,9 @@ type ClipboardHistoryEntry =
 pi.shell.openExternal(url: string): Promise<void>
 ```
 
+`openExternal` 解析 `url`，只打开 `http:`、`https:` 和 `mailto:`（D330 / ADR 0168）。
+其他 scheme 以 `INVALID_ARGUMENT` 失败。
+
 `getHistory` 返回主机在应用运行期间捕获的条目，按最新优先排列，文本和图片按捕获
 时间混排。启动后的第一次采样只建立基线，不会把启动前的内容加入历史；通过
 `writeText` 写入的内容会立即记录。连续相同内容会合并并刷新时间戳。历史只保留在
