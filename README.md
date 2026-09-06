@@ -212,30 +212,33 @@ This project was created by the models below — not by a lone genius, but by a 
 
 | Provider | Model | Tokens |
 | --- | --- | ---: |
-| OpenAI | `gpt-5.6-sol` | 4,799,525,785 |
+| OpenAI | `gpt-5.6-luna` | 5,304,019,817 |
+| OpenAI | `gpt-5.6-sol` | 4,825,458,273 |
 | OpenAI | `gpt-5.4` | 4,213,269,324 |
-| OpenAI | `gpt-5.6-luna` | 3,980,161,792 |
 | Anthropic | `claude-opus-5` | 3,909,952,653 |
 | OpenAI | `gpt-5.5` | 3,800,382,171 |
 | xAI | `grok-4.5` | 1,947,736,115 |
+| xAI | `grok-4.6` | 797,233,571 |
 | DeepSeek | `deepseek-v4-flash` | 329,790,234 |
 | OpenAI | `gpt-5.2-codex` | 320,983,170 |
+| Anthropic | `claude-fable-5-1` | 302,580,552 |
+| Xiaomi | `mimo-v2.5-pro` | 293,575,842 |
 | OpenAI | `gpt-5.6-terra` | 274,107,085 |
 | OpenAI | `gpt-5.3-codex` | 255,366,945 |
-| Xiaomi | `mimo-v2.5-pro` | 234,295,998 |
 | OpenAI | `gpt-5.1-codex-max` | 220,947,212 |
 | OpenAI | `gpt-5.1` | 142,533,699 |
 | — | `Unknown model` | 69,801,632 |
 | Anthropic | `claude-opus-4.6` | 55,223,768 |
 | Zhipu | `stealth/ox-alpha` | 22,954,876 |
+| Anthropic | `claude-fable-5` | 16,116,907 |
 | OpenAI | `gpt-5.1-codex-mini` | 12,895,478 |
 | Xiaomi | `mimo-v2.5-pro-think` | 11,246,210 |
 | Xiaohongshu | `dots-3-note-prev` | 10,166,895 |
 | OpenAI | `gpt-5.1-codex` | 3,916,509 |
 | Xiaomi | `mimo-v2.5` | 3,785,071 |
-| xAI | `grok-4.6` | 3,366,971 |
 
-**Total for listed models:** 24,622,409,593 tokens.
+**Total for listed models:** 27,144,044,009 tokens.
+
 ## Community Links
 
 - [Linux.Do](https://linux.do/) — A community for sharing and discussing technology.
