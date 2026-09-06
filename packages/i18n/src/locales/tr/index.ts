@@ -30,6 +30,10 @@ export const tr = {
     askBody:
       "Pencereyi kapattığınızda PI-Desktop sistem tepsisinde çalışmaya devam edebilir; hiçbir şey kaybolmaz. Bunu Ayarlar’dan dilediğiniz zaman değiştirebilirsiniz.",
     closeToTray: "Tepsiye kapat",
+    confirmQuitTitle: "PI-Desktop'tan çıkılsın mı?",
+    confirmQuitBody:
+      "Çıkmak istediğinizden emin misiniz? Tüm çalışan oturumlar durdurulur ve kaydedilmemiş değişiklikler kaybolabilir.",
+    confirmQuit: "Çık",
   },
   /**
    * Native consent dialog for a file access a plugin's manifest did not

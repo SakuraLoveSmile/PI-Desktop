@@ -319,6 +319,10 @@ let shutdownPromise: Promise<void> | null = null;
 // close behavior only decides whether a close hides the window to it.
 let closeBehavior: CloseBehavior = "ask";
 let closePromptOpen = false;
+// Set when the user has explicitly confirmed a quit through the confirmation
+// dialog (Cmd+Q, tray quit, etc.). Prevents the dialog from showing again when
+// `app.quit()` is re-issued after the user confirmed.
+let quitConfirmed = false;
 // Windows whose close handler has already decided to let the close through.
 // Per-window rather than a module-level latch, so a real close never leaks
 // permission to close into the next window `ensureWindow()` creates.
@@ -2063,6 +2067,32 @@ async function askCloseBehavior(
   return response === 1 ? "tray" : response === 2 ? "quit" : null;
 }
 
+/**
+ * Quit-confirmation dialog shown on explicit quit (Cmd+Q, tray quit, menu Quit).
+ * Data is already saved as part of the normal shutdown sequence, but this
+ * gives the user a chance to cancel before that process begins.
+ * Returns `true` when the user confirms, `false` when they cancel.
+ */
+async function confirmQuitDialog(): Promise<boolean> {
+  const labels = catalogs[resolveLocale(app.getLocale())];
+  const parent =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+  const options = {
+    type: "warning" as const,
+    title: labels.tray.confirmQuitTitle,
+    message: labels.tray.confirmQuitTitle,
+    detail: labels.tray.confirmQuitBody,
+    buttons: [labels.common.cancel, labels.tray.confirmQuit],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  };
+  const { response } = parent
+    ? await dialog.showMessageBox(parent, options)
+    : await dialog.showMessageBox(options);
+  return response === 1;
+}
+
 function workPanelMinimumWindowWidth() {
   return WINDOW_MIN_WIDTH + workPanelReservation.width;
 }
@@ -3035,7 +3065,9 @@ async function createWindow() {
       }
       // "quit" means quit: go through the ordered `before-quit` shutdown
       // rather than relying on `window-all-closed`, which stays silent while
-      // the D216 tray is resident.
+      // the D216 tray is resident. Mark `quitConfirmed` because the user
+      // already chose to quit in the close-behavior dialog above.
+      quitConfirmed = true;
       windowsAllowedToClose.add(window);
       app.quit();
     })();
@@ -8302,6 +8334,27 @@ app.on("before-quit", (event) => {
   if (shutdownComplete) return;
   event.preventDefault();
   if (shutdownPromise) return;
+
+  // Show a confirmation dialog on the first explicit quit (Cmd+Q, tray quit,
+  // application-menu Quit). The data-saving shutdown runs after confirmation.
+  // Skip confirmation in automated probe/capture modes where no human is
+  // present to interact with the dialog.
+  const isAutomatedMode =
+    process.env.PI_DESKTOP_BOOT_PROBE === "1" ||
+    process.env.PI_DESKTOP_SUPERVISION_PROBE === "1" ||
+    process.env.PI_DESKTOP_CAPTURE === "1";
+  if (!quitConfirmed && !isAutomatedMode) {
+    quitConfirmed = true;
+    void confirmQuitDialog().then((confirmed) => {
+      if (confirmed) {
+        app.quit();
+      } else {
+        // User cancelled: allow future quit requests to prompt again.
+        quitConfirmed = false;
+      }
+    });
+    return;
+  }
 
   quitting = true;
   clipboardHistory.stop();
