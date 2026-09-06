@@ -39,6 +39,28 @@ test("accepted files become compact references while directories keep completion
     autocompleteHook,
     /formatFileInsert\(item\.entry\.path, item\.entry\.kind\)/,
   );
+  // Enter/Tab must splice a sentinel into the draft. A token-less reference
+  // no longer paints after chips moved inline, so the @ token just vanished.
+  assert.match(
+    composer,
+    /const token = nextChipToken\(\);[\s\S]*?result\.value\.slice\(0, result\.cursor\) \+ token/,
+  );
+  assert.match(
+    composer,
+    /createFileReference\(\s*acceptedFileReference\.path,[\s\S]*?token,/,
+  );
+  assert.match(composer, /applyEditorDraft\(\s*nextText,/);
+  // Workspace switches still drop relative `@` chips, not every token-backed
+  // chip — paste/scratch paths are absolute and must survive.
+  assert.match(composer, /function isPersistedScratchReference\(path: string\)/);
+  assert.match(
+    composer,
+    /kept = current\.filter\(\(fileReference\) =>\s*isPersistedScratchReference\(fileReference\.path\)/,
+  );
+  assert.doesNotMatch(
+    composer,
+    /current\.filter\(\(fileReference\) => Boolean\(fileReference\.token\)\)/,
+  );
 });
 
 test("composer renders atomic inline chips and serializes paths on send", () => {

@@ -2201,7 +2201,7 @@ reasoning-level control.
   There are no visual previews in MVP.
 - No voice input
 
-### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, D262, ADR 0024, ADR 0059, ADR 0070, ADR 0131)
+### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, D262, D331, ADR 0024, ADR 0059, ADR 0070, ADR 0131)
 
 The composer owns an inline autocomplete menu — one component serving two
 modes. Focus never leaves the textarea (D125).
@@ -2234,14 +2234,17 @@ Anatomy:
 - File mode (`@` token at cursor, boundary-preceded): rows persistently show
   only the leaf file or directory name; directories get a trailing `/` and
   continue completion on accept. The complete relative path remains available
-  through the row tooltip and accessible name. Accepting a completed file adds
-  a compact reference whose canonical value is the original `entry.path`;
-  accepting a directory keeps the literal path in the textarea so completion
-  can continue. Entries come from `fs/index` (D124, D209). A
+  through the row tooltip and accessible name. Accepting a completed file
+  (Enter, Tab, or click) replaces the `@` token with an inline leaf-name chip
+  at the caret — the same sentinel-backed chip as a pasted file — whose
+  canonical value is the original `entry.path`; the menu closes and that Enter
+  does not send. Accepting a directory keeps the literal path in the draft so
+  completion can continue. Entries come from `fs/index` (D124, D209, D331). A
   truncation footnote appears when the index is capped; without a workspace the
   menu shows an "open a project" empty state.
 - Accepting commands and directories inserts text (`/name ` / `@dir/`);
-  accepting a completed file creates a renderer-owned reference. Immediately
+  accepting a completed file inserts the inline chip rather than deleting the
+  trigger. Immediately
   before dispatch, ordinary references serialize in stable order after the
   visible draft as complete `@path` text using D124's quoting. A generated
   large-paste token is resolved in place to its canonical scratch path exactly

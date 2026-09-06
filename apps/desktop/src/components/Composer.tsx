@@ -107,6 +107,11 @@ function isImageFilePath(path: string): boolean {
   return /\.(avif|bmp|gif|heic|jpe?g|png|tiff?|webp)$/i.test(path);
 }
 
+/** Paste/scratch files keep absolute paths; `@` menu entries are workspace-relative. */
+function isPersistedScratchReference(path: string): boolean {
+  return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path) || path.startsWith("\\\\");
+}
+
 const CODE_FILE_PATTERN =
   /\.(cjs|css|go|java|js|json|jsx|kt|mjs|php|py|rb|rs|sh|sql|svelte|swift|toml|ts|tsx|vue|ya?ml)$/i;
 const ARCHIVE_FILE_PATTERN = /\.(7z|bz2|gz|jar|rar|tar|zip)$/i;
@@ -933,10 +938,39 @@ export function Composer({
   useEffect(() => {
     // Relative autocomplete references belong to the workspace that produced
     // them. Session scratch references remain valid across project switches.
-    setFileReferences((current) => {
-      const next = current.filter((fileReference) => Boolean(fileReference.token));
-      return next.length === current.length ? current : next;
-    });
+    // Inline chips use sentinels for every file, so token presence is no
+    // longer the discriminator — absolute paste/scratch paths are.
+    const current = fileReferencesRef.current;
+    const kept = current.filter((fileReference) =>
+      isPersistedScratchReference(fileReference.path),
+    );
+    if (kept.length === current.length) return;
+    const droppedTokens = new Set(
+      current
+        .filter((fileReference) => !isPersistedScratchReference(fileReference.path))
+        .flatMap((fileReference) => (fileReference.token ? [fileReference.token] : [])),
+    );
+    if (droppedTokens.size > 0) {
+      const el = ref.current;
+      const source = el ? readEditorValue(el) : valueRef.current;
+      const caret = el ? editorSelectionRange(el).start : source.length;
+      let nextValue = "";
+      let nextCaret = caret;
+      let index = 0;
+      for (const char of Array.from(source)) {
+        if (droppedTokens.has(char)) {
+          if (index < caret) nextCaret -= char.length;
+        } else {
+          nextValue += char;
+        }
+        index += char.length;
+      }
+      const nextIndex = Math.max(0, Math.min(nextCaret, nextValue.length));
+      pendingEditorCaretRef.current = nextIndex;
+      setValue(nextValue);
+      setCursor(nextIndex);
+    }
+    setFileReferences(kept);
   }, [workspacePath]);
 
   useEffect(() => {
@@ -1812,26 +1846,34 @@ export function Composer({
   const acceptCompletion = (index: number) => {
     const result = composerAc.accept(index);
     if (!result) return;
-    setValue(result.value);
-    setCursor(result.cursor);
+    invalidatePromptEnhancement();
+    // File accept strips the @ token (empty insert) and used to store a
+    // token-less chip above the textarea. Inline chips only paint when a
+    // sentinel is in the draft, so Enter looked like the reference vanished.
     const acceptedFileReference = result.fileReference;
-    if (acceptedFileReference) {
-      setFileReferences((current) => [
-        ...current,
+    if (!acceptedFileReference) {
+      applyEditorDraft(result.value, fileReferencesRef.current, result.cursor);
+      return;
+    }
+    const token = nextChipToken();
+    const nextText =
+      result.value.slice(0, result.cursor) + token + result.value.slice(result.cursor);
+    applyEditorDraft(
+      nextText,
+      [
+        ...fileReferencesRef.current,
         createFileReference(
           acceptedFileReference.path,
           acceptedFileReference.name,
           referenceSessionId,
-          { kind: isImageFilePath(acceptedFileReference.path) ? "image" : "file" },
+          {
+            kind: isImageFilePath(acceptedFileReference.path) ? "image" : "file",
+            token,
+          },
         ),
-      ]);
-    }
-    requestAnimationFrame(() => {
-      const el = ref.current;
-      if (!el) return;
-      el.focus();
-      setEditorCaret(el, result.cursor);
-    });
+      ],
+      result.cursor + token.length,
+    );
   };
 
   // Keep the transcript's bottom reserve in sync with the composer's real

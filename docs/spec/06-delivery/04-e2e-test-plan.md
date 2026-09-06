@@ -4665,22 +4665,25 @@ Each scenario is documented in this format:
   a directory whose name contains whitespace.
 - **Steps**: 1) Type `@` and filter to the nested and duplicate entries. 2)
   Inspect the visible rows, then hover for full-path tooltips and inspect their
-  accessible names. 3) Accept a file and confirm a leaf-name chip appears while
-  the textarea omits its path. Accept a directory result and continue to a
-  child file. 4) Send the completed references and inspect the persisted user
-  message.
+  accessible names. 3) Accept a file with Enter and confirm a leaf-name chip
+  remains in the draft at the caret while the `@` token and full path stay
+  hidden. Accept a second file with Tab or click. Accept a directory result
+  and continue to a child file. 4) Send the completed references and inspect
+  the persisted user message.
 - **Expected**:
   - Each result persistently renders only its leaf name; directories retain a
     trailing `/`, and no parent path consumes horizontal row space.
   - The tooltip and accessible name retain the complete relative path so
     duplicate leaf names remain distinguishable.
-  - File acceptance retains the original complete `entry.path` behind the chip;
-    directory acceptance retains literal path continuation. At dispatch the
-    sent and persisted prompt contains each complete path with existing
-    whitespace quoting, and the agent can read both selected files normally.
+  - Enter/Tab/click on a file replaces the `@` token with an inline chip that
+    stays in the draft; that key does not send. File acceptance retains the
+    original complete `entry.path` behind the chip; directory acceptance
+    retains literal path continuation. At dispatch the sent and persisted
+    prompt contains each complete path with existing whitespace quoting, and
+    the agent can read both selected files normally.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.8,
   `04-ux/09-interaction-patterns.md` §8a, `03-runtime/01-ipc-protocol.md` §13c,
-  `08-meta/decisions-log.md` (D124, D209), ADR 0024, ADR 0070
+  `08-meta/decisions-log.md` (D124, D209, D331), ADR 0024, ADR 0070
 - **Acceptance**: C (conversation & stream), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered

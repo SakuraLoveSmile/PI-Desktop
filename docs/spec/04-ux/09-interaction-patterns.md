@@ -920,7 +920,7 @@ When drag/drop is implemented, these patterns should apply:
 - Cancel drag with Escape
 - Drag feedback: opacity 0.5 on source, accent outline on target
 
-## 8a. Composer autocomplete and clipboard files (D123–D125, D197, D262, ADR 0131)
+## 8a. Composer autocomplete and clipboard files (D123–D125, D197, D209, D262, D331, ADR 0131)
 
 ### 8a.1 Triggers
 
@@ -936,9 +936,11 @@ When drag/drop is implemented, these patterns should apply:
   trigger token.
 - File results keep each row compact by rendering only the leaf name (with a
   trailing `/` for directories). The full relative path remains available as
-  the row tooltip and accessible name. Accepting a file creates a compact
-  reference backed by the full `entry.path`; accepting a directory keeps the
-  full literal path in the textarea so deeper completion can continue.
+  the row tooltip and accessible name. Accepting a file (Enter/Tab/click)
+  replaces the `@` token with an inline sentinel-backed leaf-name chip at the
+  caret, backed by the full `entry.path`; that confirmation does not send.
+  Accepting a directory keeps the full literal path in the draft so deeper
+  completion can continue.
 
 ### 8a.2 Reference chips and clipboard files
 
@@ -975,7 +977,9 @@ When drag/drop is implemented, these patterns should apply:
   draft instead of being appended or sent as duplicate attachments.
   Successful dispatch clears both; failed or rejected dispatch retains both.
   References are session-scoped and scratch references survive a workspace
-  switch while their owning session remains available.
+  switch while their owning session remains available. Workspace `@` chips
+  are relative to the project that produced them and are removed from the
+  draft, sentinels included, when the workspace changes.
 - When an image reference is active, Composer shows one compact live status
   line. It names visual transport for a model whose pi-ai `input` includes
   `image`, and names the file-path fallback for unknown/non-vision models.
