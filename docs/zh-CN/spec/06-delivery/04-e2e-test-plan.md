@@ -1796,15 +1796,16 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   并触发内联工具权限卡。 5) 切换到另一个面板选项卡
   然后回来；关闭面板。 6) 使用开放式外部。
 - **预期**：无方案输入标准化为 http；导航状态（URL 栏，
-  back/forward 启用、加载微调器）镜像页面。弹出窗口打开于
-  默认浏览器（绝不在应用程序内）；许可请求被拒绝；
-  非 http(s) 导航被阻止。预览隐藏在每个遮挡下
-  覆盖并卸载时，随后以正确的边界重新出现。安
+  back/forward 启用、加载微调器）镜像页面。弹出窗口仅在 URL 解析为
+  http(s) 或 mailto 时打开默认浏览器（绝不在应用程序内）；
+  `file:`、`javascript:` 和自定义 scheme 被拒绝。许可请求被拒绝；
+  非 http(s) 导航被阻止，根内 `file:` 同级文件除外。预览隐藏在每个遮挡下
+  覆盖并卸载时，随后以正确的边界重新出现。
   内嵌权限卡不会隐藏或重新挂载预览； resize/drag
   保持视图与占位符矩形对齐。
-  Open-external 在默认浏览器中启动当前的 URL。景色
+  Open-external 对 http(s) 页走系统浏览器，对根内文件预览走 `openPath`。景色
   使用隔离的持久分区（应用程序外壳中没有会话流失）。
-- **链接规格**：`03-runtime/01-ipc-protocol.md` §13a、ADR 0019
+- **链接规格**：`03-runtime/01-ipc-protocol.md` §13a、ADR 0019、ADR 0168
 - **验收**：质量、安全
 - **里程碑**：M5
 - **状态**：草案（手动）
@@ -5629,3 +5630,27 @@ IPC 请求无法关闭。
 - **里程碑**：M5
 - **状态**：单元已覆盖（host-core `user_skills` / `agent_capabilities` 测试、
   `apps/desktop/test/plugin-skills.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
+
+#### E2E-185：外部链接只打开 http(s) 和 mailto
+
+- **前提条件**：对话可渲染 markdown 链接。插件已授予 `shell.openExternal`。
+  工作面板预览可加载 http 页和工作区 HTML 文件。
+- **步骤**：1) 对 https、mailto、`file:`、`javascript:`、`ms-msdt:` 和自定义
+  scheme 的 markdown 链接做 modified-click（`target="_blank"`）。
+  2) 从插件调用 `pi.shell.openExternal`，分别传入 https、mailto 和 `file:`。
+  3) 在嵌入预览中 `window.open` 一个 https URL 和一个 `file:` URL；对 http 页
+  和根内 HTML 文件使用「在系统浏览器打开」。
+- **预期**：
+  - https 和 mailto 交给系统处理器。`file:`、`javascript:`、`data:`、
+    `ms-msdt:` 和自定义 scheme 不会。
+  - 插件的 `file:` 以 `INVALID_ARGUMENT` 失败；mailto 成功。
+  - 预览对非白名单 scheme 的 `window.open` 在应用内拒绝，且不调用
+    `openExternal`。
+  - 「在系统浏览器打开」对 http(s) 走 `openExternal`；对根内文件预览走
+    `openPath`，而不是把 `file:` URL 交给 `openExternal`。
+- **链接规格**：`05-security/01-security.md`、`07-plugins/04-plugin-security.md` §8、
+  `07-plugins/03-plugin-api.md`、ADR 0109、ADR 0168、`08-meta/decisions-log.md`（D330）
+- **验收**：安全
+- **里程碑**：M5
+- **状态**：单元已覆盖（`safe-open-external.test.mjs`、`feedback.test.mjs`）；完整 UI
+  旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）

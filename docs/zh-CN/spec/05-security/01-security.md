@@ -23,8 +23,11 @@
 - `sandbox: true` — preload 是一个完全捆绑的 CJS 文件，没有运行时
   模块分辨率，由 `test:e2e:boot` 进行端到端验证
 - 无远程模块（Electron ≥ 14 默认值）
-- 导航锁定：`setWindowOpenHandler` 否认并转发至
-  操作系统浏览器； `will-navigate` 阻止所有非开发服务器导航
+- 导航锁定：`setWindowOpenHandler` 拒绝应用内窗口，仅把解析后的
+  `http:` / `https:` / `mailto:` URL 转给系统浏览器
+  （`parseAllowedExternalUrl`，D330 / ADR 0168）。`file:`、`javascript:`、
+  `data:` 和自定义 URI scheme 不会到达 `shell.openExternal`。
+  `will-navigate` 阻止所有非开发服务器导航
 - 预加载仅公开经过白名单检查的 ADR/../03-runtime/09-logging-and-observability.md 桥
   （`IPC_WHITELIST` 在 preload 和主侧均强制执行）
 

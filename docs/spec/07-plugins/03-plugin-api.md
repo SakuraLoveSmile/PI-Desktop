@@ -189,6 +189,9 @@ type ClipboardHistoryEntry =
 pi.shell.openExternal(url: string): Promise<void>
 ```
 
+`openExternal` parses `url` and opens only `http:`, `https:`, and `mailto:`
+hrefs (D330 / ADR 0168). Other schemes fail with `INVALID_ARGUMENT`.
+
 `getHistory` returns newest-first entries captured by the host while the app is
 running, with text and images interleaved in capture order. The first clipboard
 sample after startup establishes a baseline and is not added; content written

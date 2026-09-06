@@ -20,8 +20,11 @@ Required (all **implemented**):
 - `sandbox: true` — the preload is a fully bundled CJS file with no runtime
   module resolution, verified end-to-end by `test:e2e:boot`
 - No remote module (Electron ≥ 14 default)
-- Navigation locked down: `setWindowOpenHandler` denies and forwards to the
-  OS browser; `will-navigate` blocks all non-dev-server navigations
+- Navigation locked down: `setWindowOpenHandler` denies in-app windows and
+  forwards only parsed `http:` / `https:` / `mailto:` URLs to the OS browser
+  (`parseAllowedExternalUrl`, D330 / ADR 0168). `file:`, `javascript:`,
+  `data:`, and custom URI schemes never reach `shell.openExternal`.
+  `will-navigate` blocks all non-dev-server navigations
 - Preload exposes a whitelist-checked `invoke`/`on` bridge only
   (`IPC_WHITELIST` enforced on both preload and main sides)
 

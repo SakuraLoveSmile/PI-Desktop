@@ -1,7 +1,7 @@
-import { session, shell, WebContentsView } from "electron";
-import type { BrowserWindow } from "electron";
+import { session, shell, WebContentsView, type BrowserWindow } from "electron";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
+import { parseAllowedExternalUrl } from "./safe-open-external";
 import {
   applyPluginEgressPolicy,
   pluginSessionPartition,
@@ -238,7 +238,8 @@ export class PluginViewHost {
     // A docked view gets exactly one web contents. `window.open` would mint a
     // chromeless window outside the egress policy applied above.
     wc.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/i.test(url)) void shell.openExternal(url);
+      const allowed = parseAllowedExternalUrl(url);
+      if (allowed) void shell.openExternal(allowed);
       return { action: "deny" };
     });
     return view;

@@ -180,3 +180,4 @@ Each ADR includes:
 | 0165 | Withdraw the A2A / Peer coordination stack | Accepted (supersedes 0147 / 0162 / 0164) |
 | 0166 | Parent-judged subagent lifetime | Accepted (amends 0089 / 0119 / 0129) |
 | 0167 | Agent-chosen Bash timeout | Accepted (amends 0054 / D190 / D273) |
+| 0168 | Main-owned http(s)/mailto allowlist for `openExternal` | Accepted (amends 0109) |

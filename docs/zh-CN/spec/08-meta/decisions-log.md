@@ -2658,3 +2658,14 @@ D193 和 D194。
 - `message_end` 现在在 outbox 追加之前检查点完成快照，`settleIf` 不会清掉写入期间开始的新回合。`completed`/`error` 的 `session.endTurn` 仅在该 id 已索引时才删除 `.inflight.json`。启动恢复把回合已是 `completed` 的残留检查点提升为 `complete` 助手行，而不是 `aborted`。
 - 主机握手在渲染器能够 `session.get` 之前等待 outbox 排空，然后 `session.recoverInflightMessages` 提升 outbox 未能落盘的已完成残留检查点。启动恢复会跳过已完成残留，以便完整的 outbox 行先写入。
 - 决策 D327 修订 D299 / ADR 0153 / ADR 0041。见 `03-runtime/04-data-storage.md` §2.1 和 §5、`03-runtime/07-process-model.md` §5、`03-runtime/10-session-state-machine.md` §4、E2E-171 和 E2E-184。
+
+## 2026-09-06 —— 主进程拥有的 openExternal 白名单（D330）
+
+- 聊天 Markdown、插件面板、启动器、OAuth 和嵌入预览都可能把原始 URL 交给
+  `shell.openExternal`。用户点击 `file:`、`javascript:`、`ms-msdt:` 或自定义
+  scheme 时会进入操作系统协议处理器。
+- Electron Main 现在解析每一条这样的 URL。只有带主机名的 http(s) 和带地址的
+  `mailto:` 会打开。不允许的 URL 会抛错，因此 OAuth 报告 `opened: false`，插件
+  仍返回 `INVALID_ARGUMENT`。工作区文件继续走 `shell.openPath`。
+- 决策 D330 修订 ADR 0109。见 ADR 0168、`05-security/01-security.md`、
+  `07-plugins/04-plugin-security.md` §8 与 E2E-185。

@@ -2191,14 +2191,16 @@ Each scenario is documented in this format:
   and back; close the panel. 6) Use open-external.
 - **Expected**: Scheme-less input normalizes to http; nav state (URL bar,
   back/forward enablement, load spinner) mirrors the page. Popups open in
-  the default browser (never in-app); permission requests are denied;
-  non-http(s) navigation is blocked. The preview hides under every blocking
-  overlay and while unmounted, reappearing with correct bounds afterwards. An
-  inline permission card does not hide or remount the preview; resize/drag
-  keeps the view aligned with the placeholder rect.
-  Open-external launches the current URL in the default browser. The view
+  the default browser (never in-app) only when the URL parses as http(s) or
+  mailto; `file:`, `javascript:`, and custom schemes are denied. Permission
+  requests are denied; non-http(s) navigation is blocked except in-root
+  `file:` siblings. The preview hides under every blocking overlay and while
+  unmounted, reappearing with correct bounds afterwards. An inline permission
+  card does not hide or remount the preview; resize/drag keeps the view
+  aligned with the placeholder rect. Open-external launches an http(s) page
+  in the default browser and an in-root file preview via `openPath`. The view
   uses an isolated persist partition (no session bleed from the app shell).
-- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, ADR 0019
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, ADR 0019, ADR 0168
 - **Acceptance**: Quality, Security
 - **Milestone**: M5
 - **Status**: Draft (manual)
@@ -7625,3 +7627,31 @@ are withdrawn with ADR 0165.
 - **Status**: Unit-covered (`chat-links.test.mjs`,
   `markdown-prose-style.test.mjs`); full UI journey Draft (do not run E2E
   locally unless explicitly requested)
+
+#### E2E-185: External URL opens stay on http(s) and mailto
+
+- **Preconditions**: A chat transcript can render markdown links. A plugin
+  is granted `shell.openExternal`. The work-panel preview can load an
+  http page and a workspace HTML file.
+- **Steps**: 1) Modified-click https, mailto, `file:`, `javascript:`,
+  `ms-msdt:`, and a custom-scheme markdown link (`target="_blank"`).
+  2) From the plugin, call `pi.shell.openExternal` with https, mailto, and
+  `file:`. 3) In the embedded preview, `window.open` an https URL and a
+  `file:` URL; use Open in browser on the http page and on the workspace
+  HTML file.
+- **Expected**:
+  - https and mailto open in the OS handler. `file:`, `javascript:`,
+    `data:`, `ms-msdt:`, and custom schemes do not.
+  - Plugin `file:` fails with `INVALID_ARGUMENT`; mailto succeeds.
+  - Preview `window.open` of a non-allowlisted scheme is denied in-app and
+    does not call `openExternal`.
+  - Open in browser for http(s) uses `openExternal`; for an in-root file
+    preview it uses `openPath`, not a `file:` URL through `openExternal`.
+- **Specs linked**: `05-security/01-security.md`,
+  `07-plugins/04-plugin-security.md` §8, `07-plugins/03-plugin-api.md`,
+  ADR 0109, ADR 0168, `08-meta/decisions-log.md` (D330)
+- **Acceptance**: Security
+- **Milestone**: M5
+- **Status**: Unit-covered (`safe-open-external.test.mjs`,
+  `feedback.test.mjs`); full UI journey Draft (do not run E2E locally
+  unless explicitly requested)

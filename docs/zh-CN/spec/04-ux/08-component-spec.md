@@ -1233,8 +1233,8 @@ Renderer： `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/s
   白色表格，带有 `#f3f3f3` 标题/`#fafafa` 斑马。黑暗围栏代码
   使用 One Dark Pro `#282c34`。
 - **链接**：工作面板中的普通点击预览；修改后的点击保留
-  `target="_blank"` 因此主要路线经过 `shell.openExternal`；窗口内
-  导航仍然被阻止。
+  `target="_blank"`，主进程在 http(s)/mailto 白名单之后走
+  `shell.openExternal`（D330）；窗口内导航仍然被阻止。
 - **长转录行为**：`.thread-scroll` 设置 `overflow-anchor: none`
   （固定跟随拥有滚动位置），`.message-row` 使用
   `content-visibility: auto` 和屏外美人鱼图延迟加载和

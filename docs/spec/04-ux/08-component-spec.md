@@ -1382,8 +1382,8 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   tables on white with `#f3f3f3` header / `#fafafa` zebra. Dark fenced code
   uses One Dark Pro `#282c34`.
 - **Links**: plain click previews in the work panel; modified click keeps
-  `target="_blank"` so main routes through `shell.openExternal`; in-window
-  navigation stays blocked.
+  `target="_blank"` so main routes through `shell.openExternal` after the
+  http(s)/mailto allowlist (D330); in-window navigation stays blocked.
 - **Long transcript behavior**: `.thread-scroll` sets `overflow-anchor: none`
   (pinned-follow owns the scroll position), `.message-row` and
   `.tool-activity-group` use `content-visibility: auto` with an intrinsic size so
