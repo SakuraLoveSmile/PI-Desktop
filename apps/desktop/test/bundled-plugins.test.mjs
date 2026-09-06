@@ -36,7 +36,9 @@ test("Files ships as an ordinary plugin, not a privileged one", () => {
 test("the Files view uses only public bridge channels", () => {
   for (const channel of [
     "fs.list",
-    "fs.readText",
+    "fs.readPreview",
+    "fs.glob",
+    "fs.openDefault",
     "fs.reveal",
     "workspace.get",
     "app.getAppearance",
@@ -64,6 +66,8 @@ test("the Files view keeps the former browser workflow while staying plugin-owne
     'id="back"',
     'id="viewer-body"',
     'id="reveal"',
+    'id="open"',
+    'id="search"',
     'role="tree"',
     'role", "treeitem"',
     'aria-expanded',
@@ -72,9 +76,14 @@ test("the Files view keeps the former browser workflow while staying plugin-owne
   ]) {
     assert.ok(view.includes(marker), `expected Files view marker: ${marker}`);
   }
-  assert.match(view, /fs\.readText/);
+  assert.match(view, /fs\.readPreview/);
+  assert.match(view, /fs\.openDefault/);
   assert.match(view, /fs\.reveal/);
-  assert.match(view, /text\.includes\("\\0"\)/);
+  assert.match(view, /fs\.glob/);
+  assert.match(view, /workspace:changed/);
+  assert.match(view, /kind === "image"/);
+  assert.match(view, /kind === "tooLarge"/);
+  assert.match(view, /content\.includes\("\\0"\)/);
   assert.match(view, /appearance:changed/);
   assert.match(view, /locale.*startsWith\("zh"\)/);
   assert.match(view, /retry/);
@@ -82,6 +91,8 @@ test("the Files view keeps the former browser workflow while staying plugin-owne
   assert.match(view, /mini-spinner/);
   assert.match(view, /aria-busy/);
   assert.match(view, /direction:\s*rtl/);
+  assert.match(view, /globFromQuery/);
+  assert.doesNotMatch(view, /setInterval/);
   // The main app is intentionally monochrome; the bundled view must not
   // drift back to the blue accent it used before joining the host palette.
   assert.doesNotMatch(view, /#7aa2f7|#2563eb|#22c55e/);
