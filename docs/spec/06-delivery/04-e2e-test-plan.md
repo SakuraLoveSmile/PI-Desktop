@@ -5303,16 +5303,18 @@ Each scenario is documented in this format:
      before files, and a failed directory offers an inline Retry. Type a unique
      filename into search and confirm matching files appear without walking the
      whole tree first.
-  5. Click a text file. Confirm the viewer shows Back, the relative path, file
-     size, line numbers, bounded text, **Open with default app**, and **Show in
-     folder**. Click Show in folder and confirm the file manager reveals the
-     file. Click Open with default app and confirm the OS associated application
-     launches. Click the binary file and confirm it reports as binary rather
-     than printing replacement characters. Click an image and confirm an in-app
-     preview, not an unavailable placeholder. Switch the app to Simplified
-     Chinese and confirm the Files toolbar, search, empty/loading/error, viewer,
-     open, and reveal-action states are localized. Switch projects and confirm
-     the tree updates without waiting on a poll.
+  5. Click a text file. Confirm the tree is replaced by a single-column viewer
+     (not a side-by-side split) that shows Back, the relative path, file size,
+     line numbers, bounded text, **Open with default app**, and **Show in
+     folder**. Click Back and confirm the tree returns with that file still
+     selected. Open the file again. Click Show in folder and confirm the file
+     manager reveals the file. Click Open with default app and confirm the OS
+     associated application launches. Click the binary file and confirm it
+     reports as binary rather than printing replacement characters. Click an
+     image and confirm an in-app preview, not an unavailable placeholder. Switch
+     the app to Simplified Chinese and confirm the Files toolbar, search,
+     empty/loading/error, viewer, open, and reveal-action states are localized.
+     Switch projects and confirm the tree updates without waiting on a poll.
   6. Click a file path in the conversation. Confirm it still opens a host
      `file:<path>` tab under Open resources — transcript artifacts did not move
      to the plugin.

@@ -769,11 +769,11 @@ workflow while rendering entirely inside the plugin's isolated page:
   fills are neutral theme surfaces, with the caret and folder/file SVGs carrying
   the hierarchy instead of emoji or text glyphs. A context menu and
   double-click open the selected file with the OS default app.
-- Selecting a file opens a viewer with a Back action, the root-relative path,
-  file size, line numbers, and a bounded preview. Wider panels keep the tree
-  beside the viewer; a narrow panel still uses the focused viewer. The viewer
+- Selecting a file replaces the tree with a focused viewer page: Back, the
+  root-relative path, file size, line numbers, and a bounded preview. The viewer
   offers **Open with default app**, **Show in folder**, and copy path through
-  the scoped plugin bridge. Loading, read failures, binary content, image
+  the scoped plugin bridge. Back and Escape return to the same tree selection.
+  Loading, read failures, binary content, image
   previews, oversized files, empty folders, and folders that fail to load each
   have a distinct localized state; a failed directory can be retried in place.
 - The page follows `app.getAppearance` and `appearance:changed` for base theme
