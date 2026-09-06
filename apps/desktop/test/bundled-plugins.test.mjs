@@ -93,6 +93,7 @@ test("the Files view keeps the former browser workflow while staying plugin-owne
   assert.match(view, /direction:\s*rtl/);
   assert.match(view, /globFromQuery/);
   assert.doesNotMatch(view, /setInterval/);
+  assert.doesNotMatch(view, /SPLIT_MIN|app\.split/);
   // The main app is intentionally monochrome; the bundled view must not
   // drift back to the blue accent it used before joining the host palette.
   assert.doesNotMatch(view, /#7aa2f7|#2563eb|#22c55e/);

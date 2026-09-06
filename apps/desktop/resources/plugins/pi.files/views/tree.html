@@ -181,16 +181,6 @@
         flex: 1;
         flex-direction: column;
       }
-      .app.split .content {
-        display: grid;
-        grid-template-columns: minmax(148px, 38%) minmax(0, 1fr);
-      }
-      .app.split .tree-view {
-        border-right: 1px solid var(--border);
-      }
-      .app.split .view[hidden] {
-        display: flex !important;
-      }
       .section-bar {
         display: flex;
         flex: 0 0 auto;
@@ -358,7 +348,6 @@
         border-bottom: 1px solid var(--border);
         background: var(--surface);
       }
-      .app.split .viewer-header .back-only { display: none; }
       .viewer-path {
         min-width: 0;
         flex: 1;
@@ -528,7 +517,6 @@
 
     <script>
       const bridge = window.pluginBridge;
-      const app = document.getElementById("app");
       const treeView = document.getElementById("tree-view");
       const tree = document.getElementById("tree");
       const treeCount = document.getElementById("tree-count");
@@ -547,7 +535,6 @@
       const toolbarSubtitle = document.getElementById("toolbar-subtitle");
 
       const MAX_LINES = 5000;
-      const SPLIT_MIN = 420;
       const expanded = new Set();
       const directories = new Map();
       const fileSizes = new Map();
@@ -560,7 +547,6 @@
       let isRevealing = false;
       let isOpening = false;
       let viewerState = null;
-      let split = false;
       let searchQuery = "";
       let searchHits = null;
       let searchTimer = 0;
@@ -579,8 +565,6 @@
           noWorkspaceTitle: "No project open",
           noWorkspaceCopy: "Choose a project from the sidebar, then come back here to inspect its files.",
           empty: "This project has no readable files.",
-          selectFile: "Select a file",
-          selectFileCopy: "Pick a file in the tree to preview it here.",
           loading: "Loading…",
           refreshing: "Refreshing…",
           error: "Could not load this folder.",
@@ -615,8 +599,6 @@
           noWorkspaceTitle: "尚未打开项目",
           noWorkspaceCopy: "请先从侧边栏选择项目，再回到这里查看文件。",
           empty: "此项目没有可读取的文件。",
-          selectFile: "选择文件",
-          selectFileCopy: "在文件树中选择一个文件即可预览。",
           loading: "加载中…",
           refreshing: "刷新中…",
           error: "无法加载此文件夹。",
@@ -705,9 +687,7 @@
         document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
         applyLabels();
         renderTree();
-        if (split && !selected) {
-          showSelectPrompt();
-        } else if (!viewerView.hidden && viewerState) {
+        if (!viewerView.hidden && viewerState) {
           if (viewerState.type === "text") renderText(viewerState.text);
           else if (viewerState.type === "image") renderImage(viewerState.dataUrl, viewerState.alt);
           else if (viewerState.type !== "loading") showViewerMessage(viewerState.type);
@@ -727,33 +707,13 @@
       };
 
       const updateViewerButtons = () => {
-        const active = Boolean(selected) && (!viewerView.hidden || split);
+        const active = Boolean(selected) && !viewerView.hidden;
         copyButton.disabled = !active;
         openButton.disabled = !active || isOpening;
         revealButton.disabled = !active || isRevealing;
         openButton.dataset.loading = String(isOpening);
         revealButton.dataset.loading = String(isRevealing);
         applyLabels();
-      };
-
-      const applyLayout = () => {
-        const next = app.clientWidth >= SPLIT_MIN;
-        if (next !== split) {
-          split = next;
-          app.classList.toggle("split", split);
-        }
-        if (split) {
-          treeView.hidden = false;
-          viewerView.hidden = false;
-          if (!selected && viewerState?.type !== "loading") showSelectPrompt();
-        } else if (selected) {
-          treeView.hidden = true;
-          viewerView.hidden = false;
-        } else {
-          treeView.hidden = false;
-          viewerView.hidden = true;
-        }
-        updateViewerButtons();
       };
 
       async function loadDirectory(path, force = false) {
@@ -918,28 +878,15 @@
       }
 
       const showTree = () => {
-        selected = split ? selected : null;
-        if (!split) {
-          viewerView.hidden = true;
-          treeView.hidden = false;
-          viewerState = null;
-        }
-        applyLayout();
+        viewerView.hidden = true;
+        treeView.hidden = false;
+        updateViewerButtons();
         const row = selected && tree.querySelector(`.tree-row[data-path="${CSS.escape(selected)}"]`);
         row?.focus();
       };
 
-      const showSelectPrompt = () => {
-        viewerState = { type: "selectFile" };
-        viewerPath.textContent = "";
-        viewerPath.title = "";
-        viewerMeta.textContent = "";
-        viewerBody.replaceChildren(emptyState(t("selectFile"), t("selectFileCopy")));
-        updateViewerButtons();
-      };
-
       const showViewer = (path) => {
-        treeView.hidden = split ? false : true;
+        treeView.hidden = true;
         viewerView.hidden = false;
         viewerState = { type: "loading" };
         viewerPath.textContent = path;
@@ -1271,7 +1218,7 @@
             void runSearch("");
             return;
           }
-          if (!split && selected && !viewerView.hidden) showTree();
+          if (selected && !viewerView.hidden) showTree();
         } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
           event.preventDefault();
           searchInput.focus();
@@ -1294,21 +1241,17 @@
         searchHits = null;
         searchQuery = "";
         searchInput.value = "";
-        applyLayout();
+        viewerView.hidden = true;
+        treeView.hidden = false;
+        viewerPath.textContent = "";
+        viewerPath.title = "";
+        viewerMeta.textContent = "";
+        viewerBody.replaceChildren();
+        updateViewerButtons();
         renderTree();
-        if (!workspace) {
-          viewerPath.textContent = "";
-          viewerPath.title = "";
-          viewerMeta.textContent = "";
-          viewerBody.replaceChildren();
-        } else if (split) {
-          showSelectPrompt();
-        }
         if (workspace) await loadDirectory("");
       }
 
-      new ResizeObserver(applyLayout).observe(app);
-      applyLayout();
       bridge.on("appearance:changed", setBaseTheme);
       bridge.on("workspace:changed", (payload) => {
         void syncWorkspace(payload ?? null);
