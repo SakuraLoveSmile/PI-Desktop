@@ -67,7 +67,7 @@ test("Settings Info exposes a Main-owned GitHub feedback action", () => {
   assert.match(mainSource, /IPC\.invoke\.appOpenFeedback/);
   assert.match(mainSource, /buildBugReportUrl\(/);
   assert.match(mainSource, /assertFeedbackIssueUrl\(/);
-  assert.match(mainSource, /shell\.openExternal\(url\)/);
+  assert.match(mainSource, /await safeOpenExternal\(url\)/);
   assert.match(apiSource, /openFeedback:\s*\(\)\s*=>\s*invoke\(IPC\.invoke\.appOpenFeedback\)/);
   assert.match(settingsSource, /t\("settings\.feedback"\)/);
   assert.match(settingsSource, /api\.openFeedback\(\)/);

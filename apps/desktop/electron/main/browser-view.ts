@@ -1,9 +1,9 @@
-import { shell, WebContentsView } from "electron";
-import type { BrowserWindow } from "electron";
+import { shell, WebContentsView, type BrowserWindow } from "electron";
 import { statSync, watch, type FSWatcher } from "node:fs";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BrowserState } from "@pi-desktop/shared";
+import { isAllowedHttpUrl, parseAllowedExternalUrl } from "./safe-open-external";
 
 /**
  * Work panel embedded preview browser (D100, ADR 0019).
@@ -165,7 +165,19 @@ export class BrowserPane {
 
   openExternal(): void {
     const url = this.view?.webContents.getURL();
-    if (url) void shell.openExternal(url);
+    if (!url) return;
+    const allowed = parseAllowedExternalUrl(url);
+    if (allowed) {
+      void shell.openExternal(allowed);
+      return;
+    }
+    if (this.isAllowedFileUrl(url)) {
+      try {
+        void shell.openPath(fileURLToPath(url));
+      } catch {
+        // Invalid file URL — leave the preview in place.
+      }
+    }
   }
 
   dispose(): void {
@@ -249,14 +261,15 @@ export class BrowserPane {
     });
     const wc = view.webContents;
     wc.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/i.test(url)) void shell.openExternal(url);
+      const allowed = parseAllowedExternalUrl(url);
+      if (allowed) void shell.openExternal(allowed);
       return { action: "deny" };
     });
     wc.session.setPermissionRequestHandler((_wc, _permission, callback) => {
       callback(false);
     });
     wc.on("will-navigate", (event, url) => {
-      if (/^https?:/i.test(url)) return;
+      if (isAllowedHttpUrl(url)) return;
       // Relative links inside a previewed page may point at sibling files;
       // anything escaping the workspace root stays blocked.
       if (/^file:/i.test(url) && this.isAllowedFileUrl(url)) return;

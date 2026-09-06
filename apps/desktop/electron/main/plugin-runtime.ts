@@ -59,6 +59,7 @@ import {
 } from "./fs-panel";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
+import { parseAllowedExternalUrl } from "./safe-open-external";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 
 export type RegisteredCommand = {
@@ -2894,10 +2895,11 @@ export class PluginRuntime {
       shell: {
         openExternal: async (url: string) => {
           this.assertPermission(loaded, "shell.openExternal");
-          if (!/^https?:\/\//i.test(url) && !/^mailto:/i.test(url)) {
+          const allowed = parseAllowedExternalUrl(url);
+          if (!allowed) {
             throw apiError("INVALID_ARGUMENT", "only http(s)/mailto URLs allowed");
           }
-          await this.services.openExternal(url);
+          await this.services.openExternal(allowed);
           this.services.audit?.({
             pluginId,
             api: "shell.openExternal",

@@ -133,6 +133,7 @@ import { builtinSkills, loadBuiltinSkillBody } from "./builtin-skills";
 import { registerPluginDevTools } from "./plugin-dev-tools";
 import { PluginPanelHost } from "./plugin-panel-host";
 import { PluginViewHost, pluginViewKey } from "./plugin-view-host";
+import { parseAllowedExternalUrl } from "./safe-open-external";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 import { Logger } from "./logger";
 import { collectWorkspaceDiff } from "./git-diff";
@@ -403,27 +404,15 @@ async function readSystemClipboard(): Promise<ClipboardCapture | null> {
 
 const clipboardHistory = new ClipboardHistory({ read: readSystemClipboard });
 
-export function isAllowedExternalUrl(rawUrl: unknown): boolean {
-  if (typeof rawUrl !== "string" || !rawUrl.trim()) {
-    return false;
-  }
-  try {
-    const parsed = new URL(rawUrl);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-export async function safeOpenExternal(rawUrl: unknown): Promise<boolean> {
-  if (!isAllowedExternalUrl(rawUrl)) {
+async function safeOpenExternal(rawUrl: unknown): Promise<void> {
+  const url = parseAllowedExternalUrl(rawUrl);
+  if (!url) {
     logger.app("permission", "warn", "Blocked disallowed external protocol or URL", {
       data: { url: typeof rawUrl === "string" ? rawUrl.slice(0, 256) : String(rawUrl) },
     });
-    return false;
+    throw new Error("DISALLOWED_EXTERNAL_URL");
   }
-  await shell.openExternal(rawUrl as string);
-  return true;
+  await shell.openExternal(url);
 }
 
 const pluginPanels = new PluginPanelHost(
@@ -2105,7 +2094,7 @@ function createPluginLauncherWindow(): Promise<BrowserWindow> {
       });
     }
     window.webContents.setWindowOpenHandler(({ url }) => {
-      void safeOpenExternal(url);
+      void safeOpenExternal(url).catch(() => undefined);
       return { action: "deny" };
     });
     window.webContents.on("will-navigate", (event, url) => {
@@ -2541,7 +2530,7 @@ async function createWindow() {
   window.on("resized", armNativeWorkPanelResizeFinish);
 
   window.webContents.setWindowOpenHandler(({ url }) => {
-    void safeOpenExternal(url);
+    void safeOpenExternal(url).catch(() => undefined);
     return { action: "deny" };
   });
   window.webContents.on("did-start-loading", () => {
@@ -5158,7 +5147,7 @@ function registerIpc() {
       hostVersion,
     });
     assertFeedbackIssueUrl(url);
-    await shell.openExternal(url);
+    await safeOpenExternal(url);
     return { ok: true };
   });
 
