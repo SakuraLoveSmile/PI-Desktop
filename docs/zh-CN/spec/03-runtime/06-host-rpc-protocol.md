@@ -233,10 +233,14 @@ type ToolBudgetHealth = {
   Plan 或 Goal 记录
 - `session.appendMessage`
 - `session.saveInflightMessage` — 仅供 Electron 主进程使用的检查点，保存正在流式
-  输出的助手回复：`{ sessionId, turnId?, message }` 原子替换
-  `sessions/<id>.inflight.json`（D299，规格 04 §2.1）。返回 `{ ok, saved }`；
+  输出的助手回复以及 `message_end` 的完成快照：`{ sessionId, turnId?, message }` 原子替换
+  `sessions/<id>.inflight.json`（D299、D327，规格 04 §2.1）。返回 `{ ok, saved }`；
   消息没有可见文本、或该 id 已被索引（最终行先落盘）时 `saved` 为 false，后一种
-  情况下还会移除残留检查点。非助手角色属于 `INVALID_PARAMS` 类失败
+  情况下还会移除残留检查点。非助手角色属于 `INVALID_PARAMS` 类失败。
+  `completed`/`error` 的 `session.endTurn` 仅在该 id 已索引时才删除该文件。
+- `session.recoverInflightMessages` — 仅供 Electron 主进程在 outbox 排空后调用的扫描
+  （D327）。把最终行从未落盘的残留检查点提升写入转录，回合已 `completed` 的提升为
+  `complete`。启动恢复会跳过已完成回合，以便 outbox 先追加。返回 `{ ok, count }`。
 - `session.appendCompaction` — 仅附加最新类型的 sidecar
   模型上下文检查点。它需要非空 checkpoint/summary/boundary
 ids 和非负 `tokensBefore`；它不会插入 message/search 行

@@ -1467,6 +1467,12 @@ async fn handle_request(
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": true, "saved": saved }))
         }
+        "session.recoverInflightMessages" => {
+            let st = state.lock().await;
+            let recovered = sessions::recover_inflight_messages(&st.db, true)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": true, "count": recovered.len() }))
+        }
         "session.appendCompaction" => {
             let session_id = params
                 .get("sessionId")

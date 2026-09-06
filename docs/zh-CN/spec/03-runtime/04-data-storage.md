@@ -98,9 +98,10 @@ commit 不会删除历史审查证据。
 `session.saveInflightMessage` 时原子替换（临时文件 + 重命名）（D299）。当
 `message_update` 事件携带可见文本时，Electron 主进程至多每 1.5 秒发送一次检查点，
 因此回复中途退出或崩溃最多丢失最后一个间隔的输出，而不是整条回复。该文件是临时的：
-同一 id 的最终行的 `session.appendMessage` 会移除它，`completed`/`error` 的回合
-结束会移除它，而启动扫描以及 sidecar 丢失时的回合结束（`recoverInflight`）会把
-最终行从未落盘的残留检查点提升为该回合下的 `aborted` 助手消息写入转录。它从不追加、
+同一 id 的最终行的 `session.appendMessage` 会移除它；`completed`/`error` 的回合
+结束仅在该 id 已索引时才移除它（D327）；启动扫描以及 sidecar 丢失时的回合结束
+（`recoverInflight`）会把最终行从未落盘的残留检查点提升写入转录——回合已
+`completed` 时为 `complete`，否则为该回合下的 `aborted` 助手消息。它从不追加、
 从不被 sidecar 读取、也从不镜像进 SQLite；针对已被索引的 id 的迟到检查点会被丢弃。
 子代理回复不做检查点。
 
@@ -855,7 +856,7 @@ CREATE INDEX idx_notifications_unread
 | 流式回复检查点（`session.saveInflightMessage`，D299） | 原子替换 `<id>.inflight.json`；空消息或已索引的 id 为空操作 | — |
 | 上下文检查点（`session.appendCompaction`） | 在其引用的消息边界之后附加类型化检查点行 | —（检查点是不可搜索的成绩单内容） |
 | 工具成功（Write/Edit） | — | upsert `artifacts` + `audit_log` 行，与结果持久化相同的 tx |
-| 通过 `session.endTurn` 打开终端 | `completed`/`error`：移除进行中检查点；`recoverInflight`：当最终行从未落盘时把检查点作为 `aborted` 消息行追加 | 更新 `turns`；对于 completed/error，在同一交易中插入一个通知并修剪至 200 个；中止插入 无；被提升的检查点在该回合下获得一个索引行 |
+| 通过 `session.endTurn` 打开终端 | `completed`/`error`：仅当该 id 已索引时才移除进行中检查点，否则留给 outbox 或启动恢复（D327）。`recoverInflight`：最终行从未落盘时，回合已 `completed` 则追加为 `complete`，否则为 `aborted` | 更新 `turns`；对于 completed/error，在同一交易中插入一个通知并修剪至 200 个；中止插入 无；被提升的检查点在该回合下获得一个索引行 |
 | plan/goal 提交 | 主机将准确的 Markdown 字节写入新的唯一 `<workspaceRoot>/.pi/<kind>/*.md` 文件 | 在发出批准请求之前插入一个 `plan_approvals(pending)` 行，其中包含类型、结构化 title/question、工件 path/hash/size 和到期时间 |
 | plan/goal 批准 | 验证不可变工件 path/hash/size | 原子地解析 `plan_approvals`，更新 `sessions.mode` 和显式 `permission_mode`，并设置 `execution_state = 'queued'`； reject/expiry 保持合约模式 |
 | 转录本截断/编辑/无应答智能停止 (`session.replaceMessages`) | 原子记录重写（临时+重命名）；只保留边界仍然存在的检查点 | single tx：删除索引行，批量重新插入携带每个幸存消息所属的 `turn_id`，重置 `last_seq`； smart Stop 仅将其结构化输入框快照保留在渲染器内存中 |
@@ -868,10 +869,13 @@ CREATE INDEX idx_notifications_unread
 
 规则：回合开始前用户消息持久（fsync'd 文件行）；
 assistant/tool 行在其结束事件时持久化；正在流式的助手回复另外至多每 1.5 秒
-做一次检查点（D299），因此回合中途退出或崩溃最多丢失进行中回复的最后一个检查点
-间隔，加上仍在运行的工具行。启动扫描把该回合标记为 `aborted`，并把残留的检查点
-提升为该回合的 `aborted` 助手行写入转录；用户停止不动检查点，因为运行时自己的
-中止最终行仍在路上，到达时会移除它。渲染器侧的停止绝不重写已有已开始回复的转录
+做一次检查点（D299），并且 `message_end` 的完成快照在 outbox 追加之前先做检查点
+（D327），因此回合中途退出或崩溃最多丢失进行中回复的最后一个检查点
+间隔，加上仍在运行的工具行。启动扫描把最终行从未落盘的残留检查点提升写入转录：
+回合已完成则为 `complete`，否则为 `aborted` 回合下的 `aborted` 助手行。
+`completed`/`error` 的 endTurn 不删除尚未索引的检查点。用户停止不动检查点，因为运行时自己的
+中止最终行仍在路上，到达时会移除它。Electron 握手在冷启动 `session.get` 之前等待
+outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 （规格 01 §5.3）；它唯一的重写是撤销未应答提示，且从完整持久转录与实时行的合并
 结果计算。
 只有在追加成功后，检查点才会安装到实时运行时中；

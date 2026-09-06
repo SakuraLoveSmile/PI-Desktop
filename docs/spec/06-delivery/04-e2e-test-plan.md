@@ -404,7 +404,9 @@ Each scenario is documented in this format:
   file was not rewritten (its earlier lines are byte-identical) and the
   checkpoint file is gone once the aborted final row landed. 5) The completed
   reply has exactly one row per assistant fragment, no `aborted` duplicate, and
-  no checkpoint file.
+  no checkpoint file. A completed reply that had not yet left the outbox at
+  quit is still present after relaunch (promoted `complete` if recovered from
+  the checkpoint, or drained from the outbox before the first `session.get`).
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `03-runtime/07-process-model.md`,
   `03-runtime/01-ipc-protocol.md`
@@ -7477,6 +7479,31 @@ are withdrawn with ADR 0165.
 - **Status**: Unit-covered (`session-transcript.test.mjs` D324 case,
   `session-switch-performance.test.mjs`); full desktop journey Draft (do
   not run E2E locally unless explicitly requested)
+
+#### E2E-184: Completed AI replies survive closing and reopening the app
+
+- **Preconditions**: A session with at least one finished user prompt and
+  assistant reply. The reply may still be in the persistence outbox or only
+  in `sessions/<id>.inflight.json` when the process exits.
+- **Steps**: 1) Send a prompt and wait until the assistant reply is complete
+  and the session is idle. 2) Quit the app (window close / tray Quit) and
+  relaunch. 3) Open the same session. 4) Repeat with a hard kill of the
+  process immediately after the reply appears on screen. 5) Repeat with
+  several completed turns, then quit and reopen.
+- **Expected**: Every user prompt and every completed assistant reply is
+  visible after relaunch. No session shows user rows with empty gaps where
+  the answers were. A reply recovered from a leftover checkpoint of a
+  `completed` turn is `complete`, not `aborted`. Tool rows that had reached
+  `tool_end` are also present. Earlier turns already on disk are unchanged.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/07-process-model.md`, `03-runtime/10-session-state-machine.md`,
+  ADR 0041, ADR 0153, `08-meta/decisions-log.md` (D327)
+- **Acceptance**: C (conversation & stream), F (persistence)
+- **Milestone**: M5
+- **Status**: Unit-covered (`sessions.rs` D327 inflight tests,
+  `persistence-outbox.test.mjs`, `inflight-checkpoint.test.mjs`); protocol
+  reproduction in the issue-42 host+outbox harness; full desktop journey
+  Draft (do not run E2E locally unless explicitly requested)
 
 #### E2E-178: A missing sessions row is restored so the outbox can drain
 

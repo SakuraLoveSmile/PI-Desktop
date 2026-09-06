@@ -100,10 +100,11 @@ message }` object that host-core replaces atomically (temp + rename) on every
 every 1.5 s while `message_update` events carry visible text, so a quit or
 crash mid-reply loses at most the last interval of output instead of the whole
 reply. The file is transient: the final row's `session.appendMessage` with the
-same id removes it, a `completed`/`error` turn end removes it, and the boot
-sweep plus a sidecar-loss turn end (`recoverInflight`) promote a leftover whose
-final row never landed into the transcript as an `aborted` assistant message
-under its turn. It is never appended to, never read by the sidecar, and never
+same id removes it; a `completed`/`error` turn end removes it only when that
+id is already indexed (D327); and the boot sweep plus a sidecar-loss turn
+end (`recoverInflight`) promote a leftover whose final row never landed —
+as `complete` when the turn already completed, otherwise as an `aborted`
+assistant message under its turn. It is never appended to, never read by the sidecar, and never
 mirrored into SQLite; a late checkpoint for an id that is already indexed is
 dropped. Delegate replies are not checkpointed.
 
@@ -880,7 +881,7 @@ is the source of truth, the index is derived and self-healing.
 | streaming reply checkpoint (`session.saveInflightMessage`, D299) | atomically replace `<id>.inflight.json`; no-op for an empty message or an id already indexed | — |
 | context checkpoint (`session.appendCompaction`) | append typed checkpoint line after its referenced message boundary | — (checkpoint is not searchable transcript content) |
 | tool succeeded (Write/Edit) | — | upsert `artifacts` + `audit_log` row, same tx as result persistence |
-| turn terminal via `session.endTurn` | `completed`/`error`: remove the in-flight checkpoint; `recoverInflight`: append the checkpoint as an `aborted` message line when its final row never landed | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none; a promoted checkpoint gets an index row under the turn |
+| turn terminal via `session.endTurn` | `completed`/`error`: remove the in-flight checkpoint only when its id is already indexed; otherwise leave it for the outbox or boot (D327). `recoverInflight`: append the leftover as `complete` when the turn is `completed`, otherwise as `aborted`, when its final row never landed | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none; a promoted checkpoint gets an index row under the turn |
 | plan/goal submission | host writes the exact Markdown bytes to a new unique `<workspaceRoot>/.pi/<kind>/*.md` file | insert one `plan_approvals(pending)` row with the kind, structured title/question, artifact path/hash/size, and expiry before emitting the approval request |
 | plan/goal approval | verify the immutable artifact path/hash/size | atomically resolve `plan_approvals`, update `sessions.mode` and explicit `permission_mode`, and set `execution_state = 'queued'`; reject/expiry stay in the contract mode |
 | transcript truncate / edit / unanswered smart Stop (`session.replaceMessages`) | atomic transcript rewrite (temp + rename); preserve only a checkpoint whose boundary remains | single tx: delete index rows, bulk reinsert carrying each surviving message's owning `turn_id`, reset `last_seq`; smart Stop keeps its structured composer snapshot only in renderer memory |
@@ -894,13 +895,17 @@ is the source of truth, the index is derived and self-healing.
 
 Rules: user message durable (fsync'd file line) before the turn starts;
 assistant/tool lines durable at their end events; the streaming assistant
-reply is additionally checkpointed at most every 1.5 s (D299), so a quit or
-crash mid-turn loses at most the last checkpoint interval of the in-flight
-reply plus any tool rows still running. The boot sweep marks that turn
-`aborted` and promotes the leftover checkpoint into the transcript as the
-turn's `aborted` assistant row; a user Stop does not touch the checkpoint,
-because the runtime's own aborted final row is still on its way and removes
-it on arrival. Renderer-side Stop never rewrites a transcript that has a
+reply is additionally checkpointed at most every 1.5 s (D299), and the
+finished `message_end` snapshot is checkpointed before the outbox append
+(D327), so a quit or crash mid-turn loses at most the last checkpoint
+interval of the in-flight reply plus any tool rows still running. The boot
+sweep promotes a leftover checkpoint whose final row never landed: as
+`complete` when the turn already completed, otherwise as `aborted` under an
+`aborted` turn. `completed`/`error` endTurn does not delete an unindexed
+checkpoint. A user Stop does not touch the checkpoint, because the runtime's
+own aborted final row is still on its way and removes it on arrival.
+Electron handshake awaits the outbox drain before a cold `session.get`.
+Renderer-side Stop never rewrites a transcript that has a
 started reply (spec 01 §5.3); its only rewrite is the undo of an unanswered
 prompt, computed from the full durable transcript merged with the live rows.
 A checkpoint is installed into the live runtime only after its append succeeds;

@@ -111,7 +111,9 @@ Supervision parameters (implemented in Electron main):
 1. Reject new prompts
 2. Flush the in-flight reply checkpoints, then abort active turns through the
    sidecar and wait, bounded (2 s total), for their aborted final rows to
-   drain through the persistence outbox while host-core is still alive (D299)
+   drain through the persistence outbox while host-core is still alive (D299).
+   An idle quit still awaits the outbox. The next handshake awaits any
+   leftover drain before the renderer can `session.get` (D327).
 3. Interrupt pending/queued/running Plan and Goal work and reject late responses
 4. Unload plugins
 5. Stop Node agent sidecar

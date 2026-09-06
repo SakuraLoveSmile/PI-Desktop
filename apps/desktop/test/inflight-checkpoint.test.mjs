@@ -111,3 +111,28 @@ test("delegate rows are the caller's decision: the checkpointer keys by session 
   assert.deepEqual(saved, ["parent", "child"]);
   checkpointer.dispose();
 });
+
+test("settleIf ignores a newer turn that started during the final flush (D327)", async () => {
+  const saved = [];
+  const checkpointer = new InflightCheckpointer(async (checkpoint) => {
+    saved.push(checkpoint.message.id);
+  }, 10_000);
+
+  checkpointer.observe({ sessionId: "s", message: assistant("old", "done") });
+  await sleep(0);
+  checkpointer.observe({ sessionId: "s", message: assistant("new", "next") });
+  checkpointer.settleIf("s", "old");
+  assert.deepEqual(checkpointer.pendingSessions(), ["s"]);
+  await checkpointer.flushAll();
+  assert.deepEqual(saved, ["old", "new"]);
+  checkpointer.dispose();
+});
+
+test("settleIf drops the matching finished snapshot", async () => {
+  const checkpointer = new InflightCheckpointer(async () => undefined, 10_000);
+  checkpointer.observe({ sessionId: "s", message: assistant("a", "done") });
+  await sleep(0);
+  checkpointer.settleIf("s", "a");
+  assert.deepEqual(checkpointer.pendingSessions(), []);
+  checkpointer.dispose();
+});

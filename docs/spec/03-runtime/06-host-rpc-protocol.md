@@ -261,12 +261,18 @@ reach this protocol — see [14-secrets-storage](14-secrets-storage.md) §10.
   Plan or Goal record
 - `session.appendMessage`
 - `session.saveInflightMessage` — Electron-main-only checkpoint of the
-  assistant reply currently streaming: `{ sessionId, turnId?, message }`
-  atomically replaces `sessions/<id>.inflight.json` (D299, spec 04 §2.1).
+  assistant reply currently streaming, including the finished `message_end`
+  snapshot: `{ sessionId, turnId?, message }`
+  atomically replaces `sessions/<id>.inflight.json` (D299, D327, spec 04 §2.1).
   Returns `{ ok, saved }`; `saved` is false for a message without visible text
   or for an id that is already indexed (the final row landed first), and in the
   latter case any leftover checkpoint is removed. Non-assistant roles are
-  `INVALID_PARAMS`-class failures
+  `INVALID_PARAMS`-class failures. A `completed`/`error` `session.endTurn`
+  deletes the file only when that id is already indexed.
+- `session.recoverInflightMessages` — Electron-main-only post-drain sweep
+  (D327). Promotes leftover checkpoints whose final row never landed,
+  including `completed` turns as `complete`. Boot recovery skips completed
+  leftovers so the outbox can append first. Returns `{ ok, count }`.
 - `session.appendCompaction` — sidecar-only append of the newest typed
   model-context checkpoint. It requires non-empty checkpoint/summary/boundary
   ids and non-negative `tokensBefore`; it does not insert a message/search row

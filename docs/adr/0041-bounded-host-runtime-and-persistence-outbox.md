@@ -22,7 +22,9 @@ are reaped before their permits are released.
 Electron host supervision is single-flight and generation-aware. A stale host
 generation cannot issue notifications or accept new RPC writes. Assistant and
 tool message appends pass through an Electron-main-owned, file-backed outbox
-and are flushed sequentially after a successful host handshake. Host-side
+and are flushed sequentially after a successful host handshake. The handshake
+**awaits** that drain before the host is advertised ready, so a cold
+`session.get` cannot race a queued assistant/tool row (D327). Host-side
 message append is idempotent by message id.
 
 ## Consequences

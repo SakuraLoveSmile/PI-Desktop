@@ -71,7 +71,7 @@ impl AppState {
             Ok(_) => {}
             Err(error) => tracing::warn!(%error, "orphaned session sweep failed"),
         }
-        match crate::sessions::recover_inflight_messages(&db) {
+        match crate::sessions::recover_inflight_messages(&db, false) {
             Ok(recovered) if !recovered.is_empty() => {
                 tracing::info!(count = recovered.len(), "recovered in-flight replies");
             }

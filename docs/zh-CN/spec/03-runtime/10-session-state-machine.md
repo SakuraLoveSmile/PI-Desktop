@@ -138,7 +138,9 @@ accept_prompt
 - 转运行行：开始+终端`session.endTurn`更新
 - 通知行：与看不见的 completed/error 终端相同的交易
   更新；决不会为了可见的当前结果或中止
-- assistant/tool 消息：在 message_end/tool_end 上。再验证仍在运行或
+- assistant/tool 消息：在 message_end/tool_end 上。完成的助手快照在
+  outbox 追加之前先做检查点；握手在冷启动 `session.get` 之前等待该
+  排空（D327）。再验证仍在运行或
   刚完成、实时行尚未刷入磁盘的会话时，把有界持久化页按时间顺序缝
   到实时快照上，使更早的实时行留在该页之前、进行中或尚未刷入的尾巴
   留在该页之后（D317、D324）。只有当该页已包含每一条实时行时才清掉

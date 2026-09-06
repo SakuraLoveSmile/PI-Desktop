@@ -4091,7 +4091,19 @@ async function startHost(): Promise<void> {
       data: { generation: h.generation },
     });
     void importLegacyScheduled();
-    void persistenceOutbox.flush(() => host);
+    // Drain before the renderer can session.get. Assistant/tool rows live in
+    // this outbox until host-core appends them; a cold start that raced the
+    // flush showed only user prompts (issue #42 / D327). Boot leaves
+    // completed checkpoints in place so this drain can land the finished
+    // row first; leftovers are then promoted as complete.
+    await persistenceOutbox.flush(() => host);
+    try {
+      await h.call("session.recoverInflightMessages");
+    } catch (error) {
+      logger.app("persistence", "warn", "in-flight reply recovery after outbox drain failed", {
+        data: String(error),
+      });
+    }
   } catch (error) {
     if (host === h) host = null;
     logger.flushChild("host");
@@ -4876,9 +4888,20 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     return;
   }
   if (event.type === "message_end" && event.message.role === "assistant") {
-    // The final row supersedes any pending checkpoint of this reply (D299).
+    // Checkpoint the finished snapshot before the outbox append (D327).
+    // Settling first dropped the last interval of text, and endTurn used to
+    // delete the host file while the final row was still queued.
     if (!envelope.parentToolCallId) {
-      inflightCheckpointer.settle(envelope.sessionId);
+      const sessionId = envelope.sessionId;
+      const finalId = event.message.id;
+      inflightCheckpointer.observe({
+        sessionId,
+        turnId: envelope.turnId ?? turnId,
+        message: event.message,
+      });
+      void inflightCheckpointer.flush(sessionId).finally(() => {
+        inflightCheckpointer.settleIf(sessionId, finalId);
+      });
     }
     // Empty aborted bubbles are not useful transcript rows. Structured
     // provider failures remain durable assistant messages so their details

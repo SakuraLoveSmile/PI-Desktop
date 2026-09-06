@@ -99,7 +99,8 @@ queued/running `plan_approvals` 执行状态已中断并中止它们
 
 1.拒绝新的提示
 2. 刷写进行中回复检查点，然后通过 sidecar 中止活动回合，并在 host-core 仍存活时
-   有界等待（总计 2 秒）其中止最终行经由持久化发件箱落盘（D299）
+   有界等待（总计 2 秒）其中止最终行经由持久化发件箱落盘（D299）。
+   空闲退出仍等待 outbox。下一次握手在渲染器能够 `session.get` 之前等待残留排空（D327）。
 3. 中断 pending/queued/running Plan 和 Goal 工作并拒绝迟到的响应
 4.卸载插件
 5. 停止 Node 代理 sidecar

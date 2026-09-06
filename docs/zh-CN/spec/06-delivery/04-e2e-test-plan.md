@@ -336,7 +336,9 @@ M5。
   3) 正在流式的行原地落定为 `aborted` 并保留文本，重新加载后同一行仍在，且不再有
   `.inflight.json`。4) 停止后以及重新打开后部分回复立即可见；转录文件没有被重写
   （其更早的行逐字节相同），并且在中止的最终行落盘后检查点文件已消失。5) 完成的
-  回复每个助手片段恰好一行，没有 `aborted` 重复行，也没有检查点文件。
+  回复每个助手片段恰好一行，没有 `aborted` 重复行，也没有检查点文件。退出时尚未离开
+  outbox 的已完成回复在重新启动后仍然存在（从检查点提升为 `complete`，或在第一次
+  `session.get` 之前从 outbox 排空）。
 - **链接规格**：`03-runtime/04-data-storage.md`、
   `03-runtime/06-host-rpc-protocol.md`、`03-runtime/07-process-model.md`、
   `03-runtime/01-ipc-protocol.md`
@@ -5562,6 +5564,19 @@ IPC 请求无法关闭。
 - **里程碑**：M5
 - **状态**：单元已覆盖（`session-transcript.test.mjs` 的 D324 用例、
   `session-switch-performance.test.mjs`）；完整桌面旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
+
+#### E2E-184：关闭并重新打开应用后，已完成的 AI 回复仍然保留
+
+- **前提条件**：会话至少有一条已完成的用户提示和助手回复。进程退出时，回复可能仍在持久化 outbox 里，或只在 `sessions/<id>.inflight.json` 中。
+- **步骤**：1）发送提示，等到助手回复完成且会话空闲。2）退出应用（关窗口 / 托盘退出）再启动。3）打开同一会话。4）在回复刚出现在屏幕上时硬杀进程，再重复。5）完成多轮后再退出并重新打开。
+- **预期**：重新启动后每一条用户提示和每一条已完成的助手回复都可见。不会出现只有用户行、答案位置空白的会话。从已 `completed` 回合的残留检查点恢复的回复是 `complete`，不是 `aborted`。已到达 `tool_end` 的工具行也在。磁盘上更早的回合不变。
+- **链接规格**：`03-runtime/04-data-storage.md`、
+  `03-runtime/07-process-model.md`、`03-runtime/10-session-state-machine.md`、
+  ADR 0041、ADR 0153、`08-meta/decisions-log.md`（D327）
+- **验收**：C（对话和直播）、F（持久化）
+- **里程碑**：M5
+- **状态**：单元已覆盖（`sessions.rs` 的 D327 inflight 测试、
+  `persistence-outbox.test.mjs`、`inflight-checkpoint.test.mjs`）；完整桌面旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
 
 #### E2E-178：缺失的 sessions 行被恢复，outbox 才能排空
 

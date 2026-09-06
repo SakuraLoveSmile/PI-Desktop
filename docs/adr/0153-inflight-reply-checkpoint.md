@@ -1,9 +1,9 @@
 # ADR 0153: Checkpoint the streaming reply beside the transcript
 
-- Status: Accepted
+- Status: Accepted (amended 2026-09-06 by D327)
 - Date: 2026-09-05
 - Deciders: PI-Desktop core
-- Related: D119, D287, D288, D299, E2E-010, E2E-171, ADR 0030
+- Related: D119, D287, D288, D299, D327, E2E-010, E2E-171, E2E-184, ADR 0030, ADR 0041
 
 ## Context
 
@@ -62,3 +62,35 @@ renderer's 64 KB display-capped rows back over the full ones.
   SQLite. `session.endTurn` gains `recoverInflight` and `recovered`.
 - Session delete removes the checkpoint file with the other session files.
 - Spec 01 §5.3, 04 §2.1 and §4.7, 06, 07 §5; E2E-171; D299.
+
+## Amendment (2026-09-06) — Completed replies survive process restart (D327)
+
+Issue #42 showed the same user-only transcript after a full quit that D324
+fixed for an in-process session switch. Two settlement rules dropped a
+finished reply that was still only in the outbox:
+
+1. `message_end` called `settle()` before enqueueing, so the host checkpoint
+   was up to 1.5 s stale and a trailing write of the finished snapshot was
+   cancelled.
+2. `session.endTurn` for `completed`/`error` deleted the checkpoint even when
+   that id was not yet indexed. Boot recovery then refused to promote a
+   leftover whose turn was already `completed`. Combined with a fire-and-forget
+   outbox flush after handshake, a cold `session.get` painted only user rows.
+
+Amendment:
+
+- Electron main checkpoints the finished `message_end` snapshot, then
+  `settleIf` so a newer turn started during that write is not wiped.
+- `completed`/`error` endTurn deletes the checkpoint only when the final row
+  is already indexed. An unindexed leftover is kept for the outbox or boot.
+- Boot/recovery promotion of a leftover whose turn is `completed` writes the
+  row as `complete`, not `aborted`. Other leftovers stay `aborted`.
+- Host handshake **awaits** the persistence outbox drain before the renderer
+  can `session.get`, then calls `session.recoverInflightMessages` (amends
+  ADR 0041). Boot recovery skips completed leftovers so the finished outbox
+  row wins. Tool rows in the same outbox are covered by that drain; they are
+  still not checkpointed.
+
+Quit still waits (bounded) for active turns. A hard kill after the outbox
+file is written is recovered by the awaited handshake drain. A hard kill
+before that persist is recovered from the finished checkpoint.

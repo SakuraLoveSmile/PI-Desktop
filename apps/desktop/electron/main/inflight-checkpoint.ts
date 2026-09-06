@@ -75,6 +75,18 @@ export class InflightCheckpointer {
     state.timer.unref?.();
   }
 
+  /**
+   * Forget the session's pending checkpoint only when it is still the same
+   * message. A newer turn that started while the final snapshot was flushing
+   * must keep its own checkpoint.
+   */
+  settleIf(sessionId: string, messageId: string): void {
+    const state = this.sessions.get(sessionId);
+    if (!state) return;
+    if (state.pending && state.pending.message.id !== messageId) return;
+    this.settle(sessionId);
+  }
+
   /** Forget the session's pending checkpoint; its final row is on its way. */
   settle(sessionId: string): void {
     const state = this.sessions.get(sessionId);

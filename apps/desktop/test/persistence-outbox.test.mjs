@@ -13,6 +13,23 @@ test("session delete drops the outbox for that session (D318)", async () => {
   assert.match(main, /await persistenceOutbox\.dropSession\(id\)/);
 });
 
+test("handshake drains the outbox before the renderer can hydrate (D327)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const main = readFileSync(new URL("../electron/main/index.ts", import.meta.url), "utf8");
+  assert.match(main, /await persistenceOutbox\.flush\(\(\) => host\)/);
+  assert.doesNotMatch(main, /void persistenceOutbox\.flush\(\(\) => host\)/);
+  assert.match(main, /session\.recoverInflightMessages/);
+});
+
+test("message_end checkpoints the finished snapshot before settling (D327)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const main = readFileSync(new URL("../electron/main/index.ts", import.meta.url), "utf8");
+  assert.match(
+    main,
+    /event\.type === "message_end"[\s\S]*inflightCheckpointer\.observe\([\s\S]*settleIf\(sessionId, finalId\)/,
+  );
+});
+
 test("deleting a session drops its queued outbox entries (D318)", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pi-outbox-"));
   const outbox = new PersistenceOutbox(dir, silent);
