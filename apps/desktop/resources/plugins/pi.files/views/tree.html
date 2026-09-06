@@ -93,16 +93,10 @@
         align-items: baseline;
         gap: 6px;
       }
-      .toolbar-name,
       .toolbar-subtitle {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-      }
-      .toolbar-name {
-        font-size: 12.5px;
-        font-weight: 500;
-        letter-spacing: -0.01em;
       }
       .toolbar-subtitle {
         min-width: 0;
@@ -470,7 +464,6 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h6l2 2h9v9.5a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18z"/><path d="M3.5 6.5V5A1.5 1.5 0 0 1 5 3.5h4l2 2h6"/></svg>
           </span>
           <span class="toolbar-copy">
-            <span class="toolbar-name" id="toolbar-name">Files</span>
             <span class="toolbar-subtitle" id="toolbar-subtitle">Project files</span>
           </span>
         </div>
@@ -534,7 +527,6 @@
       const copyButton = document.getElementById("copy");
       const searchInput = document.getElementById("search");
       const menu = document.getElementById("menu");
-      const toolbarName = document.getElementById("toolbar-name");
       const toolbarSubtitle = document.getElementById("toolbar-subtitle");
 
       const MAX_LINES = 5000;
@@ -559,7 +551,6 @@
 
       const copy = {
         en: {
-          files: "Files",
           projectFiles: "Project files",
           search: "Search files",
           searchEmpty: "No matching files.",
@@ -593,7 +584,6 @@
           file: "file",
         },
         zh: {
-          files: "文件",
           projectFiles: "项目文件",
           search: "搜索文件",
           searchEmpty: "没有匹配的文件。",
@@ -661,7 +651,6 @@
         bridge.invoke("ui.showToast", { message, level }).catch(() => {});
 
       const applyLabels = () => {
-        toolbarName.textContent = t("files");
         toolbarSubtitle.textContent = workspace?.name || t("projectFiles");
         document.getElementById("tree-label").textContent =
           searchQuery ? t("search") : t("projectFiles");
