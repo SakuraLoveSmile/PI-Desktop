@@ -953,6 +953,28 @@ function currentWorkspacePath(): string | null {
   return (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath ?? null;
 }
 
+function workspaceInfo(
+  path: string | null,
+): { path: string; name: string } | null {
+  if (!path) return null;
+  return { path, name: path.split(/[\\/]/).filter(Boolean).at(-1) || path };
+}
+
+/** Push a panel event to detached windows and docked views. */
+function broadcastPluginPanelEvent(event: string, payload: unknown): void {
+  pluginPanels.broadcast(event, payload);
+  pluginViews.broadcast(event, payload);
+}
+
+function setCurrentWorkspacePath(path: string | null): void {
+  const previous = currentWorkspacePath();
+  (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath = path;
+  if (previous === path) return;
+  const payload = workspaceInfo(path);
+  broadcastPluginPanelEvent("workspace:changed", payload);
+  plugins.broadcastEvent("workspace:changed", [payload]);
+}
+
 /** One-line message for an error of unknown shape, for user-facing lists. */
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message.slice(0, 300);
@@ -1784,7 +1806,7 @@ function broadcastAppearance(): void {
   const signature = JSON.stringify(appearance);
   if (signature === broadcastAppearanceSignature) return;
   broadcastAppearanceSignature = signature;
-  pluginPanels.broadcast("appearance:changed", appearance);
+  broadcastPluginPanelEvent("appearance:changed", appearance);
 }
 
 function flushPendingApplicationMenuCommands() {
@@ -5071,9 +5093,9 @@ async function bootBackends() {
   });
   try {
     const ws = await host!.call<{ workspace: { path?: string } | null }>("workspace.get");
-    (globalThis as any).__piWorkspacePath = ws.workspace?.path ?? null;
+    setCurrentWorkspacePath(ws.workspace?.path ?? null);
   } catch {
-    (globalThis as any).__piWorkspacePath = null;
+    setCurrentWorkspacePath(null);
   }
 
   // Restore enabled plugins
@@ -6173,19 +6195,19 @@ function registerIpc() {
     const res = (await host.call("workspace.set", {
       path: result.filePaths[0],
     })) as { workspace: { path: string; name: string } | null };
-    (globalThis as any).__piWorkspacePath = res.workspace?.path ?? result.filePaths[0];
+    setCurrentWorkspacePath(res.workspace?.path ?? result.filePaths[0]);
     return { workspace: await withGitBranch(res.workspace), canceled: false };
   });
   handle(IPC.invoke.projectSet, async (path: string) => {
     if (!host) throw new Error("host unavailable");
-    (globalThis as any).__piWorkspacePath = path;
+    setCurrentWorkspacePath(path);
     const res = (await host.call("workspace.set", { path })) as {
       workspace: { path: string; name: string } | null;
     };
     return { workspace: await withGitBranch(res.workspace) };
   });
   handle(IPC.invoke.projectClear, async () => {
-    (globalThis as any).__piWorkspacePath = null;
+    setCurrentWorkspacePath(null);
     if (!host) throw new Error("host unavailable");
     return host.call("workspace.clear");
   });

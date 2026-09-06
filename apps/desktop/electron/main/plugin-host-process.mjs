@@ -155,10 +155,12 @@ function buildApi() {
     },
     fs: {
       readText: (path) => call("fs.readText", [path]),
+      readPreview: (path) => call("fs.readPreview", [path]),
       openDefault: (path) => call("fs.openDefault", [path]),
       reveal: (path) => call("fs.reveal", [path]),
       writeText: (path, content) => call("fs.writeText", [path, content]),
       glob: (pattern) => call("fs.glob", [pattern]),
+      list: (path) => call("fs.list", [path]),
       remove: (path) => call("fs.remove", [path]),
       requestDirectory: () => call("fs.requestDirectory"),
     },

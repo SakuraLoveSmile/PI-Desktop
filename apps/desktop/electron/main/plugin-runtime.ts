@@ -53,6 +53,7 @@ import {
   type PluginSettingDefinition,
 } from "@pi-desktop/shared";
 import {
+  previewFile,
   resolveRealPathForCreateWithinRoot,
   resolveRealPathWithinRoot,
   resolveWithinRoot,
@@ -167,7 +168,8 @@ export type PluginHostServices = {
   /**
    * The appearance the host is currently showing (palette, language, active
    * plugin theme). Panels and plugin processes read it through `app.getAppearance`;
-   * the host broadcasts `appearance:changed` to open panels when it changes.
+   * the host broadcasts `appearance:changed` to open panels and docked views
+   * when it changes. Workspace switches push `workspace:changed` the same way.
    */
   getAppearance?: () => PluginAppearance;
   showToast: (message: string, level?: "info" | "warn" | "error") => void;
@@ -259,6 +261,7 @@ const HOST_API_ALLOWLIST = new Set([
   "ui.showNativeNotification",
   "workspace.get",
   "fs.readText",
+  "fs.readPreview",
   "fs.openDefault",
   "fs.reveal",
   "fs.writeText",
@@ -793,6 +796,17 @@ export class PluginRuntime {
   }
 
   /**
+   * Push a one-way host event to every loaded plugin process. Panel pages
+   * receive the same names through `pluginBridge.on`; this is the process
+   * half (spec 07 §5).
+   */
+  broadcastEvent(event: string, args: unknown[] = []): void {
+    for (const loaded of this.loaded.values()) {
+      loaded.child?.postMessage({ t: "event", event, args });
+    }
+  }
+
+  /**
    * Validate the manifest, start a dedicated host process and run `onLoad`
    * inside it. Contribution points arrive over RPC while `onLoad` runs; a
    * failure anywhere rolls the whole load back (spec 05 §7).
@@ -1126,6 +1140,8 @@ export class PluginRuntime {
         return { ok: true };
       case "fs.readText":
         return api.fs.readText(String(payload?.path ?? ""));
+      case "fs.readPreview":
+        return api.fs.readPreview(String(payload?.path ?? ""));
       case "fs.openDefault":
         await api.fs.openDefault(String(payload?.path ?? ""));
         return { ok: true };
@@ -2542,6 +2558,34 @@ export class PluginRuntime {
             path: rel,
           });
           return content;
+        },
+        readPreview: async (pathFromRoot: string) => {
+          const { full, rel } = await this.resolveFsRequest(
+            loaded,
+            "read",
+            pathFromRoot,
+          );
+          if (!statSync(full).isFile()) {
+            this.services.audit?.({
+              pluginId,
+              api: "fs.readPreview",
+              ok: false,
+              errorCode: "INVALID_ARGUMENT",
+              ts: Date.now(),
+              path: rel,
+            });
+            throw apiError("INVALID_ARGUMENT", "only files can be previewed");
+          }
+          const preview = previewFile(full, rel);
+          this.services.audit?.({
+            pluginId,
+            api: "fs.readPreview",
+            ok: true,
+            ts: Date.now(),
+            path: rel,
+            data: { kind: preview.kind, size: preview.size },
+          });
+          return preview;
         },
         openDefault: async (pathFromRoot: string) => {
           const { full, rel } = await this.resolveFsRequest(

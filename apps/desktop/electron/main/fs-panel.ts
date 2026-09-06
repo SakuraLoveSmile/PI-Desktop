@@ -1,4 +1,5 @@
-import { readdir, readFile, realpath, stat } from "node:fs/promises";
+import { readFileSync, statSync } from "node:fs";
+import { readdir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { FsEntry, FsReadResult } from "@pi-desktop/shared";
 
@@ -27,13 +28,16 @@ const IGNORED_NAMES = new Set([
 export const MAX_TEXT_BYTES = 512 * 1024;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-const IMAGE_MIME: Record<string, string> = {
+export const IMAGE_MIME: Record<string, string> = {
   png: "image/png",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   gif: "image/gif",
   webp: "image/webp",
   svg: "image/svg+xml",
+  ico: "image/x-icon",
+  bmp: "image/bmp",
+  avif: "image/avif",
 };
 
 /**
@@ -201,13 +205,13 @@ function looksBinary(buffer: Buffer): boolean {
   return false;
 }
 
-export async function readWorkspaceFile(
-  root: string,
-  rel: string,
-): Promise<FsReadResult> {
-  const target = await resolveRealPathWithinRoot(root, rel);
-  if (!target) throw new Error("path escapes workspace root");
-  const info = await stat(target);
+/**
+ * Classify one already-contained regular file for in-app preview.
+ * Used by the host Files tab and by `pi.fs.readPreview` so the two
+ * surfaces cannot drift on size caps or image detection.
+ */
+export function previewFile(fullPath: string, rel: string): FsReadResult {
+  const info = statSync(fullPath);
   if (!info.isFile()) throw new Error("not a file");
 
   const ext = rel.split(".").pop()?.toLowerCase() ?? "";
@@ -216,7 +220,7 @@ export async function readWorkspaceFile(
     if (info.size > MAX_IMAGE_BYTES) {
       return { kind: "tooLarge", size: info.size };
     }
-    const buffer = await readFile(target);
+    const buffer = readFileSync(fullPath);
     return {
       kind: "image",
       dataUrl: `data:${imageMime};base64,${buffer.toString("base64")}`,
@@ -227,9 +231,20 @@ export async function readWorkspaceFile(
   if (info.size > MAX_TEXT_BYTES) {
     return { kind: "tooLarge", size: info.size };
   }
-  const buffer = await readFile(target);
+  const buffer = readFileSync(fullPath);
   if (looksBinary(buffer)) {
     return { kind: "binary", size: info.size };
   }
   return { kind: "text", content: buffer.toString("utf8"), size: info.size };
+}
+
+export async function readWorkspaceFile(
+  root: string,
+  rel: string,
+): Promise<FsReadResult> {
+  const target = await resolveRealPathWithinRoot(root, rel);
+  if (!target) throw new Error("path escapes workspace root");
+  const info = await stat(target);
+  if (!info.isFile()) throw new Error("not a file");
+  return previewFile(target, rel);
 }

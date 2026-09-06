@@ -178,6 +178,19 @@ export class PluginViewHost {
     for (const key of [...this.views.keys()]) this.destroy(key);
   }
 
+  /**
+   * Push a one-way event to every live docked view. Detached panel windows
+   * are broadcast separately by `PluginPanelHost`; both surfaces share the
+   * preload channel `pi-plugin-panel-event:<event>`.
+   */
+  broadcast(event: string, payload: unknown): void {
+    const channel = `pi-plugin-panel-event:${event}`;
+    for (const entry of this.views.values()) {
+      if (entry.view.webContents.isDestroyed()) continue;
+      entry.view.webContents.send(channel, payload);
+    }
+  }
+
   private destroy(key: string): void {
     const entry = this.views.get(key);
     if (!entry) return;

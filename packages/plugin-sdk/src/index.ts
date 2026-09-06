@@ -303,6 +303,16 @@ export type PluginFsEntry = {
   size?: number;
 };
 
+/** Classified preview returned by `fs.readPreview`. */
+export type PluginFsPreview = {
+  kind: "text" | "image" | "binary" | "tooLarge";
+  /** UTF-8 file content when kind is `"text"`. */
+  content?: string;
+  /** Base64 data URL when kind is `"image"`. */
+  dataUrl?: string;
+  size: number;
+};
+
 export type PluginHostApi = {
   app: {
     getVersion: () => Promise<string>;
@@ -340,6 +350,12 @@ export type PluginHostApi = {
    */
   fs: {
     readText: (pathFromRoot: string) => Promise<string>;
+    /**
+     * Bounded classified preview of one existing readable file. Images return
+     * a data URL; text is capped; binary and oversized files are reported
+     * without dumping their bytes.
+     */
+    readPreview: (pathFromRoot: string) => Promise<PluginFsPreview>;
     /** Open an existing readable file with the operating system's default app. */
     openDefault: (pathFromRoot: string) => Promise<void>;
     /** Reveal an existing readable file in the operating system's file manager. */

@@ -235,3 +235,13 @@ test("opening a different project refreshes the scope-filtered view list", () =>
     /refreshPluginViews\(\)[\s\S]*api\.onPluginChanged\(refresh\)[\s\S]*\}, \[ready, projectPath\]\)/,
   );
 });
+
+test("host panel events reach docked views as well as detached windows", () => {
+  assert.match(viewHostSource, /broadcast\(event: string, payload: unknown\)/);
+  assert.match(viewHostSource, /pi-plugin-panel-event:\$\{event\}/);
+  assert.match(mainSource, /function broadcastPluginPanelEvent/);
+  assert.match(mainSource, /broadcastPluginPanelEvent\("appearance:changed"/);
+  assert.match(mainSource, /broadcastPluginPanelEvent\("workspace:changed"/);
+  assert.match(mainSource, /plugins\.broadcastEvent\("workspace:changed"/);
+  assert.match(mainSource, /function setCurrentWorkspacePath/);
+});
