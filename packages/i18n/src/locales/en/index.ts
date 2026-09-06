@@ -28,6 +28,10 @@ export const en = {
     askBody:
       "When you close the window, PI-Desktop can keep running in the system tray so nothing is lost. You can change this any time in Settings.",
     closeToTray: "Close to tray",
+    confirmQuitTitle: "Quit PI-Desktop?",
+    confirmQuitBody:
+      "Are you sure you want to quit? All running sessions will be stopped and unsaved changes may be lost.",
+    confirmQuit: "Quit",
   },
   /**
    * Native consent dialog for a file access a plugin's manifest did not

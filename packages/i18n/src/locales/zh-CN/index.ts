@@ -29,6 +29,10 @@ export const zhCN = {
     askBody:
       "关闭窗口后，PI-Desktop 可以继续在系统托盘中运行，避免丢失任何内容。你随时可以在设置中更改此选项。",
     closeToTray: "关闭到托盘",
+    confirmQuitTitle: "确定退出 PI-Desktop？",
+    confirmQuitBody:
+      "退出将停止所有正在进行的会话，未保存的内容可能会丢失。你确定要退出吗？",
+    confirmQuit: "退出",
   },
   pluginFsConsent: {
     read: "{name} 想读取声明范围之外的文件",
