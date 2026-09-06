@@ -23,6 +23,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.13.8",
+    date: "2026-09-06",
+    highlights: [
+      "Search and preview project files, including images, then open them with the default app from a dedicated viewer page.",
+      "Run the work-panel Browser as a bundled plugin, with the same isolation as other plugin views.",
+      "Keep @ file chips after Enter, and pulse the mode chip while planning.",
+      "Open only http(s) and mailto links from chat, plugins, and previews.",
+    ],
+  },
+  {
     version: "0.13.7",
     date: "2026-09-06",
     highlights: [
@@ -634,6 +644,16 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.13.8",
+    date: "2026-09-06",
+    highlights: [
+      "可搜索并预览项目文件（含图片），在独立查看页用默认应用打开。",
+      "工作面板浏览器改为随应用打包的插件，隔离方式与其他插件视图相同。",
+      "用 Enter 接受的 @ 文件芯片会保留，规划进行中模式芯片会脉冲提示。",
+      "聊天、插件和预览只打开 http(s) 与 mailto 链接。",
+    ],
+  },
   {
     version: "0.13.7",
     date: "2026-09-06",
