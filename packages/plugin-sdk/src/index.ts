@@ -237,8 +237,54 @@ export type PluginTool = {
 export type PluginToolExecContext = {
   sessionId?: string;
   turnId?: string;
+  /** Executor model for this session, `providerId/modelId`. Configuration, not transcript. */
+  modelKey?: string;
+  thinkingLevel?: string;
   signal?: AbortSignal;
   log: (msg: string) => void;
+};
+
+export type PluginModelInfo = {
+  key: string;
+  providerId: string;
+  providerName: string;
+  modelId: string;
+  label: string;
+  supportsReasoning: boolean;
+  thinkingLevels: string[];
+};
+
+export type PluginLlmMessage = {
+  role: "user" | "assistant" | "tool" | "system";
+  content: string;
+  toolName?: string;
+};
+
+export type PluginLlmContext = {
+  sessionId: string;
+  modelKey: string | null;
+  thinkingLevel?: string;
+  messages: PluginLlmMessage[];
+  truncated: boolean;
+};
+
+export type PluginCompleteInput = {
+  modelKey: string;
+  thinkingLevel?: string;
+  system?: string;
+  messages?: Array<{ role: "user" | "assistant"; content: string }>;
+  includeSessionContext?: boolean;
+};
+
+export type PluginCompleteResult = {
+  text: string;
+  modelKey: string;
+  thinkingLevel?: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
 };
 
 export type PluginServiceContext = {
@@ -380,6 +426,13 @@ export type PluginHostApi = {
   agent: {
     registerTool: (tool: PluginTool) => Promise<void>;
     unregisterTool: (name: string) => Promise<void>;
+    complete: (input: PluginCompleteInput) => Promise<PluginCompleteResult>;
+  };
+  models: {
+    list: () => Promise<PluginModelInfo[]>;
+  };
+  session: {
+    getLlmContext: () => Promise<PluginLlmContext>;
   };
   services: {
     /**
@@ -459,6 +512,9 @@ export const PLUGIN_PERMISSIONS = [
   "fs.delete",
   "agent.tool.register",
   "agent.prompt.inject",
+  "agent.complete",
+  "models.list",
+  "session.read",
   "net.fetch",
   "shell.openExternal",
   "mcp.server.local",

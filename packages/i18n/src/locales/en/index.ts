@@ -1420,6 +1420,9 @@ export const en = {
       "fs.delete.workspace": "Delete project files (legacy)",
       "agent.tool.register": "Add tools for the agent",
       "agent.prompt.inject": "Adjust agent instructions",
+      "agent.complete": "Run a one-shot completion with your models",
+      "models.list": "List authenticated models",
+      "session.read": "Read the current conversation sent to the model",
       "net.fetch": "Use the network",
       "shell.openExternal": "Open external links",
       "ui.theme": "Provide a theme",
@@ -1449,6 +1452,11 @@ export const en = {
         "Declared before file scopes existed, so it can now only delete files it wrote itself.",
       "agent.tool.register": "Lets the AI call extra tools provided by this plugin.",
       "agent.prompt.inject": "Can change instructions sent to the AI agent.",
+      "agent.complete":
+        "Can spend your model quota on a one-shot completion. The plugin never receives your API keys.",
+      "models.list": "Can see which models you have signed in for. It does not receive keys.",
+      "session.read":
+        "Can read the conversation the current tool call is operating on, including tool results.",
       "net.fetch": "Can make outbound network requests.",
       "shell.openExternal": "Can open links in your default browser.",
       "ui.theme": "Adds a theme you can pick in Settings; only styling, no data.",

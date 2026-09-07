@@ -35,10 +35,14 @@ import {
   validateManifest,
   validateMcpServer,
   type ClipboardHistoryEntry,
+  type PluginCompleteInput,
+  type PluginCompleteResult,
   type PluginFsMode,
   type PluginFsPolicy,
   type PluginFsRule,
+  type PluginLlmContext,
   type PluginManifest,
+  type PluginModelInfo,
   type PluginNativeNotificationInput,
   type PluginNativeNotificationResult,
   type PluginNotificationPermission,
@@ -80,7 +84,10 @@ export type RegisteredPluginTool = {
   description: string;
   risk?: string;
   schema?: unknown;
-  execute: (args: unknown, ctx?: { sessionId?: string }) => Promise<unknown>;
+  execute: (
+    args: unknown,
+    ctx?: { sessionId?: string; modelKey?: string; thinkingLevel?: string },
+  ) => Promise<unknown>;
 };
 
 /**
@@ -266,6 +273,12 @@ export type PluginHostServices = {
     cdp: (method: string, params?: unknown) => Promise<unknown>;
   };
   onPluginUnload?: (pluginId: string) => void;
+  listModels?: () => Promise<PluginModelInfo[]>;
+  getSessionContext?: (sessionId: string, stripToolName?: string) => Promise<PluginLlmContext>;
+  complete?: (input: PluginCompleteInput & {
+    sessionId?: string;
+    stripToolName?: string;
+  }) => Promise<PluginCompleteResult>;
 };
 
 /** Host APIs a plugin process may reach. Anything else does not exist (spec 04 §2). */
@@ -314,6 +327,9 @@ const HOST_API_ALLOWLIST = new Set([
   "browser.evaluate",
   "browser.console",
   "browser.cdp",
+  "models.list",
+  "session.getLlmContext",
+  "agent.complete",
 ]);
 
 const toolSession = new AsyncLocalStorage<string>();
@@ -382,6 +398,11 @@ const BUS_RATE_WINDOW_MS = 10_000;
  */
 export const MAX_DELETES_PER_WINDOW = 50;
 const DELETE_RATE_WINDOW_MS = 60_000;
+/** Side completions spend user quota; keep a tight rolling brake. */
+export const MAX_COMPLETES_PER_WINDOW = 8;
+const COMPLETE_RATE_WINDOW_MS = 60_000;
+export const MAX_COMPLETE_SYSTEM_CHARS = 32 * 1024;
+export const MAX_COMPLETE_MESSAGE_CHARS = 200_000;
 /** Kept from the pre-scope implementation: a listing is not a search index. */
 const MAX_GLOB_MATCHES = 500;
 /** Entries returned for one directory. A tree is walked lazily, not dumped. */
@@ -586,7 +607,8 @@ export class PluginRuntime {
    * on a later `handleChildMessage` turn, so ALS around `sendToChild` is empty
    * there — this map is the durable identity for that round trip.
    */
-  private executingToolSessions = new Map<string, string[]>();
+  private executingToolSessions = new Map<string, Array<{ sessionId: string; toolName: string }>>();
+  private completeRate = new Map<string, { windowStart: number; count: number }>();
   /**
    * File accesses the user allowed for the rest of the run, keyed
    * `<mode>:<directory>`. In memory only: a session grant that outlived the
@@ -1229,6 +1251,9 @@ export class PluginRuntime {
         return api.app.getAppearance();
       case "workspace.get":
         return api.workspace.get();
+      case "models.list":
+        this.assertPermission(loaded, "models.list");
+        return this.dispatchHostCall(loaded, "models.list", []);
       case "browser.navigate":
         return this.invokeBrowser(loaded, "navigate", payload);
       case "browser.action":
@@ -1407,7 +1432,7 @@ export class PluginRuntime {
             if (!target?.child) throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
             const sessionId = String(ctx?.sessionId ?? "");
             const stack = this.executingToolSessions.get(pluginId) ?? [];
-            stack.push(sessionId);
+            stack.push({ sessionId, toolName: name });
             this.executingToolSessions.set(pluginId, stack);
             try {
               return await toolSession.run(sessionId, () =>
@@ -1416,7 +1441,13 @@ export class PluginRuntime {
                   {
                     t: "call",
                     method: "tool.execute",
-                    payload: { name, args: toolArgs, sessionId },
+                    payload: {
+                      name,
+                      args: toolArgs,
+                      sessionId,
+                      modelKey: ctx?.modelKey,
+                      thinkingLevel: ctx?.thinkingLevel,
+                    },
                   },
                   PLUGIN_TOOL_TIMEOUT_MS,
                 ),
@@ -1432,6 +1463,24 @@ export class PluginRuntime {
       case "agent.unregisterTool": {
         this.tools.delete(pluginToolName(pluginId, String(args[0] ?? "")));
         return { ok: true };
+      }
+      case "models.list": {
+        this.assertPermission(loaded, "models.list");
+        const models = (await this.services.listModels?.()) ?? [];
+        this.services.audit?.({
+          pluginId,
+          api: "models.list",
+          ok: true,
+          count: models.length,
+          ts: Date.now(),
+        });
+        return models;
+      }
+      case "session.getLlmContext": {
+        return this.readSessionContext(loaded);
+      }
+      case "agent.complete": {
+        return this.runAgentComplete(loaded, (args[0] ?? {}) as PluginCompleteInput);
       }
       default: {
         if (!HOST_API_ALLOWLIST.has(api)) {
@@ -2268,6 +2317,114 @@ export class PluginRuntime {
     );
   }
 
+  private inFlightTool(pluginId: string): { sessionId: string; toolName: string } | undefined {
+    return this.executingToolSessions.get(pluginId)?.at(-1);
+  }
+
+  private completeRateExceeded(pluginId: string): boolean {
+    const now = Date.now();
+    const current = this.completeRate.get(pluginId);
+    if (!current || now - current.windowStart >= COMPLETE_RATE_WINDOW_MS) {
+      this.completeRate.set(pluginId, { windowStart: now, count: 1 });
+      return false;
+    }
+    current.count += 1;
+    return current.count > MAX_COMPLETES_PER_WINDOW;
+  }
+
+  private async readSessionContext(loaded: LoadedPlugin): Promise<PluginLlmContext> {
+    this.assertPermission(loaded, "session.read");
+    const inFlight = this.inFlightTool(loaded.manifest.id);
+    const sessionId = inFlight?.sessionId?.trim() ?? "";
+    if (!sessionId) {
+      throw apiError("INVALID_ARGUMENT", "session context is only available during tool execution");
+    }
+    if (!this.services.getSessionContext) {
+      throw apiError("UNSUPPORTED", "host api not available: session.getLlmContext");
+    }
+    const stripToolName = inFlight?.toolName
+      ? pluginToolName(loaded.manifest.id, inFlight.toolName)
+      : undefined;
+    const context = await this.services.getSessionContext(sessionId, stripToolName);
+    this.services.audit?.({
+      pluginId: loaded.manifest.id,
+      api: "session.getLlmContext",
+      ok: true,
+      sessionId,
+      count: context.messages.length,
+      truncated: context.truncated,
+      ts: Date.now(),
+    });
+    return context;
+  }
+
+  private async runAgentComplete(
+    loaded: LoadedPlugin,
+    input: PluginCompleteInput,
+  ): Promise<PluginCompleteResult> {
+    this.assertPermission(loaded, "agent.complete");
+    const modelKey = String(input.modelKey ?? "").trim();
+    if (!modelKey || !modelKey.includes("/")) {
+      throw apiError("INVALID_ARGUMENT", "modelKey must be providerId/modelId");
+    }
+    const system = typeof input.system === "string" ? input.system : "";
+    if (system.length > MAX_COMPLETE_SYSTEM_CHARS) {
+      throw apiError("INVALID_ARGUMENT", "system prompt exceeds 32 KiB");
+    }
+    const messages = Array.isArray(input.messages) ? input.messages : [];
+    const messageChars = messages.reduce(
+      (sum, message) => sum + String(message?.content ?? "").length,
+      0,
+    );
+    if (messageChars > MAX_COMPLETE_MESSAGE_CHARS) {
+      throw apiError("INVALID_ARGUMENT", "messages exceed 200k characters");
+    }
+    if (this.completeRateExceeded(loaded.manifest.id)) {
+      this.services.audit?.({
+        pluginId: loaded.manifest.id,
+        api: "agent.complete",
+        ok: false,
+        errorCode: "RATE_LIMITED",
+        ts: Date.now(),
+      });
+      throw apiError("RATE_LIMITED", "advisor complete rate exceeded");
+    }
+    const includeSessionContext = input.includeSessionContext === true;
+    if (includeSessionContext) {
+      this.assertPermission(loaded, "session.read");
+    }
+    const inFlight = this.inFlightTool(loaded.manifest.id);
+    if (includeSessionContext && !inFlight?.sessionId) {
+      throw apiError("INVALID_ARGUMENT", "session context is only available during tool execution");
+    }
+    if (!this.services.complete) {
+      throw apiError("UNSUPPORTED", "host api not available: agent.complete");
+    }
+    const result = await this.services.complete({
+      modelKey,
+      thinkingLevel: input.thinkingLevel,
+      system: system || undefined,
+      messages,
+      includeSessionContext,
+      sessionId: inFlight?.sessionId,
+      stripToolName: inFlight?.toolName
+        ? pluginToolName(loaded.manifest.id, inFlight.toolName)
+        : undefined,
+    });
+    this.services.audit?.({
+      pluginId: loaded.manifest.id,
+      api: "agent.complete",
+      ok: true,
+      modelKey: result.modelKey,
+      systemChars: system.length,
+      messageChars,
+      outputChars: result.text.length,
+      usage: result.usage,
+      ts: Date.now(),
+    });
+    return result;
+  }
+
   /** Per-plugin data directory. Host-owned; the fs API cannot reach it. */
   private pluginDataDir(pluginId: string): string {
     const root = process.env.PI_DESKTOP_DATA_DIR
@@ -2281,7 +2438,7 @@ export class PluginRuntime {
     if (als) return als;
     if (!pluginId) return undefined;
     const stack = this.executingToolSessions.get(pluginId);
-    return stack?.at(-1)?.trim() || undefined;
+    return stack?.at(-1)?.sessionId?.trim() || undefined;
   }
 
   private async invokeBrowser(

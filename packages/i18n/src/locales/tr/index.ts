@@ -1422,6 +1422,9 @@ export const tr = {
       "fs.delete.workspace": "Proje dosyalarını sil (eski)",
       "agent.tool.register": "Ajan için araç ekle",
       "agent.prompt.inject": "Ajan yönergelerini ayarla",
+      "agent.complete": "Modellerinizle tek seferlik tamamlatma çalıştır",
+      "models.list": "Kimliği doğrulanmış modelleri listele",
+      "session.read": "Modele gönderilen geçerli konuşmayı oku",
       "net.fetch": "Ağı kullan",
       "shell.openExternal": "Dış bağlantılar aç",
       "ui.theme": "Tema sağla",
@@ -1451,6 +1454,11 @@ export const tr = {
         "Dosya kapsamları yokken bildirildi, bu yüzden artık yalnızca kendi yazdığı dosyaları silebilir.",
       "agent.tool.register": "AI’nin bu eklentinin sağladığı ek araçları çağırmasını sağlar.",
       "agent.prompt.inject": "AI ajanına gönderilen yönergeleri değiştirebilir.",
+      "agent.complete":
+        "Model kotanızı tek seferlik bir tamamlatma için harcayabilir. Eklenti API anahtarlarınızı almaz.",
+      "models.list": "Oturum açtığınız modelleri görebilir. Anahtar almaz.",
+      "session.read":
+        "Geçerli araç çağrısının üzerinde çalıştığı konuşmayı, araç sonuçları dahil, okuyabilir.",
       "net.fetch": "Dışarıya ağ istekleri yapabilir.",
       "shell.openExternal": "Varsayılan tarayıcınızda bağlantı açabilir.",
       "ui.theme": "Ayarlar’dan seçebileceğiniz bir tema ekler; yalnızca stil, veri yok.",

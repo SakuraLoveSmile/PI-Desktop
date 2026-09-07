@@ -98,6 +98,7 @@ import {
   visionFromModelConfig,
   expandSlashInvocation,
   enhancePromptDraft,
+  completeOneShot,
   loadComposerTemplates,
   globalInstructionPath,
   loadInstructionChain,
@@ -110,11 +111,19 @@ import {
 } from "@pi-desktop/agent-runtime";
 import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
 import type {
+  PluginCompleteResult,
   PluginNativeNotificationInput,
   PluginNativeNotificationResult,
   PluginNotificationPermission,
 } from "@pi-desktop/plugin-sdk";
 import { resolvePluginLocalizedString } from "@pi-desktop/plugin-sdk";
+import {
+  asPluginThinkingLevel,
+  listReadyPluginModels,
+  parsePluginModelKey,
+  pluginCompleteContext,
+  pluginSessionContextFromSession,
+} from "./plugin-agent-complete";
 
 import { HostProcess } from "./host-process";
 import {
@@ -444,7 +453,7 @@ const pluginPanels = new PluginPanelHost(
   },
 
 );
-const plugins = new PluginRuntime({
+const plugins: PluginRuntime = new PluginRuntime({
   getWorkspacePath: () => {
     // Filled after host boots; temporary stub until services rebinding.
     return null;
@@ -538,6 +547,92 @@ const plugins = new PluginRuntime({
   // and the session store, and a plugin reaching it would undo every other
   // limit on this list.
   protectedPaths: () => [dataDir],
+  listModels: async () => {
+    if (!host) return [];
+    const listed = await host.call<{ providers: Array<{
+      id: string;
+      name: string;
+      enabled?: boolean;
+      hasSecret?: boolean;
+      hasOauth?: boolean;
+      authKind?: string;
+      supportsReasoning?: boolean;
+      supportedThinkingLevels?: ThinkingLevel[];
+      defaultModelId?: string;
+      models?: ModelBinding[];
+    }> }>("providers.list", { includeDisabled: false });
+    return listReadyPluginModels(listed.providers ?? []);
+  },
+  getSessionContext: async (sessionId, stripToolName) => {
+    if (!host) {
+      throw Object.assign(new Error("host unavailable"), { code: "UNSUPPORTED" });
+    }
+    const detail = await host.call<{
+      session?: {
+        messages?: UiMessage[];
+        compaction?: import("@pi-desktop/shared").ContextCompactionRecord;
+        providerId?: string;
+        modelId?: string;
+        thinkingLevel?: string;
+      } | null;
+    }>("session.get", { id: sessionId });
+    return pluginSessionContextFromSession(sessionId, detail?.session, stripToolName);
+  },
+  complete: async (input): Promise<PluginCompleteResult> => {
+    if (!host) {
+      throw Object.assign(new Error("host unavailable"), { code: "UNSUPPORTED" });
+    }
+    const parsed = parsePluginModelKey(input.modelKey);
+    if (!parsed) {
+      throw Object.assign(new Error("modelKey must be providerId/modelId"), {
+        code: "INVALID_ARGUMENT",
+      });
+    }
+    const thinkingLevel = asPluginThinkingLevel(input.thinkingLevel);
+    const settings = await host.call<any>("settings.get");
+    const launchSessionId = input.sessionId || `plugin-complete:${crypto.randomUUID()}`;
+    const session = input.sessionId
+      ? (await host.call<{ session?: any }>("session.get", { id: input.sessionId })).session
+      : {};
+    const launch = await resolveAgentRuntimeLaunch(launchSessionId, session ?? {}, settings, {
+      mode: "agent",
+      providerId: parsed.providerId,
+      modelId: parsed.modelId,
+      thinkingLevel,
+    });
+    const runtimeProvider = {
+      ...launch.sidecarParams.provider,
+      ...(launch.sidecarParams.provider.authKind === OAUTH_AUTH_KIND
+        ? { resolveAuth: () => vendorOAuth.resolveAuth(launch.providerId) }
+        : {}),
+    } as RuntimeProviderConfig;
+    const sessionContext = input.includeSessionContext
+      ? pluginSessionContextFromSession(
+          String(input.sessionId ?? ""),
+          session,
+          input.stripToolName,
+        )
+      : undefined;
+    const context = pluginCompleteContext({
+      modelKey: input.modelKey,
+      thinkingLevel: input.thinkingLevel,
+      system: input.system,
+      messages: input.messages,
+      includeSessionContext: input.includeSessionContext,
+      sessionContext,
+    });
+    const result = await completeOneShot(
+      runtimeProvider,
+      context,
+      launch.sidecarParams.thinkingLevel,
+    );
+    return {
+      text: result.text,
+      modelKey: `${launch.providerId}/${launch.modelId}`,
+      thinkingLevel: launch.sidecarParams.thinkingLevel,
+      usage: result.usage,
+    };
+  },
   // A plugin host process dying is contained: contributions are already
   // deregistered by the runtime, we only have to tell the user and the UI.
   onPluginCrash: ({ pluginId, exitCode }) => {
@@ -779,6 +874,7 @@ type RuntimeProvider = {
 type RuntimeSession = {
   providerId?: string;
   modelId?: string;
+  thinkingLevel?: ThinkingLevel;
 };
 
 function bindingForModel(
@@ -4148,7 +4244,27 @@ function wireHost(h: HostProcess) {
           };
         } else {
           try {
-            const result = await tool.execute(q.args, { sessionId: q.sessionId });
+            let modelKey: string | undefined;
+            let thinkingLevel: string | undefined;
+            if (q.sessionId && host) {
+              try {
+                const detail = await host.call<{
+                  session?: { providerId?: string; modelId?: string; thinkingLevel?: string };
+                }>("session.get", { id: q.sessionId });
+                const session = detail?.session;
+                if (session?.providerId && session?.modelId) {
+                  modelKey = `${session.providerId}/${session.modelId}`;
+                }
+                thinkingLevel = session?.thinkingLevel;
+              } catch {
+                // Executor identity is best-effort; the tool can still run.
+              }
+            }
+            const result = await tool.execute(q.args, {
+              sessionId: q.sessionId,
+              modelKey,
+              thinkingLevel,
+            });
             payload = {
               executionId: q.executionId,
               ok: true,
@@ -5742,7 +5858,25 @@ function registerIpc() {
       );
       if (!result.session) return result;
       const { providers, defaults } = await sessionCapabilityContext();
-      return { ...result, session: enrichSession(result.session, providers, defaults) };
+      const session = enrichSession(result.session, providers, defaults);
+      if (
+        config.providerId !== undefined ||
+        config.modelId !== undefined ||
+        config.thinkingLevel !== undefined
+      ) {
+        const modelKey =
+          session.providerId && session.modelId
+            ? `${session.providerId}/${session.modelId}`
+            : null;
+        plugins.broadcastEvent("session:modelChanged", [
+          {
+            sessionId: id,
+            modelKey,
+            thinkingLevel: session.thinkingLevel,
+          },
+        ]);
+      }
+      return { ...result, session };
     },
   );
 

@@ -116,9 +116,10 @@ fails at runtime. Ask for the least you need — the plugins page shows the risk
 user.
 
 - High risk: `net.fetch`, `fs.write`, `fs.delete`, `agent.prompt.inject`,
-  `agent.tool.register`, `mcp.server.local`, `mcp.server.remote`
+  `agent.tool.register`, `agent.complete`, `session.read`, `mcp.server.local`,
+  `mcp.server.remote`
 - Medium: `fs.read`, `clipboard.read`, `clipboard.write`, `shell.openExternal`,
-  `background.service`, `bus.publish`, `bus.subscribe`
+  `background.service`, `bus.publish`, `bus.subscribe`, `models.list`
 - Low: `ui.panel`, `ui.theme`, `notify` (Toast and best-effort native notifications)
 
 ### File and network range

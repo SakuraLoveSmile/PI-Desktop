@@ -191,6 +191,13 @@ function buildApi() {
         tools.delete(name);
         await call("agent.unregisterTool", [name]);
       },
+      complete: (input) => call("agent.complete", [input ?? {}]),
+    },
+    models: {
+      list: () => call("models.list"),
+    },
+    session: {
+      getLlmContext: () => call("session.getLlmContext"),
     },
     /**
      * Resident background workers (spec 07 §3). Registration is local: the
@@ -360,6 +367,8 @@ async function handleParentCall(method, payload) {
       const result = await execute(payload?.args, {
         sessionId: payload?.sessionId,
         turnId: payload?.turnId,
+        modelKey: payload?.modelKey,
+        thinkingLevel: payload?.thinkingLevel,
         log: (msg) => log("info", msg),
       });
       return result ?? null;

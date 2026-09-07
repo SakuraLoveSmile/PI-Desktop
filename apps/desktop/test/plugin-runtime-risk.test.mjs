@@ -27,6 +27,9 @@ test("plugin runtime exposes gated high-risk host APIs", () => {
     "fs.openDefault",
     "fs.reveal",
     "net.fetch",
+    "agent.complete",
+    "session.read",
+    "models.list",
     "shell.openExternal",
     "clipboard.read",
     "clipboard.write",
@@ -82,6 +85,9 @@ test("the plugins page shows the file scope behind a file permission", () => {
     assert.equal(typeof catalog.plugins.fsMode.delete, "string");
     assert.equal(typeof catalog.plugins.permissions["fs.delete"], "string");
     assert.equal(typeof catalog.plugins.permissionHelp["fs.delete"], "string");
+    assert.equal(typeof catalog.plugins.permissions["agent.complete"], "string");
+    assert.equal(typeof catalog.plugins.permissionHelp["session.read"], "string");
+    assert.equal(typeof catalog.plugins.permissions["models.list"], "string");
   }
 });
 

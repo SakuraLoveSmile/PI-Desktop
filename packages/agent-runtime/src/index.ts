@@ -5,6 +5,8 @@ export * from "./runtime.js";
 export * from "./parent-host-proxy.js";
 export * from "./plugin-skills.js";
 export * from "./plugin-skills-prompt.js";
+export * from "./plugin-session-context.js";
+export * from "./one-shot-complete.js";
 export * from "./prompt-templates.js";
 export * from "./prompt-enhancement.js";
 export * from "./project-instructions.js";
