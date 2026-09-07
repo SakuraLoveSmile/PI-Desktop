@@ -65,6 +65,19 @@ export type ApiBinding = {
   defaultBaseUrl: string;
 };
 
+/**
+ * pi-ai's Anthropic SDK client appends `/v1` to its configured base URL.
+ * Provider discovery accepts both an Anthropic root and a URL that already
+ * includes `/v1`, so canonicalize the latter before runtime requests to keep
+ * both forms on the same `/v1/messages` endpoint.
+ */
+export function runtimeBaseUrlForApi(api: Api, baseUrl: string): string {
+  if (api !== "anthropic-messages") return baseUrl;
+  const withoutTrailingSlash = baseUrl.replace(/\/+$/, "");
+  const withoutVersion = withoutTrailingSlash.replace(/\/v1$/i, "");
+  return withoutVersion || withoutTrailingSlash;
+}
+
 /** Map a stored provider apiStyle onto a pi-ai wire API. Unknown styles fall
  * back to OpenAI Chat Completions, the pre-apiStyle behavior. */
 export function apiBindingForStyle(apiStyle?: string): ApiBinding {
@@ -131,7 +144,10 @@ export function buildProviderModel(
   const catalogModel = catalog
     ? (({ source: _source, ...model }) => model)(catalog)
     : genericModelConfig(provider.modelId, provider.baseUrl ?? binding.defaultBaseUrl);
-  const baseUrl = provider.baseUrl ?? catalog?.baseUrl ?? binding.defaultBaseUrl;
+  const baseUrl = runtimeBaseUrlForApi(
+    binding.api,
+    provider.baseUrl ?? catalog?.baseUrl ?? binding.defaultBaseUrl,
+  );
   const zhipuCompat = zhipuRequestCompat({
     vendorKey: provider.vendorKey,
     baseUrl,

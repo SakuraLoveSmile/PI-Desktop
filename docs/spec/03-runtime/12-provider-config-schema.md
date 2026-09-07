@@ -113,6 +113,13 @@ models.dev snapshot. Unknown free-form models initially expose
 still persist an explicit thinking-level binding for an endpoint that supports
 it. The raw secret and internal compatibility JSON remain hidden.
 
+Anthropic Messages providers may store either the service root or a URL ending
+in `/v1`. Model discovery preserves that configured path and requests
+`/v1/models` exactly once; runtime request setup removes the trailing `/v1`
+before invoking pi-ai, whose Anthropic SDK adds `/v1` to the messages route.
+Both forms therefore send messages to the configured service's
+`/v1/messages` endpoint rather than a doubled `/v1/v1/messages` path.
+
 For OpenAI-compatible Chat Completions models, the runtime defaults
 `compat.supportsDeveloperRole` to `false`, so system instructions are sent as
 `role: "system"` even when the selected model supports reasoning. A resolved

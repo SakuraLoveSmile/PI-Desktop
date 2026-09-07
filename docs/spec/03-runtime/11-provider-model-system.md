@@ -471,7 +471,10 @@ When starting a turn with `(providerId, modelId)`:
 7. clamp the session thinking level against the exact binding's enabled levels
    and build the runtime provider adapter by replacing only provider/model
    identity, selected API adapter, auth, and an explicitly configured endpoint
-   URL
+   URL. For `anthropic_messages`, the runtime removes a trailing `/v1` from
+   that URL before passing it to pi-ai because the Anthropic SDK appends `/v1`
+   itself; configured roots with or without `/v1` therefore both reach the
+   same `/v1/messages` route.
 8. execute stream with abort handle and separate answer/thinking events
 9. translate vendor errors into shared `AppError` codes (§15)
 

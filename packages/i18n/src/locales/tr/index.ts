@@ -521,6 +521,9 @@ export const tr = {
     addProvider: "Servis ekle",
     apiKey: "API anahtarı",
     baseUrl: "Temel URL",
+    baseUrlHint:
+      "Servis temel URL'sini girin; istekler {{route}} yolunu hedefler. Tam uç nokta yolları odak kaybında düzenlenir.",
+    baseUrlInvalid: "Geçerli bir http:// veya https:// adresi girin.",
     modelId: "Model kimliği",
     save: "Kaydet",
     testConnection: "Bağlantıyı dene",

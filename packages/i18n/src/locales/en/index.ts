@@ -519,6 +519,9 @@ export const en = {
     addProvider: "Add provider",
     apiKey: "API key",
     baseUrl: "Base URL",
+    baseUrlHint:
+      "Use the service base URL; requests target {{route}}. Full endpoint paths are cleaned up on blur.",
+    baseUrlInvalid: "Enter a valid http:// or https:// URL.",
     modelId: "Model ID",
     save: "Save",
     testConnection: "Test connection",
