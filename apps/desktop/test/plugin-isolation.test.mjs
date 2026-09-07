@@ -28,6 +28,7 @@ test("plugin host calls pass an allowlist and time out", () => {
     "PLUGIN_COMMAND_TIMEOUT_MS",
     "PLUGIN_TOOL_TIMEOUT_MS",
     "PLUGIN_PANEL_TIMEOUT_MS",
+    "PLUGIN_COMPLETE_TIMEOUT_MS",
   ]) {
     assert.match(runtimeSrc, new RegExp(token));
   }

@@ -625,6 +625,7 @@ const plugins: PluginRuntime = new PluginRuntime({
       runtimeProvider,
       context,
       launch.sidecarParams.thinkingLevel,
+      { signal: input.signal },
     );
     return {
       text: result.text,

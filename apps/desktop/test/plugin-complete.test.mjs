@@ -160,6 +160,7 @@ test("session context and complete stay bound to an in-flight tool call", async 
   assert.equal(output.result.text, "ship smaller");
   assert.equal(completes[0].includeSessionContext, true);
   assert.equal(completes[0].sessionId, "sess-1");
+  assert.equal(typeof completes[0].signal?.aborted, "boolean");
 });
 
 test("agent.complete is rate-limited per plugin", async (t) => {

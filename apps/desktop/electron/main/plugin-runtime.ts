@@ -278,6 +278,7 @@ export type PluginHostServices = {
   complete?: (input: PluginCompleteInput & {
     sessionId?: string;
     stripToolName?: string;
+    signal?: AbortSignal;
   }) => Promise<PluginCompleteResult>;
 };
 
@@ -350,6 +351,8 @@ const PLUGIN_DISPOSE_ALL_TIMEOUT_MS = 3_000;
 const PLUGIN_COMMAND_TIMEOUT_MS = 30_000;
 /** Kept under host-core's 120s tool budget so the plugin-side error wins. */
 const PLUGIN_TOOL_TIMEOUT_MS = 110_000;
+/** Side completions sit under the plugin tool budget (ADR 0174). */
+export const PLUGIN_COMPLETE_TIMEOUT_MS = 90_000;
 /** Fixed panel operations are user-facing and must not hang the renderer. */
 const PLUGIN_PANEL_TIMEOUT_MS = 30_000;
 const PANEL_SKILL_CHANNELS = new Set([
@@ -2400,17 +2403,37 @@ export class PluginRuntime {
     if (!this.services.complete) {
       throw apiError("UNSUPPORTED", "host api not available: agent.complete");
     }
-    const result = await this.services.complete({
-      modelKey,
-      thinkingLevel: input.thinkingLevel,
-      system: system || undefined,
-      messages,
-      includeSessionContext,
-      sessionId: inFlight?.sessionId,
-      stripToolName: inFlight?.toolName
-        ? pluginToolName(loaded.manifest.id, inFlight.toolName)
-        : undefined,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PLUGIN_COMPLETE_TIMEOUT_MS);
+    let result: PluginCompleteResult;
+    try {
+      result = await this.services.complete({
+        modelKey,
+        thinkingLevel: input.thinkingLevel,
+        system: system || undefined,
+        messages,
+        includeSessionContext,
+        sessionId: inFlight?.sessionId,
+        stripToolName: inFlight?.toolName
+          ? pluginToolName(loaded.manifest.id, inFlight.toolName)
+          : undefined,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        this.services.audit?.({
+          pluginId: loaded.manifest.id,
+          api: "agent.complete",
+          ok: false,
+          errorCode: "TIMEOUT",
+          ts: Date.now(),
+        });
+        throw apiError("TIMEOUT", "advisor complete timed out");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
     this.services.audit?.({
       pluginId: loaded.manifest.id,
       api: "agent.complete",
