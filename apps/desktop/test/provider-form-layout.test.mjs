@@ -73,6 +73,26 @@ test("custom API format sits beside the key, not in a disclosure", () => {
   assert.match(pickerSource, /provider-chosen-advanced-toggle/);
 });
 
+test("custom base URL input is wide, validated, and safe to paste", () => {
+  assert.match(setupSource, /type="url"/);
+  assert.match(setupSource, /inputMode="url"/);
+  assert.match(setupSource, /autoComplete="url"/);
+  assert.match(setupSource, /settings\.baseUrlHint/);
+  assert.match(setupSource, /onBlur={commitBaseUrl}/);
+  assert.match(setupSource, /normalizeBaseUrlInput\(resolvedBaseUrl, resolvedApiStyle\)/);
+  assert.match(setupSource, /!baseUrlIssue/);
+  assert.match(setupSource, /aria-invalid={Boolean\(baseUrlError\)}/);
+  assert.match(setupSource, /provider-base-url-error/);
+
+  const customFields = block(".provider-setup-fields.is-custom");
+  assert.match(customFields, /grid-template-columns:\s*minmax\(160px, 0\.7fr\)/);
+  const baseUrl = block(".provider-setup-base-url");
+  assert.match(baseUrl, /grid-column: 1 \/ -1/);
+  assert.match(baseUrl, /min-width: 0/);
+  assert.match(styles, /\.provider-setup-base-url \.field-input\[aria-invalid="true"\]/);
+  assert.match(styles, /\.provider-setup-field-error\s*\{[\s\S]*overflow-wrap: anywhere/);
+});
+
 test("list rows carry no box of their own inside the inset pane", () => {
   // Double borders were what made the dialog look coarse; D297 removed the
   // hairline between rows too — the checkbox and a 2px gap make the list.

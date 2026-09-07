@@ -517,6 +517,9 @@ export const zhCN = {
     addProvider: "添加服务",
     apiKey: "API 密钥",
     baseUrl: "接口地址",
+    baseUrlHint:
+      "填写服务基础地址；请求会访问 {{route}}。粘贴完整接口路径后会在失焦时自动整理。",
+    baseUrlInvalid: "请输入有效的 http:// 或 https:// 地址。",
     modelId: "模型 ID",
     save: "保存",
     testConnection: "测试连接",

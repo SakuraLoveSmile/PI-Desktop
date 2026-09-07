@@ -298,6 +298,28 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Unit-covered; deterministic provider fixture pending
 
+#### E2E-005F: Custom endpoint input guardrails
+
+- **Preconditions**: App running; the add-provider dialog is open with Custom
+  endpoint selected.
+- **Steps**: 1) Enter a valid gateway URL ending in `/v1/messages`, then leave
+  the Base URL field. 2) Confirm the field keeps the service base URL ending in
+  `/v1`, and that its helper identifies the API path that will be targeted. 3)
+  Replace the value with `ftp://gateway.example.com`, then leave the field.
+  4) Enter a valid URL again and confirm model discovery can run; paste a full
+  `/models` path and leave the field.
+- **Expected**: Full operation paths are normalized to the service root on
+  blur, without changing the selected API style. A non-http(s) URL shows an
+  inline, accessible error, does not start discovery, and keeps Save disabled.
+  A valid URL restores discovery; the `/models` suffix is also removed before
+  the request is made. The long URL field uses a full row on wide dialogs and
+  stacks cleanly with the other credentials at the responsive breakpoint.
+- **Specs linked**: `04-ux/06-settings-ia.md`,
+  `03-runtime/12-provider-config-schema.md`
+- **Acceptance**: B (custom provider configuration)
+- **Milestone**: M2
+- **Status**: Unit-covered; rendered UI scenario pending
+
 #### E2E-005D: Configure a Zhipu / Z.AI named endpoint preset
 
 - **Preconditions**: App running; no Zhipu provider configured; the models.dev

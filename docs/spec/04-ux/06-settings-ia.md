@@ -218,7 +218,12 @@ a usage tab.
     Moonshot/Kimi, Zhipu, SiliconFlow, Volcengine Ark, MiniMax, Xiaomi, Kimi
     For Coding) then show Service + API key, with the published host as a
     one-line summary. Custom endpoint then shows Service, Name, Base URL, then
-    API key beside API format. Named display names stay behind Advanced.
+    API key beside API format. The custom Base URL field spans the dialog's
+    available width for long gateway paths, accepts only http(s) service base URLs,
+    and trims pasted operation paths such as `/models`, `/messages`,
+    `/chat/completions`, or `/responses` when the field loses focus. Invalid
+    URLs show an inline error and block discovery and save. Named display names
+    stay behind Advanced.
     Service is a searchable anchored menu of vendors (filter by localized
     name, vendor key, alias, or host), not a native select, region grouping,
     stepper, or vendor-card grid. Saved named rows store the models.dev `vendorKey` and
