@@ -279,6 +279,25 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Unit-covered (including the #30 GLM gateway regression); deterministic provider fixture pending
 
+#### E2E-005E: Anthropic Messages endpoint with a `/v1` base URL
+
+- **Preconditions**: A deterministic Anthropic Messages fixture exposes
+  `GET /v1/models` and `POST /v1/messages`; the configured custom endpoint ends
+  in `/v1` and returns one model such as `glm-5.3`.
+- **Steps**: 1) Open Settings → Model configuration and add a Custom endpoint.
+  2) Enter the fixture URL ending in `/v1`, choose Anthropic Messages, and
+  wait for model discovery. 3) Select the discovered model and save. 4) Start
+  an Agent turn and capture the fixture request path.
+- **Expected**: Discovery succeeds against `/v1/models`, and the Agent turn
+  succeeds against `/v1/messages`. The runtime does not send the request to a
+  doubled `/v1/v1/messages` path; a configured Anthropic root without `/v1`
+  remains equivalent.
+- **Specs linked**: `03-runtime/11-provider-model-system.md`,
+  `03-runtime/12-provider-config-schema.md`
+- **Acceptance**: B (custom provider interoperability), C (chat and stream)
+- **Milestone**: M2
+- **Status**: Unit-covered; deterministic provider fixture pending
+
 #### E2E-005D: Configure a Zhipu / Z.AI named endpoint preset
 
 - **Preconditions**: App running; no Zhipu provider configured; the models.dev
