@@ -86,7 +86,11 @@ export function isOpaqueBadRequest(error: ClassifiedAgentError): boolean {
   );
 }
 
-const OUTPUT_LIMIT_FIELDS = ["max_tokens", "max_completion_tokens"] as const;
+const OUTPUT_LIMIT_FIELDS = [
+  "max_tokens",
+  "max_completion_tokens",
+  "max_output_tokens",
+] as const;
 
 /** Drop the auto-derived output-limit fields, leaving the provider's own default in effect. */
 export function stripOutputLimitFields(payload: unknown): unknown {
@@ -273,13 +277,17 @@ export function providerSetupRetryDelayMs(
   return Math.min(PROVIDER_SETUP_MAX_RETRY_DELAY_MS, base);
 }
 
+function requestAbortedError(): Error {
+  return Object.assign(new Error("Request aborted"), { name: "AbortError" });
+}
+
 export function delayWithAbort(
   ms: number,
   signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(Object.assign(new Error("Request aborted"), { name: "AbortError" }));
+      reject(requestAbortedError());
       return;
     }
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -380,6 +388,7 @@ export function createProviderRetryStream(
     // transient budget, and a second opaque failure surfaces untouched.
     let limitRepairTried = false;
     for (;;) {
+      if (options.signal?.aborted) throw requestAbortedError();
       const inner = createStream({
         ...(limitRepairTried ? withoutDerivedOutputLimit(options) : options),
         maxRetries: 0,
@@ -428,6 +437,7 @@ export function createProviderRetryStream(
         // Drain the ended stream so providers with deferred cleanup do not
         // overlap the repair request, mirroring the retry path below.
         await inner.result();
+        if (options.signal?.aborted) throw requestAbortedError();
         limitRepairTried = true;
         continue;
       }
