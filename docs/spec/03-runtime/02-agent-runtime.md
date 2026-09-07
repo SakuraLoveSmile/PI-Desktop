@@ -140,6 +140,14 @@ context, and other non-retryable errors do not enter either provider replay
 path, and a non-retryable `PROVIDER_ERROR` from a malformed 400/422 request
 stays terminal.
 
+Before surfacing a pre-stream `PROVIDER_ERROR` for HTTP 400/422 whose message
+ends in `(no body)`, the runtime makes at most one silent repair attempt with
+the generated output-limit fields removed: `max_tokens`,
+`max_completion_tokens`, and `max_output_tokens`. This repair does not consume
+the transient retry budget or add backoff, and the caller's `onPayload` rewrite
+remains active. A second opaque failure is terminal, and an abort before the
+repair starts prevents the repair request.
+
 The non-429 delay honors the server first: `retry-after-ms`, `retry-after`
 seconds, then `retry-after` HTTP-date, capped at 8 seconds. Captured headers are
 retained for every status that can carry a usable delay (429, 408, 409, and
