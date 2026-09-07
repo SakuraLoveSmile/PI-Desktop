@@ -137,6 +137,31 @@ test("Browser ships as an ordinary plugin over the public CDP API", () => {
   assert.doesNotMatch(browserView, /require\(|ipcRenderer|webview/);
 });
 
+test("Advisor ships as an ordinary plugin over the public complete APIs", () => {
+  const advisorManifest = JSON.parse(read("resources/plugins/pi.advisor/manifest.json"));
+  const advisorMain = read("resources/plugins/pi.advisor/main.js");
+  const advisorPanel = read("resources/plugins/pi.advisor/renderer/index.html");
+  assert.equal(advisorManifest.id, "pi.advisor");
+  assert.deepEqual(
+    [...advisorManifest.permissions].sort(),
+    [
+      "agent.complete",
+      "agent.prompt.inject",
+      "agent.tool.register",
+      "models.list",
+      "session.read",
+      "ui.panel",
+    ],
+  );
+  assert.match(advisorMain, /pi\.agent\.complete/);
+  assert.match(advisorMain, /includeSessionContext:\s*true/);
+  assert.match(advisorMain, /pi\.session\.getLlmContext|pi\.models\.list/);
+  assert.match(advisorPanel, /pluginBridge/);
+  assert.match(advisorPanel, /advisor\.set/);
+  assert.doesNotMatch(advisorMain, /apiKey|safeStorage|net\.fetch/);
+  assert.doesNotMatch(advisorPanel, /require\(|ipcRenderer/);
+});
+
 test("bundled plugins are packaged and located at runtime", () => {
   assert.ok(
     packageJson.build.extraResources.some(
