@@ -33,6 +33,7 @@ Principles:
 | `window` | Frameless window state, controls, and compatibility work-panel geometry channels |
 | `menu` | Allowlisted application-menu commands and native editing/window actions |
 | `notification` | Durable inbox list/read/clear and new/activated events |
+| `stats` | Completed-turn token history for Settings → Usage |
 
 ## 3. Channel Conventions
 
@@ -411,7 +412,7 @@ type AgentEvent =
  | { type: "agent_start" }
  | { type: "agent_end"; messageIds: string[] }
  | { type: "turn_start" }
- | { type: "turn_end" }
+ | { type: "turn_end"; subagentUsage?: MessageUsage }
  | { type: "message_start"; message: UiMessage }
  | { type: "message_update"; message: UiMessage;
      deltaText?: string; deltaThinking?: string }
@@ -731,6 +732,19 @@ is a runtime estimate from the tool call arguments and result; providers do not
 report per-tool allocation, so the renderer labels these rows as estimates and
 never merges them into the exact provider total. Older peers may omit all of
 these optional fields without breaking the v6 handshake.
+
+`turn_end.subagentUsage` is the settled subagent total since the previous
+emitted `turn_end` of the same durable turn. Parent `message.usage` stays the
+provider-reported assistant usage (D103). Electron sums parent-message usages
+plus `subagentUsage` into `session.endTurn.usage`.
+
+### stats
+
+- `pi-desktop/stats/getTokenUsageHistory({ startDate?, endDate?, bucket? }) -> TokenUsageHistoryResult`
+
+`bucket` is `day` | `week` | `month`. Omitted dates use the host default window
+(53 weeks / 52 weeks / 24 months) in the host's local calendar. `week` keys use
+ISO week year (`%G-W%V`). The result fills empty buckets in range.
 
 ## 8. Settings / Secrets API
 

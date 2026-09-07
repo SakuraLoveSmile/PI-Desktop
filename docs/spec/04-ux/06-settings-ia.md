@@ -16,20 +16,21 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   exact order:
   1. **General / 常规** — Lucide `SlidersHorizontal` (appearance)
   2. **AI** — Lucide `Sparkles` (permissions, defaults, command shell)
-  3. **Shortcuts / 快捷键** — Lucide `Keyboard` (keyboard shortcuts)
-  4. **Instructions / 指令** — Lucide `FileText` (global and project instruction files)
-  5. **Models / 模型** — Lucide `Bot` (providers and default model)
-  6. **Skills / 技能** — Lucide `BookOpen` (reusable agent instructions)
-  7. **MCP** — Lucide `Server` (agent connections)
-  8. **Subagents / 子智能体** — Lucide `Bot` (personal parallel agents)
-  9. **Import / 导入** — Lucide `Download` (bring sessions in from other tools)
-  10. **Projects / 项目** — Lucide `Archive` (durable project index)
-  11. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
+  3. **Usage / 用量** — Lucide `Activity` (completed-turn token totals)
+  4. **Shortcuts / 快捷键** — Lucide `Keyboard` (keyboard shortcuts)
+  5. **Instructions / 指令** — Lucide `FileText` (global and project instruction files)
+  6. **Models / 模型** — Lucide `Bot` (providers and default model)
+  7. **Skills / 技能** — Lucide `BookOpen` (reusable agent instructions)
+  8. **MCP** — Lucide `Server` (agent connections)
+  9. **Subagents / 子智能体** — Lucide `Bot` (personal parallel agents)
+  10. **Import / 导入** — Lucide `Download` (bring sessions in from other tools)
+  11. **Projects / 项目** — Lucide `Archive` (durable project index)
+  12. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
 - The directory remains a flat searchable list in the same exact order. For
   scanability, the destinations are shown in four titled visual clusters:
-  `Preferences` / `偏好` (General, AI, Shortcuts), `Agent` / `智能体`
+  `Preferences` / `偏好` (General, AI, Usage, Shortcuts), `Agent` / `智能体`
   (Instructions, Models, Skills, MCP, Subagents), `Workspace` / `工作区`
   (Import, Projects), and `System` / `系统` (Info). Headings are muted,
   non-interactive labels and use whitespace for separation; no divider lines are
@@ -101,6 +102,20 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   Manual `/compact` remains available from the command palette for an idle
   session; the transcript shows where each compaction happened and the context
   usage inspector shows whether a checkpoint is installed.
+
+### Usage (`usage` tab)
+
+- KPI row: total tokens (input + output + cache read + cache write), input,
+  output, and completed-turn count for the selected window
+- Activity matrix for `day` (Monday-first week columns), `week` (ISO week
+  year), and `month` buckets. Cells are keyboard-activatable; selecting one
+  shows that bucket's input/output/turns. Empty cells stay in the grid.
+- Host defaults: last 53 weeks (`day`), 52 weeks (`week`), 24 months (`month`),
+  bucketed in the host machine's local calendar. Turns completed before this
+  build may have zero `turns.input_tokens` because Electron did not previously
+  send `session.endTurn.usage`.
+- Search indexes Total, Input, Activity, and Turns. No subtitle, cost, or
+  pricing.
 
 ### Shortcuts (`shortcuts` tab)
 - **Keyboard shortcuts** card:
@@ -386,8 +401,8 @@ system while preserving their different data ownership:
 ## 4. Acceptance
 
 1. Opening Settings hides the coding app sidebar (full-page takeover)
-2. Rail shows search + back and exactly General / 常规, AI, Shortcuts / 快捷键,
-   Instructions / 指令, Models / 模型, Skills / 技能, MCP,
+2. Rail shows search + back and exactly General / 常规, AI, Usage / 用量,
+   Shortcuts / 快捷键, Instructions / 指令, Models / 模型, Skills / 技能, MCP,
    Subagents / 子智能体, Import / 导入, Projects / 项目, and Info / 信息 in
    that order. The rows are grouped under Preferences / 偏好, Agent / 智能体,
    Workspace / 工作区, and System / 系统.
@@ -396,9 +411,10 @@ system while preserving their different data ownership:
 5. Plugins has no Settings destination; the app-shell Plugins page supports
    load, enable, disable, and uninstall
 6. General shows the host-backed Appearance card; the AI destination shows
-   Permissions and Defaults, including the Command shell row; the Shortcuts
-   destination shows the Keyboard shortcuts card; Info shows the Developer card.
-   No additional settings destinations are rendered
+   Permissions and Defaults, including the Command shell row; the Usage
+   destination shows completed-turn token totals and the activity matrix; the
+   Shortcuts destination shows the Keyboard shortcuts card; Info shows the
+   Developer card. No additional settings destinations are rendered
 7. Provider secrets never display raw key values
 8. Model configuration shows compact Defaults, separate vendor accounts, the
    account edit/add dialogs, and AI service cards rather than a dense always-on
