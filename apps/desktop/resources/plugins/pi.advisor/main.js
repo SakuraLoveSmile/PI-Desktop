@@ -1,5 +1,5 @@
 /**
- * Advisor — bundled first-party plugin (ADR 0173).
+ * Advisor — bundled first-party plugin (ADR 0174).
  *
  * Registers a zero-parameter reviewer tool once the user picks a model with
  * `/advisor`. Completions and session context go through public host APIs.
