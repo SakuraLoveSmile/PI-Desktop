@@ -54,8 +54,6 @@ import { ProjectsPage } from "./ProjectsPage";
 import { AgentSkillsPage } from "../components/settings/AgentSkillsPage";
 import { AgentMcpPage } from "../components/settings/AgentMcpPage";
 import { AgentSubagentsPage } from "../components/settings/AgentSubagentsPage";
-import { TokenUsagePage } from "../components/settings/TokenUsagePage";
-import { IconActivity } from "../components/icons";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
 
@@ -929,7 +927,6 @@ export function SettingsPage() {
       // Semantic Lucide glyphs for the settings destinations.
       general: <IconSliders size={14} />,
       ai: <IconSparkles size={14} />,
-      usage: <IconActivity size={14} />,
       shortcuts: <IconKeyboard size={14} />,
       instructions: <IconFileText size={14} />,
       agent: <IconBot size={14} />,
@@ -1135,8 +1132,6 @@ export function SettingsPage() {
               />
             </div>
           )}
-
-          {tab === "usage" && <TokenUsagePage />}
 
           {tab === "agent" && <ModelConfigPage />}
 

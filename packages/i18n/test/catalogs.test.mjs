@@ -42,7 +42,6 @@ test("settings rail labels stay concise and parallel across locales", () => {
   const keys = [
     "general",
     "ai",
-    "usage",
     "shortcuts",
     "instructions",
     "models",
@@ -59,7 +58,6 @@ test("settings rail labels stay concise and parallel across locales", () => {
     [
       "General",
       "AI",
-      "Usage",
       "Shortcuts",
       "Instructions",
       "Models",
@@ -76,7 +74,6 @@ test("settings rail labels stay concise and parallel across locales", () => {
     [
       "常规",
       "AI",
-      "用量",
       "快捷键",
       "指令",
       "模型",
