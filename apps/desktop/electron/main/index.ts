@@ -548,20 +548,27 @@ const plugins: PluginRuntime = new PluginRuntime({
   // limit on this list.
   protectedPaths: () => [dataDir],
   listModels: async () => {
-    if (!host) return [];
-    const listed = await host.call<{ providers: Array<{
-      id: string;
-      name: string;
-      enabled?: boolean;
-      hasSecret?: boolean;
-      hasOauth?: boolean;
-      authKind?: string;
-      supportsReasoning?: boolean;
-      supportedThinkingLevels?: ThinkingLevel[];
-      defaultModelId?: string;
-      models?: ModelBinding[];
-    }> }>("providers.list", { includeDisabled: false });
-    return listReadyPluginModels(listed.providers ?? []);
+    // Same D080 degrade as skills/MCP/subagent catalog reads: a dead
+    // transport is expected during shutdown and supervised restarts.
+    if (!host?.isAvailable()) return [];
+    try {
+      const listed = await host.call<{ providers: Array<{
+        id: string;
+        name: string;
+        enabled?: boolean;
+        hasSecret?: boolean;
+        hasOauth?: boolean;
+        authKind?: string;
+        supportsReasoning?: boolean;
+        supportedThinkingLevels?: ThinkingLevel[];
+        defaultModelId?: string;
+        models?: ModelBinding[];
+      }> }>("providers.list", { includeDisabled: false });
+      return listReadyPluginModels(listed.providers ?? []);
+    } catch (error) {
+      if (!isHostUnavailable(error)) throw error;
+      return [];
+    }
   },
   getSessionContext: async (sessionId, stripToolName) => {
     if (!host) {

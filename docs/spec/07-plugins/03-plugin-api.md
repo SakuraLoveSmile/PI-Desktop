@@ -201,7 +201,8 @@ type PluginModelInfo = {
 
 Only enabled, authenticated provider rows are returned (API key, OAuth, or
 `authKind: "none"`). No secrets. `models.list` is also a panel-bridge channel
-so a picker page can populate itself.
+so a picker page can populate itself. When the host transport is unavailable,
+the call returns an empty list instead of warning (D080).
 
 ### session (requires `session.read`)
 ```ts

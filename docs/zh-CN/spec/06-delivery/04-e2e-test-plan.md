@@ -5700,11 +5700,12 @@ IPC 请求无法关闭。
   2. 在工具执行之外调用 `pi.session.getLlmContext()`。确认 `INVALID_ARGUMENT`。
   3. 让 Agent 调用插件工具。在 `execute` 内调用 `getLlmContext()`，再调用 `agent.complete({ modelKey, includeSessionContext: true })`。确认工具结果含评审文本和 usage，不含密钥。
   4. 在 60 秒内重复 `agent.complete`，直到第 8 次成功、第 9 次返回 `RATE_LIMITED`。
-- **预期**：凭据不离开 Electron main。审计行记录插件 id、模型 key、体积和 usage，不含转录或补全文本。Plan 仍对插件工具返回 `PLUGIN_DISABLED_IN_PLAN`。
+  5. 停止 host-core 后再调用 `pi.models.list()`。确认返回 `[]` 且没有 warn 日志。
+- **预期**：凭据不离开 Electron main。审计行记录插件 id、模型 key、体积和 usage，不含转录或补全文本。Plan 仍对插件工具返回 `PLUGIN_DISABLED_IN_PLAN`。宿主传输不可用时模型列表为空且不记警告（D080）。
 - **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/13-plugin-permissions-matrix.md`、ADR 0174、D336
 - **验收**：G（插件智能体工具）、安全
 - **里程碑**：M5
-- **状态**：单元已覆盖（`plugin-complete.test.mjs`、`plugin-session-context.test.ts`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
+- **状态**：单元已覆盖（`plugin-complete.test.mjs`、`plugin-session-context.test.ts`、`subagent-wiring.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
 
 #### E2E-189：随应用打包的 Advisor 插件选择评审模型并返回第二意见
 

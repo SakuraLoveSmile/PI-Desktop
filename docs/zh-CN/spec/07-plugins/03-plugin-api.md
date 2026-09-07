@@ -192,7 +192,7 @@ type PluginModelInfo = {
 ```
 
 只返回已启用且已认证的 provider 行（API key、OAuth 或 `authKind: "none"`）。不含密钥。
-`models.list` 也是面板桥通道，选择器页面可以自行填充。
+`models.list` 也是面板桥通道，选择器页面可以自行填充。宿主传输不可用时返回空列表，不记警告（D080）。
 
 ### session（需要 `session.read`）
 ```ts

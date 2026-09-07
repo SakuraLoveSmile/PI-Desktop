@@ -7772,16 +7772,18 @@ are withdrawn with ADR 0165.
      a secret.
   4. Repeat `agent.complete` until the eighth call in 60s succeeds and the
      ninth returns `RATE_LIMITED`.
+  5. Stop host-core and call `pi.models.list()`. Confirm `[]` and no warn line.
 - **Expected**: Credentials never leave Electron main. Audit lines record
   plugin id, model key, sizes, and usage — not transcript or completion text.
-  Plan still returns `PLUGIN_DISABLED_IN_PLAN` for the plugin tool.
+  Plan still returns `PLUGIN_DISABLED_IN_PLAN` for the plugin tool. A dead
+  host transport returns an empty model list without a warning (D080).
 - **Specs linked**: `07-plugins/03-plugin-api.md`,
   `07-plugins/13-plugin-permissions-matrix.md`, ADR 0174, D336
 - **Acceptance**: G (plugin agent tool), Security
 - **Milestone**: M5
 - **Status**: Unit-covered (`plugin-complete.test.mjs`,
-  `plugin-session-context.test.ts`); full UI journey Draft (do not run E2E
-  locally unless explicitly requested)
+  `plugin-session-context.test.ts`, `subagent-wiring.test.mjs`); full UI
+  journey Draft (do not run E2E locally unless explicitly requested)
 
 #### E2E-189: Bundled Advisor plugin picks a reviewer and returns a second opinion
 
