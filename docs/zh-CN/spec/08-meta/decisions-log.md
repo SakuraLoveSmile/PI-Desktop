@@ -36,7 +36,7 @@
 | D016 | 卸载插件数据 | **默认删除**，可选稍后保留数据 |
 | D017 | 启用 → 加载失败 | **自动回退到禁用** |
 | D018 | 设置中的插件秘密 | **MVP 中不允许** |
-| D019 | 插件会话摘要访问 | **默认拒绝** |
+| D019 | 插件会话摘要访问 | **默认拒绝** *（由 D336 修订：仅在授予 `session.read` 时，且仅限进行中的工具会话）* |
 | D020 | 自动更新 | **后MVP** |
 | D021 | 首次运行新手引导 | **内联清单（不是模式向导）** |
 | D022 | 本地遥测 | **仅在 MVP 中记录本地日志（无远程遥测）** |
@@ -2709,3 +2709,10 @@ D193 和 D194。
 - 粘贴/上传的图片存为无扩展名的 `attachments/<sha256>` blob。渲染器源无法加载它们，历史回合只显示芯片；`fs/open` 还把该引用当成工作区相对路径。
 - `fs/read`、`fs/reveal`、`fs/open` 共用 `resolveOpenablePath`（工作区、scratch、attachments，以及 blob 引用）。读取会 `realpath`。`fs/readImageDataUrl` 只返回有界图片 data URL。客户端 `mimeType` 不能把非图片扩展名重新分类。
 - 决策 D334 记录为 ADR 0172。见 `03-runtime/01-ipc-protocol.md`、`04-ux/08-component-spec.md` §8.3 与 E2E-187。
+
+## 2026-09-07 —— 宿主代发的插件补全与会话上下文（D336）
+
+- 插件可以注册工具，但不能列出已认证模型、读取当前 LLM 上下文，也不能用用户的额度打一次侧向补全。
+- `pi.models.list`、`pi.session.getLlmContext`、`pi.agent.complete` 是公开宿主 API。凭据和线路调用留在 Electron main。会话上下文绑定到进行中的工具会话（修订 D019）。
+- 随应用打包的 `pi.advisor` 证明这条通道：`/advisor` 选择评审模型；执行模型调用 `plugin_pi_advisor_advisor` 获取第二意见。
+- 决策 D336 记录为 ADR 0174。见 `07-plugins/03-plugin-api.md`、`07-plugins/13-plugin-permissions-matrix.md` 与 E2E-188 / E2E-189。

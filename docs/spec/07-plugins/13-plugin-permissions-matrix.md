@@ -30,6 +30,9 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `bus.publish` | medium | `bus.publish` to declared topics | Confirm at install | Other plugins can act on the message |
 | `bus.subscribe` | medium | `bus.subscribe` to declared patterns | Confirm at install | Can observe another plugin's messages |
 | `browser.cdp` | high | `pi.browser.*` against the host work-panel guest | Confirm at install | Guest bounds are clamped to the calling plugin view; CDP is allowlisted |
+| `models.list` | medium | `pi.models.list` | Confirm at install | Ready provider/model rows only; no secrets |
+| `session.read` | high | `pi.session.getLlmContext` | Confirm at install | In-flight tool session only; compaction-aware projection (D019 / D336) |
+| `agent.complete` | high | `pi.agent.complete` | Confirm at install | Host-owned one-shot; spends user quota; `includeSessionContext` also needs `session.read` |
 
 ## 2A. A permission is the switch; the manifest carries the range
 
@@ -117,6 +120,9 @@ so "Modify the files it lists" is followed by the list.
 | `bus.publish` | Send messages to other plugins | 向其他插件发送消息 |
 | `bus.subscribe` | Receive messages from other plugins | 接收其他插件的消息 |
 | `browser.cdp` | Control the work-panel browser | 控制工作面板浏览器 |
+| `models.list` | List authenticated models | 列出已登录的模型 |
+| `session.read` | Read the current conversation sent to the model | 读取当前发给模型的对话 |
+| `agent.complete` | Run a one-shot completion with your models | 用你的模型发起一次补全 |
 
 ## 5. Adding permissions on upgrade
 

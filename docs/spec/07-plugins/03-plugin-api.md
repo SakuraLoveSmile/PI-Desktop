@@ -176,10 +176,82 @@ the selected Agent permission policy.
 type ToolExecContext = {
  sessionId: string
  turnId?: string
+ /** Executor model for this session, `providerId/modelId`. Configuration, not transcript. */
+ modelKey?: string
+ thinkingLevel?: ThinkingLevel
  signal?: AbortSignal
  log: (msg: string) => void
 }
 ```
+
+### models (requires `models.list`)
+```ts
+pi.models.list(): Promise<PluginModelInfo[]>
+
+type PluginModelInfo = {
+  key: string                 // `${providerId}/${modelId}` — first slash splits
+  providerId: string
+  providerName: string
+  modelId: string
+  label: string
+  supportsReasoning: boolean
+  thinkingLevels: ThinkingLevel[]
+}
+```
+
+Only enabled, authenticated provider rows are returned (API key, OAuth, or
+`authKind: "none"`). No secrets. `models.list` is also a panel-bridge channel
+so a picker page can populate itself.
+
+### session (requires `session.read`)
+```ts
+pi.session.getLlmContext(): Promise<PluginLlmContext>
+
+type PluginLlmMessage = {
+  role: "user" | "assistant" | "tool" | "system"
+  content: string
+  toolName?: string
+}
+
+type PluginLlmContext = {
+  sessionId: string
+  modelKey: string | null
+  thinkingLevel?: ThinkingLevel
+  messages: PluginLlmMessage[]
+  truncated: boolean
+}
+```
+
+The plugin cannot pass a session id. Identity is the in-flight `plugins.execute`
+session (D333 / D336). Calling this outside a tool execution fails with
+`INVALID_ARGUMENT`. Subagent rows are omitted. An in-flight call of the
+plugin's own tool is stripped from the tail. A compaction summary replaces
+pre-checkpoint history. Combined content is capped at 200k characters.
+
+### agent.complete (requires `agent.complete`)
+```ts
+pi.agent.complete(input: {
+  modelKey: string
+  thinkingLevel?: ThinkingLevel
+  system?: string
+  messages?: Array<{ role: "user" | "assistant"; content: string }>
+  includeSessionContext?: boolean
+}): Promise<{
+  text: string
+  modelKey: string
+  thinkingLevel?: ThinkingLevel
+  usage?: MessageUsage
+}>
+```
+
+The host resolves credentials and runs a one-shot completion with `tools: []`
+through the same path as Composer prompt enhancement. The plugin never receives
+a secret. `includeSessionContext: true` also requires `session.read` and an
+in-flight tool session; the host serializes that context and, if `messages` is
+empty, appends `Please advise on the executor's situation above.` System prompt
+≤ 32 KiB; combined messages ≤ 200k characters; eight calls per plugin per
+rolling 60s (`RATE_LIMITED`); 90s budget (`TIMEOUT`). Empty model output is
+`INVALID_ARGUMENT`.
 
 ### clipboard / shell
 ```ts
@@ -323,6 +395,9 @@ The host pushes events to the plugin process as one-way frames. Delivered today:
   matching `workspace.get()`, sent when the cached workspace path changes.
 - `plugin:settingsChanged` is delivered after edits from the generated Plugins
   settings UI.
+- `session:modelChanged` — `{ sessionId, modelKey, thinkingLevel }`, sent after
+  a successful `session.configure` that changes provider, model, or thinking
+  level.
 
 A throwing handler is logged and does not affect other listeners or the plugin.
 
@@ -360,6 +435,7 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`, `workspace.get`, `app.getAppearance` | None |
+| `models.list` | `models.list` |
 | `fs.readText`, `fs.readPreview`, `fs.openDefault`, `fs.reveal`, `fs.glob`, `fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText`, `clipboard.getHistory` | `clipboard.read` |
@@ -404,6 +480,9 @@ Any of the following calls must be logged for audit:
 - bus.publish / bus.subscribe / bus.unsubscribe (with the topic and fan-out size)
 - browser.navigate / evaluate / cdp / openExternal
 - service start / stop / restart
+- models.list (returned row count)
+- session.getLlmContext (session id, message count, truncated flag — never transcript text)
+- agent.complete (model key, sizes, usage — never prompt or completion text)
 
 Log fields:
 - pluginId
@@ -427,7 +506,8 @@ The desktop plugin runtime now implements the MVP host API surface used by local
 - `fs.readText` / `fs.readPreview` / `fs.openDefault` / `fs.reveal` /
   `fs.writeText` / `fs.glob` / `fs.list` / `fs.remove` / `fs.requestDirectory`,
   bounded by `manifest.fs` (ADR 0088)
-- `agent.registerTool` / `unregisterTool`
+- `agent.registerTool` / `unregisterTool` / `agent.complete`
+- `models.list`, `session.getLlmContext`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `browser.*` (guest CDP; `browser.cdp`)
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`

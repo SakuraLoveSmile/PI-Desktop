@@ -285,6 +285,9 @@ Namespace: `pi.plugin.*`
 ### Agent (requires permission)
 - `pi.agent.registerTool(tool)`
 - `pi.agent.unregisterTool(name)`
+- `pi.models.list()` // `models.list`
+- `pi.session.getLlmContext()` // `session.read`; in-flight tool session only
+- `pi.agent.complete(input)` // `agent.complete`; host-owned one-shot
 
 Skills are contributed declaratively (`contributes.skills` + `agent.prompt.inject`),
 not invoked by the plugin: the host puts the catalog in the system prompt and the

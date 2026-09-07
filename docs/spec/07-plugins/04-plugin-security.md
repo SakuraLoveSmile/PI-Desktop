@@ -13,6 +13,7 @@ Main risks:
 3. Stealing API keys / session content
 4. Hijacking agent tools
 5. Phishing via the UI
+6. Spending the user's model quota, or sending the conversation to another model (`agent.complete` / `session.read`)
 
 ## 2. Default-deny principle
 
@@ -28,8 +29,12 @@ Main risks:
 ### Must
 1. Plugin UI is isolated from the host UI DOM
 2. Plugins cannot directly require host modules
-3. The secret store is not open to plugins
+3. The secret store is not open to plugins. Host-owned completions
+   (`agent.complete`) resolve credentials in Electron main and never pass keys,
+   refresh tokens, or `ModelAuth` to the plugin process
 4. The plugin-private data directory is separate from the host core library
+5. Session transcripts from `session.getLlmContext` are a bounded projection of
+   the in-flight tool session only (D336 / D019)
 
 Clipboard history is host-owned and remains in the Electron main process only.
 It is never written to the plugin data directory or the host database. A plugin

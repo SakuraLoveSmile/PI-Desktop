@@ -186,3 +186,4 @@ Each ADR includes:
 | 0171 | Host-owned completed-turn token history | Accepted (amended by 0173) |
 | 0172 | Contained in-chat image display | Accepted (amends fs/read workspace-only clause) |
 | 0173 | Plugin-owned token usage dashboard | Accepted (amends 0171) |
+| 0174 | Host-owned plugin completions and session context | Accepted (amends D019) |

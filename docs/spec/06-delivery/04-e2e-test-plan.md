@@ -7755,3 +7755,53 @@ are withdrawn with ADR 0165.
 - **Status**: Unit-covered (`fs-panel-guard.test.mjs`,
   `message-image-display.test.mjs`); full UI journey Draft (do not run E2E
   locally unless explicitly requested)
+
+#### E2E-188: Plugin host APIs list models, read in-flight context, and complete
+
+- **Preconditions**: At least one authenticated provider; a development plugin
+  granted `models.list`, `session.read`, and `agent.complete`; an Agent
+  session with a prior user turn.
+- **Steps**:
+  1. From the plugin process call `pi.models.list()`. Confirm only ready
+     models are returned and no secret fields appear.
+  2. Call `pi.session.getLlmContext()` outside a tool execution. Confirm
+     `INVALID_ARGUMENT`.
+  3. Ask the Agent to call the plugin tool. Inside `execute`, call
+     `getLlmContext()` then `agent.complete({ modelKey, includeSessionContext:
+     true })`. Confirm the tool result contains reviewer text and usage, not
+     a secret.
+  4. Repeat `agent.complete` until the eighth call in 60s succeeds and the
+     ninth returns `RATE_LIMITED`.
+- **Expected**: Credentials never leave Electron main. Audit lines record
+  plugin id, model key, sizes, and usage — not transcript or completion text.
+  Plan still returns `PLUGIN_DISABLED_IN_PLAN` for the plugin tool.
+- **Specs linked**: `07-plugins/03-plugin-api.md`,
+  `07-plugins/13-plugin-permissions-matrix.md`, ADR 0174, D336
+- **Acceptance**: G (plugin agent tool), Security
+- **Milestone**: M5
+- **Status**: Unit-covered (`plugin-complete.test.mjs`,
+  `plugin-session-context.test.ts`); full UI journey Draft (do not run E2E
+  locally unless explicitly requested)
+
+#### E2E-189: Bundled Advisor plugin picks a reviewer and returns a second opinion
+
+- **Preconditions**: `pi.advisor` is enabled (bundled, not uninstallable). At
+  least one authenticated provider. An Agent session.
+- **Steps**:
+  1. Confirm the `advisor` tool is absent from the active tool set before a
+     reviewer is selected.
+  2. Run `/advisor` (or the plugin command) and pick a model plus effort.
+     Confirm the toast `Advisor: <label>[, <effort>]` and that settings persist.
+  3. Ask the Agent to proceed with a non-trivial task. Confirm it can call
+     `plugin_pi_advisor_advisor` with no parameters and restates the guidance
+     in the visible reply.
+  4. Disable the plugin. Confirm `/advisor` is gone and the tool is
+     unregistered. Confirm Uninstall is refused.
+- **Expected**: Off costs no completion and no tool schema. The plugin uses
+  only public host APIs. D015 prefix is `plugin_pi_advisor_advisor`.
+- **Specs linked**: `07-plugins/03-plugin-api.md`, ADR 0174, D336
+- **Acceptance**: G (plugin agent tool), C (conversation)
+- **Milestone**: M5
+- **Status**: Unit-covered (`bundled-plugins.test.mjs`,
+  `plugin-complete.test.mjs`); full UI journey Draft (do not run E2E locally
+  unless explicitly requested)
