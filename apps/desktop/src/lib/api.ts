@@ -748,6 +748,11 @@ export const api = {
     invoke<{ behavior: CloseBehavior }>(IPC.invoke.closeBehaviorSet, {
       behavior,
     }),
+  getTokenUsageHistory: (query?: { startDate?: number; endDate?: number; bucket?: "day" | "week" | "month" }) =>
+    invoke<import("@pi-desktop/shared").TokenUsageHistoryResult>(
+      IPC.invoke.statsGetTokenUsageHistory,
+      query,
+    ),
   menuRendererReady: () =>
     invoke<{ ready: boolean }>(IPC.invoke.menuRendererReady),
   nativeMenuAction: (action: NativeMenuAction) =>

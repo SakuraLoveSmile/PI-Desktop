@@ -8,6 +8,7 @@
 export type SettingsTabId =
   | "general"
   | "ai"
+  | "usage"
   | "shortcuts"
   | "instructions"
   | "agent"
@@ -76,6 +77,18 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.commandShell",
       "settings.enterToSend",
       "settings.largePasteThreshold",
+    ],
+  },
+  {
+    id: "usage",
+    labelKey: "settings.nav.usage",
+    titleKey: "settings.usage",
+    group: "preferences",
+    keywordKeys: [
+      "settings.usageTitle",
+      "settings.tokenUsage",
+      "settings.heatmap",
+      "settings.tokens",
     ],
   },
   {

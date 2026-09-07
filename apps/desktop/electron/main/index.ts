@@ -84,6 +84,7 @@ import {
   type ShortcutPlatform,
   type ThinkingLevel,
   type UiMessage,
+  type MessageUsage,
   type UserSkillRecord,
   type UserSubagentRecord,
   type WindowControlAction,
@@ -1969,6 +1970,8 @@ const inFlightExecutionFinishes = new Set<string>();
 let approvedExecutionDrain: Promise<void> | null = null;
 const turnSettlements = new Map<string, Set<() => void>>();
 const turnFinalizations = new Map<string, Promise<void>>();
+/** sessionId -> last assistant usage recorded for active turn */
+const activeTurnUsages = new Map<string, MessageUsage>();
 /** sessionId → scheduled task_run id awaiting completion. */
 const scheduledRunsBySession = new Map<string, string>();
 /** Session currently rendered on the chat page; focus remains Main-owned. */
@@ -4573,6 +4576,8 @@ function finishTurn(
         const createNotification =
           options.createNotification ??
           (!wasPlanSubmission && shouldCreateTaskNotification(sessionId));
+        const turnUsage = activeTurnUsages.get(sessionId);
+        activeTurnUsages.delete(sessionId);
         try {
           const result = await host.call<{
             ok: boolean;
@@ -4583,6 +4588,7 @@ function finishTurn(
             status,
             errorCode,
             createNotification,
+            ...(turnUsage ? { usage: turnUsage } : {}),
             // The reply can no longer finish on its own: promote its last
             // checkpoint instead of waiting for a final row that never comes.
             ...(options.recoverInflight ? { recoverInflight: true } : {}),
@@ -5024,6 +5030,9 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     return;
   }
   if (event.type === "message_end" && event.message.role === "assistant") {
+    if (!envelope.parentToolCallId && event.message.usage) {
+      activeTurnUsages.set(envelope.sessionId, event.message.usage);
+    }
     // Checkpoint the finished snapshot before the outbox append (D327).
     // Settling first dropped the last interval of text, and endTurn used to
     // delete the host file while the final row was still queued.
@@ -6376,6 +6385,14 @@ function registerIpc() {
     async (input: { sessionId: string; snapshotId: string }) => {
       if (!host) throw new Error("host unavailable");
       return host.call("review.rollback", input);
+    },
+  );
+
+  handle(
+    IPC.invoke.statsGetTokenUsageHistory,
+    async (input?: { startDate?: number; endDate?: number; bucket?: string }) => {
+      if (!host) throw new Error("host unavailable");
+      return host.call("stats.getTokenUsageHistory", input ?? {});
     },
   );
 

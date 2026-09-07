@@ -169,7 +169,7 @@ function boundedReport(value: string): string {
   return `${text.slice(0, head)}${marker}${text.slice(-tail)}`;
 }
 
-function addUsage(
+export function addUsage(
   total: MessageUsage | undefined,
   next: MessageUsage | undefined,
 ): MessageUsage | undefined {

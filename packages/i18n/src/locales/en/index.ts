@@ -535,6 +535,7 @@ export const en = {
     nav: {
       general: "General",
       ai: "AI",
+      usage: "Token Usage",
       shortcuts: "Shortcuts",
       instructions: "Instructions",
       models: "Models",
@@ -547,6 +548,7 @@ export const en = {
     },
     general: "General",
     ai: "AI",
+    usage: "Token Usage & Heatmap",
     shortcuts: "Shortcuts",
     instructions: "Instructions",
     instructionsGlobal: "Global instructions",

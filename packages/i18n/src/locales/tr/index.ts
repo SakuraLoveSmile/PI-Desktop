@@ -537,6 +537,7 @@ export const tr = {
     nav: {
       general: "Genel",
       ai: "AI",
+      usage: "Token Kullanımı",
       shortcuts: "Kısayollar",
       instructions: "Yönergeler",
       models: "Modeller",
@@ -549,6 +550,7 @@ export const tr = {
     },
     general: "Genel",
     ai: "AI",
+    usage: "Token Kullanımı ve Isı Haritası",
     shortcuts: "Kısayollar",
     instructions: "Yönergeler",
     instructionsGlobal: "Genel yönergeler",

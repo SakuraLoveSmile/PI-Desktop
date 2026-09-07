@@ -533,6 +533,7 @@ export const zhCN = {
     nav: {
       general: "常规",
       ai: "AI",
+      usage: "用量统计",
       shortcuts: "快捷键",
       instructions: "指令",
       models: "模型",
@@ -545,6 +546,7 @@ export const zhCN = {
     },
     general: "常规",
     ai: "全局 AI",
+    usage: "Token 用量与统计",
     shortcuts: "快捷键",
     instructions: "指令",
     instructionsGlobal: "全局指令",

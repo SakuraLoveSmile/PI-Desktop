@@ -203,6 +203,7 @@ CREATE TABLE turns (
   ended_at      INTEGER
 );
 CREATE INDEX idx_turns_session ON turns(session_id, started_at DESC);
+CREATE INDEX idx_turns_ended_at ON turns(ended_at DESC);
 CREATE UNIQUE INDEX idx_turns_one_running_session
   ON turns(session_id) WHERE status = 'running';
 
@@ -498,6 +499,10 @@ impl Database {
     /// Crash recovery + retention, run once per process at open.
     fn boot_maintenance(&self) -> Result<()> {
         let now = now_ms();
+        let _ = self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_turns_ended_at ON turns(ended_at DESC)",
+            [],
+        );
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
             "UPDATE turns

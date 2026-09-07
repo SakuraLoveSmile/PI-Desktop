@@ -1760,3 +1760,32 @@ export type FsIndexResult = {
   /** True when the index hit its entry cap and results were dropped. */
   truncated: boolean;
 };
+
+export type TokenUsageBucket = "day" | "week" | "month";
+
+export type TokenUsageHistoryItem = {
+  date: string;
+  timestamp: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  reasoningTokens: number;
+  turnCount: number;
+};
+
+export type TokenUsageHistoryResult = {
+  bucket: TokenUsageBucket;
+  items: TokenUsageHistoryItem[];
+  totals: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    reasoningTokens: number;
+    turnCount: number;
+  };
+};
+

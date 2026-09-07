@@ -2624,6 +2624,142 @@ pub fn search_messages(db: &Database, query: &str, limit: i64) -> Result<Vec<Sea
     }
 }
 
+pub fn get_token_usage_history(
+    db: &Database,
+    start_date: i64,
+    end_date: i64,
+    bucket: &str,
+) -> Result<Value> {
+    let mut stmt = db.conn().prepare_cached(
+        "SELECT ended_at, input_tokens, output_tokens, usage_json, model_id
+         FROM turns
+         WHERE status = 'completed' AND ended_at IS NOT NULL AND ended_at >= ?1 AND ended_at <= ?2
+         ORDER BY ended_at ASC",
+    )?;
+
+    struct TurnUsageRecord {
+        ended_at: i64,
+        input_tokens: i64,
+        output_tokens: i64,
+        usage_json: Option<String>,
+        model_id: Option<String>,
+    }
+
+    let rows = stmt.query_map(params![start_date, end_date], |row| {
+        Ok(TurnUsageRecord {
+            ended_at: row.get(0)?,
+            input_tokens: row.get(1)?,
+            output_tokens: row.get(2)?,
+            usage_json: row.get(3)?,
+            model_id: row.get(4)?,
+        })
+    })?;
+
+    use std::collections::BTreeMap;
+    let mut bucket_map: BTreeMap<String, Value> = BTreeMap::new();
+    let mut total_input = 0i64;
+    let mut total_output = 0i64;
+    let mut total_turns = 0i64;
+    let mut total_cache_read = 0i64;
+    let mut total_cache_write = 0i64;
+    let mut total_reasoning = 0i64;
+
+    for row in rows {
+        let rec = row?;
+        total_turns += 1;
+        total_input += rec.input_tokens;
+        total_output += rec.output_tokens;
+
+        let parsed_usage = rec
+            .usage_json
+            .as_deref()
+            .and_then(|s| serde_json::from_str::<Value>(s).ok());
+
+        let cache_read = parsed_usage
+            .as_ref()
+            .and_then(|u| u.get("cacheReadTokens"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let cache_write = parsed_usage
+            .as_ref()
+            .and_then(|u| u.get("cacheWriteTokens"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let reasoning = parsed_usage
+            .as_ref()
+            .and_then(|u| u.get("reasoningTokens"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+
+        total_cache_read += cache_read;
+        total_cache_write += cache_write;
+        total_reasoning += reasoning;
+
+        let dt = chrono::DateTime::from_timestamp_millis(rec.ended_at)
+            .unwrap_or_else(chrono::Utc::now);
+
+        let key = match bucket {
+            "month" => dt.format("%Y-%m").to_string(),
+            "week" => format!("{}-W{:02}", dt.format("%Y"), dt.format("%V")),
+            _ => dt.format("%Y-%m-%d").to_string(),
+        };
+
+        let entry = bucket_map.entry(key.clone()).or_insert_with(|| {
+            json!({
+                "date": key,
+                "timestamp": rec.ended_at,
+                "inputTokens": 0i64,
+                "outputTokens": 0i64,
+                "totalTokens": 0i64,
+                "cacheReadTokens": 0i64,
+                "cacheWriteTokens": 0i64,
+                "reasoningTokens": 0i64,
+                "turnCount": 0i64,
+            })
+        });
+
+        if let Some(obj) = entry.as_object_mut() {
+            if let Some(inp) = obj.get_mut("inputTokens").and_then(|v| v.as_i64()) {
+                obj.insert("inputTokens".into(), json!(inp + rec.input_tokens));
+            }
+            if let Some(out) = obj.get_mut("outputTokens").and_then(|v| v.as_i64()) {
+                obj.insert("outputTokens".into(), json!(out + rec.output_tokens));
+            }
+            if let Some(tot) = obj.get_mut("totalTokens").and_then(|v| v.as_i64()) {
+                obj.insert("totalTokens".into(), json!(tot + rec.input_tokens + rec.output_tokens));
+            }
+            if let Some(cr) = obj.get_mut("cacheReadTokens").and_then(|v| v.as_i64()) {
+                obj.insert("cacheReadTokens".into(), json!(cr + cache_read));
+            }
+            if let Some(cw) = obj.get_mut("cacheWriteTokens").and_then(|v| v.as_i64()) {
+                obj.insert("cacheWriteTokens".into(), json!(cw + cache_write));
+            }
+            if let Some(rs) = obj.get_mut("reasoningTokens").and_then(|v| v.as_i64()) {
+                obj.insert("reasoningTokens".into(), json!(rs + reasoning));
+            }
+            if let Some(tc) = obj.get_mut("turnCount").and_then(|v| v.as_i64()) {
+                obj.insert("turnCount".into(), json!(tc + 1));
+            }
+        }
+    }
+
+    let items: Vec<Value> = bucket_map.into_values().collect();
+
+    Ok(json!({
+        "bucket": bucket,
+        "items": items,
+        "totals": {
+            "inputTokens": total_input,
+            "outputTokens": total_output,
+            "totalTokens": total_input + total_output,
+            "cacheReadTokens": total_cache_read,
+            "cacheWriteTokens": total_cache_write,
+            "reasoningTokens": total_reasoning,
+            "turnCount": total_turns,
+        }
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4654,5 +4790,35 @@ mod tests {
         assert!(delete_session(&db, &session.id).unwrap());
         assert!(!path.exists());
         assert!(recover_inflight_messages(&db, true).unwrap().is_empty());
+    }
+
+    #[test]
+    fn token_usage_history_aggregation() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let usage = json!({
+            "inputTokens": 120,
+            "outputTokens": 80,
+            "cacheReadTokens": 40,
+            "cacheWriteTokens": 10,
+            "reasoningTokens": 20
+        });
+
+        let ended = end_turn_settling(&db, &turn, "completed", None, Some(&usage), false, false).unwrap();
+        assert!(ended.updated);
+
+        let history = get_token_usage_history(&db, 0, i64::MAX, "day").unwrap();
+        let totals = history.get("totals").unwrap();
+        assert_eq!(totals.get("inputTokens").unwrap().as_i64(), Some(120));
+        assert_eq!(totals.get("outputTokens").unwrap().as_i64(), Some(80));
+        assert_eq!(totals.get("totalTokens").unwrap().as_i64(), Some(200));
+        assert_eq!(totals.get("cacheReadTokens").unwrap().as_i64(), Some(40));
+        assert_eq!(totals.get("turnCount").unwrap().as_i64(), Some(1));
+
+        let items = history.get("items").unwrap().as_array().unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].get("totalTokens").unwrap().as_i64(), Some(200));
     }
 }

@@ -108,6 +108,7 @@ import {
   SUBAGENT_TOOL_NAME,
   SUBAGENT_WAIT_TOOL_NAME,
   type SubagentRunResult,
+  addUsage,
 } from "./subagent.js";
 import {
   composeModeSystemPrompt,
@@ -1281,6 +1282,7 @@ export class DesktopAgentRuntime {
   private contextFallbackReminderClaimed = false;
   private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
   private hostCloseUnsubscribe?: () => void;
+  private turnSubagentUsage?: MessageUsage;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
@@ -2994,6 +2996,9 @@ Delegation rules:
         : result.status;
     record.result = result;
     record.completedAt = Date.now();
+    if (result.usage) {
+      this.turnSubagentUsage = addUsage(this.turnSubagentUsage, result.usage);
+    }
     logTiming("subagent", {
       agent: result.agentName,
       delegationId: record.delegationId,
@@ -4898,7 +4903,8 @@ Delegation rules:
               `[agent-runtime] assistant emitted a tool call as text (session=${this.sessionId} turn=${this.turnId})\n`,
             );
           }
-          const usage = usageFromPi((event.message as any).usage as Usage | undefined);
+          const rawUsage = usageFromPi((event.message as any).usage as Usage | undefined);
+          const usage = addUsage(rawUsage, this.turnSubagentUsage);
           const endedAt = Date.now();
           const providerWaitMs =
             this.requestStartedAt !== undefined &&
@@ -5153,6 +5159,7 @@ Delegation rules:
           (this.runningDelegations().length > 0 && !this.runCancelled)
         )
           break;
+        this.turnSubagentUsage = undefined;
         this.emit({ type: "turn_end" });
         break;
       case "agent_end":
