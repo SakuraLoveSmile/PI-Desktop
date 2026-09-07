@@ -140,6 +140,14 @@ context, and other non-retryable errors do not enter either provider replay
 path, and a non-retryable `PROVIDER_ERROR` from a malformed 400/422 request
 stays terminal.
 
+Before surfacing a pre-stream `PROVIDER_ERROR` for HTTP 400/422 whose message
+ends in `(no body)`, the runtime makes at most one silent repair attempt with
+the generated output-limit fields removed: `max_tokens`,
+`max_completion_tokens`, and `max_output_tokens`. This repair does not consume
+the transient retry budget or add backoff, and the caller's `onPayload` rewrite
+remains active. A second opaque failure is terminal, and an abort before the
+repair starts prevents the repair request.
+
 The non-429 delay honors the server first: `retry-after-ms`, `retry-after`
 seconds, then `retry-after` HTTP-date, capped at 8 seconds. Captured headers are
 retained for every status that can carry a usable delay (429, 408, 409, and
@@ -694,7 +702,28 @@ classification as an agent request, but creates a separate completion context
 with exactly one user message and the static enhancement system prompt. It
 does not instantiate a session agent, include transcript history, expose tools,
 or persist a turn. The renderer receives only the trimmed text result; API
-keys and vendor refresh credentials remain in Electron main.
+keys and vendor refresh credentials remain in Electron main. OpenCode Go
+one-shots reuse the conversation id as `x-opencode-session` when a session is
+present; otherwise the runtime synthesizes a per-call id so the gateway
+accepts the request.
+
+### 6.2 OpenCode session routing headers
+
+Chat, subagent, prompt-enhancement, and plugin one-shot completions whose
+provider is `apiStyle: opencode_go`, whose `vendorKey` is `opencode` or
+`opencode-go`, whose pi-ai provider id is one of those values, or whose base
+URL host is `opencode.ai` send:
+
+- `x-opencode-session`: the durable conversation id, or a per-call UUID when
+  the caller has no session
+- `x-opencode-client: pi-desktop`
+- `User-Agent: pi-desktop/<APP_VERSION>`
+
+Caller-supplied headers override the client and User-Agent defaults. An empty
+session header is restored from the conversation id so OpenCode Go cannot
+return `MissingSessionID`. This is an agent-runtime concern, matching the
+official Pi coding-agent attribution layer; pi-ai's `sessionId` stream option
+does not emit `x-opencode-session`.
 
 
 ## 7. System prompt composition

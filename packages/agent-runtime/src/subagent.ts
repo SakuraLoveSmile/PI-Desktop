@@ -54,6 +54,10 @@ import {
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
 import {
+  openCodeEndpointFromProvider,
+  withOpenCodeSessionHeaders,
+} from "./opencode-session-headers.js";
+import {
   captureProviderResponse,
   classifyProviderError,
   createProviderRetryStream,
@@ -203,19 +207,25 @@ export class SubagentRun {
       streamFn: (m, context, options) => {
         this.providerRetryHeaders = undefined;
         this.providerResponseStatus = undefined;
-        const requestOptions = {
-          ...options,
-          maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
-          sessionId: opts.sessionId,
-          fetch: captureProviderResponse(options?.fetch, (response) => {
-            this.providerResponseStatus = response?.status;
-            this.providerRetryHeaders = carriesRetryDelayHeaders(
-              response?.status,
-            )
-              ? response?.headers
-              : undefined;
-          }),
-        };
+        const requestOptions = withOpenCodeSessionHeaders(
+          {
+            ...options,
+            maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
+            sessionId: opts.sessionId,
+            fetch: captureProviderResponse(options?.fetch, (response) => {
+              this.providerResponseStatus = response?.status;
+              this.providerRetryHeaders = carriesRetryDelayHeaders(
+                response?.status,
+              )
+                ? response?.headers
+                : undefined;
+            }),
+          },
+          {
+            ...openCodeEndpointFromProvider(opts.provider, m),
+            sessionId: opts.sessionId,
+          },
+        );
         return createProviderRetryStream(
           m,
           context,

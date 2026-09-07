@@ -3716,3 +3716,15 @@ D193, and D194.
   `plugin_pi_advisor_advisor` for a second opinion.
 - Decision D336 is recorded as ADR 0174. See `07-plugins/03-plugin-api.md`,
   `07-plugins/13-plugin-permissions-matrix.md`, and E2E-188 / E2E-189.
+
+## 2026-09-07 — OpenCode Go session routing headers (D337)
+
+- OpenCode Go rejects LLM requests that omit `x-opencode-session`
+  (`MissingSessionID`). pi-ai 0.85 does not emit that header; the official Pi
+  coding-agent injects it in the agent layer.
+- Decision D337 amends ADR 0116: agent-runtime sends `x-opencode-session`,
+  `x-opencode-client: pi-desktop`, and a PI-Desktop `User-Agent` on session,
+  subagent, prompt-enhancement, and plugin one-shot requests to OpenCode Go
+  and any `opencode.ai` host, using the durable conversation id.
+- See `03-runtime/02-agent-runtime.md` §6.2, `03-runtime/11-provider-model-system.md`,
+  `03-runtime/12-provider-config-schema.md`, ADR 0116, and E2E-005D.

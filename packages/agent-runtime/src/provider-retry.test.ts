@@ -550,6 +550,7 @@ describe("opaque bad-request repair", () => {
       model: "glm-5.3-flash",
       max_tokens: 4096,
       max_completion_tokens: 1_044_472,
+      max_output_tokens: 1_044_472,
       messages: [{ role: "user", content: "hi" }],
     });
     expect(repaired).toEqual({
@@ -557,6 +558,40 @@ describe("opaque bad-request repair", () => {
       model: "glm-5.3-flash",
       messages: [{ role: "user", content: "hi" }],
     });
+  });
+
+  it("does not start the repair after the request is aborted", async () => {
+    const abortController = new AbortController();
+    let attempts = 0;
+    const stream = createProviderRetryStream(
+      model,
+      context,
+      { signal: abortController.signal },
+      () => {
+        attempts += 1;
+        const result = createAssistantMessageEventStream();
+        const error = assistantMessage({ errorMessage: "400 status code (no body)" });
+        queueMicrotask(() => {
+          result.push({ type: "error", reason: "error", error });
+          abortController.abort();
+          result.end(error);
+        });
+        return result;
+      },
+      {
+        claim: vi.fn(() => undefined),
+        headers: () => undefined,
+        status: () => 400,
+        sleep: async () => undefined,
+      },
+    );
+
+    const events: string[] = [];
+    for await (const event of stream) events.push(event.type);
+
+    expect(attempts).toBe(1);
+    expect(events).toEqual(["error"]);
+    expect((await stream.result()).stopReason).toBe("aborted");
   });
 
   it("surfaces the original error when the repaired attempt fails the same way", async () => {
@@ -634,6 +669,7 @@ describe("opaque bad-request repair", () => {
         model: "m",
         max_tokens: 1,
         max_completion_tokens: 2,
+        max_output_tokens: 3,
         stream: true,
       }),
     ).toEqual({ model: "m", stream: true });

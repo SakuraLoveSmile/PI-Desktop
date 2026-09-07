@@ -237,6 +237,29 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Unit-covered (form and discovery contracts); rendered UI scenario Draft
 
+#### E2E-005D: OpenCode Go requests carry a stable session header
+
+- **Preconditions**: An OpenCode Go provider is configured; a deterministic
+  fixture or capture proxy records outbound HTTP headers. A second generic
+  OpenAI-compatible provider is also configured.
+- **Steps**: 1) Start an Agent turn in a session against OpenCode Go. 2)
+  Capture the provider request headers. 3) Send a follow-up in the same
+  session. 4) Run prompt enhancement and a plugin `agent.complete` one-shot
+  against the same provider. 5) Repeat a turn against the generic
+  OpenAI-compatible provider.
+- **Expected**: Every OpenCode Go LLM request includes `x-opencode-session`
+  equal to the conversation id (or a stable per-call id when no session
+  exists), `x-opencode-client: pi-desktop`, and a `User-Agent` identifying
+  PI-Desktop. Follow-up turns reuse the same session header. The generic
+  OpenAI-compatible provider does not receive these headers. The gateway does
+  not return `MissingSessionID`.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/11-provider-model-system.md`,
+  `03-runtime/12-provider-config-schema.md`, ADR 0116
+- **Acceptance**: B (model configuration), F (runtime provider requests)
+- **Milestone**: M2
+- **Status**: Unit-covered (header merge and one-shot stream options)
+
 #### E2E-005C: OpenAI-compatible system role fallback
 
 - **Preconditions**: A deterministic OpenAI-compatible Chat Completions
@@ -3820,7 +3843,10 @@ Each scenario is documented in this format:
   succeeds on the next request; a second fixture run can terminate five times; a
   third fixture returns `OpenAI API error (502)` before headers on one attempt
   and mid-stream on the next; a fourth fixture returns six consecutive 502s; a
-  fifth fixture returns a 503 with `Retry-After`; timing logs are enabled.
+  fifth fixture returns a 503 with `Retry-After`; a sixth fixture returns a
+  pre-stream opaque 400/422 once and succeeds when the output-limit fields are
+  omitted; the fixture supports both Chat Completions and Responses payloads and
+  aborting after the opaque failure; timing logs are enabled.
 - **Steps**:
   1. Start an Agent turn with the one-termination fixture and observe the
      partial assistant response.
@@ -3832,7 +3858,11 @@ Each scenario is documented in this format:
      log for both the pre-header and the mid-stream 502.
   5. Run the persistent six-502 fixture and inspect the terminal error.
   6. Run the 503 `Retry-After` fixture and inspect the observed wait.
-  7. Reload the session and verify that only the completed response or the
+  7. Run the opaque 400/422 fixture with both API styles and inspect the two
+     request payloads, request count, and timing log.
+  8. Abort immediately after the first opaque 400/422 failure and inspect that
+     no repair request starts.
+  9. Reload the session and verify that only the completed response or the
      single terminal failed assistant remains durable.
 - **Expected**:
   - `terminated` is classified as `STREAM_FAILED`, and an upstream gateway
@@ -3858,11 +3888,20 @@ Each scenario is documented in this format:
     unrestricted provider body.
   - The 503 fixture waits for the server's `Retry-After` instead of the client
     backoff. Non-429 server and fallback waits are capped at 8 seconds.
+  - A pre-stream 400/422 with the `(no body)` marker gets one silent repair
+    request with `max_tokens`, `max_completion_tokens`, and `max_output_tokens`
+    removed. The caller's payload rewrite remains active, the repair consumes no
+    transient retry budget or backoff, and both Chat Completions and Responses
+    fixtures complete on their second request. A second opaque failure remains
+    terminal.
+  - If the turn is aborted after the first opaque failure, the repair request is
+    not started and the result is `aborted`.
   - A mid-stream HTTP 429 is covered by E2E-149's separate five-retry path; the
     two budgets do not draw from each other.
-  - Authentication, model-selection, context, and malformed-request failures
-    do not enter either provider replay path, including a non-retryable
-    `PROVIDER_ERROR` from a malformed 400/422 request.
+  - Authentication, model-selection, context, and descriptive
+    malformed-request failures do not enter either provider replay path. The
+    opaque empty-body 400/422 case is the bounded repair exception described
+    above.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/08-error-codes.md`,
   `08-meta/decisions-log.md` (D186, D259), ADR 0050, ADR 0128
