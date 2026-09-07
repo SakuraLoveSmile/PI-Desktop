@@ -33,7 +33,7 @@ Principles:
 | `window` | Frameless window state, controls, and compatibility work-panel geometry channels |
 | `menu` | Allowlisted application-menu commands and native editing/window actions |
 | `notification` | Durable inbox list/read/clear and new/activated events |
-| `stats` | Completed-turn token history for Settings → Usage |
+| `stats` | Completed-turn token history (host RPC; dashboard is plugin-owned) |
 
 ## 3. Channel Conventions
 
@@ -744,7 +744,9 @@ plus `subagentUsage` into `session.endTurn.usage`.
 
 `bucket` is `day` | `week` | `month`. Omitted dates use the host default window
 (53 weeks / 52 weeks / 24 months) in the host's local calendar. `week` keys use
-ISO week year (`%G-W%V`). The result fills empty buckets in range.
+ISO week year (`%G-W%V`). The result fills empty buckets in range. This channel
+is not a Settings page; the user-facing dashboard is plugin `pi.token-insights`
+(D335 / ADR 0173).
 
 ## 8. Settings / Secrets API
 

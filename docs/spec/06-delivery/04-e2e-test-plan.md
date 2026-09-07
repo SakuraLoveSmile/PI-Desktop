@@ -7698,30 +7698,35 @@ are withdrawn with ADR 0165.
   `feedback.test.mjs`); full UI journey Draft (do not run E2E locally
   unless explicitly requested)
 
-#### E2E-186: Settings Usage shows completed-turn token history
+#### E2E-186: Token usage dashboard is plugin-owned; host still stores turn totals
 
 - **Preconditions**: A profile with at least one completed Agent turn that
-  reported provider usage after this build. Settings is reachable.
+  reported provider usage after this build. Settings is reachable. Plugin
+  `pi.token-insights` may be installed.
 - **Steps**: 1) Complete a turn that also settled a subagent. 2) Open
-  Settings → Usage. 3) Switch Day / Week / Month. 4) Activate a filled cell
-  from the keyboard. 5) Search settings for "tokens" / "用量".
+  Settings. 3) Search settings for "tokens" / "用量". 4) Open Token Insights
+  from the command palette (`usage` / `用量`). 5) Confirm the transcript
+  assistant chip.
 - **Expected**:
-  - The rail lists Usage / 用量 under Preferences, after AI and before
+  - The rail has no Usage / 用量 destination. Preferences is General, AI,
     Shortcuts.
-  - KPI totals match the host `stats.getTokenUsageHistory` window.
+  - Settings search does not surface a usage tab.
+  - `stats.getTokenUsageHistory` still returns completed-turn totals that
+    include subagent spend.
   - The assistant chip under the transcript still shows parent-only provider
-    usage; subagent tokens appear only in the Usage totals.
-  - Day matrix is Monday-first with empty cells present. Week labels use ISO
-    week year.
-  - Search surfaces the Usage destination.
+    usage.
+  - Token Insights is the heatmap / KPI dashboard. When the plugin is
+    installed, PI-Desktop remainders from the host turns table appear there
+    without rewriting `message.usage`.
 - **Specs linked**: `04-ux/06-settings-ia.md`,
   `03-runtime/01-ipc-protocol.md`, `03-runtime/06-host-rpc-protocol.md`,
-  ADR 0171, `08-meta/decisions-log.md` (D331)
+  ADR 0171, ADR 0173, `08-meta/decisions-log.md` (D331, D335)
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (agent-runtime usage split, host-core history
-  aggregation, settings-search / i18n catalogs); full UI journey Draft (do
-  not run E2E locally unless explicitly requested)
+  aggregation, settings-search / i18n catalogs); plugin remainder merge
+  covered in `pi-desktop-plugins`; full UI journey Draft (do not run E2E
+  locally unless explicitly requested)
 
 #### E2E-187: History attachments and local markdown images render inline
 

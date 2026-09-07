@@ -327,10 +327,11 @@ reach this protocol — see [14-secrets-storage](14-secrets-storage.md) §10.
   `usage_json` cache/reasoning fields into local-calendar `day` / `week` /
   `month` buckets. Additive RPC; no protocol version bump. Default range is
   bounded (53 weeks / 52 weeks / 24 months). `week` uses ISO week year.
-  Empty buckets in range are returned as zero rows so the Settings matrix is a
-  complete calendar. `session.endTurn.usage` is the durable turn total: parent
+  Empty buckets in range are returned as zero rows so a calendar consumer sees a
+  complete window. `session.endTurn.usage` is the durable turn total: parent
   assistant messages plus settled subagent usage, not a rewrite of
-  `message.usage`.
+  `message.usage`. The user-facing dashboard is plugin `pi.token-insights`
+  (D335 / ADR 0173), not a Settings destination.
 
 ### Plan and Goal state and approvals
 

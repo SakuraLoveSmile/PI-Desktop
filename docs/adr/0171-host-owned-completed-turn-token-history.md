@@ -1,9 +1,9 @@
 # ADR 0171: Host-owned completed-turn token history
 
-- Status: Accepted
+- Status: Accepted (amended by ADR 0173)
 - Date: 2026-09-07
 - Deciders: PI-Desktop core
-- Related: D103, D157, D331, ADR 0014,
+- Related: D103, D157, D331, D335, ADR 0014, ADR 0173,
   `03-runtime/04-data-storage.md` §4.6,
   `03-runtime/06-host-rpc-protocol.md`,
   `04-ux/06-settings-ia.md`, E2E-186
@@ -16,8 +16,8 @@ sent it. Per-message chips (D103) read provider usage from assistant
 `meta_json`. Mixing subagent spend into those chips would inflate the context
 inspector and the composed-turn total.
 
-A Settings destination still needs a global history of what the user actually
-spent, including subagents, without a new schema version.
+A durable completed-turn total is still required so a later dashboard can show
+what the user actually spent, including subagents, without a new schema version.
 
 ## Decision
 
@@ -31,18 +31,20 @@ spent, including subagents, without a new schema version.
    `month`, fills empty buckets, and does not bump `PROTOCOL_VERSION` or
    `SCHEMA_VERSION`. `idx_turns_ended_at` is created with
    `CREATE INDEX IF NOT EXISTS` at boot.
-4. **Settings → Usage** is a Preferences destination. It shows totals and an
-   activity matrix. It does not price tokens. Historical rows from before
-   Electron sent `usage` may be zero.
+4. **The user-facing dashboard is not Settings.** ADR 0173 moves that surface
+   to marketplace plugin `pi.token-insights`. This RPC still exists so local
+   completed-turn history, including subagent spend, has a host owner.
+   Historical rows from before Electron sent `usage` may be zero.
 
 ## Consequences
 
 - Context inspector and D103 chips keep exact provider values.
-- New completed turns populate the heatmap; older turns may not.
+- New completed turns populate host history; older turns may be zero.
+- The heatmap lives in `pi.token-insights` (ADR 0173).
 - A later backfill from transcript `meta.usage` would be a separate change.
 
 ## Alternatives
 
 - Rewrite parent `message.usage` with subagent spend: rejected (D103).
-- Scan JSONL transcripts on each Settings open: rejected (unbounded, wrong
-  owner).
+- Scan JSONL transcripts in the host Settings page: rejected (unbounded, wrong
+  owner). The marketplace plugin may scan local tool metadata, including JSONL.
