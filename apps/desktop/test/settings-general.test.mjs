@@ -232,6 +232,7 @@ test("OAuth account identity is provider-scoped across IPC and pi-ai", () => {
 test("settings nav icons map each destination to a semantic lucide glyph", () => {
   assert.match(settingsPageSource, /general: <IconSliders/);
   assert.match(settingsPageSource, /ai: <IconSparkles/);
+  assert.match(settingsPageSource, /usage: <IconActivity/);
   assert.match(settingsPageSource, /shortcuts: <IconKeyboard/);
   assert.match(settingsPageSource, /instructions: <IconFileText/);
   assert.match(settingsPageSource, /agent: <IconBot/);
@@ -267,6 +268,7 @@ test("settings nav keeps a flat searchable index with titled visual groups", () 
   const navOrder = [
     "general",
     "ai",
+    "usage",
     "shortcuts",
     "instructions",
     "agent",
@@ -278,9 +280,10 @@ test("settings nav keeps a flat searchable index with titled visual groups", () 
   assert.deepEqual(navOrder, [...navOrder].sort((a, b) => a - b));
   const generalStart = settingsSearchSource.indexOf('id: "general"');
   const aiStart = settingsSearchSource.indexOf('id: "ai"');
+  const usageStart = settingsSearchSource.indexOf('id: "usage"');
   const shortcutsStart = settingsSearchSource.indexOf('id: "shortcuts"');
   const generalEntry = settingsSearchSource.slice(generalStart, aiStart);
-  const aiEntry = settingsSearchSource.slice(aiStart, shortcutsStart);
+  const aiEntry = settingsSearchSource.slice(aiStart, usageStart);
   assert.doesNotMatch(generalEntry, /settings\.defaultsTitle/);
   assert.match(aiEntry, /settings\.defaultsTitle/);
   assert.match(aiEntry, /settings\.commandShell/);
@@ -300,6 +303,7 @@ test("settings rail uses short parallel labels and descriptive page titles", () 
   const navKeys = [
     "settings.nav.general",
     "settings.nav.ai",
+    "settings.nav.usage",
     "settings.nav.shortcuts",
     "settings.nav.instructions",
     "settings.nav.models",

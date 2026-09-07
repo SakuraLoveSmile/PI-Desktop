@@ -84,6 +84,8 @@ import {
   type ShortcutPlatform,
   type ThinkingLevel,
   type UiMessage,
+  type MessageUsage,
+  addUsage,
   type UserSkillRecord,
   type UserSubagentRecord,
   type WindowControlAction,
@@ -1969,6 +1971,14 @@ const inFlightExecutionFinishes = new Set<string>();
 let approvedExecutionDrain: Promise<void> | null = null;
 const turnSettlements = new Map<string, Set<() => void>>();
 const turnFinalizations = new Map<string, Promise<void>>();
+/** sessionId -> last assistant usage recorded for active turn */
+const activeTurnUsages = new Map<string, MessageUsage>();
+
+function addActiveTurnUsage(sessionId: string, usage: MessageUsage | undefined) {
+  if (!usage) return;
+  const next = addUsage(activeTurnUsages.get(sessionId), usage);
+  if (next) activeTurnUsages.set(sessionId, next);
+}
 /** sessionId → scheduled task_run id awaiting completion. */
 const scheduledRunsBySession = new Map<string, string>();
 /** Session currently rendered on the chat page; focus remains Main-owned. */
@@ -4573,6 +4583,8 @@ function finishTurn(
         const createNotification =
           options.createNotification ??
           (!wasPlanSubmission && shouldCreateTaskNotification(sessionId));
+        const turnUsage = activeTurnUsages.get(sessionId);
+        activeTurnUsages.delete(sessionId);
         try {
           const result = await host.call<{
             ok: boolean;
@@ -4583,6 +4595,7 @@ function finishTurn(
             status,
             errorCode,
             createNotification,
+            ...(turnUsage ? { usage: turnUsage } : {}),
             // The reply can no longer finish on its own: promote its last
             // checkpoint instead of waiting for a final row that never comes.
             ...(options.recoverInflight ? { recoverInflight: true } : {}),
@@ -4796,6 +4809,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
     turnId = String(turn.turnId || "").trim();
     if (!turnId) throw new Error("execution turn was not created");
     activeTurns.set(execution.sessionId, turnId);
+    activeTurnUsages.delete(execution.sessionId);
     approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
     approvedExecutionTurns.set(execution.id, {
       sessionId: execution.sessionId,
@@ -5023,7 +5037,13 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     })();
     return;
   }
+  if (event.type === "turn_end" && !envelope.parentToolCallId) {
+    addActiveTurnUsage(envelope.sessionId, event.subagentUsage);
+  }
   if (event.type === "message_end" && event.message.role === "assistant") {
+    if (!envelope.parentToolCallId && event.message.usage) {
+      addActiveTurnUsage(envelope.sessionId, event.message.usage);
+    }
     // Checkpoint the finished snapshot before the outbox append (D327).
     // Settling first dropped the last interval of text, and endTurn used to
     // delete the host file while the final row was still queued.
@@ -6380,6 +6400,14 @@ function registerIpc() {
   );
 
   handle(
+    IPC.invoke.statsGetTokenUsageHistory,
+    async (input?: { startDate?: number; endDate?: number; bucket?: string }) => {
+      if (!host) throw new Error("host unavailable");
+      return host.call("stats.getTokenUsageHistory", input ?? {});
+    },
+  );
+
+  handle(
     IPC.invoke.browserNavigate,
     async (input: { url?: string; sessionId?: string } = {}) => {
       if (!plugins.getLoaded(BROWSER_PLUGIN_ID)) {
@@ -6994,6 +7022,7 @@ function registerIpc() {
       throw new Error("session.beginTurn returned no turn");
     }
     activeTurns.set(req.sessionId, durableTurnId);
+    activeTurnUsages.delete(req.sessionId);
 
     // Slash template expansion (D123, ADR 0024): templates expand before
     // persistence so reseed replays exactly what the model saw; the typed

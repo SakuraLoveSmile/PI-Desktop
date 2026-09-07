@@ -321,6 +321,17 @@ reach this protocol — see [14-secrets-storage](14-secrets-storage.md) §10.
   project path is normalized and upserted into `projects` before the session
   references it; returns `{ imported, skipped }`
 
+### Stats
+
+- `stats.getTokenUsageHistory` — roll up completed `turns` token columns and
+  `usage_json` cache/reasoning fields into local-calendar `day` / `week` /
+  `month` buckets. Additive RPC; no protocol version bump. Default range is
+  bounded (53 weeks / 52 weeks / 24 months). `week` uses ISO week year.
+  Empty buckets in range are returned as zero rows so the Settings matrix is a
+  complete calendar. `session.endTurn.usage` is the durable turn total: parent
+  assistant messages plus settled subagent usage, not a rewrite of
+  `message.usage`.
+
 ### Plan and Goal state and approvals
 
 Both contract kinds share these methods; the optional `kind`

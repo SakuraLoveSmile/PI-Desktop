@@ -1,5 +1,6 @@
 import type { SVGProps } from "react";
 import {
+  Activity,
   AppWindow,
   Archive,
   ArchiveRestore,
@@ -107,6 +108,7 @@ export const IconBookOpen = icon(BookOpen);
 export const IconClipboard = icon(ClipboardPaste);
 export const IconArchive = icon(Archive);
 export const IconArchiveRestore = icon(ArchiveRestore);
+export const IconActivity = icon(Activity);
 export const IconArrowUpDown = icon(ArrowUpDown);
 export const IconSearch = icon(Search);
 export const IconChat = icon(MessageSquare);

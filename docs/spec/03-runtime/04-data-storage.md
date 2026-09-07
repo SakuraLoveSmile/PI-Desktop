@@ -433,6 +433,7 @@ CREATE TABLE turns (
   ended_at      INTEGER
 );
 CREATE INDEX idx_turns_session ON turns(session_id, started_at DESC);
+CREATE INDEX idx_turns_ended_at ON turns(ended_at DESC);
 ```
 
 ### 4.6a plan_approvals — immutable checkpoint and execution fields (schema v11)
@@ -973,6 +974,7 @@ truncating at a guessed position.
   - session list → `idx_sessions_updated`
   - group-by-project → `idx_sessions_project`
   - badges/cost rollup → `idx_turns_session` (latest turn per session)
+  - global token history → `idx_turns_ended_at` (completed turns by end time)
   - artifacts by session → PK; global recent artifacts → `idx_artifacts_time`
   - run history → `idx_task_runs`
   - audit forensics/pruning → `idx_audit_session` / `idx_audit_ts`

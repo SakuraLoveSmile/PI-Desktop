@@ -3457,6 +3457,87 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     await runtime.dispose();
   });
 
+  it("keeps parent message usage provider-only and reports subagent usage on turn_end", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const settleDelegation = (runtime as any).settleDelegation.bind(runtime);
+
+    settleDelegation(
+      {
+        delegationId: "del-1",
+        toolCallId: "tool-1",
+        agentName: "explorer",
+        prompt: "sub-prompt",
+        startedAt: Date.now(),
+        status: "running",
+        resolveCompletion: () => {},
+        abort: () => {},
+      },
+      {
+        agentName: "explorer",
+        status: "completed",
+        report: "subagent done",
+        turns: 1,
+        toolCalls: 0,
+        usage: {
+          inputTokens: 100,
+          outputTokens: 50,
+          totalTokens: 150,
+        },
+      },
+    );
+
+    (runtime as any).currentAssistant = {
+      id: "asst-1",
+      role: "assistant",
+      content: "Hello",
+      status: "streaming",
+    };
+
+    await handleAgentEvent({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "Hello" }],
+        usage: {
+          input: 200,
+          output: 80,
+          totalTokens: 280,
+        },
+      },
+    });
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    const endEvent = events.find((e) => e.type === "message_end");
+    expect(endEvent).toBeDefined();
+    expect(endEvent.message.usage).toEqual({
+      inputTokens: 200,
+      outputTokens: 80,
+      totalTokens: 280,
+    });
+
+    onEvent.mockClear();
+    await handleAgentEvent({ type: "turn_end" });
+    const turnEnd = onEvent.mock.calls
+      .map(([envelope]) => (envelope as any).event)
+      .find((e) => e.type === "turn_end");
+    expect(turnEnd.subagentUsage).toEqual({
+      inputTokens: 100,
+      outputTokens: 50,
+      totalTokens: 150,
+    });
+
+    onEvent.mockClear();
+    await handleAgentEvent({ type: "turn_end" });
+    const secondTurnEnd = onEvent.mock.calls
+      .map(([envelope]) => (envelope as any).event)
+      .find((e) => e.type === "turn_end");
+    expect(secondTurnEnd.subagentUsage).toBeUndefined();
+
+    await runtime.dispose();
+  });
+
   it("lets the model ask for a new window, and compacts at the next boundary", async () => {
     const runtime = createRuntime();
     const tool = (runtime as any).agent.state.tools.find(
