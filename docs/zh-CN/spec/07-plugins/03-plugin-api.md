@@ -168,10 +168,62 @@ pi.agent.unregisterTool(name: string): Promise<void>
 type ToolExecContext = {
  sessionId: string
  turnId?: string
+ /** 本会话执行模型，`providerId/modelId`。这是配置，不是转录。 */
+ modelKey?: string
+ thinkingLevel?: ThinkingLevel
  signal?: AbortSignal
  log: (msg: string) => void
 }
 ```
+
+### models（需要 `models.list`）
+```ts
+pi.models.list(): Promise<PluginModelInfo[]>
+
+type PluginModelInfo = {
+  key: string                 // `${providerId}/${modelId}` — 第一个斜杠切开
+  providerId: string
+  providerName: string
+  modelId: string
+  label: string
+  supportsReasoning: boolean
+  thinkingLevels: ThinkingLevel[]
+}
+```
+
+只返回已启用且已认证的 provider 行（API key、OAuth 或 `authKind: "none"`）。不含密钥。
+`models.list` 也是面板桥通道，选择器页面可以自行填充。
+
+### session（需要 `session.read`）
+```ts
+pi.session.getLlmContext(): Promise<PluginLlmContext>
+```
+
+插件不能传入 session id。身份来自进行中的 `plugins.execute` 会话（D333 / D336）。
+在工具执行之外调用会以 `INVALID_ARGUMENT` 失败。子代理行会被省略。插件自己
+正在飞行的工具调用会从尾部剥掉。compaction 摘要替换检查点之前的历史。
+合计内容上限 200k 字符。
+
+### agent.complete（需要 `agent.complete`）
+```ts
+pi.agent.complete(input: {
+  modelKey: string
+  thinkingLevel?: ThinkingLevel
+  system?: string
+  messages?: Array<{ role: "user" | "assistant"; content: string }>
+  includeSessionContext?: boolean
+}): Promise<{
+  text: string
+  modelKey: string
+  thinkingLevel?: ThinkingLevel
+  usage?: MessageUsage
+}>
+```
+
+宿主解析凭据，并通过与 Composer 提示增强相同的路径发起 `tools: []` 的一次性补全。
+插件拿不到密钥。`includeSessionContext: true` 还需要 `session.read` 以及进行中的
+工具会话。system ≤ 32 KiB；消息合计 ≤ 200k 字符；每个插件每滚动 60 秒 8 次
+（`RATE_LIMITED`）；预算 90 秒（`TIMEOUT`）。
 
 ### 剪贴板/外壳
 ```ts
@@ -308,6 +360,8 @@ pi.events.off(event, handler)
 - `workspace:changed` — 载荷为 `{ path: string; name: string } | null`，
   与 `workspace.get()` 一致，在缓存的工作区路径变化时发送。
 - `plugin:settingsChanged`（由插件设置页面编辑触发）
+- `session:modelChanged` — `{ sessionId, modelKey, thinkingLevel }`，在成功的
+  `session.configure` 改变 provider、模型或 thinking level 之后发送
 
 抛出的处理程序会被记录下来，并且不会影响其他侦听器或插件。
 
@@ -339,6 +393,7 @@ window.pluginBridge.on(event, handler)
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`、`workspace.get`、`app.getAppearance` | 无 |
+| `models.list` | `models.list` |
 | `fs.readText`、`fs.readPreview`、`fs.openDefault`、`fs.reveal`、`fs.glob`、`fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText`、`clipboard.getHistory` | `clipboard.read` |
@@ -382,6 +437,9 @@ window.pluginBridge.on(event, handler)
 -bus.publish/bus.subscribe/bus.unsubscribe（带有主题和扇出大小）
 - browser.navigate / evaluate / cdp / openExternal
 - 服务启动/停止/重新启动
+- models.list（返回行数）
+- session.getLlmContext（会话 id、消息数、truncated 标志 —— 不含转录文本）
+- agent.complete（模型 key、体积、usage —— 不含提示或补全文本）
 
 日志字段：
 - 插件ID
@@ -405,7 +463,8 @@ window.pluginBridge.on(event, handler)
 - `fs.readText` / `fs.readPreview` / `fs.openDefault` / `fs.reveal` /
   `fs.writeText` / `fs.glob` / `fs.list` / `fs.remove` / `fs.requestDirectory`，
   范围由 `manifest.fs` 限定（ADR 0088）
-- `agent.registerTool` / `unregisterTool`
+- `agent.registerTool` / `unregisterTool` / `agent.complete`
+- `models.list`、`session.getLlmContext`
 - `clipboard.*`、`shell.openExternal`、`net.fetch`
 - `browser.*`（访客页 CDP；`browser.cdp`）
 - `services.register` / `unregister`、`bus.publish` / `subscribe`、`events.on` / `off`

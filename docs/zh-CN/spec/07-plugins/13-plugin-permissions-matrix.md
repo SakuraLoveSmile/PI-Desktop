@@ -33,6 +33,9 @@
 | `bus.publish` | 中等 | `bus.publish` 声明的主题 | 安装时确认 | 其他插件可以对消息进行操作 |
 | `bus.subscribe` | 中等 | `bus.subscribe` 到声明的模式 | 安装时确认 | 可以观察另一个插件的消息 |
 | `browser.cdp` | 高 | 对宿主工作面板访客页调用 `pi.browser.*` | 安装时确认 | 访客页边界夹紧到调用插件视图；CDP 走白名单 |
+| `models.list` | 中等 | `pi.models.list` | 安装时确认 | 仅已就绪的 provider/model 行；不含密钥 |
+| `session.read` | 高 | `pi.session.getLlmContext` | 安装时确认 | 仅限进行中的工具会话；带 compaction 的投影（D019 / D336） |
+| `agent.complete` | 高 | `pi.agent.complete` | 安装时确认 | 宿主代发一次性补全；消耗用户额度；`includeSessionContext` 还需要 `session.read` |
 
 ## 2A. 权限是开关，manifest 承载范围
 
@@ -115,6 +118,9 @@ Agent，在 Plan 中不可见。主机返回 `PLUGIN_DISABLED_IN_PLAN`
 | `bus.publish` | 向其他插件发送消息 | 向其他插件发送消息 |
 | `bus.subscribe` | 接收来自其他插件的消息 | 接收其他插件的消息 |
 | `browser.cdp` | Control the work-panel browser | 控制工作面板浏览器 |
+| `models.list` | List authenticated models | 列出已登录的模型 |
+| `session.read` | Read the current conversation sent to the model | 读取当前发给模型的对话 |
+| `agent.complete` | Run a one-shot completion with your models | 用你的模型发起一次补全 |
 
 ## 5. 添加升级权限
 

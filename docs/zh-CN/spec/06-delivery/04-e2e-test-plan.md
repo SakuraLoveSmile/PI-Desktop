@@ -5691,3 +5691,31 @@ IPC 请求无法关闭。
 - **验收**：C（对话与流）、D（工作区）、安全、质量
 - **里程碑**：M5
 - **状态**：单元已覆盖（`fs-panel-guard.test.mjs`、`message-image-display.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
+
+#### E2E-188：插件宿主 API 可列出模型、读取进行中的上下文并发起补全
+
+- **前提条件**：至少一个已认证 provider；开发插件已授予 `models.list`、`session.read` 和 `agent.complete`；Agent 会话已有一条用户回合。
+- **步骤**：
+  1. 在插件进程调用 `pi.models.list()`。确认只返回就绪模型，且没有密钥字段。
+  2. 在工具执行之外调用 `pi.session.getLlmContext()`。确认 `INVALID_ARGUMENT`。
+  3. 让 Agent 调用插件工具。在 `execute` 内调用 `getLlmContext()`，再调用 `agent.complete({ modelKey, includeSessionContext: true })`。确认工具结果含评审文本和 usage，不含密钥。
+  4. 在 60 秒内重复 `agent.complete`，直到第 8 次成功、第 9 次返回 `RATE_LIMITED`。
+- **预期**：凭据不离开 Electron main。审计行记录插件 id、模型 key、体积和 usage，不含转录或补全文本。Plan 仍对插件工具返回 `PLUGIN_DISABLED_IN_PLAN`。
+- **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/13-plugin-permissions-matrix.md`、ADR 0174、D336
+- **验收**：G（插件智能体工具）、安全
+- **里程碑**：M5
+- **状态**：单元已覆盖（`plugin-complete.test.mjs`、`plugin-session-context.test.ts`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
+
+#### E2E-189：随应用打包的 Advisor 插件选择评审模型并返回第二意见
+
+- **前提条件**：`pi.advisor` 已启用（随应用打包，不可卸载）。至少一个已认证 provider。一个 Agent 会话。
+- **步骤**：
+  1. 确认未选择评审模型前，活动工具集里没有 advisor 工具。
+  2. 运行 `/advisor`（或插件命令）并选择模型和 effort。确认 toast `Advisor: <label>[, <effort>]`，且设置已持久化。
+  3. 让 Agent 做一项非琐碎任务。确认它可以无参数调用 `plugin_pi_advisor_advisor`，并在可见回复中复述建议。
+  4. 禁用插件。确认 `/advisor` 消失且工具已注销。确认卸载被拒绝。
+- **预期**：关闭时不消耗补全、不占工具 schema。插件只使用公开宿主 API。D015 前缀为 `plugin_pi_advisor_advisor`。
+- **链接规格**：`07-plugins/03-plugin-api.md`、ADR 0174、D336
+- **验收**：G（插件智能体工具）、C（对话）
+- **里程碑**：M5
+- **状态**：单元已覆盖（`bundled-plugins.test.mjs`、`plugin-complete.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）

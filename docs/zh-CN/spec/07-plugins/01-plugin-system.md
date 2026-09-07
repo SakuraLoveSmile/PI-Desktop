@@ -277,6 +277,9 @@ Host Main (PI-Desktop)
 ### Agent（需要许可）
 - `pi.agent.registerTool(tool)`
 - `pi.agent.unregisterTool(name)`
+- `pi.models.list()` // `models.list`
+- `pi.session.getLlmContext()` // `session.read`；仅限进行中的工具会话
+- `pi.agent.complete(input)` // `agent.complete`；宿主代发一次性补全
 
 技能以声明方式贡献（`contributes.skills` + `agent.prompt.inject`），
 不由插件调用：主机将目录放在系统提示符中，并且
