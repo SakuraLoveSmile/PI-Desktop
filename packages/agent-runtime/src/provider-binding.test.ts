@@ -4,7 +4,9 @@ import { convertMessages } from "@earendil-works/pi-ai/api/openai-completions";
 import {
   apiBindingForStyle,
   buildProviderModel,
+  buildSessionHeaders,
   createProviderModels,
+  isOpenCodeGoProvider,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
 
@@ -170,5 +172,49 @@ describe("createProviderModels auth resolution", () => {
       apiKey: "second-token",
       baseUrl: "https://per-account.acme.test",
     });
+  });
+});
+
+describe("OpenCode Go session headers", () => {
+  it("identifies OpenCode Go by apiStyle", () => {
+    const provider: RuntimeProviderConfig = {
+      ...keyedProvider,
+      apiStyle: "opencode_go",
+    };
+    expect(isOpenCodeGoProvider(provider)).toBe(true);
+    expect(buildSessionHeaders(provider, "sess-123")).toEqual({
+      "x-opencode-session": "sess-123",
+    });
+  });
+
+  it("identifies OpenCode Go by baseUrl containing opencode.ai/zen/go", () => {
+    const provider: RuntimeProviderConfig = {
+      ...keyedProvider,
+      baseUrl: "https://opencode.ai/zen/go/v1",
+      apiStyle: "chat_completions",
+    };
+    expect(isOpenCodeGoProvider(provider)).toBe(true);
+    expect(buildSessionHeaders(provider, "sess-456")).toEqual({
+      "x-opencode-session": "sess-456",
+    });
+  });
+
+  it("does not attach headers when sessionId is missing", () => {
+    const provider: RuntimeProviderConfig = {
+      ...keyedProvider,
+      apiStyle: "opencode_go",
+    };
+    expect(buildSessionHeaders(provider, undefined)).toEqual({});
+    expect(buildSessionHeaders(provider, "")).toEqual({});
+  });
+
+  it("does not attach headers for other providers", () => {
+    const provider: RuntimeProviderConfig = {
+      ...keyedProvider,
+      baseUrl: "https://api.openai.com/v1",
+      apiStyle: "chat_completions",
+    };
+    expect(isOpenCodeGoProvider(provider)).toBe(false);
+    expect(buildSessionHeaders(provider, "sess-789")).toEqual({});
   });
 });

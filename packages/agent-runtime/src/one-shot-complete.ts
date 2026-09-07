@@ -12,10 +12,12 @@ import type {
   SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { MessageUsage, ThinkingLevel } from "@pi-desktop/shared";
+import { randomUUID } from "node:crypto";
 import { classifyAgentError } from "./agent-errors.js";
 import { assistantContent, usageFromPi } from "./agent-messages.js";
 import {
   buildProviderModel,
+  buildSessionHeaders,
   createProviderModels,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
@@ -78,9 +80,11 @@ export async function completeOneShot(
   let transientRetryAttempt = 0;
   let rateLimitRetryAttempt = 0;
 
+  const sessionHeaders = buildSessionHeaders(provider, randomUUID());
   const requestOptions: SimpleStreamOptions = {
     ...(options.signal ? { signal: options.signal } : {}),
     maxRetries: 0,
+    headers: sessionHeaders,
     ...(thinkingLevel !== "off" ? { reasoning: thinkingLevel } : {}),
     fetch: captureProviderResponse(undefined, (response) => {
       providerStatus = response?.status;

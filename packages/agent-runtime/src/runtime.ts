@@ -94,6 +94,7 @@ import { buildSessionContext } from "./session-context.js";
 import {
   apiBindingForStyle,
   buildProviderModel,
+  buildSessionHeaders,
   createProviderModels,
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_MAX_TOKENS,
@@ -1391,10 +1392,15 @@ Delegation rules:
       streamFn: (m, context, options) => {
         this.providerResponseStatus = undefined;
         this.providerRetryHeaders = undefined;
+        const sessionHeaders = buildSessionHeaders(this.provider, this.sessionId);
         const requestOptions: SimpleStreamOptions = {
           ...options,
           maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
           sessionId: this.sessionId,
+          headers: {
+            ...(options?.headers ?? {}),
+            ...sessionHeaders,
+          },
           // pi-ai only exposes onResponse after a request succeeds. Capture the
           // failed response separately so a 429 can honor Retry-After headers.
           fetch: captureProviderResponse(options?.fetch, (response) => {

@@ -49,6 +49,7 @@ import {
 } from "./agent-messages.js";
 import {
   buildProviderModel,
+  buildSessionHeaders,
   createProviderModels,
   providerRequestKey,
   type RuntimeProviderConfig,
@@ -203,10 +204,15 @@ export class SubagentRun {
       streamFn: (m, context, options) => {
         this.providerRetryHeaders = undefined;
         this.providerResponseStatus = undefined;
+        const sessionHeaders = buildSessionHeaders(opts.provider, opts.sessionId);
         const requestOptions = {
           ...options,
           maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
           sessionId: opts.sessionId,
+          headers: {
+            ...(options?.headers ?? {}),
+            ...sessionHeaders,
+          },
           fetch: captureProviderResponse(options?.fetch, (response) => {
             this.providerResponseStatus = response?.status;
             this.providerRetryHeaders = carriesRetryDelayHeaders(

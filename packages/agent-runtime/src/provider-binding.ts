@@ -196,3 +196,28 @@ export function createProviderModels(
   );
   return models;
 }
+
+/** Whether a resolved provider targets OpenCode Go. */
+export function isOpenCodeGoProvider(provider: RuntimeProviderConfig): boolean {
+  if (provider.apiStyle === OPENCODE_GO_API_STYLE) {
+    return true;
+  }
+  if (typeof provider.baseUrl === "string" && provider.baseUrl.includes("opencode.ai/zen/go")) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Build outgoing request headers for provider sessions (e.g. OpenCode Go affinity routing).
+ */
+export function buildSessionHeaders(
+  provider: RuntimeProviderConfig,
+  sessionId?: string,
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (sessionId && isOpenCodeGoProvider(provider)) {
+    headers["x-opencode-session"] = sessionId;
+  }
+  return headers;
+}
