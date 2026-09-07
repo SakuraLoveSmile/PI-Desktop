@@ -94,7 +94,6 @@ import { buildSessionContext } from "./session-context.js";
 import {
   apiBindingForStyle,
   buildProviderModel,
-  buildSessionHeaders,
   createProviderModels,
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_MAX_TOKENS,
@@ -126,6 +125,10 @@ import {
 } from "./plugin-skills-prompt.js";
 import { pluginSkillsDigest } from "./plugin-skills.js";
 import { logTiming } from "./timing.js";
+import {
+  openCodeEndpointFromProvider,
+  withOpenCodeSessionHeaders,
+} from "./opencode-session-headers.js";
 import {
   captureProviderResponse,
   classifyProviderError,
@@ -1392,32 +1395,33 @@ Delegation rules:
       streamFn: (m, context, options) => {
         this.providerResponseStatus = undefined;
         this.providerRetryHeaders = undefined;
-        const sessionHeaders = buildSessionHeaders(this.provider, this.sessionId);
-        const requestOptions: SimpleStreamOptions = {
-          ...options,
-          maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
-          sessionId: this.sessionId,
-          headers: {
-            ...(options?.headers ?? {}),
-            ...sessionHeaders,
+        const requestOptions: SimpleStreamOptions = withOpenCodeSessionHeaders(
+          {
+            ...options,
+            maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
+            sessionId: this.sessionId,
+            // pi-ai only exposes onResponse after a request succeeds. Capture the
+            // failed response separately so a 429 can honor Retry-After headers.
+            fetch: captureProviderResponse(options?.fetch, (response) => {
+              this.providerResponseStatus = response?.status;
+              // A gateway 502/503 can also state Retry-After, so keep headers for
+              // every status whose delay is usable instead of only for 429.
+              this.providerRetryHeaders = carriesRetryDelayHeaders(
+                response?.status,
+              )
+                ? response?.headers
+                : undefined;
+            }),
+            onResponse: async (response, responseModel) => {
+              this.providerResponseStatus = response.status;
+              await options?.onResponse?.(response, responseModel);
+            },
           },
-          // pi-ai only exposes onResponse after a request succeeds. Capture the
-          // failed response separately so a 429 can honor Retry-After headers.
-          fetch: captureProviderResponse(options?.fetch, (response) => {
-            this.providerResponseStatus = response?.status;
-            // A gateway 502/503 can also state Retry-After, so keep headers for
-            // every status whose delay is usable instead of only for 429.
-            this.providerRetryHeaders = carriesRetryDelayHeaders(
-              response?.status,
-            )
-              ? response?.headers
-              : undefined;
-          }),
-          onResponse: async (response, responseModel) => {
-            this.providerResponseStatus = response.status;
-            await options?.onResponse?.(response, responseModel);
+          {
+            ...openCodeEndpointFromProvider(this.provider, m),
+            sessionId: this.sessionId,
           },
-        };
+        );
         return createProviderRetryStream(
           m,
           context,

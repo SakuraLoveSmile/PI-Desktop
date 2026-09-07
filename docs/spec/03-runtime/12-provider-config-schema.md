@@ -174,6 +174,13 @@ key, with the host shown as a summary. Model discovery calls the fixed
 `/models` endpoint with a Bearer key, and the raw key continues to follow the
 normal secret-store path.
 
+OpenCode Go (and any `opencode.ai` host) requires a stable
+`x-opencode-session` header on LLM requests. Agent-runtime sends that header
+plus `x-opencode-client: pi-desktop` and `User-Agent: pi-desktop/<APP_VERSION>`
+on session turns, subagent turns, prompt enhancement, and plugin one-shots.
+Caller-supplied headers override the client and User-Agent values; a missing
+or empty session header is always restored from the conversation id.
+
 ## 3. Built-in vendor presets
 
 Presets only prefill form defaults; they are not a closed world.

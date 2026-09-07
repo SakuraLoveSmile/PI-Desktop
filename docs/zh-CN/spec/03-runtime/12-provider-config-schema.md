@@ -128,6 +128,11 @@ base URL 与粘贴的密钥工作。厂商行的样式不由厂商固定：GitHu
 |---|---|---|---|---|
 | `opencode_go` | `openai_compatible` | `api_key_and_base_url` | `OpenCode Go` | `https://opencode.ai/zen/go/v1` |
 
+OpenCode Go（以及任何 `opencode.ai` 主机）的 LLM 请求必须带稳定的
+`x-opencode-session`。agent-runtime 在会话、子代理、提示增强与插件 one-shot
+上发送该头，并附带 `x-opencode-client: pi-desktop` 与
+`User-Agent: pi-desktop/<APP_VERSION>`。
+
 ### 命名端点预设
 
 这些行由添加提供商对话框的**服务**下拉框创建。命名服务的常见路径是服务 +
