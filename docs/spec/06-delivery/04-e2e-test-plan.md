@@ -7785,20 +7785,24 @@ are withdrawn with ADR 0165.
 
 #### E2E-189: Bundled Advisor plugin picks a reviewer and returns a second opinion
 
-- **Preconditions**: `pi.advisor` is enabled (bundled, not uninstallable). At
-  least one authenticated provider. An Agent session.
+- **Preconditions**: `pi.advisor` is installed as bundled (not uninstallable)
+  and starts disabled. At least one authenticated provider. An Agent session.
 - **Steps**:
-  1. Confirm the `advisor` tool is absent from the active tool set before a
-     reviewer is selected.
-  2. Run `/advisor` (or the plugin command) and pick a model plus effort.
+  1. Confirm `/advisor` is absent and the `advisor` tool is not registered
+     while the plugin is disabled.
+  2. Enable `pi.advisor`. Confirm `/advisor` appears and the `advisor` tool is
+     still absent until a reviewer is selected.
+  3. Run `/advisor` (or the plugin command) and pick a model plus effort.
      Confirm the toast `Advisor: <label>[, <effort>]` and that settings persist.
-  3. Ask the Agent to proceed with a non-trivial task. Confirm it can call
+  4. Ask the Agent to proceed with a non-trivial task. Confirm it can call
      `plugin_pi_advisor_advisor` with no parameters and restates the guidance
      in the visible reply.
-  4. Disable the plugin. Confirm `/advisor` is gone and the tool is
+  5. Disable the plugin. Confirm `/advisor` is gone and the tool is
      unregistered. Confirm Uninstall is refused.
-- **Expected**: Off costs no completion and no tool schema. The plugin uses
-  only public host APIs. D015 prefix is `plugin_pi_advisor_advisor`.
+- **Expected**: First registration is disabled (`enabledByDefault: false`). Off
+  costs no completion and no tool schema. The plugin uses only public host APIs.
+  D015 prefix is `plugin_pi_advisor_advisor`. An explicit enable survives the
+  next launch.
 - **Specs linked**: `07-plugins/03-plugin-api.md`, ADR 0174, D336
 - **Acceptance**: G (plugin agent tool), C (conversation)
 - **Milestone**: M5

@@ -2714,5 +2714,5 @@ D193 和 D194。
 
 - 插件可以注册工具，但不能列出已认证模型、读取当前 LLM 上下文，也不能用用户的额度打一次侧向补全。
 - `pi.models.list`、`pi.session.getLlmContext`、`pi.agent.complete` 是公开宿主 API。凭据和线路调用留在 Electron main。会话上下文绑定到进行中的工具会话（修订 D019）。
-- 随应用打包的 `pi.advisor` 证明这条通道：`/advisor` 选择评审模型；执行模型调用 `plugin_pi_advisor_advisor` 获取第二意见。
+- 随应用打包的 `pi.advisor` 证明这条通道：默认关闭，用户启用后用 `/advisor` 选择评审模型；执行模型调用 `plugin_pi_advisor_advisor` 获取第二意见。
 - 决策 D336 记录为 ADR 0174。见 `07-plugins/03-plugin-api.md`、`07-plugins/13-plugin-permissions-matrix.md` 与 E2E-188 / E2E-189。

@@ -5708,13 +5708,14 @@ IPC 请求无法关闭。
 
 #### E2E-189：随应用打包的 Advisor 插件选择评审模型并返回第二意见
 
-- **前提条件**：`pi.advisor` 已启用（随应用打包，不可卸载）。至少一个已认证 provider。一个 Agent 会话。
+- **前提条件**：`pi.advisor` 作为随应用打包插件安装（不可卸载），首次注册为关闭。至少一个已认证 provider。一个 Agent 会话。
 - **步骤**：
-  1. 确认未选择评审模型前，活动工具集里没有 advisor 工具。
-  2. 运行 `/advisor`（或插件命令）并选择模型和 effort。确认 toast `Advisor: <label>[, <effort>]`，且设置已持久化。
-  3. 让 Agent 做一项非琐碎任务。确认它可以无参数调用 `plugin_pi_advisor_advisor`，并在可见回复中复述建议。
-  4. 禁用插件。确认 `/advisor` 消失且工具已注销。确认卸载被拒绝。
-- **预期**：关闭时不消耗补全、不占工具 schema。插件只使用公开宿主 API。D015 前缀为 `plugin_pi_advisor_advisor`。
+  1. 插件关闭时，确认 `/advisor` 不存在，且 advisor 工具未注册。
+  2. 启用 `pi.advisor`。确认 `/advisor` 出现，且在选择评审模型前 advisor 工具仍未注册。
+  3. 运行 `/advisor`（或插件命令）并选择模型和 effort。确认 toast `Advisor: <label>[, <effort>]`，且设置已持久化。
+  4. 让 Agent 做一项非琐碎任务。确认它可以无参数调用 `plugin_pi_advisor_advisor`，并在可见回复中复述建议。
+  5. 禁用插件。确认 `/advisor` 消失且工具已注销。确认卸载被拒绝。
+- **预期**：首次注册为关闭（`enabledByDefault: false`）。关闭时不消耗补全、不占工具 schema。插件只使用公开宿主 API。D015 前缀为 `plugin_pi_advisor_advisor`。用户显式启用会在下次启动后保留。
 - **链接规格**：`07-plugins/03-plugin-api.md`、ADR 0174、D336
 - **验收**：G（插件智能体工具）、C（对话）
 - **里程碑**：M5

@@ -65,10 +65,11 @@ hands a secret to the renderer.
 
 7. **Official advisor ships as bundled plugin `pi.advisor`.** It uses only
    these public APIs (plus `agent.tool.register`, `agent.prompt.inject`,
-   `ui.panel`). Enabled by default, disableable, not uninstallable. The
-   `advisor` tool stays unregistered until the user picks a reviewer with
-   `/advisor` or plugin settings, so an unused advisor costs no completion
-   and no tool schema.
+   `ui.panel`). Disabled by default (`enabledByDefault: false`), enableable,
+   not uninstallable. The user's enable/disable choice is preserved across
+   launches. The `advisor` tool stays unregistered until the user picks a
+   reviewer with `/advisor` or plugin settings, so an unused advisor costs no
+   completion and no tool schema.
 
 No host-protocol or storage schema bump. Completions are Electron-local, like
 `prompt/enhance`.

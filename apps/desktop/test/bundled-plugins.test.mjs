@@ -142,6 +142,7 @@ test("Advisor ships as an ordinary plugin over the public complete APIs", () => 
   const advisorMain = read("resources/plugins/pi.advisor/main.js");
   const advisorPanel = read("resources/plugins/pi.advisor/renderer/index.html");
   assert.equal(advisorManifest.id, "pi.advisor");
+  assert.equal(advisorManifest.enabledByDefault, false);
   assert.deepEqual(
     [...advisorManifest.permissions].sort(),
     [

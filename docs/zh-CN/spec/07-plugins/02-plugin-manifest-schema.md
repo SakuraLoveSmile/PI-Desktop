@@ -44,6 +44,11 @@ type PluginManifestV1 = {
  onUninstall?: string;
  };
  activationEvents?: string[]; // e.g. onCommand:xxx / onStartup
+ /**
+  * 随应用打包插件的首次注册默认值。省略表示启用。
+  * 市场安装和开发加载仍在用户授权后启用。
+  */
+ enabledByDefault?: boolean;
 };
 ```
 

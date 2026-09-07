@@ -41,6 +41,12 @@ type PluginManifestV1 = {
  onUninstall?: string;
  };
  activationEvents?: string[]; // e.g. onCommand:xxx / onStartup
+ /**
+  * First-registration default for bundled plugins. Omitted means enabled.
+  * Marketplace and development installs still enable after the user grants
+  * permissions.
+  */
+ enabledByDefault?: boolean;
 };
 ```
 

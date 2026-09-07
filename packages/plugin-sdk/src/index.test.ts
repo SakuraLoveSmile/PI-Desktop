@@ -45,6 +45,13 @@ describe("validateManifest", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("accepts enabledByDefault as a boolean", () => {
+    expect(validateManifest({ ...base, enabledByDefault: false }).ok).toBe(true);
+    expect(validateManifest({ ...base, enabledByDefault: "no" }).error).toMatch(
+      /enabledByDefault must be a boolean/,
+    );
+  });
+
   it("surfaces contribution errors", () => {
     expect(
       validateManifest({ ...base, contributes: { themes: [{ id: "a", label: "A", path: "a.json" }] } })

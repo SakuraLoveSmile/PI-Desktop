@@ -17,6 +17,12 @@ export type PluginManifest = {
   author?: string;
   main: string;
   icon?: string;
+  /**
+   * First-registration default for bundled plugins. Omitted means enabled.
+   * Marketplace and development installs still enable after the user grants
+   * permissions.
+   */
+  enabledByDefault?: boolean;
   ui?: {
     panel?: string;
     width?: number;
@@ -550,6 +556,9 @@ export function validateManifest(raw: unknown): {
   }
   if (typeof m.schemaVersion !== "number") {
     return { ok: false, error: "manifest.schemaVersion is required" };
+  }
+  if (m.enabledByDefault !== undefined && typeof m.enabledByDefault !== "boolean") {
+    return { ok: false, error: "manifest.enabledByDefault must be a boolean" };
   }
   const ui = m.ui as
     | { title?: unknown }

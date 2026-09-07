@@ -203,6 +203,10 @@ pub struct PluginManifest {
     pub ui: Option<PluginUiMeta>,
     #[serde(default)]
     pub fs: Option<Value>,
+    /// First-registration default for bundled plugins. Marketplace/dev
+    /// installs still enable after the user grants permissions.
+    #[serde(default, rename = "enabledByDefault")]
+    pub enabled_by_default: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -536,14 +540,17 @@ impl PluginManager {
                 };
                 let previous = self.runtime.iter().find(|p| p.id == manifest.id);
                 let now = Utc::now().to_rfc3339();
+                let enabled = previous
+                    .map(|p| p.enabled)
+                    .unwrap_or(manifest.enabled_by_default.unwrap_or(true));
                 shipped.push(PluginSummary {
                     id: manifest.id.clone(),
                     name: manifest.name.clone(),
                     version: manifest.version.clone(),
-                    enabled: previous.map(|p| p.enabled).unwrap_or(true),
+                    enabled,
                     scope: previous.map(|p| p.scope.clone()).unwrap_or_default(),
                     source: "builtin".into(),
-                    status: if previous.map(|p| p.enabled).unwrap_or(true) {
+                    status: if enabled {
                         "ready".into()
                     } else {
                         "disabled".into()
@@ -4011,6 +4018,43 @@ mod tests {
         fs::remove_dir_all(&root).unwrap();
         mgr.sync_builtin(Some(ship.path())).unwrap();
         assert!(mgr.get("pi.files").is_none());
+    }
+
+    #[test]
+    fn bundled_plugin_can_default_to_disabled_without_overwriting_user_state() {
+        let ship = tempdir().unwrap();
+        let root = ship.path().join("pi.opt-in");
+        write_plugin(
+            &root,
+            json!({
+                "schemaVersion": 1,
+                "id": "pi.opt-in",
+                "name": "Opt In",
+                "version": "1.0.0",
+                "main": "main.js",
+                "enabledByDefault": false,
+                "permissions": ["ui.panel"],
+            }),
+            &[],
+        );
+
+        let data = tempdir().unwrap();
+        let mut mgr = PluginManager::new(data.path(), None);
+        mgr.sync_builtin(Some(ship.path())).unwrap();
+        let listed = mgr.get("pi.opt-in").expect("bundled plugin is registered");
+        assert!(!listed.enabled, "opt-in bundled plugins start disabled");
+        assert_eq!(listed.status, "disabled");
+        assert!(
+            mgr.uninstall("pi.opt-in")
+                .unwrap_err()
+                .to_string()
+                .contains("cannot be uninstalled"),
+        );
+
+        mgr.set_enabled("pi.opt-in", true).unwrap();
+        mgr.sync_builtin(Some(ship.path())).unwrap();
+        let after = mgr.get("pi.opt-in").unwrap();
+        assert!(after.enabled, "an explicit enable survives the next launch");
     }
 
     #[test]
