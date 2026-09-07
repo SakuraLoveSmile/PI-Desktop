@@ -301,6 +301,39 @@ export type MessageUsage = {
   totalTokens: number;
 };
 
+/** Sum two provider usage records. Used for turn rollups, never to rewrite a message. */
+export function addUsage(
+  total: MessageUsage | undefined,
+  next: MessageUsage | undefined,
+): MessageUsage | undefined {
+  if (!next) return total;
+  if (!total) return next;
+  return {
+    inputTokens: total.inputTokens + next.inputTokens,
+    outputTokens: total.outputTokens + next.outputTokens,
+    ...(total.cacheReadTokens !== undefined || next.cacheReadTokens !== undefined
+      ? {
+          cacheReadTokens:
+            (total.cacheReadTokens ?? 0) + (next.cacheReadTokens ?? 0),
+        }
+      : {}),
+    ...(total.cacheWriteTokens !== undefined ||
+    next.cacheWriteTokens !== undefined
+      ? {
+          cacheWriteTokens:
+            (total.cacheWriteTokens ?? 0) + (next.cacheWriteTokens ?? 0),
+        }
+      : {}),
+    ...(total.reasoningTokens !== undefined || next.reasoningTokens !== undefined
+      ? {
+          reasoningTokens:
+            (total.reasoningTokens ?? 0) + (next.reasoningTokens ?? 0),
+        }
+      : {}),
+    totalTokens: total.totalTokens + next.totalTokens,
+  };
+}
+
 export type MessageAttachment = {
   kind: "image" | "file";
   name: string;
@@ -645,7 +678,7 @@ export type AgentEvent =
   | { type: "agent_start" }
   | { type: "agent_end"; messageIds: string[] }
   | { type: "turn_start" }
-  | { type: "turn_end" }
+  | { type: "turn_end"; subagentUsage?: MessageUsage }
   | { type: "message_start"; message: UiMessage }
   | {
       type: "message_update";
@@ -1777,6 +1810,8 @@ export type TokenUsageHistoryItem = {
 
 export type TokenUsageHistoryResult = {
   bucket: TokenUsageBucket;
+  rangeStart: number;
+  rangeEnd: number;
   items: TokenUsageHistoryItem[];
   totals: {
     inputTokens: number;

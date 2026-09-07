@@ -3457,7 +3457,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     await runtime.dispose();
   });
 
-  it("merges subagent usage into main turn usage", async () => {
+  it("keeps parent message usage provider-only and reports subagent usage on turn_end", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
@@ -3512,10 +3512,28 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const endEvent = events.find((e) => e.type === "message_end");
     expect(endEvent).toBeDefined();
     expect(endEvent.message.usage).toEqual({
-      inputTokens: 300,
-      outputTokens: 130,
-      totalTokens: 430,
+      inputTokens: 200,
+      outputTokens: 80,
+      totalTokens: 280,
     });
+
+    onEvent.mockClear();
+    await handleAgentEvent({ type: "turn_end" });
+    const turnEnd = onEvent.mock.calls
+      .map(([envelope]) => (envelope as any).event)
+      .find((e) => e.type === "turn_end");
+    expect(turnEnd.subagentUsage).toEqual({
+      inputTokens: 100,
+      outputTokens: 50,
+      totalTokens: 150,
+    });
+
+    onEvent.mockClear();
+    await handleAgentEvent({ type: "turn_end" });
+    const secondTurnEnd = onEvent.mock.calls
+      .map(([envelope]) => (envelope as any).event)
+      .find((e) => e.type === "turn_end");
+    expect(secondTurnEnd.subagentUsage).toBeUndefined();
 
     await runtime.dispose();
   });

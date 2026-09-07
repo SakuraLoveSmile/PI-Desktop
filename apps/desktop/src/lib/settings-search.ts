@@ -85,10 +85,10 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     titleKey: "settings.usage",
     group: "preferences",
     keywordKeys: [
-      "settings.usageTitle",
-      "settings.tokenUsage",
-      "settings.heatmap",
-      "settings.tokens",
+      "settings.usageTotal",
+      "settings.usageInput",
+      "settings.usageActivity",
+      "settings.usageTurns",
     ],
   },
   {

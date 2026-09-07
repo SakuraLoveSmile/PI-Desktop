@@ -30,17 +30,16 @@ import {
 } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import {
+  addUsage,
   DEFAULT_SUBAGENT_IDLE_TIMEOUT_SECONDS,
   DEFAULT_SUBAGENT_MAX_DURATION_SECONDS,
   subagentCanMutate,
+  type AgentEventEnvelope,
+  type MessageUsage,
   type SubagentDefinition,
   type SubagentRunStatus as SharedSubagentRunStatus,
-} from "@pi-desktop/shared";
-import type {
-  AgentEventEnvelope,
-  MessageUsage,
-  ThinkingLevel,
-  UiMessage,
+  type ThinkingLevel,
+  type UiMessage,
 } from "@pi-desktop/shared";
 import { classifyAgentError } from "./agent-errors.js";
 import {
@@ -169,37 +168,7 @@ function boundedReport(value: string): string {
   return `${text.slice(0, head)}${marker}${text.slice(-tail)}`;
 }
 
-export function addUsage(
-  total: MessageUsage | undefined,
-  next: MessageUsage | undefined,
-): MessageUsage | undefined {
-  if (!next) return total;
-  if (!total) return next;
-  return {
-    inputTokens: total.inputTokens + next.inputTokens,
-    outputTokens: total.outputTokens + next.outputTokens,
-    ...(total.cacheReadTokens !== undefined || next.cacheReadTokens !== undefined
-      ? {
-          cacheReadTokens:
-            (total.cacheReadTokens ?? 0) + (next.cacheReadTokens ?? 0),
-        }
-      : {}),
-    ...(total.cacheWriteTokens !== undefined ||
-    next.cacheWriteTokens !== undefined
-      ? {
-          cacheWriteTokens:
-            (total.cacheWriteTokens ?? 0) + (next.cacheWriteTokens ?? 0),
-        }
-      : {}),
-    ...(total.reasoningTokens !== undefined || next.reasoningTokens !== undefined
-      ? {
-          reasoningTokens:
-            (total.reasoningTokens ?? 0) + (next.reasoningTokens ?? 0),
-        }
-      : {}),
-    totalTokens: total.totalTokens + next.totalTokens,
-  };
-}
+export { addUsage };
 
 /** One delegate execution. Instances are single-use. */
 export class SubagentRun {

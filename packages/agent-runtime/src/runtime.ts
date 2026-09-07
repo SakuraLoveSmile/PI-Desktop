@@ -65,6 +65,7 @@ import type {
   UiMessage,
 } from "@pi-desktop/shared";
 import {
+  addUsage,
   checkpointGeneration,
   contextCompactionMark,
   DEFAULT_SUBAGENT_PERMISSION,
@@ -108,7 +109,6 @@ import {
   SUBAGENT_TOOL_NAME,
   SUBAGENT_WAIT_TOOL_NAME,
   type SubagentRunResult,
-  addUsage,
 } from "./subagent.js";
 import {
   composeModeSystemPrompt,
@@ -4903,8 +4903,7 @@ Delegation rules:
               `[agent-runtime] assistant emitted a tool call as text (session=${this.sessionId} turn=${this.turnId})\n`,
             );
           }
-          const rawUsage = usageFromPi((event.message as any).usage as Usage | undefined);
-          const usage = addUsage(rawUsage, this.turnSubagentUsage);
+          const usage = usageFromPi((event.message as any).usage as Usage | undefined);
           const endedAt = Date.now();
           const providerWaitMs =
             this.requestStartedAt !== undefined &&
@@ -5159,8 +5158,12 @@ Delegation rules:
           (this.runningDelegations().length > 0 && !this.runCancelled)
         )
           break;
+        const subagentUsage = this.turnSubagentUsage;
         this.turnSubagentUsage = undefined;
-        this.emit({ type: "turn_end" });
+        this.emit({
+          type: "turn_end",
+          ...(subagentUsage ? { subagentUsage } : {}),
+        });
         break;
       case "agent_end":
         if (
@@ -5382,6 +5385,7 @@ Delegation rules:
     this.turnId = nextTurnId;
     this.gracefulStopRequested = false;
     this.runCancelled = false;
+    this.turnSubagentUsage = undefined;
     // Capabilities and path-scoped instruction claims belong to one prompt.
     this.resetDeferredToolsForPrompt();
     this.pathInstructionClaims.clear();
@@ -5455,6 +5459,7 @@ Delegation rules:
     this.runCancelled = true;
     this.resolvePendingAskTools();
     this.abortRunningDelegations();
+    this.turnSubagentUsage = undefined;
     this.agent.abort();
     this.providerRetryAbort?.abort();
     this.compactionAbort?.abort();

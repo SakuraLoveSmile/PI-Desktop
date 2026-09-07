@@ -2624,39 +2624,195 @@ pub fn search_messages(db: &Database, query: &str, limit: i64) -> Result<Vec<Sea
     }
 }
 
+fn normalize_usage_bucket(bucket: &str) -> &'static str {
+    match bucket {
+        "week" => "week",
+        "month" => "month",
+        _ => "day",
+    }
+}
+
+fn local_from_ms(ms: i64) -> Option<chrono::DateTime<chrono::Local>> {
+    chrono::DateTime::from_timestamp_millis(ms).map(|dt| dt.with_timezone(&chrono::Local))
+}
+
+fn usage_bucket_key(dt: &chrono::DateTime<chrono::Local>, bucket: &str) -> String {
+    match bucket {
+        "month" => dt.format("%Y-%m").to_string(),
+        "week" => dt.format("%G-W%V").to_string(),
+        _ => dt.format("%Y-%m-%d").to_string(),
+    }
+}
+
+fn default_history_start(
+    end: chrono::DateTime<chrono::Local>,
+    bucket: &str,
+) -> chrono::DateTime<chrono::Local> {
+    match bucket {
+        "month" => end - chrono::Duration::days(365 * 2),
+        "week" => end - chrono::Duration::weeks(52),
+        _ => end - chrono::Duration::weeks(53),
+    }
+}
+
+fn resolve_history_range(
+    start_date: Option<i64>,
+    end_date: Option<i64>,
+    bucket: &str,
+) -> (i64, i64) {
+    let now = chrono::Local::now();
+    let end = end_date.filter(|v| *v > 0).and_then(local_from_ms).unwrap_or(now);
+    let start = start_date
+        .filter(|v| *v > 0)
+        .and_then(local_from_ms)
+        .unwrap_or_else(|| default_history_start(end, bucket));
+    if start <= end {
+        (start.timestamp_millis(), end.timestamp_millis())
+    } else {
+        (end.timestamp_millis(), start.timestamp_millis())
+    }
+}
+
+fn naive_local_midnight(date: chrono::NaiveDate) -> Option<chrono::DateTime<chrono::Local>> {
+    use chrono::TimeZone;
+    let naive = date.and_hms_opt(0, 0, 0)?;
+    match chrono::Local.from_local_datetime(&naive) {
+        chrono::LocalResult::Single(dt) => Some(dt),
+        chrono::LocalResult::Ambiguous(dt, _) => Some(dt),
+        chrono::LocalResult::None => None,
+    }
+}
+
+fn filled_history_keys(start_ms: i64, end_ms: i64, bucket: &str) -> Vec<(String, i64)> {
+    use chrono::{Datelike, TimeZone};
+    let start = local_from_ms(start_ms).unwrap_or_else(chrono::Local::now);
+    let end = local_from_ms(end_ms).unwrap_or_else(chrono::Local::now);
+    let mut keys = Vec::new();
+    match bucket {
+        "month" => {
+            let mut year = start.year();
+            let mut month = start.month();
+            let end_y = end.year();
+            let end_m = end.month();
+            loop {
+                if let chrono::LocalResult::Single(dt)
+                | chrono::LocalResult::Ambiguous(dt, _) =
+                    chrono::Local.with_ymd_and_hms(year, month, 1, 0, 0, 0)
+                {
+                    keys.push((dt.format("%Y-%m").to_string(), dt.timestamp_millis()));
+                }
+                if year > end_y || (year == end_y && month >= end_m) {
+                    break;
+                }
+                month += 1;
+                if month == 13 {
+                    month = 1;
+                    year += 1;
+                }
+            }
+        }
+        "week" => {
+            let weekday = start.weekday().num_days_from_monday() as i64;
+            let mut cursor = start.date_naive() - chrono::Duration::days(weekday);
+            let end_date = end.date_naive();
+            while cursor <= end_date {
+                if let Some(dt) = naive_local_midnight(cursor) {
+                    keys.push((dt.format("%G-W%V").to_string(), dt.timestamp_millis()));
+                }
+                cursor += chrono::Duration::days(7);
+            }
+        }
+        _ => {
+            let mut cursor = start.date_naive();
+            let end_date = end.date_naive();
+            while cursor <= end_date {
+                if let Some(dt) = naive_local_midnight(cursor) {
+                    keys.push((dt.format("%Y-%m-%d").to_string(), dt.timestamp_millis()));
+                }
+                cursor += chrono::Duration::days(1);
+            }
+        }
+    }
+    keys
+}
+
+#[derive(Default, Clone, Copy)]
+struct UsageBucketAcc {
+    input: i64,
+    output: i64,
+    cache_read: i64,
+    cache_write: i64,
+    reasoning: i64,
+    turns: i64,
+    timestamp: i64,
+}
+
+impl UsageBucketAcc {
+    fn add(
+        &mut self,
+        input: i64,
+        output: i64,
+        cache_read: i64,
+        cache_write: i64,
+        reasoning: i64,
+        ts: i64,
+    ) {
+        if self.turns == 0 {
+            self.timestamp = ts;
+        }
+        self.input += input;
+        self.output += output;
+        self.cache_read += cache_read;
+        self.cache_write += cache_write;
+        self.reasoning += reasoning;
+        self.turns += 1;
+    }
+
+    fn total_tokens(&self) -> i64 {
+        self.input + self.output + self.cache_read + self.cache_write
+    }
+
+    fn to_json(&self, date: &str) -> Value {
+        json!({
+            "date": date,
+            "timestamp": self.timestamp,
+            "inputTokens": self.input,
+            "outputTokens": self.output,
+            "totalTokens": self.total_tokens(),
+            "cacheReadTokens": self.cache_read,
+            "cacheWriteTokens": self.cache_write,
+            "reasoningTokens": self.reasoning,
+            "turnCount": self.turns,
+        })
+    }
+}
+
 pub fn get_token_usage_history(
     db: &Database,
-    start_date: i64,
-    end_date: i64,
+    start_date: Option<i64>,
+    end_date: Option<i64>,
     bucket: &str,
 ) -> Result<Value> {
+    let bucket = normalize_usage_bucket(bucket);
+    let (range_start, range_end) = resolve_history_range(start_date, end_date, bucket);
     let mut stmt = db.conn().prepare_cached(
-        "SELECT ended_at, input_tokens, output_tokens, usage_json, model_id
+        "SELECT ended_at, input_tokens, output_tokens, usage_json
          FROM turns
          WHERE status = 'completed' AND ended_at IS NOT NULL AND ended_at >= ?1 AND ended_at <= ?2
          ORDER BY ended_at ASC",
     )?;
 
-    struct TurnUsageRecord {
-        ended_at: i64,
-        input_tokens: i64,
-        output_tokens: i64,
-        usage_json: Option<String>,
-        model_id: Option<String>,
-    }
-
-    let rows = stmt.query_map(params![start_date, end_date], |row| {
-        Ok(TurnUsageRecord {
-            ended_at: row.get(0)?,
-            input_tokens: row.get(1)?,
-            output_tokens: row.get(2)?,
-            usage_json: row.get(3)?,
-            model_id: row.get(4)?,
-        })
+    let rows = stmt.query_map(params![range_start, range_end], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, Option<String>>(3)?,
+        ))
     })?;
 
     use std::collections::BTreeMap;
-    let mut bucket_map: BTreeMap<String, Value> = BTreeMap::new();
+    let mut bucket_map: BTreeMap<String, UsageBucketAcc> = BTreeMap::new();
     let mut total_input = 0i64;
     let mut total_output = 0i64;
     let mut total_turns = 0i64;
@@ -2665,16 +2821,17 @@ pub fn get_token_usage_history(
     let mut total_reasoning = 0i64;
 
     for row in rows {
-        let rec = row?;
+        let (ended_at, input_tokens, output_tokens, usage_json) = row?;
+        let Some(dt) = local_from_ms(ended_at) else {
+            continue;
+        };
         total_turns += 1;
-        total_input += rec.input_tokens;
-        total_output += rec.output_tokens;
+        total_input += input_tokens;
+        total_output += output_tokens;
 
-        let parsed_usage = rec
-            .usage_json
+        let parsed_usage = usage_json
             .as_deref()
             .and_then(|s| serde_json::from_str::<Value>(s).ok());
-
         let cache_read = parsed_usage
             .as_ref()
             .and_then(|u| u.get("cacheReadTokens"))
@@ -2690,68 +2847,41 @@ pub fn get_token_usage_history(
             .and_then(|u| u.get("reasoningTokens"))
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
-
         total_cache_read += cache_read;
         total_cache_write += cache_write;
         total_reasoning += reasoning;
 
-        let dt = chrono::DateTime::from_timestamp_millis(rec.ended_at)
-            .unwrap_or_else(chrono::Utc::now);
-
-        let key = match bucket {
-            "month" => dt.format("%Y-%m").to_string(),
-            "week" => format!("{}-W{:02}", dt.format("%Y"), dt.format("%V")),
-            _ => dt.format("%Y-%m-%d").to_string(),
-        };
-
-        let entry = bucket_map.entry(key.clone()).or_insert_with(|| {
-            json!({
-                "date": key,
-                "timestamp": rec.ended_at,
-                "inputTokens": 0i64,
-                "outputTokens": 0i64,
-                "totalTokens": 0i64,
-                "cacheReadTokens": 0i64,
-                "cacheWriteTokens": 0i64,
-                "reasoningTokens": 0i64,
-                "turnCount": 0i64,
-            })
-        });
-
-        if let Some(obj) = entry.as_object_mut() {
-            if let Some(inp) = obj.get_mut("inputTokens").and_then(|v| v.as_i64()) {
-                obj.insert("inputTokens".into(), json!(inp + rec.input_tokens));
-            }
-            if let Some(out) = obj.get_mut("outputTokens").and_then(|v| v.as_i64()) {
-                obj.insert("outputTokens".into(), json!(out + rec.output_tokens));
-            }
-            if let Some(tot) = obj.get_mut("totalTokens").and_then(|v| v.as_i64()) {
-                obj.insert("totalTokens".into(), json!(tot + rec.input_tokens + rec.output_tokens));
-            }
-            if let Some(cr) = obj.get_mut("cacheReadTokens").and_then(|v| v.as_i64()) {
-                obj.insert("cacheReadTokens".into(), json!(cr + cache_read));
-            }
-            if let Some(cw) = obj.get_mut("cacheWriteTokens").and_then(|v| v.as_i64()) {
-                obj.insert("cacheWriteTokens".into(), json!(cw + cache_write));
-            }
-            if let Some(rs) = obj.get_mut("reasoningTokens").and_then(|v| v.as_i64()) {
-                obj.insert("reasoningTokens".into(), json!(rs + reasoning));
-            }
-            if let Some(tc) = obj.get_mut("turnCount").and_then(|v| v.as_i64()) {
-                obj.insert("turnCount".into(), json!(tc + 1));
-            }
-        }
+        let key = usage_bucket_key(&dt, bucket);
+        bucket_map.entry(key).or_default().add(
+            input_tokens,
+            output_tokens,
+            cache_read,
+            cache_write,
+            reasoning,
+            ended_at,
+        );
     }
 
-    let items: Vec<Value> = bucket_map.into_values().collect();
+    let items: Vec<Value> = filled_history_keys(range_start, range_end, bucket)
+        .into_iter()
+        .map(|(date, timestamp)| {
+            let mut acc = bucket_map.remove(&date).unwrap_or_default();
+            if acc.turns == 0 {
+                acc.timestamp = timestamp;
+            }
+            acc.to_json(&date)
+        })
+        .collect();
 
     Ok(json!({
         "bucket": bucket,
+        "rangeStart": range_start,
+        "rangeEnd": range_end,
         "items": items,
         "totals": {
             "inputTokens": total_input,
             "outputTokens": total_output,
-            "totalTokens": total_input + total_output,
+            "totalTokens": total_input + total_output + total_cache_read + total_cache_write,
             "cacheReadTokens": total_cache_read,
             "cacheWriteTokens": total_cache_write,
             "reasoningTokens": total_reasoning,
@@ -4808,17 +4938,68 @@ mod tests {
 
         let ended = end_turn_settling(&db, &turn, "completed", None, Some(&usage), false, false).unwrap();
         assert!(ended.updated);
+        let ended_at: i64 = db
+            .conn()
+            .query_row("SELECT ended_at FROM turns WHERE id = ?1", params![turn], |r| r.get(0))
+            .unwrap();
 
-        let history = get_token_usage_history(&db, 0, i64::MAX, "day").unwrap();
+        let history = get_token_usage_history(&db, Some(ended_at - 1_000), Some(ended_at + 1_000), "day").unwrap();
         let totals = history.get("totals").unwrap();
         assert_eq!(totals.get("inputTokens").unwrap().as_i64(), Some(120));
         assert_eq!(totals.get("outputTokens").unwrap().as_i64(), Some(80));
-        assert_eq!(totals.get("totalTokens").unwrap().as_i64(), Some(200));
+        assert_eq!(totals.get("totalTokens").unwrap().as_i64(), Some(250));
         assert_eq!(totals.get("cacheReadTokens").unwrap().as_i64(), Some(40));
         assert_eq!(totals.get("turnCount").unwrap().as_i64(), Some(1));
 
         let items = history.get("items").unwrap().as_array().unwrap();
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].get("totalTokens").unwrap().as_i64(), Some(200));
+        assert!(!items.is_empty());
+        let active = items
+            .iter()
+            .find(|item| item.get("turnCount").and_then(|v| v.as_i64()) == Some(1))
+            .expect("active day");
+        assert_eq!(active.get("totalTokens").unwrap().as_i64(), Some(250));
+    }
+
+    #[test]
+    fn token_usage_history_uses_iso_week_year() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let turn = begin_turn(&db, &session.id, None, None).unwrap();
+        let usage = json!({ "inputTokens": 1, "outputTokens": 1 });
+        end_turn_settling(&db, &turn, "completed", None, Some(&usage), false, false).unwrap();
+        // Monday 2025-12-29 is ISO week 1 of 2026.
+        let ended_at = chrono::TimeZone::with_ymd_and_hms(&chrono::Utc, 2025, 12, 29, 12, 0, 0)
+            .unwrap()
+            .timestamp_millis();
+        db.conn()
+            .execute(
+                "UPDATE turns SET ended_at = ?1 WHERE id = ?2",
+                params![ended_at, turn],
+            )
+            .unwrap();
+
+        let history = get_token_usage_history(
+            &db,
+            Some(ended_at - 86_400_000),
+            Some(ended_at + 86_400_000),
+            "week",
+        )
+        .unwrap();
+        let items = history.get("items").unwrap().as_array().unwrap();
+        let active = items
+            .iter()
+            .find(|item| item.get("turnCount").and_then(|v| v.as_i64()) == Some(1))
+            .expect("iso week");
+        assert_eq!(active.get("date").and_then(|v| v.as_str()), Some("2026-W01"));
+    }
+
+    #[test]
+    fn token_usage_history_defaults_to_a_bounded_window() {
+        let db = test_db();
+        let history = get_token_usage_history(&db, None, None, "day").unwrap();
+        let items = history.get("items").unwrap().as_array().unwrap();
+        assert!(items.len() >= 365);
+        assert!(items.len() <= 53 * 7 + 1);
+        assert_eq!(history.get("totals").unwrap().get("turnCount").unwrap().as_i64(), Some(0));
     }
 }

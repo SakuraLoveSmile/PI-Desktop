@@ -1744,16 +1744,19 @@ async fn handle_request(
         }
 
         "stats.getTokenUsageHistory" => {
-            let start_date = params.get("startDate").and_then(|v| v.as_i64()).unwrap_or(0);
-            let end_date = params.get("endDate").and_then(|v| v.as_i64()).unwrap_or(i64::MAX);
             let bucket = params
                 .get("bucket")
                 .and_then(|v| v.as_str())
                 .unwrap_or("day");
 
             let st = state.lock().await;
-            let history = sessions::get_token_usage_history(&st.db, start_date, end_date, bucket)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let history = sessions::get_token_usage_history(
+                &st.db,
+                params.get("startDate").and_then(|v| v.as_i64()),
+                params.get("endDate").and_then(|v| v.as_i64()),
+                bucket,
+            )
+            .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(history)
         }
 

@@ -85,6 +85,7 @@ import {
   type ThinkingLevel,
   type UiMessage,
   type MessageUsage,
+  addUsage,
   type UserSkillRecord,
   type UserSubagentRecord,
   type WindowControlAction,
@@ -1972,6 +1973,12 @@ const turnSettlements = new Map<string, Set<() => void>>();
 const turnFinalizations = new Map<string, Promise<void>>();
 /** sessionId -> last assistant usage recorded for active turn */
 const activeTurnUsages = new Map<string, MessageUsage>();
+
+function addActiveTurnUsage(sessionId: string, usage: MessageUsage | undefined) {
+  if (!usage) return;
+  const next = addUsage(activeTurnUsages.get(sessionId), usage);
+  if (next) activeTurnUsages.set(sessionId, next);
+}
 /** sessionId → scheduled task_run id awaiting completion. */
 const scheduledRunsBySession = new Map<string, string>();
 /** Session currently rendered on the chat page; focus remains Main-owned. */
@@ -4802,6 +4809,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
     turnId = String(turn.turnId || "").trim();
     if (!turnId) throw new Error("execution turn was not created");
     activeTurns.set(execution.sessionId, turnId);
+    activeTurnUsages.delete(execution.sessionId);
     approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
     approvedExecutionTurns.set(execution.id, {
       sessionId: execution.sessionId,
@@ -5029,9 +5037,12 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     })();
     return;
   }
+  if (event.type === "turn_end" && !envelope.parentToolCallId) {
+    addActiveTurnUsage(envelope.sessionId, event.subagentUsage);
+  }
   if (event.type === "message_end" && event.message.role === "assistant") {
     if (!envelope.parentToolCallId && event.message.usage) {
-      activeTurnUsages.set(envelope.sessionId, event.message.usage);
+      addActiveTurnUsage(envelope.sessionId, event.message.usage);
     }
     // Checkpoint the finished snapshot before the outbox append (D327).
     // Settling first dropped the last interval of text, and endTurn used to
@@ -7011,6 +7022,7 @@ function registerIpc() {
       throw new Error("session.beginTurn returned no turn");
     }
     activeTurns.set(req.sessionId, durableTurnId);
+    activeTurnUsages.delete(req.sessionId);
 
     // Slash template expansion (D123, ADR 0024): templates expand before
     // persistence so reseed replays exactly what the model saw; the typed

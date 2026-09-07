@@ -158,7 +158,6 @@ export const IconSheet = icon(FileSpreadsheet);
 export const IconAudio = icon(Music);
 export const IconVideo = icon(Video);
 export const IconReview = icon(RefreshCw);
-export const IconRefreshCw = icon(RefreshCw);
 export const IconKeyboard = icon(Keyboard);
 export const IconMic = icon(Mic);
 export const IconPlug = icon(Plug);
