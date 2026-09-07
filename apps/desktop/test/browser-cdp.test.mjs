@@ -114,7 +114,7 @@ const mainSource = readFileSync(resolve("electron/main/index.ts"), "utf8");
 
 test("in-flight tool.execute session survives the child host-api round trip", () => {
   assert.match(runtimeSource, /private executingToolSessions = new Map/);
-  assert.match(runtimeSource, /stack.push\(sessionId\)/);
+  assert.match(runtimeSource, /stack.push\(\{ sessionId, toolName: name \}\)/);
   assert.match(runtimeSource, /this\.browserSessionId\(pluginId\)/);
 });
 

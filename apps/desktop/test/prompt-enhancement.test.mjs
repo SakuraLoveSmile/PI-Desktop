@@ -4,12 +4,13 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [composer, api, main, protocol, runtime, en, zh] = await Promise.all([
+const [composer, api, main, protocol, runtime, oneShot, en, zh] = await Promise.all([
   read("../src/components/Composer.tsx"),
   read("../src/lib/api.ts"),
   read("../electron/main/index.ts"),
   read("../../../packages/shared/src/protocol.ts"),
   read("../../../packages/agent-runtime/src/prompt-enhancement.ts"),
+  read("../../../packages/agent-runtime/src/one-shot-complete.ts"),
   read("../../../packages/i18n/src/locales/en/index.ts"),
   read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
 ]);
@@ -21,8 +22,9 @@ test("prompt enhancement uses the typed main-process bridge", () => {
   assert.match(main, /handle\(IPC\.invoke\.promptEnhance/);
   assert.match(main, /enhancePromptDraft\(/);
   assert.match(main, /resolveAuth: \(\) => vendorOAuth\.resolveAuth/);
-  assert.match(runtime, /createProviderRetryStream/);
-  assert.match(runtime, /models\.streamSimple/);
+  assert.match(runtime, /completeOneShot\(/);
+  assert.match(oneShot, /createProviderRetryStream/);
+  assert.match(oneShot, /models\.streamSimple/);
 });
 
 test("Composer gates enhancement, preserves file references, and guards stale results", () => {
