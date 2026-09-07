@@ -694,7 +694,28 @@ classification as an agent request, but creates a separate completion context
 with exactly one user message and the static enhancement system prompt. It
 does not instantiate a session agent, include transcript history, expose tools,
 or persist a turn. The renderer receives only the trimmed text result; API
-keys and vendor refresh credentials remain in Electron main.
+keys and vendor refresh credentials remain in Electron main. OpenCode Go
+one-shots reuse the conversation id as `x-opencode-session` when a session is
+present; otherwise the runtime synthesizes a per-call id so the gateway
+accepts the request.
+
+### 6.2 OpenCode session routing headers
+
+Chat, subagent, prompt-enhancement, and plugin one-shot completions whose
+provider is `apiStyle: opencode_go`, whose `vendorKey` is `opencode` or
+`opencode-go`, whose pi-ai provider id is one of those values, or whose base
+URL host is `opencode.ai` send:
+
+- `x-opencode-session`: the durable conversation id, or a per-call UUID when
+  the caller has no session
+- `x-opencode-client: pi-desktop`
+- `User-Agent: pi-desktop/<APP_VERSION>`
+
+Caller-supplied headers override the client and User-Agent defaults. An empty
+session header is restored from the conversation id so OpenCode Go cannot
+return `MissingSessionID`. This is an agent-runtime concern, matching the
+official Pi coding-agent attribution layer; pi-ai's `sessionId` stream option
+does not emit `x-opencode-session`.
 
 
 ## 7. System prompt composition

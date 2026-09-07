@@ -67,7 +67,13 @@ inside the `openai_compatible` provider path: the preset fixes the endpoint to
 `https://opencode.ai/zen/go/v1`, uses Bearer API-key authentication, discovers
 models from `/models`, and sends chat turns through pi-ai's OpenAI Chat
 Completions adapter. It does not create a second transport or a closed model
-allowlist.
+allowlist. Agent-runtime injects OpenCode routing headers on every LLM
+request (session turns, subagents, prompt enhancement, and plugin
+one-shots): `x-opencode-session` is the durable conversation id (or a
+per-call UUID when the caller has no session), `x-opencode-client` is
+`pi-desktop`, and `User-Agent` is `pi-desktop/<APP_VERSION>`. A custom
+OpenAI-compatible row whose base URL host is `opencode.ai` receives the
+same headers. pi-ai is not relied on to emit `x-opencode-session`.
 
 Zhipu / GLM and Z.AI are named OpenAI-compatible endpoint presets among a
 short models.dev-backed Service list of first-party vendors (including

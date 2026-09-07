@@ -632,7 +632,7 @@ const plugins: PluginRuntime = new PluginRuntime({
       runtimeProvider,
       context,
       launch.sidecarParams.thinkingLevel,
-      { signal: input.signal },
+      { signal: input.signal, sessionId: launchSessionId },
     );
     return {
       text: result.text,
@@ -7053,6 +7053,7 @@ function registerIpc() {
       runtimeProvider,
       draft,
       launch.sidecarParams.thinkingLevel,
+      { sessionId: launchSessionId },
     );
     logger.app("session", "info", "prompt enhanced", {
       sessionId: sessionId || undefined,
