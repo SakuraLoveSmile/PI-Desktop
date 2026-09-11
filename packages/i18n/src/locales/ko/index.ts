@@ -273,6 +273,7 @@ export const ko = {
     forkResponse: "이 답변에서 브랜치 만들기",
     quote: "인용",
     quoteSource: "{{title}}에서 인용",
+    quoteSelection: "선택 항목 인용",
     startSideChat: "사이드 채팅 열기",
     editMessage: "편집 후 다시 보내기",
     cancelEdit: "취소",

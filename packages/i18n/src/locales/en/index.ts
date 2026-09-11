@@ -271,6 +271,7 @@ export const en = {
     forkResponse: "Branch from this reply",
     quote: "Quote",
     quoteSource: "Quoted from {{title}}",
+    quoteSelection: "Quote selection",
     startSideChat: "Open side chat",
     editMessage: "Edit and resend",
     cancelEdit: "Cancel",

@@ -266,6 +266,7 @@ export const zhCN = {
     forkResponse: "从此回复创建分支",
     quote: "引用",
     quoteSource: "引用自 {{title}}",
+    quoteSelection: "引用选中内容",
     startSideChat: "打开侧边聊天",
     editMessage: "编辑并重新发送",
     cancelEdit: "取消",

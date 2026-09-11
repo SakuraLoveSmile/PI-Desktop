@@ -953,6 +953,60 @@
   opacity: 1;
 }
 
+/*
+ * Floating quote affordance for a selection (ADR 0223). Fixed, and in the
+ * body-portaled popover layer: it is read while the passage underneath stays
+ * visible, so it must clear the docked composer without pushing the passage
+ * around (D-layer table in 04-ux/07-ui-design-system.md §9).
+ */
+.selection-quote-btn {
+  position: fixed;
+  z-index: 60; /* z-command-palette: body-portaled popovers */
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-elevated-opaque);
+  color: var(--ds-text-primary);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-compact);
+  box-shadow: var(--ds-shadow-dialog);
+  cursor: pointer;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+  animation: selection-quote-in var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.selection-quote-btn:hover {
+  background: var(--ds-bg-hover);
+}
+
+.selection-quote-btn:active {
+  transform: scale(0.96);
+}
+
+.selection-quote-btn:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 1px;
+}
+
+@keyframes selection-quote-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selection-quote-btn {
+    animation: none;
+  }
+}
+
 .icon-btn:active:not(:disabled),
 .title-nav-btn:active:not(:disabled),
 .nav-item:active:not(:disabled),

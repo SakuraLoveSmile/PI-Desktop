@@ -273,6 +273,7 @@ export const tr = {
     forkResponse: "Bu yanıttan dal oluştur",
     quote: "Alıntıla",
     quoteSource: "{{title}} alıntısı",
+    quoteSelection: "Seçimi alıntıla",
     startSideChat: "Yan sohbeti aç",
     editMessage: "Düzenle ve yeniden gönder",
     cancelEdit: "İptal",

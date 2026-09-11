@@ -76,6 +76,7 @@ import {
   isHtmlFilePath,
   splitChatText,
 } from "../lib/chat-links";
+import { selectionMarkdownWithinRow } from "../lib/selection-quote";
 import {
   isRecentScrollGesture,
   reduceTranscriptScroll,
@@ -146,6 +147,7 @@ import { useAppStore } from "../stores/app-store";
 import type { PendingPermission } from "../lib/pending-permissions";
 import { PermissionCard } from "./PermissionCard";
 import { TooltipButton } from "./ui";
+import { SelectionQuoteButton } from "./SelectionQuoteButton";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -160,28 +162,6 @@ type Translate = (key: string, options?: Record<string, unknown>) => string;
  * control for its child.
  */
 export const TranscriptReadOnlyContext = createContext(false);
-
-/**
- * The text the user selected inside one transcript row.
- *
- * A selection outside the row being quoted — or no selection at all — yields an
- * empty string and the caller quotes the whole message instead. Selection wins
- * because quoting a paragraph of a long answer is the common case.
- */
-function selectedTextWithinRow(rowAnchorId: string): string {
-  if (typeof window === "undefined") return "";
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
-    return "";
-  }
-  const text = selection.toString().trim();
-  if (!text) return "";
-  const node = selection.anchorNode;
-  const element = node instanceof Element ? node : node?.parentElement ?? null;
-  const row = element?.closest?.("[data-minimap-id]");
-  if (!row || row.getAttribute("data-minimap-id") !== rowAnchorId) return "";
-  return text;
-}
 
 /** Visible conversation title: the quote attribution and the side-chat source. */
 function useActiveSessionTitle(): string {
@@ -2352,7 +2332,10 @@ const MessageRow = memo(function MessageRow({
                 quoteMessageIntoComposer({
                   title: sessionTitle,
                   text: editSeed,
-                  selection: selectedTextWithinRow(message.id),
+                  // The rendered selection is recovered as Markdown, so a quoted
+                  // formula keeps its TeX and a quoted table keeps its rows
+                  // (ADR 0223 / D399).
+                  selection: selectionMarkdownWithinRow(message.id),
                 })
               }
             >
@@ -2690,7 +2673,7 @@ const AssistantTurn = memo(function AssistantTurn({
                     // An assistant row is anchored by its turn, and a turn
                     // without an anchor has no selection to match.
                     selection: entry.anchorId
-                      ? selectedTextWithinRow(entry.anchorId)
+                      ? selectionMarkdownWithinRow(entry.anchorId)
                       : "",
                   })
                 }
@@ -2774,6 +2757,7 @@ export const ChatTranscript = memo(function ChatTranscript({
   const { t } = useTranslation();
   // A read-only projection renders content only; the panel owns its own controls.
   const transcriptReadOnly = useContext(TranscriptReadOnlyContext);
+  const sessionTitle = useActiveSessionTitle();
   const latestTurnResult = useAppStore((state) =>
     sessionId ? state.latestTurnResults[sessionId] : undefined,
   );
@@ -3423,6 +3407,11 @@ export const ChatTranscript = memo(function ChatTranscript({
           onRevealEarlier={revealEarlierHistory}
         />
       ) : null}
+      {/* Quoting follows the selection: the row action at the end of a long
+        * answer is the wrong end of the message to reach for (ADR 0223 / D399). */}
+      {transcriptReadOnly ? null : (
+        <SelectionQuoteButton scrollRef={scrollRef} title={sessionTitle} />
+      )}
       <div
         className="thread-scroll"
         ref={scrollRef}

@@ -266,6 +266,7 @@ export const zhTW = {
     forkResponse: "從此回覆建立分支",
     quote: "引用",
     quoteSource: "引用自 {{title}}",
+    quoteSelection: "引用選取內容",
     startSideChat: "開啟側邊聊天",
     editMessage: "編輯並重新發送",
     cancelEdit: "取消",
