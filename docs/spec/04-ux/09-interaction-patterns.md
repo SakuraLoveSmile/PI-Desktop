@@ -918,14 +918,20 @@ Running turns and pending approvals continue to gate the controls.
   remain text-selectable for inspection and copying.
 - Interactive controls nested inside selectable content remain
   non-selectable and must keep their click and keyboard behavior.
-- A non-empty selection inside a transcript row raises one floating quote
-  affordance on the selection's last line (`chat.quoteSelection`, D399). It is
-  viewport-positioned and viewport-clamped, portaled above the transcript, and
-  hides on scroll, resize, selection collapse, and after activation. It never
-  renders in a read-only projection, next to no transcript at all, and it does
-  not steal the selection: the pointer press is prevented so the excerpt is
-  whatever was selected, including a whole formula. Activating it writes a
-  composer draft and focuses the composer; it never sends.
+- A non-empty selection inside a transcript row raises one floating overlay
+  above it (D399): Add to chat, Ask in side chat, and Copy. It is centered on the
+  selection, clamped into the clipping ancestors' rects (capped above the docked
+  composer), portaled above the transcript, and it follows the selection while
+  the thread scrolls instead of disappearing. It recomputes on selection change,
+  double click, key up, pointer up, pointer cancel, and resize, and hides when a
+  press lands outside it, when the selection collapses, and after any action
+  (each action clears the native selection). A selection that spans two rows
+  raises no overlay, and a range that leaves its row is clamped back to it. It
+  never renders in a read-only projection, and it does not steal the selection:
+  the pointer press is prevented so the excerpt is whatever was selected,
+  including a whole formula. Add to chat writes a composer draft and focuses the
+  composer; Ask in side chat sends the excerpt to the side chat anchored at that
+  row; neither sends into the conversation being read.
 - Selection rules must not disable `focus-visible` feedback or native window
   drag regions.
 

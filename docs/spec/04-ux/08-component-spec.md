@@ -1642,15 +1642,26 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   clicked message row; otherwise it is the message's own text (for an assistant
   turn, its answer text). The inserted text follows the Composer contract in
   §11.9.
-- A non-empty selection inside a transcript row also floats **one** quote
-  affordance (`chat.quoteSelection`) on the selection's last line, so the common
-  case — quoting the sentence, formula, or table just read — needs no scroll to
-  the end of the message. It is positioned in viewport coordinates inside the
-  viewport edges (below the selection, above it when the pane runs out of room),
-  is portaled above the transcript, and hides on scroll, on resize, on selection
-  collapse, and after it is activated. It is a transcript affordance, not a
-  message one: a read-only projection (§5.8) never renders it, and never
-  renders the row toolbars either.
+- A non-empty selection inside a transcript row also floats **one** overlay
+  above it, so the common case — quoting the sentence, formula, or table just
+  read — needs no scroll to the end of the message. It is an action row of text
+  buttons with hairline separators and the icon action last: **Add to chat**
+  (`chat.addToChat`), **Ask in side chat** (`chat.askInSideChat`, disabled while
+  the visible session runs), and **Copy** (`chat.copy`). It is centered on the
+  selection, sits 8 px above it, is clamped into its bounds, and is portaled
+  above the transcript in the body-portaled popover layer.
+- The overlay's bounds are the clipping ancestors' rects (the transcript
+  scroller is one) intersected with the viewport, capped by the docked
+  composer's top edge, which floats over the transcript. Scrolling the thread
+  recomputes and follows the selection; scrolling something unrelated leaves the
+  overlay alone. It also recomputes on selection change, double click, key up,
+  pointer up, pointer cancel, and resize (at most once per frame), and it hides
+  on a press outside it, on selection collapse, and after any action clears the
+  native selection.
+- The selection must live in one message row: a drag that crosses rows raises no
+  overlay, and a range that leaves the row is clamped back to it. The overlay is
+  a transcript affordance, not a message one: a read-only projection (§5.8)
+  never renders it, and never renders the row toolbars either.
 - The excerpt is recovered from the rendered DOM (D399), not from
   `Selection.toString()`: a formula quotes as `$…$` / `$$…$$` TeX from KaTeX's
   `application/x-tex` annotation (a partial formula selection is expanded to the
@@ -2606,9 +2617,9 @@ Anatomy:
 
 ### 11.9 Quoted message drafts (D398, D399)
 
-- Quote in the transcript action row (§8.8), the floating selection affordance
-  (§8.8), and Add to main chat in the side chat (§5.8) prefill the composer
-  draft with ordinary Markdown text: each
+- Quote in the transcript action row (§8.8), Add to chat in the floating
+  selection overlay (§8.8), and Add to main chat in the side chat (§5.8) prefill
+  the composer draft with ordinary Markdown text: each
   excerpt line prefixed with `> `, then one blank line, then the attribution
   line rendered from `chat.quoteSource` ("Quoted from {{title}}"; Chinese
   "引用自 {{title}}"), where the title is the source session's title.

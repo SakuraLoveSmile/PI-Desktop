@@ -5,23 +5,40 @@ import {
   SELECTION_QUOTE_GAP,
   SELECTION_QUOTE_MARGIN,
   codeFenceFor,
+  intersectSelectionQuoteRect,
   normalizeSelectionMarkdown,
   placeSelectionQuote,
-  selectionAnchorRect,
 } from "../src/lib/selection-quote.ts";
 
 const source = await readFile(
   new URL("../src/lib/selection-quote.ts", import.meta.url),
   "utf8",
 );
+const overlay = await readFile(
+  new URL("../src/components/SelectionQuoteButton.tsx", import.meta.url),
+  "utf8",
+);
 const transcript = await readFile(
   new URL("../src/components/ChatTranscript.tsx", import.meta.url),
   "utf8",
 );
-const button = await readFile(
-  new URL("../src/components/SelectionQuoteButton.tsx", import.meta.url),
+const composer = await readFile(
+  new URL("../src/components/Composer.tsx", import.meta.url),
   "utf8",
 );
+const styles = await readFile(
+  new URL("../src/styles/messages.css", import.meta.url),
+  "utf8",
+);
+
+const rect = (left, top, width, height) => ({
+  left,
+  top,
+  right: left + width,
+  bottom: top + height,
+  width,
+  height,
+});
 
 test("a fence outgrows the backticks inside the quoted snippet", () => {
   assert.equal(codeFenceFor("plain"), "```");
@@ -37,73 +54,98 @@ test("rendered whitespace collapses back to source-like text", () => {
   assert.equal(normalizeSelectionMarkdown("\n  \n"), "");
 });
 
-test("the affordance sits below the selection and follows its start edge", () => {
+test("a selection scrolled half out of its container anchors to what is visible", () => {
+  const bounds = { left: 0, top: 100, right: 400, bottom: 300 };
+  assert.deepEqual(intersectSelectionQuoteRect(rect(50, 120, 100, 20), bounds), {
+    left: 50,
+    top: 120,
+    right: 150,
+    bottom: 140,
+    width: 100,
+    height: 20,
+  });
+  // Partially scrolled out: only the visible strip is left.
+  assert.deepEqual(intersectSelectionQuoteRect(rect(50, 80, 100, 40), bounds), {
+    left: 50,
+    top: 100,
+    right: 150,
+    bottom: 120,
+    width: 100,
+    height: 20,
+  });
+  assert.equal(intersectSelectionQuoteRect(rect(50, 40, 100, 20), bounds), null);
+});
+
+test("the overlay floats above the selection, centered on it", () => {
   const placement = placeSelectionQuote({
-    anchor: { left: 100, top: 100, right: 200, bottom: 120, width: 100, height: 20 },
-    size: { width: 80, height: 26 },
-    viewport: { width: 400, height: 300 },
+    anchor: rect(100, 200, 120, 20),
+    size: { width: 200, height: 30 },
+    bounds: { left: 0, top: 0, right: 800, bottom: 600 },
   });
-  assert.deepEqual(placement, { top: 120 + SELECTION_QUOTE_GAP, left: 100 });
+  assert.deepEqual(placement, {
+    top: 200 - SELECTION_QUOTE_GAP - 30,
+    left: 160 - 100,
+    maxWidth: 800 - SELECTION_QUOTE_MARGIN * 2,
+  });
 });
 
-test("the affordance stays inside the viewport on both axes", () => {
-  const size = { width: 80, height: 26 };
-  const viewport = { width: 400, height: 300 };
+test("the overlay is clamped into its bounds on both axes", () => {
+  const bounds = { left: 40, top: 100, right: 360, bottom: 300 };
+  // A selection against the right edge slides left instead of escaping.
   const atRight = placeSelectionQuote({
-    anchor: { left: 390, top: 100, right: 400, bottom: 120, width: 10, height: 20 },
-    size,
-    viewport,
+    anchor: rect(340, 200, 20, 20),
+    size: { width: 200, height: 30 },
+    bounds,
   });
-  assert.equal(atRight.left, 400 - 80 - SELECTION_QUOTE_MARGIN);
+  assert.equal(atRight.left, bounds.right - SELECTION_QUOTE_MARGIN - 200);
+  assert.ok(atRight.left + 200 <= bounds.right - SELECTION_QUOTE_MARGIN);
 
-  const atBottom = placeSelectionQuote({
-    anchor: { left: 100, top: 270, right: 200, bottom: 290, width: 100, height: 20 },
-    size,
-    viewport,
+  // A selection at the top of the bounds keeps the pill inside them.
+  const atTop = placeSelectionQuote({
+    anchor: rect(100, 102, 100, 20),
+    size: { width: 200, height: 30 },
+    bounds,
   });
-  assert.equal(atBottom.top, 270 - 26 - SELECTION_QUOTE_GAP);
+  assert.equal(atTop.top, bounds.top + SELECTION_QUOTE_MARGIN);
 
-  // No room above or below: the preference for "below" wins, clamped.
-  const cramped = placeSelectionQuote({
-    anchor: { left: 100, top: 10, right: 200, bottom: 290, width: 100, height: 280 },
-    size,
-    viewport: { width: 400, height: 300 },
+  // Bounds narrower than the pill cap its width instead of overflowing.
+  const narrow = placeSelectionQuote({
+    anchor: rect(40, 200, 20, 20),
+    size: { width: 200, height: 30 },
+    bounds: { left: 0, top: 0, right: 150, bottom: 300 },
   });
-  assert.equal(cramped.top, 300 - 26 - SELECTION_QUOTE_MARGIN);
+  assert.equal(narrow.maxWidth, 150 - SELECTION_QUOTE_MARGIN * 2);
+  assert.equal(narrow.left, SELECTION_QUOTE_MARGIN);
 });
 
-test("the anchor is the selection's last line, not its bounding box", () => {
-  const last = { left: 10, top: 40, right: 60, bottom: 60, width: 50, height: 20 };
-  const first = { left: 0, top: 0, right: 100, bottom: 20, width: 100, height: 20 };
-  assert.deepEqual(
-    selectionAnchorRect({
-      getClientRects: () => [first, last],
-      getBoundingClientRect: () => first,
-    }),
-    last,
-  );
-  // Degenerate rects (a caret between lines) fall back to the bounding box.
-  assert.deepEqual(
-    selectionAnchorRect({
-      getClientRects: () => [{ ...first, width: 0, height: 0 }],
-      getBoundingClientRect: () => first,
-    }),
-    first,
-  );
-  assert.equal(
-    selectionAnchorRect({
-      getClientRects: () => [],
-      getBoundingClientRect: () => ({ ...first, width: 0, height: 0 }),
-    }),
-    null,
-  );
-  assert.equal(selectionAnchorRect(null), null);
+test("the bounds are the scroll container, capped above the docked composer", () => {
+  // The composer floats over the transcript, so the scroller's own bottom is not
+  // the visible bottom (D399).
+  assert.match(source, /export const COMPOSER_DOCK_SELECTOR = '\[data-composer-dock="docked"\]'/);
+  assert.match(source, /bottomBoundaryTop/);
+  assert.match(composer, /data-composer-dock=\{variant\}/);
+  // Every clipping ancestor counts, as in the reference overlay.
+  assert.match(source, /new Set\(\["auto", "clip", "hidden", "overlay", "scroll"\]\)/);
+  assert.match(source, /style\?\.overflowY/);
+  assert.match(source, /node = node\.parentElement/);
+});
+
+test("the pill only owns a selection that lives in one row of one transcript", () => {
+  assert.match(source, /startRow !== quotableRowFor\(live\.endContainer\)/);
+  assert.match(source, /if \(!scrollRoot\.contains\(startRow\)\) return null/);
+  // A drag that leaves the row is clamped back to it instead of quoting the
+  // next row.
+  assert.match(source, /clamped\.compareBoundaryPoints\(Range\.START_TO_START, contents\) < 0/);
+  assert.match(source, /clamped\.compareBoundaryPoints\(Range\.END_TO_END, contents\) > 0/);
 });
 
 test("a formula quotes as TeX instead of two duplicated renderings", () => {
   // KaTeX's source lives in the MathML annotation; the visual tree is a copy.
   assert.match(source, /annotation\[encoding="application\/x-tex"\]/);
-  assert.match(source, /replaceWithText\(katex, isDisplay \? `\\n\$\$\\n\$\{tex\}\\n\$\$\\n` : `\$\$\{tex\}\$`, doc\)/);
+  assert.match(
+    source,
+    /replaceWithText\(katex, isDisplay \? `\\n\$\$\\n\$\{tex\}\\n\$\$\\n` : `\$\$\{tex\}\$`, doc\)/,
+  );
   assert.match(source, /closest\("\.katex-display"\)/);
   // A partial selection is expanded to the whole formula before cloning.
   assert.match(source, /setStartBefore\(start\)/);
@@ -136,24 +178,34 @@ test("formulas and code are reduced before chrome is dropped", () => {
   assert.deepEqual(order, [...order].sort((a, b) => a - b), "steps run in order");
 });
 
-test("the floating affordance follows a selection in this transcript only", () => {
-  assert.match(button, /scrollRef\.current\?\.contains\(row\)/);
-  assert.match(button, /document\.addEventListener\("selectionchange", schedule\)/);
-  assert.match(button, /requestAnimationFrame\(sync\)/);
-  assert.match(button, /window\.addEventListener\("scroll", hide, \{ capture: true, passive: true \}\)/);
-  assert.match(button, /document\.removeEventListener\("selectionchange", schedule\)/);
-  // The press must not collapse the selection the quote is taken from.
-  assert.match(button, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/);
+test("the overlay follows the selection instead of disappearing on scroll", () => {
+  assert.match(overlay, /document\.addEventListener\("selectionchange", schedule\)/);
+  assert.match(overlay, /window\.addEventListener\("scroll", onScroll, \{ capture: true, passive: true \}\)/);
+  assert.match(overlay, /if \(!row \|\| !\(node instanceof Node\) \|\| !node\.contains\(row\)\) return/);
+  for (const event of ["dblclick", "keyup", "pointerup", "pointercancel", "resize"]) {
+    assert.match(overlay, new RegExp(`addEventListener\\("${event}"`), event);
+  }
+  assert.match(overlay, /requestAnimationFrame\(sync\)/);
+  // Pressing anywhere else is a new gesture: the pill waits for it to settle.
+  assert.match(overlay, /pressedRef\.current = true/);
+  assert.match(overlay, /if \(pressedRef\.current\) return/);
+  assert.match(overlay, /onPointerDown=\{\(event\) => event\.preventDefault\(\)\}/);
 });
 
-test("the affordance only writes a draft and hides when there is nothing to quote", () => {
-  assert.match(button, /quoteMessageIntoComposer\(\{ title, text: pending\.markdown \}\)/);
-  assert.doesNotMatch(button, /sendPrompt|appendComposerDraftText|createSession/);
-  assert.match(button, /if \(!pending\) return null;/);
-  assert.match(button, /t\("chat\.quoteSelection"\)/);
+test("the overlay offers add to chat, ask in side chat, and copy", () => {
+  assert.match(overlay, /quoteMessageIntoComposer\(\{ title, text: target\.markdown \}\)/);
+  assert.match(overlay, /t\("chat\.addToChat"\)/);
+  assert.match(overlay, /t\("chat\.askInSideChat"\)/);
+  assert.match(overlay, /t\("chat\.copy"\)/);
+  assert.match(overlay, /await openSideChat\(target\.rowAnchorId\)/);
+  assert.match(overlay, /sendPrompt\(\s*target\.markdown,\s*\{ text: target\.markdown, fileReferences: \[\] \},\s*childSessionId,?\s*\)/);
+  // The action consumes the selection, as in the reference overlay.
+  assert.match(overlay, /window\.getSelection\(\)\?\.removeAllRanges\(\)/);
+  // And it never sends to the conversation being read.
+  assert.doesNotMatch(overlay, /activeSessionId \?\s*await sendPrompt|sendPrompt\(target\.markdown, \{[^}]*\}\);/);
 });
 
-test("the transcript mounts the affordance and skips read-only projections", () => {
+test("the transcript mounts the overlay and skips read-only projections", () => {
   assert.match(
     transcript,
     /transcriptReadOnly \? null : \(\s*<SelectionQuoteButton scrollRef=\{scrollRef\} title=\{sessionTitle\} \/>/,
@@ -162,4 +214,10 @@ test("the transcript mounts the affordance and skips read-only projections", () 
   assert.match(transcript, /selectionMarkdownWithinRow\(message\.id\)/);
   assert.match(transcript, /selectionMarkdownWithinRow\(entry\.anchorId\)/);
   assert.doesNotMatch(transcript, /selection\.toString\(\)/);
+});
+
+test("the pill is one rounded action row with hairline separators", () => {
+  assert.match(styles, /\.selection-quote \{[\s\S]*?border-radius: var\(--radius-full\)/);
+  assert.match(styles, /\.selection-quote-sep \{/);
+  assert.match(styles, /\.selection-quote-action:disabled/);
 });

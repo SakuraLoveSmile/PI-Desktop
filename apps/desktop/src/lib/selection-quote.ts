@@ -1,5 +1,11 @@
 /**
- * Selection → Markdown recovery for message quotes (ADR 0223 / D398).
+ * Selection overlay geometry and selection → Markdown recovery for message
+ * quotes (ADR 0223 / D399).
+ *
+ * Mirrors the ChatGPT desktop app's selected-text overlay: one pill floats
+ * *above* the selection, horizontally centered on it, inside the bounds of the
+ * scroll container it lives in (and above the docked composer), and it follows
+ * the selection while the thread scrolls instead of disappearing.
  *
  * A selection inside a rendered answer is DOM, not source text: KaTeX paints
  * two parallel trees per formula, the highlighter splits one fence into a span
@@ -8,24 +14,27 @@
  * decorations, so a clone of the range is reduced back to Markdown — `$…$` TeX,
  * fenced code, one line per table row — before it becomes draft text.
  *
- * The floating affordance and the per-message action row both quote through
+ * The overlay and the per-message action row both quote through
  * {@link serializeSelectionMarkdown}: one recovery path, not two spellings of
  * the same mistake.
  */
 
-/** Gap between the selection and the floating quote affordance. */
-export const SELECTION_QUOTE_GAP = 6;
-/** Smallest distance the affordance keeps from the viewport edges. */
+/** Gap between the selection and the floating pill. */
+export const SELECTION_QUOTE_GAP = 8;
+/** Smallest distance the pill keeps from the bounds it is clamped into. */
 export const SELECTION_QUOTE_MARGIN = 8;
 /** Markdown fences start at three backticks and grow past the longest run. */
 export const SELECTION_QUOTE_MIN_FENCE = 3;
 
-/** The transcript row attribute the quote affordances anchor to (D398). */
+/** The transcript row attribute a quotable selection anchors to (D398). */
 export const QUOTABLE_ROW_ATTRIBUTE = "data-minimap-id";
+/** The docked composer's own element, which the pill must stay above. */
+export const COMPOSER_DOCK_SELECTOR = '[data-composer-dock="docked"]';
 
 const KATEX_TEX_SELECTOR = 'annotation[encoding="application/x-tex"]';
+const OVERFLOW_VALUES = new Set(["auto", "clip", "hidden", "overlay", "scroll"]);
 
-/** Viewport rectangle, structurally typed so placement is testable. */
+/** Viewport rectangle, structurally typed so geometry stays testable. */
 export type SelectionQuoteRect = {
   left: number;
   top: number;
@@ -35,10 +44,24 @@ export type SelectionQuoteRect = {
   height: number;
 };
 
-/** The geometry half of a `Range` the affordance needs, structurally typed. */
-export type SelectionQuoteGeometry = {
-  getClientRects(): ArrayLike<SelectionQuoteRect>;
-  getBoundingClientRect(): SelectionQuoteRect;
+/** The box the pill has to stay inside. */
+export type SelectionQuoteBounds = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+/** Everything the pill needs to render and act on one selection. */
+export type SelectionQuoteTarget = {
+  /** Transcript row the selection belongs to; the quote and fork anchor. */
+  rowAnchorId: string;
+  /** The selection, already reduced to the Markdown the composer receives. */
+  markdown: string;
+  /** Visible part of the selection, in viewport coordinates. */
+  anchor: SelectionQuoteRect;
+  /** Bounds the pill is clamped into. */
+  bounds: SelectionQuoteBounds;
 };
 
 /* ---------- pure helpers ---------- */
@@ -87,31 +110,55 @@ export function normalizeSelectionMarkdown(value: string): string {
 }
 
 /**
- * Place the floating affordance against a selection: on the selection's start
- * edge, below its last line, flipped above when the pane runs out of room, and
- * clamped so it never leaves the viewport.
+ * The part of `rect` that is inside `bounds`, or null when they do not overlap.
+ * A selection scrolled half out of its container is anchored to the half that
+ * is still on screen.
+ */
+export function intersectSelectionQuoteRect(
+  rect: SelectionQuoteRect,
+  bounds: SelectionQuoteBounds,
+): SelectionQuoteRect | null {
+  const left = Math.max(rect.left, bounds.left);
+  const top = Math.max(rect.top, bounds.top);
+  const right = Math.min(rect.right, bounds.right);
+  const bottom = Math.min(rect.bottom, bounds.bottom);
+  if (left >= right || top >= bottom) return null;
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
+/**
+ * Place the pill above the selection, centered on it, then clamp it into the
+ * bounds. Only the horizontal axis can collide (the pill is narrow and near the
+ * top of the selection), so a selection against the right edge slides left
+ * instead of leaving the container. Returns the measured width cap too, so a
+ * narrow panel cannot push the pill out of its own bounds.
  */
 export function placeSelectionQuote({
   anchor,
   size,
-  viewport,
+  bounds,
   margin = SELECTION_QUOTE_MARGIN,
   gap = SELECTION_QUOTE_GAP,
 }: {
   anchor: SelectionQuoteRect;
   size: { width: number; height: number };
-  viewport: { width: number; height: number };
+  bounds: SelectionQuoteBounds;
   margin?: number;
   gap?: number;
-}): { top: number; left: number } {
-  const maxLeft = Math.max(margin, viewport.width - size.width - margin);
-  const left = Math.min(Math.max(margin, anchor.left), maxLeft);
-  const maxTop = Math.max(margin, viewport.height - size.height - margin);
-  const below = anchor.bottom + gap;
-  const above = anchor.top - size.height - gap;
-  const top =
-    below <= maxTop ? below : above >= margin ? above : Math.min(below, maxTop);
-  return { top, left };
+}): { top: number; left: number; maxWidth: number } {
+  const maxWidth = Math.max(0, bounds.right - bounds.left - margin * 2);
+  const width = Math.min(size.width, maxWidth);
+  const maximumLeft = Math.max(bounds.left + margin, bounds.right - margin - width);
+  const left = Math.min(
+    Math.max(anchor.left + anchor.width / 2 - width / 2, bounds.left + margin),
+    maximumLeft,
+  );
+  const maximumTop = Math.max(bounds.top + margin, bounds.bottom - size.height);
+  const top = Math.min(
+    Math.max(anchor.top - gap - size.height, bounds.top + margin),
+    maximumTop,
+  );
+  return { top, left, maxWidth };
 }
 
 /* ---------- DOM reduction ---------- */
@@ -128,9 +175,7 @@ function replaceWithText(node: Element, text: string, doc: Document): void {
  */
 function replaceKatex(wrapper: Element, doc: Document): void {
   for (const katex of Array.from(wrapper.querySelectorAll(".katex"))) {
-    const tex = katex
-      .querySelector(KATEX_TEX_SELECTOR)
-      ?.textContent?.trim();
+    const tex = katex.querySelector(KATEX_TEX_SELECTOR)?.textContent?.trim();
     const isDisplay = Boolean(katex.closest(".katex-display"));
     if (tex) {
       replaceWithText(katex, isDisplay ? `\n$$\n${tex}\n$$\n` : `$${tex}$`, doc);
@@ -174,9 +219,10 @@ function replaceInlineCode(wrapper: Element, doc: Document): void {
 }
 
 function replaceTaskCheckboxes(wrapper: Element, doc: Document): void {
-  for (const input of Array.from(wrapper.querySelectorAll('input[type="checkbox"]'))) {
-    const checked = (input as HTMLInputElement).checked;
-    replaceWithText(input, checked ? "[x] " : "[ ] ", doc);
+  for (const input of Array.from(
+    wrapper.querySelectorAll('input[type="checkbox"]'),
+  )) {
+    replaceWithText(input, (input as HTMLInputElement).checked ? "[x] " : "[ ] ", doc);
   }
 }
 
@@ -289,7 +335,7 @@ export function expandRangeToWholeKatex(range: Range): Range {
 
 /**
  * The Markdown a rendered selection stands for. Returns an empty string when
- * there is nothing quotable, which every caller treats as "keep the affordance
+ * there is nothing quotable, which every caller treats as "keep the pill
  * hidden".
  */
 export function serializeSelectionMarkdown(range: Range | null): string {
@@ -342,19 +388,156 @@ export function activeSelectionRange(): Range | null {
 }
 
 /**
- * The last line of the selection, which is where the affordance anchors: the
- * end of the selection is where the pointer and the eye already are.
+ * Keep a range inside one element: a drag that leaves the row must not pull the
+ * next row's text into the quote.
  */
-export function selectionAnchorRect(
-  geometry: SelectionQuoteGeometry | null | undefined,
-): SelectionQuoteRect | null {
-  const rects = Array.from(geometry?.getClientRects?.() ?? []).filter(
+export function clampRangeToElement(range: Range, element: Element): Range {
+  const clamped = range.cloneRange();
+  const contents = range.startContainer.ownerDocument!.createRange();
+  contents.selectNodeContents(element);
+  if (
+    !element.contains(clamped.startContainer) ||
+    clamped.compareBoundaryPoints(Range.START_TO_START, contents) < 0
+  ) {
+    clamped.setStart(contents.startContainer, contents.startOffset);
+  }
+  if (
+    !element.contains(clamped.endContainer) ||
+    clamped.compareBoundaryPoints(Range.END_TO_END, contents) > 0
+  ) {
+    clamped.setEnd(contents.endContainer, contents.endOffset);
+  }
+  return clamped;
+}
+
+/**
+ * The visible band the pill may use: every scrollable ancestor's rect (the
+ * transcript scroller is one) intersected with the viewport, and capped by the
+ * docked composer — which floats over the transcript, so the scroller's own
+ * bottom edge is not the visible bottom.
+ */
+export function selectionQuoteBounds({
+  element,
+  viewport,
+  bottomBoundaryTop,
+}: {
+  element: Element | null;
+  viewport: { width: number; height: number };
+  bottomBoundaryTop?: number | null;
+}): SelectionQuoteBounds | null {
+  const bounds: SelectionQuoteBounds = {
+    left: 0,
+    top: 0,
+    right: viewport.width,
+    bottom:
+      typeof bottomBoundaryTop === "number"
+        ? Math.min(viewport.height, bottomBoundaryTop)
+        : viewport.height,
+  };
+  const ownerDocument = element?.ownerDocument;
+  const view = ownerDocument?.defaultView;
+  let node: Element | null = element;
+  while (node && node !== ownerDocument?.body && node !== ownerDocument?.documentElement) {
+    const style = view?.getComputedStyle?.(node);
+    // `overflow: hidden` on a decorative wrapper clips the selection too, so it
+    // counts the same as a real scroll container.
+    const clipsX = (style?.overflowX ?? "").split(/\s+/).some((v) => OVERFLOW_VALUES.has(v));
+    const clipsY = (style?.overflowY ?? "").split(/\s+/).some((v) => OVERFLOW_VALUES.has(v));
+    if (clipsX || clipsY) {
+      const rect = node.getBoundingClientRect();
+      if (clipsY) {
+        bounds.top = Math.max(bounds.top, rect.top);
+        bounds.bottom = Math.min(bounds.bottom, rect.bottom);
+      }
+      if (clipsX) {
+        bounds.left = Math.max(bounds.left, rect.left);
+        bounds.right = Math.min(bounds.right, rect.right);
+      }
+      if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return null;
+    }
+    node = node.parentElement;
+  }
+  return bounds.bottom <= bounds.top ? null : bounds;
+}
+
+/**
+ * Where the pill anchors: the selection's first client rect that is still
+ * visible inside the bounds (a multi-line selection anchors to its top line),
+ * falling back to the visible part of the whole bounding box.
+ */
+export function selectionQuoteAnchor({
+  range,
+  element,
+  bounds,
+}: {
+  range: Range;
+  element: Element;
+  bounds: SelectionQuoteBounds;
+}): SelectionQuoteRect | null {
+  const rowRect = element.getBoundingClientRect();
+  const rects = Array.from(range.getClientRects()).filter(
     (rect) => rect.width > 0 && rect.height > 0,
   );
-  if (rects.length > 0) return rects[rects.length - 1];
-  const rect = geometry?.getBoundingClientRect?.();
-  if (!rect) return null;
-  return rect.width > 0 && rect.height > 0 ? rect : null;
+  for (const rect of rects) {
+    const visible = intersectSelectionQuoteRect(rect, bounds);
+    if (!visible) continue;
+    if (rects.length > 1 || intersectSelectionQuoteRect(visible, rowRect)) {
+      return visible;
+    }
+  }
+  const bounding = range.getBoundingClientRect();
+  const visibleBounding = intersectSelectionQuoteRect(bounding, bounds);
+  if (visibleBounding && intersectSelectionQuoteRect(visibleBounding, rowRect)) {
+    return visibleBounding;
+  }
+  if (rects.length > 0 || bounding.width > 0 || bounding.height > 0) return null;
+  const rowVisible = intersectSelectionQuoteRect(rowRect, bounds);
+  return rowVisible;
+}
+
+/**
+ * Everything the pill renders from, or null when the selection is not one it
+ * should own: no selection, a selection outside this transcript, a selection
+ * that spans two rows, or an empty excerpt.
+ */
+export function selectionQuoteTarget({
+  scrollRoot,
+  bottomBoundaryTop,
+  viewport = {
+    width: typeof window === "undefined" ? 0 : window.innerWidth,
+    height: typeof window === "undefined" ? 0 : window.innerHeight,
+  },
+}: {
+  scrollRoot: Element | null;
+  bottomBoundaryTop?: number | null;
+  viewport?: { width: number; height: number };
+}): SelectionQuoteTarget | null {
+  const live = activeSelectionRange();
+  if (!live || !scrollRoot) return null;
+
+  const startRow = quotableRowFor(live.startContainer);
+  // Both ends must sit in the same row: a drag that crosses rows has no single
+  // message to attribute, and the reference implementation refuses it too.
+  if (!startRow || startRow !== quotableRowFor(live.endContainer)) return null;
+  if (!scrollRoot.contains(startRow)) return null;
+
+  const rowAnchorId = startRow.getAttribute(QUOTABLE_ROW_ATTRIBUTE) ?? "";
+  if (!rowAnchorId) return null;
+
+  const range = clampRangeToElement(live, startRow);
+  const markdown = serializeSelectionMarkdown(range);
+  if (!markdown) return null;
+
+  const bounds = selectionQuoteBounds({
+    element: startRow,
+    viewport,
+    bottomBoundaryTop,
+  });
+  if (!bounds) return null;
+  const anchor = selectionQuoteAnchor({ range, element: startRow, bounds });
+  if (!anchor) return null;
+
+  return { rowAnchorId, markdown, anchor, bounds };
 }
 
 /**
