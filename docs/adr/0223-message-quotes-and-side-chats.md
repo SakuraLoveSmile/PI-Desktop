@@ -9,7 +9,8 @@
   [04-ux/09-interaction-patterns.md](../spec/04-ux/09-interaction-patterns.md) ·
   [04-ux/01-ui-ia.md](../spec/04-ux/01-ui-ia.md) ·
   [06-delivery/04-e2e-test-plan.md](../spec/06-delivery/04-e2e-test-plan.md) ·
-  E2E-249, E2E-250, E2E-251, E2E-252, E2E-253, E2E-254
+  E2E-249, E2E-250, E2E-251, E2E-252, E2E-253, E2E-254 ·
+  Amendment: D399, E2E-255
 
 ## Context
 
@@ -143,3 +144,39 @@ main transcript leaves the screen, and coming back costs a session switch.
   background-transcript reducer already turns it into rows.
 - **Auto-send after "Add to main chat":** rejected. The main composer stays a
   reviewable draft; only the user sends it.
+- **Keep the quote action at the end of the message only:** rejected in D399.
+  The action row is the right home for quoting a whole message, but quoting a
+  sentence, a formula, or a table means reaching the end of the very message the
+  user is still reading.
+
+## Amendment (D399, 2026-09-11) — the quote affordance follows the selection
+
+- Decision 1 stands: every user message and every assistant turn keeps its Quote
+  action for the whole message. A non-empty text selection inside a transcript
+  row additionally floats **one** quote affordance on the selection's last line.
+  It is labeled `chat.quoteSelection`, positioned in viewport coordinates and
+  clamped inside the viewport (below the selection, above it when the pane runs
+  out of room), portaled above the transcript, and hidden again by scrolling the
+  thread, resizing the window, collapsing the selection, or activating it.
+  Pressing it prevents the pointer default so the press cannot collapse the
+  selection first. It is not rendered in a read-only projection (D398 decision
+  12's rule extends to it), and it quotes only selections whose start lies in
+  the transcript that owns it.
+- Decision 3's excerpt is now recovered from the rendered DOM rather than from
+  `Selection.toString()`. A range that touches a formula is expanded to the whole
+  formula and quoted from KaTeX's `application/x-tex` annotation as `$…$`
+  (inline) or `$$…$$` (display); a code block becomes a fence whose delimiter
+  outgrows the longest backtick run inside it and keeps its language; inline code
+  keeps its backticks; a table row becomes one `a | b` line; task checkboxes
+  become `[x] `/`[ ] `; transcript chrome (action rows, copy buttons) is dropped
+  while a file-reference chip keeps its code text. The row action and the
+  floating affordance call that one recovery path, so they cannot drift.
+- The 2000-character cap, the `> ` blockquote, the `chat.quoteSource`
+  attribution, the append-to-draft behavior, focus, and the no-send/no-session/
+  no-transcript-write boundaries are unchanged. One i18n key is added
+  (`chat.quoteSelection` in every shipped locale).
+- Boundaries remain those of D398 decision 12: no host protocol bump, no storage
+  schema change, no new IPC channel, no new permission. The affordance is
+  renderer-only and holds no durable state beyond the existing composer draft.
+- Covered by E2E-249 (steps and expected for the floating affordance) and
+  E2E-255 (formula, table, code, and inline-code recovery).
