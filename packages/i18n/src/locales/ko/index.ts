@@ -274,6 +274,8 @@ export const ko = {
     quote: "인용",
     annotate: "주석 추가",
     annotationMarker: "주석 {index}",
+    annotationSelectedText: "선택한 텍스트:",
+    annotationComment: "사용자 의견:",
     annotationChip: "주석 {{count}}개",
     clearAnnotations: "주석 지우기",
     quoteSource: "{{title}}에서 인용",

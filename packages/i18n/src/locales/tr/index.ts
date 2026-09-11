@@ -274,6 +274,8 @@ export const tr = {
     quote: "Alıntıla",
     annotate: "Not ekle",
     annotationMarker: "Not {index}",
+    annotationSelectedText: "Seçilen metin:",
+    annotationComment: "Kullanıcı yorumu:",
     annotationChip: "{{count}} not",
     clearAnnotations: "Notları temizle",
     quoteSource: "{{title}} alıntısı",

@@ -53,20 +53,21 @@ prompt as data, numbered so the model can address `Annotation 1`,
    so no excerpt is sent twice under two numbers. Annotations are not persisted,
    not sent to the host on their own, and do not survive relaunch.
 3. Rendering:
-   - The anchored turn draws an inline numbered marker at the end of the
-     annotated pass. The marker is produced by the markdown pipeline: the
-     excerpt's position is located in the turn's source text, the token
-     `:codex-annotation{index="N"}` is injected there, and a remark pass turns
-     that token into a numbered marker element whose tooltip is the excerpt. An
-     excerpt that does not appear verbatim (a rendered table row, a code fence)
-     gets no marker; the attachment chip still lists it. One annotation marks one
-     occurrence, never two.
+   - The answer body is **never decorated by this app**. An annotation shows up in
+     the model's answer only where the model cites it, exactly as in the
+     reference: a `:codex-annotation{index="N"}` directive in the answer's source
+     becomes a small accent-colored numbered reference (a remark pass turns the
+     token into a marker element; the sanitizer keeps the marker scheme on its
+     href), whose tooltip is the annotated excerpt and any comment. A marker is
+     a reference, not text the user picked: it takes no part in a selection, a
+     quote, or a copy, and it never breaks the line it sits in.
    - The composer shows one annotation attachment chip above the input with the
      count (`chat.annotationChip`) whose tooltip lists `N. excerpt` per
      annotation, plus one control that drops them all
      (`chat.clearAnnotations`). The chip is not a draft chip: it never enters the
      editable text, so D209's smart Stop and D301's per-session draft retention
-     are untouched.
+     are untouched. It is also the only place the user's own annotations are
+     visible before the model answers.
 4. Sending a prompt while annotations exist composes the prompt as the reference
    does: the `# Response annotations:` heading, the instruction sentence, the
    `<response-annotations>` block with `[{"text", "annotation", "source": {"messageId"}}]`
@@ -75,10 +76,12 @@ prompt as data, numbered so the model can address `Annotation 1`,
    title, and the composer's edit seed never contain the block; a stored prompt
    that carries one is displayed through `requestTextWithoutAnnotations`, which
    reduces it back to the request.
-5. The instruction sentence omits the reference's inline-directive requirement
-   (`:codex-annotation{index="N"}` in the model's answer) because this app does
-   not ask the model to cite annotations yet; the token is still the marker
-   syntax, so an answer that echoes one renders as a marker instead of raw text.
+5. The instruction sentence is the reference's own text, including its
+   requirement that the model cite every annotation it addresses with
+   `:codex-annotation{index="N"}`; that directive is what renders as the numbered
+   reference in decision 3. An app that decorates the answer itself would put
+   markers where the model never claimed to answer them, which is also what made
+   the first implementation unreadable.
 6. Routing stays explicit per surface: the overlay's **Add to chat** annotates an
    assistant turn and keeps D398's draft quote for any other row; the assistant
    turn's action row annotates (its selection when there is one, the whole answer
@@ -126,10 +129,12 @@ prompt as data, numbered so the model can address `Annotation 1`,
 - **Annotate through the host (new RPC or message field):** rejected. The prompt
   block is ordinary prompt text, so no protocol, schema, or permission change is
   needed, and the annotations only have to live as long as the send.
-- **Draw the marker by wrapping the annotated text in the DOM:** rejected. React
-  owns the transcript tree, and text surgery around memoized markdown blocks
-  breaks on re-render; injecting a token into the source keeps the marker a
-  normal render result.
+- **Mark the annotated pass inside the answer:** rejected. It would decorate text
+  the model has not answered yet, it needs the annotated range to survive every
+  re-render (React owns the transcript tree), and a marker placed by excerpt
+  lookup lands mid-word whenever the selection ended mid-word — the first
+  implementation shipped exactly that damage. The model's own citation is the
+  reference's marker.
 - **Store the annotations with the message for a persistent list:** rejected for
   now. It would need a storage-schema change and a durable annotation surface;
   the send-scoped attachment matches the reference behavior.

@@ -272,6 +272,8 @@ export const en = {
     quote: "Quote",
     annotate: "Annotate",
     annotationMarker: "Annotation {index}",
+    annotationSelectedText: "Selected text:",
+    annotationComment: "User comment:",
     annotationChip: "{{count}} annotations",
     clearAnnotations: "Clear annotations",
     quoteSource: "Quoted from {{title}}",

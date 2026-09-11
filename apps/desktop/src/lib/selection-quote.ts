@@ -246,6 +246,8 @@ function removeChrome(wrapper: Element): void {
       [
         ".message-actions",
         ".code-block-head",
+        // Annotation markers are references, not text the user picked (D400).
+        ".response-annotation-marker",
         "script",
         "style",
         "noscript",
