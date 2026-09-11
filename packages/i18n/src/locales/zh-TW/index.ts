@@ -267,6 +267,8 @@ export const zhTW = {
     quote: "引用",
     annotate: "新增批注",
     annotationMarker: "批註 {index}",
+    annotationSelectedText: "選取文字：",
+    annotationComment: "使用者評論：",
     annotationChip: "{{count}} 則批註",
     clearAnnotations: "清除批註",
     quoteSource: "引用自 {{title}}",

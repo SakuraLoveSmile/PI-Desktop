@@ -21,13 +21,13 @@ export const ANNOTATION_BLOCK_CLOSE = "</response-annotations>";
 export const ANNOTATION_REQUEST_HEADING = "## My request:";
 
 /**
- * The instruction sentence the block carries. The reference additionally asks
- * the model to cite each addressed annotation with an inline directive; this app
- * does not render those directives yet, so the sentence is omitted rather than
- * teaching the model a syntax nothing renders.
+ * The instruction sentence the block carries, verbatim from the reference. The
+ * directive it asks for is the marker the renderer draws: an answered annotation
+ * shows up as a numbered reference in the model's own answer, which is the only
+ * place the reference marks one.
  */
 export const ANNOTATION_INSTRUCTION =
-  "Each item contains text selected from an earlier assistant response and may include a user comment. Treat items as Annotation 1, Annotation 2, and so on in array order. Use every selection as context and address every comment.";
+  "Each item contains text selected from an earlier assistant response and may include a user comment. Treat items as Annotation 1, Annotation 2, and so on in array order. Use every selection as context and address every comment. For every annotation you address, include its inline directive `:codex-annotation{index=\"N\"}`, where N is its one-based array position (for example, `:codex-annotation{index=\"1\"}`). Do not use unstructured annotation labels.";
 
 /** Longest excerpt one annotation carries, matching the quote cap (D398). */
 export const MAX_ANNOTATION_CHARS = 2000;
@@ -132,75 +132,13 @@ export function annotationExcerpt(
 
 export const ANNOTATION_MARKER_CLASS = "response-annotation-marker";
 
-/** The token that stands for one numbered marker inside rendered markdown. */
+/**
+ * The token that stands in for one numbered marker. It is the reference's own
+ * directive syntax, so a model that cites an annotation renders as a marker
+ * instead of leaving the raw directive in the answer.
+ */
 export function annotationMarkerToken(index: number): string {
   return `:codex-annotation{index="${index}"}`;
-}
-
-/** One annotation's marker: its one-based number and where it belongs. */
-export type AnnotationMarker = {
-  /** One-based position within the session's annotation list. */
-  index: number;
-  /** The numbered text the user picked. */
-  text: string;
-  /**
-   * Character offset of the excerpt end within the message's stored text, or -1
-   * when the excerpt does not appear verbatim (a rendered table row, a code
-   * fence, an excerpt the model paraphrased). No marker is drawn then; the
-   * composer attachment still lists the annotation.
-   */
-  offset: number;
-};
-
-/**
- * Where each annotation's marker belongs in `source`. Markers never stack on one
- * occurrence: each annotation takes the first match that is not already taken,
- * which keeps two annotations of different sentences on their own sentences.
- */
-export function annotationMarkers(
-  source: string,
-  annotations: readonly Pick<ResponseAnnotation, "text">[],
-): AnnotationMarker[] {
-  const used: number[] = [];
-  return annotations.map((annotation, index) => {
-    const text = annotation.text.trim();
-    let offset = -1;
-    if (text) {
-      let from = 0;
-      for (;;) {
-        const found = source.indexOf(text, from);
-        if (found === -1) break;
-        if (!used.includes(found)) {
-          used.push(found);
-          offset = found + text.length;
-          break;
-        }
-        from = found + 1;
-      }
-    }
-    return { index: index + 1, text, offset };
-  });
-}
-
-/**
- * `source` with every placeable marker token inserted after its excerpt, ready
- * for the markdown pipeline to render as a numbered marker.
- */
-export function sourceWithAnnotationMarkers(
-  source: string,
-  markers: readonly AnnotationMarker[],
-): string {
-  const placed = markers
-    .filter((marker) => marker.offset >= 0)
-    .sort((a, b) => b.offset - a.offset);
-  let next = source;
-  for (const marker of placed) {
-    next =
-      next.slice(0, marker.offset) +
-      annotationMarkerToken(marker.index) +
-      next.slice(marker.offset);
-  }
-  return next;
 }
 
 /** One piece of a text node split around its marker tokens. */

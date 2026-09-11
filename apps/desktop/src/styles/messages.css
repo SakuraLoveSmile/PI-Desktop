@@ -1027,24 +1027,38 @@
 }
 
 /*
- * Inline numbered marker for one response annotation (D400): the number of the
- * annotation in array order, with the annotated excerpt as its tooltip.
+ * Inline numbered reference to one response annotation (D400).
+ *
+ * The reference implementation renders this as a small accent-colored link with
+ * a dashed underline on hover, not as a chip: it sits inside a sentence, so it
+ * must not disturb the line it annotates. The excerpt (and any comment) is the
+ * tooltip, and the marker never joins a selection or a copy.
  */
 .response-annotation-marker {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 15px;
-  height: 15px;
-  margin-inline-start: 3px;
-  padding: 0 3px;
-  border-radius: var(--radius-full);
-  background: var(--ds-bg-chip);
-  color: var(--ds-text-secondary);
-  font-size: var(--text-3xs);
-  line-height: var(--leading-compact);
-  vertical-align: 1px;
-  cursor: default;
+  display: inline;
+  margin: 0;
+  padding: 0 1px;
+  border: 0;
+  background: transparent;
+  color: var(--ds-info);
+  font: inherit;
+  font-size: var(--text-2xs);
+  line-height: inherit;
+  vertical-align: super;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.response-annotation-marker:hover,
+.response-annotation-marker:focus-visible {
+  text-decoration: underline dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+.response-annotation-marker:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 1px;
 }
 
 /*

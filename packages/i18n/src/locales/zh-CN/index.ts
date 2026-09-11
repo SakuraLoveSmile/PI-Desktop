@@ -267,6 +267,8 @@ export const zhCN = {
     quote: "引用",
     annotate: "添加批注",
     annotationMarker: "批注 {index}",
+    annotationSelectedText: "所选文本：",
+    annotationComment: "用户评论：",
     annotationChip: "{{count}} 条批注",
     clearAnnotations: "清除批注",
     quoteSource: "引用自 {{title}}",

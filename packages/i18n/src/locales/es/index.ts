@@ -265,6 +265,8 @@ export const es = {
     "quote": "Citar",
     "annotate": "Añadir anotación",
     "annotationMarker": "Anotación {index}",
+    "annotationSelectedText": "Texto seleccionado:",
+    "annotationComment": "Comentario del usuario:",
     "annotationChip": "{{count}} anotaciones",
     "clearAnnotations": "Borrar anotaciones",
     "quoteSource": "Citado de {{title}}",

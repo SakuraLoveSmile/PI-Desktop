@@ -484,20 +484,30 @@ function InlineCode({
  */
 function AnnotationMarker({ index }: { index: number }) {
   const { t } = useTranslation();
-  const excerpt = useAppStore(
-    (state) =>
-      (state.activeSessionId
-        ? state.responseAnnotations[state.activeSessionId] ?? []
-        : [])[index - 1]?.text ?? "",
+  const annotation = useAppStore((state) =>
+    state.activeSessionId
+      ? (state.responseAnnotations[state.activeSessionId] ?? [])[index - 1]
+      : undefined,
   );
+  const excerpt = annotation?.text ?? "";
+  const comment = annotation?.annotation?.trim() ?? "";
+  const tooltip = [
+    `${t("chat.annotationSelectedText")} ${excerpt}`,
+    comment ? `${t("chat.annotationComment")} ${comment}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   return (
-    <span
+    <button
+      type="button"
       className="response-annotation-marker"
       data-annotation-index={index}
-      title={excerpt ? `${t("chat.annotationMarker", { index })}: ${excerpt}` : undefined}
+      aria-label={t("chat.annotationMarker", { index })}
+      title={tooltip || undefined}
+      onClick={() => undefined}
     >
       {index}
-    </span>
+    </button>
   );
 }
 
@@ -806,6 +816,7 @@ const markdownComponents: Components = {
 
 /** Href scheme the annotation markers travel on through the markdown pipeline. */
 const ANNOTATION_MARKER_SCHEME = "annotation:";
+
 /** Url resolved for one annotation number. */
 export function annotationMarkerHref(index: number): string {
   return `${ANNOTATION_MARKER_SCHEME}${index}`;
@@ -875,6 +886,12 @@ const staticRemarkPlugins = [remarkGfm, remarkMath, remarkAnnotationMarkers];
 // Extend the default schema only for the media elements rendered above.
 const sanitizeSchema = {
   ...defaultSchema,
+  protocols: {
+    ...defaultSchema.protocols,
+    // The annotation markers travel on their own scheme; without it the
+    // sanitizer drops the href and the raw directive renders as link text.
+    href: [...(defaultSchema.protocols?.href ?? []), ANNOTATION_MARKER_SCHEME.replace(/:$/, "")],
+  },
   attributes: {
     ...defaultSchema.attributes,
     img: [...(defaultSchema.attributes?.img || []), "src", "alt", "title", "className"],

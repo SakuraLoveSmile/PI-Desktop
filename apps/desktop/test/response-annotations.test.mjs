@@ -10,11 +10,9 @@ import {
   MAX_ANNOTATION_CHARS,
   annotationExcerpt,
   annotationMarkerToken,
-  annotationMarkers,
   requestTextWithoutAnnotations,
   responseAnnotation,
   responseAnnotationPrompt,
-  sourceWithAnnotationMarkers,
   splitAnnotationMarkerTokens,
 } from "../src/lib/response-annotations.ts";
 
@@ -36,6 +34,14 @@ const composer = await readFile(
 );
 const overlay = await readFile(
   new URL("../src/components/SelectionQuoteButton.tsx", import.meta.url),
+  "utf8",
+);
+const selectionQuote = await readFile(
+  new URL("../src/lib/selection-quote.ts", import.meta.url),
+  "utf8",
+);
+const styles = await readFile(
+  new URL("../src/styles/messages.css", import.meta.url),
   "utf8",
 );
 
@@ -108,49 +114,6 @@ test("a new annotation keeps its excerpt and starts without a comment", () => {
   });
 });
 
-test("markers land on their own excerpt, never two on one occurrence", () => {
-  const source = "first pass and second pass";
-  const markers = annotationMarkers(source, [
-    { text: "first pass" },
-    { text: "second pass" },
-    { text: "missing" },
-  ]);
-  assert.deepEqual(markers, [
-    { index: 1, text: "first pass", offset: "first pass".length },
-    { index: 2, text: "second pass", offset: source.indexOf("second pass") + "second pass".length },
-    { index: 3, text: "missing", offset: -1 },
-  ]);
-
-  // The same excerpt twice: the second annotation takes the next occurrence.
-  const repeated = annotationMarkers("pass … pass", [
-    { text: "pass" },
-    { text: "pass" },
-    { text: "pass" },
-  ]);
-  assert.deepEqual(
-    repeated.map((marker) => marker.offset),
-    [4, 11, -1],
-  );
-});
-
-test("marker tokens are inserted without moving each other", () => {
-  const source = "alpha beta";
-  const markers = annotationMarkers(source, [{ text: "alpha" }, { text: "beta" }]);
-  const annotated = sourceWithAnnotationMarkers(source, markers);
-  assert.equal(
-    annotated,
-    `alpha${annotationMarkerToken(1)} beta${annotationMarkerToken(2)}`,
-  );
-  // An unplaceable marker contributes nothing.
-  assert.equal(
-    sourceWithAnnotationMarkers("alpha", [
-      { index: 1, text: "alpha", offset: 5 },
-      { index: 2, text: "gone", offset: -1 },
-    ]),
-    `alpha${annotationMarkerToken(1)}`,
-  );
-});
-
 test("a marker token round-trips through the split the renderer uses", () => {
   const source = `before${annotationMarkerToken(2)}after`;
   assert.deepEqual(splitAnnotationMarkerTokens(source), [
@@ -164,30 +127,42 @@ test("a marker token round-trips through the split the renderer uses", () => {
   ]);
 });
 
-test("the markdown pass turns marker tokens into numbered markers", () => {
+test("the markdown pass turns marker tokens into numbered references", () => {
   assert.match(markdown, /remarkAnnotationMarkers/);
   assert.match(markdown, /const staticRemarkPlugins = \[remarkGfm, remarkMath, remarkAnnotationMarkers\]/);
   assert.match(markdown, /url: annotationMarkerHref\(segment\.index\)/);
   assert.match(markdown, /if \(annotationIndex !== null\) \{\s*return <AnnotationMarker index=\{annotationIndex\} \/>;\s*\}/);
-  // The marker shows the excerpt of its own number.
-  assert.match(markdown, /\[index - 1\]\?\.text/);
+  // Without a whitelisted scheme the sanitizer drops the href and the raw
+  // directive would render as link text.
+  assert.match(markdown, /href: \[\.\.\.\(defaultSchema\.protocols\?\.href \?\? \[\]\), ANNOTATION_MARKER_SCHEME\.replace\(\/:\$\/, ""\)\]/);
+  // The reference renders a numbered reference with the excerpt (and comment)
+  // as its tooltip.
+  assert.match(markdown, /\[index - 1\]/);
+  assert.match(markdown, /t\("chat\.annotationSelectedText"\)/);
+  assert.match(markdown, /t\("chat\.annotationComment"\)/);
   assert.match(markdown, /t\("chat\.annotationMarker", \{ index \}\)/);
+  assert.match(markdown, /className="response-annotation-marker"/);
+  assert.match(markdown, /aria-label=\{t\("chat\.annotationMarker"/);
+});
+
+test("the answer body is never decorated with markers of our own", () => {
+  // The reference marks an annotation only where the model cites it: the
+  // transcript renders the answer source as it arrived.
+  assert.match(transcript, /<Markdown source=\{part\.message\.content\} \/>/);
+  assert.doesNotMatch(transcript, /sourceWithMarkers|annotationMarkers\(/);
+  assert.doesNotMatch(transcript, /sourceWithAnnotationMarkers/);
+});
+
+test("a marker never joins a quote, a copy, or a selection", () => {
+  assert.match(selectionQuote, /"\.response-annotation-marker",/);
+  assert.match(styles, /\.response-annotation-marker \{[\s\S]*?user-select: none/);
+  assert.match(styles, /\.response-annotation-marker:hover,[\s\S]*?text-decoration: underline dashed/);
 });
 
 test("annotations attach to assistant turns, not to the draft", () => {
   // The row has to say what it is before a selection can be routed.
   assert.match(transcript, /data-row-role="assistant"/);
   assert.match(transcript, /data-row-role="user"/);
-  assert.match(
-    transcript,
-    /\(marker\) => marker\.offset >= 0 && !markedAnnotations\.has\(marker\.index\),/,
-  );
-  // A read-only projection shows another session's rows.
-  assert.match(
-    transcript,
-    /if \(transcriptReadOnly \|\| sessionAnnotations\.length === 0 \|\| !source\) \{/,
-  );
-  assert.match(transcript, /<Markdown source=\{sourceWithMarkers\(part\.message\.content\)\} \/>/);
   assert.match(store, /addResponseAnnotation: \(\{ messageId, text \}\) => \{/);
   assert.match(store, /if \(current\.some\(\(annotation\) => annotation\.text === excerpt\)\) return;/);
 });
