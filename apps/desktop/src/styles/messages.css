@@ -959,37 +959,71 @@
  * visible, so it must clear the docked composer without pushing the passage
  * around (D-layer table in 04-ux/07-ui-design-system.md §9).
  */
-.selection-quote-btn {
+/*
+ * Floating selection overlay (D399): one pill above the selection, with the
+ * action row's text buttons separated by hairlines and the icon action last —
+ * the ChatGPT overlay contract. Fixed, and in the body-portaled popover layer,
+ * so it clears the docked composer without pushing the passage around.
+ */
+.selection-quote {
   position: fixed;
   z-index: 60; /* z-command-palette: body-portaled popovers */
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 24px;
-  padding: 3px 8px;
-  border: 1px solid var(--ds-border-strong);
-  border-radius: var(--radius-md);
+  padding: 3px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-full);
   background: var(--ds-bg-elevated-opaque);
   color: var(--ds-text-primary);
   font-size: var(--text-xs-plus);
   line-height: var(--leading-compact);
   box-shadow: var(--ds-shadow-dialog);
-  cursor: pointer;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out);
   animation: selection-quote-in var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.selection-quote-btn:hover {
+.selection-quote-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.selection-quote-action:hover:not(:disabled) {
   background: var(--ds-bg-hover);
 }
 
-.selection-quote-btn:active {
+.selection-quote-action:active:not(:disabled) {
   transform: scale(0.96);
 }
 
-.selection-quote-btn:focus-visible {
+.selection-quote-action:disabled {
+  color: var(--ds-text-faint);
+  cursor: default;
+}
+
+.selection-quote-action.icon {
+  padding: 3px 7px;
+}
+
+.selection-quote-action:focus-visible {
   outline: 2px solid var(--ds-accent);
   outline-offset: 1px;
+}
+
+/* Hairline between actions, sized by the row rather than by the text. */
+.selection-quote-sep {
+  align-self: stretch;
+  width: 1px;
+  background: var(--ds-border-default);
 }
 
 @keyframes selection-quote-in {
@@ -1002,7 +1036,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .selection-quote-btn {
+  .selection-quote {
     animation: none;
   }
 }

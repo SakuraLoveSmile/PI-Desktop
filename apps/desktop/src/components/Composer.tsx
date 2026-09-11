@@ -2175,6 +2175,9 @@ export function Composer({
     <div
       ref={dockRef}
       className={`composer-dock composer-dock-${variant}`}
+      // A stable hook for surfaces that must stay above the composer band, such
+      // as the floating selection overlay (D399).
+      data-composer-dock={variant}
     >
       <div className="composer-stack">
         {planCheckpoint?.status === "pending" ? (

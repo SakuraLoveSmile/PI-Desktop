@@ -1,85 +1,77 @@
 /**
- * Floating quote affordance for a text selection (ADR 0223 / D398).
+ * Floating selection overlay (ADR 0223 / D399).
  *
- * The per-message action row can only quote what the user already selected, and
- * it lives at the end of the message: reaching it means scrolling away from the
- * sentence being quoted. This affordance follows the selection instead, so a
- * phrase, a formula, or a table quotes where it was picked.
+ * Mirrors the ChatGPT desktop app's selected-text overlay: a pill that floats
+ * above the selection, centered on it, clamped into the bounds of the scroll
+ * container it belongs to (never over the docked composer), and that follows the
+ * selection while the thread scrolls.
  *
  * It is portaled to `document.body` and positioned in viewport coordinates, so
  * it never participates in the transcript's layout or scroll extent. The
- * selection is serialized back to Markdown when the affordance appears — the DOM
- * the range points at can change while it is on screen — and the click only
- * writes a composer draft: it never sends, never creates a session, and writes
- * nothing to the transcript.
+ * selection is serialized back to Markdown when the pill appears — the DOM the
+ * range points at can change while it is on screen — and every action only
+ * writes a draft, a clipboard entry, or a side chat: nothing is sent to the
+ * conversation being read, no session is created, and nothing is written to its
+ * transcript.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { RefObject } from "react";
-import { IconQuote } from "./icons";
+import { IconCheck, IconCopy } from "./icons";
+import { useCopy } from "./Markdown";
 import { useAppStore } from "../stores/app-store";
 import {
   activeSelectionRange,
+  COMPOSER_DOCK_SELECTOR,
   placeSelectionQuote,
   quotableRowFor,
-  selectionAnchorRect,
-  serializeSelectionMarkdown,
-  type SelectionQuoteRect,
+  selectionQuoteTarget,
+  type SelectionQuoteTarget,
 } from "../lib/selection-quote";
-
-type PendingQuote = {
-  /** The selection, already reduced to the Markdown the composer receives. */
-  markdown: string;
-  /** The selection's last line, in viewport coordinates. */
-  anchor: SelectionQuoteRect;
-};
 
 export function SelectionQuoteButton({
   scrollRef,
   title,
 }: {
-  /** The transcript this instance quotes from; selections elsewhere are ignored. */
+  /** The transcript this overlay quotes from; selections elsewhere are ignored. */
   scrollRef: RefObject<HTMLElement | null>;
   /** Source title for the quote attribution line. */
   title: string;
 }) {
   const { t } = useTranslation();
   const quoteMessageIntoComposer = useAppStore((s) => s.quoteMessageIntoComposer);
-  const [pending, setPending] = useState<PendingQuote | null>(null);
-  const [placement, setPlacement] = useState<{ top: number; left: number } | null>(
-    null,
+  const openSideChat = useAppStore((s) => s.openSideChat);
+  const sendPrompt = useAppStore((s) => s.sendPrompt);
+  const { copied, copy } = useCopy();
+  const [target, setTarget] = useState<SelectionQuoteTarget | null>(null);
+  const [placement, setPlacement] = useState<{
+    top: number;
+    left: number;
+    maxWidth: number;
+  } | null>(null);
+  const pillRef = useRef<HTMLDivElement | null>(null);
+  // A press on the pill must not be read as "the user clicked away", and the
+  // host refuses a fork while the visible turn is still running.
+  const pressedRef = useRef(false);
+  const sessionRunning = useAppStore((s) =>
+    s.activeSessionId ? s.runningSessions[s.activeSessionId] === true : false,
   );
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     let frame = 0;
-    const hide = () => {
-      if (frame) {
-        cancelAnimationFrame(frame);
-        frame = 0;
-      }
-      setPending(null);
-      setPlacement(null);
-    };
     const sync = () => {
       frame = 0;
-      const range = activeSelectionRange();
-      const row = range ? quotableRowFor(range.startContainer) : null;
-      // A selection in another surface — the composer, a panel, a second pane —
-      // is not this transcript's to quote.
-      if (!range || !row || !scrollRef.current?.contains(row)) {
-        hide();
-        return;
-      }
-      const anchor = selectionAnchorRect(range);
-      const markdown = serializeSelectionMarkdown(range);
-      if (!anchor || !markdown) {
-        hide();
-        return;
-      }
-      setPlacement(null);
-      setPending({ markdown, anchor });
+      if (pressedRef.current) return;
+      const dock = document.querySelector(COMPOSER_DOCK_SELECTOR);
+      setTarget(
+        selectionQuoteTarget({
+          scrollRoot: scrollRef.current,
+          // The composer floats over the transcript, so the scroller's own
+          // bottom edge is under it.
+          bottomBoundaryTop: dock ? dock.getBoundingClientRect().top : null,
+        }),
+      );
     };
     const schedule = () => {
       if (frame) return;
@@ -87,60 +79,143 @@ export function SelectionQuoteButton({
       // DOM; one rAF per frame keeps a long drag from serializing repeatedly.
       frame = requestAnimationFrame(sync);
     };
+    const clear = () => {
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      setTarget(null);
+      setPlacement(null);
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const node = event.target;
+      if (node instanceof Node && pillRef.current?.contains(node)) return;
+      // Pressing elsewhere is a new selection or a dismissal: hold the old pill
+      // back until the gesture settles.
+      pressedRef.current = true;
+      clear();
+    };
+    const onPointerUp = () => {
+      if (!pressedRef.current) return;
+      pressedRef.current = false;
+      schedule();
+    };
+    // Scroll does not bubble, so the capture phase is what catches the
+    // transcript's own scroller. Scrolling something unrelated to the selection
+    // (the sidebar, a settings page) must not move the pill.
+    const onScroll = (event: Event) => {
+      if (pressedRef.current) return;
+      const range = activeSelectionRange();
+      const row = range ? quotableRowFor(range.startContainer) : null;
+      const node = event.target;
+      if (!row || !(node instanceof Node) || !node.contains(row)) return;
+      schedule();
+    };
     document.addEventListener("selectionchange", schedule);
-    // Scroll does not bubble, so the capture phase is what catches the thread's
-    // own scroller; either way the recorded rectangle is stale afterwards.
-    window.addEventListener("scroll", hide, { capture: true, passive: true });
-    window.addEventListener("resize", hide);
+    window.addEventListener("dblclick", schedule);
+    window.addEventListener("keyup", schedule);
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    // A selection that already exists on mount (a re-rendered pane) still owns
+    // its pill without waiting for the next document event.
+    schedule();
     return () => {
-      hide();
+      clear();
       document.removeEventListener("selectionchange", schedule);
-      window.removeEventListener("scroll", hide, { capture: true });
-      window.removeEventListener("resize", hide);
+      window.removeEventListener("dblclick", schedule);
+      window.removeEventListener("keyup", schedule);
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", onScroll, { capture: true });
     };
   }, [scrollRef]);
 
-  // The affordance is laid out before it is measured, so the first painted
-  // frame already has its final place: no visible jump from a provisional spot.
+  // The pill is laid out before it is measured, so the first painted frame
+  // already has its final place: no visible jump from a provisional spot.
   useLayoutEffect(() => {
-    if (!pending) return;
-    const size = buttonRef.current?.getBoundingClientRect();
+    if (!target) {
+      setPlacement(null);
+      return;
+    }
+    const size = pillRef.current?.getBoundingClientRect();
     if (!size) return;
     setPlacement(
-      placeSelectionQuote({
-        anchor: pending.anchor,
-        size,
-        viewport: { width: window.innerWidth, height: window.innerHeight },
-      }),
+      placeSelectionQuote({ anchor: target.anchor, size, bounds: target.bounds }),
     );
-  }, [pending]);
+  }, [target]);
 
-  if (!pending) return null;
+  const dismiss = useCallback(() => {
+    // Mirrors the reference behavior: the action consumes the selection, so the
+    // pill does not survive its own click.
+    window.getSelection()?.removeAllRanges();
+    setTarget(null);
+    setPlacement(null);
+  }, []);
+
+  if (!target) return null;
+
+  const addToChat = () => {
+    quoteMessageIntoComposer({ title, text: target.markdown });
+    dismiss();
+  };
+
+  const askInSideChat = async () => {
+    const childSessionId = await openSideChat(target.rowAnchorId);
+    dismiss();
+    if (!childSessionId) return;
+    await sendPrompt(
+      target.markdown,
+      { text: target.markdown, fileReferences: [] },
+      childSessionId,
+    );
+  };
 
   return createPortal(
-    <button
-      type="button"
-      ref={buttonRef}
-      className="selection-quote-btn"
-      data-testid="selection-quote-btn"
-      aria-label={t("chat.quoteSelection")}
+    <div
+      ref={pillRef}
+      className="selection-quote"
+      data-testid="selection-quote"
       style={
         placement
-          ? { top: placement.top, left: placement.left }
+          ? {
+              top: placement.top,
+              left: placement.left,
+              maxWidth: placement.maxWidth,
+            }
           : { top: 0, left: 0, visibility: "hidden" }
       }
       // Keeping the selection alive through the press is what lets the quote be
       // taken from it rather than from a collapsed caret.
       onPointerDown={(event) => event.preventDefault()}
-      onClick={() => {
-        quoteMessageIntoComposer({ title, text: pending.markdown });
-        setPending(null);
-        setPlacement(null);
-      }}
     >
-      <IconQuote size={13} />
-      <span>{t("chat.quoteSelection")}</span>
-    </button>,
+      <button type="button" className="selection-quote-action" onClick={addToChat}>
+        {t("chat.addToChat")}
+      </button>
+      <span className="selection-quote-sep" aria-hidden="true" />
+      <button
+        type="button"
+        className="selection-quote-action"
+        disabled={sessionRunning}
+        onClick={() => void askInSideChat()}
+      >
+        {t("chat.askInSideChat")}
+      </button>
+      <span className="selection-quote-sep" aria-hidden="true" />
+      <button
+        type="button"
+        className="selection-quote-action icon"
+        aria-label={t("chat.copy")}
+        title={t("chat.copy")}
+        onClick={() => copy(target.markdown)}
+      >
+        {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+      </button>
+    </div>,
     document.body,
   );
 }
