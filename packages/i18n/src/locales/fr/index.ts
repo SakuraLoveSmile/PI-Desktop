@@ -262,6 +262,9 @@ export const fr = {
     "openFile": "Ouvrir avec l'application par défaut",
     "retry": "Régénérer la branche",
     "forkResponse": "à partir de cette réponse",
+    "quote": "Citer",
+    "quoteSource": "Citation de {{title}}",
+    "startSideChat": "Ouvrir le chat latéral",
     "editMessage": "Modifier et renvoyer",
     "cancelEdit": "Annuler",
     "retryEdit": "Réessayer",
@@ -446,6 +449,14 @@ export const fr = {
     "thinkingUnavailable": "La réflexion n'est pas disponible pour ce modèle.",
     "thinkingEnable": "Activer la réflexion",
     "untitledTask": "Nouvelle tâche"
+  },
+  "sideChat": {
+    "title": "Chat latéral",
+    "sessionTitle": "Chat latéral : {{title}}",
+    "placeholder": "Posez une question complémentaire sur cette réponse",
+    "empty": "Posez votre question ici, sans modifier la conversation principale.",
+    "addToMain": "Ajouter au chat principal",
+    "openAsSession": "Ouvrir comme conversation"
   },
   "session": {
     "renameTitle": "Renommer la tâche",

@@ -454,6 +454,16 @@ may be retained while exactly one workspace supplies the visible shell context.
   switching back restores it; selecting a workspace without an active
   conversation hides the panel. Session/workspace identity remains attached to
   every relative resource, preventing cross-context reinterpretation.
+- A side chat (D398) is one more resource in the same context: the message
+  action forks the child through `session.fork` without activating it and opens
+  one `sidechat:<childSessionId>` tab in the origin session's retained context.
+  The tab label reuses `sideChat.title`, the body renders the child's transcript
+  from the same event stream through the background-transcript reducer, and the
+  compact input sends to and stops the child session, never the visible one.
+- Closing the `sidechat` tab, opening the child as a conversation, or deleting
+  the parent or child session removes the registration; the child stays an
+  ordinary session in the sidebar, lists, and search. Like every other resource
+  it does not survive relaunch, while the durable child session does.
 - Relaunch discards every session context, including Browser resources; only
   the committed preferred panel width persists. Native window state is stored
   independently from normal bounds, including when the app closes while

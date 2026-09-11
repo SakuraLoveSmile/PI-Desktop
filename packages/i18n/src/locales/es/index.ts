@@ -262,6 +262,9 @@ export const es = {
     "openFile": "Abrir con aplicación predeterminada",
     "retry": "Regenerar",
     "forkResponse": "Rama de esta respuesta",
+    "quote": "Citar",
+    "quoteSource": "Citado de {{title}}",
+    "startSideChat": "Abrir chat lateral",
     "editMessage": "Editar y reenviar",
     "cancelEdit": "Cancelar",
     "retryEdit": "Reintentar",
@@ -446,6 +449,14 @@ export const es = {
     "thinkingUnavailable": "Pensamiento no está disponible para este modelo.",
     "thinkingEnable": "Habilitar el pensamiento",
     "untitledTask": "Nueva tarea"
+  },
+  "sideChat": {
+    "title": "Chat lateral",
+    "sessionTitle": "Chat lateral: {{title}}",
+    "placeholder": "Haga una pregunta de seguimiento sobre esta respuesta",
+    "empty": "Pregunte aquí para no cambiar la conversación principal.",
+    "addToMain": "Añadir al chat principal",
+    "openAsSession": "Abrir como conversación"
   },
   "session": {
     "renameTitle": "Cambiar nombre de tarea",

@@ -262,6 +262,9 @@ export const de = {
     "openFile": "Mit Standardanwendung öffnen",
     "retry": "Neu generieren",
     "forkResponse": "Zweig aus dieser Antwort",
+    "quote": "Zitieren",
+    "quoteSource": "Zitiert aus {{title}}",
+    "startSideChat": "Seitenchat öffnen",
     "editMessage": "Bearbeiten und erneut senden",
     "cancelEdit": "Abbrechen",
     "retryEdit": "Wiederholen",
@@ -446,6 +449,14 @@ export const de = {
     "thinkingUnavailable": "Denken ist für dieses Modell nicht verfügbar.",
     "thinkingEnable": "Denken aktivieren",
     "untitledTask": "Neue Aufgabe"
+  },
+  "sideChat": {
+    "title": "Seitenchat",
+    "sessionTitle": "Seitenchat: {{title}}",
+    "placeholder": "Stellen Sie eine Rückfrage zu dieser Antwort",
+    "empty": "Fragen Sie hier, ohne die Hauptkonversation zu ändern.",
+    "addToMain": "Zum Hauptchat hinzufügen",
+    "openAsSession": "Als Konversation öffnen"
   },
   "session": {
     "renameTitle": "Aufgabe umbenennen",
