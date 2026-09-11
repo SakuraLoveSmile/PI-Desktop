@@ -1668,6 +1668,11 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   whole formula), a code block quotes as a fence whose delimiter outgrows any
   backtick run inside it, a table quotes as one `a | b` line per row, and both
   Quote paths — row action and floating affordance — share that one recovery.
+- **Add to chat** annotates instead of quoting when the row is an assistant turn
+  (§11.10, D400): it attaches a numbered annotation to that turn, and the
+  assistant turn's action row does the same for its selection (or the whole
+  answer when there is no selection). Quoting into the draft remains the path for
+  a user message and for the side chat's **Add to main chat**.
 
 ---
 
@@ -2629,6 +2634,33 @@ Anatomy:
   one `a | b` line per table row, `[x] `/`[ ] ` for task checkboxes, and no
   transcript chrome. Excerpt whitespace is collapsed to source-like text, so a
   rendered block boundary never becomes a stray blank line.
+
+---
+
+## 11.10 Response annotations (D400)
+
+- Selecting text inside an assistant turn and activating **Add to chat** attaches
+  a numbered annotation to that turn. The turn draws an inline numbered marker at
+  the end of the annotated pass, whose tooltip is the excerpt; an excerpt that no
+  longer appears verbatim in the turn (a rendered table row, a code fence, an
+  excerpt the model paraphrased) draws no marker and is only listed in the
+  composer attachment.
+- The composer shows one annotation attachment chip above the input,
+  `chat.annotationChip` with the count, whose tooltip lists `N. excerpt` per
+  annotation, plus one control that drops them all (`chat.clearAnnotations`). The
+  chip is not draft text: it adds no chip kind, no reference, and no character to
+  the editable draft, so D209's smart Stop and D301's draft retention are
+  unchanged.
+- A send while annotations exist composes the prompt the model receives as the
+  block `# Response annotations:` + the instruction sentence +
+  `<response-annotations>` with `[{"text", "annotation", "source": {"messageId"}}]`
+  in numbering order + `## My request:` + the user's text, and consumes the
+  annotations. Numbering is the attachment order, so "annotation 2" always names
+  the second chip in the list.
+- Nothing the user sees carries the block: the draft, the optimistic row, the
+  sidebar title, and the composer's edit seed keep the user's own text, and a
+  stored prompt that carries the block is displayed through its request text
+  only.
 - The excerpt is capped at 2000 characters with a trailing ellipsis. Quoting
   inserts the draft and focuses the composer; it never sends, never creates a
   session, and adds no chip kind and no file reference.

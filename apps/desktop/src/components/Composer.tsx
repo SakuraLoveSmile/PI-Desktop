@@ -30,6 +30,7 @@ import {
   stripInlineComposerFileReferenceTokens,
 } from "@pi-desktop/shared";
 import { materializeDraftSession, useAppStore } from "../stores/app-store";
+import type { ResponseAnnotation } from "../lib/response-annotations";
 import type { ComposerDraftSnapshot } from "../lib/composer-smart-stop";
 import { latestTurnContextInspector } from "../lib/latest-turn-context";
 import {
@@ -150,6 +151,9 @@ const VIDEO_FILE_PATTERN = /\.(avi|mkv|m4v|mov|mp4|webm)$/i;
  * renders each sentinel as an atomic `composer-chip` element; serialization
  * swaps the sentinel back for the real @path at send time.
  */
+/** Stable empty list: a store selector must not return a fresh array. */
+const NO_ANNOTATIONS: ResponseAnnotation[] = [];
+
 const CHIP_TOKEN_BASE = 0xe000;
 const CHIP_TOKEN_END = 0xf8ff;
 let chipTokenSequence = 0;
@@ -634,6 +638,17 @@ export function Composer({
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
   const showToast = useAppStore((s) => s.showToast);
   const composerPrefill = useAppStore((s) => s.composerPrefill);
+  // Response annotations are prompt attachments, not draft text (D400): the
+  // chip above the input is where the user sees and drops them.
+  const sessionAnnotations = useAppStore((s) =>
+    s.activeSessionId
+      ? (s.responseAnnotations[s.activeSessionId] ?? NO_ANNOTATIONS)
+      : NO_ANNOTATIONS,
+  );
+  const clearResponseAnnotations = useAppStore((s) => s.clearResponseAnnotations);
+  const annotationPreview = sessionAnnotations
+    .map((annotation, index) => `${index + 1}. ${annotation.text}`)
+    .join("\n\n");
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
   const planCheckpoint = useAppStore((s) =>
     s.activeSessionId ? s.planCheckpoints[s.activeSessionId] : undefined,
@@ -2180,6 +2195,29 @@ export function Composer({
       data-composer-dock={variant}
     >
       <div className="composer-stack">
+        {sessionAnnotations.length ? (
+          <div
+            className="composer-annotations"
+            role="status"
+            data-testid="composer-annotations"
+          >
+            <span
+              className="composer-annotation-chip"
+              title={annotationPreview}
+            >
+              {t("chat.annotationChip", { count: sessionAnnotations.length })}
+            </span>
+            <TooltipButton
+              type="button"
+              className="composer-annotation-clear"
+              tooltip={t("chat.clearAnnotations")}
+              ariaLabel={t("chat.clearAnnotations")}
+              onClick={clearResponseAnnotations}
+            >
+              <IconX size={12} aria-hidden="true" />
+            </TooltipButton>
+          </div>
+        ) : null}
         {planCheckpoint?.status === "pending" ? (
           <PlanApprovalBar proposal={planCheckpoint} />
         ) : null}

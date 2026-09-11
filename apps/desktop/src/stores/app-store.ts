@@ -56,6 +56,12 @@ import {
   quoteExcerpt,
 } from "../lib/chat-quotes";
 import {
+  annotationExcerpt,
+  responseAnnotation,
+  responseAnnotationPrompt,
+  type ResponseAnnotationMap,
+} from "../lib/response-annotations";
+import {
   registerSideChat,
   removeSideChat,
   removeSideChatsForSessions,
@@ -1116,12 +1122,25 @@ export type AppState = {
   sideChats: SideChatMap;
   /** Live transcript of each registered side chat, fed by the agent event stream. */
   sideChatTranscripts: Record<string, UiMessage[]>;
+  /**
+   * Numbered annotations the user attached to assistant turns, keyed by the
+   * session that owns them. They are prompt attachments, not draft text: the
+   * next prompt carries them as a block and the send consumes them
+   * (ADR 0223 / D400).
+   */
+  responseAnnotations: ResponseAnnotationMap;
   /** Toggle the selected subagent detail, replacing another selection when needed. */
   toggleSubagentPanel: (delegationId: string) => void;
   /** Close the selected subagent detail without changing resource tabs. */
   closeSubagentPanel: () => void;
   /** Append text to the visible conversation's draft without sending it. */
   appendComposerDraftText: (text: string) => void;
+  /** Annotate one assistant turn with the excerpt the user selected. */
+  addResponseAnnotation: (input: { messageId: string; text: string }) => void;
+  /** Drop one annotation from the visible session. */
+  removeResponseAnnotation: (id: string) => void;
+  /** Drop every annotation of the visible session. */
+  clearResponseAnnotations: () => void;
   /** Quote one message, or a selection inside it, into the composer draft. */
   quoteMessageIntoComposer: (input: {
     /** Source title used by the attribution line. */
@@ -1433,6 +1452,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workPanelFileRequest: null,
   sideChats: {},
   sideChatTranscripts: {},
+  responseAnnotations: {},
   projectSort: initialSidebarPreferences.projectSort,
   messages: [],
   retainedSessionIds: [],
@@ -2331,8 +2351,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (!sessionId) throw new Error(i18n.t("errors.noActiveSession"));
     if (get().pendingPlans[sessionId]?.status === "pending") return false;
+    // Annotations are prompt attachments, not draft text: the send carries them
+    // in the block the model reads and consumes them (ADR 0223 / D400). The
+    // visible draft, the optimistic row, and the session title stay annotation
+    // free.
+    const outgoing = responseAnnotationPrompt(
+      content,
+      get().responseAnnotations[sessionId] ?? [],
+    );
+    const consumeAnnotations = () => {
+      const state = get();
+      if (!state.responseAnnotations[sessionId]) return;
+      set((current) => {
+        const responseAnnotations = { ...current.responseAnnotations };
+        delete responseAnnotations[sessionId];
+        return { responseAnnotations };
+      });
+    };
     if (get().runningSessions[sessionId]) {
-      get().enqueuePrompt(content, draft, sessionId);
+      // A queued prompt is still a send: it carries the annotations it was
+      // submitted with, and the queue owns them from here.
+      get().enqueuePrompt(outgoing, draft, sessionId);
+      consumeAnnotations();
       return true;
     }
     const startedIn = sessionId;
@@ -2396,13 +2436,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       await api.prompt({
         sessionId,
-        content,
+        content: outgoing,
         messageId: optimisticMessage.id,
         viewingSessionId: viewingSessionIdForPrompt(get(), sessionId),
         attachments: draft
           ? promptAttachmentsFromDraft(draft.fileReferences)
           : [],
       });
+      consumeAnnotations();
       if (submission.abortResolution && (await submission.abortResolution)) {
         return false;
       }
@@ -4491,6 +4532,53 @@ export const useAppStore = create<AppState>((set, get) => ({
         text: appendQuoteToDraft(draft?.text ?? "", text),
         fileReferences: draft?.fileReferences ?? [],
       },
+    });
+  },
+
+  addResponseAnnotation: ({ messageId, text }) => {
+    const sessionId = get().activeSessionId;
+    const excerpt = annotationExcerpt(text);
+    if (!sessionId || !excerpt) return;
+    const current = get().responseAnnotations[sessionId] ?? [];
+    // One annotation per excerpt: annotating the same pass twice must not send
+    // the same text twice under two numbers.
+    if (current.some((annotation) => annotation.text === excerpt)) return;
+    set((state) => ({
+      responseAnnotations: {
+        ...state.responseAnnotations,
+        [sessionId]: [
+          ...current,
+          responseAnnotation({
+            id: crypto.randomUUID(),
+            messageId,
+            text: excerpt,
+          }),
+        ],
+      },
+    }));
+  },
+
+  removeResponseAnnotation: (id) => {
+    const sessionId = get().activeSessionId;
+    if (!sessionId) return;
+    const current = get().responseAnnotations[sessionId] ?? [];
+    const next = current.filter((annotation) => annotation.id !== id);
+    if (next.length === current.length) return;
+    set((state) => {
+      const responseAnnotations = { ...state.responseAnnotations };
+      if (next.length === 0) delete responseAnnotations[sessionId];
+      else responseAnnotations[sessionId] = next;
+      return { responseAnnotations };
+    });
+  },
+
+  clearResponseAnnotations: () => {
+    const sessionId = get().activeSessionId;
+    if (!sessionId || !get().responseAnnotations[sessionId]) return;
+    set((state) => {
+      const responseAnnotations = { ...state.responseAnnotations };
+      delete responseAnnotations[sessionId];
+      return { responseAnnotations };
     });
   },
 

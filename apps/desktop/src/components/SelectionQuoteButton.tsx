@@ -41,6 +41,7 @@ export function SelectionQuoteButton({
 }) {
   const { t } = useTranslation();
   const quoteMessageIntoComposer = useAppStore((s) => s.quoteMessageIntoComposer);
+  const addResponseAnnotation = useAppStore((s) => s.addResponseAnnotation);
   const openSideChat = useAppStore((s) => s.openSideChat);
   const sendPrompt = useAppStore((s) => s.sendPrompt);
   const { copied, copy } = useCopy();
@@ -160,7 +161,16 @@ export function SelectionQuoteButton({
   if (!target) return null;
 
   const addToChat = () => {
-    quoteMessageIntoComposer({ title, text: target.markdown });
+    if (target.annotatable) {
+      // A response turn takes a numbered annotation instead of draft text: the
+      // excerpt travels with the next prompt as an attachment (D400).
+      addResponseAnnotation({
+        messageId: target.rowAnchorId,
+        text: target.markdown,
+      });
+    } else {
+      quoteMessageIntoComposer({ title, text: target.markdown });
+    }
     dismiss();
   };
 

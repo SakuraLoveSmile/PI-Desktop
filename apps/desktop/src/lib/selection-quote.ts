@@ -28,6 +28,10 @@ export const SELECTION_QUOTE_MIN_FENCE = 3;
 
 /** The transcript row attribute a quotable selection anchors to (D398). */
 export const QUOTABLE_ROW_ATTRIBUTE = "data-minimap-id";
+/** Row role attribute: annotations belong to assistant turns (D400). */
+export const ROW_ROLE_ATTRIBUTE = "data-row-role";
+/** The role value that takes response annotations instead of a draft quote. */
+export const ANNOTATABLE_ROW_ROLE = "assistant";
 /** The docked composer's own element, which the pill must stay above. */
 export const COMPOSER_DOCK_SELECTOR = '[data-composer-dock="docked"]';
 
@@ -62,6 +66,11 @@ export type SelectionQuoteTarget = {
   anchor: SelectionQuoteRect;
   /** Bounds the pill is clamped into. */
   bounds: SelectionQuoteBounds;
+  /**
+   * Whether the row is an assistant turn. Annotations are a response concept
+   * (D400): a selection in the user's own message still quotes into the draft.
+   */
+  annotatable: boolean;
 };
 
 /* ---------- pure helpers ---------- */
@@ -376,6 +385,11 @@ export function quotableRowFor(node: Node | null | undefined): Element | null {
   return element?.closest?.(`[${QUOTABLE_ROW_ATTRIBUTE}]`) ?? null;
 }
 
+/** Whether a transcript row is an assistant turn (the annotatable kind). */
+export function isAnnotatableRow(row: Element | null): boolean {
+  return row?.getAttribute?.(ROW_ROLE_ATTRIBUTE) === ANNOTATABLE_ROW_ROLE;
+}
+
 /** The document selection, when it is a non-empty text range. */
 export function activeSelectionRange(): Range | null {
   if (typeof window === "undefined") return null;
@@ -537,7 +551,13 @@ export function selectionQuoteTarget({
   const anchor = selectionQuoteAnchor({ range, element: startRow, bounds });
   if (!anchor) return null;
 
-  return { rowAnchorId, markdown, anchor, bounds };
+  return {
+    rowAnchorId,
+    markdown,
+    anchor,
+    bounds,
+    annotatable: isAnnotatableRow(startRow),
+  };
 }
 
 /**

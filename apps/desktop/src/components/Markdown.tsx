@@ -47,6 +47,7 @@ import {
   safeDecodeUri,
   toWorkspaceRel,
 } from "../lib/chat-links";
+import { annotationMarkerToken, splitAnnotationMarkerTokens } from "../lib/response-annotations";
 import {
   isClosedFencedCodeBlock,
   MAX_MERMAID_SOURCE_LENGTH,
@@ -475,6 +476,31 @@ function InlineCode({
   );
 }
 
+/**
+ * Inline numbered marker for one response annotation (ADR 0223 / D400).
+ *
+ * It mirrors the reference overlay's marker: the number of the annotation in
+ * array order, with the annotated excerpt as its tooltip.
+ */
+function AnnotationMarker({ index }: { index: number }) {
+  const { t } = useTranslation();
+  const excerpt = useAppStore(
+    (state) =>
+      (state.activeSessionId
+        ? state.responseAnnotations[state.activeSessionId] ?? []
+        : [])[index - 1]?.text ?? "",
+  );
+  return (
+    <span
+      className="response-annotation-marker"
+      data-annotation-index={index}
+      title={excerpt ? `${t("chat.annotationMarker", { index })}: ${excerpt}` : undefined}
+    >
+      {index}
+    </span>
+  );
+}
+
 function Anchor({
   node: _node,
   children,
@@ -489,6 +515,7 @@ function Anchor({
   const showToast = useAppStore((s) => s.showToast);
   const linkOpenTarget = useAppStore((s) => s.settings?.linkOpenTarget ?? "workpanel");
 
+  const annotationIndex = annotationMarkerIndexFromHref(href);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const anchorRef = useRef<HTMLAnchorElement | null>(null);
@@ -566,6 +593,13 @@ function Anchor({
       );
     }
   };
+
+  // An annotated pass carries its number here instead of a link: the marker is
+  // an inline reference, not a destination (ADR 0223 / D400). Every hook above
+  // still runs, so the marker branch cannot change hook order.
+  if (annotationIndex !== null) {
+    return <AnnotationMarker index={annotationIndex} />;
+  }
 
   // Plain click previews in the work panel (or external browser based on setting).
   // Modified clicks fall through to _blank, which main routes to shell.openExternal.
@@ -770,7 +804,73 @@ const markdownComponents: Components = {
   table: Table,
 };
 
-const staticRemarkPlugins = [remarkGfm, remarkMath];
+/** Href scheme the annotation markers travel on through the markdown pipeline. */
+const ANNOTATION_MARKER_SCHEME = "annotation:";
+/** Url resolved for one annotation number. */
+export function annotationMarkerHref(index: number): string {
+  return `${ANNOTATION_MARKER_SCHEME}${index}`;
+}
+/** The annotation number one rendered marker element carries, or null. */
+export function annotationMarkerIndexFromHref(href: string | undefined): number | null {
+  if (!href || !href.startsWith(ANNOTATION_MARKER_SCHEME)) return null;
+  const index = Number(href.slice(ANNOTATION_MARKER_SCHEME.length));
+  return Number.isSafeInteger(index) && index > 0 ? index : null;
+}
+
+type MdastLike = {
+  type?: string;
+  value?: string;
+  url?: string;
+  children?: MdastLike[];
+};
+
+/**
+ * Turn `:codex-annotation{index="N"}` tokens into numbered marker elements
+ * (ADR 0223 / D400). The token is the reference implementation's own syntax,
+ * so an answer that echoes one renders as a marker instead of raw text.
+ */
+export function annotationMarkerMdastTree(tree: MdastLike | null | undefined): void {
+  walk(tree);
+
+  function walk(node: MdastLike | null | undefined) {
+    if (!node?.children) return;
+    const next: MdastLike[] = [];
+    for (const child of node.children) {
+      if (child.type === "text" && typeof child.value === "string") {
+        const segments = splitAnnotationMarkerTokens(child.value);
+        if (segments.length === 1 && segments[0].kind === "text") {
+          next.push(child);
+          continue;
+        }
+        for (const segment of segments) {
+          if (segment.kind === "text") {
+            if (segment.value) next.push({ type: "text", value: segment.value });
+            continue;
+          }
+          next.push({
+            type: "link",
+            url: annotationMarkerHref(segment.index),
+            children: [
+              { type: "text", value: annotationMarkerToken(segment.index) },
+            ],
+          });
+        }
+        continue;
+      }
+      walk(child);
+      next.push(child);
+    }
+    node.children = next;
+  }
+}
+
+function remarkAnnotationMarkers() {
+  return (tree: MdastLike) => {
+    annotationMarkerMdastTree(tree);
+  };
+}
+
+const staticRemarkPlugins = [remarkGfm, remarkMath, remarkAnnotationMarkers];
 
 // Extend the default schema only for the media elements rendered above.
 const sanitizeSchema = {
