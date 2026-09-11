@@ -931,9 +931,31 @@ Running turns and pending approvals continue to gate the controls.
   the pointer press is prevented so the excerpt is whatever was selected,
   including a whole formula. Add to chat writes a composer draft and focuses the
   composer; Ask in side chat sends the excerpt to the side chat anchored at that
-  row; neither sends into the conversation being read.
+  row; neither sends into the conversation being read. On an assistant turn, Add
+  to chat attaches a numbered annotation instead of writing draft text (D400):
+  the turn gains an inline numbered marker, the composer gains one annotation
+  attachment, and the next send carries the annotated excerpts as numbered prompt
+  data (see §7.5a).
 - Selection rules must not disable `focus-visible` feedback or native window
   drag regions.
+
+### 7.5a Annotations
+
+- An annotation belongs to an **assistant turn**, never to the user's own
+  message: annotating is a response concept (D400). Selecting text inside a
+  response, or activating the turn's annotate action, adds one numbered
+  annotation; annotating the same excerpt twice is a no-op.
+- Annotations are session state that lives exactly as long as the send that
+  carries them. They are numbered in attachment order, listed in the composer's
+  annotation attachment, droppable as a group from there, and consumed by the
+  send. They are not persisted and do not survive relaunch.
+- A send with annotations attaches them to the prompt as numbered data before the
+  user's own request, so the model can address `Annotation 1`, `Annotation 2`, …
+  The user's prompt text stays what the user typed: no excerpt is copied into the
+  draft, the optimistic row, or the session title.
+- Because the stored prompt carries the block, every read surface shows the
+  request only: the transcript's user row, the composer's edit seed, and the
+  minimap all reduce a stored prompt to its request text.
 
 ## 8. Drag / drop
 
