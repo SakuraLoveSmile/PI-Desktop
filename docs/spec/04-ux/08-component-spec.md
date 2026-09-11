@@ -2640,11 +2640,11 @@ Anatomy:
 ## 11.10 Response annotations (D400)
 
 - Selecting text inside an assistant turn and activating **Add to chat** attaches
-  a numbered annotation to that turn. The turn draws an inline numbered marker at
-  the end of the annotated pass, whose tooltip is the excerpt; an excerpt that no
-  longer appears verbatim in the turn (a rendered table row, a code fence, an
-  excerpt the model paraphrased) draws no marker and is only listed in the
-  composer attachment.
+  a numbered annotation to that turn. The answer body is not decorated: an
+  annotation appears in the answer only where the model cites it, as a small
+  accent-colored numbered reference (`:codex-annotation{index="N"}` in the
+  answer's source) whose tooltip is the excerpt and any comment. A marker takes
+  no part in a selection, quote, or copy.
 - The composer shows one annotation attachment chip above the input,
   `chat.annotationChip` with the count, whose tooltip lists `N. excerpt` per
   annotation, plus one control that drops them all (`chat.clearAnnotations`). The

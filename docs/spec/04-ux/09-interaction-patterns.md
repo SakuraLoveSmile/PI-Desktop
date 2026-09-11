@@ -944,7 +944,10 @@ Running turns and pending approvals continue to gate the controls.
 - An annotation belongs to an **assistant turn**, never to the user's own
   message: annotating is a response concept (D400). Selecting text inside a
   response, or activating the turn's annotate action, adds one numbered
-  annotation; annotating the same excerpt twice is a no-op.
+  annotation; annotating the same excerpt twice is a no-op. The annotation does
+  not edit the response: the answer gains a numbered reference only where the
+  model cites the annotation (`:codex-annotation{index="N"}`), and that reference
+  is a tooltip target, not selectable text.
 - Annotations are session state that lives exactly as long as the send that
   carries them. They are numbered in attachment order, listed in the composer's
   annotation attachment, droppable as a group from there, and consumed by the

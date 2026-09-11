@@ -1310,11 +1310,13 @@ Each scenario is documented in this format:
   then repeat the same selection. 3) Inspect the answer, the composer, and the
   editor draft. 4) Send an instruction and inspect the request the agent
   received.
-- **Expected**: The answer gains one inline numbered marker at the end of each
-  annotated pass, numbered in attachment order, whose tooltip is the excerpt;
-  step 2 leaves two markers (the repeated selection changes nothing). The
-  composer shows one annotation attachment with the count, and its tooltip lists
-  `1. <excerpt>` and `2. <excerpt>`. The draft text, the optimistic user row, the
+- **Expected**: The answer body is unchanged and carries no marker, marker text,
+  or directive: nothing is inserted into the text the user reads. The composer
+  shows one annotation attachment with the count, and its tooltip lists
+  `1. <excerpt>` and `2. <excerpt>`; step 2 leaves two entries (the repeated
+  selection changes nothing). Where the model cites an annotation, that citation
+  renders as a small numbered reference whose tooltip is the excerpt, and no
+  marker joins a selection, a quote, or a copy of the answer. The draft text, the optimistic user row, the
   sidebar title, and the composer's edit seed contain the user's own words only —
   no excerpt, no blockquote, no attribution line. The request the agent receives
   begins with `# Response annotations:` and the instruction sentence, carries
