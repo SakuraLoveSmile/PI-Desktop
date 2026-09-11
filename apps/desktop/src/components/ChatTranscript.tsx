@@ -1,7 +1,9 @@
 import {
   Fragment,
+  createContext,
   memo,
   useCallback,
+  useContext,
   useDeferredValue,
   useEffect,
   useId,
@@ -112,6 +114,7 @@ import {
   IconArrowDown,
   IconBot,
   IconBranch,
+  IconChat,
   IconCheck,
   IconCircleAlert,
   IconChevronDown,
@@ -128,6 +131,7 @@ import {
   IconSheet,
   IconVideo,
   IconPencil,
+  IconQuote,
   IconSearch,
   IconReview,
   IconSparkles,
@@ -144,6 +148,49 @@ import { PermissionCard } from "./PermissionCard";
 import { TooltipButton } from "./ui";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+/**
+ * Whether this transcript is a passive projection of another session (D395).
+ *
+ * A docked side chat renders a real session that is not the application's active
+ * one, but the row toolbars resolve against the active session — Delete would
+ * re-page the visible conversation, Edit/Retry/Fork would address ids the parent
+ * does not own, and the inline permission card would duplicate the panel's own.
+ * A read-only projection therefore renders content only, and the panel owns every
+ * control for its child.
+ */
+export const TranscriptReadOnlyContext = createContext(false);
+
+/**
+ * The text the user selected inside one transcript row.
+ *
+ * A selection outside the row being quoted — or no selection at all — yields an
+ * empty string and the caller quotes the whole message instead. Selection wins
+ * because quoting a paragraph of a long answer is the common case.
+ */
+function selectedTextWithinRow(rowAnchorId: string): string {
+  if (typeof window === "undefined") return "";
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    return "";
+  }
+  const text = selection.toString().trim();
+  if (!text) return "";
+  const node = selection.anchorNode;
+  const element = node instanceof Element ? node : node?.parentElement ?? null;
+  const row = element?.closest?.("[data-minimap-id]");
+  if (!row || row.getAttribute("data-minimap-id") !== rowAnchorId) return "";
+  return text;
+}
+
+/** Visible conversation title: the quote attribution and the side-chat source. */
+function useActiveSessionTitle(): string {
+  return useAppStore(
+    (state) =>
+      state.sessions.find((session) => session.id === state.activeSessionId)
+        ?.title ?? "",
+  );
+}
 
 /**
  * Copy chip. Message toolbars are glyph-only (`icon`) with the label in a
@@ -2091,6 +2138,12 @@ const MessageRow = memo(function MessageRow({
   const copyLabel = t("chat.copy");
   const editLabel = t("chat.editMessage");
   const deleteLabel = t("chat.deleteMessage");
+  const quoteLabel = t("chat.quote");
+  const sideChatLabel = t("chat.startSideChat");
+  const sessionTitle = useActiveSessionTitle();
+  const openSideChat = useAppStore((s) => s.openSideChat);
+  const quoteMessageIntoComposer = useAppStore((s) => s.quoteMessageIntoComposer);
+  const transcriptReadOnly = useContext(TranscriptReadOnlyContext);
   // Runtime chunks are already progressive. Rendering that source directly
   // avoids a second per-frame state loop while Markdown memoizes stable blocks.
   const displayed = message.content || "";
@@ -2227,7 +2280,7 @@ const MessageRow = memo(function MessageRow({
             )}
           </div>
         ) : null}
-        {!editing && (hasAnswer || showRevisionPager) ? (
+        {!editing && !transcriptReadOnly && (hasAnswer || showRevisionPager) ? (
           <div className="message-actions">
             {showRevisionPager ? (
               <div className="message-revision-pager" role="group" aria-label={t("chat.revisions")}>
@@ -2290,6 +2343,30 @@ const MessageRow = memo(function MessageRow({
                 <IconTrash size={13} />
               </TooltipButton>
             ) : null}
+            <TooltipButton
+              className="copy-btn icon"
+              tooltip={quoteLabel}
+              ariaLabel={quoteLabel}
+              disabled={!editSeed}
+              onClick={() =>
+                quoteMessageIntoComposer({
+                  title: sessionTitle,
+                  text: editSeed,
+                  selection: selectedTextWithinRow(message.id),
+                })
+              }
+            >
+              <IconQuote size={13} />
+            </TooltipButton>
+            <TooltipButton
+              className="copy-btn icon"
+              tooltip={sideChatLabel}
+              ariaLabel={sideChatLabel}
+              disabled={isRunning}
+              onClick={() => void openSideChat(message.id)}
+            >
+              <IconChat size={13} />
+            </TooltipButton>
           </div>
         ) : null}
       </div>
@@ -2472,6 +2549,17 @@ const AssistantTurn = memo(function AssistantTurn({
   const { t } = useTranslation();
   const retryAssistantMessage = useAppStore((s) => s.retryAssistantMessage);
   const forkAssistantMessage = useAppStore((s) => s.forkAssistantMessage);
+  const quoteLabel = t("chat.quote");
+  const sideChatLabel = t("chat.startSideChat");
+  const sessionTitle = useActiveSessionTitle();
+  const openSideChat = useAppStore((s) => s.openSideChat);
+  const quoteMessageIntoComposer = useAppStore((s) => s.quoteMessageIntoComposer);
+  const transcriptReadOnly = useContext(TranscriptReadOnlyContext);
+  // The host refuses a fork while the source turn is still running, so the
+  // affordance is disabled rather than silently doing nothing.
+  const sessionRunning = useAppStore((s) =>
+    s.activeSessionId ? s.runningSessions[s.activeSessionId] === true : false,
+  );
   const messages = assistantTurnMessages(entry);
   const content = assistantTurnContent(entry);
   const actionMessage = [...messages]
@@ -2565,7 +2653,7 @@ const AssistantTurn = memo(function AssistantTurn({
             responseOutputTokens={responseOutputTokens}
           />
         ) : null}
-        {(content || hasError) && actionMessage ? (
+        {(content || hasError) && actionMessage && !transcriptReadOnly ? (
           <div className="message-actions">
             {complete ? (
               <CopyButton text={content} label={t("chat.copy")} />
@@ -2588,6 +2676,37 @@ const AssistantTurn = memo(function AssistantTurn({
                 onClick={() => void retryAssistantMessage(actionMessage.id)}
               >
                 <IconReview size={13} />
+              </TooltipButton>
+            ) : null}
+            {complete ? (
+              <TooltipButton
+                className="copy-btn icon"
+                tooltip={quoteLabel}
+                ariaLabel={quoteLabel}
+                onClick={() =>
+                  quoteMessageIntoComposer({
+                    title: sessionTitle,
+                    text: content,
+                    // An assistant row is anchored by its turn, and a turn
+                    // without an anchor has no selection to match.
+                    selection: entry.anchorId
+                      ? selectedTextWithinRow(entry.anchorId)
+                      : "",
+                  })
+                }
+              >
+                <IconQuote size={13} />
+              </TooltipButton>
+            ) : null}
+            {complete ? (
+              <TooltipButton
+                className="copy-btn icon"
+                tooltip={sideChatLabel}
+                ariaLabel={sideChatLabel}
+                disabled={sessionRunning}
+                onClick={() => void openSideChat(actionMessage.id)}
+              >
+                <IconChat size={13} />
               </TooltipButton>
             ) : null}
           </div>
@@ -2653,6 +2772,8 @@ export const ChatTranscript = memo(function ChatTranscript({
   paneVisible?: boolean;
 }) {
   const { t } = useTranslation();
+  // A read-only projection renders content only; the panel owns its own controls.
+  const transcriptReadOnly = useContext(TranscriptReadOnlyContext);
   const latestTurnResult = useAppStore((state) =>
     sessionId ? state.latestTurnResults[sessionId] : undefined,
   );
@@ -3339,7 +3460,7 @@ export const ChatTranscript = memo(function ChatTranscript({
             messages={messages}
             result={latestTurnResult}
           />
-          {pendingPermission ? (
+          {pendingPermission && !transcriptReadOnly ? (
             <PermissionCard
               key={pendingPermission.requestId}
               permission={pendingPermission}

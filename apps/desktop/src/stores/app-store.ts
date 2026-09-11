@@ -45,7 +45,27 @@ import {
 import { api } from "../lib/api";
 import type { SettingsTabId } from "../lib/settings-search";
 import { createNavigationIntentController } from "../lib/navigation-intent";
-import { scheduleHomeDraftAdopt } from "../lib/composer-draft-cache";
+import {
+  draftKeyForSession,
+  readComposerDraft,
+  scheduleHomeDraftAdopt,
+} from "../lib/composer-draft-cache";
+import {
+  appendQuoteToDraft,
+  buildQuoteText,
+  quoteExcerpt,
+} from "../lib/chat-quotes";
+import {
+  registerSideChat,
+  removeSideChat,
+  removeSideChatsForSessions,
+  sideChatEntry,
+  sideChatSessionIds,
+  sideChatTabSessionId,
+  sideChatWorkPanelTab,
+  type SideChatMap,
+  sideChatsForParent,
+} from "../lib/side-chat";
 import {
   commitForkedSessionState,
   forkedSessionMessages,
@@ -371,6 +391,8 @@ type SubmittedComposerDraft = {
   resolveAbort?: (restored: boolean) => void;
 };
 const submittedComposerDrafts = new Map<string, SubmittedComposerDraft>();
+/** One in-flight side-chat fork per parent-and-anchor, so a double click is one child. */
+const sideChatOpens = new Map<string, Promise<string | null>>();
 type SessionConfiguration = Pick<
   SessionSummary,
   "mode" | "providerId" | "modelId" | "thinkingLevel"
@@ -535,6 +557,19 @@ function insertOptimisticUserMessage(sessionId: string, message: UiMessage): voi
   if (cached) {
     sessionTranscriptCache.set(sessionId, upsertLiveSessionMessage(cached, message));
   }
+  // A side chat's panel renders its own projection rather than the active
+  // transcript, so a prompt sent from there must land in it as well (D395).
+  if (state.sideChatTranscripts[sessionId]) {
+    useAppStore.setState((s) => ({
+      sideChatTranscripts: {
+        ...s.sideChatTranscripts,
+        [sessionId]: upsertLiveSessionMessage(
+          s.sideChatTranscripts[sessionId] ?? [],
+          message,
+        ),
+      },
+    }));
+  }
 }
 
 /**
@@ -556,20 +591,34 @@ function retractOptimisticUserMessage(sessionId: string, message: UiMessage): vo
   if (cached?.includes(message)) {
     sessionTranscriptCache.set(sessionId, removeLiveSessionMessage(cached, message.id));
   }
+  if (state.sideChatTranscripts[sessionId]?.includes(message)) {
+    useAppStore.setState((s) => ({
+      sideChatTranscripts: {
+        ...s.sideChatTranscripts,
+        [sessionId]: removeLiveSessionMessage(
+          s.sideChatTranscripts[sessionId] ?? [],
+          message.id,
+        ),
+      },
+    }));
+  }
 }
 
 /**
- * Keep a warm session's renderer cache current while it streams in the
- * background. The hidden pane itself is not re-rendered; its next reveal reads
- * this cache and commits the latest available tail in one frame.
+ * Apply one agent event to one transcript projection and return the next
+ * projection. Returning the same array means "nothing changed here", which is
+ * what both callers below test for.
+ *
+ * The background cache, the side-chat panel, and (through its own switch) the
+ * visible transcript all consume the same event stream, so a session behaves
+ * identically whether it is on screen, warm behind another conversation, or
+ * docked in the work panel.
  */
-function cacheBackgroundTranscriptEvent(envelope: AgentEventEnvelope): void {
-  const { sessionId, event } = envelope;
-  const state = useAppStore.getState();
-  const current =
-    sessionTranscriptCache.get(sessionId) ?? state.retainedTranscripts[sessionId];
-  if (!current) return;
-
+function projectTranscriptEvent(
+  current: UiMessage[],
+  envelope: AgentEventEnvelope,
+): UiMessage[] {
+  const { event } = envelope;
   let next = current;
   switch (event.type) {
     case "message_start":
@@ -606,13 +655,13 @@ function cacheBackgroundTranscriptEvent(envelope: AgentEventEnvelope): void {
       });
       break;
     case "tool_update": {
-      if (event.partialResult === undefined) return;
+      if (event.partialResult === undefined) return current;
       const existing = current.find(
         (message) =>
           message.toolCallId === event.toolCallId &&
           message.toolStatus === "running",
       );
-      if (!existing) return;
+      if (!existing) return current;
       next = upsertLiveSessionMessage(current, {
         ...existing,
         content:
@@ -662,9 +711,24 @@ function cacheBackgroundTranscriptEvent(envelope: AgentEventEnvelope): void {
       break;
     }
     default:
-      return;
+      return current;
   }
+  return next;
+}
 
+/**
+ * Keep a warm session's renderer cache current while it streams in the
+ * background. The hidden pane itself is not re-rendered; its next reveal reads
+ * this cache and commits the latest available tail in one frame.
+ */
+function cacheBackgroundTranscriptEvent(envelope: AgentEventEnvelope): void {
+  const { sessionId } = envelope;
+  const state = useAppStore.getState();
+  const current =
+    sessionTranscriptCache.get(sessionId) ?? state.retainedTranscripts[sessionId];
+  if (!current) return;
+
+  const next = projectTranscriptEvent(current, envelope);
   if (next === current) return;
   liveSessionTranscripts.add(sessionId);
   cacheSessionTranscript(
@@ -672,6 +736,27 @@ function cacheBackgroundTranscriptEvent(envelope: AgentEventEnvelope): void {
     next,
     sessionHistoryCache.get(sessionId) ?? state.sessionHistory[sessionId],
   );
+}
+
+/**
+ * Keep a registered side chat's panel transcript current (D395).
+ *
+ * The child session is deliberately never the active one, so its events take the
+ * background path; this projection is what the docked panel renders, and it is
+ * dropped when the side chat is released.
+ */
+function projectSideChatEvent(envelope: AgentEventEnvelope): void {
+  const state = useAppStore.getState();
+  if (!state.sideChats[envelope.sessionId]) return;
+  const current = state.sideChatTranscripts[envelope.sessionId] ?? [];
+  const next = projectTranscriptEvent(current, envelope);
+  if (next === current) return;
+  useAppStore.setState((s) => ({
+    sideChatTranscripts: {
+      ...s.sideChatTranscripts,
+      [envelope.sessionId]: dedupeSessionMessages(next),
+    },
+  }));
 }
 
 function nextPlanSyncGeneration(sessionId: string): number {
@@ -1023,10 +1108,37 @@ export type AppState = {
   workPanelWidth: number;
   /** Chat-initiated "preview this file" request consumed by the files tab. */
   workPanelFileRequest: { path: string; seq: number; mimeType?: string } | null;
+  /**
+   * Side chats opened from messages, keyed by their child session id. The child
+   * is a real forked session on the host; this map is what keeps it out of the
+   * visible conversation and inside the docked panel (D395).
+   */
+  sideChats: SideChatMap;
+  /** Live transcript of each registered side chat, fed by the agent event stream. */
+  sideChatTranscripts: Record<string, UiMessage[]>;
   /** Toggle the selected subagent detail, replacing another selection when needed. */
   toggleSubagentPanel: (delegationId: string) => void;
   /** Close the selected subagent detail without changing resource tabs. */
   closeSubagentPanel: () => void;
+  /** Append text to the visible conversation's draft without sending it. */
+  appendComposerDraftText: (text: string) => void;
+  /** Quote one message, or a selection inside it, into the composer draft. */
+  quoteMessageIntoComposer: (input: {
+    /** Source title used by the attribution line. */
+    title: string;
+    /** Full message text; a non-blank selection wins over it. */
+    text: string;
+    /** Text the user selected inside the message, when there is one. */
+    selection?: string;
+  }) => void;
+  /** Open a side chat from a message; resolves to the child session id. */
+  openSideChat: (messageId: string) => Promise<string | null>;
+  /** Release a side chat, keeping its durable child session. */
+  closeSideChat: (sessionId: string) => void;
+  /** Quote a side chat's newest answer into the main conversation's draft. */
+  addSideChatReplyToMain: (sessionId: string) => void;
+  /** Abort one session's running turn, visible or not. */
+  abortSession: (sessionId: string) => Promise<void>;
   /** Reveal the active session's retained work panel without creating a tab. */
   openWorkPanel: () => void;
   /** Flip the work panel between revealed and collapsed for the active session. */
@@ -1319,6 +1431,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   workPanelContexts: {},
   workPanelWidth: initialWorkPanelWidth,
   workPanelFileRequest: null,
+  sideChats: {},
+  sideChatTranscripts: {},
   projectSort: initialSidebarPreferences.projectSort,
   messages: [],
   retainedSessionIds: [],
@@ -3185,6 +3299,63 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: Math.min(state.navIndex, navStack.length - 1),
       };
     });
+    // A side chat is renderer-owned state spanning two sessions: deleting either
+    // the child or the parent releases it, together with every side chat opened
+    // from it. The child session itself is deleted through its own sidebar row,
+    // so this only drops the panel projection (D395).
+    set((state) => {
+      const sideChats = removeSideChatsForSessions(state.sideChats, [id]);
+      if (sideChats === state.sideChats) return {};
+      const released = sideChatSessionIds(state.sideChats).filter(
+        (sessionId) => !sideChats[sessionId],
+      );
+      const sideChatTranscripts = { ...state.sideChatTranscripts };
+      for (const sessionId of released) delete sideChatTranscripts[sessionId];
+      // A released side chat's tab outlives its session in every panel context
+      // that still lists it, and a dead tab would offer a live composer for a
+      // deleted session, so the tabs are stripped with the registration.
+      const releasedTabIds = new Set(
+        released.map((sessionId) => sideChatWorkPanelTab(sessionId).id),
+      );
+      const stripTabs = (tabs: WorkPanelTab[]) =>
+        tabs.filter((tab) => !releasedTabIds.has(tab.id));
+      const workPanelTabs = stripTabs(state.workPanelTabs);
+      const activeTabReleased = Boolean(
+        state.activeWorkPanelTabId &&
+          releasedTabIds.has(state.activeWorkPanelTabId),
+      );
+      const workPanelContexts = Object.fromEntries(
+        Object.entries(state.workPanelContexts).map(
+          ([contextSessionId, context]) => {
+            const tabs = stripTabs(context.tabs);
+            if (tabs.length === context.tabs.length) {
+              return [contextSessionId, context];
+            }
+            const activeTabId =
+              context.activeTabId && releasedTabIds.has(context.activeTabId)
+                ? tabs.at(-1)?.id ?? null
+                : context.activeTabId;
+            return [
+              contextSessionId,
+              { ...context, tabs, activeTabId, open: activeTabId ? context.open : false },
+            ];
+          },
+        ),
+      );
+      return {
+        sideChats,
+        sideChatTranscripts,
+        workPanelTabs,
+        workPanelContexts,
+        activeWorkPanelTabId: activeTabReleased
+          ? workPanelTabs.at(-1)?.id ?? null
+          : state.activeWorkPanelTabId,
+        workPanelOpen:
+          activeTabReleased && workPanelTabs.length === 0
+            ? false
+            : state.workPanelOpen,
+      };
+    });
     persistCurrentSidebar(get);
     await get().refreshSessions();
   },
@@ -3665,6 +3836,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       // before they settle running/error state.
       streamUpdates.flushNow();
     }
+    // A registered side chat's panel projection follows every envelope, including
+    // while its child is the active session: the panel and the active transcript
+    // are separate projections of the same stream, so switching to the child and
+    // back cannot leave a hole in the docked transcript (D395).
+    projectSideChatEvent(envelope);
     if (
       event.type === "message_start" ||
       event.type === "message_update" ||
@@ -4303,6 +4479,177 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   closeSubagentPanel: () => set({ subagentPanel: null }),
 
+  appendComposerDraftText: (text) => {
+    const sessionId = get().activeSessionId;
+    if (!sessionId || !text) return;
+    // Read the live draft so a quote adds to what the user already typed. The
+    // composer applies this prefill for its own session and then clears it (D209).
+    const draft = readComposerDraft(draftKeyForSession(sessionId));
+    set({
+      composerPrefill: {
+        sessionId,
+        text: appendQuoteToDraft(draft?.text ?? "", text),
+        fileReferences: draft?.fileReferences ?? [],
+      },
+    });
+  },
+
+  quoteMessageIntoComposer: ({ title, text, selection }) => {
+    if (!get().activeSessionId) return;
+    const excerpt = quoteExcerpt(text, selection ?? "");
+    if (!excerpt) return;
+    get().appendComposerDraftText(
+      buildQuoteText(excerpt, i18n.t("chat.quoteSource", { title })),
+    );
+  },
+
+  openSideChat: async (messageId) => {
+    const state = get();
+    const parentSessionId = state.activeSessionId;
+    if (!parentSessionId) return null;
+    // One fork per anchored message: two clicks before the host answers must
+    // share one round trip, not create two children for the same anchor (D395).
+    const openKey = `${parentSessionId}:${messageId}`;
+    const inFlight = sideChatOpens.get(openKey);
+    if (inFlight) return inFlight;
+    const request = (async () => {
+      const message = state.messages.find(
+        (candidate) => candidate.id === messageId,
+      );
+      const parent = state.sessions.find(
+        (session) => session.id === parentSessionId,
+      );
+      if (!message || !parent) return null;
+      // Re-opening an existing side chat brings its panel back instead of
+      // forking a second child from the same answer.
+      const existing = sideChatsForParent(state.sideChats, parentSessionId).find(
+        (chat) => chat.anchorMessageId === messageId,
+      );
+      if (existing) {
+        // Dock into the parent's own context: the fork may resolve after the
+        // user switched conversations, and the panel must not follow them.
+        get().openWorkPanelTabForSession(
+          parentSessionId,
+          sideChatWorkPanelTab(existing.sessionId),
+        );
+        return existing.sessionId;
+      }
+      // The host refuses a fork while the source turn is still running.
+      if (state.runningSessions[parentSessionId]) return null;
+      const sourceTitle = parent.title.trim() || i18n.t("chat.untitledTask");
+      try {
+        const result = await api.forkSession(
+          parentSessionId,
+          i18n.t("sideChat.sessionTitle", { title: sourceTitle }),
+          messageId,
+        );
+        const child = result.session;
+        const messages = forkedSessionMessages(child);
+        // The child is durable on the host now. Recording it is what puts it in
+        // the session list; activation is what is deliberately skipped, so the
+        // main conversation keeps its transcript, its draft, and its run state.
+        commitForkedSession(child, { activate: false, clearError: true });
+        set((current) => ({
+          sideChats: registerSideChat(
+            current.sideChats,
+            sideChatEntry({
+              sessionId: child.id,
+              parentSessionId,
+              title: child.title,
+              anchorMessageId: messageId,
+            }),
+          ),
+          sideChatTranscripts: {
+            ...current.sideChatTranscripts,
+            [child.id]: messages,
+          },
+        }));
+        get().openWorkPanelTabForSession(
+          parentSessionId,
+          sideChatWorkPanelTab(child.id),
+        );
+        return child.id;
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : String(error),
+          errorCode: (error as { code?: string })?.code ?? null,
+        });
+        return null;
+      }
+    })();
+    sideChatOpens.set(openKey, request);
+    try {
+      return await request;
+    } finally {
+      if (sideChatOpens.get(openKey) === request) sideChatOpens.delete(openKey);
+    }
+  },
+  closeSideChat: (sessionId) => {
+    if (!sessionId) return;
+    const tabId = sideChatWorkPanelTab(sessionId).id;
+    if (get().workPanelTabs.some((tab) => tab.id === tabId)) {
+      get().closeWorkPanelTab(tabId);
+    }
+    set((state) => {
+      const sideChats = removeSideChat(state.sideChats, sessionId);
+      if (sideChats === state.sideChats) return {};
+      // The durable child session stays in the sidebar and in search; only the
+      // renderer's panel projection and its tab go away.
+      const workPanelContexts = Object.fromEntries(
+        Object.entries(state.workPanelContexts).map(([id, context]) => {
+          if (!context.tabs.some((tab) => tab.id === tabId)) return [id, context];
+          const tabs = context.tabs.filter((tab) => tab.id !== tabId);
+          return [
+            id,
+            {
+              ...context,
+              tabs,
+              activeTabId:
+                context.activeTabId === tabId
+                  ? tabs.at(-1)?.id ?? null
+                  : context.activeTabId,
+            },
+          ];
+        }),
+      );
+      return {
+        sideChats,
+        sideChatTranscripts: withoutRecordKey(
+          state.sideChatTranscripts,
+          sessionId,
+        ),
+        workPanelContexts,
+      };
+    });
+  },
+
+  addSideChatReplyToMain: (sessionId) => {
+    const entry = get().sideChats[sessionId];
+    if (!entry) return;
+    const messages = get().sideChatTranscripts[sessionId] ?? [];
+    const answer = [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === "assistant" && Boolean((message.content || "").trim()),
+      );
+    if (!answer) return;
+    get().quoteMessageIntoComposer({ title: entry.title, text: answer.content });
+  },
+
+  abortSession: async (sessionId) => {
+    if (!sessionId) return;
+    try {
+      await api.abort(sessionId);
+    } finally {
+      set((state) => ({
+        isRunning:
+          state.activeSessionId === sessionId ? false : state.isRunning,
+        runningSessions: { ...state.runningSessions, [sessionId]: false },
+      }));
+    }
+  },
+
   openWorkPanel: () => {
     const state = get();
     const sessionId = state.activeSessionId;
@@ -4424,6 +4771,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const sessionId = state.activeSessionId;
       if (!sessionId) return {};
+      const closedTab = state.workPanelTabs.find((tab) => tab.id === tabId);
       const next = closeWorkPanelTabState(
         {
           tabs: state.workPanelTabs,
@@ -4433,6 +4781,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       const activeTab = next.tabs.find((tab) => tab.id === next.activeTabId);
       closePanel = next.activeTabId === null;
+      // A side chat's tab is its only panel surface, so closing the tab releases
+      // the side chat. Its child session is durable and stays in the sidebar,
+      // where it can be opened as an ordinary conversation (D395).
+      const releasedSessionId = sideChatTabSessionId(closedTab);
+      const sideChats = releasedSessionId
+        ? removeSideChat(state.sideChats, releasedSessionId)
+        : state.sideChats;
+      const sideChatTranscripts =
+        releasedSessionId && sideChats !== state.sideChats
+          ? withoutRecordKey(state.sideChatTranscripts, releasedSessionId)
+          : state.sideChatTranscripts;
       const fileRequest =
         activeTab?.kind === "file" && activeTab.resource
           ? {
@@ -4456,6 +4815,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...state.workPanelContexts,
           [sessionId]: nextContext,
         },
+        ...(sideChats !== state.sideChats
+          ? { sideChats, sideChatTranscripts }
+          : {}),
       };
     });
   },
