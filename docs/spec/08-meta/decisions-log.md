@@ -70,8 +70,8 @@ This log freezes previously open questions into concrete decisions.
 | D393 | User-invoked Skills in the composer | **Amend D123 / D174 / ADR 0024 / ADR 0039: active built-in, plugin, and user Skills appear in a separate `Skills` group at the end of the composer slash menu. Selecting one inserts its exact id; Electron main revalidates the active project scope at send time and asks the model to call the local `Skill` tool, preserving on-demand body loading and existing permissions. Existing command names win collisions; inactive Skills remain literal slash text. See ADR 0219 and E2E-088b.** | D174's model-invoked catalog remains the body-loading and security contract, while a final explicit entry makes known workflows discoverable without moving Skill bodies into the renderer, prompt, or host protocol. |
 | D394 | Windows work-panel chrome keeps one resource action cluster | **Amend D154 / D357 / ADR 0195: the open work-panel header keeps one compact resource switcher; resource close is owned by the existing keyboard-operable context-menu rows, the viewport-fixed toggle remains the only panel collapse control, and subagent detail returns with a back chevron. Windows/Linux native controls remain fixed at the window edge. Renderer-only; no panel state, window geometry, IPC, protocol, or storage change. See ADR 0220 and E2E-067.** | The header resource `X`, viewport-fixed toggle, and Windows native close cluster read as duplicate close actions and became cramped at narrow panel widths. |
 | D396 | Renderer and plugin-panel scrollbars share one compact contract | **Amend D300: every renderer scroll container uses one 6px, trackless, transparent-at-rest scrollbar with the same hover, focus-within, scroll-reveal, and dragged-thumb states. Remove the sidebar-specific width and opacity override. The plugin-panel preload applies the same contract and 300ms reveal mark to docked and detached plugin documents, including the bundled Files view. External pages loaded inside the Browser guest remain page-owned. Presentation-only; no protocol, storage, host runtime, or external-page behavior change. See E2E-157.** | Windows' classic scrollbar made the right-side work-panel Files view visibly heavier than the conversation, while the sidebar retained a second scrollbar treatment. |
-| D398 | Message quotes and renderer-owned side chats | **Amend D209 / D301: every user message and assistant turn gains a Quote action that inserts a `> `-prefixed Markdown blockquote plus a `chat.quoteSource` attribution into the active session's composer draft and focuses it, using the live selection inside that message row when one exists and the message's own text otherwise; it never sends and adds no chip kind, with a 2000-character cap. Open side chat forks the anchored message through `session.fork` without activating the child, registers the child as a renderer-owned side chat of the parent, and opens one `sidechat:<childSessionId>` tab in the existing docked panel that streams from the same event stream through the background-transcript reducer, with Add to main chat, Open as a conversation, a compact Send/Stop input, and the existing permission card. Closing the tab or activating the child removes the registration; the durable child stays an ordinary session. No protocol, schema, IPC, or permission change. See ADR 0223 and E2E-249 through E2E-254.** | Users needed to reuse an exact earlier message or answer and to ask a side question without replacing the visible main conversation, and the existing fork path always activated its child. *(Amended by D399: the excerpt is recovered from the rendered DOM as Markdown, and a selection inside a transcript row quotes from a floating affordance on its last line.)* |
-| D399 | Selection-following quote affordance | **Amend D398: a non-empty text selection inside a transcript row floats one `chat.quoteSelection` affordance on the selection's last line, clamped inside the viewport, hidden on scroll, resize, selection collapse, activation, and in read-only projections; activating it writes a composer draft and focuses the composer without sending. The excerpt is recovered from the rendered DOM as Markdown — `$…$` / `$$…$$` TeX from KaTeX's annotation, fenced code with a language, one `a | b` line per table row — and the per-message Quote action uses that same recovery. Renderer-only; no protocol, storage, IPC, permission, or host change. See ADR 0223 and E2E-249, E2E-255.** | The Quote action lived at the end of the message, so quoting the sentence or formula being read meant scrolling away from it, and a raw DOM selection duplicated every KaTeX formula and flattened every table. |
+| D398 | Message quotes and renderer-owned side chats | **Amend D209 / D301: every user message and assistant turn gains a Quote action that inserts a `> `-prefixed Markdown blockquote plus a `chat.quoteSource` attribution into the active session's composer draft and focuses it, using the live selection inside that message row when one exists and the message's own text otherwise; it never sends and adds no chip kind, with a 2000-character cap. Open side chat forks the anchored message through `session.fork` without activating the child, registers the child as a renderer-owned side chat of the parent, and opens one `sidechat:<childSessionId>` tab in the existing docked panel that streams from the same event stream through the background-transcript reducer, with Add to main chat, Open as a conversation, a compact Send/Stop input, and the existing permission card. Closing the tab or activating the child removes the registration; the durable child stays an ordinary session. No protocol, schema, IPC, or permission change. See ADR 0223 and E2E-249 through E2E-254.** | Users needed to reuse an exact earlier message or answer and to ask a side question without replacing the visible main conversation, and the existing fork path always activated its child. *(Amended by D399: the excerpt is recovered from the rendered DOM as Markdown, and a selection inside a transcript row offers Add to chat, Ask in side chat, and Copy from a selection-following overlay.)* |
+| D399 | Selection overlay for quotes | **Amend D398: a non-empty text selection inside one transcript row floats one overlay above it — centered on the selection, clamped into its clipping ancestors' rects and above the docked composer, portaled like the app's other body-portaled popovers, and following the selection while the thread scrolls. It offers Add to chat (`chat.addToChat`, writes the excerpt to the active session's composer draft through the D398 quote contract), Ask in side chat (`chat.askInSideChat`, forks at that row and sends the excerpt as that child's prompt), and Copy (`chat.copy`); every action clears the native selection, a drag across rows raises no overlay, and a read-only projection renders none. The excerpt is recovered from the rendered DOM as Markdown — `$…$` / `$$…$$` TeX from KaTeX's annotation, fenced code with a language, one `a | b` line per table row — and the per-message Quote action shares that recovery. Renderer-only; no protocol, storage, IPC, permission, or host change beyond the composer's `data-composer-dock` hook. See ADR 0223 and E2E-249, E2E-255, E2E-256.** | The Quote action lived at the end of the message, so quoting the sentence or formula being read meant scrolling away from it; the ChatGPT desktop app answers this with a selection overlay, which this decision mirrors. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -4586,24 +4586,33 @@ D193, and D194.
   `03-runtime/07-process-model.md`, `03-runtime/06-host-rpc-protocol.md` §7,
   and E2E-247.
 
-## 2026-09-11 — Selection-following quote affordance (D399)
+## 2026-09-11 — Selection overlay for quotes (D399)
 
-- Quote no longer has to be reached at the end of the answer. A non-empty text
-  selection inside a transcript row floats one `chat.quoteSelection` affordance
-  on the selection's last line, clamped inside the viewport (below the
-  selection, above it when the pane runs out of room), portaled above the
-  transcript, and hidden again by scrolling the thread, resizing the window,
-  collapsing the selection, or activating it. The pointer press is prevented so
-  the press cannot collapse the selection first.
+- Quote no longer has to be reached at the end of the answer: a non-empty text
+  selection inside one transcript row floats one overlay **above** it, centered
+  on the selection and clamped into its clipping ancestors' rects (the transcript
+  scroller is one) and capped by the top of the docked composer. It is portaled
+  like the app's other body-portaled popovers and follows the selection while the
+  thread scrolls, rather than hiding.
+- The overlay offers Add to chat (`chat.addToChat`), Ask in side chat
+  (`chat.askInSideChat`) and Copy (`chat.copy`). Add to chat writes the excerpt
+  into the active session's composer draft under D398's quote contract; Ask in
+  side chat forks at that row and sends the excerpt as that child's prompt, so
+  the question is answered in the panel instead of the visible conversation; Copy
+  writes the Markdown to the clipboard. Every action clears the native selection,
+  a drag that crosses rows raises no overlay, and a read-only projection renders
+  none.
 - The excerpt is recovered from the rendered DOM instead of
-  `Selection.toString()`. A range touching a formula expands to the whole
-  formula and quotes KaTeX's `application/x-tex` annotation as `$…$` or `$$…$$`;
-  a code block becomes a fence with its language and a delimiter longer than any
+  `Selection.toString()`: a range touching a formula expands to the whole formula
+  and quotes KaTeX's `application/x-tex` annotation as `$…$` or `$$…$$`; a code
+  block becomes a fence with its language and a delimiter longer than any
   backtick run inside it; a table row becomes one `a | b` line; inline code keeps
   its backticks and file-reference chips keep their code text. The row action and
-  the floating affordance share this one recovery path.
+  the overlay share this one recovery path.
 - The 2000-character cap, the `> ` blockquote, the `chat.quoteSource`
   attribution, focus, and the no-send/no-session/no-transcript-write boundaries
-  are unchanged, including the read-only projection rule: a docked side chat
-  renders no quote affordance. Renderer-only; no protocol, storage-schema, IPC,
-  or permission change. See ADR 0223 and E2E-249, E2E-255.
+  are unchanged. Two deviations from the reference implementation are deliberate,
+  because the quote lands in a Markdown draft this app renders back: formulas use
+  `$…$` / `$$…$$` (remark-math), and table rows use `a | b`. Renderer-only; no
+  protocol, storage-schema, IPC, or permission change beyond the composer's
+  `data-composer-dock` hook. See ADR 0223 and E2E-249, E2E-255, E2E-256.

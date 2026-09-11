@@ -151,32 +151,63 @@ main transcript leaves the screen, and coming back costs a session switch.
 
 ## Amendment (D399, 2026-09-11) — the quote affordance follows the selection
 
+Geometry and behavior follow the ChatGPT desktop app's selected-text overlay; the
+excerpt and the side-chat target stay PI-Desktop's own contracts (D398).
+
 - Decision 1 stands: every user message and every assistant turn keeps its Quote
   action for the whole message. A non-empty text selection inside a transcript
-  row additionally floats **one** quote affordance on the selection's last line.
-  It is labeled `chat.quoteSelection`, positioned in viewport coordinates and
-  clamped inside the viewport (below the selection, above it when the pane runs
-  out of room), portaled above the transcript, and hidden again by scrolling the
-  thread, resizing the window, collapsing the selection, or activating it.
-  Pressing it prevents the pointer default so the press cannot collapse the
-  selection first. It is not rendered in a read-only projection (D398 decision
-  12's rule extends to it), and it quotes only selections whose start lies in
-  the transcript that owns it.
-- Decision 3's excerpt is now recovered from the rendered DOM rather than from
+  row additionally floats **one** overlay above it.
+- Placement: the overlay is horizontally centered on the selection's visible
+  rect, sits `SELECTION_QUOTE_GAP` (8 px) above that rect, and is clamped into
+  its **bounds** on both axes with `SELECTION_QUOTE_MARGIN` (8 px) of slack. The
+  bounds are the intersection of every clipping ancestor's rect (the transcript
+  scroller is one) with the viewport, capped by the top of the docked composer —
+  which floats over the transcript, so the scroller's own bottom edge is not the
+  visible bottom. `Composer` publishes the `data-composer-dock` hook for that cap
+  instead of the overlay guessing a class name. The overlay is portaled to
+  `document.body` and lives in the body-portaled popover layer, so it never
+  participates in the transcript's layout or scroll extent.
+- The selection has to live in **one** row: a drag that crosses rows raises no
+  overlay, and a range whose ends leave the row is clamped back to that row's
+  contents before it is quoted.
+- While the thread scrolls the overlay **recomputes and follows** the selection
+  (it does not hide); a scroll of something unrelated to the selection leaves it
+  alone. It also recomputes on selection change, double click, key up, pointer
+  up, pointer cancel, and resize, at most once per animation frame, and it hides
+  when a press lands outside it or when the selection collapses.
+- Actions, in the reference overlay's order: **Add to chat**
+  (`chat.addToChat`) writes the excerpt into the active session's composer draft
+  through D398 decision 3's contract and focuses the composer via the existing
+  prefill path; **Ask in side chat** (`chat.askInSideChat`) opens the side chat
+  anchored at that row (`session.fork` through D398 decision 4) and sends the
+  excerpt as that child's prompt, so the question is answered beside the
+  conversation instead of inside it; **Copy** reuses `chat.copy` and writes the
+  Markdown to the clipboard. The side-chat action is disabled while the visible
+  session is running, because the host refuses a fork mid-turn. Every action
+  clears the native selection first, so the overlay does not outlive its own
+  click. The overlay is not rendered in a read-only projection (D398 decision
+  12's rule extends to it).
+- Decision 3's excerpt is still recovered from the rendered DOM rather than from
   `Selection.toString()`. A range that touches a formula is expanded to the whole
   formula and quoted from KaTeX's `application/x-tex` annotation as `$…$`
   (inline) or `$$…$$` (display); a code block becomes a fence whose delimiter
   outgrows the longest backtick run inside it and keeps its language; inline code
   keeps its backticks; a table row becomes one `a | b` line; task checkboxes
   become `[x] `/`[ ] `; transcript chrome (action rows, copy buttons) is dropped
-  while a file-reference chip keeps its code text. The row action and the
-  floating affordance call that one recovery path, so they cannot drift.
+  while a file-reference chip keeps its code text. The row action and the overlay
+  call that one recovery path, so they cannot drift.
+- Two deliberate deviations from the reference implementation, both because the
+  quote lands in a **Markdown draft** PI-Desktop renders back: formulas use
+  `$…$` / `$$…$$` (this renderer parses remark-math, not `\(…\)`), and table
+  rows use `a | b` (Markdown) rather than tab-separated text. The reference's
+  numbered `annotation` model is not adopted: D398 decision 3 keeps the excerpt
+  as ordinary, visible, editable draft text.
 - The 2000-character cap, the `> ` blockquote, the `chat.quoteSource`
   attribution, the append-to-draft behavior, focus, and the no-send/no-session/
-  no-transcript-write boundaries are unchanged. One i18n key is added
-  (`chat.quoteSelection` in every shipped locale).
+  no-transcript-write boundaries are unchanged. i18n keys introduced:
+  `chat.addToChat`, `chat.askInSideChat` (Copy reuses `chat.copy`).
 - Boundaries remain those of D398 decision 12: no host protocol bump, no storage
-  schema change, no new IPC channel, no new permission. The affordance is
+  schema change, no new IPC channel, no new permission. The overlay is
   renderer-only and holds no durable state beyond the existing composer draft.
-- Covered by E2E-249 (steps and expected for the floating affordance) and
-  E2E-255 (formula, table, code, and inline-code recovery).
+- Covered by E2E-249 (overlay placement, follow, and actions), E2E-255 (formula,
+  table, code, and inline-code recovery), and E2E-256 (ask in side chat).
