@@ -918,6 +918,14 @@ Running turns and pending approvals continue to gate the controls.
   remain text-selectable for inspection and copying.
 - Interactive controls nested inside selectable content remain
   non-selectable and must keep their click and keyboard behavior.
+- A non-empty selection inside a transcript row raises one floating quote
+  affordance on the selection's last line (`chat.quoteSelection`, D399). It is
+  viewport-positioned and viewport-clamped, portaled above the transcript, and
+  hides on scroll, resize, selection collapse, and after activation. It never
+  renders in a read-only projection, next to no transcript at all, and it does
+  not steal the selection: the pointer press is prevented so the excerpt is
+  whatever was selected, including a whole formula. Activating it writes a
+  composer draft and focuses the composer; it never sends.
 - Selection rules must not disable `focus-visible` feedback or native window
   drag regions.
 

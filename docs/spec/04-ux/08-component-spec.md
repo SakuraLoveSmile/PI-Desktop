@@ -1629,7 +1629,7 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   height derives from `--composer-dock-height`, which the composer republishes as
   its draft grows, so dashes move without a marker change or a window resize.
 
-### 8.8 Quote and side-chat actions (D398)
+### 8.8 Quote and side-chat actions (D398, D399)
 
 - Every user message and every assistant turn exposes **Quote** in its hover
   action row beside Copy, Edit, Delete, Fork, and Retry. Activating it inserts a
@@ -1642,6 +1642,21 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   clicked message row; otherwise it is the message's own text (for an assistant
   turn, its answer text). The inserted text follows the Composer contract in
   §11.9.
+- A non-empty selection inside a transcript row also floats **one** quote
+  affordance (`chat.quoteSelection`) on the selection's last line, so the common
+  case — quoting the sentence, formula, or table just read — needs no scroll to
+  the end of the message. It is positioned in viewport coordinates inside the
+  viewport edges (below the selection, above it when the pane runs out of room),
+  is portaled above the transcript, and hides on scroll, on resize, on selection
+  collapse, and after it is activated. It is a transcript affordance, not a
+  message one: a read-only projection (§5.8) never renders it, and never
+  renders the row toolbars either.
+- The excerpt is recovered from the rendered DOM (D399), not from
+  `Selection.toString()`: a formula quotes as `$…$` / `$$…$$` TeX from KaTeX's
+  `application/x-tex` annotation (a partial formula selection is expanded to the
+  whole formula), a code block quotes as a fence whose delimiter outgrows any
+  backtick run inside it, a table quotes as one `a | b` line per row, and both
+  Quote paths — row action and floating affordance — share that one recovery.
 
 ---
 
@@ -2589,13 +2604,20 @@ Anatomy:
   matches renders the localized empty row and the menu counts as closed for
   key handling.
 
-### 11.9 Quoted message drafts (D398)
+### 11.9 Quoted message drafts (D398, D399)
 
-- Quote in the transcript action row (§8.8) and Add to main chat in the side
-  chat (§5.8) prefill the composer draft with ordinary Markdown text: each
+- Quote in the transcript action row (§8.8), the floating selection affordance
+  (§8.8), and Add to main chat in the side chat (§5.8) prefill the composer
+  draft with ordinary Markdown text: each
   excerpt line prefixed with `> `, then one blank line, then the attribution
   line rendered from `chat.quoteSource` ("Quoted from {{title}}"; Chinese
   "引用自 {{title}}"), where the title is the source session's title.
+- A selection is serialized back to Markdown before it becomes an excerpt
+  (D399): `$…$` / `$$…$$` TeX from the KaTeX annotation, fenced code with a
+  language and a delimiter that outgrows its content, backticked inline code,
+  one `a | b` line per table row, `[x] `/`[ ] ` for task checkboxes, and no
+  transcript chrome. Excerpt whitespace is collapsed to source-like text, so a
+  rendered block boundary never becomes a stray blank line.
 - The excerpt is capped at 2000 characters with a trailing ellipsis. Quoting
   inserts the draft and focuses the composer; it never sends, never creates a
   session, and adds no chip kind and no file reference.

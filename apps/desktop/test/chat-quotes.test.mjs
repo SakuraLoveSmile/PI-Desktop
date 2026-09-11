@@ -62,8 +62,8 @@ test("quoting appends to a draft instead of replacing it", () => {
 
 test("the quote action is wired to the composer draft and never sends", () => {
   assert.match(transcript, /quoteMessageIntoComposer\(\{/);
-  assert.match(transcript, /selectedTextWithinRow\(message\.id\)/);
-  assert.match(transcript, /selectedTextWithinRow\(entry\.anchorId\)/);
+  assert.match(transcript, /selectionMarkdownWithinRow\(message\.id\)/);
+  assert.match(transcript, /selectionMarkdownWithinRow\(entry\.anchorId\)/);
   assert.match(transcript, /t\("chat\.quote"\)/);
   // Quoting only edits a draft: no prompt, session, or transcript write.
   assert.match(store, /quoteMessageIntoComposer: \(\{ title, text, selection \}\)/);

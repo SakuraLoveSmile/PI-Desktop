@@ -264,6 +264,7 @@ export const fr = {
     "forkResponse": "à partir de cette réponse",
     "quote": "Citer",
     "quoteSource": "Citation de {{title}}",
+    "quoteSelection": "Citer la sélection",
     "startSideChat": "Ouvrir le chat latéral",
     "editMessage": "Modifier et renvoyer",
     "cancelEdit": "Annuler",
