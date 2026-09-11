@@ -93,7 +93,8 @@ test("reject or interruption returns editable planning without changing durable 
     storeSource.match(/sendPrompt: async \(content, draft, requestedSessionId\)[\s\S]*?\n  compactContext:/)?.[0] ?? "";
   assert.match(sendPromptBlock, /get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.match(sendPromptBlock, /await api\.prompt\(\{/);
-  assert.match(sendPromptBlock, /sessionId,\s*content,/);
+  // The send ships the composed prompt so annotations travel with it (D400).
+  assert.match(sendPromptBlock, /sessionId,\s*content: outgoing,/);
   assert.match(
     sendPromptBlock,
     /attachments: draft[\s\S]*promptAttachmentsFromDraft\(draft\.fileReferences\)/,

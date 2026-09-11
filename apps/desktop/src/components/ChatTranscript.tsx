@@ -78,6 +78,12 @@ import {
 } from "../lib/chat-links";
 import { selectionMarkdownWithinRow } from "../lib/selection-quote";
 import {
+  annotationMarkers,
+  requestTextWithoutAnnotations,
+  sourceWithAnnotationMarkers,
+  type ResponseAnnotation,
+} from "../lib/response-annotations";
+import {
   isRecentScrollGesture,
   reduceTranscriptScroll,
 } from "../lib/transcript-scroll";
@@ -150,6 +156,9 @@ import { TooltipButton } from "./ui";
 import { SelectionQuoteButton } from "./SelectionQuoteButton";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+/** Stable empty list: a store selector must not return a fresh array. */
+const NO_ANNOTATIONS: ResponseAnnotation[] = [];
 
 /**
  * Whether this transcript is a passive projection of another session (D398).
@@ -2157,6 +2166,7 @@ const MessageRow = memo(function MessageRow({
     <div
       className={`message-row ${isUser ? "user" : message.role}`}
       data-minimap-id={message.id}
+      data-row-role="user"
       role="article"
       aria-label={isUser ? t("chat.userMessage") : t("chat.assistantMessage")}
     >
@@ -2248,7 +2258,13 @@ const MessageRow = memo(function MessageRow({
                         {message.command}
                       </code>
                     ) : (
-                      <LinkifiedText text={String(message.content || "")} />
+                      // The stored prompt carries any annotation block it was
+                      // sent with; the user only wrote the request (D400).
+                      <LinkifiedText
+                        text={requestTextWithoutAnnotations(
+                          String(message.content || ""),
+                        )}
+                      />
                     )}
                   </div>
                 ) : null}
@@ -2532,11 +2548,15 @@ const AssistantTurn = memo(function AssistantTurn({
   const { t } = useTranslation();
   const retryAssistantMessage = useAppStore((s) => s.retryAssistantMessage);
   const forkAssistantMessage = useAppStore((s) => s.forkAssistantMessage);
-  const quoteLabel = t("chat.quote");
+  const annotateLabel = t("chat.annotate");
   const sideChatLabel = t("chat.startSideChat");
-  const sessionTitle = useActiveSessionTitle();
   const openSideChat = useAppStore((s) => s.openSideChat);
-  const quoteMessageIntoComposer = useAppStore((s) => s.quoteMessageIntoComposer);
+  const addResponseAnnotation = useAppStore((s) => s.addResponseAnnotation);
+  const sessionAnnotations = useAppStore((s) =>
+    s.activeSessionId
+      ? (s.responseAnnotations[s.activeSessionId] ?? NO_ANNOTATIONS)
+      : NO_ANNOTATIONS,
+  );
   const transcriptReadOnly = useContext(TranscriptReadOnlyContext);
   // The host refuses a fork while the source turn is still running, so the
   // affordance is disabled rather than silently doing nothing.
@@ -2545,6 +2565,22 @@ const AssistantTurn = memo(function AssistantTurn({
   );
   const messages = assistantTurnMessages(entry);
   const content = assistantTurnContent(entry);
+  // One marker per annotation, and never twice: an excerpt the answer repeats
+  // marks its first occurrence only (D400).
+  const markedAnnotations = new Set<number>();
+  const sourceWithMarkers = (source: string): string => {
+    // A read-only projection shows another session's rows; the annotations in
+    // hand belong to the visible one, so they never mark them (D400).
+    if (transcriptReadOnly || sessionAnnotations.length === 0 || !source) {
+      return source;
+    }
+    const markers = annotationMarkers(source, sessionAnnotations).filter(
+      (marker) => marker.offset >= 0 && !markedAnnotations.has(marker.index),
+    );
+    if (markers.length === 0) return source;
+    for (const marker of markers) markedAnnotations.add(marker.index);
+    return sourceWithAnnotationMarkers(source, markers);
+  };
   const actionMessage = [...messages]
     .reverse()
     .find((message) => (message.content || "").trim());
@@ -2593,6 +2629,7 @@ const AssistantTurn = memo(function AssistantTurn({
     <div
       className={`message-row assistant assistant-turn${streaming ? " streaming" : ""}`}
       data-minimap-id={entry.anchorId}
+      data-row-role="assistant"
       role="article"
       aria-label={t("chat.assistantMessage")}
     >
@@ -2619,7 +2656,7 @@ const AssistantTurn = memo(function AssistantTurn({
             >
               {part.message.content ? (
                 <div className="prose-chat">
-                  <Markdown source={part.message.content} />
+                  <Markdown source={sourceWithMarkers(part.message.content)} />
                 </div>
               ) : null}
               {part.message.error ? (
@@ -2664,19 +2701,19 @@ const AssistantTurn = memo(function AssistantTurn({
             {complete ? (
               <TooltipButton
                 className="copy-btn icon"
-                tooltip={quoteLabel}
-                ariaLabel={quoteLabel}
-                onClick={() =>
-                  quoteMessageIntoComposer({
-                    title: sessionTitle,
-                    text: content,
-                    // An assistant row is anchored by its turn, and a turn
-                    // without an anchor has no selection to match.
-                    selection: entry.anchorId
-                      ? selectionMarkdownWithinRow(entry.anchorId)
-                      : "",
-                  })
-                }
+                tooltip={annotateLabel}
+                ariaLabel={annotateLabel}
+                onClick={() => {
+                  // An annotation is a response concept (D400): the selection
+                  // when there is one, the whole answer otherwise. A turn
+                  // without an anchor has no row to annotate.
+                  if (!entry.anchorId) return;
+                  const selection = selectionMarkdownWithinRow(entry.anchorId);
+                  addResponseAnnotation({
+                    messageId: entry.anchorId,
+                    text: selection || content,
+                  });
+                }}
               >
                 <IconQuote size={13} />
               </TooltipButton>
