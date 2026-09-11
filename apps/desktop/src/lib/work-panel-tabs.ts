@@ -5,7 +5,7 @@ export type WorkPanelTabKind =
   /**
    * A follow-up conversation opened from a message. The tab id is
    * `sidechat:<childSessionId>` and the resource is that child session, so the
-   * panel shows a real session without making it the visible one (D395).
+   * panel shows a real session without making it the visible one (D398).
    */
   | "sidechat";
 

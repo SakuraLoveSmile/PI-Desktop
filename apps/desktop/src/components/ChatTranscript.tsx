@@ -150,7 +150,7 @@ import { TooltipButton } from "./ui";
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /**
- * Whether this transcript is a passive projection of another session (D395).
+ * Whether this transcript is a passive projection of another session (D398).
  *
  * A docked side chat renders a real session that is not the application's active
  * one, but the row toolbars resolve against the active session — Delete would

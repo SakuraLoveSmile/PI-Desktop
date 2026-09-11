@@ -74,7 +74,7 @@ function tabLabel(
     return view?.title ?? tab.resource ?? t("panel.tabs.plugin");
   }
   // The side-chat tab shows a conversation, so it reuses the side chat's own
-  // label instead of inventing a second name for the same surface (D395).
+  // label instead of inventing a second name for the same surface (D398).
   if (tab.kind === "sidechat") return t("sideChat.title");
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
   const path = tab.resource ?? "";
@@ -788,7 +788,7 @@ export function WorkPanel({
             })()}
           {/* A side chat docks the child session's conversation beside the main
               one. It stays mounted per child session so switching between two
-              side chats keeps each transcript's scroll position (D395). */}
+              side chats keeps each transcript's scroll position (D398). */}
           {!subagentPanel &&
             activeTab?.kind === "sidechat" &&
             (() => {

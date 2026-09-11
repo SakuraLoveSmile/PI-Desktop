@@ -4,7 +4,7 @@
  * A side chat is an ordinary forked child session on the host, but the renderer
  * keeps it out of the visible conversation: it is registered against its parent
  * session and shown in the docked work panel, so the main transcript, its
- * composer draft, and its run state are never replaced (ADR 0221 / D395).
+ * composer draft, and its run state are never replaced (ADR 0223 / D398).
  */
 import type { WorkPanelTab } from "./work-panel-tabs";
 

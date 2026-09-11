@@ -558,7 +558,7 @@ function insertOptimisticUserMessage(sessionId: string, message: UiMessage): voi
     sessionTranscriptCache.set(sessionId, upsertLiveSessionMessage(cached, message));
   }
   // A side chat's panel renders its own projection rather than the active
-  // transcript, so a prompt sent from there must land in it as well (D395).
+  // transcript, so a prompt sent from there must land in it as well (D398).
   if (state.sideChatTranscripts[sessionId]) {
     useAppStore.setState((s) => ({
       sideChatTranscripts: {
@@ -739,7 +739,7 @@ function cacheBackgroundTranscriptEvent(envelope: AgentEventEnvelope): void {
 }
 
 /**
- * Keep a registered side chat's panel transcript current (D395).
+ * Keep a registered side chat's panel transcript current (D398).
  *
  * The child session is deliberately never the active one, so its events take the
  * background path; this projection is what the docked panel renders, and it is
@@ -1111,7 +1111,7 @@ export type AppState = {
   /**
    * Side chats opened from messages, keyed by their child session id. The child
    * is a real forked session on the host; this map is what keeps it out of the
-   * visible conversation and inside the docked panel (D395).
+   * visible conversation and inside the docked panel (D398).
    */
   sideChats: SideChatMap;
   /** Live transcript of each registered side chat, fed by the agent event stream. */
@@ -3302,7 +3302,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // A side chat is renderer-owned state spanning two sessions: deleting either
     // the child or the parent releases it, together with every side chat opened
     // from it. The child session itself is deleted through its own sidebar row,
-    // so this only drops the panel projection (D395).
+    // so this only drops the panel projection (D398).
     set((state) => {
       const sideChats = removeSideChatsForSessions(state.sideChats, [id]);
       if (sideChats === state.sideChats) return {};
@@ -3839,7 +3839,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // A registered side chat's panel projection follows every envelope, including
     // while its child is the active session: the panel and the active transcript
     // are separate projections of the same stream, so switching to the child and
-    // back cannot leave a hole in the docked transcript (D395).
+    // back cannot leave a hole in the docked transcript (D398).
     projectSideChatEvent(envelope);
     if (
       event.type === "message_start" ||
@@ -4508,7 +4508,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const parentSessionId = state.activeSessionId;
     if (!parentSessionId) return null;
     // One fork per anchored message: two clicks before the host answers must
-    // share one round trip, not create two children for the same anchor (D395).
+    // share one round trip, not create two children for the same anchor (D398).
     const openKey = `${parentSessionId}:${messageId}`;
     const inFlight = sideChatOpens.get(openKey);
     if (inFlight) return inFlight;
@@ -4783,7 +4783,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       closePanel = next.activeTabId === null;
       // A side chat's tab is its only panel surface, so closing the tab releases
       // the side chat. Its child session is durable and stays in the sidebar,
-      // where it can be opened as an ordinary conversation (D395).
+      // where it can be opened as an ordinary conversation (D398).
       const releasedSessionId = sideChatTabSessionId(closedTab);
       const sideChats = releasedSessionId
         ? removeSideChat(state.sideChats, releasedSessionId)

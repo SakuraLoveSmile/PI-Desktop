@@ -1,5 +1,5 @@
 /*
-  Side chat: a follow-up conversation docked in the work panel (D395).
+  Side chat: a follow-up conversation docked in the work panel (D398).
 
   The panel owns the tab chrome and the width; this partial owns the three rows
   inside it — actions, the child session's transcript, and the compact composer.

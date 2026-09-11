@@ -12,7 +12,7 @@ import { headPermission, sessionPermissions } from "../../lib/pending-permission
 const EMPTY_MESSAGES: UiMessage[] = [];
 
 /**
- * The docked side-chat surface (ADR 0221 / D395).
+ * The docked side-chat surface (ADR 0223 / D398).
  *
  * The panel renders the child session's own live projection, so a follow-up
  * conversation streams, asks for permission, and can be stopped without making
@@ -49,7 +49,7 @@ export function SideChatTab({ sessionId }: { sessionId: string }) {
     setSending(true);
     setDraft("");
     // The child session is the prompt target, so its stream never becomes the
-    // visible conversation; the panel reads the projection it feeds (D395).
+    // visible conversation; the panel reads the projection it feeds (D398).
     const accepted = await sendPrompt(
       text,
       { text, fileReferences: [] },

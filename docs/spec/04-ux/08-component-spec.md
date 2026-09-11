@@ -1019,6 +1019,54 @@ It does not render separate Details or Output tabs.
   deleted delegation shows a localized unavailable state and never displays
   another session's rows.
 
+### 5.8 Side chat (D398)
+
+A side chat is one more work-panel resource: a live view of another session's
+transcript beside the main conversation, not a second panel and not a new kind
+of session.
+
+- Entry: **Open side chat** on an assistant turn (fork anchored at that assistant
+  message) and on a user message (fork anchored at that user message), with the
+  tooltip and accessible name `chat.startSideChat`. Opening calls the existing
+  `session.fork` with the anchor and does not activate the child, so the main
+  conversation keeps its visible session. The child is durable on the host
+  exactly as an ordinary branch.
+- Registration: the child is registered as a side chat of the parent session in
+  renderer-owned state, and the panel opens one `sidechat` tab whose identity is
+  `sidechat:<childSessionId>`. The tab reuses the docked panel, its 244–720px
+  clamp, resize, and native-reservation lifecycle, the header switcher, and the
+  existing per-session panel-context rule (D128): changing the visible session
+  swaps that session's retained context atomically.
+- Live content: while a side chat is registered, the child's message and tool
+  start / update / end events are projected into a renderer-owned per-session
+  transcript map from the same event stream the active transcript consumes,
+  reusing the existing background-transcript reducer. The panel streams live
+  although the child is never the active session.
+- Body: a compact header with the side-chat title (the tab label reuses
+  `sideChat.title`), **Add to main chat** (`sideChat.addToMain`), **Open as a
+  conversation** (`sideChat.openAsSession`), and the shared tab-close control;
+  the child's transcript rendered with the existing transcript component; the
+  existing permission card and ask card, each resolving by the request's own
+  session id, so a child that needs approval or an answer never stalls behind an
+  invisible prompt; and a compact input (placeholder
+  `sideChat.placeholder`, empty-state line `sideChat.empty`) with Send reusing
+  `chat.send` and Stop reusing `chat.stopGenerating`. Send targets the child
+  through the existing prompt path; Stop aborts that child session.
+- Add to main chat copies the side chat's newest assistant answer into the main
+  conversation's composer as a quote of that answer, under the Composer's quoted
+  draft contract (§11.9) and its 2000-character cap, attributed to the side
+  chat's title. It never sends.
+- Open as a conversation activates the child through the normal
+  session-selection path, so the full composer, prompt queue, and stop controls
+  apply, and releases the side-chat registration and its tab.
+- Close: closing the tab removes the registration and its transcript projection.
+  The child session is not deleted and keeps appearing in the sidebar, session
+  lists, and search. Entries are removed when the tab closes, when the child is
+  opened as a conversation, and when the parent or child session is deleted.
+- Boundaries: side-chat state is renderer-owned and is not persisted across
+  restart (the durable child is). No host protocol, storage schema, IPC channel,
+  or permission changes.
+
 ---
 
 ## 6. SessionList
@@ -1172,7 +1220,9 @@ storage but compose into one assistant turn until the next user message.
   cancels pending follow work, and shows the "scroll to bottom" floating button;
   stream or resize updates cannot pull the viewport back down; send / retry /
   regenerate re-pins and jumps to bottom
-- Hover message: copy action appears
+- Hover message: its action row appears — Copy, Quote, and the row's other
+  per-turn actions. Quote prefills the composer per §11.9 and Open side chat
+  opens §5.8; neither sends or leaves the visible session.
 - Assistant fragments emitted before and after tool calls compose into one
   `role="article"` turn. The turn exposes one trailing meta row and one action
   toolbar; Copy joins all contentful fragments in order, while Fork and
@@ -1578,6 +1628,20 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   when the marker set changes and whenever the rail's own box resizes: the rail's
   height derives from `--composer-dock-height`, which the composer republishes as
   its draft grows, so dashes move without a marker change or a window resize.
+
+### 8.8 Quote and side-chat actions (D398)
+
+- Every user message and every assistant turn exposes **Quote** in its hover
+  action row beside Copy, Edit, Delete, Fork, and Retry. Activating it inserts a
+  blockquote of the message into the active session's composer draft through the
+  existing prefill contract and focuses the composer; it never sends, never
+  creates a session, and writes nothing to the transcript.
+- **Open side chat** uses the same row with the `chat.startSideChat` label. It
+  forks at that message and opens §5.8 without activating the child.
+- The excerpt is the live text selection when that selection is inside the
+  clicked message row; otherwise it is the message's own text (for an assistant
+  turn, its answer text). The inserted text follows the Composer contract in
+  §11.9.
 
 ---
 
@@ -2416,7 +2480,7 @@ reasoning-level control.
   There are no visual previews in MVP.
 - No voice input
 
-### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, D262, D362, D395, D397, ADR 0024, ADR 0059, ADR 0070, ADR 0131, ADR 0221, ADR 0222)
+### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, D262, D362, D398, D397, ADR 0024, ADR 0059, ADR 0070, ADR 0131, ADR 0221, ADR 0222)
 
 The composer owns an inline autocomplete menu — one component serving two
 modes. Focus never leaves the textarea (D125).
@@ -2524,6 +2588,20 @@ Anatomy:
   query lists everything (slash) / recently indexed order (file); zero
   matches renders the localized empty row and the menu counts as closed for
   key handling.
+
+### 11.9 Quoted message drafts (D398)
+
+- Quote in the transcript action row (§8.8) and Add to main chat in the side
+  chat (§5.8) prefill the composer draft with ordinary Markdown text: each
+  excerpt line prefixed with `> `, then one blank line, then the attribution
+  line rendered from `chat.quoteSource` ("Quoted from {{title}}"; Chinese
+  "引用自 {{title}}"), where the title is the source session's title.
+- The excerpt is capped at 2000 characters with a trailing ellipsis. Quoting
+  inserts the draft and focuses the composer; it never sends, never creates a
+  session, and adds no chip kind and no file reference.
+- Because the quote is plain draft text, the existing draft contracts apply
+  unchanged: per-session draft retention (D301) and the smart Stop that restores
+  an unanswered send (§11.5, D209) both cover a quoted draft.
 
 ---
 

@@ -70,6 +70,7 @@ This log freezes previously open questions into concrete decisions.
 | D393 | User-invoked Skills in the composer | **Amend D123 / D174 / ADR 0024 / ADR 0039: active built-in, plugin, and user Skills appear in a separate `Skills` group at the end of the composer slash menu. Selecting one inserts its exact id; Electron main revalidates the active project scope at send time and asks the model to call the local `Skill` tool, preserving on-demand body loading and existing permissions. Existing command names win collisions; inactive Skills remain literal slash text. See ADR 0219 and E2E-088b.** | D174's model-invoked catalog remains the body-loading and security contract, while a final explicit entry makes known workflows discoverable without moving Skill bodies into the renderer, prompt, or host protocol. |
 | D394 | Windows work-panel chrome keeps one resource action cluster | **Amend D154 / D357 / ADR 0195: the open work-panel header keeps one compact resource switcher; resource close is owned by the existing keyboard-operable context-menu rows, the viewport-fixed toggle remains the only panel collapse control, and subagent detail returns with a back chevron. Windows/Linux native controls remain fixed at the window edge. Renderer-only; no panel state, window geometry, IPC, protocol, or storage change. See ADR 0220 and E2E-067.** | The header resource `X`, viewport-fixed toggle, and Windows native close cluster read as duplicate close actions and became cramped at narrow panel widths. |
 | D396 | Renderer and plugin-panel scrollbars share one compact contract | **Amend D300: every renderer scroll container uses one 6px, trackless, transparent-at-rest scrollbar with the same hover, focus-within, scroll-reveal, and dragged-thumb states. Remove the sidebar-specific width and opacity override. The plugin-panel preload applies the same contract and 300ms reveal mark to docked and detached plugin documents, including the bundled Files view. External pages loaded inside the Browser guest remain page-owned. Presentation-only; no protocol, storage, host runtime, or external-page behavior change. See E2E-157.** | Windows' classic scrollbar made the right-side work-panel Files view visibly heavier than the conversation, while the sidebar retained a second scrollbar treatment. |
+| D398 | Message quotes and renderer-owned side chats | **Amend D209 / D301: every user message and assistant turn gains a Quote action that inserts a `> `-prefixed Markdown blockquote plus a `chat.quoteSource` attribution into the active session's composer draft and focuses it, using the live selection inside that message row when one exists and the message's own text otherwise; it never sends and adds no chip kind, with a 2000-character cap. Open side chat forks the anchored message through `session.fork` without activating the child, registers the child as a renderer-owned side chat of the parent, and opens one `sidechat:<childSessionId>` tab in the existing docked panel that streams from the same event stream through the background-transcript reducer, with Add to main chat, Open as a conversation, a compact Send/Stop input, and the existing permission card. Closing the tab or activating the child removes the registration; the durable child stays an ordinary session. No protocol, schema, IPC, or permission change. See ADR 0223 and E2E-249 through E2E-254.** | Users needed to reuse an exact earlier message or answer and to ask a side question without replacing the visible main conversation, and the existing fork path always activated its child. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -955,6 +956,26 @@ section mirrors only marketplace/catalog items still blocking nothing.
   saving. No host RPC, protocol, workspace, or durable-schema change is added.
 - Decision D397 amends ADR 0101's previous drag/drop scope. See ADR 0222 and
   E2E-102i.
+## 2026-09-11 — Message quotes and renderer-owned side chats (D398)
+
+- Every user message and every assistant turn gains a Quote action beside Copy,
+  Edit, Delete, Fork, and Retry. It inserts a `> `-prefixed Markdown blockquote
+  plus a `chat.quoteSource` attribution line into the active session's composer
+  draft, uses the live text selection when it lies inside the clicked message
+  row and the message's own text otherwise, caps the excerpt at 2000 characters
+  with a trailing ellipsis, focuses the composer, and never sends.
+- Open side chat forks the anchored assistant or user message through the
+  existing `session.fork` without activating the child, so the main conversation
+  keeps its visible session. The child is registered as a renderer-owned side
+  chat of the parent and the work panel opens one `sidechat` tab that streams
+  from the same event stream through the shared background-transcript reducer,
+  with Add to main chat, Open as a conversation, a compact Send/Stop input, and
+  the existing permission card.
+- Closing the tab or opening the child as a conversation removes the
+  registration and its transcript projection; the durable child remains an
+  ordinary session in the sidebar, session lists, and search. No protocol,
+  storage-schema, IPC channel, or permission change. See ADR 0223 and E2E-249
+  through E2E-254.
 
 ## 2026-07-31 — Plugin themes ship CSS files
 

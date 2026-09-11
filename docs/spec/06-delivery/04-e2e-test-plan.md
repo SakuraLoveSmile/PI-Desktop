@@ -1113,6 +1113,137 @@ Each scenario is documented in this format:
 - **Status**: Source-level regression covered (`session-create.test.mjs`,
   `session-switch-performance.test.mjs`); full UI scenario Draft
 
+#### E2E-249: Quoting a message or a selection prefills the composer without sending
+
+- **Preconditions**: A session with at least one user message and one completed
+  assistant answer; a second configured session exists; no turn is running.
+- **Steps**: 1) Hover the user message and activate Quote. 2) Inspect the
+  composer draft, the transcript, and the sidebar. 3) Select a phrase inside the
+  assistant answer, hover that turn, and activate Quote again. 4) Send the
+  quoted draft. 5) Repeat step 1 for an excerpt longer than 2000 characters,
+  stop the unanswered send, and switch sessions and back.
+- **Expected**: The draft gains `> ` on every excerpt line, one blank line, then
+  the localized attribution rendered from `chat.quoteSource`
+  ("Quoted from {{title}}" / "引用自 {{title}}") naming the source session's
+  title; step 3 quotes only the selection. No turn starts, no transcript row is
+  added, no session is created, and focus moves to the composer. The excerpt is
+  capped at 2000 characters with a trailing ellipsis, and no reference chip
+  appears. The send transmits ordinary prompt text, smart Stop restores the
+  quoted draft after the unanswered send, and the draft slot survives the
+  session switch.
+- **Specs linked**: `04-ux/08-component-spec.md` §8.8, §11.9;
+  `04-ux/09-interaction-patterns.md` §8a.2, ADR 0223, D398
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-250: Opening a side chat forks the child without switching the visible session
+
+- **Preconditions**: A session with a completed assistant answer and a user
+  message; a provider ready for a child session.
+- **Steps**: 1) Hover the assistant turn and activate Open side chat
+  (`chat.startSideChat`). 2) Inspect the visible transcript, the sidebar
+  selection, and the work-panel header. 3) Repeat from a user message in the
+  same session. 4) List the host's sessions.
+- **Expected**: Each activation calls `session.fork` with the clicked message as
+  anchor and returns a durable child. The main conversation stays visible and
+  selected with an unchanged transcript and scroll position; no prompt is sent
+  and no permission is requested. The work panel opens one `sidechat` tab
+  (`sidechat:<childSessionId>`) labeled from `sideChat.title`. The children
+  appear as ordinary sessions in the sidebar, session lists, and search.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8, §8.8;
+  `04-ux/09-interaction-patterns.md` §1.8; `03-runtime/04-data-storage.md`;
+  ADR 0223, ADR 0023, D398
+- **Acceptance**: C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-251: The side-chat panel streams the child's turn live
+
+- **Preconditions**: A registered side chat whose child session has no turns
+  yet; permission mode Ask so one tool call is gated.
+- **Steps**: 1) Enter a prompt in the side-chat input and Send. 2) Watch the
+  panel while the child streams thinking, a tool call, and the answer. 3) Answer
+  the child's permission card from the panel, then answer its ask card when the
+  child asks a question. 4) Send a prompt that calls a gated tool and press Stop
+  while the child is answering.
+  gated tool and press Stop while the child is answering.
+- **Expected**: The panel renders the child's transcript with the existing
+  transcript components and updates on the same message/tool
+  start-update-end events the active transcript consumes, although the child is
+  never the active session; send and Stop target the child through the existing
+  prompt and abort paths and the main conversation gains no row. The permission
+  card and the ask card each resolve by their own request's session id, so a
+  child that needs approval or an answer never stalls behind an invisible prompt.
+  side-chat title, Add to main chat (`sideChat.addToMain`), Open as a
+  conversation (`sideChat.openAsSession`), and the shared close control; the
+  input uses `sideChat.placeholder` and `sideChat.empty`, Send reuses
+  `chat.send`, and Stop reuses `chat.stopGenerating`.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8, §11.2;
+  `03-runtime/10-session-state-machine.md`; ADR 0223, ADR 0023
+- **Acceptance**: C (conversation), E (permissions), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-252: Add to main chat prefills the main composer with the newest answer
+
+- **Preconditions**: A registered side chat whose child has at least one
+  completed assistant answer and whose panel is visible; the main composer is
+  empty.
+- **Steps**: 1) Activate Add to main chat (`sideChat.addToMain`) in the
+  side-chat header. 2) Inspect the main composer, the main transcript, and the
+  side-chat panel. 3) Send the draft. 4) Repeat for an answer longer than 2000
+  characters.
+- **Expected**: The main conversation's composer receives a Markdown blockquote
+  of the side chat's newest assistant answer under the same contract as message
+  quoting — `> ` on every line, one blank line, then the attribution naming the
+  side-chat title — capped at 2000 characters with a trailing ellipsis. Nothing
+  is sent automatically, no transcript row appears before the user sends, the
+  side chat keeps its registration and tab, and no reference chip is added.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8, §11.9; ADR 0223, D398
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-253: Open as a conversation activates the child and releases the panel entry
+
+- **Preconditions**: A registered side chat with streamed content and a
+  retained main-conversation panel context.
+- **Steps**: 1) Activate Open as a conversation (`sideChat.openAsSession`).
+  2) Inspect the active session, the sidebar selection, the composer, the
+  transcript, and the panel's context menu. 3) Send a follow-up prompt in the
+  activated child, then switch back to the main conversation.
+- **Expected**: The child becomes the visible session through the normal
+  session-selection path with its full durable transcript, composer, prompt
+  queue, and Stop controls. The side-chat registration and its `sidechat` tab
+  are released, so the panel no longer lists that resource, while the main
+  conversation's transcript and retained panel context are unchanged.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8;
+  `04-ux/09-interaction-patterns.md` §1.8; ADR 0223, ADR 0023, D128
+- **Acceptance**: C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-254: Closing the side-chat tab keeps the child session
+
+- **Preconditions**: A registered side chat whose tab is open and whose child
+  already appears in the sidebar; a second parent session for the deletion pass.
+- **Steps**: 1) Close the `sidechat` tab from its menu row or the header close
+  control. 2) Inspect the panel and the sidebar. 3) Search for the child, open
+  it, then restart the app and look for it again. 4) Register a fresh side chat,
+  delete its parent session, then repeat and delete the child session.
+- **Expected**: Closing the tab removes the registration and its transcript
+  projection and nothing streams into the panel afterwards, while the child
+  session is not deleted and stays in the sidebar, session lists, and search as
+  an ordinary conversation. After a restart the child session is still present
+  and no `sidechat` tab or projection is restored. Deleting the parent or the
+  child also removes the registration and its tab.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8;
+  `03-runtime/04-data-storage.md`; ADR 0223, ADR 0023, D128
+- **Acceptance**: C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
 ### Conversation Top Bar
 
 #### E2E-087: Conversation top bar renders on the chat route
@@ -6287,14 +6418,14 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
-| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208 , E2E-249, E2E-250, E2E-251, E2E-252, E2E-253, E2E-254 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153, E2E-158, E2E-182, E2E-187 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181 |
-| F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181 , E2E-251 |
+| F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J , E2E-250, E2E-253, E2E-254 |
 | G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219 , E2E-249, E2E-250, E2E-251, E2E-252, E2E-253, E2E-254 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -6304,7 +6435,7 @@ Each scenario is documented in this format:
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
 | M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-102i, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-177, E2E-178, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-204, E2E-208 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103, E2E-172 |
-| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-219 |
+| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-219, E2E-249, E2E-250, E2E-251, E2E-252, E2E-253, E2E-254 |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |

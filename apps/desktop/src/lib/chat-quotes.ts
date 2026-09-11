@@ -5,7 +5,7 @@
  * line, inserted into the composer of the conversation they are looking at.
  * Quoting never sends, never creates a session, and writes nothing to the
  * transcript, so per-session draft retention and the smart-Stop restore path
- * keep working unchanged (ADR 0221 / D395).
+ * keep working unchanged (ADR 0223 / D398).
  */
 
 /** Longest excerpt a quote carries; longer text is cut and marked with an ellipsis. */
