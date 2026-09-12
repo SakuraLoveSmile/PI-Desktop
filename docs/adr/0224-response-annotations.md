@@ -8,7 +8,7 @@
 - Related: [04-ux/08-component-spec.md](../spec/04-ux/08-component-spec.md) ·
   [04-ux/09-interaction-patterns.md](../spec/04-ux/09-interaction-patterns.md) ·
   [03-runtime/11-provider-model-system.md](../spec/03-runtime/11-provider-model-system.md) ·
-  ADR 0223 · E2E-257, E2E-258
+  ADR 0223 · E2E-257, E2E-258 · Amendment: 2026-09-12 (comment editor)
 
 ## Context
 
@@ -138,3 +138,48 @@ prompt as data, numbered so the model can address `Annotation 1`,
 - **Store the annotations with the message for a persistent list:** rejected for
   now. It would need a storage-schema change and a durable annotation surface;
   the send-scoped attachment matches the reference behavior.
+
+## Amendment (2026-09-12) — the attachment opens a comment editor
+
+The reference attaches an excerpt through a comment entry, not a silent action:
+selecting text in a response and choosing Comment opens a compact editor over the
+selection with the quote in place. This amendment replaces decision 1's "attaches
+with an empty `annotation` field" reading and decision 2's silent duplicate no-op
+with that editor; the annotation shape, the prompt block, and every boundary of
+decision 8 are unchanged.
+
+- **Add to chat** on an assistant turn, and the turn's annotate action, open the
+  comment editor instead of attaching the excerpt immediately. The editor shows
+  the excerpt snapshot — the Markdown serialized when the selection was taken,
+  before focus moves into the editor and collapses the selection — above a
+  multiline, optional comment. **Save** attaches the annotation (or updates the
+  one being edited) with `annotation` set to the comment with surrounding
+  whitespace trimmed; **Cancel**, **Escape** outside IME composition, and a press
+  starting on the backdrop discard it. Dragging selected text onto the backdrop
+  does not dismiss it. Escape is consumed before application shortcuts; closing
+  restores focus to the trigger or the rich composer if the trigger is gone.
+  A save with an empty comment still attaches, so Add to chat keeps working
+  as a plain reference. Opening or saving the editor sends nothing: no prompt, no
+  session, no transcript row.
+- Re-annotating an excerpt that is already attached reopens **that annotation's**
+  editor with its stored comment instead of the old silent no-op, so decision 2's
+  one-annotation-per-excerpt rule holds while the comment stays editable. Editing
+  keeps the annotation's id, position, and excerpt: only `annotation` changes.
+- The composer's attachment (decision 3) is now a disclosure. Its count chip is a
+  button that opens the session's annotation list: each item shows its number,
+  its excerpt, and its comment, with one control to edit it (the same editor,
+  seeded with the stored comment) and one to remove just that item; the existing
+  control still drops all of them (`chat.clearAnnotations`). The chip's tooltip
+  still lists `N. excerpt`, and the list is not draft text.
+- The editor belongs to the session it was opened in: a session switch closes it
+  rather than carrying a half-written comment into another conversation, and a
+  save whose annotation was already sent or removed changes nothing and never
+  recreates it.
+- i18n keys added: `chat.annotationCommentTitle`,
+  `chat.annotationCommentPlaceholder`, `chat.annotationEdit`,
+  `chat.annotationRemove`, `chat.annotationReview`. The store actions are
+  `openResponseAnnotationEditor`, `saveResponseAnnotationEditor`, and
+  `closeResponseAnnotationEditor`, replacing `addResponseAnnotation`.
+- Boundaries of decision 8 stand: no host protocol bump, no storage schema
+  change, no new IPC channel, no new permission. The comment is ordinary
+  `annotation` field content in the existing prompt block.

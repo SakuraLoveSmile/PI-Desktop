@@ -1120,13 +1120,17 @@ Each scenario is documented in this format:
 - **Steps**: 1) Hover the user message and activate Quote. 2) Inspect the
   composer draft, the transcript, and the sidebar. 3) Select a phrase inside the
   assistant answer and activate Add to chat (`chat.addToChat`) in the overlay
-  that floats above the selection. 4) Send the
+  that floats above the selection: on an assistant turn this opens the comment
+  editor instead of editing the draft (E2E-257), so cancel it with Escape, then
+  select a phrase inside the user message and quote it through that message's
+  row Quote action. 4) Send the
   quoted draft. 5) Repeat step 1 for an excerpt longer than 2000 characters,
   stop the unanswered send, and switch sessions and back.
 - **Expected**: The draft gains `> ` on every excerpt line, one blank line, then
   the localized attribution rendered from `chat.quoteSource`
   ("Quoted from {{title}}" / "引用自 {{title}}") naming the source session's
-  title; step 3 quotes only the selection. No turn starts, no transcript row is
+  title; step 3's cancelled editor adds no annotation and no draft text, and the
+  Quote action inserts only the live selection. No turn starts, no transcript row is
   added, no session is created, and focus moves to the composer. The excerpt is
   capped at 2000 characters with a trailing ellipsis, and no reference chip
   appears. The send transmits ordinary prompt text, smart Stop restores the
@@ -1306,22 +1310,32 @@ Each scenario is documented in this format:
 - **Preconditions**: A session with a completed answer containing at least two
   distinct paragraphs; no turn running.
 - **Steps**: 1) Select a phrase in the first paragraph and activate Add to chat
-  in the floating overlay. 2) Select a phrase in the second paragraph, add it,
-  then repeat the same selection. 3) Inspect the answer, the composer, and the
-  editor draft. 4) Send an instruction and inspect the request the agent
-  received.
-- **Expected**: The answer body is unchanged and carries no marker, marker text,
+  in the floating overlay; the comment editor opens with that excerpt — type a
+  comment and Save. 2) Select a phrase in the second paragraph, add it with an
+  empty comment, then select the first phrase again, edit its comment, and Save.
+  3) Inspect the answer, the composer, and the editor draft; open the composer
+  attachment and inspect the list. 4) Send an instruction and inspect the request
+  the agent received.
+- **Expected**: Activating Add to chat opens the editor and sends nothing: no
+  turn starts, no draft text appears, and Save attaches the annotation with the
+  comment in its `annotation` field while Escape and Cancel attach nothing. The
+  editor shows the selected Markdown as its excerpt snapshot. The answer body is
+  unchanged and carries no marker, marker text,
   or directive: nothing is inserted into the text the user reads. The composer
   shows one annotation attachment with the count, and its tooltip lists
-  `1. <excerpt>` and `2. <excerpt>`; step 2 leaves two entries (the repeated
-  selection changes nothing). Where the model cites an annotation, that citation
+  `1. <excerpt>` and `2. <excerpt>`; step 2 leaves two entries (reopening the
+  first excerpt edits annotation 1's comment instead of adding a third), and the
+  attachment's list shows each excerpt with its comment and its own edit and
+  remove controls beside the clear-all control. Where the model cites an
+  annotation, that citation
   renders as a small numbered reference whose tooltip is the excerpt, and no
   marker joins a selection, a quote, or a copy of the answer. The draft text, the optimistic user row, the
   sidebar title, and the composer's edit seed contain the user's own words only —
   no excerpt, no blockquote, no attribution line. The request the agent receives
   begins with `# Response annotations:` and the instruction sentence, carries
   `<response-annotations>` with
-  `[{"text","annotation","source":{"messageId"}}]` in that order, and continues
+  `[{"text","annotation","source":{"messageId"}}]` in that order — annotation 1
+  with the edited comment, annotation 2 with an empty comment — and continues
   under `## My request:` with the typed instruction. The attachment is gone after
   the send, and the transcript shows the stored prompt as the typed instruction
   only.
@@ -1335,16 +1349,28 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Two sessions; a completed answer in the first; no turn
   running.
-- **Steps**: 1) Annotate one pass in the first session. 2) Switch to the second
-  session and inspect the composer. 3) Switch back. 4) Clear the annotations from
-  the composer attachment and send a prompt. 5) Annotate again and restart the
-  app.
-- **Expected**: The attachment belongs to the session it was made in: the second
-  session shows none, and switching back restores it unchanged. Clearing drops
-  every annotation and the following send carries no block. After a restart no
+- **Steps**: 1) Annotate one pass in the first session and save a comment, then
+  open the editor again and press Escape. 2) Switch to the second
+  session and inspect the composer. 3) Switch back and open the composer
+  attachment list. Verify per-item controls announce their annotation numbers.
+  4) Edit the comment from the list and remove one item from it;
+  annotate again, clear the annotations from
+  the composer attachment, and send a prompt. 5) Annotate again and restart the
+  app. 6) Open a new annotation editor, type with a CJK IME, and press Escape
+  while composing. Drag-select comment text and release outside the dialog.
+  Finish composing, then press Escape normally and inspect focus and run state.
+- **Expected**: Step 6 keeps the editor and typed text during IME Escape and
+  drag-selection overshoot. Normal Escape closes only the editor (never aborts
+  the run) and restores focus to its trigger or the rich composer. The attachment
+  belongs to the session it was made in: the second
+  session shows none, and switching back restores it unchanged. The cancelled
+  editor adds nothing, the list edits that annotation's comment in place, and
+  removing an item drops just that annotation while clear-all drops every
+  remaining one; the following send carries no block. After a restart no
   annotation, marker, or attachment is restored, and the sessions are otherwise
   unchanged — annotations never reach the host on their own, no session file
-  gains them, and no protocol, schema, or permission surface changes.
+  gains them, and no protocol, schema, or permission surface changes,
+  including the comment editor.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.10;
   `04-ux/09-interaction-patterns.md` §7.5a; `03-runtime/04-data-storage.md`;
   ADR 0224, D400

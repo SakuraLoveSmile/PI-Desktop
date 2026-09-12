@@ -1631,8 +1631,9 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
 
 ### 8.8 Quote and side-chat actions (D398, D399)
 
-- Every user message and every assistant turn exposes **Quote** in its hover
-  action row beside Copy, Edit, Delete, Fork, and Retry. Activating it inserts a
+- Every user message exposes **Quote** in its hover action row beside Copy,
+  Edit, and Delete; an assistant turn's row exposes the annotate action instead
+  (§11.10, D400). Activating Quote inserts a
   blockquote of the message into the active session's composer draft through the
   existing prefill contract and focuses the composer; it never sends, never
   creates a session, and writes nothing to the transcript.
@@ -1668,11 +1669,13 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   whole formula), a code block quotes as a fence whose delimiter outgrows any
   backtick run inside it, a table quotes as one `a | b` line per row, and both
   Quote paths — row action and floating affordance — share that one recovery.
-- **Add to chat** annotates instead of quoting when the row is an assistant turn
-  (§11.10, D400): it attaches a numbered annotation to that turn, and the
-  assistant turn's action row does the same for its selection (or the whole
-  answer when there is no selection). Quoting into the draft remains the path for
-  a user message and for the side chat's **Add to main chat**.
+- **Add to chat** opens the annotation comment editor instead of quoting when
+  the row is an assistant turn (§11.10, D400): the excerpt is snapshotted into
+  the editor before the selection collapses, and the attachment is created when
+  the editor saves — the editor itself sends nothing. The assistant turn's
+  action row does the same for its selection (or the whole answer when there is
+  no selection). Quoting into the draft remains the path for a user message and
+  for the side chat's **Add to main chat**.
 
 ---
 
@@ -2639,18 +2642,36 @@ Anatomy:
 
 ## 11.10 Response annotations (D400)
 
-- Selecting text inside an assistant turn and activating **Add to chat** attaches
-  a numbered annotation to that turn. The answer body is not decorated: an
+- Selecting text inside an assistant turn and activating **Add to chat** — or the
+  turn's annotate action — opens a compact comment editor over the conversation
+  instead of attaching the excerpt immediately. The editor shows the excerpt
+  snapshot (the Markdown serialized when the selection was taken, before focus
+  moves into the editor and collapses the selection) above a multiline, optional
+  comment. **Save** attaches the annotation with the comment in its `annotation`
+  field; **Cancel**, **Escape** outside IME composition, and a press starting on
+  the backdrop discard it. Dragging a selection out of the editor never dismisses
+  it. The dialog owns Escape before application shortcuts and restores focus to
+  its trigger, or the rich composer when the floating trigger is gone. Opening
+  or saving the editor never sends. The answer body is not decorated: an
   annotation appears in the answer only where the model cites it, as a small
   accent-colored numbered reference (`:codex-annotation{index="N"}` in the
   answer's source) whose tooltip is the excerpt and any comment. A marker takes
   no part in a selection, quote, or copy.
-- The composer shows one annotation attachment chip above the input,
+- Re-annotating an excerpt that is already attached reopens that annotation's
+  editor with its stored comment instead of adding a second attachment, so
+  editing keeps the annotation's id, position, and excerpt and changes only
+  `annotation`. The editor belongs to the session it was opened in: a session
+  switch closes it, a save for an annotation that was already sent or removed
+  changes nothing, and a save for a duplicate excerpt is a no-op.
+- The composer shows one annotation attachment above the input,
   `chat.annotationChip` with the count, whose tooltip lists `N. excerpt` per
-  annotation, plus one control that drops them all (`chat.clearAnnotations`). The
-  chip is not draft text: it adds no chip kind, no reference, and no character to
-  the editable draft, so D209's smart Stop and D301's draft retention are
-  unchanged.
+  annotation. The count is a button that opens the session's annotation list:
+  each numbered excerpt and its comment with one control to edit it (the same
+  editor, seeded with the stored comment) and one to remove just that item, plus
+  one control that drops them all (`chat.clearAnnotations`). Per-item controls
+  include the annotation number in their accessible names. The attachment is
+  not draft text: it adds no chip kind, no reference, and no character to the
+  editable draft, so D209's smart Stop and D301's draft retention are unchanged.
 - A send while annotations exist composes the prompt the model receives as the
   block `# Response annotations:` + the instruction sentence +
   `<response-annotations>` with `[{"text", "annotation", "source": {"messageId"}}]`
@@ -2661,12 +2682,10 @@ Anatomy:
   sidebar title, and the composer's edit seed keep the user's own text, and a
   stored prompt that carries the block is displayed through its request text
   only.
-- The excerpt is capped at 2000 characters with a trailing ellipsis. Quoting
+- The excerpt is capped at 2000 characters with a trailing ellipsis, and the
+  editor's excerpt snapshot is the same excerpt the annotation carries. Quoting
   inserts the draft and focuses the composer; it never sends, never creates a
   session, and adds no chip kind and no file reference.
-- Because the quote is plain draft text, the existing draft contracts apply
-  unchanged: per-session draft retention (D301) and the smart Stop that restores
-  an unanswered send (§11.5, D209) both cover a quoted draft.
 
 ---
 
