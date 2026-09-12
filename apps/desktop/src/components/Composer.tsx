@@ -614,6 +614,9 @@ export function Composer({
   const settings = useAppStore((s) => s.settings);
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const hasAnnotations = useAppStore((s) =>
+    Boolean(s.activeSessionId && s.responseAnnotations[s.activeSessionId]?.length),
+  );
   const workspacePath = useAppStore((s) => s.workspace?.path ?? "");
   const providers = useAppStore((s) => s.providers);
   const providerModels = useAppStore((s) => s.providerModels);
@@ -1281,9 +1284,9 @@ export function Composer({
   const largePasteThreshold = normalizeLargePasteThreshold(
     settings?.largePasteThreshold,
   );
-  // Chips occupy sentinel characters, which `trim()` preserves — text and
-  // attachments share one content check.
-  const hasDraftContent = Boolean(value.trim());
+  // Chips occupy sentinel characters; saved annotations count as sendable
+  // content too, even though they never enter the editable draft.
+  const hasDraftContent = Boolean(value.trim()) || hasAnnotations;
 
   useEffect(() => {
     if (!modelThinkingOpen || modelThinkingView !== "model") return;
@@ -1630,7 +1633,13 @@ export function Composer({
       activeFileReferences,
     );
     const serializedContent = serializeComposerFileReferences(text, activeFileReferences);
-    if (!serializedContent) return;
+    // Read live state: another click may arrive before the consumed annotations
+    // have caused a render. Unsaved editor comments and other sessions do not count.
+    const state = useAppStore.getState();
+    const annotationsPending = Boolean(
+      state.activeSessionId && state.responseAnnotations[state.activeSessionId]?.length,
+    );
+    if (!serializedContent && !annotationsPending) return;
     if (sendBlocked) {
       // A paste that is still being saved is the one blocked state the user
       // cannot see, so it has to be said rather than swallowed.
