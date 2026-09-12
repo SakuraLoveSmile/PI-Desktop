@@ -958,8 +958,10 @@ Running turns and pending approvals continue to gate the controls.
   carries them. They are numbered in attachment order, listed in a collapsible
   floating index above the composer with matching out-of-flow source badges
   (ADR 0225). Locate releases follow mode and reveals/highlights the source;
-  edit opens the existing comment editor. Remove and clear-all update the same
-  session list. Collapsing retains the annotations and badges. All are consumed
+  edit opens the existing comment editor. All saved exact ranges stay highlighted
+  without selecting an item; collapsing or selecting another item retains every
+  highlight. Remove/clear/send removes them with their annotations, and unresolved
+  ranges never shade the whole answer. All are consumed
   by the send. They are not persisted and do not survive
   relaunch. The editor is owned by the session it was opened in: a session switch
   closes it, and a save for an annotation that was already sent or removed is
