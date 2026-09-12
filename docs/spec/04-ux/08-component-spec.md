@@ -2663,15 +2663,23 @@ Anatomy:
   `annotation`. The editor belongs to the session it was opened in: a session
   switch closes it, a save for an annotation that was already sent or removed
   changes nothing, and a save for a duplicate excerpt is a no-op.
-- The composer shows one annotation attachment above the input,
-  `chat.annotationChip` with the count, whose tooltip lists `N. excerpt` per
-  annotation. The count is a button that opens the session's annotation list:
-  each numbered excerpt and its comment with one control to edit it (the same
-  editor, seeded with the stored comment) and one to remove just that item, plus
-  one control that drops them all (`chat.clearAnnotations`). Per-item controls
-  include the annotation number in their accessible names. The attachment is
-  not draft text: it adds no chip kind, no reference, and no character to the
-  editable draft, so D209's smart Stop and D301's draft retention are unchanged.
+- ADR 0225 replaces the composer popover with a floating index above the composer
+  in the visible writable transcript. Its count header expands/collapses the list
+  without deleting annotations. Each numbered excerpt/comment has locate, edit,
+  and remove controls; clear-all remains available. Controls include the ordinal
+  in accessible names. No attachment text enters the editable draft.
+- Matching numbered source badges sit outside the answer DOM and follow scroll,
+  resize, and content layout. Clicking a badge or list entry releases follow mode,
+  reveals the source (expanding/loading history if necessary), and highlights the
+  selected range without changing Markdown or selection. Unresolvable ranges
+  explicitly fall back to the source row, not a guessed repeated phrase. Crowded
+  badges stack within the visible band; all items remain available in the index.
+- Renderer-only text offsets distinguish repeated occurrences. Deduplication uses
+  source row, excerpt, and offsets; the same phrase elsewhere gets its own number.
+  If either entry lacks offsets, the same row/excerpt reopens the existing item
+  rather than assuming another occurrence. History reveal grows by at most 40 rows
+  per frame. Anchors never enter the prompt payload. Hidden/read-only panes show no overlay.
+  Array order remains the numbering for list, badges, and next-send payload.
 - A send while annotations exist composes the prompt the model receives as the
   block `# Response annotations:` + the instruction sentence +
   `<response-annotations>` with `[{"text", "annotation", "source": {"messageId"}}]`

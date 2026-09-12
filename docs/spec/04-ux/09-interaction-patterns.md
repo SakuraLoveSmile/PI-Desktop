@@ -933,9 +933,8 @@ Running turns and pending approvals continue to gate the controls.
   composer; Ask in side chat sends the excerpt to the side chat anchored at that
   row; neither sends into the conversation being read. On an assistant turn, Add
   to chat opens the annotation comment editor instead of writing draft text
-  (D400): the editor snapshots the excerpt, Save attaches one annotation, the
-  composer gains one annotation
-  attachment, and the next send carries the annotated excerpts as numbered prompt
+  (D400): the editor snapshots the excerpt, Save attaches one annotation to the
+  session's floating index, and the next send carries the excerpts as numbered prompt
   data (see §7.5a).
 - Selection rules must not disable `focus-visible` feedback or native window
   drag regions.
@@ -948,15 +947,18 @@ Running turns and pending approvals continue to gate the controls.
   editor on a snapshot of the excerpt; **Save** attaches one numbered annotation
   with the optional comment, while **Cancel** and **Escape** discard it. Saving
   the editor sends nothing, and an excerpt that is already attached reopens its
-  own annotation for editing instead of adding a second one. The annotation does
+  own annotation for editing instead of adding a second one (same row and selected
+  offsets; repeated phrases elsewhere remain separate under ADR 0225). The annotation does
   not edit the response: the answer gains a numbered reference only where the
   model cites the annotation (`:codex-annotation{index="N"}`), and that reference
   is a tooltip target, not selectable text.
 - Annotations are session state that lives exactly as long as the send that
-  carries them. They are numbered in attachment order, listed in the composer's
-  annotation attachment — whose count opens a list where each item's comment can
-  be edited or just that item removed — dropped as a group from the same
-  attachment, and consumed by the send. They are not persisted and do not survive
+  carries them. They are numbered in attachment order, listed in a collapsible
+  floating index above the composer with matching out-of-flow source badges
+  (ADR 0225). Locate releases follow mode and reveals/highlights the source;
+  edit opens the existing comment editor. Remove and clear-all update the same
+  session list. Collapsing retains the annotations and badges. All are consumed
+  by the send. They are not persisted and do not survive
   relaunch. The editor is owned by the session it was opened in: a session switch
   closes it, and a save for an annotation that was already sent or removed is
   dropped.
