@@ -6552,7 +6552,9 @@ Each scenario is documented in this format:
   session after its source is outside the mounted history window. 5) Edit/remove
   an item; clear or send the remaining annotations. Copy the answer and inspect
   the outgoing prompt. 6) Repeat on formulas, split highlighted code, and a source
-  whose text changed or was removed.
+  whose text changed or was removed. 7) Save an annotation, empty the composer,
+  and send using the button; repeat with Enter and while running. Try whitespace
+  only, no saved annotations, another session's annotations, and a blocked send.
 - **Expected**: One floating index stays above the composer. Collapse retains a
   small count header and visible source badges. List and badge numbers agree with
   prompt array order, renumbering after removal. Distinct occurrences remain
@@ -6563,7 +6565,12 @@ Each scenario is documented in this format:
   coincident and clip to the visible transcript, never the composer. Copied answer
   text, Markdown, formulas and layout are unchanged. Anchor metadata is not in the
   prompt. Hidden/read-only panes show no index or badges. Send/clear removes both;
-  no persistence, host protocol, schema, IPC or permission change.
+  no persistence, host protocol, schema, IPC or permission change. Step 7 enables
+  Send for saved annotations without request text (queues while running), carries
+  each excerpt/comment in the existing block, and consumes only that session's
+  sent annotations. No filler request is invented. Truly empty submissions remain
+  disabled; model/paste/approval blocks and rejection retain annotations. Trimmed
+  annotation-only prompts never display the internal block.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.10;
   `04-ux/09-interaction-patterns.md` §7.5a; ADR 0225 (amends D400).
 - **Acceptance**: C (conversation), Quality

@@ -228,7 +228,10 @@ export function requestTextWithoutAnnotations(prompt: string): string {
   if (!text.startsWith(`${ANNOTATION_BLOCK_HEADING}\n`)) return text;
   const heading = `\n${ANNOTATION_REQUEST_HEADING}\n`;
   const index = text.lastIndexOf(heading);
-  if (index === -1) return text;
+  if (index === -1) {
+    // Main trims prompt text; an annotation-only request ends at the heading.
+    return text.endsWith(`\n${ANNOTATION_REQUEST_HEADING}`) ? "" : text;
+  }
   return text.slice(index + heading.length);
 }
 
