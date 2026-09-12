@@ -208,7 +208,7 @@ test("the overlay offers add to chat, ask in side chat, and copy", () => {
 test("the transcript mounts the overlay and skips read-only projections", () => {
   assert.match(
     transcript,
-    /transcriptReadOnly \? null : \(\s*<SelectionQuoteButton scrollRef=\{scrollRef\} title=\{sessionTitle\} \/>/,
+    /transcriptReadOnly \|\| !paneVisible \? null : \(\s*<SelectionQuoteButton scrollRef=\{scrollRef\} title=\{sessionTitle\} \/>/,
   );
   // One recovery path: the row actions quote through the same serializer.
   assert.match(transcript, /selectionMarkdownWithinRow\(message\.id\)/);

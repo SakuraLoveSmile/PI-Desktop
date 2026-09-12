@@ -15,7 +15,7 @@ import {
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 const store = await read("../src/stores/app-store.ts");
-const composer = await read("../src/components/Composer.tsx");
+const composer = await read("../src/components/ResponseAnnotationOverlay.tsx");
 const overlay = await read("../src/components/SelectionQuoteButton.tsx");
 const transcript = await read("../src/components/ChatTranscript.tsx");
 const dialog = await read("../src/components/ResponseAnnotationDialog.tsx");
@@ -86,7 +86,7 @@ test("an already attached excerpt reopens for editing and is never doubled", () 
   ];
   const reopened = annotationEditorFor(existing, {
     sessionId: "s1",
-    messageId: "m7",
+    messageId: "m1",
     text: "the pass",
   });
   assert.deepEqual(reopened, {
@@ -189,11 +189,11 @@ test("the editor belongs to the session it was opened in", () => {
 test("the quote surfaces open the editor and never attach directly", () => {
   assert.match(
     overlay,
-    /openResponseAnnotationEditor\(\{\s*messageId: target\.rowAnchorId,\s*text: target\.markdown,\s*\}\)/,
+    /openResponseAnnotationEditor\(\{\s*messageId: target\.rowAnchorId,\s*text: target\.markdown,\s*anchor: selectionAnnotationAnchorWithinRow\(target\.rowAnchorId\),\s*\}\)/,
   );
   assert.match(
     transcript,
-    /openResponseAnnotationEditor\(\{\s*messageId: entry\.anchorId,\s*text: selection \|\| content,\s*\}\)/,
+    /openResponseAnnotationEditor\(\{\s*messageId: entry\.anchorId,\s*text: selection \|\| content,\s*anchor: selectionAnnotationAnchorWithinRow\(entry\.anchorId\),\s*\}\)/,
   );
   assert.doesNotMatch(overlay, /addResponseAnnotation/);
   assert.doesNotMatch(transcript, /addResponseAnnotation/);
@@ -210,15 +210,15 @@ test("the store saves the editor through the annotation transition", () => {
   assert.match(store, /\[editor\.sessionId\]: next/);
 });
 
-test("the composer lists each annotation with edit and remove actions", () => {
+test("the floating index lists each annotation with edit and remove actions", () => {
   assert.match(composer, /data-testid="composer-annotation-menu"/);
   assert.match(composer, /data-testid="composer-annotation-item"/);
   assert.match(
     composer,
-    /openResponseAnnotationEditor\(\{\s*messageId: annotation\.messageId,\s*text: annotation\.text,\s*annotationId: annotation\.id,\s*\}\)/,
+    /edit\(\{\s*messageId: annotation\.messageId,\s*text: annotation\.text,\s*annotationId: annotation\.id\s*\}\)/,
   );
-  assert.match(composer, /removeResponseAnnotation\(annotation\.id\)/);
-  assert.match(composer, /aria-expanded=\{annotationsOpen\}/);
+  assert.match(composer, /remove\(annotation\.id\)/);
+  assert.match(composer, /aria-expanded=\{expanded\}/);
   assert.ok(composer.includes('ariaLabel={`${t("chat.annotationEdit")} ${index + 1}`}'));
   assert.ok(composer.includes('ariaLabel={`${t("chat.annotationRemove")} ${index + 1}`}'));
 });

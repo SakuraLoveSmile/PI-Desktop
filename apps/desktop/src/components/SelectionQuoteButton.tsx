@@ -21,6 +21,7 @@ import type { RefObject } from "react";
 import { IconCheck, IconCopy } from "./icons";
 import { useCopy } from "./Markdown";
 import { useAppStore } from "../stores/app-store";
+import { selectionAnnotationAnchorWithinRow } from "../lib/response-annotation-anchor";
 import {
   activeSelectionRange,
   COMPOSER_DOCK_SELECTOR,
@@ -169,6 +170,7 @@ export function SelectionQuoteButton({
       openResponseAnnotationEditor({
         messageId: target.rowAnchorId,
         text: target.markdown,
+        anchor: selectionAnnotationAnchorWithinRow(target.rowAnchorId),
       });
     } else {
       quoteMessageIntoComposer({ title, text: target.markdown });

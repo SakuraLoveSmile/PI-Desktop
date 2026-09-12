@@ -30,7 +30,6 @@ import {
   stripInlineComposerFileReferenceTokens,
 } from "@pi-desktop/shared";
 import { materializeDraftSession, useAppStore } from "../stores/app-store";
-import type { ResponseAnnotation } from "../lib/response-annotations";
 import type { ComposerDraftSnapshot } from "../lib/composer-smart-stop";
 import { latestTurnContextInspector } from "../lib/latest-turn-context";
 import {
@@ -86,7 +85,6 @@ import {
   IconChevronRight,
   IconCheck,
   IconBot,
-  IconPencil,
   IconSearch,
   IconListChecks,
   IconSparkles,
@@ -153,7 +151,6 @@ const VIDEO_FILE_PATTERN = /\.(avi|mkv|m4v|mov|mp4|webm)$/i;
  * swaps the sentinel back for the real @path at send time.
  */
 /** Stable empty list: a store selector must not return a fresh array. */
-const NO_ANNOTATIONS: ResponseAnnotation[] = [];
 
 const CHIP_TOKEN_BASE = 0xe000;
 const CHIP_TOKEN_END = 0xf8ff;
@@ -639,28 +636,6 @@ export function Composer({
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
   const showToast = useAppStore((s) => s.showToast);
   const composerPrefill = useAppStore((s) => s.composerPrefill);
-  // Response annotations are prompt attachments, not draft text (D400): the
-  // chip above the input is where the user sees and drops them.
-  const sessionAnnotations = useAppStore((s) =>
-    s.activeSessionId
-      ? (s.responseAnnotations[s.activeSessionId] ?? NO_ANNOTATIONS)
-      : NO_ANNOTATIONS,
-  );
-  const clearResponseAnnotations = useAppStore((s) => s.clearResponseAnnotations);
-  const openResponseAnnotationEditor = useAppStore(
-    (s) => s.openResponseAnnotationEditor,
-  );
-  const removeResponseAnnotation = useAppStore(
-    (s) => s.removeResponseAnnotation,
-  );
-  // The editor dialog owns Escape while it is open, so the popover must not
-  // also close behind it.
-  const annotationEditorOpen = useAppStore((s) =>
-    Boolean(s.responseAnnotationEditor),
-  );
-  const annotationPreview = sessionAnnotations
-    .map((annotation, index) => `${index + 1}. ${annotation.text}`)
-    .join("\n\n");
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
   const planCheckpoint = useAppStore((s) =>
     s.activeSessionId ? s.planCheckpoints[s.activeSessionId] : undefined,
@@ -703,10 +678,6 @@ export function Composer({
   );
   const [permissionOpen, setPermissionOpen] = useState(false);
   const permissionRef = useRef<HTMLDivElement>(null);
-  // The annotation chip is a disclosure: its popover lists the session's
-  // annotations with per-item edit and remove actions (D400).
-  const [annotationsOpen, setAnnotationsOpen] = useState(false);
-  const annotationsRef = useRef<HTMLDivElement>(null);
   const [modelThinkingOpen, setModelThinkingOpen] = useState(false);
   const [modelThinkingView, setModelThinkingView] =
     useState<ComposerMenuView>("root");
@@ -1174,40 +1145,6 @@ export function Composer({
       window.removeEventListener("keydown", onKey);
     };
   }, [modelThinkingOpen]);
-
-  // The annotation list belongs to the visible session's attachments: a session
-  // switch or an emptied list closes it instead of leaving it behind.
-  useEffect(() => {
-    setAnnotationsOpen(false);
-  }, [activeSessionId]);
-
-  useEffect(() => {
-    if (!sessionAnnotations.length) setAnnotationsOpen(false);
-  }, [sessionAnnotations.length]);
-
-  useEffect(() => {
-    if (!annotationsOpen) return;
-    const onPointer = (e: MouseEvent) => {
-      // The comment editor is a modal layer above the list: presses inside it
-      // must not be read as "clicked away from the list".
-      if (annotationEditorOpen) return;
-      if (!annotationsRef.current?.contains(e.target as Node)) {
-        setAnnotationsOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      // The comment editor is its own layer: Escape closes it, not the list.
-      if (e.key === "Escape" && !annotationEditorOpen) {
-        setAnnotationsOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", onPointer);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", onPointer);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [annotationsOpen, annotationEditorOpen]);
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
   const draftConfiguration = useAppStore((s) => s.draftConfiguration);
@@ -2245,99 +2182,6 @@ export function Composer({
       data-composer-dock={variant}
     >
       <div className="composer-stack">
-        {sessionAnnotations.length ? (
-          <div
-            ref={annotationsRef}
-            className="composer-annotations"
-            data-testid="composer-annotations"
-          >
-            <button
-              type="button"
-              className={`composer-annotation-chip${
-                annotationsOpen ? " active" : ""
-              }`}
-              title={annotationPreview}
-              aria-haspopup="dialog"
-              aria-expanded={annotationsOpen}
-              onClick={() => {
-                setPermissionOpen(false);
-                setModelThinkingOpen(false);
-                setAnnotationsOpen((open) => !open);
-              }}
-            >
-              {t("chat.annotationChip", { count: sessionAnnotations.length })}
-            </button>
-            <TooltipButton
-              type="button"
-              className="composer-annotation-clear"
-              tooltip={t("chat.clearAnnotations")}
-              ariaLabel={t("chat.clearAnnotations")}
-              onClick={clearResponseAnnotations}
-            >
-              <IconX size={12} aria-hidden="true" />
-            </TooltipButton>
-            {annotationsOpen ? (
-              <div
-                className="composer-annotation-menu"
-                role="dialog"
-                aria-label={t("chat.annotationReview")}
-                data-testid="composer-annotation-menu"
-              >
-                {sessionAnnotations.map((annotation, index) => (
-                  <div
-                    key={annotation.id}
-                    className="composer-annotation-item"
-                    data-testid="composer-annotation-item"
-                  >
-                    <div className="composer-annotation-item-head">
-                      <span
-                        className="composer-annotation-item-index"
-                        aria-hidden="true"
-                      >
-                        {index + 1}
-                      </span>
-                      <span
-                        className="composer-annotation-item-text"
-                        title={annotation.text}
-                      >
-                        {annotation.text}
-                      </span>
-                      <TooltipButton
-                        type="button"
-                        className="composer-annotation-item-action"
-                        tooltip={t("chat.annotationEdit")}
-                        ariaLabel={`${t("chat.annotationEdit")} ${index + 1}`}
-                        onClick={() =>
-                          openResponseAnnotationEditor({
-                            messageId: annotation.messageId,
-                            text: annotation.text,
-                            annotationId: annotation.id,
-                          })
-                        }
-                      >
-                        <IconPencil size={13} aria-hidden="true" />
-                      </TooltipButton>
-                      <TooltipButton
-                        type="button"
-                        className="composer-annotation-item-action"
-                        tooltip={t("chat.annotationRemove")}
-                        ariaLabel={`${t("chat.annotationRemove")} ${index + 1}`}
-                        onClick={() => removeResponseAnnotation(annotation.id)}
-                      >
-                        <IconX size={13} aria-hidden="true" />
-                      </TooltipButton>
-                    </div>
-                    {annotation.annotation ? (
-                      <p className="composer-annotation-item-comment">
-                        {annotation.annotation}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
         {planCheckpoint?.status === "pending" ? (
           <PlanApprovalBar proposal={planCheckpoint} />
         ) : null}
@@ -2612,7 +2456,6 @@ export function Composer({
                     onClick={() => {
                       setModelThinkingOpen(false);
                       setPermissionOpen((open) => !open);
-                      setAnnotationsOpen(false);
                     }}
                   >
                     <span className="text-sm">
@@ -2687,7 +2530,6 @@ export function Composer({
                   disabled={controlsBlocked}
                   onClick={() => {
                     setPermissionOpen(false);
-                    setAnnotationsOpen(false);
                     if (!modelThinkingOpen) {
                       setModelThinkingView("root");
                       setModelQuery("");

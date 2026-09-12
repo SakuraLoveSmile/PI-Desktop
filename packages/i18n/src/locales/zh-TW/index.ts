@@ -274,6 +274,8 @@ export const zhTW = {
     annotationEdit: "編輯評論",
     annotationRemove: "移除批註",
     annotationReview: "檢視批註",
+    annotationLocate: "定位批註",
+    annotationRowLocation: "原選區已無法定位，顯示來源回答",
     annotationChip: "{{count}} 則批註",
     clearAnnotations: "清除批註",
     quoteSource: "引用自 {{title}}",

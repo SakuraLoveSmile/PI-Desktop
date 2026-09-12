@@ -279,6 +279,8 @@ export const en = {
     annotationEdit: "Edit comment",
     annotationRemove: "Remove annotation",
     annotationReview: "Review annotations",
+    annotationLocate: "Locate annotation",
+    annotationRowLocation: "Original text unavailable; showing the source response",
     annotationChip: "{{count}} annotations",
     clearAnnotations: "Clear annotations",
     quoteSource: "Quoted from {{title}}",

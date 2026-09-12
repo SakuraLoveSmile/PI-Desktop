@@ -1148,6 +1148,7 @@ export type AppState = {
     text: string;
     /** Existing annotation to edit; omitted while the excerpt is unattached. */
     annotationId?: string;
+    anchor?: ResponseAnnotationEditor["anchor"];
   }) => void;
   /** Save the editor's comment and close it; a stale target is dropped. */
   saveResponseAnnotationEditor: (comment: string) => void;
@@ -4552,7 +4553,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  openResponseAnnotationEditor: ({ messageId, text, annotationId }) => {
+  openResponseAnnotationEditor: ({ messageId, text, annotationId, anchor }) => {
     const sessionId = get().activeSessionId;
     if (!sessionId) return;
     const current = get().responseAnnotations[sessionId] ?? [];
@@ -4565,6 +4566,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         messageId,
         text,
         annotationId,
+        anchor,
       }),
     });
   },

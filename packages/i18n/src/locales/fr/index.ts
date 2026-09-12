@@ -272,6 +272,8 @@ export const fr = {
     "annotationEdit": "Modifier le commentaire",
     "annotationRemove": "Supprimer l'annotation",
     "annotationReview": "Examiner les annotations",
+    "annotationLocate": "Localiser l’annotation",
+    "annotationRowLocation": "Texte original indisponible ; affichage de la réponse source",
     "annotationChip": "{{count}} annotations",
     "clearAnnotations": "Effacer les annotations",
     "quoteSource": "Citation de {{title}}",
