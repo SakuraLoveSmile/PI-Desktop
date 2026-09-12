@@ -35,6 +35,7 @@ import type {
   FsReadResult,
   HostHealth,
   HostStatusEvent,
+  McpCatalogEntry,
   ModelInfo,
   McpServerInput,
   McpServerRecord,
@@ -658,6 +659,12 @@ export const api = {
       imported: McpServerRecord[];
       failed: Array<{ id: string; reason: string }>;
     }>(IPC.invoke.mcpImport, { text }),
+  /** Search the official MCP registry; `error` means fall back to built-in. */
+  searchMcpMarketRegistry: (query: string) =>
+    invoke<{ entries: McpCatalogEntry[]; error?: "unavailable" }>(
+      IPC.invoke.mcpMarketSearch,
+      { query },
+    ),
 
   // --- Skills the user owns -------------------------------------------------
   listUserSkills: (query?: AgentCapabilityQuery) =>
