@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 import ts from "typescript";
+import { intersectSelectionQuoteRect } from "../src/lib/selection-quote.ts";
 
 const source = await readFile(new URL("../src/components/ResponseAnnotationOverlay.tsx", import.meta.url), "utf8");
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -67,6 +68,52 @@ test("the floating index collapses, expands, navigates by id and edits/removes t
   state.responseAnnotations.s = [];
   render();
   assert.equal(tree, null);
+});
+
+test("all saved resolved ranges stay highlighted without selecting an item or expanding the index", () => {
+  const ast = ts.createSourceFile("overlay.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let effect;
+  function visit(node) {
+    if (ts.isCallExpression(node) && node.expression.getText(ast) === "useLayoutEffect") {
+      effect = node.arguments[0].getText(ast);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  assert.ok(effect, "exercise the real layout effect, not a copied implementation");
+  const executable = ts.transpileModule(`(${effect})();`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const rect = (top) => ({ top, bottom: top + 20, left: 20, right: 80, width: 60, height: 20 });
+  const saved = [{ id: "a1", messageId: "m1", anchor: [rect(20)] },
+    { id: "a2", messageId: "m2", anchor: [rect(60)] },
+    { id: "stale", messageId: "m3" }];
+  for (const [annotations, activeId, expanded, expected] of [
+    [saved, null, true, [20, 60]],
+    [saved, "a1", true, [20, 60]],
+    [saved, "a2", false, [20, 60]],
+    [saved.slice(1), null, false, [60]],
+    [[], null, false, []],
+  ]) {
+    let geometry;
+    const root = { addEventListener() {}, removeEventListener() {} };
+    class Observer { observe() {} disconnect() {} }
+    const cleanup = runInNewContext(executable, {
+      annotations, activeId, expanded, scrollRef: { current: root },
+      setGeometry: (value) => { geometry = value; },
+      document: { querySelector: () => null },
+      window: { innerWidth: 100, innerHeight: 100, addEventListener() {}, removeEventListener() {} },
+      COMPOSER_DOCK_SELECTOR: "dock",
+      selectionQuoteBounds: () => ({ top: 0, bottom: 100, left: 0, right: 100 }),
+      annotationRow: () => ({ getBoundingClientRect: () => rect(0) }),
+      annotationRange: (_, anchor) => anchor ? { getClientRects: () => anchor } : null,
+      intersectSelectionQuoteRect,
+      placeAnnotationBadges: (badges) => badges,
+      ResizeObserver: Observer, MutationObserver: Observer, cancelAnimationFrame() {},
+    });
+    assert.deepEqual(Array.from(geometry.highlights, (item) => item.top), expected);
+    cleanup?.();
+  }
 });
 
 test("only the visible writable pane owns badges and navigation releases follow mode", async () => {

@@ -2673,6 +2673,10 @@ Anatomy:
   without deleting annotations. Each numbered excerpt/comment has locate, edit,
   and remove controls; clear-all remains available. Controls include the ordinal
   in accessible names. No attachment text enters the editable draft.
+- All saved, resolvable selections remain highlighted whenever visible, including
+  before any locate click and while the floating index is collapsed. Selecting one
+  item never hides the other highlights. Removal/clear/send clears the corresponding
+  highlights; unresolved row fallbacks do not highlight an entire answer.
 - Matching numbered source badges sit outside the answer DOM and follow scroll,
   resize, and content layout. Clicking a badge or list entry releases follow mode,
   reveals the source (expanding/loading history if necessary), and highlights the

@@ -21,8 +21,11 @@ text into Markdown previously broke words, selections, and formulas.
    excerpts, comments, locate, edit, remove, and clear-all controls. Collapsing does
    not remove annotations or source badges. The existing modal comment editor stays.
 2. Source badges use the same one-based array order as the list and prompt payload.
-   Clicking either a list item or a badge navigates within that pane and highlights
-   the selected range using a non-interactive overlay. The transcript releases
+   Every saved, resolvable selection stays highlighted by a non-interactive
+   overlay while visible, without a click and even when the index is collapsed.
+   Clicking a list item or badge navigates within the pane; it does not switch
+   off other highlights. Removal/clear/send removes the corresponding highlights;
+   an unresolved row fallback never highlights the whole answer. The transcript releases
    follow-to-bottom first; an older source expands the mounted history window by
    at most D261's 40 rows per frame or loads older pages, stopping on exhaustion,
    error, or no progress.

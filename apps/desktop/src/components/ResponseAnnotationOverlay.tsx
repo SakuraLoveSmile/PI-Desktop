@@ -63,7 +63,7 @@ export function ResponseAnnotationOverlay({ sessionId, scrollRef, onNavigate }: 
           left: Math.max(bounds.left, Math.min(rowRect.right + 4, bounds.right - 24)),
           top: visible[0].top, exact: range !== null,
         });
-        if (annotation.id === activeId && range) highlights.push(...visible);
+        if (range) highlights.push(...visible);
       });
       setGeometry({ badges: placeAnnotationBadges(badges, bounds.top, bounds.bottom), highlights });
     };
@@ -85,7 +85,7 @@ export function ResponseAnnotationOverlay({ sessionId, scrollRef, onNavigate }: 
       resize.disconnect();
       mutation.disconnect();
     };
-  }, [annotations, activeId, scrollRef]);
+  }, [annotations, scrollRef]);
 
   if (!annotations.length) return null;
   const choose = (annotation: ResponseAnnotation) => {

@@ -6553,7 +6553,8 @@ Each scenario is documented in this format:
 - **Preconditions**: A long session with repeated phrases, a formula, and a code block;
   another retained session; a writable main transcript and read-only side chat.
 - **Steps**: 1) Annotate two occurrences of identical words and add comments.
-  2) Collapse and expand the floating index. 3) Click each numbered item, then
+  2) Inspect both saved ranges before clicking any item, then collapse and expand
+  the floating index. 3) Click each numbered item, then
   its source badge. 4) Scroll, resize the work panel and composer, and revisit the
   session after its source is outside the mounted history window. 5) Edit/remove
   an item; clear or send the remaining annotations. Copy the answer and inspect
@@ -6562,7 +6563,10 @@ Each scenario is documented in this format:
   and send using the button; repeat with Enter and while running. Try whitespace
   only, no saved annotations, another session's annotations, and a blocked send.
 - **Expected**: One floating index stays above the composer. Collapse retains a
-  small count header and visible source badges. List and badge numbers agree with
+  small count header and visible source badges. Both saved exact ranges stay
+  highlighted before any click, while collapsed, and when another item is selected;
+  deleting one removes only its highlight, clear/send removes all. Unresolved
+  ranges never highlight the whole answer. List and badge numbers agree with
   prompt array order, renumbering after removal. Distinct occurrences remain
   separate; repeating one selection edits that annotation. Locate releases follow
   mode, loads/mounts history if needed, scrolls the same pane and overlays a highlight
