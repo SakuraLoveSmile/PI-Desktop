@@ -118,4 +118,6 @@ test("the real store queues an annotation-only prompt while the session is runni
 test("a host-trimmed annotation-only prompt never exposes the wire block in the transcript", () => {
   const wire = responseAnnotationPrompt("", [annotation]);
   assert.equal(requestTextWithoutAnnotations(wire.trim()), "");
+  const request = "Explain this heading:\n## My request: extra";
+  assert.equal(requestTextWithoutAnnotations(responseAnnotationPrompt(request, [annotation])), request);
 });
