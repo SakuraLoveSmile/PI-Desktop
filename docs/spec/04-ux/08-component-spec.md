@@ -2291,11 +2291,11 @@ reasoning-level control.
 | State | Appearance | Actions |
 |---|---|---|
 | Idle (no model) | textarea active, send button disabled + tooltip "Configure a model first" | Agent link remains available in model menu |
-| Idle (ready) | textarea active, send button enabled | Send active |
+| Idle (ready) | textarea active; Send requires draft content or saved annotations | Send active when content exists |
 | Home/new-session initialization | textarea and mode/model × reasoning/permission triggers remain available while the durable empty session is loading; the session row is already present and the first configuration selection applies to that session | Configure the session, then send |
 | New session (reasoning model) | Combined model × reasoning chip shows the model and its binding default thinking level | User may select any level enabled in the model binding, including Off when enabled |
 | New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Stop hidden unless the destination session itself is running with an empty draft |
-| Running | textarea and mode/model × reasoning/permission controls remain editable for the next turn; the single submit slot shows Stop for an empty draft and Send for a non-empty draft | Stop active when empty; Send active when non-empty; submitted prompts become queued |
+| Running | textarea and mode/model × reasoning/permission controls remain editable for the next turn; the single submit slot shows Stop only with an empty draft and no saved annotations | Send queues text, attachments, or saved annotations alone; Stop when all are empty |
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Same single-slot Stop/Send behavior as Running |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled; Stop remains active whenever the running empty-draft condition is met |
 | Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible; mode chip pulses while the live turn projects `planning` | inspect, send, or submit a contract |
@@ -2340,16 +2340,17 @@ reasoning-level control.
   timer, and clearing or sending a draft never changes the guidance.
 - Escape: when textarea focused, clears input or blurs (not abort)
 - Send while running: clears the current draft and appends one FIFO row to the
-  active session's in-memory queue when the draft has content. The row is sent
+  active session's in-memory queue when the draft has content or saved annotations. The row is sent
   as a new normal prompt only after the current run reaches `agent_end`; a
   different session's queue is not affected by switching sessions. Running
-  with an empty draft changes this same submit slot to Stop, so clearing the
-  draft is the way to expose the immediate-stop action.
+  with an empty draft and no saved annotations changes this same submit slot to
+  Stop. Clear both draft and annotations to expose the immediate-stop action.
 - Send now: moves the selected row to the head, requests `agent/stop`, and
   releases it after the current reply/tool batch completes normally. It then
   starts before the remaining FIFO rows. When idle, Send now sends immediately.
 - Stop: the single submit slot is shown only while a turn is running and the
-  draft is empty. It stops the running turn and cancels pending permission.
+  draft is empty and there are no saved annotations. It stops the running turn
+  and cancels pending permission.
   Before any
   assistant text, thinking, or tool row begins, it also removes the just-sent
   user row and restores the pre-serialization composer draft. Ordinary text
@@ -2680,6 +2681,13 @@ Anatomy:
   rather than assuming another occurrence. History reveal grows by at most 40 rows
   per frame. Anchors never enter the prompt payload. Hidden/read-only panes show no overlay.
   Array order remains the numbering for list, badges, and next-send payload.
+- Saved annotations alone enable Send (or queue while running), even when the
+  composer is empty/whitespace-only. Click and Enter share the same live-state
+  check. Unsaved comments and annotations in another session do not count; an
+  entirely empty submission stays disabled. Model/paste/approval gates remain.
+  No filler request is inserted: `## My request:` may have an empty body, and the
+  existing annotation instruction tells the model to address each comment.
+  Host trimming of that empty body must not expose the internal block on display.
 - A send while annotations exist composes the prompt the model receives as the
   block `# Response annotations:` + the instruction sentence +
   `<response-annotations>` with `[{"text", "annotation", "source": {"messageId"}}]`

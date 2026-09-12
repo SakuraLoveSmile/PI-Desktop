@@ -962,6 +962,12 @@ Running turns and pending approvals continue to gate the controls.
   relaunch. The editor is owned by the session it was opened in: a session switch
   closes it, and a save for an annotation that was already sent or removed is
   dropped.
+- Saved annotations make an empty composer sendable: click Send or press Enter
+  to send only the annotations, or queue them while a turn runs. Unconfigured
+  models, pending approval, and unfinished paste still block sending. Unsaved
+  comments and other sessions' annotations do not enable Send; clearing the last
+  annotation restores the empty-draft disabled/Stop behavior. No request text is
+  fabricated, and a rejected send keeps the annotations.
 - A send with annotations attaches them to the prompt as numbered data before the
   user's own request, so the model can address `Annotation 1`, `Annotation 2`, …
   The user's prompt text stays what the user typed: no excerpt is copied into the
