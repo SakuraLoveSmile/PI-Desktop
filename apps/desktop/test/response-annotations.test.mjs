@@ -163,8 +163,12 @@ test("annotations attach to assistant turns, not to the draft", () => {
   // The row has to say what it is before a selection can be routed.
   assert.match(transcript, /data-row-role="assistant"/);
   assert.match(transcript, /data-row-role="user"/);
-  assert.match(store, /addResponseAnnotation: \(\{ messageId, text \}\) => \{/);
-  assert.match(store, /if \(current\.some\(\(annotation\) => annotation\.text === excerpt\)\) return;/);
+  // Attaching goes through the comment editor state the store owns (D400).
+  assert.match(
+    store,
+    /openResponseAnnotationEditor: \(\{ messageId, text, annotationId \}\) => \{/,
+  );
+  assert.match(store, /annotationEditorFor\(current, \{/);
 });
 
 test("sending carries the annotations and consumes them", () => {
@@ -186,6 +190,9 @@ test("the composer shows one annotation attachment and can drop it", () => {
 
 test("the overlay annotates a response and quotes anything else", () => {
   assert.match(overlay, /if \(target\.annotatable\) \{/);
-  assert.match(overlay, /addResponseAnnotation\(\{\s*messageId: target\.rowAnchorId,\s*text: target\.markdown,\s*\}\);/);
+  assert.match(
+    overlay,
+    /openResponseAnnotationEditor\(\{\s*messageId: target\.rowAnchorId,\s*text: target\.markdown,\s*\}\);/,
+  );
   assert.match(overlay, /quoteMessageIntoComposer\(\{ title, text: target\.markdown \}\)/);
 });

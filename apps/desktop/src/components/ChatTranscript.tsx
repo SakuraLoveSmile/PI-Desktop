@@ -2543,7 +2543,9 @@ const AssistantTurn = memo(function AssistantTurn({
   const annotateLabel = t("chat.annotate");
   const sideChatLabel = t("chat.startSideChat");
   const openSideChat = useAppStore((s) => s.openSideChat);
-  const addResponseAnnotation = useAppStore((s) => s.addResponseAnnotation);
+  const openResponseAnnotationEditor = useAppStore(
+    (s) => s.openResponseAnnotationEditor,
+  );
   const transcriptReadOnly = useContext(TranscriptReadOnlyContext);
   // The host refuses a fork while the source turn is still running, so the
   // affordance is disabled rather than silently doing nothing.
@@ -2676,11 +2678,12 @@ const AssistantTurn = memo(function AssistantTurn({
                 ariaLabel={annotateLabel}
                 onClick={() => {
                   // An annotation is a response concept (D400): the selection
-                  // when there is one, the whole answer otherwise. A turn
-                  // without an anchor has no row to annotate.
+                  // when there is one, the whole answer otherwise. The excerpt
+                  // is read before the editor takes focus. A turn without an
+                  // anchor has no row to annotate.
                   if (!entry.anchorId) return;
                   const selection = selectionMarkdownWithinRow(entry.anchorId);
-                  addResponseAnnotation({
+                  openResponseAnnotationEditor({
                     messageId: entry.anchorId,
                     text: selection || content,
                   });

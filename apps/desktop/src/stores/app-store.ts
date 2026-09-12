@@ -56,9 +56,10 @@ import {
   quoteExcerpt,
 } from "../lib/chat-quotes";
 import {
-  annotationExcerpt,
-  responseAnnotation,
+  annotationEditorFor,
+  applyAnnotationComment,
   responseAnnotationPrompt,
+  type ResponseAnnotationEditor,
   type ResponseAnnotationMap,
 } from "../lib/response-annotations";
 import {
@@ -1129,14 +1130,29 @@ export type AppState = {
    * (ADR 0223 / D400).
    */
   responseAnnotations: ResponseAnnotationMap;
+  /**
+   * The comment editor's state (D400); null while it is closed. It is owned by
+   * the session it was opened in and holds the excerpt snapshot the selection
+   * collapsed into.
+   */
+  responseAnnotationEditor: ResponseAnnotationEditor | null;
   /** Toggle the selected subagent detail, replacing another selection when needed. */
   toggleSubagentPanel: (delegationId: string) => void;
   /** Close the selected subagent detail without changing resource tabs. */
   closeSubagentPanel: () => void;
   /** Append text to the visible conversation's draft without sending it. */
   appendComposerDraftText: (text: string) => void;
-  /** Annotate one assistant turn with the excerpt the user selected. */
-  addResponseAnnotation: (input: { messageId: string; text: string }) => void;
+  /** Open the comment editor for one assistant turn's excerpt. */
+  openResponseAnnotationEditor: (input: {
+    messageId: string;
+    text: string;
+    /** Existing annotation to edit; omitted while the excerpt is unattached. */
+    annotationId?: string;
+  }) => void;
+  /** Save the editor's comment and close it; a stale target is dropped. */
+  saveResponseAnnotationEditor: (comment: string) => void;
+  /** Close the editor without saving its comment. */
+  closeResponseAnnotationEditor: () => void;
   /** Drop one annotation from the visible session. */
   removeResponseAnnotation: (id: string) => void;
   /** Drop every annotation of the visible session. */
@@ -1453,6 +1469,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sideChats: {},
   sideChatTranscripts: {},
   responseAnnotations: {},
+  responseAnnotationEditor: null,
   projectSort: initialSidebarPreferences.projectSort,
   messages: [],
   retainedSessionIds: [],
@@ -4535,27 +4552,50 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  addResponseAnnotation: ({ messageId, text }) => {
+  openResponseAnnotationEditor: ({ messageId, text, annotationId }) => {
     const sessionId = get().activeSessionId;
-    const excerpt = annotationExcerpt(text);
-    if (!sessionId || !excerpt) return;
+    if (!sessionId) return;
     const current = get().responseAnnotations[sessionId] ?? [];
-    // One annotation per excerpt: annotating the same pass twice must not send
-    // the same text twice under two numbers.
-    if (current.some((annotation) => annotation.text === excerpt)) return;
-    set((state) => ({
-      responseAnnotations: {
-        ...state.responseAnnotations,
-        [sessionId]: [
-          ...current,
-          responseAnnotation({
-            id: crypto.randomUUID(),
-            messageId,
-            text: excerpt,
-          }),
-        ],
-      },
-    }));
+    // An excerpt that is already attached reopens its own annotation for
+    // editing. The excerpt is snapshotted here, before focus moves into the
+    // editor and collapses the selection it came from.
+    set({
+      responseAnnotationEditor: annotationEditorFor(current, {
+        sessionId,
+        messageId,
+        text,
+        annotationId,
+      }),
+    });
+  },
+
+  saveResponseAnnotationEditor: (comment) => {
+    const editor = get().responseAnnotationEditor;
+    if (!editor) return;
+    const current = get().responseAnnotations[editor.sessionId] ?? [];
+    const next = applyAnnotationComment(
+      current,
+      editor,
+      comment,
+      crypto.randomUUID(),
+    );
+    set((state) => {
+      // A save whose target was already sent or removed changes nothing; it
+      // must not recreate the annotation.
+      if (!next) return { responseAnnotationEditor: null };
+      return {
+        responseAnnotations: {
+          ...state.responseAnnotations,
+          [editor.sessionId]: next,
+        },
+        responseAnnotationEditor: null,
+      };
+    });
+  },
+
+  closeResponseAnnotationEditor: () => {
+    if (!get().responseAnnotationEditor) return;
+    set({ responseAnnotationEditor: null });
   },
 
   removeResponseAnnotation: (id) => {
