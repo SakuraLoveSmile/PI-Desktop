@@ -281,6 +281,8 @@ export const tr = {
     annotationEdit: "Yorumu düzenle",
     annotationRemove: "Notu kaldır",
     annotationReview: "Notları incele",
+    annotationLocate: "Notu bul",
+    annotationRowLocation: "Özgün metin bulunamadı; kaynak yanıt gösteriliyor",
     annotationChip: "{{count}} not",
     clearAnnotations: "Notları temizle",
     quoteSource: "{{title}} alıntısı",

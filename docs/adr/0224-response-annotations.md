@@ -1,6 +1,6 @@
 # ADR 0224: Response Annotations as Prompt Attachments
 
-- Status: Accepted
+- Status: Accepted; presentation and duplicate identity amended by ADR 0225
 - Date: 2026-09-11
 - Deciders: PI-Desktop runtime and desktop UI maintainers
 - Amends: D398 decision 3 (for assistant turns)

@@ -1,19 +1,21 @@
 /**
- * Response annotations (ADR 0223 / D400).
+ * Response annotations (ADR 0224 / D400, presentation amended by ADR 0225).
  *
  * The reference implementation (ChatGPT desktop app) does not put a quoted
  * excerpt into the composer as text. Selecting text in a response and choosing
  * "Add to chat" opens a compact comment editor and attaches a **numbered
- * annotation** to that response when it saves: the composer shows one
- * annotation attachment, and the next prompt carries the excerpts in a
+ * annotation** to that response when it saves: a floating index and source
+ * badges identify the selections, and the next prompt carries the excerpts in a
  * structured block the model reads as `Annotation 1`, `Annotation 2`, … in
- * array order. The answer body is never decorated; only the model's own
- * `:codex-annotation{index="N"}` citation renders as a marker.
+ * array order. Source badges never modify the answer DOM; the model's own
+ * `:codex-annotation{index="N"}` citation is rendered separately.
  *
  * This module owns that contract: the editor's open/save transitions, the wire
  * block the prompt carries, the request text a stored prompt reduces back to,
  * and the inline marker geometry.
  */
+
+import type { ResponseAnnotationAnchor } from "./response-annotation-anchor";
 
 /** Heading the annotation block opens with, exactly as the reference sends it. */
 export const ANNOTATION_BLOCK_HEADING = "# Response annotations:";
@@ -46,6 +48,8 @@ export type ResponseAnnotation = {
   /** Free-form user comment; empty until the user writes one in the editor. */
   annotation: string;
   createdAt: number;
+  /** Optional renderer-only selected occurrence; never sent to the model. */
+  anchor?: ResponseAnnotationAnchor;
 };
 
 /** Annotations of one session, in the order they were made. */
@@ -57,6 +61,7 @@ export function responseAnnotation(input: {
   text: string;
   annotation?: string;
   createdAt?: number;
+  anchor?: ResponseAnnotationAnchor;
 }): ResponseAnnotation {
   return {
     id: input.id,
@@ -64,6 +69,7 @@ export function responseAnnotation(input: {
     text: annotationExcerpt(input.text),
     annotation: (input.annotation ?? "").trim(),
     createdAt: input.createdAt ?? Date.now(),
+    ...(input.anchor ? { anchor: input.anchor } : {}),
   };
 }
 
@@ -79,7 +85,18 @@ export type ResponseAnnotationEditor = {
   text: string;
   annotationId: string | null;
   comment: string;
+  anchor?: ResponseAnnotationAnchor;
 };
+
+/** Missing offsets mean an unknown location, not proof of another occurrence. */
+function sameAnnotationSelection(
+  annotation: ResponseAnnotation,
+  input: Pick<ResponseAnnotationEditor, "messageId" | "text" | "anchor">,
+): boolean {
+  return annotation.messageId === input.messageId && annotation.text === input.text &&
+    (!annotation.anchor || !input.anchor ||
+      (annotation.anchor.start === input.anchor.start && annotation.anchor.end === input.anchor.end));
+}
 
 /**
  * The editor to open for an excerpt, or null when there is none to open. An
@@ -95,13 +112,14 @@ export function annotationEditorFor(
     messageId: string;
     text: string;
     annotationId?: string;
+    anchor?: ResponseAnnotationAnchor;
   },
 ): ResponseAnnotationEditor | null {
   if (!input.sessionId) return null;
   const excerpt = annotationExcerpt(input.text);
   const existing = input.annotationId
     ? annotations.find((annotation) => annotation.id === input.annotationId)
-    : annotations.find((annotation) => annotation.text === excerpt);
+    : annotations.find((annotation) => sameAnnotationSelection(annotation, { ...input, text: excerpt }));
   if (existing) {
     return {
       sessionId: input.sessionId,
@@ -109,6 +127,7 @@ export function annotationEditorFor(
       text: existing.text,
       annotationId: existing.id,
       comment: existing.annotation,
+      ...(existing.anchor ? { anchor: existing.anchor } : {}),
     };
   }
   // A stale id, or an excerpt with nothing to quote, has no editor to open.
@@ -119,6 +138,7 @@ export function annotationEditorFor(
     text: excerpt,
     annotationId: null,
     comment: "",
+    ...(input.anchor ? { anchor: input.anchor } : {}),
   };
 }
 
@@ -147,7 +167,7 @@ export function applyAnnotationComment(
     next[index] = { ...next[index], annotation: nextComment };
     return next;
   }
-  if (annotations.some((annotation) => annotation.text === editor.text)) {
+  if (annotations.some((annotation) => sameAnnotationSelection(annotation, editor))) {
     return null;
   }
   return [
@@ -158,6 +178,7 @@ export function applyAnnotationComment(
       text: editor.text,
       annotation: nextComment,
       createdAt,
+      anchor: editor.anchor,
     }),
   ];
 }

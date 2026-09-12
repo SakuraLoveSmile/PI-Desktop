@@ -29,7 +29,7 @@ const markdown = await readFile(
   "utf8",
 );
 const composer = await readFile(
-  new URL("../src/components/Composer.tsx", import.meta.url),
+  new URL("../src/components/ResponseAnnotationOverlay.tsx", import.meta.url),
   "utf8",
 );
 const overlay = await readFile(
@@ -166,7 +166,7 @@ test("annotations attach to assistant turns, not to the draft", () => {
   // Attaching goes through the comment editor state the store owns (D400).
   assert.match(
     store,
-    /openResponseAnnotationEditor: \(\{ messageId, text, annotationId \}\) => \{/,
+    /openResponseAnnotationEditor: \(\{ messageId, text, annotationId, anchor \}\) => \{/,
   );
   assert.match(store, /annotationEditorFor\(current, \{/);
 });
@@ -180,19 +180,18 @@ test("sending carries the annotations and consumes them", () => {
   assert.match(store, /get\(\)\.enqueuePrompt\(outgoing, draft, sessionId\);/);
 });
 
-test("the composer shows one annotation attachment and can drop it", () => {
-  assert.match(composer, /data-testid="composer-annotations"/);
-  assert.match(composer, /t\("chat\.annotationChip", \{ count: sessionAnnotations\.length \}\)/);
-  assert.match(composer, /onClick=\{clearResponseAnnotations\}/);
-  // The chip's tooltip is the numbered excerpt list.
-  assert.match(composer, /\.map\(\(annotation, index\) => `\$\{index \+ 1\}\. \$\{annotation\.text\}`\)/);
+test("the floating annotation index exposes count, locate, edit and clear", () => {
+  assert.match(composer, /data-testid="annotation-float"/);
+  assert.match(composer, /t\("chat\.annotationChip", \{ count: annotations\.length \}\)/);
+  assert.match(composer, /onClick=\{clear\}/);
+  assert.match(composer, /onNavigate\(annotation\)/);
 });
 
 test("the overlay annotates a response and quotes anything else", () => {
   assert.match(overlay, /if \(target\.annotatable\) \{/);
   assert.match(
     overlay,
-    /openResponseAnnotationEditor\(\{\s*messageId: target\.rowAnchorId,\s*text: target\.markdown,\s*\}\);/,
+    /openResponseAnnotationEditor\(\{\s*messageId: target\.rowAnchorId,\s*text: target\.markdown,\s*anchor: selectionAnnotationAnchorWithinRow\(target\.rowAnchorId\),\s*\}\);/,
   );
   assert.match(overlay, /quoteMessageIntoComposer\(\{ title, text: target\.markdown \}\)/);
 });

@@ -274,6 +274,8 @@ export const zhCN = {
     annotationEdit: "编辑评论",
     annotationRemove: "移除批注",
     annotationReview: "查看批注",
+    annotationLocate: "定位批注",
+    annotationRowLocation: "原选区已不可定位，显示来源回答",
     annotationChip: "{{count}} 条批注",
     clearAnnotations: "清除批注",
     quoteSource: "引用自 {{title}}",

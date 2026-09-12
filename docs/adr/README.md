@@ -241,4 +241,5 @@ Each ADR includes:
 | 0221 | Render canonical thinking-level values without translation | Accepted (amends D369 / ADR 0202) |
 | 0222 | Native file and folder drops in the Composer | Accepted (amends ADR 0101 / D397) |
 | 0223 | Message quotes and renderer-owned side chats | Accepted (preserves D097 / D128 / D134 / D154; amended by D399) |
-| 0224 | Response annotations as prompt attachments | Accepted (amends D398 decision 3 for assistant turns) |
+| 0224 | Response annotations as prompt attachments | Accepted (amends D398 decision 3 for assistant turns; presentation amended by 0225) |
+| 0225 | Floating annotation index and source locations | Accepted (amends D400 / 0224) |

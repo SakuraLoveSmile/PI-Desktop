@@ -281,6 +281,8 @@ export const ko = {
     annotationEdit: "댓글 수정",
     annotationRemove: "주석 제거",
     annotationReview: "주석 검토",
+    annotationLocate: "주석 위치 찾기",
+    annotationRowLocation: "원문을 찾을 수 없어 원본 응답을 표시합니다",
     annotationChip: "주석 {{count}}개",
     clearAnnotations: "주석 지우기",
     quoteSource: "{{title}}에서 인용",

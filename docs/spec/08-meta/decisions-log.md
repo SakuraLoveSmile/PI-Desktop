@@ -4651,3 +4651,9 @@ D193, and D194.
   session it was opened in, and a save for an annotation that was already sent
   or removed changes nothing. No protocol, storage-schema, IPC channel, or
   permission change.
+- *(Floating-index amendment, ADR 0225.)* The user-requested collapsible floating
+  index replaces the composer popover. Matching source badges and non-interactive
+  highlights use renderer-only text offsets, never inserted Markdown. Locate reveals
+  history and releases follow mode; duplicate identity now includes source row and
+  selected occurrence. List/badge/prompt numbering stays identical. Send-scoped
+  lifecycle and host boundaries remain unchanged. See E2E-259.
