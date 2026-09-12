@@ -10,9 +10,9 @@
  * it never participates in the transcript's layout or scroll extent. The
  * selection is serialized back to Markdown when the pill appears — the DOM the
  * range points at can change while it is on screen — and every action only
- * writes a draft, a clipboard entry, or a side chat: nothing is sent to the
- * conversation being read, no session is created, and nothing is written to its
- * transcript.
+ * writes a draft, a clipboard entry, a side chat, or the annotation comment
+ * editor: nothing is sent to the conversation being read, no session is created,
+ * and nothing is written to its transcript.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -41,7 +41,9 @@ export function SelectionQuoteButton({
 }) {
   const { t } = useTranslation();
   const quoteMessageIntoComposer = useAppStore((s) => s.quoteMessageIntoComposer);
-  const addResponseAnnotation = useAppStore((s) => s.addResponseAnnotation);
+  const openResponseAnnotationEditor = useAppStore(
+    (s) => s.openResponseAnnotationEditor,
+  );
   const openSideChat = useAppStore((s) => s.openSideChat);
   const sendPrompt = useAppStore((s) => s.sendPrompt);
   const { copied, copy } = useCopy();
@@ -162,9 +164,9 @@ export function SelectionQuoteButton({
 
   const addToChat = () => {
     if (target.annotatable) {
-      // A response turn takes a numbered annotation instead of draft text: the
-      // excerpt travels with the next prompt as an attachment (D400).
-      addResponseAnnotation({
+      // A response turn opens the comment editor on the excerpt snapshotted by
+      // the pill; the annotation is attached when that editor saves (D400).
+      openResponseAnnotationEditor({
         messageId: target.rowAnchorId,
         text: target.markdown,
       });
