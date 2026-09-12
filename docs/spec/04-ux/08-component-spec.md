@@ -2649,7 +2649,11 @@ Anatomy:
   snapshot (the Markdown serialized when the selection was taken, before focus
   moves into the editor and collapses the selection) above a multiline, optional
   comment. **Save** attaches the annotation with the comment in its `annotation`
-  field; **Cancel**, **Escape** outside IME composition, and a press starting on
+  field. In the comment textarea, **Enter** saves the live value and **Shift+Enter**
+  inserts a newline, independent of the main composer's Enter-to-send preference.
+  IME confirmation Enter never saves; key-repeat is ignored by the editor. Saving
+  by keyboard only attaches/updates the annotation, never sends a prompt.
+  **Cancel**, **Escape** outside IME composition, and a press starting on
   the backdrop discard it. Dragging a selection out of the editor never dismisses
   it. The dialog owns Escape before application shortcuts and restores focus to
   its trigger, or the rich composer when the floating trigger is gone. Opening

@@ -177,6 +177,13 @@ function CommentEditor({
             aria-label={t("chat.annotationCommentTitle")}
             placeholder={t("chat.annotationCommentPlaceholder")}
             onChange={(event) => setComment(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+              if (event.key !== "Enter" || event.shiftKey) return;
+              event.preventDefault();
+              event.stopPropagation();
+              if (!event.repeat) onSave(event.currentTarget.value);
+            }}
             data-testid="annotation-comment-input"
           />
           <div className="session-rename-dialog-actions">

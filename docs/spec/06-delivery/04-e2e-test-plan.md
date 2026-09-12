@@ -1358,7 +1358,13 @@ Each scenario is documented in this format:
   app. 6) Open a new annotation editor, type with a CJK IME, and press Escape
   while composing. Drag-select comment text and release outside the dialog.
   Finish composing, then press Escape normally and inspect focus and run state.
-- **Expected**: Step 6 keeps the editor and typed text during IME Escape and
+  7) Reopen the editor, type a comment with Shift+Enter between lines, and press
+  Enter to save. Repeat with the main composer's Enter-to-send preference disabled
+  and with an IME candidate-confirmation Enter.
+- **Expected**: Step 7 saves the multiline comment on plain Enter without sending
+  a prompt; Shift+Enter inserts a newline. IME confirmation keeps the editor open,
+  and the main composer's preference does not change these editor shortcuts.
+  Step 6 keeps the editor and typed text during IME Escape and
   drag-selection overshoot. Normal Escape closes only the editor (never aborts
   the run) and restores focus to its trigger or the rich composer. The attachment
   belongs to the session it was made in: the second

@@ -115,6 +115,34 @@ test("the mounted editor shows the excerpt, focuses the comment and saves typed 
   assert.equal(view.closed, 0);
 });
 
+test("Enter saves the live comment, Shift+Enter inserts a newline, and IME Enter never saves", () => {
+  const view = mount();
+  const input = view.nodes().find((node) => node.type === "textarea");
+  const key = (overrides = {}) => {
+    const event = {
+      key: "Enter", nativeEvent: {}, currentTarget: { value: "最新评价\n第二行" },
+      preventDefault() { this.prevented = true; },
+      stopPropagation() { this.stopped = true; }, ...overrides,
+    };
+    input.props.onKeyDown?.(event);
+    return event;
+  };
+  for (const event of [
+    { shiftKey: true }, { nativeEvent: { isComposing: true } },
+    { nativeEvent: { keyCode: 229 } }, { key: "a" },
+  ]) {
+    assert.equal(key(event).prevented, undefined, "typing and IME keep their native behavior");
+    assert.equal(view.saved, undefined);
+  }
+  assert.equal(key({ repeat: true }).prevented, true);
+  assert.equal(view.saved, undefined, "holding Enter must not repeat a save");
+  const enter = key();
+  assert.equal(view.saved, "最新评价\n第二行", "save the DOM value, not stale React state");
+  assert.equal(enter.prevented, true);
+  assert.equal(enter.stopped, true);
+  assert.equal(view.closed, 0);
+});
+
 test("IME Escape keeps the editor open; ordinary Escape is owned by the dialog", () => {
   const view = mount();
   view.key({ isComposing: true });
