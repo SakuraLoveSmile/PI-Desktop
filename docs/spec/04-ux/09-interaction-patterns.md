@@ -945,7 +945,9 @@ Running turns and pending approvals continue to gate the controls.
   message: annotating is a response concept (D400). Selecting text inside a
   response, or activating the turn's annotate action, opens a compact comment
   editor on a snapshot of the excerpt; **Save** attaches one numbered annotation
-  with the optional comment, while **Cancel** and **Escape** discard it. Saving
+  with the optional comment; **Enter** in the comment textarea does the same,
+  while **Shift+Enter** keeps native multiline input and IME confirmation Enter
+  never saves. **Cancel** and **Escape** discard it. Saving
   the editor sends nothing, and an excerpt that is already attached reopens its
   own annotation for editing instead of adding a second one (same row and selected
   offsets; repeated phrases elsewhere remain separate under ADR 0225). The annotation does
