@@ -5232,3 +5232,13 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
   replay it after the summary; set `requiresNonEmptyReasoningReplay` for
   non-official DeepSeek Completions rows so the pi-ai patch fills a documented
   placeholder instead of `""`. See ADR 0256 and E2E-005E.
+
+### Tray session shortcuts (issue #293)
+
+[ADR tray-session-shortcuts](/adr/tray-session-shortcuts) amends the D216 native
+tray menu with Running, Unread, and Pinned groups, three rows each after global
+priority assignment. Host session/inbox reads and runtime events remain the
+source of truth; renderer organization is mirrored without a persistence
+change. macOS single-click opens the menu without restoring the window;
+selection is delivered after bootstrap and uses normal session navigation.
+Validation contract: E2E-TRAY-bounded-session-navigation.

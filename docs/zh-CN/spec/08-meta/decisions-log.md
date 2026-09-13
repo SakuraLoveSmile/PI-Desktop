@@ -4172,3 +4172,13 @@ the retained upstream work-panel lifecycle. See
 
 - OpenCode / 第三方 DeepSeek 中转在上下文压缩丢掉助手思考后，会拒绝空的 `reasoning_*` 回传（#296）。官方 `deepseek.com` 仍接受 `""`（#223 / D389）。
 - 决策 D424 修订 D389 / ADR 0136：历史重建时恢复 `thinkingSignature`；把最近思考暂存在检查点 `details.retainedReasoning` 并在摘要后回放；对非官方 DeepSeek Completions 行设置 `requiresNonEmptyReasoningReplay`，使 pi-ai 补丁填入文档化占位符而非 `""`。见 ADR 0256 与 E2E-005E。
+
+### Tray session shortcuts (issue #293)
+
+[ADR tray-session-shortcuts](/adr/tray-session-shortcuts) amends the D216 native
+tray menu with Running, Unread, and Pinned groups, three rows each after global
+priority assignment. Host session/inbox reads and runtime events remain the
+source of truth; renderer organization is mirrored without a persistence
+change. macOS single-click opens the menu without restoring the window;
+selection is delivered after bootstrap and uses normal session navigation.
+Validation contract: E2E-TRAY-bounded-session-navigation.
