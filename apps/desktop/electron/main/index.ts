@@ -1372,6 +1372,7 @@ registerApplicationStartup({
   plugins,
   activeTurns,
   isSessionBusy,
+  getHost: () => host,
   getMainWindow: () => mainWindow,
   sendToRenderer,
   applyDevelopmentBranding,

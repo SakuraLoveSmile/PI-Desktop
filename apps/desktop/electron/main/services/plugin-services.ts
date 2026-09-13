@@ -417,6 +417,7 @@ export function createPluginServices({
   const emitBrowserState = (state: BrowserState) => {
     sendToRenderer(IPC.event.browserState, state);
     pluginPanels.broadcast("browser:state", state);
+    pluginViews.broadcast("browser:state", state);
   };
   /**
    * Tell the plugin surfaces that a host turn reached a terminal state. The

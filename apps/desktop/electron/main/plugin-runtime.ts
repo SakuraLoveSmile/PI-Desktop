@@ -101,17 +101,16 @@ export type RegisteredPluginTool = {
     args: unknown,
     ctx?: {
       sessionId?: string;
-      turnId?: string;
-      signal?: AbortSignal;
-      mode?: "agent" | "plan" | "goal";
-      modelKey?: string;
-      thinkingLevel?: string;
       /**
        * Runtime turn identity for this tool call. Matches the `turnId` the host
        * reports through `session:turnEnded`, so a plugin can scope resources
        * (overlays, caches, helper sessions) to one host turn.
        */
       turnId?: string;
+      signal?: AbortSignal;
+      mode?: "agent" | "plan" | "goal";
+      modelKey?: string;
+      thinkingLevel?: string;
     },
   ) => Promise<unknown>;
 };
