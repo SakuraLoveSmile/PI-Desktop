@@ -66,7 +66,7 @@ export function useAppShellRuntime() {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(() => loadSidebarWidth());
+  const [sidebarWidth] = useState(() => loadSidebarWidth());
   const [sidebarExiting, setSidebarExiting] = useState(false);
   const [shellWidth, setShellWidth] = useState(0);
   const appShellRef = useRef<HTMLDivElement>(null);
@@ -75,6 +75,7 @@ export function useAppShellRuntime() {
   const shellWidthRef = useRef(shellWidth);
   const workPanelWidthRef = useRef(workPanelWidth);
   const workPanelOpenRef = useRef(workPanelVisible);
+  const workPanelMaximizedRef = useRef(false);
   const autoCollapsedSidebarRef = useRef(false);
   sidebarCollapsedRef.current = sidebarCollapsed;
   sidebarWidthRef.current = sidebarWidth;
@@ -98,20 +99,15 @@ export function useAppShellRuntime() {
     observer.observe(shell);
     return () => observer.disconnect();
   }, []);
-  const handleSidebarWidthChange = useCallback((width: number) => {
-    setSidebarWidth(clampSidebarWidth(width));
-  }, []);
-  const handleSidebarWidthCommit = useCallback((width: number) => {
-    const nextWidth = clampSidebarWidth(width);
-    setSidebarWidth(nextWidth);
-    saveSidebarWidth(nextWidth);
-  }, []);
+  // The sidebar is a fixed-width column: it only collapses and opens.
+  const handleSidebarWidthChange = useCallback(() => {}, []);
+  const handleSidebarWidthCommit = useCallback(() => {}, []);
   // Reopening prefers the right column: the work panel gives up width first so
   // MainChat keeps the width it already had, and only a would-be breach of the
-  // 360px floor falls back to the 370px reopen target.
+  // 450px floor falls back to the 460px reopen target.
   const reopenSidebar = useCallback(() => {
     if (!sidebarCollapsedRef.current) return;
-    if (workPanelOpenRef.current) {
+    if (workPanelOpenRef.current && !workPanelMaximizedRef.current) {
       const currentPanelWidth = workPanelWidthRef.current;
       const width =
         appShellRef.current?.clientWidth ||
@@ -173,7 +169,9 @@ export function useAppShellRuntime() {
     return () => window.clearTimeout(timer);
   }, [sidebarExiting]);
   const [presentedWorkPanelOpen, setPresentedWorkPanelOpen] = useState(false);
+  const [workPanelMaximized, setWorkPanelMaximized] = useState(false);
   const [workPanelExiting, setWorkPanelExiting] = useState(false);
+  workPanelMaximizedRef.current = workPanelMaximized;
   const workPanelReservationRequest = useRef(0);
   const workPanelExitGeneration = useRef(0);
   const workPanelExitClosing = useRef(false);
@@ -216,9 +214,25 @@ export function useAppShellRuntime() {
     }
   }, [activeSessionId, closeSubagentPanel, page, subagentPanel]);
 
+  // Destination pages own the center pane. Leaving Chat while previewing must
+  // restore that pane before the destination is presented; otherwise the
+  // sidebar can change `page` successfully while the route stays unmounted.
+  useEffect(() => {
+    if (workPanelMaximized && page !== "chat") {
+      setWorkPanelMaximized(false);
+    }
+  }, [page, workPanelMaximized]);
+
   useEffect(() => {
     workPanelExitingRef.current = workPanelExiting;
   }, [workPanelExiting]);
+
+  // Preview mode: MainChat is not rendered and the panel takes its width as
+  // well, so the user can read a wide plugin view or preview. Transient: it is
+  // never persisted and it ends with the panel.
+  const toggleWorkPanelMaximize = useCallback(() => {
+    setWorkPanelMaximized((current) => !current);
+  }, []);
 
   const togglePresentedWorkPanel = useCallback(() => {
     const store = useAppStore.getState();
@@ -259,6 +273,7 @@ export function useAppShellRuntime() {
         generation === workPanelExitGeneration.current,
       commit: () => {
         setPresentedWorkPanelOpen(false);
+        setWorkPanelMaximized(false);
         setWorkPanelExiting(false);
         workPanelExitingRef.current = false;
         workPanelExitClosing.current = false;
@@ -337,6 +352,7 @@ export function useAppShellRuntime() {
       autoCollapsedSidebarRef.current = false;
       setSidebarCollapsed(false);
     }
+    if (!workPanelVisible) setWorkPanelMaximized(false);
     previousWorkPanelOpen.current = workPanelVisible;
   }, [workPanelVisible]);
 
@@ -346,6 +362,7 @@ export function useAppShellRuntime() {
         const store = useAppStore.getState();
         switch (command) {
           case "newTask":
+            if (workPanelMaximizedRef.current) setWorkPanelMaximized(false);
             await store.newSession();
             requestAnimationFrame(() =>
               document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus(),
@@ -834,6 +851,8 @@ export function useAppShellRuntime() {
     workPanelExitGeneration,
     finishWorkPanelExit,
     togglePresentedWorkPanel,
+    workPanelMaximized,
+    toggleWorkPanelMaximize,
     backendDown,
     archMismatch,
     setArchMismatch,

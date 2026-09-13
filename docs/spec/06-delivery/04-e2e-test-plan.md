@@ -10624,12 +10624,12 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
      manually collapsing the sidebar.
   5. Repeat divider changes with `ArrowLeft`, `ArrowRight`, `Home`, and `End`.
 - **Expected**: The native window width never changes. MainChat never measures
-  below 360px — including mid-drag and while `sidebar-out` still occupies flex
-  space. The effective panel maximum is the client width minus the 360px
+  below 450px — including mid-drag and while `sidebar-out` still occupies flex
+  space. The effective panel maximum is the client width minus the 450px
   MainChat floor and the expanded sidebar width, with no fixed pixel cap. When that
   budget is exhausted the expanded sidebar collapses immediately, and the panel
   may keep growing afterwards. A manual reopen spends panel width first;
-  MainChat is preserved where possible and otherwise lands on the 370px reopen
+  MainChat is preserved where possible and otherwise lands on the 460px reopen
   target. Closing the panel restores only a sidebar the layout collapsed. The
   separator's ARIA minimum/maximum follow the same dynamic budget.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
@@ -10638,9 +10638,36 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: Post-M6 desktop shell maintenance
 - **Status**: Automated (`scripts/e2e-three-column-layout.mjs` via
-  `pnpm test:e2e:layout` — fixed-window width invariance, the 360px floor across
-  a pointer drag, sidebar yield/restore, and the 370px reopen target); unit
-  coverage in `work-panel-resize.test.mjs`
+  `pnpm test:e2e:layout` — fixed-window width invariance, the 450px floor across
+  a pointer drag, the unfolded composer row at that floor, sidebar
+  yield/restore, the 460px reopen target, and preview mode); unit coverage in
+  `work-panel-resize.test.mjs`
+
+#### E2E-LAYOUT-work-panel-maximize
+
+- **Preconditions**: A desktop session is open with the work panel visible.
+- **Steps**:
+  1. Note the current panel width and sidebar state, then click the panel
+     header's preview toggle.
+  2. Inspect the shell: MainChat, then click the toggle again.
+- **Expected**: Entering preview mode stops rendering MainChat and hands its
+  width to the panel, so the panel spans the client area minus the expanded
+  sidebar (the whole client area when the sidebar is collapsed). The native
+  window never changes size. The divider is inert while preview mode is on
+  (`aria-disabled`). Leaving preview mode restores the previous panel width and
+  keeps whatever sidebar state the user chose last. The mode is transient: it is
+  not persisted and ends when the panel closes. Preview mode keeps the shell's
+  new-task, sidebar, and system-window actions reachable while MainChat is
+  absent. On non-fullscreen macOS with the sidebar collapsed, the first preview
+  action starts at the 76px traffic-light safe inset; fullscreen releases that
+  inset.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
+  `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8,
+  ADR 0238 §6, issue #289
+- **Acceptance**: F (persistence), Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated (`scripts/e2e-three-column-layout.mjs` — preview mode
+  entry/exit widths, MainChat unmount, and window invariance)
 
 #### E2E-AGENT-alt-enter-steers-active-turn: Enter follows up and Alt+Enter steers the active turn
 
