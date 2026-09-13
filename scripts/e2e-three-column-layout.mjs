@@ -466,18 +466,30 @@ async function main() {
       `window ${beforeMaximize.windowWidth} -> ${maximizing.windowWidth}`,
     );
 
-    const previewActions = await cdp.evaluate(`(() => ({
-      platform: window.piDesktop?.platform ?? "unknown",
-      newTask: !!document.querySelector('.window-chrome-row [data-nav="new-task"]'),
-      sidebarToggle:
-        !!document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ||
-        !!document.querySelector('.sidebar [data-nav="toggle-sidebar"]'),
-      controls: !!document.querySelector(".window-chrome-row .window-controls"),
-    }))()`);
+    const previewActions = await cdp.evaluate(`(() => {
+      const firstAction =
+        document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ??
+        document.querySelector('.window-chrome-row [data-nav="new-task"]');
+      const firstActionBox = firstAction?.getBoundingClientRect();
+      return {
+        platform: window.piDesktop?.platform ?? "unknown",
+        fullscreen: document.documentElement.dataset.fullscreen === "true",
+        firstActionLeft: firstActionBox ? Math.round(firstActionBox.left) : null,
+        newTask: !!document.querySelector('.window-chrome-row [data-nav="new-task"]'),
+        sidebarToggle:
+          !!document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ||
+          !!document.querySelector('.sidebar [data-nav="toggle-sidebar"]'),
+        controls: !!document.querySelector(".window-chrome-row .window-controls"),
+      };
+    })()`);
     check(
       previewActions.newTask &&
         previewActions.sidebarToggle &&
-        (previewActions.controls || previewActions.platform === "darwin"),
+        (previewActions.controls || previewActions.platform === "darwin") &&
+        (previewActions.platform !== "darwin" ||
+          previewActions.fullscreen ||
+          (previewActions.firstActionLeft !== null &&
+            previewActions.firstActionLeft >= 76)),
       "preview mode keeps new-task, sidebar, and window controls available",
       JSON.stringify(previewActions),
     );
@@ -652,11 +664,17 @@ async function main() {
       const handle = document.querySelector(".sidebar-resize-handle");
       const panel = document.querySelector('[data-testid="work-panel"]');
       const controlsBox = controls ? controls.getBoundingClientRect() : null;
+      const firstAction =
+        document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ??
+        document.querySelector('.window-chrome-row [data-nav="new-task"]');
+      const firstActionBox = firstAction?.getBoundingClientRect();
       return {
         bandZ: band ? Number(getComputedStyle(band).zIndex) : null,
         bandHeight: band ? Math.round(band.getBoundingClientRect().height) : null,
         bandPointerEvents: band ? getComputedStyle(band).pointerEvents : null,
         platform: window.piDesktop?.platform ?? "unknown",
+        fullscreen: document.documentElement.dataset.fullscreen === "true",
+        firstActionLeft: firstActionBox ? Math.round(firstActionBox.left) : null,
         controlsPosition: controls ? getComputedStyle(controls).position : null,
         controlsOnScreen: controlsBox
           ? controlsBox.width > 0 && controlsBox.right <= window.innerWidth + 1
@@ -709,6 +727,14 @@ async function main() {
     check(
       e2eChromePreview.bandHeight === 46 && e2eChromePreview.bandPointerEvents === "none",
       "the preview band is a 46px pass-through strip",
+      JSON.stringify(e2eChromePreview),
+    );
+    check(
+      e2eChromePreview.platform !== "darwin" ||
+        e2eChromePreview.fullscreen ||
+        (e2eChromePreview.firstActionLeft !== null &&
+          e2eChromePreview.firstActionLeft >= 76),
+      "preview actions clear the macOS traffic-light hit area",
       JSON.stringify(e2eChromePreview),
     );
     check(

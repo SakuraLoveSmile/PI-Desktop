@@ -1131,6 +1131,17 @@
   left: var(--ds-sidebar-width);
 }
 
+/* Native macOS traffic lights occupy the top-left ~76px of the window. Keep
+ * preview actions outside that hit area while the sidebar is collapsed. */
+:root[data-platform="darwin"] .window-chrome-row:not(.sidebar-expanded) {
+  padding-left: 76px;
+}
+
+:root[data-platform="darwin"][data-fullscreen="true"]
+  .window-chrome-row:not(.sidebar-expanded) {
+  padding-left: 8px;
+}
+
 .window-chrome-row button {
   pointer-events: auto;
 }

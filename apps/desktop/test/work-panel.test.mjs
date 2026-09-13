@@ -578,4 +578,12 @@ test("preview mode keeps shell actions and restores routes before navigation", (
     globalStyles,
     /\.window-chrome-row\.sidebar-expanded \{[\s\S]*?left: var\(--ds-sidebar-width\);/,
   );
+  assert.match(
+    globalStyles,
+    /:root\[data-platform="darwin"\] \.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*76px;/,
+  );
+  assert.match(
+    globalStyles,
+    /:root\[data-platform="darwin"\]\[data-fullscreen="true"\][\s\S]*?\.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*8px;/,
+  );
 });
