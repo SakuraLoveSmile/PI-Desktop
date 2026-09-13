@@ -62,16 +62,19 @@ test("subagent models use the exact stored binding for thinking capability", () 
   );
 });
 
-test("the sidecar forwards both subagent params to the runtime", () => {
+test("the sidecar forwards subagent bindings and the independent override opt-in to the runtime", () => {
   assert.match(sidecarSource, /subagents\?: SubagentDefinition\[\];/);
   assert.match(
     sidecarSource,
     /subagentProviders\?: Record<string, RuntimeProviderConfig>;/,
   );
+  assert.match(sidecarSource, /subagentModelKeys\?: string\[\];/);
+  assert.match(sessionLaunchSource, /subagentModelKeys,/);
   // Once for the reuse check, once for the constructor: a changed catalog must
   // rebuild the runtime rather than silently keep the old delegates.
   assert.equal(sidecarSource.match(/^\s+subagents,$/gm)?.length, 2);
   assert.equal(sidecarSource.match(/^\s+subagentProviders,$/gm)?.length, 2);
+  assert.equal(sidecarSource.match(/^\s+subagentModelKeys,$/gm)?.length, 2);
 });
 
 test("persisted subagent rows keep their attribution", () => {

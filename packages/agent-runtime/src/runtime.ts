@@ -808,12 +808,14 @@ export type AgentRuntimeOptions = {
    */
   subagents?: SubagentDefinition[];
   /**
-   * Provider resolved for each definition that pins one, keyed by definition
-   * name. Main owns credential lookup, so a pinned provider that is missing
+   * Provider resolved for each definition that pins one, keyed by its model
+   * key. Main owns credential lookup, so a pinned provider that is missing
    * here is unavailable and the delegate must fail loudly rather than
    * silently run on the session's model.
    */
   subagentProviders?: Record<string, RuntimeProviderConfig>;
+  /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
+  subagentModelKeys?: string[];
 };
 
 export type RuntimeMatchConfig = {
@@ -829,6 +831,8 @@ export type RuntimeMatchConfig = {
   commandShell: CommandShellOption;
   subagents?: SubagentDefinition[];
   subagentProviders?: Record<string, RuntimeProviderConfig>;
+  /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
+  subagentModelKeys?: string[];
 };
 
 /** Tool calls ride in the assistant content array as `type: "toolCall"`. A
@@ -1394,6 +1398,7 @@ export class DesktopAgentRuntime {
   /** Subagent definitions offered through the `Task` tool (ADR 0062). */
   private subagents: SubagentDefinition[];
   private subagentProviders: Record<string, RuntimeProviderConfig>;
+  private subagentModelKeys: Set<string>;
   /**
    * Background delegations of this session (ADR 0089). `Task` starts one and
    * returns; `TaskWait`/`TaskList`/`TaskStop` drive it afterwards.
@@ -1537,6 +1542,7 @@ export class DesktopAgentRuntime {
     this.trustedExtensionSpecs = opts.trustedExtensions ?? [];
     this.subagents = opts.subagents ?? [];
     this.subagentProviders = opts.subagentProviders ?? {};
+    this.subagentModelKeys = new Set(opts.subagentModelKeys ?? []);
     if (!isCommandShellOption(opts.commandShell) || !opts.commandShell.available) {
       throw Object.assign(new Error("active command shell is invalid or unavailable"), {
         errorCode: "COMMAND_SHELL_INVALID",
@@ -2000,6 +2006,8 @@ Delegation rules:
       // are compared in full.
       safeJson(this.subagents) === safeJson(config.subagents ?? []) &&
       safeJson(this.subagentProviders) === safeJson(config.subagentProviders ?? {}) &&
+      safeJson([...this.subagentModelKeys].sort()) ===
+        safeJson([...new Set(config.subagentModelKeys ?? [])].sort()) &&
       // Enabling or disabling a trusted extension retires the runtime so the
       // next prompt reloads the set (spec 16 §4.3).
       trustedExtensionIds(this.trustedExtensionSpecs) ===
@@ -3204,8 +3212,8 @@ Delegation rules:
 
   /**
    * On-demand model resolution for Task-time model overrides. Asks Electron
-   * main to resolve a `providerId/modelId` key that was not statically pinned
-   * by any definition. The result is cached for the life of this runtime.
+   * main to authorize and resolve a `providerId/modelId` key outside the
+   * opted-in launch catalog. The result is cached for the life of this runtime.
    */
   private async resolveSubagentModel(
     key: string,
@@ -3229,6 +3237,7 @@ Delegation rules:
             });
         }
         this.subagentProviders[key] = provider;
+        this.subagentModelKeys.add(key);
         return provider;
       }
     } catch {
@@ -3238,11 +3247,11 @@ Delegation rules:
   }
 
   /**
-   * Keys the parent agent can pass as `Task.model`. Includes both statically
-   * pinned providers and the `availableModels` catalog injected at launch.
+   * Keys explicitly enabled for Task.model at launch or authorized by main
+   * on demand. A binding resolved only for a definition pin is not an opt-in.
    */
   private availableSubagentModelKeys(): string[] {
-    return Object.keys(this.subagentProviders);
+    return [...this.subagentModelKeys].filter((key) => this.subagentProviders[key]);
   }
 
   /**
@@ -3250,11 +3259,11 @@ Delegation rules:
    * agent can make informed model choices for Task.model overrides.
    */
   private subagentModelSummary(): string | undefined {
-    const keys = Object.keys(this.subagentProviders);
+    const keys = this.availableSubagentModelKeys();
     if (keys.length === 0) {
       return [
         "No delegation model overrides are configured.",
-        "Omit the `model` parameter on Task to inherit the parent conversation's selected model.",
+        "Omit the `model` parameter on Task to use the definition's default model, or inherit the parent conversation's selected model when no default is pinned.",
         "Never invent a provider/model key. Prefer omitting `model`; repeating the exact parent provider/model is safe but unnecessary.",
       ].join(" ");
     }
@@ -3337,10 +3346,12 @@ Delegation rules:
   private buildSubagentTool(): AgentTool {
     const names = this.subagents.map((definition) => definition.name);
     const catalog = this.subagents
-      .map(
-        (definition) =>
-          `- ${definition.name} (tools: ${definition.tools.join(", ")}): ${definition.description}`,
-      )
+      .map((definition) => {
+        const defaultModel = definition.model
+          ? `${subagentModelKey(definition.model)}; omit model to use this default.`
+          : "inherits the session.";
+        return `- ${definition.name} (tools: ${definition.tools.join(", ")}): ${definition.description} Default model: ${defaultModel}`;
+      })
       .join("\n");
     return {
       name: SUBAGENT_TOOL_NAME,
@@ -3351,10 +3362,10 @@ Delegation rules:
         "Do not delegate what you can finish in a couple of tool calls, and do not delegate anything that needs the user — a subagent cannot ask a question or propose a plan on your behalf.",
         ...(this.availableSubagentModelKeys().length
           ? [
-              "Only pass `model` when selecting a listed delegation model; otherwise omit it. Repeating the exact parent provider/model is also safe but unnecessary.",
+              "Only pass `model` when deliberately overriding the definition default with a listed delegation model; otherwise omit it. Repeating the exact parent provider/model is also safe but unnecessary.",
             ]
           : [
-              "No delegation model overrides are configured. Omit `model` so the subagent inherits the parent conversation's selected model; never invent a provider/model key.",
+              "No delegation model overrides are configured. Omit `model` to use the definition's default, or the parent model when no default is pinned; never invent a provider/model key.",
             ]),
         "`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.",
         "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time. You may keep working or talk to the user while they run; the runtime delivers their reports when they finish. Call TaskStop only to cancel.",
@@ -3377,7 +3388,7 @@ Delegation rules:
         model: Type.Optional(
           Type.String({
             description:
-              "Override the delegate's model for this run, e.g. 'anthropic/claude-sonnet-4-20250514'. Omit to use the subagent's default. Pick cheaper/faster models for simple searches; reserve expensive reasoning models for complex analysis.",
+              "Override the delegate's model for this run, e.g. 'anthropic/claude-sonnet-4-20250514'. Omit to use the subagent's default. Prefer omitting this parameter to preserve a configured definition default. Only choose an override from the available delegation model catalog.",
           }),
         ),
       }),
@@ -3417,10 +3428,12 @@ Delegation rules:
           // echoed by the parent despite an empty delegation catalog.
           provider = this.isSessionModelOverride(modelOverride)
             ? this.provider
-            : this.subagentProviders[modelOverride];
+            : this.subagentModelKeys.has(modelOverride)
+              ? this.subagentProviders[modelOverride]
+              : undefined;
           if (!provider) {
-            // On-demand resolution: ask Electron main for a provider the
-            // definitions did not statically pin but the user has configured.
+            // Only main can authorize an override absent from the launch
+            // opt-in list, even if its binding was resolved for a private pin.
             try {
               provider = await this.resolveSubagentModel(modelOverride);
             } catch {

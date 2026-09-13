@@ -3032,6 +3032,14 @@ D193, and D194.
   exact repeat of the current session provider/model is treated as inheritance,
   equivalent to omitting `model`, so an empty delegation catalog does not turn
   the parent model into a false unavailable-model error.
+- Implementation clarification (2026-09-13, ADR subagent-model-opt-in):
+  `subagentProviders` may contain definition-only pins and is not an override
+  allowlist. The additive `subagentModelKeys` launch field carries opt-in
+  separately, defaults to empty, and participates in runtime reuse matching.
+  Only opt-in keys or successfully authorized on-demand results enter the
+  override catalog/cache. This restores D278's selection boundary without
+  reversing the existing override priority; the Task catalog now discloses
+  each definition's default model.
 - Models not pre-resolved at sidecar launch are resolved on-demand via the
   `provider.resolveSubagentModel` RPC to Electron main, where credentials and
   the models.dev snapshot live.

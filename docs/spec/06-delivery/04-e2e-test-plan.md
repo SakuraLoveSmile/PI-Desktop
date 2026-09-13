@@ -8754,12 +8754,17 @@ are withdrawn with ADR 0165.
   Task with no `model:` parameter and a definition that has no frontmatter
   model pin. 8) With no enabled delegation models, delegate a Task once with
   no `model:` and once with `model:` repeating the current session's
-  `provider/modelId`.
+  `provider/modelId`. 9) Pin an unselected model to one definition; attempt to
+  use it as another definition's explicit override, then invoke its owner with
+  no override. 10) Remove a previously enabled override key and start another
+  prompt in the same idle session.
 - **Expected**:
   1. Saving and reopening the provider preserves the
      `availableForSubagents` opt-in, including after an application restart.
   2. The delegation model summary appears in the parent's system prompt listing
-     every model marked `availableForSubagents`.
+     every successfully resolved model marked `availableForSubagents`, with
+     no definition-only pins. The Task definition catalog displays each default
+     model and recommends omitting `model` to preserve it.
   3. The Task tool accepts the `model` parameter and the delegate runs on the
      specified model, not the session model; its delegation node shows the
      effective model id immediately after the subagent name.
@@ -8772,13 +8777,25 @@ are withdrawn with ADR 0165.
   7. When no delegation model is configured, omitting `model:` and explicitly
      repeating the current session `provider/modelId` both start the delegate
      on the session model; the latter is not reported as an unavailable model.
+  8. A private pin remains usable by its definition when `model` is omitted,
+     but cannot be selected for another definition without opt-in. Rejection
+     issues no child provider request. Changed opt-in retires the idle runtime
+     on the next prompt, so a stale cached binding grants no selection rights.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
   `03-runtime/11-provider-model-system.md` §7,
   `03-runtime/12-provider-config-schema.md` §2,
   `08-meta/decisions-log.md` (D278)
 - **Acceptance**: C (chat/stream) + B (model configuration) + E (tools)
 - **Milestone**: M6+
-- **Status**: Draft
+- **Status**: Partially automated. `pnpm test:e2e:subagent-models` drives the
+  built sidecar over real NDJSON and a local deterministic SSE model fixture:
+  private cross-definition rejection, normal pin use, allowed override priority,
+  on-demand authorization, exact-session inheritance, and revocation across two
+  prompts all pass. Runtime unit tests cover the same selection gates and the
+  desktop launch test exercises independent opt-in, revocation, and accounts
+  sharing a vendor alias; the wiring test checks the additive launch field. The settings checkbox
+  UI/persistence journey and live external provider execution remain manual;
+  this fixture does not claim a complete native UI journey.
 
 #### E2E-170: Shell titlebars use borderless chrome
 
