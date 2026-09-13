@@ -82,6 +82,7 @@ export const MessageRow = memo(function MessageRow({
     <div
       className={`message-row ${isSessionMessage ? "session-message" : isUser ? "user" : message.role}`}
       data-minimap-id={message.id}
+      data-message-id={message.id}
       role="article"
       aria-label={isSessionMessage ? t("sessionCollaboration.agentMessage") : isUser ? t("chat.userMessage") : t("chat.assistantMessage")}
     >

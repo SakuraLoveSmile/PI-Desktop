@@ -216,6 +216,11 @@ pub struct SessionDetail {
     /// for a window. Omitted for the full-history form.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message_start: Option<i64>,
+    /// Exclusive physical end of a bounded read, including deduplicated lines.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_end: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_more_after: Option<bool>,
     /// True when older messages exist outside the returned window.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub has_more_before: Option<bool>,
@@ -230,8 +235,10 @@ pub struct SessionDetail {
     pub compactions: Vec<CompactionRecord>,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SessionReadOptions {
+    /// Center a bounded UI read on this stable message ID.
+    pub message_around: Option<String>,
     /// Exclusive message sequence before which the window ends. When omitted,
     /// the window is taken from the end of the canonical transcript.
     pub message_before: Option<i64>,
@@ -1309,7 +1316,7 @@ pub fn get_session_with_options(
         return Ok(None);
     };
 
-    let (records, compactions, message_start, has_more_before) =
+    let (records, compactions, message_start, has_more_before, message_end, has_more_after) =
         if let Some(raw_limit) = options.message_limit.filter(|limit| *limit > 0) {
             let limit = raw_limit.min(1_000) as usize;
             // Window coordinates are physical transcript lines, so they must be
@@ -1319,9 +1326,18 @@ pub fn get_session_with_options(
             // silently dropped the newest messages of a long session.
             let layout = session_layout(db, id)?;
             let total = layout.message_count();
-            let before = match options.message_before {
-                Some(value) => (value.max(0) as usize).min(total),
-                None => total,
+            let before = if let Some(message_id) = options.message_around.as_deref() {
+                let Some(position) =
+                    transcripts::find_message_position(db.data_dir(), id, &layout, message_id)?
+                else {
+                    return Ok(None);
+                };
+                (position + limit / 2 + 1).min(total)
+            } else {
+                match options.message_before {
+                    Some(value) => (value.max(0) as usize).min(total),
+                    None => total,
+                }
             };
             let start = before.saturating_sub(limit);
             let read = transcripts::read_transcript_window_with_layout(
@@ -1336,10 +1352,19 @@ pub fn get_session_with_options(
                 read.compactions,
                 Some(start as i64),
                 Some(start > 0),
+                Some(before as i64),
+                Some(before < total),
             )
         } else {
             let read = transcripts::read_transcript_with_compactions(db.data_dir(), id)?;
-            (dedupe_records(read.messages), read.compactions, None, None)
+            (
+                dedupe_records(read.messages),
+                read.compactions,
+                None,
+                None,
+                None,
+                None,
+            )
         };
     // Content comes from the transcript file; SQLite only indexes it. A
     // renderer window may additionally request a display cap so a single
@@ -1348,13 +1373,27 @@ pub fn get_session_with_options(
     let messages = match options.content_limit {
         Some(limit) => records
             .into_iter()
-            .map(|record| record_to_ui_for_display(record, limit))
+            .map(|record| {
+                // An explicit search jump must retain the focused message's
+                // original text, including hits beyond the normal display cap.
+                // Neighbors and tool payloads keep their presentation limits.
+                let focused = options.message_around.as_deref() == Some(record.id.as_str())
+                    && matches!(record.role.as_str(), "user" | "assistant");
+                let content = focused.then(|| record_index_text(&record)).flatten();
+                let mut message = record_to_ui_for_display(record, limit);
+                if let Some(content) = content {
+                    message.content = content;
+                }
+                message
+            })
             .collect(),
         None => records.into_iter().map(record_to_ui).collect(),
     };
     Ok(Some(SessionDetail {
         summary,
         message_start,
+        message_end,
+        has_more_after,
         has_more_before,
         messages,
         compaction: compactions.last().cloned(),
@@ -1478,6 +1517,8 @@ pub fn fork_session_through(
     Ok(ForkSessionResult::Created(Box::new(SessionDetail {
         summary,
         message_start: None,
+        message_end: None,
+        has_more_after: None,
         has_more_before: None,
         messages,
         compaction: compactions.last().cloned(),
@@ -3937,6 +3978,7 @@ mod tests {
                 &db,
                 &session.id,
                 SessionReadOptions {
+                    message_around: None,
                     message_before: before,
                     message_limit: Some(2),
                     content_limit: None,
@@ -3969,6 +4011,7 @@ mod tests {
             &db,
             &session.id,
             SessionReadOptions {
+                message_around: None,
                 message_before: None,
                 message_limit: Some(2),
                 content_limit: None,
@@ -4024,6 +4067,7 @@ mod tests {
             &db,
             &session.id,
             SessionReadOptions {
+                message_around: None,
                 message_before: None,
                 message_limit: Some(2),
                 content_limit: None,
@@ -4046,6 +4090,7 @@ mod tests {
                 &db,
                 &session.id,
                 SessionReadOptions {
+                    message_around: None,
                     message_before: Some(start),
                     message_limit: Some(2),
                     content_limit: None,
@@ -4084,6 +4129,7 @@ mod tests {
             &db,
             &session.id,
             SessionReadOptions {
+                message_around: None,
                 message_before: None,
                 message_limit: Some(1),
                 content_limit: Some(128),
