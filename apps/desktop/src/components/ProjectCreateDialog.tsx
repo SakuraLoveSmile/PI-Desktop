@@ -10,7 +10,6 @@ import {
   IconFolder,
   IconMonitor,
   IconNewProject,
-  IconSparkles,
   IconStar,
   IconX,
 } from "./icons";
@@ -142,7 +141,6 @@ export function ProjectCreateDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="project-create-dialog-title"
-        aria-describedby="project-create-memory-hint"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="project-create-dialog-head">
@@ -150,10 +148,6 @@ export function ProjectCreateDialog() {
             <h2 id="project-create-dialog-title" className="project-create-dialog-title">
               {t("project.createTitle")}
             </h2>
-            <div id="project-create-memory-hint" className="project-create-dialog-memory-hint">
-              <IconSparkles size={14} aria-hidden />
-              <span>{t("project.createMemoryHint")}</span>
-            </div>
           </div>
           <TooltipButton
             type="button"
@@ -198,7 +192,6 @@ export function ProjectCreateDialog() {
                 value={name}
                 maxLength={MAX_PROJECT_NAME_CHARS}
                 onChange={(event) => setName(event.target.value)}
-                placeholder={t("project.createNamePlaceholder")}
                 aria-label={t("project.createNameLabel")}
                 disabled={busy}
                 spellCheck={false}
@@ -218,7 +211,7 @@ export function ProjectCreateDialog() {
                     <span className="project-create-dialog-count">{folders.length}</span>
                   ) : null}
                 </h3>
-                <span className="project-create-dialog-location">
+                <span className="project-create-dialog-source" data-project-source="local">
                   <IconMonitor size={15} aria-hidden />
                   {t("project.createComputer")}
                 </span>
@@ -273,9 +266,6 @@ export function ProjectCreateDialog() {
                 <span className="project-create-add-folder-copy">
                   <span className="project-create-add-folder-title">
                     {t("project.createAddFolder")}
-                  </span>
-                  <span className="project-create-add-folder-hint">
-                    {t("project.createAddFolderHint")}
                   </span>
                 </span>
               </button>

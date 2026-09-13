@@ -1464,13 +1464,22 @@ needed.
   workspace; every selected folder is retained as an open project tab. The
   dialog is unavailable while creation is in flight and returns focus to the
   invoking control after close. The surface follows the shell's neutral gray
-  theme with 20px tokenized corners and shared dialog elevation. It shows one
-  Create project title and the quiet memory hint, a filled name field, and a
-  softly filled Add folder action. No outer stroke, section rules, footer
-  divider, or dashed picker border appears. Spacing provides the section
+  theme with a 480px maximum width, 18px tokenized corners, shared dialog
+  elevation, and the global compact type ramp. The title uses the dialog-level
+  heading size, the name field uses the body/input size, and labels/metadata
+  remain on the smaller global steps. The header and action row use the shared
+  18px dialog gutter; sections use a 16px gap. It shows one Create project
+  title, a filled name field without duplicate placeholder copy, a compact
+  local source chip, and a softly filled Add folder action. It does not add
+  explanatory memory or multi-selection copy. The workspace section keeps the
+  current local folder selection behavior while staying neutral about future
+  remote sources. No outer stroke, section rules,
+  footer divider, or dashed picker border appears. Spacing provides the section
   hierarchy; long names and paths remain contained, and scrolling content never
   hides the fixed action row. Both themes keep text readable and keyboard focus
-  visible; reduced motion suppresses the control transitions.
+  visible; reduced motion suppresses the control transitions. The source chip
+  is the extension point for a future remote project source; the current flow
+  remains local-only.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` (§9),
   `04-ux/06-settings-ia.md` (Project archive),
   `04-ux/07-ui-design-system.md`,

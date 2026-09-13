@@ -439,15 +439,23 @@ visually distinct from list content.
   lists every selected folder with a remove action, and marks the first folder
   as Primary. The primary folder is activated and named after creation; every
   other selected folder is retained as an open project tab. The dialog follows
-  the shell's neutral gray surfaces, with `--radius-xl` (20px) corners and the
-  shared `--ds-shadow-dialog` elevation. One Create project title leads into
-  the quiet memory hint, an explicitly labeled filled name field, and the
-  folder list with a softly filled Add folder action. Spacing separates the
-  compact sections; the surface has no outer stroke, section rules, footer
-  divider, or dashed picker border. The action row stays fixed while the
-  content scrolls; narrow windows retain a single column and reachable actions.
-  Light and dark themes preserve readable filled surfaces and visible keyboard
-  focus, and transitions respect reduced motion.
+  the shell's neutral gray surfaces, with a 480px maximum width,
+  `--radius-lg-plus` (18px) corners, and the shared `--ds-shadow-dialog`
+  elevation. Its compact type hierarchy uses `--text-lg` for the title,
+  `--text-base` for the name field, and `--text-sm-plus` or smaller for labels
+  and metadata. The header and action row use the shared 18px dialog gutter,
+  while distinct sections use a 16px gap and shared button/input metrics. One
+  Create project title leads into an explicitly labeled filled name field and
+  the workspace list with a softly filled Add folder action; the field does not
+  repeat its label as placeholder text. The folder section exposes the current
+  local source as a compact source chip; a future remote source can replace
+  that slot without changing the project name or workspace list contract. The
+  dialog does not add explanatory copy for durable memory or multi-selection.
+  The surface has no outer stroke, section rules, footer divider, or dashed
+  picker border. The action row stays fixed while the content scrolls; narrow
+  windows retain a single column and reachable actions. Light and dark themes
+  preserve readable filled surfaces and visible keyboard focus, and transitions
+  respect reduced motion.
 - Right-click the `Projects` heading or empty project-list chrome: open a
   single-item create menu that runs the same Create project dialog action
 - Click project `+`: activate that project, then select its most recent empty
