@@ -1374,6 +1374,18 @@ Only the description enters the prompt, and the body is fetched when the model
 invokes `Skill` (D174). A missing file is removed from the list and its local
 state is pruned during the next scan.
 
+Desktop-only skill market channels (not host RPC) live on Electron IPC:
+
+- `pi-desktop/skill/market/search` — `{ query, sources[] }` → `{ entries, failedSources }`.
+  Main aggregates builtin-safe catalog JSON and GitHub repo SKILL.md scans.
+  Source URLs must pass the public-HTTPS policy (ADR 0243). One failing source
+  is dropped; the rest still return.
+- `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`.
+  Main fetches the document over the same policy, splits frontmatter, and may
+  attach sibling `.md` files from a jsDelivr listing. The renderer installs
+  through existing `skills.create`. Catalog ids are sanitized to host
+  `valid_capability_id` (`[a-z0-9][a-z0-9-]{0,63}`).
+
 ## 12c. Subagent API (D202)
 
 User-owned subagents are global-only Markdown documents under

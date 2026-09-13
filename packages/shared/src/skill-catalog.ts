@@ -9,6 +9,7 @@
  * picks share these rules.
  */
 import type { UserSkillInput } from "./types.js";
+import { isSafePublicHttpsUrl } from "./public-network.js";
 
 export type SkillCatalogCategory = "workflow" | "writing" | "coding" | "data" | "docs";
 
@@ -33,8 +34,44 @@ export type SkillCatalogFile = {
   skills: SkillCatalogEntry[];
 };
 
+/** Mirrors host-core `MAX_SKILL_BYTES` in `user_skills.rs`. */
+export const MAX_SKILL_DOCUMENT_BYTES = 128 * 1024;
+
+/** Host `valid_capability_id`: lowercase ASCII, digits, hyphen; starts alphanumeric. */
+const SKILL_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+export function isSafeSkillSourceUrl(url: string): boolean {
+  return isSafePublicHttpsUrl(url);
+}
+
+/**
+ * Align a scanned or catalog id with host-core `valid_capability_id`.
+ * Underscores become hyphens; an empty or illegal remainder falls back.
+ */
+export function sanitizeSkillCatalogId(raw: string, fallback: string): string {
+  const slug = raw
+    .toLowerCase()
+    .replace(/_/g, "-")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64)
+    .replace(/-+$/g, "");
+  if (SKILL_ID.test(slug)) return slug;
+  if (slug) {
+    const prefixed = `skill-${slug}`.replace(/-+$/g, "").slice(0, 64);
+    if (SKILL_ID.test(prefixed)) return prefixed;
+  }
+  const safeFallback = fallback
+    .toLowerCase()
+    .replace(/_/g, "-")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return SKILL_ID.test(safeFallback) ? safeFallback : "skill";
+}
+
 export function skillEntryError(entry: SkillCatalogEntry): string | null {
-  if (!/^[a-z][a-z0-9_-]{0,63}$/.test(entry.id)) return `bad id: ${entry.id}`;
+  if (!SKILL_ID.test(entry.id)) return `bad id: ${entry.id}`;
   if (!entry.url) return `${entry.id}: url is required`;
   try {
     const parsed = new URL(entry.url);
@@ -57,11 +94,15 @@ export function validateSkillCatalogFile(value: unknown): {
   const skills: SkillCatalogEntry[] = [];
   const seen = new Set<string>();
   for (const [index, candidate] of rawSkills.entries()) {
-    const entry = candidate as SkillCatalogEntry;
-    if (!entry || typeof entry !== "object") {
+    const raw = candidate as SkillCatalogEntry;
+    if (!raw || typeof raw !== "object") {
       warnings.push(`entry ${index} is not an object`);
       continue;
     }
+    const entry: SkillCatalogEntry = {
+      ...raw,
+      id: typeof raw.id === "string" ? sanitizeSkillCatalogId(raw.id, `skill-${index}`) : "",
+    };
     if (seen.has(entry.id)) {
       warnings.push(`duplicate id: ${entry.id}`);
       continue;
@@ -118,95 +159,8 @@ export type SkillMarketSource = {
   url: string;
 };
 
-/**
- * Guard for user-entered source/document URLs: https only, never a loopback
- * or private-network host — trailing dots, IPv4-mapped/compatible and ULA /
- * link-local IPv6 included. Syntactic only; DNS resolution is the main
- * process's per-hop job.
- */
-export function isSafeSkillSourceUrl(url: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return false;
-  }
-  if (parsed.protocol !== "https:") return false;
-  return isPublicHostname(parsed.hostname);
-}
-
-/**
- * Syntactic hostname check used by renderer and main. DNS resolution is
- * additional and lives in the main process (shared stays I/O-free): a name
- * that passes here can still resolve to a private address.
- */
-export function isPublicHostname(hostname: string): boolean {
-  // Trailing-dot FQDN smuggling: `https://localhost./` normalizes to
-  // `localhost.` and previously slipped past the localhost check.
-  const host = hostname.toLowerCase().replace(/\.+$/, "");
-  if (!host) return false;
-  if (host.startsWith("[")) {
-    return isPublicIpLiteral(host.slice(1, -1));
-  }
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
-    return false;
-  }
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
-    return isPublicIpLiteral(host);
-  }
-  return true;
-}
-
-/** False for loopback, unspecified, v4-mapped/compatible, ULA, link-local, multicast and private/reserved IPv4. */
-export function isPublicIpLiteral(ip: string): boolean {
-  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
-  if (v4) {
-    const octets = v4.slice(1).map(Number);
-    if (octets.some((octet) => octet > 255)) return false;
-    const [a, b] = octets;
-    if (a === 0 || a === 10 || a === 127) return false;
-    if (a === 169 && b === 254) return false;
-    if (a === 172 && b >= 16 && b <= 31) return false;
-    if (a === 192 && b === 168) return false;
-    if (a === 100 && b >= 64 && b <= 127) return false;
-    return true;
-  }
-  const lower = ip.toLowerCase();
-  const halves = lower.split("::");
-  if (halves.length > 2) return false;
-  let groups: number[];
-  if (halves.length === 2) {
-    const head = halves[0] ? halves[0].split(":") : [];
-    const tail = halves[1] ? halves[1].split(":") : [];
-    const fill = 8 - head.length - tail.length;
-    if (fill < 1) return false;
-    groups = [...head, ...Array.from({ length: fill }, () => "0"), ...tail].map((g) =>
-      /^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : -1,
-    );
-  } else {
-    groups = lower.split(":").map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : -1));
-  }
-  if (groups.length !== 8 || groups.some((n) => n < 0)) return false;
-  if (groups.every((n) => n === 0)) return false; // unspecified ::
-  // ::ffff:a.b.c.d (v4-mapped) and ::a.b.c.d (v4-compatible) inherit v4 rules.
-  if (groups.slice(0, 5).every((n) => n === 0)) {
-    if (groups[5] === 0xffff || groups[5] === 0) {
-      const v4 = `${(groups[6] >> 8) & 255}.${groups[6] & 255}.${(groups[7] >> 8) & 255}.${groups[7] & 255}`;
-      return isPublicIpLiteral(v4);
-    }
-  }
-  const first = groups[0];
-  const second = groups[1];
-  if (first === 0x7f00) return false; // ::7f00:... loopback variants
-  if (first >= 0xfe80 && first <= 0xfebf) return false; // fe80::/10 link-local
-  if (first >>> 8 === 0xfc || first >>> 8 === 0xfd) return false; // fc00::/7 ULA
-  if (first >>> 8 === 0xff) return false; // multicast
-  if (first === 0x2001 && second === 0x0db8) return false; // documentation
-  return true;
-}
-
-
 export type SourcedSkillEntry = SkillCatalogEntry & { sourceId: string };
+
 /** Built-in picks first; catalog source entries fill the tail without id collisions. */
 export function mergeSkillEntries(
   builtin: SkillCatalogEntry[],
@@ -268,6 +222,44 @@ export function expandSkillResources(doc: { body: string }, resources: SkillReso
       .join("") +
     "\n"
   );
+}
+
+export function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+/** Byte length of the document host-core would persist (frontmatter + body). */
+export function renderedSkillDocumentBytes(
+  name: string,
+  description: string | undefined,
+  body: string,
+): number {
+  let out = `---\nname: ${name.replace(/\n/g, " ")}\n`;
+  if (description && description.trim()) {
+    out += `description: ${description.replace(/\n/g, " ")}\n`;
+  }
+  out += `---\n\n${body.trim()}\n`;
+  return utf8ByteLength(out);
+}
+
+export type AssembledSkillInstall = {
+  name: string;
+  description?: string;
+  body: string;
+  bytes: number;
+  tooLarge: boolean;
+};
+
+/** Expand resources and measure the host document that install will write. */
+export function assembleSkillInstall(
+  document: { name?: string; description?: string; body: string; resources?: SkillResource[] },
+  entry: { name: string; description?: string },
+): AssembledSkillInstall {
+  const name = document.name || entry.name;
+  const description = document.description || entry.description;
+  const body = expandSkillResources(document, document.resources ?? []);
+  const bytes = renderedSkillDocumentBytes(name, description, body);
+  return { name, description, body, bytes, tooLarge: bytes > MAX_SKILL_DOCUMENT_BYTES };
 }
 
 /** Assemble the input for the existing `skills.create` write path. */

@@ -15,21 +15,29 @@ const [panel, page, en, zh] = await Promise.all([
 test("skill market installs through the existing create path only", () => {
   assert.match(panel, /api\.fetchSkillMarketDocument\(/);
   assert.match(panel, /api\.createUserSkill\(/);
+  assert.match(panel, /assembleSkillInstall\(/);
   assert.match(panel, /level: "global"/);
   assert.match(panel, /scope: GLOBAL_SCOPE/);
-  // No other write path may appear.
   assert.doesNotMatch(panel, /skillImport|writeFile|host\.call\(/);
 });
 
-test("install sheet previews the full document before saving", () => {
+test("install sheet previews the assembled document and blocks oversized bodies", () => {
   assert.match(panel, /settings\.sklm\.willInstall/);
   assert.match(panel, /settings\.sklm\.preview/);
-  assert.match(panel, /fetchSkillMarketDocument/);
+  assert.match(panel, /settings\.sklm\.documentTooLarge/);
+  assert.match(panel, /setDocumentBody\(assembled\.body\)/);
+  assert.match(panel, /documentTooLarge/);
 });
 
 test("installed state comes from matching skill ids", () => {
   assert.match(panel, /installedIds\.includes\(entry\.id\)/);
   assert.match(page, /installedIds=\{\[\.\.\.globalSkills, \.\.\.projectSkills\]/);
+});
+
+test("source badges use the catalog sourceId, including default GitHub sources", () => {
+  assert.match(panel, /DEFAULT_SKILL_SOURCES, \.\.\.sources/);
+  assert.match(panel, /entry\.sourceId \?/);
+  assert.doesNotMatch(panel, /remoteIds\.has\(entry\.id\)/);
 });
 
 test("skills page wires the market view with reload on exit", () => {
@@ -43,11 +51,15 @@ test("skill market strings exist in en and zh-CN", () => {
     assert.match(locale, /sklm: \{/);
     assert.match(locale, /browse: "/);
     assert.match(locale, /installSuccess: "/);
+    assert.match(locale, /documentTooLarge: "/);
   }
 });
 
-test("builtin catalog keeps the offline promise", () => {
+test("builtin catalog keeps the offline promise in English", () => {
   assert.ok(BUILTIN_SKILL_CATALOG.skills.length >= 8);
   const ids = BUILTIN_SKILL_CATALOG.skills.map((s) => s.id);
   assert.equal(new Set(ids).size, ids.length, "duplicate catalog ids");
+  for (const skill of BUILTIN_SKILL_CATALOG.skills) {
+    assert.equal(/[^\u0000-\u007f]/.test(skill.name), false, skill.name);
+  }
 });

@@ -3,11 +3,13 @@
  * Skill market E2E (headless protocol-level).
  * Covers the market install path, resource expansion and the URL boundary:
  *
- *   E2E-SKILL-MARKET-INSTALL      builtin entry → document → skills.create →
- *                                 record on disk with rendered frontmatter
+ *   E2E-SKILL-MARKET-INSTALL      builtin entry → assembled document →
+ *                                 skills.create → record on disk
  *   E2E-SKILL-MARKET-EXPANSION    adjacent resources expand into the body
  *   E2E-SKILL-MARKET-NET-BOUNDARY URL guard rejects loopback/private/mapped/
  *                                 ULA/link-local bypass forms
+ *   E2E-SKILL-MARKET-ID-ALIGN     scanned ids match host valid_capability_id
+ *   E2E-SKILL-MARKET-SIZE-LIMIT   expanded documents over 128KiB are flagged
  *
  * Env: PI_DESKTOP_HOST_BIN (optional), DEBUG_HOST for tracing.
  * Deterministic: no live network access.
@@ -23,8 +25,11 @@ import { PROTOCOL_VERSION } from "../packages/shared/dist/protocol.js";
 import {
   BUILTIN_SKILL_CATALOG,
   GLOBAL_SCOPE,
+  assembleSkillInstall,
   expandSkillResources,
   isSafeSkillSourceUrl,
+  MAX_SKILL_DOCUMENT_BYTES,
+  sanitizeSkillCatalogId,
   splitSkillDocument,
   validateSkillCatalogFile,
 } from "../packages/shared/dist/index.js";
@@ -129,6 +134,26 @@ class Host {
   );
 }
 
+// ── E2E-SKILL-MARKET-ID-ALIGN ────────────────────────────────────────────
+{
+  const ok =
+    sanitizeSkillCatalogId("Frontend_Design", "skill-0") === "frontend-design" &&
+    sanitizeSkillCatalogId("1-pdf", "skill-0") === "1-pdf" &&
+    sanitizeSkillCatalogId("***", "skill-7") === "skill-7";
+  record("E2E-SKILL-MARKET-ID-ALIGN", ok, ok ? "underscore and fallback ids match host" : "id mismatch");
+}
+
+// ── E2E-SKILL-MARKET-SIZE-LIMIT ──────────────────────────────────────────
+{
+  const small = assembleSkillInstall(
+    { body: "Read FORMS.md.", resources: [{ path: "FORMS.md", body: "Forms." }] },
+    { name: "pdf" },
+  );
+  const huge = assembleSkillInstall({ body: "x".repeat(MAX_SKILL_DOCUMENT_BYTES) }, { name: "huge" });
+  const ok = small.tooLarge === false && small.body.includes("Attached resource: FORMS.md") && huge.tooLarge === true;
+  record("E2E-SKILL-MARKET-SIZE-LIMIT", ok, ok ? "small expands, huge flagged" : "size gate broken");
+}
+
 // ── E2E-SKILL-MARKET-EXPANSION ───────────────────────────────────────────
 {
   const doc = splitSkillDocument(
@@ -165,12 +190,13 @@ try {
     const raw = "---\nname: pdf\ndescription: process PDF files\n---\n\nProcess PDFs.";
     const document = splitSkillDocument(raw);
     const entry = catalog.skills.find((skill) => skill.id === "pdf");
+    const assembled = assembleSkillInstall(document, entry);
     const created = await host.call("skills.create", {
       skill: {
         id: entry.id,
-        name: document.name || entry.name,
-        description: document.description || entry.description,
-        body: document.body,
+        name: assembled.name,
+        description: assembled.description,
+        body: assembled.body,
         level: "global",
         scope: GLOBAL_SCOPE,
         enabled: true,

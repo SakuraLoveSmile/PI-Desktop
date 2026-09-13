@@ -85,6 +85,7 @@
 | D408 | 三栏布局中优先保障 MainChat | **针对 issue #267 修订 ADR 0226 / ADR 0151 / ADR 0033：MainChat 保持 450px 硬下限；工作面板上限为动态预算（`客户端宽度 − 450px − 展开的左栏宽度`，无固定上限）；中栏到达阈值时展开的左栏立即让位（`sidebar-out` 退场期间仍计入预算）。手动重开左栏优先占用右栏宽度，否则以 460px 为目标；关闭右栏只恢复由布局机制收起的左栏。原生窗口不变：预留 seam 保持 0 且不套用任何面板几何。预览模式临时卸载 MainChat 并使用窗口级 chrome 行；侧边栏折叠时，macOS 窗口模式预留 76px、全屏预留 8px 给交通灯。见 ADR 0238 与 E2E-LAYOUT-three-column-width-priority。** | 固定客户区此前没有明确的宽度优先级，侧边停靠可以把 MainChat 压到下限、使 composer 不可用；显式化让位顺序后聊天在固定窗口内保持可读，且不重新引入原生窗口增长（issue #267）。 |
 | D409 | 宿主拥有的会话协作消息 | **修订 ADR 0237 / ADR 0165 / ADR 0213：Rust host-core 拥有以消息 id 和真实源/目标 Session ID 为键的持久会话协作 ledger。插件驱动的 `spawn`、`send`、`status`、`result` 和 `cancel` 使用已审查的 desktop-control 网关；发送者绑定当前插件 Agent 工具调用，目标回合保留原有配置，每条投递由实际持久回合认领。完成回调持久化且最多一次，并引用已结算回合。来源信息随转录行持久化，不能在重生成中伪造、剥离或编辑。增量架构 v16 迁移在重启后保留排队工作但不无人值守重放，执行权限上限和有界自主跳数，同时保持既有 Task 系列不变。见 ADR 0239 与 E2E-PLUGIN-session-orchestrator-real-workers。** | 插件之前的创建/提示轮询路径既无法推断持久回合结果，也无法安全确认双向发送者身份。宿主拥有的 ledger 让投递、来源、回调、取消和重启行为可审计，同时不恢复已撤回的 A2A 协议。 |
 | D410 | 独立会话发现与可导航协作投影 | **修订 ADR 0239：新增经审查的 `session/collaboration/list` 读取操作，限制为最多 100 个未删除 Agent 会话，并只返回 Session ID、标题、状态、更新时间、可读 provider/model 标签和有界创建关系。侧边栏投影增加可读模型标签和最多八个已创建会话引用。创建者/已创建会话引用渲染为可键盘聚焦的导航按钮；独立会话不伪造创建者链接。不改变渲染器存储归属或协作写入边界。见 ADR 0240、E2E-SESSION-independent-top-level-communication 和 E2E-SESSION-hover-card-model-and-links。** | 现有 Session ID 虽然是有效发送目标，但未由插件创建的会话可能不可发现；hover 卡片也只暴露 ID，来源信息不可交互。有界 host 目录和可导航投影让持久会话可通信、可解释，同时不暴露转录或凭据。 |
+| D413 | 技能市场公网 HTTPS 目录拉取 | **增量：设置 → 技能市场由 Electron 主进程按共享公网 HTTPS 策略发现 SKILL.md（公网主机语法 + DNS 分类 + 逐跳 redirect）。渲染层不发网。安装仍走 `skills.create`。目录 id 与 host `valid_capability_id` 对齐。展开后超过 128 KiB 拒绝写入。内置标题为英文。见 ADR 0243、E2E-SKILL-MARKET-*、issue #287。** | 社区技能发现需要主进程出网，且不能复用插件市场的主机允许列表；复制分类器会与 MCP 市场撞名。 |
 | D412 | 仅增量且合并的流式更新 | **修订本地 `message_update` 契约：追加型流式帧携带 `stream: delta` 以及 `deltaText`/`deltaThinking`（和 reset 标志），不再附带增长中的 `content`/`thinking`。运行时每 16ms 合并这些帧，并在语义边界前立即 flush。AgentHost、进行中检查点和渲染器应用增量；`message_start`/`message_end` 仍是完整快照。仅尾部 token 变化时，转录活动 part 保持对象身份。协议版本仍为 11。见 ADR 0242、E2E-STREAM-long-turn-keeps-realtime 和 issue #299。** | 每个 token 都在 sidecar、AgentHost 和 IPC 上重新序列化完整助手快照，长回合接近 O(n²) 字节并让后续短块排队变慢。 |
 | D244 | 紧凑的上下文用量摘要 | **修订 D103 / D184 / ADR 0047：保留上下文检查器的剩余容量触发器、已用/窗口计数、回合合计、已完成回合速度、精确的提供商数值、聚合的工具类型/调用数/令牌数以及检查点摘要，但把它们渲染为一段简短摘要。从默认面板中移除逐工具行、占比条、来源徽章、解释性估算段落和已用容量计量条。不改动协议、存储、运行时计费或模型元数据。** *（由 D347 修订：触发器移到输入框工具栏。）* | 之前的诊断式布局让一次例行的容量检查变得又高又密。保留聚合信号、移除下钻装饰，使默认状态界面可以快速浏览，同时不改变底层用量数据。参见 ADR 0103 与 E2E-060d / US-UI-61。 |
 | D347 | 输入框工具栏中的上下文用量检查器 | **修订 D103 / D184 / D244 / ADR 0047 / ADR 0103：紧凑上下文检查器放在输入框右侧工具栏、模型 × 推理芯片左侧，始终对应当前最新一条已报告用量的助手回合。触发器保留剩余容量圆环和百分比，去掉重复的 Context 文字。弹层标题为剩余 tokens + 百分比；下方行用同一套左标签/右数值节奏，只用留白分隔，不画内部分隔线（D297）。答案下方的助理元只保留模型徽章。仅渲染器改动。** | 挂在最新答案下方的检查器会随记录滚出视野。输入框只保留一个入口作为最新快照的权威位置；标题双线通过去掉多余说明文字解决，而不是加分隔线。参见 ADR 0184 与 E2E-060d / US-UI-61。 |
@@ -3959,3 +3960,10 @@ D193 和 D194。
   进行中检查点从同一批增量重建快照。渲染器先拼接同一帧内的增量，再补丁 live 行。
   未变化的活动 part 保持对象身份。
 - 协议版本仍为 11。见 ADR 0242、E2E-STREAM-long-turn-keeps-realtime 和 issue #299。
+
+## 2026-09-13 — 技能市场公网 HTTPS 目录拉取 (D413)
+
+- 技能市场的 search/fetch 在 Electron 主进程执行，渲染层 CSP 仍禁止出网，安装走现有 `skills.create`。
+- 共享 `isSafePublicHttpsUrl` / `isPublicHostname` / `isPublicIpLiteral` 做语法分类；主进程再检查 DNS 与每一跳 redirect。
+- 扫描 id 净化为 host `valid_capability_id`。预览展示组装正文；超过 128 KiB 不写入。
+- 见 ADR 0243、E2E-SKILL-MARKET-*、issue #287。

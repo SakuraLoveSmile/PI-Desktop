@@ -17,8 +17,6 @@ export {
   mapRegistryServer,
   mergeRegistryEntries,
   isSafeMarketSourceUrl,
-  isPublicHostname,
-  isPublicIpLiteral,
   sanitizeMarketSources,
   DEFAULT_MARKET_SOURCE,
   type RegistryEnvVar,
@@ -31,6 +29,7 @@ export {
   type MarketSource,
   type SourcedCatalogEntry,
 } from "./mcp-registry.js";
+export * from "./public-network.js";
 export * from "./skill-catalog.js";
 export * from "./skill-catalog-builtin.js";
 export * from "./model-config-import.js";

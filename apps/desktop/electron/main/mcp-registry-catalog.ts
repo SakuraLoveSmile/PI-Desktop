@@ -15,9 +15,7 @@
  * whole catalog regardless of what is cached. One failing source only costs
  * itself, and a total outage degrades to the built-in catalog.
  */
-import { lookup } from "node:dns/promises";
 import {
-  isPublicIpLiteral,
   isSafeMarketSourceUrl,
   mapRegistryServer,
   validateMcpCatalogFile,
@@ -26,15 +24,13 @@ import {
   type RegistryRecord,
   type SourcedCatalogEntry,
 } from "@pi-desktop/shared";
+import { createPublicHttpsClient } from "./public-https-fetch";
 
 const PAGE_SIZE = 100;
 /** First browse paints two pages; every "load more" appends this many. */
 const INITIAL_PAGES = 2;
 const MORE_PAGES = 10;
 const CACHE_TTL_MS = 5 * 60_000;
-const TIMEOUT_MS = 8_000;
-const MAX_HOPS = 5;
-
 export type McpRegistrySearchResult = {
   entries: SourcedCatalogEntry[];
   /** Sources that could not be fetched (unsafe URL, offline, bad payload). */
@@ -47,45 +43,9 @@ function registryUrl(endpoint: string, params: URLSearchParams): string {
   return endpoint.includes("?") ? `${endpoint}&${params}` : `${endpoint}?${params}`;
 }
 
-/** Syntactic policy check plus DNS resolution: every resolved address must be public. */
-async function assertPublicUrl(url: string): Promise<void> {
-  if (!isSafeMarketSourceUrl(url)) {
-    throw new Error(`url rejected by the public-network policy: ${url}`);
-  }
-  const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
-  if (host.startsWith("[")) return; // literal IP, already classified by the guard
-  const addresses = await lookup(host, { all: true });
-  if (!addresses.length) throw new Error(`hostname does not resolve: ${host}`);
-  for (const address of addresses) {
-    if (!isPublicIpLiteral(address.address)) {
-      throw new Error(`hostname resolves to a private address: ${host} -> ${address.address}`);
-    }
-  }
-}
-
-/**
- * fetch with the public-network policy applied per hop: manual redirects so
- * every location is re-validated (syntax + DNS) before the next request.
- */
-async function fetchPolicy<T>(url: string, kind: "json" | "text"): Promise<T> {
-  let current = url;
-  for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
-    await assertPublicUrl(current);
-    const response = await fetch(current, {
-      redirect: "manual",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location) throw new Error("redirect without a location header");
-      current = new URL(location, current).toString();
-      continue;
-    }
-    if (!response.ok) throw new Error(`source responded ${response.status}`);
-    return (kind === "json" ? ((await response.json()) as unknown) : await response.text()) as T;
-  }
-  throw new Error("too many redirects");
-}
+const publicHttps = createPublicHttpsClient({
+  fetchImpl: (url, init) => fetch(url, init),
+});
 
 /** Per-registry-source streaming state, so "load more" continues a cursor. */
 type RegistryBrowse = {
@@ -117,10 +77,10 @@ export function createMcpMarketAggregator() {
     for (let page = 0; page < pages && !state.exhausted; page += 1) {
       const params = new URLSearchParams({ version: "latest", limit: String(PAGE_SIZE) });
       if (state.cursor) params.set("cursor", state.cursor);
-      const body = await fetchPolicy<{
+      const body = (await publicHttps.request(registryUrl(source.url, params), "json")) as {
         servers?: RegistryRecord[];
         metadata?: { nextCursor?: string };
-      }>(registryUrl(source.url, params), "json");
+      };
       const seen = new Set(state.entries.map((entry) => entry.id));
       ingest(body.servers ?? [], source, seen, state.entries);
       if (body.metadata?.nextCursor) state.cursor = body.metadata.nextCursor;
@@ -138,7 +98,7 @@ export function createMcpMarketAggregator() {
   async function loadCatalog(source: MarketSource): Promise<SourcedCatalogEntry[]> {
     const hit = catalogCache.get(source.url);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.entries;
-    const body = await fetchPolicy<unknown>(source.url, "json");
+    const body = await publicHttps.request(source.url, "json");
     const { catalog } = validateMcpCatalogFile(body);
     const entries = catalog.servers.map((entry) => ({ ...entry, sourceId: source.id }));
     catalogCache.set(source.url, { at: Date.now(), entries });
@@ -150,7 +110,7 @@ export function createMcpMarketAggregator() {
     const key = `${source.id}|${trimmed}`;
     const hit = searchCache.get(key);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.entries;
-    const body = await fetchPolicy<{ servers?: RegistryRecord[]; metadata?: { nextCursor?: string } }>(registryUrl(source.url, new URLSearchParams({ version: "latest", search: trimmed, limit: String(PAGE_SIZE) })), "json");
+    const body = (await publicHttps.request(registryUrl(source.url, new URLSearchParams({ version: "latest", search: trimmed, limit: String(PAGE_SIZE) })), "json")) as { servers?: RegistryRecord[]; metadata?: { nextCursor?: string } };
     const entries: SourcedCatalogEntry[] = [];
     const seen = new Set<string>();
     ingest(body.servers ?? [], source, seen, entries);
