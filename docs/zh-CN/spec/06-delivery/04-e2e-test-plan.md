@@ -6565,11 +6565,12 @@ IPC 请求无法关闭。
   无 `node_modules` 的 pi 扩展目录；npm 可达；导入确认已接受。
 - **步骤**：1）插件页 → 导入 pi 扩展，选择该目录。2）检查 `plugins/imported/<slug>/`。
   3）发送一个会用到该扩展的提示。
-- **预期**：插件根有复制来的 `package.json`（`workspaces` 字段已被剥离）和由
-  `npm install --omit=dev --legacy-peer-deps --no-audit --no-fund --ignore-scripts`
-  创建的 `node_modules`（没有运行任何安装脚本）；扩展行达到 `loaded`，工具、命令与
-  hooks 均已注册，并在回合中生效。
-- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§10.2
+- **预期**：插件根有复制来的 `package.json`（`workspaces` 字段已被剥离）。依赖解析先运行
+  `npm install --package-lock-only --omit=dev --legacy-peer-deps --no-audit --no-fund
+  --ignore-scripts`，校验 registry-only 来源，再通过 `npm ci --omit=dev --legacy-peer-deps
+  --no-audit --no-fund --ignore-scripts` 创建 `node_modules`（没有运行任何安装脚本）；
+  扩展行达到 `loaded`，工具、命令与 hooks 均已注册，并在回合中生效。
+- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§10.2；ADR 0243
 - **验收**：安全、质量
 - **里程碑**：MVP 后（R7 v1）
 - **状态**：由 `apps/desktop/test/agent-extensions.test.mjs` 单元覆盖，并已用
@@ -6584,7 +6585,7 @@ IPC 请求无法关闭。
   第二个目录并开始回合。
 - **预期**：渲染层出现携带 npm stderr 尾部的警告 toast；插件仍然注册；该行显示扩展
   `error` 状态与 `load_error` 诊断；会话与其他扩展均不受影响。
-- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§4.4、§10.2
+- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§4.4、§10.2；ADR 0243
 - **验收**：安全、质量
 - **里程碑**：MVP 后（R7 v1）
 - **状态**：由 `apps/desktop/test/agent-extensions.test.mjs`（跳过、失败与无效 manifest
