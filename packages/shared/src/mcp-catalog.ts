@@ -7,6 +7,7 @@
  * builtin catalog and a later main-process fetch layer shares the same rules.
  */
 import type { McpServerInput } from "./types.js";
+import { isPublicHttpsUrl } from "./public-network.js";
 
 export type McpCatalogCategory = "devtools" | "web" | "docs" | "data" | "productivity";
 
@@ -32,7 +33,7 @@ export type McpCatalogEntry = {
   command?: string;
   args?: string[];
   env?: Record<string, string>;
-  /** http template. Catalog endpoints must be https; http stays a manual choice. */
+  /** http template. Market endpoints must use credentials-free public HTTPS. */
   url?: string;
   headers?: Record<string, string>;
   requiredEnv?: McpCatalogRequiredEnv[];
@@ -48,12 +49,84 @@ export type McpCatalogFile = {
 };
 
 const PLACEHOLDER = /\$\{([A-Z_][A-Z0-9_]*)\}/g;
+const CATALOG_CATEGORIES = new Set<McpCatalogCategory>(["devtools", "web", "docs", "data", "productivity"]);
+const ENV_NAME = /^[A-Z_][A-Z0-9_]*$/;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((item) => typeof item === "string");
+}
+
+function requiredEnvError(value: unknown, id: string): string | null {
+  if (!Array.isArray(value)) return `${id}: requiredEnv must be an array`;
+  const names = new Set<string>();
+  for (const item of value) {
+    if (!isRecord(item)) return `${id}: requiredEnv items must be objects`;
+    if (typeof item.name !== "string" || !ENV_NAME.test(item.name)) {
+      return `${id}: requiredEnv names must be environment variable names`;
+    }
+    if (names.has(item.name)) return `${id}: duplicate requiredEnv name ${item.name}`;
+    names.add(item.name);
+    if (item.description !== undefined && typeof item.description !== "string") {
+      return `${id}: requiredEnv descriptions must be strings`;
+    }
+    if (item.optional !== undefined && typeof item.optional !== "boolean") {
+      return `${id}: requiredEnv optional must be boolean`;
+    }
+    if (item.defaultValue !== undefined && typeof item.defaultValue !== "string") {
+      return `${id}: requiredEnv defaultValue must be a string`;
+    }
+  }
+  return null;
+}
+
+function entryShapeError(value: unknown): string | null {
+  if (!isRecord(value)) return "entry is not an object";
+  const id = typeof value.id === "string" ? value.id : "unknown";
+  if (typeof value.id !== "string" || !/^[a-z][a-z0-9_-]{0,63}$/.test(value.id)) return `bad id: ${id}`;
+  if (typeof value.name !== "string" || !value.name.trim()) return `${id}: name is required`;
+  if (value.transport !== "stdio" && value.transport !== "http") return `${id}: transport is invalid`;
+
+  if (value.categories !== undefined) {
+    if (!Array.isArray(value.categories) || !value.categories.every((category) => typeof category === "string" && CATALOG_CATEGORIES.has(category as McpCatalogCategory))) {
+      return `${id}: categories must be an array of known categories`;
+    }
+  }
+  if (value.args !== undefined && !isStringArray(value.args)) return `${id}: args must be an array of strings`;
+  if (value.env !== undefined && !isStringRecord(value.env)) return `${id}: env must be an object of strings`;
+  if (value.headers !== undefined && !isStringRecord(value.headers)) return `${id}: headers must be an object of strings`;
+  if (value.prerequisites !== undefined && !isStringArray(value.prerequisites)) return `${id}: prerequisites must be an array of strings`;
+  if (value.requiredEnv !== undefined) {
+    const error = requiredEnvError(value.requiredEnv, id);
+    if (error) return error;
+  }
+  for (const field of ["description", "author", "homepage", "command", "url", "notes"]) {
+    if (value[field] !== undefined && typeof value[field] !== "string") return `${id}: ${field} must be a string`;
+  }
+  if (value.verified !== undefined && typeof value.verified !== "boolean") return `${id}: verified must be boolean`;
+  return null;
+}
 
 function templateStrings(entry: McpCatalogEntry): string[] {
+  if (!isRecord(entry)) return [];
   if (entry.transport === "http") {
-    return [entry.url ?? "", ...Object.values(entry.headers ?? {})];
+    return [
+      typeof entry.url === "string" ? entry.url : "",
+      ...(isStringRecord(entry.headers) ? Object.values(entry.headers) : []),
+    ];
   }
-  return [entry.command ?? "", ...(entry.args ?? []), ...Object.values(entry.env ?? {})];
+  return [
+    typeof entry.command === "string" ? entry.command : "",
+    ...(isStringArray(entry.args) ? entry.args : []),
+    ...(isStringRecord(entry.env) ? Object.values(entry.env) : []),
+  ];
 }
 
 /** Every `${NAME}` the entry's install template needs, deduped and sorted. */
@@ -70,27 +143,27 @@ function declaredNames(entry: McpCatalogEntry): Map<string, McpCatalogRequiredEn
 }
 
 /** Client-side mirror of the host rules, plus market-specific template checks. */
-export function catalogEntryError(entry: McpCatalogEntry): string | null {
-  if (!/^[a-z][a-z0-9_-]{0,63}$/.test(entry.id)) return `bad id: ${entry.id}`;
-  if (entry.transport === "stdio") {
-    if (!entry.command?.trim()) return `${entry.id}: stdio requires command`;
-    if (entry.command.includes("..")) return `${entry.id}: command must not contain ..`;
+export function catalogEntryError(entry: McpCatalogEntry | unknown): string | null {
+  const shapeError = entryShapeError(entry);
+  if (shapeError) return shapeError;
+  const candidate = entry as McpCatalogEntry;
+  if (candidate.transport === "stdio") {
+    if (!candidate.command?.trim()) return `${candidate.id}: stdio requires command`;
+    if (candidate.command.includes("..")) return `${candidate.id}: command must not contain ..`;
   } else {
-    if (!entry.url) return `${entry.id}: http requires url`;
+    if (!candidate.url) return `${candidate.id}: http requires url`;
+    let parsed: URL;
     try {
-      const parsed = new URL(entry.url);
-      if (parsed.protocol !== "https:") {
-        return `${entry.id}: catalog endpoints must be https`;
-      }
+      parsed = new URL(candidate.url);
     } catch {
-      return `${entry.id}: url does not parse`;
+      return `${candidate.id}: url does not parse`;
     }
+    if (parsed.protocol !== "https:") return `${candidate.id}: catalog endpoints must be https`;
+    if (!isPublicHttpsUrl(candidate.url)) return `${candidate.id}: catalog endpoints must use a public https address`;
   }
-  const declared = declaredNames(entry);
-  for (const name of collectCatalogPlaceholders(entry)) {
-    if (!declared.has(name)) {
-      return `${entry.id}: placeholder ${name} is not declared in requiredEnv`;
-    }
+  const declared = declaredNames(candidate);
+  for (const name of collectCatalogPlaceholders(candidate)) {
+    if (!declared.has(name)) return `${candidate.id}: placeholder ${name} is not declared in requiredEnv`;
   }
   return null;
 }

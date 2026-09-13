@@ -16,4 +16,9 @@ describe("BUILTIN_MCP_CATALOG", () => {
     );
     expect(zeroConfig.length).toBeGreaterThanOrEqual(5);
   });
+
+  it("uses a cwd-relative filesystem root instead of a shell-only tilde", () => {
+    const filesystem = BUILTIN_MCP_CATALOG.servers.find((entry) => entry.id === "filesystem");
+    expect(filesystem?.requiredEnv?.find((item) => item.name === "MCP_FS_ROOT")?.defaultValue).toBe(".");
+  });
 });

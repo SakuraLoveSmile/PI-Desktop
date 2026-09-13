@@ -7,13 +7,14 @@
  * runnable form (no npm/pypi package and no https remote) maps to null: the
  * market never saves a template it could not start.
  */
-import { isSafePublicHttpsUrl } from "./public-network.js";
 import {
   catalogEntryError,
   type McpCatalogCategory,
   type McpCatalogEntry,
   type McpCatalogRequiredEnv,
 } from "./mcp-catalog.js";
+import { isPublicHttpsUrl } from "./public-network.js";
+export { isPublicHostname, isPublicIpLiteral } from "./public-network.js";
 
 export type RegistryEnvVar = {
   name?: string;
@@ -75,14 +76,14 @@ export function registryIdFromName(name: string): string {
 
 function envSpecs(pkg: RegistryPackage): McpCatalogRequiredEnv[] {
   return (pkg.environmentVariables ?? [])
-    .filter((variable): variable is RegistryEnvVar & { name: string } => !!variable.name)
+    .filter((variable): variable is RegistryEnvVar & { name: string } => typeof variable.name === "string" && !!variable.name)
     .map((variable) => ({
       name: variable.name,
-      ...(variable.description ? { description: variable.description } : {}),
+      ...(typeof variable.description === "string" && variable.description ? { description: variable.description } : {}),
       ...(variable.isRequired ? {} : { optional: true }),
-      ...(variable.value !== undefined
+      ...(typeof variable.value === "string"
         ? { defaultValue: variable.value }
-        : variable.default !== undefined
+        : typeof variable.default === "string"
           ? { defaultValue: variable.default }
           : {}),
     }));
@@ -98,11 +99,12 @@ export function argumentValues(
 ): string[] {
   const out: string[] = [];
   for (const argument of args ?? []) {
+    if (!argument || typeof argument !== "object") continue;
     const named = argument.type === "named" || (!!argument.name && argument.type !== "positional");
     if (named) {
-      if (argument.name) out.push(argument.name);
-      if (argument.value) out.push(argument.value);
-    } else if (argument.value) {
+      if (typeof argument.name === "string" && argument.name) out.push(argument.name);
+      if (typeof argument.value === "string" && argument.value) out.push(argument.value);
+    } else if (typeof argument.value === "string" && argument.value) {
       out.push(argument.value);
     }
   }
@@ -111,9 +113,35 @@ export function argumentValues(
 
 function envTemplates(pkg: RegistryPackage): Record<string, string> | undefined {
   const names = (pkg.environmentVariables ?? [])
-    .filter((variable): variable is RegistryEnvVar & { name: string } => !!variable.name)
+    .filter((variable): variable is RegistryEnvVar & { name: string } => typeof variable.name === "string" && !!variable.name)
     .map((variable) => variable.name);
   return names.length ? Object.fromEntries(names.map((name) => [name, `\${${name}}`])) : undefined;
+}
+
+function packageSpecifier(pkg: RegistryPackage, separator: "@" | "=="): string | undefined {
+  if (typeof pkg.identifier !== "string" || !pkg.identifier.trim()) return undefined;
+  const identifier = pkg.identifier.trim();
+  const version = typeof pkg.version === "string" ? pkg.version.trim() : "";
+  return version ? `${identifier}${separator}${version}` : identifier;
+}
+
+const REMOTE_PLACEHOLDER = /\$\{([A-Z_][A-Z0-9_]*)\}/g;
+
+function remoteHeaderTemplates(remote: RegistryRemote): {
+  headers: Record<string, string>;
+  requiredEnv?: McpCatalogRequiredEnv[];
+} {
+  const headers = Object.fromEntries(
+    (remote.headers ?? [])
+      .filter((header) => typeof header.name === "string" && !!header.name && typeof header.value === "string")
+      .map((header) => [header.name!, header.value!]),
+  );
+  const names = new Set<string>();
+  for (const value of Object.values(headers)) {
+    for (const match of value.matchAll(REMOTE_PLACEHOLDER)) names.add(match[1]);
+  }
+  const requiredEnv = [...names].sort().map((name) => ({ name }));
+  return { headers, ...(requiredEnv.length ? { requiredEnv } : {}) };
 }
 
 /*
@@ -160,22 +188,24 @@ export function mapRegistryServer(record: RegistryRecord): McpCatalogEntry | nul
     categories: [guessCategory(server)],
   };
 
-  const npm = server.packages?.find((pkg) => pkg.registryType === "npm" && pkg.identifier);
+  const npm = server.packages?.find(
+    (pkg) => pkg.registryType?.toLowerCase() === "npm" && typeof pkg.identifier === "string" && !!pkg.identifier.trim(),
+  );
   if (npm) {
     const runtimeArgs = argumentValues(npm.runtimeArguments);
     const packageArgs = argumentValues(npm.packageArguments);
+    const packageName = packageSpecifier(npm, "@");
     const args = [...runtimeArgs];
-    if (npm.identifier && !args.includes(npm.identifier) && !packageArgs.includes(npm.identifier)) {
-      args.push(npm.identifier);
-    }
+    if (packageName && !args.includes(packageName) && !packageArgs.includes(packageName)) args.push(packageName);
     args.push(...packageArgs);
+    const env = envTemplates(npm);
     const entry: McpCatalogEntry = {
       ...base,
       transport: "stdio",
-      command: npm.runtimeHint?.trim() || "npx",
+      command: typeof npm.runtimeHint === "string" && npm.runtimeHint.trim() ? npm.runtimeHint.trim() : "npx",
       args,
-      ...(envTemplates(npm) ? { env: envTemplates(npm) } : {}),
-      ...(npm.environmentVariables?.length
+      ...(env ? { env } : {}),
+      ...(Array.isArray(npm.environmentVariables) && npm.environmentVariables.length
         ? { requiredEnv: envSpecs(npm) }
         : {}),
     };
@@ -183,38 +213,47 @@ export function mapRegistryServer(record: RegistryRecord): McpCatalogEntry | nul
   }
 
   const pypi = server.packages?.find(
-    (pkg) => pkg.registryType?.toLowerCase() === "pypi" && pkg.identifier,
+    (pkg) => pkg.registryType?.toLowerCase() === "pypi" && typeof pkg.identifier === "string" && !!pkg.identifier.trim(),
   );
   if (pypi) {
+    const runtimeArgs = argumentValues(pypi.runtimeArguments);
+    const packageArgs = argumentValues(pypi.packageArguments);
+    const packageName = packageSpecifier(pypi, "==");
+    const args = [...runtimeArgs];
+    if (packageName && !args.includes(packageName) && !packageArgs.includes(packageName)) args.push(packageName);
+    args.push(...packageArgs);
+    const env = envTemplates(pypi);
     const entry: McpCatalogEntry = {
       ...base,
       transport: "stdio",
-      command: pypi.runtimeHint?.trim() || "uvx",
-      args: [pypi.identifier!],
+      command: typeof pypi.runtimeHint === "string" && pypi.runtimeHint.trim() ? pypi.runtimeHint.trim() : "uvx",
+      args,
       prerequisites: ["Requires uv/uvx on PATH"],
-      ...(envTemplates(pypi) ? { env: envTemplates(pypi) } : {}),
-      ...(pypi.environmentVariables?.length ? { requiredEnv: envSpecs(pypi) } : {}),
+      ...(env ? { env } : {}),
+      ...(Array.isArray(pypi.environmentVariables) && pypi.environmentVariables.length
+        ? { requiredEnv: envSpecs(pypi) }
+        : {}),
     };
     return catalogEntryError(entry) ? null : entry;
   }
 
-  const remote = server.remotes?.find((candidate) => /^https:/i.test(candidate.url ?? ""));
+  const remote = server.remotes?.find(
+    (candidate) => candidate?.type?.toLowerCase() === "streamable-http" && isPublicHttpsUrl(candidate.url ?? ""),
+  );
   if (remote) {
-    const headers = Object.fromEntries(
-      (remote.headers ?? [])
-        .filter((header) => header.name && header.value !== undefined)
-        .map((header) => [header.name!, header.value!]),
-    );
+    const template = remoteHeaderTemplates(remote);
     const entry: McpCatalogEntry = {
       ...base,
       transport: "http",
       url: remote.url!,
-      ...(Object.keys(headers).length ? { headers } : {}),
+      ...(Object.keys(template.headers).length ? { headers: template.headers } : {}),
+      ...(template.requiredEnv ? { requiredEnv: template.requiredEnv } : {}),
     };
     return catalogEntryError(entry) ? null : entry;
   }
 
   return null;
+
 }
 
 /** Built-in picks first; registry entries fill the tail without id collisions. */
@@ -252,12 +291,14 @@ export const DEFAULT_MARKET_SOURCE: MarketSource = {
   builtin: true,
 };
 
-/** Same public-HTTPS classifier as the skill market (ADR 0243). */
+const MAX_MARKET_SOURCES = 16;
+/**
+ * Guard for user-entered source URLs. The same credentials-free public HTTPS
+ * policy is used by renderer validation and by main-process requests.
+ */
 export function isSafeMarketSourceUrl(url: string): boolean {
-  return isSafePublicHttpsUrl(url);
+  return isPublicHttpsUrl(url);
 }
-
-export { isPublicHostname, isPublicIpLiteral } from "./public-network.js";
 
 /** A catalog entry tagged with the source that produced it. */
 export type SourcedCatalogEntry = McpCatalogEntry & { sourceId: string };
@@ -268,10 +309,11 @@ export function sanitizeMarketSources(value: unknown): MarketSource[] {
   const seen = new Set<string>();
   const sources: MarketSource[] = [];
   for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
     const candidate = item as MarketSource;
     if (
-      !candidate ||
       typeof candidate.id !== "string" ||
+      !/^[a-z][a-z0-9_-]{0,63}$/.test(candidate.id) ||
       typeof candidate.name !== "string" ||
       typeof candidate.url !== "string" ||
       (candidate.kind !== "registry" && candidate.kind !== "catalog") ||
@@ -280,14 +322,25 @@ export function sanitizeMarketSources(value: unknown): MarketSource[] {
     ) {
       continue;
     }
+    const official = candidate.id === DEFAULT_MARKET_SOURCE.id;
+    if (
+      official &&
+      (candidate.url !== DEFAULT_MARKET_SOURCE.url || candidate.kind !== DEFAULT_MARKET_SOURCE.kind)
+    ) {
+      continue;
+    }
+    if (!official && sources.length >= MAX_MARKET_SOURCES - 1) continue;
     seen.add(candidate.id);
-    sources.push({
-      id: candidate.id.slice(0, 64),
-      name: candidate.name.slice(0, 64) || candidate.id,
-      url: candidate.url,
-      kind: candidate.kind,
-      ...(candidate.builtin ? { builtin: true } : {}),
-    });
+    sources.push(
+      official
+        ? DEFAULT_MARKET_SOURCE
+        : {
+            id: candidate.id,
+            name: candidate.name.slice(0, 64) || candidate.id,
+            url: candidate.url,
+            kind: candidate.kind,
+          },
+    );
   }
   if (!sources.some((source) => source.id === DEFAULT_MARKET_SOURCE.id)) {
     sources.unshift(DEFAULT_MARKET_SOURCE);

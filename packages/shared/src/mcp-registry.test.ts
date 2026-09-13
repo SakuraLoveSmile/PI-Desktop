@@ -6,6 +6,7 @@ import {
   isSafeMarketSourceUrl,
   mapRegistryServer,
   mergeRegistryEntries,
+  sanitizeMarketSources,
   registryIdFromName,
   type RegistryRecord,
 } from "./mcp-registry.js";
@@ -20,6 +21,7 @@ const npmRecord: RegistryRecord = {
       {
         registryType: "npm",
         identifier: "playwright-stealth-mcp-server",
+        version: "1.2.3",
         runtimeHint: "npx",
         runtimeArguments: [{ value: "-y", type: "positional" }],
         environmentVariables: [
@@ -34,8 +36,15 @@ const npmRecord: RegistryRecord = {
 const pypiRecord: RegistryRecord = {
   server: {
     name: "io.github.example/fetch-mcp",
-    description: "Fetch pages",
-    packages: [{ registryType: "pypi", identifier: "mcp-server-fetch" }],
+    packages: [
+      {
+        registryType: "pypi",
+        identifier: "mcp-server-fetch",
+        version: "2.4.0",
+        runtimeArguments: [{ type: "positional", value: "--python" }, { type: "positional", value: "3.12" }],
+        packageArguments: [{ type: "named", name: "--transport", value: "stdio" }],
+      },
+    ],
   },
 };
 
@@ -44,7 +53,17 @@ const remoteRecord: RegistryRecord = {
     name: "ac.inference.sh/mcp",
     title: "inference.sh",
     description: "run any ai model",
-    remotes: [{ type: "streamable-http", url: "https://api.inference.sh/mcp" }],
+    remotes: [
+      { type: "sse", url: "https://api.inference.sh/sse" },
+      {
+        type: "streamable-http",
+        url: "https://api.inference.sh/mcp",
+        headers: [
+          { name: "Authorization", value: "Bearer ${TOKEN}" },
+          { name: "X-Project", value: "${PROJECT}" },
+        ],
+      },
+    ],
   },
 };
 
@@ -66,7 +85,7 @@ describe("mapRegistryServer", () => {
     expect(entry).not.toBeNull();
     expect(entry!.transport).toBe("stdio");
     expect(entry!.command).toBe("npx");
-    expect(entry!.args).toEqual(["-y", "playwright-stealth-mcp-server"]);
+    expect(entry!.args).toEqual(["-y", "playwright-stealth-mcp-server@1.2.3"]);
     expect(entry!.env).toEqual({
       STEALTH_MODE: "${STEALTH_MODE}",
       PROXY_URL: "${PROXY_URL}",
@@ -81,7 +100,7 @@ describe("mapRegistryServer", () => {
     const entry = mapRegistryServer(pypiRecord);
     expect(entry!.transport).toBe("stdio");
     expect(entry!.command).toBe("uvx");
-    expect(entry!.args).toEqual(["mcp-server-fetch"]);
+    expect(entry!.args).toEqual(["--python", "3.12", "mcp-server-fetch==2.4.0", "--transport", "stdio"]);
     expect(entry!.prerequisites?.join(" ")).toContain("uv");
     expect(catalogEntryError(entry!)).toBeNull();
   });
@@ -90,6 +109,11 @@ describe("mapRegistryServer", () => {
     const entry = mapRegistryServer(remoteRecord);
     expect(entry!.transport).toBe("http");
     expect(entry!.url).toBe("https://api.inference.sh/mcp");
+    expect(entry!.headers).toEqual({
+      Authorization: "Bearer ${TOKEN}",
+      "X-Project": "${PROJECT}",
+    });
+    expect(entry!.requiredEnv).toEqual([{ name: "PROJECT" }, { name: "TOKEN" }]);
     expect(entry!.name).toBe("inference.sh");
     expect(catalogEntryError(entry!)).toBeNull();
   });
@@ -104,6 +128,16 @@ describe("mapRegistryServer", () => {
     expect(mapRegistryServer(ociOnly)).toBeNull();
     expect(mapRegistryServer({})).toBeNull();
     expect(mapRegistryServer({ server: { name: "io.github.example/http-only", remotes: [{ url: "http://x/mcp" }] } })).toBeNull();
+    expect(
+      mapRegistryServer({
+        server: { name: "io.github.example/sse-only", remotes: [{ type: "sse", url: "https://example.com/sse" }] },
+      }),
+    ).toBeNull();
+    expect(
+      mapRegistryServer({
+        server: { name: "io.github.example/private", remotes: [{ type: "streamable-http", url: "https://127.0.0.1/mcp" }] },
+      }),
+    ).toBeNull();
   });
 });
 
@@ -199,5 +233,34 @@ describe("isPublicHostname / isPublicIpLiteral edge cases", () => {
     expect(isSafeMarketSourceUrl("https://[2001:db8::1]/")).toBe(false);
     expect(isSafeMarketSourceUrl("https://[2606:4700::1]/")).toBe(true);
     expect(isSafeMarketSourceUrl("https://registry.example/x")).toBe(true);
+  });
+});
+
+describe("sanitizeMarketSources", () => {
+  it("restores the canonical official source and caps custom sources", () => {
+    const sources = sanitizeMarketSources([
+      { id: "official", name: "attacker", url: "https://evil.example/catalog", kind: "catalog" },
+      ...Array.from({ length: 20 }, (_, index) => ({
+        id: `custom-${index}`,
+        name: `Source ${index}`,
+        url: `https://source-${index}.example/catalog`,
+        kind: "catalog" as const,
+      })),
+    ]);
+    expect(sources[0]).toMatchObject({
+      id: "official",
+      url: "https://registry.modelcontextprotocol.io/v0/servers",
+      kind: "registry",
+      builtin: true,
+    });
+    expect(sources).toHaveLength(16);
+  });
+
+  it("rejects embedded source credentials", () => {
+    expect(
+      sanitizeMarketSources([
+        { id: "custom-auth", name: "Auth", url: "https://user:pass@example.com/catalog", kind: "catalog" },
+      ]),
+    ).toHaveLength(1);
   });
 });

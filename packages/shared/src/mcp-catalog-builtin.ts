@@ -65,7 +65,7 @@ export const BUILTIN_MCP_CATALOG: McpCatalogFile = {
         {
           name: "MCP_FS_ROOT",
           description: "允许访问的根目录",
-          defaultValue: "~",
+          defaultValue: ".",
         },
       ],
       notes: "server 只能访问该目录之内的路径",

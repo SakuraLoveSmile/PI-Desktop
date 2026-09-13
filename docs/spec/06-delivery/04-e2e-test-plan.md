@@ -10971,8 +10971,8 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 
 | ID | Scenario | Verification |
 |---|---|---|
-| E2E-MCP-MARKET-NET-BOUNDARY | URL guard rejects loopback, private, v4-mapped, ULA and link-local bypass forms (trailing dot included) and accepts public https endpoints | deterministic guard assertions |
-| E2E-MCP-MARKET-SEMANTICS | Registry records map to install templates preserving named/positional arguments and required/optional env variables | deterministic mapping assertions |
+| E2E-MCP-MARKET-NET-BOUNDARY | URL guard rejects credentials, loopback, private, special-use IPv4, v4-mapped, ULA, site-local and link-local bypass forms (trailing dot included); Main pins the checked public address and rechecks HTTPS redirects | deterministic guard assertions; source-contract coverage for DNS pin and bounded responses |
+| E2E-MCP-MARKET-SEMANTICS | Registry records map to install templates preserving package versions, named/positional runtime/package arguments and required/optional env variables | deterministic mapping assertions |
 | E2E-MCP-MARKET-INSTALL | Builtin catalog entry resolves through `resolveCatalogEntry` and installs via the host `mcp.upsert` RPC; record lands in `~/.agents/servers/` | real host binary, isolated temp HOME |
 
 

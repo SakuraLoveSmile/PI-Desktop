@@ -230,4 +230,19 @@ describe("validateMcpCatalogFile", () => {
     expect(catalog.servers).toHaveLength(1);
     expect(warnings.join("\n")).toContain("duplicate id");
   });
+  it("rejects malformed collection fields without exposing them to the renderer", () => {
+    const malformed = [
+      { ...stdioTemplate, id: "bad-categories", categories: "web" },
+      { ...stdioTemplate, id: "bad-args", args: ["--ok", 1] },
+      { ...stdioTemplate, id: "bad-env", env: { TOKEN: 1 } },
+      { ...stdioTemplate, id: "bad-required-env", requiredEnv: [{ name: "TOKEN", optional: "yes" }] },
+      { ...httpTemplate, id: "private-http", url: "https://127.0.0.1/mcp" },
+    ];
+    expect(() => validateMcpCatalogFile({ servers: malformed })).not.toThrow();
+    const { catalog, warnings } = validateMcpCatalogFile({ servers: malformed });
+    expect(catalog.servers).toEqual([]);
+    expect(warnings).toHaveLength(malformed.length);
+    expect(warnings.join("\n")).toContain("categories");
+    expect(warnings.join("\n")).toContain("public https");
+  });
 });
