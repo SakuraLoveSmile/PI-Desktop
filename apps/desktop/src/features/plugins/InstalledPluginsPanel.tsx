@@ -121,6 +121,9 @@ export function InstalledPluginsPanel({
                               {plugin.source === "dev" ? (
                                 <span className="plugins-tag">{t("plugins.tagLocal")}</span>
                               ) : null}
+                              {plugin.bundled ? (
+                                <span className="plugins-tag">{t("plugins.tagBundled")}</span>
+                              ) : null}
                             </div>
                             <div className="plugins-row-meta">
                               <span className="plugins-row-id">{plugin.id}</span>
@@ -266,22 +269,30 @@ export function InstalledPluginsPanel({
                                         ? t("plugins.disableAutoUpdate")
                                         : t("plugins.enableAutoUpdate")}
                                     </button>
-                                    <div className="plugins-menu-sep" />
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      className="danger"
-                                      onClick={() => {
-                                        setRowMenu(null);
-                                        void run(async () => {
-                                          await api.uninstallPlugin(plugin.id);
-                                          await refreshPlugins();
-                                        });
-                                      }}
-                                    >
-                                      <IconTrash size={14} />
-                                      {t("plugins.uninstall")}
-                                    </button>
+                                    {/* A bundled plugin belongs to the
+                                        application: the host refuses the
+                                        removal, so the action is not offered
+                                        (ADR 0104, ADR 0241). */}
+                                    {plugin.bundled ? null : (
+                                      <>
+                                        <div className="plugins-menu-sep" />
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          className="danger"
+                                          onClick={() => {
+                                            setRowMenu(null);
+                                            void run(async () => {
+                                              await api.uninstallPlugin(plugin.id);
+                                              await refreshPlugins();
+                                            });
+                                          }}
+                                        >
+                                          <IconTrash size={14} />
+                                          {t("plugins.uninstall")}
+                                        </button>
+                                      </>
+                                    )}
                               </AnchoredMenu>
                             </div>
                           </div>

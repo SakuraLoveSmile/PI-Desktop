@@ -66,6 +66,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 
 | 编号 | 标题 | 状态 |
 |---|---|---|
+| subagent-model-opt-in | [区分子代理模型自动调度许可与定义固定模型](/adr/subagent-model-opt-in) | 已接受待实现 |
 | 0001 | [Electron 桌面壳](/adr/0001-use-electron) | 已接受 |
 | 0002 | [使用 pi Agent Harness 作为内核](/adr/0002-use-pi-agent-harness) | 已接受 |
 | 0003 | [混合运行时 — Rust host core + Node pi agent sidecar](/adr/0003-agent-in-main-process) | 部分被取代 |
@@ -170,7 +171,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0102 | [发布者拥有的插件源与 Git 托管的工件存储](/adr/0102-publisher-owned-plugin-source-and-git-hosted-artifacts) | 已接受待实现（取代 ADR 0006） |
 | 0103 | [紧凑的上下文用量摘要](/adr/0103-compact-context-usage-summary) | 已接受（修订 ADR 0047） |
 | 0104 | [插件贡献的工作面板视图](/adr/0104-plugin-contributed-work-panel-views) | 已接受 |
-| 0105 | [将 Files 作为捆绑插件发布；Review 留在宿主](/adr/0105-files-as-a-bundled-plugin) | 已接受（终端条款已被 ADR 0108 取代） |
+| 0105 | [将 Files 作为捆绑插件发布；Review 留在宿主](/adr/0105-files-as-a-bundled-plugin) | 已被 ADR 0241 取代 |
 | 0106 | [核心五条内置命令](/adr/0106-core-five-builtin-commands) | 已接受 |
 | 0107 | [让当前会话任务通知抑制原子化](/adr/0107-atomic-viewing-context-for-task-notifications) | 已接受 |
 | 0108 | [移除内置交互式终端](/adr/0108-remove-built-in-interactive-terminal) | 已接受 |
@@ -270,6 +271,8 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0204 | [未签名 macOS 首次启动助手](/adr/0204-unsigned-macos-first-launch-helper) | 已接受（由 D406 / ADR 0232 修订） |
 | 0205 | [远程 Agent 控制使用专用的 Host 边界](/adr/0205-remote-agent-control-boundary) | 已接受待实现（MVP 之后；由 D376 修订） |
 | 0232 | [macOS DMG 只保留打开说明](/adr/0232-macos-dmg-text-only-opening-guidance) | 已接受（修订 D371 / ADR 0204） |
+| 0241 | [文件视图改为 vendor 的可更新插件](/adr/0241-vendored-updatable-file-view-plugin) | 已接受（取代 ADR 0105；issue #304） |
+| 0242 | [仅增量且合并的流式更新](/adr/0242-delta-only-streaming-updates) | 已接受（修订 0127 / 0130 / 0149 / 0153；issue #299） |
 | active-turn-steering | [用 Alt+Enter 向当前回合补充指令](/adr/active-turn-steering) | 已接受 |
 
 ## 什么时候看 ADR

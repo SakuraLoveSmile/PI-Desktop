@@ -10,7 +10,29 @@ export * from "./fuzzy.js";
 export * from "./mcp-import.js";
 export * from "./mcp-catalog.js";
 export * from "./mcp-catalog-builtin.js";
-export * from "./mcp-registry.js";
+export {
+  registryIdFromName,
+  argumentValues,
+  guessCategory,
+  mapRegistryServer,
+  mergeRegistryEntries,
+  isSafeMarketSourceUrl,
+  isPublicHostname,
+  isPublicIpLiteral,
+  sanitizeMarketSources,
+  DEFAULT_MARKET_SOURCE,
+  type RegistryEnvVar,
+  type RegistryArgument,
+  type RegistryPackage,
+  type RegistryRemote,
+  type RegistryServer,
+  type RegistryRecord,
+  type MarketSourceKind,
+  type MarketSource,
+  type SourcedCatalogEntry,
+} from "./mcp-registry.js";
+export * from "./skill-catalog.js";
+export * from "./skill-catalog-builtin.js";
 export * from "./model-config-import.js";
 export * from "./thinking-levels.js";
 export * from "./command-shells.js";
@@ -28,4 +50,5 @@ export * from "./font-size.js";
 export * from "./racp.js";
 export * from "./trusted-extensions.js";
 export * from "./provider-retry.js";
+export * from "./message-stream.js";
 export * from "./session-collaboration.js";

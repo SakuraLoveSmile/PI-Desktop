@@ -104,6 +104,8 @@ type RuntimeParams = {
   subagents?: SubagentDefinition[];
   /** Provider bindings for pinned models, keyed by `subagentModelKey`. */
   subagentProviders?: Record<string, RuntimeProviderConfig>;
+  /** Opted-in override keys, separate from definition-only pinned bindings. */
+  subagentModelKeys?: string[];
   scratchDir?: string;
   /** Session-bound workspace root supplied by Electron main. */
   projectPath?: string;
@@ -294,6 +296,7 @@ async function runtimeFor(
   const pluginSkills = params.pluginSkills ?? [];
   const trustedExtensions = params.trustedExtensions ?? [];
   const subagents = params.subagents ?? [];
+  const subagentModelKeys = params.subagentModelKeys ?? [];
   const subagentProviders = Object.fromEntries(
     Object.entries(params.subagentProviders ?? {}).map(([key, pinned]) => [
       key,
@@ -328,6 +331,7 @@ async function runtimeFor(
     trustedExtensions,
     subagents,
     subagentProviders,
+    subagentModelKeys,
     projectInstructions: params.projectInstructions,
     projectMemory: params.projectMemory,
     projectPath: params.projectPath,
@@ -385,6 +389,7 @@ async function runtimeFor(
     trustedExtensions,
     subagents,
     subagentProviders,
+    subagentModelKeys,
     projectPath: params.projectPath,
     projectInstructions: params.projectInstructions,
     projectMemory: params.projectMemory,

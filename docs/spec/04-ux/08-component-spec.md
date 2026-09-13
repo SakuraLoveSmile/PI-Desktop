@@ -5,12 +5,12 @@
 > Interaction behavior: [09-interaction-patterns.md](09-interaction-patterns.md)
 
 
-> Shell layout is Codex-aligned: left thread sidebar (240–520px, 275px by default), main transcript, floating bottom composer with runtime mode/permission/model controls, and a compact action-only top bar. Prefer neutral charcoal surfaces over blue-slate chrome.
+> Shell layout is Codex-aligned: left thread sidebar (fixed 275px), main transcript, floating bottom composer with runtime mode/permission/model controls, and a compact action-only top bar. Prefer neutral charcoal surfaces over blue-slate chrome.
 >
 > **Precedence rule**: where a metric or copy string below disagrees with a
 > Codex parity decision in [decisions-log §D](../08-meta/decisions-log.md)
 > (D034+), the decision log wins — it tracks the live gold captures. Known
-> updated values: sidebar 240–520px (275px default), toolbar 46px (not 44px),
+> updated values: sidebar 275px fixed, toolbar 46px (not 44px),
 > composer placeholder per D094/D066, home empty stack and bottom composer per
 > D111/D204/D206,
 > Projects index table per D066/D133, settings full-page shell per D063 with the
@@ -30,7 +30,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ```text
 +------------------+------------------------------+------------------+
 | Sidebar          | MainChat                     | WorkPanel        |
-| (240–520px / 48px) | (flex-1)                   | (≥244px / dynamic|
+| (275px / 48px) | (flex-1)                   | (≥244px / dynamic|
 |                  |                              |  hidden)         |
 +------------------+------------------------------+------------------+
 | Titlebar row: 46px, traffic lights at {x:16,y:16} (D034/D070)      |
@@ -43,7 +43,8 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 |---|---|
 | Default | Sidebar expanded, work panel hidden |
 | Narrow (<640px) | Sidebar auto-collapses to icon rail |
-| Work panel open in a fixed client area | Work panel keeps its committed width while MainChat keeps its 360px hard floor; the expanded sidebar yields first when the budget is exhausted |
+| Work panel open in a fixed client area | Work panel keeps its committed width while MainChat keeps its 450px hard floor; the expanded sidebar yields first when the budget is exhausted |
+| Preview (maximize) | MainChat is unmounted and the work panel fills the client area beside the sidebar; a window-level chrome row keeps shell actions and native window controls available |
 | Fullscreen | Topbar remains; sidebar toggle and artifact-driven panel stay available |
 
 ### 1.4 Interactions
@@ -54,19 +55,19 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   `sidebar-in`, exit `sidebar-out` keyframes) that mirrors the work-panel dock:
   the aside stays in the tree through the exit keyframe, then unmounts
   (`is-exiting` flag + `animationend` guard, with a timeout fallback)
-- Sidebar width resize: the right-edge `separator` handle follows horizontal
-  pointer movement from the press position, clamps to 240–520px, and commits
-  the preferred width on release. `Escape`, pointer cancellation, and unmount
-  restore the press-time width. The focused handle supports ArrowLeft/Right
-  (16px steps), Home, and End, and exposes the current width through ARIA.
-  The 8px edge hit area stays transparent when the sidebar body is hovered;
-  direct handle hover reveals only a centered compact marker, while focus and
-  active dragging use the accent marker without changing layout.
+- Sidebar width: the expanded column is fixed at 275px. Collapse/open changes
+  only whether the column is present; the historical resize handle is hidden
+  and legacy persisted width preferences are ignored.
 - Work panel collapse: the sole control is the viewport-fixed toggle in the
   window's top-right corner, available on every non-Settings route whether the
   panel is open or closed. It does not sit in the work-panel content header.
   Opening and collapsing change only the shell's internal flex allocation; the
   native window bounds stay unchanged.
+- Work panel preview: the header maximize action temporarily unmounts MainChat
+  and expands the panel across the client area beside the sidebar. A window-level
+  46px chrome row owns the drag area, New Task/sidebar actions, and native
+  window controls. On macOS, collapsed-sidebar preview reserves 76px on the
+  left in windowed mode and 8px in fullscreen for the traffic lights.
 - Work panel resize: its inner left-edge handle changes the committed panel
   width in the renderer, so dragging left gives the panel more internal space
   and dragging right returns space to MainChat (§5.4)
@@ -81,10 +82,8 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 ### 1.6 MVP constraints
 
-- Sidebar width is adjustable from its right-edge handle within 240–520px
-  (275px default), persists across launches, and remains independent from the
-  collapsed icon-rail state; the work panel remains adjustable from its own
-  divider
+- Sidebar width is fixed at 275px and remains independent from the collapsed
+  icon-rail state; the work panel remains adjustable from its own divider
 - The main pane renders one active transcript and one selected workspace while
   the sidebar may retain several project tabs/groups
 - Sidebar and work-panel dock transitions animate their flex allocation as well
@@ -369,7 +368,7 @@ visually distinct from list content.
 | State | Behavior |
 |---|---|
 | Expanded | Full session titles visible |
-| Sidebar resizing | Right-edge handle is active; direct hover/focus reveals a compact marker, pointer movement previews width, and release commits it |
+| Sidebar width | Fixed at 275px; collapse/open changes only column presence |
 | Collapsed | Icon rail — hover shows tooltip with session title |
 | Active session | Accent-blue outlined status ring plus active row background |
 | Selecting session | Destination row receives the active treatment immediately while transcript/workspace resolution continues |
@@ -743,7 +742,8 @@ reading surface of the workstation.
 
 Docked right work column for inspecting and steering the agent's workspace.
 Launchable surfaces are the host-owned Review row and plugin views (ADR 0104),
-including bundled `pi.files` (project browsing) and bundled `pi.browser`
+including the vendored file manager `pi.file-manager` (project browsing and
+editing) and bundled `pi.browser`
 (work-panel browser chrome; the guest page stays host-owned, ADR 0170). File
 resources are *artifact* surfaces: the host renders them, but the conversation
 opens them, so they are absent from the launcher. There is no interactive
@@ -819,51 +819,51 @@ singleton without duplicating it:
   Copy wraps at 34ch rather than 48ch because the panel can be 244px wide. No
   hero art, cards, or marketing framing (design-system §14, D206)
 
-### 5.2.2 Files plugin surface
+### 5.2.2 File manager plugin surface
 
-The bundled `pi.files` view keeps the former Files tool's focused browsing
-workflow while rendering entirely inside the plugin's isolated page:
+The vendored `pi.file-manager` view browses, opens, and edits the project
+entirely inside the plugin's isolated page:
 
-- The compact toolbar identifies the active project and offers search, collapse,
-  and refresh. Refresh disables itself and shows the same restrained spinner
-  language used by the host while the root and expanded folders are reloaded.
-  The tree loads one directory at a time, keeps directories
-  above files, preserves expanded folders, and shows file sizes without
-  walking the whole workspace up front. Search uses `fs.glob` and lists matching
-  files without expanding the whole tree first.
-- Directory rows use `role="treeitem"` with `aria-expanded`; Enter/Space opens
-  the row and Arrow/Home/End keys move through visible rows. Hover and active
-  fills are neutral theme surfaces, with the caret and folder/file SVGs carrying
-  the hierarchy instead of emoji or text glyphs. A context menu and
-  double-click open the selected file with the OS default app.
-- Selecting a file replaces the tree with a focused viewer page: Back, the
-  root-relative path, file size, line numbers, and a bounded preview. The viewer
-  offers **Open with default app**, **Show in folder**, and copy path through
-  the scoped plugin bridge. Back and Escape return to the same tree selection.
-  Loading, read failures, binary content, image
-  previews, oversized files, empty folders, and folders that fail to load each
-  have a distinct localized state; a failed directory can be retried in place.
+- The tree loads one directory at a time, keeps directories above files,
+  preserves expanded folders, and shows per-file-type icons and file sizes
+  without walking the whole workspace up front. Search (`fs.glob`-equivalent
+  filename matching) lists hits without expanding the tree, and refresh
+  disables itself while it reloads the root and the expanded folders.
+- A context menu on a row offers create, rename/move, **Open with default app**,
+  and **Show in folder**. The last two are offered for files only: the host
+  refuses them for directories.
+- Selecting a file replaces the tree with a focused viewer: syntax-highlighted
+  editing with save, a Markdown preview toggle, image and audio/video viewing,
+  CSV/TSV tables with paging and sorting, a JSON tree, and read-only SQLite
+  browsing with a SQL query box. Binaries report that they cannot be previewed
+  rather than being decoded, and every viewer names its own bound — 2 MiB for
+  text, 8 MiB for images, 24 MiB for media, none for databases, whose bytes stay
+  out of the page.
+- Saving is atomic and refuses to overwrite a file that changed on disk since it
+  was opened until the user confirms. Loading, read failures, unsupported
+  binaries, oversized files, empty folders, and folders that fail to load each
+  have a distinct localized state, and a failed directory can be retried in
+  place.
 - The page follows `app.getAppearance` and `appearance:changed` for base theme
   and English/Simplified Chinese copy, and `workspace:changed` for the open
-  project. Its only data access remains the public `workspace.get`, `fs.list`,
-  `fs.readPreview`, `fs.glob`, `fs.openDefault`, and `fs.reveal` bridge, so the
-  richer surface does not add host-only capabilities. Text previews are capped
-  at 5,000 lines; images use a bounded data URL from `fs.readPreview`. The
-  palette stays monochrome like the main app rather than introducing a
-  plugin-specific blue accent.
+  project. `workspace.get`, `app.getAppearance`, `fs.openDefault`, and
+  `fs.reveal` are the only host channels it calls; its own reads and writes go
+  through its host process, which keeps the workspace path jail, refuses
+  credential paths, and records writes to its own audit log (ADR 0241).
 
 ### 5.3 States
 
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; startup has no retained tabs. The viewport-fixed toggle or `Cmd/Ctrl + J` reveals the active session's panel context without creating a tab. Inline review cards remain available in the transcript because they are message-scoped and do not require the work panel. |
-| Open | Docked flex row right of the main pane; opened by an artifact, the viewport-fixed toggle, or `Cmd/Ctrl + J` at a fixed committed width of 244–720px (new-profile default 360px). The toggle or `Cmd/Ctrl + J` again collapses it, retaining the session context. |
+| Open | Docked flex row right of the main pane; opened by an artifact, the viewport-fixed toggle, or `Cmd/Ctrl + J` at a committed preferred width of at least 244px (new-profile default 360px), capped by the live three-column budget. The toggle or `Cmd/Ctrl + J` again collapses it, retaining the session context. |
+| Preview (maximize) | MainChat is unmounted and the panel fills the client area beside the sidebar. The mode is transient and restores the prior panel width and sidebar state when left. |
 | Multiple artifacts | The header keeps a horizontally scrollable tab strip. The fixed `+` action creates a new launcher tab; its buttons open Review and all in-scope plugin views without duplicating open resource tabs. |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The inner left divider follows anchored pointer delta or keyboard input for the panel target; pointer changes are frame-coalesced and committed in the renderer. Escape, pointer cancellation, or lost capture restores the prior panel width. Native window edges resize only the fixed application window. |
 | No workspace | Each tab renders its own "open a project" empty state |
 | Open with no resource | `Cmd/Ctrl + J` reveals the panel without creating a tab, so the body renders the New launcher. Clicking `+` creates an explicit, closable New tab with the same launcher rows. Activating a row from that tab replaces it with or selects the singleton view. Closing the final tab leaves the panel open in the no-resource state. |
-| Constrained work area | The panel is capped by the shared three-column budget inside the existing client area; MainChat never drops below its 360px floor and the expanded sidebar yields at the threshold |
+| Constrained work area | The panel is capped by the shared three-column budget inside the existing client area; MainChat never drops below its 450px floor and the expanded sidebar yields at the threshold |
 | New launcher active | The body hosts concise Review and plugin-view buttons. Each row replaces the launcher tab with its destination or activates the existing singleton; the page is independently closeable. |
 | Plugin view active | The body hosts the plugin's own isolated page as a native `WebContentsView`, positioned from the measured surface rect. It remains visible at its full rect while the divider is being resized or a New launcher tab is created; creating a page never pushes the plugin body down or changes its bounds. It is hidden whenever the tab is inactive, the panel is animating, or a panel-wide blocking overlay is open — the same rule the Browser preview follows, since both composite above renderer content. A view whose plugin is disabled, uninstalled, reloaded, or crashed is destroyed; the tab stays and re-opens the page on the next lifecycle event (ADR 0104) |
 | Plugin out of scope | A view contributed by a plugin that is not active in the current project disappears from the New launcher when the project changes. Unlike contributed themes, which are one global setting and stay unfiltered, a view is scoped work |
@@ -929,7 +929,7 @@ workflow while rendering entirely inside the plugin's isolated page:
   file and Browser resources are never reinterpreted against another workspace.
 - Resize: the inner left-edge handle changes the panel's committed width in the
   renderer. Moving it left grows the panel into MainChat's internal space until
-  the shared budget is exhausted; when the 360px floor is reached the expanded
+  the shared budget is exhausted; when the 450px floor is reached the expanded
   sidebar collapses immediately, and moving it right gives that space back to
   MainChat. `ArrowLeft` / `ArrowRight`
   adjust the panel width in 16px steps (`Shift` uses 32px), and `Home` / `End`
@@ -944,7 +944,7 @@ workflow while rendering entirely inside the plugin's isolated page:
   localStorage `pi.desktop.workPanel`. Opening and collapsing never request a
   positive native reservation and never change native window bounds. The panel
   flexes inside the existing client area, so MainChat reflows beside it while
-  retaining its 360px hard minimum; the expanded sidebar is the column that
+  retaining its 450px hard minimum; the expanded sidebar is the column that
   yields, and closing the panel restores a sidebar the layout collapsed.
   Background session artifacts never update the
   visible panel or window geometry.
@@ -1922,6 +1922,16 @@ in place:
   lifecycle status source, same as `TaskWait`/`TaskList` `delegations[]`; a
   snapshot that still says `running` is presented as `stopped`. A finished
   session therefore never keeps a live “Subagent working” card.
+- The brief spawn window before a delegate settles is presented as a creating
+  state rather than a generic running one. Because the parent `Task` returns
+  its structured handle (`delegationId`, `startedAt`) only at its own
+  `tool_end` (ADR 0089), a `Task` row that is `running` with no delegation
+  payload is identified as still being created: its node and dock badge read
+  `chat.subagentCreating` (“Starting subagent…”), the status icon pulses in
+  the subagent accent, and the elapsed clock ticks from the call's own
+  `createdAt` instead of waiting for the handle — so the creation phase never
+  reads as stalled. Once the result arrives the node transitions to the normal
+  `running` presentation and continues from its real `startedAt`.
 - The expanded card renders a low-noise dotted canvas with one main-agent root
   connected to the `Task` nodes in parent-row order. The runtime exposes no
   delegate dependencies and forbids nested `Task`, so the renderer must not
@@ -2195,7 +2205,7 @@ reasoning-level control.
   `.tool-spinner` and localized `Enhancing…` label while running, and remains
   a one-shot draft rewrite action. Inline file-reference chips, including
   pasted image chips, do not disable this action and remain in the draft.
-- MainPane and the chat surface keep a 360px hard minimum so the composer toolbar
+- MainPane and the chat surface keep a 450px hard minimum so the composer toolbar
   retains a usable single-row layout. The left and right control groups do not
   shrink; mode and permission labels stay on one line and ellipsize within their
   chips, so a sidebar or work-panel resize cannot vertically split, squeeze, or

@@ -481,10 +481,13 @@ pi.desktop.invoke(input: {
 }): Promise<unknown>
 ```
 
-这是第一方插件通往同一份已审查操作目录的网关，该目录也被可选启用的本地
-MCP 控制平面使用（ADR 0203 / D370）。返回的目录省略 Electron 通道名，插件也
-永远拿不到 MCP bearer token。调用复用控制器、IPC 处理器、生命周期检查、完成
-事件和审计边界；插件无法触达任意 Electron IPC。
+这是第一方插件通往与可选启用的本地 MCP 控制平面共用同一份已审查操作目录的
+网关（ADR 0203 / D370）。两份目录的差异仅在于标记为 plugin-only 的操作：六个
+`session/collaboration/*` 操作可以通过该网关调用，却被刻意排除在 MCP 可见目录
+之外（`tools/list`、`pi_control_describe` 以及 `pi_desktop_invoke` 的枚举），
+因为它们需要已认证的插件调用上下文，且渲染器没有任何变更通道。返回的目录省略
+Electron 通道名，插件也永远拿不到 MCP bearer token。调用复用控制器、IPC 处理器、
+生命周期检查、完成事件和审计边界；插件无法触达任意 Electron IPC。
 
 `dangerous` 操作（删除会话、更改权限模式、批准工具）需要两次答复。
 `confirm: true` 是插件的知会，必须先给出（否则返回

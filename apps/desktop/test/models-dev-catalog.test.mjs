@@ -110,23 +110,26 @@ function observeModelIdReads(model) {
   return () => reads;
 }
 
-test("repeated model matches and misses do not scan the catalog again", async (t) => {
+test("repeated model matches and misses resolve through the bounded catalog index", async (t) => {
   const catalog = await loadFixtureCatalog(t);
   const input = { vendorKey: "anthropic", modelId: "claude-opus-4.6" };
   const match = catalog.findModel(input);
   assert.ok(match);
   const reads = observeModelIdReads(match);
+  const perQuery = reads();
 
   assert.equal(catalog.findModel({ ...input }), match);
   assert.equal(catalog.findModel({ ...input, modelId: " CLAUDE-OPUS-4.6 " }), match);
-  assert.equal(reads(), 0, "a repeated match must reuse the catalog result");
+  // A repeated exact match returns the same catalog object and touches only the
+  // constant-sized candidate bucket, not a full catalog scan.
+  assert.ok(reads() - perQuery <= 8, "a repeated match must reuse the catalog result");
 
   const missing = { ...input, modelId: "unpublished-model" };
   assert.equal(catalog.findModel(missing), undefined);
   const afterMiss = reads();
-  assert.ok(afterMiss > 0, "the first miss must search the loaded catalog");
   assert.equal(catalog.findModel({ ...missing }), undefined);
   assert.equal(catalog.findModel({ ...missing, modelId: " UNPUBLISHED-MODEL " }), undefined);
+  // A miss resolves through an empty bucket without scanning or growing the index.
   assert.equal(reads(), afterMiss, "a repeated miss must not search again");
 });
 
@@ -155,25 +158,48 @@ test("cached matches remain scoped to the requested provider and endpoint", asyn
   }
 });
 
-test("model lookup retention stays bounded when many unknown IDs are queried", async (t) => {
+test("model lookup memory is bounded by the catalog, not by query count", async (t) => {
   const catalog = await loadFixtureCatalog(t);
   const input = { vendorKey: "anthropic", modelId: "claude-opus-4.6" };
   const match = catalog.findModel(input);
   assert.ok(match);
   const reads = observeModelIdReads(match);
 
-  for (let index = 0; index < 1_024; index += 1) {
+  // Thousands of distinct miss queries do not grow the per-generation index and
+  // do not evict an already-resolved key from it.
+  for (let index = 0; index < 3_000; index += 1) {
     assert.equal(catalog.findModel({ ...input, modelId: `unknown-${index}` }), undefined);
   }
-  const beforeRepeatedMiss = reads();
-  assert.equal(catalog.findModel({ ...input, modelId: "unknown-1023" }), undefined);
-  assert.equal(reads(), beforeRepeatedMiss, "the newest lookup remains reusable");
+  const beforeRepeat = reads();
+  assert.equal(catalog.findModel(input), match);
+  // The resolved key stays resolvable to the same object without a catalog rescan.
+  assert.ok(reads() - beforeRepeat <= 8, "a resolved key stays usable after many distinct queries");
+});
 
-  assert.equal(catalog.findModel(input), match);
-  assert.ok(reads() > beforeRepeatedMiss, "older entries are evicted after the 1,024-entry budget");
-  const afterReload = reads();
-  assert.equal(catalog.findModel(input), match);
-  assert.equal(reads(), afterReload, "an evicted match becomes reusable after recomputation");
+test("one read with more distinct keys than any cache budget does not rescan a resolved key", async (t) => {
+  const catalog = await loadFixtureCatalog(t);
+  const input = { vendorKey: "anthropic", modelId: "claude-opus-4.6" };
+  const match = catalog.findModel(input);
+  assert.ok(match);
+  const reads = observeModelIdReads(match);
+  const baseline = reads();
+  const exactRepeats = 2_000;
+  // Interleave the originally resolved key among a burst of distinct keys far
+  // larger than the former 1,024-entry per-key eviction cache.
+  for (let index = 0; index < exactRepeats; index += 1) {
+    catalog.findModel({ ...input, modelId: `unknown-${index}` });
+    catalog.findModel(input);
+  }
+  const touches = reads() - baseline;
+  // Each exact re-query resolves through a bounded candidate bucket, so the work
+  // stays proportional to the repeated queries and independent of the distinct
+  // keys interleaved between them. The old 1,024-entry eviction cache would rescan
+  // the whole catalog (thousands of model reads) on every repeat once its budget
+  // was exceeded, growing with the distinct-key burst.
+  assert.ok(
+    touches <= exactRepeats * 8,
+    `exact re-queries touched the model ${touches} times, expected <= ${exactRepeats * 8}`,
+  );
 });
 
 test("model IDs match provider namespaces without matching model variants", () => {

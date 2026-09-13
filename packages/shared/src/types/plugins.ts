@@ -197,7 +197,13 @@ export type PluginSummary = {
   enabled: boolean;
   /** Where the plugin is allowed to run; absent records predate scopes. */
   scope?: ActivationScope;
-  source: "installed" | "dev" | "marketplace";
+  source: "builtin" | "installed" | "dev" | "marketplace";
+  /**
+   * True while this application build ships the plugin from
+   * `resources/plugins`. A bundled plugin cannot be uninstalled, but it can be
+   * updated, and this flag follows that update (ADR 0241).
+   */
+  bundled?: boolean;
   status: "ready" | "error" | "disabled" | "load_error";
   errorMessage?: string;
   permissions: string[];

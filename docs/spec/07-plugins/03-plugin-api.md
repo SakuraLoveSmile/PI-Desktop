@@ -368,6 +368,7 @@ channels or the local MCP bearer token.
 type SessionCollaborationOperation =
   | "session/collaboration/spawn"
   | "session/collaboration/send"
+  | "session/collaboration/list"
   | "session/collaboration/status"
   | "session/collaboration/result"
   | "session/collaboration/cancel"
@@ -387,6 +388,7 @@ type SendInput = {
   notifyOnCompletion?: boolean
   idempotencyKey?: string
 }
+type ListInput = {}
 type StatusInput = { sessionId: string }
 type ResultInput = { sessionId: string; messageId?: string; turnId?: string }
 type CancelInput = { sessionId: string; messageId?: string }
@@ -399,6 +401,14 @@ reuses that session's project, model, context, and permission configuration;
 and `result` are bounded projections and do not load a full transcript.
 `cancel` interrupts only the exact queued delivery or bound turn and retains
 the target session and history.
+
+`list` returns at most 100 non-deleted Agent sessions that can receive a
+message, including sessions created independently of Session Orchestrator. Each
+entry contains only its Session ID, title, status, updated time, readable
+provider/model labels, and bounded creation links; it does not include a
+transcript, project path, credentials, or message previews. The caller can
+pass the returned Session ID to `send`, and `status`/`result` remain the
+authoritative detail reads.
 
 `spawn` and `send` are valid only during the plugin's active Agent tool
 invocation. The broker injects `pluginId`, source `sessionId`, source `turnId`,
@@ -567,12 +577,17 @@ open an existing durable session. Plugin-originated `session/create` and
 `agent/prompt` calls refresh session state without changing the active
 renderer session; `session/open` is explicit navigation.
 
-This is the first-party plugin gateway to the same reviewed operation catalog
-used by the opt-in local MCP control plane (ADR 0203 / D370). The returned
-catalog omits Electron channel names and the plugin never receives the MCP
-bearer token. Invocation reuses the controller, IPC handler, lifecycle checks,
-completion event, and audit boundary; a plugin cannot reach arbitrary Electron
-IPC.
+This is the first-party plugin gateway to the reviewed operation catalog shared
+with the opt-in local MCP control plane (ADR 0203 / D370). The two catalogs
+differ only for operations marked plugin-only: the six
+`session/collaboration/*` operations are callable through this gateway but are
+deliberately absent from the MCP-visible catalog (`tools/list`,
+`pi_control_describe`, and the `pi_desktop_invoke` enum), because they require
+an authenticated plugin invocation context and no renderer mutation channel
+exists for them. The returned catalog omits Electron channel names and the
+plugin never receives the MCP bearer token. Invocation reuses the controller,
+IPC handler, lifecycle checks, completion event, and audit boundary; a plugin
+cannot reach arbitrary Electron IPC.
 
 A `dangerous` operation (session delete, permission-mode change, tool
 approval) needs two answers. `confirm: true` is the plugin's acknowledgement

@@ -79,8 +79,10 @@ This log freezes previously open questions into concrete decisions.
 | D405 | Ideographic comma opens the slash menu | **Amend D123 / D139 / ADR 0024: a `、` (U+3001) committed as the first character of an empty composer draft is rewritten to `/` before trigger detection, so a Chinese IME reaches the ordinary slash menu without switching input methods. Only that position is rewritten; a `、` anywhere else stays ordinary punctuation, and the `@` file menu is unaffected. Shared grammar and renderer only; no IPC, storage, or autocomplete-source change. See ADR 0231 and E2E-255.** | Reaching `/new`, `/compact`, a mode alias, or a Skill forced a Chinese IME user to switch to ASCII input mid-sentence and then switch back (issue #65). |
 | D406 | Keep macOS DMG opening guidance text-only | **Amend D371 / ADR 0204: macOS DMGs expose the opening-help note as `If app won't open, read this.txt` and no longer include the executable `PI-Desktop-macOS-open.command`. macOS ZIP packages retain both the note and the helper. The note provides the narrow Terminal fallback for trusted unsigned builds; signed and notarized builds do not need it. See ADR 0232 and E2E-196b.** | The DMG should keep the normal app-to-Applications flow focused while still giving users a visible, actionable answer when an unsigned app does not open. |
 | D407 | Restore archived projects after session import | **Additive renderer behavior for issue #250: when a core or plugin import adds a new project-bound session, the import-triggered session refresh normalizes its project path and clears the renderer's archived presentation state for that project. Pathless sessions, skipped imports, historical plugin paths without an active binding, and ordinary refreshes leave archive state unchanged. Host project rows, IPC channels, plugin methods, storage schema, and data formats do not change. See ADR 0236 and E2E-257.** | The host can successfully materialize an imported session under a project while the renderer still hides that project's sidebar row as archived. Restoring only the newly imported binding makes the result discoverable without weakening deliberate archive choices during ordinary refreshes (issue #250). |
-| D408 | Prioritize MainChat in the three-column shell | **Amend ADR 0226 / ADR 0151 / ADR 0033 for issue #267: MainChat keeps a hard 360px minimum, the work panel is capped by the live budget (`client width - 360px - expanded sidebar`, with no fixed maximum), and the expanded sidebar yields at that threshold — including while `sidebar-out` still occupies flex space. A manual sidebar reopen spends panel width first and otherwise targets 370px; closing the panel restores only a sidebar the layout collapsed. The native window never changes: the reservation seam stays at zero and no geometry is applied. See ADR 0238 and E2E-LAYOUT-three-column-width-priority.** | The fixed client area had no explicit width priority, so the side docks could pin MainChat to its floor and leave the composer unusable. Making the yield order explicit keeps the chat readable inside the fixed window without reintroducing native window growth (issue #267). |
+| D408 | Prioritize MainChat in the three-column shell | **Amend ADR 0226 / ADR 0151 / ADR 0033 for issue #267: MainChat keeps a hard 450px minimum, the work panel is capped by the live budget (`client width - 450px - expanded sidebar`, with no fixed maximum), and the expanded sidebar yields at that threshold — including while `sidebar-out` still occupies flex space. A manual sidebar reopen spends panel width first and otherwise targets 460px; closing the panel restores only a sidebar the layout collapsed. The native window never changes: the reservation seam stays at zero and no geometry is applied. Preview mode temporarily unmounts MainChat and uses a window-level chrome row; collapsed-sidebar macOS preview reserves 76px, or 8px in fullscreen, for traffic lights. See ADR 0238 and E2E-LAYOUT-three-column-width-priority.** | The fixed client area had no explicit width priority, so the side docks could pin MainChat to its floor and leave the composer unusable. Making the yield order explicit keeps the chat readable inside the fixed window without reintroducing native window growth (issue #267). |
 | D409 | Host-owned session collaboration messages | **Amend ADR 0237 / ADR 0165 / ADR 0213: Rust host-core owns a durable session-collaboration ledger keyed by message id and real source/target Session IDs. Plugin-mediated `spawn`, `send`, `status`, `result`, and `cancel` operations use the reviewed desktop-control gateway; the sender is bound to the active plugin Agent tool invocation, target turns retain their existing configuration, and each delivery is claimed by its actual durable turn. Completion callbacks are durable, at-most-once, and reference the settled turn. Provenance is persisted with transcript rows and cannot be forged, stripped, or edited through regeneration. The additive schema v16 migration retains queued work across restart without unattended replay, applies permission ceilings and bounded autonomous hops, and keeps the existing Task family unchanged. See ADR 0239 and E2E-PLUGIN-session-orchestrator-real-workers.** | The plugin's prior create/prompt polling path could infer neither a durable turn outcome nor a safe bidirectional sender identity. A host-owned ledger makes delivery, provenance, callback, cancellation, and restart behavior auditable without restoring the withdrawn A2A protocol. |
+| D410 | Independent session discovery and navigable collaboration projections | **Amend ADR 0239: add the reviewed read operation `session/collaboration/list`, bounded to 100 non-deleted Agent sessions and redacted to Session IDs, titles, status, updated time, readable provider/model labels, and bounded creation links. Extend the sidebar projection with readable model labels and at most eight created-session references. Render creator/created-session references as keyboard-focusable navigation buttons; independent sessions do not receive fabricated creator links. No renderer storage ownership or collaboration mutation boundary changes. See ADR 0240, E2E-SESSION-independent-top-level-communication, and E2E-SESSION-hover-card-model-and-links.** | Existing Session IDs were valid send targets but could be undiscoverable when they were not created by the plugin, while the hover card exposed only IDs and non-interactive provenance. A bounded host directory and navigable projection make durable sessions communicable and explainable without exposing transcripts or credentials. |
+| D412 | Delta-only coalesced streaming updates | **Amend the local `message_update` contract: append-only streaming frames carry `stream: delta` plus `deltaText`/`deltaThinking` (and reset flags) without growing `content`/`thinking`. Runtime coalesces those frames every 16ms and flushes before semantic boundaries. AgentHost, inflight checkpoints, and the renderer apply deltas; `message_start`/`message_end` remain full snapshots. Transcript activity parts keep object identity when only the tail token changes. Protocol version stays 11. See ADR 0242, E2E-STREAM-long-turn-keeps-realtime, and issue #299.** | Each token re-serialized the full assistant snapshot across sidecar, AgentHost, and IPC, so a long turn cost O(n²) bytes and backlogged later short chunks. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -3031,6 +3033,16 @@ D193, and D194.
   exact repeat of the current session provider/model is treated as inheritance,
   equivalent to omitting `model`, so an empty delegation catalog does not turn
   the parent model into a false unavailable-model error.
+- Implementation clarification (2026-09-13, ADR subagent-model-opt-in):
+  `subagentProviders` may contain definition-only pins and is not an override
+  allowlist. The additive `subagentModelKeys` launch field carries opt-in
+  separately, defaults to empty, and participates in runtime reuse matching.
+  Only launch opt-in keys enter that reuse snapshot. Successfully authorized
+  on-demand results use a separate cache, must not overwrite a pin with a
+  different provider id, and do not retire an idle runtime. Repeating a
+  definition's own pin key is omit. On-demand matching uses unique provider
+  lookup. The Task catalog discloses each definition's default model.
+
 - Models not pre-resolved at sidecar launch are resolved on-demand via the
   `provider.resolveSubagentModel` RPC to Electron main, where credentials and
   the models.dev snapshot live.
@@ -3051,7 +3063,7 @@ D193, and D194.
 - No IPC, storage, host protocol, or renderer resize contract changes. This
   refines D156/D163 and is covered by E2E-167.
 
-## 2026-09-01 — Expanded sidebar width is user-resizable (D280)
+## 2026-09-01 — Expanded sidebar width is user-resizable (D280; superseded by D408)
 
 - The expanded sidebar owns a persisted preferred width with a `240..520px`
   clamp and a `275px` default. The right-edge renderer handle previews width
@@ -3064,6 +3076,9 @@ D193, and D194.
 - Sidebar collapse remains independent from the preferred expanded width. No
   IPC, native-window bounds, work-panel reservation, or project/session order
   contract changes. See ADR 0141 and E2E-168.
+- D408 supersedes this width contract for the live shell: the expanded sidebar
+  is fixed at 275px and the historical resize handle is hidden.
+
 
 ## 2026-09-01 — Non-loopback HTTP MCP endpoints are supported (D281)
 
@@ -4644,6 +4659,7 @@ D193, and D194.
   inside their chips when localized text is longer than the label slot.
 - No IPC, storage, or native-window reservation changes. See ADR 0226 and
   E2E-168.
+- D408 supersedes the live 515px floor with a 450px MainChat floor.
 
 ## 2026-09-11 — Long-press the project title to reorder (D402)
 
@@ -4712,16 +4728,20 @@ D193, and D194.
 
 ## 2026-09-13 — Prioritize MainChat in the three-column shell (D408)
 
-- The in-flow shell treats MainChat as the first-priority column: a hard 360px
-  minimum, a panel capped by the live budget (`client width - 360px - expanded
+- The in-flow shell treats MainChat as the first-priority column: a hard 450px
+  minimum, a panel capped by the live budget (`client width - 450px - expanded
   sidebar`, no fixed maximum), and an expanded sidebar that yields at the
   threshold while its
   exit animation still counts toward the shared budget.
 - A manual sidebar reopen spends work-panel width first and otherwise targets
-  370px. Closing the panel restores only a sidebar the layout collapsed; a
+  460px. Closing the panel restores only a sidebar the layout collapsed; a
   manual collapse stays collapsed.
 - The native window never participates: the reservation seam stays at zero and
   no panel width or x-offset geometry is applied.
+- Preview mode unmounts MainChat and gives the client area to the work panel
+  beside the sidebar. AppShell supplies a window-level chrome row for shell
+  actions and native controls; macOS reserves 76px in windowed mode and 8px in
+  fullscreen when the sidebar is collapsed.
 - Decision D408 records the issue #267 behavior. See ADR 0238 and
   E2E-LAYOUT-three-column-width-priority.
 
@@ -4742,6 +4762,21 @@ D193, and D194.
 - Decision D409 amends ADR 0237, ADR 0165, and ADR 0213. See ADR 0239 and
   E2E-PLUGIN-session-orchestrator-real-workers.
 
+## 2026-09-13 — Independent session discovery and navigable collaboration projections (D410)
+
+- The reviewed plugin gateway exposes a bounded `session/collaboration/list`
+  read for non-deleted Agent sessions, including sessions created outside
+  Session Orchestrator. It returns no project paths, credentials, transcripts,
+  or message previews; `send` continues to use the real Session ID and the
+  existing host authorization path.
+- Sidebar collaboration summaries now carry readable provider/model labels and
+  bounded creator/created-session references. The renderer presents those
+  references as keyboard-focusable navigation buttons and opens the durable
+  session through the existing selection path.
+- Decision D410 amends ADR 0239. See ADR 0240 and
+  E2E-SESSION-independent-top-level-communication /
+  E2E-SESSION-hover-card-model-and-links.
+
 ## 2026-09-12 — Steer the active turn with Alt+Enter
 
 - Normal Send/Enter remains a Host-owned follow-up; Alt+Enter submits input to
@@ -4753,3 +4788,64 @@ D193, and D194.
 - Journal accepted user input with a provisional preceding reply when needed;
   finalize only an indexed streaming assistant in place and retain completed
   message idempotency. See ADR active-turn-steering and E2E-AGENT-alt-enter-steers-active-turn.
+
+## 2026-09-13 — Harden session collaboration navigation and delivery
+
+- Collaboration references now carry `available`. A reference to a session that was
+  deleted or is otherwise gone is reported with `available: false`; the renderer renders
+  it as text instead of a navigation control, and opening a session that no longer exists
+  reports a visible error instead of committing an empty transcript.
+  `session_collaboration_messages.source_session_id` intentionally has no foreign key, so
+  a delivery record survives deletion of its sender and is reported as unavailable.
+- The six `session/collaboration/*` operations are first-party-plugin-only: they require
+  an authenticated plugin tool invocation context, so they are excluded from the
+  MCP-visible catalog while remaining available through `pi.desktop.listOperations` and
+  `pi.desktop.invoke`. This amends the "same reviewed operation catalog" claim of
+  ADR 0203 / D370 and the `desktop.control` row of the plugin permission matrix.
+- Settling a delivery now asserts that the conditional `queued` to `running` claim
+  actually changed a row, so losing that race cannot create a second turn for one
+  delivery, and `spawn` evaluates its worker limits inside the same transaction as the
+  session insert.
+- Electron delivery settlement no longer drops a settlement recorded before a host
+  restart, and a drain that is already running picks up settlements queued during it
+  instead of deferring them to an unrelated trigger. A persisted delivery failure keeps a
+  stable `CODE: message` form.
+- Review fixes for the orchestration refresh path bound the model-catalog lookup work per
+  read instead of relying on cache eviction, and replace E2E boot conditions that could
+  not fail with observations the probe does not itself guarantee.
+- See ADR 0239, ADR 0240, E2E-SESSION-hover-card-model-and-links.
+
+## 2026-09-13 — Vendor the file view as an updatable plugin (issue #304)
+
+- The work panel's file view is no longer `pi.files`. It is a vendored copy of
+  the third-party `pi.file-manager` release, shipped from
+  `apps/desktop/resources/plugins/` and recorded in its own `UPSTREAM.md`. The
+  old plugin is removed, and host-core drops its stale registry row on the next
+  launch.
+- Bundled means default and non-removable, not frozen: a bundled plugin can be
+  updated from the marketplace, that update survives the next launch, and a
+  build that ships a strictly newer version still wins. `uninstall` refuses by
+  ID against what the build ships, not by the row's `source`, so an updated
+  plugin stays uninstallable and a plugin dropped from a build is removable
+  again.
+- A marketplace entry is offered as an update only when it is strictly newer.
+  Equality is not an update, and an older catalog version is not one either.
+- Editing writes stay inside the plugin's own process, which keeps the workspace
+  path jail, atomic writes, conflict detection, and its write audit. The host
+  gateway does not mediate them: a manifest cannot declare a whole-tree write.
+- See ADR 0241 (supersedes ADR 0105), ADR 0104, E2E-153,
+  E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update.
+
+## 2026-09-14 — Delta-only coalesced streaming updates (D412)
+
+- Append-only `message_update` frames carry `stream: "delta"` and the new
+  chunk only. Growing `content`/`thinking` stay in the runtime accumulator and
+  in `message_end`. Retry replacements still send a full snapshot.
+- A 16ms coalescer concatenates pending deltas and flushes before tool,
+  terminal, abort, error, and retry events so order is preserved.
+- AgentHost applies deltas to live items and skips a hot-path `JSON.stringify`
+  for small delta frames. Inflight checkpoints reconstruct the snapshot from
+  the same deltas. The renderer concatenates same-frame deltas, then patches
+  the live row. Unchanged activity parts keep object identity.
+- Protocol version remains 11. See ADR 0242, E2E-STREAM-long-turn-keeps-realtime,
+  and issue #299.

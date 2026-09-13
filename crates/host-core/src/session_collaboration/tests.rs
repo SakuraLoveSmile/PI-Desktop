@@ -33,6 +33,16 @@ fn ui(role: &str, content: &str) -> sessions::UiMessage {
     .unwrap()
 }
 
+fn turn_count(db: &Database, session_id: &str) -> i64 {
+    db.conn()
+        .query_row(
+            "SELECT COUNT(*) FROM turns WHERE session_id=?1",
+            params![session_id],
+            |row| row.get(0),
+        )
+        .unwrap()
+}
+
 #[test]
 fn sessions_are_reused_and_send_is_idempotent() {
     let dir = tempfile::tempdir().unwrap();
@@ -59,6 +69,70 @@ fn sessions_are_reused_and_send_is_idempotent() {
         .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
         .unwrap();
     assert_eq!(count, 2);
+}
+
+#[test]
+fn projections_expose_readable_model_names_and_session_discovery_links() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let parent = session(&db, "Parent");
+    let child = session(&db, "Linked child");
+    db.conn()
+        .execute(
+            "INSERT INTO providers(id,name,created_at,updated_at) VALUES(?1,?2,?3,?3)",
+            params!["provider-id", "Readable Provider", now_ms()],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO models(provider_id,model_id,display_name,updated_at) VALUES(?1,?2,?3,?4)",
+            params!["provider-id", "model-id", "Readable Model", now_ms()],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "UPDATE sessions SET provider_id=?1,model_id=?2 WHERE id=?3",
+            params!["provider-id", "model-id", child],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO session_collaboration_links(session_id,created_by_session_id,plugin_id,created_at)
+             VALUES(?1,?2,?3,?4)",
+            params![child, parent, "pi.session-orchestrator", now_ms()],
+        )
+        .unwrap();
+
+    let child_summary = handle(
+        &db,
+        "session.collaboration.status",
+        &json!({"sessionId":child}),
+    )
+    .unwrap();
+    assert_eq!(child_summary["providerName"], "Readable Provider");
+    assert_eq!(child_summary["modelName"], "Readable Model");
+    assert_eq!(child_summary["createdBySession"]["sessionId"], parent);
+
+    let parent_summary = handle(
+        &db,
+        "session.collaboration.status",
+        &json!({"sessionId":parent}),
+    )
+    .unwrap();
+    assert_eq!(parent_summary["createdSessions"][0]["sessionId"], child);
+    assert_eq!(parent_summary["createdSessions"][0]["available"], true);
+
+    let listed = handle(&db, "session.collaboration.list", &json!({})).unwrap();
+    let sessions = listed["sessions"].as_array().unwrap();
+    assert!(sessions.iter().any(|entry| entry["sessionId"] == parent));
+    assert!(sessions.iter().any(|entry| entry["sessionId"] == child));
+    assert_eq!(
+        sessions
+            .iter()
+            .find(|entry| entry["sessionId"] == child)
+            .unwrap()["providerName"],
+        "Readable Provider"
+    );
 }
 
 #[test]
@@ -216,4 +290,116 @@ fn schema_v15_upgrade_preserves_sessions_and_adds_the_ledger() {
     );
     assert!(crate::db::migration_backup_path(&path, 15).exists());
     assert!(repository::pending_callbacks(&db, None).unwrap().is_empty());
+}
+
+#[test]
+fn deleted_creator_keeps_its_reference_and_reports_it_unavailable() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let parent = session(&db, "Parent");
+    let child = session(&db, "Child");
+    let soft_parent = session(&db, "Soft parent");
+    let soft_child = session(&db, "Soft child");
+    for (linked, creator) in [(&child, &parent), (&soft_child, &soft_parent)] {
+        db.conn()
+            .execute(
+                "INSERT INTO session_collaboration_links(session_id,created_by_session_id,plugin_id,created_at)
+                 VALUES(?1,?2,?3,?4)",
+                params![linked, creator, "pi.session-orchestrator", now_ms()],
+            )
+            .unwrap();
+    }
+    assert!(sessions::delete_session(&db, &parent).unwrap());
+    db.conn()
+        .execute(
+            "UPDATE sessions SET deleted_at=?1 WHERE id=?2",
+            params![now_ms(), soft_parent],
+        )
+        .unwrap();
+
+    let removed = handle(
+        &db,
+        "session.collaboration.status",
+        &json!({"sessionId":child}),
+    )
+    .unwrap();
+    assert_eq!(removed["createdBySession"]["sessionId"], parent);
+    // Without the session row the title falls back to the referenced id.
+    assert_eq!(removed["createdBySession"]["title"], parent);
+    assert_eq!(removed["createdBySession"]["available"], false);
+
+    let soft_removed = handle(
+        &db,
+        "session.collaboration.status",
+        &json!({"sessionId":soft_child}),
+    )
+    .unwrap();
+    assert_eq!(soft_removed["createdBySession"]["sessionId"], soft_parent);
+    assert_eq!(soft_removed["createdBySession"]["title"], "Soft parent");
+    assert_eq!(soft_removed["createdBySession"]["available"], false);
+}
+
+#[test]
+fn deleted_message_source_survives_the_ledger_and_reports_an_unavailable_peer() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let parent = session(&db, "Parent");
+    let child = session(&db, "Child");
+    let message = send(&db, &parent, &child, "one");
+    assert!(sessions::delete_session(&db, &parent).unwrap());
+    // source_session_id has no foreign key, so the delivered row survives.
+    assert_eq!(get(&db, &message.id).unwrap().unwrap().status, "queued");
+
+    let summary = handle(
+        &db,
+        "session.collaboration.status",
+        &json!({"sessionId":child}),
+    )
+    .unwrap();
+    assert_eq!(summary["currentTask"]["senderSession"]["sessionId"], parent);
+    assert_eq!(summary["currentTask"]["senderSession"]["available"], false);
+    assert_eq!(summary["recentExchanges"][0]["peer"]["sessionId"], parent);
+    assert_eq!(summary["recentExchanges"][0]["peer"]["available"], false);
+}
+
+#[test]
+fn begin_turn_twice_reports_conflict_without_a_second_turn() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let parent = session(&db, "Parent");
+    let child = session(&db, "Child");
+    let message = send(&db, &parent, &child, "one");
+    let turn = begin_turn(&db, &child, &message.id, None, None).unwrap();
+    let conflict = begin_turn(&db, &child, &message.id, None, None).unwrap_err();
+    assert_eq!(
+        conflict.to_string(),
+        "CONFLICT: session message already claimed or settled"
+    );
+    assert_eq!(get(&db, &message.id).unwrap().unwrap().turn_id, Some(turn));
+    assert_eq!(turn_count(&db, &child), 1);
+}
+
+#[test]
+fn a_claim_that_loses_the_race_returns_conflict_and_rolls_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let parent = session(&db, "Parent");
+    let child = session(&db, "Child");
+    let message = send(&db, &parent, &child, "one");
+    // Simulates another actor settling the queued message between the read at
+    // the start of begin_turn and its conditional claim.
+    db.conn()
+        .execute_batch(
+            "CREATE TRIGGER settle_during_claim AFTER INSERT ON turns
+             BEGIN
+               UPDATE session_collaboration_messages SET status='cancelled'
+               WHERE target_session_id=NEW.session_id AND status='queued';
+             END;",
+        )
+        .unwrap();
+    let conflict = begin_turn(&db, &child, &message.id, None, None).unwrap_err();
+    assert!(conflict.to_string().starts_with("CONFLICT"));
+    // The claim changed no row, so the transaction rolled back completely.
+    assert_eq!(turn_count(&db, &child), 0);
+    assert_eq!(get(&db, &message.id).unwrap().unwrap().status, "queued");
 }

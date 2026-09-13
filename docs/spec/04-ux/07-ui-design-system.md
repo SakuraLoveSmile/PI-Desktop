@@ -492,11 +492,9 @@ same 6px contract and scroll-reveal mark. This keeps first-party surfaces such
 as the Files view aligned with the host renderer; the external page loaded
 inside the Browser guest remains page-owned and keeps its own scrollbar style.
 
-The expanded sidebar's resize handle keeps its 8px hit area transparent when
-the sidebar surface is merely hovered. Direct handle hover reveals only a
-centered 32px semantic-ink marker; keyboard focus and active dragging may use
-the accent marker. The handle never paints a full-height hover rail or changes
-the sidebar layout.
+The expanded sidebar is a fixed 275px column. Collapse/open changes only whether
+the column is present; the historical resize handle is hidden and legacy width
+preferences are not persisted.
 
 The profile menu is `280px` wide, opens `8px` above the footer, and uses the
 standard opaque elevated-menu surface, subtle border, and dialog shadow. Its
@@ -938,12 +936,12 @@ Codex parity decisions (D034/D070) supersede any older value here.
 |---|---|---|
 | Titlebar row height | 46px | Codex toolbar rhythm (D034); traffic lights {x:16,y:16} |
 | Sidebar width (collapsed) | 48px | Icon-only rail |
-| Sidebar width (expanded) | `240px–520px` (default 275px) | Right-edge resize handle; persisted preferred width |
-| Main pane minimum readable width | 360px | The MainChat hard floor; the sidebar yields before it is breached (ADR 0238) |
+| Sidebar width (expanded) | 275px | Fixed column; collapse/open does not resize it |
+| Main pane minimum readable width | 450px | The MainChat hard floor; the sidebar yields before it is breached (ADR 0238) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `244px–720px` (new-profile default 360px), capped by `client width - 360px - expanded sidebar` with no fixed pixel cap | the panel is an in-flow column whose width is taken from the existing client area; the renderer owns its divider (ADR 0033 / ADR 0151 / ADR 0238); saved widths remain unchanged |
+| Work panel width (open) | `≥244px` (new-profile default 360px), capped by `client width - 450px - expanded sidebar` with no fixed pixel cap | the panel is an in-flow column whose width is taken from the existing client area; the renderer owns its divider (ADR 0033 / ADR 0151 / ADR 0238); saved widths remain unchanged |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
-| Composer toolbar | MainChat `≥360px` | Left/right control groups stay on one row and do not shrink; mode/permission labels stay single-line and ellipsize |
+| Composer toolbar | MainChat `≥450px` | Left/right control groups stay on one row and do not shrink; mode/permission labels stay single-line and ellipsize |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
 | Window min width | 1040px | Enforced by Electron for the whole app; opening the panel never changes native bounds |
@@ -951,11 +949,11 @@ Codex parity decisions (D034/D070) supersede any older value here.
 
 An open work panel is a fixed-width in-flow column inside the existing client
 area (ADR 0033 / ADR 0151). Its flex allocation comes from MainChat, but MainPane
-retains a 360px hard minimum and the panel's effective maximum is the remaining
+retains a 450px hard minimum and the panel's effective maximum is the remaining
 client width after the expanded sidebar and that floor (ADR 0238). When the
 budget is exhausted the expanded sidebar collapses immediately, and the shared
 budget keeps counting it while `sidebar-out` occupies flex space. Side-dock
-resizing therefore cannot paint over or claim MainChat's floor. The renderer's
+allocation therefore cannot paint over or claim MainChat's floor. The renderer's
 measured panel rect continues to position the native Browser view. Opening and
 collapsing do not request a positive native reservation or change persisted
 window bounds. Before
@@ -963,13 +961,19 @@ collapse motion starts, any native Browser preview surface is detached because
 it cannot participate in renderer CSS animation; macOS, Windows, and Linux
 retain the fade-and-slide exit.
 
+Preview mode is a transient shell state: MainChat is unmounted and the work
+panel occupies the client width beside the sidebar. A window-level 46px chrome
+row owns the drag area, New Task/sidebar actions, and native window controls.
+Collapsed-sidebar preview reserves 76px on the left for macOS traffic lights in
+windowed mode and 8px in fullscreen.
+
 ### 10.1 Responsive collapse
 
 - The work panel never participates in responsive collapse. It keeps its
-  committed `244..720px` width (new-profile default 360px) while visible, capped
-  by the shared budget; saved widths remain unchanged.
+  committed preferred width of at least `244px` (new-profile default 360px)
+  while visible, capped by the shared budget; saved widths remain unchanged.
 - The inner panel divider changes the panel width in the renderer. Moving it
-  left takes internal space from MainChat until the 360px floor is reached, at
+  left takes internal space from MainChat until the 450px floor is reached, at
   which point the expanded sidebar yields; moving it right returns that space.
   Native window edges resize only the fixed app window.
 - Panel open and collapse change only the in-flow flex allocation. No positive

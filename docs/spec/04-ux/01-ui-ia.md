@@ -16,7 +16,7 @@ destination, chat as the home surface, tools and permissions inline.
 +----------------------------------------------------------------------+
 | Platform titlebar: macOS traffic lights / Windows/Linux actions     |
 +------------------+--------------------------------+------------------+
-| Sidebar (240–520px) | Main pane (active destination) | Work panel       |
+| Sidebar (275px) | Main pane (active destination) | Work panel       |
 |                  |  chat home / transcript        |  (optional,      |
 |                  |  or Extensions page            |   resizable      |
 |                  |                                |   ≥244px, dynamic|
@@ -40,8 +40,8 @@ destination, chat as the home surface, tools and permissions inline.
   non-destructive pin/archive actions, an independent conversation-branch
   command, and sortable views. Projects not retained in the sidebar remain
   discoverable through Settings → Project archive.
-  Collapsible to an icon rail (Cmd/Ctrl+B). When expanded, its right edge is a
-  drag handle for a persisted 240–520px width (275px by default).
+  Collapsible to an icon rail (Cmd/Ctrl+B). Its expanded column is fixed at
+  275px; persisted resize preferences from older builds are ignored.
 - **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero and
   sidebar reuse the derived `src/assets/brand/logo-*.png` marks, while composer prompt
   rows have no leading brand icon and session-creation controls use a dedicated
@@ -76,7 +76,11 @@ destination, chat as the home surface, tools and permissions inline.
   header rather than travelling with MainPane. Destination history is shortcut-only (`Cmd/Ctrl+[` and
   `Cmd/Ctrl+]`); no back/forward buttons are rendered. The main titlebar has no
   notification action; the durable local inbox opens from the sidebar footer
-  bell instead (D130/D117).
+  bell instead (D130/D117). In work-panel preview mode, MainChat is unmounted
+  and a window-level 46px chrome row keeps New Task, sidebar, and native window
+  controls available. On macOS, collapsed-sidebar preview reserves the
+  leftmost 76px in windowed mode (8px in fullscreen) so these actions do not
+  overlap the traffic lights.
 - **Work panel**: docked right column (not an overlay) opened by an artifact,
   the viewport-fixed toggle, or `Cmd/Ctrl + J`. File, URL, browser-preview, and
   successful workspace-edit artifacts create their resources atomically. The
@@ -96,8 +100,10 @@ destination, chat as the home surface, tools and permissions inline.
   successful active-session workspace Write/Edit artifact opens Review;
   scratch, failed, and background-session writes never steal focus. The inner
   divider resizes the panel through the shared three-column budget; moving it
-  left takes space until MainChat reaches 360px, at which point the expanded
-  sidebar yields immediately, and moving it right gives space back. The sole
+  left takes space until MainChat reaches 450px, at which point the expanded
+  sidebar yields immediately, and moving it right gives space back. A manual
+  sidebar reopen spends work-panel width first and otherwise targets a 460px
+  MainChat width. The sole
   panel-level control is the viewport-fixed toggle; each session retains its own runtime
   open state, tab set, active tab, and Browser resource in renderer memory.
   Selecting another session swaps the visible panel context without deleting
@@ -108,7 +114,7 @@ destination, chat as the home surface, tools and permissions inline.
   retained session contexts, and only the preferred panel width persists across
   launches.
   The work panel remains a fixed-width in-flow column beside MainChat inside
-  the existing client area (ADR 0033 / ADR 0151). MainChat keeps a hard 360px
+  the existing client area (ADR 0033 / ADR 0151). MainChat keeps a hard 450px
   minimum; the work panel's effective maximum is the remaining client width
   after the expanded sidebar and that floor (ADR 0238). When the budget is
   exhausted the sidebar collapses immediately through its existing animation
@@ -116,6 +122,9 @@ destination, chat as the home surface, tools and permissions inline.
   returns when the panel closes. Opening and collapsing change only the
   shell's internal flex allocation and never expand or shrink native window
   bounds; no panel action requests a positive native reservation. The
+  panel-header preview toggle temporarily unmounts MainChat and expands the
+  panel across the client area beside the sidebar; leaving preview restores the
+  prior panel width and sidebar state without changing native bounds. The
   renderer-measured panel
   rectangle continues to position the native Browser view. Native window edges
   resize the app window only; they do not change the panel target. The outer

@@ -39,9 +39,9 @@ export async function runSessionListProbe({
   ) {
     throw new Error("session-list probe requires its own temporary boot profile");
   }
-  const existing = await host.call<{ providers: unknown[] }>("providers.list");
-  if (existing.providers.length > 0) {
-    throw new Error("session-list probe refuses a profile with configured providers");
+  const existing = await host.call<{ providers?: unknown[] }>("providers.list");
+  if (!Array.isArray(existing?.providers) || existing.providers.length > 0) {
+    throw new Error("session-list probe requires an unconfigured boot profile");
   }
   await catalog.ensureLoaded();
   const models = catalog.modelsForProvider({

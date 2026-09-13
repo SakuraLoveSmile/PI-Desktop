@@ -609,6 +609,8 @@ CREATE UNIQUE INDEX idx_session_collaboration_receipt
 - ledger 是插件协作投递的权威身份与生命周期记录。`source_session_id` 和
   `target_session_id` 是真实的持久 Session ID；标题只是显示快照。目标真正开始投递时
   才分配 `turn_id`，插件创建记录时不会提前分配。
+  `source_session_id` 有意不设外键，而 `target_session_id` 会级联删除，因此投递记录及其完成回执
+  在发送者被删除后仍然保留。读取投影因此把此类引用报告为 `available: false`，而不是丢弃该行。
 - `turn_queue.session_message_id` 将排队的 Agent Host 准入绑定到 ledger 行。使用相同
   `(plugin_id, source_session_id, idempotency_key)` 重试会返回原投递；改变目标、正文、
   类型或回调标志则以 `IDEMPOTENCY_CONFLICT` 失败。
