@@ -5,6 +5,7 @@ import type {
   AgentCompactRequest,
   AgentCompactResponse,
   AgentPromptRequest,
+  AgentSteerRequest,
   UiMessage,
   MessageRevisionSummary,
   AgentPromptResponse,
@@ -63,6 +64,7 @@ import type {
   Result,
   SessionDetail,
   SessionSummary,
+  SessionCollaborationSummary,
   ToolPermissionResolution,
   UserSkillInput,
   UserSkillRecord,
@@ -341,6 +343,8 @@ export const api = {
       ...result,
       session: normalizeSessionDetail(result.session),
     })),
+  getSessionCollaboration: (sessionId: string) =>
+    invoke<SessionCollaborationSummary>(IPC.invoke.sessionCollaboration, { sessionId }),
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
   getSessionScratchPath: (sessionId: string) =>
     invoke<{ path: string }>(IPC.invoke.sessionGetScratchPath, { sessionId }),
@@ -544,6 +548,8 @@ export const api = {
     prefix: UiMessage[];
   }) =>
     invoke<{ messages: UiMessage[] }>(IPC.invoke.sessionActivateRevision, input),
+  steer: (req: AgentSteerRequest) =>
+    invoke<AgentPromptResponse>(IPC.invoke.agentSteer, req),
   prompt: (req: AgentPromptRequest) =>
     invoke<AgentPromptResponse>(IPC.invoke.agentPrompt, req),
   enhancePrompt: (req: PromptEnhancementRequest) =>

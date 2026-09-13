@@ -434,6 +434,12 @@ export type PluginModelInfo = {
   providerName: string;
   modelId: string;
   label: string;
+  /** User-configured display alias; the key remains the model identity. */
+  alias?: string;
+  /** Whether the user enabled this binding for AI-driven delegation. */
+  availableForSubagents?: boolean;
+  /** The host's default launch model, when it is present in this ready catalog. */
+  isDefault?: boolean;
   supportsReasoning: boolean;
   thinkingLevels: string[];
 };

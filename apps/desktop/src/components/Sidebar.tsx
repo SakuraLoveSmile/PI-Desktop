@@ -37,6 +37,8 @@ const MAX_VISIBLE_SESSIONS = 10;
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
+import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
+import { useSessionHoverCard } from "../features/sessions/useSessionHoverCard";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import { normalizeProjectPath } from "../lib/sidebar-session-groups";
 import {
@@ -53,12 +55,7 @@ import {
   sidebarSessionStatus,
   type SidebarSessionStatus,
 } from "../lib/sidebar-session-status";
-import type {
-  Mode,
-  PermissionMode,
-  ProjectWorkspace,
-  SessionSummary,
-} from "@pi-desktop/shared";
+import type { SessionSummary } from "@pi-desktop/shared";
 import type {
   ProjectMeta,
   ProjectSort,
@@ -82,7 +79,6 @@ import {
   IconBranch,
   IconCheck,
   IconChevronDown,
-  IconClock,
   IconCopy,
   IconCircleAlert,
   IconNewSession,
@@ -107,19 +103,6 @@ type ProjectEntry = {
   meta: ProjectMeta;
   /** Best-effort git branch from the project workspace, if known. */
   branch?: string;
-};
-
-type SessionHoverCard = {
-  id: string;
-  top: number;
-  left: number;
-  title: string;
-  mode: Mode;
-  permissionMode: PermissionMode;
-  space: string;
-  branch?: string;
-  updatedAt: string;
-  temporary: boolean;
 };
 
 const VIEWPORT_PADDING = 8;
@@ -252,7 +235,7 @@ export function Sidebar({
   className?: string;
   onAnimationEnd?: ReactAnimationEventHandler<HTMLElement>;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const selectingSessionId = useAppStore((s) => s.selectingSessionId);
@@ -311,7 +294,7 @@ export function Sidebar({
     top: number;
     left: number;
   } | null>(null);
-  const [sessionHoverCard, setSessionHoverCard] = useState<SessionHoverCard | null>(null);
+  const { card: sessionHoverCard, show: revealSessionHoverCard, hide: hideSessionHoverCard } = useSessionHoverCard();
   const [expandedProjectSessions, setExpandedProjectSessions] = useState<Record<string, boolean>>({});
   const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
   const [dropProjectKey, setDropProjectKey] = useState<string | null>(null);
@@ -322,8 +305,6 @@ export function Sidebar({
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
-  const sessionHoverTimerRef = useRef<number | undefined>(undefined);
-  const sessionHoverTargetRef = useRef<HTMLElement | null>(null);
   const sidebarResizeRef = useRef<SidebarResizeState | null>(null);
   const projectReorderRef = useRef<ProjectReorderPointerState | null>(null);
   const suppressProjectTitleClickRef = useRef(false);
@@ -486,12 +467,10 @@ export function Sidebar({
       setSortOpen(false);
       setProjectMenu(null);
       setSectionMenu(null);
-      sessionHoverTargetRef.current = null;
-      window.clearTimeout(sessionHoverTimerRef.current);
-      setSessionHoverCard(null);
+      hideSessionHoverCard();
       setSessionMenu(sessionId);
     },
-    [],
+    [hideSessionHoverCard],
   );
 
   const openProjectRowMenu = useCallback(
@@ -504,11 +483,6 @@ export function Sidebar({
     },
     [],
   );
-
-  // Match WorkBuddy's hover-card cadence: half a second is long enough for
-  // the pointer to settle on the row, but short enough that a deliberate
-  // hover does not feel sluggish.
-  const PROJECT_PATH_HOVER_DELAY_MS = 500;
 
   const openSectionMenu = useCallback(
     (section: "sessions" | "projects", x: number, y: number) => {
@@ -552,34 +526,6 @@ export function Sidebar({
     if (!sessionMenu && !projectMenu && !sectionMenu && !sortOpen) return;
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
   }, [sessionMenu, projectMenu, sectionMenu, sortOpen]);
-
-  useEffect(() => {
-    if (!sessionHoverCard) return;
-    const hide = () => {
-      window.clearTimeout(sessionHoverTimerRef.current);
-      setSessionHoverCard(null);
-    };
-    window.addEventListener("resize", hide);
-    return () => window.removeEventListener("resize", hide);
-  }, [sessionHoverCard]);
-
-  // Cancel any pending session hover-card reveal when the sidebar scrolls;
-  // mirrors the project path tooltip behavior so the cards never anchor to a
-  // row that has scrolled out from under the cursor.
-  useEffect(() => {
-    if (!sessionHoverCard) return;
-    let frame = 0;
-    const onScroll = () => {
-      window.clearTimeout(sessionHoverTimerRef.current);
-      if (!sessionHoverCard) return;
-      frame = window.requestAnimationFrame(() => setSessionHoverCard(null));
-    };
-    window.addEventListener("scroll", onScroll, true);
-    return () => {
-      window.removeEventListener("scroll", onScroll, true);
-      window.cancelAnimationFrame(frame);
-    };
-  }, [sessionHoverCard]);
 
   // Footer utility bar: settings / plugins / notifications + build chip.
 
@@ -944,94 +890,22 @@ export function Sidebar({
     [projectEntries, reorderProjectEntries],
   );
 
-  // Locale-aware absolute timestamp matching the WorkBuddy card shape:
-  // "2026-09-04 14:11:53" in zh-CN, "Sep 4, 2026, 2:11 PM" in en-US.
-  const formatHoverCardTimestamp = useCallback(
-    (value: string | undefined): string => {
-      if (!value) return "—";
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) return value;
-      try {
-        const locale = i18n.language || undefined;
-        const usesAbsoluteDateTime =
-          (locale || "").toLowerCase().startsWith("zh");
-        const fmt = new Intl.DateTimeFormat(locale, {
-          year: "numeric",
-          month: usesAbsoluteDateTime ? "2-digit" : "short",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: !usesAbsoluteDateTime,
-        });
-        return fmt.format(parsed);
-      } catch {
-        return parsed.toLocaleString();
-      }
-    },
-    [i18n],
-  );
-
-  const hideSessionHoverCard = useCallback(() => {
-    sessionHoverTargetRef.current = null;
-    window.clearTimeout(sessionHoverTimerRef.current);
-    setSessionHoverCard(null);
-  }, []);
-
-  const showSessionHoverCard = useCallback(
-    (
-      session: SessionSummary,
-      target: HTMLElement,
-      temporary: boolean,
-    ) => {
-      // Clear any pending timer so back-to-back hovers don't flash the card.
-      sessionHoverTargetRef.current = target;
-      window.clearTimeout(sessionHoverTimerRef.current);
-      sessionHoverTimerRef.current = window.setTimeout(async () => {
-        // Skip if the row was torn down while we were waiting (project
-        // closed, list filtered, etc.) — nothing meaningful to point at.
-        if (!target.isConnected || sessionHoverTargetRef.current !== target) return;
-        const projectPath = session.projectPath ?? "";
-        let refreshedWorkspace: ProjectWorkspace | null = null;
-        if (!temporary) {
-          try {
-            refreshedWorkspace = await refreshProject(projectPath);
-          } catch {
-            // Hover metadata is best effort; keep the last cached branch when
-            // the host is unavailable or the project is no longer active.
-          }
-        }
-        if (!target.isConnected || sessionHoverTargetRef.current !== target) return;
-        const rect = target.getBoundingClientRect();
-        const cardWidth = Math.min(320, window.innerWidth - 16);
-        const cardHeight = 168; // estimated; used for flip-below detection
-        const wantBelow = rect.bottom + cardHeight <= window.innerHeight;
-        const normalizedProjectPath = normalizeProjectPath(projectPath);
-        const spaceEntry = temporary
-          ? null
-          : projectEntriesByPath.get(normalizedProjectPath ?? "");
-        const spaceName = temporary
-          ? t("nav.hoverCardTemporarySpace")
-          : (refreshedWorkspace?.name ?? spaceEntry?.name ?? projectName(projectPath));
-        setSessionHoverCard({
-          id: `session-hover-${session.id}`,
-          top: wantBelow ? rect.bottom + 6 : Math.max(8, rect.top - cardHeight - 6),
-          left: Math.max(
-            8,
-            Math.min(rect.left, window.innerWidth - cardWidth - 8),
-          ),
-          title: taskTitle(session.title),
-          mode: session.mode,
-          permissionMode: session.permissionMode,
-          space: spaceName,
-          branch: refreshedWorkspace ? refreshedWorkspace.branch : spaceEntry?.branch,
-          updatedAt: formatHoverCardTimestamp(session.updatedAt),
-          temporary,
-        });
-      }, PROJECT_PATH_HOVER_DELAY_MS);
-    },
-    [projectEntriesByPath, refreshProject, t, taskTitle, formatHoverCardTimestamp],
-  );
+  const showSessionHoverCard = useCallback((
+    session: SessionSummary,
+    target: HTMLElement,
+    temporary: boolean,
+  ) => {
+    const projectPath = session.projectPath ?? "";
+    const normalizedProjectPath = normalizeProjectPath(projectPath);
+    const entry = projectEntriesByPath.get(normalizedProjectPath ?? "");
+    revealSessionHoverCard({
+      session: { ...session, title: taskTitle(session.title) },
+      target,
+      temporary,
+      space: temporary ? t("nav.hoverCardTemporarySpace") : entry?.name ?? projectName(projectPath),
+      branch: entry?.branch,
+    });
+  }, [projectEntriesByPath, revealSessionHoverCard, t, taskTitle]);
 
   const temporarySessions = useMemo(
     () => filtered
@@ -1570,6 +1444,7 @@ export function Sidebar({
               : selectProjectSession(session));
           }}
           aria-current={active ? "page" : undefined}
+          aria-describedby={sessionHoverCard?.session.id === session.id ? `session-hover-${session.id}` : undefined}
         >
           {sessionPinned(session, meta) ? (
             <IconPin size={11} className="thread-item-pin" aria-hidden />
@@ -2034,81 +1909,6 @@ export function Sidebar({
     );
   };
 
-  // Map a session mode to the secondary tag label. We only show one tag in
-  // addition to the always-on "Local task" badge so the row stays compact.
-  const modeTagLabel = (mode: Mode, permission: PermissionMode): string => {
-    if (mode === "plan") return t("chat.modePlan");
-    if (mode === "goal") return t("chat.modeGoal");
-    if (permission === "auto") return t("chat.permissionAuto");
-    if (permission === "accept-edits") return t("chat.permissionAcceptEdits");
-    if (permission === "ask") return t("chat.permissionAsk");
-    return t("chat.modeAgent");
-  };
-
-  const renderSessionHoverCard = () => {
-    if (!sessionHoverCard || typeof document === "undefined") return null;
-    return createPortal(
-      <div
-        id={sessionHoverCard.id}
-        className="sidebar-session-hover-card"
-        role="tooltip"
-        style={{ top: sessionHoverCard.top, left: sessionHoverCard.left }}
-      >
-        <div className="sidebar-session-hover-card-title">
-          {sessionHoverCard.title}
-        </div>
-        <div className="sidebar-session-hover-card-tags">
-          <span className="sidebar-session-hover-card-tag">
-            <IconBranch size={12} aria-hidden />
-            {t("nav.hoverCardLocalTask")}
-          </span>
-          <span className="sidebar-session-hover-card-tag sidebar-session-hover-card-tag-accent">
-            {modeTagLabel(sessionHoverCard.mode, sessionHoverCard.permissionMode)}
-          </span>
-        </div>
-        <div className="sidebar-session-hover-card-meta">
-          <div className="sidebar-session-hover-card-meta-row">
-            <span className="sidebar-session-hover-card-meta-icon" aria-hidden>
-              <IconFolder size={12} />
-            </span>
-            <span className="sidebar-session-hover-card-meta-label">
-              {t("nav.hoverCardSpace")}
-            </span>
-            <span className="sidebar-session-hover-card-meta-value">
-              {sessionHoverCard.space}
-            </span>
-          </div>
-          {sessionHoverCard.branch ? (
-            <div className="sidebar-session-hover-card-meta-row">
-              <span className="sidebar-session-hover-card-meta-icon" aria-hidden>
-                <IconBranch size={12} />
-              </span>
-              <span
-                className="sidebar-session-hover-card-meta-value"
-                aria-label={t("nav.hoverCardBranchAria", {
-                  name: sessionHoverCard.branch,
-                })}
-              >
-                {sessionHoverCard.branch}
-              </span>
-            </div>
-          ) : null}
-          <div className="sidebar-session-hover-card-meta-row">
-            <span className="sidebar-session-hover-card-meta-icon" aria-hidden>
-              <IconClock size={12} />
-            </span>
-            <span className="sidebar-session-hover-card-meta-label">
-              {t("nav.hoverCardUpdatedAt", {
-                when: sessionHoverCard.updatedAt,
-              })}
-            </span>
-          </div>
-        </div>
-      </div>,
-      document.body,
-    );
-  };
-
   return (
     <aside
       className={cx("sidebar", className)}
@@ -2335,7 +2135,9 @@ export function Sidebar({
         </div>
       </div>
       {renderFloatingMenu()}
-      {renderSessionHoverCard()}
+      {sessionHoverCard ? (
+        <SessionHoverCard key={sessionHoverCard.session.id} card={sessionHoverCard} refreshProject={refreshProject} />
+      ) : null}
       {renameFor ? (
         <SessionRenameDialog
           session={renameFor}

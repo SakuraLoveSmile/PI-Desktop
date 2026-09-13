@@ -13,7 +13,7 @@ use crate::agent_capabilities::CapabilityLevel;
 use crate::artifacts;
 use crate::audit;
 use crate::notifications;
-use crate::permissions::{PermissionDecision, PermissionManager};
+use crate::permissions::{PermissionDecision, PermissionEvaluationParams, PermissionManager};
 use crate::plans;
 use crate::plugin_sessions;
 use crate::providers::{self, DiscoveredModelInput, ProviderCreateInput, ProviderUpdateInput};
@@ -476,6 +476,19 @@ fn provider_rpc_err(error: impl ToString) -> JsonRpcError {
     rpc_err(1000, message, "INTERNAL")
 }
 
+fn session_collaboration_rpc_err(error: impl ToString) -> JsonRpcError {
+    let message = error.to_string();
+    let code = message.split(':').next().unwrap_or("INTERNAL").trim();
+    let rpc_code = match code {
+        "INVALID_ARGUMENT" | "INVALID_PARAMS" | "LIMIT_EXCEEDED" => 1002,
+        "PERMISSION_DENIED" => 1003,
+        "NOT_FOUND" => 1007,
+        "CONFLICT" | "IDEMPOTENCY_CONFLICT" | "AGENT_BUSY" => 1008,
+        _ => return rpc_err(1000, message, "INTERNAL"),
+    };
+    rpc_err(rpc_code, message.clone(), code)
+}
+
 fn plugin_session_rpc_err(error: impl ToString) -> JsonRpcError {
     let message = error.to_string();
     let code = message
@@ -933,6 +946,7 @@ async fn execute_plugin_tool(
         json!({
             "executionId": execution_id,
             "sessionId": p.session_id,
+            "turnId": p.turn_id,
             "toolCallId": p.tool_call_id,
             "toolName": p.tool_name,
             "args": p.args,
@@ -1126,6 +1140,11 @@ async fn handle_request(
     }
 
     match method {
+        method if method.starts_with("session.collaboration.") => {
+            let st = state.lock().await;
+            crate::session_collaboration::handle(&st.db, method, &params)
+                .map_err(session_collaboration_rpc_err)
+        }
         "app.handshake" => {
             let client_version = params
                 .get("protocolVersion")
@@ -2039,20 +2058,15 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
-            let turn_id = sessions::begin_turn(
-                &st.db,
-                session_id,
-                params.get("providerId").and_then(|v| v.as_str()),
-                params.get("modelId").and_then(|v| v.as_str()),
-            )
-            .map_err(|e| {
-                let message = e.to_string();
-                if message == "AGENT_BUSY" {
-                    rpc_err(1008, message, "AGENT_BUSY")
-                } else {
-                    rpc_err(1000, message, "INTERNAL")
-                }
-            })?;
+            let provider = params.get("providerId").and_then(Value::as_str);
+            let model = params.get("modelId").and_then(Value::as_str);
+            let turn_id = match params.get("sessionMessageId").and_then(Value::as_str) {
+                Some(message_id) => crate::session_collaboration::begin_turn(
+                    &st.db, session_id, message_id, provider, model,
+                ),
+                None => sessions::begin_turn(&st.db, session_id, provider, model),
+            }
+            .map_err(session_collaboration_rpc_err)?;
             Ok(json!({ "turnId": turn_id }))
         }
         "session.endTurn" => {
@@ -2808,14 +2822,16 @@ async fn handle_request(
                     let mut auto = st
                         .permissions
                         .evaluate_auto_with_permission_mode_and_risk_and_path(
-                            &p.session_id,
-                            &p.tool_name,
-                            &durable_mode,
-                            &effective_pm,
-                            &st.session_grants,
-                            p.declared_risk.as_deref(),
-                            external_path_permission,
-                            p.plan_safe_actions.as_deref(),
+                            PermissionEvaluationParams {
+                                session_id: &p.session_id,
+                                tool_name: &p.tool_name,
+                                mode: &durable_mode,
+                                permission_mode: &effective_pm,
+                                session_grants: &st.session_grants,
+                                declared_risk: p.declared_risk.as_deref(),
+                                requires_external_path_permission: external_path_permission,
+                                plan_safe_actions: p.plan_safe_actions.as_deref(),
+                            },
                         );
                     // Write/Edit targeting the session scratch dir never touch
                     // the user's project — skip the prompt (D114). The lexical
@@ -3157,10 +3173,12 @@ async fn handle_request(
                         scratch_path.as_deref(),
                         &p.tool_name,
                         &p.args,
-                        execution_timeout_ms,
-                        bash_options,
-                        external_path_permission,
-                        Some(&hashline_ctx),
+                        tools::ToolExecutionOptions {
+                            timeout_ms: execution_timeout_ms,
+                            bash_options,
+                            allow_external_paths: external_path_permission,
+                            hashline: Some(hashline_ctx),
+                        },
                     )
                     .await
                 };
@@ -3331,16 +3349,16 @@ async fn handle_request(
             );
             let decision = st
                 .permissions
-                .evaluate_auto_with_permission_mode_and_risk_and_path(
+                .evaluate_auto_with_permission_mode_and_risk_and_path(PermissionEvaluationParams {
                     session_id,
                     tool_name,
-                    &mode,
-                    &effective_pm,
-                    &st.session_grants,
+                    mode: &mode,
+                    permission_mode: &effective_pm,
+                    session_grants: &st.session_grants,
                     declared_risk,
-                    external_path_permission,
-                    plan_safe_actions.as_deref(),
-                );
+                    requires_external_path_permission: external_path_permission,
+                    plan_safe_actions: plan_safe_actions.as_deref(),
+                });
             Ok(json!({
                 "decision": decision,
                 "risk": PermissionManager::tool_risk_with_declared(tool_name, declared_risk),
@@ -4546,10 +4564,12 @@ mod tests {
             Some(&scratch),
             "Write",
             &json!({ "path": "notes.txt", "content": "temporary" }),
-            None,
-            None,
-            false,
-            None,
+            crate::tools::ToolExecutionOptions {
+                timeout_ms: None,
+                bash_options: None,
+                allow_external_paths: false,
+                hashline: None,
+            },
         )
         .await;
         assert!(written.ok);
@@ -4564,10 +4584,12 @@ mod tests {
             Some(&scratch),
             "Read",
             &json!({ "path": "notes.txt" }),
-            None,
-            None,
-            false,
-            None,
+            crate::tools::ToolExecutionOptions {
+                timeout_ms: None,
+                bash_options: None,
+                allow_external_paths: false,
+                hashline: None,
+            },
         )
         .await;
         assert!(read.ok);

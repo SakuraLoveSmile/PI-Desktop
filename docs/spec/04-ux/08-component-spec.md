@@ -438,11 +438,24 @@ visually distinct from list content.
   dialog. The dialog accepts a project name and one or more local folders,
   lists every selected folder with a remove action, and marks the first folder
   as Primary. The primary folder is activated and named after creation; every
-  other selected folder is retained as an open project tab. The form uses a
-  compact ChatGPT-like hierarchy: an explicit name label, a quiet memory hint,
-  then the folder list and one primary action. The surface uses two compact
-  sections with a fixed action row; on narrow windows the content remains
-  single-column while the action row stays reachable.
+  other selected folder is retained as an open project tab. The dialog follows
+  the shell's neutral gray surfaces, with a 480px maximum width,
+  `--radius-lg-plus` (18px) corners, and the shared `--ds-shadow-dialog`
+  elevation. Its compact type hierarchy uses `--text-lg` for the title,
+  `--text-base` for the name field, and `--text-sm-plus` or smaller for labels
+  and metadata. The header and action row use the shared 18px dialog gutter,
+  while distinct sections use a 16px gap and shared button/input metrics. One
+  Create project title leads into an explicitly labeled filled name field and
+  the workspace list with a softly filled Add folder action; the field does not
+  repeat its label as placeholder text. The folder section exposes the current
+  local source as a compact source chip; a future remote source can replace
+  that slot without changing the project name or workspace list contract. The
+  dialog does not add explanatory copy for durable memory or multi-selection.
+  The surface has no outer stroke, section rules, footer divider, or dashed
+  picker border. The action row stays fixed while the content scrolls; narrow
+  windows retain a single column and reachable actions. Light and dark themes
+  preserve readable filled surfaces and visible keyboard focus, and transitions
+  respect reduced motion.
 - Right-click the `Projects` heading or empty project-list chrome: open a
   single-item create menu that runs the same Create project dialog action
 - Click project `+`: activate that project, then select its most recent empty
@@ -1893,6 +1906,11 @@ in place:
   transparent while streaming — no whole-turn tile wrapping thinking, tools, or
   answer fragments (D323). The card keeps 16px inset from its
   tile edge so the graph and any leftover rows do not sit on the border.
+- A delegate's terminal Task snapshot updates its topology node, settled count,
+  elapsed time, and open detail dock immediately, even while siblings or the
+  parent remain active. A completed delegate is green and stops spinning.
+  Terminal Task state takes precedence over older lifecycle polling snapshots
+  that still say `running`; the same outcome survives transcript reload.
 - A topology group stays live — open once, ticking elapsed, labelled working —
   while any of *its* delegates is still running, even when the parent has
   already moved on to a later processing group in the same turn. Elapsed time

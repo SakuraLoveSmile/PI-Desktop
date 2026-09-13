@@ -18,12 +18,14 @@ import {
   McpControlServer,
   mcpControlRendererEvent,
   type McpControlController,
+  type McpControlInvokeInput,
 } from "../mcp-control";
 import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { AppUpdaterController } from "../updater";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { PluginRuntime } from "../plugin-runtime";
+import { runSessionListProbe } from "../session-list-probe";
 
 type IpcInvoker = (
   channel: string,
@@ -72,6 +74,8 @@ export type StartupDependencies = {
   bootHostStatus: (bootError: unknown) => unknown;
   flushPendingApplicationMenuCommands: () => void;
   getSidecar?: () => unknown;
+  invokeSessionCollaboration?: (input: McpControlInvokeInput) => Promise<unknown>;
+  onSessionQueueChange?: () => void;
 };
 
 /**
@@ -143,12 +147,16 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       getHost,
       isSessionBusy: (sessionId) =>
         activeTurns.has(sessionId) || turnFinalizations.has(sessionId),
-      onQueueChange: (event) => sendToRenderer(IPC.event.agentQueueChanged, event),
+      onQueueChange: (event) => {
+        sendToRenderer(IPC.event.agentQueueChanged, event);
+        deps.onSessionQueueChange?.();
+      },
       log: (level, message, data) => logger.app("runtime", level, message, { data }),
     });
     const control = createMcpControlController({
       invoke: invokeIpc,
       channels: IPC.invoke,
+      invokeSessionCollaboration: deps.invokeSessionCollaboration,
       onOperationComplete: async (operation, result, args, source) => {
         const event = mcpControlRendererEvent(operation, result, args, source);
         if (event) sendToRenderer(IPC.event.sessionsChanged, event);
@@ -269,6 +277,13 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
             );
             probe.appName = app.getName();
             probe.menuCount = Menu.getApplicationMenu()?.items.length ?? 0;
+            if (!host || !window) throw new Error("session-list probe requires a healthy desktop");
+            probe.sessionList = await runSessionListProbe({
+              dataDir,
+              host,
+              window,
+              catalog: modelsDevCatalog,
+            });
             console.log("BOOT_PROBE", JSON.stringify(probe));
           } catch (error) {
             console.log(

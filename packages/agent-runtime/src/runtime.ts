@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
+  settledDelegationMessage,
+  taskMessageSnapshot,
+} from "./delegation-message.js";
+import {
   Agent,
   BACKGROUND_CONTEXT,
   compact,
@@ -70,6 +74,7 @@ import type {
   MessageUsage,
   Mode,
   MessageAttachment,
+  SessionMessageOrigin,
   PlanExecution,
   PlanProposal,
   PlanningState,
@@ -87,6 +92,7 @@ import {
   contextCompactionMark,
   DEFAULT_SUBAGENT_PERMISSION,
   formatAskToolOutput,
+  formatSessionMessage,
   isCommandShellOption,
   isToolsOutputParams,
   MAX_SUBAGENT_CONCURRENCY,
@@ -174,6 +180,7 @@ export type RuntimePromptAttachment = AgentPromptAttachment & {
 
 export type RuntimePrompt = {
   text: string;
+  sessionMessage?: SessionMessageOrigin;
   attachments?: RuntimePromptAttachment[];
 };
 
@@ -317,6 +324,9 @@ export type DelegationStatus =
  */
 export type DelegationRecord = {
   delegationId: string;
+  /** Original Task transcript snapshot, available after its immediate result. */
+  taskMessage?: UiMessage;
+  taskTurnId?: string;
   agentName: string;
   modelId: string;
   thinkingLevel: SubagentThinkingLevel;
@@ -1456,7 +1466,7 @@ export class DesktopAgentRuntime {
   private suppressProgressTurnRunEnd = false;
   private activeToolCalls = new Map<
     string,
-    { toolName: string; args: unknown }
+    { toolName: string; args: unknown; startedAt: number }
   >();
   private pendingAskTools = new Map<
     string,
@@ -1484,6 +1494,10 @@ export class DesktopAgentRuntime {
   private compactionEnabled: boolean;
   private readonly compactionStrategy: CompactionStrategy;
   private pendingUserMessageId?: string;
+  private acceptingSteering = false;
+  private steeringContinuation = false;
+  private steeringWaitAbort?: AbortController;
+  private pendingSteering = new Map<AgentMessage, string>();
   private pendingOverflow = false;
   private overflowRecoveryAttempted = false;
   private suppressOverflowRunEnd = false;
@@ -1694,6 +1708,7 @@ Delegation rules:
       // `Task` calls — subagent fan-out (ADR 0062) — and every existing tool
       // ordering guarantee is untouched.
       toolExecution: "parallel",
+      steeringMode: "all",
       // A queued renderer prompt asks the current run to finish normally at
       // the next turn boundary. pi-agent-core evaluates this after the
       // assistant response and completed tool batch, before another provider
@@ -2191,7 +2206,10 @@ Delegation rules:
             attachment.data,
           ),
         );
-        const content = promptContent({ text: m.content, attachments });
+        const content = promptContent({
+          text: m.sessionMessage ? formatSessionMessage(m.content, m.sessionMessage) : m.content,
+          attachments,
+        });
         if (
           !(m.content || "").trim() &&
           !attachments.some((attachment) => attachment.data)
@@ -3467,6 +3485,7 @@ Delegation rules:
         });
         const record: DelegationRecord = {
           delegationId,
+          taskTurnId: this.turnId,
           agentName: definition.name,
           modelId: provider.modelId,
           thinkingLevel,
@@ -3592,9 +3611,21 @@ Delegation rules:
     if (result.usage) {
       this.turnSubagentUsage = addUsage(this.turnSubagentUsage, result.usage);
     }
+    this.publishDelegationSettlement(record);
     record.resolveCompletion();
     this.refreshDelegationWait();
     this.pruneFinishedDelegations();
+  }
+
+  private publishDelegationSettlement(record: DelegationRecord): void {
+    if (!record.taskMessage || record.status === "running") return;
+    this.emit(
+      {
+        type: "message_end",
+        message: settledDelegationMessage(record.taskMessage, delegationSummary(record)),
+      },
+      record.taskTurnId,
+    );
   }
 
   /** Cap retained history so a long session cannot grow the registry forever.
@@ -3658,6 +3689,8 @@ Delegation rules:
    */
   private terminateParentTurn(): void {
     this.turnHadError = true;
+    this.acceptingSteering = false;
+    this.retainPendingSteering();
     this.abortRunningDelegations();
     this.delegationWaitTargets = undefined;
     this.clearAgentActivity();
@@ -3779,8 +3812,21 @@ Delegation rules:
     ) {
       const targets = this.pendingCurrentTurnDelegations();
       this.beginDelegationWait(targets);
-      await this.waitForDelegations(targets, targets.length, null);
-      this.endDelegationWait();
+      const waitAbort = new AbortController();
+      this.steeringWaitAbort = waitAbort;
+      try {
+        if (!this.pendingSteering.size) {
+          await this.waitForDelegations(targets, targets.length, null, waitAbort.signal);
+        }
+      } finally {
+        if (this.steeringWaitAbort === waitAbort) this.steeringWaitAbort = undefined;
+        this.endDelegationWait();
+      }
+      if (this.pendingSteering.size && !this.runCancelled && !this.turnHadError) {
+        await this.waitForIdleAndSteering();
+        if (!(await this.runPendingRecoveries())) return;
+        continue;
+      }
       if (
         this.disposed ||
         this.runCancelled ||
@@ -3821,7 +3867,7 @@ Delegation rules:
         .join("\n\n");
       this.requestStartedAt = Date.now();
       await this.agent.prompt(text);
-      await this.agent.waitForIdle();
+      await this.waitForIdleAndSteering();
       if (!(await this.runPendingRecoveries())) return;
       if (this.turnHadError || epoch !== this.turnEpoch) {
         if (this.turnHadError) this.terminateParentTurn();
@@ -4447,11 +4493,11 @@ Delegation rules:
     };
   }
 
-  private emit(event: AgentEventEnvelope["event"], turnId?: string) {
+  private emit(event: AgentEventEnvelope["event"], turnId?: string, ts = Date.now()) {
     this.onEvent({
       sessionId: this.sessionId,
       turnId: turnId ?? this.turnId,
-      ts: Date.now(),
+      ts,
       event,
     });
   }
@@ -4635,7 +4681,7 @@ Delegation rules:
       // are suppressed; the retry must close the visible run normally.
       this.suppressProviderRetryRunEnd = false;
       await this.agent.continue();
-      await this.agent.waitForIdle();
+      await this.waitForIdleAndSteering();
     } finally {
       this.providerRetryAbort = undefined;
       this.activeProviderRetryAttempt = 0;
@@ -4672,7 +4718,7 @@ Delegation rules:
     try {
       if (this.disposed) throw new Error("runtime disposed");
       await this.agent.continue();
-      await this.agent.waitForIdle();
+      await this.waitForIdleAndSteering();
     } finally {
       if (this.agent.state.systemPrompt === promptWithNudge) {
         this.agent.state.systemPrompt = promptBefore;
@@ -4741,7 +4787,7 @@ Delegation rules:
         this.turnHadError = false;
         this.requestStartedAt = Date.now();
         await this.agent.continue();
-        await this.agent.waitForIdle();
+        await this.waitForIdleAndSteering();
         continue;
       }
       if (this.pendingSilentTurnRerun) {
@@ -4780,7 +4826,7 @@ Delegation rules:
       if (this.disposed) throw new Error("runtime disposed");
       this.suppressProgressTurnRunEnd = false;
       await this.agent.continue();
-      await this.agent.waitForIdle();
+      await this.waitForIdleAndSteering();
     } finally {
       if (this.agent.state.systemPrompt === promptWithNudge) {
         this.agent.state.systemPrompt = promptBefore;
@@ -5721,6 +5767,7 @@ Delegation rules:
     this.forwardAgentEventToExtensions(event);
     switch (event.type) {
       case "agent_start":
+        if (this.steeringContinuation) break;
         if (
           this.providerRetryInProgress ||
           this.silentTurnRerunInProgress ||
@@ -5827,8 +5874,10 @@ Delegation rules:
       }
       case "message_end": {
         if (event.message.role === "user") {
-          const id = this.pendingUserMessageId ?? randomUUID();
-          this.pendingUserMessageId = undefined;
+          const steeringId = this.pendingSteering.get(event.message);
+          const id = steeringId ?? this.pendingUserMessageId ?? randomUUID();
+          if (steeringId) this.pendingSteering.delete(event.message);
+          else this.pendingUserMessageId = undefined;
           this.appendLiveEntry(id, event.message);
           break;
         }
@@ -6077,19 +6126,22 @@ Delegation rules:
         }
         break;
       }
-      case "tool_execution_start":
+      case "tool_execution_start": {
+        const startedAt = Date.now();
         this.clearAgentActivity();
         this.activeToolCalls.set(event.toolCallId, {
           toolName: event.toolName,
           args: event.args,
+          startedAt,
         });
         this.emit({
           type: "tool_start",
           toolCallId: event.toolCallId,
           toolName: event.toolName,
           args: event.args,
-        });
+        }, undefined, startedAt);
         break;
+      }
       case "tool_execution_update":
         this.emit({
           type: "tool_update",
@@ -6130,7 +6182,24 @@ Delegation rules:
             result: event.result,
             isError: event.isError,
             ...(toolUsage ? { toolUsage } : {}),
-          });
+          }, undefined, endedAt);
+          if (activeTool?.toolName === SUBAGENT_TOOL_NAME && isRecord(event.result)) {
+            const details = event.result.details;
+            const record = isRecord(details) && typeof details.delegationId === "string"
+              ? this.delegations.get(details.delegationId)
+              : undefined;
+            if (record) {
+              record.taskMessage = taskMessageSnapshot({
+                ...activeTool,
+                toolCallId: event.toolCallId,
+                result: event.result,
+                endedAt,
+                ...(toolUsage ? { toolUsage } : {}),
+              });
+              // A fast delegate may settle before its Task tool_end arrives.
+              this.publishDelegationSettlement(record);
+            }
+          }
         }
         break;
       case "turn_end":
@@ -6150,6 +6219,9 @@ Delegation rules:
         });
         break;
       case "agent_end":
+        // Input admitted after pi's last queue poll still belongs to this turn.
+        // Continue after the current run settles; never wake the follow-up FIFO.
+        if (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) break;
         if (
           this.suppressOverflowRunEnd ||
           this.suppressProviderRetryRunEnd ||
@@ -6158,6 +6230,8 @@ Delegation rules:
           this.keepTurnOpenForDelegates()
         )
           break;
+        this.acceptingSteering = false;
+        this.retainPendingSteering();
         this.autonomousExecution = false;
         this.clearAgentActivity();
         this.reportMutationTermination();
@@ -6290,6 +6364,7 @@ Delegation rules:
   ): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.assertNotRunning();
+    this.retainPendingSteering();
     if (execution.sessionId !== this.sessionId) {
       throw Object.assign(new Error("approved plan belongs to another session"), {
         errorCode: "PLAN_EXECUTION_NOT_FOUND",
@@ -6309,6 +6384,7 @@ Delegation rules:
     this.pathInstructionClaims.clear();
     this.hostTurnId = durableTurnId;
     this.turnId = durableTurnId;
+    this.acceptingSteering = true;
     this.pendingUserMessageId = undefined;
     this.gracefulStopRequested = false;
     this.runCancelled = false;
@@ -6359,7 +6435,7 @@ Delegation rules:
     ).messages;
     this.setAgentActivity({ phase: "starting", since: Date.now() });
     await this.agent.continue();
-    await this.agent.waitForIdle();
+    await this.waitForIdleAndSteering();
     // Same recovery contract as a user prompt: a plan execution that overflows,
     // hits a retriable stream failure, or comes back silent must not end as a
     // run with no end events at all.
@@ -6379,9 +6455,14 @@ Delegation rules:
   ): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.assertNotRunning();
+    const modelInput = typeof input !== "string" && input.sessionMessage
+      ? { ...input, text: formatSessionMessage(input.text, input.sessionMessage), sessionMessage: undefined }
+      : input;
+    this.retainPendingSteering();
     const nextTurnId = durableTurnId?.trim() || randomUUID();
     this.hostTurnId = nextTurnId;
     this.turnId = nextTurnId;
+    this.acceptingSteering = true;
     this.gracefulStopRequested = false;
     this.runCancelled = false;
     this.turnSubagentUsage = undefined;
@@ -6396,7 +6477,7 @@ Delegation rules:
     this.requestStartedAt = Date.now();
     this.setAgentActivity({ phase: "starting", since: Date.now() });
     try {
-      const content = promptContent(input);
+      const content = promptContent(modelInput);
       const incomingUserMessage: AgentMessage = {
         role: "user",
         content,
@@ -6429,13 +6510,13 @@ Delegation rules:
           return { turnId: this.turnId };
         }
       }
-      await this.extensionBeforeAgentStart(input);
-      if (typeof input === "string") {
-        await this.agent.prompt(input);
+      await this.extensionBeforeAgentStart(modelInput);
+      if (typeof modelInput === "string") {
+        await this.agent.prompt(modelInput);
       } else {
-        await this.agent.prompt(input.text, promptImages(input));
+        await this.agent.prompt(modelInput.text, promptImages(modelInput));
       }
-      await this.agent.waitForIdle();
+      await this.waitForIdleAndSteering();
       void this.extensionRunner?.emit("agent_settled", { type: "agent_settled" });
 
       if (!(await this.runPendingRecoveries())) return { turnId: this.turnId };
@@ -6548,7 +6629,69 @@ Delegation rules:
     });
   }
 
+  /** Resolve attachments against the configuration of the running turn. */
+  steeringContext(expectedTurnId: string): { projectPath?: string; supportsVision: boolean } {
+    if (
+      this.disposed || !this.acceptingSteering || this.runCancelled ||
+      this.turnHadError || !this.getStatus().isRunning ||
+      !expectedTurnId || expectedTurnId !== this.turnId ||
+      this.planningState === "awaiting_approval"
+    ) {
+      throw Object.assign(new Error("The target turn is no longer accepting input"), {
+        errorCode: "TURN_NOT_FOUND",
+      });
+    }
+    return { projectPath: this.projectPath, supportsVision: this.model.input.includes("image") };
+  }
+
+  steer(input: RuntimePrompt, expectedTurnId: string, message: UiMessage): { accepted: boolean; turnId: string } {
+    this.steeringContext(expectedTurnId);
+    const queued: AgentMessage = { role: "user", content: promptContent(input), timestamp: Date.now() };
+    this.pendingSteering.set(queued, message.id);
+    this.agent.steer(queued);
+    this.steeringWaitAbort?.abort();
+    // Main persists this echo through the same outbox as assistant messages.
+    this.emit({ type: "message_start", message });
+    this.emit({
+      type: "message_end", message,
+      ...(this.currentAssistant?.status === "streaming"
+        ? { precedingAssistant: { ...this.currentAssistant } } : {}),
+    });
+    return { accepted: true, turnId: this.turnId! };
+  }
+
+  private retainPendingSteering(): void {
+    this.agent.clearSteeringQueue();
+    for (const [message, id] of this.pendingSteering) {
+      if (!this.agent.state.messages.includes(message)) this.agent.state.messages = [...this.agent.state.messages, message];
+      this.appendLiveEntry(id, message);
+    }
+    this.pendingSteering.clear();
+  }
+
+  private async waitForIdleAndSteering(): Promise<void> {
+    await this.agent.waitForIdle();
+    if (!this.acceptingSteering || this.runCancelled || this.turnHadError) {
+      this.retainPendingSteering();
+      return;
+    }
+    // Recovery owns the next request when the previous response failed. Its
+    // continuation will consume steering after repairing the context/backoff.
+    if (this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd ||
+        this.suppressSilentTurnRunEnd || this.suppressProgressTurnRunEnd) return;
+    while (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) {
+      this.steeringContinuation = true;
+      try {
+        await this.agent.continue();
+        await this.agent.waitForIdle();
+      } finally {
+        this.steeringContinuation = false;
+      }
+    }
+  }
+
   async abort(): Promise<void> {
+    this.acceptingSteering = false;
     this.gracefulStopRequested = false;
     this.runCancelled = true;
     this.resolvePendingAskTools();
@@ -6565,6 +6708,7 @@ Delegation rules:
     if (this.disposed || !this.agent.state.isStreaming) {
       return { requested: false };
     }
+    this.acceptingSteering = false;
     this.gracefulStopRequested = true;
     return { requested: true };
   }
@@ -6591,6 +6735,7 @@ Delegation rules:
     this.extensionRunner = undefined;
     if (runner) await runner.dispose().catch(() => undefined);
     this.disposed = true;
+    this.acceptingSteering = false;
     this.runCancelled = true;
     this.resolvePendingAskTools();
     this.abortRunningDelegations();

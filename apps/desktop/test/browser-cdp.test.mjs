@@ -114,8 +114,9 @@ const runtimeSource = readFileSync(
 const mainSource = readMainSourceSync();
 
 test("in-flight tool.execute session survives the child host-api round trip", () => {
-  assert.match(runtimeSource, /private executingToolSessions = new Map/);
-  assert.match(runtimeSource, /stack.push\(\{ sessionId, toolName: name \}\)/);
+  assert.match(runtimeSource, /private readonly toolInvocations = new PluginToolInvocations/);
+  assert.match(runtimeSource, /toolInvocations\.begin\(target/);
+  assert.match(runtimeSource, /invocationId: invocation\.id/);
   assert.match(runtimeSource, /this\.browserSessionId\(pluginId\)/);
 });
 

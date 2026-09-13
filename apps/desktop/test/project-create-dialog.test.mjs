@@ -17,13 +17,15 @@ const [dialog, store, api, protocol, main, styles] = await Promise.all([
 
 test("create project dialog supports named multi-folder setup", () => {
   assert.match(dialog, /role="dialog"/);
-  assert.match(dialog, /project\.createNamePlaceholder/);
+  assert.doesNotMatch(dialog, /project\.createNamePlaceholder/);
   assert.match(dialog, /api\.pickProjectFolders\(\)/);
   assert.match(dialog, /result\.folders/);
   assert.match(dialog, /project\.createRemoveFolder/);
   assert.match(dialog, /project\.createPrimary/);
-  assert.match(dialog, /project\.createMemoryHint/);
-  assert.match(dialog, /aria-describedby="project-create-memory-hint"/);
+  assert.match(dialog, /data-project-source="local"/);
+  assert.doesNotMatch(dialog, /project\.createMemoryHint/);
+  assert.doesNotMatch(dialog, /project\.createAddFolderHint/);
+  assert.doesNotMatch(dialog, /aria-describedby="project-create-memory-hint"/);
   assert.match(dialog, /project-create-dialog-content/);
   assert.match(dialog, /project-create-dialog-section/);
   assert.match(dialog, /project-create-dialog-field-label/);
@@ -56,6 +58,12 @@ test("folder picker is a renderer-only multi-directory selection", () => {
 });
 
 test("create project dialog remains usable on narrow screens and reduced motion", () => {
+  assert.match(styles, /width: min\(100%, 480px\)/);
+  assert.match(styles, /border-radius: var\(--radius-lg-plus\)/);
+  assert.match(styles, /font-size: var\(--text-lg\)/);
+  assert.match(styles, /font-size: var\(--text-base\)/);
+  assert.match(styles, /gap: 16px/);
+  assert.match(styles, /padding: 14px 18px 18px/);
   assert.match(styles, /@media \(max-width: 520px\)/);
   assert.match(styles, /align-items: flex-end/);
   assert.match(styles, /min-height: 48px/);

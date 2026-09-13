@@ -22,6 +22,7 @@
 | `agent` | 对话、中止、状态和交互式 Asktool 解决方案 |
 | `plan` | Plan 提案列出、决议和变更事件 |
 | `session` | 会话 CRUD/历史记录 |
+| `session collaboration` | 侧边栏投影使用的有界只读协作状态；变更仍通过已审查的插件网关完成 |
 | `settings` | 配置 read/write |
 | `secrets` | 秘密 write/delete/exists（绝不将明文返回到 UI 日志） |
 | `project` | 工作空间选择与查询 |
@@ -48,6 +49,7 @@ event: pi-desktop/<domain>/event/<name>
 示例：
 
 - `pi-desktop/agent/prompt`
+- `pi-desktop/agent/steer`
 - `pi-desktop/agent/abort`
 - `pi-desktop/agent/event/message`
 - `pi-desktop/agent/askTool/resolve`
@@ -55,6 +57,7 @@ event: pi-desktop/<domain>/event/<name>
 - `pi-desktop/project/open`
 - `pi-desktop/project/clone`
 - `pi-desktop/project/openFolder`
+- `pi-desktop/session/collaboration`
 
 ## 4. 通用响应包络
 
@@ -79,6 +82,8 @@ type AppError = {
 type AgentPromptRequest = {
  sessionId: string;
  content: string;
+ /** 宿主拥有的协作投递；内容和来源由 ledger 提供。 */
+ sessionMessageId?: string;
  /** Truncate durable transcript to N leading messages before append (regenerate). */
  truncateBefore?: number;
  /** Renderer snapshot used to close the prompt-to-completion notification race. */
@@ -146,6 +151,37 @@ Root 用户轮次可能包括 `revisionRootId`、`revisionCount` 和
  输入框
 附件可供性保持隐藏，直到 main、sidecar、pi 模型
 功能和持久性都会消耗有效负载。
+
+### 5.1a 向当前回合补充指令
+
+`pi-desktop/agent/steer` 接受 `AgentSteerRequest`：
+
+```ts
+type AgentSteerRequest = {
+ sessionId: string;
+ expectedTurnId: string;
+ content: string;
+ messageId?: string;
+ attachments?: AgentPromptAttachment[];
+};
+```
+
+成功时返回现有回合的 `{ accepted: true, turnId }`。主进程检查正在运行的持久回合，
+从现有 sidecar 运行时读取当前项目的附件根目录和模型图像能力，再执行普通提示所用的
+有界附件准备。sidecar 在这些 IO 完成后重新验证 `expectedTurnId`。
+目标回合不存在、已结束、正在停止、标识不匹配，或正在等待 Plan/Goal 审批时，返回
+`TURN_NOT_FOUND`，不会退回到新建回合或排队。空载荷返回 `INVALID_ARGUMENT`。
+
+内部 `agent.steeringContext` 和 `agent.steer` 只使用已存在的运行时，不执行启动配置、
+`runtimeFor` 或 `session.beginTurn`。补充指令不能改变当前模型、权限模式、工作区或
+已批准的执行；此通道中的斜杠文本按普通输入处理。
+
+已接收的输入以普通用户消息事件回显，携带当前 `turnId`、主进程准备的附件引用和
+`UiMessage.steering: true`。这个持久标记确保渲染器重载后，Smart Stop 仍保留该输入。
+用户 `message_end` 还可携带 `precedingAssistant` 流式快照，在持久化输入前为回复预留
+位置。主进程通过可重放 outbox 写入两者；主机仅以终态快照替换该临时助手行，保留其
+id、顺序和所属回合。图像字节不进入持久消息。这是新增的桌面通道和事件字段，
+不改变 RACP、主机 RPC 版本或存储架构。见 ADR active-turn-steering。
 
 ### 5.2 在下一个回合边界停止
 
@@ -402,6 +438,46 @@ type QueuedTurnSummary = { id: string; sessionId: string; content: string; attac
 “立即发送”随后请求优雅停止，使该条目在下一个边界启动。`remove` 取消尚未开始的条目。恢复
 的队列在桌面以 owner 身份接入之前保持挂起，因此重启绝不无人值守地启动工作。
 
+### 5.7 会话协作投影
+
+渲染器通过一个只读 Electron 通道为侧边栏悬浮卡片读取协作状态：
+
+```ts
+// pi-desktop/session/collaboration({ sessionId }) -> SessionCollaborationSummary
+type SessionCollaborationSummary = {
+ sessionId: string;
+ title: string;
+ status: "idle" | "waiting_permission" |
+   "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+ observedAt: string;
+ modelKey?: string;
+ createdBySession?: { sessionId: string; title: string };
+ currentTask?: {
+   messageId: string;
+   senderSession: { sessionId: string; title: string };
+   text: string;
+   status: string;
+   turnId?: string;
+   createdAt: string;
+ };
+ result?: { messageId: string; turnId?: string; status: string; text?: string; error?: string };
+ recentExchanges: Array<{
+   messageId: string;
+   direction: "incoming" | "outgoing";
+   peer: { sessionId: string; title: string };
+   kind: "task" | "message" | "completion";
+   status: string;
+   preview: string;
+   createdAt: string;
+ }>;
+};
+```
+
+Electron 将实时 Agent 状态叠加到宿主持久投影上，限制交换预览的大小，且只在会话行
+获得悬停或焦点时读取。渲染器不能调用宿主可变的 `session.collaboration.*` 方法。
+插件的 `desktop.control` 网关是唯一经过审查的变更入口，并将发送/取消授权绑定到
+插件当前的 Agent 工具调用。
+
 ## 6. Agent 事件
 
 从主→渲染器推送：
@@ -560,6 +636,16 @@ Main 发送两个事件：
 `pi-desktop/session/event/changed`。渲染器通过现有的 `refreshSessions()` 链处理
 该宿主事件；插件不发送侧栏事件，跳过的导入也不会发送该事件。
 
+渲染器 store 的 `refreshSessions()` 会话列表刷新路径在每个 store 实例中，
+同一时间最多执行一个请求。请求执行期间到达的调用合并为一次后续读取；
+相应 Promise 在后续响应写入状态后才完成，
+不会把较早的读取结果当作本次刷新结果。后续读取期间的新调用组成下一批。
+每批只提交一次状态，一批失败不会阻止排队或之后的刷新。导入刷新保留各自
+刷新前的会话基线和项目显示意图，即使较早的普通刷新已观察到导入的会话。
+普通刷新不会获得导入时显示项目的行为，也不会切换当前会话、项目或页面。
+因此，并行插件 worker 的突发通知会持续更新列表，而不会在该刷新路径中发出
+相互重叠的完整列表读取请求。启动初始化和提供商刷新快照仍独立读取。
+
 Electron 拥有本机表面，而渲染器则派生本地化表面
 结构化记录中的 title/body 文本。 Electron 仅接受 `showNative`
 对于有效的 notification/session 对和受支持的平台 API。`"task"` 源仍然
@@ -602,6 +688,8 @@ type UiMessage = {
  id: string;
  role: "user" | "assistant" | "system" | "tool";
  content: string;
+ /** 宿主认证的会话协作来源；人类输入没有此字段。 */
+ sessionMessage?: SessionMessageOrigin;
  thinking?: string; // assistant reasoning, never folded into content
  usage?: MessageUsage; // provider-reported assistant usage
  responseDurationMs?: number; // model stream duration for throughput
@@ -617,6 +705,15 @@ type UiMessage = {
  parentToolCallId?: string;   // `Task` call that spawned the delegate
  agentName?: string;          // delegate definition name
  // status/tool fields omitted here
+};
+
+type SessionMessageOrigin = {
+ messageId: string;
+ sourceSessionId: string;
+ sourceTitle: string;
+ targetSessionId: string;
+ kind: "task" | "message" | "completion";
+ replyToMessageId?: string;
 };
 
 type ToolTokenUsage = {
@@ -653,7 +750,7 @@ Electron 主进程用该会话精确 provider/API URL 与 model 的本地 models
 键盘钩子检测和弦；钩子消耗了那个和弦，所以活动的
 窗口系统菜单打不开。非 Windows 主机将该方法视为
 无操作。 `responseDurationMs` 和 `responseOutputTokens` 是可选的转录本
-元数据保留在消息元数据中，因此协议 v11 和存储架构 v14
+元数据保留在消息元数据中，因此协议 v11 和存储架构 v16
 保持不变。
 
 设置字体选择器（ADR 0083）通过一个仅 Electron 的允许通道读取

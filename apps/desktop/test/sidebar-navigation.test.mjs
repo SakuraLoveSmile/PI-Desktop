@@ -8,6 +8,14 @@ const sidebarSource = await readFile(
   new URL("../src/components/Sidebar.tsx", import.meta.url),
   "utf8",
 );
+const hoverSource = await readFile(
+  new URL("../src/features/sessions/SessionHoverCard.tsx", import.meta.url),
+  "utf8",
+);
+const hoverHookSource = await readFile(
+  new URL("../src/features/sessions/useSessionHoverCard.ts", import.meta.url),
+  "utf8",
+);
 const globalStyles = await loadStyles();
 const appSource = await readAppSource();
 const panelSource = await readFile(
@@ -269,6 +277,12 @@ test("session rows use the hover card instead of a native title tooltip", () => 
   assert.match(sessionMain, /showSessionHoverCard\(/);
   assert.doesNotMatch(sessionMain, /title=\{taskTitle\(session\.title\)\}/);
   assert.doesNotMatch(sessionMain, /\btitle=\{/);
-  assert.match(sidebarSource, /className="sidebar-session-hover-card"/);
-  assert.match(sidebarSource, /className="sidebar-session-hover-card-title"/);
+  assert.match(hoverSource, /className="sidebar-session-hover-card"/);
+  assert.match(hoverSource, /className="sidebar-session-hover-card-title"/);
+  assert.match(sessionMain, /onFocusCapture=/);
+  assert.match(sessionMain, /aria-describedby=/);
+  assert.match(hoverHookSource, /\}, 500\)/);
+  assert.match(hoverHookSource, /event\.key === "Escape"/);
+  assert.match(hoverHookSource, /addEventListener\("scroll", hide, true\)/);
+  assert.match(hoverHookSource, /addEventListener\("visibilitychange", onVisibility\)/);
 });

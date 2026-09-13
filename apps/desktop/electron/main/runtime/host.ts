@@ -104,6 +104,7 @@ export function createHostRuntime({
         const q = params as {
           executionId: string;
           sessionId?: string;
+          turnId?: string;
           toolCallId?: string;
           toolName: string;
           args: unknown;
@@ -181,6 +182,7 @@ export function createHostRuntime({
             }
             const result = await tool.execute(q.args, {
               sessionId: q.sessionId,
+              turnId: q.turnId,
               mode: sessionMode,
               modelKey,
               thinkingLevel,

@@ -80,6 +80,7 @@ This log freezes previously open questions into concrete decisions.
 | D406 | Keep macOS DMG opening guidance text-only | **Amend D371 / ADR 0204: macOS DMGs expose the opening-help note as `If app won't open, read this.txt` and no longer include the executable `PI-Desktop-macOS-open.command`. macOS ZIP packages retain both the note and the helper. The note provides the narrow Terminal fallback for trusted unsigned builds; signed and notarized builds do not need it. See ADR 0232 and E2E-196b.** | The DMG should keep the normal app-to-Applications flow focused while still giving users a visible, actionable answer when an unsigned app does not open. |
 | D407 | Restore archived projects after session import | **Additive renderer behavior for issue #250: when a core or plugin import adds a new project-bound session, the import-triggered session refresh normalizes its project path and clears the renderer's archived presentation state for that project. Pathless sessions, skipped imports, historical plugin paths without an active binding, and ordinary refreshes leave archive state unchanged. Host project rows, IPC channels, plugin methods, storage schema, and data formats do not change. See ADR 0236 and E2E-257.** | The host can successfully materialize an imported session under a project while the renderer still hides that project's sidebar row as archived. Restoring only the newly imported binding makes the result discoverable without weakening deliberate archive choices during ordinary refreshes (issue #250). |
 | D408 | Prioritize MainChat in the three-column shell | **Amend ADR 0226 / ADR 0151 / ADR 0033 for issue #267: MainChat keeps a hard 360px minimum, the work panel is capped by the live budget (`client width - 360px - expanded sidebar`, with no fixed maximum), and the expanded sidebar yields at that threshold — including while `sidebar-out` still occupies flex space. A manual sidebar reopen spends panel width first and otherwise targets 370px; closing the panel restores only a sidebar the layout collapsed. The native window never changes: the reservation seam stays at zero and no geometry is applied. See ADR 0238 and E2E-LAYOUT-three-column-width-priority.** | The fixed client area had no explicit width priority, so the side docks could pin MainChat to its floor and leave the composer unusable. Making the yield order explicit keeps the chat readable inside the fixed window without reintroducing native window growth (issue #267). |
+| D409 | Host-owned session collaboration messages | **Amend ADR 0237 / ADR 0165 / ADR 0213: Rust host-core owns a durable session-collaboration ledger keyed by message id and real source/target Session IDs. Plugin-mediated `spawn`, `send`, `status`, `result`, and `cancel` operations use the reviewed desktop-control gateway; the sender is bound to the active plugin Agent tool invocation, target turns retain their existing configuration, and each delivery is claimed by its actual durable turn. Completion callbacks are durable, at-most-once, and reference the settled turn. Provenance is persisted with transcript rows and cannot be forged, stripped, or edited through regeneration. The additive schema v16 migration retains queued work across restart without unattended replay, applies permission ceilings and bounded autonomous hops, and keeps the existing Task family unchanged. See ADR 0239 and E2E-PLUGIN-session-orchestrator-real-workers.** | The plugin's prior create/prompt polling path could infer neither a durable turn outcome nor a safe bidirectional sender identity. A host-owned ledger makes delivery, provenance, callback, cancellation, and restart behavior auditable without restoring the withdrawn A2A protocol. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -4723,3 +4724,32 @@ D193, and D194.
   no panel width or x-offset geometry is applied.
 - Decision D408 records the issue #267 behavior. See ADR 0238 and
   E2E-LAYOUT-three-column-width-priority.
+
+## 2026-09-13 — Host-owned session collaboration messages (D409)
+
+- Rust host-core owns a durable ledger for plugin-mediated messages between real
+  Session IDs. A delivery is bound to its actual durable target turn before
+  execution, and the result is derived from that turn's persisted terminal
+  state rather than assistant-text polling.
+- The reviewed plugin gateway authenticates the source from the active Agent
+  tool invocation. Existing target sessions retain their project, model,
+  context, and permission configuration; new workers inherit the initiating
+  session's project and permission ceiling.
+- Completion callbacks are durable and at-most-once. Session-message
+  provenance is persisted with transcript rows and is immutable across
+  replacement or regeneration. Restart recovery retains queued work but never
+  replays an unclaimed or interrupted turn automatically.
+- Decision D409 amends ADR 0237, ADR 0165, and ADR 0213. See ADR 0239 and
+  E2E-PLUGIN-session-orchestrator-real-workers.
+
+## 2026-09-12 — Steer the active turn with Alt+Enter
+
+- Normal Send/Enter remains a Host-owned follow-up; Alt+Enter submits input to
+  the current durable turn using a required expected turn id.
+- Reuse pi-agent-core steering at the next model-request boundary, preserve
+  started tools, and retain the active model/workspace/permission configuration.
+- Stop and ended targets reject without redirecting input to another turn.
+  Accepted input remains history without independent replay after cancellation.
+- Journal accepted user input with a provisional preceding reply when needed;
+  finalize only an indexed streaming assistant in place and retain completed
+  message idempotency. See ADR active-turn-steering and E2E-AGENT-alt-enter-steers-active-turn.

@@ -21,7 +21,7 @@
 
 - 完全由UI驱动的自动化覆盖；协议和源合同自动化是
   仍在计划中，而更广泛的桌面套件仍在计划中。
-- 性能/压力测试（后 MVP）。
+- 通用性能/压力测试（后 MVP）；桌面响应性的有界回归检查由相关功能场景覆盖。
 - 原生 Windows/Linux 发布资格（已发布的工件存在；原生
   资格差距仍然记录在案）。
 - 市场发行商来源和恶意插件沙箱场景；基本的
@@ -57,7 +57,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 | **维斯特** | 单元+集成（TS侧） | 活动（`pnpm test`，共享包） |
 | **Rust #[测试]** | 主机核心单元测试 | 活跃（`cargo test -p host-core`） |
 | **协议烟雾** | 主机 RPC + 工具 + 无头插件 | 有效（`test:e2e`，20 次检查） |
-| **Electron 探针** | 启动桥+崩溃监控 | 活跃（`test:e2e:boot`、`test:e2e:supervision`） |
+| **Electron 探针** | 启动桥、会话列表响应性和崩溃监控 | 活跃（`test:e2e:boot`、`test:e2e:supervision`） |
 | **剧作家** | 完整的 UI 驱动旅程 | 计划（M5 之后） |
 
 > 决策：协议烟雾测试和 Electron 探针是活跃的验证资产；更广泛的桌面旅程按场景执行，所需平台不可用时记录为环境受限。
@@ -103,6 +103,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 
 - 跨域运行时、host 或 IPC：`pnpm test:e2e`。
 - Electron 启动、preload 或窗口生命周期：`pnpm test:e2e` 和 `pnpm test:e2e:boot`。
+- 会话列表刷新或模型能力查询：`pnpm test:e2e` 和 `pnpm test:e2e:boot`，
+  包括合成大列表的响应性检查。
 - Plan host/runtime：`pnpm test:e2e` 和 `pnpm test:e2e:plan`。
 - Plan UI：`pnpm test:e2e:plan` 和 `pnpm test:e2e:plan-ui`。
 - host/sidecar 监督、崩溃恢复或重启：`pnpm test:e2e` 和 `pnpm test:e2e:supervision`。
@@ -2366,27 +2368,30 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
 - **里程碑**：M5
 - **状态**：草案
 
-#### E2E-066：提供程序模型目录在重新启动和离线刷新后仍然存在
+#### E2E-066：提供商模型目录在重启和离线刷新后保持可用
 
-- **先决条件**：已保存的提供程序已从其返回至少两个模型
-  发现端点和生成的目录存储在 `models` 中。
-- **步骤**：1) 退出并重新启动应用程序。 2) 断开提供商端点的连接。
-  3) 打开 Composer 模型菜单。 4）等待后台刷新失败。
-  5) 使用一个重命名的模型和一个附加模型重新连接端点，
-  然后更新提供程序配置并重新打开选择器。
-- **预期**：第一个打开的选择器渲染先前的目录而不启动
-  来自一个空列表。离线刷新保留每个缓存的条目和
-  配置模型后备。重新连接后，实时结果更新
-  渲染器并保留到 Rust 拥有的 SQLite。保留用户定义的模型行
-  不变，新发现的模型仍然可用
-  重新启动。
+- **先决条件**：已保存的提供商匹配 models.dev 的提供商/API URL，并包含至少两个
+  目录模型；确定性测试夹具能分别让 `https://models.dev/api.json` 和提供商发现端点不可用。
+- **步骤**：1）打开提供商模型选择器，确认显示 models.dev 模型名称、限制、能力标记和来源。
+  2）检查网络夹具，确认提供商 API key 从未发送给 models.dev。3）退出并重启应用。
+  4）断开 models.dev 和提供商端点。5）打开 Composer 模型菜单并等待刷新回退。
+  6）仅恢复提供商端点，返回一个自定义模型，然后重新打开选择器。
+  7）预热一个已知模型和一个未知模型的查询，再刷新目录夹具，使其包含更新后的元数据
+  和此前未知的模型。8）让目录刷新失败后重复检查。
+- **预期**：首次打开选择器即呈现已配置的模型/提供商缓存，不从空列表开始。
+  重启时无需网络即可使用随应用提供的 models.dev 发布快照。设置页刷新失败会保留该内存
+  快照；自定义提供商仅针对 models.dev 未收录的 ID 回退到其端点，最后回退到已配置的绑定。
+  离线刷新保留所有缓存和配置条目。提供商发现成功时可将规范化 ID 持久化到 Rust 拥有的
+  SQLite，但不能替换 models.dev 元数据或用户定义的绑定。目录刷新成功会同时替换缓存中
+  命中和未命中的结果；刷新失败保留之前的结果。修改模型绑定或默认提供商/模型无需重启
+  应用即可生效。
 - **链接规格**：`03-runtime/04-data-storage.md`，
   `03-runtime/12-provider-config-schema.md`，
   `03-runtime/13-model-catalog-and-selection.md`、`04-ux/08-component-spec.md`
-- **验收**：B（模型配置）、F（持久性）、质量
+- **验收**：B（模型配置）、F（持久性）、质量、安全性
 - **里程碑**：M5
-- **状态**：单位覆盖（`providers::tests`、`model-cache.test.mjs`）；满
-  restart/offline UI 场景草案
+- **状态**：单元测试覆盖（`providers::tests`、`model-cache.test.mjs`、
+  `models-dev-catalog.test.mjs`）；完整重启/离线 UI 场景为草案
 
 #### E2E-080：Claude Opus 5 从固定的 pi-ai 目录中解析
 
@@ -2643,6 +2648,25 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
 - **里程碑**：M5
 - **状态**：单位覆盖（`sessions::tests::message_scoped_fork_stops_at_selected_assistant_response`，
   `session-fork.test.mjs`、`transcript-style.test.mjs`)；完全重启 UI 场景草稿
+
+#### E2E-SESSION-list-refresh-keeps-desktop-responsive：大规模会话列表刷新时 Electron 保持响应
+
+- **前提条件**：已构建的 Electron 桌面应用、随应用提供的 models.dev 目录，以及未配置
+  提供商的全新临时 profile。探针仅使用合成的 `authKind: none` 提供商，不启动 Agent 回合。
+- **步骤**：1）通过 Rust Host API 创建 800 个空的持久化会话，分配到最多十三个已知模型 ID。
+  2）夹具创建完成后，通过渲染器 preload 桥并发请求八次会话列表。
+  3）读取期间测量 Electron Main 定时器间隔，以及渲染器到 Main 的版本 IPC 延迟。
+  4）比较所有返回的会话 ID 和能力字段。
+- **预期**：每份列表都包含所有夹具会话，模型和能力字段保持一致。Main 保持响应：测得的
+  定时器间隔和版本 IPC 往返耗时均不得达到一秒。探针记录每次列表读取、心跳的耗时和
+  Main 的最大间隔。原有沙箱启动、平台窗口和菜单断言仍通过。完成后丢弃临时 profile，
+  现有用户 profile 和正在运行的桌面进程不受影响。
+- **链接规格**：`03-runtime/01-ipc-protocol.md`、
+  `03-runtime/13-model-catalog-and-selection.md`、ADR 0134
+- **验收**：C（会话）、质量
+- **里程碑**：M6+
+- **状态**：已自动化（通过 `pnpm test:e2e:boot` 运行 `scripts/e2e-electron-boot.mjs`，
+  使用现有的 `PI_DESKTOP_BOOT_PROBE` 入口）。
 
 #### E2E-071g：保留的会话面板有上限并逐出最旧的
 
@@ -4589,13 +4613,13 @@ IPC 请求无法关闭。
 | C — 对话和直播 | E2E-008、E2E-008d、E2E-008a、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-031、E2E-040、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-052、 E2E-053、E2E-054、E2E-055、E2E-059、E2E-059a、E2E-060c、E2E-060d、E2E-061、E2E-061a、E2E-062、E2E-064、E2E-065、E2E-068、E2E-071、 E2E-073、E2E-074、E2E-075、E2E-081、E2E-083、E2E-084、E2E-086、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-094、E2E-095、E2E-096、 E2E-097、E2E-098、E2E-099、E2E-102、E2E-102a、E2E-102b、E2E-106、E2E-109、E2E-111、E2E-114、E2E-116、E2E-117、E2E-118、E2E-119、 E2E-120、E2E-121、E2E-代理-001、E2E-142、E2E-144、E2E-145、E2E-146、E2E-147、E2E-151、E2E-199、E2E-250 |
 | D——工作区 | E2E-012、E2E-013、E2E-022B、E2E-024I、E2E-047、E2E-049、E2E-057、E2E-058、E2E-060、E2E-068、E2E-075、E2E-078、E2E-153 |
 | D——工作区（项目排序） | E2E-253 |
-| E——工具和权限 | E2E-008a、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-024I、E2E-024K、E2E-040、E2E-049、E2E-074、E2E-093、E2E-097、 E2E-099、E2E-100、E2E-101、E2E-102、E2E-103、E2E-105、E2E-106、E2E-107、E2E-111、E2E-112、E2E-113、E2E-114、E2E-115、E2E-116、 E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-145、E2E-147 |
+| E——工具和权限 | E2E-008a、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-024I、E2E-024K、E2E-040、E2E-049、E2E-074、E2E-093、E2E-097、 E2E-099、E2E-100、E2E-101、E2E-102、E2E-103、E2E-105、E2E-106、E2E-107、E2E-111、E2E-112、E2E-113、E2E-114、E2E-115、E2E-116、 E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-145、E2E-147、E2E-PLUGIN-imported-pi-package-skills |
 | F——坚持 | E2E-020、E2E-021、E2E-036、E2E-037、E2E-038、E2E-040、E2E-042、E2E-047、E2E-048、E2E-051、E2E-054、E2E-056、E2E-061、E2E-062、 E2E-064、E2E-066、E2E-068、E2E-071、E2E-072、E2E-073、E2E-082、E2E-084、E2E-096、E2E-098、E2E-102、E2E-102b、E2E-103、E2E-代理-001、 E2E-061a、E2E-073a、E2E-104、E2E-106、E2E-107、E2E-108、E2E-109、E2E-110、E2E-112、E2E-118、E2E-119、E2E-120、E2E-121、E2E-123、E2E-142、E2E-146、E2E-148、E2E-151、E2E-171、E2E-005J |
 | F——持久化（项目排序） | E2E-253 |
-| G——插件 | E2E-022、E2E-022A、E2E-022B、E2E-022C、E2E-023、E2E-024、E2E-024B、E2E-024C、E2E-024D、E2E-024E、E2E-024W、E2E-024F、E2E-024G、E2E-024H、 E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M、E2E-024N、E2E-024O、E2E-024P、E2E-025、E2E-026、E2E-105、E2E-117、E2E-120、E2E-122、E2E-123、E2E-148、E2E-153 |
+| G——插件 | E2E-022、E2E-022A、E2E-022B、E2E-022C、E2E-023、E2E-024、E2E-024B、E2E-024C、E2E-024D、E2E-024E、E2E-024W、E2E-024F、E2E-024G、E2E-024H、 E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M、E2E-024N、E2E-024O、E2E-024P、E2E-025、E2E-026、E2E-105、E2E-117、E2E-120、E2E-122、E2E-123、E2E-148、E2E-153、E2E-PLUGIN-imported-pi-package-skills |
 | H——诊断 | E2E-027、E2E-031、E2E-034、E2E-042、E2E-096、E2E-098、E2E-104、E2E-107、E2E-108、E2E-109、E2E-110、E2E-113、E2E-115、E2E-116、 E2E-118、E2E-121、E2E-146、E2E-194、E2E-195 |
 | 安全性 | E2E-028、E2E-029、E2E-030、E2E-024J、E2E-024K、E2E-024M、E2E-049、E2E-068、E2E-086、E2E-105、E2E-106、E2E-107、E2E-108、E2E-109、 E2E-110、E2E-112、E2E-113、E2E-115、E2E-116、E2E-117、E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-151、E2E-153 |
-| 品质 | E2E-032、E2E-033、E2E-039、E2E-043、E2E-044、E2E-045、E2E-046、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-050、E2E-053、E2E-055、 E2E-056、E2E-057、E2E-058、E2E-059、E2E-060、E2E-061、E2E-062、E2E-063、E2E-064、E2E-065、E2E-066、E2E-067、E2E-068、E2E-069、 E2E-070、E2E-071、E2E-072、E2E-073、E2E-074、E2E-075、E2E-076、E2E-077、E2E-078、E2E-079、E2E-080、E2E-081、E2E-082、E2E-083、 E2E-084、E2E-085、E2E-086、E2E-092、E2E-093、E2E-094、E2E-095、E2E-096、E2E-097、E2E-098、E2E-099、E2E-100、E2E-101、E2E-102、 E2E-102a、E2E-102b、E2E-103、E2E-AGENTS-001、E2E-024N、E2E-024O、E2E-059a、E2E-060b、E2E-060c、E2E-060d、E2E-061a、E2E-073a、E2E-111、 E2E-114、E2E-117、E2E-118、E2E-119、E2E-120、E2E-122、E2E-123、E2E-142、E2E-143、E2E-144、E2E-145、E2E-146、E2E-147、E2E-148、E2E-150、E2E-151、E2E-153、E2E-194、E2E-195、E2E-199、E2E-200、E2E-201、E2E-202、E2E-203、E2E-204、E2E-209、E2E-210、E2E-250 |
+| 品质 | E2E-032、E2E-033、E2E-039、E2E-043、E2E-044、E2E-045、E2E-046、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-050、E2E-053、E2E-055、 E2E-056、E2E-057、E2E-058、E2E-059、E2E-060、E2E-061、E2E-062、E2E-063、E2E-064、E2E-065、E2E-066、E2E-067、E2E-068、E2E-069、 E2E-070、E2E-071、E2E-072、E2E-073、E2E-074、E2E-075、E2E-076、E2E-077、E2E-078、E2E-079、E2E-080、E2E-081、E2E-082、E2E-083、 E2E-084、E2E-085、E2E-086、E2E-092、E2E-093、E2E-094、E2E-095、E2E-096、E2E-097、E2E-098、E2E-099、E2E-100、E2E-101、E2E-102、 E2E-102a、E2E-102b、E2E-103、E2E-AGENTS-001、E2E-024N、E2E-024O、E2E-059a、E2E-060b、E2E-060c、E2E-060d、E2E-061a、E2E-073a、E2E-111、 E2E-114、E2E-117、E2E-118、E2E-119、E2E-120、E2E-122、E2E-123、E2E-142、E2E-143、E2E-144、E2E-145、E2E-146、E2E-147、E2E-148、E2E-150、E2E-151、E2E-153、E2E-194、E2E-195、E2E-199、E2E-200、E2E-201、E2E-202、E2E-203、E2E-204、E2E-209、E2E-210、E2E-250、E2E-PLUGIN-imported-pi-package-skills |
 | 品质（项目排序） | E2E-253 |
 | C — 对话和直播（输入法斜杠别名） | E2E-255 |
 | E——工具和权限（Skill 常驻） | E2E-254 |
@@ -4607,6 +4631,8 @@ IPC 请求无法关闭。
 | G——插件（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
 | 安全性（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
 | 品质（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
+| C — 对话与流式（会话列表响应性） | E2E-SESSION-list-refresh-keeps-desktop-responsive |
+| 品质（会话列表响应性） | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 
 | 里程碑 | 应用场景 |
 |---|---|
@@ -4621,10 +4647,11 @@ IPC 请求无法关闭。
 | M6 | E2E-104、E2E-105、E2E-106、E2E-107、E2E-108、E2E-109、E2E-110、E2E-111、E2E-112、E2E-113、E2E-114、E2E-115、E2E-116、E2E-117、 E2E-118、E2E-119、E2E-120、E2E-103 |
 | M6+ | E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-150、E2E-151、E2E-168、E2E-199、E2E-200、E2E-202、E2E-203、E2E-209、E2E-211、E2E-212、E2E-213、E2E-214、E2E-215、E2E-216、E2E-217、E2E-257 |
 | M6+（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
+| M6+（会话列表响应性） | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | 后MVP | E2E-022A、E2E-022B、E2E-022C、E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M（插件路线图 R2/R3/R6） |
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
-| 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245 |
+| 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策
@@ -5721,8 +5748,8 @@ IPC 请求无法关闭。
 #### E2E-142：后台委托通过 TaskWait 收敛并遵守权限作用域
 
 - **先决条件**：一个绑定项目、权限模式可以在 `ask`、`accept-edits` 和 `auto`
-  之间切换的 Agent 会话，其提供方的流可以被驱动；四个内置子代理（`explorer`、
-  `code-reviewer`、`test-runner`、`fixer`）以及一个全局 `~/.agents/subagents/readonly.md`
+  之间切换的 Agent 会话，其提供方的流可以被驱动；五个内置子代理（`explorer`、
+  `code-reviewer`、`test-runner`、`fixer`、`ui-designer`）以及一个全局 `~/.agents/subagents/readonly.md`
   定义。内置定义使用默认的 `permission: inherit` 行为。
 - **步骤**：
   1. 提示一轮，其中助手在一条消息里发出两次 `Task` 调用 —— 一个 `explorer`
@@ -6334,6 +6361,44 @@ IPC 请求无法关闭。
 - **里程碑**：MVP 后（R7 v1）
 - **状态**：由手动 MCP 驱动的夹具 `apps/desktop/test/e2e/trusted-extensions` 执行（2026-09-10，两个会话，全部检查通过；D388 后于 2026-09-11 在插件形态夹具上重新执行）；无 CI 旅程
 
+#### E2E-PLUGIN-imported-pi-package-skills：显式导入包后按插件权限提供技能
+
+- **前提条件**：一个本地夹具包位于 npm 风格的
+  `node_modules/@fixture/package-skills` 路径，声明 `pi.extensions` 和 `pi.skills`。
+  技能包含直接指定的 Markdown 文件、含 `SKILL.md` 的目录，以及两个不同目录都含
+  `SKILL.md` 的集合。另有引用文件、素材、`node_modules-note.txt` 资源和包内
+  `node_modules` 依赖目录；第二个夹具仅声明 `pi.skills`。无需下载或执行第三方代码，
+  也无需安装依赖。
+- **步骤**：
+  1. 通过插件页 → 导入 pi 扩展选择混合包，检查生成的 manifest 和复制的资源。
+     无界面验证时，将明确选定的路径传给同一个导入器。
+  2. 在真实 `PluginRuntime` 中加载生成目录，检查 `getSkills()`，并通过
+     `loadSkillBody(id)` 读取每份文档。
+  3. 重新加载时只授予 `agent.extension`，随后只授予 `agent.prompt.inject`；
+     卸载插件后再次尝试读取旧技能 ID。
+  4. 导入仅技能包，确认辅助 `index.js` 不成为扩展。对生成的双技能夹具调用真实 Host
+     `plugins.installFromPath`，列出插件，读取安装后的 manifest 和技能文件，最后卸载。
+  5. 尝试绝对路径、`..`、缺失或不受支持的文件、包内依赖路径及后代符号链接；
+     超出 32 个技能或 256 个目录的扫描限制，并检查失败后的清理。
+- **预期**：四项技能均以独立且稳定的 ID 进入目录，同名 `SKILL.md` 不相互覆盖；
+  加载返回正确正文并移除 frontmatter。导入的扩展保持独立贡献。资源和相对路径复制
+  后仍然存在；npm 安装路径的祖先目录不导致整个包被排除，只排除所选包内的依赖目录
+  路径段。缺失技能授权时技能目录为空，并产生既有权限审计；重新授权后 ID 不变。
+  卸载清除两类贡献，旧技能 ID 返回 `NOT_FOUND`。仅技能包只声明 `agent.prompt.inject`，
+  Host 报告 `skills` 能力，并保留两份技能文档。无效声明导入失败，不读取包外数据，
+  也不留下部分复制的插件。不会自动导入 `~/.pi` 或执行 npm、包生命周期脚本。
+- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2；
+  `07-plugins/02-plugin-manifest-schema.md`；D007
+- **验收**：E（工具与权限）、G（插件）、品质
+- **里程碑**：MVP 后（R7 v1）
+- **状态**：部分自动化。`imported-package-skills.test.mjs` 覆盖导入发现、资源复制、
+  权限和无效路径；`imported-package-skills-runtime.test.mjs` 通过真实插件宿主子进程
+  加载生成的空操作插件，验证技能目录、正文、权限撤销与恢复，以及卸载。2026-09-13
+  另用临时双技能夹具完成真实 Host `plugins.installFromPath` → `plugins.list` →
+  安装后 manifest/正文读取 → `plugins.uninstall` 验证，仅报告 `agent.prompt.inject`
+  权限和 `skills` 能力。本场景尚未执行原生选择器、插件行渲染或提供商回合调用导入
+  技能的测试，不声称完整桌面旅程已通过。
+
 #### E2E-242：扩展工具与 hooks 在回合中生效
 
 - **前置条件**：一个已启用的夹具扩展，注册工具 `fx_add`，在 `before_agent_start`
@@ -6463,19 +6528,26 @@ IPC 请求无法关闭。
 - **前提条件**：已安装并启用市场中的 `pi.session-orchestrator` 插件；父 Agent 会话已配置可认证的
   provider/model 和项目路径，并处于 Agent 模式。
 - **步骤**：1）请求父 Agent 并行审查 Frontend、Electron 和 Rust。2）确认
-  `SessionTask.spawn` 返回三个不同的 Worker 会话 id，且每个 Worker 出现在普通会话列表中。
-  3）确认三个 Worker 都收到 prompt，不使用 `session/fork`，并可以并行运行。4）调用
-  `SessionTask.wait`，再对每个 Worker 调用 `result`。5）从 Agents 面板打开一个 Worker，
-  发送 follow-up，并停止另一个 Worker。6）重启插件，确认关系列表和持久化 Worker 会话仍然可用。
+  `SessionTask.spawn` 返回三个不同的原始持久化 `sessionId`，且每个 Worker 出现在普通会话列表中。
+  3）确认三个 Worker 都收到 prompt，不使用 `session/fork`，并可以并行运行。
+  4）在 Worker 活动期间调用 `SessionTask.status`，确认不读取 Worker transcript。
+  5）使用默认等待上限调用 `SessionTask.wait`，再对每个 Worker 调用 `result`。
+  6）从 Agents 面板打开一个 Worker，使用返回的原始 `sessionId` 发送 follow-up，
+  并停止另一个 Worker。7）重启插件，确认关系列表和持久化 Worker 会话仍然可用。
+  在已有大量会话的情况下重复并行创建步骤，并保持父会话可见。
 - **预期**：每个 Worker 都是真实持久化会话，继承父会话的项目、模型、thinking 和权限上限，
   创建时拥有独立的空 transcript。父会话只收到有界的最终 report；完整 Worker transcript
-  仍可在各自会话中查看。`send` 使用相同 Worker id，`cancel` 中止但不删除，独立会话和现有
-  Task 系列保持不变，且不发生 localhost MCP 调用或 token 访问。Worker 不能再创建 Worker，
-  并发上限超出时必须安全失败。
+  仍可在各自会话中查看。`sessionId` 是 Worker 唯一的规范身份，后续 `send` 复用同一会话和
+  上下文，不创建替代会话。状态和面板刷新使用有界的轻量轮询；`wait` 在其等待上限内返回
+  `timedOut`，不占满宿主工具超时时间。`cancel` 中止但不删除，无关会话和现有 Task 系列
+  保持不变，且不发生 localhost MCP 调用或 token 访问。Worker 不能再创建 Worker，
+  不属于调用方的 Session ID 必须被拒绝，并发上限超出时必须安全失败。Worker 创建和
+  prompt 通知突发时，会话列表刷新串行执行并合并，同时保留最终 Worker 列表和前台会话。
+  后到达的通知等待后续读取，不会因复用 Worker 创建之前已开始的读取而丢失。
 - **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/04-plugin-security.md`、
   `07-plugins/11-plugin-storage-isolation.md`、`03-runtime/01-ipc-protocol.md`、
   `03-runtime/06-host-rpc-protocol.md`、ADR 0237
-- **接受**：C（对话与流式）、D（插件安全性）、品质
+- **接受**：C（并行持久化会话）、D（插件安全性）、品质
 - **里程碑**：M6+
 - **状态**：marketplace 插件测试覆盖插件运行时；host-core 和 desktop 单元测试覆盖新增的
   宿主原子能力。完整真实 provider/Electron 旅程仍需在具备条件的 runner 中验证，遵循无本地
@@ -6659,3 +6731,29 @@ IPC 请求无法关闭。
 - **验收**：F（持久化）、品质
 - **里程碑**：M6 之后的桌面外壳维护
 - **状态**：已自动化（`scripts/e2e-three-column-layout.mjs`，经 `pnpm test:e2e:layout` —— 固定窗口宽度不变、指针拖动全程 360px 下限、左栏让位/恢复、370px 重开目标）；单元覆盖见 `work-panel-resize.test.mjs`
+
+#### E2E-AGENT-alt-enter-steers-active-turn：Enter 排队跟进，Alt+Enter 向当前回合补充指令
+
+- **前提条件**：会话已配置模型，能够控制流式回复或工具完成时机；附件场景使用支持图像的模型。
+- **步骤**：
+  1. 发起提示，再输入 follow-up 并按 Enter，确认出现 FIFO 行。
+  2. 在同一回合输入修正并按 Alt+Enter；分别以图像芯片、当前请求结束前连续两次修正重复操作。
+  3. 完成当前回复和工具批次，检查下一次模型输入、转录及持久回合 id；回合结束后观察 follow-up。
+  4. 分别关闭回车发送、打开自动完成菜单，并测试 Shift+Enter、Alt+Shift+Enter 和中文输入法候选词确认。
+     检查 macOS 的 `⌥+Enter` 和 Windows/Linux 的 `Alt+Enter` 发送按钮提示。
+  5. 让补充指令分别与回合结束、Stop、待处理 Plan 审批同时发生；拒绝请求返回前切换会话。
+  6. 运行中更改下一回合模型，再提交补充指令；确认当前模型和权限配置不变。
+  7. 父代理等待后台委托时提交补充指令，保持委托运行，确认父代理在委托报告完成前收到修正。
+  8. 完成后重新加载，并模拟补充指令预留流式回复后崩溃；检查行顺序、恢复文本和所属回合。
+  9. 补充指令接收成功但尚未开始回复时重载渲染器，再按 Stop 并检查持久转录。
+- **预期**：Enter 排队普通 follow-up；Alt+Enter 在当前回合创建用户行，不创建队列行或新公开
+  `agent_start`。已启动工具先完成，下一次请求包含修正和图像；普通 FIFO 仅在持久回合最终落定后
+  启动。输入法确认和换行不提交，空闲时 Alt+Enter 正常发送。过期或关闭的目标将草稿保留在原会话，
+  不使当前回合失败。Stop 后已接收输入不会独立重放；重载渲染器并停止后，已完成回复和补充输入仍
+  留在历史中。终态助手快照原位替换临时快照；崩溃恢复保留最新检查点和相邻补充输入，无重复行。
+- **链接规格**：`03-runtime/01-ipc-protocol.md`（§5.1a）、`03-runtime/02-agent-runtime.md`（§4.0）、
+  `03-runtime/04-data-storage.md`、`04-ux/09-interaction-patterns.md`（§3.5）、ADR active-turn-steering
+- **验收**：C（对话与流）、E（工具与权限）、品质
+- **里程碑**：M5
+- **状态**：草稿。现有回归套件覆盖周边行为，尚未运行渲染界面的 steering 完整流程
+  （除非明确要求，不本地运行 E2E）。

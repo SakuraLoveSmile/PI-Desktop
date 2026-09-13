@@ -159,12 +159,13 @@ Rules:
    advertises `"a2a"`. A v10 host or client is rejected before the UI becomes
    interactive, so a mixed pair cannot call a missing domain.
 
-Protocol v11 is paired with host-core storage schema v14. Schema v12 had added
+Protocol v11 is paired with host-core storage schema v16. Schema v12 had added
 the A2A tables (`a2a_tasks`, `a2a_messages`, `a2a_artifacts`,
 `a2a_push_configs`) via `migrate_v11_to_v12`; `migrate_v12_to_v13` drops those
 tables, and v14 adds the plugin-session ownership sidecar and soft-delete
-column. A fresh database creates neither A2A tables nor unowned plugin-session
-rows. The schema version is an
+column. Schema v15 adds the Host-owned turn queue, and schema v16 adds the
+session collaboration ledger and its turn-queue binding. A fresh database
+creates neither A2A tables nor unowned plugin-session rows. The schema version is an
 internal persistence invariant, not an additional JSON-RPC field; the
 checkpoint architecture remains host-owned.
 
@@ -349,7 +350,12 @@ to later refresh and inference; the vendor picker does not collect them.
   last archive is lost. When the family is present in the durable transcript,
   the prefix in front of the restored branch is taken from there rather than
   from the caller. Surviving messages keep their owning `turn_id`
-- `session.beginTurn`
+- `session.beginTurn({ sessionId, providerId?, modelId?, sessionMessageId? })` —
+  starts one durable turn. When `sessionMessageId` is present, host-core
+  atomically verifies that the queued collaboration delivery targets this
+  session, rechecks its permission ceiling, claims the delivery, and binds the
+  new turn to its message id. A collaboration turn cannot be started from
+  caller-supplied replacement text.
 - `session.queuePush` / `session.queueList` / `session.queueRemove` — the
   Host-owned turn queue (D386 / ADR 0213, schema v15); push is idempotent per
   principal and key, bounded at eight entries per session
@@ -382,6 +388,39 @@ Electron main after plugin permission and manifest-source checks:
 - Successful plugin session mutations cause Electron main to emit one
   `sessionsChanged` renderer event; the renderer refreshes the session list,
   and plugins do not emit this UI synchronization event.
+
+Host-internal session collaboration methods are additive to protocol v11 and
+are called by Electron main only after the reviewed plugin gateway has checked
+the plugin permission and active Agent tool invocation. They are not renderer
+or general MCP operations:
+
+- `session.collaboration.spawn` — create a bounded Agent worker session that
+  inherits the source project's, thinking, and permission configuration, create
+  its first `task` delivery, and return the real target `sessionId` plus the
+  message record. Worker creation is limited per parent and plugin; a worker
+  cannot create another worker.
+- `session.collaboration.send` — enqueue a `task` or `message` delivery to an
+  existing Agent session. The host binds `sourceSessionId` and `sourceTurnId`
+  to the current plugin tool invocation, enforces idempotency, a target inbox
+  bound, the source permission ceiling, and a bounded autonomous hop count.
+- `session.collaboration.message` — read one durable delivery by message id for
+  Electron's dispatch and provenance paths.
+- `session.collaboration.status` / `session.collaboration.result` — return a
+  bounded status/result projection without loading a complete worker
+  transcript. `result` may select a delivery by `messageId` or `turnId`.
+- `session.collaboration.pending` — list queued completion callbacks for the
+  Electron drain; `fail` records a dispatch failure and creates the requested
+  failure callback once; `settle` derives the result from the persisted turn
+  and creates at most one completion callback.
+- `session.collaboration.cancel` — cancel queued deliveries or interrupt their
+  exact currently-bound turns while retaining the target session and history.
+
+The ledger is durable across a host restart. A queued entry with its
+`turn_queue.session_message_id` remains held for a new Agent Host controller;
+an unclaimed or running delivery is marked `interrupted` by the startup fence
+and is never replayed automatically. Transcript provenance is host-derived and
+cannot be forged or removed by `session.appendMessage` or transcript
+replacement.
 
 The host rejects unknown roles, non-RFC3339 or non-monotonic timestamps, and
 oversized/deep payloads. Tool values are sanitized for host-reserved keys. The

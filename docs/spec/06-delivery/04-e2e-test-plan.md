@@ -18,7 +18,8 @@
 
 - Full UI-driven automated coverage; protocol and source-contract automation is
   active while the broader desktop suite remains planned.
-- Performance / stress testing (post-MVP).
+- General performance / stress testing (post-MVP); bounded regression checks
+  for desktop responsiveness are covered by the relevant functional scenarios.
 - Native Windows/Linux release qualification (published artifacts exist; native
   qualification gaps remain documented).
 - Hostile-plugin sandbox scenarios. Publisher provenance and the marketplace
@@ -58,7 +59,7 @@ levels does not waive the relevant E2E gate.
 | **Vitest** | Unit + integration (TS side) | Active (`pnpm test`, shared package) |
 | **Rust #[test]** | Host-core unit tests | Active (`cargo test -p host-core`) |
 | **Protocol smoke** | Host RPC + tools + plugins headless | Active (`test:e2e`, 20 checks) |
-| **Electron probes** | Boot bridge + crash supervision | Active (`test:e2e:boot`, `test:e2e:supervision`) |
+| **Electron probes** | Boot bridge, session-list responsiveness, and crash supervision | Active (`test:e2e:boot`, `test:e2e:supervision`) |
 | **Playwright** | Full UI-driven journeys | Planned (post-M5) |
 
 > Decision: protocol smoke and Electron probes are active validation assets;
@@ -114,6 +115,8 @@ The minimum selection is:
 - Cross-cutting runtime, host, or IPC: `pnpm test:e2e`.
 - Electron startup, preload, or window lifecycle: `pnpm test:e2e` and
   `pnpm test:e2e:boot`.
+- Session-list refresh or model capability lookup: `pnpm test:e2e` and
+  `pnpm test:e2e:boot`, including the synthetic large-list responsiveness check.
 - Plan host/runtime behavior: `pnpm test:e2e` and `pnpm test:e2e:plan`.
 - Plan UI behavior: `pnpm test:e2e:plan` and `pnpm test:e2e:plan-ui`.
 - Host supervision, crash recovery, or restart behavior: `pnpm test:e2e` and
@@ -1439,11 +1442,19 @@ needed.
 #### E2E-012a: Create a named project from multiple folders
 
 - **Preconditions**: App running; no project dialog open; at least two local
-  folders are available.
-- **Steps**: 1) Invoke Add project from Settings → Project archive or the
-  sidebar Projects heading. 2) Enter a project name. 3) Add two folders with
-  the folder picker. 4) Confirm both rows render and the first row is marked
-  Primary. 5) Remove one row, add it again, and create the project.
+  folders are available, including one with a long name or path.
+- **Steps**:
+  1. Invoke Add project from Settings → Project archive or the sidebar Projects
+     heading and inspect the empty dialog.
+  2. Enter a project name and add two folders with the folder picker. Confirm
+     both rows render and the first row is marked Primary.
+  3. Remove one row, check the count, and add it again.
+  4. Inspect the empty and populated states in light and dark themes, including
+     a narrow window and reduced-motion settings.
+  5. Use Tab and Shift+Tab to traverse the controls. Close with Escape, then
+     reopen and close by clicking outside; check focus after each close.
+  6. Reopen, enter the name, add the folders, and create the project. Inspect
+     the in-flight controls and the resulting active workspace and project tabs.
 - **Expected**: The dialog traps focus, closes on Escape or outside click while
   idle, and keeps the name and selected folders visible without horizontal
   overflow. The native picker allows multiple directories in one selection.
@@ -1452,9 +1463,26 @@ needed.
   primary folder receives the entered display name and becomes the active
   workspace; every selected folder is retained as an open project tab. The
   dialog is unavailable while creation is in flight and returns focus to the
-  invoking control after close.
+  invoking control after close. The surface follows the shell's neutral gray
+  theme with a 480px maximum width, 18px tokenized corners, shared dialog
+  elevation, and the global compact type ramp. The title uses the dialog-level
+  heading size, the name field uses the body/input size, and labels/metadata
+  remain on the smaller global steps. The header and action row use the shared
+  18px dialog gutter; sections use a 16px gap. It shows one Create project
+  title, a filled name field without duplicate placeholder copy, a compact
+  local source chip, and a softly filled Add folder action. It does not add
+  explanatory memory or multi-selection copy. The workspace section keeps the
+  current local folder selection behavior while staying neutral about future
+  remote sources. No outer stroke, section rules,
+  footer divider, or dashed picker border appears. Spacing provides the section
+  hierarchy; long names and paths remain contained, and scrolling content never
+  hides the fixed action row. Both themes keep text readable and keyboard focus
+  visible; reduced motion suppresses the control transitions. The source chip
+  is the extension point for a future remote project source; the current flow
+  remains local-only.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` (§9),
   `04-ux/06-settings-ia.md` (Project archive),
+  `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md` (§3.5)
 - **Acceptance**: C (project creation UI), D (multi-folder project setup),
   Accessibility, Localization
@@ -3359,7 +3387,9 @@ needed.
   3) Quit and restart the app. 4) Disconnect models.dev and the provider
   endpoint. 5) Open the Composer model menu and wait for refresh fallback.
   6) Reconnect only the provider endpoint with one custom model, then reopen
-  the picker.
+  the picker. 7) Warm lookups for a known and an unknown model, then refresh
+  the catalog fixture with changed metadata and the previously unknown model.
+  8) Repeat after making that catalog refresh fail.
 - **Expected**: The first picker open renders the configured/provider cache
   without starting from an empty list. On restart, the bundled models.dev
   release snapshot is used without network access. A failed Settings refresh
@@ -3368,6 +3398,9 @@ needed.
   bindings. Offline refresh preserves every cached/configured entry. A
   successful provider discovery may persist normalized IDs to Rust-owned SQLite,
   but it cannot replace models.dev metadata or user-defined bindings.
+  A successful catalog refresh replaces both cached matches and cached misses;
+  a failed refresh keeps the previous results. Editing a model binding or
+  changing the default provider/model takes effect without restarting the app.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/12-provider-config-schema.md`,
   `03-runtime/13-model-catalog-and-selection.md`, `04-ux/08-component-spec.md`
@@ -3754,6 +3787,29 @@ needed.
 - **Status**: Unit-covered (`transcripts::tests::layout_window_reads_only_the_requested_tail`,
   `sessions::tests::bounded_reads_use_physical_line_positions_not_the_dedup_counter`);
   UI scenario Draft
+
+#### E2E-SESSION-list-refresh-keeps-desktop-responsive: Large session-list refreshes keep Electron responsive
+
+- **Preconditions**: A built Electron desktop, the bundled models.dev catalog,
+  and a fresh temporary profile with no configured providers. The probe uses
+  only a synthetic `authKind: none` provider and never starts an Agent turn.
+- **Steps**: 1) Create 800 empty durable sessions through the Rust Host API,
+  distributed over up to thirteen known model IDs. 2) After fixture creation,
+  request eight session lists concurrently through the renderer preload bridge.
+  3) Measure Electron Main timer gaps and renderer-to-Main version IPC latency
+  during those reads. 4) Compare all returned session IDs and capability fields.
+- **Expected**: Every list contains all fixture sessions with stable model and
+  capability fields. Main remains responsive: no measured timer gap or version
+  IPC round trip reaches one second. The probe records individual list/heartbeat
+  durations and the largest Main gap. The ordinary sandboxed boot, platform
+  window, and menu assertions still pass. The profile is discarded afterwards;
+  existing user profiles and running desktop processes are untouched.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/13-model-catalog-and-selection.md`, ADR 0134
+- **Acceptance**: C (sessions), Quality
+- **Milestone**: M6+
+- **Status**: Automated (`scripts/e2e-electron-boot.mjs` via
+  `pnpm test:e2e:boot`, using the existing `PI_DESKTOP_BOOT_PROBE` entry point).
 
 #### E2E-071e: Regenerating from a paged-back transcript replaces the right turn
 
@@ -6475,16 +6531,16 @@ needed.
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
-| C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers |
+| C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153, E2E-158, E2E-182, E2E-187, E2E-252 |
 | D — Workspace (project ordering) | E2E-253 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills |
 | F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J, E2E-PLUGIN-session-orchestrator-real-workers |
 | F — Persistence (project ordering) | E2E-251 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153 |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219, E2E-250, E2E-252, E2E-102i |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills |
 | Quality (project ordering) | E2E-253 |
 | C — Conversation & stream (IME slash alias) | E2E-255 |
 | E — Tools & permissions (Skill residency) | E2E-254 |
@@ -6496,6 +6552,8 @@ needed.
 | G — Plugins (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | Security (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | Quality (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
+| C — Conversation & stream (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
+| Quality (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 
 | Milestone | Scenarios |
 |---|---|
@@ -6508,12 +6566,13 @@ needed.
 | M2 (IME slash alias) | E2E-255 |
 | M5 (Skill residency) | E2E-254 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103, E2E-172 |
-| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-219, E2E-257 |
+| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll |
 | M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
+| M6+ (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245 |
+| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -7986,8 +8045,8 @@ This test plan spec is accepted when:
 
 - **Preconditions**: A project-bound Agent session whose permission mode can be
   switched between `ask`, `accept-edits`, and `auto`, with a provider whose
-  stream can be driven; the four builtin subagents (`explorer`,
-  `code-reviewer`, `test-runner`, `fixer`) and a global
+  stream can be driven; the five builtin subagents (`explorer`,
+  `code-reviewer`, `test-runner`, `fixer`, `ui-designer`) and a global
   `~/.agents/subagents/readonly.md` definition. Builtins use the default
   `permission: inherit` behavior.
 - **Steps**:
@@ -8178,8 +8237,30 @@ This test plan spec is accepted when:
 - **Status**: Documented; desktop journey pending. The failure card's data
   source is unit-tested in `subagent-topology.test.mjs`: a settled delegation's
   `error: { code, message }` read from `TaskWait` `delegations[]` and `TaskStop`
-  `stopped[]`, last-write-wins across rows, entries without an error, and the
-  `Task` row that must never carry one.
+  `stopped[]`, lifecycle row ordering, entries without an error, and the
+  terminal Task snapshot that carries a failure before parent polling.
+
+#### E2E-SUBAGENT-settlement-updates-before-parent-poll
+
+- **Preconditions**: An Agent session with two parallel delegates; one can
+  finish while the other continues and the parent does not poll lifecycle tools.
+- **Steps**: 1) Start both delegates and open the first delegate's detail dock.
+  2) Optionally let TaskList report both as running. 3) Complete only the first
+  delegate while the parent turn remains live. 4) Switch sessions and return,
+  then reload history after the turn finishes. 5) Repeat with failed and stopped
+  delegates, and with a delegate finishing before its Task result arrives.
+- **Expected**: The settled node stops spinning immediately, its status is
+  completed (green) or the actual failure/stop outcome, and its elapsed time
+  stops increasing. The sibling remains running; the aggregate reads one of
+  two settled. The open dock updates with the same status and failure details.
+  A stale running TaskList snapshot cannot undo settlement. Reload preserves
+  the actual terminal outcome and original Task identity, arguments, and usage.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §Subagents,
+  `04-ux/08-component-spec.md` delegation topology
+- **Acceptance criterion**: C, Quality
+- **Milestone**: M6+
+- **Status**: Runtime event-order and renderer projection regressions automated;
+  desktop journey documented. Required suites: `test:e2e`, `test:e2e:subagents`.
 
 #### E2E-161: A delegation lifecycle row reads as a subagent row
 
@@ -9632,31 +9713,54 @@ are withdrawn with ADR 0165.
   `apps/desktop/test/plugin-desktop-control.test.mjs`; the native dialog
   journey is documented and deferred by the no-local-E2E policy
 
-#### E2E-PLUGIN-session-orchestrator-real-workers: Session Orchestrator creates parallel durable workers
+#### E2E-PLUGIN-session-orchestrator-real-workers: Session Orchestrator creates and coordinates durable sessions
 
 - **Preconditions**: The marketplace `pi.session-orchestrator` plugin is installed and enabled;
   the parent Agent session has a configured authenticated provider/model and a
   project path. The parent is in Agent mode.
 - **Steps**: 1) Ask the parent to review Frontend, Electron, and Rust in
-  parallel. 2) Confirm that `SessionTask.spawn` returns three distinct worker
-  session ids and that each worker is visible in the normal session list. 3)
-  Confirm all three workers receive prompts without using `session/fork` and
-  can run concurrently. 4) Call `SessionTask.wait`, then `result` for each
-  worker. 5) Open one worker from the Agents panel, send it a follow-up, and
-  stop another worker. 6) Restart the plugin and confirm the relationship list
-  and durable worker sessions remain available.
+  parallel. 2) Confirm that `SessionTask.spawn` returns three distinct real
+  durable `sessionId` values and one host `messageId` per delivery; each
+  worker is visible in the normal session list. 3) Confirm all three workers
+  receive prompts without using `session/fork` and can run concurrently. 4)
+  While a worker is busy, send a follow-up to that exact Session ID and verify
+  it is queued against the target inbox rather than starting a second turn. 5)
+  Inspect status from the Agents panel and a sidebar hover card; confirm both
+  use bounded host projections and do not fetch a complete worker transcript.
+  6) Wait for one worker, query `result` by its exact `messageId` and `turnId`,
+  and inspect the parent transcript for one host-generated completion message.
+  7) Re-read the result and repeat the settlement notification path; confirm
+  the callback and transcript row are not duplicated. 8) Send a parent-to-worker
+  and worker-to-parent message in separate active plugin Agent tool turns;
+  verify source/target provenance and real target turn binding in both
+  transcripts. 9) Open one worker from the Agents panel, send it a follow-up
+  using the exact returned `sessionId`, and stop another worker. 10) Restart
+  the host/plugin with a queued delivery and confirm it remains held, while an
+  interrupted turn is not replayed. Repeat the parallel creation step with a
+  large existing session list while keeping the parent visible.
 - **Expected**: Each worker is a real durable session with the parent's
   project/model/thinking/permission ceiling and an independent empty
-  transcript at creation. The parent receives only bounded final reports;
-  full worker transcripts remain inspectable in their own sessions. Send uses
-  the same worker id, cancel aborts without deletion, unrelated sessions and
-  the existing Task family are unchanged, and no localhost MCP call or token
-  access occurs. A worker cannot create another worker, and concurrency limits
-  fail closed.
+  transcript at creation. The host ledger binds every delivery to the actual
+  target durable turn; result text and error status derive from that turn's
+  terminal state, not from polling assistant text. The parent receives only
+  bounded, at-most-once completion messages; full worker transcripts remain
+  inspectable in their own sessions. `sessionId` is the only canonical worker
+  identity and follow-up `send` reuses that same session and context without
+  creating a replacement. A session-message row is visibly distinct from
+  human input and its provenance survives reload. `wait` returns `timedOut`
+  within its bound instead of occupying the host tool deadline. Cancel
+  interrupts only the selected delivery/turn without deleting the session.
+  Sends without an active plugin tool invocation, forged source ids, targets
+  above the source permission ceiling, worker fan-out overflow, inbox overflow,
+  and autonomous callback loops fail closed. Unrelated sessions and the
+  existing Task family are unchanged, and no localhost MCP call or token
+  access occurs. Bursts of worker notifications serialize and coalesce
+  session-list refreshes while preserving the final worker list and the
+  foreground session.
 - **Specs linked**: `07-plugins/03-plugin-api.md`,
   `07-plugins/04-plugin-security.md`, `07-plugins/11-plugin-storage-isolation.md`,
   `03-runtime/01-ipc-protocol.md`, `03-runtime/06-host-rpc-protocol.md`,
-  ADR 0237
+  `03-runtime/04-data-storage.md`, ADR 0237, ADR 0239
 - **Acceptance**: C (parallel durable sessions), D (plugin security), Quality
 - **Milestone**: M6+
 - **Status**: marketplace plugin tests cover the plugin runtime; host-core and
@@ -10087,6 +10191,59 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
 
+#### E2E-PLUGIN-imported-pi-package-skills: Explicit package import exposes skills through plugin grants
+
+- **Preconditions**: A local fixture package under an npm-style
+  `node_modules/@fixture/package-skills` path declares `pi.extensions` and
+  `pi.skills`. Its skills include a direct Markdown file, a directory with
+  `SKILL.md`, and a collection containing two different `SKILL.md` files.
+  Reference files, assets, a `node_modules-note.txt` resource, and an internal
+  `node_modules` dependency are present. A second fixture declares only
+  `pi.skills`. No downloaded third-party code or dependency installation is
+  needed.
+- **Steps**:
+  1. Choose the mixed package through Plugins → Import pi extension and
+     inspect the generated manifest and copied resources. For headless
+     validation, pass the explicit selected path to the same importer.
+  2. Load the generated directory in the real `PluginRuntime`; inspect
+     `getSkills()` and read every document with `loadSkillBody(id)`.
+  3. Reload with only `agent.extension` granted, then reload with only
+     `agent.prompt.inject` granted. Unload the plugin and try the old skill IDs.
+  4. Import the skill-only package; ensure a helper `index.js` is not treated
+     as an extension. Install a generated two-skill fixture through the real
+     Host `plugins.installFromPath`, list it, read its installed manifest and
+     skill files, then uninstall it.
+  5. Attempt declarations with absolute paths, `..`, missing or unsupported
+     files, an internal dependency path, or descendant symbolic links. Exceed
+     the 32-skill or 256-directory scan limit and inspect failure cleanup.
+- **Expected**: All four declared skills appear with independent stable IDs,
+  including the repeated `SKILL.md` basenames, and loading them returns the
+  correct body with frontmatter removed. The imported extension remains a
+  separate contribution. Resources and their relative paths survive copying;
+  npm installation ancestors do not suppress the package, and only dependency
+  directory segments within the selection are excluded. Missing skill grants
+  leave no skill catalog entries and produce the existing permission audit;
+  grants can be restored without changing IDs. Unload removes both catalogs,
+  and old skill IDs return `NOT_FOUND`. Skill-only imports declare only
+  `agent.prompt.inject`, and Host reports the `skills` capability while
+  retaining both skill documents. Invalid declarations fail without importing
+  outside data or retaining a partial copied plugin. Nothing automatically
+  imports `~/.pi` or runs npm/package lifecycle scripts.
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2;
+  `07-plugins/02-plugin-manifest-schema.md`; D007
+- **Acceptance**: E (tools & permissions), G (plugins), Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Partially automated. `imported-package-skills.test.mjs` covers
+  import discovery, resource copying, grants, and invalid-path handling.
+  `imported-package-skills-runtime.test.mjs` drives the generated no-op plugin
+  through the real plugin host subprocess and verifies catalog/body loading,
+  grant removal/restoration, and unload. On 2026-09-13, a separate temporary
+  two-skill fixture passed real Host `plugins.installFromPath` → `plugins.list`
+  → installed manifest/body reads → `plugins.uninstall`; it reported only
+  `agent.prompt.inject` and the `skills` capability. The native picker,
+  rendered plugin row, and a provider turn invoking the imported Skill have
+  not been executed for this scenario; no full desktop journey is claimed.
+
 #### E2E-242: Extension tools and hooks take effect in a turn
 
 - **Preconditions**: An enabled fixture extension that registers tool `fx_add`,
@@ -10507,3 +10664,46 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Milestone**: Post-M6 desktop shell maintenance
 - **Status**: Automated (`scripts/e2e-three-column-layout.mjs` — preview mode
   entry/exit widths, MainChat unmount, and window invariance)
+
+#### E2E-AGENT-alt-enter-steers-active-turn: Enter follows up and Alt+Enter steers the active turn
+
+- **Preconditions**: A session with a configured model and a controllable
+  streaming response/tool; an image-capable model for the attachment case.
+- **Steps**:
+  1. Start a prompt, then type a follow-up and press Enter. Confirm a FIFO row.
+  2. During the same turn, type a correction and press Alt+Enter. Repeat with
+     an image chip and with two corrections before the current request ends.
+  3. Finish the current response/tool batch and inspect the next model input,
+     transcript and durable turn id. Let the turn finish and observe follow-up.
+  4. Repeat with Enter-to-send off, an open autocomplete menu, Shift+Enter,
+     Alt+Shift+Enter and a Chinese IME candidate confirmation. Inspect the Send
+     tooltip on macOS (`⌥+Enter`) and Windows/Linux (`Alt+Enter`).
+  5. Race steering against turn completion, Stop, and a pending plan approval;
+     switch sessions while a rejected request is pending.
+  6. Change the next-turn model while running, then steer. Verify the active
+     model and permission configuration remain unchanged.
+  7. Steer while the parent waits for background delegates; leave them running
+     and verify the parent receives the correction before their reports finish.
+  8. Reload after completion and simulate a crash after a streaming reply was
+     reserved by steering. Inspect row order, recovered text and owning turn.
+  9. Reload the renderer after steering is accepted but before its reply starts,
+     then press Stop and inspect the persisted transcript.
+- **Expected**: Enter queues an ordinary follow-up. Alt+Enter creates a user
+  row in the current turn with no queue row or new public `agent_start`.
+  Started tools finish, then the next request contains the corrections/images.
+  The ordinary FIFO starts only after durable turn finalization. IME and
+  newline actions never submit; idle Alt+Enter sends normally. A stale/closed
+  target keeps the draft in its own session and never fails the active turn.
+  Accepted input is not replayed independently after Stop. Completed replies
+  and accepted steering input remain in history after renderer reload and Stop.
+  Terminal assistant snapshots replace provisional snapshots in place; crash
+  recovery preserves the latest
+  checkpoint and adjacent steering rows without duplicates.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.1a),
+  `03-runtime/02-agent-runtime.md` (§4.0), `03-runtime/04-data-storage.md`,
+  `04-ux/09-interaction-patterns.md` (§3.5), ADR active-turn-steering
+- **Acceptance**: C (conversation & stream), E (tools & permissions), Quality
+- **Milestone**: M5
+- **Status**: Draft. Existing regression suites cover surrounding behavior;
+  the rendered steering journey has not been run
+  (do not run E2E locally unless explicitly requested).

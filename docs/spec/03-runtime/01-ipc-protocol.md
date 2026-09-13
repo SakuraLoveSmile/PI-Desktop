@@ -19,6 +19,7 @@ Principles:
 | `agent` | Conversation, queued-send stop/abort, status, and interactive asktool resolution |
 | `plan` | Plan proposal listing, resolution, and change events |
 | `session` | Session CRUD / history / title metadata and summarization |
+| `session collaboration` | Read-only bounded collaboration status for sidebar projections; mutation stays in the reviewed plugin gateway |
 | `settings` | Config read/write |
 | `secrets` | Secret write/delete/exists (never return plaintext to UI logs) |
 | `project` | Workspace selection and query |
@@ -45,6 +46,7 @@ event: pi-desktop/<domain>/event/<name>
 Examples:
 
 - `pi-desktop/agent/prompt`
+- `pi-desktop/agent/steer`
 - `pi-desktop/agent/stop`
 - `pi-desktop/agent/abort`
 - `pi-desktop/agent/event/message`
@@ -57,6 +59,7 @@ Examples:
 - `pi-desktop/project/openFolder`
 - `pi-desktop/session/getScratchPath`
 - `pi-desktop/session/openScratchPath`
+- `pi-desktop/session/collaboration`
 
 ## 4. Common Response Envelope
 
@@ -81,6 +84,8 @@ type AppError = {
 type AgentPromptRequest = {
  sessionId: string;
  content: string;
+ /** Host-owned collaboration delivery; its ledger supplies content and provenance. */
+ sessionMessageId?: string;
  attachments?: AgentPromptAttachment[];
  /** Truncate durable transcript to N leading messages before append (regenerate). */
  truncateBefore?: number;
@@ -177,6 +182,44 @@ current turn. On a vision runtime, persisted image refs are hydrated from the
 session-bound attachment/scratch roots when history is rebuilt; oversized or
 unavailable images remain path fallbacks. This keeps renderer, main, sidecar, the models.dev catalog, and host
 persistence on one capability-aware contract.
+
+### 5.1a Steer an active turn
+
+`pi-desktop/agent/steer` accepts `AgentSteerRequest`:
+
+```ts
+type AgentSteerRequest = {
+ sessionId: string;
+ expectedTurnId: string;
+ content: string;
+ messageId?: string;
+ attachments?: AgentPromptAttachment[];
+};
+```
+
+It returns `{ accepted: true, turnId }` for the existing turn. Main checks its
+active durable turn, asks the existing sidecar runtime for the active project's
+attachment roots and model image capability, then applies the ordinary bounded
+attachment preparation. The sidecar revalidates `expectedTurnId` after that IO.
+A missing, ended, stopping, or mismatched turn, or a pending plan/goal approval,
+fails with `TURN_NOT_FOUND`; it never falls back to starting or queueing a turn.
+An empty payload fails with `INVALID_ARGUMENT`.
+
+The internal `agent.steeringContext` and `agent.steer` methods use only an
+existing runtime. They do not run launch configuration, `runtimeFor`, or
+`session.beginTurn`. Steering cannot change the active model, permission mode,
+workspace, or approved execution. Slash text is literal input on this channel.
+
+Accepted input is echoed as ordinary user message events with the current
+`turnId`, main-prepared attachment refs, and `UiMessage.steering: true`. This
+persisted marker protects accepted input from Smart Stop after renderer reload.
+A user `message_end` can additionally
+carry `precedingAssistant`, a streaming snapshot that reserves the reply's
+position before the input is persisted. Main writes both through its replayable
+outbox; the host replaces only that provisional assistant row with its terminal
+snapshot, preserving its id, sequence and owning turn. No image bytes enter the
+durable message. This is an additive desktop channel and event field; it does
+not change RACP, the host RPC version, or the storage schema. See ADR active-turn-steering.
 
 ### 5.2 stop at the next turn boundary
 
@@ -460,6 +503,48 @@ at the next boundary. `remove` cancels an entry that has not started. A
 restored queue stays held until the desktop attaches as the owner, so a
 reboot never starts work unattended.
 
+### 5.7 Session collaboration projection
+
+The renderer has one read-only Electron channel for the sidebar hover card:
+
+```ts
+// pi-desktop/session/collaboration({ sessionId }) -> SessionCollaborationSummary
+type SessionCollaborationSummary = {
+  sessionId: string;
+  title: string;
+  status: "idle" | "waiting_permission" |
+    "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+  observedAt: string;
+  modelKey?: string;
+  createdBySession?: { sessionId: string; title: string };
+  currentTask?: {
+    messageId: string;
+    senderSession: { sessionId: string; title: string };
+    text: string;
+    status: string;
+    turnId?: string;
+    createdAt: string;
+  };
+  result?: { messageId: string; turnId?: string; status: string; text?: string; error?: string };
+  recentExchanges: Array<{
+    messageId: string;
+    direction: "incoming" | "outgoing";
+    peer: { sessionId: string; title: string };
+    kind: "task" | "message" | "completion";
+    status: string;
+    preview: string;
+    createdAt: string;
+  }>;
+};
+```
+
+Electron overlays live Agent status on the durable host projection, bounds the
+exchange previews, and fetches it only while a session row is hovered or
+focused. The renderer cannot invoke the host's mutating
+`session.collaboration.*` methods. The plugin's `desktop.control` gateway is
+the sole reviewed mutation surface and binds send/cancel authorization to the
+active plugin Agent tool invocation.
+
 ## 6. Agent Events
 
 Pushed from main → renderer:
@@ -633,6 +718,19 @@ Plugin-owned session mutations additionally emit
 handles this host-owned event by calling its existing `refreshSessions()` path;
 plugins never send a sidebar event and a skipped import does not emit one.
 
+Calls to the renderer store's `refreshSessions()` action have at most one
+session-list request in flight per store instance. Calls arriving while that
+request is running share one follow-up request; their promises resolve
+after that later response is committed, rather than accepting the older read.
+Further calls during the follow-up form the next batch. Each batch commits
+once, and a failed batch does not prevent a queued or later refresh. An import
+refresh retains its own pre-refresh session baseline and project-reveal intent,
+even if an earlier ordinary refresh already observed the imported rows.
+Ordinary refreshes do not gain import-reveal behavior or change the current
+session, project, or page. Bursts from parallel plugin workers therefore remain
+current without issuing overlapping full-list reads within this refresh path.
+Bootstrap and provider-refresh snapshots remain independent reads.
+
 Electron owns the native surface while the renderer derives localized
 title/body text from the structured record. Electron accepts `showNative` only
 for a valid notification/session pair. For `kind: "task"`, it shows a native
@@ -673,10 +771,21 @@ type SessionSummary = {
  createdAt: string;
 };
 
+type SessionMessageOrigin = {
+ messageId: string;
+ sourceSessionId: string;
+ sourceTitle: string;
+ targetSessionId: string;
+ kind: "task" | "message" | "completion";
+ replyToMessageId?: string;
+};
+
 type UiMessage = {
  id: string;
  role: "user" | "assistant" | "system" | "tool";
  content: string;
+ /** Host-authenticated session collaboration origin; absent for human input. */
+ sessionMessage?: SessionMessageOrigin;
  thinking?: string; // assistant reasoning, never folded into content
  usage?: MessageUsage; // provider-reported assistant usage
  responseDurationMs?: number; // model stream duration for throughput
@@ -740,7 +849,7 @@ for the reserved `Alt+Space` binding. Host-core emits the notification
 keyboard hook detects the chord; the hook consumes that chord so the active
 window system menu does not open. Non-Windows hosts treat the method as a
 no-op. `responseDurationMs` and `responseOutputTokens` are optional transcript
-metadata persisted in message metadata, so protocol v11 and storage schema v14
+  metadata persisted in message metadata, so protocol v11 and storage schema v16
 remain unchanged.
 
 The Settings font picker (ADR 0083) reads installed system font families

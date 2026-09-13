@@ -131,6 +131,7 @@ import { createSessionCoordination } from "./runtime/session-coordination";
 import { createScheduledRuntime } from "./runtime/scheduled";
 import { createDesktopServices } from "./services/desktop-services";
 import { createPluginServices } from "./services/plugin-services";
+import { createSessionCollaborationService } from "./services/session-collaboration";
 import {
   createApplicationLifecycle,
   type ApplicationAppearanceState,
@@ -557,6 +558,7 @@ const logger = new Logger(
 const persistenceOutbox = new PersistenceOutbox(dataDir, (level, message, data) => {
   logger.app("persistence", level, message, { data });
 });
+const steeringReplies = new Set<string>();
 const scheduledRuntime = createScheduledRuntime({
   dataDir,
   getHost: () => host,
@@ -1091,6 +1093,21 @@ const planUiProbe = createPlanUiProbe({
 
 let emitAgentEvent: (envelope: AgentEventEnvelope) => void = () => undefined;
 
+const sessionCollaboration = createSessionCollaborationService({
+  getHost: () => host,
+  getSidecar: () => sidecar,
+  getBridge: () => agentHostBridge,
+  getActiveTurn: (sessionId) => activeTurns.get(sessionId),
+  flushTranscript: async () => {
+    await persistenceOutbox.flush(() => host);
+    return persistenceOutbox.size() === 0;
+  },
+  isPluginLoaded: (pluginId) => plugins.listLoaded().some((plugin) => plugin.manifest.id === pluginId),
+  isQuitting: () => quitting,
+  onChanged: () => sendToRenderer(IPC.event.sessionsChanged, { reason: "session.collaboration" }),
+  log: (message, data) => logger.app("runtime", "warn", message, { data }),
+});
+
 const planRuntime = createPlanRuntime({
   runtimeState,
   planState: planRuntimeState,
@@ -1118,6 +1135,7 @@ const planRuntime = createPlanRuntime({
   acquireSessionOperation,
   resolveAgentRuntimeLaunch,
   isQuitting: () => quitting,
+  onTurnSettled: sessionCollaboration.settle,
 });
 const {
   finishTurn,
@@ -1129,6 +1147,7 @@ const {
 
 const eventPersistence = createEventPersistence({
   runtimeState,
+  steeringReplies,
   activeTurns,
   activeToolCalls,
   activeToolCallKey,
@@ -1149,6 +1168,7 @@ const { persistAgentEvent } = eventPersistence;
 
 const sidecarRuntime = createSidecarRuntime({
   runtimeState,
+  steeringReplies,
   logger,
   sendToRenderer,
   persistAgentEvent,
@@ -1235,6 +1255,7 @@ function registerIpc() {
     updater,
     dataDir,
     activeTurns,
+    turnFinalizations,
     sessionProjects,
     persistenceOutbox,
     logger,
@@ -1386,6 +1407,12 @@ registerApplicationStartup({
   ensureWindow,
   bootHostStatus,
   flushPendingApplicationMenuCommands,
+  invokeSessionCollaboration: sessionCollaboration.invoke,
+  onSessionQueueChange: () => {
+    void sessionCollaboration.drain().catch((error: unknown) => {
+      logger.app("runtime", "warn", "session callback drain failed", { data: String(error) });
+    });
+  },
 });
 
 const shutdownState: ShutdownState = {
