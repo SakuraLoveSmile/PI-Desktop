@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import type { ProjectWorkspace, SessionCollaborationSummary } from "@pi-desktop/shared";
+import type { ProjectWorkspace, SessionCollaborationSummary, SessionReference } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
-import { IconBranch, IconClock, IconFolder } from "../../components/icons";
+import { IconArrowUpRight, IconBranch, IconClock, IconFolder } from "../../components/icons";
 import { observeSessionCollaboration } from "./session-collaboration-reader";
 import {
   collaborationStatusKey,
@@ -17,9 +17,15 @@ import type { SessionHoverCardData } from "./useSessionHoverCard";
 export function SessionHoverCard({
   card,
   refreshProject,
+  onOpenSession,
+  keepVisible,
+  scheduleHide,
 }: {
   card: SessionHoverCardData;
   refreshProject: (path: string) => Promise<ProjectWorkspace | null>;
+  onOpenSession: (sessionId: string) => Promise<void>;
+  keepVisible: () => void;
+  scheduleHide: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const elementRef = useRef<HTMLDivElement>(null);
@@ -79,17 +85,26 @@ export function SessionHoverCard({
         : session.permissionMode === "accept-edits" ? "chat.permissionAcceptEdits"
           : session.permissionMode === "ask" ? "chat.permissionAsk" : "chat.modeAgent";
   const result = summary ? currentCollaborationResult(summary) : undefined;
-  const modelKey = summary?.modelKey ?? session.modelId;
+  const modelName = summary?.modelName;
   const timestamp = (value: string | undefined) => formatSessionTimestamp(value, i18n.language);
+  const openSessionReference = (reference: SessionReference) => {
+    void onOpenSession(reference.sessionId);
+  };
 
   return createPortal(
     <div
       ref={elementRef}
       id={`session-hover-${session.id}`}
       className="sidebar-session-hover-card"
-      role="tooltip"
+      role="dialog"
+      aria-label={t("sessionCollaboration.sessionDetails", { name: session.title })}
       data-session-collaboration={session.id}
       style={{ ...position, visibility: position ? "visible" : "hidden" }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onMouseEnter={keepVisible}
+      onMouseLeave={scheduleHide}
+      onFocusCapture={keepVisible}
+      onBlurCapture={scheduleHide}
     >
       <div className="sidebar-session-hover-card-title">{session.title}</div>
       <div className="sidebar-session-hover-card-tags">
@@ -108,8 +123,40 @@ export function SessionHoverCard({
       {summary?.createdBySession ? (
         <div className="sidebar-session-hover-card-section">
           <span className="sidebar-session-hover-card-section-label">{t("sessionCollaboration.createdBy")}</span>
-          <span className="sidebar-session-hover-card-preview">{summary.createdBySession.title || summary.createdBySession.sessionId}</span>
+          <button
+            type="button"
+            className="sidebar-session-hover-card-session-link"
+            data-session-link={summary.createdBySession.sessionId}
+            title={summary.createdBySession.sessionId}
+            aria-label={t("sessionCollaboration.openSession", { name: summary.createdBySession.title || summary.createdBySession.sessionId })}
+            onClick={() => openSessionReference(summary.createdBySession!)}
+          >
+            <span className="sidebar-session-hover-card-session-link-title">{summary.createdBySession.title || summary.createdBySession.sessionId}</span>
+            <IconArrowUpRight size={12} aria-hidden />
+          </button>
           <code className="sidebar-session-hover-card-id">{summary.createdBySession.sessionId}</code>
+        </div>
+      ) : null}
+      {summary?.createdSessions?.length ? (
+        <div className="sidebar-session-hover-card-section">
+          <span className="sidebar-session-hover-card-section-label">{t("sessionCollaboration.createdSessions")}</span>
+          <ul className="sidebar-session-hover-card-session-links">
+            {summary.createdSessions.slice(0, 8).map((reference) => (
+              <li key={reference.sessionId}>
+                <button
+                  type="button"
+                  className="sidebar-session-hover-card-session-link"
+                  data-session-link={reference.sessionId}
+                  title={reference.sessionId}
+                  aria-label={t("sessionCollaboration.openSession", { name: reference.title || reference.sessionId })}
+                  onClick={() => openSessionReference(reference)}
+                >
+                  <span className="sidebar-session-hover-card-session-link-title">{reference.title || reference.sessionId}</span>
+                  <IconArrowUpRight size={12} aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
       {summary?.currentTask ? (
@@ -147,10 +194,20 @@ export function SessionHoverCard({
         </div>
       ) : null}
       <div className="sidebar-session-hover-card-meta">
-        {modelKey ? (
+        {modelName || summary?.providerName ? (
           <div className="sidebar-session-hover-card-detail">
-            <span className="sidebar-session-hover-card-meta-label">{t("sessionCollaboration.model")}</span>
-            <span className="sidebar-session-hover-card-model">{modelKey}</span>
+            {summary?.providerName ? (
+              <>
+                <span className="sidebar-session-hover-card-meta-label">{t("sessionCollaboration.provider")}</span>
+                <span className="sidebar-session-hover-card-model">{summary.providerName}</span>
+              </>
+            ) : null}
+            {modelName ? (
+              <>
+                <span className="sidebar-session-hover-card-meta-label">{t("sessionCollaboration.model")}</span>
+                <span className="sidebar-session-hover-card-model">{modelName}</span>
+              </>
+            ) : null}
           </div>
         ) : null}
         <div className="sidebar-session-hover-card-meta-row">

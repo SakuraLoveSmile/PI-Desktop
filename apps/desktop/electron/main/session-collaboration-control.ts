@@ -18,6 +18,11 @@ export const SESSION_COLLABORATION_OPERATIONS: McpControlOperation[] = [
     argumentShape: ["{sessionId}"],
   },
   {
+    id: "session/collaboration/list", channel: "internal:session-collaboration", risk: "read",
+    description: "List bounded, communicable Agent sessions without loading their transcripts.",
+    argumentShape: ["{}"],
+  },
+  {
     id: "session/collaboration/result", channel: "internal:session-collaboration", risk: "read",
     description: "Read the durable outcome of a specific delivery or the session's latest delivery.",
     argumentShape: ["{sessionId,messageId?,turnId?}"],

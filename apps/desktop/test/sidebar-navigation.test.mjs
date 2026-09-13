@@ -286,3 +286,18 @@ test("session rows use the hover card instead of a native title tooltip", () => 
   assert.match(hoverHookSource, /addEventListener\("scroll", hide, true\)/);
   assert.match(hoverHookSource, /addEventListener\("visibilitychange", onVisibility\)/);
 });
+
+test("session hover cards expose readable models and keyboard-navigable session links", () => {
+  assert.match(hoverSource, /role="dialog"/);
+  assert.match(hoverSource, /summary\?\.providerName/);
+  assert.match(hoverSource, /summary\?\.modelName/);
+  assert.doesNotMatch(hoverSource, /modelKey\?\.includes\("\/"\)/);
+  assert.match(hoverSource, /data-session-link=\{summary\.createdBySession\.sessionId\}/);
+  assert.match(hoverSource, /summary\.createdSessions\.slice\(0, 8\)/);
+  assert.match(hoverSource, /type="button"/);
+  assert.match(hoverSource, /onClick=\{\(\) => openSessionReference/);
+  assert.match(hoverSource, /onFocusCapture=\{keepVisible\}/);
+  assert.match(hoverHookSource, /setTimeout\(\(\) => \{[\s\S]*?hide\(\);[\s\S]*?\}, 160\)/);
+  assert.match(globalStyles, /\.sidebar-session-hover-card\s*\{[\s\S]*?pointer-events:\s*auto;/);
+  assert.match(globalStyles, /\.sidebar-session-hover-card-session-link:focus-visible\s*\{[\s\S]*?outline:/);
+});

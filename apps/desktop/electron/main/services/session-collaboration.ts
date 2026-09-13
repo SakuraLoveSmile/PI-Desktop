@@ -213,6 +213,9 @@ export function createSessionCollaborationService(deps: SessionCollaborationDepe
         case "session/collaboration/status":
           await drain();
           return readSessionCollaboration(host, deps.getSidecar(), text(data, "sessionId")!);
+        case "session/collaboration/list":
+          await drain();
+          return host.call("session.collaboration.list", {});
         case "session/collaboration/result":
           await drain();
           return host.call("session.collaboration.result", {

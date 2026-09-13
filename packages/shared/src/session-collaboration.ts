@@ -40,7 +40,10 @@ export type SessionCollaborationSummary = {
   status: "idle" | "waiting_permission" | SessionMessageStatus;
   observedAt: string;
   modelKey?: string;
+  providerName?: string;
+  modelName?: string;
   createdBySession?: SessionReference;
+  createdSessions?: SessionReference[];
   currentTask?: {
     messageId: string;
     senderSession: SessionReference;
@@ -65,6 +68,22 @@ export type SessionCollaborationSummary = {
     preview: string;
     createdAt: string;
   }>;
+};
+
+export type SessionCollaborationListItem = {
+  sessionId: string;
+  title: string;
+  status: "idle" | "waiting_permission" | SessionMessageStatus;
+  updatedAt: string;
+  modelKey?: string;
+  providerName?: string;
+  modelName?: string;
+  createdBySession?: SessionReference;
+  createdSessions?: SessionReference[];
+};
+
+export type SessionCollaborationList = {
+  sessions: SessionCollaborationListItem[];
 };
 
 export type SessionCollaborationSendRequest = {

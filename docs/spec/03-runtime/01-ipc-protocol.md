@@ -516,7 +516,10 @@ type SessionCollaborationSummary = {
     "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
   observedAt: string;
   modelKey?: string;
+  providerName?: string;
+  modelName?: string;
   createdBySession?: { sessionId: string; title: string };
+  createdSessions?: Array<{ sessionId: string; title: string }>;
   currentTask?: {
     messageId: string;
     senderSession: { sessionId: string; title: string };
