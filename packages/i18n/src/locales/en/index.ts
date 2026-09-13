@@ -1509,6 +1509,7 @@ export const en = {
     groupActive: "Active",
     groupDisabled: "Turned off",
     tagLocal: "Local",
+    tagBundled: "Bundled",
     rowActions: "Actions for {{name}}",
     details: "Details",
     capabilitiesTitle: "Capabilities",

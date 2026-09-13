@@ -1501,6 +1501,7 @@ export const zhCN = {
     groupActive: "已启用",
     groupDisabled: "已关闭",
     tagLocal: "本地",
+    tagBundled: "内置",
     rowActions: "{{name}} 的操作",
     details: "详情",
     capabilitiesTitle: "能力",

@@ -1501,6 +1501,7 @@ export const zhTW = {
     groupActive: "已啟用",
     groupDisabled: "已關閉",
     tagLocal: "本地",
+    tagBundled: "內建",
     rowActions: "{{name}} 的操作",
     details: "詳情",
     capabilitiesTitle: "能力",

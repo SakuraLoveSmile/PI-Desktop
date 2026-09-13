@@ -1511,6 +1511,7 @@ export const ko = {
     groupActive: "활성",
     groupDisabled: "꺼짐",
     tagLocal: "로컬",
+    tagBundled: "내장",
     rowActions: "{{name}} 작업",
     details: "세부 정보",
     capabilitiesTitle: "기능",

@@ -1511,6 +1511,7 @@ export const tr = {
     groupActive: "Etkin",
     groupDisabled: "Kapalı",
     tagLocal: "Yerel",
+    tagBundled: "Yerleşik",
     rowActions: "{{name}} eylemleri",
     details: "Ayrıntılar",
     capabilitiesTitle: "Yetenekler",

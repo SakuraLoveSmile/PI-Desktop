@@ -1492,6 +1492,7 @@ export const de = {
     "groupActive": "Aktiv",
     "groupDisabled": "Deaktiviert",
     "tagLocal": "Lokal",
+    "tagBundled": "Mitgeliefert",
     "rowActions": "Aktionen für {{name}}",
     "details": "Details",
     "capabilitiesTitle": "Funktionen",

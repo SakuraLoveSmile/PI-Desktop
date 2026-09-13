@@ -1492,6 +1492,7 @@ export const es = {
     "groupActive": "Activa",
     "groupDisabled": "Desactivada",
     "tagLocal": "Local",
+    "tagBundled": "Incluido",
     "rowActions": "Acciones para {{name}}",
     "details": "Detalles",
     "capabilitiesTitle": "Capacidades",

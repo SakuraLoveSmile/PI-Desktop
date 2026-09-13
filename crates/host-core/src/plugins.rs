@@ -43,6 +43,9 @@ pub(crate) use install::{
     copy_dir_filtered, crc32, decode_curl_output, download_url, download_url_guarded,
     extract_zip_bytes, find_plugin_root, read_u16, read_u32, safe_join, sha256_hex,
 };
+// The GBK fallback only exists on Windows, and so does the test that pins it.
+#[cfg(windows)]
+pub(crate) use install::decode_windows_code_page;
 pub(crate) use marketplace::catalog::make_zip;
 pub(crate) use marketplace::compare_plugin_versions;
 pub(crate) use marketplace::{
