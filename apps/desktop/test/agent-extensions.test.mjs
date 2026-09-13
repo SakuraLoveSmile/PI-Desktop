@@ -53,6 +53,33 @@ test("non-registry dependency specs are rejected before npm runs", async () => {
   assert.equal(npmRan, false);
 });
 
+test("optional dependencies and overrides cannot escape the registry before npm runs", async () => {
+  const cases = [
+    {
+      dependencies: { "left-pad": "^1.3.0" },
+      optionalDependencies: { evil: "git+ssh://git@evil.example/evil.git" },
+    },
+    {
+      dependencies: { "left-pad": "^1.3.0" },
+      overrides: { "left-pad": "https://evil.example/left-pad.tgz" },
+    },
+  ];
+  for (const packageJson of cases) {
+    const root = mkdtempSync(join(tmpdir(), "ext-deps-source-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify(packageJson));
+    let npmRan = false;
+    const result = await installExtensionDependencies(root, {
+      runner: async () => {
+        npmRan = true;
+        return { code: 0, stderr: "" };
+      },
+    });
+    assert.equal(result.state, "failed");
+    assert.match(String(result.error), /non-registry spec/);
+    assert.equal(npmRan, false);
+  }
+});
+
 test("a lockfile with non-registry resolved urls is dropped before install", async () => {
   const root = mkdtempSync(join(tmpdir(), "ext-deps-lock-"));
   writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }));
@@ -62,6 +89,25 @@ test("a lockfile with non-registry resolved urls is dropped before install", asy
   );
   const result = await installExtensionDependencies(root, { runner: async () => ({ code: 0, stderr: "" }) });
   assert.equal(result.state, "installed");
+  assert.equal(existsSync(join(root, "package-lock.json")), false);
+});
+test("a legacy package-lock dependency tree with a non-registry source is dropped", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ext-deps-legacy-lock-"));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }));
+  writeFileSync(
+    join(root, "package-lock.json"),
+    JSON.stringify({
+      name: "x",
+      lockfileVersion: 1,
+      dependencies: {
+        evil: { version: "1.0.0", resolved: "https://evil.example/evil.tgz" },
+      },
+    }),
+  );
+  const result = await installExtensionDependencies(root, {
+    runner: async () => ({ code: 0, stderr: "" }),
+  });
+  assert.deepEqual(result, { state: "installed" });
   assert.equal(existsSync(join(root, "package-lock.json")), false);
 });
 
@@ -229,6 +275,26 @@ test("default runner caps captured stderr and escalates the timeout kill", async
   );
   assert.notEqual(stalled.code, 0, "a stalled install is killed");
   assert.match(stalled.stderr, /exceeded 300ms and was terminated/);
+});
+test("the default dependency runner isolates npm config sources and proxies", async () => {
+  const { defaultDependencyRunner } = await import("../electron/main/agent-extensions.ts");
+  const result = await defaultDependencyRunner(
+    process.execPath,
+    ["-e", "process.stderr.write(JSON.stringify(process.env))"],
+    process.cwd(),
+    30_000,
+  );
+  assert.equal(result.code, 0);
+  const childEnv = JSON.parse(result.stderr);
+  assert.notEqual(childEnv.npm_config_userconfig, childEnv.npm_config_globalconfig);
+  assert.ok(childEnv.npm_config_userconfig.startsWith(tmpdir()));
+  assert.ok(childEnv.npm_config_globalconfig.startsWith(tmpdir()));
+  assert.equal(childEnv.npm_config_registry, "https://registry.npmjs.org/");
+  assert.equal(childEnv.npm_config_proxy, "");
+  assert.equal(childEnv.npm_config_https_proxy, "");
+  assert.equal(childEnv.npm_config_noproxy, "*");
+  assert.equal(childEnv.NPM_TOKEN, undefined);
+  assert.equal(childEnv.NODE_AUTH_TOKEN, undefined);
 });
 
 test("dependency install: skips without a manifest or dependencies, runs npm with pinned flags, surfaces failures", async () => {

@@ -129,10 +129,10 @@ failure. The generated destination must not be inside the selected source.
 
 This is an explicit local import, not a pi CLI package manager. It never
 automatically scans or imports `~/.pi`, does not read the CLI's installed
-package registry, and does not run npm installation or package lifecycle
-scripts. Full CLI package semantics and dependency installation/resolution
-remain separate work (including PR #277); importing a package does not
-promise that every third-party extension dependency can execute.
+package registry, and does not run npm lifecycle scripts. When dependencies
+are declared, the bounded installer accepts only registry version specs and
+registry-resolved npm lockfiles; importing a package does not promise that
+every third-party extension dependency can execute.
 
 ## 4. Loading and runtime
 
