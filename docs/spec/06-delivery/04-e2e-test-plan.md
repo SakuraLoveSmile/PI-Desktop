@@ -4454,6 +4454,34 @@ and identify the platform validation still needed.
   content, and checks cross-part Task terminal status/timing updates. Styles
   are omitted; full provider streaming and shell responsiveness remain Draft.
 
+#### E2E-STREAM-long-turn-keeps-realtime
+
+- **Preconditions**: Provider configured; an Agent session can run a long
+  autonomous turn with thinking, tools, and at least one subagent.
+- **Steps**:
+  1. Start a long Agent task that streams thinking and answer text at a high
+     upstream token rate and continues through many tool rounds.
+  2. Observe streaming latency of later short thinking/answer blocks in the
+     same turn, including a nested subagent.
+  3. Stop the turn, send a new prompt in the same session, and compare the
+     new turn's streaming latency.
+  4. Confirm historical activity rows in the still-running turn do not flash
+     or rebuild as the tail token updates.
+- **Expected**:
+  - Upstream 200+ tok/s streams stay visually caught up (batched to the
+    display refresh is allowed; a growing backlog is not).
+  - Later short chunks in the same long turn do not keep getting slower.
+  - Stop plus a new prompt is not required to restore speed.
+  - Parent and subagent streams both stay realtime.
+  - Transcript text after `message_end` matches the streamed content.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/02-agent-runtime.md`, ADR 0242, D412, issue #299
+- **Acceptance**: C (chat stream), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`message-stream.test.ts`,
+  `stream-coalescer.test.ts`, `streaming-benchmark.test.ts`,
+  `assistant-turns.test.mjs`); rendered long-turn scenario Draft
+
 #### E2E-084: Long tool loop compacts before the provider context limit
 
 - **Preconditions**: Provider configured with known pi-ai context/output

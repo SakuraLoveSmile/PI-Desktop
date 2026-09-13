@@ -15,6 +15,7 @@ import type {
 import type { PendingPermission } from "../../../../lib/pending-permissions";
 import {
   buildTranscriptEntries,
+  reuseTranscriptEntries,
   transcriptEntryMessages,
   type TranscriptEntry,
 } from "../../../../lib/assistant-turns";
@@ -81,6 +82,8 @@ export function useTranscriptScroll({
   // Read by `reachTop`, which must stay referentially stable for the scroll
   // listener; the projection it describes is only known later in this render.
   const historyLengthRef = useRef(0);
+  const previousEntriesRef = useRef<TranscriptEntry[]>([]);
+  const previousSessionIdRef = useRef(sessionId);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     const el = scrollRef.current;
@@ -384,10 +387,16 @@ export function useTranscriptScroll({
     firstCommit || paneRevealed ? messages : deferredMessages;
   const renderedCompactions =
     firstCommit || paneRevealed ? compactions : deferredCompactions;
-  const { entries, visible } = useMemo(
-    () => buildTranscriptEntries(renderedMessages, renderedCompactions),
-    [renderedMessages, renderedCompactions],
-  );
+  const { entries, visible } = useMemo(() => {
+    if (previousSessionIdRef.current !== sessionId) {
+      previousSessionIdRef.current = sessionId;
+      previousEntriesRef.current = [];
+    }
+    const built = buildTranscriptEntries(renderedMessages, renderedCompactions);
+    const entries = reuseTranscriptEntries(previousEntriesRef.current, built.entries);
+    previousEntriesRef.current = entries;
+    return { entries, visible: built.visible };
+  }, [renderedMessages, renderedCompactions, sessionId]);
   // Memoized so a re-render that changed no message (jump pill, loading row,
   // window growth) hands `TranscriptHistory` the same array, letting its
   // comparator bail on identity instead of walking every mounted row.

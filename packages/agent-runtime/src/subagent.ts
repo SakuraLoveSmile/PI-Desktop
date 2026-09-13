@@ -31,6 +31,7 @@ import {
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import {
   addUsage,
+  cumulativeDelta,
   subagentCanMutate,
   type AgentEventEnvelope,
   type MessageUsage,
@@ -522,28 +523,33 @@ export class SubagentRun {
         const nextThinking = content.hasThinking
           ? content.thinking
           : previousThinking;
-        const deltaText = content.hasText
-          ? content.text.startsWith(previousText)
-            ? content.text.slice(previousText.length)
-            : content.text
-          : "";
-        const deltaThinking = content.hasThinking
-          ? content.thinking.startsWith(previousThinking)
-            ? content.thinking.slice(previousThinking.length)
-            : content.thinking
-          : "";
+        const textDelta = content.hasText
+          ? cumulativeDelta(previousText, content.text)
+          : { delta: "", reset: false };
+        const thinkingDelta = content.hasThinking
+          ? cumulativeDelta(previousThinking, content.thinking)
+          : { delta: "", reset: false };
         this.currentAssistant = {
           ...this.currentAssistant,
           content: nextText,
           ...(nextThinking ? { thinking: nextThinking } : {}),
           status: "streaming",
         };
-        this.emit({
-          type: "message_update",
-          message: this.currentAssistant,
-          deltaText,
-          ...(deltaThinking ? { deltaThinking } : {}),
-        });
+        if (
+          textDelta.delta ||
+          thinkingDelta.delta ||
+          textDelta.reset ||
+          thinkingDelta.reset
+        ) {
+          this.emit({
+            type: "message_update",
+            message: this.currentAssistant,
+            ...(textDelta.delta ? { deltaText: textDelta.delta } : {}),
+            ...(thinkingDelta.delta ? { deltaThinking: thinkingDelta.delta } : {}),
+            ...(textDelta.reset ? { resetText: true } : {}),
+            ...(thinkingDelta.reset ? { resetThinking: true } : {}),
+          });
+        }
         break;
       }
       case "message_end": {

@@ -587,7 +587,8 @@ type AgentEvent =
  | { type: "turn_end"; subagentUsage?: MessageUsage }
  | { type: "message_start"; message: UiMessage }
  | { type: "message_update"; message: UiMessage;
-     deltaText?: string; deltaThinking?: string }
+     deltaText?: string; deltaThinking?: string;
+     stream?: "delta"; resetText?: boolean; resetThinking?: boolean }
  | { type: "message_end"; message: UiMessage }
  | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
  | { type: "tool_update"; toolCallId: string; partialResult?: unknown }
@@ -611,6 +612,15 @@ type AgentEvent =
 
 > These are **UI-normalized events**, not a pass-through of raw pi events.
 > `packages/agent-runtime` is responsible for mapping pi events to this model.
+
+Append-only `message_update` frames set `stream: \"delta\"` and omit growing
+`content` / `thinking` from `message`. Consumers apply `deltaText` /
+`deltaThinking` onto the live row (replace instead of append when `resetText`
+or `resetThinking` is set). The runtime coalesces those frames on an ~16ms
+interval and flushes immediately before tool, terminal, abort, error, and
+retry events. `message_start` and `message_end` still carry a full
+`UiMessage`. Snapshot replacements omit `stream`. These fields are additive
+in protocol v11 (D412).
 
 `status` events include an optional runtime-owned `activity` phase while a turn
 is active. `starting` is the prompt handoff; `waiting-model` is the interval
