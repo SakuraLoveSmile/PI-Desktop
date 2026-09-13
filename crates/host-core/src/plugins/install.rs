@@ -102,6 +102,7 @@ impl PluginManager {
                     .map(|p| p.scope.clone())
                     .unwrap_or_default(),
                 source: opts.source.clone(),
+                bundled: self.bundled_ids.contains(&manifest.id),
                 status: if opts.enable {
                     "ready".into()
                 } else {
@@ -466,7 +467,7 @@ pub(crate) fn decode_curl_output(bytes: &[u8]) -> String {
 }
 
 #[cfg(windows)]
-fn decode_windows_code_page(bytes: &[u8], code_page: u32) -> Option<String> {
+pub(crate) fn decode_windows_code_page(bytes: &[u8], code_page: u32) -> Option<String> {
     use std::ptr::null_mut;
     use windows_sys::Win32::Globalization::MultiByteToWideChar;
 

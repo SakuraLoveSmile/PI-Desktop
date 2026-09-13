@@ -190,6 +190,60 @@ fn marketplace_uses_highest_semver_when_catalog_versions_are_unsorted() {
 }
 
 #[test]
+fn market_entry_offers_an_update_only_when_the_catalog_is_newer() {
+    with_local_market(|| {
+        let ship = tempdir().unwrap();
+        write_plugin(
+            &ship.path().join("pi.todo"),
+            json!({
+                "schemaVersion": 1,
+                "id": "pi.todo",
+                "name": "Todo",
+                "version": "0.6.0",
+                "main": "main.js",
+                "permissions": ["ui.panel"],
+            }),
+            &[],
+        );
+
+        let dir = tempdir().unwrap();
+        unsafe {
+            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+        }
+        let mut mgr = PluginManager::new(dir.path(), None);
+        mgr.sync_builtin(Some(ship.path())).unwrap();
+        assert_eq!(mgr.get("pi.todo").unwrap().version, "0.6.0");
+
+        // Same catalog shape at three versions, so the only difference between
+        // the assertions is which side the installed version sits on.
+        let entry = |latest: &str| MarketCatalogEntry {
+            id: "pi.todo".into(),
+            name: "Todo".into(),
+            description: "Todo plugin".into(),
+            author: "PI-Desktop".into(),
+            versions: vec![MarketVersion {
+                version: latest.into(),
+                published_at: "2026-08-12T00:00:00Z".into(),
+                shasum: "a".repeat(64),
+                url: "pi.todo.piplug".into(),
+                size_bytes: 1,
+                permissions: vec!["ui.panel".into()],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        // A catalog that is behind the installed plugin must not present the
+        // older version as an update: that would be a downgrade wearing the
+        // update affordance.
+        assert!(!mgr.to_market_summary(&entry("0.5.0")).update_available);
+        assert!(mgr.to_market_summary(&entry("0.7.0")).update_available);
+        // Same version is not an update either.
+        assert!(!mgr.to_market_summary(&entry("0.6.0")).update_available);
+    });
+}
+
+#[test]
 fn announced_version_without_a_package_is_visible_but_not_installable() {
     with_local_market(|| {
         let dir = tempdir().unwrap();
@@ -819,6 +873,157 @@ fn bundled_plugin_can_default_to_disabled_without_overwriting_user_state() {
     mgr.sync_builtin(Some(ship.path())).unwrap();
     let after = mgr.get("pi.opt-in").unwrap();
     assert!(after.enabled, "an explicit enable survives the next launch");
+}
+
+/// The user updates a bundled plugin; the update must outlive the next launch
+/// while the plugin stays uninstallable (ADR 0241).
+#[test]
+fn a_bundled_plugin_keeps_the_update_the_user_installed() {
+    let ship = tempdir().unwrap();
+    let shipped = ship.path().join("pi.view");
+    let shipped_manifest = |version: &str| {
+        json!({
+            "schemaVersion": 1,
+            "id": "pi.view",
+            "name": "View",
+            "version": version,
+            "main": "main.js",
+            "permissions": ["ui.panel"],
+        })
+    };
+    write_plugin(&shipped, shipped_manifest("1.0.0"), &[]);
+
+    let data = tempdir().unwrap();
+    let mut mgr = PluginManager::new(data.path(), None);
+    mgr.sync_builtin(Some(ship.path())).unwrap();
+    assert!(mgr.get("pi.view").unwrap().bundled);
+
+    let update = data.path().join("package");
+    write_plugin(&update, shipped_manifest("1.1.0"), &[]);
+    let installed = mgr
+        .install_from_path(
+            update.to_str().unwrap(),
+            InstallOptions {
+                source: "marketplace".into(),
+                enable: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(installed.plugin.source, "marketplace");
+    assert!(
+        installed.plugin.bundled,
+        "updating does not stop a plugin from being bundled"
+    );
+
+    // The next launch reconciles against the shipped 1.0.0 again.
+    let mut mgr = PluginManager::new(data.path(), None);
+    mgr.sync_builtin(Some(ship.path())).unwrap();
+    let after = mgr.get("pi.view").unwrap();
+    assert_eq!(
+        after.version, "1.1.0",
+        "the user's update is not rolled back"
+    );
+    assert_eq!(after.source, "marketplace");
+    assert!(after.bundled);
+    assert_eq!(after.path, installed.plugin.path);
+
+    // Updating is allowed; removing is still not.
+    assert!(mgr
+        .uninstall("pi.view")
+        .unwrap_err()
+        .to_string()
+        .contains("cannot be uninstalled"));
+}
+
+/// The other direction: an app update that ships a newer version than the one
+/// the user installed must win, otherwise a stale install would pin the plugin
+/// for good.
+#[test]
+fn a_newer_shipped_version_replaces_an_older_user_install() {
+    let ship = tempdir().unwrap();
+    let shipped = ship.path().join("pi.view");
+    let manifest = |version: &str| {
+        json!({
+            "schemaVersion": 1,
+            "id": "pi.view",
+            "name": "View",
+            "version": version,
+            "main": "main.js",
+            "permissions": ["ui.panel"],
+        })
+    };
+    write_plugin(&shipped, manifest("1.0.0"), &[]);
+
+    let data = tempdir().unwrap();
+    let mut mgr = PluginManager::new(data.path(), None);
+    mgr.sync_builtin(Some(ship.path())).unwrap();
+
+    let update = data.path().join("package");
+    write_plugin(&update, manifest("1.1.0"), &[]);
+    mgr.install_from_path(
+        update.to_str().unwrap(),
+        InstallOptions {
+            source: "marketplace".into(),
+            enable: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    // The app update ships 2.0.0.
+    fs::remove_dir_all(&shipped).unwrap();
+    write_plugin(&shipped, manifest("2.0.0"), &[]);
+    mgr.sync_builtin(Some(ship.path())).unwrap();
+    let after = mgr.get("pi.view").unwrap();
+    assert_eq!(after.version, "2.0.0");
+    assert_eq!(after.source, "builtin");
+    assert!(after.bundled);
+}
+
+/// A build that stops shipping the plugin stops protecting it: the user's
+/// install is left alone, and it becomes theirs to remove.
+#[test]
+fn a_plugin_a_build_stops_shipping_is_no_longer_bundled() {
+    let ship = tempdir().unwrap();
+    let shipped = ship.path().join("pi.view");
+    let manifest = |version: &str| {
+        json!({
+            "schemaVersion": 1,
+            "id": "pi.view",
+            "name": "View",
+            "version": version,
+            "main": "main.js",
+            "permissions": ["ui.panel"],
+        })
+    };
+    write_plugin(&shipped, manifest("1.0.0"), &[]);
+
+    let data = tempdir().unwrap();
+    let mut mgr = PluginManager::new(data.path(), None);
+    mgr.sync_builtin(Some(ship.path())).unwrap();
+
+    let update = data.path().join("package");
+    write_plugin(&update, manifest("1.1.0"), &[]);
+    mgr.install_from_path(
+        update.to_str().unwrap(),
+        InstallOptions {
+            source: "marketplace".into(),
+            enable: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    fs::remove_dir_all(&shipped).unwrap();
+    mgr.sync_builtin(Some(ship.path())).unwrap();
+    let after = mgr.get("pi.view").expect("the user's install survives");
+    assert_eq!(after.version, "1.1.0");
+    assert!(
+        !after.bundled,
+        "a plugin this build does not ship is not advertised as bundled"
+    );
+    assert!(mgr.uninstall("pi.view").unwrap());
 }
 
 #[test]

@@ -506,9 +506,13 @@ impl PluginManager {
             publisher_id: entry.publisher_id.clone(),
             installed: installed.is_some(),
             installed_version: installed.as_ref().map(|p| p.version.clone()),
+            // Only a strictly newer catalog version is an update. Equality is
+            // not one, and neither is an older catalog version — a bundled
+            // plugin can be ahead of a catalog that has not caught up yet, and
+            // offering it as an "update" would downgrade the user (ADR 0241).
             update_available: installed
                 .as_ref()
-                .map(|p| p.version != latest)
+                .map(|p| compare_plugin_versions(&latest, &p.version) == Ordering::Greater)
                 .unwrap_or(false),
             // An install the host would refuse must not be offered. That
             // covers an announced-but-unpublished version, a version pinned to
