@@ -56,7 +56,7 @@ export function classifyIpLiteral(ip: string): PublicNetworkAddressKind {
   if (first === 0x0100 && groups.slice(1, 4).every((group) => group === 0)) return "reserved"; // 100::/64
   if (first === 0x2001 && second === 0x0000) return "reserved"; // 2001::/32
   if (first === 0x2001 && second === 0x0002 && groups[2] === 0) return "benchmark"; // 2001:2::/48
-  if (first === 0x2001 && (second === 0x0010 || second === 0x0020)) return "reserved"; // ORCHID/ORCHIDv2
+  if (first === 0x2001 && ((second & 0xfff0) === 0x0010 || (second & 0xfff0) === 0x0020)) return "reserved"; // ORCHID/ORCHIDv2 /28 ranges
   if (first === 0x2001 && second === 0x0db8) return "documentation"; // 2001:db8::/32
   if (first === 0x2002) return "reserved"; // 6to4
   if (first === 0x3fff && (second & 0xf000) === 0) return "documentation"; // 3fff::/20
@@ -106,7 +106,7 @@ export function isPublicHostname(hostname: string): boolean {
   // WHATWG URL parses legacy numeric IPv4 forms (decimal, hexadecimal and
   // shortened dotted forms) before exposing `hostname`. Keep this direct
   // hostname helper consistent for callers that pass a hostname themselves.
-  if (/^[0-9a-f.]+$/i.test(host)) {
+  if (/^[0-9a-fx.]+$/i.test(host)) {
     try {
       const normalized = new URL(`https://${host}`).hostname.replace(/\.+$/, "");
       if (normalized !== host && parseIpv4(normalized) !== null) {

@@ -438,7 +438,7 @@ test("cross-origin mcp redirects do not forward credentials or session ids", asy
   assert.equal(requests[1].options.headers.Authorization, undefined);
   assert.equal(requests[1].options.headers.Cookie, undefined);
   assert.equal(requests[1].options.headers["x-api-key"], undefined);
-  assert.equal(requests[1].options.headers["x-safe"], "keep");
+  assert.equal(requests[1].options.headers["x-safe"], undefined);
   assert.equal(requests[1].options.headers["mcp-session-id"], undefined);
 });
 

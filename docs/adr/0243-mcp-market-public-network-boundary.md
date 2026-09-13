@@ -54,9 +54,11 @@ than the version the Registry described.
 - A Registry/catalog entry cannot be used as a market shortcut for a private
   MCP endpoint; users can still add such endpoints through the explicit MCP
   editor permitted by ADR 0142.
-- Main market requests use a pinned HTTPS socket, so environments requiring a
-  configured application proxy must use a proxy that can route the pinned
-  public address; no credentials are sent to the market source implicitly.
+- Main market requests use pinned Node HTTPS sockets. They do not inherit
+  Electron session proxy resolution, so a System-proxy-only environment may
+  report a source as unavailable until a proxy-aware pinned dispatcher exists;
+  custom HTTP(S) proxy environment support follows the Node runtime. No
+  credentials are sent to the market source implicitly.
 
 ## Alternatives considered
 

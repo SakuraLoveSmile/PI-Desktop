@@ -41,6 +41,7 @@ const MAX_SOURCE_RESPONSE_BYTES = 4 * 1024 * 1024;
 const MAX_QUERY_LENGTH = 200;
 const MAX_CACHE_ENTRIES = 128;
 const MAX_MARKET_SOURCES = 16;
+const MAX_CACHED_ENTRIES = 2_000;
 
 type ResolvedAddress = { address: string; family: 4 | 6 };
 type PolicyResponse = {
@@ -238,6 +239,7 @@ type RegistryBrowse = {
   entries: SourcedCatalogEntry[];
   cursor?: string;
   exhausted: boolean;
+  at: number;
 };
 
 type CachedSearch = { at: number; state: RegistryBrowse };
@@ -261,15 +263,16 @@ function ingest(
   source: MarketSource,
   seen: Set<string>,
   into: SourcedCatalogEntry[],
+  limit = MAX_CACHED_ENTRIES,
 ): void {
   for (const record of records) {
+    if (into.length >= limit) break;
     const entry = mapRegistryServer(record);
     if (!entry || seen.has(entry.id)) continue;
     seen.add(entry.id);
     into.push({ ...entry, sourceId: source.id });
   }
 }
-
 export function createMcpMarketAggregator() {
   const registryBrowse = new Map<string, RegistryBrowse>();
   const registryInflight = new Map<string, Promise<RegistryBrowse>>();
@@ -283,7 +286,7 @@ export function createMcpMarketAggregator() {
     const task = (async () => {
       let state = registryBrowse.get(key);
       if (!state) {
-        state = { entries: [], exhausted: false };
+        state = { entries: [], exhausted: false, at: Date.now() };
         putBounded(registryBrowse, key, state);
       }
       for (let page = 0; page < pages && !state.exhausted; page += 1) {
@@ -294,9 +297,12 @@ export function createMcpMarketAggregator() {
           metadata?: { nextCursor?: string };
         }>(registryUrl(source.url, params), "json");
         const seen = new Set(state.entries.map((entry) => entry.id));
-        ingest(body.servers ?? [], source, seen, state.entries);
         const previousCursor = state.cursor;
-        if (body.metadata?.nextCursor && body.metadata.nextCursor !== previousCursor) {
+        ingest(body.servers ?? [], source, seen, state.entries);
+        state.at = Date.now();
+        if (state.entries.length >= MAX_CACHED_ENTRIES) {
+          state.exhausted = true;
+        } else if (body.metadata?.nextCursor && body.metadata.nextCursor !== previousCursor) {
           state.cursor = body.metadata.nextCursor;
         } else {
           state.exhausted = true;
@@ -317,7 +323,11 @@ export function createMcpMarketAggregator() {
 
   async function browseRegistry(source: MarketSource, more: boolean): Promise<RegistryBrowse> {
     const key = sourceKey(source);
-    const state = registryBrowse.get(key);
+    let state = registryBrowse.get(key);
+    if (state && Date.now() - state.at >= CACHE_TTL_MS) {
+      registryBrowse.delete(key);
+      state = undefined;
+    }
     if (!state || (more && !state.exhausted)) {
       return extendRegistry(source, more ? MORE_PAGES : INITIAL_PAGES);
     }
@@ -345,8 +355,9 @@ export function createMcpMarketAggregator() {
   ): Promise<RegistryBrowse> {
     const key = `${sourceKey(source)}|${query}`;
     const hit = searchCache.get(key);
-    if (hit && Date.now() - hit.at < CACHE_TTL_MS && !more) return hit.state;
-    const state = hit?.state ?? { entries: [], exhausted: false };
+    const fresh = hit !== undefined && Date.now() - hit.at < CACHE_TTL_MS;
+    if (fresh && !more) return hit!.state;
+    const state = fresh ? hit!.state : { entries: [], exhausted: false, at: Date.now() };
     if (state.exhausted) return state;
     const params = new URLSearchParams({ version: "latest", search: query, limit: String(PAGE_SIZE) });
     if (state.cursor) params.set("cursor", state.cursor);
@@ -356,13 +367,18 @@ export function createMcpMarketAggregator() {
     }>(registryUrl(source.url, params), "json");
     const seen = new Set(state.entries.map((entry) => entry.id));
     ingest(body.servers ?? [], source, seen, state.entries);
-    const previousCursor = state.cursor;
-    if (body.metadata?.nextCursor && body.metadata.nextCursor !== previousCursor) {
-      state.cursor = body.metadata.nextCursor;
-    } else {
+    state.at = Date.now();
+    if (state.entries.length >= MAX_CACHED_ENTRIES) {
       state.exhausted = true;
+    } else {
+      const previousCursor = state.cursor;
+      if (body.metadata?.nextCursor && body.metadata.nextCursor !== previousCursor) {
+        state.cursor = body.metadata.nextCursor;
+      } else {
+        state.exhausted = true;
+      }
     }
-    putBounded(searchCache, key, { at: Date.now(), state });
+    putBounded(searchCache, key, { at: state.at, state });
     return state;
   }
 

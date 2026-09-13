@@ -56,7 +56,9 @@ describe("public network address policy", () => {
       ["2001::1", "reserved"],
       ["2001:2::1", "benchmark"],
       ["2001:10::1", "reserved"],
+      ["2001:1f::1", "reserved"],
       ["2001:20::1", "reserved"],
+      ["2001:2f::1", "reserved"],
       ["2001:db8::1", "documentation"],
       ["2002::1", "reserved"],
       ["3fff::1", "documentation"],
@@ -78,5 +80,6 @@ describe("public network address policy", () => {
     expect(isPublicHttpsUrl("https://[2606:4700::1]/mcp")).toBe(true);
     expect(isPublicHostname("localhost.")).toBe(false);
     expect(isPublicHostname("registry.example.")).toBe(true);
+    expect(isPublicHostname("0x7f000001")).toBe(false);
   });
 });

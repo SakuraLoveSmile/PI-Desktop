@@ -212,17 +212,15 @@ function parseSseMessages(body: string): JsonRpcMessage[] {
   return out;
 }
 
-const REDIRECT_SENSITIVE_HEADERS = new Set([
-  "authorization",
-  "cookie",
-  "proxy-authorization",
-  "x-api-key",
-  "x-api-token",
-]);
 
 async function readBoundedHttpBody(response: Response): Promise<string> {
   const contentLength = Number(response.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > MAX_HTTP_RESPONSE_BYTES) {
+    try {
+      await response.body?.cancel();
+    } catch {
+      // The response is already rejected; cancellation is best effort.
+    }
     throw mcpError("LIMIT_EXCEEDED", "mcp server response is too large");
   }
   if (!response.body) return "";
@@ -259,9 +257,7 @@ function headersForMcpRequest(
   currentUrl: string,
 ): Record<string, string> {
   if (new URL(initialUrl).origin === new URL(currentUrl).origin) return { ...headers };
-  return Object.fromEntries(
-    Object.entries(headers).filter(([name]) => !REDIRECT_SENSITIVE_HEADERS.has(name.toLowerCase())),
-  );
+  return {};
 }
 
 function createHttpTransport(
@@ -280,13 +276,13 @@ function createHttpTransport(
   }
   let closed = false;
   let sessionId: string | undefined;
-  let activeController: AbortController | null = null;
+  const activeControllers = new Set<AbortController>();
 
   return {
     send: async (message) => {
       if (closed) throw mcpError("UNAVAILABLE", "mcp session is closed");
       const controller = new AbortController();
-      activeController = controller;
+      activeControllers.add(controller);
       const timer = setTimeout(() => controller.abort(), options.timeoutMs);
       let url = options.url;
       try {
@@ -360,12 +356,13 @@ function createHttpTransport(
         }
       } finally {
         clearTimeout(timer);
-        if (activeController === controller) activeController = null;
+        activeControllers.delete(controller);
       }
     },
     close: () => {
       closed = true;
-      activeController?.abort();
+      for (const controller of activeControllers) controller.abort();
+      activeControllers.clear();
       handlers.onClose("mcp session closed");
     },
   };
