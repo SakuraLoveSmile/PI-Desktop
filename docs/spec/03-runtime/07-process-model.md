@@ -79,6 +79,17 @@ those writes so a Linux AppImage or GUI launch without a live TTY keeps
 supervising host/sidecar instead of showing Electron's uncaught exception
 dialog.
 
+A main-process JavaScript `uncaughtException` is also not an Electron main
+crash (only a native main abort exits the app). Main installs its own
+`uncaughtException` / `unhandledRejection` handlers, writes `app/runtime`
+records, and keeps running. That suppresses Electron's default
+"A JavaScript error occurred in the main process" dialog. Recoverable
+network-stack throws include Chromium copying a non-Latin-1 HTTP header into
+`Headers.set` (`TypeError: Cannot convert argument to a ByteString`), which
+appears on Windows behind a system proxy or gateway that injects Unicode
+header values. The next `net.fetch` or updater request must not re-open that
+native dialog.
+
 Linux packaged host-core is built on Ubuntu 22.04 and needs glibc 2.35 or newer
 (Ubuntu 22.04, Debian 12, Fedora 36+). A lower glibc is a fatal host status,
 not a restart loop: the UI names those releases instead of "Can't reach the
