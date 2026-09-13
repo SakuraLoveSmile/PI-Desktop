@@ -94,6 +94,10 @@ CDP 插件工具在 Plan 中仍被拒绝）。 Bash 在 Plan 中仍然可用：�
 结构化 title/question 字段。 Renderer 和 sidecar 状态无法写入或
 替换一个工件。
 
+## 4.1 技能市场出网
+
+渲染层不拉取技能目录或 SKILL.md。Electron 主进程按公网策略发起 HTTPS 请求（ADR 0243 / D413）：仅 `https`、共享的公网主机语法检查、对每个解析地址做 DNS 分类，以及 `redirect: "manual"` 的逐跳再校验。回环、RFC1918、ULA、link-local 与 mapped IPv6 一律拒绝。安装只通过 `skills.create` 写入 markdown。内联相邻 markdown 后仍受 128 KiB 宿主上限约束。
+
 ## 5. 命令执行
 
 - Bash默认需要确认（风险分级权限卡）；在

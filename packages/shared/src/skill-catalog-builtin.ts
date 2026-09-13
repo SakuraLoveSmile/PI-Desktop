@@ -6,6 +6,9 @@
  * from configured sources (e.g. GitHub repos auto-scanned for SKILL.md).
  * Documents are served via jsDelivr — raw.githubusercontent.com is
  * TLS-flaky from some networks while the CDN edge reaches them reliably.
+ *
+ * Names and descriptions are English (ADR 0009). Locale catalogs translate
+ * chrome around the market, not these upstream document titles.
  */
 import type { SkillCatalogFile } from "./skill-catalog.js";
 
@@ -19,8 +22,8 @@ export const BUILTIN_SKILL_CATALOG: SkillCatalogFile = {
   skills: [
     {
       id: "docx",
-      name: "Word 文档",
-      description: "创建、读取、编辑 Word (.docx) 文档,支持修订与批注",
+      name: "Word documents",
+      description: "Create, read, and edit Word (.docx) files with tracked changes and comments",
       author: "anthropic",
       homepage: homepageFor("docx"),
       url: `${ANTHROPIC}/docx/SKILL.md`,
@@ -29,8 +32,8 @@ export const BUILTIN_SKILL_CATALOG: SkillCatalogFile = {
     },
     {
       id: "pdf",
-      name: "PDF 处理",
-      description: "读取、提取、合并、拆分与生成 PDF 文件",
+      name: "PDF files",
+      description: "Read, extract, merge, split, and generate PDF files",
       author: "anthropic",
       homepage: homepageFor("pdf"),
       categories: ["docs"],
@@ -39,8 +42,8 @@ export const BUILTIN_SKILL_CATALOG: SkillCatalogFile = {
     },
     {
       id: "pptx",
-      name: "PPT 演示文稿",
-      description: "创建、编辑与分析 PowerPoint (.pptx) 演示文稿",
+      name: "PowerPoint decks",
+      description: "Create, edit, and analyze PowerPoint (.pptx) presentations",
       author: "anthropic",
       homepage: homepageFor("pptx"),
       categories: ["docs"],
@@ -49,8 +52,8 @@ export const BUILTIN_SKILL_CATALOG: SkillCatalogFile = {
     },
     {
       id: "xlsx",
-      name: "Excel 表格",
-      description: "处理电子表格:公式、图表、数据透视与多工作表",
+      name: "Excel spreadsheets",
+      description: "Work with spreadsheets: formulas, charts, pivots, and multiple sheets",
       author: "anthropic",
       homepage: homepageFor("xlsx"),
       categories: ["docs", "data"],
@@ -60,7 +63,7 @@ export const BUILTIN_SKILL_CATALOG: SkillCatalogFile = {
     {
       id: "frontend-design",
       name: "Frontend Design",
-      description: "构建或重塑 UI 时做出有辨识度、有意图的视觉设计",
+      description: "Make distinctive, intentional visual design when building or restyling UI",
       author: "anthropic",
       homepage: homepageFor("frontend-design"),
       categories: ["coding"],
@@ -70,7 +73,7 @@ export const BUILTIN_SKILL_CATALOG: SkillCatalogFile = {
     {
       id: "webapp-testing",
       name: "Webapp Testing",
-      description: "用 Playwright 与本地 Web 应用交互并验证前端行为",
+      description: "Drive and verify a local web app with Playwright",
       author: "anthropic",
       homepage: homepageFor("webapp-testing"),
       categories: ["coding"],
@@ -80,7 +83,7 @@ export const BUILTIN_SKILL_CATALOG: SkillCatalogFile = {
     {
       id: "mcp-builder",
       name: "MCP Builder",
-      description: "创建高质量的 MCP 服务器,让 LLM 对接外部工具与数据",
+      description: "Create high-quality MCP servers that connect LLMs to tools and data",
       author: "anthropic",
       homepage: homepageFor("mcp-builder"),
       categories: ["coding"],
@@ -90,7 +93,7 @@ export const BUILTIN_SKILL_CATALOG: SkillCatalogFile = {
     {
       id: "skill-creator",
       name: "Skill Creator",
-      description: "创建新技能、改进现有技能并度量技能效果",
+      description: "Create new skills, improve existing ones, and measure how well they work",
       author: "anthropic",
       homepage: homepageFor("skill-creator"),
       categories: ["coding", "workflow"],

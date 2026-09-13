@@ -375,6 +375,14 @@ system while preserving their different data ownership:
   the width with evenly divided segments, search sits below it, and the
   actions wrap left-aligned. Group headers drop the resolved path so row copy
   keeps the width.
+- Skills exposes a Market action beside New / Import. Market is a second view
+  of the same page, not a new Settings destination: browse catalog sources,
+  preview the assembled markdown (including inlined sibling `.md` files), and
+  install through `skills.create` into `~/.agents/skills`. Built-in picks are
+  English-titled offline fallback. Default GitHub sources are queried with
+  user-added sources; a remote badge uses `sourceId`, not id collision with
+  builtin rows. Documents that would exceed the 128 KiB host cap cannot be
+  installed. Back reloads the skill list.
 - The Subagents create/edit sheet pins a model with a searchable, provider-
   grouped anchored menu — the same option-menu control the service picker uses
   — over the configured, runnable models the Composer offers, plus an
@@ -622,6 +630,9 @@ system while preserving their different data ownership:
     if the host rejects the change
 26. Info exposes a Report a problem action that opens the GitHub bug form
     with version and OS filled in; Settings search indexes the row
+27. The Skills page Market view browses public-HTTPS catalogs, previews
+    the assembled document, and installs only through `skills.create`; oversized
+    expanded documents are refused and source badges follow `sourceId`
 
 ## 5. General chrome metrics
 

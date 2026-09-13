@@ -2843,10 +2843,12 @@
   transform: scale(1.07);
 }
 
+.sklm-glyph.is-coding,
 .sklm-glyph.is-devtools {
   --sklm-hue: oklch(72% 0.12 250);
 }
 
+.sklm-glyph.is-writing,
 .sklm-glyph.is-web {
   --sklm-hue: oklch(74% 0.11 195);
 }
@@ -2859,6 +2861,7 @@
   --sklm-hue: oklch(76% 0.12 80);
 }
 
+.sklm-glyph.is-workflow,
 .sklm-glyph.is-productivity {
   --sklm-hue: oklch(72% 0.13 155);
 }

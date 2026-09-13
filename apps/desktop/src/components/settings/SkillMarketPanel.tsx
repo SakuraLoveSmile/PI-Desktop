@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
+  assembleSkillInstall,
   BUILTIN_SKILL_CATALOG,
-  expandSkillResources,
   GLOBAL_SCOPE,
   isSafeSkillSourceUrl,
   mergeSkillEntries,
@@ -78,7 +78,7 @@ function loadSources(): SkillMarketSource[] {
 
 // Curated defaults: each repo is auto-scanned, so every SKILL.md on its
 // default branch becomes an installable entry and the catalogs grow with the
-// repos. All five were verified to publish SKILL.md files at scan time.
+// repos. All seven were verified to publish SKILL.md files at scan time.
 const DEFAULT_SKILL_SOURCES: SkillMarketSource[] = [
   { id: "anthropics-skills", name: "anthropics/skills", url: "https://github.com/anthropics/skills" },
   { id: "anthropics-plugins", name: "anthropics/claude-plugins-official", url: "https://github.com/anthropics/claude-plugins-official" },
@@ -120,6 +120,7 @@ export function SkillMarketPanel({
   const [jump, setJump] = useState("");
   const [installFor, setInstallFor] = useState<MarketItem | null>(null);
   const [documentBody, setDocumentBody] = useState<string | null>(null);
+  const [documentTooLarge, setDocumentTooLarge] = useState(false);
   const [installing, setInstalling] = useState(false);
   const previewGate = useRef(new LatestWinsGate());
   const [sources, setSources] = useState<SkillMarketSource[]>(loadSources);
@@ -174,12 +175,9 @@ export function SkillMarketPanel({
   }, [search, sources]);
 
   const sourceName = (id?: string) =>
-    id ? sources.find((source) => source.id === id)?.name : undefined;
-
-  const remoteIds = useMemo(
-    () => new Set(remote.entries.map((entry) => entry.id)),
-    [remote.entries],
-  );
+    id
+      ? [...DEFAULT_SKILL_SOURCES, ...sources].find((source) => source.id === id)?.name
+      : undefined;
 
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -207,13 +205,20 @@ export function SkillMarketPanel({
     const token = previewGate.current.begin();
     setInstallFor(entry);
     setDocumentBody(null);
+    setDocumentTooLarge(false);
     api
       .fetchSkillMarketDocument(entry)
       .then((document) => {
-        if (previewGate.current.isCurrent(token)) setDocumentBody(document.body);
+        if (!previewGate.current.isCurrent(token)) return;
+        const assembled = assembleSkillInstall(document, entry);
+        setDocumentBody(assembled.body);
+        setDocumentTooLarge(assembled.tooLarge);
       })
       .catch(() => {
-        if (previewGate.current.isCurrent(token)) setDocumentBody(null);
+        if (previewGate.current.isCurrent(token)) {
+          setDocumentBody(null);
+          setDocumentTooLarge(false);
+        }
       });
   };
 
@@ -222,19 +227,26 @@ export function SkillMarketPanel({
     setInstalling(true);
     try {
       const document = await api.fetchSkillMarketDocument(installFor);
-      await api.createUserSkill({
+      const assembled = assembleSkillInstall(document, installFor);
+      if (assembled.tooLarge) {
+        setDocumentBody(assembled.body);
+        setDocumentTooLarge(true);
+        showToast(t("settings.sklm.documentTooLarge"), { variant: "error" });
+        return;
+      }
+      const created = await api.createUserSkill({
         id: installFor.id,
-        name: document.name || installFor.name,
-        description: document.description || installFor.description,
-        body: expandSkillResources(document, document.resources ?? []),
+        name: assembled.name,
+        description: assembled.description,
+        body: assembled.body,
         level: "global",
         scope: GLOBAL_SCOPE,
         enabled: true,
       });
-      showToast(t("settings.sklm.installSuccess", { name: installFor.name }), {
+      showToast(t("settings.sklm.installSuccess", { name: assembled.name }), {
         variant: "success",
       });
-      onInstalled(installFor.id);
+      onInstalled(created.skill?.id ?? installFor.id);
       setInstallFor(null);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
@@ -407,6 +419,7 @@ export function SkillMarketPanel({
           <div className="ext-field-group">
             <div className="ext-field-label">{t("settings.sklm.preview")}</div>
             <pre className="sklm-preview">{documentBody ?? t("common.loading")}</pre>
+            {documentTooLarge ? <p className="sklm-note">{t("settings.sklm.documentTooLarge")}</p> : null}
           </div>
 
           {installFor.notes ? (
@@ -432,7 +445,7 @@ export function SkillMarketPanel({
               type="button"
               className="sklm-install"
               onClick={() => void install()}
-              disabled={installing || documentBody === null}
+              disabled={installing || documentBody === null || documentTooLarge}
             >
               {installing ? t("common.saving") : t("settings.sklm.install")}
             </button>
@@ -532,7 +545,7 @@ export function SkillMarketPanel({
                         ✓ {t("settings.sklm.verified")}
                       </span>
                     ) : null}
-                    {remoteIds.has(entry.id) ? (
+                    {entry.sourceId ? (
                       <span className="sklm-badge is-remote">
                         {sourceName(entry.sourceId) ?? t("settings.sklm.remoteBadge")}
                       </span>
