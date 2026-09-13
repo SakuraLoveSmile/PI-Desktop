@@ -430,6 +430,7 @@ export const de = {
     "subagentCount_one": "{{count}} Subagent",
     "subagentCount_other": "{{count}} Subagenten",
     "subagentFinishedCount": "{{finished}}/{{total}} fertig",
+    "subagentCreating": "Starte Subagent…",
     "subagentStatus": {
       "running": "Läuft",
       "completed": "Abgeschlossen",
