@@ -1038,6 +1038,8 @@ export const fr = {
     "availableForSubagentsHint": "Autoriser l'IA à utiliser ce modèle lors de la délégation de tâches à des sous-agents",
     "notSupported": "Non pris en charge",
     "searchModelId": "ID de modèle de recherche…",
+    "searchChosenModels": "Rechercher les modèles ajoutés…",
+    "noChosenModelMatches": "Aucun modèle ajouté correspondant.",
     "selectAllVisibleModels": "Tout sélectionner",
     "deselectAllVisibleModels": "Tout désélectionner",
     "fetchModelList": "Récupérer la liste",

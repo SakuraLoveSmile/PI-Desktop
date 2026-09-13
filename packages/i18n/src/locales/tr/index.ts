@@ -1057,6 +1057,8 @@ export const tr = {
     availableForSubagentsHint: "Görevler alt ajanlara devredilirken AI’nin bu modeli kullanmasına izin ver",
     notSupported: "Desteklenmiyor",
     searchModelId: "Model kimliği ara…",
+    searchChosenModels: "Eklenen modellerde ara…",
+    noChosenModelMatches: "Eşleşen eklenen model yok.",
     selectAllVisibleModels: "Tümünü seç",
     deselectAllVisibleModels: "Tümünün seçimini kaldır",
     fetchModelList: "Listeyi al",

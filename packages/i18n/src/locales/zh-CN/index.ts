@@ -1047,6 +1047,8 @@ export const zhCN = {
     availableForSubagentsHint: "允许 AI 在委派子任务时自动选用此模型",
     notSupported: "不支持",
     searchModelId: "搜索模型 ID…",
+    searchChosenModels: "搜索已添加模型…",
+    noChosenModelMatches: "没有匹配的已添加模型",
     selectAllVisibleModels: "全选",
     deselectAllVisibleModels: "取消全选",
     fetchModelList: "获取列表",

@@ -1055,6 +1055,8 @@ export const en = {
     availableForSubagentsHint: "Allow AI to use this model when delegating tasks to subagents",
     notSupported: "Not supported",
     searchModelId: "Search model ID…",
+    searchChosenModels: "Search added models…",
+    noChosenModelMatches: "No matching added models.",
     selectAllVisibleModels: "Select all",
     deselectAllVisibleModels: "Deselect all",
     fetchModelList: "Fetch list",

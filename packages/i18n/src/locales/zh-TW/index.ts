@@ -1047,6 +1047,8 @@ export const zhTW = {
     availableForSubagentsHint: "允許 AI 在委派子任務時自動選用此模型",
     notSupported: "不支援",
     searchModelId: "搜尋模型 ID…",
+    searchChosenModels: "搜尋已新增模型…",
+    noChosenModelMatches: "沒有符合的已新增模型",
     selectAllVisibleModels: "全選",
     deselectAllVisibleModels: "取消全選",
     fetchModelList: "取得列表",
