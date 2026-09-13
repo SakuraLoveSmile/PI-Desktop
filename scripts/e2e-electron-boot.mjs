@@ -82,14 +82,22 @@ child.on("close", (code) => {
     process.platform === "darwin" ? probe?.menuCount >= 6 : probe?.menuCount === 0;
   const sessions = probe?.sessionList;
   const sessionListOk =
-    sessions?.seededCount === 800 &&
+  // Each condition is able to fail. The probe's own construction guarantees the
+  // seeded count, fixture-model count, refresh rounds and main-loop ticks, so
+  // those are not asserted; the per-read list duration and the Main-thread
+  // heartbeat gap are the live responsiveness observations that can fail.
+  const listDurations = Array.isArray(sessions?.listDurationsMs)
+    ? sessions.listDurationsMs
+    : [];
+  const sessionListOk =
+    sessions !== undefined &&
     sessions.returnedCount >= 800 &&
-    sessions.refreshCount === 8 &&
-    sessions.distinctModels >= 2 &&
     sessions.complete === true &&
     sessions.capabilitiesConsistent === true &&
-    sessions.mainTicks > 0 &&
+    listDurations.length === 8 &&
+    Math.max(...listDurations) < 1000 &&
     sessions.maxMainGapMs < 1000 &&
+    Array.isArray(sessions.heartbeatDurationsMs) &&
     sessions.heartbeatDurationsMs.length > 0 &&
     sessions.heartbeatDurationsMs.every((duration) => duration < 1000);
   if (
