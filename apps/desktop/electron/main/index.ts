@@ -23,15 +23,12 @@ import {
   KEYBOARD_SHORTCUTS,
   keybindingToElectronAccelerator,
   resolveKeybinding,
-  err,
   isActiveInProject,
-  ok,
   type ActivationScope,
   type AgentEventEnvelope,
   type AppMenuCommand,
   type CloseBehavior,
   type KeybindingOverrides,
-  type Result,
   type PlanExecutionFinishStatus,
 } from "@pi-desktop/shared";
 import {
@@ -154,6 +151,7 @@ import { registerMcpIpc } from "./ipc/mcp-ipc";
 import { registerPluginIpc } from "./ipc/plugin-ipc";
 import { registerPluginUiIpc } from "./ipc/plugin-ui-ipc";
 import { registerSkillsIpc } from "./ipc/skills-ipc";
+import { stripWinLongPrefix } from "./path-utils";
 
 // The shared error-code union is reconciled in the shared lane. Keep desktop
 // source type-safe while that lane is temporarily staged at main.
@@ -164,25 +162,6 @@ const ErrorCodes = {
   PLAN_EXECUTION_INTERRUPTED: "PLAN_EXECUTION_INTERRUPTED",
   PLAN_PERMISSION_MODE_REQUIRED: "PLAN_PERMISSION_MODE_REQUIRED",
 } as const;
-
-/**
- * Strip the Windows extended-length path prefix (`\\?\`) so that shell APIs
- * like `ShellExecuteW` (used by Electron's `shell.openPath`) work correctly.
- * Also handles the forward-slash variant (`//?/`) stored by older versions.
- * On non-Windows or for UNC paths (`\\?\UNC\...`) the input is returned as-is.
- */
-function stripWinLongPrefix(p: string): string {
-  if (process.platform !== "win32") return p;
-  // Matches `\\?\X:\...` (verbatim drive-letter paths)
-  if (p.startsWith("\\\\?\\") && p.length >= 7 && p[5] === ":" && p[6] === "\\") {
-    return p.slice(4);
-  }
-  // Matches `//?/X:/...` (forward-slash variant from DB normalization)
-  if (p.startsWith("//?/") && p.length >= 7 && p[5] === ":" && p[6] === "/") {
-    return p.slice(4);
-  }
-  return p;
-}
 
 // A closed stdout/stderr (Linux AppImage, GUI launch without a TTY) must not
 // surface as Electron's "Uncaught Exception: write EPIPE" dialog.
@@ -974,18 +953,6 @@ const {
   applySummonWindowShortcut,
 } = createdLauncher;
 
-function wrap<T>(fn: () => Promise<T>): Promise<Result<T>> {
-  return fn()
-    .then((data) => ok(data))
-    .catch((e: any) =>
-      err(
-        e?.data?.errorCode || e?.errorCode || ErrorCodes.INTERNAL,
-        e instanceof Error ? e.message : String(e),
-        { retriable: e?.data?.retriable === true, details: e?.data },
-      ),
-    );
-}
-
 /** sessionId → open host turn id, for turn bookkeeping across agent events. */
 const activeTurns = new Map<string, string>();
 /** Plan submission turns end without a task-complete notification. */
@@ -1240,7 +1207,6 @@ const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 function registerIpc() {
   return registerIpcHandlers({
     ipcMain,
-    wrap,
     getMainWindow: () => mainWindow,
     getHost: () => host,
     getSidecar: () => sidecar,

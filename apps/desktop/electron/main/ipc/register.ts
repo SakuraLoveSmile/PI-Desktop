@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from "electron";
-import { ErrorCodes, IPC } from "@pi-desktop/shared";
+import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
@@ -36,10 +36,21 @@ export type RegisterIpcDependencies = {
   [name: string]: any;
 };
 
+function wrap<T>(fn: () => Promise<T>): Promise<Result<T>> {
+  return fn()
+    .then((data) => ok(data))
+    .catch((e: any) =>
+      err(
+        e?.data?.errorCode || e?.errorCode || ErrorCodes.INTERNAL,
+        e instanceof Error ? e.message : String(e),
+        { retriable: e?.data?.retriable === true, details: e?.data },
+      ),
+    );
+}
+
 export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   const {
     ipcMain,
-    wrap,
     getMainWindow,
     getHost,
     getSidecar,
