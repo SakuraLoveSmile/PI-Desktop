@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { register } from "node:module";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,6 +12,7 @@ const {
   generateImportedExtensionPlugin,
   installExtensionDependencies,
 } = await import("../electron/main/agent-extensions.ts");
+const { withRegistryOnlyProxy } = await import("../electron/main/npm-registry-proxy.ts");
 
 function bridge(overrides = {}) {
   const events = { changed: 0, prompts: [], toasts: [], statuses: [] };
@@ -27,6 +29,29 @@ function bridge(overrides = {}) {
   });
   return { b, events };
 }
+
+test("registry-only proxy rejects non-registry HTTP targets", async () => {
+  const status = await withRegistryOnlyProxy(async (proxyUrl) => {
+    const proxy = new URL(proxyUrl);
+    return new Promise((resolve, reject) => {
+      const request = httpRequest(
+        {
+          hostname: proxy.hostname,
+          port: Number(proxy.port),
+          path: "http://127.0.0.1:9/not-allowed",
+          method: "GET",
+        },
+        (response) => {
+          response.resume();
+          response.once("end", () => resolve(response.statusCode));
+        },
+      );
+      request.once("error", reject);
+      request.end();
+    });
+  });
+  assert.equal(status, 403);
+});
 
 test("installing a package.json whose JSON body is null or an array fails without throwing", async () => {
   for (const body of ["null", "[]"]) {
@@ -63,6 +88,10 @@ test("optional dependencies and overrides cannot escape the registry before npm 
       dependencies: { "left-pad": "^1.3.0" },
       overrides: { "left-pad": "https://evil.example/left-pad.tgz" },
     },
+    {
+      dependencies: { "left-pad": "^1.3.0" },
+      devDependencies: { evil: "git+ssh://git@evil.example/evil.git" },
+    },
   ];
   for (const packageJson of cases) {
     const root = mkdtempSync(join(tmpdir(), "ext-deps-source-"));
@@ -77,6 +106,51 @@ test("optional dependencies and overrides cannot escape the registry before npm 
     assert.equal(result.state, "failed");
     assert.match(String(result.error), /non-registry spec/);
     assert.equal(npmRan, false);
+  }
+  let deepOverrides = {};
+  let cursor = deepOverrides;
+  for (let index = 0; index < 2000; index += 1) {
+    cursor[`package-${index}`] = {};
+    cursor = cursor[`package-${index}`];
+  }
+  cursor.evil = "git+ssh://git@evil.example/evil.git";
+  const deepRoot = mkdtempSync(join(tmpdir(), "ext-deps-deep-overrides-"));
+  writeFileSync(join(deepRoot, "package.json"), JSON.stringify({ dependencies: { ok: "^1" }, overrides: deepOverrides }));
+  const deepResult = await installExtensionDependencies(deepRoot, { runner: async () => ({ code: 0, stderr: "" }) });
+  assert.equal(deepResult.state, "failed");
+  assert.match(String(deepResult.error), /non-registry spec/);
+
+});
+
+test("lockfiles reject nested dependency sources and package paths", async () => {
+  const cases = [
+    {
+      packages: {
+        "node_modules/root": {
+          dependencies: { evil: "git+ssh://git@evil.example/evil.git" },
+        },
+      },
+    },
+    {
+      packages: {
+        "../../outside": { resolved: "https://registry.npmjs.org/evil/-/evil.tgz" },
+      },
+    },
+  ];
+  for (const lock of cases) {
+    const root = mkdtempSync(join(tmpdir(), "ext-deps-lock-nested-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }));
+    writeFileSync(join(root, "package-lock.json"), JSON.stringify(lock));
+    let npmRan = false;
+    const result = await installExtensionDependencies(root, {
+      runner: async () => {
+        npmRan = true;
+        return { code: 0, stderr: "" };
+      },
+    });
+    assert.deepEqual(result, { state: "installed" });
+    assert.equal(npmRan, true);
+    assert.equal(existsSync(join(root, "package-lock.json")), false);
   }
 });
 
@@ -193,12 +267,13 @@ test("importing a pi extension directory or file generates a plugin holding agen
   const file = join(root, "solo.ts");
   writeFileSync(file, "export default function () {}\n");
   const single = generateImportedExtensionPlugin(file, importRoot);
-  assert.equal(single.id, "imported.solo");
+  assert.equal(single.id, `imported.${single.path.split(/[\\/]/).pop()}`);
   assert.deepEqual(single.entries, ["src/solo.ts"]);
 
   // A second import of the same name gets its own directory.
   const again = generateImportedExtensionPlugin(file, importRoot);
-  assert.notEqual(again.path, single.path);
+  assert.notEqual(again.id, single.id);
+  assert.equal(again.id, `imported.${again.path.split(/[\\/]/).pop()}`);
 
   writeFileSync(join(root, "notes.md"), "# no");
   assert.throws(() => generateImportedExtensionPlugin(join(root, "notes.md"), importRoot), /no extension entry/);
@@ -209,6 +284,9 @@ test("importing a directory keeps its package.json at the plugin root and never 
   const extDir = join(root, "memory-ext");
   mkdirSync(join(extDir, "node_modules", "some-dep"), { recursive: true });
   writeFileSync(join(extDir, "node_modules", "some-dep", "index.js"), "module.exports = {};");
+  mkdirSync(join(extDir, ".git"), { recursive: true });
+  writeFileSync(join(extDir, ".env"), "SECRET=do-not-copy\n");
+  writeFileSync(join(extDir, ".npmrc"), "//registry.example/:_authToken=secret\n");
   writeFileSync(join(extDir, "index.ts"), "export default function () {}\n");
   writeFileSync(
     join(extDir, "package.json"),
@@ -219,7 +297,10 @@ test("importing a directory keeps its package.json at the plugin root and never 
   const generated = generateImportedExtensionPlugin(extDir, join(root, "imported"));
   assert.equal(readFileSync(join(generated.path, "package.json"), "utf8"), readFileSync(join(extDir, "package.json"), "utf8"), "package.json lands at the plugin root for dependency install");
   assert.ok(existsSync(join(generated.path, "package-lock.json")));
-  assert.ok(!existsSync(join(generated.path, "src", "node_modules")), "node_modules is reinstalled, never copied");
+  assert.equal(existsSync(join(generated.path, "src", ".env")), false, "credential files are not copied");
+  assert.equal(existsSync(join(generated.path, "src", ".npmrc")), false, "npm config is not copied");
+  assert.equal(existsSync(join(generated.path, "src", ".git")), false, "repository metadata is not copied");
+  assert.equal(existsSync(join(generated.path, "src", "node_modules")), false, "node_modules is reinstalled, never copied");
 
   const file = join(root, "solo.ts");
   writeFileSync(file, "export default function () {}\n");
@@ -274,7 +355,7 @@ test("default runner caps captured stderr and escalates the timeout kill", async
     300,
   );
   assert.notEqual(stalled.code, 0, "a stalled install is killed");
-  assert.match(stalled.stderr, /exceeded 300ms and was terminated/);
+  assert.match(stalled.stderr, /dependency install exceeded 300ms and was terminated/);
 });
 test("the default dependency runner isolates npm config sources and proxies", async () => {
   const { defaultDependencyRunner } = await import("../electron/main/agent-extensions.ts");
@@ -293,6 +374,8 @@ test("the default dependency runner isolates npm config sources and proxies", as
   assert.equal(childEnv.npm_config_proxy, "");
   assert.equal(childEnv.npm_config_https_proxy, "");
   assert.equal(childEnv.npm_config_noproxy, "*");
+  assert.ok(childEnv.npm_config_git.startsWith(tmpdir()));
+  assert.equal(childEnv.npm_config_cache, join(process.cwd(), ".npm-cache"));
   assert.equal(childEnv.NPM_TOKEN, undefined);
   assert.equal(childEnv.NODE_AUTH_TOKEN, undefined);
 });
@@ -324,12 +407,14 @@ test("dependency install: skips without a manifest or dependencies, runs npm wit
     return { code: 0, stderr: "" };
   };
   assert.deepEqual(await installExtensionDependencies(installed, { runner, timeoutMs: 1234 }), { state: "installed" });
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
   assert.equal(calls[0].command, "npm");
-  assert.deepEqual(calls[0].args, ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund", "--ignore-scripts"]);
+  assert.deepEqual(calls[0].args, ["install", "--package-lock-only", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund", "--ignore-scripts"]);
+  assert.deepEqual(calls[1].args, ["ci", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund", "--ignore-scripts"]);
   assert.equal(calls[0].cwd, installed, "npm runs inside the plugin directory");
-  assert.equal(calls[0].timeoutMs, 1234);
-
+  assert.equal(calls[1].cwd, installed, "npm ci runs inside the plugin directory");
+  assert.ok(calls[0].timeoutMs > 0 && calls[0].timeoutMs <= 1234);
+  assert.ok(calls[1].timeoutMs > 0 && calls[1].timeoutMs <= 1234);
   const failing = write("failing", JSON.stringify({ name: "x", dependencies: { "some-dep": "^1" } }));
   const result = await installExtensionDependencies(failing, {
     runner: async () => ({ code: 1, stderr: "npm error code ENOTFOUND\nnpm error network unreachable" }),
@@ -338,6 +423,21 @@ test("dependency install: skips without a manifest or dependencies, runs npm wit
   assert.match(result.error, /exited 1/);
   assert.match(result.error, /ENOTFOUND/);
 
+  const partial = write("partial", JSON.stringify({ name: "x", dependencies: { "some-dep": "^1" } }));
+  const partialResult = await installExtensionDependencies(partial, {
+    runner: async () => {
+      mkdirSync(join(partial, "node_modules", "partial"), { recursive: true });
+      mkdirSync(join(partial, ".npm-cache"), { recursive: true });
+      writeFileSync(join(partial, "node_modules", "partial", "index.js"), "module.exports = {};");
+      writeFileSync(join(partial, "package-lock.json"), "{}");
+      return { code: 1, stderr: "partial install" };
+    },
+  });
+  assert.equal(partialResult.state, "failed");
+  assert.equal(existsSync(join(partial, "node_modules")), false);
+  assert.equal(existsSync(join(partial, ".npm-cache")), false);
+  assert.equal(existsSync(join(partial, "package-lock.json")), false);
+
   const throwing = write("throwing", JSON.stringify({ name: "x", dependencies: { "some-dep": "^1" } }));
   const thrown = await installExtensionDependencies(throwing, {
     runner: async () => {
@@ -345,4 +445,15 @@ test("dependency install: skips without a manifest or dependencies, runs npm wit
     },
   });
   assert.deepEqual(thrown, { state: "failed", error: "npm not found" });
+  const missing = write("missing-npm", JSON.stringify({ name: "x", dependencies: { "some-dep": "^1" } }));
+  const missingResult = await installExtensionDependencies(missing, {
+    runner: async () => {
+      throw Object.assign(new Error("spawn npm"), { code: "ENOENT" });
+    },
+  });
+  assert.deepEqual(missingResult, {
+    state: "failed",
+    error: "npm is not available on PATH; install Node.js/npm before importing dependencies",
+  });
+
 });
