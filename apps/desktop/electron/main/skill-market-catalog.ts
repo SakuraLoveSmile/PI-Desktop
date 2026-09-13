@@ -11,8 +11,10 @@
  * CSP reason; the actual write goes through the existing `skills.create`
  * path on the renderer's side.
  */
+import { lookup } from "node:dns/promises";
 import { net } from "electron";
 import {
+  isPublicIpLiteral,
   isSafeSkillSourceUrl,
   type SkillCatalogCategory,
   splitSkillDocument,
@@ -28,19 +30,37 @@ const TIMEOUT_MS = 8_000;
 // net.fetch rides Chromium's network stack, so system/user proxy settings
 // apply — plain undici fetch would ignore them and raw.githubusercontent is
 // unreachable directly from some networks. Three attempts ride out flaps.
-async function request(url: string, kind: "json" | "text"): Promise<unknown> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      const response = await net.fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-      if (!response.ok) throw new Error(`responded ${response.status}`);
-      return kind === "json" ? ((await response.json()) as unknown) : await response.text();
-    } catch (error) {
-      lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+const MAX_HOPS = 5;
+
+async function assertPublicUrl(url: string): Promise<void> {
+  if (!isSafeSkillSourceUrl(url)) throw new Error(`url rejected by the public-network policy: ${url}`);
+  const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
+  if (host.startsWith("[")) return; // literal IP already classified
+  const addresses = await lookup(host, { all: true });
+  if (!addresses.length) throw new Error(`hostname does not resolve: ${host}`);
+  for (const address of addresses) {
+    if (!isPublicIpLiteral(address.address)) {
+      throw new Error(`hostname resolves to a private address: ${host} -> ${address.address}`);
     }
   }
-  throw lastError;
+}
+
+/** net.fetch with per-hop re-validation: manual redirects, every location checked. */
+async function request(url: string, kind: "json" | "text"): Promise<unknown> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
+    await assertPublicUrl(current);
+    const response = await net.fetch(current, { redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("redirect without a location header");
+      current = new URL(location, current).toString();
+      continue;
+    }
+    if (!response.ok) throw new Error(`responded ${response.status}`);
+    return kind === "json" ? ((await response.json()) as unknown) : await response.text();
+  }
+  throw new Error("too many redirects");
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -85,6 +105,7 @@ export type SkillMarketDocument = {
   name?: string;
   description?: string;
   body: string;
+  resources?: Array<{ path: string; body: string }>;
 };
 
 export function createSkillMarketAggregator() {
@@ -152,10 +173,40 @@ export function createSkillMarketAggregator() {
       : loadCatalog(source);
   }
 
+  const JSDELIVR_GH = /^https:\/\/cdn\.jsdelivr\.net\/gh\/([^/]+)\/([^/]+)@([^/]+)\/(.+)$/;
+  const SKILL_FILE = /(?:^|\/)SKILL\.md$/;
+
   async function fetchDocument(url: string): Promise<SkillMarketDocument> {
     const hit = documentCache.get(url);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.document;
     const document = splitSkillDocument(await fetchText(url));
+    // Adjacent files complete the skill: the pdf/pptx-style documents
+    // reference FORMS.md / scripts that would otherwise dangle. jsDelivr's
+    // data API lists the directory; everything except SKILL.md is fetched
+    // and expanded inline by the renderer.
+    const match = JSDELIVR_GH.exec(url);
+    if (match) {
+      const [, owner, repo, ref, path] = match;
+      const dir = path.replace(/SKILL\.md$/, "");
+      try {
+        const listing = (await fetchJson<{ files?: Array<{ name: string }> }>(
+          `https://data.jsdelivr.com/v1/packages/gh/${owner}/${repo}@${ref}?structure=flat`,
+        )) as { files?: Array<{ name: string }> };
+        const siblings = (listing.files ?? [])
+          .map((file) => file.name)
+          .filter((name) => name.startsWith(dir) && !SKILL_FILE.test(name) && name.endsWith(".md"));
+        const resources: Array<{ path: string; body: string }> = [];
+        for (const name of siblings.slice(0, 20)) {
+          resources.push({
+            path: name.slice(dir.length),
+            body: await fetchText(`https://cdn.jsdelivr.net/gh/${owner}/${repo}@${ref}/${name}`),
+          });
+        }
+        if (resources.length) (document as SkillMarketDocument).resources = resources;
+      } catch {
+        // A listing failure degrades to the single document, never blocks.
+      }
+    }
     documentCache.set(url, { at: Date.now(), document });
     return document;
   }

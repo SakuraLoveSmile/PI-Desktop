@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   BUILTIN_SKILL_CATALOG,
+  expandSkillResources,
   GLOBAL_SCOPE,
   isSafeSkillSourceUrl,
   mergeSkillEntries,
@@ -25,6 +26,7 @@ import {
   IconX,
 } from "../icons";
 import { Field, Input, TooltipButton, cx } from "../ui";
+import { LatestWinsGate } from "../../lib/latest-wins";
 
 const CATEGORIES: readonly SkillCatalogCategory[] = [
   "workflow",
@@ -119,6 +121,7 @@ export function SkillMarketPanel({
   const [installFor, setInstallFor] = useState<MarketItem | null>(null);
   const [documentBody, setDocumentBody] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
+  const previewGate = useRef(new LatestWinsGate());
   const [sources, setSources] = useState<SkillMarketSource[]>(loadSources);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [draftSource, setDraftSource] = useState<{ name: string; url: string }>({
@@ -130,6 +133,12 @@ export function SkillMarketPanel({
   useEffect(() => {
     saveSources(sources);
   }, [sources]);
+
+  // Closing the sheet (cancel, overlay, X) must invalidate any in-flight
+  // preview response so a slow A cannot land after reopen.
+  useEffect(() => {
+    if (!installFor) previewGate.current.invalidate();
+  }, [installFor]);
 
   // Catalog sources are searched live (debounced); built-in picks render
   // immediately and stay as the offline floor when all sources are down.
@@ -195,12 +204,17 @@ export function SkillMarketPanel({
   );
 
   const openInstall = (entry: MarketItem) => {
+    const token = previewGate.current.begin();
     setInstallFor(entry);
     setDocumentBody(null);
     api
       .fetchSkillMarketDocument(entry)
-      .then((document) => setDocumentBody(document.body))
-      .catch(() => setDocumentBody(null));
+      .then((document) => {
+        if (previewGate.current.isCurrent(token)) setDocumentBody(document.body);
+      })
+      .catch(() => {
+        if (previewGate.current.isCurrent(token)) setDocumentBody(null);
+      });
   };
 
   const install = async () => {
@@ -212,7 +226,7 @@ export function SkillMarketPanel({
         id: installFor.id,
         name: document.name || installFor.name,
         description: document.description || installFor.description,
-        body: document.body,
+        body: expandSkillResources(document, document.resources ?? []),
         level: "global",
         scope: GLOBAL_SCOPE,
         enabled: true,

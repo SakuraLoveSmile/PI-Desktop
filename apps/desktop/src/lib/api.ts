@@ -668,7 +668,7 @@ export const api = {
     ),
   /** Fetch one catalog document (frontmatter split off) for preview/install. */
   fetchSkillMarketDocument: (entry: SkillCatalogEntry) =>
-    invoke<{ name?: string; description?: string; body: string }>(
+    invoke<{ name?: string; description?: string; body: string; resources?: Array<{ path: string; body: string }> }>(
       IPC.invoke.skillMarketFetch,
       { entry },
     ),

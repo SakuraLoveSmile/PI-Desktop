@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BUILTIN_SKILL_CATALOG } from "./skill-catalog-builtin.js";
 import {
+  expandSkillResources,
   skillEntryError,
   splitSkillDocument,
   toSkillInput,
@@ -81,5 +82,22 @@ describe("BUILTIN_SKILL_CATALOG", () => {
       expect(liveHost).toBe(true);
       expect(skill.url.endsWith("SKILL.md")).toBe(true);
     }
+  });
+});
+
+describe("expandSkillResources", () => {
+  it("returns the body untouched without resources", () => {
+    expect(expandSkillResources({ body: "Body." }, [])).toBe("Body.");
+  });
+
+  it("appends each resource as a fenced appendix", () => {
+    const out = expandSkillResources({ body: "Main body." }, [
+      { path: "FORMS.md", body: "Forms content." },
+      { path: "scripts/run.md", body: "Run it." },
+    ]);
+    expect(out).toContain("Main body.");
+    expect(out).toContain("# Attached resource: FORMS.md");
+    expect(out).toContain("Forms content.");
+    expect(out).toContain("# Attached resource: scripts/run.md");
   });
 });
