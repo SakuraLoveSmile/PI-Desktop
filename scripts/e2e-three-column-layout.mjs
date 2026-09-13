@@ -8,11 +8,11 @@
  * the fixed-window three-column contract:
  *
  *   - the native window width never changes (opening, dragging, closing);
- *   - MainChat never measures below its 360px floor, including mid-drag and
+ *   - MainChat never measures below its 450px floor, including mid-drag and
  *     while `sidebar-out` still occupies flex space;
  *   - the expanded sidebar yields at the threshold and returns when the panel
  *     closes;
- *   - a manual reopen spends work-panel width first, otherwise targeting 370px.
+ *   - a manual reopen spends work-panel width first, otherwise targeting 460px.
  *
  * Prereqs: `pnpm --filter @pi-desktop/desktop build` (or `pnpm build:js`) and a
  * host-core binary (target/debug, target/release, or PI_DESKTOP_HOST_BIN).
@@ -188,6 +188,7 @@ async function main() {
         PI_DESKTOP_START_MAXIMIZED: "0",
         ELECTRON_RENDERER_URL: "",
       },
+      detached: process.platform !== "win32",
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
@@ -200,7 +201,8 @@ async function main() {
 
   const cleanup = () => {
     try {
-      child.kill("SIGKILL");
+      if (process.platform === "win32" || !child.pid) child.kill("SIGKILL");
+      else process.kill(-child.pid, "SIGKILL");
     } catch {}
     for (const dir of [dataDir, profileDir]) {
       try {
@@ -239,7 +241,13 @@ async function main() {
     };
     const clickSidebarToggle = async () => {
       await cdp.evaluate(
-        `document.querySelector(".ct-lead .ct-icon-btn")?.dispatchEvent(new MouseEvent("click", { bubbles: true }))`,
+        `(() => {
+          const toggle =
+            document.querySelector(".ct-lead .ct-icon-btn") ??
+            document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ??
+            document.querySelector('.sidebar [data-nav="toggle-sidebar"]');
+          toggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        })()`,
       );
       await delay(500);
     };
@@ -344,7 +352,7 @@ async function main() {
     );
     check(
       drag.minMain >= MAIN_PANE_MIN_WIDTH,
-      "MainChat never drops below 360px during the drag preview",
+      "MainChat never drops below 450px during the drag preview",
       `min=${drag.minMain}`,
     );
     check(
@@ -364,7 +372,7 @@ async function main() {
       `panel=${drag.after.panel} budget=${Math.max(0, drag.after.windowWidth - MAIN_PANE_MIN_WIDTH)}`,
     );
 
-    // 3. Reopen spends panel width first, otherwise targeting 370px.
+    // 3. Reopen spends panel width first, otherwise targeting 460px.
     await rig(`window.__PI_DESKTOP__.setWorkPanelWidth(720)`);
     if ((await measure()).sidebarKind === "sidebar") {
       await clickSidebarToggle();
@@ -389,7 +397,7 @@ async function main() {
     check(
       reopened.main === MAIN_PANE_REOPEN_TARGET_WIDTH &&
         reopened.panel === expectedPanel,
-      "the constrained reopen lands on the 370px MainChat target",
+      "the constrained reopen lands on the 460px MainChat target",
       `main=${reopened.main} panel=${reopened.panel}`,
     );
 
@@ -457,6 +465,22 @@ async function main() {
       "preview mode never resizes the native window",
       `window ${beforeMaximize.windowWidth} -> ${maximizing.windowWidth}`,
     );
+
+    const previewActions = await cdp.evaluate(`(() => ({
+      platform: window.piDesktop?.platform ?? "unknown",
+      newTask: !!document.querySelector('.window-chrome-row [data-nav="new-task"]'),
+      sidebarToggle:
+        !!document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ||
+        !!document.querySelector('.sidebar [data-nav="toggle-sidebar"]'),
+      controls: !!document.querySelector(".window-chrome-row .window-controls"),
+    }))()`);
+    check(
+      previewActions.newTask &&
+        previewActions.sidebarToggle &&
+        (previewActions.controls || previewActions.platform === "darwin"),
+      "preview mode keeps new-task, sidebar, and window controls available",
+      JSON.stringify(previewActions),
+    );
     await cdp.evaluate(
       `document.querySelector(".work-panel-maximize")?.dispatchEvent(new MouseEvent("click", { bubbles: true }))`,
     );
@@ -469,6 +493,56 @@ async function main() {
       "leaving preview mode restores the previous three-column widths",
       `before=${JSON.stringify(beforeMaximize)} after=${JSON.stringify(restoredAfterMaximize)}`,
     );
+
+    // Preview chrome actions must remain usable while MainChat is absent.
+    await cdp.evaluate(
+      `document.querySelector(".work-panel-maximize")?.dispatchEvent(new MouseEvent("click", { bubbles: true }))`,
+    );
+    await waitFor(
+      () => cdp.evaluate(`!!document.querySelector('.window-chrome-row [data-nav="new-task"]')`),
+      "preview new-task action",
+    );
+    await cdp.evaluate(
+      `document.querySelector('.window-chrome-row [data-nav="new-task"]')?.click?.()`,
+    );
+    await waitFor(
+      () =>
+        cdp.evaluate(
+          `!!document.querySelector(".main-pane") && !document.querySelector(".app-shell.work-panel-maximized")`,
+        ),
+      "new task exits preview mode",
+    );
+    check(
+      (await cdp.evaluate(`!!document.querySelector(".composer-input")`)) === true,
+      "new task leaves a usable composer after preview mode",
+    );
+    if ((await measure()).sidebarKind !== "sidebar") await clickSidebarToggle();
+    await waitFor(
+      () => cdp.evaluate(`!!document.querySelector('[data-nav="plugins"]')`),
+      "sidebar navigation after preview mode",
+    );
+    await cdp.evaluate(`document.querySelector('[data-nav="plugins"]')?.click?.()`);
+    await waitFor(
+      () =>
+        cdp.evaluate(
+          `!!document.querySelector(".plugins-page") && !!document.querySelector(".main-pane") && !document.querySelector(".app-shell.work-panel-maximized")`,
+        ),
+      "plugin route remains visible after preview mode",
+    );
+    await cdp.evaluate(`document.querySelector('[data-nav="home"]')?.click?.()`);
+    await waitFor(
+      () =>
+        cdp.evaluate(
+          `!!document.querySelector(".conversation-topbar") && !!document.querySelector(".main-pane")`,
+        ),
+      "home route returns after preview navigation",
+    );
+    await rig(`window.__PI_DESKTOP__.openWorkPanel()`);
+    await waitFor(
+      () => cdp.evaluate(`!!document.querySelector('[data-testid="work-panel"]')`),
+      "work panel remounted after preview navigation",
+    );
+    await rig(`window.__PI_DESKTOP__.setWorkPanelWidth(500)`);
 
     // 6. Preview-mode details: inert divider, sidebar interop, persistence.
     const storedBefore = await cdp.evaluate(
@@ -534,25 +608,10 @@ async function main() {
       "entering preview mode never rewrites the persisted preferred width",
       `${storedBefore} -> ${storedAfterPreview}`,
     );
-    // The sidebar toggle lives in MainChat's topbar, which preview mode does not
-    // render, so the keyboard shortcut is the path that stays available.
-    await cdp.send("Input.dispatchKeyEvent", {
-      type: "keyDown",
-      modifiers: 2,
-      key: "b",
-      code: "KeyB",
-      windowsVirtualKeyCode: 66,
-      nativeVirtualKeyCode: 66,
-    });
-    await cdp.send("Input.dispatchKeyEvent", {
-      type: "keyUp",
-      modifiers: 2,
-      key: "b",
-      code: "KeyB",
-      windowsVirtualKeyCode: 66,
-      nativeVirtualKeyCode: 66,
-    });
-    await delay(700);
+    // The preview shell keeps the sidebar action available either in its
+    // window-level row (collapsed) or in the expanded sidebar header. Exercise
+    // the visible control so persistence is checked across a real UI action.
+    await clickSidebarToggle();
     const previewWithSidebar = await measure();
     check(
       previewWithSidebar.main === null &&
@@ -565,17 +624,11 @@ async function main() {
     const storedAfterReopen = await cdp.evaluate(
       `localStorage.getItem("pi.desktop.workPanel")`,
     );
-    // Reopening the sidebar while previewing is the documented reopen path: it
-    // spends panel width first, so the preferred width follows that gesture.
+    // Preview is transient: reopening the sidebar changes only the current
+    // rectangle and must not rewrite the user's preferred width.
     check(
-      storedAfterReopen ===
-        JSON.stringify({
-          width:
-            previewWithSidebar.windowWidth -
-            (previewWithSidebar.sidebar ?? 0) -
-            MAIN_PANE_REOPEN_TARGET_WIDTH,
-        }),
-      "reopening the sidebar from preview mode records the reopen width",
+      storedAfterReopen === storedAfterPreview,
+      "reopening the sidebar from preview mode preserves the preferred width",
       `${storedAfterPreview} -> ${storedAfterReopen}`,
     );
     await rig(`window.__PI_DESKTOP__.collapseWorkPanel()`);
@@ -603,11 +656,15 @@ async function main() {
         bandZ: band ? Number(getComputedStyle(band).zIndex) : null,
         bandHeight: band ? Math.round(band.getBoundingClientRect().height) : null,
         bandPointerEvents: band ? getComputedStyle(band).pointerEvents : null,
+        platform: window.piDesktop?.platform ?? "unknown",
         controlsPosition: controls ? getComputedStyle(controls).position : null,
         controlsOnScreen: controlsBox
           ? controlsBox.width > 0 && controlsBox.right <= window.innerWidth + 1
           : null,
-        sidebarToggle: !!document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]'),
+        newTask: !!document.querySelector('.window-chrome-row [data-nav="new-task"]'),
+        sidebarToggle:
+          !!document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ||
+          !!document.querySelector('.sidebar [data-nav="toggle-sidebar"]'),
         panelToggle: !!document.querySelector(".app-work-panel-toggle"),
         sidebarWidth: sidebar ? Math.round(sidebar.getBoundingClientRect().width) : null,
         handleVisible: handle ? getComputedStyle(handle).display !== "none" : false,
@@ -655,13 +712,20 @@ async function main() {
       JSON.stringify(e2eChromePreview),
     );
     check(
-      e2eChromePreview.controlsPosition === "fixed" && e2eChromePreview.controlsOnScreen === true,
+      e2eChromePreview.platform === "darwin" ||
+        (e2eChromePreview.controlsPosition === "fixed" &&
+          e2eChromePreview.controlsOnScreen === true),
       "system buttons keep their ordinary seat while previewing",
       JSON.stringify(e2eChromePreview),
     );
     check(
       e2eChromePreview.panelToggle === true,
       "the panel toggle stays in the top row while previewing",
+      JSON.stringify(e2eChromePreview),
+    );
+    check(
+      e2eChromePreview.newTask === true && e2eChromePreview.sidebarToggle === true,
+      "preview mode keeps new-task and sidebar navigation controls",
       JSON.stringify(e2eChromePreview),
     );
     await cdp.evaluate(`document.querySelector(".work-panel-maximize")?.click?.()`);

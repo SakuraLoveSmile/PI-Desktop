@@ -33,7 +33,7 @@ test("the three-column budget protects MainChat and collapses the sidebar at the
   assert.equal(layout.shouldCollapseSidebar, true);
 });
 
-test("the expanded sidebar collapses as soon as MainChat reaches 360px", () => {
+test("the expanded sidebar collapses as soon as MainChat reaches 450px", () => {
   const justAbove = workPanelLayout({
     containerWidth: 1040,
     sidebarWidth: 275,

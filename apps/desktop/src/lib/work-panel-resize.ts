@@ -109,7 +109,7 @@ export function workPanelLayout({
 /**
  * Computes the right-column width used while manually reopening the sidebar.
  * The right column gives up its space first, preserving the current MainChat
- * width. If that cannot keep the 360px hard floor, the 370px reopen target is
+ * width. If that cannot keep the 450px hard floor, the 460px reopen target is
  * used as the next best stable width.
  */
 export function workPanelWidthForSidebarReopen({

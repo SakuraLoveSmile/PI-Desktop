@@ -1,6 +1,10 @@
 import { lazy, Suspense, type CSSProperties, type ReactNode } from "react";
 import { TooltipButton, cx } from "../../components/ui";
-import { IconSidebar, IconPanel, IconPanelOpen } from "../../components/icons";
+import {
+  IconNewSession,
+  IconPanel,
+  IconPanelOpen,
+} from "../../components/icons";
 import { Sidebar } from "../../components/Sidebar";
 import { ConversationTopbar } from "../../components/ConversationTopbar";
 import { WorkPanel } from "../../components/workpanel/WorkPanel";
@@ -110,22 +114,29 @@ export function AppShell() {
             /* Preview mode hides MainChat, which normally owns the drag band and
                the window controls. Keep the same top band with the same system
                buttons, at the window level rather than inside the panel. */
-            <div className="window-chrome-row">
+            <div
+              className={cx(
+                "window-chrome-row",
+                !sidebarCollapsed && "sidebar-expanded",
+              )}
+            >
               {sidebarCollapsed && (
+                <CollapsedTitlebarActions
+                  onToggleSidebar={toggleSidebar}
+                  onNewTask={() => void runMenuCommand("newTask")}
+                  sidebarToggleShortcut={sidebarToggleShortcut}
+                />
+              )}
+              {!sidebarCollapsed && (
                 <TooltipButton
                   type="button"
-                  className="icon-btn"
-                  tooltip={
-                    sidebarToggleShortcut
-                      ? `${t("nav.expandSidebar")} (${sidebarToggleShortcut})`
-                      : t("nav.expandSidebar")
-                  }
-                  ariaLabel={t("nav.expandSidebar")}
-                  aria-expanded={false}
-                  data-nav="toggle-sidebar"
-                  onClick={toggleSidebar}
+                  className="title-nav-btn"
+                  tooltip={t("nav.newTask")}
+                  ariaLabel={t("nav.newTask")}
+                  data-nav="new-task"
+                  onClick={() => void runMenuCommand("newTask")}
                 >
-                  <IconSidebar size={15} />
+                  <IconNewSession size={13} />
                 </TooltipButton>
               )}
               <div className="window-chrome-drag" aria-hidden />

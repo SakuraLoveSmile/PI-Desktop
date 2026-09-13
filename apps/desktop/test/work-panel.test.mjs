@@ -551,3 +551,31 @@ test("the shell budgets the three columns inside the fixed client area", () => {
   assert.match(appSource, /setWorkPanelReservation\(0\)/);
   assert.doesNotMatch(appSource, /setWorkPanelReservation\(Math\.round\(/);
 });
+
+test("preview mode keeps shell actions and restores routes before navigation", () => {
+  assert.match(appSource, /className=\{cx\([\s\S]*?"window-chrome-row"/);
+  assert.match(appSource, /data-nav="new-task"/);
+  assert.match(appSource, /<CollapsedTitlebarActions[\s\S]*?onNewTask=/);
+  assert.match(appSource, /<WindowControls contained \/>/);
+  assert.match(appSource, /const workPanelMaximizedRef = useRef\(false\)/);
+  assert.match(
+    appSource,
+    /if \(workPanelOpenRef\.current && !workPanelMaximizedRef\.current\)/,
+  );
+  assert.match(
+    appSource,
+    /if \(workPanelMaximized && page !== "chat"\) \{\s*setWorkPanelMaximized\(false\);/s,
+  );
+  assert.match(
+    appSource,
+    /case "newTask":[\s\S]*?if \(workPanelMaximizedRef\.current\) setWorkPanelMaximized\(false\);/,
+  );
+  assert.match(
+    globalStyles,
+    /\.window-chrome-row \{[\s\S]*?-webkit-app-region: drag;/,
+  );
+  assert.match(
+    globalStyles,
+    /\.window-chrome-row\.sidebar-expanded \{[\s\S]*?left: var\(--ds-sidebar-width\);/,
+  );
+});

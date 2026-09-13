@@ -1123,7 +1123,12 @@
   align-items: center;
   padding-left: 8px;
   pointer-events: none;
-  -webkit-app-region: no-drag;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.window-chrome-row.sidebar-expanded {
+  left: var(--ds-sidebar-width);
 }
 
 .window-chrome-row button {
@@ -1139,6 +1144,8 @@
 .window-chrome-drag {
   flex: 1 1 auto;
   align-self: stretch;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .window-chrome-row .window-controls,

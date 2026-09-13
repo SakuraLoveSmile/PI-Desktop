@@ -75,6 +75,7 @@ export function useAppShellRuntime() {
   const shellWidthRef = useRef(shellWidth);
   const workPanelWidthRef = useRef(workPanelWidth);
   const workPanelOpenRef = useRef(workPanelVisible);
+  const workPanelMaximizedRef = useRef(false);
   const autoCollapsedSidebarRef = useRef(false);
   sidebarCollapsedRef.current = sidebarCollapsed;
   sidebarWidthRef.current = sidebarWidth;
@@ -103,10 +104,10 @@ export function useAppShellRuntime() {
   const handleSidebarWidthCommit = useCallback(() => {}, []);
   // Reopening prefers the right column: the work panel gives up width first so
   // MainChat keeps the width it already had, and only a would-be breach of the
-  // 360px floor falls back to the 370px reopen target.
+  // 450px floor falls back to the 460px reopen target.
   const reopenSidebar = useCallback(() => {
     if (!sidebarCollapsedRef.current) return;
-    if (workPanelOpenRef.current) {
+    if (workPanelOpenRef.current && !workPanelMaximizedRef.current) {
       const currentPanelWidth = workPanelWidthRef.current;
       const width =
         appShellRef.current?.clientWidth ||
@@ -170,6 +171,7 @@ export function useAppShellRuntime() {
   const [presentedWorkPanelOpen, setPresentedWorkPanelOpen] = useState(false);
   const [workPanelMaximized, setWorkPanelMaximized] = useState(false);
   const [workPanelExiting, setWorkPanelExiting] = useState(false);
+  workPanelMaximizedRef.current = workPanelMaximized;
   const workPanelReservationRequest = useRef(0);
   const workPanelExitGeneration = useRef(0);
   const workPanelExitClosing = useRef(false);
@@ -211,6 +213,15 @@ export function useAppShellRuntime() {
       closeSubagentPanel();
     }
   }, [activeSessionId, closeSubagentPanel, page, subagentPanel]);
+
+  // Destination pages own the center pane. Leaving Chat while previewing must
+  // restore that pane before the destination is presented; otherwise the
+  // sidebar can change `page` successfully while the route stays unmounted.
+  useEffect(() => {
+    if (workPanelMaximized && page !== "chat") {
+      setWorkPanelMaximized(false);
+    }
+  }, [page, workPanelMaximized]);
 
   useEffect(() => {
     workPanelExitingRef.current = workPanelExiting;
@@ -351,6 +362,7 @@ export function useAppShellRuntime() {
         const store = useAppStore.getState();
         switch (command) {
           case "newTask":
+            if (workPanelMaximizedRef.current) setWorkPanelMaximized(false);
             await store.newSession();
             requestAnimationFrame(() =>
               document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus(),
