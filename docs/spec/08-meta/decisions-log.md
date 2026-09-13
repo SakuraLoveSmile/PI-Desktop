@@ -4803,3 +4803,24 @@ D193, and D194.
   read instead of relying on cache eviction, and replace E2E boot conditions that could
   not fail with observations the probe does not itself guarantee.
 - See ADR 0239, ADR 0240, E2E-SESSION-hover-card-model-and-links.
+
+## 2026-09-13 — Vendor the file view as an updatable plugin (issue #304)
+
+- The work panel's file view is no longer `pi.files`. It is a vendored copy of
+  the third-party `pi.file-manager` release, shipped from
+  `apps/desktop/resources/plugins/` and recorded in its own `UPSTREAM.md`. The
+  old plugin is removed, and host-core drops its stale registry row on the next
+  launch.
+- Bundled means default and non-removable, not frozen: a bundled plugin can be
+  updated from the marketplace, that update survives the next launch, and a
+  build that ships a strictly newer version still wins. `uninstall` refuses by
+  ID against what the build ships, not by the row's `source`, so an updated
+  plugin stays uninstallable and a plugin dropped from a build is removable
+  again.
+- A marketplace entry is offered as an update only when it is strictly newer.
+  Equality is not an update, and an older catalog version is not one either.
+- Editing writes stay inside the plugin's own process, which keeps the workspace
+  path jail, atomic writes, conflict detection, and its write audit. The host
+  gateway does not mediate them: a manifest cannot declare a whole-tree write.
+- See ADR 0241 (supersedes ADR 0105), ADR 0104, E2E-153,
+  E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update.

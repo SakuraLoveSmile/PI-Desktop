@@ -124,7 +124,7 @@ Each ADR includes:
 | 0102 | Publisher-owned plugin source with a Git-hosted artifact store | Accepted for implementation (supersedes 0006) |
 | 0103 | Compact context usage summary | Accepted (amends 0047) |
 | 0104 | Plugin-contributed work panel views | Accepted |
-| 0105 | Ship Files as a bundled plugin; keep Review in the host | Accepted (Terminal clause superseded by 0108) |
+| 0105 | Ship Files as a bundled plugin; keep Review in the host | Superseded by 0241 |
 | 0106 | Keep only five core builtin commands | Accepted |
 | 0107 | Make current-session task notification suppression atomic | Accepted |
 | 0108 | Remove the built-in interactive terminal | Accepted |
@@ -258,4 +258,5 @@ Each ADR includes:
 | 0238 | Prioritize MainChat in the three-column shell | Accepted (amends ADR 0226) |
 | 0239 | Host-owned session collaboration messages | Accepted (amends ADR 0237 / 0165 / 0213) |
 | 0240 | Independent session discovery and navigable collaboration projections | Accepted (amends ADR 0239) |
+| 0241 | Ship the file view as a vendored, updatable plugin | Accepted (supersedes ADR 0105; issue #304) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
