@@ -119,6 +119,7 @@ export const fr = {
     "devDisabled": "Les mises à jour sont désactivées dans les versions de développement."
   },
   "nav": {
+    "pinnedSessions": "Épinglées",
     "home": "Accueil",
     "newTask": "Nouvelle tâche",
     "newProject": "Nouveau projet",

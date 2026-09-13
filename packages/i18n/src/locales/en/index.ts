@@ -126,6 +126,7 @@ export const en = {
     devDisabled: "Updates are disabled in development builds.",
   },
   nav: {
+    "pinnedSessions": "Pinned",
     home: "Home",
     newTask: "New task",
     newProject: "New project",
