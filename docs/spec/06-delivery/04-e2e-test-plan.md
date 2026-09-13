@@ -10800,7 +10800,9 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   Use the latest-message control to resume the live transcript. Scroll within
   the active conversation, reopen search, and select its own result; locate the
   target inside the same pane. Edit, retry, branch, and delete an old message. Reopen search and check the retained query.
-  Repeat with CJK and symbols. Change queries rapidly while delayed first-page
+  Repeat with CJK and symbols. Verify that a contiguous Chinese phrase matches,
+  while inserting a space between its words only matches text with that space.
+  Change queries rapidly while delayed first-page
   and later-page requests resolve out of order. Close/reopen during loading.
   Retry after a transient search error.
   Open the nested answer and verify that the owning Task is revealed and its
@@ -10840,4 +10842,3 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   Existing commands, pages, settings, and keyboard navigation still work.
 - **Status**: Draft; Rust and renderer unit regressions cover the data/query
   boundaries. Full rendered E2E requires an explicitly authorized run.
-

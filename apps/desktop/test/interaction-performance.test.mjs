@@ -70,7 +70,7 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
   // commit that reveals it, or the reveal shows one empty frame (ADR 0137).
   assert.match(
     transcript,
-    /const renderedMessages =\s*firstCommit \|\| paneRevealed \? messages : deferredMessages/,
+    /const renderedMessages =\s*readingWindow \|\| firstCommit \|\| paneRevealed \? messages : deferredMessages/,
   );
   assert.match(transcript, /const \{ entries, visible \} = useMemo/);
   assert.match(
@@ -222,7 +222,7 @@ test("a pane bounds its own first commit instead of rebuilding it", () => {
   // whichever session was rendered last. It still must be derived during render.
   assert.match(
     hydration,
-    /const hydrationBounded =\s*firstCommit &&/,
+    /const hydrationBounded =\s*!readingWindow && firstCommit &&/,
     "the gate must be derived during render, not set from an effect",
   );
   // The first commit is bounded by the initial mount budget, and the expansion

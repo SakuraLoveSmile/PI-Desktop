@@ -28,7 +28,9 @@ non-ASCII case mappings use that predicate directly to avoid tokenizer
 Unicode-version gaps. Retrieval and highlighting both use Unicode lowercase
 and map expanding case conversions back to original text. Quotes, `%`, `_`,
 and backslashes never become operators. Queries are trimmed and bounded to
-500 characters. Each page contains 30 sessions ordered by updated time and ID,
+500 characters. The complete query is a literal substring, including internal
+spaces; it is not split into independent words or interpreted as FTS syntax.
+Each page contains 30 sessions ordered by updated time and ID,
 full matching-message counts, and at most two recent message excerpts. Offsets
 continue the current query; reopening refreshes results against current data.
 

@@ -4788,4 +4788,3 @@ Task context through additive `navigationParent`; parser source offsets locate
 hidden Markdown and file-chip matches. Read ownership rejects interrupted pages,
 and explicit message actions hydrate canonical input when history is partial or
 text is capped. Validation: E2E-SESSION-content-search-and-message-navigation.
-
