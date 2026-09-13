@@ -240,6 +240,12 @@ fn market_entry_offers_an_update_only_when_the_catalog_is_newer() {
         assert!(mgr.to_market_summary(&entry("0.7.0")).update_available);
         // Same version is not an update either.
         assert!(!mgr.to_market_summary(&entry("0.6.0")).update_available);
+
+        // The data directory is process-global; leaving it set would leak into
+        // whichever test runs next.
+        unsafe {
+            std::env::remove_var("PI_DESKTOP_DATA_DIR");
+        }
     });
 }
 
