@@ -439,6 +439,7 @@ export const tr = {
     subagentCount_one: "{{count}} alt ajan",
     subagentCount_other: "{{count}} alt ajan",
     subagentFinishedCount: "{{finished}}/{{total}} bitti",
+    subagentCreating: "Alt ajan başlatılıyor…",
     subagentStatus: {
       running: "Çalışıyor",
       completed: "Tamamlandı",
