@@ -1,4 +1,4 @@
-import { ErrorCodes, IPC, type AgentEventEnvelope, type Risk } from "@pi-desktop/shared";
+import { ErrorCodes, IPC, type AgentEventEnvelope, type PlanExecutionFinishStatus, type Risk } from "@pi-desktop/shared";
 import { assertLinuxGlibcSupported } from "../linux-glibc";
 import { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
@@ -6,6 +6,7 @@ import type { PersistenceOutbox } from "../persistence-outbox";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { UserMcpRuntime } from "../user-mcp";
 import type { RuntimeState } from "./context";
+import type { FinishTurn } from "./plans";
 
 export type HostRuntimeDependencies = {
   runtimeState: RuntimeState;
@@ -21,8 +22,20 @@ export type HostRuntimeDependencies = {
   sendToRenderer: (channel: string, payload: unknown) => void;
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
   togglePluginLauncher: () => Promise<void>;
-  finishTurn: (...args: any[]) => Promise<void>;
-  finishApprovedExecution: (...args: any[]) => Promise<void>;
+  finishTurn: FinishTurn;
+  finishApprovedExecution: (
+    executionId: string,
+    status: PlanExecutionFinishStatus,
+    errorCode?: string,
+  ) => Promise<void>;
+  /**
+   * Last synchronous gate before a plugin side effect. A turn that was cancelled
+   * or started finalizing while this handler awaited the session read must not
+   * dispatch.
+   */
+  isTurnDispatchable: (sessionId: string, turnId: string | null | undefined) => boolean;
+  /** Identity of the turn a host crash interrupted, captured before teardown. */
+  activeTurns: Map<string, string>;
   approvedExecutionIdsBySession: Map<string, string>;
   claimedExecutionSessions: Map<string, string>;
   importLegacyScheduled: () => Promise<unknown>;
@@ -45,7 +58,9 @@ export function createHostRuntime({
   emitAgentEvent,
   togglePluginLauncher,
   finishTurn,
+  isTurnDispatchable,
   finishApprovedExecution,
+  activeTurns,
   approvedExecutionIdsBySession,
   claimedExecutionSessions,
   importLegacyScheduled,
@@ -116,11 +131,15 @@ export function createHostRuntime({
       };
       emitAgentEvent(envelope);
     } else if (method === "plugins.execute") {
-      // Host dispatches plugin_* and mcp_* tools to us; run them and answer.
       void (async () => {
         const q = params as {
           executionId: string;
           sessionId?: string;
+          /**
+           * Runtime turn identity of the tool call, forwarded unchanged from the
+           * host so a plugin receives the same identity `session:turnEnded`
+           * carries. Absent for callers that predate turn tracking.
+           */
           turnId?: string;
           toolCallId?: string;
           toolName: string;
@@ -197,18 +216,34 @@ export function createHostRuntime({
                 // Executor identity is best-effort; the tool can still run.
               }
             }
-            const result = await tool.execute(q.args, {
-              sessionId: q.sessionId,
-              turnId: q.turnId,
-              mode: sessionMode,
-              modelKey,
-              thinkingLevel,
-            });
-            payload = {
-              executionId: q.executionId,
-              ok: true,
-              content: result ?? null,
-            };
+            // Last synchronous gate before dispatch: the turn may have been
+            // cancelled or started finalizing while the session read above was
+            // awaited, and neither may start a plugin side effect. No await may
+            // sit between this check and the dispatch, and the rejection is
+            // answered on the original execution id rather than dropped.
+            if (!isTurnDispatchable(q.sessionId ?? "", q.turnId)) {
+              payload = {
+                executionId: q.executionId,
+                ok: false,
+                errorCode: "TOOL_TURN_CANCELLED",
+                content: {
+                  error: `turn ${q.turnId ?? "(none)"} is no longer dispatchable`,
+                },
+              };
+            } else {
+              const result = await tool.execute(q.args, {
+                sessionId: q.sessionId,
+                turnId: q.turnId,
+                mode: sessionMode,
+                modelKey,
+                thinkingLevel,
+              });
+              payload = {
+                executionId: q.executionId,
+                ok: true,
+                content: result ?? null,
+              };
+            }
           } catch (e) {
             const code =
               e && typeof e === "object" && "code" in e && typeof e.code === "string"
@@ -259,7 +294,14 @@ export function createHostRuntime({
     if (intentional || isQuitting()) return;
     for (const [executionId, sessionId] of claimedExecutionSessions) {
       if (approvedExecutionIdsBySession.get(sessionId) === executionId) {
-        void finishTurn(sessionId, "aborted", "PLAN_EXECUTION_INTERRUPTED");
+        // Captured before the teardown awaits: the turn this interrupted is the
+        // one running now, and it must not be inferred later.
+        const interruptedTurnId = activeTurns.get(sessionId);
+        if (interruptedTurnId) {
+          void finishTurn(sessionId, "aborted", "PLAN_EXECUTION_INTERRUPTED", {
+            turnId: interruptedTurnId,
+          });
+        }
       }
       void finishApprovedExecution(
         executionId,

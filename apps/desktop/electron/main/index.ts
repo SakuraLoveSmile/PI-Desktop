@@ -676,6 +676,7 @@ const {
   pluginViews,
   browserHost,
   browserPane,
+  announceTurnEnded,
 } = pluginServices;
 
 const providerCatalogRuntime = createProviderCatalogRuntime({
@@ -1008,8 +1009,6 @@ const planRuntimeState: PlanRuntimeState = {
     approvedExecutionDrain = value;
   },
 };
-const turnFinalizations = new Map<string, Promise<void>>();
-
 /** sessionId → scheduled task_run id awaiting completion. */
 const scheduledRunsBySession = new Map<string, string>();
 /** Session currently rendered on the chat page; focus remains Main-owned. */
@@ -1043,6 +1042,10 @@ const {
   planSubmissionTurnKey,
   waitForTurnSettlement,
   shouldCreateTaskNotification,
+  lockAbortReason,
+  isTurnDispatchable,
+  isSessionBusy,
+  isStaleTerminalEvent,
 } = sessionCoordination;
 
 async function withGitBranch<T extends { path?: string; name?: string } | null | undefined>(
@@ -1104,12 +1107,9 @@ const planRuntime = createPlanRuntime({
   planState: planRuntimeState,
   logger,
   sendToRenderer,
-  activeTurns,
-  activeTurnUsages,
+  coordination: sessionCoordination,
   scheduledRunsBySession,
   activeToolCalls,
-  turnFinalizations,
-  turnSettlements,
   planSubmissionTurnIds,
   approvedExecutionIdsBySession,
   claimedExecutionSessions,
@@ -1119,9 +1119,7 @@ const planRuntime = createPlanRuntime({
   dispatchingApprovedExecutions,
   inFlightExecutionFinishes,
   pendingExecutionFinishes,
-  waitForTurnSettlement,
-  planSubmissionTurnKey,
-  shouldCreateTaskNotification,
+  announceTurnEnded,
   emitAgentEvent: (envelope) => emitAgentEvent(envelope),
   acquireSessionOperation,
   resolveAgentRuntimeLaunch,
@@ -1152,6 +1150,7 @@ const eventPersistence = createEventPersistence({
   addActiveTurnUsage,
   logger,
   finishTurn,
+  isStaleTerminalEvent,
   finishApprovedExecution,
   emitAgentEvent: (envelope) => emitAgentEvent(envelope),
 });
@@ -1168,6 +1167,7 @@ const sidecarRuntime = createSidecarRuntime({
   claimedExecutionSessions,
   inflightCheckpointer,
   finishTurn,
+  isStaleTerminalEvent,
   finishApprovedExecution,
   superviseRestart,
   isQuitting: () => quitting,
@@ -1203,7 +1203,9 @@ const { wireHost, startHost } = createHostRuntime({
   emitAgentEvent,
   togglePluginLauncher,
   finishTurn,
+  isTurnDispatchable,
   finishApprovedExecution,
+  activeTurns,
   approvedExecutionIdsBySession,
   claimedExecutionSessions,
   importLegacyScheduled,
@@ -1245,7 +1247,7 @@ function registerIpc() {
     updater,
     dataDir,
     activeTurns,
-    turnFinalizations,
+    isTurnDispatchable,
     sessionProjects,
     persistenceOutbox,
     logger,
@@ -1296,6 +1298,7 @@ function registerIpc() {
     claimedExecutionSessions,
     resolveAgentRuntimeLaunch,
     finishTurn,
+    lockAbortReason,
     finishApprovedExecution,
     dispatchApprovedPlan,
     dispatchExecutionForProposal,
@@ -1368,8 +1371,7 @@ registerApplicationStartup({
   modelsDevCatalog,
   plugins,
   activeTurns,
-  turnFinalizations,
-  getHost: () => host,
+  isSessionBusy,
   getMainWindow: () => mainWindow,
   sendToRenderer,
   applyDevelopmentBranding,

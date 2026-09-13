@@ -1,8 +1,9 @@
 import { applyMessageUpdate, IPC, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
+import type { FinishTurn } from "./plans";
+import type { RuntimeState } from "./context";
 import type { InflightCheckpointer } from "../inflight-checkpoint";
 import type { Logger } from "../logger";
 import type { PersistenceOutbox } from "../persistence-outbox";
-import type { RuntimeState } from "./context";
 
 export type EventPersistenceDependencies = {
   runtimeState: RuntimeState;
@@ -19,7 +20,13 @@ export type EventPersistenceDependencies = {
   persistenceOutbox: PersistenceOutbox;
   addActiveTurnUsage: (sessionId: string, usage: any) => void;
   logger: Logger;
-  finishTurn: (...args: any[]) => Promise<void>;
+  finishTurn: FinishTurn;
+  /**
+   * Terminal identity, shared with the event fan-out. Persistence is a separate
+   * call, so a stale terminal event must be blocked here as well: the caller
+   * returning early does not stop this function from running.
+   */
+  isStaleTerminalEvent: (envelope: AgentEventEnvelope) => boolean;
   finishApprovedExecution: (...args: any[]) => Promise<void>;
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
 };
@@ -40,6 +47,7 @@ export function createEventPersistence({
   addActiveTurnUsage,
   logger,
   finishTurn,
+  isStaleTerminalEvent,
   finishApprovedExecution,
   emitAgentEvent,
 }: EventPersistenceDependencies): {
@@ -137,10 +145,15 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
         details: event.error.details,
       },
     });
+    // The event fan-out blocks a stale terminal event from Agent Host and the
+    // renderer, but persistence is a separate call: without this check the
+    // finalizer below would still settle a turn this event does not own.
+    if (isStaleTerminalEvent(envelope)) return;
     const turnFinalization = finishTurn(
       envelope.sessionId,
       event.error.code === "TURN_ABORTED" ? "aborted" : "error",
       event.error.code,
+      { turnId: envelope.turnId ?? "" },
     );
     if (executionId) {
       void turnFinalization.then(() =>
@@ -154,7 +167,12 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     return;
   }
   if (event.type === "agent_end") {
-    const turnFinalization = finishTurn(envelope.sessionId, "completed");
+    // A late terminal event must not close a newer turn, nor restate the
+    // regenerate branch archive below on its behalf.
+    if (isStaleTerminalEvent(envelope)) return;
+    const turnFinalization = finishTurn(envelope.sessionId, "completed", undefined, {
+      turnId: envelope.turnId ?? "",
+    });
     if (executionId) {
       void turnFinalization.then(() =>
         finishApprovedExecution(executionId, "completed"),

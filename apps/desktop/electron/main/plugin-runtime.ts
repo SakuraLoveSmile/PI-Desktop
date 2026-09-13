@@ -106,6 +106,12 @@ export type RegisteredPluginTool = {
       mode?: "agent" | "plan" | "goal";
       modelKey?: string;
       thinkingLevel?: string;
+      /**
+       * Runtime turn identity for this tool call. Matches the `turnId` the host
+       * reports through `session:turnEnded`, so a plugin can scope resources
+       * (overlays, caches, helper sessions) to one host turn.
+       */
+      turnId?: string;
     },
   ) => Promise<unknown>;
 };
@@ -1240,7 +1246,20 @@ export class PluginRuntime {
    */
   broadcastEvent(event: string, args: unknown[] = []): void {
     for (const loaded of this.loaded.values()) {
-      loaded.child?.postMessage({ t: "event", event, args });
+      try {
+        loaded.child?.postMessage({ t: "event", event, args });
+      } catch (error) {
+        // One unreachable recipient must not starve the rest of the fan-out. The
+        // event is one-way: whoever is live still receives it.
+        this.services.audit?.({
+          pluginId: loaded.manifest.id,
+          api: "plugin.event.error",
+          ok: false,
+          event,
+          message: (error as Error).message,
+          ts: Date.now(),
+        });
+      }
     }
   }
 
@@ -1936,6 +1955,7 @@ export class PluginRuntime {
                     payload: {
                       name,
                       args: toolArgs,
+                      ...(ctx?.turnId ? { turnId: ctx.turnId } : {}),
                       sessionId,
                       turnId: ctx?.turnId,
                       mode: ctx?.mode,
