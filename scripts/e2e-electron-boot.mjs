@@ -81,7 +81,6 @@ child.on("close", (code) => {
   const menuContractOk =
     process.platform === "darwin" ? probe?.menuCount >= 6 : probe?.menuCount === 0;
   const sessions = probe?.sessionList;
-  const sessionListOk =
   // Each condition is able to fail. The probe's own construction guarantees the
   // seeded count, fixture-model count, refresh rounds and main-loop ticks, so
   // those are not asserted; the per-read list duration and the Main-thread
