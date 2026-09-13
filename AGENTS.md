@@ -447,6 +447,10 @@ Never report a skipped command as passing.
 
 Every **code-bearing PR** must pass relevant E2E before merge.
 
+The same gate applies to code-bearing local `main` integration. Required
+validation is part of an authorized integration request and needs no separate
+E2E permission.
+
 Build, typecheck, unit tests, or manual inspection do not replace E2E.
 
 Select suites according to the affected regression surface as defined in:
@@ -459,7 +463,7 @@ If the current environment cannot run required E2E:
 
 * the branch may be committed
 * a Draft / blocked PR may be opened
-* the PR is **not merge-ready**
+* local integration and PR merge remain **blocked**
 
 Record:
 
@@ -598,6 +602,18 @@ Before delivery, review the complete diff for:
 
 Do not push merely because local development is complete unless remote delivery is part of the task or the user has authorized it.
 
+When the user requests a commit, a push, or both, complete this task's
+integration into local `main` after the applicable gates pass. Do not stop at
+a task-branch commit or push, or ask again for merge permission. Explicit
+branch-only or draft-only instructions override that completion target.
+
+A commit-only or local-merge request does not authorize remote publishing.
+A push request requires the existing PR workflow: push the task branch, pass
+the required checks and reviews, merge into remote `main`, and synchronize
+local `main`. It does not authorize a direct push to `main` or a force-push.
+Report genuine validation, conflict, or access blockers; never bypass a merge
+gate to satisfy the delivery request.
+
 Before pushing, verify:
 
 * remote
@@ -625,7 +641,8 @@ Before integration:
 
 After merge:
 
-1. verify expected commits are present in `main`
+1. verify expected commits are present in local `main`, and remote `main` for
+   remote delivery
 2. remove your request worktree
 3. delete your merged local branch
 4. prune stale worktree metadata
@@ -639,6 +656,9 @@ git worktree prune
 ```
 
 Delete only your own worktree and branch.
+
+When the user also requests a launch, build and start from the integrated
+`main` checkout and its development environment.
 
 ---
 
@@ -676,13 +696,17 @@ A code task is Done only when all applicable conditions are true:
 * [ ] E2E documentation was updated when required
 * [ ] New E2E IDs use the multi-agent-safe semantic format
 * [ ] Relevant static / unit / integration checks pass
-* [ ] Relevant E2E passes for code-bearing PRs
+* [ ] Relevant E2E passes for code-bearing PRs and local `main` integration
 * [ ] Test evidence applies to the intended merge code
 * [ ] Complete diff was reviewed
 * [ ] No secrets, local data, or unrelated changes are included
 * [ ] Logical changes are committed
 * [ ] Required merge gates pass
+* [ ] Requested commit/push delivery reaches local `main`; authorized remote
+  delivery also reaches remote `main` through a PR, unless explicitly limited
+  to a branch or draft
 * [ ] Worktree and branch cleanup are complete after integration
+* [ ] Any requested launch uses the integrated `main` build/development environment
 
 The following are **not** equivalent to Done:
 
