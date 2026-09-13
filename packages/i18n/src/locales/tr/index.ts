@@ -249,6 +249,8 @@ export const tr = {
     enhancementFailed: "İstem iyileştirilemedi",
     dismissEnhancementError: "İyileştirme hatasını kapat",
     abort: "Durdur",
+    sendWhileRunning: "Takip mesajı gönder · {{shortcut}} ile yönlendir",
+    steeringUnavailable: "Bu tur artık yönlendirme kabul edemiyor. Taslağınız korundu.",
     stopGenerating: "Oluşturmayı durdur",
     running: "Çalışıyor…",
     loadingSession: "Sohbet yükleniyor…",
@@ -1404,7 +1406,7 @@ export const tr = {
     importExtensionDone: "{{id}} eklentisi olarak içe aktarıldı",
     agentExtension: {
       title: "Ajan uzantısı",
-      importConfirm: "İçe aktarılan uzantı ajan sürecinde, ajanın kendi araçlarıyla aynı erişimle çalışacak. Devam edilsin mi?",
+      importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araçlarıyla aynı erişimle çalışır. Bildirilen beceriler ajana talimatlar ekleyebilir. Devam edilsin mi?",
       diagnostics: "Tanılamalar",
       commandNeedsSession: "Uzantı komutu çalıştırmak için önce bir sohbet başlatın.",
       state: {
@@ -1826,6 +1828,8 @@ export const tr = {
       presetTestRunnerDesc: "Test veya derleme komutunu çalıştırıp hataları raporlar.",
       presetFixerName: "Düzeltici",
       presetFixerDesc: "Bir spesifikasyona göre çok dosyalı değişikliği uygular.",
+      presetUiDesignerName: "UI tasarımcısı",
+      presetUiDesignerDesc: "Brief'e göre bir arayüz tasarlar ve uygular; tarayıcı önizlemesinde doğrular.",
       presetBlank: "Boş başla",
       presetBlankDesc: "Varsayılan araçlar. Yönergeleri siz yazın.",
       presetApply: "Uygula",

@@ -240,6 +240,8 @@ export const es = {
     "enhancementFailed": "Error en la mejora de solicitud",
     "dismissEnhancementError": "Descartar error de mejora",
     "abort": "Detener",
+    sendWhileRunning: "Enviar seguimiento · {{shortcut}} para orientar",
+    steeringUnavailable: "Este turno ya no acepta indicaciones. Se conservó el borrador.",
     "stopGenerating": "Dejar de generar",
     "running": "Trabajando...",
     "loadingSession": "Cargando conversación...",
@@ -1385,7 +1387,7 @@ export const es = {
     "importExtensionDone": "Importada como complemento {{id}}",
     "agentExtension": {
       "title": "Extensión del agente",
-      "importConfirm": "La extensión importada se ejecutará en el proceso del agente con el mismo acceso que sus propias herramientas. ¿Continuar?",
+      "importConfirm": "Las extensiones importadas se ejecutan en el proceso del agente con el mismo acceso que sus propias herramientas. Las habilidades declaradas pueden añadir instrucciones al agente. ¿Continuar?",
       "diagnostics": "Diagnósticos",
       "commandNeedsSession": "Inicia un chat antes de ejecutar un comando de extensión.",
       "state": {
@@ -1789,6 +1791,8 @@ export const es = {
       "presetTestRunnerDesc": "Ejecuta un test o build y reporta los fallos.",
       "presetFixerName": "Reparador",
       "presetFixerDesc": "Implementa un cambio de varios archivos a partir de una spec.",
+      "presetUiDesignerName": "Diseñador UI",
+      "presetUiDesignerDesc": "Diseña e implementa una interfaz a partir del encargo, verificada en la vista previa del navegador.",
       "presetBlank": "Empezar en blanco",
       "presetBlankDesc": "Herramientas por defecto. Escribe tus instrucciones.",
       "presetApply": "Aplicar",

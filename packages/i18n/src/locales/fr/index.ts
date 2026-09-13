@@ -240,6 +240,8 @@ export const fr = {
     "enhancementFailed": "L'amélioration de l'invite a échoué",
     "dismissEnhancementError": "Ignorer l'erreur d'amélioration",
     "abort": "Arrêter",
+    sendWhileRunning: "Envoyer à la suite · {{shortcut}} pour réorienter",
+    steeringUnavailable: "Ce tour ne peut plus recevoir de consignes. Votre brouillon a été conservé.",
     "stopGenerating": "Arrêter de générer",
     "running": "Travailler…",
     "loadingSession": "Chargement de la conversation…",
@@ -1385,7 +1387,7 @@ export const fr = {
     "importExtensionDone": "Importée comme plugin {{id}}",
     "agentExtension": {
       "title": "Extension de l'agent",
-      "importConfirm": "L'extension importée s'exécutera dans le processus de l'agent avec le même accès que ses propres outils. Continuer ?",
+      "importConfirm": "Les extensions importées s’exécutent dans le processus de l’agent avec les mêmes droits que ses outils. Les compétences déclarées peuvent ajouter des instructions à l’agent. Continuer ?",
       "diagnostics": "Diagnostics",
       "commandNeedsSession": "Démarrez d'abord une discussion pour exécuter une commande d'extension.",
       "state": {
@@ -1789,6 +1791,8 @@ export const fr = {
       "presetTestRunnerDesc": "Exécute un test ou un build et signale les échecs.",
       "presetFixerName": "Correcteur",
       "presetFixerDesc": "Implémente un changement multi-fichiers à partir d’une spec.",
+      "presetUiDesignerName": "Designer UI",
+      "presetUiDesignerDesc": "Conçoit et implémente une interface à partir d’un brief, vérifiée dans l’aperçu navigateur.",
       "presetBlank": "Vierge",
       "presetBlankDesc": "Outils par défaut. Rédigez vos instructions.",
       "presetApply": "Appliquer",

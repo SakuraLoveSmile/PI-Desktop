@@ -242,6 +242,8 @@ export const zhTW = {
     enhancementFailed: "提示詞增強失敗",
     dismissEnhancementError: "關閉增強錯誤",
     abort: "停止",
+    sendWhileRunning: "傳送後續訊息 · {{shortcut}} 立即轉向",
+    steeringUnavailable: "目前回合已無法接收轉向輸入，草稿已保留。",
     stopGenerating: "停止生成",
     running: "正在處理…",
     loadingSession: "正在載入會話…",
@@ -1394,7 +1396,7 @@ export const zhTW = {
     importExtensionDone: "已匯入為外掛 {{id}}",
     agentExtension: {
       title: "Agent 擴充",
-      importConfirm: "匯入的擴充將在 agent 程序內執行，擁有與 agent 自身工具相同的權限。要繼續嗎？",
+      importConfirm: "匯入的擴充會在 agent 程序內執行，擁有與 agent 自身工具相同的權限；套件宣告的技能可向 agent 提供指令。要繼續嗎？",
       diagnostics: "診斷",
       commandNeedsSession: "請先開始一個對話，再執行擴充命令。",
       state: {
@@ -1799,6 +1801,8 @@ export const zhTW = {
       presetTestRunnerDesc: "執行測試或建置，並回報失敗原因。",
       presetFixerName: "修復者",
       presetFixerDesc: "依照規格實作跨檔案變更。",
+      presetUiDesignerName: "UI 設計師",
+      presetUiDesignerDesc: "按需求稿設計並實作介面，瀏覽器預覽驗收。",
       presetBlank: "空白開始",
       presetBlankDesc: "預設工具，自行撰寫指令。",
       presetApply: "套用",

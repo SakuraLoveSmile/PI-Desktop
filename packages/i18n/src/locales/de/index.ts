@@ -240,6 +240,8 @@ export const de = {
     "enhancementFailed": "Eingabeaufforderung zur Verbesserung fehlgeschlagen",
     "dismissEnhancementError": "Verbesserungsfehler verwerfen",
     "abort": "Stoppen",
+    sendWhileRunning: "Folgenachricht senden · {{shortcut}} zum Lenken",
+    steeringUnavailable: "Diese Runde nimmt keine weiteren Eingaben an. Dein Entwurf wurde behalten.",
     "stopGenerating": "Generieren stoppen",
     "running": "Funktioniert…",
     "loadingSession": "Konversation wird geladen…",
@@ -1385,7 +1387,7 @@ export const de = {
     "importExtensionDone": "Als Plugin {{id}} importiert",
     "agentExtension": {
       "title": "Agent-Erweiterung",
-      "importConfirm": "Die importierte Erweiterung läuft im Agentenprozess mit denselben Rechten wie die Tools des Agenten. Fortfahren?",
+      "importConfirm": "Importierte Erweiterungen laufen im Agentenprozess mit denselben Rechten wie die Tools des Agenten. Deklarierte Skills können dem Agenten Anweisungen hinzufügen. Fortfahren?",
       "diagnostics": "Diagnosen",
       "commandNeedsSession": "Starte zuerst einen Chat, um einen Erweiterungsbefehl auszuführen.",
       "state": {
@@ -1789,6 +1791,8 @@ export const de = {
       "presetTestRunnerDesc": "Führt Test oder Build aus und meldet Fehler.",
       "presetFixerName": "Fixer",
       "presetFixerDesc": "Setzt eine mehrteilige Änderung aus einer Spezifikation um.",
+      "presetUiDesignerName": "UI-Designer",
+      "presetUiDesignerDesc": "Gestaltet und implementiert eine Oberfläche nach Vorgabe, verifiziert in der Browservorschau.",
       "presetBlank": "Leer starten",
       "presetBlankDesc": "Standardwerkzeuge. Schreiben Sie die Anweisungen selbst.",
       "presetApply": "Anwenden",

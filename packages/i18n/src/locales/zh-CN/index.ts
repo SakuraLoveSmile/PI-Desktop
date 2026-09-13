@@ -242,6 +242,8 @@ export const zhCN = {
     enhancementFailed: "提示词增强失败",
     dismissEnhancementError: "关闭增强错误",
     abort: "停止",
+    sendWhileRunning: "发送后续消息 · {{shortcut}} 立即转向",
+    steeringUnavailable: "当前轮已无法接收转向输入，草稿已保留。",
     stopGenerating: "停止生成",
     running: "正在处理…",
     loadingSession: "正在加载会话…",
@@ -1394,7 +1396,7 @@ export const zhCN = {
     importExtensionDone: "已导入为插件 {{id}}",
     agentExtension: {
       title: "Agent 扩展",
-      importConfirm: "导入的扩展将在 agent 进程内运行，拥有与 agent 自身工具相同的权限。继续吗？",
+      importConfirm: "导入的扩展会在 agent 进程内运行，拥有与 agent 自身工具相同的权限；包声明的技能可向 agent 提供指令。继续吗？",
       diagnostics: "诊断",
       commandNeedsSession: "请先开始一个对话，再运行扩展命令。",
       state: {
@@ -1800,6 +1802,8 @@ export const zhCN = {
       presetTestRunnerDesc: "运行测试或构建，并报告失败原因。",
       presetFixerName: "修复者",
       presetFixerDesc: "按规格实现跨文件改动。",
+      presetUiDesignerName: "UI 设计师",
+      presetUiDesignerDesc: "按需求稿设计并实现界面，浏览器预览验收。",
       presetBlank: "空白开始",
       presetBlankDesc: "默认工具，自行撰写指令。",
       presetApply: "套用",

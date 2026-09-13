@@ -4613,13 +4613,13 @@ IPC 请求无法关闭。
 | C — 对话和直播 | E2E-008、E2E-008d、E2E-008a、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-031、E2E-040、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-052、 E2E-053、E2E-054、E2E-055、E2E-059、E2E-059a、E2E-060c、E2E-060d、E2E-061、E2E-061a、E2E-062、E2E-064、E2E-065、E2E-068、E2E-071、 E2E-073、E2E-074、E2E-075、E2E-081、E2E-083、E2E-084、E2E-086、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-094、E2E-095、E2E-096、 E2E-097、E2E-098、E2E-099、E2E-102、E2E-102a、E2E-102b、E2E-106、E2E-109、E2E-111、E2E-114、E2E-116、E2E-117、E2E-118、E2E-119、 E2E-120、E2E-121、E2E-代理-001、E2E-142、E2E-144、E2E-145、E2E-146、E2E-147、E2E-151、E2E-199、E2E-250 |
 | D——工作区 | E2E-012、E2E-013、E2E-022B、E2E-024I、E2E-047、E2E-049、E2E-057、E2E-058、E2E-060、E2E-068、E2E-075、E2E-078、E2E-153 |
 | D——工作区（项目排序） | E2E-253 |
-| E——工具和权限 | E2E-008a、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-024I、E2E-024K、E2E-040、E2E-049、E2E-074、E2E-093、E2E-097、 E2E-099、E2E-100、E2E-101、E2E-102、E2E-103、E2E-105、E2E-106、E2E-107、E2E-111、E2E-112、E2E-113、E2E-114、E2E-115、E2E-116、 E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-145、E2E-147 |
+| E——工具和权限 | E2E-008a、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-024I、E2E-024K、E2E-040、E2E-049、E2E-074、E2E-093、E2E-097、 E2E-099、E2E-100、E2E-101、E2E-102、E2E-103、E2E-105、E2E-106、E2E-107、E2E-111、E2E-112、E2E-113、E2E-114、E2E-115、E2E-116、 E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-145、E2E-147、E2E-PLUGIN-imported-pi-package-skills |
 | F——坚持 | E2E-020、E2E-021、E2E-036、E2E-037、E2E-038、E2E-040、E2E-042、E2E-047、E2E-048、E2E-051、E2E-054、E2E-056、E2E-061、E2E-062、 E2E-064、E2E-066、E2E-068、E2E-071、E2E-072、E2E-073、E2E-082、E2E-084、E2E-096、E2E-098、E2E-102、E2E-102b、E2E-103、E2E-代理-001、 E2E-061a、E2E-073a、E2E-104、E2E-106、E2E-107、E2E-108、E2E-109、E2E-110、E2E-112、E2E-118、E2E-119、E2E-120、E2E-121、E2E-123、E2E-142、E2E-146、E2E-148、E2E-151、E2E-171、E2E-005J |
 | F——持久化（项目排序） | E2E-253 |
-| G——插件 | E2E-022、E2E-022A、E2E-022B、E2E-022C、E2E-023、E2E-024、E2E-024B、E2E-024C、E2E-024D、E2E-024E、E2E-024W、E2E-024F、E2E-024G、E2E-024H、 E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M、E2E-024N、E2E-024O、E2E-024P、E2E-025、E2E-026、E2E-105、E2E-117、E2E-120、E2E-122、E2E-123、E2E-148、E2E-153 |
+| G——插件 | E2E-022、E2E-022A、E2E-022B、E2E-022C、E2E-023、E2E-024、E2E-024B、E2E-024C、E2E-024D、E2E-024E、E2E-024W、E2E-024F、E2E-024G、E2E-024H、 E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M、E2E-024N、E2E-024O、E2E-024P、E2E-025、E2E-026、E2E-105、E2E-117、E2E-120、E2E-122、E2E-123、E2E-148、E2E-153、E2E-PLUGIN-imported-pi-package-skills |
 | H——诊断 | E2E-027、E2E-031、E2E-034、E2E-042、E2E-096、E2E-098、E2E-104、E2E-107、E2E-108、E2E-109、E2E-110、E2E-113、E2E-115、E2E-116、 E2E-118、E2E-121、E2E-146、E2E-194、E2E-195 |
 | 安全性 | E2E-028、E2E-029、E2E-030、E2E-024J、E2E-024K、E2E-024M、E2E-049、E2E-068、E2E-086、E2E-105、E2E-106、E2E-107、E2E-108、E2E-109、 E2E-110、E2E-112、E2E-113、E2E-115、E2E-116、E2E-117、E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-151、E2E-153 |
-| 品质 | E2E-032、E2E-033、E2E-039、E2E-043、E2E-044、E2E-045、E2E-046、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-050、E2E-053、E2E-055、 E2E-056、E2E-057、E2E-058、E2E-059、E2E-060、E2E-061、E2E-062、E2E-063、E2E-064、E2E-065、E2E-066、E2E-067、E2E-068、E2E-069、 E2E-070、E2E-071、E2E-072、E2E-073、E2E-074、E2E-075、E2E-076、E2E-077、E2E-078、E2E-079、E2E-080、E2E-081、E2E-082、E2E-083、 E2E-084、E2E-085、E2E-086、E2E-092、E2E-093、E2E-094、E2E-095、E2E-096、E2E-097、E2E-098、E2E-099、E2E-100、E2E-101、E2E-102、 E2E-102a、E2E-102b、E2E-103、E2E-AGENTS-001、E2E-024N、E2E-024O、E2E-059a、E2E-060b、E2E-060c、E2E-060d、E2E-061a、E2E-073a、E2E-111、 E2E-114、E2E-117、E2E-118、E2E-119、E2E-120、E2E-122、E2E-123、E2E-142、E2E-143、E2E-144、E2E-145、E2E-146、E2E-147、E2E-148、E2E-150、E2E-151、E2E-153、E2E-194、E2E-195、E2E-199、E2E-200、E2E-201、E2E-202、E2E-203、E2E-204、E2E-209、E2E-210、E2E-250 |
+| 品质 | E2E-032、E2E-033、E2E-039、E2E-043、E2E-044、E2E-045、E2E-046、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-050、E2E-053、E2E-055、 E2E-056、E2E-057、E2E-058、E2E-059、E2E-060、E2E-061、E2E-062、E2E-063、E2E-064、E2E-065、E2E-066、E2E-067、E2E-068、E2E-069、 E2E-070、E2E-071、E2E-072、E2E-073、E2E-074、E2E-075、E2E-076、E2E-077、E2E-078、E2E-079、E2E-080、E2E-081、E2E-082、E2E-083、 E2E-084、E2E-085、E2E-086、E2E-092、E2E-093、E2E-094、E2E-095、E2E-096、E2E-097、E2E-098、E2E-099、E2E-100、E2E-101、E2E-102、 E2E-102a、E2E-102b、E2E-103、E2E-AGENTS-001、E2E-024N、E2E-024O、E2E-059a、E2E-060b、E2E-060c、E2E-060d、E2E-061a、E2E-073a、E2E-111、 E2E-114、E2E-117、E2E-118、E2E-119、E2E-120、E2E-122、E2E-123、E2E-142、E2E-143、E2E-144、E2E-145、E2E-146、E2E-147、E2E-148、E2E-150、E2E-151、E2E-153、E2E-194、E2E-195、E2E-199、E2E-200、E2E-201、E2E-202、E2E-203、E2E-204、E2E-209、E2E-210、E2E-250、E2E-PLUGIN-imported-pi-package-skills |
 | 品质（项目排序） | E2E-253 |
 | C — 对话和直播（输入法斜杠别名） | E2E-255 |
 | E——工具和权限（Skill 常驻） | E2E-254 |
@@ -4651,7 +4651,7 @@ IPC 请求无法关闭。
 | 后MVP | E2E-022A、E2E-022B、E2E-022C、E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M（插件路线图 R2/R3/R6） |
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
-| 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245 |
+| 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策
@@ -5748,8 +5748,8 @@ IPC 请求无法关闭。
 #### E2E-142：后台委托通过 TaskWait 收敛并遵守权限作用域
 
 - **先决条件**：一个绑定项目、权限模式可以在 `ask`、`accept-edits` 和 `auto`
-  之间切换的 Agent 会话，其提供方的流可以被驱动；四个内置子代理（`explorer`、
-  `code-reviewer`、`test-runner`、`fixer`）以及一个全局 `~/.agents/subagents/readonly.md`
+  之间切换的 Agent 会话，其提供方的流可以被驱动；五个内置子代理（`explorer`、
+  `code-reviewer`、`test-runner`、`fixer`、`ui-designer`）以及一个全局 `~/.agents/subagents/readonly.md`
   定义。内置定义使用默认的 `permission: inherit` 行为。
 - **步骤**：
   1. 提示一轮，其中助手在一条消息里发出两次 `Task` 调用 —— 一个 `explorer`
@@ -6361,6 +6361,44 @@ IPC 请求无法关闭。
 - **里程碑**：MVP 后（R7 v1）
 - **状态**：由手动 MCP 驱动的夹具 `apps/desktop/test/e2e/trusted-extensions` 执行（2026-09-10，两个会话，全部检查通过；D388 后于 2026-09-11 在插件形态夹具上重新执行）；无 CI 旅程
 
+#### E2E-PLUGIN-imported-pi-package-skills：显式导入包后按插件权限提供技能
+
+- **前提条件**：一个本地夹具包位于 npm 风格的
+  `node_modules/@fixture/package-skills` 路径，声明 `pi.extensions` 和 `pi.skills`。
+  技能包含直接指定的 Markdown 文件、含 `SKILL.md` 的目录，以及两个不同目录都含
+  `SKILL.md` 的集合。另有引用文件、素材、`node_modules-note.txt` 资源和包内
+  `node_modules` 依赖目录；第二个夹具仅声明 `pi.skills`。无需下载或执行第三方代码，
+  也无需安装依赖。
+- **步骤**：
+  1. 通过插件页 → 导入 pi 扩展选择混合包，检查生成的 manifest 和复制的资源。
+     无界面验证时，将明确选定的路径传给同一个导入器。
+  2. 在真实 `PluginRuntime` 中加载生成目录，检查 `getSkills()`，并通过
+     `loadSkillBody(id)` 读取每份文档。
+  3. 重新加载时只授予 `agent.extension`，随后只授予 `agent.prompt.inject`；
+     卸载插件后再次尝试读取旧技能 ID。
+  4. 导入仅技能包，确认辅助 `index.js` 不成为扩展。对生成的双技能夹具调用真实 Host
+     `plugins.installFromPath`，列出插件，读取安装后的 manifest 和技能文件，最后卸载。
+  5. 尝试绝对路径、`..`、缺失或不受支持的文件、包内依赖路径及后代符号链接；
+     超出 32 个技能或 256 个目录的扫描限制，并检查失败后的清理。
+- **预期**：四项技能均以独立且稳定的 ID 进入目录，同名 `SKILL.md` 不相互覆盖；
+  加载返回正确正文并移除 frontmatter。导入的扩展保持独立贡献。资源和相对路径复制
+  后仍然存在；npm 安装路径的祖先目录不导致整个包被排除，只排除所选包内的依赖目录
+  路径段。缺失技能授权时技能目录为空，并产生既有权限审计；重新授权后 ID 不变。
+  卸载清除两类贡献，旧技能 ID 返回 `NOT_FOUND`。仅技能包只声明 `agent.prompt.inject`，
+  Host 报告 `skills` 能力，并保留两份技能文档。无效声明导入失败，不读取包外数据，
+  也不留下部分复制的插件。不会自动导入 `~/.pi` 或执行 npm、包生命周期脚本。
+- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2；
+  `07-plugins/02-plugin-manifest-schema.md`；D007
+- **验收**：E（工具与权限）、G（插件）、品质
+- **里程碑**：MVP 后（R7 v1）
+- **状态**：部分自动化。`imported-package-skills.test.mjs` 覆盖导入发现、资源复制、
+  权限和无效路径；`imported-package-skills-runtime.test.mjs` 通过真实插件宿主子进程
+  加载生成的空操作插件，验证技能目录、正文、权限撤销与恢复，以及卸载。2026-09-13
+  另用临时双技能夹具完成真实 Host `plugins.installFromPath` → `plugins.list` →
+  安装后 manifest/正文读取 → `plugins.uninstall` 验证，仅报告 `agent.prompt.inject`
+  权限和 `skills` 能力。本场景尚未执行原生选择器、插件行渲染或提供商回合调用导入
+  技能的测试，不声称完整桌面旅程已通过。
+
 #### E2E-242：扩展工具与 hooks 在回合中生效
 
 - **前置条件**：一个已启用的夹具扩展，注册工具 `fx_add`，在 `before_agent_start`
@@ -6693,3 +6731,29 @@ IPC 请求无法关闭。
 - **验收**：F（持久化）、品质
 - **里程碑**：M6 之后的桌面外壳维护
 - **状态**：已自动化（`scripts/e2e-three-column-layout.mjs`，经 `pnpm test:e2e:layout` —— 固定窗口宽度不变、指针拖动全程 360px 下限、左栏让位/恢复、370px 重开目标）；单元覆盖见 `work-panel-resize.test.mjs`
+
+#### E2E-AGENT-alt-enter-steers-active-turn：Enter 排队跟进，Alt+Enter 向当前回合补充指令
+
+- **前提条件**：会话已配置模型，能够控制流式回复或工具完成时机；附件场景使用支持图像的模型。
+- **步骤**：
+  1. 发起提示，再输入 follow-up 并按 Enter，确认出现 FIFO 行。
+  2. 在同一回合输入修正并按 Alt+Enter；分别以图像芯片、当前请求结束前连续两次修正重复操作。
+  3. 完成当前回复和工具批次，检查下一次模型输入、转录及持久回合 id；回合结束后观察 follow-up。
+  4. 分别关闭回车发送、打开自动完成菜单，并测试 Shift+Enter、Alt+Shift+Enter 和中文输入法候选词确认。
+     检查 macOS 的 `⌥+Enter` 和 Windows/Linux 的 `Alt+Enter` 发送按钮提示。
+  5. 让补充指令分别与回合结束、Stop、待处理 Plan 审批同时发生；拒绝请求返回前切换会话。
+  6. 运行中更改下一回合模型，再提交补充指令；确认当前模型和权限配置不变。
+  7. 父代理等待后台委托时提交补充指令，保持委托运行，确认父代理在委托报告完成前收到修正。
+  8. 完成后重新加载，并模拟补充指令预留流式回复后崩溃；检查行顺序、恢复文本和所属回合。
+  9. 补充指令接收成功但尚未开始回复时重载渲染器，再按 Stop 并检查持久转录。
+- **预期**：Enter 排队普通 follow-up；Alt+Enter 在当前回合创建用户行，不创建队列行或新公开
+  `agent_start`。已启动工具先完成，下一次请求包含修正和图像；普通 FIFO 仅在持久回合最终落定后
+  启动。输入法确认和换行不提交，空闲时 Alt+Enter 正常发送。过期或关闭的目标将草稿保留在原会话，
+  不使当前回合失败。Stop 后已接收输入不会独立重放；重载渲染器并停止后，已完成回复和补充输入仍
+  留在历史中。终态助手快照原位替换临时快照；崩溃恢复保留最新检查点和相邻补充输入，无重复行。
+- **链接规格**：`03-runtime/01-ipc-protocol.md`（§5.1a）、`03-runtime/02-agent-runtime.md`（§4.0）、
+  `03-runtime/04-data-storage.md`、`04-ux/09-interaction-patterns.md`（§3.5）、ADR active-turn-steering
+- **验收**：C（对话与流）、E（工具与权限）、品质
+- **里程碑**：M5
+- **状态**：草稿。现有回归套件覆盖周边行为，尚未运行渲染界面的 steering 完整流程
+  （除非明确要求，不本地运行 E2E）。
