@@ -134,6 +134,7 @@ impl Database {
                 let tx = conn.unchecked_transaction()?;
                 tx.execute_batch(SCHEMA_LATEST)?;
                 tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
+                tx.execute_batch(crate::session_collaboration::SCHEMA)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
             }
@@ -171,6 +172,7 @@ impl Database {
             14 => {
                 migrate_v14_to_v15(&conn, path)?;
             }
+            15 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -184,8 +186,13 @@ impl Database {
                 ));
             }
         }
+        let migrated_version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if migrated_version == 15 {
+            super::session_collaboration_migration::migrate(&conn, path)?;
+        }
         let db = Self { conn, data_dir };
         db.boot_maintenance()?;
+        crate::session_collaboration::recover(&db)?;
         Ok(db)
     }
 

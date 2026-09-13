@@ -9688,42 +9688,54 @@ are withdrawn with ADR 0165.
   `apps/desktop/test/plugin-desktop-control.test.mjs`; the native dialog
   journey is documented and deferred by the no-local-E2E policy
 
-#### E2E-PLUGIN-session-orchestrator-real-workers: Session Orchestrator creates parallel durable workers
+#### E2E-PLUGIN-session-orchestrator-real-workers: Session Orchestrator creates and coordinates durable sessions
 
 - **Preconditions**: The marketplace `pi.session-orchestrator` plugin is installed and enabled;
   the parent Agent session has a configured authenticated provider/model and a
   project path. The parent is in Agent mode.
 - **Steps**: 1) Ask the parent to review Frontend, Electron, and Rust in
-  parallel. 2) Confirm that `SessionTask.spawn` returns three distinct
-  original durable `sessionId` values and that each worker is visible in the
-  normal session list. 3) Confirm all three workers receive prompts without
-  using `session/fork` and can run concurrently. 4) Call `SessionTask.status`
-  while they are active and confirm it does not fetch worker transcripts. 5)
-  Call `SessionTask.wait` with its default bound, then `result` for each
-  worker. 6) Open one worker from the Agents panel, send it a follow-up using
-  the exact returned `sessionId`, and stop another worker. 7) Restart the
-  plugin and confirm the relationship list and durable worker sessions remain
-  available. Repeat the parallel creation step with a large existing session
-  list while keeping the parent visible.
+  parallel. 2) Confirm that `SessionTask.spawn` returns three distinct real
+  durable `sessionId` values and one host `messageId` per delivery; each
+  worker is visible in the normal session list. 3) Confirm all three workers
+  receive prompts without using `session/fork` and can run concurrently. 4)
+  While a worker is busy, send a follow-up to that exact Session ID and verify
+  it is queued against the target inbox rather than starting a second turn. 5)
+  Inspect status from the Agents panel and a sidebar hover card; confirm both
+  use bounded host projections and do not fetch a complete worker transcript.
+  6) Wait for one worker, query `result` by its exact `messageId` and `turnId`,
+  and inspect the parent transcript for one host-generated completion message.
+  7) Re-read the result and repeat the settlement notification path; confirm
+  the callback and transcript row are not duplicated. 8) Send a parent-to-worker
+  and worker-to-parent message in separate active plugin Agent tool turns;
+  verify source/target provenance and real target turn binding in both
+  transcripts. 9) Open one worker from the Agents panel, send it a follow-up
+  using the exact returned `sessionId`, and stop another worker. 10) Restart
+  the host/plugin with a queued delivery and confirm it remains held, while an
+  interrupted turn is not replayed. Repeat the parallel creation step with a
+  large existing session list while keeping the parent visible.
 - **Expected**: Each worker is a real durable session with the parent's
   project/model/thinking/permission ceiling and an independent empty
-  transcript at creation. The parent receives only bounded final reports;
-  full worker transcripts remain inspectable in their own sessions. `sessionId`
-  is the only canonical Worker identity and follow-up `send` reuses that same
-  session and context without creating a replacement. Status and panel refresh
-  use bounded lightweight polling; `wait` returns `timedOut` within its limit
-  instead of occupying the host tool deadline. Cancel aborts without
-  deletion, unrelated sessions and the existing Task family are unchanged,
-  and no localhost MCP call or token access occurs. A worker cannot create
-  another worker, unowned Session IDs are rejected, and concurrency limits fail
-  closed. Bursts of worker create/prompt notifications serialize and coalesce
+  transcript at creation. The host ledger binds every delivery to the actual
+  target durable turn; result text and error status derive from that turn's
+  terminal state, not from polling assistant text. The parent receives only
+  bounded, at-most-once completion messages; full worker transcripts remain
+  inspectable in their own sessions. `sessionId` is the only canonical worker
+  identity and follow-up `send` reuses that same session and context without
+  creating a replacement. A session-message row is visibly distinct from
+  human input and its provenance survives reload. `wait` returns `timedOut`
+  within its bound instead of occupying the host tool deadline. Cancel
+  interrupts only the selected delivery/turn without deleting the session.
+  Sends without an active plugin tool invocation, forged source ids, targets
+  above the source permission ceiling, worker fan-out overflow, inbox overflow,
+  and autonomous callback loops fail closed. Unrelated sessions and the
+  existing Task family are unchanged, and no localhost MCP call or token
+  access occurs. Bursts of worker notifications serialize and coalesce
   session-list refreshes while preserving the final worker list and the
-  foreground session. A later notification waits for a follow-up read; it is
-  not lost by reusing a read that began before the worker was created.
+  foreground session.
 - **Specs linked**: `07-plugins/03-plugin-api.md`,
   `07-plugins/04-plugin-security.md`, `07-plugins/11-plugin-storage-isolation.md`,
   `03-runtime/01-ipc-protocol.md`, `03-runtime/06-host-rpc-protocol.md`,
-  ADR 0237
+  `03-runtime/04-data-storage.md`, ADR 0237, ADR 0239
 - **Acceptance**: C (parallel durable sessions), D (plugin security), Quality
 - **Milestone**: M6+
 - **Status**: marketplace plugin tests cover the plugin runtime; host-core and

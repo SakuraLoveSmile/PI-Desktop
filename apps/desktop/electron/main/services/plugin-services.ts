@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   IPC,
   type ActivationScope,
+  type AppSettings,
   type BrowserState,
   type ModelBinding,
   type ThinkingLevel,
@@ -236,21 +237,25 @@ export function createPluginServices({
     listModels: async () => {
       // Same D080 degrade as skills/MCP/subagent catalog reads: a dead
       // transport is expected during shutdown and supervised restarts.
-      if (!getHost()?.isAvailable()) return [];
+      const host = getHost();
+      if (!host?.isAvailable()) return [];
       try {
-        const listed = await getHost()!.call<{ providers: Array<{
-          id: string;
-          name: string;
-          enabled?: boolean;
-          hasSecret?: boolean;
-          hasOauth?: boolean;
-          authKind?: string;
-          supportsReasoning?: boolean;
-          supportedThinkingLevels?: ThinkingLevel[];
-          defaultModelId?: string;
-          models?: ModelBinding[];
-        }> }>("providers.list", { includeDisabled: false });
-        return listReadyPluginModels(listed.providers ?? []);
+        const [listed, settings] = await Promise.all([
+          host.call<{ providers: Array<{
+            id: string;
+            name: string;
+            enabled?: boolean;
+            hasSecret?: boolean;
+            hasOauth?: boolean;
+            authKind?: string;
+            supportsReasoning?: boolean;
+            supportedThinkingLevels?: ThinkingLevel[];
+            defaultModelId?: string;
+            models?: ModelBinding[];
+          }> }>("providers.list", { includeDisabled: false }),
+          host.call<AppSettings>("settings.get"),
+        ]);
+        return listReadyPluginModels(listed.providers ?? [], settings);
       } catch (error) {
         if (!isHostUnavailable(error)) throw error;
         return [];

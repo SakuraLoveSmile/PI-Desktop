@@ -74,6 +74,7 @@ import type {
   MessageUsage,
   Mode,
   MessageAttachment,
+  SessionMessageOrigin,
   PlanExecution,
   PlanProposal,
   PlanningState,
@@ -91,6 +92,7 @@ import {
   contextCompactionMark,
   DEFAULT_SUBAGENT_PERMISSION,
   formatAskToolOutput,
+  formatSessionMessage,
   isCommandShellOption,
   isToolsOutputParams,
   MAX_SUBAGENT_CONCURRENCY,
@@ -178,6 +180,7 @@ export type RuntimePromptAttachment = AgentPromptAttachment & {
 
 export type RuntimePrompt = {
   text: string;
+  sessionMessage?: SessionMessageOrigin;
   attachments?: RuntimePromptAttachment[];
 };
 
@@ -2198,7 +2201,10 @@ Delegation rules:
             attachment.data,
           ),
         );
-        const content = promptContent({ text: m.content, attachments });
+        const content = promptContent({
+          text: m.sessionMessage ? formatSessionMessage(m.content, m.sessionMessage) : m.content,
+          attachments,
+        });
         if (
           !(m.content || "").trim() &&
           !attachments.some((attachment) => attachment.data)
@@ -6419,6 +6425,9 @@ Delegation rules:
   ): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.assertNotRunning();
+    const modelInput = typeof input !== "string" && input.sessionMessage
+      ? { ...input, text: formatSessionMessage(input.text, input.sessionMessage), sessionMessage: undefined }
+      : input;
     const nextTurnId = durableTurnId?.trim() || randomUUID();
     this.hostTurnId = nextTurnId;
     this.turnId = nextTurnId;
@@ -6436,7 +6445,7 @@ Delegation rules:
     this.requestStartedAt = Date.now();
     this.setAgentActivity({ phase: "starting", since: Date.now() });
     try {
-      const content = promptContent(input);
+      const content = promptContent(modelInput);
       const incomingUserMessage: AgentMessage = {
         role: "user",
         content,
@@ -6469,11 +6478,11 @@ Delegation rules:
           return { turnId: this.turnId };
         }
       }
-      await this.extensionBeforeAgentStart(input);
-      if (typeof input === "string") {
-        await this.agent.prompt(input);
+      await this.extensionBeforeAgentStart(modelInput);
+      if (typeof modelInput === "string") {
+        await this.agent.prompt(modelInput);
       } else {
-        await this.agent.prompt(input.text, promptImages(input));
+        await this.agent.prompt(modelInput.text, promptImages(modelInput));
       }
       await this.agent.waitForIdle();
       void this.extensionRunner?.emit("agent_settled", { type: "agent_settled" });

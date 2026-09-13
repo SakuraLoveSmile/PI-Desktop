@@ -26,6 +26,7 @@ import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { PersistenceOutbox } from "../persistence-outbox";
 import type { PluginRuntime } from "../plugin-runtime";
+import { readSessionCollaboration } from "../services/session-collaboration";
 import type { IpcRegistrar } from "./types";
 
 type RuntimeSession = {
@@ -230,6 +231,16 @@ export function registerSessionIpc({
         : result;
     },
   );
+  handle(IPC.invoke.sessionCollaboration, async (input?: { sessionId?: unknown }) => {
+    if (!host) throw new Error("host unavailable");
+    const sessionId = typeof input?.sessionId === "string" ? input.sessionId.trim() : "";
+    if (!sessionId || sessionId.length > 256) {
+      throw Object.assign(new Error("sessionId must be a non-empty string of at most 256 characters"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    return readSessionCollaboration(host, sidecar, sessionId);
+  });
   handle(IPC.invoke.sessionOpen, async (rawSessionId: string) => {
     if (!host) throw new Error("host unavailable");
     const sessionId = String(rawSessionId ?? "").trim();

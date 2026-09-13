@@ -18,6 +18,7 @@ import {
   McpControlServer,
   mcpControlRendererEvent,
   type McpControlController,
+  type McpControlInvokeInput,
 } from "../mcp-control";
 import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { AppUpdaterController } from "../updater";
@@ -73,6 +74,8 @@ export type StartupDependencies = {
   bootHostStatus: (bootError: unknown) => unknown;
   flushPendingApplicationMenuCommands: () => void;
   getSidecar?: () => unknown;
+  invokeSessionCollaboration?: (input: McpControlInvokeInput) => Promise<unknown>;
+  onSessionQueueChange?: () => void;
 };
 
 /**
@@ -144,12 +147,16 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       getHost,
       isSessionBusy: (sessionId) =>
         activeTurns.has(sessionId) || turnFinalizations.has(sessionId),
-      onQueueChange: (event) => sendToRenderer(IPC.event.agentQueueChanged, event),
+      onQueueChange: (event) => {
+        sendToRenderer(IPC.event.agentQueueChanged, event);
+        deps.onSessionQueueChange?.();
+      },
       log: (level, message, data) => logger.app("runtime", level, message, { data }),
     });
     const control = createMcpControlController({
       invoke: invokeIpc,
       channels: IPC.invoke,
+      invokeSessionCollaboration: deps.invokeSessionCollaboration,
       onOperationComplete: async (operation, result, args, source) => {
         const event = mcpControlRendererEvent(operation, result, args, source);
         if (event) sendToRenderer(IPC.event.sessionsChanged, event);

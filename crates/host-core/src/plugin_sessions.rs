@@ -254,6 +254,7 @@ fn parse_message(
         is_error: None,
         parent_tool_call_id: None,
         agent_name: None,
+        session_message: None,
     })
 }
 

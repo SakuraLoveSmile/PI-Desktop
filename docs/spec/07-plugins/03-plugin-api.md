@@ -358,6 +358,63 @@ storage. P2/P3 operations (session create, message mutation, arbitrary re-bindin
 provider/model binding, batch delete, and tags) are intentionally not part of
 this contract.
 
+### session collaboration (requires `desktop.control`)
+
+The official Session Orchestrator composes the reviewed desktop-control
+catalog; this is not a second session API and it does not expose Electron
+channels or the local MCP bearer token.
+
+```ts
+type SessionCollaborationOperation =
+  | "session/collaboration/spawn"
+  | "session/collaboration/send"
+  | "session/collaboration/status"
+  | "session/collaboration/result"
+  | "session/collaboration/cancel"
+
+// All calls use pi.desktop.invoke({ operation, args: [input] }).
+type SpawnInput = {
+  task: string
+  title?: string
+  modelKey?: string
+  notifyOnCompletion?: boolean
+  idempotencyKey?: string
+}
+type SendInput = {
+  sessionId: string
+  content: string
+  kind?: "task" | "message"
+  notifyOnCompletion?: boolean
+  idempotencyKey?: string
+}
+type StatusInput = { sessionId: string }
+type ResultInput = { sessionId: string; messageId?: string; turnId?: string }
+type CancelInput = { sessionId: string; messageId?: string }
+```
+
+`spawn` returns a real durable target `sessionId` and host delivery
+`messageId`. `send` addresses an existing Session ID in either direction and
+reuses that session's project, model, context, and permission configuration;
+`messageId` identifies one delivery and is never a worker identity. `status`
+and `result` are bounded projections and do not load a full transcript.
+`cancel` interrupts only the exact queued delivery or bound turn and retains
+the target session and history.
+
+`spawn` and `send` are valid only during the plugin's active Agent tool
+invocation. The broker injects `pluginId`, source `sessionId`, source `turnId`,
+and an invocation identity; plugin arguments cannot supply or override those
+values. A user-facing plugin panel may use `cancel` with its own plugin
+identity, but cannot use that path to send or spawn work. The host enforces
+the source permission ceiling, Agent-mode target, inbox and worker limits,
+idempotency, and bounded autonomous hops. A requested completion callback is
+a host-owned `completion` message linked to the source delivery and is created
+at most once after the actual target turn settles.
+The callback is session data, not a new user authorization, and completion
+messages do not trigger another callback.
+
+The renderer may read the separate sidebar collaboration projection, but a
+plugin panel cannot invoke the mutation operations outside this gateway.
+
 ### agent.complete (requires `agent.complete`)
 ```ts
 pi.agent.complete(input: {

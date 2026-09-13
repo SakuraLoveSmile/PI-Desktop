@@ -63,6 +63,7 @@ import type {
   Result,
   SessionDetail,
   SessionSummary,
+  SessionCollaborationSummary,
   ToolPermissionResolution,
   UserSkillInput,
   UserSkillRecord,
@@ -341,6 +342,8 @@ export const api = {
       ...result,
       session: normalizeSessionDetail(result.session),
     })),
+  getSessionCollaboration: (sessionId: string) =>
+    invoke<SessionCollaborationSummary>(IPC.invoke.sessionCollaboration, { sessionId }),
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
   getSessionScratchPath: (sessionId: string) =>
     invoke<{ path: string }>(IPC.invoke.sessionGetScratchPath, { sessionId }),
