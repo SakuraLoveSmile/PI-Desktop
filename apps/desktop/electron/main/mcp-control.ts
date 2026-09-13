@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { isIP } from "node:net";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { SESSION_COLLABORATION_OPERATIONS } from "./session-collaboration-control";
 
 /** A small JSON Schema subset used by MCP's tools/list response. */
 export type McpJsonSchema = {
@@ -31,6 +32,9 @@ export type McpControlInvokeInput = {
   confirm?: boolean;
   /** Internal origin used to keep plugin background work from stealing focus. */
   source?: "mcp" | "plugin";
+  /** Supplied only by PluginRuntime, never copied from plugin/MCP arguments. */
+  pluginContext?: { pluginId: string; sessionId?: string; turnId?: string; invocationId?: string };
+  signal?: AbortSignal;
 };
 
 export type McpControlInvocationSource = NonNullable<McpControlInvokeInput["source"]>;
@@ -662,6 +666,7 @@ export function mcpControlRendererEvent(
 export function createMcpControlController(options: {
   channels: Readonly<Record<string, string>>;
   invoke: IpcInvoke;
+  invokeSessionCollaboration?: (input: McpControlInvokeInput) => Promise<unknown>;
   onOperationComplete?: (
     operation: McpControlOperation,
     result: unknown,
@@ -669,7 +674,8 @@ export function createMcpControlController(options: {
     source?: McpControlInvocationSource,
   ) => void | Promise<void>;
 }): McpControlController {
-  const operations = createMcpControlOperations(options.channels);
+  const operations = [...createMcpControlOperations(options.channels),
+    ...(options.invokeSessionCollaboration ? SESSION_COLLABORATION_OPERATIONS : [])];
   const operationById = new Map(operations.map((operation) => [operation.id, operation]));
   return {
     operations,
@@ -696,7 +702,9 @@ export function createMcpControlController(options: {
         });
       }
       const sanitized = args.map((value) => stripSecretMaterial(value)) as unknown[];
-      const result = await options.invoke(operation.channel, sanitized);
+      const result = operation.channel === "internal:session-collaboration"
+        ? await options.invokeSessionCollaboration!({ ...input, args: sanitized })
+        : await options.invoke(operation.channel, sanitized);
       await options.onOperationComplete?.(operation, result, sanitized, input.source);
       return result;
     },

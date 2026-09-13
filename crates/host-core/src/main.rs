@@ -17,6 +17,7 @@ mod rpc;
 mod scheduled;
 mod scratch;
 mod secrets;
+mod session_collaboration;
 mod sessions;
 mod state;
 mod tool_budget;

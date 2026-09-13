@@ -33,6 +33,7 @@ export type PlanRuntimeDependencies = {
   acquireSessionOperation: (sessionId: string) => Promise<() => void>;
   resolveAgentRuntimeLaunch: (...args: any[]) => Promise<any>;
   isQuitting: () => boolean;
+  onTurnSettled?: (sessionId: string, turnId: string) => Promise<void>;
 };
 
 export function createPlanRuntime({
@@ -62,6 +63,7 @@ export function createPlanRuntime({
   acquireSessionOperation,
   resolveAgentRuntimeLaunch,
   isQuitting,
+  onTurnSettled,
 }: PlanRuntimeDependencies): {
   finishTurn: PlanRuntimeDependencies["activeTurns"] extends any ? (...args: any[]) => Promise<void> : never;
   finishApprovedExecution: (...args: any[]) => Promise<void>;
@@ -77,6 +79,7 @@ function finishTurn(
 ): Promise<void> {
   const existing = turnFinalizations.get(sessionId);
   if (existing) return existing;
+  let settledTurnId: string | undefined;
 
   const finalization = (async () => {
     const turnId = activeTurns.get(sessionId);
@@ -109,6 +112,7 @@ function finishTurn(
             // checkpoint instead of waiting for a final row that never comes.
             ...(options.recoverInflight ? { recoverInflight: true } : {}),
           });
+          settledTurnId = turnId;
           if (result.notification) {
             sendToRenderer(IPC.event.notificationChanged, {
               notification: result.notification,
@@ -186,6 +190,13 @@ function finishTurn(
       // this session. Retry its deferred queue drain once settlement releases
       // both busy guards, unless the application is shutting down.
       if (!isQuitting()) runtimeState.agentHostBridge?.agentHost.kick(sessionId);
+      if (!isQuitting() && settledTurnId && typeof onTurnSettled === "function") {
+        void onTurnSettled(sessionId, settledTurnId).catch((error: unknown) => {
+          logger.app("persistence", "warn", "session collaboration settlement failed", {
+            sessionId, data: String(error),
+          });
+        });
+      }
     }
   };
   void finalization.then(releaseFinalization, releaseFinalization);

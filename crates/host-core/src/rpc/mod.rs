@@ -476,6 +476,19 @@ fn provider_rpc_err(error: impl ToString) -> JsonRpcError {
     rpc_err(1000, message, "INTERNAL")
 }
 
+fn session_collaboration_rpc_err(error: impl ToString) -> JsonRpcError {
+    let message = error.to_string();
+    let code = message.split(':').next().unwrap_or("INTERNAL").trim();
+    let rpc_code = match code {
+        "INVALID_ARGUMENT" | "INVALID_PARAMS" | "LIMIT_EXCEEDED" => 1002,
+        "PERMISSION_DENIED" => 1003,
+        "NOT_FOUND" => 1007,
+        "CONFLICT" | "IDEMPOTENCY_CONFLICT" | "AGENT_BUSY" => 1008,
+        _ => return rpc_err(1000, message, "INTERNAL"),
+    };
+    rpc_err(rpc_code, message.clone(), code)
+}
+
 fn plugin_session_rpc_err(error: impl ToString) -> JsonRpcError {
     let message = error.to_string();
     let code = message
@@ -933,6 +946,7 @@ async fn execute_plugin_tool(
         json!({
             "executionId": execution_id,
             "sessionId": p.session_id,
+            "turnId": p.turn_id,
             "toolCallId": p.tool_call_id,
             "toolName": p.tool_name,
             "args": p.args,
@@ -1126,6 +1140,11 @@ async fn handle_request(
     }
 
     match method {
+        method if method.starts_with("session.collaboration.") => {
+            let st = state.lock().await;
+            crate::session_collaboration::handle(&st.db, method, &params)
+                .map_err(session_collaboration_rpc_err)
+        }
         "app.handshake" => {
             let client_version = params
                 .get("protocolVersion")
@@ -2039,20 +2058,15 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
-            let turn_id = sessions::begin_turn(
-                &st.db,
-                session_id,
-                params.get("providerId").and_then(|v| v.as_str()),
-                params.get("modelId").and_then(|v| v.as_str()),
-            )
-            .map_err(|e| {
-                let message = e.to_string();
-                if message == "AGENT_BUSY" {
-                    rpc_err(1008, message, "AGENT_BUSY")
-                } else {
-                    rpc_err(1000, message, "INTERNAL")
-                }
-            })?;
+            let provider = params.get("providerId").and_then(Value::as_str);
+            let model = params.get("modelId").and_then(Value::as_str);
+            let turn_id = match params.get("sessionMessageId").and_then(Value::as_str) {
+                Some(message_id) => crate::session_collaboration::begin_turn(
+                    &st.db, session_id, message_id, provider, model,
+                ),
+                None => sessions::begin_turn(&st.db, session_id, provider, model),
+            }
+            .map_err(session_collaboration_rpc_err)?;
             Ok(json!({ "turnId": turn_id }))
         }
         "session.endTurn" => {

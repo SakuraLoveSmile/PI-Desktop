@@ -1,4 +1,4 @@
-# 04. 数据存储（架构 v15）
+# 04. 数据存储（架构 v16）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -564,6 +564,66 @@ CREATE UNIQUE INDEX idx_turn_queue_idempotency
 - 重启后模块列出全部条目，把每个会话的队列挂起到 controller 接入，并在活动回合终止事件
   之后释放一条。删除会话会级联删除其条目。
 
+### 4.6c 会话协作 ledger —— 宿主拥有的投递状态（架构 v16）
+
+```sql
+CREATE TABLE session_collaboration_links (
+  session_id            TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+  created_by_session_id TEXT NOT NULL,
+  plugin_id             TEXT NOT NULL,
+  created_at            INTEGER NOT NULL
+);
+
+CREATE TABLE session_collaboration_messages (
+  id                    TEXT PRIMARY KEY,
+  plugin_id             TEXT NOT NULL,
+  source_session_id     TEXT NOT NULL,
+  source_title          TEXT NOT NULL,
+  target_session_id     TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  target_title          TEXT NOT NULL,
+  kind                  TEXT NOT NULL CHECK(kind IN ('task', 'message', 'completion')),
+  content               TEXT NOT NULL,
+  status                TEXT NOT NULL CHECK(status IN
+    ('queued', 'running', 'completed', 'failed', 'cancelled', 'interrupted')),
+  notify_on_completion  INTEGER NOT NULL DEFAULT 0,
+  turn_id               TEXT REFERENCES turns(id) ON DELETE SET NULL,
+  reply_to_message_id   TEXT,
+  idempotency_key       TEXT NOT NULL,
+  remaining_hops        INTEGER NOT NULL,
+  permission_ceiling    TEXT NOT NULL CHECK(permission_ceiling IN
+    ('ask', 'accept-edits', 'auto')),
+  result                TEXT,
+  error                 TEXT,
+  created_at            INTEGER NOT NULL,
+  updated_at            INTEGER NOT NULL,
+  UNIQUE(plugin_id, source_session_id, idempotency_key)
+);
+
+CREATE UNIQUE INDEX idx_session_collaboration_turn
+  ON session_collaboration_messages(turn_id) WHERE turn_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_session_collaboration_receipt
+  ON session_collaboration_messages(reply_to_message_id)
+  WHERE kind = 'completion';
+```
+
+- ledger 是插件协作投递的权威身份与生命周期记录。`source_session_id` 和
+  `target_session_id` 是真实的持久 Session ID；标题只是显示快照。目标真正开始投递时
+  才分配 `turn_id`，插件创建记录时不会提前分配。
+- `turn_queue.session_message_id` 将排队的 Agent Host 准入绑定到 ledger 行。使用相同
+  `(plugin_id, source_session_id, idempotency_key)` 重试会返回原投递；改变目标、正文、
+  类型或回调标志则以 `IDEMPOTENCY_CONFLICT` 失败。
+- 回调是 `kind = 'completion'` 的行，通过 `reply_to_message_id` 指向原投递。部分唯一
+  索引和宿主结算事务使回调最多创建一次。回调正文只含有界的结果/错误投影；目标转录本
+  仍是完整事实来源。
+- 宿主保存发送者的有效权限上限，并拒绝当前有效模式超过该上限的目标。自主链路每跳递减
+  `remaining_hops`；完成行不能再创建自动回调。
+- 启动时，仍有 `turn_queue` 行的排队工作会继续由 Agent Host controller 接管但保持挂起。
+  运行中工作和没有队列准入的排队投递会标记为 `interrupted`；启动栅栏不会在新的
+  controller 准入前重放回合。
+- 协作来源存储在转录行 `meta` 的 `sessionMessage` 中，并以
+  `UiMessage.sessionMessage` 投影到 UI。宿主校验阻止伪造、剥离、编辑或重新生成协作输入
+  变成人类输入。该元数据是增量字段，不需要给 `messages` 增加列。
+
 ### 4.7 messages — 转录索引
 
 脚本本身是每个会话的 JSONL 文件（第 2.1 节）；这张表是它的
@@ -1005,7 +1065,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 - JSON 列在热路径上盲读（按原样发送到渲染器）；
   任何过滤或求和的内容都是按规则提升的列。
 
-## 7. 版本控制、v7 重置和 v8 到 v15 迁移
+## 7. 版本控制、v7 重置和 v8 到 v16 迁移
 
 - `PRAGMA user_version` 保留模式权限；未来的结构性变化
   再次添加有序的 Rust 迁移 fns，每个都在一个事务中，并带有一个
@@ -1016,9 +1076,13 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   旧文件中的会话、提供程序和设置不会保留；
   存档仍保留以供手动恢复。所有 v7 之前的迁移代码
   （v1 `settings.sqlite` 导入，v2→v6 链）被删除。
-- 全新安装直接运行完整的 v15 DDL。
+- 全新安装直接运行完整的 v16 DDL。
 - **架构 v15 是增量的。** 它增加 `turn_queue` 表及其两个索引（D386 / ADR 0213），使 Host
   拥有的回合队列在重启后存活；不改动任何已有行，迁移前保留 `pi.sqlite.v14.bak`。
+- **架构 v16 是增量的。** 它增加会话协作 link 和投递表、生命周期索引，以及可为空的
+  `turn_queue.session_message_id` 绑定（D409 / ADR 0239）。既有会话、回合、队列条目和
+  插件数据保持有效。迁移前保留 `pi.sqlite.v15.bak`；启动恢复保留持久排队投递，但不会
+  自动重放已中断工作。
 - **架构 v7 首先到达 v8，然后使用受保护的路径。** v7→v8
   迁移之后是相同的受保护的 v8→v15 迁移；架构-v9 和
   schema-v10 数据库采用相同的受保护路径并接收精确的可读数据
@@ -1175,7 +1239,9 @@ UI投影损失
     `(pluginId, source, externalId)` 幂等；除非显式提供宿主创建的
     `projectId`，否则不绑定项目或模型；读取和变更按所有权限制，并支持先
     trash、后 purge。
-
+21. 架构 v16 协作行在重试时保留源/目标 Session ID 和幂等性，将投递绑定到
+    实际目标回合，持久化转录来源，不创建重复完成回调，执行权限上限和跳数限制，
+    在重启后保留排队工作但不重放，并在取消时保留目标会话。
 ## 当前回合补充指令的转录位置预留
 
 已接收的补充输入通过 Electron 现有消息 outbox 写入，带有 `meta.steering: true`，

@@ -22,6 +22,7 @@
 | `agent` | 对话、中止、状态和交互式 Asktool 解决方案 |
 | `plan` | Plan 提案列出、决议和变更事件 |
 | `session` | 会话 CRUD/历史记录 |
+| `session collaboration` | 侧边栏投影使用的有界只读协作状态；变更仍通过已审查的插件网关完成 |
 | `settings` | 配置 read/write |
 | `secrets` | 秘密 write/delete/exists（绝不将明文返回到 UI 日志） |
 | `project` | 工作空间选择与查询 |
@@ -56,6 +57,7 @@ event: pi-desktop/<domain>/event/<name>
 - `pi-desktop/project/open`
 - `pi-desktop/project/clone`
 - `pi-desktop/project/openFolder`
+- `pi-desktop/session/collaboration`
 
 ## 4. 通用响应包络
 
@@ -80,6 +82,8 @@ type AppError = {
 type AgentPromptRequest = {
  sessionId: string;
  content: string;
+ /** 宿主拥有的协作投递；内容和来源由 ledger 提供。 */
+ sessionMessageId?: string;
  /** Truncate durable transcript to N leading messages before append (regenerate). */
  truncateBefore?: number;
  /** Renderer snapshot used to close the prompt-to-completion notification race. */
@@ -434,6 +438,46 @@ type QueuedTurnSummary = { id: string; sessionId: string; content: string; attac
 “立即发送”随后请求优雅停止，使该条目在下一个边界启动。`remove` 取消尚未开始的条目。恢复
 的队列在桌面以 owner 身份接入之前保持挂起，因此重启绝不无人值守地启动工作。
 
+### 5.7 会话协作投影
+
+渲染器通过一个只读 Electron 通道为侧边栏悬浮卡片读取协作状态：
+
+```ts
+// pi-desktop/session/collaboration({ sessionId }) -> SessionCollaborationSummary
+type SessionCollaborationSummary = {
+ sessionId: string;
+ title: string;
+ status: "idle" | "waiting_permission" |
+   "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
+ observedAt: string;
+ modelKey?: string;
+ createdBySession?: { sessionId: string; title: string };
+ currentTask?: {
+   messageId: string;
+   senderSession: { sessionId: string; title: string };
+   text: string;
+   status: string;
+   turnId?: string;
+   createdAt: string;
+ };
+ result?: { messageId: string; turnId?: string; status: string; text?: string; error?: string };
+ recentExchanges: Array<{
+   messageId: string;
+   direction: "incoming" | "outgoing";
+   peer: { sessionId: string; title: string };
+   kind: "task" | "message" | "completion";
+   status: string;
+   preview: string;
+   createdAt: string;
+ }>;
+};
+```
+
+Electron 将实时 Agent 状态叠加到宿主持久投影上，限制交换预览的大小，且只在会话行
+获得悬停或焦点时读取。渲染器不能调用宿主可变的 `session.collaboration.*` 方法。
+插件的 `desktop.control` 网关是唯一经过审查的变更入口，并将发送/取消授权绑定到
+插件当前的 Agent 工具调用。
+
 ## 6. Agent 事件
 
 从主→渲染器推送：
@@ -644,6 +688,8 @@ type UiMessage = {
  id: string;
  role: "user" | "assistant" | "system" | "tool";
  content: string;
+ /** 宿主认证的会话协作来源；人类输入没有此字段。 */
+ sessionMessage?: SessionMessageOrigin;
  thinking?: string; // assistant reasoning, never folded into content
  usage?: MessageUsage; // provider-reported assistant usage
  responseDurationMs?: number; // model stream duration for throughput
@@ -659,6 +705,15 @@ type UiMessage = {
  parentToolCallId?: string;   // `Task` call that spawned the delegate
  agentName?: string;          // delegate definition name
  // status/tool fields omitted here
+};
+
+type SessionMessageOrigin = {
+ messageId: string;
+ sourceSessionId: string;
+ sourceTitle: string;
+ targetSessionId: string;
+ kind: "task" | "message" | "completion";
+ replyToMessageId?: string;
 };
 
 type ToolTokenUsage = {
@@ -695,7 +750,7 @@ Electron 主进程用该会话精确 provider/API URL 与 model 的本地 models
 键盘钩子检测和弦；钩子消耗了那个和弦，所以活动的
 窗口系统菜单打不开。非 Windows 主机将该方法视为
 无操作。 `responseDurationMs` 和 `responseOutputTokens` 是可选的转录本
-元数据保留在消息元数据中，因此协议 v11 和存储架构 v14
+元数据保留在消息元数据中，因此协议 v11 和存储架构 v16
 保持不变。
 
 设置字体选择器（ADR 0083）通过一个仅 Electron 的允许通道读取

@@ -143,6 +143,9 @@ pub struct UiMessage {
     pub id: String,
     pub role: String,
     pub content: String,
+    /// Host-authenticated agent-to-agent origin, never a human authorization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_message: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<MessageAttachment>>,
     /// Accepted input to an existing turn, preserved by Stop after renderer reload.
@@ -262,6 +265,9 @@ fn is_default_title(title: &str) -> bool {
 /// the search index row (None for tool rows, matching the FTS triggers).
 pub(crate) fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String>) {
     let mut meta_obj = serde_json::Map::new();
+    if let Some(origin) = &message.session_message {
+        meta_obj.insert("sessionMessage".into(), origin.clone());
+    }
     if let Some(steering) = message.steering {
         meta_obj.insert("steering".into(), json!(steering));
     }
@@ -394,6 +400,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
         _ => Vec::new(),
     };
     let meta = record.meta.unwrap_or(Value::Null);
+    let session_message = meta.get("sessionMessage").cloned();
     let steering = meta.get("steering").and_then(Value::as_bool);
     let status = meta
         .get("status")
@@ -485,6 +492,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             id: record.id,
             role: record.role,
             content: text,
+            session_message,
             attachments: None,
             steering,
             created_at: record.created_at,
@@ -532,6 +540,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             id: record.id,
             role: record.role,
             content,
+            session_message,
             attachments,
             steering,
             created_at: record.created_at,
@@ -1639,11 +1648,13 @@ pub fn append_message(
     message: &UiMessage,
     turn_id: Option<&str>,
 ) -> Result<()> {
+    let message = crate::session_collaboration::prepare_append(db, session_id, message, turn_id)?;
     let session_created = ensure_session_for_append(db, session_id)?;
-    let (record, text) = ui_to_record(message);
-    // A steering input reserves its preceding streaming assistant's position.
-    // Only a terminal assistant snapshot may replace that provisional row;
-    // completed rows remain immutable under outbox replay.
+    let (record, text) = ui_to_record(&message);
+    // Electron may replay an outbox entry after a host restart. Message ids
+    // are globally unique, so an existing row is already the durable result.
+    // A steering input reserves its preceding streaming assistant's position;
+    // only a terminal assistant snapshot may replace that provisional row.
     if message_indexed(db, session_id, &record.id)? {
         if message.role == "assistant"
             && message.status.as_deref() != Some("streaming")
@@ -1954,6 +1965,7 @@ fn compaction_valid_for_records(compaction: &CompactionRecord, records: &[Messag
 
 pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage]) -> Result<()> {
     let session_created = session_created_at(db, session_id)?;
+    crate::session_collaboration::validate_replacement(db, session_id, messages)?;
     let (records, texts) = records_and_texts(messages);
     let compactions: Vec<CompactionRecord> =
         transcripts::read_compactions(db.data_dir(), session_id)?
@@ -2062,6 +2074,14 @@ pub fn truncate_from(
         },
     };
     let discarded = &messages[cut..];
+    if discarded
+        .first()
+        .is_some_and(|message| message.session_message.is_some())
+    {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: session messages cannot be edited or regenerated"
+        ));
+    }
     let kept = &messages[..cut];
 
     let aborted_turn_id = abort_running_turn(db, session_id)?;
@@ -3280,6 +3300,7 @@ mod tests {
             is_error: None,
             parent_tool_call_id: None,
             agent_name: None,
+            session_message: None,
         }
     }
 
@@ -3777,6 +3798,7 @@ mod tests {
             is_error: None,
             parent_tool_call_id: None,
             agent_name: None,
+            session_message: None,
         };
         append_message(&db, &session.id, &tool, None).unwrap();
         // Host recovery may replay the Electron persistence outbox; a message
@@ -4118,6 +4140,7 @@ mod tests {
             is_error: None,
             parent_tool_call_id: None,
             agent_name: None,
+            session_message: None,
         };
         append_message(&db, &session.id, &assistant, None).unwrap();
 

@@ -20,7 +20,7 @@ import {
   type RuntimeProviderConfig,
 } from "./runtime.js";
 import type { PluginSkillDef } from "./plugin-skills-prompt.js";
-import type { TrustedExtensionSpec } from "@pi-desktop/shared";
+import type { SessionMessageOrigin, TrustedExtensionSpec } from "@pi-desktop/shared";
 import type { ProjectInstructions } from "./project-instructions.js";
 import {
   normalizeSupportedThinkingLevels,
@@ -112,6 +112,7 @@ type RuntimeParams = {
   compactionSettings?: ContextCompactionSettings;
   attachmentsDir?: string;
   userMessageId?: string;
+  sessionMessage?: SessionMessageOrigin;
   attachments?: RuntimePromptAttachment[];
 };
 
@@ -463,7 +464,11 @@ async function handle(method: string, params: any): Promise<unknown> {
         typeof params.userMessageId === "string" && params.userMessageId
           ? params.userMessageId
           : undefined;
-      const prompt: RuntimePrompt = { text: content, attachments };
+      const prompt: RuntimePrompt = {
+        text: content,
+        attachments,
+        ...(params.sessionMessage ? { sessionMessage: params.sessionMessage as SessionMessageOrigin } : {}),
+      };
       void runtime.prompt(prompt, userMessageId, turnId).catch((err) => {
         // Rejected-prompt path (pre-flight/transport failures). Streamed
         // provider errors surface via stopReason "error" and are classified
@@ -529,9 +534,13 @@ async function handle(method: string, params: any): Promise<unknown> {
     }
     case "agent.abort": {
       const sessionId = String(params.sessionId);
-      await hostProxy.call("plans.abort", { sessionId }).catch(() => undefined);
       const runtime = runtimes.get(sessionId);
-      if (runtime) await runtime.abort();
+      const turnId = typeof params.turnId === "string" ? params.turnId : undefined;
+      if (turnId && runtime?.getStatus().currentTurnId !== turnId) return { ok: false, aborted: false };
+      await hostProxy.call("plans.abort", { sessionId, ...(turnId ? { turnId } : {}) }).catch(() => undefined);
+      if (runtime && runtimes.get(sessionId) === runtime && (!turnId || runtime.getStatus().currentTurnId === turnId)) {
+        await runtime.abort();
+      }
       return { ok: true };
     }
     case "agent.stop": {

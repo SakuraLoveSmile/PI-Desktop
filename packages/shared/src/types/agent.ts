@@ -10,6 +10,8 @@ import type { ThinkingLevel } from "./models.js";
 export type AgentPromptRequest = {
   sessionId: string;
   content: string;
+  /** Host-owned collaboration delivery; its durable record supplies the input. */
+  sessionMessageId?: string;
   /** Attachments are resolved by Electron main and never trusted by the sidecar. */
   attachments?: AgentPromptAttachment[];
   /**
@@ -122,6 +124,7 @@ export type QueuedTurnSummary = {
   id: string;
   sessionId: string;
   content: string;
+  sessionMessageId?: string;
   attachments?: AgentPromptAttachment[];
   position: number;
   createdAt: string;
@@ -130,6 +133,7 @@ export type QueuedTurnSummary = {
 export type AgentQueuePushRequest = {
   sessionId: string;
   content: string;
+  sessionMessageId?: string;
   attachments?: AgentPromptAttachment[];
   idempotencyKey?: string;
 };

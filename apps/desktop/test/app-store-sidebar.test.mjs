@@ -9,6 +9,10 @@ const sidebarSource = await readFile(
   new URL("../src/components/Sidebar.tsx", import.meta.url),
   "utf8",
 );
+const hoverSource = await readFile(
+  new URL("../src/features/sessions/SessionHoverCard.tsx", import.meta.url),
+  "utf8",
+);
 const topbarSource = await readFile(
   new URL("../src/components/ConversationTopbar.tsx", import.meta.url),
   "utf8",
@@ -37,11 +41,10 @@ test("sidebar hover refreshes the active project branch without activating a pro
   assert.match(refreshBlock, /normalizeProjectPath\(state\.activeProjectPath\) !== requestedKey/);
   assert.match(refreshBlock, /openProjects: upsertWorkspace\(state\.openProjects, workspace\)/);
 
-  const hoverBlock = sidebarSource.match(
-    /const showSessionHoverCard = useCallback\([\s\S]*?\n  \);/,
-  )?.[0] ?? "";
-  assert.match(hoverBlock, /await refreshProject\(projectPath\)/);
-  assert.match(hoverBlock, /branch: refreshedWorkspace \? refreshedWorkspace\.branch : spaceEntry\?\.branch/);
+  assert.match(hoverSource, /refreshProject\(session\.projectPath \?\? ""\)/);
+  assert.match(hoverSource, /current && target\.isConnected && workspace/);
+  assert.match(hoverSource, /setProject\(\{ space: workspace\.name, branch: workspace\.branch \}\)/);
+  assert.match(sidebarSource, /branch: entry\?\.branch/);
   assert.match(sidebarSource, /for \(const entry of projectEntries\) map\.set\(entry\.key, entry\)/);
   assert.match(sidebarSource, /projectEntriesByPath\.get\(normalizedProjectPath \?\? ""\)/);
 });

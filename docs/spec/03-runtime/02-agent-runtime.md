@@ -794,12 +794,12 @@ delegate may call), `04-data-storage.md` §4.7a (persisted attribution),
 `04-ux/03-permission-ux.md` §6a (more than one pending request) and
 `04-ux/08-component-spec.md` §9.9 (how a delegation reads).
 
-### 5f.2 No sibling or parent-to-parent channel (D326, ADR 0165)
+### 5f.2 No in-process sibling or parent-to-parent Task channel (D326, ADR 0165)
 
-Concurrent delegates do not message each other, and parent agents do not
-message other conversations. The in-process `Peer` mailbox (ADR 0138 / ADR
-0140) and the host-core A2A broker (ADR 0147 / ADR 0162 / ADR 0164) are
-withdrawn.
+Concurrent `Task` delegates do not message each other, and the parent Task
+runtime does not address other conversations. The in-process `Peer` mailbox
+(ADR 0138 / ADR 0140) and the host-core A2A broker (ADR 0147 / ADR 0162 /
+ADR 0164) are withdrawn.
 
 Coordination stays on the existing delegation contract: the parent writes
 independent briefs, starts `Task`s, and collects self-contained reports through
@@ -807,6 +807,24 @@ independent briefs, starts `Task`s, and collects self-contained reports through
 new `Task` whose brief includes earlier reports. `A2A` and `Peer` are not
 assignable tools; a definition that names either is treated as an unknown
 tool name and dropped with a parse warning.
+
+### 5f.3 Plugin-mediated session collaboration (D409, ADR 0239)
+
+The official `pi.session-orchestrator` plugin is the reviewed exception for
+durable cross-session communication. Its `desktop.control` calls are composed
+outside the `Task` runtime and are admitted only from the plugin's active
+Agent tool invocation. Host-core owns the source/target Session IDs, durable
+delivery ledger, permission ceiling, actual target turn, completion callback,
+cancellation, restart fence, and transcript provenance. Existing sessions keep
+their own project, model, context, and permission configuration; a newly
+spawned worker inherits the initiating session's project and permission
+ceiling.
+
+Session messages are framed as agent-provided task data and never become new
+human authorization. A completion callback is durable and at-most-once, and
+does not automatically trigger another callback. This path does not restore
+the withdrawn `A2A` or `Peer` tools and does not change `Task`, `TaskWait`,
+`TaskList`, or `TaskStop` semantics.
 
 ## 6. Providers & models
 

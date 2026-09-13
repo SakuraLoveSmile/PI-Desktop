@@ -108,7 +108,7 @@ test("dangerous desktop operations need the user's native consent, not just conf
   answer = true;
   const granted = await runtime.invokePanelBridge("demo.dangerous", "desktop.test", {});
   assert.equal(granted.ok, true, JSON.stringify(granted));
-  assert.deepEqual(calls, [{ operation: "session/delete", args: ["s1"], confirm: true, source: "plugin" }]);
+  assert.deepEqual(calls, [{ operation: "session/delete", args: ["s1"], confirm: true, source: "plugin", pluginContext: { pluginId: "demo.dangerous" } }]);
 
   // A plugin that does not even acknowledge the risk never reaches the user.
   const unacknowledged = await runtime.invokePanelBridge("demo.dangerous", "desktop.test", { confirm: false });
@@ -134,7 +134,7 @@ test("desktop control is permission-gated and uses the shared controller", async
     { id: "session/create", description: "Create a durable session", risk: "write" },
     { id: "session/delete", description: "Delete a session", risk: "dangerous" },
   ]);
-  assert.deepEqual(calls, [{ operation: "project/set", args: ["/tmp/project"], confirm: false, source: "plugin" }]);
+  assert.deepEqual(calls, [{ operation: "project/set", args: ["/tmp/project"], confirm: false, source: "plugin", pluginContext: { pluginId: "demo.desktop" } }]);
 });
 
 test("permission inheritance is bound to the current plugin tool session", async (t) => {
@@ -165,12 +165,16 @@ test("permission inheritance is bound to the current plugin tool session", async
   assert.deepEqual(calls, []);
 
   await tool.execute({}, { sessionId: "parent" });
+  assert.equal(typeof calls[0].pluginContext.invocationId, "string");
+  assert.ok(calls[0].signal instanceof AbortSignal);
   assert.deepEqual(calls, [
     {
       operation: "session/create",
       args: [{ inheritPermissionFromSessionId: "parent" }],
       confirm: false,
       source: "plugin",
+      pluginContext: { pluginId: "demo.inheritance", sessionId: "parent", invocationId: calls[0].pluginContext.invocationId },
+      signal: calls[0].signal,
     },
   ]);
 });

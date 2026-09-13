@@ -3,6 +3,7 @@ import { expandSlashInvocation, enhancePromptDraft, summarizeSessionTitle, visio
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import { appendPromptFallbackPaths, durableUserMessageId, preparePromptAttachments, type PreparedPromptAttachment } from "../prompt-attachments";
 import { executionFromResponse } from "../plan-execution";
+import { resolveSessionMessageInput } from "../session-message-input";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { AgentSidecar } from "../agent-sidecar";
@@ -20,6 +21,7 @@ export type AgentIpcDependencies = {
   logger: Pick<Logger, "app">;
   vendorOAuth: VendorOAuth;
   agentExtensions: AgentExtensionBridge;
+  cancelSessionTools: (sessionId: string, reason?: string) => void;
   persistenceOutbox: PersistenceOutbox;
   dataDir: string;
   activeTurns: Map<string, string>;
@@ -49,6 +51,7 @@ export function registerAgentIpc({
   logger,
   vendorOAuth,
   agentExtensions,
+  cancelSessionTools,
   persistenceOutbox,
   dataDir,
   activeTurns,
@@ -233,6 +236,7 @@ export function registerAgentIpc({
     if (!host || !sidecar) throw new Error("backend unavailable");
     const releaseSessionOperation = await acquireSessionOperation(req.sessionId);
     try {
+    const sessionMessage = await resolveSessionMessageInput(host, req);
     // Install the renderer's prompt-time snapshot before any asynchronous
     // setup. This closes the gap where a fast completion could beat the
     // effect that reports the active chat session. Missing or mismatched
@@ -266,6 +270,7 @@ export function registerAgentIpc({
         ? Math.floor(req.truncateBefore)
         : undefined;
     if (truncateFromMessageId || truncateBefore !== undefined) {
+      cancelSessionTools(req.sessionId, "Session turn was replaced");
       // Host-owned cut: the kept prefix never crosses the JSON-RPC pipe
       // (issue #211). Abort any leftover running turn first so beginTurn
       // cannot see AGENT_BUSY after a timed-out retry.
@@ -334,6 +339,7 @@ export function registerAgentIpc({
       sessionId: req.sessionId,
       providerId: launch.providerId,
       modelId: launch.modelId,
+      ...(sessionMessage ? { sessionMessageId: sessionMessage.origin.messageId } : {}),
     });
     const durableTurnId = String(turn?.turnId ?? "").trim();
     if (!durableTurnId) {
@@ -349,9 +355,9 @@ export function registerAgentIpc({
     // explicit, while the typed form remains the visible transcript chip.
     // Builtin/plugin slash aliases never reach this channel, and unknown
     // /names stay literal text.
-    let promptContent = req.content;
+    let promptContent = sessionMessage?.content ?? req.content;
     let slashCommand: string | undefined;
-    if (req.content.startsWith("/")) {
+    if (!sessionMessage && req.content.startsWith("/")) {
       try {
         const root = await optionalWorkspaceRoot();
         const commandEnd = req.content.search(/\s/);
@@ -431,6 +437,7 @@ export function registerAgentIpc({
 
       role: "user" as const,
       content: promptContent,
+      ...(sessionMessage ? { sessionMessage: sessionMessage.origin } : {}),
       createdAt: new Date().toISOString(),
       status: "complete" as const,
       ...(preparedAttachments.length
@@ -482,6 +489,7 @@ export function registerAgentIpc({
           // Rust. The runtime must not replace it with a provider-local UUID.
           turnId: durableTurnId,
           content: modelContent,
+          ...(sessionMessage ? { sessionMessage: sessionMessage.origin } : {}),
           attachments: preparedAttachments
             .filter((attachment) => attachment.inlineData)
             .map((attachment) => ({
@@ -540,8 +548,12 @@ export function registerAgentIpc({
     return result;
   });
 
-  handle(IPC.invoke.agentAbort, async (req: { sessionId: string }) => {
+  handle(IPC.invoke.agentAbort, async (req: { sessionId: string; turnId?: string }) => {
     if (!sidecar) throw new Error("sidecar unavailable");
+    const releaseSessionOperation = req.turnId ? await acquireSessionOperation(req.sessionId) : undefined;
+    try {
+    const abortedTurnId = activeTurns.get(req.sessionId);
+    if (req.turnId && abortedTurnId !== req.turnId) return { ok: false, aborted: false };
     logger.app("session", "info", "prompt aborted", { sessionId: req.sessionId });
     agentHostBridge?.markAborting(req.sessionId);
     const executionId =
@@ -553,9 +565,12 @@ export function registerAgentIpc({
     try {
       // An open extension prompt resolves with its abort value (spec 16 §9).
       agentExtensions.cancelPrompts(req.sessionId);
+      cancelSessionTools(req.sessionId, "Session turn was aborted");
       result = await sidecar.call("agent.abort", req);
     } finally {
-      await finishTurn(req.sessionId, "aborted", "TURN_ABORTED");
+      if (activeTurns.get(req.sessionId) === abortedTurnId) {
+        await finishTurn(req.sessionId, "aborted", "TURN_ABORTED");
+      }
       if (executionId) {
         await finishApprovedExecution(
           executionId,
@@ -565,6 +580,9 @@ export function registerAgentIpc({
       }
     }
     return result;
+    } finally {
+      releaseSessionOperation?.();
+    }
   });
 
   handle(IPC.invoke.agentStop, async (req: AgentStopRequest) => {

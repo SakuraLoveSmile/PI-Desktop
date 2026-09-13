@@ -16,6 +16,7 @@ import {
   IconTrash,
 } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
+import { SessionMessageOrigin } from "./SessionMessageOrigin";
 import {
   CopyButton,
   FileRefChip,
@@ -35,11 +36,13 @@ export const MessageRow = memo(function MessageRow({
   const activateMessageRevision = useAppStore((s) => s.activateMessageRevision);
   const deleteMessage = useAppStore((s) => s.deleteMessage);
   const isUser = message.role === "user";
+  const isSessionMessage = Boolean(message.sessionMessage);
+  const editableUserMessage = isUser && !isSessionMessage;
   const workspaceRoot = useAppStore((s) => s.workspace?.path);
   const openFileRef = useOpenChatFileRef();
   // Slash prompts are stored expanded; editing works on the typed form so the
   // resent turn re-expands the template (D123).
-  const editSeed = (isUser && message.command) || message.content || "";
+  const editSeed = (editableUserMessage && message.command) || message.content || "";
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(editSeed);
   const [retryingEdit, setRetryingEdit] = useState(false);
@@ -52,7 +55,7 @@ export const MessageRow = memo(function MessageRow({
   const hasAnswer = Boolean((message.content || "").trim());
   const revisionCount = message.revisionCount ?? 0;
   const activeRevision = message.activeRevision ?? revisionCount;
-  const showRevisionPager = isUser && revisionCount > 1;
+  const showRevisionPager = editableUserMessage && revisionCount > 1;
   const extraAttachments = useMemo(() => {
     const attachments = message.attachments;
     if (!attachments?.length) return [];
@@ -69,7 +72,7 @@ export const MessageRow = memo(function MessageRow({
   };
   const retryEdit = async () => {
     const next = editValue.trim();
-    if (retryingEdit || (!next && !message.attachments?.length)) return;
+    if (!editableUserMessage || retryingEdit || (!next && !message.attachments?.length)) return;
     setRetryingEdit(true);
     const saved = await editUserMessage(message.id, next, message.attachments);
     setRetryingEdit(false);
@@ -77,15 +80,16 @@ export const MessageRow = memo(function MessageRow({
   };
   return (
     <div
-      className={`message-row ${isUser ? "user" : message.role}`}
+      className={`message-row ${isSessionMessage ? "session-message" : isUser ? "user" : message.role}`}
       data-minimap-id={message.id}
       role="article"
-      aria-label={isUser ? t("chat.userMessage") : t("chat.assistantMessage")}
+      aria-label={isSessionMessage ? t("sessionCollaboration.agentMessage") : isUser ? t("chat.userMessage") : t("chat.assistantMessage")}
     >
       <div className="message-col">
+        {message.sessionMessage ? <SessionMessageOrigin origin={message.sessionMessage} /> : null}
         {isUser || displayed ? (
           <div className="message-bubble">
-            {editing ? (
+            {editing && editableUserMessage ? (
               <div className="message-edit">
                 <textarea
                   className="message-edit-input selectable"
@@ -159,7 +163,7 @@ export const MessageRow = memo(function MessageRow({
                 ) : null}
                 {message.content ? (
                   <div className="message-user-text selectable">
-                    {message.command ? (
+                    {editableUserMessage && message.command ? (
                       // Slash invocations show the typed form as a chip; the
                       // expanded template body lives in `content` (hover reveals
                       // it) and is what regenerate/reseed replay (D123).
@@ -220,7 +224,7 @@ export const MessageRow = memo(function MessageRow({
               </div>
             ) : null}
             {hasAnswer ? <CopyButton text={message.content} label={copyLabel} /> : null}
-            {isUser ? (
+            {editableUserMessage ? (
               <TooltipButton
                 className="copy-btn icon"
                 tooltip={editLabel}
@@ -234,7 +238,7 @@ export const MessageRow = memo(function MessageRow({
                 <IconPencil size={13} />
               </TooltipButton>
             ) : null}
-            {isUser ? (
+            {editableUserMessage ? (
               <TooltipButton
                 className="copy-btn icon danger"
                 tooltip={deleteLabel}

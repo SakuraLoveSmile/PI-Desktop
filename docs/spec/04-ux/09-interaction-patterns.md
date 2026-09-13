@@ -1237,6 +1237,14 @@ Project drag/drop follows these patterns:
   tag chips, **Workspace**, branch (when the project exposes one), and
   **Updated {{when}}**. Temporary/scratch sessions show the localized
   "Temporary" / "临时对话" placeholder instead of a workspace name.
+- For a session with host-owned collaboration activity, the card adds a
+  bounded collaboration section after the standard metadata: localized
+  status, creator/source session when present, current task preview, and up to
+  four recent exchanges with direction, kind, and terminal result. It may
+  show a live `running` or `waiting_permission` state, but never loads the
+  complete transcript or exposes message content beyond the host's bounded
+  preview. Completion and failure results are derived from the durable target
+  turn and remain visible after reload.
 - Before showing a project session card, the renderer re-reads the active
   workspace through the existing project-read operation. This keeps the Git
   branch current after an external checkout without activating a project or
