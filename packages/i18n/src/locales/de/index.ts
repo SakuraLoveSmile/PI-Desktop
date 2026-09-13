@@ -222,6 +222,9 @@ export const de = {
     "completionMessage": "Abschlussbericht",
     "agentMessage": "Agent-Nachricht",
     "openSource": "Quellsitzung öffnen: {{name}}",
+    statusUnknown: "Unbekannt",
+    referenceUnavailable: "Sitzung nicht verfügbar",
+    sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
     "emptyTitle": "Was kann ich Ihnen beim Aufbau helfen?",

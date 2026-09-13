@@ -24,6 +24,12 @@ export type McpControlOperation = {
   description: string;
   risk: McpControlRisk;
   argumentShape: string[] | string;
+  /**
+   * Operation requires an authenticated first-party plugin context, so it is
+   * excluded from the external MCP surface (tools/list, pi_control_describe and
+   * the pi_desktop_invoke enum) while staying callable by plugins.
+   */
+  pluginOnly?: boolean;
 };
 
 export type McpControlInvokeInput = {
@@ -763,7 +769,7 @@ export class McpControlServer {
       invoke: options.invoke,
       onOperationComplete: options.onOperationComplete,
     });
-    this.operations = [...this.controller.operations];
+    this.operations = this.controller.operations.filter((operation) => !operation.pluginOnly);
     for (const operation of this.operations) this.operationById.set(operation.id, operation);
     this.toolsList = this.buildTools();
   }

@@ -9817,17 +9817,26 @@ are withdrawn with ADR 0165.
 - **Steps**: 1) Hover or keyboard-focus the collaboration-created session.
   2) Inspect the model metadata, creator reference, and created-session list.
   3) Activate the creator and one created-session reference with the keyboard.
-  4) Inspect an independent session's card as well.
+  4) Delete (or otherwise remove) one referenced session, or use a session whose
+  reference is already stale, then revisit the card. 5) Inspect an independent
+  session's card as well.
 - **Expected**: The card shows the provider's readable name and model display
   name instead of the provider ID. A collaboration-created session shows its
-  creator, and a creator shows its bounded created-session list. Each reference
-  is a native keyboard-focusable button with an accessible open-session name;
-  activating it opens that durable session and focuses the Composer. An
-  independent session remains a valid local session without a fabricated
-  creator link. Hover polling remains bounded and does not load a transcript.
+  creator, and a creator shows its bounded created-session list. Each live
+  reference is a native keyboard-focusable button with an accessible
+  open-session name; activating it opens that durable session and focuses the
+  Composer. A reference whose session no longer exists is presented as text
+  with an "unavailable" indication and is not a keyboard-focusable navigation
+  control; activating a session that no longer exists (for example a session
+  deleted between the snapshot and the click) surfaces a visible error instead
+  of switching to an empty transcript. An independent session remains a valid
+  local session without a fabricated creator link. Hover polling remains
+  bounded and does not load a transcript: a read that exceeds its deadline is
+  abandoned, and an unfocused window keeps a slower idle poll instead of
+  stopping or overrunning.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §5.7,
-  `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
-  ADR 0240
+  `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`, ADR 0240
 - **Acceptance**: C (conversation & stream), Quality
 - **Milestone**: M6+
 - **Status**: source-contract and projection tests are automated; rendered

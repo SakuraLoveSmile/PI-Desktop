@@ -3924,3 +3924,12 @@ D193 和 D194。
 - 必要时将前一条回复的临时快照与已接收用户输入一并记入日志；只原位落定索引中的
   流式助手，并保持已完成消息的幂等性。见 ADR active-turn-steering 和
   E2E-AGENT-alt-enter-steers-active-turn。
+
+## 2026-09-13 —— 加固会话协作导航与投递
+
+- 协作引用现在携带 `available`。指向已删除或已不存在的会话的引用以 `available: false` 报告；渲染器把它渲染为文本而不是导航控件，打开一个已不存在的会话会报告可见错误，而不是提交空转录。`session_collaboration_messages.source_session_id` 有意不设外键，因此投递记录在发送者被删除后仍然保留，并被报告为不可用。
+- 六个 `session/collaboration/*` 操作仅限第一方插件：它们要求经过认证的插件工具调用上下文，因此被排除在 MCP 可见目录之外，同时仍可通过 `pi.desktop.listOperations` 和 `pi.desktop.invoke` 使用。这修订了 ADR 0203 / D370 的“同一审查操作目录”说法以及插件权限矩阵中的 `desktop.control` 行。
+- 结算投递时现在会断言条件式的 `queued` 到 `running` 抢占确实改变了一行，因此在该竞争中落败不会为同一次投递创建第二个回合；`spawn` 也在与会话插入相同的事务内评估其 worker 上限。
+- Electron 投递结算不再丢弃宿主重启之前记录的结算，已经在运行的 drain 会接收在其期间排队的结算，而不是把它们推迟到无关的触发条件。持久化的投递失败保持稳定的 `CODE: message` 形式。
+- 针对编排刷新路径的审查修正把模型目录查找的工作量限制为每次读取，而不再依赖缓存淘汰；并用探针本身并不保证的观察替换那些不可能失败的 E2E 启动条件。
+- 见 ADR 0239、ADR 0240、E2E-SESSION-hover-card-model-and-links。

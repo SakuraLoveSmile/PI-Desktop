@@ -224,6 +224,9 @@ export const zhCN = {
     completionMessage: "完成报告",
     agentMessage: "Agent 消息",
     openSource: "打开来源会话：{{name}}",
+    statusUnknown: "未知",
+    referenceUnavailable: "会话不可用",
+    sessionMissing: "该会话已不存在",
   },
   chat: {
     emptyTitle: "今天想做点什么？",

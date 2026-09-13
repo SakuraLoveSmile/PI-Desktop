@@ -451,10 +451,11 @@ type SessionCollaborationSummary = {
    "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
  observedAt: string;
  modelKey?: string;
- createdBySession?: { sessionId: string; title: string };
+ createdBySession?: { sessionId: string; title: string; available?: boolean };
+ createdSessions?: Array<{ sessionId: string; title: string; available?: boolean }>;
  currentTask?: {
    messageId: string;
-   senderSession: { sessionId: string; title: string };
+   senderSession: { sessionId: string; title: string; available?: boolean };
    text: string;
    status: string;
    turnId?: string;
@@ -464,7 +465,7 @@ type SessionCollaborationSummary = {
  recentExchanges: Array<{
    messageId: string;
    direction: "incoming" | "outgoing";
-   peer: { sessionId: string; title: string };
+   peer: { sessionId: string; title: string; available?: boolean };
    kind: "task" | "message" | "completion";
    status: string;
    preview: string;
@@ -473,10 +474,20 @@ type SessionCollaborationSummary = {
 };
 ```
 
+`available` 在被引用的会话已删除或因其他原因不存在时为 `false`；此时宿主还会回退使用
+Session ID 作为标题。渲染器把不可用的引用渲染为文本，而不是可键盘聚焦的导航控件；激活
+一个会话已不存在的引用会报告可见错误，而不是提交一个空选择。独立创建的会话绝不会获得
+伪造的创建者引用。`session_collaboration_messages.source_session_id` 有意不设外键，因此
+投递记录在发送者被删除后仍然保留；此类引用报告为不可用，而不是被移除。
+
 Electron 将实时 Agent 状态叠加到宿主持久投影上，限制交换预览的大小，且只在会话行
 获得悬停或焦点时读取。渲染器不能调用宿主可变的 `session.collaboration.*` 方法。
 插件的 `desktop.control` 网关是唯一经过审查的变更入口，并将发送/取消授权绑定到
 插件当前的 Agent 工具调用。
+
+卡片的一次读取若未在其截止时间内完成即被放弃，迟到的结果被忽略，并安排下一次有界读取。
+卡片仍挂载但不可见时（窗口隐藏，或窗口没有焦点），循环以更慢的空闲间隔继续轮询，以便之后
+的焦点变化能被捕获。轮询仍然绝不重叠读取，并在卸载时停止。
 
 ## 6. Agent 事件
 
@@ -1609,6 +1620,11 @@ Electron 等待主机关闭之前会停止服务，并将清单标记为非活�
 计划工具，都要求 `confirm: true`。该标志是 Agent 确认，不是桌面用户弹窗。所有调用
 仍会经过现有 IPC 处理器的校验、主机权限、工作区边界和错误模型。文本负载和
 `structuredContent` 都有大小上限。
+
+六个 `session/collaboration/*` 操作仅限第一方插件：它们要求经过认证的插件工具调用上下文，
+因此会出现在 `pi.desktop.listOperations` 中并可通过 `pi.desktop.invoke` 调用，但被排除在
+MCP 可见目录（`tools/list`、`pi_control_describe` 以及 `pi_desktop_invoke` 的操作枚举）之外，
+MCP 调用方无法调用它们。
 
 **变更性** 外部调用成功后，Electron Main 可以通过现有的
 `pi-desktop/session/event/changed` 事件发送附加字段：

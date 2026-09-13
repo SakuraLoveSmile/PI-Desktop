@@ -231,6 +231,9 @@ export const ko = {
     completionMessage: "완료 보고",
     agentMessage: "에이전트 메시지",
     openSource: "원본 세션 열기: {{name}}",
+    statusUnknown: "알 수 없음",
+    referenceUnavailable: "세션을 사용할 수 없음",
+    sessionMissing: "해당 세션이 더 이상 존재하지 않습니다",
   },
   chat: {
     emptyTitle: "무엇을 만들어 볼까요?",

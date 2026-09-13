@@ -34,8 +34,14 @@ pub fn begin_turn(
     }
     super::permissions::check_target(db, session_id, &message.permission_ceiling)?;
     let turn = sessions::begin_turn(db, session_id, provider, model)?;
-    db.conn().execute("UPDATE session_collaboration_messages SET status='running',turn_id=?2,updated_at=?3 WHERE id=?1 AND status='queued'",
+    let claimed = db.conn().execute("UPDATE session_collaboration_messages SET status='running',turn_id=?2,updated_at=?3 WHERE id=?1 AND status='queued'",
         params![message_id,turn,now_ms()])?;
+    if claimed == 0 {
+        // Another claim won the race; dropping the transaction rolls the turn back.
+        return Err(anyhow!(
+            "CONFLICT: session message already claimed or settled"
+        ));
+    }
     tx.commit()?;
     Ok(turn)
 }

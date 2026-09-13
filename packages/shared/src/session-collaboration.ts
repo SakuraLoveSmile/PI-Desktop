@@ -11,7 +11,8 @@ export type SessionMessageOrigin = {
   replyToMessageId?: string;
 };
 
-export type SessionReference = { sessionId: string; title: string };
+/** `available` is false when the host knows the referenced session is gone (deleted or absent). */
+export type SessionReference = { sessionId: string; title: string; available?: boolean };
 
 export type SessionCollaborationMessage = {
   id: string;

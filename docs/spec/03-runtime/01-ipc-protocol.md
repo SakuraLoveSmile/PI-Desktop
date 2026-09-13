@@ -518,11 +518,11 @@ type SessionCollaborationSummary = {
   modelKey?: string;
   providerName?: string;
   modelName?: string;
-  createdBySession?: { sessionId: string; title: string };
-  createdSessions?: Array<{ sessionId: string; title: string }>;
+  createdBySession?: { sessionId: string; title: string; available?: boolean };
+  createdSessions?: Array<{ sessionId: string; title: string; available?: boolean }>;
   currentTask?: {
     messageId: string;
-    senderSession: { sessionId: string; title: string };
+    senderSession: { sessionId: string; title: string; available?: boolean };
     text: string;
     status: string;
     turnId?: string;
@@ -532,7 +532,7 @@ type SessionCollaborationSummary = {
   recentExchanges: Array<{
     messageId: string;
     direction: "incoming" | "outgoing";
-    peer: { sessionId: string; title: string };
+    peer: { sessionId: string; title: string; available?: boolean };
     kind: "task" | "message" | "completion";
     status: string;
     preview: string;
@@ -541,12 +541,28 @@ type SessionCollaborationSummary = {
 };
 ```
 
+`available` is `false` when the referenced session was deleted or is otherwise
+absent; the host then also falls back to the Session ID as the title. The
+renderer renders an unavailable reference as text rather than a
+keyboard-focusable navigation control, and activating a reference whose session
+no longer exists reports a visible error instead of committing an empty
+selection. Independently created sessions never receive a fabricated creator
+reference. `session_collaboration_messages.source_session_id` intentionally has
+no foreign key, so a delivery record survives deletion of its sender; such
+references are reported as unavailable rather than removed.
+
 Electron overlays live Agent status on the durable host projection, bounds the
 exchange previews, and fetches it only while a session row is hovered or
 focused. The renderer cannot invoke the host's mutating
 `session.collaboration.*` methods. The plugin's `desktop.control` gateway is
 the sole reviewed mutation surface and binds send/cancel authorization to the
 active plugin Agent tool invocation.
+
+A hover-card read that does not settle within the card's deadline is abandoned,
+its late result is ignored, and the next bounded read is scheduled. While the
+card is mounted but not visible (a hidden window, or a window without focus) the
+loop keeps polling at a slower idle interval so a later focus change is picked
+up. Polling still never overlaps reads and stops on unmount.
 
 ## 6. Agent Events
 
@@ -1849,6 +1865,13 @@ plan-resolution tools require `confirm: true`. That flag is an agent
 acknowledgement, not a desktop user prompt. All calls still pass through the
 existing IPC handler validation, host permissions, workspace boundaries, and
 error model. Both the text payload and `structuredContent` are size-bounded.
+
+The six `session/collaboration/*` operations are first-party-plugin-only: they
+require an authenticated plugin tool invocation context, so they appear in
+`pi.desktop.listOperations` and are callable through `pi.desktop.invoke`, but
+they are excluded from the MCP-visible catalog (`tools/list`,
+`pi_control_describe`, and the `pi_desktop_invoke` operation enum) and an MCP
+caller cannot invoke them.
 
 After successful **mutating** external calls, Electron Main may emit the existing
 `pi-desktop/session/event/changed` event with additive fields:

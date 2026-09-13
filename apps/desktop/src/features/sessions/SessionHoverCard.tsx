@@ -11,6 +11,7 @@ import {
   formatSessionTimestamp,
   positionSessionHoverCard,
   sessionPreview,
+  sessionReferenceAvailable,
 } from "./session-collaboration-view";
 import type { SessionHoverCardData } from "./useSessionHoverCard";
 
@@ -38,16 +39,23 @@ export function SessionHoverCard({
   });
   const { session, target } = card;
 
-  useEffect(() => observeSessionCollaboration({
-    sessionId: session.id,
-    read: api.getSessionCollaboration,
-    isVisible: () => target.isConnected && !document.hidden,
-    onSummary: (next) => {
-      setSummary(next);
-      setReadState("ready");
-    },
-    onUnavailable: () => setReadState("unavailable"),
-  }), [session.id, target]);
+  useEffect(() => {
+    // The card is reusable; its per-session read state must not leak into the
+    // next hovered session when the caller does not remount it.
+    setSummary(undefined);
+    setReadState("loading");
+    setProject({ space: card.space, branch: card.branch });
+    return observeSessionCollaboration({
+      sessionId: session.id,
+      read: api.getSessionCollaboration,
+      isVisible: () => target.isConnected && !document.hidden && document.hasFocus(),
+      onSummary: (next) => {
+        setSummary(next);
+        setReadState("ready");
+      },
+      onUnavailable: () => setReadState("unavailable"),
+    });
+  }, [card.space, card.branch, session.id, target]);
 
   useEffect(() => {
     if (card.temporary) return;
@@ -123,17 +131,29 @@ export function SessionHoverCard({
       {summary?.createdBySession ? (
         <div className="sidebar-session-hover-card-section">
           <span className="sidebar-session-hover-card-section-label">{t("sessionCollaboration.createdBy")}</span>
-          <button
-            type="button"
-            className="sidebar-session-hover-card-session-link"
-            data-session-link={summary.createdBySession.sessionId}
-            title={summary.createdBySession.sessionId}
-            aria-label={t("sessionCollaboration.openSession", { name: summary.createdBySession.title || summary.createdBySession.sessionId })}
-            onClick={() => openSessionReference(summary.createdBySession!)}
-          >
-            <span className="sidebar-session-hover-card-session-link-title">{summary.createdBySession.title || summary.createdBySession.sessionId}</span>
-            <IconArrowUpRight size={12} aria-hidden />
-          </button>
+          {sessionReferenceAvailable(summary.createdBySession) ? (
+            <button
+              type="button"
+              className="sidebar-session-hover-card-session-link"
+              data-session-link={summary.createdBySession.sessionId}
+              title={summary.createdBySession.sessionId}
+              aria-label={t("sessionCollaboration.openSession", { name: summary.createdBySession.title || summary.createdBySession.sessionId })}
+              onClick={() => openSessionReference(summary.createdBySession!)}
+            >
+              <span className="sidebar-session-hover-card-session-link-title">{summary.createdBySession.title || summary.createdBySession.sessionId}</span>
+              <IconArrowUpRight size={12} aria-hidden />
+            </button>
+          ) : (
+            <span
+              className="sidebar-session-hover-card-session-link sidebar-session-hover-card-session-link-unavailable"
+              data-session-link={summary.createdBySession.sessionId}
+              data-session-link-unavailable="true"
+              title={t("sessionCollaboration.referenceUnavailable")}
+            >
+              <span className="sidebar-session-hover-card-session-link-title">{summary.createdBySession.title || summary.createdBySession.sessionId}</span>
+              <span className="sr-only">{t("sessionCollaboration.referenceUnavailable")}</span>
+            </span>
+          )}
           <code className="sidebar-session-hover-card-id">{summary.createdBySession.sessionId}</code>
         </div>
       ) : null}
@@ -143,17 +163,29 @@ export function SessionHoverCard({
           <ul className="sidebar-session-hover-card-session-links">
             {summary.createdSessions.slice(0, 8).map((reference) => (
               <li key={reference.sessionId}>
-                <button
-                  type="button"
-                  className="sidebar-session-hover-card-session-link"
-                  data-session-link={reference.sessionId}
-                  title={reference.sessionId}
-                  aria-label={t("sessionCollaboration.openSession", { name: reference.title || reference.sessionId })}
-                  onClick={() => openSessionReference(reference)}
-                >
-                  <span className="sidebar-session-hover-card-session-link-title">{reference.title || reference.sessionId}</span>
-                  <IconArrowUpRight size={12} aria-hidden />
-                </button>
+                {sessionReferenceAvailable(reference) ? (
+                  <button
+                    type="button"
+                    className="sidebar-session-hover-card-session-link"
+                    data-session-link={reference.sessionId}
+                    title={reference.sessionId}
+                    aria-label={t("sessionCollaboration.openSession", { name: reference.title || reference.sessionId })}
+                    onClick={() => openSessionReference(reference)}
+                  >
+                    <span className="sidebar-session-hover-card-session-link-title">{reference.title || reference.sessionId}</span>
+                    <IconArrowUpRight size={12} aria-hidden />
+                  </button>
+                ) : (
+                  <span
+                    className="sidebar-session-hover-card-session-link sidebar-session-hover-card-session-link-unavailable"
+                    data-session-link={reference.sessionId}
+                    data-session-link-unavailable="true"
+                    title={t("sessionCollaboration.referenceUnavailable")}
+                  >
+                    <span className="sidebar-session-hover-card-session-link-title">{reference.title || reference.sessionId}</span>
+                    <span className="sr-only">{t("sessionCollaboration.referenceUnavailable")}</span>
+                  </span>
+                )}
               </li>
             ))}
           </ul>
