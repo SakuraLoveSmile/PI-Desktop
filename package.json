@@ -36,7 +36,8 @@
     "lint": "pnpm lint:biome && pnpm -r --if-present lint",
     "host:dev": "cargo run -p host-core",
     "clean": "pnpm -r --if-present clean && cargo clean",
-    "lint:biome": "biome lint"
+    "lint:biome": "biome lint",
+    "test:e2e:mcp-market": "node scripts/e2e-mcp-market.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",

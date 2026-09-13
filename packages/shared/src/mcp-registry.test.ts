@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { catalogEntryError } from "./mcp-catalog.js";
 import {
   guessCategory,
+  isPublicIpLiteral,
+  isSafeMarketSourceUrl,
   mapRegistryServer,
   mergeRegistryEntries,
   registryIdFromName,
@@ -132,5 +134,70 @@ describe("mergeRegistryEntries", () => {
     ];
     const merged = mergeRegistryEntries(builtin, remote);
     expect(merged.map((entry) => entry.id)).toEqual(["context7", "deepwiki"]);
+  });
+});
+
+describe("registry argument and env semantics", () => {
+  it("keeps named arguments with name and value", () => {
+    const record: RegistryRecord = {
+      server: {
+        name: "io.github.example/named-args",
+        packages: [
+          {
+            registryType: "npm",
+            identifier: "named-args-mcp",
+            runtimeHint: "npx",
+            runtimeArguments: [{ type: "positional", value: "-y" }],
+            packageArguments: [
+              { type: "named", name: "--port", value: "8080" },
+              { type: "named", name: "--verbose" },
+            ],
+          },
+        ],
+      },
+    };
+    const entry = mapRegistryServer(record)!;
+    expect(entry.args).toEqual(["-y", "named-args-mcp", "--port", "8080", "--verbose"]);
+  });
+
+  it("maps isRequired to optional and keeps registry values as defaults", () => {
+    const record: RegistryRecord = {
+      server: {
+        name: "io.github.example/env-req",
+        packages: [
+          {
+            registryType: "npm",
+            identifier: "env-req-mcp",
+            environmentVariables: [
+              { name: "REQUIRED_KEY", description: "Needed", isRequired: true },
+              { name: "OPT_KEY", isRequired: false, default: "off" },
+              { name: "FIXED", isRequired: false, value: "preset" },
+            ],
+          },
+        ],
+      },
+    };
+    const entry = mapRegistryServer(record)!;
+    const specs = entry.requiredEnv ?? [];
+    expect(specs.find((s) => s.name === "REQUIRED_KEY")?.optional).toBeUndefined();
+    expect(specs.find((s) => s.name === "OPT_KEY")?.optional).toBe(true);
+    expect(specs.find((s) => s.name === "OPT_KEY")?.defaultValue).toBe("off");
+    expect(specs.find((s) => s.name === "FIXED")?.defaultValue).toBe("preset");
+  });
+});
+
+describe("isPublicHostname / isPublicIpLiteral edge cases", () => {
+  it("rejects trailing-dot and smuggeled private hosts", () => {
+    expect(isSafeMarketSourceUrl("https://localhost./x")).toBe(false);
+    expect(isSafeMarketSourceUrl("https://localhost.example./x")).toBe(true); // public dot-FQDN ok
+    expect(isSafeMarketSourceUrl("https://[::ffff:127.0.0.1]/")).toBe(false);
+    expect(isSafeMarketSourceUrl("https://[fd00::1]/")).toBe(false);
+    expect(isSafeMarketSourceUrl("https://[fe80::1]/")).toBe(false);
+    expect(isSafeMarketSourceUrl("https://[::1]/")).toBe(false);
+    expect(isSafeMarketSourceUrl("https://127.0.0.1/x")).toBe(false);
+    expect(isSafeMarketSourceUrl("https://10.1.2.3/x")).toBe(false);
+    expect(isSafeMarketSourceUrl("https://[2001:db8::1]/")).toBe(false);
+    expect(isSafeMarketSourceUrl("https://[2606:4700::1]/")).toBe(true);
+    expect(isSafeMarketSourceUrl("https://registry.example/x")).toBe(true);
   });
 });
