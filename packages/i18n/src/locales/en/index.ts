@@ -273,6 +273,8 @@ export const en = {
     enhancementFailed: "Prompt enhancement failed",
     dismissEnhancementError: "Dismiss enhancement error",
     abort: "Stop",
+    sendWhileRunning: "Send follow-up · {{shortcut}} to steer",
+    steeringUnavailable: "This turn can no longer accept steering. Your draft was kept.",
     stopGenerating: "Stop generating",
     running: "Working…",
     loadingSession: "Loading conversation…",
@@ -1428,7 +1430,7 @@ export const en = {
     importExtensionDone: "Imported as plugin {{id}}",
     agentExtension: {
       title: "Agent extension",
-      importConfirm: "The imported extension will run inside the agent process with the same access as the agent's own tools. Continue?",
+      importConfirm: "Imported extensions run inside the agent process with the same access as the agent's own tools. Declared skills can add instructions to the agent. Continue?",
       diagnostics: "Diagnostics",
       commandNeedsSession: "Start a chat first to run an extension command.",
       state: {
@@ -1851,6 +1853,8 @@ export const en = {
       presetTestRunnerDesc: "Run a test or build command and report what failed.",
       presetFixerName: "Fixer",
       presetFixerDesc: "Implement a multi-file change from a spec.",
+      presetUiDesignerName: "UI designer",
+      presetUiDesignerDesc: "Design and implement an interface from a brief, verified in the browser preview.",
       presetBlank: "Start blank",
       presetBlankDesc: "Default tools. Write your own instructions.",
       presetApply: "Apply",

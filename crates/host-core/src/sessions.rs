@@ -148,6 +148,9 @@ pub struct UiMessage {
     pub session_message: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<MessageAttachment>>,
+    /// Accepted input to an existing turn, preserved by Stop after renderer reload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steering: Option<bool>,
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
@@ -264,6 +267,9 @@ pub(crate) fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String
     let mut meta_obj = serde_json::Map::new();
     if let Some(origin) = &message.session_message {
         meta_obj.insert("sessionMessage".into(), origin.clone());
+    }
+    if let Some(steering) = message.steering {
+        meta_obj.insert("steering".into(), json!(steering));
     }
     if let Some(status) = &message.status {
         meta_obj.insert("status".into(), json!(status));
@@ -395,6 +401,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
     };
     let meta = record.meta.unwrap_or(Value::Null);
     let session_message = meta.get("sessionMessage").cloned();
+    let steering = meta.get("steering").and_then(Value::as_bool);
     let status = meta
         .get("status")
         .and_then(|v| v.as_str())
@@ -487,6 +494,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             content: text,
             session_message,
             attachments: None,
+            steering,
             created_at: record.created_at,
             thinking,
             status,
@@ -534,6 +542,7 @@ pub(crate) fn record_to_ui(record: MessageRecord) -> UiMessage {
             content,
             session_message,
             attachments,
+            steering,
             created_at: record.created_at,
             thinking,
             status,
@@ -1644,17 +1653,57 @@ pub fn append_message(
     let (record, text) = ui_to_record(&message);
     // Electron may replay an outbox entry after a host restart. Message ids
     // are globally unique, so an existing row is already the durable result.
+    // A steering input reserves its preceding streaming assistant's position;
+    // only a terminal assistant snapshot may replace that provisional row.
     if message_indexed(db, session_id, &record.id)? {
+        if message.role == "assistant"
+            && message.status.as_deref() != Some("streaming")
+            && streaming_assistant_indexed(db, session_id, &record.id)?
+        {
+            invalidate_transcript_layout(session_id);
+            if !transcripts::update_message(db.data_dir(), session_id, &record)? {
+                return Err(anyhow!(
+                    "streaming assistant is missing from its transcript"
+                ));
+            }
+            db.conn().execute(
+                "UPDATE messages SET text = ?3, is_error = ?4 WHERE session_id = ?1 AND id = ?2",
+                params![session_id, record.id, text, record.is_error],
+            )?;
+        } else {
+            return Ok(());
+        }
+    } else {
+        append_record(
+            db,
+            session_id,
+            &session_created,
+            &record,
+            text.as_deref(),
+            turn_id,
+        )?;
+    }
+    if message.role == "assistant" && message.status.as_deref() == Some("streaming") {
+        // Even an empty reservation needs a checkpoint so a crash can settle
+        // it as aborted. Later stream checkpoints replace this snapshot.
+        let existing = transcripts::read_inflight(db.data_dir(), session_id)?;
+        if existing.as_ref().is_none_or(|checkpoint| {
+            ts_to_ms(&checkpoint.message.created_at) < ts_to_ms(&record.created_at)
+        }) {
+            transcripts::write_inflight(
+                db.data_dir(),
+                session_id,
+                &transcripts::InflightRecord {
+                    schema: transcripts::INFLIGHT_SCHEMA,
+                    session_id: session_id.to_string(),
+                    turn_id: turn_id.map(str::to_string),
+                    saved_at: ms_to_ts(now_ms()),
+                    message: record,
+                },
+            )?;
+        }
         return Ok(());
     }
-    append_record(
-        db,
-        session_id,
-        &session_created,
-        &record,
-        text.as_deref(),
-        turn_id,
-    )?;
     // The final assistant row supersedes any checkpoint of the same message
     // (D299). A checkpoint for a different id belongs to a newer fragment and
     // stays until its own final row or the turn end settles it.
@@ -1679,6 +1728,37 @@ fn message_indexed(db: &Database, session_id: &str, message_id: &str) -> Result<
         )
         .optional()?;
     Ok(existing.is_some())
+}
+
+fn streaming_assistant_indexed(db: &Database, session_id: &str, message_id: &str) -> Result<bool> {
+    let layout = session_layout(db, session_id)?;
+    let mut end = layout.message_count();
+    while end > 0 {
+        let start = end.saturating_sub(64);
+        let window = transcripts::read_transcript_window_with_layout(
+            db.data_dir(),
+            session_id,
+            &layout,
+            start,
+            Some(end - start),
+        )?;
+        if let Some(record) = window
+            .messages
+            .iter()
+            .rev()
+            .find(|record| record.id == message_id)
+        {
+            return Ok(record.role == "assistant"
+                && record
+                    .meta
+                    .as_ref()
+                    .and_then(|meta| meta.get("status"))
+                    .and_then(Value::as_str)
+                    == Some("streaming"));
+        }
+        end = start;
+    }
+    Ok(false)
 }
 
 /// Append one canonical record: transcript line first, then the index row.
@@ -1736,7 +1816,9 @@ pub fn save_inflight_message(
     if !has_text {
         return Ok(false);
     }
-    if message_indexed(db, session_id, &message.id)? {
+    if message_indexed(db, session_id, &message.id)?
+        && !streaming_assistant_indexed(db, session_id, &message.id)?
+    {
         transcripts::remove_inflight(db.data_dir(), session_id)?;
         return Ok(false);
     }
@@ -1777,7 +1859,8 @@ pub fn recover_inflight_message(
             return Ok(None);
         }
     };
-    if message_indexed(db, session_id, &inflight.message.id)? {
+    let indexed = message_indexed(db, session_id, &inflight.message.id)?;
+    if indexed && !streaming_assistant_indexed(db, session_id, &inflight.message.id)? {
         transcripts::remove_inflight(db.data_dir(), session_id)?;
         return Ok(None);
     }
@@ -1808,14 +1891,23 @@ pub fn recover_inflight_message(
     meta.insert("status".into(), json!(promoted_status));
     record.meta = Some(Value::Object(meta));
     let text = record_index_text(&record);
-    append_record(
-        db,
-        session_id,
-        &session_created,
-        &record,
-        text.as_deref(),
-        inflight.turn_id.as_deref(),
-    )?;
+    if indexed {
+        append_message(
+            db,
+            session_id,
+            &record_to_ui(record.clone()),
+            inflight.turn_id.as_deref(),
+        )?;
+    } else {
+        append_record(
+            db,
+            session_id,
+            &session_created,
+            &record,
+            text.as_deref(),
+            inflight.turn_id.as_deref(),
+        )?;
+    }
     Ok(Some(record_to_ui(record)))
 }
 
@@ -2825,7 +2917,9 @@ pub fn end_turn_settling(
         Some(session_id) if recover_inflight => recover_inflight_message(db, session_id, true)?,
         Some(session_id) if status != "aborted" => {
             if let Some(inflight) = transcripts::read_inflight(db.data_dir(), session_id)? {
-                if message_indexed(db, session_id, &inflight.message.id)? {
+                if message_indexed(db, session_id, &inflight.message.id)?
+                    && !streaming_assistant_indexed(db, session_id, &inflight.message.id)?
+                {
                     transcripts::remove_inflight(db.data_dir(), session_id)?;
                 }
             }
@@ -3183,6 +3277,7 @@ mod tests {
             role: "user".into(),
             content: content.into(),
             attachments: None,
+            steering: None,
             created_at: ts.into(),
             thinking: None,
             status: None,
@@ -3680,6 +3775,7 @@ mod tests {
             role: "tool".into(),
             content: "ok".into(),
             attachments: None,
+            steering: None,
             created_at: "2025-05-01T00:00:02Z".into(),
             thinking: None,
             status: Some("complete".into()),
@@ -4014,6 +4110,7 @@ mod tests {
             role: "assistant".into(),
             content: "final answer".into(),
             attachments: None,
+            steering: None,
             created_at: "2025-05-01T00:00:01Z".into(),
             thinking: Some("first plan\nsecond plan".into()),
             status: Some("complete".into()),

@@ -4741,3 +4741,15 @@ D193, and D194.
   replays an unclaimed or interrupted turn automatically.
 - Decision D409 amends ADR 0237, ADR 0165, and ADR 0213. See ADR 0239 and
   E2E-PLUGIN-session-orchestrator-real-workers.
+
+## 2026-09-12 — Steer the active turn with Alt+Enter
+
+- Normal Send/Enter remains a Host-owned follow-up; Alt+Enter submits input to
+  the current durable turn using a required expected turn id.
+- Reuse pi-agent-core steering at the next model-request boundary, preserve
+  started tools, and retain the active model/workspace/permission configuration.
+- Stop and ended targets reject without redirecting input to another turn.
+  Accepted input remains history without independent replay after cancellation.
+- Journal accepted user input with a provisional preceding reply when needed;
+  finalize only an indexed streaming assistant in place and retain completed
+  message idempotency. See ADR active-turn-steering and E2E-AGENT-alt-enter-steers-active-turn.

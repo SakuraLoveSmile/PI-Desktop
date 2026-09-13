@@ -275,6 +275,8 @@ export const ko = {
     enhancementFailed: "프롬프트 개선 실패",
     dismissEnhancementError: "프롬프트 개선 오류 닫기",
     abort: "중지",
+    sendWhileRunning: "후속 메시지 보내기 · {{shortcut}}로 방향 수정",
+    steeringUnavailable: "현재 턴에 지시를 추가할 수 없습니다. 초안은 유지됩니다.",
     stopGenerating: "생성 중지",
     running: "작업 중…",
     loadingSession: "대화 불러오는 중…",
@@ -1430,7 +1432,7 @@ export const ko = {
     importExtensionDone: "플러그인 {{id}}(으)로 가져왔습니다",
     agentExtension: {
       title: "에이전트 확장",
-      importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이전트 자체 도구와 같은 권한으로 실행됩니다. 계속할까요?",
+      importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이전트 자체 도구와 같은 권한으로 실행됩니다. 선언된 스킬은 에이전트에 지침을 추가할 수 있습니다. 계속할까요?",
       diagnostics: "진단",
       commandNeedsSession: "확장 명령을 실행하려면 먼저 채팅을 시작하세요.",
       state: {
@@ -1852,6 +1854,8 @@ export const ko = {
       presetTestRunnerDesc: "테스트나 빌드를 실행하고 실패를 보고합니다.",
       presetFixerName: "수정자",
       presetFixerDesc: "스펙에 따라 여러 파일 변경을 구현합니다.",
+      presetUiDesignerName: "UI 디자이너",
+      presetUiDesignerDesc: "요구사항에 따라 인터페이스를 설계·구현하고 브라우저 미리보기로 검증합니다.",
       presetBlank: "빈 문서로 시작",
       presetBlankDesc: "기본 도구. 지시문은 직접 작성합니다.",
       presetApply: "적용",

@@ -49,6 +49,7 @@ crates/host-core (tool execution + permissions)
 ```ts
 interface AgentRuntime {
  prompt(input: PromptInput): Promise<{ turnId: string }>
+ steer(input: RuntimePrompt, expectedTurnId: string, message: UiMessage): { accepted: boolean; turnId: string }
  requestGracefulStop(): { requested: boolean }
  abort(turnId?: string): Promise<void>
  getStatus(): RuntimeStatus
@@ -62,6 +63,24 @@ interface AgentRuntime {
 模型请求之前正常地发出 `agent_end`。它不会取消进行中的提供商流或正在运行的
 工具。空闲的运行时返回 `{ requested: false }`；立即生效的 `abort()` 仍然是另
 一条独立的取消路径。
+
+### 4.0 当前回合补充指令
+
+`steer` 在改变任何状态之前验证当前回合标识，再通过 pi-agent-core 原生 steering 队列的
+`all` 模式加入用户输入。当前提供商请求和已启动的一批工具先完成；所有已接收输入在
+同一个持久回合的下一次模型请求边界进入上下文。进行中的请求不会被改写或中止。
+与普通提示相同，主进程负责附件验证和转录持久化。
+
+pi 消费排队输入时保留渲染器提供的消息 id；即使补充输入早于最初用户消息被消费，
+也遵循这一规则。如果输入在 pi 最后一次检查队列后才获准进入，运行时抑制终态事件，
+等 pi 释放执行后沿用同一回合继续，不再次公开发出 `agent_start`。现有上下文和提供商
+恢复流程优先于这次继续执行。补充指令也会唤醒正在空闲等待后台委托的父代理，
+不会取消这些委托。
+
+中止、优雅停止、致命错误和终态落定都会关闭接收入口。已接收但尚未消费的输入保留在
+转录和上下文历史中，并从 pi steering 队列移除，避免在后续回合独立执行。
+普通 follow-up 仍留在独立的 Host FIFO 中，直到当前持久回合最终落定。
+补充指令失败不得终止当前运行。
 
 ## 5. 提示流程
 
@@ -480,8 +499,8 @@ Goal 批准所承诺的内容与 Plan 批准所承诺的内容完全相同：`mo
 会话 Agent 可以把可拆分的工作交给在独立上下文中后台运行的委托，
 并按需取回报告。
 
-**目录。** 定义是来自两个来源的 Markdown 文档：`agent-runtime` 中内嵌的四个
-内置函数（`explorer`、`code-reviewer`、`test-runner`、`fixer`），以及
+**目录。** 定义是来自两个来源的 Markdown 文档：`agent-runtime` 中内嵌的五个
+内置函数（`explorer`、`code-reviewer`、`test-runner`、`fixer`、`ui-designer`），以及
 `~/.agents/subagents/*.md` 下的全局用户文档。没有项目级子代理目录，`.pi/agents`
 不会作为能力来源被扫描。用户文档在进入加载器前会根据应用本地启用状态过滤。
 Electron main 每次启动加载全局目录，并在 sidecar 参数中传递
@@ -494,9 +513,9 @@ Frontmatter 新增 `permission: inherit | ask | accept-edits | auto`（默认
 委托使用会话的有效权限模式；因此父会话为 `auto` 时，明确的外部路径也不会再次
 弹出授权卡。只有内置定义和用户定义可以声明非 `inherit` 作用域；项目定义随仓库
 一起到来，声明会在解析时被丢弃并留下警告，其委托仍在会话的有效模式下运行 ——
-想要该作用域的用户把文档复制到自己的 agents 目录。唯一可写的内置 `fixer` 也
-默认继承父会话：`auto` 下跟随父会话自动放行，而 `ask` 和 `accept-edits` 仍保留
-各自的审批边界。显式声明的内置或用户作用域仍然是一次有意的覆盖。
+想要该作用域的用户把文档复制到自己的 agents 目录。可写的内置 `fixer` 与
+`ui-designer` 也默认继承父会话：`auto` 下跟随父会话自动放行，而 `ask` 和
+`accept-edits` 仍保留各自的审批边界。显式声明的内置或用户作用域仍然是一次有意的覆盖。
 
 **工具（ADR 0089）。** 委托是四个工具的生命周期，仅在 Agent 模式下且目录
 非空时构建，四个工具都属于 Agent 核心集而不是第 7.1 节的按需目录：
@@ -540,9 +559,11 @@ Frontmatter 新增 `permission: inherit | ask | accept-edits | auto`（默认
 委托自身的响应 —— 会话自己的请求仍沿用模型绑定。超过天花板的值属于笔误，会被钳制
 而不会转发给 provider。
 内置委托各自声明与其工作量相称的值 —— `explorer` 60、`code-reviewer` 50、
-`test-runner` 40、`fixer` 80 —— 因此始终无法收敛的委托会以 `truncated`
+`test-runner` 40、`fixer` 80、`ui-designer` 80 —— 因此始终无法收敛的委托会以 `truncated`
 连同其部分报告结束，而不是一直跑到时长上限。内置的 `explorer` 声明 `Read`、
-`Glob`、`Grep` 和 `Bash`，而 `code-reviewer` 保持只读。其状态为 `completed`、
+`Glob`、`Grep` 和 `Bash`，而 `code-reviewer` 保持只读；`fixer` 与 `ui-designer`
+会在工作区内写入，`ui-designer` 另外声明 `BrowserPreview`，以便在报告前检查渲染结果。
+其状态为 `completed`、
 `truncated`、`failed`、`aborted`、`timed_out` 以及仅存在于注册表的
 `stopped`；终态通过 `TaskWait` 呈现，其文本是报告（上限为
 `MAX_SUBAGENT_REPORT_CHARS`，12k），其 details 携带 `delegationId`、`agent`、
