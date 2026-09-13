@@ -35,6 +35,8 @@ import type {
   FsReadResult,
   HostHealth,
   HostStatusEvent,
+  MarketSource,
+  McpCatalogEntry,
   SkillCatalogEntry,
   ModelInfo,
   McpServerInput,
@@ -659,6 +661,12 @@ export const api = {
       imported: McpServerRecord[];
       failed: Array<{ id: string; reason: string }>;
     }>(IPC.invoke.mcpImport, { text }),
+  /** Query the configured market sources; `failedSources` names dead ones. */
+  searchMcpMarketRegistry: (query: string, sources: MarketSource[], options?: { more?: boolean }) =>
+    invoke<{ entries: McpCatalogEntry[]; failedSources?: string[]; exhausted?: boolean }>(
+      IPC.invoke.mcpMarketSearch,
+      { query, sources, ...options },
+    ),
 
   // --- Skill market ----------------------------------------------------------
   searchSkillMarket: (query: string, sources: { id: string; name: string; url: string }[]) =>

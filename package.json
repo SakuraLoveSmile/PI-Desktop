@@ -39,6 +39,7 @@
     "host:dev": "cargo run -p host-core",
     "clean": "pnpm -r --if-present clean && cargo clean",
     "lint:biome": "biome lint",
+    "test:e2e:mcp-market": "node scripts/e2e-mcp-market.mjs",
     "test:e2e:skill-market": "node scripts/e2e-skill-market.mjs"
   },
   "devDependencies": {

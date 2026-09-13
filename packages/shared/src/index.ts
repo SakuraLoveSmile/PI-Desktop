@@ -8,6 +8,29 @@ export * from "./changelog.js";
 export * from "./composer-trigger.js";
 export * from "./fuzzy.js";
 export * from "./mcp-import.js";
+export * from "./mcp-catalog.js";
+export * from "./mcp-catalog-builtin.js";
+export {
+  registryIdFromName,
+  argumentValues,
+  guessCategory,
+  mapRegistryServer,
+  mergeRegistryEntries,
+  isSafeMarketSourceUrl,
+  isPublicHostname,
+  isPublicIpLiteral,
+  sanitizeMarketSources,
+  DEFAULT_MARKET_SOURCE,
+  type RegistryEnvVar,
+  type RegistryArgument,
+  type RegistryPackage,
+  type RegistryRemote,
+  type RegistryServer,
+  type RegistryRecord,
+  type MarketSourceKind,
+  type MarketSource,
+  type SourcedCatalogEntry,
+} from "./mcp-registry.js";
 export * from "./skill-catalog.js";
 export * from "./skill-catalog-builtin.js";
 export * from "./model-config-import.js";

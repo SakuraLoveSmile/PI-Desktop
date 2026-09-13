@@ -6872,6 +6872,13 @@ IPC 请求无法关闭。
 - **里程碑**：M5
 - **状态**：草稿。现有回归套件覆盖周边行为，尚未运行渲染界面的 steering 完整流程
   （除非明确要求，不本地运行 E2E）。
+### MCP 市场场景(`pnpm test:e2e:mcp-market`,协议级无头)
+
+| ID | 场景 | 验证 |
+|---|---|---|
+| E2E-MCP-MARKET-NET-BOUNDARY | URL guard 拒绝回环、私网、v4-mapped、ULA、link-local 及尾点绕过形态,放行公网 https | 确定性 guard 断言 |
+| E2E-MCP-MARKET-SEMANTICS | Registry 记录映射为安装模板时保留 named/positional 参数与 required/optional 环境变量语义 | 确定性映射断言 |
+| E2E-MCP-MARKET-INSTALL | 内置目录条目经 `resolveCatalogEntry` 解析并通过宿主 `mcp.upsert` RPC 安装;记录落盘 `~/.agents/servers/` | 真实宿主二进制,隔离临时 HOME |
 ### 技能市场场景(`pnpm test:e2e:skill-market`,协议级无头)
 
 | ID | 场景 | 验证 |
