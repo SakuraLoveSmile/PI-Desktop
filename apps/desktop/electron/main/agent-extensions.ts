@@ -273,10 +273,23 @@ export function defaultDependencyRunner(
     // Shell only where npm is a .cmd shim (Windows); every arg is a literal.
     // A shell kill on Windows terminates the shim, possibly leaving npm
     // itself running — accepted for v1, the timeout result still resolves.
+    // Explicit minimal environment: npm must not see npm auth tokens,
+    // proxy/SSH configuration or anything else from the desktop process.
     const child = spawn(command, args, {
       cwd,
       shell: process.platform === "win32",
+      windowsHide: true,
       stdio: ["ignore", "ignore", "pipe"],
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: process.env.HOME ?? process.env.USERPROFILE ?? "",
+        TMPDIR: process.env.TMPDIR ?? process.env.TEMP ?? "",
+        LANG: process.env.LANG ?? "en_US.UTF-8",
+        npm_config_ignore_scripts: "true",
+        npm_config_audit: "false",
+        npm_config_fund: "false",
+        npm_config_update_notifier: "false",
+      },
     });
     let stderr = "";
     child.stderr?.on("data", (chunk: Buffer) => {
@@ -334,8 +347,49 @@ export async function installExtensionDependencies(
       error: `package.json is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
+  // JSON.parse("null") succeeds; reading .dependencies below would then throw
+  // outside this guard and block the whole import.
+  if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { state: "failed", error: "package.json is not a JSON object" };
+  }
   if (!manifest.dependencies || Object.keys(manifest.dependencies).length === 0) {
     return { state: "skipped", reason: "no-dependencies" };
+  }
+  // Registry-only dependency sources: file:/link:/git*/http(s) specs would
+  // escape the registry boundary this install enforces.
+  for (const [name, spec] of Object.entries(manifest.dependencies)) {
+    const value = String(spec);
+    if (/^(file:|link:|git|git\+|\/|\.\.?\/)|:\/\//i.test(value) || value.startsWith("http")) {
+      return {
+        state: "failed",
+        error: `dependency ${name} uses a non-registry spec (${value}); only registry versions are installable`,
+      };
+    }
+  }
+  // A copied lockfile pins resolved URLs; keep it only when every entry
+  // resolves from the public registry, otherwise drop it so npm resolves
+  // from package.json against the default registry.
+  const lockfileCandidates = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml"];
+  for (const name of lockfileCandidates) {
+    const lockPath = join(pluginDir, name);
+    if (!existsSync(lockPath)) continue;
+    if (name === "package-lock.json" || name === "npm-shrinkwrap.json") {
+      try {
+        const lock = JSON.parse(readFileSync(lockPath, "utf8")) as {
+          packages?: Record<string, { resolved?: string }>;
+        };
+        const resolved = Object.values(lock.packages ?? {})
+          .map((entry) => entry.resolved ?? "")
+          .filter(Boolean);
+        if (resolved.some((url) => !url.startsWith("https://registry.npmjs.org/"))) {
+          rmSync(lockPath);
+        }
+      } catch {
+        rmSync(lockPath);
+      }
+    } else {
+      rmSync(lockPath);
+    }
   }
   try {
     const result = await (options?.runner ?? defaultDependencyRunner)(

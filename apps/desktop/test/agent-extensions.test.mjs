@@ -28,6 +28,43 @@ function bridge(overrides = {}) {
   return { b, events };
 }
 
+test("installing a package.json whose JSON body is null or an array fails without throwing", async () => {
+  for (const body of ["null", "[]"]) {
+    const root = mkdtempSync(join(tmpdir(), "ext-deps-null-"));
+    writeFileSync(join(root, "package.json"), body);
+    const result = await installExtensionDependencies(root, { runner: async () => ({ code: 0, stderr: "" }) });
+    assert.equal(result.state, "failed");
+    assert.match(String(result.error), /not a JSON object/);
+  }
+});
+
+test("non-registry dependency specs are rejected before npm runs", async () => {
+  let npmRan = false;
+  const root = mkdtempSync(join(tmpdir(), "ext-deps-git-"));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { evil: "github:a/b" } }));
+  const result = await installExtensionDependencies(root, {
+    runner: async () => {
+      npmRan = true;
+      return { code: 0, stderr: "" };
+    },
+  });
+  assert.equal(result.state, "failed");
+  assert.match(String(result.error), /non-registry spec/);
+  assert.equal(npmRan, false);
+});
+
+test("a lockfile with non-registry resolved urls is dropped before install", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ext-deps-lock-"));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }));
+  writeFileSync(
+    join(root, "package-lock.json"),
+    JSON.stringify({ packages: { "node_modules/evil": { resolved: "https://evil.example/x.tgz" } } }),
+  );
+  const result = await installExtensionDependencies(root, { runner: async () => ({ code: 0, stderr: "" }) });
+  assert.equal(result.state, "installed");
+  assert.equal(existsSync(join(root, "package-lock.json")), false);
+});
+
 test("session publications drive the plugin's agent-extension status and the command list", () => {
   const { b, events } = bridge();
   const ids = ["/p/a.ts", "/p/b.ts"];
