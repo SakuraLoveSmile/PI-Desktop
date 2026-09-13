@@ -438,11 +438,16 @@ visually distinct from list content.
   dialog. The dialog accepts a project name and one or more local folders,
   lists every selected folder with a remove action, and marks the first folder
   as Primary. The primary folder is activated and named after creation; every
-  other selected folder is retained as an open project tab. The form uses a
-  compact ChatGPT-like hierarchy: an explicit name label, a quiet memory hint,
-  then the folder list and one primary action. The surface uses two compact
-  sections with a fixed action row; on narrow windows the content remains
-  single-column while the action row stays reachable.
+  other selected folder is retained as an open project tab. The dialog follows
+  the shell's neutral gray surfaces, with `--radius-xl` (20px) corners and the
+  shared `--ds-shadow-dialog` elevation. One Create project title leads into
+  the quiet memory hint, an explicitly labeled filled name field, and the
+  folder list with a softly filled Add folder action. Spacing separates the
+  compact sections; the surface has no outer stroke, section rules, footer
+  divider, or dashed picker border. The action row stays fixed while the
+  content scrolls; narrow windows retain a single column and reachable actions.
+  Light and dark themes preserve readable filled surfaces and visible keyboard
+  focus, and transitions respect reduced motion.
 - Right-click the `Projects` heading or empty project-list chrome: open a
   single-item create menu that runs the same Create project dialog action
 - Click project `+`: activate that project, then select its most recent empty

@@ -147,15 +147,12 @@ export function ProjectCreateDialog() {
       >
         <div className="project-create-dialog-head">
           <div className="project-create-dialog-heading">
-            <div className="project-create-dialog-heading-copy">
-              <span className="project-create-dialog-kicker">{t("project.title")}</span>
-              <h2 id="project-create-dialog-title" className="project-create-dialog-title">
-                {t("project.createTitle")}
-              </h2>
-              <div id="project-create-memory-hint" className="project-create-dialog-memory-hint">
-                <IconSparkles size={14} aria-hidden />
-                <span>{t("project.createMemoryHint")}</span>
-              </div>
+            <h2 id="project-create-dialog-title" className="project-create-dialog-title">
+              {t("project.createTitle")}
+            </h2>
+            <div id="project-create-memory-hint" className="project-create-dialog-memory-hint">
+              <IconSparkles size={14} aria-hidden />
+              <span>{t("project.createMemoryHint")}</span>
             </div>
           </div>
           <TooltipButton
@@ -194,24 +191,20 @@ export function ProjectCreateDialog() {
                   {name.length}/{MAX_PROJECT_NAME_CHARS}
                 </span>
               </div>
-              <div className="project-create-dialog-name-field">
-                <span className="project-create-dialog-name-icon" aria-hidden>
-                  <IconFolder size={18} />
-                </span>
-                <input
-                  ref={inputRef}
-                  id="project-create-name"
-                  value={name}
-                  maxLength={MAX_PROJECT_NAME_CHARS}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder={t("project.createNamePlaceholder")}
-                  aria-label={t("project.createNameLabel")}
-                  disabled={busy}
-                  spellCheck={false}
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                />
-              </div>
+              <input
+                ref={inputRef}
+                id="project-create-name"
+                className="field-input project-create-dialog-name-field"
+                value={name}
+                maxLength={MAX_PROJECT_NAME_CHARS}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={t("project.createNamePlaceholder")}
+                aria-label={t("project.createNameLabel")}
+                disabled={busy}
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
+              />
             </section>
 
             <section

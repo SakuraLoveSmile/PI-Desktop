@@ -1442,11 +1442,19 @@ needed.
 #### E2E-012a: Create a named project from multiple folders
 
 - **Preconditions**: App running; no project dialog open; at least two local
-  folders are available.
-- **Steps**: 1) Invoke Add project from Settings → Project archive or the
-  sidebar Projects heading. 2) Enter a project name. 3) Add two folders with
-  the folder picker. 4) Confirm both rows render and the first row is marked
-  Primary. 5) Remove one row, add it again, and create the project.
+  folders are available, including one with a long name or path.
+- **Steps**:
+  1. Invoke Add project from Settings → Project archive or the sidebar Projects
+     heading and inspect the empty dialog.
+  2. Enter a project name and add two folders with the folder picker. Confirm
+     both rows render and the first row is marked Primary.
+  3. Remove one row, check the count, and add it again.
+  4. Inspect the empty and populated states in light and dark themes, including
+     a narrow window and reduced-motion settings.
+  5. Use Tab and Shift+Tab to traverse the controls. Close with Escape, then
+     reopen and close by clicking outside; check focus after each close.
+  6. Reopen, enter the name, add the folders, and create the project. Inspect
+     the in-flight controls and the resulting active workspace and project tabs.
 - **Expected**: The dialog traps focus, closes on Escape or outside click while
   idle, and keeps the name and selected folders visible without horizontal
   overflow. The native picker allows multiple directories in one selection.
@@ -1455,9 +1463,17 @@ needed.
   primary folder receives the entered display name and becomes the active
   workspace; every selected folder is retained as an open project tab. The
   dialog is unavailable while creation is in flight and returns focus to the
-  invoking control after close.
+  invoking control after close. The surface follows the shell's neutral gray
+  theme with 20px tokenized corners and shared dialog elevation. It shows one
+  Create project title and the quiet memory hint, a filled name field, and a
+  softly filled Add folder action. No outer stroke, section rules, footer
+  divider, or dashed picker border appears. Spacing provides the section
+  hierarchy; long names and paths remain contained, and scrolling content never
+  hides the fixed action row. Both themes keep text readable and keyboard focus
+  visible; reduced motion suppresses the control transitions.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` (§9),
   `04-ux/06-settings-ia.md` (Project archive),
+  `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md` (§3.5)
 - **Acceptance**: C (project creation UI), D (multi-folder project setup),
   Accessibility, Localization
