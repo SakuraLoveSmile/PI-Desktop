@@ -10,7 +10,7 @@
  * starter values and is exercised by `subagent-presets.test.ts`.
  */
 
-import { DEFAULT_SUBAGENT_TOOLS } from "./subagent-definition.js";
+import { DEFAULT_SUBAGENT_TOOLS, type SubagentDefinition } from "./subagent-definition.js";
 
 /**
  * One built-in subagent surfaced as a "start from template" entry in the
@@ -209,4 +209,19 @@ export function findSubagentPreset(id: string): SubagentPreset | undefined {
 /** Tools a fresh subagent draft starts with when no preset is chosen. */
 export function defaultSubagentPresetTools(): readonly string[] {
   return [...DEFAULT_SUBAGENT_TOOLS];
+}
+
+/**
+ * Catalog-shaped builtins for Settings when `subagent/catalog` is unavailable.
+ * Ids match `Task` handles, not the editor's display names.
+ */
+export function fallbackBuiltinDefinitions(): SubagentDefinition[] {
+  return SUBAGENT_PRESETS.map((preset) => ({
+    name: preset.id,
+    description: preset.description,
+    prompt: preset.body,
+    tools: [...preset.tools],
+    maxTurns: preset.maxTurns,
+    source: "builtin",
+  }));
 }
