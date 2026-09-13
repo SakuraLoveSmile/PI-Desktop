@@ -343,7 +343,9 @@ prompt. The parent agent can then select it via the Task tool's `model`
 parameter. Resolving a model for a definition pin does not imply this opt-in.
 The launch payload carries the permitted override keys separately as
 `subagentModelKeys`; definition-only bindings remain available solely through
-normal pin resolution. If vendor/model aliases collide across accounts, the
+normal pin resolution, including when `Task.model` repeats that definition's
+own pin key. On-demand matching uses unique provider id/vendor/name lookup and
+must not overwrite a pin with another account's credentials. If vendor/model aliases collide across accounts, the
 opted-in account uses its exact provider ID as the override key. Selection priority remains Task.model → definition pin
 → session model (D278; ADR subagent-model-opt-in).
 

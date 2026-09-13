@@ -5454,7 +5454,12 @@ describe("DesktopAgentRuntime subagents", () => {
     await taskTool(runtime).execute("own-pin", { agent: "reviewer", task: "Review." });
     expect(subagentRuns.calls[0].provider).toBe(remote);
     expect(taskTool(runtime).description).toContain("Default model: remote/remote-model");
-    await runtime.dispose();
+    const echoed = await taskTool(runtime).execute("own-pin-echo", {
+      agent: "reviewer", task: "Review.", model: "remote/remote-model",
+    });
+    expect(echoed.details.error).toBeUndefined();
+    expect(subagentRuns.calls[1].provider).toBe(remote);
+    expect(host.call).toHaveBeenCalledTimes(1);
   });
 
   it("allows an opted-in model to override a definition pin without changing D278", async () => {
@@ -5488,6 +5493,33 @@ describe("DesktopAgentRuntime subagents", () => {
     expect(subagentRuns.calls).toHaveLength(2);
     expect(host.call).toHaveBeenCalledTimes(1);
     expect((runtime as any).availableSubagentModelKeys()).toEqual(["new/new-model"]);
+    expect((runtime as any).subagentModelKeys.has("new/new-model")).toBe(false);
+    expect(runtimeMatches(runtime)).toBe(true);
+    await runtime.dispose();
+  });
+
+  it("does not replace a private pin with another account's on-demand binding (#286)", async () => {
+    const pin = { ...provider, id: "account-a", name: "A", modelId: "remote-model", modelConfig: undefined };
+    const other = { ...provider, id: "account-b", name: "B", modelId: "remote-model", modelConfig: undefined };
+    const host = { call: vi.fn().mockResolvedValue(other) };
+    const runtime = createRuntime({
+      subagents: [explorer, pinned],
+      subagentProviders: { "remote/remote-model": pin },
+      subagentModelKeys: [],
+      host,
+    });
+    subagentRuns.calls.length = 0;
+    subagentRuns.deferred = false;
+    subagentRuns.result = undefined;
+    const denied = await taskTool(runtime).execute("cross", {
+      agent: "explorer", task: "Search.", model: "remote/remote-model",
+    });
+    expect(denied.details.error).toContain("not available for delegation");
+    expect(subagentRuns.calls).toHaveLength(0);
+    await taskTool(runtime).execute("own", { agent: "reviewer", task: "Review." });
+    expect(subagentRuns.calls[0].provider).toBe(pin);
+    expect((runtime as any).subagentProviders["remote/remote-model"]).toBe(pin);
+    expect(runtimeMatches(runtime)).toBe(true);
     await runtime.dispose();
   });
 

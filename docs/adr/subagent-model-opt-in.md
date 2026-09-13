@@ -24,17 +24,22 @@ opted-in row's vendor/model alias collides with a binding from another row,
 main uses that row's exact provider ID as the override key; one account's
 opt-in cannot authorize another account's pinned credentials.
 
-The runtime uses the separate keys for its model summary and cached explicit
-overrides. Missing keys mean no cached override authorization. Other keys still
-use the existing main-owned `provider.resolveSubagentModel` check; only a
-successful response can populate the override cache. A changed launch list
-retires an idle runtime on the next prompt, including after opt-in is revoked.
+The runtime uses the separate keys for its model summary. Missing keys mean
+no cached override authorization. Other keys still use the existing
+main-owned `provider.resolveSubagentModel` check; only a successful response
+can populate a separate override cache. That cache is not part of launch
+reuse matching and must not overwrite a definition pin with a different
+provider id. On-demand provider matching uses the same unique id / vendor /
+name rule as pin resolution; ambiguous vendor aliases fail closed unless the
+caller uses the exact provider id. A changed launch list retires an idle
+runtime on the next prompt, including after opt-in is revoked.
 
 D278's priority remains Task.model → definition pin → session model. The
-existing exact-session-model exception remains unchanged. An unlisted private
-pin must be used by omitting `model`, not by selecting it as an override.
-The Task catalog displays each definition default and recommends omission to
-preserve it; this does not prohibit deliberately selecting an opted-in override.
+existing exact-session-model exception remains unchanged. Repeating the
+target definition's own pin key is treated as omitting `model`, so catalog
+echo does not become a tool error. The Task catalog displays each definition
+default and says that omitting or repeating that key keeps it; this does not
+prohibit deliberately selecting an opted-in override for a different model.
 
 ## Consequences
 

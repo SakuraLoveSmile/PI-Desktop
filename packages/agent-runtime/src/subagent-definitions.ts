@@ -358,12 +358,13 @@ function providerAlias(value: string): string {
  *
  * Stored provider ids are UUIDs, so a hand-written definition almost never
  * names one. The vendor key (`anthropic`) and the display name are what a
- * person actually writes, and both are accepted.
+ * person actually writes, and both are accepted. Vendor or name aliases that
+ * match more than one row are not guessed.
  */
-function findProvider(
+export function findSubagentProviderSource<T extends SubagentProviderSource>(
   providerId: string,
-  providers: readonly SubagentProviderSource[],
-): SubagentProviderSource | undefined {
+  providers: readonly T[],
+): T | undefined {
   const alias = providerAlias(providerId);
   const exact = providers.find((provider) => provider.id === providerId);
   if (exact) return exact;
@@ -375,6 +376,24 @@ function findProvider(
     (provider) => providerAlias(provider.name) === alias,
   );
   return nameMatches.length === 1 ? nameMatches[0] : undefined;
+}
+
+/** Why `findSubagentProviderSource` returned nothing: missing vs ambiguous. */
+export function subagentProviderLookupError(
+  providerId: string,
+  providers: readonly Pick<SubagentProviderSource, "id" | "name" | "vendorKey">[],
+): string {
+  const alias = providerAlias(providerId);
+  const vendorMatches = providers.filter(
+    (provider) => providerAlias(provider.vendorKey ?? "") === alias,
+  );
+  const nameMatches = providers.filter(
+    (provider) => providerAlias(provider.name) === alias,
+  );
+  if (vendorMatches.length > 1 || nameMatches.length > 1) {
+    return `provider alias "${providerId}" matches multiple accounts; use the exact provider id`;
+  }
+  return `no provider matches "${providerId}"`;
 }
 
 /**
@@ -420,7 +439,7 @@ export async function resolveSubagentProviders(input: {
       );
       continue;
     }
-    const provider = findProvider(pin.providerId, input.providers);
+    const provider = findSubagentProviderSource(pin.providerId, input.providers);
     if (!provider) {
       diagnostics.push(
         `${definition.name}: no enabled provider matches "${pin.providerId}"`,
