@@ -117,6 +117,7 @@ The minimum selection is:
   `pnpm test:e2e:boot`.
 - Session-list refresh or model capability lookup: `pnpm test:e2e` and
   `pnpm test:e2e:boot`, including the synthetic large-list responsiveness check.
+- Transcript render boundaries and cross-part delegation display: `pnpm test:e2e:transcript`.
 - Plan host/runtime behavior: `pnpm test:e2e` and `pnpm test:e2e:plan`.
 - Plan UI behavior: `pnpm test:e2e:plan` and `pnpm test:e2e:plan-ui`.
 - Host supervision, crash recovery, or restart behavior: `pnpm test:e2e` and
@@ -4397,6 +4398,10 @@ needed.
   - Completed history remains in its stable render boundary while the active
     tail changes; history stays selectable, copyable, and anchored in the
     minimap without being rebuilt as a React subtree for every token.
+  - Within that same active turn, unchanged non-delegation activity groups do
+    not render again just because text updates rebuild turn-wide delegation
+    maps. Tool content changes still render; later TaskWait results update
+    the original Task group's terminal status and completion duration.
   - Pressing and releasing standard, icon, sidebar, send, stop, and message
     action controls uses one eased transform rather than a snapped scale;
     active streaming labels keep their readable text while their compact status
@@ -4414,8 +4419,13 @@ needed.
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`
 - **Acceptance**: C (chat stream), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`interaction-performance.test.mjs`); rendered
-  streaming scenario Draft
+- **Status**: Unit-covered (`interaction-performance.test.mjs`); automated
+  React/Chromium render regression via `pnpm test:e2e:transcript` (no provider
+  credentials; requires installed Electron and a graphical session, or Xvfb on
+  Linux). It mounts production transcript components, counts ActivityGroup
+  renders across 20 text updates with 100 completed groups, checks changed tool
+  content, and checks cross-part Task terminal status/timing updates. Styles
+  are omitted; full provider streaming and shell responsiveness remain Draft.
 
 #### E2E-084: Long tool loop compacts before the provider context limit
 

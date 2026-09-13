@@ -105,6 +105,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - Electron 启动、preload 或窗口生命周期：`pnpm test:e2e` 和 `pnpm test:e2e:boot`。
 - 会话列表刷新或模型能力查询：`pnpm test:e2e` 和 `pnpm test:e2e:boot`，
   包括合成大列表的响应性检查。
+- 聊天记录渲染边界和跨活动段委派显示：`pnpm test:e2e:transcript`。
 - Plan host/runtime：`pnpm test:e2e` 和 `pnpm test:e2e:plan`。
 - Plan UI：`pnpm test:e2e:plan` 和 `pnpm test:e2e:plan-ui`。
 - host/sidecar 监督、崩溃恢复或重启：`pnpm test:e2e` 和 `pnpm test:e2e:supervision`。
@@ -3119,6 +3120,9 @@ IPC 请求无法关闭。
   - 已完成的历史记录保留在其稳定的渲染边界中，而活动的历史记录保留在其稳定的渲染边界中
     尾部变化；历史保持可选择、可复制并锚定在
     小地图，无需为每个标记重建为 React 子树。
+  - 在同一活动回合内，内容未变化且不含委派的活动组，不因文本更新重建了
+    回合级委派 Map 而再次渲染。工具内容变化仍会渲染；后续 TaskWait 结果
+    仍会更新原 Task 组的终态和完成耗时。
   - 按下和释放标准、图标、侧边栏、发送、停止和消息
 动作控制使用一种缓和变换而不是捕捉比例；
     活动流标签和加载骨架保留其 shimmer/pulse
@@ -3136,8 +3140,12 @@ IPC 请求无法关闭。
   `04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`
 - **验收**：C（聊天流），质量
 - **里程碑**：M5
-- **状态**：单位覆盖（`interaction-performance.test.mjs`）；呈现
-  流媒体场景草稿
+- **状态**：单元覆盖（`interaction-performance.test.mjs`）；通过
+  `pnpm test:e2e:transcript` 自动验证 React/Chromium 渲染回归（无需提供商
+  凭据；需安装 Electron，并有图形会话，Linux 可用 Xvfb）。该测试挂载生产
+  聊天组件，统计 100 个已完成活动组在 20 次文本更新中的 ActivityGroup
+  渲染次数，并检查工具内容变化和跨活动段的 Task 终态及耗时更新。
+  测试不加载样式；完整提供商流式响应与 shell 交互响应性仍为草稿。
 
 #### E2E-084：长工具循环在提供程序上下文限制之前压缩
 
