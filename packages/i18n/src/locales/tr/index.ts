@@ -231,6 +231,9 @@ export const tr = {
     completionMessage: "Tamamlanma raporu",
     agentMessage: "Ajan mesajı",
     openSource: "Kaynak oturumu aç: {{name}}",
+    statusUnknown: "Bilinmiyor",
+    referenceUnavailable: "Oturum kullanılamıyor",
+    sessionMissing: "Bu oturum artık mevcut değil",
   },
   chat: {
     emptyTitle: "Neyi birlikte oluşturalım?",

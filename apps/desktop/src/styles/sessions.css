@@ -707,6 +707,14 @@
   outline-offset: 1px;
 }
 
+/* A reference the host marked gone keeps its identity but is not a link. */
+.sidebar-session-hover-card-session-link-unavailable,
+.sidebar-session-hover-card-session-link-unavailable:hover {
+  background: transparent;
+  color: var(--ds-text-muted);
+  cursor: default;
+}
+
 .sidebar-session-hover-card-session-link-title {
   min-width: 0;
   overflow: hidden;

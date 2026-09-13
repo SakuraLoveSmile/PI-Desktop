@@ -4777,3 +4777,29 @@ D193, and D194.
 - Journal accepted user input with a provisional preceding reply when needed;
   finalize only an indexed streaming assistant in place and retain completed
   message idempotency. See ADR active-turn-steering and E2E-AGENT-alt-enter-steers-active-turn.
+
+## 2026-09-13 — Harden session collaboration navigation and delivery
+
+- Collaboration references now carry `available`. A reference to a session that was
+  deleted or is otherwise gone is reported with `available: false`; the renderer renders
+  it as text instead of a navigation control, and opening a session that no longer exists
+  reports a visible error instead of committing an empty transcript.
+  `session_collaboration_messages.source_session_id` intentionally has no foreign key, so
+  a delivery record survives deletion of its sender and is reported as unavailable.
+- The six `session/collaboration/*` operations are first-party-plugin-only: they require
+  an authenticated plugin tool invocation context, so they are excluded from the
+  MCP-visible catalog while remaining available through `pi.desktop.listOperations` and
+  `pi.desktop.invoke`. This amends the "same reviewed operation catalog" claim of
+  ADR 0203 / D370 and the `desktop.control` row of the plugin permission matrix.
+- Settling a delivery now asserts that the conditional `queued` to `running` claim
+  actually changed a row, so losing that race cannot create a second turn for one
+  delivery, and `spawn` evaluates its worker limits inside the same transaction as the
+  session insert.
+- Electron delivery settlement no longer drops a settlement recorded before a host
+  restart, and a drain that is already running picks up settlements queued during it
+  instead of deferring them to an unrelated trigger. A persisted delivery failure keeps a
+  stable `CODE: message` form.
+- Review fixes for the orchestration refresh path bound the model-catalog lookup work per
+  read instead of relying on cache eviction, and replace E2E boot conditions that could
+  not fail with observations the probe does not itself guarantee.
+- See ADR 0239, ADR 0240, E2E-SESSION-hover-card-model-and-links.

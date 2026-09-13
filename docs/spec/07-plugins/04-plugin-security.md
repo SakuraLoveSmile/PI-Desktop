@@ -326,10 +326,14 @@ manifest did not name:
 
 `desktop.control` hands a plugin the reviewed operation catalog the local MCP
 control plane exposes (ADR 0203 / D370): project, session, Agent, and
-workspace operations, each tagged `read`, `write`, or `dangerous`. The plugin
-sees ids, descriptions, and risk, never Electron channel names or the MCP
-bearer token, and every invocation crosses the same IPC validation, lifecycle
-checks, completion event, and audit entry as an MCP call.
+workspace operations, each tagged `read`, `write`, or `dangerous`. The
+plugin-only exception covers the six `session/collaboration/*` operations: they
+are callable through the plugin gateway but deliberately absent from the
+MCP-visible catalog, because they need an authenticated plugin invocation
+context and no renderer mutation channel exists for them. The plugin sees ids,
+descriptions, and risk, never Electron channel names or the MCP bearer token,
+and every invocation crosses the same IPC validation, lifecycle checks,
+completion event, and audit entry as an MCP call.
 
 A `dangerous` operation is decided by the user, not by the caller. The
 controller's `confirm: true` is only the plugin's acknowledgement (MCP treats

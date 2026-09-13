@@ -222,6 +222,9 @@ export const es = {
     "completionMessage": "Informe de finalización",
     "agentMessage": "Mensaje de agente",
     "openSource": "Abrir sesión de origen: {{name}}",
+    statusUnknown: "Desconocido",
+    referenceUnavailable: "Sesión no disponible",
+    sessionMissing: "Esa sesión ya no existe",
   },
   "chat": {
     "emptyTitle": "¿Qué puedo ayudarte a construir?",

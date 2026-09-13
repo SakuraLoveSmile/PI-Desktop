@@ -224,6 +224,9 @@ export const zhTW = {
     completionMessage: "完成報告",
     agentMessage: "Agent 訊息",
     openSource: "開啟來源對話：{{name}}",
+    statusUnknown: "未知",
+    referenceUnavailable: "對話無法使用",
+    sessionMissing: "該對話已不存在",
   },
   chat: {
     emptyTitle: "今天想做點什麼？",

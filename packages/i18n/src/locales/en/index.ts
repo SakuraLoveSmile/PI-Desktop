@@ -229,6 +229,9 @@ export const en = {
     completionMessage: "Completion report",
     agentMessage: "Agent message",
     openSource: "Open source session: {{name}}",
+    statusUnknown: "Unknown",
+    referenceUnavailable: "Session unavailable",
+    sessionMissing: "That session no longer exists",
   },
   chat: {
     emptyTitle: "What can I help you build?",

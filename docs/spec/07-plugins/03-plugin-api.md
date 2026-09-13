@@ -577,12 +577,17 @@ open an existing durable session. Plugin-originated `session/create` and
 `agent/prompt` calls refresh session state without changing the active
 renderer session; `session/open` is explicit navigation.
 
-This is the first-party plugin gateway to the same reviewed operation catalog
-used by the opt-in local MCP control plane (ADR 0203 / D370). The returned
-catalog omits Electron channel names and the plugin never receives the MCP
-bearer token. Invocation reuses the controller, IPC handler, lifecycle checks,
-completion event, and audit boundary; a plugin cannot reach arbitrary Electron
-IPC.
+This is the first-party plugin gateway to the reviewed operation catalog shared
+with the opt-in local MCP control plane (ADR 0203 / D370). The two catalogs
+differ only for operations marked plugin-only: the six
+`session/collaboration/*` operations are callable through this gateway but are
+deliberately absent from the MCP-visible catalog (`tools/list`,
+`pi_control_describe`, and the `pi_desktop_invoke` enum), because they require
+an authenticated plugin invocation context and no renderer mutation channel
+exists for them. The returned catalog omits Electron channel names and the
+plugin never receives the MCP bearer token. Invocation reuses the controller,
+IPC handler, lifecycle checks, completion event, and audit boundary; a plugin
+cannot reach arbitrary Electron IPC.
 
 A `dangerous` operation (session delete, permission-mode change, tool
 approval) needs two answers. `confirm: true` is the plugin's acknowledgement
