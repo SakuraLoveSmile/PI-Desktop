@@ -10624,12 +10624,12 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
      manually collapsing the sidebar.
   5. Repeat divider changes with `ArrowLeft`, `ArrowRight`, `Home`, and `End`.
 - **Expected**: The native window width never changes. MainChat never measures
-  below 360px — including mid-drag and while `sidebar-out` still occupies flex
-  space. The effective panel maximum is the client width minus the 360px
+  below 450px — including mid-drag and while `sidebar-out` still occupies flex
+  space. The effective panel maximum is the client width minus the 450px
   MainChat floor and the expanded sidebar width, with no fixed pixel cap. When that
   budget is exhausted the expanded sidebar collapses immediately, and the panel
   may keep growing afterwards. A manual reopen spends panel width first;
-  MainChat is preserved where possible and otherwise lands on the 370px reopen
+  MainChat is preserved where possible and otherwise lands on the 460px reopen
   target. Closing the panel restores only a sidebar the layout collapsed. The
   separator's ARIA minimum/maximum follow the same dynamic budget.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
@@ -10656,7 +10656,11 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   window never changes size. The divider is inert while preview mode is on
   (`aria-disabled`). Leaving preview mode restores the previous panel width and
   keeps whatever sidebar state the user chose last. The mode is transient: it is
-  not persisted and ends when the panel closes.
+  not persisted and ends when the panel closes. Preview mode keeps the shell's
+  new-task, sidebar, and system-window actions reachable while MainChat is
+  absent. On non-fullscreen macOS with the sidebar collapsed, the first preview
+  action starts at the 76px traffic-light safe inset; fullscreen releases that
+  inset.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238 §6, issue #289
