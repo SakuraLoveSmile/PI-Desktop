@@ -1,6 +1,6 @@
 # 16. Trusted Extensions
 
-> Status: Implemented v1.1 (D387 / D388, ADR 0214 / ADR 0215); implementation notes are marked "v1 note"
+> Status: Implemented v1.1 (D387 / D388, ADR 0214 / ADR 0215 / ADR 0244); implementation notes are marked "v1 note"
 > Scope: v1.1. v2 and v3 items are listed in §12 and are not committed.
 
 ## 1. Purpose and terminology
@@ -72,10 +72,11 @@ manifest that lists entries without the permission is invalid
 Plugins → "Import pi extension" opens a native picker (main owns the path,
 D344) for an explicit local file or directory. Main copies the selected
 source under `<dataDir>/plugins/imported/<slug>/src/`, writes a generated
-no-op `main.js` and a manifest with id `imported.<slug>`, and registers the
-directory through the existing local-plugin flow. The confirmation before
-the picker remains the trust decision; the generated manifest declares the
-permissions needed by its actual contributions.
+no-op `main.js` and a manifest with id `imported.<slug>` (a unique suffix is
+added for repeated imports), and registers the directory through the existing
+local-plugin flow. The confirmation before the picker remains the trust
+decision; the generated manifest declares the permissions needed by its actual
+contributions.
 
 For extension files and packages without `pi.skills`, entry discovery keeps
 the existing `pi-coding-agent` rules: `package.json` `pi.extensions`, otherwise
@@ -84,15 +85,17 @@ A package that explicitly declares `pi.skills` and has no `pi.extensions` (or
 an empty array) is skill-only: incidental scripts, including `index.js`, are
 copied as resources but never promoted to executable agent extensions.
 
-A directory that ships a `package.json` also has it (plus its lockfile) copied
-to the plugin root with any `workspaces` field stripped; if it declares
-`dependencies`, main installs them into the plugin root before the first load
-with `npm install --omit=dev --legacy-peer-deps --no-audit --no-fund
---ignore-scripts` (bounded time, no third-party install script ever runs,
-kernel packages keep resolving through virtual modules). A failed install is
-reported to the renderer and never blocks the import — the extension then
-reports its own load error. The confirm discloses the npm step alongside the
-skills disclosure.
+A directory that ships a `package.json` also has it (plus its npm lockfile)
+copied to the plugin root with any `workspaces` field stripped. When it declares
+production or optional dependencies, main performs a bounded two-step install:
+it first resolves `npm install --package-lock-only --omit=dev --legacy-peer-deps
+--no-audit --no-fund --ignore-scripts`, validates the complete generated lockfile,
+then runs `npm ci` with the same safety flags. Direct specs in `dependencies`,
+`optionalDependencies`, `devDependencies`, and `peerDependencies` must be
+registry-only because npm may inspect all four; the git resolver is disabled.
+No lifecycle script runs. Failed installs remove partial dependencies/cache and
+are reported to the renderer without blocking the import. The confirm discloses
+the npm step alongside the skills disclosure.
 
 | Source | Becomes |
 |---|---|
@@ -120,19 +123,25 @@ Copying uses paths relative to the selected package. A package installed
 under an ancestor `node_modules` directory is copied normally; only its own
 `node_modules` directory segments are excluded. References, assets, helper
 scripts, and other ordinary source files remain under `src/`, preserving
-skill-relative resource paths. The selected root is resolved to its real
-path. Contribution paths must stay inside that root, cannot traverse `..`,
-and cannot point into its dependency directories. Absolute `pi.skills`
-paths and descendant symbolic links are rejected. Copying also rejects
-symbolic links among retained resources and removes a partial copy on
-failure. The generated destination must not be inside the selected source.
+skill-relative resource paths. Credential files (`.env*`, `.npmrc`, `.netrc`,
+`.pypirc`, private-key and certificate files) and repository metadata directories
+are not copied. The selected root is resolved to its real path. Contribution
+paths must stay inside that root, cannot traverse `..`, and cannot point into
+its dependency directories. Absolute `pi.skills` paths and descendant symbolic
+links are rejected. Copying also rejects symbolic links among retained resources
+and removes a partial copy on failure. The generated destination is created
+atomically and must not be inside the selected source.
 
 This is an explicit local import, not a pi CLI package manager. It never
 automatically scans or imports `~/.pi`, does not read the CLI's installed
 package registry, and does not run npm lifecycle scripts. When dependencies
 are declared, the bounded installer accepts only registry version specs and
-registry-resolved npm lockfiles; importing a package does not promise that
-every third-party extension dependency can execute.
+registry-resolved npm lockfiles, rejects unsafe package locations and nested
+dependency specs, disables git resolution, and isolates npm's config/cache from
+the user's credentials and proxy settings. Importing a package does not promise
+that every third-party extension dependency can execute.
+
+## 4. Loading and runtime
 
 ## 4. Loading and runtime
 

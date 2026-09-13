@@ -10440,7 +10440,8 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   `agent.prompt.inject`, and Host reports the `skills` capability while
   retaining both skill documents. Invalid declarations fail without importing
   outside data or retaining a partial copied plugin. Nothing automatically
-  imports `~/.pi` or runs npm/package lifecycle scripts.
+  imports `~/.pi` or runs npm lifecycle scripts; the explicit dependency path
+  may run the bounded npm installer described in E2E-PLUGIN-import-extension-installs-dependencies.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2;
   `07-plugins/02-plugin-manifest-schema.md`; D007
 - **Acceptance**: E (tools & permissions), G (plugins), Quality
@@ -10546,12 +10547,14 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   Inspect `plugins/imported/<slug>/`. 3) Send a prompt that exercises the
   extension.
 - **Expected**: The plugin root holds the copied `package.json` with any
-  `workspaces` field stripped and a `node_modules` directory created by
-  `npm install --omit=dev --legacy-peer-deps --no-audit --no-fund
-  --ignore-scripts` (no install script ran); the extension row reaches
-  `loaded` with its tools, commands, and hooks registered, and they take
-  effect in the turn.
-- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §10.2
+  `workspaces` field stripped. Dependency resolution first runs
+  `npm install --package-lock-only --omit=dev --legacy-peer-deps --no-audit
+  --no-fund --ignore-scripts`, validates registry-only sources, and then
+  creates `node_modules` with `npm ci --omit=dev --legacy-peer-deps --no-audit
+  --no-fund --ignore-scripts` (no install script ran); the extension row reaches
+  `loaded` with its tools, commands, and hooks registered, and they take effect
+  in the turn.
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §10.2; ADR 0244
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
@@ -10570,7 +10573,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   tail; the plugin still registers; the row reports the extension `error`
   state with a `load_error` diagnostic; the session and all other extensions
   keep working.
-- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §4.4, §10.2
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §4.4, §10.2; ADR 0244
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`

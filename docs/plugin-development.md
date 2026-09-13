@@ -39,6 +39,7 @@ For the recommended app-first path, you need:
 - a running PI-Desktop build;
 - an empty folder for the plugin; and
 - a text editor.
+- To import a pi extension directory with npm dependencies, a system `npm` executable must be on `PATH`. Release builds ship no standalone Node/npm; without it, PI-Desktop reports a warning and the imported dependency cannot load.
 
 For the repository CLI path, you also need Node.js 22.19 or newer, pnpm 10 or
 newer, and a checkout of this repository. The devkit and SDK are currently
@@ -725,15 +726,17 @@ What to know before you use it:
   details, never thrown.
 - **Existing pi extensions** need no changes: Plugins → overflow menu →
   "Import pi extension" wraps a file or directory in a generated plugin. If
-  the directory ships a `package.json` with `dependencies`, they are
-  installed into the plugin root before the first load
-  (`npm install --omit=dev --legacy-peer-deps --no-audit --no-fund
-  --ignore-scripts`): no third-party install script ever runs, so a native
-  module that needs one fails to load with a diagnostic — rebuild it against
-  Electron headers (`npx @electron/rebuild -v <electron version>`) inside
-  the plugin directory to fix it. A failed install never blocks the import;
-  you get a warning toast with the npm error and the row shows the load
-  error.
+  the directory declares production or optional dependencies, PI-Desktop first
+  runs `npm install --package-lock-only --omit=dev --legacy-peer-deps --no-audit
+  --no-fund --ignore-scripts`, validates the generated registry-only lockfile,
+  then runs `npm ci` with the same safety flags. Direct dependency specs are
+  checked across production, optional, dev, and peer fields; git resolution is
+  disabled, and no third-party lifecycle script runs. A native module that
+  needs a build script fails with a diagnostic — rebuild it against Electron
+  headers (`npx @electron/rebuild -v <electron version>`) inside the plugin
+  directory to fix it. Failed installs clean partial dependencies and report a
+  warning toast without blocking the import; the row shows a load error only if
+  the extension actually fails to load.
 
 ## 7. Permission design
 
