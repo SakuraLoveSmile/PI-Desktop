@@ -80,6 +80,7 @@ import {
   MAX_SUBAGENT_CONCURRENCY,
   normalizeSubagentName,
   proposalKindForMode,
+  resolveSubagentToolNames,
   subagentModelKey,
   type ProposalKind,
   type SubagentPermission,
@@ -2814,7 +2815,11 @@ Delegation rules:
    * talk to, and its report format is set by `composeSubagentSystemPrompt`.
    */
   private subagentGuidance(definition: SubagentDefinition): string[] {
-    const tools = new Set(definition.tools);
+    const tools = new Set(
+      definition.inheritTools
+        ? resolveSubagentToolNames(definition, [...this.toolCatalog.keys()])
+        : definition.tools,
+    );
     const blocks: string[] = [];
     if (tools.has("Read") || tools.has("Grep") || tools.has("Glob")) {
       blocks.push(
@@ -2975,7 +2980,13 @@ Delegation rules:
             );
           }
         }
-        const tools = definition.tools
+        const declaredToolNames = definition.inheritTools
+          ? resolveSubagentToolNames(
+              definition,
+              [...this.toolCatalog.keys()],
+            )
+          : definition.tools;
+        const tools = declaredToolNames
           .map((name) => this.toolCatalog.get(name))
           .filter((tool): tool is AgentTool => tool !== undefined);
         if (tools.length === 0) {

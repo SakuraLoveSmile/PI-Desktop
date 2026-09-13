@@ -5,9 +5,12 @@ import {
   DEFAULT_SUBAGENT_TOOLS,
   MAX_SUBAGENT_DEFINITIONS,
   MAX_SUBAGENT_MAX_TURNS,
+  SUBAGENT_ASSIGNABLE_TOOLS,
+  SUBAGENT_INHERIT_DENY_TOOLS,
   mergeSubagentDefinitions,
   normalizeSubagentName,
   parseSubagentDefinition,
+  resolveSubagentToolNames,
   subagentCanMutate,
   subagentPinnedProviders,
   type SubagentDefinition,
@@ -389,6 +392,100 @@ Review it.`,
   it("fails a document with no frontmatter at all", () => {
     const result = parse("Just some prose.");
     expect(result.ok).toBe(false);
+  });
+
+  it("parses tools: inherit as an opt-in parent-tool union", () => {
+    const result = parse(`---
+description: Works with the parent toolset.
+tools: inherit
+---
+Do the job.`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.definition.inheritTools).toBe(true);
+    expect(result.definition.tools).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("parses tools: inherit with assignable extras", () => {
+    const result = parse(`---
+description: Writes with the parent toolset plus Bash.
+tools: [inherit, Bash]
+---
+Do the job.`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.definition.inheritTools).toBe(true);
+    expect(result.definition.tools).toEqual(["Bash"]);
+  });
+
+  it("does not treat inherit as a bare unknown tool", () => {
+    const result = parse(`---
+description: Only inherit.
+tools: inherit, Grep
+---
+Do the job.`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.warnings).toEqual([]);
+    expect(result.definition.inheritTools).toBe(true);
+    expect(result.definition.tools).toEqual(["Grep"]);
+  });
+});
+
+describe("resolveSubagentToolNames", () => {
+  const parent = [
+    "Read",
+    "Glob",
+    "Grep",
+    "Bash",
+    "Skill",
+    "ToolSearch",
+    "Task",
+    "TaskWait",
+    "asktool",
+    "EnterPlanMode",
+    "mcp-foo",
+  ];
+
+  it("returns only the declared list when inherit is off", () => {
+    expect(
+      resolveSubagentToolNames({ tools: ["Read", "Bash"] }, parent),
+    ).toEqual(["Read", "Bash"]);
+  });
+
+  it("unions parent tools minus the deny list", () => {
+    const resolved = resolveSubagentToolNames(
+      { tools: [], inheritTools: true },
+      parent,
+    );
+    expect(resolved).toContain("Read");
+    expect(resolved).toContain("Skill");
+    expect(resolved).toContain("ToolSearch");
+    expect(resolved).toContain("mcp-foo");
+    for (const denied of SUBAGENT_INHERIT_DENY_TOOLS) {
+      expect(resolved).not.toContain(denied);
+    }
+  });
+
+  it("keeps declared extras and does not duplicate parent names", () => {
+    const resolved = resolveSubagentToolNames(
+      { tools: ["Edit", "Read"], inheritTools: true },
+      parent,
+    );
+    expect(resolved).toContain("Edit");
+    expect(resolved).toContain("Read");
+    expect(resolved.filter((n) => n === "Read")).toHaveLength(1);
+  });
+
+  it("does not hand a delegate nested Task tools", () => {
+    const resolved = resolveSubagentToolNames(
+      { tools: [...SUBAGENT_ASSIGNABLE_TOOLS], inheritTools: true },
+      ["Task", "TaskList", "Read"],
+    );
+    expect(resolved).toEqual([...SUBAGENT_ASSIGNABLE_TOOLS, "Read"].filter(
+      (name, index, all) => all.indexOf(name) === index,
+    ));
   });
 });
 

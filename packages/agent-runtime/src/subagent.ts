@@ -153,7 +153,11 @@ export function composeSubagentSystemPrompt(options: {
   guidance?: string[];
 }): string {
   const { definition } = options;
-  const toolList = definition.tools.join(", ") || "none";
+  const toolList = definition.inheritTools
+    ? definition.tools.length > 0
+      ? `inherit + ${definition.tools.join(", ")}`
+      : "inherit (parent tools)"
+    : definition.tools.join(", ") || "none";
   const framing = [
     `You are the "${definition.name}" subagent inside PI-Desktop, working on one task delegated by the main agent.`,
     `You cannot see the user, ask questions, or delegate further. Finish the task with the tools you have: ${toolList}.`,
