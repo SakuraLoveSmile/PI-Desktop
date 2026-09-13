@@ -528,6 +528,10 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Transcript reconciliation keeps completed history in a memoized history boundary;
   token updates do not reconcile each historical row in React while preserving
   the full history for selection, copying, minimap anchors, and accessibility.
+- Within the active assistant turn, unchanged activity groups without Task
+  delegations also keep their memoized boundary across text updates. Changed
+  tool messages still render, and Task groups still receive later lifecycle
+  status and completion timing updates from the same turn.
 - An unfinished `mermaid` fence remains a source code block. After its closing
   fence arrives, answer prose loads and renders the diagram only when it
   approaches the viewport; thinking disclosures always retain Mermaid source.
