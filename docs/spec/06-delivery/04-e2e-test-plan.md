@@ -10711,3 +10711,14 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Status**: Draft. Existing regression suites cover surrounding behavior;
   the rendered steering journey has not been run
   (do not run E2E locally unless explicitly requested).
+  `pnpm test:e2e:layout` — fixed-window width invariance, the 360px floor across
+  a pointer drag, sidebar yield/restore, and the 370px reopen target); unit
+  coverage in `work-panel-resize.test.mjs`
+
+### Skill market scenarios (`pnpm test:e2e:skill-market`, headless protocol-level)
+
+| ID | Scenario | Verification |
+|---|---|---|
+| E2E-SKILL-MARKET-NET-BOUNDARY | URL guard rejects loopback, private, v4-mapped, ULA and link-local bypass forms and accepts the public CDN | deterministic guard assertions |
+| E2E-SKILL-MARKET-EXPANSION | Adjacent skill resources inline into the document body as fenced appendices | deterministic expansion assertions |
+| E2E-SKILL-MARKET-INSTALL | Builtin entry document → `skills.create` → record and rendered frontmatter land in `~/.agents/skills/` | real host binary, isolated temp HOME |

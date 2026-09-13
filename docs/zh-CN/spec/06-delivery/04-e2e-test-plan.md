@@ -6760,3 +6760,10 @@ IPC 请求无法关闭。
 - **里程碑**：M5
 - **状态**：草稿。现有回归套件覆盖周边行为，尚未运行渲染界面的 steering 完整流程
   （除非明确要求，不本地运行 E2E）。
+### 技能市场场景(`pnpm test:e2e:skill-market`,协议级无头)
+
+| ID | 场景 | 验证 |
+|---|---|---|
+| E2E-SKILL-MARKET-NET-BOUNDARY | URL guard 拒绝回环、私网、v4-mapped、ULA、link-local 绕过形态,放行公共 CDN | 确定性 guard 断言 |
+| E2E-SKILL-MARKET-EXPANSION | 技能相邻资源以内联附录形式展开进文档正文 | 确定性展开断言 |
+| E2E-SKILL-MARKET-INSTALL | 内置条目文档 → `skills.create` → 记录与渲染出的 frontmatter 落盘 `~/.agents/skills/` | 真实宿主二进制,隔离临时 HOME |
