@@ -72,6 +72,13 @@ agent 循环上注册工具、命令和事件处理器。`ExtensionAPI` 契约�
 的包视为仅技能包：包括 `index.js` 在内的附带脚本作为资源复制，不会被提升为可执行的
 Agent 扩展。
 
+目录若自带 `package.json`，会（连同其 lockfile）一并复制到插件根并剥离 `workspaces` 字段；
+若声明了 `dependencies`，main 会在首次加载前把依赖安装到插件根，命令为
+`npm install --omit=dev --legacy-peer-deps --no-audit --no-fund --ignore-scripts`
+（限时执行、绝不运行第三方安装脚本、内核包继续经 virtual modules 解析）。安装失败会上报
+渲染层且绝不阻塞导入——扩展随后上报自身的 load error。确认对话框会与技能披露一并说明
+npm 安装步骤。
+
 | 来源 | 结果 |
 |---|---|
 | 一个 pi 扩展目录或文件 | `plugins/imported` 下的本地插件，id 为 `imported.<slug>` |
@@ -97,8 +104,8 @@ Agent 扩展。
 会清理部分生成的目录。生成目标不能位于所选源目录内。
 
 这是显式本地导入，不是 pi CLI 包管理器：不会自动扫描或导入 `~/.pi`，不会读取 CLI
-已安装包注册表，也不会执行 npm 安装或包生命周期脚本。完整 CLI 包语义及依赖安装、
-解析仍属独立工作（包括 PR #277）；导入包不代表其所有第三方扩展依赖都能执行。
+已安装包注册表，也不会执行 npm 生命周期脚本。声明依赖时，有界安装器只接受 registry
+版本说明和 registry 来源的 npm lockfile；导入包不代表其所有第三方扩展依赖都能执行。
 
 ## 4. 加载与运行时
 

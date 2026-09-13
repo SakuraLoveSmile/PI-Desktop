@@ -84,6 +84,16 @@ A package that explicitly declares `pi.skills` and has no `pi.extensions` (or
 an empty array) is skill-only: incidental scripts, including `index.js`, are
 copied as resources but never promoted to executable agent extensions.
 
+A directory that ships a `package.json` also has it (plus its lockfile) copied
+to the plugin root with any `workspaces` field stripped; if it declares
+`dependencies`, main installs them into the plugin root before the first load
+with `npm install --omit=dev --legacy-peer-deps --no-audit --no-fund
+--ignore-scripts` (bounded time, no third-party install script ever runs,
+kernel packages keep resolving through virtual modules). A failed install is
+reported to the renderer and never blocks the import — the extension then
+reports its own load error. The confirm discloses the npm step alongside the
+skills disclosure.
+
 | Source | Becomes |
 |---|---|
 | A pi extension directory or file | A local plugin under `plugins/imported`, id `imported.<slug>` |
@@ -119,10 +129,10 @@ failure. The generated destination must not be inside the selected source.
 
 This is an explicit local import, not a pi CLI package manager. It never
 automatically scans or imports `~/.pi`, does not read the CLI's installed
-package registry, and does not run npm installation or package lifecycle
-scripts. Full CLI package semantics and dependency installation/resolution
-remain separate work (including PR #277); importing a package does not
-promise that every third-party extension dependency can execute.
+package registry, and does not run npm lifecycle scripts. When dependencies
+are declared, the bounded installer accepts only registry version specs and
+registry-resolved npm lockfiles; importing a package does not promise that
+every third-party extension dependency can execute.
 
 ## 4. Loading and runtime
 

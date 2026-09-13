@@ -8,9 +8,11 @@
  * the modal prompts between the sidecar and the renderer. Discovery and
  * enablement are the plugin system's job; nothing here touches the filesystem.
  */
+import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
 import { assertImportedPackagePath, discoverImportedPackageSkills } from "./imported-package-skills";
 import { discoverManualPath } from "@pi-desktop/agent-runtime";
 import {
@@ -237,6 +239,248 @@ export class AgentExtensionBridge {
   }
 }
 
+export type ExtensionDependencyInstallResult =
+  | { state: "skipped"; reason: "no-package-json" | "no-dependencies" }
+  | { state: "installed" }
+  | { state: "failed"; error: string };
+
+/** Injectable so tests never run npm. Resolves with the exit code and captured stderr. */
+export type DependencyCommandRunner = (
+  command: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+) => Promise<{ code: number; stderr: string }>;
+
+const NPM_INSTALL_TIMEOUT_MS = 120_000;
+/** npm output is not toast-shaped; the tail carries the actual failure. */
+const DEPENDENCY_ERROR_TAIL_CHARS = 200;
+/** Rolling cap so a chatty npm cannot balloon the main process's memory. */
+const DEPENDENCY_STDERR_KEEP_CHARS = 8192;
+
+function dependencyErrorTail(text: string): string {
+  return text.length > DEPENDENCY_ERROR_TAIL_CHARS
+    ? `…${text.slice(-DEPENDENCY_ERROR_TAIL_CHARS)}`
+    : text;
+}
+
+const PUBLIC_NPM_REGISTRY = "https://registry.npmjs.org/";
+
+function isRegistryDependencySpec(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const spec = value.trim();
+  // Registry versions and ranges contain no URL/path separators or scheme
+  // delimiter. This also rejects npm aliases and workspace/local specs.
+  return spec.length > 0 && !/[\\/:]/.test(spec);
+}
+
+function dependencyMapError(field: string, value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return `${field} must be a JSON object`;
+  }
+  for (const [name, spec] of Object.entries(value as Record<string, unknown>)) {
+    if (!isRegistryDependencySpec(spec)) {
+      return `dependency ${name} in ${field} uses a non-registry spec (${String(spec)}); only registry versions are installable`;
+    }
+  }
+  return undefined;
+}
+
+function overrideSpecError(value: unknown, path = "overrides"): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "string") {
+    // npm's $name references reuse a dependency spec already declared above.
+    if (value.startsWith("$")) return undefined;
+    if (!isRegistryDependencySpec(value)) {
+      return `override ${path} uses a non-registry spec (${value}); only registry versions are installable`;
+    }
+    return undefined;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return `override ${path} must be a JSON object or registry version`;
+  }
+  for (const [name, nested] of Object.entries(value as Record<string, unknown>)) {
+    const error = overrideSpecError(nested, `${path}.${name}`);
+    if (error) return error;
+  }
+  return undefined;
+}
+
+function lockfileHasUnsafeSource(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(lockfileHasUnsafeSource);
+  if (!value || typeof value !== "object") return false;
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if (key === "resolved") {
+      if (
+        typeof nested !== "string" ||
+        (nested.length > 0 && !nested.startsWith(PUBLIC_NPM_REGISTRY))
+      ) {
+        return true;
+      }
+    }
+    if (key === "link" && nested === true) return true;
+    if ((key === "version" || key === "from") && typeof nested === "string" && nested.length > 0) {
+      if (!isRegistryDependencySpec(nested)) return true;
+    }
+    if (lockfileHasUnsafeSource(nested)) return true;
+  }
+  return false;
+}
+
+export function defaultDependencyRunner(
+  command: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<{ code: number; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    // Shell only where npm is a .cmd shim (Windows); every arg is a literal.
+    // A shell kill on Windows terminates the shim, possibly leaving npm
+    // itself running — accepted for v1, the timeout result still resolves.
+    // Explicit minimal environment: npm must not see npm auth tokens,
+    // proxy/SSH configuration or anything else from the desktop process.
+    const isolatedUserConfig = join(tmpdir(), `.pi-desktop-npm-user-${randomUUID()}.npmrc`);
+    const isolatedGlobalConfig = join(tmpdir(), `.pi-desktop-npm-global-${randomUUID()}.npmrc`);
+    const child = spawn(command, args, {
+      cwd,
+      shell: process.platform === "win32",
+      windowsHide: true,
+      stdio: ["ignore", "ignore", "pipe"],
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: process.env.HOME ?? process.env.USERPROFILE ?? "",
+        TMPDIR: process.env.TMPDIR ?? process.env.TEMP ?? "",
+        LANG: process.env.LANG ?? "en_US.UTF-8",
+        npm_config_userconfig: isolatedUserConfig,
+        npm_config_globalconfig: isolatedGlobalConfig,
+        npm_config_registry: PUBLIC_NPM_REGISTRY,
+        npm_config_proxy: "",
+        npm_config_https_proxy: "",
+        npm_config_noproxy: "*",
+        npm_config_ignore_scripts: "true",
+        npm_config_audit: "false",
+        npm_config_fund: "false",
+        npm_config_update_notifier: "false",
+      },
+    });
+    let stderr = "";
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+      if (stderr.length > DEPENDENCY_STDERR_KEEP_CHARS * 2) {
+        stderr = stderr.slice(-DEPENDENCY_STDERR_KEEP_CHARS);
+      }
+    });
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const timer = setTimeout(() => {
+      stderr += `\nnpm install exceeded ${timeoutMs}ms and was terminated`;
+      child.kill("SIGTERM");
+      killTimer = setTimeout(() => child.kill("SIGKILL"), 5_000);
+    }, timeoutMs);
+    const settle = (fn: () => void) => {
+      clearTimeout(timer);
+      if (killTimer) clearTimeout(killTimer);
+      fn();
+    };
+    child.on("error", (err) => {
+      settle(() => reject(err));
+    });
+    child.on("close", (code) => {
+      settle(() => resolve({ code: code ?? 1, stderr }));
+    });
+  });
+}
+
+/**
+ * Install an imported extension's npm dependencies inside the generated plugin
+ * directory (spec 07-plugins/16 §3): the sidecar's jiti resolves bare imports
+ * from the plugin root's `node_modules`, and the kernel packages (`pi-ai`,
+ * `pi-coding-agent`, `pi-tui`) keep winning through virtual modules, so
+ * installing them is harmless. `--legacy-peer-deps` keeps `pi-coding-agent`
+ * peers out of the tree; `--ignore-scripts` means no third-party install
+ * script ever runs here — a native module that needs one fails to load with a
+ * diagnostic instead (documented workaround: rebuild against Electron
+ * headers). A failure never blocks the import; the extension reports its own
+ * load error and the renderer surfaces this result.
+ */
+export async function installExtensionDependencies(
+  pluginDir: string,
+  options?: { runner?: DependencyCommandRunner; timeoutMs?: number },
+): Promise<ExtensionDependencyInstallResult> {
+  const packageJsonPath = join(pluginDir, "package.json");
+  if (!existsSync(packageJsonPath)) {
+    return { state: "skipped", reason: "no-package-json" };
+  }
+  let manifest: {
+    dependencies?: unknown;
+    optionalDependencies?: unknown;
+    overrides?: unknown;
+  };
+  try {
+    manifest = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+  } catch (err) {
+    return {
+      state: "failed",
+      error: `package.json is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  // JSON.parse("null") succeeds; reading .dependencies below would then throw
+  // outside this guard and block the whole import.
+  if (manifest === null || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { state: "failed", error: "package.json is not a JSON object" };
+  }
+  for (const field of ["dependencies", "optionalDependencies"] as const) {
+    const error = dependencyMapError(field, manifest[field]);
+    if (error) return { state: "failed", error };
+  }
+  const overrideError = overrideSpecError(manifest.overrides);
+  if (overrideError) return { state: "failed", error: overrideError };
+  const hasDependencies = [manifest.dependencies, manifest.optionalDependencies].some(
+    (value) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0,
+  );
+  if (!hasDependencies) {
+    return { state: "skipped", reason: "no-dependencies" };
+  }
+  // A copied lockfile pins resolved URLs; keep it only when every entry
+  // resolves from the public registry, otherwise drop it so npm resolves
+  // from package.json against the default registry.
+  const lockfileCandidates = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml"];
+  for (const name of lockfileCandidates) {
+    const lockPath = join(pluginDir, name);
+    if (!existsSync(lockPath)) continue;
+    if (name === "package-lock.json" || name === "npm-shrinkwrap.json") {
+      try {
+        const lock = JSON.parse(readFileSync(lockPath, "utf8")) as unknown;
+        if (lockfileHasUnsafeSource(lock)) rmSync(lockPath);
+      } catch {
+        rmSync(lockPath);
+      }
+    } else {
+      rmSync(lockPath);
+    }
+  }
+  try {
+    const result = await (options?.runner ?? defaultDependencyRunner)(
+      "npm",
+      ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund", "--ignore-scripts"],
+      pluginDir,
+      options?.timeoutMs ?? NPM_INSTALL_TIMEOUT_MS,
+    );
+    if (result.code !== 0) {
+      return {
+        state: "failed",
+        error: dependencyErrorTail(`npm install exited ${result.code}: ${result.stderr.trim()}`),
+      };
+    }
+    return { state: "installed" };
+  } catch (err) {
+    return {
+      state: "failed",
+      error: dependencyErrorTail(err instanceof Error ? err.message : String(err)),
+    };
+  }
+}
+
 const PLUGIN_ID_PREFIX = "imported.";
 
 function slugFor(path: string): string {
@@ -250,7 +494,10 @@ function slugFor(path: string): string {
 /**
  * Build a plugin directory from a pi extension file or directory (spec §3):
  * copies the source under `src/`, writes a manifest that declares the entry
- * files as `contributes.agentExtensions`, and a no-op `main.js`.
+ * files as `contributes.agentExtensions`, and a no-op `main.js`. A directory
+ * that ships a `package.json` also gets it (plus its lockfile) at the plugin
+ * root so {@link installExtensionDependencies} can resolve its dependencies
+ * there; `node_modules` itself is never copied — it is reinstalled.
  */
 export function generateImportedExtensionPlugin(
   source: string,
@@ -330,5 +577,27 @@ export function generateImportedExtensionPlugin(
     "// Generated by PI-Desktop: declarative skills and/or agent extensions.\nmodule.exports = {};\n",
     "utf8",
   );
+  if (isDirectory) {
+    const rootPackageJson = join(resolved, "package.json");
+    if (existsSync(rootPackageJson)) {
+      // A `workspaces` field would send npm into the copied sources under
+      // src/; strip it so the install sees only the declared dependencies.
+      try {
+        const pkg = JSON.parse(readFileSync(rootPackageJson, "utf8")) as Record<string, unknown>;
+        if (pkg && typeof pkg === "object" && "workspaces" in pkg) {
+          delete pkg.workspaces;
+          writeFileSync(join(dir, "package.json"), JSON.stringify(pkg, null, 2) + "\n", "utf8");
+        } else {
+          copyFileSync(rootPackageJson, join(dir, "package.json"));
+        }
+      } catch {
+        // Not valid JSON: copy verbatim; the install step reports the failure.
+        copyFileSync(rootPackageJson, join(dir, "package.json"));
+      }
+      for (const file of ["package-lock.json", "npm-shrinkwrap.json"]) {
+        if (existsSync(join(resolved, file))) copyFileSync(join(resolved, file), join(dir, file));
+      }
+    }
+  }
   return { path: dir, id, entries };
 }

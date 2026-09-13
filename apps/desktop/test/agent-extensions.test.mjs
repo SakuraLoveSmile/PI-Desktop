@@ -9,6 +9,7 @@ register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const {
   AgentExtensionBridge,
   generateImportedExtensionPlugin,
+  installExtensionDependencies,
 } = await import("../electron/main/agent-extensions.ts");
 
 function bridge(overrides = {}) {
@@ -26,6 +27,89 @@ function bridge(overrides = {}) {
   });
   return { b, events };
 }
+
+test("installing a package.json whose JSON body is null or an array fails without throwing", async () => {
+  for (const body of ["null", "[]"]) {
+    const root = mkdtempSync(join(tmpdir(), "ext-deps-null-"));
+    writeFileSync(join(root, "package.json"), body);
+    const result = await installExtensionDependencies(root, { runner: async () => ({ code: 0, stderr: "" }) });
+    assert.equal(result.state, "failed");
+    assert.match(String(result.error), /not a JSON object/);
+  }
+});
+
+test("non-registry dependency specs are rejected before npm runs", async () => {
+  let npmRan = false;
+  const root = mkdtempSync(join(tmpdir(), "ext-deps-git-"));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { evil: "github:a/b" } }));
+  const result = await installExtensionDependencies(root, {
+    runner: async () => {
+      npmRan = true;
+      return { code: 0, stderr: "" };
+    },
+  });
+  assert.equal(result.state, "failed");
+  assert.match(String(result.error), /non-registry spec/);
+  assert.equal(npmRan, false);
+});
+
+test("optional dependencies and overrides cannot escape the registry before npm runs", async () => {
+  const cases = [
+    {
+      dependencies: { "left-pad": "^1.3.0" },
+      optionalDependencies: { evil: "git+ssh://git@evil.example/evil.git" },
+    },
+    {
+      dependencies: { "left-pad": "^1.3.0" },
+      overrides: { "left-pad": "https://evil.example/left-pad.tgz" },
+    },
+  ];
+  for (const packageJson of cases) {
+    const root = mkdtempSync(join(tmpdir(), "ext-deps-source-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify(packageJson));
+    let npmRan = false;
+    const result = await installExtensionDependencies(root, {
+      runner: async () => {
+        npmRan = true;
+        return { code: 0, stderr: "" };
+      },
+    });
+    assert.equal(result.state, "failed");
+    assert.match(String(result.error), /non-registry spec/);
+    assert.equal(npmRan, false);
+  }
+});
+
+test("a lockfile with non-registry resolved urls is dropped before install", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ext-deps-lock-"));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }));
+  writeFileSync(
+    join(root, "package-lock.json"),
+    JSON.stringify({ packages: { "node_modules/evil": { resolved: "https://evil.example/x.tgz" } } }),
+  );
+  const result = await installExtensionDependencies(root, { runner: async () => ({ code: 0, stderr: "" }) });
+  assert.equal(result.state, "installed");
+  assert.equal(existsSync(join(root, "package-lock.json")), false);
+});
+test("a legacy package-lock dependency tree with a non-registry source is dropped", async () => {
+  const root = mkdtempSync(join(tmpdir(), "ext-deps-legacy-lock-"));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ dependencies: { "left-pad": "^1.3.0" } }));
+  writeFileSync(
+    join(root, "package-lock.json"),
+    JSON.stringify({
+      name: "x",
+      lockfileVersion: 1,
+      dependencies: {
+        evil: { version: "1.0.0", resolved: "https://evil.example/evil.tgz" },
+      },
+    }),
+  );
+  const result = await installExtensionDependencies(root, {
+    runner: async () => ({ code: 0, stderr: "" }),
+  });
+  assert.deepEqual(result, { state: "installed" });
+  assert.equal(existsSync(join(root, "package-lock.json")), false);
+});
 
 test("session publications drive the plugin's agent-extension status and the command list", () => {
   const { b, events } = bridge();
@@ -118,4 +202,147 @@ test("importing a pi extension directory or file generates a plugin holding agen
 
   writeFileSync(join(root, "notes.md"), "# no");
   assert.throws(() => generateImportedExtensionPlugin(join(root, "notes.md"), importRoot), /no extension entry/);
+});
+
+test("importing a directory keeps its package.json at the plugin root and never copies node_modules", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-ax-pkg-"));
+  const extDir = join(root, "memory-ext");
+  mkdirSync(join(extDir, "node_modules", "some-dep"), { recursive: true });
+  writeFileSync(join(extDir, "node_modules", "some-dep", "index.js"), "module.exports = {};");
+  writeFileSync(join(extDir, "index.ts"), "export default function () {}\n");
+  writeFileSync(
+    join(extDir, "package.json"),
+    JSON.stringify({ name: "memory-ext", dependencies: { "some-dep": "^1.0.0" }, pi: { extensions: ["index.ts"] } }),
+  );
+  writeFileSync(join(extDir, "package-lock.json"), "{}");
+
+  const generated = generateImportedExtensionPlugin(extDir, join(root, "imported"));
+  assert.equal(readFileSync(join(generated.path, "package.json"), "utf8"), readFileSync(join(extDir, "package.json"), "utf8"), "package.json lands at the plugin root for dependency install");
+  assert.ok(existsSync(join(generated.path, "package-lock.json")));
+  assert.ok(!existsSync(join(generated.path, "src", "node_modules")), "node_modules is reinstalled, never copied");
+
+  const file = join(root, "solo.ts");
+  writeFileSync(file, "export default function () {}\n");
+  const single = generateImportedExtensionPlugin(file, join(root, "imported"));
+  assert.ok(!existsSync(join(single.path, "package.json")), "a lone file has nothing to install from");
+});
+
+test("importing strips workspaces from the copied package.json so npm never enters src/", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-ax-ws-"));
+  const extDir = join(root, "monorepo-ext");
+  mkdirSync(extDir, { recursive: true });
+  writeFileSync(join(extDir, "index.ts"), "export default function () {}\n");
+  writeFileSync(
+    join(extDir, "package.json"),
+    JSON.stringify({ name: "monorepo-ext", workspaces: ["packages/*"], dependencies: { "some-dep": "^1" } }),
+  );
+
+  const generated = generateImportedExtensionPlugin(extDir, join(root, "imported"));
+  const pkg = JSON.parse(readFileSync(join(generated.path, "package.json"), "utf8"));
+  assert.ok(!("workspaces" in pkg), "workspaces is stripped from the plugin root copy");
+  assert.deepEqual(pkg.dependencies, { "some-dep": "^1" });
+
+  const plainDir = join(root, "plain-ext");
+  mkdirSync(plainDir, { recursive: true });
+  writeFileSync(join(plainDir, "index.ts"), "export default function () {}\n");
+  writeFileSync(join(plainDir, "package.json"), JSON.stringify({ name: "plain-ext", dependencies: {} }));
+  const plain = generateImportedExtensionPlugin(plainDir, join(root, "imported"));
+  assert.deepEqual(JSON.parse(readFileSync(join(plain.path, "package.json"), "utf8")), {
+    name: "plain-ext",
+    dependencies: {},
+  }, "a package.json without workspaces is copied verbatim");
+});
+
+test("default runner caps captured stderr and escalates the timeout kill", async () => {
+  const { defaultDependencyRunner } = await import("../electron/main/agent-extensions.ts");
+
+  const flooded = await defaultDependencyRunner(
+    process.execPath,
+    ["-e", "process.stderr.write('x'.repeat(40000)); process.exit(0)"],
+    process.cwd(),
+    30_000,
+  );
+  assert.equal(flooded.code, 0);
+  // Invariant of the rolling cap: after every chunk the buffer is at most
+  // 2× the keep size, regardless of how the pipe chunks the writes.
+  assert.ok(flooded.stderr.length <= 16384, "stderr is capped to a bounded tail");
+
+  const stalled = await defaultDependencyRunner(
+    process.execPath,
+    ["-e", "setTimeout(() => {}, 60000)"],
+    process.cwd(),
+    300,
+  );
+  assert.notEqual(stalled.code, 0, "a stalled install is killed");
+  assert.match(stalled.stderr, /exceeded 300ms and was terminated/);
+});
+test("the default dependency runner isolates npm config sources and proxies", async () => {
+  const { defaultDependencyRunner } = await import("../electron/main/agent-extensions.ts");
+  const result = await defaultDependencyRunner(
+    process.execPath,
+    ["-e", "process.stderr.write(JSON.stringify(process.env))"],
+    process.cwd(),
+    30_000,
+  );
+  assert.equal(result.code, 0);
+  const childEnv = JSON.parse(result.stderr);
+  assert.notEqual(childEnv.npm_config_userconfig, childEnv.npm_config_globalconfig);
+  assert.ok(childEnv.npm_config_userconfig.startsWith(tmpdir()));
+  assert.ok(childEnv.npm_config_globalconfig.startsWith(tmpdir()));
+  assert.equal(childEnv.npm_config_registry, "https://registry.npmjs.org/");
+  assert.equal(childEnv.npm_config_proxy, "");
+  assert.equal(childEnv.npm_config_https_proxy, "");
+  assert.equal(childEnv.npm_config_noproxy, "*");
+  assert.equal(childEnv.NPM_TOKEN, undefined);
+  assert.equal(childEnv.NODE_AUTH_TOKEN, undefined);
+});
+
+test("dependency install: skips without a manifest or dependencies, runs npm with pinned flags, surfaces failures", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-ax-deps-"));
+  const write = (name, json) => {
+    const dir = join(root, name);
+    mkdirSync(dir, { recursive: true });
+    if (json !== null) writeFileSync(join(dir, "package.json"), json);
+    return dir;
+  };
+
+  const noPackage = write("no-package", null);
+  assert.deepEqual(await installExtensionDependencies(noPackage), { state: "skipped", reason: "no-package-json" });
+
+  const noDeps = write("no-deps", JSON.stringify({ name: "x" }));
+  assert.deepEqual(await installExtensionDependencies(noDeps), { state: "skipped", reason: "no-dependencies" });
+
+  const badJson = write("bad-json", "{ not json");
+  const bad = await installExtensionDependencies(badJson);
+  assert.equal(bad.state, "failed");
+  assert.match(bad.error, /package\.json is not valid JSON/);
+
+  const calls = [];
+  const installed = write("installed", JSON.stringify({ name: "x", dependencies: { "some-dep": "^1" } }));
+  const runner = async (command, args, cwd, timeoutMs) => {
+    calls.push({ command, args, cwd, timeoutMs });
+    return { code: 0, stderr: "" };
+  };
+  assert.deepEqual(await installExtensionDependencies(installed, { runner, timeoutMs: 1234 }), { state: "installed" });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, "npm");
+  assert.deepEqual(calls[0].args, ["install", "--omit=dev", "--legacy-peer-deps", "--no-audit", "--no-fund", "--ignore-scripts"]);
+  assert.equal(calls[0].cwd, installed, "npm runs inside the plugin directory");
+  assert.equal(calls[0].timeoutMs, 1234);
+
+  const failing = write("failing", JSON.stringify({ name: "x", dependencies: { "some-dep": "^1" } }));
+  const result = await installExtensionDependencies(failing, {
+    runner: async () => ({ code: 1, stderr: "npm error code ENOTFOUND\nnpm error network unreachable" }),
+  });
+  assert.equal(result.state, "failed");
+  assert.match(result.error, /exited 1/);
+  assert.match(result.error, /ENOTFOUND/);
+
+  const throwing = write("throwing", JSON.stringify({ name: "x", dependencies: { "some-dep": "^1" } }));
+  const thrown = await installExtensionDependencies(throwing, {
+    runner: async () => {
+      throw new Error("npm not found");
+    },
+  });
+  assert.deepEqual(thrown, { state: "failed", error: "npm not found" });
 });
