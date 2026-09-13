@@ -1456,6 +1456,24 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - **里程碑**：M5
 - **状态**：单位覆盖（`logger-routing.test.mjs`）；打包 AppImage 旅程已记录
 
+#### E2E-RUNTIME-non-ascii-http-header-does-not-show-main-exception-dialog
+
+- **先决条件**：已打包或开发版应用；系统 HTTP 代理或网关会注入非 Latin-1
+  响应头（例如以 U+661F「星」开头的值），或测试通过 Electron `net` 投递同样的
+  `TypeError: Cannot convert argument to a ByteString`。
+- **步骤**：1) 启动，使自动更新检查或模型发现发出主进程 `net.fetch` /
+  electron-updater 请求。2) 确认没有原生异常对话框。3) 无需关闭任何框；等待
+  下一次更新或发现请求。4) 打开 `~/.pi-desktop/logs/app/runtime.log`。
+- **预期**：不会出现 Electron “A JavaScript error occurred in the main process”
+  对话框。应用保持运行、不会退出。`runtime.log` 中有
+  `code: "NON_ASCII_HTTP_HEADER"` 且 `recoverable: true` 的错误记录。后续
+  主进程 HTTP 请求不会再次弹出该原生框。
+- **链接规格**：`03-runtime/07-process-model.md`、
+  `03-runtime/09-logging-and-observability.md`
+- **验收**：H（诊断），质量（主路径无崩溃）
+- **里程碑**：M5
+- **状态**：单位覆盖（`main-process-errors.test.mjs`）；打包 Windows 代理旅程已记录
+
 #### E2E-195：Linux glibc 低于 2.35 时列出支持的发行版
 
 - **先决条件**：Linux x64 打包应用；本机 glibc 低于 2.35（例如 Ubuntu 20.04 /

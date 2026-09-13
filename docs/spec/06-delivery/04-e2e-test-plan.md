@@ -2467,6 +2467,27 @@ and identify the platform validation still needed.
 - **Status**: Unit-covered (`logger-routing.test.mjs`); packaged AppImage
   journey Documented
 
+#### E2E-RUNTIME-non-ascii-http-header-does-not-show-main-exception-dialog
+
+- **Preconditions**: Packaged or development app on a machine whose system
+  HTTP proxy or gateway injects a non-Latin-1 response header (for example a
+  value starting with U+661F), or a test that delivers the same
+  `TypeError: Cannot convert argument to a ByteString` through Electron `net`.
+- **Steps**: 1) Launch so the auto-updater check or model discovery issues a
+  main-process `net.fetch` / Electron-updater request. 2) Confirm the native
+  exception dialog does not appear. 3) Dismiss nothing; wait for a later
+  updater or discovery request. 4) Open `~/.pi-desktop/logs/app/runtime.log`.
+- **Expected**: No Electron "A JavaScript error occurred in the main process"
+  dialog. The app stays running and does not quit. `runtime.log` contains an
+  error record with `code: "NON_ASCII_HTTP_HEADER"` and `recoverable: true`.
+  A later main-process HTTP request does not re-open the native dialog.
+- **Specs linked**: `03-runtime/07-process-model.md`,
+  `03-runtime/09-logging-and-observability.md`
+- **Acceptance**: H (diagnostics), Quality (main path no crash)
+- **Milestone**: M5
+- **Status**: Unit-covered (`main-process-errors.test.mjs`); packaged Windows
+  proxy journey Documented
+
 #### E2E-195: Linux glibc below 2.35 names supported distros
 
 - **Preconditions**: Linux x64 packaged app; the machine glibc is older than

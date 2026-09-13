@@ -48,6 +48,7 @@ import { PersistenceOutbox } from "./persistence-outbox";
 import { InflightCheckpointer } from "./inflight-checkpoint";
 import { AgentSidecar } from "./agent-sidecar";
 import { Logger, ignoreBrokenStdio } from "./logger";
+import { installMainProcessErrorHandlers } from "./main-process-errors";
 import {
   isDbSchemaTooNewError,
 } from "./host-boot-diagnostics";
@@ -164,8 +165,11 @@ const ErrorCodes = {
 } as const;
 
 // A closed stdout/stderr (Linux AppImage, GUI launch without a TTY) must not
-// surface as Electron's "Uncaught Exception: write EPIPE" dialog.
+// surface as Electron's "Uncaught Exception: write EPIPE" dialog. The same
+// default dialog must not appear for a stray uncaughtException (non-ASCII
+// HTTP headers from a system proxy, destroyed webContents, etc.).
 ignoreBrokenStdio();
+installMainProcessErrorHandlers();
 
 app.setName(APP_NAME);
 if (process.platform === "win32") {
@@ -534,6 +538,15 @@ const logger = new Logger(
   dataDir,
   process.env.NODE_ENV === "production" ? "info" : "debug",
 );
+installMainProcessErrorHandlers({
+  emit: (record) => {
+    logger.app("runtime", "error", record.message, {
+      code: record.code,
+      data: { recoverable: record.recoverable, detail: record.detail },
+    });
+  },
+});
+
 const persistenceOutbox = new PersistenceOutbox(dataDir, (level, message, data) => {
   logger.app("persistence", level, message, { data });
 });
@@ -1290,16 +1303,6 @@ function registerIpc() {
     sendToRenderer,
   });
 }
-
-// A rejected promise nobody awaited must land in the log with its stack, not
-// in Electron's default handler. Main must keep running: the renderer, the
-// host, and the sidecar are supervised separately and a stray rejection from
-// one plugin bridge or IPC handler is not a reason to lose all of them.
-process.on("unhandledRejection", (reason) => {
-  logger.app("runtime", "error", "unhandled promise rejection in main", {
-    data: reason instanceof Error ? `${reason.stack ?? reason.message}` : String(reason),
-  });
-});
 
 // Default hardening for every web contents Electron creates, applied before
 // the owning surface can wire its own handlers (which replace these). A new
