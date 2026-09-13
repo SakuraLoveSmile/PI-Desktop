@@ -2667,6 +2667,11 @@ D193 和 D194。
 - 父级指定的模型未配置或未启用委托时，Task 工具返回一个列出可用模型的工具
   错误。与当前会话 provider/model 完全相同的重复视为继承，等价于省略
   `model`，因此空的委托目录不会把父级模型变成一个假的「模型不可用」错误。
+- 实现澄清（2026-09-13，ADR subagent-model-opt-in）：`subagentProviders`
+  可包含仅供定义固定使用的模型，不是覆盖许可列表。新增启动字段
+  `subagentModelKeys` 单独表达许可，缺省为空，并参与运行时复用判断。
+  只有许可键或通过按需授权的结果才能进入覆盖目录与缓存。此修改恢复 D278
+  的选择边界，保持原有覆盖优先级；Task 目录同时展示各定义的默认模型。
 - sidecar 启动时未预解析的模型通过发往 Electron main 的
   `provider.resolveSubagentModel` RPC 按需解析，凭据和 models.dev 快照都在
   那里。

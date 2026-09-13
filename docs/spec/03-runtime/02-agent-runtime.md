@@ -640,10 +640,19 @@ core set rather than the on-demand catalog of §7.1:
   session model. The parent agent sees a model summary in the system prompt
   listing all models marked `availableForSubagents` in provider settings. If
   the delegation catalog is empty, the prompt tells the model to omit `model`
-  and inherit the session model; an explicit key that exactly names the current
-  session provider/model is treated as the same inheritance case. Other
-  explicit model keys must be configured and enabled for delegation. When a
-  model key is not pre-resolved, the runtime asks Electron main to resolve it
+  and use the definition pin, or inherit the session model when unpinned; an
+  explicit key that exactly names the current session provider/model is treated as the same inheritance case. Other
+  explicit model keys must be configured and enabled for delegation. Electron
+  sends `subagentModelKeys` separately from `subagentProviders`: the latter may
+  include definition-only pins, while only the former authorizes cached
+  overrides and the model summary. Missing keys default to an empty list;
+  successful on-demand resolution adds a key to the override cache. A changed
+  opt-in list retires the idle runtime on the next launch. Pins remain usable
+  by their own definitions when `model` is omitted, even without an opt-in.
+  The Task definition catalog displays each default model and recommends
+  omitting `model` to preserve it. See
+  [ADR subagent-model-opt-in](../../adr/subagent-model-opt-in.md).
+  When a model key is not pre-resolved, the runtime asks Electron main to resolve it
   on-demand via the `provider.resolveSubagentModel` RPC. The started `Task`
   result details record the effective `modelId` and resolved `thinkingLevel`
   used for that run. The level is resolved after inheritance and target-model

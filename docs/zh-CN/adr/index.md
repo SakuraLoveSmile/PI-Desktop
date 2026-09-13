@@ -66,6 +66,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 
 | 编号 | 标题 | 状态 |
 |---|---|---|
+| subagent-model-opt-in | [区分子代理模型自动调度许可与定义固定模型](/adr/subagent-model-opt-in) | 已接受待实现 |
 | 0001 | [Electron 桌面壳](/adr/0001-use-electron) | 已接受 |
 | 0002 | [使用 pi Agent Harness 作为内核](/adr/0002-use-pi-agent-harness) | 已接受 |
 | 0003 | [混合运行时 — Rust host core + Node pi agent sidecar](/adr/0003-agent-in-main-process) | 部分被取代 |
