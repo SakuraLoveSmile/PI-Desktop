@@ -2926,10 +2926,9 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     expect(events[0].event.message.thinking).toBe("plan ");
     expect(events[1].event.deltaText).toBe("answer");
     expect(events[1].event.deltaThinking).toBe("done");
-    expect(events[1].event.message).toMatchObject({
-      content: "answer",
-      thinking: "plan done",
-    });
+    expect(events[1].event.stream).toBe("delta");
+    expect(events[1].event.message.content).toBe("");
+    expect(events[1].event.message.thinking).toBeUndefined();
     expect(events[2].event.message).toMatchObject({
       content: "answer",
       thinking: "plan done",

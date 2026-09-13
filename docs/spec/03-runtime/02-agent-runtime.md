@@ -559,6 +559,10 @@ criterion-by-criterion report of what was met and the evidence observed.
 - Pi `thinking` blocks become `UiMessage.thinking` and
   `message_update.deltaThinking`. They never append to `content` or
   `deltaText`.
+- Append-only `message_update` events set `stream: \"delta\"` and carry only the
+  new chunk. The runtime keeps the full `currentAssistant` in memory, coalesces
+  deltas every 16ms, and flushes before tool/terminal/abort/error/retry
+  boundaries. `message_end` is the authoritative snapshot (D412).
 - Restored assistant history reconstructs separate text and thinking blocks
   before the next turn.
 - Restored history also reconstructs tool call/result pairs from persisted

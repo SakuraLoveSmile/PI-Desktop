@@ -189,6 +189,26 @@ describe("AgentHost ingest", () => {
     expect(host.getTurn("rt_1").status).toBe("interrupted");
     expect(done.session.status).toBe("idle");
   });
+
+  it("applies delta-only message_update onto the live item snapshot", async () => {
+    const { host } = build();
+    host.ingest(envelope("s1", "rt_1", { type: "agent_start" }));
+    host.ingest(envelope("s1", "rt_1", { type: "message_start", message: message("m1", "") }));
+    host.ingest(envelope("s1", "rt_1", {
+      type: "message_update",
+      stream: "delta",
+      message: { id: "m1", role: "assistant", content: "", createdAt: "2026-09-10T00:00:00.000Z", status: "streaming" },
+      deltaText: "partial ",
+    }));
+    host.ingest(envelope("s1", "rt_1", {
+      type: "message_update",
+      stream: "delta",
+      message: { id: "m1", role: "assistant", content: "", createdAt: "2026-09-10T00:00:00.000Z", status: "streaming" },
+      deltaText: "text",
+    }));
+    const streaming = await host.snapshot("s1");
+    expect((streaming.activeItems[0]!.content as UiMessage).content).toBe("partial text");
+  });
 });
 
 describe("AgentHost turns", () => {

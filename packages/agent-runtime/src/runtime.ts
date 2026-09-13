@@ -90,6 +90,7 @@ import {
   addUsage,
   checkpointGeneration,
   contextCompactionMark,
+  cumulativeDelta,
   DEFAULT_SUBAGENT_PERMISSION,
   formatAskToolOutput,
   formatSessionMessage,
@@ -102,6 +103,7 @@ import {
   type ProposalKind,
   type SubagentPermission,
 } from "@pi-desktop/shared";
+import { createStreamCoalescer, type StreamCoalescer } from "./stream-coalescer.js";
 import type { RuntimeHost } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
 import {
@@ -1383,6 +1385,7 @@ export class DesktopAgentRuntime {
   private thinkingLevel: ThinkingLevel;
   private host: RuntimeHost;
   private onEvent: (envelope: AgentEventEnvelope) => void;
+  private streamSink: StreamCoalescer;
   private baseSystemPrompt: string;
   private planningState: PlanningState;
   private pendingPlanId?: string;
@@ -1538,7 +1541,8 @@ export class DesktopAgentRuntime {
     this.hostCloseUnsubscribe = this.host.onClose?.(() => {
       this.cleanupActiveToolProgress();
     });
-    this.onEvent = opts.onEvent;
+    this.streamSink = createStreamCoalescer(opts.onEvent);
+    this.onEvent = (envelope) => this.streamSink.push(envelope);
     this.pluginTools = opts.pluginTools ?? [];
     this.pluginSkills = opts.pluginSkills ?? [];
     this.trustedExtensionSpecs = opts.trustedExtensions ?? [];
@@ -5909,16 +5913,12 @@ Delegation rules:
           const nextThinking = content.hasThinking
             ? content.thinking
             : previousThinking;
-          const deltaText = content.hasText
-            ? content.text.startsWith(previousText)
-              ? content.text.slice(previousText.length)
-              : content.text
-            : "";
-          const deltaThinking = content.hasThinking
-            ? content.thinking.startsWith(previousThinking)
-              ? content.thinking.slice(previousThinking.length)
-              : content.thinking
-            : "";
+          const textDelta = content.hasText
+            ? cumulativeDelta(previousText, content.text)
+            : { delta: "", reset: false };
+          const thinkingDelta = content.hasThinking
+            ? cumulativeDelta(previousThinking, content.thinking)
+            : { delta: "", reset: false };
           this.currentAssistant = {
             ...this.currentAssistant,
             content: nextText,
@@ -5929,12 +5929,21 @@ Delegation rules:
                 : {}),
             status: "streaming",
           };
-          this.emit({
-            type: "message_update",
-            message: this.currentAssistant,
-            deltaText,
-            ...(deltaThinking ? { deltaThinking } : {}),
-          });
+          if (
+            textDelta.delta ||
+            thinkingDelta.delta ||
+            textDelta.reset ||
+            thinkingDelta.reset
+          ) {
+            this.emit({
+              type: "message_update",
+              message: this.currentAssistant,
+              ...(textDelta.delta ? { deltaText: textDelta.delta } : {}),
+              ...(thinkingDelta.delta ? { deltaThinking: thinkingDelta.delta } : {}),
+              ...(textDelta.reset ? { resetText: true } : {}),
+              ...(thinkingDelta.reset ? { resetThinking: true } : {}),
+            });
+          }
         }
         break;
       }
@@ -6800,6 +6809,7 @@ Delegation rules:
     const runner = this.extensionRunner;
     this.extensionRunner = undefined;
     if (runner) await runner.dispose().catch(() => undefined);
+    this.streamSink.dispose();
     this.disposed = true;
     this.acceptingSteering = false;
     this.runCancelled = true;

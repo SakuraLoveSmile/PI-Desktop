@@ -3,6 +3,7 @@ import type {
   SessionSummary,
   UiMessage,
 } from "@pi-desktop/shared";
+import { applyMessageUpdate } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { createNavigationIntentController } from "../../lib/navigation-intent";
 import {
@@ -245,8 +246,13 @@ export function createSessionRuntime({ get, set }: StoreAccess): SessionRuntime 
     let next = current;
     switch (event.type) {
       case "message_start":
-      case "message_update":
         next = upsertLiveSessionMessage(current, event.message);
+        break;
+      case "message_update": {
+        const previous = current.find((message) => message.id === event.message.id);
+        next = upsertLiveSessionMessage(current, applyMessageUpdate(previous, event));
+        break;
+      }
         break;
       case "message_end": {
         const failed =

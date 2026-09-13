@@ -272,6 +272,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0205 | [远程 Agent 控制使用专用的 Host 边界](/adr/0205-remote-agent-control-boundary) | 已接受待实现（MVP 之后；由 D376 修订） |
 | 0232 | [macOS DMG 只保留打开说明](/adr/0232-macos-dmg-text-only-opening-guidance) | 已接受（修订 D371 / ADR 0204） |
 | 0241 | [文件视图改为 vendor 的可更新插件](/adr/0241-vendored-updatable-file-view-plugin) | 已接受（取代 ADR 0105；issue #304） |
+| 0242 | [仅增量且合并的流式更新](/adr/0242-delta-only-streaming-updates) | 已接受（修订 0127 / 0130 / 0149 / 0153；issue #299） |
 | active-turn-steering | [用 Alt+Enter 向当前回合补充指令](/adr/active-turn-steering) | 已接受 |
 
 ## 什么时候看 ADR
