@@ -294,7 +294,13 @@ export function Sidebar({
     top: number;
     left: number;
   } | null>(null);
-  const { card: sessionHoverCard, show: revealSessionHoverCard, hide: hideSessionHoverCard } = useSessionHoverCard();
+  const {
+    card: sessionHoverCard,
+    show: revealSessionHoverCard,
+    hide: hideSessionHoverCard,
+    scheduleHide: scheduleSessionHoverCardHide,
+    keepVisible: keepSessionHoverCardVisible,
+  } = useSessionHoverCard();
   const [expandedProjectSessions, setExpandedProjectSessions] = useState<Record<string, boolean>>({});
   const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
   const [dropProjectKey, setDropProjectKey] = useState<string | null>(null);
@@ -1002,6 +1008,17 @@ export function Sidebar({
     sessionPrefetchTimerRef.current = undefined;
   };
 
+  const openSessionFromHover = useCallback(async (sessionId: string) => {
+    cancelSessionPrefetch();
+    hideSessionHoverCard();
+    try {
+      await selectSession(sessionId);
+      focusComposer();
+    } catch (error) {
+      reportError(error);
+    }
+  }, [focusComposer, hideSessionHoverCard, reportError, selectSession]);
+
   useEffect(() => cancelSessionPrefetch, []);
 
   const setCollapsed = (path: string, value: boolean) => {
@@ -1431,11 +1448,11 @@ export function Sidebar({
           onMouseEnter={(event) =>
             showSessionHoverCard(session, event.currentTarget, options?.temporary ?? false)
           }
-          onMouseLeave={hideSessionHoverCard}
+          onMouseLeave={scheduleSessionHoverCardHide}
           onFocusCapture={(event) =>
             showSessionHoverCard(session, event.currentTarget, options?.temporary ?? false)
           }
-          onBlur={hideSessionHoverCard}
+          onBlur={scheduleSessionHoverCardHide}
           onClick={() => {
             cancelSessionPrefetch();
             hideSessionHoverCard();
@@ -2136,7 +2153,14 @@ export function Sidebar({
       </div>
       {renderFloatingMenu()}
       {sessionHoverCard ? (
-        <SessionHoverCard key={sessionHoverCard.session.id} card={sessionHoverCard} refreshProject={refreshProject} />
+        <SessionHoverCard
+          key={sessionHoverCard.session.id}
+          card={sessionHoverCard}
+          refreshProject={refreshProject}
+          onOpenSession={openSessionFromHover}
+          keepVisible={keepSessionHoverCardVisible}
+          scheduleHide={scheduleSessionHoverCardHide}
+        />
       ) : null}
       {renameFor ? (
         <SessionRenameDialog

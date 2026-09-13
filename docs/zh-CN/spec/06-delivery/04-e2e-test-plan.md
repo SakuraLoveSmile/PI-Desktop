@@ -4633,6 +4633,11 @@ IPC 请求无法关闭。
 | 品质（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
 | C — 对话与流式（会话列表响应性） | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | 品质（会话列表响应性） | E2E-SESSION-list-refresh-keeps-desktop-responsive |
+| C — 对话与流式（独立会话通信） | E2E-SESSION-independent-top-level-communication |
+| D — 插件安全（独立会话通信） | E2E-SESSION-independent-top-level-communication |
+| G — 插件（独立会话通信） | E2E-SESSION-independent-top-level-communication |
+| 品质（独立会话通信） | E2E-SESSION-independent-top-level-communication、E2E-SESSION-hover-card-model-and-links |
+| C — 对话与流式（hover 卡片模型和链接） | E2E-SESSION-hover-card-model-and-links |
 
 | 里程碑 | 应用场景 |
 |---|---|
@@ -4648,6 +4653,7 @@ IPC 请求无法关闭。
 | M6+ | E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-150、E2E-151、E2E-168、E2E-199、E2E-200、E2E-202、E2E-203、E2E-209、E2E-211、E2E-212、E2E-213、E2E-214、E2E-215、E2E-216、E2E-217、E2E-257 |
 | M6+（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+（会话列表响应性） | E2E-SESSION-list-refresh-keeps-desktop-responsive |
+| M6+（独立会话通信） | E2E-SESSION-independent-top-level-communication、E2E-SESSION-hover-card-model-and-links |
 | 后MVP | E2E-022A、E2E-022B、E2E-022C、E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M（插件路线图 R2/R3/R6） |
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
@@ -6552,6 +6558,26 @@ IPC 请求无法关闭。
 - **状态**：marketplace 插件测试覆盖插件运行时；host-core 和 desktop 单元测试覆盖新增的
   宿主原子能力。完整真实 provider/Electron 旅程仍需在具备条件的 runner 中验证，遵循无本地
   E2E 策略
+
+#### E2E-SESSION-independent-top-level-communication：SessionTask 发现并与现有会话通信
+
+- **前提条件**：已安装并启用 marketplace 中的 `pi.session-orchestrator` 插件。两个现有 Agent 会话通过普通的新建任务流程创建，彼此不是 Session Orchestrator worker。调用者是已配置认证 provider 的活动 Agent 会话。
+- **步骤**：1）调用 `SessionTask`，使用 `action: "list"`，通过持久化 `sessionId` 找到两个独立会话。2）向其中一个独立会话发送消息，确认消息进入该会话的 inbox。3）从目标会话向原会话回复。4）使用返回的 ID 调用 `status` 和 `result`，检查两个会话的转录。
+- **预期**：`list` 返回有界的可通信 Agent 会话引用，不要求插件拥有历史，也不把它们当作 worker。使用真实目标 Session ID 的 `send` 可以双向工作，保留每个目标已有的模型、项目、上下文和权限，不创建替代会话。host 记录源/目标来源信息，结果绑定真实持久回合，列表不包含转录、项目路径、凭据或消息预览。非 Agent 会话仍按既有 host 策略拒绝。
+- **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/04-plugin-security.md`、`03-runtime/01-ipc-protocol.md`、`03-runtime/04-data-storage.md`、ADR 0239、ADR 0240
+- **验收**：C（对话与流式）、D（插件安全）、G（插件）、品质
+- **里程碑**：M6+
+- **状态**：插件和 host-core 回归覆盖已自动化；真实 provider/Electron 多会话旅程仍需在具备条件的 runner 中验证，遵循无本地 E2E 策略
+
+#### E2E-SESSION-hover-card-model-and-links：会话 hover 卡片展示可读模型并支持创建关系导航
+
+- **前提条件**：应用中存在一个协作创建的会话、一个独立会话，以及带可读目录名称的 provider/model。侧边栏包含这两个会话。
+- **步骤**：1）悬停或键盘聚焦协作创建的会话。2）检查模型元数据、创建者引用和已创建会话列表。3）使用键盘激活创建者引用和一个已创建会话引用。4）检查独立会话的卡片。
+- **预期**：卡片显示 provider 可读名称和模型显示名称，而不是 provider ID。协作创建的会话显示其创建者，创建者显示有界的已创建会话列表。每个引用都是可用键盘聚焦、带可访问打开名称的原生按钮；激活后打开对应持久会话并聚焦 Composer。独立会话保持有效本地会话，不伪造创建者链接。hover 轮询有界且不加载转录。
+- **链接规格**：`03-runtime/01-ipc-protocol.md` §5.7、`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`、ADR 0240
+- **验收**：C（对话与流式）、品质
+- **里程碑**：M6+
+- **状态**：源码契约和投影测试已自动化；渲染后的指针/键盘验证仍需在 runner 中执行
 
 #### E2E-237：插件 fetch 在每次重定向时重新检查出网
 

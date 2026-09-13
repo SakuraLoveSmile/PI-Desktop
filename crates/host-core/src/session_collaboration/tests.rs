@@ -62,6 +62,69 @@ fn sessions_are_reused_and_send_is_idempotent() {
 }
 
 #[test]
+fn projections_expose_readable_model_names_and_session_discovery_links() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let parent = session(&db, "Parent");
+    let child = session(&db, "Linked child");
+    db.conn()
+        .execute(
+            "INSERT INTO providers(id,name,created_at,updated_at) VALUES(?1,?2,?3,?3)",
+            params!["provider-id", "Readable Provider", now_ms()],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO models(provider_id,model_id,display_name,updated_at) VALUES(?1,?2,?3,?4)",
+            params!["provider-id", "model-id", "Readable Model", now_ms()],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "UPDATE sessions SET provider_id=?1,model_id=?2 WHERE id=?3",
+            params!["provider-id", "model-id", child],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO session_collaboration_links(session_id,created_by_session_id,plugin_id,created_at)
+             VALUES(?1,?2,?3,?4)",
+            params![child, parent, "pi.session-orchestrator", now_ms()],
+        )
+        .unwrap();
+
+    let child_summary = handle(
+        &db,
+        "session.collaboration.status",
+        &json!({"sessionId":child}),
+    )
+    .unwrap();
+    assert_eq!(child_summary["providerName"], "Readable Provider");
+    assert_eq!(child_summary["modelName"], "Readable Model");
+    assert_eq!(child_summary["createdBySession"]["sessionId"], parent);
+
+    let parent_summary = handle(
+        &db,
+        "session.collaboration.status",
+        &json!({"sessionId":parent}),
+    )
+    .unwrap();
+    assert_eq!(parent_summary["createdSessions"][0]["sessionId"], child);
+
+    let listed = handle(&db, "session.collaboration.list", &json!({})).unwrap();
+    let sessions = listed["sessions"].as_array().unwrap();
+    assert!(sessions.iter().any(|entry| entry["sessionId"] == parent));
+    assert!(sessions.iter().any(|entry| entry["sessionId"] == child));
+    assert_eq!(
+        sessions
+            .iter()
+            .find(|entry| entry["sessionId"] == child)
+            .unwrap()["providerName"],
+        "Readable Provider"
+    );
+}
+
+#[test]
 fn turn_bound_result_and_callback_are_durable_and_exactly_once() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("pi.sqlite");

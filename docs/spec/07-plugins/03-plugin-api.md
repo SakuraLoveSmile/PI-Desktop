@@ -368,6 +368,7 @@ channels or the local MCP bearer token.
 type SessionCollaborationOperation =
   | "session/collaboration/spawn"
   | "session/collaboration/send"
+  | "session/collaboration/list"
   | "session/collaboration/status"
   | "session/collaboration/result"
   | "session/collaboration/cancel"
@@ -387,6 +388,7 @@ type SendInput = {
   notifyOnCompletion?: boolean
   idempotencyKey?: string
 }
+type ListInput = {}
 type StatusInput = { sessionId: string }
 type ResultInput = { sessionId: string; messageId?: string; turnId?: string }
 type CancelInput = { sessionId: string; messageId?: string }
@@ -399,6 +401,14 @@ reuses that session's project, model, context, and permission configuration;
 and `result` are bounded projections and do not load a full transcript.
 `cancel` interrupts only the exact queued delivery or bound turn and retains
 the target session and history.
+
+`list` returns at most 100 non-deleted Agent sessions that can receive a
+message, including sessions created independently of Session Orchestrator. Each
+entry contains only its Session ID, title, status, updated time, readable
+provider/model labels, and bounded creation links; it does not include a
+transcript, project path, credentials, or message previews. The caller can
+pass the returned Session ID to `send`, and `status`/`result` remain the
+authoritative detail reads.
 
 `spawn` and `send` are valid only during the plugin's active Agent tool
 invocation. The broker injects `pluginId`, source `sessionId`, source `turnId`,

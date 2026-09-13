@@ -196,6 +196,7 @@ pub fn handle(db: &Database, method: &str, input: &Value) -> Result<Value> {
         "session.collaboration.status" => {
             projections::summary(db, string(input, "sessionId", 256)?)
         }
+        "session.collaboration.list" => projections::list(db),
         "session.collaboration.result" => projections::result(db, input),
         "session.collaboration.pending" => Ok(
             json!({"messages":repository::pending_callbacks(db,input.get("sessionId").and_then(Value::as_str))?}),

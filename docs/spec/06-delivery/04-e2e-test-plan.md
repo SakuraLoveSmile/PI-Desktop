@@ -6554,6 +6554,11 @@ needed.
 | Quality (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | C — Conversation & stream (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | Quality (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
+| C — Conversation & stream (Independent session communication) | E2E-SESSION-independent-top-level-communication |
+| D — Plugin security (Independent session communication) | E2E-SESSION-independent-top-level-communication |
+| G — Plugins (Independent session communication) | E2E-SESSION-independent-top-level-communication |
+| Quality (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
+| C — Conversation & stream (Hover card model and links) | E2E-SESSION-hover-card-model-and-links |
 
 | Milestone | Scenarios |
 |---|---|
@@ -6569,6 +6574,7 @@ needed.
 | M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll |
 | M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+ (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
+| M6+ (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
@@ -9767,6 +9773,59 @@ are withdrawn with ADR 0165.
   desktop unit tests cover the additive host primitives. The full live
   provider/Electron journey remains runner validation under the no-local-E2E
   policy
+
+#### E2E-SESSION-independent-top-level-communication: SessionTask discovers and communicates with existing sessions
+
+- **Preconditions**: The marketplace `pi.session-orchestrator` plugin is
+  installed and enabled. Two existing Agent sessions were created from the
+  normal New Task flow and are not linked as Session Orchestrator workers. The
+  caller is an active Agent session with a configured authenticated provider.
+- **Steps**: 1) Call `SessionTask` with `action: "list"` and identify both
+  existing sessions by their durable `sessionId`. 2) Send a message to one
+  independent session and verify it is admitted against that session's inbox.
+  3) From the target session, send a reply to the original session. 4) Call
+  `status` and `result` with the returned IDs and inspect the two transcripts.
+- **Expected**: `list` includes bounded references to existing communicable
+  Agent sessions without requiring plugin-owned history or treating them as
+  workers. `send` works in either direction using the real target Session ID,
+  preserves each target's existing model/project/context/permissions, and
+  never creates a replacement session. The host records source and target
+  provenance, results remain bound to the actual durable turns, and the list
+  response contains no transcript, project path, credentials, or message
+  previews. Non-Agent sessions remain rejected by the existing host policy.
+- **Specs linked**: `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`, `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/04-data-storage.md`, ADR 0239, ADR 0240
+- **Acceptance**: C (conversation & stream), D (plugin security),
+  G (plugins), Quality
+- **Milestone**: M6+
+- **Status**: plugin and host-core regression coverage is automated; the live
+  multi-session provider/Electron journey remains runner validation under the
+  no-local-E2E policy
+
+#### E2E-SESSION-hover-card-model-and-links: Session hover cards expose readable model and creation navigation
+
+- **Preconditions**: The app has one collaboration-created session, one
+  independent session, and a configured provider/model with readable catalog
+  names. The sidebar contains both sessions.
+- **Steps**: 1) Hover or keyboard-focus the collaboration-created session.
+  2) Inspect the model metadata, creator reference, and created-session list.
+  3) Activate the creator and one created-session reference with the keyboard.
+  4) Inspect an independent session's card as well.
+- **Expected**: The card shows the provider's readable name and model display
+  name instead of the provider ID. A collaboration-created session shows its
+  creator, and a creator shows its bounded created-session list. Each reference
+  is a native keyboard-focusable button with an accessible open-session name;
+  activating it opens that durable session and focuses the Composer. An
+  independent session remains a valid local session without a fabricated
+  creator link. Hover polling remains bounded and does not load a transcript.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §5.7,
+  `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
+  ADR 0240
+- **Acceptance**: C (conversation & stream), Quality
+- **Milestone**: M6+
+- **Status**: source-contract and projection tests are automated; rendered
+  pointer/keyboard validation remains runner validation
 
 #### E2E-237: Plugin fetch re-checks egress on every redirect
 
