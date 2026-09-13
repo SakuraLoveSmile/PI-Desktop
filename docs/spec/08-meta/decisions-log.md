@@ -79,7 +79,7 @@ This log freezes previously open questions into concrete decisions.
 | D405 | Ideographic comma opens the slash menu | **Amend D123 / D139 / ADR 0024: a `、` (U+3001) committed as the first character of an empty composer draft is rewritten to `/` before trigger detection, so a Chinese IME reaches the ordinary slash menu without switching input methods. Only that position is rewritten; a `、` anywhere else stays ordinary punctuation, and the `@` file menu is unaffected. Shared grammar and renderer only; no IPC, storage, or autocomplete-source change. See ADR 0231 and E2E-255.** | Reaching `/new`, `/compact`, a mode alias, or a Skill forced a Chinese IME user to switch to ASCII input mid-sentence and then switch back (issue #65). |
 | D406 | Keep macOS DMG opening guidance text-only | **Amend D371 / ADR 0204: macOS DMGs expose the opening-help note as `If app won't open, read this.txt` and no longer include the executable `PI-Desktop-macOS-open.command`. macOS ZIP packages retain both the note and the helper. The note provides the narrow Terminal fallback for trusted unsigned builds; signed and notarized builds do not need it. See ADR 0232 and E2E-196b.** | The DMG should keep the normal app-to-Applications flow focused while still giving users a visible, actionable answer when an unsigned app does not open. |
 | D407 | Restore archived projects after session import | **Additive renderer behavior for issue #250: when a core or plugin import adds a new project-bound session, the import-triggered session refresh normalizes its project path and clears the renderer's archived presentation state for that project. Pathless sessions, skipped imports, historical plugin paths without an active binding, and ordinary refreshes leave archive state unchanged. Host project rows, IPC channels, plugin methods, storage schema, and data formats do not change. See ADR 0236 and E2E-257.** | The host can successfully materialize an imported session under a project while the renderer still hides that project's sidebar row as archived. Restoring only the newly imported binding makes the result discoverable without weakening deliberate archive choices during ordinary refreshes (issue #250). |
-| D408 | Prioritize MainChat in the three-column shell | **Amend ADR 0226 / ADR 0151 / ADR 0033 for issue #267: MainChat keeps a hard 360px minimum, the work panel is capped by the live budget (`client width - 360px - expanded sidebar`, with no fixed maximum), and the expanded sidebar yields at that threshold — including while `sidebar-out` still occupies flex space. A manual sidebar reopen spends panel width first and otherwise targets 370px; closing the panel restores only a sidebar the layout collapsed. The native window never changes: the reservation seam stays at zero and no geometry is applied. See ADR 0238 and E2E-LAYOUT-three-column-width-priority.** | The fixed client area had no explicit width priority, so the side docks could pin MainChat to its floor and leave the composer unusable. Making the yield order explicit keeps the chat readable inside the fixed window without reintroducing native window growth (issue #267). |
+| D408 | Prioritize MainChat in the three-column shell | **Amend ADR 0226 / ADR 0151 / ADR 0033 for issue #267: MainChat keeps a hard 450px minimum, the work panel is capped by the live budget (`client width - 450px - expanded sidebar`, with no fixed maximum), and the expanded sidebar yields at that threshold — including while `sidebar-out` still occupies flex space. A manual sidebar reopen spends panel width first and otherwise targets 460px; closing the panel restores only a sidebar the layout collapsed. The native window never changes: the reservation seam stays at zero and no geometry is applied. Preview mode temporarily unmounts MainChat and uses a window-level chrome row; collapsed-sidebar macOS preview reserves 76px, or 8px in fullscreen, for traffic lights. See ADR 0238 and E2E-LAYOUT-three-column-width-priority.** | The fixed client area had no explicit width priority, so the side docks could pin MainChat to its floor and leave the composer unusable. Making the yield order explicit keeps the chat readable inside the fixed window without reintroducing native window growth (issue #267). |
 | D409 | Host-owned session collaboration messages | **Amend ADR 0237 / ADR 0165 / ADR 0213: Rust host-core owns a durable session-collaboration ledger keyed by message id and real source/target Session IDs. Plugin-mediated `spawn`, `send`, `status`, `result`, and `cancel` operations use the reviewed desktop-control gateway; the sender is bound to the active plugin Agent tool invocation, target turns retain their existing configuration, and each delivery is claimed by its actual durable turn. Completion callbacks are durable, at-most-once, and reference the settled turn. Provenance is persisted with transcript rows and cannot be forged, stripped, or edited through regeneration. The additive schema v16 migration retains queued work across restart without unattended replay, applies permission ceilings and bounded autonomous hops, and keeps the existing Task family unchanged. See ADR 0239 and E2E-PLUGIN-session-orchestrator-real-workers.** | The plugin's prior create/prompt polling path could infer neither a durable turn outcome nor a safe bidirectional sender identity. A host-owned ledger makes delivery, provenance, callback, cancellation, and restart behavior auditable without restoring the withdrawn A2A protocol. |
 | D410 | Independent session discovery and navigable collaboration projections | **Amend ADR 0239: add the reviewed read operation `session/collaboration/list`, bounded to 100 non-deleted Agent sessions and redacted to Session IDs, titles, status, updated time, readable provider/model labels, and bounded creation links. Extend the sidebar projection with readable model labels and at most eight created-session references. Render creator/created-session references as keyboard-focusable navigation buttons; independent sessions do not receive fabricated creator links. No renderer storage ownership or collaboration mutation boundary changes. See ADR 0240, E2E-SESSION-independent-top-level-communication, and E2E-SESSION-hover-card-model-and-links.** | Existing Session IDs were valid send targets but could be undiscoverable when they were not created by the plugin, while the hover card exposed only IDs and non-interactive provenance. A bounded host directory and navigable projection make durable sessions communicable and explainable without exposing transcripts or credentials. |
 
@@ -3052,7 +3052,7 @@ D193, and D194.
 - No IPC, storage, host protocol, or renderer resize contract changes. This
   refines D156/D163 and is covered by E2E-167.
 
-## 2026-09-01 — Expanded sidebar width is user-resizable (D280)
+## 2026-09-01 — Expanded sidebar width is user-resizable (D280; superseded by D408)
 
 - The expanded sidebar owns a persisted preferred width with a `240..520px`
   clamp and a `275px` default. The right-edge renderer handle previews width
@@ -3065,6 +3065,9 @@ D193, and D194.
 - Sidebar collapse remains independent from the preferred expanded width. No
   IPC, native-window bounds, work-panel reservation, or project/session order
   contract changes. See ADR 0141 and E2E-168.
+- D408 supersedes this width contract for the live shell: the expanded sidebar
+  is fixed at 275px and the historical resize handle is hidden.
+
 
 ## 2026-09-01 — Non-loopback HTTP MCP endpoints are supported (D281)
 
@@ -4645,6 +4648,7 @@ D193, and D194.
   inside their chips when localized text is longer than the label slot.
 - No IPC, storage, or native-window reservation changes. See ADR 0226 and
   E2E-168.
+- D408 supersedes the live 515px floor with a 450px MainChat floor.
 
 ## 2026-09-11 — Long-press the project title to reorder (D402)
 
@@ -4713,16 +4717,20 @@ D193, and D194.
 
 ## 2026-09-13 — Prioritize MainChat in the three-column shell (D408)
 
-- The in-flow shell treats MainChat as the first-priority column: a hard 360px
-  minimum, a panel capped by the live budget (`client width - 360px - expanded
+- The in-flow shell treats MainChat as the first-priority column: a hard 450px
+  minimum, a panel capped by the live budget (`client width - 450px - expanded
   sidebar`, no fixed maximum), and an expanded sidebar that yields at the
   threshold while its
   exit animation still counts toward the shared budget.
 - A manual sidebar reopen spends work-panel width first and otherwise targets
-  370px. Closing the panel restores only a sidebar the layout collapsed; a
+  460px. Closing the panel restores only a sidebar the layout collapsed; a
   manual collapse stays collapsed.
 - The native window never participates: the reservation seam stays at zero and
   no panel width or x-offset geometry is applied.
+- Preview mode unmounts MainChat and gives the client area to the work panel
+  beside the sidebar. AppShell supplies a window-level chrome row for shell
+  actions and native controls; macOS reserves 76px in windowed mode and 8px in
+  fullscreen when the sidebar is collapsed.
 - Decision D408 records the issue #267 behavior. See ADR 0238 and
   E2E-LAYOUT-three-column-width-priority.
 

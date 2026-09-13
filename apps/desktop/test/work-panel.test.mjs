@@ -135,7 +135,7 @@ test("work panel uses the fixed-window internal dock", () => {
   // before unmounting, so MainChat reflows continuously in both directions.
   assert.match(
     appSource,
-    /<\/section>\s*\{\(presentedWorkPanelOpen \|\| workPanelExiting\) && \(?\s*<WorkPanel/,
+    /<\/section>\s*\)\}\s*\{\(presentedWorkPanelOpen \|\| workPanelExiting\) && \(?\s*<WorkPanel/,
   );
   assert.doesNotMatch(
     appSource,
@@ -280,7 +280,7 @@ test("closing the final tab keeps the panel open for the New launcher", () => {
 });
 
 test("work panel width is renderer-owned inside the fixed window", () => {
-  assert.equal(MAIN_PANE_MIN_WIDTH, 360);
+  assert.equal(MAIN_PANE_MIN_WIDTH, 450);
   assert.equal(WORK_PANEL_DEFAULT_WIDTH, 360);
   assert.equal(WORK_PANEL_MIN_WIDTH, 244);
   assert.match(panelSource, /const renderPanelWidth = layout\.panelWidth/);
@@ -291,11 +291,11 @@ test("work panel width is renderer-owned inside the fixed window", () => {
   assert.doesNotMatch(panelSource, /\.sidebar, \.sidebar-rail/);
   assert.match(
     globalStyles,
-    /\.main-pane \{[^}]*min-width:\s*var\(--ds-main-pane-min-width, 360px\);/s,
+    /\.main-pane \{[^}]*min-width:\s*var\(--ds-main-pane-min-width, 450px\);/s,
   );
   assert.match(
     globalStyles,
-    /\.chat-surface,[\s\S]*?\.route-page \{[^}]*min-width:\s*var\(--ds-main-pane-min-width, 360px\);/s,
+    /\.chat-surface,[\s\S]*?\.route-page \{[^}]*min-width:\s*var\(--ds-main-pane-min-width, 450px\);/s,
   );
   assert.match(globalStyles, /\.work-panel \{[^}]*flex: 0 0 var\(--work-panel-width\)/s);
   // The Electron seam remains available for old callers but is deliberately
@@ -528,14 +528,14 @@ test("work panel empty states match the app's other empty-state proportions", ()
 test("the shell budgets the three columns inside the fixed client area", () => {
   // MainChat is the first-priority column: the panel is capped by the shared
   // budget and the expanded sidebar is the column that yields.
-  assert.equal(MAIN_PANE_MIN_WIDTH, 360);
+  assert.equal(MAIN_PANE_MIN_WIDTH, 450);
   assert.match(
     globalStyles,
-    /\.main-pane \{[^}]*min-width:\s*var\(--ds-main-pane-min-width, 360px\);/s,
+    /\.main-pane \{[^}]*min-width:\s*var\(--ds-main-pane-min-width, 450px\);/s,
   );
   assert.match(
     globalStyles,
-    /\.chat-surface,[\s\S]*?\.route-page \{[^}]*min-width:\s*var\(--ds-main-pane-min-width, 360px\);/s,
+    /\.chat-surface,[\s\S]*?\.route-page \{[^}]*min-width:\s*var\(--ds-main-pane-min-width, 450px\);/s,
   );
   assert.match(panelSource, /const renderPanelWidth = layout\.panelWidth/);
   assert.match(panelSource, /maxWidth: layout\.maxPanelWidth/);
@@ -550,4 +550,40 @@ test("the shell budgets the three columns inside the fixed client area", () => {
   // zero and no committed panel width is mirrored through it.
   assert.match(appSource, /setWorkPanelReservation\(0\)/);
   assert.doesNotMatch(appSource, /setWorkPanelReservation\(Math\.round\(/);
+});
+
+test("preview mode keeps shell actions and restores routes before navigation", () => {
+  assert.match(appSource, /className=\{cx\([\s\S]*?"window-chrome-row"/);
+  assert.match(appSource, /data-nav="new-task"/);
+  assert.match(appSource, /<CollapsedTitlebarActions[\s\S]*?onNewTask=/);
+  assert.match(appSource, /<WindowControls contained \/>/);
+  assert.match(appSource, /const workPanelMaximizedRef = useRef\(false\)/);
+  assert.match(
+    appSource,
+    /if \(workPanelOpenRef\.current && !workPanelMaximizedRef\.current\)/,
+  );
+  assert.match(
+    appSource,
+    /if \(workPanelMaximized && page !== "chat"\) \{\s*setWorkPanelMaximized\(false\);/s,
+  );
+  assert.match(
+    appSource,
+    /case "newTask":[\s\S]*?if \(workPanelMaximizedRef\.current\) setWorkPanelMaximized\(false\);/,
+  );
+  assert.match(
+    globalStyles,
+    /\.window-chrome-row \{[\s\S]*?-webkit-app-region: drag;/,
+  );
+  assert.match(
+    globalStyles,
+    /\.window-chrome-row\.sidebar-expanded \{[\s\S]*?left: var\(--ds-sidebar-width\);/,
+  );
+  assert.match(
+    globalStyles,
+    /:root\[data-platform="darwin"\] \.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*76px;/,
+  );
+  assert.match(
+    globalStyles,
+    /:root\[data-platform="darwin"\]\[data-fullscreen="true"\][\s\S]*?\.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*8px;/,
+  );
 });

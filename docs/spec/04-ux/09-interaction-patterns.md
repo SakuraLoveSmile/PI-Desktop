@@ -442,8 +442,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   deleting tabs.
 - On every platform, opening and collapsing the visible panel change only the
   internal flex allocation; native window bounds remain unchanged. The inner
-  divider updates the renderer-owned panel target between 244px and 720px,
-  while native window edges resize only the fixed application window (ADR 0151).
+  divider updates the renderer-owned panel target from 244px upward, capped by
+  the live three-column budget, while native window edges resize only the fixed
+  application window (ADR 0151).
 - A successful workspace Write/Edit creates or activates Review in its
   originating session. Failed and scratch writes do not. Background-session
   artifacts update only their retained context and never open, activate, resize,
@@ -968,20 +969,20 @@ Work-panel and application-window resizing are implemented in MVP:
 - The 10px inner left-edge separator anchors to the press position and
   starting panel width, then follows pointer delta without jumping. Moving it
   left grows the panel until the shared budget is exhausted; when MainChat
-  reaches its 360px minimum the expanded sidebar collapses immediately. Moving
+  reaches its 450px minimum the expanded sidebar collapses immediately. Moving
   it right gives space back to MainChat.
 - The inner divider's target clamps to the shared three-column budget
-  (`client width - 360px - expanded sidebar`, with no fixed pixel cap); pointer movement is
+  (`client width - 450px - expanded sidebar`, with no fixed pixel cap); pointer movement is
   frame-coalesced and release commits the preferred width. Escape, pointer
   cancellation, and lost capture restore the press-time panel width.
 - Opening and closing animate the dock's `width` and `flex-basis` together with
   the bounded opacity/transform feedback, so MainChat reflows continuously
-  inside the existing client area without crossing its 360px minimum instead of
+  inside the existing client area without crossing its 450px minimum instead of
   changing width before the first motion frame. While `sidebar-out` still
   occupies flex space, the shared budget continues to count the sidebar.
 - Reopening a sidebar the layout collapsed spends work-panel width first: the
-  panel keeps its width while MainChat stays at or above 360px, and otherwise
-  the reopen targets 370px. Closing the panel restores only a sidebar the
+  panel keeps its width while MainChat stays at or above 450px, and otherwise
+  the reopen targets 460px. Closing the panel restores only a sidebar the
   layout collapsed; a manual collapse stays collapsed.
 - No panel action requests a positive native reservation: the preferred panel
   width is renderer-local, the native seam stays at zero, and native window
@@ -992,22 +993,14 @@ Work-panel and application-window resizing are implemented in MVP:
   renderer CSS animation. Native bounds recovery and persistence continue to
   apply to ordinary window resize/move gestures without panel-specific deltas.
 
-Sidebar width resizing is also implemented in MVP:
+- Preview mode unmounts MainChat and lets the work panel fill the client area
+  beside the sidebar. A window-level 46px chrome row keeps New Task, sidebar,
+  and native window controls available; collapsed-sidebar macOS preview
+  reserves 76px on the left in windowed mode and 8px in fullscreen.
 
-- The expanded sidebar's right-edge `separator` handle anchors to the press
-  position and starting width, then previews a clamped width from `240px` to
-  `520px` while the main pane reflows.
-- Pointer release commits and persists the final width. Pointer cancellation,
-  lost component ownership, unmount, and Escape restore the press-time width
-  without changing the saved preference.
-- The focused handle supports ArrowLeft/ArrowRight in 16px steps plus Home and
-  End. Keyboard changes commit immediately and expose `aria-valuenow` and a
-  localized width description.
-- Hovering the sidebar body leaves the edge transparent. Hovering the handle
-  reveals a centered compact marker only; focus and active dragging keep the
-  marker visible without painting a full-height rail or shifting layout.
-- Collapsing the sidebar hides the handle but does not discard the preferred
-  expanded width; re-expanding restores that width.
+The expanded sidebar is fixed at 275px. Collapse/open changes only whether the
+column is present; the historical resize handle is hidden and legacy width
+preferences are ignored.
 
 Project ordering is implemented for retained project groups. There is no
 reorder grip. Pressing the project title and moving 8px starts a project drag,
@@ -1386,7 +1379,7 @@ This does not prevent state changes — it makes them instant.
     navigation, composer, completed rows, and work-panel content do not rerender
     solely because the current assistant message appended content
 21. The work panel opens and collapses inside the fixed client area; the inner
-    divider follows the shared budget while MainChat keeps its 360px minimum,
+    divider follows the shared budget while MainChat keeps its 450px minimum,
     the expanded sidebar yields at the threshold and returns when the panel
     closes, and divider cancellation restores the prior panel width
     (ADR 0033 / ADR 0151 / ADR 0238)

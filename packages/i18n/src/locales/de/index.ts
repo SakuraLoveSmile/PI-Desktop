@@ -1314,6 +1314,8 @@ export const de = {
     "subagentEmpty": "Die Unteragent-Details sind nicht mehr verfügbar.",
     "collapse": "Arbeitsfenster ausblenden",
     "resize": "Größe des Arbeitsfensters ändern",
+    "maximize": "Expand work panel",
+    "restore": "Restore work panel",
     "resizeChat": "Größe des Konversationsbereichs ändern",
     "tools": "Werkzeuge",
     "toolsAndPanels": "Werkzeuge & Panels",
