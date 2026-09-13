@@ -2670,8 +2670,9 @@ D193 和 D194。
 - 实现澄清（2026-09-13，ADR subagent-model-opt-in）：`subagentProviders`
   可包含仅供定义固定使用的模型，不是覆盖许可列表。新增启动字段
   `subagentModelKeys` 单独表达许可，缺省为空，并参与运行时复用判断。
-  只有许可键或通过按需授权的结果才能进入覆盖目录与缓存。此修改恢复 D278
-  的选择边界，保持原有覆盖优先级；Task 目录同时展示各定义的默认模型。
+  只有启动许可键进入复用快照。按需授权写入独立缓存，不得用不同 provider id
+  覆盖固定模型，也不会替换空闲运行时。重复定义自己的固定键视为省略 `model`。
+  按需匹配使用唯一提供商查找。Task 目录同时展示各定义的默认模型。
 - sidecar 启动时未预解析的模型通过发往 Electron main 的
   `provider.resolveSubagentModel` RPC 按需解析，凭据和 models.dev 快照都在
   那里。

@@ -534,9 +534,10 @@ Frontmatter 新增 `permission: inherit | ask | accept-edits | auto`（默认
   provider/model，同样按继承处理。其他显式模型键必须已配置并已为委托启用。
   Electron 单独传递 `subagentModelKeys` 与 `subagentProviders`：后者可含仅供定义
   固定使用的模型，只有前者授权缓存覆盖并生成模型摘要。缺省列表为空；按需解析成功
-  才把该键加入覆盖缓存。许可列表变化会在下一次启动时替换空闲运行时。
-  省略 `model` 时，定义仍可使用未勾选自动调度的固定模型。Task 的定义目录展示
-  每项默认模型，并提示省略 `model` 以保留默认值。参见
+  写入独立覆盖缓存，不得覆盖定义固定模型或改变运行时复用判断。按需匹配使用与
+  固定模型相同的唯一 id/vendor/name 规则。许可列表变化会在下一次启动时替换空闲运行时。
+  省略 `model`，或 `Task.model` 重复该定义自己的固定模型键时，定义仍可使用未勾选自动调度的固定模型。Task 的定义目录展示
+  每项默认模型，并提示省略或重复该键以保留默认值。参见
   [ADR subagent-model-opt-in](/adr/subagent-model-opt-in)。
   当某个模型键没有被预先解析时，运行时会请求 Electron main 通过
   `provider.resolveSubagentModel` RPC 按需解析。已启动的 `Task` 结果详情会记录

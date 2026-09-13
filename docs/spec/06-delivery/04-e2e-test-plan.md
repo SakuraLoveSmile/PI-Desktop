@@ -8777,10 +8777,12 @@ are withdrawn with ADR 0165.
   7. When no delegation model is configured, omitting `model:` and explicitly
      repeating the current session `provider/modelId` both start the delegate
      on the session model; the latter is not reported as an unavailable model.
-  8. A private pin remains usable by its definition when `model` is omitted,
-     but cannot be selected for another definition without opt-in. Rejection
-     issues no child provider request. Changed opt-in retires the idle runtime
-     on the next prompt, so a stale cached binding grants no selection rights.
+  8. A private pin remains usable by its definition when `model` is omitted
+     or when `Task.model` repeats that definition's own pin key, but cannot be
+     selected for another definition without opt-in. Rejection issues no child
+     provider request. On-demand authorization does not retire an idle runtime;
+     changed launch opt-in does, so a stale cached binding grants no selection
+     rights.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
   `03-runtime/11-provider-model-system.md` §7,
   `03-runtime/12-provider-config-schema.md` §2,
@@ -8789,11 +8791,11 @@ are withdrawn with ADR 0165.
 - **Milestone**: M6+
 - **Status**: Partially automated. `pnpm test:e2e:subagent-models` drives the
   built sidecar over real NDJSON and a local deterministic SSE model fixture:
-  private cross-definition rejection, normal pin use, allowed override priority,
-  on-demand authorization, exact-session inheritance, and revocation across two
+  private cross-definition rejection, own-pin echo, normal pin use, allowed override priority,
+  on-demand authorization without runtime rebuild, exact-session inheritance, and revocation across two
   prompts all pass. Runtime unit tests cover the same selection gates and the
   desktop launch test exercises independent opt-in, revocation, and accounts
-  sharing a vendor alias; the wiring test checks the additive launch field. The settings checkbox
+  sharing a vendor alias; the wiring test checks unique on-demand matching. The settings checkbox
   UI/persistence journey and live external provider execution remain manual;
   this fixture does not claim a complete native UI journey.
 

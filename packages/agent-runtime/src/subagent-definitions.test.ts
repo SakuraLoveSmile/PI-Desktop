@@ -11,9 +11,11 @@ import {
 } from "@pi-desktop/shared";
 import {
   BUILTIN_SUBAGENT_DOCUMENTS,
+  findSubagentProviderSource,
   loadSubagentDefinitions,
   resolveSubagentProviders,
   subagentDefinitionDir,
+  subagentProviderLookupError,
   type SubagentProviderSource,
 } from "./subagent-definitions.js";
 import {
@@ -286,6 +288,20 @@ describe("resolveSubagentProviders", () => {
     expect(diagnostics).toEqual([
       'ambiguous: no enabled provider matches "anthropic"',
     ]);
+  });
+
+  it("matches a unique display name after an ambiguous vendor alias", () => {
+    const other = { ...providers[0], id: "33333333-3333-4333-8333-333333333333", name: "Other" };
+    expect(findSubagentProviderSource("anthropic", [...providers, other])?.id).toBe(providers[0].id);
+    expect(findSubagentProviderSource(other.id, [...providers, other])?.id).toBe(other.id);
+  });
+
+  it("does not guess when vendor and display name both collide", () => {
+    const other = { ...providers[0], id: "33333333-3333-4333-8333-333333333333" };
+    expect(findSubagentProviderSource("anthropic", [...providers, other])).toBeUndefined();
+    expect(subagentProviderLookupError("anthropic", [...providers, other])).toBe(
+      'provider alias "anthropic" matches multiple accounts; use the exact provider id',
+    );
   });
 
   it("resolves each distinct pin once and reuses the secret lookup", async () => {

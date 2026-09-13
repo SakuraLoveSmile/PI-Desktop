@@ -76,6 +76,14 @@ test("the sidecar forwards subagent bindings and the independent override opt-in
   assert.equal(sidecarSource.match(/^\s+subagentProviders,$/gm)?.length, 2);
   assert.equal(sidecarSource.match(/^\s+subagentModelKeys,$/gm)?.length, 2);
 });
+test("on-demand Task.model lookup uses unique provider matching (#286)", () => {
+  assert.match(desktopSidecarSource, /findSubagentProviderSource\(/);
+  assert.match(desktopSidecarSource, /subagentProviderLookupError\(/);
+  assert.doesNotMatch(
+    desktopSidecarSource,
+    /filter\(\(p\) => \(p\.vendorKey[\s\S]*?\[0\]/,
+  );
+});
 
 test("persisted subagent rows keep their attribution", () => {
   assert.match(

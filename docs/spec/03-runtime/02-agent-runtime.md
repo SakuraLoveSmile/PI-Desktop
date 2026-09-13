@@ -646,11 +646,14 @@ core set rather than the on-demand catalog of §7.1:
   sends `subagentModelKeys` separately from `subagentProviders`: the latter may
   include definition-only pins, while only the former authorizes cached
   overrides and the model summary. Missing keys default to an empty list;
-  successful on-demand resolution adds a key to the override cache. A changed
-  opt-in list retires the idle runtime on the next launch. Pins remain usable
-  by their own definitions when `model` is omitted, even without an opt-in.
-  The Task definition catalog displays each default model and recommends
-  omitting `model` to preserve it. See
+  successful on-demand resolution is cached separately from launch opt-in and
+  does not rewrite definition pins or runtime reuse matching. On-demand
+  provider matching uses the same unique id/vendor/name rule as pin resolution.
+  A changed opt-in list retires the idle runtime on the next launch. Pins remain usable
+  by their own definitions when `model` is omitted or when `Task.model` repeats
+  that definition's own pin key, even without an opt-in.
+  The Task definition catalog displays each default model and treats omitting
+  or repeating that key as keeping the default. See
   [ADR subagent-model-opt-in](../../adr/subagent-model-opt-in.md).
   When a model key is not pre-resolved, the runtime asks Electron main to resolve it
   on-demand via the `provider.resolveSubagentModel` RPC. The started `Task`

@@ -122,8 +122,12 @@ try {
   await run("private-cross-definition", { agent: "explorer", model: "fixture/private" });
   assert.deepEqual(resolutions, ["fixture/private"]);
   await run("definition-default", { agent: "reviewer" }, "private");
+  await run("own-pin-echo", { agent: "reviewer", model: "fixture/private" }, "private");
+  assert.deepEqual(resolutions, ["fixture/private"]);
   await run("allowed-overrides-pin", { agent: "reviewer", model: "fixture/allowed" }, "allowed");
-  await run("on-demand-opt-in", { agent: "explorer", model: "fixture/dynamic" }, "dynamic");
+  const demand = await run("on-demand-opt-in", { agent: "explorer", model: "fixture/dynamic" }, "dynamic", ["fixture/allowed"], "demand");
+  const demandAgain = await run("on-demand-reuse", { agent: "explorer", model: "fixture/dynamic" }, "dynamic", ["fixture/allowed"], "demand");
+  assert.equal(demand.runtimeId, demandAgain.runtimeId, "on-demand grants must not retire an idle runtime");
   await run("session-inheritance", { agent: "explorer", model: "fixture/parent" }, "parent", []);
   const first = await run("before-revocation", { agent: "explorer", model: "fixture/allowed" }, "allowed", ["fixture/allowed"], "reload");
   const second = await run("after-revocation", { agent: "explorer", model: "fixture/allowed" }, undefined, [], "reload");

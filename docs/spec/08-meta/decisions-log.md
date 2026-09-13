@@ -3036,10 +3036,12 @@ D193, and D194.
   `subagentProviders` may contain definition-only pins and is not an override
   allowlist. The additive `subagentModelKeys` launch field carries opt-in
   separately, defaults to empty, and participates in runtime reuse matching.
-  Only opt-in keys or successfully authorized on-demand results enter the
-  override catalog/cache. This restores D278's selection boundary without
-  reversing the existing override priority; the Task catalog now discloses
-  each definition's default model.
+  Only launch opt-in keys enter that reuse snapshot. Successfully authorized
+  on-demand results use a separate cache, must not overwrite a pin with a
+  different provider id, and do not retire an idle runtime. Repeating a
+  definition's own pin key is omit. On-demand matching uses unique provider
+  lookup. The Task catalog discloses each definition's default model.
+
 - Models not pre-resolved at sidecar launch are resolved on-demand via the
   `provider.resolveSubagentModel` RPC to Electron main, where credentials and
   the models.dev snapshot live.

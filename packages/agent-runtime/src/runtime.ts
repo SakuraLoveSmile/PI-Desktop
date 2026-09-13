@@ -1399,6 +1399,8 @@ export class DesktopAgentRuntime {
   private subagents: SubagentDefinition[];
   private subagentProviders: Record<string, RuntimeProviderConfig>;
   private subagentModelKeys: Set<string>;
+  /** On-demand Task.model grants; never mixed into launch opt-in matching. */
+  private subagentOverrideProviders: Record<string, RuntimeProviderConfig>;
   /**
    * Background delegations of this session (ADR 0089). `Task` starts one and
    * returns; `TaskWait`/`TaskList`/`TaskStop` drive it afterwards.
@@ -1543,6 +1545,7 @@ export class DesktopAgentRuntime {
     this.subagents = opts.subagents ?? [];
     this.subagentProviders = opts.subagentProviders ?? {};
     this.subagentModelKeys = new Set(opts.subagentModelKeys ?? []);
+    this.subagentOverrideProviders = {};
     if (!isCommandShellOption(opts.commandShell) || !opts.commandShell.available) {
       throw Object.assign(new Error("active command shell is invalid or unavailable"), {
         errorCode: "COMMAND_SHELL_INVALID",
@@ -3211,13 +3214,45 @@ Delegation rules:
   }
 
   /**
+   * Repeating the target definition's own pin is omit, not an override. The
+   * Task catalog prints that key, and models copy it back into `model`.
+   */
+  private isDefinitionPinOverride(
+    definition: SubagentDefinition,
+    key: string,
+  ): boolean {
+    if (!definition.model) return false;
+    if (key === subagentModelKey(definition.model)) return true;
+    const slash = key.indexOf("/");
+    if (slash < 1) return false;
+    const requestedProvider = key
+      .slice(0, slash)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+    const requestedModel = key.slice(slash + 1).trim().toLowerCase();
+    const pinProvider = definition.model.providerId
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+    return (
+      Boolean(requestedProvider) &&
+      requestedProvider === pinProvider &&
+      requestedModel === definition.model.modelId.toLowerCase()
+    );
+  }
+
+  /**
    * On-demand model resolution for Task-time model overrides. Asks Electron
    * main to authorize and resolve a `providerId/modelId` key outside the
-   * opted-in launch catalog. The result is cached for the life of this runtime.
+   * opted-in launch catalog. Grants live in a separate cache so they cannot
+   * rewrite definition pins or change launch-time reuse matching.
    */
   private async resolveSubagentModel(
     key: string,
   ): Promise<RuntimeProviderConfig | undefined> {
+    const cached = this.subagentOverrideProviders[key];
+    if (cached) return cached;
     try {
       const result = await (this.host as any).call(
         "provider.resolveSubagentModel",
@@ -3225,6 +3260,11 @@ Delegation rules:
       );
       if (result && typeof result === "object" && "modelId" in result) {
         const provider = result as RuntimeProviderConfig;
+        const pinned = this.subagentProviders[key];
+        if (pinned && pinned.id !== provider.id) {
+          // Another account's opt-in must use its exact provider-id key.
+          return undefined;
+        }
         // Vendor-account (OAuth) providers need a resolveAuth callback so
         // pi-ai can obtain short-lived credentials per request. The JSON-RPC
         // result does not carry the callback, so we attach one that calls
@@ -3236,8 +3276,7 @@ Delegation rules:
               providerId: provider.id,
             });
         }
-        this.subagentProviders[key] = provider;
-        this.subagentModelKeys.add(key);
+        this.subagentOverrideProviders[key] = provider;
         return provider;
       }
     } catch {
@@ -3251,7 +3290,14 @@ Delegation rules:
    * on demand. A binding resolved only for a definition pin is not an opt-in.
    */
   private availableSubagentModelKeys(): string[] {
-    return [...this.subagentModelKeys].filter((key) => this.subagentProviders[key]);
+    const keys = new Set<string>();
+    for (const key of this.subagentModelKeys) {
+      if (this.subagentProviders[key] || this.subagentOverrideProviders[key]) {
+        keys.add(key);
+      }
+    }
+    for (const key of Object.keys(this.subagentOverrideProviders)) keys.add(key);
+    return [...keys];
   }
 
   /**
@@ -3264,14 +3310,16 @@ Delegation rules:
       return [
         "No delegation model overrides are configured.",
         "Omit the `model` parameter on Task to use the definition's default model, or inherit the parent conversation's selected model when no default is pinned.",
-        "Never invent a provider/model key. Prefer omitting `model`; repeating the exact parent provider/model is safe but unnecessary.",
+        "Repeating a definition's own Default model key is the same as omitting `model`. Never invent a provider/model key.",
       ].join(" ");
     }
     const lines: string[] = [
       "Available models for delegation (pass as `model` parameter on Task):\n",
     ];
     for (const key of keys) {
-      const provider = this.subagentProviders[key];
+      const provider =
+        this.subagentProviders[key] ?? this.subagentOverrideProviders[key];
+      if (!provider) continue;
       const reasoning = provider.supportsReasoning ? "reasoning" : "standard";
       const levels = provider.supportedThinkingLevels?.length
         ? provider.supportedThinkingLevels.join("/")
@@ -3348,7 +3396,7 @@ Delegation rules:
     const catalog = this.subagents
       .map((definition) => {
         const defaultModel = definition.model
-          ? `${subagentModelKey(definition.model)}; omit model to use this default.`
+          ? `${subagentModelKey(definition.model)}; omit model or repeat this key to keep this default.`
           : "inherits the session.";
         return `- ${definition.name} (tools: ${definition.tools.join(", ")}): ${definition.description} Default model: ${defaultModel}`;
       })
@@ -3362,10 +3410,10 @@ Delegation rules:
         "Do not delegate what you can finish in a couple of tool calls, and do not delegate anything that needs the user — a subagent cannot ask a question or propose a plan on your behalf.",
         ...(this.availableSubagentModelKeys().length
           ? [
-              "Only pass `model` when deliberately overriding the definition default with a listed delegation model; otherwise omit it. Repeating the exact parent provider/model is also safe but unnecessary.",
+              "Only pass `model` when deliberately overriding the definition default with a listed delegation model; otherwise omit it. Repeating the definition's own Default model key, or the exact parent provider/model, is the same as omitting `model`.",
             ]
           : [
-              "No delegation model overrides are configured. Omit `model` to use the definition's default, or the parent model when no default is pinned; never invent a provider/model key.",
+              "No delegation model overrides are configured. Omit `model` to use the definition's default, or the parent model when no default is pinned. Repeating a definition's own Default model key is the same as omitting `model`; never invent a provider/model key.",
             ]),
         "`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.",
         "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time. You may keep working or talk to the user while they run; the runtime delivers their reports when they finish. Call TaskStop only to cancel.",
@@ -3388,7 +3436,7 @@ Delegation rules:
         model: Type.Optional(
           Type.String({
             description:
-              "Override the delegate's model for this run, e.g. 'anthropic/claude-sonnet-4-20250514'. Omit to use the subagent's default. Prefer omitting this parameter to preserve a configured definition default. Only choose an override from the available delegation model catalog.",
+              "Override the delegate's model for this run, e.g. 'anthropic/claude-sonnet-4-20250514'. Omit to use the subagent's default. Repeating the definition's own Default model key is the same as omitting this parameter. Only choose a different override from the available delegation model catalog.",
           }),
         ),
       }),
@@ -3423,21 +3471,26 @@ Delegation rules:
             : "";
         let provider: RuntimeProviderConfig | undefined;
         if (modelOverride) {
-          // Repeating the parent model is inheritance, not a request to select
-          // an additional delegation model. This also handles a model that was
-          // echoed by the parent despite an empty delegation catalog.
-          provider = this.isSessionModelOverride(modelOverride)
-            ? this.provider
-            : this.subagentModelKeys.has(modelOverride)
+          if (this.isDefinitionPinOverride(definition, modelOverride)) {
+            provider = this.subagentProvider(definition);
+            if (!provider) {
+              return this.subagentToolError(
+                toolCallId,
+                `The ${definition.name} subagent pins ${definition.model?.providerId}/${definition.model?.modelId}, which is not configured in PI-Desktop. Do this work yourself or delegate to another subagent.`,
+              );
+            }
+          } else if (this.isSessionModelOverride(modelOverride)) {
+            provider = this.provider;
+          } else {
+            provider = this.subagentModelKeys.has(modelOverride)
               ? this.subagentProviders[modelOverride]
-              : undefined;
-          if (!provider) {
-            // Only main can authorize an override absent from the launch
-            // opt-in list, even if its binding was resolved for a private pin.
-            try {
-              provider = await this.resolveSubagentModel(modelOverride);
-            } catch {
-              // Resolution failed; fall through to the error below.
+              : this.subagentOverrideProviders[modelOverride];
+            if (!provider) {
+              try {
+                provider = await this.resolveSubagentModel(modelOverride);
+              } catch {
+                // Resolution failed; fall through to the error below.
+              }
             }
           }
           if (!provider) {
