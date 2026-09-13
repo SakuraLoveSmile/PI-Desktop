@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeSet;
 
 /// Directory holding the plugins this application build ships, if any.
 ///
@@ -16,6 +17,12 @@ fn builtin_plugins_dir() -> Option<PathBuf> {
 pub struct PluginManager {
     pub(crate) data_dir: PathBuf,
     pub(crate) runtime: Vec<PluginSummary>,
+    /// Ids this build ships from `resources/plugins` (ADR 0241).
+    ///
+    /// Recomputed from disk on every launch and never persisted: a plugin this
+    /// build stops shipping must stop being protected immediately, whatever the
+    /// row that survives it looks like.
+    pub(crate) bundled_ids: BTreeSet<String>,
     /// Catalog URL pinned by app settings; `None` keeps the official default.
     pub(crate) market_source: Option<String>,
 }
@@ -30,6 +37,7 @@ impl PluginManager {
         let mut mgr = Self {
             data_dir: data_dir.to_path_buf(),
             runtime: Vec::new(),
+            bundled_ids: BTreeSet::new(),
             market_source,
         };
         let _ = mgr.ensure_dirs();
@@ -50,13 +58,24 @@ impl PluginManager {
     /// owns — whether it is enabled, and its activation scope — are carried
     /// across. A bundled plugin that disappears from a newer build leaves the
     /// registry with it.
+    ///
+    /// The user *may* update a bundled plugin from the marketplace (ADR 0241).
+    /// Their copy is not state to discard: it stays registered for as long as
+    /// this build does not ship something newer, so an update survives the next
+    /// launch while a stale install cannot hold an app update back.
     pub fn sync_builtin(&mut self, dir: Option<&Path>) -> Result<()> {
         let mut shipped: Vec<PluginSummary> = Vec::new();
         if let Some(dir) = dir {
             let entries = match fs::read_dir(dir) {
                 Ok(entries) => entries,
                 // A build without bundled plugins is valid, not an error.
-                Err(_) => return self.drop_missing_builtin(&shipped),
+                Err(_) => {
+                    self.bundled_ids.clear();
+                    for plugin in &mut self.runtime {
+                        plugin.bundled = false;
+                    }
+                    return self.drop_missing_builtin(&shipped);
+                }
             };
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -81,6 +100,7 @@ impl PluginManager {
                     enabled,
                     scope: previous.map(|p| p.scope.clone()).unwrap_or_default(),
                     source: "builtin".into(),
+                    bundled: true,
                     status: if enabled {
                         "ready".into()
                     } else {
@@ -109,10 +129,32 @@ impl PluginManager {
             }
         }
 
+        self.bundled_ids = shipped.iter().map(|p| p.id.clone()).collect();
         self.drop_missing_builtin(&shipped)?;
         for summary in shipped {
+            // An install the user made over a bundled plugin is theirs to keep:
+            // it stays registered unless this build ships something newer.
+            let user_copy = self
+                .runtime
+                .iter()
+                .find(|p| p.id == summary.id && p.source != "builtin")
+                .filter(|p| compare_plugin_versions(&p.version, &summary.version) != Ordering::Less)
+                .cloned();
             self.runtime.retain(|p| p.id != summary.id);
-            self.runtime.push(summary);
+            self.runtime.push(match user_copy {
+                Some(existing) => PluginSummary {
+                    bundled: true,
+                    ..existing
+                },
+                None => summary,
+            });
+        }
+        // What this build ships decides the flag, not what the row says: a
+        // plugin dropped from a newer build stops being bundled on the same
+        // launch that drops it.
+        let bundled_ids = self.bundled_ids.clone();
+        for plugin in &mut self.runtime {
+            plugin.bundled = bundled_ids.contains(&plugin.id);
         }
         self.save()
     }
@@ -217,6 +259,7 @@ impl PluginManager {
             enabled: true,
             scope: ActivationScope::default(),
             source: "dev".into(),
+            bundled: false,
             status: "ready".into(),
             error_message: None,
             permissions: manifest.permissions.clone(),
@@ -282,7 +325,11 @@ impl PluginManager {
         // A bundled plugin is part of the application, so there is nothing to
         // remove and its files are not ours to delete. Disabling is the
         // supported way to turn one off (ADR 0104).
-        if existing.as_ref().map(|p| p.source.as_str()) == Some("builtin") {
+        //
+        // The id decides this, not the row: a bundled plugin the user updated
+        // from the marketplace stays uninstallable even though it now lives
+        // under `plugins/installed` and carries a marketplace source (ADR 0241).
+        if self.bundled_ids.contains(id) {
             bail!("PLUGIN_INVALID: a bundled plugin cannot be uninstalled; disable it instead");
         }
         let before = self.runtime.len();

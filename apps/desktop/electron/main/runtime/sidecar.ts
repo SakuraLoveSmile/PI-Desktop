@@ -1,8 +1,10 @@
 import { IPC, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
 import {
+  findSubagentProviderSource,
   genericModelConfig,
   loadInstructionChain,
   modelConfigWithBinding,
+  subagentProviderLookupError,
 } from "@pi-desktop/agent-runtime";
 import { loadBuiltinSkillBody } from "../builtin-skills";
 import { registerPluginDevTools } from "../plugin-dev-tools";
@@ -218,13 +220,10 @@ export function createSidecarRuntime({
     if (!modelId) throw new Error("empty model id");
 
     const allProviders = await listRuntimeProviders(false);
-    // Use the same matching logic as resolveSubagentProviders
-    const alias = providerPart.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
-    const provider =
-      allProviders.find((p) => p.id === providerPart) ||
-      allProviders.filter((p) => (p.vendorKey ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "") === alias)[0] ||
-      allProviders.filter((p) => p.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "") === alias)[0];
-    if (!provider) throw new Error(`no provider matches "${providerPart}"`);
+    const provider = findSubagentProviderSource(providerPart, allProviders);
+    if (!provider) {
+      throw new Error(subagentProviderLookupError(providerPart, allProviders));
+    }
 
     // Check if the model has availableForSubagents enabled
     const binding = provider.models?.find(

@@ -412,12 +412,21 @@ export function createSessionLaunchRuntime({
     // them and the parent agent can pass them to `Task.model` without an
     // extra RPC round-trip. Statically pinned entries from definitions take
     // precedence — they were resolved above with stricter diagnostics.
+    const subagentModelKeys: string[] = [];
     for (const row of providers.providers) {
       if (!row.enabled) continue;
       for (const binding of row.models ?? []) {
         if (!binding.availableForSubagents) continue;
-        const key = `${row.vendorKey ?? row.name}/${binding.id}`;
-        if (subagentBindings.providers[key]) continue; // already pinned
+        let key = `${row.vendorKey ?? row.name}/${binding.id}`;
+        // Two provider rows can share a vendor alias. Opting in one row must
+        // not authorize the credential-bearing pin resolved from another row.
+        if (subagentBindings.providers[key]?.id && subagentBindings.providers[key].id !== row.id) {
+          key = `${row.id}/${binding.id}`;
+        }
+        if (subagentBindings.providers[key]) {
+          subagentModelKeys.push(key);
+          continue; // already resolved, and independently opted in
+        }
         const isVendorAccount = row.authKind === OAUTH_AUTH_KIND;
         let apiKey = "";
         if (!isVendorAccount && row.authKind !== "none") {
@@ -470,6 +479,7 @@ export function createSessionLaunchRuntime({
           supportedThinkingLevels: [...caps.supportedThinkingLevels],
           ...(mc ? { modelConfig: mc } : {}),
         };
+        subagentModelKeys.push(key);
       }
     }
 
@@ -572,6 +582,7 @@ export function createSessionLaunchRuntime({
           })),
         subagents: subagentCatalog.definitions,
         subagentProviders: subagentBindings.providers,
+        subagentModelKeys,
       },
     };
   }

@@ -116,6 +116,9 @@ fn spawn(db: &Database, input: &Value) -> Result<Value> {
         }
         return Ok(json!({"message":existing,"sessionId":existing.target_session_id}));
     }
+    // Worker limits are read inside the transaction so the counts cannot go
+    // stale between the check and the session/link inserts below.
+    let tx = db.conn().unchecked_transaction()?;
     let is_worker: bool = db.conn().query_row(
         "SELECT EXISTS(SELECT 1 FROM session_collaboration_links WHERE session_id=?1)",
         params![source],
@@ -142,7 +145,6 @@ fn spawn(db: &Database, input: &Value) -> Result<Value> {
         },
     )?
     .ok_or_else(|| anyhow!("NOT_FOUND: parent session"))?;
-    let tx = db.conn().unchecked_transaction()?;
     let created = sessions::create_session_with_options(
         db,
         sessions::SessionCreateOptions {
@@ -196,6 +198,7 @@ pub fn handle(db: &Database, method: &str, input: &Value) -> Result<Value> {
         "session.collaboration.status" => {
             projections::summary(db, string(input, "sessionId", 256)?)
         }
+        "session.collaboration.list" => projections::list(db),
         "session.collaboration.result" => projections::result(db, input),
         "session.collaboration.pending" => Ok(
             json!({"messages":repository::pending_callbacks(db,input.get("sessionId").and_then(Value::as_str))?}),

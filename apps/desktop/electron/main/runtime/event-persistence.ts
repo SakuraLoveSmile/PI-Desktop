@@ -1,4 +1,4 @@
-import { IPC, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
+import { applyMessageUpdate, IPC, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
 import type { InflightCheckpointer } from "../inflight-checkpoint";
 import type { Logger } from "../logger";
 import type { PersistenceOutbox } from "../persistence-outbox";
@@ -46,6 +46,7 @@ export function createEventPersistence({
   subagentTagged: (message: UiMessage, envelope: AgentEventEnvelope) => UiMessage;
   persistAgentEvent: (envelope: AgentEventEnvelope) => UiMessage | undefined;
 } {
+  const inflightSnapshots = new Map<string, UiMessage>();
 function subagentTagged(message: UiMessage, envelope: AgentEventEnvelope): UiMessage {
   if (!envelope.parentToolCallId) return message;
   return {
@@ -79,15 +80,27 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
       planSubmissionTurnKey(envelope.sessionId, envelope.turnId || turnId!),
     );
   }
+  if (
+    event.type === "message_start" &&
+    event.message.role === "assistant" &&
+    !envelope.parentToolCallId
+  ) {
+    inflightSnapshots.set(envelope.sessionId, event.message);
+  }
   if (event.type === "message_update" && event.message.role === "assistant") {
     // Checkpoint only the session's own reply (D299). Delegate rows stream in
     // parallel with the parent's and would thrash a per-session checkpoint;
     // their loss on a crash is bounded to the Task call's activity.
     if (!envelope.parentToolCallId) {
+      const message = applyMessageUpdate(
+        inflightSnapshots.get(envelope.sessionId),
+        event,
+      );
+      inflightSnapshots.set(envelope.sessionId, message);
       inflightCheckpointer.observe({
         sessionId: envelope.sessionId,
         turnId: envelope.turnId ?? turnId,
-        message: event.message,
+        message,
       });
     }
     return;
@@ -219,6 +232,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     // delete the host file while the final row was still queued.
     if (!envelope.parentToolCallId) {
       const sessionId = envelope.sessionId;
+      inflightSnapshots.delete(sessionId);
       const finalId = event.message.id;
       inflightCheckpointer.observe({
         sessionId,

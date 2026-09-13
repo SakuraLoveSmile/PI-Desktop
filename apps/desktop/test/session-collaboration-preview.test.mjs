@@ -44,7 +44,8 @@ test("a visible card reads serially and stops reading after dismissal", async (t
   });
   t.after(stop);
   assert.equal(calls, 1);
-  t.mock.timers.tick(20_000);
+  // Below the hard deadline a hung read is never overlapped.
+  t.mock.timers.tick(14_000);
   assert.equal(calls, 1, "slow reads must not overlap");
   first.resolve(summary());
   await setImmediate();
@@ -129,6 +130,65 @@ test("hidden or detached cards do not poll again", async (t) => {
   visible = false;
   t.mock.timers.tick(20_000);
   assert.equal(calls, 1);
+});
+
+test("a read that never settles is abandoned, reschedules, and cannot report late", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const hung = [deferred(), deferred()];
+  const events = [];
+  let calls = 0;
+  const stop = observeSessionCollaboration({
+    sessionId: "worker-session",
+    read: () => hung[calls++].promise,
+    onSummary: (value) => events.push(value.status),
+    onUnavailable: () => events.push("unavailable"),
+  });
+  t.after(stop);
+  t.mock.timers.tick(5_000);
+  assert.deepEqual(events, ["unavailable"]);
+  t.mock.timers.tick(10_000);
+  assert.deepEqual(events, ["unavailable"], "the hard deadline does not report twice");
+  assert.equal(calls, 1, "the abandoned read is never overlapped before the deadline");
+  t.mock.timers.tick(4_000);
+  assert.equal(calls, 2, "the abandoned iteration schedules the next read");
+  hung[0].resolve(summary({ status: "completed" }));
+  await setImmediate();
+  assert.deepEqual(events, ["unavailable"], "a late result of an abandoned read is ignored");
+});
+
+test("a hidden card reschedules at the idle interval and reads again when it returns", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let visible = false;
+  let calls = 0;
+  const received = [];
+  const stop = observeSessionCollaboration({
+    sessionId: "worker-session",
+    read: async () => { calls++; return summary(); },
+    onSummary: (value) => received.push(value.sessionId),
+    onUnavailable: () => received.push("unavailable"),
+    isVisible: () => visible,
+  });
+  t.after(stop);
+  await setImmediate();
+  assert.equal(calls, 0, "a hidden card does not read");
+  t.mock.timers.tick(10_000);
+  t.mock.timers.tick(10_000);
+  assert.equal(calls, 0, "an idle card keeps rescheduling without reading");
+  visible = true;
+  t.mock.timers.tick(10_000);
+  assert.equal(calls, 1, "the next idle attempt reads once the card is visible again");
+  await setImmediate();
+  assert.deepEqual(received, ["worker-session"]);
+  visible = false;
+  t.mock.timers.tick(4_000);
+  assert.equal(calls, 1, "becoming hidden stops the reads after the current one");
+  t.mock.timers.tick(10_000);
+  assert.equal(calls, 1);
+});
+
+test("an unknown host status falls back to the shared unknown label", () => {
+  assert.equal(collaborationStatusKey("status-from-a-newer-host"), "sessionCollaboration.statusUnknown");
+  assert.equal(collaborationStatusKey("completed"), "sessionCollaboration.statusCompleted");
 });
 
 test("a reused worker displays only the current settled request's result", () => {

@@ -23,10 +23,12 @@
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "test:e2e:plan": "node scripts/e2e-plan.mjs",
     "test:e2e:plan-ui": "node scripts/e2e-plan-ui.mjs",
+    "test:e2e:transcript": "node scripts/e2e-transcript-render.mjs",
     "test:e2e:boot": "node scripts/e2e-electron-boot.mjs",
     "test:e2e:layout": "node scripts/e2e-three-column-layout.mjs",
     "test:e2e:supervision": "node scripts/e2e-supervision.mjs",
     "test:e2e:subagents": "node scripts/e2e-subagents.mjs",
+    "test:e2e:subagent-models": "node scripts/e2e-subagent-models.mjs",
     "check:marketplace": "node scripts/check-marketplace-catalog.mjs",
     "check:release-docs": "node scripts/check-release-docs.mjs",
     "docs:dev": "pnpm --filter @pi-desktop/docs dev",
@@ -36,7 +38,8 @@
     "lint": "pnpm lint:biome && pnpm -r --if-present lint",
     "host:dev": "cargo run -p host-core",
     "clean": "pnpm -r --if-present clean && cargo clean",
-    "lint:biome": "biome lint"
+    "lint:biome": "biome lint",
+    "test:e2e:skill-market": "node scripts/e2e-skill-market.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",

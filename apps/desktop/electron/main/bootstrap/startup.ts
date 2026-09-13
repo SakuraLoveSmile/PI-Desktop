@@ -164,9 +164,10 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     });
     state.desktopControl = control;
     plugins.setServices({ desktopControl: control });
-    // Load the local model snapshot immediately. A changed APP_VERSION marks
-    // the snapshot stale, so every release performs one bounded update without
-    // blocking the first window; Settings can force the same refresh on demand.
+    // Load the bundled model snapshot at startup without blocking the first
+    // window. Startup neither fetches nor rewrites the catalog; the snapshot
+    // is refreshed on demand from Settings (see models-dev-catalog / the
+    // 13-model-catalog-and-selection spec).
     void modelsDevCatalog.ensureLoaded();
     let bootError: unknown = null;
     try {

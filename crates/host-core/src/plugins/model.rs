@@ -43,6 +43,14 @@ pub struct PluginSummary {
     #[serde(default)]
     pub scope: ActivationScope,
     pub source: String,
+    /// True while this application build ships the plugin from
+    /// `resources/plugins` (ADR 0241).
+    ///
+    /// A bundled plugin cannot be uninstalled, but the user may update it from
+    /// the marketplace. The flag follows that update, so the panel keeps
+    /// offering the actions that stay valid for the plugin.
+    #[serde(default)]
+    pub bundled: bool,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,

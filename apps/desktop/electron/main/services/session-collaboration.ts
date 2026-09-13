@@ -56,10 +56,22 @@ function text(input: Record<string, unknown>, key: string, required = true): str
   return value.trim();
 }
 
+function messageKind(value: unknown): "task" | "message" {
+  if (value === undefined) return "message";
+  if (value !== "task" && value !== "message") fail("INVALID_ARGUMENT", "kind must be task or message");
+  return value;
+}
+
 function errorCode(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return undefined;
   const value = error as { code?: string; errorCode?: string; data?: { errorCode?: string } };
   return value.data?.errorCode ?? value.errorCode ?? value.code;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try { return JSON.stringify(error) ?? String(error); } catch { return String(error); }
 }
 
 function delivery(message: SessionCollaborationMessage): SessionCollaborationDelivery {
@@ -74,8 +86,11 @@ function delivery(message: SessionCollaborationMessage): SessionCollaborationDel
 /** Coordinates reviewed operations; Rust owns all identity and outcome state. */
 export function createSessionCollaborationService(deps: SessionCollaborationDependencies) {
   const dispatching = new Map<string, Promise<SessionCollaborationDelivery>>();
-  const settlements = new Map<string, { sessionId: string; host: Host }>();
+  // Turn IDs awaiting settlement. The host keys the receipt by the turn row in
+  // its own database, so an entry orphaned by a host restart is replayed there.
+  const settlements = new Set<string>();
   let draining: Promise<void> | undefined;
+  let dirty = false;
 
   function requireHost(): Host {
     if (deps.isQuitting()) fail("ABORTED", "The application is shutting down");
@@ -137,9 +152,12 @@ export function createSessionCollaborationService(deps: SessionCollaborationDepe
         // A full callback inbox is deferred until a later queue/turn change.
         // It must not turn a successfully completed original task into failure.
         if (deps.getHost() === host && !(message.kind === "completion" && errorCode(error) === "AGENT_BUSY")) {
+          // The host persists free text, so the code is embedded to keep the
+          // stored failure machine-readable and bounded.
+          const persisted = `${errorCode(error) ?? "FAILED"}: ${errorMessage(error)}`;
           await host.call("session.collaboration.fail", {
             messageId: message.id,
-            error: String(error instanceof Error ? error.message : error).slice(0, 2000),
+            error: persisted.slice(0, 2000),
           }).catch((persistenceError: unknown) => deps.log("Session delivery failure could not be saved", {
             messageId: message.id, error: String(persistenceError),
           }));
@@ -173,28 +191,48 @@ export function createSessionCollaborationService(deps: SessionCollaborationDepe
   }
 
   async function drain(): Promise<void> {
-    if (draining) return draining;
-    if (!deps.getHost() || deps.isQuitting()) return;
-    draining = (async () => {
-      const host = requireHost();
-      if (settlements.size && await deps.flushTranscript()) {
-        checkCurrent(host);
-        for (const [turnId, owner] of settlements) {
-          if (owner.host === host) await host.call("session.collaboration.settle", { turnId });
-          settlements.delete(turnId);
-        }
+    // Re-entrant, self-healing: a caller arriving while a pass is running flags
+    // dirty and awaits it, then re-checks. This also closes the narrow window
+    // where a settlement is queued right as a running pass decides to stop, so a
+    // completion callback is never deferred to an unrelated later trigger.
+    for (;;) {
+      if (draining) {
+        dirty = true;
+        await draining;
+        if (!dirty) return;
+        continue;
       }
-      const pending = await host.call<{ messages: SessionCollaborationMessage[] }>("session.collaboration.pending", {});
-      checkCurrent(host);
-      await Promise.all(pending.messages.map(async (message) => {
-        try { await dispatch(message); }
-        catch (error) {
-          deps.log("Session completion delivery is pending or failed", { messageId: message.id, error: String(error) });
-        }
-      }));
-    })();
-    try { await draining; }
-    finally { draining = undefined; }
+      if (!deps.getHost() || deps.isQuitting()) return;
+      draining = (async () => {
+        do {
+          // Cleared first so a throwing pass cannot keep re-running the loop.
+          dirty = false;
+          const host = requireHost();
+          if (settlements.size && await deps.flushTranscript()) {
+            checkCurrent(host);
+            for (const turnId of settlements) {
+              // Settling is idempotent host-side, so entries recorded against a
+              // previous host are replayed rather than dropped. A failing call
+              // keeps its entry for a later drain.
+              await host.call("session.collaboration.settle", { turnId });
+              settlements.delete(turnId);
+            }
+          }
+          const pending = await host.call<{ messages: SessionCollaborationMessage[] }>("session.collaboration.pending", {});
+          checkCurrent(host);
+          await Promise.all(pending.messages.map(async (message) => {
+            try { await dispatch(message); }
+            catch (error) {
+              deps.log("Session completion delivery is pending or failed", { messageId: message.id, error: String(error) });
+            }
+          }));
+        } while (dirty);
+      })();
+      try { await draining; }
+      finally { draining = undefined; }
+      if (dirty) continue;
+      return;
+    }
   }
 
   return {
@@ -213,6 +251,9 @@ export function createSessionCollaborationService(deps: SessionCollaborationDepe
         case "session/collaboration/status":
           await drain();
           return readSessionCollaboration(host, deps.getSidecar(), text(data, "sessionId")!);
+        case "session/collaboration/list":
+          await drain();
+          return host.call("session.collaboration.list", {});
         case "session/collaboration/result":
           await drain();
           return host.call("session.collaboration.result", {
@@ -255,17 +296,19 @@ export function createSessionCollaborationService(deps: SessionCollaborationDepe
             idempotencyKey: text(data, "idempotencyKey", false) ?? randomUUID(),
             ...(typeof notify === "boolean" ? { notifyOnCompletion: notify } : {}),
             ...(spawn ? { ...model, title: text(data, "title", false) }
-              : { sessionId: text(data, "sessionId"), kind: data.kind ?? "message" }),
+              : { sessionId: text(data, "sessionId"), kind: messageKind(data.kind) }),
           });
           return dispatch(response.message, input.signal);
         }
         default: fail("NOT_FOUND", "Unknown session collaboration operation");
       }
     },
-    async settle(sessionId: string, turnId: string): Promise<void> {
+    // The session ID stays part of the runtime callback contract; the host
+    // resolves the receipt from the turn ID alone.
+    async settle(_sessionId: string, turnId: string): Promise<void> {
       const host = deps.getHost();
       if (!host || deps.isQuitting()) return;
-      settlements.set(turnId, { sessionId, host });
+      settlements.add(turnId);
       // Let final message_end enqueues from this event-loop turn reach the outbox.
       await new Promise<void>((resolve) => setImmediate(resolve));
       await drain();

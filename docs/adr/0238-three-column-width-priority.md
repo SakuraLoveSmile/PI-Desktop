@@ -43,7 +43,7 @@ MainChat to its floor while the expanded sidebar kept its full width.
    the panel can continue growing after the sidebar has yielded.
 3. A manual sidebar reopen spends work-panel width first. It preserves the
    current MainChat width where possible; if the 450px floor would be crossed,
-   it targets `370px`. This reopen path may persist a positive compact panel
+   it targets `460px`. This reopen path may persist a positive compact panel
    width below the ordinary `244px` presentation minimum.
 4. Automatic sidebar collapse is remembered only until the work panel closes.
    Closing the panel restores a sidebar collapsed by the layout mechanism.
@@ -63,6 +63,10 @@ MainChat to its floor while the expanded sidebar kept its full width.
    column to protect. Leaving preview mode restores the previous panel width
    and keeps whatever sidebar state the user chose last; the mode is transient
    (never persisted, ends with the panel) and never changes native bounds.
+   Because MainChat is absent in this mode, AppShell supplies a window-level
+   46px chrome row with New Task, sidebar, and native window controls.
+   Collapsed-sidebar preview reserves 76px on the left for macOS traffic lights
+   in windowed mode and 8px in fullscreen.
 
 ## Consequences
 

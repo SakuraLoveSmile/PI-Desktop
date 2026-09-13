@@ -62,16 +62,27 @@ test("subagent models use the exact stored binding for thinking capability", () 
   );
 });
 
-test("the sidecar forwards both subagent params to the runtime", () => {
+test("the sidecar forwards subagent bindings and the independent override opt-in to the runtime", () => {
   assert.match(sidecarSource, /subagents\?: SubagentDefinition\[\];/);
   assert.match(
     sidecarSource,
     /subagentProviders\?: Record<string, RuntimeProviderConfig>;/,
   );
+  assert.match(sidecarSource, /subagentModelKeys\?: string\[\];/);
+  assert.match(sessionLaunchSource, /subagentModelKeys,/);
   // Once for the reuse check, once for the constructor: a changed catalog must
   // rebuild the runtime rather than silently keep the old delegates.
   assert.equal(sidecarSource.match(/^\s+subagents,$/gm)?.length, 2);
   assert.equal(sidecarSource.match(/^\s+subagentProviders,$/gm)?.length, 2);
+  assert.equal(sidecarSource.match(/^\s+subagentModelKeys,$/gm)?.length, 2);
+});
+test("on-demand Task.model lookup uses unique provider matching (#286)", () => {
+  assert.match(desktopSidecarSource, /findSubagentProviderSource\(/);
+  assert.match(desktopSidecarSource, /subagentProviderLookupError\(/);
+  assert.doesNotMatch(
+    desktopSidecarSource,
+    /filter\(\(p\) => \(p\.vendorKey[\s\S]*?\[0\]/,
+  );
 });
 
 test("persisted subagent rows keep their attribution", () => {
@@ -133,7 +144,7 @@ test("a dead host transport degrades quietly instead of warning", () => {
 test("the subagents page recovers when the host comes back", () => {
   // The page loads through the shared host-collection hook, which owns the
   // plugin-changed and host-status subscriptions.
-  assert.match(pageSource, /useHostCollection\(fetchSubagents/);
+  assert.match(pageSource, /useHostCollection\(fetchSubagentPageData/);
   assert.match(hostCollectionSource, /api\.onHostStatus\(\(status\) => \{\n\s+if \(status\.ok\) void reload\(\);/);
   // Both subscriptions have to be released, so the effect returns a composed
   // cleanup rather than a single unsubscribe.

@@ -1,6 +1,7 @@
 import {
   memo,
   useMemo,
+  useRef,
 } from "react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -13,6 +14,7 @@ import {
   assistantTurnResponseDuration,
   assistantTurnResponseOutputTokens,
   assistantTurnUsage,
+  reuseReadonlyMap,
   subagentRunsEqual,
   type AssistantTurnEntry,
   type TranscriptEntry,
@@ -89,6 +91,7 @@ export function transcriptEntryEqual(
   previous: TranscriptEntry,
   next: TranscriptEntry,
 ): boolean {
+  if (previous === next) return true;
   if (previous.kind !== next.kind) return false;
   if (previous.kind === "message" && next.kind === "message") {
     return previous.message === next.message;
@@ -245,15 +248,29 @@ export const AssistantTurn = memo(function AssistantTurn({
       ),
     [entry.parts],
   );
-  const turnDelegationStatuses = useMemo(
+  const rawDelegationStatuses = useMemo(
     () =>
       collectDelegationStatuses(turnAllActivityItems, { turnLive: isActive }),
     [turnAllActivityItems, isActive],
   );
-  const turnDelegationTimings = useMemo(
+  const rawDelegationTimings = useMemo(
     () => collectDelegationTimings(turnAllActivityItems),
     [turnAllActivityItems],
   );
+  const statusesRef = useRef(rawDelegationStatuses);
+  const timingsRef = useRef(rawDelegationTimings);
+  const turnDelegationStatuses = reuseReadonlyMap(
+    statusesRef.current,
+    rawDelegationStatuses,
+  );
+  const turnDelegationTimings = reuseReadonlyMap(
+    timingsRef.current,
+    rawDelegationTimings,
+    (left, right) =>
+      left.startedAt === right.startedAt && left.completedAt === right.completedAt,
+  );
+  statusesRef.current = turnDelegationStatuses;
+  timingsRef.current = turnDelegationTimings;
 
   return (
     <div
@@ -270,7 +287,11 @@ export const AssistantTurn = memo(function AssistantTurn({
               items={part.items}
               endedAt={part.endedAt}
               isActive={isActive && index === entry.parts.length - 1}
-              runtimeActivity={runtimeActivity}
+              runtimeActivity={
+                isActive && index === entry.parts.length - 1
+                  ? runtimeActivity
+                  : undefined
+              }
               turnDelegationStatuses={turnDelegationStatuses}
               turnDelegationTimings={turnDelegationTimings}
             />

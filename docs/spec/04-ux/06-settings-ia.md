@@ -27,7 +27,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   5. **Models / 模型** — Lucide `Bot` (providers and default model)
   6. **Skills / 技能** — Lucide `BookOpen` (reusable agent instructions)
   7. **MCP** — Lucide `Server` (agent connections)
-  8. **Subagents / 子智能体** — Lucide `Bot` (personal parallel agents)
+  8. **Subagents / 子智能体** — Lucide `Bot` (built-in and personal parallel agents)
   9. **Import / 导入** — Lucide `Download` (bring sessions and model configuration in from other tools)
   10. **Projects / 项目** — Lucide `Archive` (durable project index)
   11. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
@@ -325,6 +325,18 @@ system while preserving their different data ownership:
   search field with a clear affordance, the selected-project picker, and the
   page's primary actions right-aligned. Subagents omits the filter and the
   picker because it is global-only, keeping only search and its actions.
+  The panel still uses two in-panel groups: **Built-in** (the five shipped
+  definitions `explorer`, `code-reviewer`, `test-runner`, `fixer`, and
+  `ui-designer`, rendered as read-only rows) and **Global**
+  (`~/.agents/subagents`, user-owned). An enabled user document of the same
+  name shadows that builtin in the Task catalog, so the Built-in row is omitted
+  while the user row remains. A disabled user document of the same name leaves
+  the builtin in the catalog (and on the Built-in list) because Task uses the
+  shipped definition again. Built-in rows carry a source badge and
+  **Copy as mine** (opens the create sheet pre-filled from that definition, with
+  the matching template chip selected); they have no enablement switch, reveal,
+  or delete because they are not files.
+  are not files.
 - The level filter narrows which groups the panel renders; it never hides the
   toolbar or moves the actions. New capabilities are created at the level the
   filter points at — Global under All or Global, Project under Project — and
@@ -407,9 +419,9 @@ system while preserving their different data ownership:
   is a picker over the configured providers' models; the picker groups entries
   by provider and every option comes from the configured catalog, so there is
   no hand-typed pin entry (issue #60). With no providers configured it shows
-  an empty state whose action opens Models. Builtins and project shadows stay
-  on the existing read-only rows; the picker is for new and user-owned
-  subagents only.
+  an empty state whose action opens Models. Builtins stay on the existing
+  read-only Built-in rows; the picker is for new and user-owned subagents
+  only.
   The create/edit sheet stays compact at desktop sizes: form controls are
   local filled wells with restrained padding, the prompt editor is the only
   intentionally tall control, and Advanced remains a compact disclosure. Hover

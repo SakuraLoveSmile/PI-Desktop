@@ -568,10 +568,11 @@ plugin's own persisted session partition, and network limited to
 plugin restricted to certain projects does not offer its views in others.
 
 `examples/plugins/hello` ships a working view at `views/greetings.html`, and
-PI-Desktop's own **Files** panel is a bundled plugin built the same way —
-`apps/desktop/resources/plugins/pi.files` is a complete, non-toy example of a
-view that reads the workspace over the public `fs.list` / `fs.readPreview` /
-`fs.glob` / `fs.openDefault` / `fs.reveal` bridge.
+PI-Desktop's own file view is a bundled plugin built the same way —
+`apps/desktop/resources/plugins/pi.file-manager` is a complete, non-toy example
+of a view that reaches the workspace over the public bridge: `fs.openDefault`
+and `fs.reveal` for the two actions only the host can perform, and the plugin's
+own `onPanelInvoke` channels for everything it reads and writes itself.
 
 ### 6.9 MCP server
 

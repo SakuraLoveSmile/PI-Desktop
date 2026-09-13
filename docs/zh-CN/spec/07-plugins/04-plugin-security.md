@@ -266,9 +266,11 @@ MCP 服务器是 `net.fetch` 旁边的第二个出口路径，因此它是声明
 
 `desktop.control` 把本地 MCP 控制平面暴露的那份已审查操作目录（ADR 0203 /
 D370）交给插件：项目、会话、Agent 和工作区操作，每一项都标记为 `read`、
-`write` 或 `dangerous`。插件看到的是 id、描述和风险等级，绝不会看到 Electron
-通道名或 MCP bearer token；每一次调用都经过与 MCP 调用相同的 IPC 校验、
-生命周期检查、完成事件和审计条目。
+`write` 或 `dangerous`。plugin-only 例外涵盖六个 `session/collaboration/*`
+操作：它们可以经由插件网关调用，却被刻意排除在 MCP 可见目录之外，因为它们
+需要已认证的插件调用上下文，且渲染器没有任何变更通道。插件看到的是 id、描述和
+风险等级，绝不会看到 Electron 通道名或 MCP bearer token；每一次调用都经过与
+MCP 调用相同的 IPC 校验、生命周期检查、完成事件和审计条目。
 
 `dangerous` 操作由用户拍板，而不是由调用者。控制器的 `confirm: true` 只是
 插件的知会（MCP 也是同样处理，D372）。在此之后，宿主弹出一个原生对话框，
