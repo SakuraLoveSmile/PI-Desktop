@@ -1,4 +1,4 @@
-# ADR 0243: Bound dependency installation for imported extensions
+# ADR 0244: Bound dependency installation for imported extensions
 
 - Status: Accepted
 - Date: 2026-09-14

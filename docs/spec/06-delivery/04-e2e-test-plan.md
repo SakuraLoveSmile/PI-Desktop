@@ -10554,7 +10554,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   --no-fund --ignore-scripts` (no install script ran); the extension row reaches
   `loaded` with its tools, commands, and hooks registered, and they take effect
   in the turn.
-- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §10.2; ADR 0243
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §10.2; ADR 0244
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
@@ -10573,7 +10573,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   tail; the plugin still registers; the row reports the extension `error`
   state with a `load_error` diagnostic; the session and all other extensions
   keep working.
-- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §4.4, §10.2; ADR 0243
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §4.4, §10.2; ADR 0244
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
@@ -10966,6 +10966,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Status**: Draft. Existing regression suites cover surrounding behavior;
   the rendered steering journey has not been run
   (do not run E2E locally unless explicitly requested).
+
 ### MCP market scenarios (`pnpm test:e2e:mcp-market`, headless protocol-level)
 
 | ID | Scenario | Verification |
@@ -10973,14 +10974,63 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 | E2E-MCP-MARKET-NET-BOUNDARY | URL guard rejects loopback, private, v4-mapped, ULA and link-local bypass forms (trailing dot included) and accepts public https endpoints | deterministic guard assertions |
 | E2E-MCP-MARKET-SEMANTICS | Registry records map to install templates preserving named/positional arguments and required/optional env variables | deterministic mapping assertions |
 | E2E-MCP-MARKET-INSTALL | Builtin catalog entry resolves through `resolveCatalogEntry` and installs via the host `mcp.upsert` RPC; record lands in `~/.agents/servers/` | real host binary, isolated temp HOME |
-  `pnpm test:e2e:layout` — fixed-window width invariance, the 360px floor across
-  a pointer drag, sidebar yield/restore, and the 370px reopen target); unit
-  coverage in `work-panel-resize.test.mjs`
 
-### Skill market scenarios (`pnpm test:e2e:skill-market`, headless protocol-level)
 
-| ID | Scenario | Verification |
-|---|---|---|
-| E2E-SKILL-MARKET-NET-BOUNDARY | URL guard rejects loopback, private, v4-mapped, ULA and link-local bypass forms and accepts the public CDN | deterministic guard assertions |
-| E2E-SKILL-MARKET-EXPANSION | Adjacent skill resources inline into the document body as fenced appendices | deterministic expansion assertions |
-| E2E-SKILL-MARKET-INSTALL | Builtin entry document → `skills.create` → record and rendered frontmatter land in `~/.agents/skills/` | real host binary, isolated temp HOME |
+#### E2E-SKILL-MARKET-NET-BOUNDARY: Public-HTTPS skill sources reject private and loopback URLs
+
+- **Preconditions**: Shared public-network helpers and the main-process
+  public-HTTPS client with injectable fetch/DNS.
+- **Steps**: 1) Classify trailing-dot localhost, IPv4 loopback, IPv4-mapped
+  IPv6, ULA, link-local, RFC1918, and `http://` URLs. 2) Resolve a public
+  hostname to a private A record. 3) Follow a 302 whose Location is
+  `https://127.0.0.1/`.
+- **Expected**: Every bypass form is rejected. A public CDN URL is accepted.
+  DNS that yields a private address and a redirect onto loopback both throw a
+  policy error without fetching the private target. Policy failures are not
+  retried.
+- **Specs linked**: `05-security/01-security.md`, ADR 0243,
+  `03-runtime/01-ipc-protocol.md` §12b
+- **Acceptance**: Security, Quality
+- **Milestone**: M6+
+- **Status**: Automated (`pnpm test:e2e:skill-market`,
+  `apps/desktop/test/public-https-fetch.test.mjs`,
+  `packages/shared/src/public-network.test.ts`)
+
+#### E2E-SKILL-MARKET-EXPANSION: Adjacent markdown resources inline before install
+
+- **Preconditions**: A jsDelivr skill document whose directory lists FORMS.md
+  and REFERENCE.md (mocked listing in unit tests; expansion helper in E2E).
+- **Steps**: Split SKILL.md, expand listed sibling markdown files as fenced
+  appendices, and confirm a document over 128 KiB is flagged too large.
+- **Expected**: The preview/install body contains the skill text plus
+  `# Attached resource:` appendices. Non-markdown siblings are omitted. A
+  body that would exceed host `MAX_SKILL_BYTES` is not written.
+- **Specs linked**: `04-ux/06-settings-ia.md`, ADR 0243
+- **Acceptance**: Quality
+- **Milestone**: M6+
+- **Status**: Automated (`pnpm test:e2e:skill-market`,
+  `apps/desktop/test/skill-market-scan.test.mjs`)
+
+#### E2E-SKILL-MARKET-INSTALL: Market install writes a user skill through skills.create
+
+- **Preconditions**: Host binary; isolated HOME. A builtin catalog entry with
+  an assembled markdown body.
+- **Steps**: Handshake; `skills.create` with the assembled name/description/body;
+  read `~/.agents/skills/pdf.md`; `skills.list`.
+- **Expected**: The file has rendered frontmatter and the instruction body.
+  The skill appears in `skills.list`. No path besides `skills.create` is used.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §12b, ADR 0243
+- **Acceptance**: Quality
+- **Milestone**: M6+
+- **Status**: Automated (`pnpm test:e2e:skill-market`)
+
+#### E2E-SKILL-MARKET-ID-ALIGN: Scanned skill ids match host valid_capability_id
+
+- **Preconditions**: Shared `sanitizeSkillCatalogId`.
+- **Steps**: Sanitize `Frontend_Design`, `1-pdf`, and an empty remainder.
+- **Expected**: Host-legal slugs (`frontend-design`, `1-pdf`, `skill-7`) so
+  `installedIds` matches the created record.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §12b
+- **Acceptance**: Quality
+- **Milestone**: M6+
+- **Status**: Automated (`pnpm test:e2e:skill-market`)

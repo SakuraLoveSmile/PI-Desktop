@@ -6570,7 +6570,7 @@ IPC 请求无法关闭。
   --ignore-scripts`，校验 registry-only 来源，再通过 `npm ci --omit=dev --legacy-peer-deps
   --no-audit --no-fund --ignore-scripts` 创建 `node_modules`（没有运行任何安装脚本）；
   扩展行达到 `loaded`，工具、命令与 hooks 均已注册，并在回合中生效。
-- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§10.2；ADR 0243
+- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§10.2；ADR 0244
 - **验收**：安全、质量
 - **里程碑**：MVP 后（R7 v1）
 - **状态**：由 `apps/desktop/test/agent-extensions.test.mjs` 单元覆盖，并已用
@@ -6585,7 +6585,7 @@ IPC 请求无法关闭。
   第二个目录并开始回合。
 - **预期**：渲染层出现携带 npm stderr 尾部的警告 toast；插件仍然注册；该行显示扩展
   `error` 状态与 `load_error` 诊断；会话与其他扩展均不受影响。
-- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§4.4、§10.2；ADR 0243
+- **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§4.4、§10.2；ADR 0244
 - **验收**：安全、质量
 - **里程碑**：MVP 后（R7 v1）
 - **状态**：由 `apps/desktop/test/agent-extensions.test.mjs`（跳过、失败与无效 manifest
@@ -6907,6 +6907,7 @@ IPC 请求无法关闭。
 - **里程碑**：M5
 - **状态**：草稿。现有回归套件覆盖周边行为，尚未运行渲染界面的 steering 完整流程
   （除非明确要求，不本地运行 E2E）。
+
 ### MCP 市场场景(`pnpm test:e2e:mcp-market`,协议级无头)
 
 | ID | 场景 | 验证 |
@@ -6914,10 +6915,44 @@ IPC 请求无法关闭。
 | E2E-MCP-MARKET-NET-BOUNDARY | URL guard 拒绝回环、私网、v4-mapped、ULA、link-local 及尾点绕过形态,放行公网 https | 确定性 guard 断言 |
 | E2E-MCP-MARKET-SEMANTICS | Registry 记录映射为安装模板时保留 named/positional 参数与 required/optional 环境变量语义 | 确定性映射断言 |
 | E2E-MCP-MARKET-INSTALL | 内置目录条目经 `resolveCatalogEntry` 解析并通过宿主 `mcp.upsert` RPC 安装;记录落盘 `~/.agents/servers/` | 真实宿主二进制,隔离临时 HOME |
-### 技能市场场景(`pnpm test:e2e:skill-market`,协议级无头)
 
-| ID | 场景 | 验证 |
-|---|---|---|
-| E2E-SKILL-MARKET-NET-BOUNDARY | URL guard 拒绝回环、私网、v4-mapped、ULA、link-local 绕过形态,放行公共 CDN | 确定性 guard 断言 |
-| E2E-SKILL-MARKET-EXPANSION | 技能相邻资源以内联附录形式展开进文档正文 | 确定性展开断言 |
-| E2E-SKILL-MARKET-INSTALL | 内置条目文档 → `skills.create` → 记录与渲染出的 frontmatter 落盘 `~/.agents/skills/` | 真实宿主二进制,隔离临时 HOME |
+
+#### E2E-SKILL-MARKET-NET-BOUNDARY：技能源公网 HTTPS 策略拒绝私网与回环
+
+- **前提条件**：共享 public-network helper，以及可注入 fetch/DNS 的主进程公网 HTTPS 客户端。
+- **步骤**：1）分类 trailing-dot localhost、IPv4 回环、IPv4-mapped IPv6、ULA、link-local、RFC1918 与 `http://`。2）将公网主机名解析到私网 A 记录。3）跟随 Location 为 `https://127.0.0.1/` 的 302。
+- **预期**：上述绕过形态全部拒绝；公共 CDN 放行。解析到私网地址或 redirect 到回环会抛出策略错误，且不会请求私网目标。策略失败不重试。
+- **链接规格**：`05-security/01-security.md`、ADR 0243、`03-runtime/01-ipc-protocol.md` §12b
+- **验收**：Security、Quality
+- **里程碑**：M6+
+- **状态**：已自动化（`pnpm test:e2e:skill-market`、`apps/desktop/test/public-https-fetch.test.mjs`、`packages/shared/src/public-network.test.ts`）
+
+#### E2E-SKILL-MARKET-EXPANSION：相邻 markdown 资源在安装前内联
+
+- **前提条件**：技能目录列出 FORMS.md 与 REFERENCE.md。
+- **步骤**：拆分 SKILL.md，把相邻 markdown 展开为附录，并确认超过 128 KiB 的文档被标记过大。
+- **预期**：预览/安装正文含技能文本与 `# Attached resource:` 附录。非 markdown 兄弟文件省略。超过 host `MAX_SKILL_BYTES` 的正文不会写入。
+- **链接规格**：`04-ux/06-settings-ia.md`、ADR 0243
+- **验收**：Quality
+- **里程碑**：M6+
+- **状态**：已自动化（`pnpm test:e2e:skill-market`、`apps/desktop/test/skill-market-scan.test.mjs`）
+
+#### E2E-SKILL-MARKET-INSTALL：市场安装经 skills.create 写入用户技能
+
+- **前提条件**：宿主二进制；隔离 HOME。内置目录条目与组装后的 markdown 正文。
+- **步骤**：handshake；用组装后的 name/description/body 调用 `skills.create`；读取 `~/.agents/skills/pdf.md`；`skills.list`。
+- **预期**：文件含渲染后的 frontmatter 与指令正文；出现在 `skills.list`。不走 `skills.create` 以外的写入路径。
+- **链接规格**：`03-runtime/01-ipc-protocol.md` §12b、ADR 0243
+- **验收**：Quality
+- **里程碑**：M6+
+- **状态**：已自动化（`pnpm test:e2e:skill-market`）
+
+#### E2E-SKILL-MARKET-ID-ALIGN：扫描得到的技能 id 与 host valid_capability_id 对齐
+
+- **前提条件**：共享 `sanitizeSkillCatalogId`。
+- **步骤**：净化 `Frontend_Design`、`1-pdf` 以及空余量。
+- **预期**：得到 host 合法 slug（`frontend-design`、`1-pdf`、`skill-7`），使 `installedIds` 能对上创建结果。
+- **链接规格**：`03-runtime/01-ipc-protocol.md` §12b
+- **验收**：Quality
+- **里程碑**：M6+
+- **状态**：已自动化（`pnpm test:e2e:skill-market`）

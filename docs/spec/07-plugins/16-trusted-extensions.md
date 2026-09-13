@@ -1,6 +1,6 @@
 # 16. Trusted Extensions
 
-> Status: Implemented v1.1 (D387 / D388, ADR 0214 / ADR 0215 / ADR 0243); implementation notes are marked "v1 note"
+> Status: Implemented v1.1 (D387 / D388, ADR 0214 / ADR 0215 / ADR 0244); implementation notes are marked "v1 note"
 > Scope: v1.1. v2 and v3 items are listed in §12 and are not committed.
 
 ## 1. Purpose and terminology

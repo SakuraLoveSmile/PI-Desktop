@@ -96,6 +96,16 @@ and byte size, and only then creates the `plan_approvals` record with
 structured title/question fields. Renderer and sidecar state cannot write or
 replace an artifact.
 
+## 4.1 Skill market egress
+
+The renderer does not fetch skill catalogs or SKILL.md documents. Electron
+main performs those HTTPS requests under the public-network policy (ADR 0243 /
+D413): `https` only, a shared syntactic public-host check, DNS classification
+of every resolved address, and `redirect: "manual"` with per-hop
+re-validation. Loopback, RFC1918, ULA, link-local, and mapped IPv6 targets
+are rejected. Install writes markdown only through `skills.create`. The host
+document cap remains 128 KiB after sibling markdown is inlined.
+
 ## 5. Command execution
 
 - Bash requires confirmation by default (risk-tiered permission cards); in
@@ -234,6 +244,7 @@ host-core. They do not change the loopback-only rule above.
 | Prompt-injected destructive tool use | host-owned durable mode policy, permission confirmation, path boundary, secret isolation |
 | Dependency poisoning | lockfiles, few deps, native-module review |
 | Malicious local plugin | declared permissions, no secret access, process isolation tracked post-MVP (ADR 0008) |
+| Skill market SSRF via user source URL | public-HTTPS classifier + DNS + per-hop redirect checks in main; renderer CSP forbids the fetch (ADR 0243) |
 
 ## 11. Security acceptance gates
 

@@ -1161,6 +1161,13 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 进入提示，模型调用 `Skill` 时才读取正文 (D174)。缺失文件会在下一次扫描时
 从列表移除，并清理其本地状态。
 
+桌面专用技能市场通道（不是 host RPC）走 Electron IPC：
+
+- `pi-desktop/skill/market/search` — `{ query, sources[] }` → `{ entries, failedSources }`。
+  主进程聚合目录 JSON 与 GitHub 仓库 SKILL.md 扫描。源 URL 必须通过公网 HTTPS 策略（ADR 0243）。单源失败只丢掉该源。
+- `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`。
+  主进程按同一策略拉取文档、拆 frontmatter，并可能附上 jsDelivr 目录中的兄弟 `.md`。渲染层通过现有 `skills.create` 安装。目录 id 会净化为 host `valid_capability_id`。
+
 ## 12c. 子代理 API (D202)
 
 用户拥有的子代理仅是全局 Markdown 文档：`~/.agents/subagents/<id>.md`。
