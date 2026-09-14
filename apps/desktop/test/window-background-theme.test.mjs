@@ -21,18 +21,27 @@ test("theme changes synchronize the native non-macOS window background", () => {
   );
   assert.match(
     apiSource,
-    /setWindowBackgroundColor:\s*\(theme:\s*"light" \| "dark"\)[\s\S]*?IPC\.invoke\.windowSetBackgroundColor/,
+    /setWindowBackgroundColor:\s*\(theme:\s*"light" \| "dark",\s*color\?:\s*string\)[\s\S]*?IPC\.invoke\.windowSetBackgroundColor/,
   );
   assert.match(
     mainSource,
-    /handle\(IPC\.invoke\.windowSetBackgroundColor,[\s\S]*?setBackgroundColor\(theme === "light" \? "#ffffff" : "#181818"\)/,
+    /handle\(IPC\.invoke\.windowSetBackgroundColor,[\s\S]*?!isWindowBackgroundColor\(requested\)[\s\S]*?mainWindow\.setBackgroundColor\(color\)/,
   );
+  // A malformed colour is refused; an omitted one falls back to the host
+  // palette, which is what restores the default after a theme switch.
+  assert.match(mainSource, /isWindowBackgroundColor\(requested\)\s*\n?\s*\? requested/);
+  assert.match(mainSource, /: theme === "light"\s*\n?\s*\? "#ffffff"\s*\n?\s*: "#181818"/);
   assert.match(
     mainSource,
     /process\.platform === "darwin"\) return \{ applied: false, theme \};/,
   );
   assert.match(
     appSource,
-    /document\.documentElement\.dataset\.theme = resolvedTheme;[\s\S]*?api\.setWindowBackgroundColor\(resolvedTheme\)/,
+    /document\.documentElement\.dataset\.theme = resolvedTheme;/,
+  );
+  assert.ok(
+    appSource.includes(
+      "setWindowBackgroundColor(resolvedTheme, pluginTheme?.windowBackground?.[resolvedTheme])",
+    ),
   );
 });

@@ -72,6 +72,51 @@ test("settings offers plugin themes in the searchable picker", () => {
   assert.doesNotMatch(settingsSrc, /settings-theme-card/);
 });
 
+test("declared theme assets are served over a host-owned scheme", () => {
+  const protocolSrc = readFileSync(
+    join(desktopRoot, "electron/main/plugin-asset-protocol.ts"),
+    "utf8",
+  );
+  const startupSrc = readFileSync(
+    join(desktopRoot, "electron/main/bootstrap/startup.ts"),
+    "utf8",
+  );
+  const htmlSrc = readFileSync(join(desktopRoot, "index.html"), "utf8");
+
+  // The scheme is reserved before the app is ready, then handled by a resolver
+  // that only answers for paths the loaded plugin actually declared.
+  assert.match(startupSrc, /registerPluginAssetScheme\(\);/);
+  assert.match(startupSrc, /installPluginAssetProtocol\(/);
+  assert.match(protocolSrc, /registerSchemesAsPrivileged/);
+  assert.match(protocolSrc, /protocol\.handle\(THEME_ASSET_SCHEME/);
+  assert.match(protocolSrc, /resolve\(pluginId, assetPath\)/);
+  assert.match(protocolSrc, /x-content-type-options/);
+  // The renderer must be allowed to load the scheme it is handed.
+  assert.match(htmlSrc, /img-src[^;]*plugin-asset:/);
+  assert.match(htmlSrc, /font-src[^;]*plugin-asset:/);
+});
+
+test("theme css only reaches package bytes through the declared list", () => {
+  const register = runtimeSrc.slice(runtimeSrc.indexOf("private registerThemes"));
+  assert.match(register, /resolveThemeAssets\(/);
+  assert.match(register, /themeAssetUrl\(pluginId, normalized\)/);
+  assert.match(register, /assets\.files\.has\(normalized\)/);
+  assert.match(runtimeSrc, /sanitizeThemeCss\(raw, THEME_CSS_MAX_BYTES/);
+  // A disabled plugin stops serving its assets.
+  const clear = runtimeSrc.slice(
+    runtimeSrc.indexOf("private clearContributions"),
+    runtimeSrc.indexOf("private registerSkills"),
+  );
+  assert.match(clear, /this\.themeAssets\.delete\(pluginId\)/);
+});
+
+test("a contributed window background needs its own grant", () => {
+  const register = runtimeSrc.slice(runtimeSrc.indexOf("private registerThemes"));
+  assert.match(register, /permissions\.has\("ui\.window\.appearance"\)/);
+  assert.match(register, /resolveWindowBackground\(/);
+  assert.match(runtimeSrc, /windowBackground\?: \{ light\?: string; dark\?: string \}/);
+});
+
 test("the shipped example theme survives sanitation", () => {
   const css = readFileSync(
     join(repoRoot, "examples/plugins/hello/themes/midnight.css"),

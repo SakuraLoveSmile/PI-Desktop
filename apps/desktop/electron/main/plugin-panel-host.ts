@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain, session } from "electron";
 import { pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";
-import { isNetUrlAllowed } from "@pi-desktop/plugin-sdk";
+import { isNetUrlAllowed, THEME_ASSET_SCHEME } from "@pi-desktop/plugin-sdk";
 import {
   isPluginPanelWindowControlAction,
   PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
@@ -31,13 +31,19 @@ export type PluginPanelOpenRequest = {
   development?: boolean;
 };
 
-/** Schemes a panel may always load: its own bundle and devtools plumbing. */
+/**
+ * Schemes a panel may always load: its own bundle, devtools plumbing, and the
+ * host scheme that serves declared theme assets. The asset handler resolves
+ * through the requested plugin's own declarations, so admitting it here does
+ * not widen egress — it is read-only and package-scoped (ADR 0247).
+ */
 const PANEL_LOCAL_SCHEMES = new Set([
   "file:",
   "data:",
   "blob:",
   "devtools:",
   "chrome-extension:",
+  `${THEME_ASSET_SCHEME}:`,
 ]);
 
 const DROPPED_PATH_TTL_MS = 30_000;
