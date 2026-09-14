@@ -7408,7 +7408,8 @@ This test plan spec is accepted when:
 - **Steps**: open Settings → Project archive, open A's row menu, choose Delete
   project, and confirm in the dialog. Then repeat the same action from the
   sidebar project menu for B while B is the active workspace. Then attempt the
-  same action for C, and finally for a path the host no longer knows.
+  same action for C, then for a path the host no longer knows, and finally for a
+  fourth project D while one of D's tasks is still running.
 - **Expected**: the dialog names the project, states that the project and its
   sessions with their transcripts are removed permanently, and states that the
   folder on disk is not deleted; nothing is removed before the confirmation.
@@ -7424,12 +7425,20 @@ This test plan spec is accepted when:
   was moved or deleted on disk is still removable. Deleting C is refused with a
   message and the group is unchanged; a path the host has no durable row for is
   removed from the archive and the sidebar anyway, without a missing-project
-  error.
+  error. Deleting D while its task runs is refused with a message and removes
+  nothing — the project row, its session, and the running turn all survive —
+  and the same delete succeeds once that task has stopped.
 - **Specs linked**: `03-runtime/06-host-rpc-protocol.md` §Projects,
   `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md` §3.9, ADR 0251
 - **Acceptance criterion**: D (workspace), F (persistence), Quality
 - **Milestone**: M6+
-- **Status**: Unit/source-contract covered; full journey Draft
+- **Status**: Partially automated — `pnpm test:e2e` covers the host contract
+  (project row, owned sessions, on-disk transcripts and scratch, project
+  memory, isolation from other projects, the running-task refusal, the
+  group-root refusal, and the idempotent unknown path), and
+  `pnpm test:e2e:boot` round-trips `pi-desktop/project/remove` through the
+  sandboxed preload; the Settings archive → dialog → sidebar journey remains
+  Draft
 
 ### US-UI-59 Session-rooted background tools
 - Start a visible turn in project A, switch to project B while it runs, and
