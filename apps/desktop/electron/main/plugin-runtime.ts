@@ -1954,7 +1954,6 @@ export class PluginRuntime {
                     payload: {
                       name,
                       args: toolArgs,
-                      ...(ctx?.turnId ? { turnId: ctx.turnId } : {}),
                       sessionId,
                       turnId: ctx?.turnId,
                       mode: ctx?.mode,
