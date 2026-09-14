@@ -22,6 +22,9 @@
  *   ⑤ 写入审计：追加到插件数据目录 write-audit.jsonl（宿主审计不到这条路径）
  *   ⑥ 上限：文本预览 2 MiB / 图片 8 MiB / 音视频 24 MiB / 写入 8 MiB /
  *      单目录 3000 条 / 搜索分页（后两类要走 base64，所以单独设限）
+ *   ⑦ 宿主请求打开：宿主可以要求视图打开项目之外的文件（会话临时目录 / 附件，
+ *      路径由宿主自己选定）。视图带 external: true 时才放行绝对路径，这条路径
+ *      不做根内包含校验（它本来就在根外），黑名单与 realpath 检查照旧全量生效。
  *
  * 通道：视图 window.pluginBridge.invoke("fm.*", payload) → onPanelInvoke。
  *   宿主对自定义通道的转发超时是 30s（plugin-runtime.ts PLUGIN_PANEL_TIMEOUT_MS），
@@ -116,6 +119,8 @@ const IGNORE_FILE_NAMES = [".gitignore", ".ignore"];
 let dataPath = null;
 let prefs = {
   splitRatio: 0.32,
+  /** 左侧文件列表是否收起；宿主请求打开文件时视图会强制收起并持久化。 */
+  treeCollapsed: false,
   showIgnored: false,
   mdPreview: false,
   csvTable: true,
@@ -246,6 +251,74 @@ async function resolveInsideRoot(relPath, { mode = "read", allowRoot = false } =
   }
 
   return { root, rootPath, abs, rel, isRoot: false };
+}
+
+/** 绝对路径判定：POSIX 根、Windows 盘符、UNC（`\\server\share`）。 */
+function isAbsolutePath(target) {
+  return /^\//.test(target) || /^[A-Za-z]:[\\/]/.test(target) || target.startsWith("\\\\");
+}
+
+/** 黑名单按 POSIX 段切分，所以外部路径里的 `\` 先统一成 `/`。 */
+function denyPathOf(target) {
+  return String(target).replace(/\\/g, "/");
+}
+
+/**
+ * 项目之外的绝对路径——宿主请求视图打开的文件（会话临时目录 / 附件），路径由
+ * 宿主自己选定，本来就在项目根外。
+ *
+ * 与 resolveInsideRoot 的唯一区别是不做根内包含校验：对这条路径做包含校验没有
+ * 意义。黑名单照旧全量生效，而且「原始字符串 / 规范化后 / realpath 之后」各查
+ * 一遍，免得 `..` 折叠或符号链接把 .ssh 这类段藏起来。
+ */
+async function resolveExternal(rawPath, mode) {
+  if (typeof rawPath !== "string" || !rawPath.trim()) {
+    throw fail("INVALID_PATH", "path must be a non-empty string");
+  }
+  if (!isAbsolutePath(rawPath)) {
+    throw fail("INVALID_PATH", "external mode requires an absolute path");
+  }
+
+  const abs = path.resolve(rawPath);
+  if (isDenied(denyPathOf(rawPath), mode) || isDenied(denyPathOf(abs), mode)) {
+    throw fail("DENIED_PATH", `refused path: ${abs}`);
+  }
+
+  // 父目录必须真实存在（写新文件也一样），且真实路径不在黑名单里。
+  let realParent;
+  try {
+    realParent = await fs.realpath(path.dirname(abs));
+  } catch {
+    throw fail("NOT_FOUND", "parent directory does not exist");
+  }
+  if (isDenied(denyPathOf(realParent), mode)) {
+    throw fail("DENIED_PATH", `refused path: ${realParent}`);
+  }
+
+  if (await exists(abs)) {
+    let realAbs;
+    try {
+      realAbs = await fs.realpath(abs);
+    } catch {
+      realAbs = abs;
+    }
+    if (isDenied(denyPathOf(realAbs), mode)) {
+      throw fail("DENIED_PATH", `refused path: ${realAbs}`);
+    }
+  }
+
+  // rel 直接取绝对路径：外部路径没有「相对根」的形态，响应里的 path 就是它，
+  // 视图把这个字符串原样带回来读写。
+  return { abs, rel: abs };
+}
+
+/**
+ * 读 / 写共用的目标解析。默认仍走根内守卫；只有 payload 显式 `external: true`
+ * （视图在宿主请求打开项目外文件时才带）才走外部解析。
+ */
+async function resolveTarget(payload, mode) {
+  if (payload?.external === true) return resolveExternal(payload?.path ?? "", mode);
+  return resolveInsideRoot(payload?.path ?? "", { mode });
 }
 
 // ── 忽略规则（.gitignore / .ignore 语义子集） ────────────────────────────────
@@ -468,7 +541,7 @@ function asDataUri(mime, buffer) {
 }
 
 async function handleRead(payload) {
-  const { abs, rel } = await resolveInsideRoot(payload?.path ?? "", { mode: "read" });
+  const { abs, rel } = await resolveTarget(payload, "read");
 
   const stat = await fs.stat(abs).catch(() => null);
   if (!stat) throw fail("NOT_FOUND", "file not found");
@@ -574,7 +647,7 @@ async function atomicWrite(abs, serialized, mode) {
 }
 
 async function handleWrite(payload) {
-  const { abs, rel } = await resolveInsideRoot(payload?.path ?? "", { mode: "write" });
+  const { abs, rel } = await resolveTarget(payload, "write");
 
   const text = typeof payload?.text === "string" ? payload.text : "";
   if (Buffer.byteLength(text, "utf8") > MAX_WRITE_BYTES) {
@@ -1323,6 +1396,7 @@ function sanitizePrefs(partial) {
     if (typeof partial.splitRatio === "number" && Number.isFinite(partial.splitRatio)) {
       next.splitRatio = Math.min(Math.max(partial.splitRatio, 0.15), 0.7);
     }
+    if (typeof partial.treeCollapsed === "boolean") next.treeCollapsed = partial.treeCollapsed;
     if (typeof partial.showIgnored === "boolean") next.showIgnored = partial.showIgnored;
     if (typeof partial.mdPreview === "boolean") next.mdPreview = partial.mdPreview;
     if (typeof partial.csvTable === "boolean") next.csvTable = partial.csvTable;
