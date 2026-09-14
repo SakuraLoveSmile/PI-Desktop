@@ -39,7 +39,6 @@ describe("changelog catalog", () => {
     // highlights. The in-app changelog lists shipped releases, not tags.
     expect(versions).toEqual([
       "0.14.8",
-      "0.14.7",
       "0.14.6",
       "0.14.5",
       "0.14.4",

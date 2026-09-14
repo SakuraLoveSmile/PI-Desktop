@@ -5,13 +5,6 @@ export const frEntries: ChangelogEntry[] = [
     "version": "0.14.8",
     "date": "2026-09-14",
     "highlights": [
-      "Renforce les préchargements du bac à sable pour que l’application et les panneaux de plugins démarrent de manière fiable sans erreur de résolution des paquets partagés."
-    ]
-  },
-  {
-    "version": "0.14.7",
-    "date": "2026-09-14",
-    "highlights": [
       "Parcourez et installez des serveurs MCP depuis le registre officiel et des sources configurées par l'utilisateur dans le marché MCP.",
       "Parcourez et installez des skills depuis des catalogues sélectionnés et GitHub dans le marché des Skills, avec HTTPS public et limites de taille.",
       "Livre la vue fichiers comme plugin File Manager intégré, et laisse un plugin fourni conserver une mise à jour du marketplace.",

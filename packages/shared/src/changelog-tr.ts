@@ -5,13 +5,6 @@ export const trEntries: ChangelogEntry[] = [
     "version": "0.14.8",
     "date": "2026-09-14",
     "highlights": [
-      "Paketlenmiş sandbox ön yüklemeleri güçlendirildi; uygulama ve eklenti panelleri paylaşılan paket çözümleme hataları olmadan güvenilir şekilde açılır."
-    ]
-  },
-  {
-    "version": "0.14.7",
-    "date": "2026-09-14",
-    "highlights": [
       "MCP pazarında resmi kayıttan ve kullanıcı tanımlı kaynaklardan MCP sunucularını tarayıp yükleyin.",
       "Skill pazarında seçilmiş ve GitHub kaynaklarından skill tarayıp yükleyin; kurulum herkese açık HTTPS ve boyut sınırlarıyla yapılır.",
       "Dosya görünümünü birlikte gelen File Manager eklentisi olarak sunar; paketlenmiş bir eklenti pazar güncellemesini koruyabilir.",

@@ -5,13 +5,6 @@ export const koEntries: ChangelogEntry[] = [
     version: "0.14.8",
     date: "2026-09-14",
     highlights: [
-      "샌드박스 프리로드를 강화해 공유 패키지 확인 오류 없이 앱과 플러그인 패널이 안정적으로 시작됩니다.",
-    ],
-  },
-  {
-    version: "0.14.7",
-    date: "2026-09-14",
-    highlights: [
       "MCP 마켓에서 공식 레지스트리와 사용자 구성 소스의 MCP 서버를 찾아 설치합니다.",
       "Skill 마켓에서 큐레이션 및 GitHub 소스의 스킬을 찾아 설치하며, 공개 HTTPS와 크기 제한을 적용합니다.",
       "파일 보기를 내장 File Manager 플러그인으로 제공하고, 번들 플러그인도 마켓플레이스 업데이트를 유지할 수 있습니다.",

@@ -32,13 +32,6 @@ const enEntries: ChangelogEntry[] = [
     version: "0.14.8",
     date: "2026-09-14",
     highlights: [
-      "Harden packaged sandbox preloads so the app and plugin panels start reliably without shared-package resolution failures.",
-    ],
-  },
-  {
-    version: "0.14.7",
-    date: "2026-09-14",
-    highlights: [
       "Browse and install MCP servers from the official registry and user-configured sources in the MCP market.",
       "Browse and install skills from curated and GitHub sources in the Skill market, with public-HTTPS and size gates.",
       "Ship the file view as the vendored File Manager plugin, and let a bundled plugin keep a marketplace update.",
@@ -769,13 +762,6 @@ const zhCNEntries: ChangelogEntry[] = [
     version: "0.14.8",
     date: "2026-09-14",
     highlights: [
-      "加固打包后的沙箱预加载脚本，让应用和插件面板无需解析共享包也能可靠启动。",
-    ],
-  },
-  {
-    version: "0.14.7",
-    date: "2026-09-14",
-    highlights: [
       "在 MCP 市场中浏览并安装官方注册表和自定义来源的 MCP 服务器。",
       "在 Skill 市场中从精选来源和 GitHub 浏览并安装技能，安装走公开 HTTPS 并受大小限制。",
       "将文件视图作为内置 File Manager 插件随应用分发，内置插件也可继续接收市场更新。",
@@ -1503,13 +1489,6 @@ const zhCNEntries: ChangelogEntry[] = [
 const zhTWEntries: ChangelogEntry[] = [
   {
     version: "0.14.8",
-    date: "2026-09-14",
-    highlights: [
-      "強化打包後的沙箱預載入腳本，讓應用程式與外掛面板無需解析共享套件也能可靠啟動。",
-    ],
-  },
-  {
-    version: "0.14.7",
     date: "2026-09-14",
     highlights: [
       "在 MCP 市場中瀏覽並安裝官方登錄檔和自訂來源的 MCP 伺服器。",

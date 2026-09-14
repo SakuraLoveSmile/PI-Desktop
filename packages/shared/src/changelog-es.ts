@@ -5,13 +5,6 @@ export const esEntries: ChangelogEntry[] = [
     "version": "0.14.8",
     "date": "2026-09-14",
     "highlights": [
-      "Refuerza las precargas del sandbox para que la aplicación y los paneles de plugins se inicien de forma fiable sin fallos al resolver paquetes compartidos."
-    ]
-  },
-  {
-    "version": "0.14.7",
-    "date": "2026-09-14",
-    "highlights": [
       "Explora e instala servidores MCP del registro oficial y de fuentes configuradas por el usuario en el mercado MCP.",
       "Explora e instala skills de catálogos curados y GitHub en el mercado de Skills, con HTTPS público y límites de tamaño.",
       "Incluye la vista de archivos como el plugin File Manager integrado, y permite que un plugin empaquetado conserve una actualización del marketplace.",
