@@ -226,6 +226,8 @@ export function Sidebar({
   const sessionOutcomes = useAppStore((s) => s.sessionOutcomes);
   const pendingPermissions = useAppStore((s) => s.pendingPermissions);
   const setPage = useAppStore((s) => s.setPage);
+  const navBack = useAppStore((s) => s.navBack);
+  const canNavBack = useAppStore((s) => s.canNavBack);
   const page = useAppStore((s) => s.page);
   const settings = useAppStore((s) => s.settings);
   const prefetchSession = useAppStore((s) => s.prefetchSession);
@@ -2161,6 +2163,7 @@ export function Sidebar({
               tooltip={t("nav.settings")}
               ariaLabel={t("nav.settings")}
               onClick={() => setPage("settings")}
+              aria-pressed={page === "settings"}
             >
               <IconSettings size={14} aria-hidden />
             </TooltipButton>
@@ -2170,7 +2173,10 @@ export function Sidebar({
               data-nav="plugins"
               tooltip={t("nav.plugins")}
               ariaLabel={t("nav.plugins")}
-              onClick={() => setPage("plugins")}
+              onClick={() => page === "plugins"
+                ? (canNavBack() ? navBack() : setPage("chat"))
+                : setPage("plugins")}
+              aria-pressed={page === "plugins"}
             >
               <IconPlug size={14} aria-hidden />
             </TooltipButton>
