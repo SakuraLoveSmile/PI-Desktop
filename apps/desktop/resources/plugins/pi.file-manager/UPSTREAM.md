@@ -45,20 +45,33 @@ directory carries the built view the plugin publishes, not its React source.
 
 ## Local changes
 
-Only one, so a re-sync stays a copy:
+Two, so a re-sync stays a copy:
 
 - `manifest.json` gains `"license": "MIT"` (after `author`), making the vendored
   copy 9785 bytes
   (`9145f39b6ce7eddf0511a4f1bf1ec0a16412d6f06a81f33b2ddf2f3e67c209bc`). Every
   shipped plugin carries its license, and the upstream manifest predates that
   convention.
+- `package.json` is **added**, containing `{"type": "commonjs"}`. It is not in
+  the upstream release and not in the published `.piplug`. `main.js` is
+  CommonJS, and `apps/desktop/package.json` declares `"type": "module"`, so in
+  a checkout every `.js` beneath it — this one included — is classified as ESM
+  and the host's `require()` fails with "require is not defined in ES module
+  scope". The marker is Node's own mechanism for that and scopes the correction
+  to this plugin alone; `pi.browser` is ESM and must keep inheriting the
+  ancestor's `"module"`, which is why the marker cannot live one directory up.
+  In a packaged app the file is inert, and deleting it only costs the developer
+  experience, never a user.
 
 ## Re-syncing a newer release
 
 1. Check out the new upstream tag and confirm the marketplace entry points at
    the same bytes.
-2. Replace the five files above with the tag's copies.
-3. Re-apply `"license": "MIT"` to `manifest.json`.
+2. Replace the four upstream files above (`main.js`, `README.md`,
+   `views/index.html`, `views/assets/index.js`) plus `manifest.json` with the
+   tag's copies.
+3. Re-apply `"license": "MIT"` to `manifest.json`, and re-create
+   `package.json` — the marker is local and the tag does not carry it.
 4. Update `Origin` and the checksum table here, then run
    `node --test test/bundled-plugins.test.mjs` in `apps/desktop`.
 5. Leave the version in `manifest.json` untouched: it is the upstream version,
