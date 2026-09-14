@@ -6659,6 +6659,48 @@ and identify the platform validation still needed.
 - **Status**: Unit/source-contract covered; full provider-dialog journey Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-PROVIDER-copy-config-without-credentials: Copy configuration into an independent provider
+
+- **Preconditions**: Settings contains an ordinary provider with a saved API
+  key, custom headers, and two model bindings with distinct aliases, limits,
+  thinking levels, and modality overrides; an OAuth account also exists.
+  Record the source configuration and global default provider/model. Use a
+  deterministic endpoint to capture discovery requests without real secrets.
+- **Steps**: 1) Copy the ordinary provider. 2) Confirm the custom-service
+  draft retains the name, URL, API format, and model bindings while the key
+  and custom headers are blank and an omission notice is visible. 3) Change
+  the API format, a model alias/limit, and its thinking levels; cancel.
+  4) Confirm provider count, source data, and global defaults are unchanged.
+  5) Copy again and trigger discovery before entering a new key, then with a
+  distinct fixture key. 6) Save under a distinct name with the changed API
+  format. 7) Reopen both providers and edit the copy. 8) Inspect the OAuth
+  account row for absence of Copy. 9) In the draft-construction fixture, add
+  unknown source/model fields and verify they are not copied. 10) Copy an
+  OpenCode Go provider, confirm its named service and fixed format are kept,
+  then select Custom service and choose another ordinary API format.
+- **Expected**: Cancel creates no provider or secret. Draft model objects and
+  thinking arrays do not share references with the source. Discovery and
+  connection testing do not use the source provider id or stored credential;
+  authenticated discovery uses only the new draft key. Copy never reads the
+  secret store. Save creates a distinct provider through the existing create
+  path with independent model bindings and credentials, while the source and
+  global defaults remain unchanged. Custom headers and unknown fields are
+  omitted even if they contain credential-like values. OAuth accounts cannot
+  be copied through this action.
+- **Specs linked**: `03-runtime/12-provider-config-schema.md`,
+  `03-runtime/14-secrets-storage.md`
+- **Acceptance**: B (model configuration), F (independent persistence), Security
+- **Milestone**: M2
+- **Status**: Real Host/helper fixture verified independent creation, edits,
+  deletion, retained source credentials/defaults, and restart persistence.
+  Actual UI validation on an isolated no-secret profile confirmed cancel
+  leaves one provider; saving a copy with Responses changed to Anthropic
+  Messages and a changed name/alias creates a second provider without changing
+  the global default. Reopening both rows confirmed the source retained
+  Responses and its original alias, while the copy retained Anthropic Messages
+  and its edited alias. Credential-bearing network discovery, external-model
+  calls, and the OpenCode Go UI variant were not exercised.
+
 ## 8. Traceability Matrix
 
 
@@ -6667,6 +6709,7 @@ and identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
+| B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
 | C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll |
