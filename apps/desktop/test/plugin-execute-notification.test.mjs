@@ -176,7 +176,7 @@ function assertRefused(resolved, expectedExecutionId) {
 }
 
 test("the host-core notification carries every field the receiver reads", () => {
-  for (const field of ["executionId", "sessionId", "toolCallId", "toolName", "args", "turnId"]) {
+  for (const field of ["executionId", "sessionId", "toolCallId", "toolName", "args", "turnId", "mode"]) {
     assert.ok(FIELDS.includes(field), `plugins.execute no longer sends ${field}`);
   }
   assert.equal(

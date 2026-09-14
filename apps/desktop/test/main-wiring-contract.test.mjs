@@ -45,16 +45,47 @@ function braceBody(source, openIndex) {
 }
 
 /**
- * Required top-level member names of an interface. Members are indented two
- * spaces in these files, so a deeper indent belongs to a nested object literal
- * and a `*` line belongs to a doc comment.
+ * Top-level members of an interface. Members are indented two spaces in these
+ * files, so a deeper indent belongs to a nested object literal and a `*` line
+ * belongs to a doc comment.
  */
-function requiredKeys(body) {
+function declaredKeys(body) {
   return body
     .split("\n")
     .map((line) => /^ {2}([A-Za-z_$][\w$]*)(\?)?\s*[:(]/.exec(line))
-    .filter((match) => match && match[2] !== "?")
-    .map((match) => match[1]);
+    .filter(Boolean)
+    .map((match) => ({ name: match[1], optional: match[2] === "?" }));
+}
+
+function requiredKeys(body) {
+  return declaredKeys(body)
+    .filter((member) => !member.optional)
+    .map((member) => member.name);
+}
+
+/**
+ * A dependency wired as an explicit `undefined` type-checks and then fails the
+ * first time it is called, which is how a dropped argument is usually written
+ * by accident. Only names this interface declares are checked, so an unrelated
+ * `x: undefined` inside a nested literal is not reported.
+ */
+function assertNoUndefinedMember(interfaceSource, interfaceName, callSource, callee) {
+  const declared = new Set(
+    declaredKeys(interfaceBody(interfaceSource, interfaceName)).map(
+      (member) => member.name,
+    ),
+  );
+  const argument = callArgument(callSource, callee);
+  const wiredUndefined = [
+    ...argument.matchAll(/(^|\n)\s*([A-Za-z_$][\w$]*)\s*:\s*undefined\s*[,}]/g),
+  ]
+    .map((match) => match[2])
+    .filter((key) => declared.has(key));
+  assert.deepEqual(
+    wiredUndefined,
+    [],
+    `${callee} must not wire an ${interfaceName} member as undefined`,
+  );
 }
 
 function assertPassesRequiredKeys(interfaceSource, interfaceName, callSource, callee) {
@@ -105,6 +136,46 @@ test("the composition root passes every required factory dependency", () => {
   );
 });
 
+test("no factory dependency is wired as an explicit undefined", () => {
+  const index = read("index.ts");
+  assertNoUndefinedMember(
+    read("bootstrap/startup.ts"),
+    "StartupDependencies",
+    index,
+    "registerApplicationStartup",
+  );
+  assertNoUndefinedMember(
+    read("runtime/plans.ts"),
+    "PlanRuntimeDependencies",
+    index,
+    "createPlanRuntime",
+  );
+  assertNoUndefinedMember(
+    read("runtime/event-persistence.ts"),
+    "EventPersistenceDependencies",
+    index,
+    "createEventPersistence",
+  );
+  assertNoUndefinedMember(
+    read("runtime/sidecar.ts"),
+    "SidecarRuntimeDependencies",
+    index,
+    "createSidecarRuntime",
+  );
+  assertNoUndefinedMember(
+    read("runtime/host.ts"),
+    "HostRuntimeDependencies",
+    index,
+    "createHostRuntime",
+  );
+  assertNoUndefinedMember(
+    read("ipc/agent-ipc.ts"),
+    "AgentIpcDependencies",
+    read("ipc/register.ts"),
+    "registerAgentIpc",
+  );
+});
+
 test("the IPC registrar passes every required agent IPC dependency", () => {
   assertPassesRequiredKeys(
     read("ipc/agent-ipc.ts"),
@@ -136,4 +207,11 @@ test("a finished turn is announced to every plugin surface", () => {
   assert.match(announce, /plugins\.broadcastEvent\("session:turnEnded", \[payload\]\)/);
   assert.match(announce, /pluginPanels\.broadcast\("session:turnEnded", payload\)/);
   assert.match(announce, /pluginViews\.broadcast\("session:turnEnded", payload\)/);
+  // Each surface owns its failure: one unreachable plugin process, panel or
+  // view must not suppress the other two.
+  assert.equal(
+    (announce.match(/\} catch \(/g) ?? []).length,
+    3,
+    "every plugin surface must isolate its own delivery",
+  );
 });
