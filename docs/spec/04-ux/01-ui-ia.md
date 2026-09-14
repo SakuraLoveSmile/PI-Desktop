@@ -179,21 +179,22 @@ destination, chat as the home surface, tools and permissions inline.
   project navigation. The following `Projects` heading exposes the
   folder-picker action; retained project groups use the remaining height and
   scroll independently.
-- **Identity**: each group is keyed by the normalized full project path, never
-  by a potentially ambiguous folder basename.
+- **Identity**: each project group is keyed by a host-owned logical group id;
+  each root path remains canonical and is never inferred from an ambiguous
+  folder basename. Legacy single-folder projects are compatibility groups.
 - **Header**: project name, active state, disclosure, new-task action, and an
   overflow menu. The directory title is one full-row disclosure target;
   collapse/expand affects only child visibility, and adjacent groups form one
   dense tree rather than detached cards. Hovering or focusing the project title
   reveals the full project path. Pressing the title and moving 8px reorders
   the group.
-- **Project actions**: open folder reveals the project directory; rename edits
-  the renderer-local display name while the normalized path remains the
-  project identity; pin/unpin changes presentation priority; archive/restore
-  hides or restores the group in the default view; close removes the retained
-  tab without deleting or archiving project/session data. Custom display names
-  are stored with sidebar preferences and are used by both the sidebar and
-  Project archive after restart.
+- **Project actions**: open folder reveals the primary project directory; Edit
+  project changes the host-owned logical group name and adjusts eligible
+  non-primary roots (keeping renderer metadata in sync); pin/unpin changes
+  presentation priority; archive/restore hides or restores the group in the
+  default view; close removes the retained primary tab without deleting or
+  archiving group roots, sessions, or memory. Expanded Project archive details
+  list every group root.
 - **Conversation actions**: rename, pin/unpin, archive/restore, fork, and
   delete remain separate actions. Rename edits the task label only; archive
   never removes the transcript. Open folder is a project action, not a

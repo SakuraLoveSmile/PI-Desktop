@@ -86,6 +86,7 @@ This log freezes previously open questions into concrete decisions.
 | D412 | Delta-only coalesced streaming updates | **Amend the local `message_update` contract: append-only streaming frames carry `stream: delta` plus `deltaText`/`deltaThinking` (and reset flags) without growing `content`/`thinking`. Runtime coalesces those frames every 16ms and flushes before semantic boundaries. AgentHost, inflight checkpoints, and the renderer apply deltas; `message_start`/`message_end` remain full snapshots. Transcript activity parts keep object identity when only the tail token changes. Protocol version stays 11. See ADR 0242, E2E-STREAM-long-turn-keeps-realtime, and issue #299.** | Each token re-serialized the full assistant snapshot across sidecar, AgentHost, and IPC, so a long turn cost O(n²) bytes and backlogged later short chunks. |
 | D416 | Git clone accepts only syntactically public hosts | **Amend home git clone: `parseGitCloneUrl` reuses `isPublicHostname` so loopback, private, CGNAT, link-local, ULA, and `.local`/`.localhost` remotes are rejected before `git clone` runs. HTTPS/HTTP/SSH/`git@host:path` to public hosts remain valid. `file:` and URL passwords stay rejected. Git still performs its own DNS; this is not a market-style pin. See ADR 0247 and E2E-CLONE-public-hostname-rejects-private.** | Clone accepted `http://127.0.0.1/...` and RFC1918 literals, which is a LAN/SSRF hole the market fetchers already close for HTTPS catalogs. |
 | D417 | Plugin runtime theme APIs + sidebar image token | **Add `pi.app.setTheme` and `pi.themes.upsert`/`remove`/`list` under `ui.theme` (ADR 0249 / issue #352). Remove `MAX_THEMES_PER_PLUGIN`. Runtime upsert sanitizes CSS like load-time registration and emits `pluginChanged` (`reason: "themes"`); `setTheme` persists `AppSettings.theme` and emits `settingsChanged`. Split sidebar paint: `--ds-bg-sidebar` stays a color; optional `--ds-bg-sidebar-image` holds gradients/images, with macOS vibrancy stacking sheen over the image layer.** | Theme editor plugins cannot apply a theme from their panel, cannot ship an unlimited library, and cannot live-edit production CSS without reload; sidebar gradients broke `color-mix` / vibrancy consumers when stuffed into the color token. |
+| D420 | Structured, bounded, and redacted process logs | **Amend ADR 0046 / ADR 0212: every app/host/agent NDJSON record has a stable event and top-level correlation fields. A normal tool call emits one completion/failure record, while an unexpected sidecar exit emits interruption records for active tools; the tool protocol and transcript remain unchanged. Central logging redacts credentials and local paths, bounds structured data to 8 KiB, summarizes tool results instead of copying output, and mirrors the same sanitized record to development console output.** | The old `tool start` / `tool end` rows were redundant and unclear, while free-form child/error details could leak secrets or consume unbounded storage. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -4818,6 +4819,15 @@ D193, and D194.
   not fail with observations the probe does not itself guarantee.
 - See ADR 0239, ADR 0240, E2E-SESSION-hover-card-model-and-links.
 
+### Global sidebar conversation pins (issue #306)
+
+[ADR global-sidebar-pins](/adr/global-sidebar-pins) amends ADR 0016: conversation
+pins occupy one global section above standalone and project history, including
+closed or collapsed projects. Archive visibility and session sorting still
+apply. Pins carry project context and are removed from normal history before
+date grouping and row limits. Persisted metadata and host ownership stay intact.
+Validation contract: E2E-SIDEBAR-global-pinned-conversations.
+
 ## 2026-09-13 — Vendor the file view as an updatable plugin (issue #304)
 
 - The work panel's file view is no longer `pi.files`. It is a vendored copy of
@@ -4955,3 +4965,19 @@ D193, and D194.
   token. A literal inside a `:root[data-theme]` override is the failure mode.
 - Same class of hole remains in `settings.css` (rail, search fields, toggle
   knob, capability search) and a few other sheets; see issue #339.
+
+## 2026-09-14 — Structured, bounded, and redacted process logs (D420)
+
+- Every app/host/agent NDJSON record has a stable dot-separated `event` and
+  top-level correlation fields. A normal tool call emits one completion or
+  failure record; an unexpected sidecar exit emits interruption records for
+  active tools. The tool protocol and transcript remain unchanged.
+- Central logging redacts credential formats, sensitive keys, and local paths;
+  bounds strings and structured values; and caps each record's `data` at 8 KiB.
+  Host-core audit payloads receive corresponding shaping and a serialized
+  payload cap.
+- Tool results retain outcome, error/code, duration, field names, content-block
+  count, and stdout/stderr sizes rather than copying raw arguments, output, or
+  plugin responses. Child stderr and main-process fallbacks use stable events;
+  development console mirrors contain the same sanitized record.
+- See ADR 0250 and E2E-034.

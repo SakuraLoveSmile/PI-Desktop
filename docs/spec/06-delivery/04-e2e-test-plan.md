@@ -1466,14 +1466,22 @@ and identify the platform validation still needed.
   5. Use Tab and Shift+Tab to traverse the controls. Close with Escape, then
      reopen and close by clicking outside; check focus after each close.
   6. Reopen, enter the name, add the folders, and create the project. Inspect
-     the in-flight controls and the resulting active workspace and project tabs.
+     the in-flight controls and the resulting active primary workspace and one
+     grouped project entry with both roots.
+  7. Start a session in the group and ask the agent to read a file using the
+     additional root's absolute path; then try an unrelated outside path.
 - **Expected**: The dialog traps focus, closes on Escape or outside click while
   idle, and keeps the name and selected folders visible without horizontal
   overflow. The native picker allows multiple directories in one selection.
   Removing a folder updates the count and never removes another row. Create is
-  disabled until both a name and one folder are present. On creation the
-  primary folder receives the entered display name and becomes the active
-  workspace; every selected folder is retained as an open project tab. The
+  disabled until both a name and one folder are present. On creation one
+  logical project group receives the entered display name; its primary folder
+  becomes the active workspace and every selected folder is retained as a group
+  root. The Project archive shows one group row, and its sessions, shared
+  instructions, and shared memory use the group identity. Read/Glob/Grep/
+  Write/Edit can use an explicitly addressed additional root only after host
+  canonical containment; an unrelated outside path still follows the normal
+  permission flow. The
   dialog is unavailable while creation is in flight and returns focus to the
   invoking control after close. The surface follows the shell's neutral gray
   theme with a 480px maximum width, 18px tokenized corners, shared dialog
@@ -2466,7 +2474,7 @@ and identify the platform validation still needed.
 
 - **Preconditions**: Fresh profile; provider configured; one chat turn completed.
 - **Steps**: 1) Run a prompt with a tool call. 2) Open `~/.pi-desktop/logs/`. 3) Inspect the categorized files under `app/`, `host/`, and `agent/`.
-- **Expected**: NDJSON records exist with `ts/level/channel/category/message`; tool start/end carry `sessionId`/`toolCallId`; no API key material appears; each category file rotates at 5 MB; lifecycle, permission, tool, provider, plugin, persistence, updater, and error records remain available without creating dedicated timing category files.
+- **Expected**: NDJSON records exist with `ts/level/channel/category/event/message`; a normal tool call produces one completion or failure record carrying `sessionId`/`toolCallId`, safe tool metadata, and bounded result/duration information; an interrupted tool remains traceable by the same id; no API key, authorization value, raw command output, or local absolute path appears; each category file rotates at 5 MB; lifecycle, permission, tool, provider, plugin, persistence, updater, and error records remain available without creating dedicated timing category files.
 - **Specs linked**: `03-runtime/09-logging-and-observability.md`
 - **Acceptance**: H (diagnostics)
 - **Milestone**: M5
@@ -2707,25 +2715,28 @@ and identify the platform validation still needed.
 - **Status**: Unit-covered (`sidebar-preferences.test.mjs` for metadata,
   filtering, and sort behavior); full UI scenario Draft
 
-#### E2E-048b: Rename a project display name and retain it across restart
+#### E2E-048b: Edit a logical project name and folder roots
 
-- **Preconditions**: One retained project is visible in the sidebar and in
-  Settings → Project archive; its directory name is distinct from the desired
-  display name.
+- **Preconditions**: One retained logical project is visible in the sidebar and
+  in Settings → Project archive; it has a primary folder and one additional
+  folder.
 - **Steps**: 1) Open the project's overflow menu in the sidebar and choose
-  Rename project. 2) Enter a non-empty name and save. 3) Inspect the sidebar
-  row and Settings → Project archive. 4) Restart the app and inspect both
-  surfaces again. 5) Open the project folder and verify the filesystem path.
-- **Expected**: The rename action is available from both project menus and the
-  modal keeps focus contained, trims surrounding whitespace, and limits input
-  to 80 Unicode characters. The custom display name replaces the basename in
-  the sidebar and Project archive, survives restart, and does not alter the
-  normalized project path, workspace identity, sessions, or on-disk folder.
+  Edit project. 2) Change the name, remove the additional folder, and add it
+  again with the native folder picker. 3) Confirm the Primary row cannot be
+  removed. 4) Save and inspect the sidebar row, Project archive roots, and
+  active workspace. 5) Restart the app and inspect the group again.
+- **Expected**: Both project menus offer Edit project. The editor keeps focus
+  contained, trims the name, limits it to 80 Unicode characters, preserves the
+  Primary folder as the first row, and updates the root count without removing
+  another row. Saving persists one logical group with the adjusted roots; the
+  name survives restart, while normalized paths, workspace identity, sessions,
+  and on-disk folders remain unchanged. A root with existing chats is rejected
+  instead of orphaning those chats.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`
 - **Acceptance**: D (workspace identity), F (local presentation persistence)
 - **Milestone**: M5
-- **Status**: Unit-covered (`project-rename.test.mjs`,
+- **Status**: Unit-covered (`project-edit.test.mjs`,
   `sidebar-preferences.test.mjs`); rendered scenario Draft
 
 #### E2E-048A: Project session lists fold after the ten most recent rows
@@ -3530,7 +3541,8 @@ and identify the platform validation still needed.
   the renderer while its native window is already maximized and inspect the
   initial queried glyph/state. 6) Attempt unknown menu/window IPC actions
   while a window exists and after it closes. 7) Build each target on its
-  native runner from a clean release-host directory.
+  native runner from a clean release-host directory. On Windows, inspect the
+  installed app's taskbar button and Start menu shortcut icon.
 - **Expected**: macOS development and packaged launches show PI-Desktop as the
   native application identity, and the About panel uses the canonical
   PI-Desktop icon; neither surface exposes the stock Electron name or icon.
@@ -3557,9 +3569,11 @@ and identify the platform validation still needed.
   plugin detail sheet close button. The titlebar and right-side control band
   share one continuous 1px `border-subtle` separator; the control band's
   leading divider uses the same token and its bottom edge does not disappear
-  under the window buttons. Unknown actions fail closed. Each package contains
-  the target-native host binary (`.exe` only on Windows). Passing this scenario
-  on Windows/Linux proves shell readiness, not first-release qualification.
+  under the window buttons. Unknown actions fail closed. The installed Windows
+  taskbar button and Start menu shortcut use the PI-Desktop icon, never
+  Electron's default icon. Each package contains the target-native host binary
+  (`.exe` only on Windows). Passing this scenario on Windows/Linux proves
+  shell readiness, not first-release qualification.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `04-ux/01-ui-ia.md`, `04-ux/02-i18n-english-first.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
@@ -6663,6 +6677,48 @@ and identify the platform validation still needed.
 - **Status**: Unit/source-contract covered; full provider-dialog journey Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-PROVIDER-copy-config-without-credentials: Copy configuration into an independent provider
+
+- **Preconditions**: Settings contains an ordinary provider with a saved API
+  key, custom headers, and two model bindings with distinct aliases, limits,
+  thinking levels, and modality overrides; an OAuth account also exists.
+  Record the source configuration and global default provider/model. Use a
+  deterministic endpoint to capture discovery requests without real secrets.
+- **Steps**: 1) Copy the ordinary provider. 2) Confirm the custom-service
+  draft retains the name, URL, API format, and model bindings while the key
+  and custom headers are blank and an omission notice is visible. 3) Change
+  the API format, a model alias/limit, and its thinking levels; cancel.
+  4) Confirm provider count, source data, and global defaults are unchanged.
+  5) Copy again and trigger discovery before entering a new key, then with a
+  distinct fixture key. 6) Save under a distinct name with the changed API
+  format. 7) Reopen both providers and edit the copy. 8) Inspect the OAuth
+  account row for absence of Copy. 9) In the draft-construction fixture, add
+  unknown source/model fields and verify they are not copied. 10) Copy an
+  OpenCode Go provider, confirm its named service and fixed format are kept,
+  then select Custom service and choose another ordinary API format.
+- **Expected**: Cancel creates no provider or secret. Draft model objects and
+  thinking arrays do not share references with the source. Discovery and
+  connection testing do not use the source provider id or stored credential;
+  authenticated discovery uses only the new draft key. Copy never reads the
+  secret store. Save creates a distinct provider through the existing create
+  path with independent model bindings and credentials, while the source and
+  global defaults remain unchanged. Custom headers and unknown fields are
+  omitted even if they contain credential-like values. OAuth accounts cannot
+  be copied through this action.
+- **Specs linked**: `03-runtime/12-provider-config-schema.md`,
+  `03-runtime/14-secrets-storage.md`
+- **Acceptance**: B (model configuration), F (independent persistence), Security
+- **Milestone**: M2
+- **Status**: Real Host/helper fixture verified independent creation, edits,
+  deletion, retained source credentials/defaults, and restart persistence.
+  Actual UI validation on an isolated no-secret profile confirmed cancel
+  leaves one provider; saving a copy with Responses changed to Anthropic
+  Messages and a changed name/alias creates a second provider without changing
+  the global default. Reopening both rows confirmed the source retained
+  Responses and its original alias, while the copy retained Anthropic Messages
+  and its edited alias. Credential-bearing network discovery, external-model
+  calls, and the OpenCode Go UI variant were not exercised.
+
 ## 8. Traceability Matrix
 
 
@@ -6671,6 +6727,7 @@ and identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
+| B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
 | C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll |
@@ -7278,11 +7335,38 @@ This test plan spec is accepted when:
   actions with keyboard-reachable menu semantics.
 - Open the sort menu from the standalone `Sessions` heading, pin one
   project/session, and choose each user-facing sort mode (Recently updated,
-  Created date, Oldest first, Name). Pinned rows remain first.
+  Created date, Oldest first, Name). Pinned projects remain first in Projects;
+  pinned conversations appear once in the global Pinned section above Sessions
+  and Projects, with the selected session sort and no date headers.
 - Archive a row, verify it is absent by default, enable Show archived, and
   restore it. The transcript and project binding remain unchanged.
 - A legacy `manual` preference loads without presenting a drag-reorder
   affordance.
+
+### E2E-SIDEBAR-global-pinned-conversations
+
+- Seed an old pinned conversation in project A, today's unpinned conversation
+  and eleven other normal rows in A, a pinned conversation in collapsed project
+  B, one in closed project C, and a pinned Temporary conversation.
+- Expect one Pinned section above Sessions and Projects, containing all four
+  pins with their project names or Temporary space label. Pins have no date
+  headers and do not appear a second time in ordinary history. A still shows
+  ten normal rows initially, with its remaining rows behind Load more.
+- Change the date across midnight and select each session sort. Pins remain
+  above history; sorting changes only their internal order. Selecting B or C's
+  pin activates its original conversation and project; selecting the Temporary
+  pin clears workspace context. Running and unread states remain visible.
+- Pin and unpin through the keyboard menu. The row moves immediately and focus
+  follows its overflow control, or returns to the Sessions sort control if the
+  row is now folded or belongs to a closed project. Unpin the last pin and
+  expect no empty Pinned section.
+- Archive a pin and a pinned conversation's project. Both disappear by default;
+  Show archived reveals them and Restore preserves the pin. Delete a pinned
+  conversation and expect no stale row. Reload and expect saved pins to return.
+- With enough pins to overflow, scroll within Pinned and verify that Sessions,
+  Projects, and the footer remain reachable in light/dark themes at minimum
+  supported window size. Existing hover cards, context menus, drag/drop, and
+  project pinning retain their normal behavior.
 
 ### US-UI-59 Session-rooted background tools
 - Start a visible turn in project A, switch to project B while it runs, and
