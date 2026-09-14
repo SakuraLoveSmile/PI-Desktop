@@ -102,6 +102,8 @@
   --ds-accent: var(--gray-0);
   --ds-accent-hover: var(--gray-100);
   --ds-accent-soft: var(--gray-300);
+  /* Focus rings / resize affordances. Tied to the accent so themes stay monochrome. */
+  --ds-focus: var(--ds-accent);
   /*
     Switch track/knob. Off keeps a dim fill plus a hairline ring so the empty
     slot still reads as a control; on inverts to the solid accent, so the knob
@@ -190,6 +192,7 @@
   --ds-accent: #1a1c1f;
   --ds-accent-hover: #303030;
   --ds-accent-soft: #5d5d5d;
+  --ds-focus: var(--ds-accent);
   /* Off knob stays white on the pale track; on knob keeps white on near-black. */
   --ds-switch-track-off: color-mix(in oklab, #1a1c1f 10%, transparent);
   --ds-switch-track-off-hover: color-mix(in oklab, #1a1c1f 18%, transparent);
