@@ -162,6 +162,19 @@ export function createSessionCoordination({
     if (!id || !turn) return;
     pendingAbortReasons.delete(planSubmissionTurnKey(id, turn));
   }
+  /**
+   * Drop a turn's records when it can no longer finalize itself: its settlement
+   * waiters and its cancellation lock. Only that turn's key is touched, so a
+   * newer turn on the same session keeps its own records. Idempotent.
+   */
+  function releaseTurnClaims(sessionId: string, turnId: string): void {
+    const key = planSubmissionTurnKey(sessionId.trim(), turnId.trim());
+    pendingAbortReasons.delete(key);
+    const waiters = turnSettlements.get(key);
+    if (!waiters) return;
+    turnSettlements.delete(key);
+    for (const resolve of waiters) resolve();
+  }
 
   /**
    * Last synchronous gate before a plugin side effect. A turn that is not the
@@ -249,6 +262,7 @@ export function createSessionCoordination({
     lockAbortReason,
     peekAbortReason,
     clearAbortReason,
+    releaseTurnClaims,
     isTurnDispatchable,
     isSessionBusy,
     isStaleTerminalEvent,
