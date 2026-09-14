@@ -1,4 +1,4 @@
-# ADR 0247 — Package theme assets and contributed window backgrounds
+# ADR 0248 — Package theme assets and contributed window backgrounds
 
 - **Status**: Accepted for implementation
 - **Date**: 2026-09-14

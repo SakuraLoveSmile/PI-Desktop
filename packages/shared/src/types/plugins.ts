@@ -176,7 +176,7 @@ export type PluginTheme = {
   /**
    * Native window background for this theme, per resolved palette, as
    * `#rrggbb` or `#rrggbbaa`. Absent unless the providing plugin declared it
-   * and holds `ui.window.appearance` (ADR 0247).
+   * and holds `ui.window.appearance` (ADR 0248).
    */
   windowBackground?: { light?: string; dark?: string };
 };

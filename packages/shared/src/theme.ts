@@ -30,7 +30,7 @@ export type BuiltinTheme = {
  * Before this existed the same `#ffffff` / `#181818` pair was spelled out in
  * four files, so changing the dark plate meant finding all four. A contributed
  * theme declares the same value through
- * `contributes.windowAppearance.backgroundColor` (ADR 0247).
+ * `contributes.windowAppearance.backgroundColor` (ADR 0248).
  */
 const BUILTIN_THEME_BY_ID: Record<ThemeColorScheme, BuiltinTheme> = {
   light: { id: "light", base: "light", windowBackground: "#ffffff" },

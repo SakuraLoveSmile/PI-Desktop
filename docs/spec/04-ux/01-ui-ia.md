@@ -78,9 +78,10 @@ destination, chat as the home surface, tools and permissions inline.
   notification action; the durable local inbox opens from the sidebar footer
   bell instead (D130/D117). In work-panel preview mode, MainChat is unmounted
   and a window-level 46px chrome row keeps New Task, sidebar, and native window
-  controls available. On macOS, collapsed-sidebar preview reserves the
-  leftmost 76px in windowed mode (8px in fullscreen) so these actions do not
-  overlap the traffic lights.
+  controls available. In macOS collapsed-sidebar preview, the panel header
+  reserves the 76px windowed (8px fullscreen) traffic-light inset plus the
+  preview action lane and an 8px gap, so its first tab never overlaps either
+  the traffic lights or the preview controls.
 - **Work panel**: docked right column (not an overlay) opened by an artifact,
   the viewport-fixed toggle, or `Cmd/Ctrl + J`. File, URL, browser-preview, and
   successful workspace-edit artifacts create their resources atomically. The
@@ -152,7 +153,7 @@ destination, chat as the home surface, tools and permissions inline.
 - Empty state: a restrained hero title ("What can I help you build?" — a
   project-bound session turns the project name into a dotted-underline
   switcher that lists the sidebar's open projects, can search them, can
-  clone a git repository, and can open another local folder), an optional first-run
+  clone a git repository from a syntactically public remote (ADR 0247 / D416), and can open another local folder), an optional first-run
   checklist, and a bottom-reserved composer. Task entry starts directly in the composer; no
   redundant supporting paragraph, developer starter cards, or contextual
   quick-action row is rendered (D204/D206).

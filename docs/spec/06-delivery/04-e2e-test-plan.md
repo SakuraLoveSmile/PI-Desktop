@@ -128,6 +128,9 @@ The minimum selection is:
 - Host supervision, crash recovery, or restart behavior: `pnpm test:e2e` and
   `pnpm test:e2e:supervision`.
 - Subagent lifecycle: `pnpm test:e2e` and `pnpm test:e2e:subagents`.
+- Imported-extension dependency installation or registry-boundary changes: `pnpm test:e2e:plugin-import-deps`.
+- Trusted extension or plugin-extension changes: `pnpm test:e2e:trusted-extensions`.
+- Session collaboration / Session Orchestrator: `pnpm test:e2e:collaboration`.
 - Changes spanning multiple surfaces use the union of the applicable suites.
 
 `pnpm test:e2e` is the default cross-system smoke suite for host RPC, IPC,
@@ -5516,12 +5519,7 @@ and identify the platform validation still needed.
   `03-runtime/02-agent-runtime.md` §5f/§7.2b, ADR 0246, issue #215
 - **Acceptance**: E (tools & permissions), Security
 - **Milestone**: M6+
-- **Status**: Covered by unit tests: `packages/shared`
-  `subagent-definition.test.ts` (parse inherit, deny list), `packages/agent-runtime`
-  `runtime.test.ts` (spawn catalog minus deny, Skill prompt) and
-  `subagent.test.ts` (resolved mutation framing); host-core `user_subagents`
-  inherit round-trip. Full UI inherit checkbox journey Draft. Required suites:
-  `test:e2e`, `test:e2e:subagents`.
+- **Status**: Automated by `test:e2e:subagents` (host-core create/read/on-disk/active/loader inherit round-trip) and `test:e2e:subagent-models` (real sidecar/local transport Task spawn, inherited Skill/plugin catalog minus the deny list, and builtin explorer isolation). Unit coverage remains in `packages/shared`, `packages/agent-runtime`, and host-core `user_subagents`; the UI inherit-checkbox journey remains Draft. Required suites: `test:e2e`, `test:e2e:subagents`, `test:e2e:subagent-models`.
 
 #### E2E-145: Tool results read as structured blocks, never JSON
 
@@ -9947,10 +9945,11 @@ are withdrawn with ADR 0165.
   `03-runtime/04-data-storage.md`, ADR 0237, ADR 0239
 - **Acceptance**: C (parallel durable sessions), D (plugin security), Quality
 - **Milestone**: M6+
-- **Status**: marketplace plugin tests cover the plugin runtime; host-core and
-  desktop unit tests cover the additive host primitives. The full live
-  provider/Electron journey remains runner validation under the no-local-E2E
-  policy
+- **Status**: host ledger coverage is automated by
+  `pnpm test:e2e:collaboration`; marketplace plugin tests cover the plugin
+  runtime, and host-core/desktop unit tests cover the additive host primitives.
+  The full live provider/Electron journey remains runner validation under the
+  no-local-E2E policy
 
 #### E2E-SESSION-independent-top-level-communication: SessionTask discovers and communicates with existing sessions
 
@@ -9977,9 +9976,10 @@ are withdrawn with ADR 0165.
 - **Acceptance**: C (conversation & stream), D (plugin security),
   G (plugins), Quality
 - **Milestone**: M6+
-- **Status**: plugin and host-core regression coverage is automated; the live
-  multi-session provider/Electron journey remains runner validation under the
-  no-local-E2E policy
+- **Status**: host discovery and bidirectional delivery are automated by
+  `pnpm test:e2e:collaboration`; plugin and host-core regression coverage is
+  automated. The live multi-session provider/Electron journey remains runner
+  validation under the no-local-E2E policy
 
 #### E2E-SESSION-hover-card-model-and-links: Session hover cards expose readable model and creation navigation
 
@@ -10410,8 +10410,8 @@ browser milestones are scheduled.
 ## Trusted extension scenarios (R7 v1)
 
 The following scenarios are the acceptance targets of D387 / ADR 0214 and
-`07-plugins/16-trusted-extensions.md`. They use a fixture directory of
-sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
+`07-plugins/16-trusted-extensions.md`. The headless runner generates its six
+plugin-form fixtures in an isolated temporary directory at runtime.
 
 #### E2E-241: Discovery lists trusted extensions and enablement is explicit
 
@@ -10435,7 +10435,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §2, §3, §11; D007; D387
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); the headless journey covers plugin discovery/projection, project scope, load state, and diagnostics, while native picker import and explicit enablement remain renderer/platform validation.
 
 #### E2E-PLUGIN-imported-pi-package-skills: Explicit package import exposes skills through plugin grants
 
@@ -10511,7 +10511,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §6, §7; ADR 0214
 - **Acceptance**: B (agent), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); Agent-mode tool dispatch, ToolSearch deferral, hooks, blocking, and result replacement pass, while Plan-mode gating and core-tool collision remain additional validation.
 
 #### E2E-243: Extension commands and UI prompts round-trip through the renderer
 
@@ -10533,7 +10533,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   `07-plugins/09-plugin-command-palette.md`
 - **Acceptance**: A (app control), Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); global/composer command discovery, prompt broker round-trip, abort, session rename, exec, and Host-owned queue pass, while no-session and remote-control cases remain additional validation.
 
 #### E2E-244: Unsupported APIs, load errors, and handler timeouts degrade to diagnostics
 
@@ -10553,7 +10553,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §4.2, §4.4, §5, §6
 - **Acceptance**: Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); load errors and inert terminal-UI APIs degrade to diagnostics, while the stalled-handler timeout and disable-at-boundary journey remain additional validation.
 
 #### E2E-245: The packaged sidecar loads a TypeScript extension through jiti
 
@@ -10570,48 +10570,43 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §4.2, §13; ADR 0214
 - **Acceptance**: Quality, Release
 - **Milestone**: Post-MVP (R7 v1, delivered first as the bundling spike)
-- **Status**: Unit-covered by `packages/agent-runtime/src/extensions/bundle.test.ts`
-  (esbuild bundle run from a temp directory); packaged-app journey Draft
+- **Status**: Unit-covered by `packages/agent-runtime/src/extensions/bundle.test.ts` (esbuild bundle run from a temp directory); the packaged-app jiti journey remains Draft and is not faked by the headless runner.
 #### E2E-PLUGIN-import-extension-installs-dependencies: Importing an extension with npm dependencies installs them before first load
 
-- **Preconditions**: A pi extension directory shipping a `package.json` with
-  `dependencies` (a pure-JavaScript package is sufficient) and no
-  `node_modules`; npm reachable; the import confirm accepted.
-- **Steps**: 1) Plugins → Import pi extension, pick the directory. 2)
-  Inspect `plugins/imported/<slug>/`. 3) Send a prompt that exercises the
-  extension.
-- **Expected**: The plugin root holds the copied `package.json` with any
-  `workspaces` field stripped. Dependency resolution first runs
-  `npm install --package-lock-only --omit=dev --legacy-peer-deps --no-audit
-  --no-fund --ignore-scripts`, validates registry-only sources, and then
-  creates `node_modules` with `npm ci --omit=dev --legacy-peer-deps --no-audit
-  --no-fund --ignore-scripts` (no install script ran); the extension row reaches
-  `loaded` with its tools, commands, and hooks registered, and they take effect
-  in the turn.
+- **Preconditions**: A local pi extension package with `package.json`, `pi.extensions`,
+  a pinned pure-JavaScript `is-number@7.0.0` dependency, a `workspaces` field, and
+  no `node_modules`; the built workspace packages and npm are available.
+- **Steps**: 1) Generate the imported plugin from the local directory. 2) Run the
+  real bounded installer. 3) Inspect the copied package, lockfile, installed module,
+  lifecycle marker, and trusted-extension load report.
+- **Expected**: The plugin root holds the copied `package.json` with `workspaces`
+  stripped. The installer runs the two registry-only, `--ignore-scripts` npm steps;
+  every lockfile `resolved` URL is registry-only, `node_modules/is-number` exists,
+  no lifecycle marker is written, and the trusted-extension runner reports `loaded`
+  with the dependency-backed command registered.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §10.2; ADR 0244
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
-  and verified manually with `pi-hermes-memory` through the sidecar bundle
-  (tools, commands, and hooks registered, zero diagnostics); no CI journey yet
+- **Status**: Automated by `pnpm test:e2e:plugin-import-deps` for the deterministic
+  installer boundary; the full picker/renderer/turn journey remains a separate
+  validation surface.
 
 #### E2E-PLUGIN-import-extension-reports-missing-dependency: A failed dependency install or unloadable dependency is surfaced, never silent
 
-- **Preconditions**: A pi extension directory whose `package.json` declares
-  a dependency that cannot install (npm offline or unresolvable); and one
-  whose dependency installs but fails to load (for example a native module
-  that needs a build script).
-- **Steps**: 1) Import the first directory with npm failing. 2) Inspect the
-  toast and the plugin row. 3) Import the second directory and start a turn.
-- **Expected**: The renderer shows a warning toast carrying the npm stderr
-  tail; the plugin still registers; the row reports the extension `error`
-  state with a `load_error` diagnostic; the session and all other extensions
-  keep working.
+- **Preconditions**: Three local pi extension packages whose `package.json`
+  dependencies use unsupported `file:`, git, and HTTP tarball sources; none has
+  `node_modules` or a lockfile.
+- **Steps**: 1) Generate each imported plugin. 2) Invoke the real dependency
+  installer. 3) Inspect the returned error and the generated plugin directory.
+- **Expected**: Each failure is explicit and occurs before npm starts; the imported
+  plugin and manifest remain registered, while no loadable `node_modules` or generated
+  lockfile remains. The renderer toast/load-error journey is covered separately.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §4.4, §10.2; ADR 0244
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
-  (skip, failure, and invalid-manifest paths); no CI journey yet
+- **Status**: Automated by `pnpm test:e2e:plugin-import-deps` for the deterministic
+  registry-source rejection boundary; renderer warning-toast and `load_error`
+  behavior remains a separate validation surface.
 
 
 ---
@@ -10670,10 +10665,10 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   ADR 0211
 - **Acceptance**: Functional, Quality
 - **Milestone**: M6
-- **Status**: Unit/source-contract covered (`runtime.test.ts`
-  plan-safe filtering, `bundled-plugins.test.mjs` Browser
-  declaration, `mode-prompts.test.ts` updated wording); desktop
-  journey is Draft (run only in a capable environment when this surface changes)
+- **Status**: Partially automated: `test:e2e:plan` covers Plan-mode host
+  admission, durable-mode/action-list forwarding, and fixture-boundary
+  mutation denial; the full Electron Browser journey remains Draft (run only
+  in a capable environment when this surface changes)
 
 #### E2E-250: Context usage display preference switches the inspector's leading figure
 
@@ -10840,6 +10835,16 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   `git-clone.test.mjs`, `sidebar-preferences.test.mjs`); full UI scenario Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-CLONE-public-hostname-rejects-private
+
+- **Preconditions**: The home project switcher Clone git project action is available.
+- **Steps**: 1) Enter `https://127.0.0.1/org/repo.git`, `http://localhost/org/repo.git`, `https://10.0.0.5/org/repo.git`, and `git@127.0.0.1:org/repo.git`. 2) Enter `https://github.com/org/repo.git` and `git@github.com:org/repo.git`.
+- **Expected**: Private, loopback, and link-local remotes are rejected before `git clone` runs. Public GitHub HTTPS and SSH remotes still parse to a folder name. `file:` and password-bearing URLs remain rejected.
+- **Specs linked**: `04-ux/01-ui-ia.md`, ADR 0247, D416
+- **Acceptance**: Security, D (workspace)
+- **Milestone**: M5
+- **Status**: Unit-covered (`apps/desktop/test/git-clone.test.mjs`)
+
 #### E2E-257: Importing into an archived project restores its visibility
 
 - **Preconditions**: A durable project has been archived in the renderer
@@ -10935,10 +10940,10 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 #### E2E-LAYOUT-work-panel-maximize
 
 - **Preconditions**: A desktop session is open with the work panel visible.
-- **Steps**:
-  1. Note the current panel width and sidebar state, then click the panel
-     header's preview toggle.
-  2. Inspect the shell: MainChat, then click the toggle again.
+  1. Note the current panel width. If the sidebar is expanded, collapse it;
+     then click the panel header's `+` action to open a real work-panel tab.
+  2. Click the panel header's preview toggle.
+  3. Inspect the shell and tab alignment, then click the toggle again.
 - **Expected**: Entering preview mode stops rendering MainChat and hands its
   width to the panel, so the panel spans the client area minus the expanded
   sidebar (the whole client area when the sidebar is collapsed). The native
@@ -10948,8 +10953,9 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   not persisted and ends when the panel closes. Preview mode keeps the shell's
   new-task, sidebar, and system-window actions reachable while MainChat is
   absent. On non-fullscreen macOS with the sidebar collapsed, the first preview
-  action starts at the 76px traffic-light safe inset; fullscreen releases that
-  inset.
+  action starts at the 76px traffic-light safe inset. After opening a real work
+  panel tab, its first tab starts at least 8px to the right of the preview action
+  group; fullscreen uses the 8px native inset but retains that action lane.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238 §6, issue #289

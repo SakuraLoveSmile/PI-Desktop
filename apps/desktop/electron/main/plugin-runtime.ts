@@ -157,7 +157,7 @@ export type RegisteredPluginTheme = {
   /**
    * Native window background while this theme is selected, per resolved
    * palette. Absent unless the plugin declared it and holds
-   * `ui.window.appearance` (ADR 0247).
+   * `ui.window.appearance` (ADR 0248).
    */
   windowBackground?: { light?: string; dark?: string };
 };
@@ -935,7 +935,7 @@ export class PluginRuntime {
   /**
    * Declared theme assets, keyed by plugin id and then by the package-relative
    * path the sheet writes. The `plugin-asset:` handler answers only from here,
-   * so a path nobody declared has no URL at all (ADR 0247).
+   * so a path nobody declared has no URL at all (ADR 0248).
    */
   private themeAssets = new Map<string, Map<string, string>>();
   private mcpClients = new Map<string, McpServerClient[]>();

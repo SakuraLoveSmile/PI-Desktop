@@ -9,7 +9,7 @@ import { THEME_ASSET_SCHEME } from "@pi-desktop/plugin-sdk";
  * URI: the sheet is capped at 256 KB and base64 inflates by a third. Instead a
  * theme declares its assets in the manifest, the host rewrites the matching
  * `url()` references to `plugin-asset://<pluginId>/<path>`, and this handler
- * hands back the bytes (ADR 0247).
+ * hands back the bytes (ADR 0248).
  *
  * The allowlist is not computed here. `resolve` answers only for paths a loaded
  * plugin actually declared, already resolved inside that plugin's package, so a

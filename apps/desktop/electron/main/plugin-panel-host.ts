@@ -36,7 +36,7 @@ export type PluginPanelOpenRequest = {
  * Schemes a panel may always load: its own bundle, devtools plumbing, and the
  * host scheme that serves declared theme assets. The asset handler resolves
  * through the requested plugin's own declarations, so admitting it here does
- * not widen egress — it is read-only and package-scoped (ADR 0247).
+ * not widen egress — it is read-only and package-scoped (ADR 0248).
  */
 const PANEL_LOCAL_SCHEMES = new Set([
   "file:",

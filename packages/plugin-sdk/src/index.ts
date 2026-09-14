@@ -79,7 +79,7 @@ export type PluginManifest = {
     agentExtensions?: string[];
     settings?: PluginSettingContrib[];
     themes?: PluginThemeContrib[];
-    /** Native window background for this plugin's themes (ADR 0247). */
+    /** Native window background for this plugin's themes (ADR 0248). */
     windowAppearance?: PluginWindowAppearanceContrib;
     mcpServers?: PluginMcpServerContrib[];
     services?: PluginServiceContrib[];
