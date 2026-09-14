@@ -87,6 +87,7 @@ This log freezes previously open questions into concrete decisions.
 | D416 | Git clone accepts only syntactically public hosts | **Amend home git clone: `parseGitCloneUrl` reuses `isPublicHostname` so loopback, private, CGNAT, link-local, ULA, and `.local`/`.localhost` remotes are rejected before `git clone` runs. HTTPS/HTTP/SSH/`git@host:path` to public hosts remain valid. `file:` and URL passwords stay rejected. Git still performs its own DNS; this is not a market-style pin. See ADR 0247 and E2E-CLONE-public-hostname-rejects-private.** | Clone accepted `http://127.0.0.1/...` and RFC1918 literals, which is a LAN/SSRF hole the market fetchers already close for HTTPS catalogs. |
 | D417 | Plugin runtime theme APIs + sidebar image token | **Add `pi.app.setTheme` and `pi.themes.upsert`/`remove`/`list` under `ui.theme` (ADR 0249 / issue #352). Remove `MAX_THEMES_PER_PLUGIN`. Runtime upsert sanitizes CSS like load-time registration and emits `pluginChanged` (`reason: "themes"`); `setTheme` persists `AppSettings.theme` and emits `settingsChanged`. Split sidebar paint: `--ds-bg-sidebar` stays a color; optional `--ds-bg-sidebar-image` holds gradients/images, with macOS vibrancy stacking sheen over the image layer.** | Theme editor plugins cannot apply a theme from their panel, cannot ship an unlimited library, and cannot live-edit production CSS without reload; sidebar gradients broke `color-mix` / vibrancy consumers when stuffed into the color token. |
 | D420 | Structured, bounded, and redacted process logs | **Amend ADR 0046 / ADR 0212: every app/host/agent NDJSON record has a stable event and top-level correlation fields. A normal tool call emits one completion/failure record, while an unexpected sidecar exit emits interruption records for active tools; the tool protocol and transcript remain unchanged. Central logging redacts credentials and local paths, bounds structured data to 8 KiB, summarizes tool results instead of copying output, and mirrors the same sanitized record to development console output.** | The old `tool start` / `tool end` rows were redundant and unclear, while free-form child/error details could leak secrets or consume unbounded storage. |
+| D421 | Host turn-end event for plugins | **`session:turnEnded` is a host event with payload `{ sessionId, turnId, reason }` (`completed` / `aborted` / `error`), broadcast once per turn actually started by `session.beginTurn` at the end of turn teardown, after the durable `session.endTurn` attempt. The emitted `turnId` is the identity the terminal runtime event carried rather than whichever turn is active, and the plugin tool context's `turnId` is populated with the same value. There is no ack and no replay: a live subscribed plugin receives it once, delivery that races a crash, reload, or host quit is not guaranteed, and receiving it does not mean every in-flight tool of that turn has exited, so cleanup must be serialised or scoped by `turnId`. No new permission is required, and no published host emits it yet (0.14.8 does not include it). See ADR 0251.** | Plugins driving a GUI had to guess turn completion with idle timers, which fire mid-turn and again after the turn ends. A host-owned once-per-turn terminal event with an explicit turn identity lets a plugin settle exactly once, and the same identity in the tool context lets it correlate late tool results. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -5002,3 +5003,25 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
 - The action is deliberately absent from `CONTROL_OPERATION_SPECS`, so local
   MCP control cannot delete projects. See ADR 0251 and
   E2E-PROJECT-delete-removes-project-and-owned-sessions.
+
+## 2026-09-13 — Host turn-end event for plugins (D421)
+
+- `session:turnEnded` is delivered to plugin processes, plugin panel pages, and
+  docked views with `{ sessionId, turnId, reason }`, where `reason` is
+  `completed`, `aborted`, or `error`, once per turn actually started by
+  `session.beginTurn` (a user submission, an approved plan execution, or a
+  scheduled run).
+- The announcement runs at the end of turn teardown, after the durable
+  `session.endTurn` attempt, and carries the `turnId` of the terminal runtime
+  event rather than whichever turn is active. The plugin tool context's
+  `turnId` is populated with the same identity, forwarded from the host.
+- The finalizer is the single entry every terminal path funnels through and it
+  requires an explicit `turnId`: a terminal event that carries none, or one
+  whose turn no longer owns the session, settles nothing and announces nothing.
+  The turn's record is keyed by `(sessionId, turnId)`, so a repeat terminal
+  event joins the first claim instead of announcing twice.
+- The event needs no permission, has no ack and no replay, is not guaranteed
+  across plugin crash, reload, or host quit, and does not prove that every
+  in-flight tool of the turn has exited. No published host emits it yet: the
+  release that ships it has not been published.
+- Decision D421 is recorded by ADR 0251.
