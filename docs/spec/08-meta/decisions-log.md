@@ -4861,3 +4861,22 @@ D193, and D194.
   assembled body; over 128 KiB is not written.
 - See ADR 0243, E2E-SKILL-MARKET-NET-BOUNDARY / EXPANSION / INSTALL / ID-ALIGN,
   and issue #287.
+
+## 2026-09-14 — Harden the MCP market public-network boundary (D414)
+
+- MCP market source and catalog endpoint validation is shared by Renderer and
+  Electron Main. It accepts credentials-free public HTTPS only and rejects
+  loopback, private, CGNAT, link-local, multicast, reserved, documentation,
+  benchmark, ULA, and site-local address ranges, including mapped and
+  compatible IPv6 forms.
+- Main resolves each hostname immediately before the request and pins the
+  selected public address to the HTTPS socket. Redirects are followed manually,
+  checked and pinned at every hop, and limited to five hops. Source responses
+  are capped at 4 MiB, calls accept at most 16 sources, and browse/search
+  caches are bounded by age, key count, and entry count.
+- Registry npm/PyPI package versions and runtime/package arguments are retained
+  in install templates. Only `streamable-http` public HTTPS remotes are mapped;
+  remote header placeholders become explicit install values. Cross-origin MCP
+  redirects do not forward caller headers.
+- Manual user-owned MCP configuration keeps ADR 0142's explicit local/LAN
+  endpoint policy. See ADR 0245 and E2E-MCP-MARKET-*.

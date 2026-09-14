@@ -117,9 +117,15 @@ class Host {
     "https://[::ffff:127.0.0.1]/x",
     "https://[fd00::1]/x",
     "https://[fe80::1]/x",
+    "https://[fec0::1]/x",
     "https://127.0.0.1/x",
     "https://10.1.2.3/x",
+    "https://192.0.0.1/x",
+    "https://198.18.0.1/x",
+    "https://240.0.0.1/x",
     "https://192.168.1.1/x",
+    "https://[2001:2::1]/x",
+    "https://user:pass@example.com/x",
     "http://registry.example/x",
   ];
   const accepted = "https://registry.modelcontextprotocol.io/v0/servers";
@@ -131,7 +137,7 @@ class Host {
   record(
     "E2E-MCP-MARKET-NET-BOUNDARY",
     rejectedAll && publicOk,
-    rejectedAll && publicOk ? "9 bypass forms rejected, public accepted" : "guard misclassification",
+    rejectedAll && publicOk ? "15 bypass forms rejected, public accepted" : "guard misclassification"
   );
 }
 
@@ -145,6 +151,7 @@ class Host {
         {
           registryType: "npm",
           identifier: "semantics-mcp",
+          version: "1.2.3",
           runtimeHint: "npx",
           runtimeArguments: [{ type: "positional", value: "-y" }],
           packageArguments: [
@@ -162,7 +169,7 @@ class Host {
   const entry = mapRegistryServer(semanticsRecord);
   const argsOk =
     JSON.stringify(entry?.args) ===
-    JSON.stringify(["-y", "semantics-mcp", "--port", "8080", "--verbose"]);
+    JSON.stringify(["-y", "semantics-mcp@1.2.3", "--port", "8080", "--verbose"]);
   const specs = entry?.requiredEnv ?? [];
   const envOk =
     specs.find((s) => s.name === "REQUIRED_KEY") &&

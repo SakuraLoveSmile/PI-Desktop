@@ -98,6 +98,12 @@ CDP 插件工具在 Plan 中仍被拒绝）。 Bash 在 Plan 中仍然可用：�
 
 渲染层不拉取技能目录或 SKILL.md。Electron 主进程按公网策略发起 HTTPS 请求（ADR 0243 / D413）：仅 `https`、共享的公网主机语法检查、对每个解析地址做 DNS 分类，以及 `redirect: "manual"` 的逐跳再校验。回环、RFC1918、ULA、link-local 与 mapped IPv6 一律拒绝。安装只通过 `skills.create` 写入 markdown。内联相邻 markdown 后仍受 128 KiB 宿主上限约束。
 
+## 4.2 MCP 市场出网
+
+MCP 市场只接受无凭据的公网 HTTPS 源和目录端点。Main 在每次连接前解析主机名，并把选中的公网地址固定到 HTTPS socket，同时保留原主机名用于 TLS SNI 和 HTTP Host。重定向手动跟随、仅限 HTTPS、最多五跳，并在每次连接前重新检查。响应上限为 4 MiB，请求共享 8 秒截止时间，源、缓存和条目数量均有界。跨 origin 的用户 MCP 重定向不会转发调用方 header。
+
+手动配置的用户 MCP 仍遵循 ADR 0142，可以显式使用本地/LAN 端点；市场路径不会扩大该策略。
+
 ## 5. 命令执行
 
 - Bash默认需要确认（风险分级权限卡）；在
