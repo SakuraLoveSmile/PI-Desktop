@@ -23,9 +23,46 @@ test("contributed css is sanitized in the main process, not the renderer", () =>
   assert.match(register, /sanitizeThemeCss\(raw,\s*THEME_CSS_MAX_BYTES,/);
   assert.match(register, /resolveInsidePlugin/);
   assert.match(register, /INVALID_CSS/);
-  assert.match(runtimeSrc, /MAX_THEMES_PER_PLUGIN = 8/);
+  // The hard per-plugin theme cap was removed (ADR 0249 / issue #352).
+  assert.doesNotMatch(runtimeSrc, /MAX_THEMES_PER_PLUGIN/);
   // The renderer injects the stored text verbatim, so it must not re-filter.
   assert.doesNotMatch(appSrc, /sanitizeThemeCss/);
+});
+
+test("runtime theme APIs and setTheme are allowlisted and wired", () => {
+  assert.match(runtimeSrc, /"app\.setTheme"/);
+  assert.match(runtimeSrc, /"themes\.upsert"/);
+  assert.match(runtimeSrc, /"themes\.remove"/);
+  assert.match(runtimeSrc, /"themes\.list"/);
+  assert.match(runtimeSrc, /setThemePreference/);
+  assert.match(runtimeSrc, /onPluginThemesChanged/);
+  assert.match(mainSrc, /setThemePreference/);
+  assert.match(mainSrc, /IPC\.event\.settingsChanged/);
+  assert.match(mainSrc, /IPC\.event\.pluginChanged,\s*\{\s*reason: "themes"/);
+  // Child host process must expose the same surface.
+  const childSrc = readFileSync(
+    join(desktopRoot, "electron/main/plugin-host-process.mjs"),
+    "utf8",
+  );
+  assert.match(childSrc, /setTheme:\s*\(themeId\)/);
+  assert.match(childSrc, /themes:\s*\{/);
+  // Panel bridge channels.
+  assert.match(runtimeSrc, /case "app\.setTheme"/);
+  assert.match(runtimeSrc, /case "themes\.upsert"/);
+  assert.match(runtimeSrc, /case "themes\.list"/);
+  // Renderer applies host-originated theme writes.
+  assert.match(appSrc, /api\.onSettingsChanged/);
+});
+
+test("sidebar paints color and optional image layers separately", () => {
+  const tokensSrc = readFileSync(join(desktopRoot, "src/styles/tokens.css"), "utf8");
+  const chromeSrc = readFileSync(join(desktopRoot, "src/styles/chrome.css"), "utf8");
+  assert.match(tokensSrc, /--ds-bg-sidebar-image:\s*none/);
+  assert.match(chromeSrc, /background-color:\s*var\(--ds-bg-sidebar/);
+  assert.match(chromeSrc, /background-image:\s*var\(--ds-bg-sidebar-image/);
+  // macOS stacks the optional image under the glass sheen.
+  const darwin = chromeSrc.slice(chromeSrc.indexOf('data-platform="darwin"'));
+  assert.match(darwin, /--ds-bg-sidebar-image/);
 });
 
 test("themes only load with ui.theme and are withdrawn on unload", () => {

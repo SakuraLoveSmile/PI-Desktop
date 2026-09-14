@@ -74,9 +74,18 @@ PluginManager
 
 The shipped `pluginChanged` event carries a `reason` so the renderer can decide
 what to refetch: `install`, `loadDev`, `enable`, `disable`, `uninstall`, `crash`,
-`service`, `market.install`, `market.applyUpdates`. `service` fires on every
+`service`, `market.install`, `market.applyUpdates`, `themes` (runtime
+`themes.upsert` / `themes.remove`). `service` fires on every
 supervision transition and is the cheapest of them — only the service list needs
 a reload.
+
+`settingsChanged` (`pi-desktop/app/event/settingsChanged`) carries a settings
+patch when the **host** writes app settings outside the renderer path — today
+only plugin `app.setTheme` (`{ theme }`). The renderer merges the patch into
+its store so the shell paints the new preference.
+
+Panel bridge fixed channels also include `app.setTheme`, `themes.upsert`,
+`themes.remove`, and `themes.list` (all require `ui.theme`).
 
 ## 4.1 Events (host → plugin process)
 

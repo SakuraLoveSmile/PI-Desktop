@@ -936,6 +936,21 @@ const {
   flushPendingApplicationMenuCommands,
 } = applicationLifecycle;
 
+// Theme runtime APIs (`app.setTheme` / `themes.*`) need lifecycle reactions
+// that only exist after the application lifecycle is constructed.
+plugins.setServices({
+  setThemePreference: async (theme: string) => {
+    if (!host) throw new Error("host unavailable");
+    await host.call("settings.set", { theme });
+    applyApplicationMenuSettings({ theme });
+    sendToRenderer(IPC.event.settingsChanged, { theme });
+  },
+  onPluginThemesChanged: (pluginId: string) => {
+    sendToRenderer(IPC.event.pluginChanged, { reason: "themes", pluginId });
+    broadcastAppearance();
+  },
+});
+
 closeBehaviorRuntime = createCloseBehaviorRuntime({
   state: windowLifecycleState,
   dataDir,
