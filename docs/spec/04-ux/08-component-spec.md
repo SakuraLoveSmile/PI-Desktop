@@ -419,7 +419,21 @@ visually distinct from list content.
   chat home while preserving the active conversation and workspace; macOS
   intentionally omits this brand control from the sidebar header
 - Click the footer Plugins icon immediately right of Settings to open the
-  Extensions destination; the icon exposes the localized label on hover/focus
+  Extensions destination; click it again to restore the last non-Plugins,
+  non-Settings page (`chat`, `pulls`, or `scheduled`, defaulting to `chat`).
+  The pressed state clears on return and the localized label remains available
+  on hover/focus. Switching between Plugins and Settings preserves that same
+  return destination; Settings uses its existing Back to app control because
+  its full-window layout has no sidebar footer.
+- Utility navigation leaves the active session and workspace untouched. It
+  never reselects a saved session id: if a session is deleted or another session
+  becomes active, returning respects the current selection rather than reviving
+  stale history.
+- Reopening Plugins retains its Installed/Marketplace tab, both search inputs,
+  and category filter in renderer memory. Detail/settings/permission dialogs,
+  transient menus, and pending-operation UI are not retained. The page still
+  unmounts normally, releasing listeners; this is not a hidden live workbench
+  or durable preference across application restart.
 - The footer action group stays on the left and the build/version chip stays
   right-aligned; clicking the chip checks for updates or opens the available
   release in Settings

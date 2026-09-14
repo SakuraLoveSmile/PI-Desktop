@@ -72,6 +72,7 @@ export function createInitialState(): AppStateData {
     pendingPlans: {},
     planCheckpoints: {},
     page: "chat",
+    utilityReturnPage: "chat",
     settingsTab: "general",
     settingsAnchor: null,
     navStack: [{ page: "chat" }],

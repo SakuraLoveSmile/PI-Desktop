@@ -12,6 +12,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 
 - Left settings rail only (sidebar surface `#f4f4f4` light / `#000` dark), **~275px** (Codex gold at 1200-wide)
 - Top of rail: traffic-light clearance, **Back to app** (`返回应用`), pill **Search settings…**
+- Back to app restores the last non-Settings/non-Plugins page, with chat as
+  the initial fallback. Entering another settings tab or arriving through
+  Plugins must not replace that return destination. The current session is
+  retained; deleted or newly selected sessions are not overridden.
 - The 46px top band is a native window drag region across both the rail and the
   content pane, but it is drawn in two parts so each keeps its own surface: the
   rail drags via its own top strip on the rail surface, and the content pane's
