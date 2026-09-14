@@ -3739,7 +3739,15 @@ export class PluginRuntime {
             throw apiError("INVALID_ARGUMENT", error instanceof Error ? error.message : "invalid theme variables");
           }
           const id = pluginThemeId(pluginId, localThemeId);
-          const current = await this.hostApi(loaded).plugin.getSettings();
+          // Read the raw private record here. `plugin.getSettings()` intentionally
+          // removes host-reserved state before exposing it to plugin code.
+          const settingsFile = join(this.pluginDataDir(pluginId), "settings.json");
+          let current: Record<string, unknown> = {};
+          try {
+            if (existsSync(settingsFile)) current = JSON.parse(readFileSync(settingsFile, "utf8"));
+          } catch {
+            current = {};
+          }
           const existing = current[THEME_VARIABLES_SETTINGS_KEY];
           const stored = existing && typeof existing === "object" && !Array.isArray(existing) ? existing as Record<string, unknown> : {};
           const previous = stored[id] && typeof stored[id] === "object" && !Array.isArray(stored[id]) ? stored[id] as Record<string, unknown> : {};
@@ -3749,7 +3757,7 @@ export class PluginRuntime {
           };
           const dir = this.pluginDataDir(pluginId);
           mkdirSync(dir, { recursive: true });
-          writeFileSync(join(dir, "settings.json"), JSON.stringify(next, null, 2), "utf8");
+          writeFileSync(settingsFile, JSON.stringify(next, null, 2), "utf8");
           const registered = this.themes.get(id);
           if (registered) {
             registered.variablesCss = this.themeVariablesCss(loaded, id, declarations);

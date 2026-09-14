@@ -13,6 +13,7 @@ test("theme variables remain host-generated and plugin-scoped", () => {
   assert.match(runtime, /formatPluginThemeVariables/);
   assert.match(runtime, /THEME_VARIABLES_SETTINGS_KEY/);
   assert.match(runtime, /delete stored\[THEME_VARIABLES_SETTINGS_KEY\]/);
+  assert.match(runtime, /Read the raw private record/);
   assert.match(shell, /pluginTheme\.variablesCss/);
 });
 
