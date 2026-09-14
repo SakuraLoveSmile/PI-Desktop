@@ -2140,6 +2140,7 @@ export function Sidebar({
               tooltip={t("nav.settings")}
               ariaLabel={t("nav.settings")}
               onClick={() => setPage("settings")}
+              aria-pressed={page === "settings"}
             >
               <IconSettings size={14} aria-hidden />
             </TooltipButton>
