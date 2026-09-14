@@ -4902,3 +4902,55 @@ D193, and D194.
   market guards. Private and loopback literals fail in the parser.
 - Git's own DNS/SSH is unchanged; there is no Electron Main pin.
 - See ADR 0247 and E2E-CLONE-public-hostname-rejects-private.
+
+## 2026-09-14 — Theme CSS validation only inspects CSS that runs (D417)
+
+- The `ui.theme` sanitizer masks comment bodies and string literals before the
+  `@import`, markup, and script keyword checks, one space per masked character so
+  offsets still point at the source, and keeps every `url(...)` argument verbatim
+  so a real reference is still judged by its target.
+- A character-level three-state scan, not a `/* … */` strip: in
+  `content: "/*";` the browser sees a string, and a naive strip would read a
+  comment there and hide the real `@import "x.css";` behind it.
+- `examples/plugins/hello/themes/midnight.css` loads again. Only the false
+  rejection narrows: no new capability, no format change, and sheets that never
+  name a banned token behave exactly as before. See issue #334 and E2E-024J.
+
+## 2026-09-14 — Themed package assets and native window backgrounds (D418)
+
+- `contributes.themes[].assets` declares package-relative image and font files
+  (whitelisted extensions, 4 MB summed). The host resolves each inside the plugin
+  package, refuses the dependency directory, rewrites every matching `url()` to
+  `plugin-asset://<pluginId>/<path>`, and serves it through a privileged
+  host-owned scheme whose handler answers only from the loaded plugin's declared
+  list. An undeclared reference is still refused and the raw path never reaches
+  the renderer, so the `data:`-only rule and every existing rejection are
+  unchanged. Permission stays `ui.theme`.
+- `contributes.windowAppearance.backgroundColor.{light,dark}` accepts
+  `#rrggbb` / `#rrggbbaa` behind the new `ui.window.appearance` grant. It applies
+  only while one of that plugin's themes is the selected theme and only off
+  macOS, and it is restored by derivation: the renderer recomputes the colour
+  from the persisted preference and the live catalog, so a switch, a disable, and
+  an uninstall all converge on the host palette with no stored value to unwind.
+- Built-in themes reach the same value through one shared table
+  (`packages/shared/src/theme.ts`): `BUILTIN_THEMES` holds each palette's
+  `windowBackground` once and `isThemeColorScheme` holds the built-in-id
+  question once, read by the renderer, main, the panel host, the panel preload,
+  and the theme picker. The pair `#ffffff` / `#181818` was restated in four
+  files before this, so the built-in and contributed paths could drift apart.
+  See ADR 0248, issue #335, and E2E-024J.
+
+## 2026-09-14 — The dock column is a token, not a literal (D419)
+
+- The work-panel column and the bars inside it take their surface from
+  `--ds-bg-dock` and `--ds-bg-dock-raised`. In light those are `#fafafa` and
+  `#ffffff`; in dark they are `var(--ds-bg-secondary)` and `transparent`, which
+  is exactly what the base rules resolved to before.
+- Six `:root[data-theme="light"]` literals in `work-panel.css` used to raise
+  specificity above the base rule *and* skip the variable, so the whole column
+  stayed host-coloured under any contributed theme. Those overrides are gone.
+- The design-system surface table now records both tokens, and §6.4 states the
+  rule they exist to enforce: a surface colour the shell paints must come from a
+  token. A literal inside a `:root[data-theme]` override is the failure mode.
+- Same class of hole remains in `settings.css` (rail, search fields, toggle
+  knob, capability search) and a few other sheets; see issue #339.

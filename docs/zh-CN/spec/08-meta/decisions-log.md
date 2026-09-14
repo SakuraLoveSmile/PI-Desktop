@@ -3982,3 +3982,41 @@ D193 和 D194。
 - 主机名用与市场守卫相同的 `isPublicHostname` 分类。私网和回环字面量在解析阶段失败。
 - Git 自己的 DNS/SSH 不变；Electron Main 不固定 clone 连接。
 - 见 ADR 0247 与 E2E-CLONE-public-hostname-rejects-private。
+
+## 2026-09-14 —— 主题 CSS 校验只检查真正生效的 CSS（D417）
+
+- `ui.theme` 消毒器在 `@import`、标记和脚本关键字检查前遮蔽注释体与字符串字面量，
+  每个被遮蔽字符对应一个空格，偏移仍指向原文；每个 `url(...)` 参数按原样保留，
+  因此真实引用仍按目标判定。
+- 采用字符级三态扫描而非 `/* … */` 剥离：在 `content: "/*";` 中浏览器看到的是字符串，
+  朴素剥离会把它当成注释，从而藏掉其后的真实 `@import "x.css";`。
+- `examples/plugins/hello/themes/midnight.css` 恢复加载。只是收窄了误拒面：没有新增能力、
+  没有格式变化，对从不出现被禁关键字的样式表行为完全不变。见 issue #334 与 E2E-024J。
+
+## 2026-09-14 —— 主题包内资源与原生窗口背景（D418）
+
+- `contributes.themes[].assets` 声明插件包内的图片与字体文件（扩展名白名单、总量上限
+  4MB）。宿主在插件包内解析它们、拒绝依赖目录、把命中的 `url()` 改写为
+  `plugin-asset://<pluginId>/<path>`，并通过宿主自有的特权协议提供；该处理器只按已加载
+  插件自己声明的清单应答。未声明的引用仍被拒绝，原始路径不会到达渲染器，因此
+  `data:`-only 规则与既有全部拒绝行为不变。权限仍沿用 `ui.theme`。
+- `contributes.windowAppearance.backgroundColor.{light,dark}` 接受
+  `#rrggbb` / `#rrggbbaa`，需要新增的 `ui.window.appearance` 授予。它只在该插件的某个
+  主题被选中时、且仅在非 macOS 上生效；还原靠推导而非记忆——渲染器每次根据持久化偏好与
+  实时主题目录重新计算，所以切换、禁用、卸载都会收敛回宿主背景，没有需要回滚的存储值。
+- 内置主题改由同一张共享表提供该值（`packages/shared/src/theme.ts`）：`BUILTIN_THEMES`
+  只写一次每个调色板的 `windowBackground`，`isThemeColorScheme` 只写一次「这是内置
+  id」的判断，由渲染器、main、面板宿主、面板 preload 与主题选择器共同读取。此前
+  `#ffffff` / `#181818` 这对字面量散在四个文件里，内置路径与插件路径可能因此分叉。
+  见 ADR 0248、issue #335 与 E2E-024J。
+
+## 2026-09-14 —— 停靠列的颜色是标记而非字面量（D419）
+
+- 工作面板列及其内部条目栏的表面色改由 `--ds-bg-dock` 与 `--ds-bg-dock-raised`
+  提供。浅色下为 `#fafafa` 与 `#ffffff`；深色下为 `var(--ds-bg-secondary)` 与
+  `transparent`，与改动前基础规则解析出的值完全一致。
+- `work-panel.css` 里原有 6 处 `:root[data-theme="light"]` 字面量，既抬高特异度压过
+  基础规则、又不读变量，导致整列在任何插件主题下都保持宿主底色。这些覆写已删除。
+- 设计系统的表面层级表现在登记了这两个标记，§6.4 也写下了它们要维护的规则：外壳绘制的
+  表面色必须来自标记，而 `:root[data-theme]` 覆写里写字面量正是失效模式。
+- `settings.css`（导航轨、搜索框、开关钮、能力搜索）等文件另有同类洞，见 issue #339。
