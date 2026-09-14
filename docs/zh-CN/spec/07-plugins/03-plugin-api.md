@@ -595,9 +595,17 @@ window.pluginBridge.on(event, handler)
 
 同一个桥同时服务插件的两种表面：独立的 `ui.panel` 窗口，以及停靠在工作面板中的
 `contributes.views` 表面（ADR 0104）。通道列表、权限门与 preload 完全相同，
-因此同一份 HTML 入口在两种放置方式下都能工作。唯一的差别在于 chrome：停靠视图
-没有窗口控制胶囊、没有拖拽带，其 `--pi-plugin-titlebar-height` 为 `0px` 而非
-`46px`。
+因此同一份 HTML 入口在两种放置方式下都能工作。差别只在于 chrome 与下面这个
+视图 `location`：停靠视图没有窗口控制胶囊、没有拖拽带，其
+`--pi-plugin-titlebar-height` 为 `0px` 而非 `46px`。
+
+停靠视图还可以被指定一个要展示的对象。工作面板选项卡本来就携带的 `location`
+会投递给任何贡献视图——不再只限 `pi.browser`（它的地址栏保留自己的导航通道）：
+创建时它作为视图入口 URL 的 `piViewOpen` 查询参数传递，文档加载完成后则通过
+`view:open` 事件送达。在首次加载之前到达的 location 改为重启这次加载；已加载的
+视图永远不会被导航，因此插件里未保存的改动不会被丢弃，重复打开同一个 location
+什么也不做。该载荷对主机是不透明的——每个插件自行决定 `location` 的含义——它
+不需要新权限，也不新增 SDK 方法。
 
 主机拥有的 preload 仅将固定通道转发到插件运行时：
 
@@ -632,6 +640,9 @@ window.pluginBridge.on(event, handler)
   语言发生变化时发送，因此面板可以实时重新着色和重新标注文案。
 - `workspace:changed` —— 载荷为 `{ path: string; name: string } | null`，
   与 `workspace.get()` 一致，在打开的项目变化时发送。
+- `view:open`（仅限停靠的工作面板视图；独立 `ui.panel` 窗口不会收到）——载荷为
+  `{ path: string }`，即主机要求该视图展示的 location。创建时就带 location 的视图
+  已经从入口 URL 拿到它；这个事件投递的是之后的 location。
 
 ## 7. 通话审计
 

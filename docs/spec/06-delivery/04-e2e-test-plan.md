@@ -6598,11 +6598,12 @@ and identify the platform validation still needed.
      viewer. Switch the app to Simplified Chinese and confirm the tree, viewer,
      and context menu are localized. Switch projects and confirm the tree
      updates without waiting on a poll.
-  6. Click a file path in the conversation. Confirm it still opens a host
-     `file:<path>` tab under Open resources — transcript artifacts did not move
-     to the plugin.
+  6. Click a project file path in the conversation. Confirm it opens in this
+     view on that file — a chat click now prefers the file view over the host
+     `file:` tab.
   7. Disable the File Manager plugin. Confirm the view disappears from the menu
-     and the panel, and that transcript file links still work.
+     and the panel, and that a clicked conversation file path falls back to the
+     host `file:<path>` tab under Open resources.
   8. Re-enable it, then restart the app. Confirm the enabled state and the tree
      return, and that the registry did not gain a duplicate row.
 - **Expected**: A panel surface runs entirely on the public plugin contribution
@@ -6622,6 +6623,39 @@ and identify the platform validation still needed.
   event broadcast), and host-core
   `bundled_plugins_refresh_from_disk_but_keep_user_state`; the packaged journey
   is Draft (run only in a capable environment when this surface changes)
+
+#### E2E-PLUGIN-file-view-collapse-persists
+
+- **Preconditions**: The bundled File Manager view is open on a project with
+  nested folders and a text file, and the work panel is wide enough for the
+  two-pane layout.
+- **Steps**:
+  1. Drag the divider between the file list and the content pane to a
+     non-default width, then activate the toolbar's left-most toggle from the
+     keyboard alone (Tab to it, then Enter or Space).
+  2. Click a file reference in the conversation.
+  3. Activate the same toggle again.
+  4. Collapse the file list, then close and reopen the view, and finally
+     restart the app.
+  5. Expand the file list by hand and click another chat file reference.
+- **Expected**: The toggle hides the view's own left file list and gives the
+  content pane the full width, and it stays keyboard-reachable with an
+  accessible name that swaps between `Hide file list` and `Show file list`.
+  The open request that follows a chat click shows the requested file with its
+  ancestor folders expanded and the file list collapsed, whether the view was
+  already open or was opened by that click. Expanding again restores the
+  previously dragged split width together with the expanded folders and the
+  selected file, not the default split or the project root. The collapsed state
+  is persisted: it survives closing and reopening the view and a full app
+  restart, and a manual expansion holds until the next host open request
+  collapses it again.
+- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4/§5,
+  `04-ux/08-component-spec.md` §5.2.2, ADR 0104, ADR 0241, ADR 0251
+- **Acceptance**: G (plugins), Quality
+- **Milestone**: M6+
+- **Status**: The bundle's manifest, entry page, and upstream checksum are
+  unit-covered (`apps/desktop/test/bundled-plugins.test.mjs`); the plugin-side
+  journey is Draft (run only in a capable environment when this surface changes)
 
 #### E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update
 
@@ -6760,6 +6794,9 @@ and identify the platform validation still needed.
 | G — Plugins (Independent session communication) | E2E-SESSION-independent-top-level-communication |
 | Quality (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
 | C — Conversation & stream (Hover card model and links) | E2E-SESSION-hover-card-model-and-links |
+| C — Conversation & stream (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
+| G — Plugins (Chat file references) | E2E-CHAT-file-ref-opens-the-surface-that-owns-it, E2E-PLUGIN-file-view-collapse-persists |
+| Quality (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it, E2E-PLUGIN-file-view-collapse-persists |
 
 | Milestone | Scenarios |
 |---|---|
@@ -6776,6 +6813,8 @@ and identify the platform validation still needed.
 | M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+ (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | M6+ (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
+| M5 (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
+| M6+ (Chat file references) | E2E-PLUGIN-file-view-collapse-persists |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
@@ -9261,11 +9300,12 @@ are withdrawn with ADR 0165.
 
 - **Preconditions**: An Agent session in a workspace that contains a nested
   source file, an HTML file, and a file whose name contains whitespace. The
-  composer can also paste an OS file into session scratch.
+  composer can also paste an OS file into session scratch. The bundled File
+  Manager plugin is loaded.
 - **Steps**: 1) Attach a workspace source file, a workspace HTML file, a
   whitespace-named file, and a pasted scratch file via composer chips, then
-  send. 2) Inspect the user bubble. 3) Click the HTML chip, then click a
-  non-HTML chip.
+  send. 2) Inspect the user bubble. 3) Click the HTML chip, then the workspace
+  source chip, then the scratch chip.
 - **Expected**:
   - Each sent reference renders as a compact leaf-name chip (icon + name),
     not as a full `@path`. The tooltip and accessible name keep the
@@ -9273,16 +9313,93 @@ are withdrawn with ADR 0165.
   - A chip plus a short prompt keeps the user plate content-sized; it does
     not stretch to the `min(82%, 600px)` ceiling.
   - Clicking the HTML chip opens the work-panel browser on that file.
-  - Clicking any other allowed file opens it with the OS default application.
+  - Clicking the workspace source chip opens it in the File Manager work-panel
+    view on that file; the host `file:` tab and the OS default application are
+    no longer what a chip click opens.
+  - Clicking the scratch chip opens the host `file:` tab on that file's
+    absolute path, because it lives outside the File Manager's project root.
   - The persisted user message still contains the canonical `@path` text for
     the agent.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3 / §11.8,
   `04-ux/09-interaction-patterns.md` §8a.2, `03-runtime/01-ipc-protocol.md`,
-  ADR 0163, `08-meta/decisions-log.md` (D320)
+  ADR 0163, ADR 0241, ADR 0251, `08-meta/decisions-log.md` (D320)
 - **Acceptance**: C (conversation & stream), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`chat-links.test.mjs`, `transcript-file-chips.test.mjs`,
   `fs-panel-guard.test.mjs`, `transcript-style.test.mjs`); full UI journey Draft (run only in a capable environment when this surface changes)
+
+#### E2E-CHAT-shorthand-file-ref-opens-the-matching-file
+
+- **Preconditions**: A project whose tree holds `img/openimage.js`, `src/dir/a.ts`,
+  and a deeper second `dir/a.ts` such as `packages/app/dir/a.ts`. The open
+  session's scratch store holds a file with the same leaf name `openimage.js`
+  and one file no project folder has; the attachment store holds an
+  `attachments/<sha256>` blob. The transcript renders assistant markdown.
+- **Steps**: 1) Prompt a turn whose reply names `openimage.js` as inline code
+  and click it. 2) Prompt a turn that names `dir/a.ts` and click it. 3) Prompt
+  a turn that names the scratch-only file, click it, then do the same for the
+  `attachments/<sha256>` ref. 4) Prompt a turn that names an absolute path to a
+  project file whose leaf name also exists in scratch, and click it. 5) Prompt
+  a turn that names `missing-helper.js` and click it.
+- **Expected**:
+  - Clicking `openimage.js` opens the project's `img/openimage.js`, although the
+    scratch store holds a file with that same leaf name: the project is
+    searched to exhaustion before the scratch store is considered at all.
+  - `dir/a.ts` opens `src/dir/a.ts`: an exact path beats a shorthand, a longer
+    matching tail beats a bare leaf name, and the shallowest candidate wins a
+    tail-length tie, so the deeper `packages/app/dir/a.ts` is never the one
+    that opens.
+  - A reference the project cannot answer resolves in the session scratch
+    store; one that neither answers resolves in the attachment store, and an
+    `attachments/<sha256>` ref opens that stored blob.
+  - An absolute reference that names a real file inside a known root wins
+    outright, whichever shorthand would otherwise have matched.
+  - A reference that matches nothing raises an error toast reading
+    `No file matches missing-helper.js` and opens nothing: no new work-panel
+    tab, no empty panel, no blank side-browser page, and the work panel and
+    transcript keep the content they already had.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` § fs,
+  `04-ux/09-interaction-patterns.md` §8a.2, ADR 0124, ADR 0163, ADR 0251
+- **Acceptance**: C (conversation & stream), D (workspace), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered
+  (`apps/desktop/test/chat-ref-resolve.test.mjs`); full UI journey Draft (run
+  only in a capable environment when this surface changes)
+
+#### E2E-CHAT-file-ref-opens-the-surface-that-owns-it
+
+- **Preconditions**: The bundled File Manager plugin is loaded and enabled and
+  the work panel is closed. The open session's scratch store holds one file and
+  the attachment store one blob. The project contains an `.html` page and a text
+  file.
+- **Steps**: 1) Click a project file reference in an assistant reply. 2) Type an
+  unsaved edit into that view and click the same reference again. 3) Click a
+  reference that resolves into the session scratch store, then the
+  `attachments/<sha256>` reference. 4) Click a workspace `.html` reference in an
+  assistant reply and the same reference as a sent user chip. 5) Disable the
+  File Manager plugin, click a project file reference again, then re-enable it
+  and click that reference once more.
+- **Expected**:
+  - A project file opens in the File Manager work-panel view on that file, with
+    its ancestor folders expanded and the file selected; no host `file:` tab is
+    added for it.
+  - Clicking the same reference again does not reload the view: the unsaved edit
+    is still in the editor and no second tab appears.
+  - A scratch or attachment file opens in the host `file:` tab under Open
+    resources, addressed by its absolute path, never in the File Manager view.
+  - A workspace `.html` / `.htm` reference opens in the work-panel side browser,
+    from the assistant reply and the user chip alike.
+  - With the plugin disabled, a project file reference falls back to the host
+    `file:` tab — the surface the click used before — instead of opening
+    nothing; re-enabling the plugin restores the File Manager destination.
+- **Specs linked**: `04-ux/08-component-spec.md` §8.3,
+  `04-ux/09-interaction-patterns.md` §8a.2, ADR 0104, ADR 0163, ADR 0241,
+  ADR 0251
+- **Acceptance**: C (conversation & stream), G (plugins), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered
+  (`apps/desktop/test/transcript-file-chips.test.mjs`); full UI journey Draft
+  (run only in a capable environment when this surface changes)
 
 #### E2E-181: An imported skill is listed in the next session catalog
 
@@ -9329,8 +9446,9 @@ are withdrawn with ADR 0165.
   and a `~/` path in chat; confirm only the under-root path becomes a target.
 - **Expected**:
   - Opening the session paints the transcript without throwing.
-  - Each chat path opens the work-panel files viewer on
-    `apps/desktop/src/App.tsx`.
+  - Each chat path opens `apps/desktop/src/App.tsx` in the File Manager
+    work-panel view — the file view a chat click prefers — not a host `file:`
+    tab.
   - Unicode filenames and multi-segment paths inside the workspace become
     targets, while an outside absolute path and a `~/` path stay plain text.
   - An absolute path under the workspace resolves to its workspace-relative

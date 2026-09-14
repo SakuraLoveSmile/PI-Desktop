@@ -709,14 +709,25 @@ window.pluginBridge.on(event, handler)
 The same bridge serves both plugin surfaces: a detached `ui.panel` window and a
 `contributes.views` surface docked in the work panel (ADR 0104). The channel
 list, the permission gate, and the preload are identical, so one HTML entry
-works in either placement. The only difference is chrome: a docked view has no
-window-control capsule and no drag band, and its
-`--pi-plugin-titlebar-height` is `0px` rather than `46px`.
+works in either placement. The only differences are chrome and the view
+`location` below: a docked view has no window-control capsule and no drag band,
+and its `--pi-plugin-titlebar-height` is `0px` rather than `46px`.
 
 Detached panel pages using the current chrome contract declare
 `<meta name="pi-plugin-chrome" content="v2">` and use the published variable
 for normal-flow top spacing. The host preserves that page-owned spacing. A
 page without the marker remains supported through the legacy additive offset.
+
+A docked view may also be given one subject to show. The `location` a work-panel
+tab already carries is delivered to any contributed view — not only
+`pi.browser`, whose address bar keeps its own navigation channel: on creation it
+travels as the view entry URL's `piViewOpen` query parameter, and once the
+document has finished loading it arrives as the `view:open` event. A location
+that reaches the host before the first load restarts the load instead, and a
+view that is already loaded is never navigated, so unsaved work inside a plugin
+is not discarded; re-opening the same location does nothing. The payload is
+opaque to the host — each plugin decides what its `location` means — and it
+needs no permission and adds no SDK method.
 
 The host-owned preload forwards only fixed channels to the plugin runtime:
 
@@ -752,6 +763,10 @@ Delivered today:
   the app's palette or language changes, so a panel can restyle and relabel live.
 - `workspace:changed` — payload is `{ path: string; name: string } | null`,
   matching `workspace.get()`, sent when the open project changes.
+- `view:open` (docked work-panel views only; a detached `ui.panel` window never
+  receives it) — payload is `{ path: string }`, the location the host asked this
+  view to show. A view created with a location already carried it in its entry
+  URL; this event delivers a later one.
 
 ## 7. Call auditing
 

@@ -270,5 +270,6 @@ Each ADR includes:
 | 0249 | ChatGPT-style logical project groups | Accepted (amends ADR 0233 / ADR 0234 / ADR 0016) |
 | global-sidebar-pins | [Show pinned conversations in a global sidebar section](global-sidebar-pins.md) | Accepted (amends ADR 0016; issue #306) |
 | 0250 | [Structured, bounded, and redacted process logs](0250-structured-bounded-redacted-process-logs.md) | Accepted for implementation |
+| 0251 | [Chat file references complete in main and open in the file view](0251-chat-file-refs-open-in-the-file-view.md) | Accepted (amends ADR 0163 / ADR 0241) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |

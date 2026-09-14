@@ -1357,10 +1357,14 @@ Single message render — either user (plaintext) or assistant (markdown streami
   chip exactly like ASCII ones; absolute and `~/` tokens are matched whole,
   and one outside the workspace (or any home path) stays plain text rather
   than rendering a chip that could never open — containment is unchanged
-  (D322). Clicking a
-  workspace HTML chip previews it in the side browser; clicking a resolved
-  image thumbnail opens the host files viewer on that ref; clicking any other
-  allowed file opens it with the OS default application for that suffix.
+  (D322). Clicking a chip
+  completes the reference through `pi-desktop/fs/resolveRef` and opens where it
+  resolved: a project file in the bundled `pi.file-manager` work-panel view (the
+  host `file:` tab when that view is unavailable), a session-scratch or
+  attachment file in the host `file:` tab, and a workspace `.html`/`.htm` in the
+  side browser. A resolved image thumbnail resolves and opens the same way. A
+  chip whose reference matches nothing opens nothing and reports itself; the OS
+  default application is no longer what this click does.
   HTTP(S) URLs remain inline text links. Plain clicks follow the persisted
   Link open destination setting (Work panel browser by default, or the system
   default browser). Right-clicking a link opens a body-level context menu with
@@ -1371,7 +1375,10 @@ Single message render — either user (plaintext) or assistant (markdown streami
 - Assistant: transparent surface, left-aligned, markdown rendered at full
   content width. Workspace file paths in that markdown are previewable:
   inline code, markdown links, and bare path tokens (with a known
-  extension) open the work-panel files viewer. Local markdown images render
+  extension) complete and open like a chip: the resolved file in the bundled
+  `pi.file-manager` view (the host `file:` tab without it), a workspace
+  `.html`/`.htm` in the side browser, and nothing plus a report when the
+  reference matches no file. Local markdown images render
   inline via the same contained data-URL channel, with a chip fallback.
   Unprefixed relative paths
   resolve from the workspace root; `./` and `../` resolve from the workspace
@@ -2612,9 +2619,13 @@ Anatomy:
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - Sent `@path` file references (quoted or unquoted) render as the same compact
-  leaf-name chip as the draft. Clicking a workspace `.html`/`.htm` file opens
-  the work-panel browser; clicking any other allowed file (workspace, session
-  scratch, or attachments) opens it with the OS default application. HTTP(S)
+  leaf-name chip as the draft. Clicking one completes the reference through
+  `pi-desktop/fs/resolveRef` and opens where it resolved: a workspace file in
+  the bundled `pi.file-manager` view (the host `file:` tab when that view is
+  unavailable), a session-scratch or attachment file in the host `file:` tab,
+  and a workspace `.html`/`.htm` in the side browser. A reference that matches
+  no file opens nothing and reports itself; the OS default application is no
+  longer what this click does. HTTP(S)
   URLs stay text links. Plain clicks follow the Link open destination setting,
   and right-clicking exposes the same external, work-panel, and copy actions.
 - States: keyboard-active row uses the shared `kb-active` treatment; empty

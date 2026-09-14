@@ -30,7 +30,7 @@ Principles:
 | `commandPalette` | Command palette search and execution |
 | `workspace` | Workspace selection and legacy working-tree diagnostics |
 | `browser` | Work panel embedded preview navigation/bounds/visibility + state events |
-| `fs` | Work panel workspace file listing/reading/reveal, plus user-initiated open with the OS default handler (read-only) |
+| `fs` | Work panel workspace file listing/reading/reveal, chat file-reference completion against the project, session scratch, and attachment roots, plus user-initiated open with the OS default handler (read-only) |
 | `window` | Frameless window state, controls, and compatibility work-panel geometry channels |
 | `menu` | Allowlisted application-menu commands and native editing/window actions |
 | `notification` | Durable inbox list/read/clear and new/activated events |
@@ -1552,6 +1552,22 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
 - `fs/reveal({path})` → reveal in Finder. Same containment as `fs/read`.
 - `fs/open({path})` → open with the OS default application. Same lexical
   containment as `fs/read` (without the extra realpath step used by reads).
+- `fs/resolveRef({ref, sessionId?})` → `FsChatRefResolveResult`
+  (`{ match: FsChatRefMatch | null }`, the match naming the answering `root`
+  (`workspace` / `scratch` / `attachments`), the root-relative `relativePath`,
+  the absolute `absolutePath`, and `matchedBy` (`exact-relative` /
+  `exact-absolute` / `path-suffix` / `basename`)); `sessionId` selects the
+  session whose scratch store is searched. Completes a file reference the agent
+  printed in chat, because the renderer cannot see the session's own scratch
+  store: an absolute reference that already names a real file inside a known
+  root wins outright, and an `attachments/<sha256>` blob resolves against the
+  attachment store directly; otherwise the roots are searched in priority order
+  — the open project first, the session's own scratch store
+  (`<data_dir>/scratch/<sessionId>/`, ADR 0124) second, the attachment store
+  last — and the first root that answers wins. Inside one root an exact path
+  beats a shorthand; among shorthands the longest matching tail wins, then the
+  shallowest path. The files-panel ignore set applies. A reference that matches
+  nothing returns `match: null`; resolving never opens anything (ADR 0251).
 - `fs/list` stays workspace-only; traversal outside is rejected
   (`INVALID_ARGUMENT`).
 

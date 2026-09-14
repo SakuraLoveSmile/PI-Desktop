@@ -4646,14 +4646,29 @@ IPC 请求无法关闭。
   3. 打开文件管理器，确认文件树按需加载目录，并忽略 `node_modules`、`.git` 和 `.env`。
   4. 右键一个文件，确认提供“用默认应用打开”和“在文件夹中显示”且可用；右键一个目录，确认不提供这两项，因为宿主会拒绝目录。
   5. 打开文本文件、编辑并保存，确认磁盘上的文件已改变且编辑器保留保存后的内容。在应用之外改动同一文件，再次编辑并保存，确认报告冲突而不是覆盖外部改动。点击二进制文件，确认显示不支持预览而不是打印替换字符；依次打开图片、CSV 和 Markdown，确认各自使用专属查看器。切换到简体中文，确认文件树、查看器和上下文菜单均已本地化。切换项目后确认文件树立即更新，不必等待轮询。
-  6. 点击对话中的文件路径，确认它仍然打开宿主的 `file:<path>` 选项卡；对话产物没有迁移到插件。
-  7. 禁用文件管理器插件，确认视图从菜单和面板消失，但对话文件链接仍然可用。
+  6. 点击对话中的项目文件路径，确认它在本视图中打开该文件——对话点击现在优先使用文件视图，而不是宿主的 `file:` 选项卡。
+  7. 禁用文件管理器插件，确认视图从菜单和面板消失，且此时点击对话中的文件路径会退回宿主的 `file:<path>` 选项卡（位于「已打开项目」下）。
   8. 重新启用并重启应用，确认启用状态和文件树恢复，注册表没有重复行。
 - **预期**：这一面板完全通过公开插件贡献通道运行，可由用户禁用但不可卸载；由宿主代为执行的动作遵守声明的 `fs.read` 范围，插件自身的读写仍留在插件的工作区牢笼内（ADR 0241）。
 - **链接规格**：`07-plugins/03-plugin-api.md` §3、`07-plugins/13-plugin-permissions-matrix.md` §2、`04-ux/08-component-spec.md` §5、ADR 0104、ADR 0109、ADR 0111、ADR 0169、ADR 0241
 - **接受**：G（插件）、D（工作区）、安全性、品质
 - **里程碑**：M6+
 - **状态**：`apps/desktop/test/bundled-plugins.test.mjs`（manifest 契约、页面只用公开桥接、vendored 校验和）、`apps/desktop/test/plugin-fs-scope.test.mjs`（`fs.openDefault`、`fs.reveal`）、`apps/desktop/test/plugin-work-panel-views.test.mjs`（停靠视图事件广播）已覆盖；完整打包旅程为草稿（适用变更合入前需在具备条件的环境中运行 E2E）
+
+#### E2E-PLUGIN-file-view-collapse-persists
+
+- **先决条件**：内置的文件管理器视图已在含有嵌套目录和一个文本文件的项目上打开，且工作面板宽度足以容纳双栏布局。
+- **步骤**：
+  1. 把文件列表与内容区之间的分隔条拖到非默认宽度，然后只用键盘操作工具栏最左边的切换按钮（Tab 定位后按 Enter 或 Space）。
+  2. 点击对话中的一个文件引用。
+  3. 再次操作同一个切换按钮。
+  4. 收起文件列表，关闭并重新打开该视图，最后重启应用。
+  5. 手动展开文件列表，再点击另一个对话文件引用。
+- **预期**：切换按钮收起视图自己的左侧文件列表，内容区占满整个宽度，且按钮始终可用键盘到达，无障碍名称在「隐藏文件列表」与「显示文件列表」之间切换。对话点击触发的宿主打开请求会显示请求的文件、展开其祖先目录并收起文件列表——无论视图本来已经打开，还是由这次点击打开。再次展开时恢复之前拖拽的分栏宽度、已展开的目录与被选中的文件，而不是默认分栏宽度或项目根。收起状态会被持久化：关闭并重新打开视图乃至重启应用后仍然保持；手动展开会一直保持到下一次宿主打开请求再次收起它。
+- **链接规格**：`07-plugins/02-plugin-manifest-schema.md` §4/§5、`04-ux/08-component-spec.md` §5.2.2、ADR 0104、ADR 0241、ADR 0251
+- **接受**：G（插件）、品质
+- **里程碑**：M6+
+- **状态**：随包副本的 manifest、入口页面与上游校验和已由 `apps/desktop/test/bundled-plugins.test.mjs` 覆盖；插件侧旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
 
 #### E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update
 
@@ -4727,6 +4742,9 @@ IPC 请求无法关闭。
 | 品质（Skill 常驻与输入法斜杠别名） | E2E-254、E2E-255 |
 | C — 对话和直播（导入可见性） | E2E-257 |
 | F——持久化（导入可见性） | E2E-257 |
+| C — 对话和直播（聊天文件引用） | E2E-CHAT-shorthand-file-ref-opens-the-matching-file、E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
+| G——插件（聊天文件引用） | E2E-CHAT-file-ref-opens-the-surface-that-owns-it、E2E-PLUGIN-file-view-collapse-persists |
+| 品质（聊天文件引用） | E2E-CHAT-shorthand-file-ref-opens-the-matching-file、E2E-CHAT-file-ref-opens-the-surface-that-owns-it、E2E-PLUGIN-file-view-collapse-persists |
 | G——插件（导入可见性） | E2E-257 |
 | 品质（导入可见性） | E2E-257 |
 | G——插件（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
@@ -4757,6 +4775,8 @@ IPC 请求无法关闭。
 | M6+（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+（会话列表响应性） | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | M6+（独立会话通信） | E2E-SESSION-independent-top-level-communication、E2E-SESSION-hover-card-model-and-links |
+| M5（聊天文件引用） | E2E-CHAT-shorthand-file-ref-opens-the-matching-file、E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
+| M6+（聊天文件引用） | E2E-PLUGIN-file-view-collapse-persists |
 | 后MVP | E2E-022A、E2E-022B、E2E-022C、E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M（插件路线图 R2/R3/R6） |
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
@@ -6162,21 +6182,52 @@ IPC 请求无法关闭。
 
 #### E2E-180：已发送的文件引用保持芯片并可点击打开
 
-- **前提条件**：Agent 会话所在工作区含有嵌套源文件、HTML 文件，以及文件名带空格的文件。输入框也可以把操作系统文件粘贴到会话临时目录。
-- **步骤**：1）通过输入框芯片引用工作区源文件、工作区 HTML、带空格的文件名，以及粘贴的临时文件，然后发送。2）查看用户气泡。3）点击 HTML 芯片，再点击非 HTML 芯片。
+- **前提条件**：Agent 会话所在工作区含有嵌套源文件、HTML 文件，以及文件名带空格的文件。输入框也可以把操作系统文件粘贴到会话临时目录。内置的文件管理器插件已加载。
+- **步骤**：1）通过输入框芯片引用工作区源文件、工作区 HTML、带空格的文件名，以及粘贴的临时文件，然后发送。2）查看用户气泡。3）点击 HTML 芯片，再点击工作区源文件芯片，最后点击临时目录芯片。
 - **预期**：
   - 每条已发送引用画成紧凑的叶子名芯片（图标 + 名称），而不是完整 `@path`。工具提示和无障碍名称保留规范路径。带引号路径和临时绝对路径也包括在内。
   - 芯片加上短提示时，用户气泡按内容收缩，而不是撑到 `min(82%, 600px)` 上限。
   - 点击 HTML 芯片在工作面板浏览器打开该文件。
-  - 点击其余允许的文件用系统默认应用打开。
+  - 点击工作区源文件芯片后，该文件在文件管理器工作面板视图中打开；芯片点击不再打开宿主的 `file:` 选项卡，也不再交给系统默认应用。
+  - 点击临时目录芯片时，文件在宿主的 `file:` 选项卡中按其绝对路径打开——它位于文件管理器项目根之外。
   - 持久化用户消息仍包含给模型用的规范 `@path` 文本。
 - **链接规格**：`04-ux/08-component-spec.md` §8.3 / §11.8、
   `04-ux/09-interaction-patterns.md` §8a.2、`03-runtime/01-ipc-protocol.md`、
-  ADR 0163、`08-meta/decisions-log.md`（D320）
+  ADR 0163、ADR 0241、ADR 0251、`08-meta/decisions-log.md`（D320）
 - **验收**：C（对话和直播）、质量
 - **里程碑**：M5
 - **状态**：单元已覆盖（`chat-links.test.mjs`、`transcript-file-chips.test.mjs`、
   `fs-panel-guard.test.mjs`、`transcript-style.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
+
+#### E2E-CHAT-shorthand-file-ref-opens-the-matching-file
+
+- **前提条件**：项目树里有 `img/openimage.js`、`src/dir/a.ts`，以及更深的第二份 `dir/a.ts`（例如 `packages/app/dir/a.ts`）。当前会话的临时目录里有一个同名叶子文件 `openimage.js`，以及一个项目里没有的文件；附件目录里有一个 `attachments/<sha256>` blob。对话能渲染助手 markdown。
+- **步骤**：1）让一轮回复用行内代码提到 `openimage.js`，点击它。2）让一轮回复提到 `dir/a.ts`，点击它。3）让一轮回复提到只存在于临时目录的文件并点击，再对 `attachments/<sha256>` 引用做同样操作。4）让一轮回复给出某个项目文件的绝对路径（该叶子名在临时目录里也存在），点击它。5）让一轮回复提到 `missing-helper.js`，点击它。
+- **预期**：
+  - 点击 `openimage.js` 打开项目里的 `img/openimage.js`，而不是临时目录里的同名文件：项目会被搜到底，之后才会考虑临时目录。
+  - `dir/a.ts` 打开 `src/dir/a.ts`：精确路径优先于简写，更长的匹配尾优先于裸叶子名，尾长相同则更浅的路径胜出，因此更深的 `packages/app/dir/a.ts` 永远不会被选中。
+  - 项目里找不到的引用回落到会话临时目录；两边都没有的再回落到附件目录，`attachments/<sha256>` 引用打开对应的已存 blob。
+  - 指向已知根内真实文件的绝对引用直接命中，无论哪条简写规则本来会匹配。
+  - 什么都匹配不上时弹出错误提示「没有匹配 missing-helper.js 的文件」，并且什么都不打开：不新增工作面板选项卡、不出现空面板、不出现空白旁浏览器页面，工作面板与对话保持原有内容。
+- **链接规格**：`03-runtime/01-ipc-protocol.md` § fs、`04-ux/09-interaction-patterns.md` §8a.2、ADR 0124、ADR 0163、ADR 0251
+- **验收**：C（对话和直播）、D（工作区）、质量
+- **里程碑**：M5
+- **状态**：单元已覆盖（`apps/desktop/test/chat-ref-resolve.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
+
+#### E2E-CHAT-file-ref-opens-the-surface-that-owns-it
+
+- **前提条件**：内置的文件管理器插件已加载并启用，工作面板处于关闭状态。当前会话的临时目录里有一个文件，附件目录里有一个 blob。项目里有一个 `.html` 页面和一个文本文件。
+- **步骤**：1）点击助手回复中的项目文件引用。2）在该视图里留下未保存的改动，再次点击同一引用。3）点击解析到会话临时目录的引用，再点击 `attachments/<sha256>` 引用。4）在助手回复和已发送的用户芯片中分别点击一次工作区 `.html` 引用。5）禁用文件管理器插件后再次点击项目文件引用，重新启用后再点击一次同一引用。
+- **预期**：
+  - 项目文件在文件管理器工作面板视图中打开：该文件被选中、祖先目录已展开，不会为它新增宿主 `file:` 选项卡。
+  - 再次点击同一引用不会重新加载视图：未保存的改动仍在编辑器里，也不会出现第二个选项卡。
+  - 临时目录或附件里的文件在宿主的 `file:` 选项卡（位于「已打开项目」下）中按绝对路径打开，而不是在文件管理器视图中打开。
+  - 工作区 `.html` / `.htm` 引用在旁浏览器中打开，助手回复和用户芯片两条路径一致。
+  - 插件被禁用时，项目文件引用退回到宿主的 `file:` 选项卡（也就是改动前点击所用的界面），而不是什么都不打开；重新启用后恢复为文件管理器视图。
+- **链接规格**：`04-ux/08-component-spec.md` §8.3、`04-ux/09-interaction-patterns.md` §8a.2、ADR 0104、ADR 0163、ADR 0241、ADR 0251
+- **验收**：C（对话和直播）、G（插件）、质量
+- **里程碑**：M5
+- **状态**：单元已覆盖（`apps/desktop/test/transcript-file-chips.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
 
 #### E2E-181：导入的技能会出现在下一个会话的目录里
 
