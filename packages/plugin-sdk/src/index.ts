@@ -7,7 +7,11 @@ import {
 } from "./fs-policy.js";
 import { validateMcpServer } from "./mcp-config.js";
 import { parseNetDomains, type PluginNetDomain } from "./net-policy.js";
-import { isThemeAssetPath, THEME_ASSET_EXTENSIONS } from "./theme-css.js";
+import {
+  isThemeAssetPath,
+  normalizeThemeAssetPath,
+  THEME_ASSET_EXTENSIONS,
+} from "./theme-css.js";
 
 /**
  * Manifest id shape frozen by docs/spec/07-plugins/02-plugin-manifest-schema.md:
@@ -1080,8 +1084,12 @@ export function validateContributions(
             "/",
           )} path`;
         }
-        if (assetPaths.has(asset)) return `theme "${theme.id}" declares "${asset}" twice`;
-        assetPaths.add(asset);
+        // `bg.png` and `./bg.png` are one asset, so compare the normalized form.
+        const normalized = normalizeThemeAssetPath(asset);
+        if (assetPaths.has(normalized)) {
+          return `theme "${theme.id}" declares "${asset}" twice`;
+        }
+        assetPaths.add(normalized);
       }
     }
   }
