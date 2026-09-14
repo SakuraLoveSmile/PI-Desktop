@@ -4922,4 +4922,10 @@ D193, and D194.
   macOS, and it is restored by derivation: the renderer recomputes the colour
   from the persisted preference and the live catalog, so a switch, a disable, and
   an uninstall all converge on the host palette with no stored value to unwind.
+- Built-in themes reach the same value through one shared table
+  (`packages/shared/src/theme.ts`): `BUILTIN_THEMES` holds each palette's
+  `windowBackground` once and `isThemeColorScheme` holds the built-in-id
+  question once, read by the renderer, main, the panel host, the panel preload,
+  and the theme picker. The pair `#ffffff` / `#181818` was restated in four
+  files before this, so the built-in and contributed paths could drift apart.
   See ADR 0247, issue #335, and E2E-024J.

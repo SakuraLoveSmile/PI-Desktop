@@ -1,8 +1,10 @@
 import { BrowserWindow } from "electron";
 import { isWindowBackgroundColor } from "@pi-desktop/plugin-sdk";
 import {
+  builtinWindowBackground,
   ErrorCodes,
   IPC,
+  isThemeColorScheme,
   NATIVE_MENU_ACTIONS,
   WINDOW_CONTROL_ACTIONS,
   type NativeMenuAction,
@@ -78,7 +80,7 @@ export function registerWindowIpc({
 
   handle(IPC.invoke.windowSetBackgroundColor, async (input: unknown = {}) => {
     const theme = (input as { theme?: unknown })?.theme;
-    if (theme !== "light" && theme !== "dark") {
+    if (!isThemeColorScheme(theme)) {
       throw Object.assign(new Error("invalid window background theme"), {
         errorCode: ErrorCodes.INVALID_ARGUMENT,
       });
@@ -102,9 +104,7 @@ export function registerWindowIpc({
     }
     const color = isWindowBackgroundColor(requested)
       ? requested
-      : theme === "light"
-        ? "#ffffff"
-        : "#181818";
+      : builtinWindowBackground(theme);
     mainWindow.setBackgroundColor(color);
     return { applied: true, theme, color };
   });

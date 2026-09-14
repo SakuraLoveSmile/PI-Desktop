@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   KEYBOARD_SHORTCUTS,
   isActiveInProject,
+  isThemeColorScheme,
   keybindingDisplayParts,
   keybindingMatchesEvent,
   resolveFontScale,
@@ -460,7 +461,7 @@ export function useAppShellRuntime() {
     // `system` instead of leaving the shell on a half-applied palette.
     const base: "system" | "light" | "dark" = pluginTheme
       ? pluginTheme.base
-      : preference === "light" || preference === "dark"
+      : isThemeColorScheme(preference)
         ? preference
         : "system";
 

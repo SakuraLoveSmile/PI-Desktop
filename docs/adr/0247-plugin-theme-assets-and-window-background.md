@@ -78,6 +78,16 @@ Permission: new `ui.window.appearance`, confirmed at install and shown in the
 Settings permission list. A declaration without the grant is audited and
 ignored.
 
+Built-in themes reach the same value through a shared table
+(`packages/shared/src/theme.ts`): `BUILTIN_THEMES` carries each palette's
+`windowBackground` once, and `isThemeColorScheme` carries the "is this a
+palette rather than `system`/a plugin theme" question once. The renderer, main,
+the plugin panel host, the panel preload, and the theme picker all read it
+instead of restating the `#ffffff` / `#181818` pair or re-listing the built-in
+ids. The two paths therefore differ only in where the colour is declared, not in
+how it is applied or restored. `system` stays resolved locally, because the
+renderer asks `matchMedia` and main asks `nativeTheme`.
+
 ## Consequences
 
 - A theme can ship a photographic background or a webfont and can own the native
@@ -94,6 +104,10 @@ ignored.
 - The asset handler reads each file synchronously. Within a 4 MB per-plugin
   budget this is bounded and avoids holding a stream open across a plugin
   unload, which is the failure mode that would matter more.
+- The built-in window palette has one definition. It previously lived in four
+  files, so a palette change could leave one of them behind and split the
+  built-in and contributed paths — the exact divergence this ADR exists to
+  prevent.
 
 ## Alternatives
 

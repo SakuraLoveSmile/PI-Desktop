@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain, session } from "electron";
 import { pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";
 import { isNetUrlAllowed, THEME_ASSET_SCHEME } from "@pi-desktop/plugin-sdk";
+import { builtinWindowBackground } from "@pi-desktop/shared";
 import {
   isPluginPanelWindowControlAction,
   PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
@@ -342,7 +343,7 @@ export class PluginPanelHost {
       autoHideMenuBar: true,
       // The host theme is only a fallback; the preload samples the actual
       // plugin page colors after it has loaded and paints the chrome from them.
-      backgroundColor: request.theme === "light" ? "#ffffff" : "#181818",
+      backgroundColor: builtinWindowBackground(request.theme),
       // Every platform uses the same frameless surface. The preload owns the
       // only visible window controls: a fixed three-button capsule.
       frame: false,

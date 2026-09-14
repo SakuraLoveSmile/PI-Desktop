@@ -3996,4 +3996,8 @@ D193 和 D194。
   `#rrggbb` / `#rrggbbaa`，需要新增的 `ui.window.appearance` 授予。它只在该插件的某个
   主题被选中时、且仅在非 macOS 上生效；还原靠推导而非记忆——渲染器每次根据持久化偏好与
   实时主题目录重新计算，所以切换、禁用、卸载都会收敛回宿主背景，没有需要回滚的存储值。
+- 内置主题改由同一张共享表提供该值（`packages/shared/src/theme.ts`）：`BUILTIN_THEMES`
+  只写一次每个调色板的 `windowBackground`，`isThemeColorScheme` 只写一次"这是内置
+  id"的判断，由渲染器、main、面板宿主、面板 preload 与主题选择器共同读取。此前
+  `#ffffff` / `#181818` 这对字面量散在四个文件里，内置路径与插件路径可能因此分叉。
   见 ADR 0247、issue #335 与 E2E-024J。
