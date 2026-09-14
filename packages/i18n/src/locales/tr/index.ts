@@ -1339,6 +1339,8 @@ sklm: {
     droppedFolder: "Klasör bırakıldı",
     openAsProject: "Proje olarak aç",
     referenceFolder: "Klasöre başvur",
+    foldersLabel: "Proje klasörleri",
+    notFound: "Proje bulunamadı",
     noProjects: "Henüz proje yok",
   },
   pulls: {

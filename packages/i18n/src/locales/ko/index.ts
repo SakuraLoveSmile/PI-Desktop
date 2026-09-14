@@ -1339,6 +1339,8 @@ sklm: {
     droppedFolder: "폴더를 놓았습니다",
     openAsProject: "프로젝트로 열기",
     referenceFolder: "폴더 참조",
+    foldersLabel: "프로젝트 폴더",
+    notFound: "프로젝트를 찾을 수 없습니다",
     noProjects: "프로젝트가 아직 없음",
   },
   pulls: {

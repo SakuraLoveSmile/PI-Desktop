@@ -1337,6 +1337,8 @@ sklm: {
     droppedFolder: "Folder dropped",
     openAsProject: "Open as project",
     referenceFolder: "Reference folder",
+    foldersLabel: "Project folders",
+    notFound: "Project not found",
     noProjects: "No projects yet",
   },
   pulls: {

@@ -1320,6 +1320,8 @@ sklm: {
     "droppedFolder": "Dossier déposé",
     "openAsProject": "Ouvrir comme projet",
     "referenceFolder": "Référencer le dossier",
+    "foldersLabel": "Dossiers du projet",
+    "notFound": "Projet introuvable",
     "noProjects": "Aucun projet pour l'instant"
   },
   "pulls": {

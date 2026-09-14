@@ -1327,6 +1327,8 @@ sklm: {
     droppedFolder: "已拖入文件夹",
     openAsProject: "作为项目打开",
     referenceFolder: "仅引用路径",
+    foldersLabel: "项目文件夹",
+    notFound: "未找到项目",
     noProjects: "暂无项目",
   },
   pulls: {

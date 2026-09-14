@@ -1327,6 +1327,8 @@ sklm: {
     droppedFolder: "已拖入資料夾",
     openAsProject: "以專案開啟",
     referenceFolder: "僅引用路徑",
+    foldersLabel: "專案資料夾",
+    notFound: "找不到專案",
     noProjects: "暫無專案",
   },
   pulls: {

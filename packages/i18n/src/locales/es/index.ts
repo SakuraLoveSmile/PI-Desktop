@@ -1320,6 +1320,8 @@ sklm: {
     "droppedFolder": "Carpeta soltada",
     "openAsProject": "Abrir como proyecto",
     "referenceFolder": "Referenciar carpeta",
+    "foldersLabel": "Carpetas del proyecto",
+    "notFound": "Proyecto no encontrado",
     "noProjects": "Aún no hay proyectos"
   },
   "pulls": {
