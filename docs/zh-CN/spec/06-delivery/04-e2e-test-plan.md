@@ -110,6 +110,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - Plan UI：`pnpm test:e2e:plan` 和 `pnpm test:e2e:plan-ui`。
 - host/sidecar 监督、崩溃恢复或重启：`pnpm test:e2e` 和 `pnpm test:e2e:supervision`。
 - 子代理生命周期：`pnpm test:e2e` 和 `pnpm test:e2e:subagents`。
+- 导入扩展依赖安装或 registry 边界改动：`pnpm test:e2e:plugin-import-deps`。
 - 同时涉及多个面的改动使用适用套件的并集。
 
 `pnpm test:e2e` 是 host RPC、IPC、Agent 执行、插件、持久化集成和共享运行时合约的默认跨系统烟雾测试。由于显示、平台、凭据、硬件或其他环境能力缺失而无法运行的必需套件，必须记录为 `NOT RUN`，并说明原因、替代验证和剩余风险。在具备条件且可信的环境中通过前，该 pull request 不具备合入条件。
@@ -6561,35 +6562,31 @@ IPC 请求无法关闭。
   （esbuild 打包产物在临时目录运行）；打包应用旅程为草稿
 #### E2E-PLUGIN-import-extension-installs-dependencies：导入带 npm 依赖的扩展会在首次加载前安装依赖
 
-- **前置条件**：一个自带 `package.json` 且声明了 `dependencies`（纯 JavaScript 包即可）、
-  无 `node_modules` 的 pi 扩展目录；npm 可达；导入确认已接受。
-- **步骤**：1）插件页 → 导入 pi 扩展，选择该目录。2）检查 `plugins/imported/<slug>/`。
-  3）发送一个会用到该扩展的提示。
-- **预期**：插件根有复制来的 `package.json`（`workspaces` 字段已被剥离）。依赖解析先运行
-  `npm install --package-lock-only --omit=dev --legacy-peer-deps --no-audit --no-fund
-  --ignore-scripts`，校验 registry-only 来源，再通过 `npm ci --omit=dev --legacy-peer-deps
-  --no-audit --no-fund --ignore-scripts` 创建 `node_modules`（没有运行任何安装脚本）；
-  扩展行达到 `loaded`，工具、命令与 hooks 均已注册，并在回合中生效。
+- **前置条件**：本地 pi 扩展包包含 `package.json`、`pi.extensions`、固定版本的纯 JavaScript 依赖
+  `is-number@7.0.0` 和 `workspaces` 字段，且没有 `node_modules`；workspace 构建产物和 npm 可用。
+- **步骤**：1）从本地目录生成导入插件。2）运行真实的有界安装器。3）检查复制后的 package、lockfile、
+  已安装模块、生命周期标记和受信任扩展加载报告。
+- **预期**：插件根目录复制了去除 `workspaces` 字段的 `package.json`。安装器运行两个 registry-only、
+  `--ignore-scripts` 的 npm 步骤；所有 lockfile 的 `resolved` URL 都只指向 registry，
+  `node_modules/is-number` 存在，没有写入生命周期标记，受信任扩展 runner 报告 `loaded` 并注册依赖驱动的命令。
 - **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§10.2；ADR 0244
 - **验收**：安全、质量
 - **里程碑**：MVP 后（R7 v1）
-- **状态**：由 `apps/desktop/test/agent-extensions.test.mjs` 单元覆盖，并已用
-  `pi-hermes-memory` 经 sidecar 打包产物人工验证（工具、命令与 hooks 注册成功，零
-  诊断）；暂无 CI 旅程
+- **状态**：由 `pnpm test:e2e:plugin-import-deps` 自动化覆盖确定性的安装边界；完整的 picker/renderer/回合旅程
+  保留为独立验证面。
 
 #### E2E-PLUGIN-import-extension-reports-missing-dependency：依赖安装失败或依赖无法加载会被呈现，绝不静默
 
-- **前置条件**：一个 `package.json` 声明了无法安装依赖（npm 离线或无法解析）的 pi 扩展
-  目录；以及一个依赖可安装但无法加载（例如需要构建脚本的原生模块）的扩展目录。
-- **步骤**：1）在 npm 失败的情况下导入第一个目录。2）检查 toast 与插件行。3）导入
-  第二个目录并开始回合。
-- **预期**：渲染层出现携带 npm stderr 尾部的警告 toast；插件仍然注册；该行显示扩展
-  `error` 状态与 `load_error` 诊断；会话与其他扩展均不受影响。
+- **前置条件**：三个本地 pi 扩展包的 `package.json` 分别使用不支持的 `file:`、git 和 HTTP tarball
+  依赖源；都没有 `node_modules` 或 lockfile。
+- **步骤**：1）生成每个导入插件。2）调用真实依赖安装器。3）检查返回的错误和生成的插件目录。
+- **预期**：每次失败都被明确报告并发生在 npm 启动前；导入插件和 manifest 仍保留，但不会留下可加载的
+  `node_modules` 或生成的 lockfile。renderer toast/加载错误旅程单独覆盖。
 - **链接规格**：`07-plugins/16-trusted-extensions.md` §3.2、§4.4、§10.2；ADR 0244
 - **验收**：安全、质量
 - **里程碑**：MVP 后（R7 v1）
-- **状态**：由 `apps/desktop/test/agent-extensions.test.mjs`（跳过、失败与无效 manifest
-  路径）单元覆盖；暂无 CI 旅程
+- **状态**：由 `pnpm test:e2e:plugin-import-deps` 自动化覆盖确定性的 registry 源拒绝边界；renderer 警告 toast
+  和 `load_error` 行为保留为独立验证面。
 
 
 #### E2E-234：工作区安全拒绝名单与忽略层
