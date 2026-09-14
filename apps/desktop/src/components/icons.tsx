@@ -25,6 +25,7 @@ import {
   Clock,
   CloudDownload,
   Code2,
+  Database,
   Download,
   Copy,
   Dot,
@@ -35,6 +36,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  GripVertical,
   Globe2,
   GitFork,
   GitPullRequestArrow,
@@ -56,6 +58,9 @@ import {
   Palette,
   PanelLeft,
   PanelRight,
+  PanelRightOpen,
+  Maximize2,
+  Minimize2,
   PawPrint,
   PencilLine,
   Pin,
@@ -147,13 +152,14 @@ export const IconArrowUpDown = icon(ArrowUpDown);
 export const IconSearch = icon(Search);
 export const IconRefresh = icon(RefreshCcw);
 export const IconChat = icon(MessageSquare);
-/** Message reference: quote part of a message into the composer (D398). */
+/** Message reference: quote part of a message into the composer (D-LOCAL-message-quotes). */
 export const IconQuote = icon(TextQuote);
 /** Session creation affordance. Keep it distinct from generic add actions. */
 export const IconNewSession = icon(MessageSquarePlus);
 export const IconFolder = icon(Folder);
 export const IconFolderOpen = icon(FolderOpen);
 export const IconNewProject = icon(FolderPlus);
+export const IconGripVertical = icon(GripVertical);
 export const IconFileText = icon(FileText);
 export const IconGlobe = icon(Globe2);
 export const IconBranch = icon(GitFork);
@@ -166,12 +172,16 @@ export const IconAt = icon(AtSign);
 export const IconSettings = icon(Settings);
 export const IconHelp = icon(CircleHelp);
 export const IconPanel = icon(PanelRight);
+export const IconPanelOpen = icon(PanelRightOpen);
+export const IconPanelMaximize = icon(Maximize2);
+export const IconPanelRestore = icon(Minimize2);
 export const IconDiff = icon(FileDiff);
 export const IconSidebar = icon(PanelLeft);
 export const IconArrowUp = icon(ArrowUp);
 export const IconArrowDown = icon(ArrowDown);
 export const IconCopy = icon(Copy);
 export const IconCode = icon(Code2);
+export const IconDatabase = icon(Database);
 export const IconCheck = icon(Check);
 export const IconBell = icon(Bell);
 export const IconBot = icon(Bot);

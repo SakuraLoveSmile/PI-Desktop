@@ -1,3 +1,4 @@
+import { readTranscriptSource, readComposerSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -18,14 +19,8 @@ const overlay = await readFile(
   new URL("../src/components/SelectionQuoteButton.tsx", import.meta.url),
   "utf8",
 );
-const transcript = await readFile(
-  new URL("../src/components/ChatTranscript.tsx", import.meta.url),
-  "utf8",
-);
-const composer = await readFile(
-  new URL("../src/components/Composer.tsx", import.meta.url),
-  "utf8",
-);
+const transcript = await readTranscriptSource();
+const composer = await readComposerSource();
 const styles = await readFile(
   new URL("../src/styles/messages.css", import.meta.url),
   "utf8",
@@ -120,7 +115,7 @@ test("the overlay is clamped into its bounds on both axes", () => {
 
 test("the bounds are the scroll container, capped above the docked composer", () => {
   // The composer floats over the transcript, so the scroller's own bottom is not
-  // the visible bottom (D399).
+  // the visible bottom (D-LOCAL-selection-overlay).
   assert.match(source, /export const COMPOSER_DOCK_SELECTOR = '\[data-composer-dock="docked"\]'/);
   assert.match(source, /bottomBoundaryTop/);
   assert.match(composer, /data-composer-dock=\{variant\}/);

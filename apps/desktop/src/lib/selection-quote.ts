@@ -1,6 +1,6 @@
 /**
  * Selection overlay geometry and selection → Markdown recovery for message
- * quotes (ADR 0223 / D399).
+ * quotes (ADR message-quotes-and-side-chats / D-LOCAL-selection-overlay).
  *
  * Mirrors the ChatGPT desktop app's selected-text overlay: one pill floats
  * *above* the selection, horizontally centered on it, inside the bounds of the
@@ -26,9 +26,9 @@ export const SELECTION_QUOTE_MARGIN = 8;
 /** Markdown fences start at three backticks and grow past the longest run. */
 export const SELECTION_QUOTE_MIN_FENCE = 3;
 
-/** The transcript row attribute a quotable selection anchors to (D398). */
+/** The transcript row attribute a quotable selection anchors to (D-LOCAL-message-quotes). */
 export const QUOTABLE_ROW_ATTRIBUTE = "data-minimap-id";
-/** Row role attribute: annotations belong to assistant turns (D400). */
+/** Row role attribute: annotations belong to assistant turns (D-LOCAL-response-annotations). */
 export const ROW_ROLE_ATTRIBUTE = "data-row-role";
 /** The role value that takes response annotations instead of a draft quote. */
 export const ANNOTATABLE_ROW_ROLE = "assistant";
@@ -68,7 +68,7 @@ export type SelectionQuoteTarget = {
   bounds: SelectionQuoteBounds;
   /**
    * Whether the row is an assistant turn. Annotations are a response concept
-   * (D400): a selection in the user's own message still quotes into the draft.
+   * (D-LOCAL-response-annotations): a selection in the user's own message still quotes into the draft.
    */
   annotatable: boolean;
 };
@@ -246,7 +246,7 @@ function removeChrome(wrapper: Element): void {
       [
         ".message-actions",
         ".code-block-head",
-        // Annotation markers are references, not text the user picked (D400).
+        // Annotation markers are references, not text the user picked (D-LOCAL-response-annotations).
         ".response-annotation-marker",
         "script",
         "style",

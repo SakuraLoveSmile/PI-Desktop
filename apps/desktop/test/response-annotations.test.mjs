@@ -1,3 +1,4 @@
+import { readStoreSource, readTranscriptSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -16,14 +17,8 @@ import {
   splitAnnotationMarkerTokens,
 } from "../src/lib/response-annotations.ts";
 
-const store = await readFile(
-  new URL("../src/stores/app-store.ts", import.meta.url),
-  "utf8",
-);
-const transcript = await readFile(
-  new URL("../src/components/ChatTranscript.tsx", import.meta.url),
-  "utf8",
-);
+const store = await readStoreSource();
+const transcript = await readTranscriptSource();
 const markdown = await readFile(
   new URL("../src/components/Markdown.tsx", import.meta.url),
   "utf8",
@@ -162,8 +157,8 @@ test("a marker never joins a quote, a copy, or a selection", () => {
 test("annotations attach to assistant turns, not to the draft", () => {
   // The row has to say what it is before a selection can be routed.
   assert.match(transcript, /data-row-role="assistant"/);
-  assert.match(transcript, /data-row-role="user"/);
-  // Attaching goes through the comment editor state the store owns (D400).
+  assert.match(transcript, /data-row-role=\{isSessionMessage \? undefined : "user"\}/);
+  // Attaching goes through the comment editor state the store owns (D-LOCAL-response-annotations).
   assert.match(
     store,
     /openResponseAnnotationEditor: \(\{ messageId, text, annotationId, anchor \}\) => \{/,
@@ -172,12 +167,12 @@ test("annotations attach to assistant turns, not to the draft", () => {
 });
 
 test("sending carries the annotations and consumes them", () => {
-  assert.match(store, /const outgoing = responseAnnotationPrompt\(\s*content,\s*get\(\)\.responseAnnotations\[sessionId\] \?\? \[\],\s*\);/);
+  assert.match(store, /const outgoing = responseAnnotationPrompt\(content, annotations\);/);
   assert.match(store, /content: outgoing,/);
-  assert.match(store, /isDefaultSessionTitle\(current\?\.title\)[\s\S]*?promptFallbackSessionTitle\(content,/);
+  assert.match(store, /isDefaultSessionTitle\(current\?\.title\)[\s\S]*?promptFallbackSessionTitle\(\s*content,/);
   assert.match(store, /consumeAnnotations\(\)/);
   // Queued prompts are sends too.
-  assert.match(store, /get\(\)\.enqueuePrompt\(outgoing, draft, sessionId\);/);
+  assert.match(store, /await get\(\)\.enqueuePrompt\(outgoing, draft, sessionId\);/);
 });
 
 test("the floating annotation index exposes count, locate, edit and clear", () => {

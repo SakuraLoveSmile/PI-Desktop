@@ -1,5 +1,5 @@
 /**
- * Floating selection overlay (ADR 0223 / D399).
+ * Floating selection overlay (ADR message-quotes-and-side-chats / D-LOCAL-selection-overlay).
  *
  * Mirrors the ChatGPT desktop app's selected-text overlay: a pill that floats
  * above the selection, centered on it, clamped into the bounds of the scroll
@@ -166,7 +166,7 @@ export function SelectionQuoteButton({
   const addToChat = () => {
     if (target.annotatable) {
       // A response turn opens the comment editor on the excerpt snapshotted by
-      // the pill; the annotation is attached when that editor saves (D400).
+      // the pill; the annotation is attached when that editor saves (D-LOCAL-response-annotations).
       openResponseAnnotationEditor({
         messageId: target.rowAnchorId,
         text: target.markdown,

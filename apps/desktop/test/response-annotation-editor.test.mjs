@@ -1,5 +1,6 @@
+import { readStoreModule, readTranscriptSource } from "./helpers/source-contracts.mjs";
 /**
- * The comment editor's flow (ADR 0224 / D400), driven through the same pure
+ * The comment editor's flow (ADR response-annotations / D-LOCAL-response-annotations), driven through the same pure
  * transitions the store calls: opening from an excerpt, saving the comment into
  * the annotation, re-editing an already attached excerpt, and dropping a save
  * whose annotation was already sent or removed.
@@ -14,10 +15,10 @@ import {
 } from "../src/lib/response-annotations.ts";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const store = await read("../src/stores/app-store.ts");
+const store = await readStoreModule("slices/annotation-slice.ts");
 const composer = await read("../src/components/ResponseAnnotationOverlay.tsx");
 const overlay = await read("../src/components/SelectionQuoteButton.tsx");
-const transcript = await read("../src/components/ChatTranscript.tsx");
+const transcript = await readTranscriptSource();
 const dialog = await read("../src/components/ResponseAnnotationDialog.tsx");
 
 test("Add to chat opens the comment editor instead of attaching the excerpt", () => {

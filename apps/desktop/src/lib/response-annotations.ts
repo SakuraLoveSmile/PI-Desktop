@@ -1,5 +1,5 @@
 /**
- * Response annotations (ADR 0224 / D400, presentation amended by ADR 0225).
+ * Response annotations (ADR response-annotations / D-LOCAL-response-annotations, presentation amended by ADR floating-annotation-index).
  *
  * The reference implementation (ChatGPT desktop app) does not put a quoted
  * excerpt into the composer as text. Selecting text in a response and choosing
@@ -33,7 +33,7 @@ export const ANNOTATION_REQUEST_HEADING = "## My request:";
 export const ANNOTATION_INSTRUCTION =
   "Each item contains text selected from an earlier assistant response and may include a user comment. Treat items as Annotation 1, Annotation 2, and so on in array order. Use every selection as context and address every comment. For every annotation you address, include its inline directive `:codex-annotation{index=\"N\"}`, where N is its one-based array position (for example, `:codex-annotation{index=\"1\"}`). Do not use unstructured annotation labels.";
 
-/** Longest excerpt one annotation carries, matching the quote cap (D398). */
+/** Longest excerpt one annotation carries, matching the quote cap (D-LOCAL-message-quotes). */
 export const MAX_ANNOTATION_CHARS = 2000;
 
 /** Inline marker syntax, matching the reference directive. */
@@ -74,7 +74,7 @@ export function responseAnnotation(input: {
 }
 
 /**
- * The comment editor's state (D400): which annotation it edits, the excerpt it
+ * The comment editor's state (D-LOCAL-response-annotations): which annotation it edits, the excerpt it
  * was opened for, and the comment it was seeded with. `annotationId` is null
  * while the excerpt is still unattached. It is owned by the session it was
  * opened in, so a session switch cannot carry a half-written comment over.

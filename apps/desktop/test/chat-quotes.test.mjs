@@ -1,3 +1,4 @@
+import { readStoreSource, readTranscriptSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -8,14 +9,8 @@ import {
   quoteExcerpt,
 } from "../src/lib/chat-quotes.ts";
 
-const transcript = await readFile(
-  new URL("../src/components/ChatTranscript.tsx", import.meta.url),
-  "utf8",
-);
-const store = await readFile(
-  new URL("../src/stores/app-store.ts", import.meta.url),
-  "utf8",
-);
+const transcript = await readTranscriptSource();
+const store = await readStoreSource();
 
 test("a quote carries the selected text when there is a selection", () => {
   assert.equal(

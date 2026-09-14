@@ -1,3 +1,4 @@
+import { readStoreSource, readComposerSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
@@ -5,7 +6,7 @@ import test from "node:test";
 import ts from "typescript";
 import { responseAnnotationPrompt, requestTextWithoutAnnotations } from "../src/lib/response-annotations.ts";
 
-const source = await readFile(new URL("../src/components/Composer.tsx", import.meta.url), "utf8");
+const source = await readComposerSource();
 const ast = ts.createSourceFile("Composer.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 function initializer(name) {
   let result;
@@ -27,7 +28,12 @@ function harness({ text = "", annotations = [annotation], sendBlocked = false, m
   const sent = [];
   const restored = [];
   const context = {
-    value: text, ref: { current: null }, activeSessionId: "s1", activeFileReferences: [],
+    value: text, draft: {
+      ref: { current: null },
+      draftSnapshot: (value) => ({ text: value.trim(), fileReferences: [] }),
+      clearDraftForKey() {},
+      restoreDraftForKey: (key, value) => restored.push([key, value]),
+    }, activeSessionId: "s1", activeFileReferences: [],
     useAppStore: { getState: () => state }, hasAnnotations: annotations.length > 0,
     serializeInlineComposerFileReferences: (value) => value.trim(),
     serializeComposerFileReferences: (value) => value.trim(),
@@ -42,7 +48,8 @@ function harness({ text = "", annotations = [annotation], sendBlocked = false, m
       return accepted;
     },
   };
-  return { state, sent, restored, context, submit: () => runInNewContext(`(async () => { ${submitCode.replace("submit();", "return submit();")} })()`, context) };
+  context.steerPrompt = async (content, draft) => { sent.push({ content, draft, steering: true }); return accepted; };
+  return { state, sent, restored, context, submit: (steering = false) => runInNewContext(`(async () => { ${submitCode.replace("submit();", `return submit(${steering});`)} })()`, context) };
 }
 
 test("saved annotations enable Send even when the composer text is empty", () => {
@@ -89,7 +96,7 @@ test("a rejected annotation-only submit retains the annotations", async () => {
 });
 
 test("the real store queues an annotation-only prompt while the session is running", async () => {
-  const store = await readFile(new URL("../src/stores/app-store.ts", import.meta.url), "utf8");
+  const store = await readStoreSource();
   const storeAst = ts.createSourceFile("app-store.ts", store, ts.ScriptTarget.Latest, true);
   let handler;
   function visit(node) {
@@ -101,11 +108,11 @@ test("the real store queues an annotation-only prompt while the session is runni
   const queued = [];
   const state = { activeSessionId: "s1", pendingPlans: {}, runningSessions: { s1: true },
     responseAnnotations: { s1: [annotation], s2: [annotation] },
-    enqueuePrompt: (...args) => queued.push(args),
+    enqueuePrompt: async (...args) => { queued.push(args); return true; },
   };
   const code = ts.transpileModule(`const send = ${handler};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const accepted = await runInNewContext(code + 'send("", { text: "", fileReferences: [] });', {
-    get: () => state, set: (update) => Object.assign(state, update(state)), responseAnnotationPrompt,
+    pendingSubmissions: new Set(), get: () => state, set: (update) => Object.assign(state, update(state)), responseAnnotationPrompt,
   });
   assert.equal(accepted, true);
   assert.equal(queued.length, 1);
@@ -120,4 +127,18 @@ test("a host-trimmed annotation-only prompt never exposes the wire block in the 
   assert.equal(requestTextWithoutAnnotations(wire.trim()), "");
   const request = "Explain this heading:\n## My request: extra";
   assert.equal(requestTextWithoutAnnotations(responseAnnotationPrompt(request, [annotation])), request);
+});
+
+
+test("steering is text-only and preserves saved annotations; annotation-only steering does nothing", async () => {
+  const empty = harness();
+  await empty.submit(true);
+  assert.equal(empty.sent.length, 0);
+  assert.equal(empty.state.responseAnnotations.s1.length, 1);
+  const text = harness({ text: "steer the active turn" });
+  await text.submit(true);
+  assert.equal(text.sent.length, 1);
+  assert.equal(text.sent[0].steering, true);
+  assert.equal(text.sent[0].content, "steer the active turn");
+  assert.equal(text.state.responseAnnotations.s1.length, 1);
 });

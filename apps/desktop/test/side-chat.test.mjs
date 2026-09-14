@@ -1,3 +1,4 @@
+import { readStoreSource, readTranscriptSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -15,10 +16,7 @@ import {
 } from "../src/lib/side-chat.ts";
 import { isKnownWorkPanelTab } from "../src/lib/work-panel-tabs.ts";
 
-const store = await readFile(
-  new URL("../src/stores/app-store.ts", import.meta.url),
-  "utf8",
-);
+const store = await readStoreSource();
 const panel = await readFile(
   new URL("../src/components/workpanel/WorkPanel.tsx", import.meta.url),
   "utf8",
@@ -27,10 +25,7 @@ const sideChatTab = await readFile(
   new URL("../src/components/workpanel/SideChatTab.tsx", import.meta.url),
   "utf8",
 );
-const transcript = await readFile(
-  new URL("../src/components/ChatTranscript.tsx", import.meta.url),
-  "utf8",
-);
+const transcript = await readTranscriptSource();
 
 const entry = (sessionId, parentSessionId, createdAt, anchorMessageId) =>
   sideChatEntry({
@@ -135,7 +130,7 @@ test("closing the panel releases the side chat and keeps the child session", () 
   assert.match(store, /closeSideChat: \(sessionId\) => \{/);
   // The child is durable: releasing never deletes the session.
   assert.doesNotMatch(
-    store.slice(store.indexOf("closeSideChat: (sessionId) => {"), store.indexOf("addSideChatReplyToMain:")),
+    store.slice(store.indexOf("closeSideChat: (sessionId) => {"), store.indexOf("addSideChatReplyToMain: (sessionId) =>")),
     /api\.deleteSession/,
   );
 });
@@ -162,7 +157,7 @@ test("a question from the child session is answerable inside the panel", () => {
   // answer the child without activating it.
   assert.match(sideChatTab, /<AskToolCard request=\{pendingAsk\} queued=\{queuedAsks\} \/>/);
   assert.match(sideChatTab, /askPending=\{Boolean\(pendingAsk\)\}/);
-  assert.match(store, /resolveAsk: async \(sessionId, resolution\) => \{/);
+  assert.match(store, /resolveAsk: async \(sessionId, resolution: AskToolResolution\) => \{/);
 });
 
 test("the optimistic prompt row reaches an open side-chat panel", () => {

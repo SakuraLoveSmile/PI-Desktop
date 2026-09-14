@@ -477,7 +477,7 @@ function InlineCode({
 }
 
 /**
- * Inline numbered marker for one response annotation (ADR 0223 / D400).
+ * Inline numbered marker for one response annotation (ADR response-annotations / D-LOCAL-response-annotations).
  *
  * It mirrors the reference overlay's marker: the number of the annotation in
  * array order, with the annotated excerpt as its tooltip.
@@ -605,7 +605,7 @@ function Anchor({
   };
 
   // An annotated pass carries its number here instead of a link: the marker is
-  // an inline reference, not a destination (ADR 0223 / D400). Every hook above
+  // an inline reference, not a destination (ADR response-annotations / D-LOCAL-response-annotations). Every hook above
   // still runs, so the marker branch cannot change hook order.
   if (annotationIndex !== null) {
     return <AnnotationMarker index={annotationIndex} />;
@@ -837,7 +837,7 @@ type MdastLike = {
 
 /**
  * Turn `:codex-annotation{index="N"}` tokens into numbered marker elements
- * (ADR 0223 / D400). The token is the reference implementation's own syntax,
+ * (ADR response-annotations / D-LOCAL-response-annotations). The token is the reference implementation's own syntax,
  * so an answer that echoes one renders as a marker instead of raw text.
  */
 export function annotationMarkerMdastTree(tree: MdastLike | null | undefined): void {

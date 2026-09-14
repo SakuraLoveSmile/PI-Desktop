@@ -1,3 +1,4 @@
+import { readTranscriptSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
@@ -117,7 +118,7 @@ test("all saved resolved ranges stay highlighted without selecting an item or ex
 });
 
 test("only the visible writable pane owns badges and navigation releases follow mode", async () => {
-  const transcript = await readFile(new URL("../src/components/ChatTranscript.tsx", import.meta.url), "utf8");
+  const transcript = await readTranscriptSource();
   assert.match(transcript, /!transcriptReadOnly && paneVisible && !veilCovering && sessionId/);
   assert.match(transcript, /const navigateAnnotation[\s\S]*?pinnedRef\.current = false/);
   assert.match(transcript, /requestAnimationFrame\(\(\) => setWindowSize\(\(size\) =>\s*Math\.min\(Math\.max\(size, allHistoryEntries\.length - index\),\s*growTranscriptWindow\(size, allHistoryEntries\.length\)\)\)/);

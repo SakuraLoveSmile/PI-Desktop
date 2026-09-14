@@ -5,6 +5,7 @@ import type {
   AgentCompactRequest,
   AgentCompactResponse,
   AgentPromptRequest,
+  AgentSteerRequest,
   UiMessage,
   MessageRevisionSummary,
   AgentPromptResponse,
@@ -34,6 +35,9 @@ import type {
   FsReadResult,
   HostHealth,
   HostStatusEvent,
+  MarketSource,
+  McpCatalogEntry,
+  SkillCatalogEntry,
   ModelInfo,
   McpServerInput,
   McpServerRecord,
@@ -52,6 +56,8 @@ import type {
   MarketPluginDetail,
   PluginInstallResult,
   ProjectRecord,
+  ProjectMemory,
+  ProjectMemoryEntry,
   ProjectWorkspace,
   PullRequestSummary,
   ScheduledTask,
@@ -61,6 +67,7 @@ import type {
   Result,
   SessionDetail,
   SessionSummary,
+  SessionCollaborationSummary,
   ToolPermissionResolution,
   UserSkillInput,
   UserSkillRecord,
@@ -113,7 +120,8 @@ export interface ImportCandidate {
   model: string | null;
   createdAt: string;
   updatedAt: string;
-  messageCount: number;
+  /** null when the source file was too large to scan without sampling. */
+  messageCount: number | null;
 }
 
 export interface ImportRunResult {
@@ -338,6 +346,8 @@ export const api = {
       ...result,
       session: normalizeSessionDetail(result.session),
     })),
+  getSessionCollaboration: (sessionId: string) =>
+    invoke<SessionCollaborationSummary>(IPC.invoke.sessionCollaboration, { sessionId }),
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
   getSessionScratchPath: (sessionId: string) =>
     invoke<{ path: string }>(IPC.invoke.sessionGetScratchPath, { sessionId }),
@@ -349,6 +359,11 @@ export const api = {
     invoke<{ ok: boolean; path: string }>(IPC.invoke.projectOpenFolder, path),
   renameSession: (id: string, title: string) =>
     invoke<{ ok: boolean }>(IPC.invoke.sessionRename, id, title),
+  moveSessionProject: (sessionId: string, projectPath: string) =>
+    invoke<{ session: SessionSummary }>(IPC.invoke.sessionMoveProject, {
+      sessionId,
+      projectPath,
+    }).then((result) => ({ ...result, session: normalizeSession(result.session) })),
   summarizeSessionTitle: (req: SessionSummarizeTitleRequest) =>
     invoke<SessionSummarizeTitleResponse>(IPC.invoke.sessionSummarizeTitle, req),
   configureSession: (
@@ -462,6 +477,20 @@ export const api = {
     invoke<{ workspace: ProjectWorkspace | null; canceled?: boolean }>(
       IPC.invoke.projectOpen,
     ),
+  pickProjectFolders: () =>
+    invoke<{ folders: string[]; canceled?: boolean }>(IPC.invoke.projectPickFolders),
+  getProjectMemory: (projectPath: string) =>
+    invoke<{ memory: ProjectMemory }>(IPC.invoke.projectMemoryGet, { projectPath }),
+  saveProjectMemory: (projectPath: string, entries: ProjectMemoryEntry[]) =>
+    invoke<{ memory: ProjectMemory }>(IPC.invoke.projectMemorySave, {
+      projectPath,
+      entries,
+    }),
+  cloneProject: (url: string) =>
+    invoke<{ workspace: ProjectWorkspace | null; canceled?: boolean }>(
+      IPC.invoke.projectClone,
+      { url },
+    ),
   pickFiles: () =>
     invoke<{ token: string | null; canceled?: boolean }>(IPC.invoke.composerPickFiles),
   getDroppedFilePath: (file: File) =>
@@ -522,6 +551,8 @@ export const api = {
     prefix: UiMessage[];
   }) =>
     invoke<{ messages: UiMessage[] }>(IPC.invoke.sessionActivateRevision, input),
+  steer: (req: AgentSteerRequest) =>
+    invoke<AgentPromptResponse>(IPC.invoke.agentSteer, req),
   prompt: (req: AgentPromptRequest) =>
     invoke<AgentPromptResponse>(IPC.invoke.agentPrompt, req),
   enhancePrompt: (req: PromptEnhancementRequest) =>
@@ -630,6 +661,25 @@ export const api = {
       imported: McpServerRecord[];
       failed: Array<{ id: string; reason: string }>;
     }>(IPC.invoke.mcpImport, { text }),
+  /** Query the configured market sources; `failedSources` names dead ones. */
+  searchMcpMarketRegistry: (query: string, sources: MarketSource[], options?: { more?: boolean }) =>
+    invoke<{ entries: McpCatalogEntry[]; failedSources?: string[]; exhausted?: boolean }>(
+      IPC.invoke.mcpMarketSearch,
+      { query, sources, ...options },
+    ),
+
+  // --- Skill market ----------------------------------------------------------
+  searchSkillMarket: (query: string, sources: { id: string; name: string; url: string }[]) =>
+    invoke<{ entries: SkillCatalogEntry[]; failedSources?: string[] }>(
+      IPC.invoke.skillMarketSearch,
+      { query, sources },
+    ),
+  /** Fetch one catalog document (frontmatter split off) for preview/install. */
+  fetchSkillMarketDocument: (entry: SkillCatalogEntry) =>
+    invoke<{ name?: string; description?: string; body: string; resources?: Array<{ path: string; body: string }> }>(
+      IPC.invoke.skillMarketFetch,
+      { entry },
+    ),
 
   // --- Skills the user owns -------------------------------------------------
   listUserSkills: (query?: AgentCapabilityQuery) =>
@@ -767,9 +817,19 @@ export const api = {
     ),
   /** Import a pi CLI extension file or directory as a development plugin (spec 16 §3). */
   importPiExtension: () =>
-    invoke<{ canceled: true } | { canceled: false; id: string; path: string; entries: string[] }>(
-      IPC.invoke.pluginImportExtension,
-    ),
+    invoke<
+      | { canceled: true }
+      | {
+          canceled: false;
+          id: string;
+          path: string;
+          entries: string[];
+          dependencies:
+            | { state: "skipped"; reason: "no-package-json" | "no-dependencies" }
+            | { state: "installed" }
+            | { state: "failed"; error: string };
+        }
+    >(IPC.invoke.pluginImportExtension),
   runExtensionCommand: (input: { sessionId: string; name: string; args: string }) =>
     invoke<{ ok: boolean }>(IPC.invoke.extensionsCommandRun, input),
   respondExtensionPrompt: (response: TrustedExtensionUiPromptResponse) =>

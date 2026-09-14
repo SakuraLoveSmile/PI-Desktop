@@ -954,13 +954,13 @@
 }
 
 /*
- * Floating quote affordance for a selection (ADR 0223). Fixed, and in the
+ * Floating quote affordance for a selection (ADR message-quotes-and-side-chats). Fixed, and in the
  * body-portaled popover layer: it is read while the passage underneath stays
  * visible, so it must clear the docked composer without pushing the passage
  * around (D-layer table in 04-ux/07-ui-design-system.md §9).
  */
 /*
- * Floating selection overlay (D399): one pill above the selection, with the
+ * Floating selection overlay (D-LOCAL-selection-overlay): one pill above the selection, with the
  * action row's text buttons separated by hairlines and the icon action last —
  * the ChatGPT overlay contract. Fixed, and in the body-portaled popover layer,
  * so it clears the docked composer without pushing the passage around.
@@ -1027,7 +1027,7 @@
 }
 
 /*
- * Inline numbered reference to one response annotation (D400).
+ * Inline numbered reference to one response annotation (D-LOCAL-response-annotations).
  *
  * The reference implementation renders this as a small accent-colored link with
  * a dashed underline on hover, not as a chip: it sits inside a sentence, so it
@@ -1190,7 +1190,7 @@
 }
 
 /*
- * The annotation comment editor (D400): the excerpt snapshot above the
+ * The annotation comment editor (D-LOCAL-response-annotations): the excerpt snapshot above the
  * multiline comment field, with Save and Cancel in the shared dialog rhythm.
  */
 .response-annotation-dialog {
@@ -1714,6 +1714,68 @@
   word-break: normal;
   min-width: 0;
   line-height: inherit;
+}
+
+.message-row.session-message .message-col {
+  width: min(100%, 720px);
+  max-width: 100%;
+  align-items: stretch;
+}
+
+.message-row.session-message .message-bubble {
+  background: var(--ds-bg-hover);
+  border-radius: var(--radius-md-plus);
+  color: var(--ds-text-primary);
+}
+
+.session-message-origin {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.session-message-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: var(--font-weight-medium);
+}
+
+.session-message-source {
+  padding: 2px 0;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ds-accent);
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.session-message-source:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.session-message-source:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.session-message-session-id {
+  flex-basis: 100%;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-compact);
+  overflow-wrap: anywhere;
 }
 
 .message-attachments {
@@ -2259,6 +2321,31 @@
 .subagent-topology-node.outcome-aborted .subagent-topology-status-icon,
 .subagent-topology-node.outcome-denied .subagent-topology-status-icon {
   background: var(--ds-text-muted);
+}
+
+.subagent-topology-node.outcome-creating .subagent-topology-status-icon {
+  background: var(--ds-purple);
+  animation: subagent-creating-pulse 1.4s var(--motion-ease-standard) infinite;
+}
+
+.subagent-topology-node.outcome-creating .subagent-topology-node-status {
+  color: var(--ds-purple);
+}
+
+@keyframes subagent-creating-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subagent-topology-node.outcome-creating .subagent-topology-status-icon {
+    animation: none;
+  }
 }
 
 .subagent-topology-node-title-row {

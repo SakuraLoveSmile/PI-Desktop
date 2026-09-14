@@ -1,5 +1,5 @@
 /**
- * Compact comment editor for one response annotation (ADR 0224 / D400).
+ * Compact comment editor for one response annotation (ADR response-annotations / D-LOCAL-response-annotations).
  *
  * Add to chat in the selection overlay and the assistant turn's annotate action
  * open it with the excerpt snapshotted when the selection was taken; the

@@ -12,7 +12,6 @@ import { open as openFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { homedir } from "node:os";
-import { AsyncLocalStorage } from "node:async_hooks";
 import {
   busTopicAllowed,
   isDeniedFsPath,
@@ -66,6 +65,7 @@ import {
   resolveWithinRoot,
 } from "./fs-panel";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
+import { PluginToolInvocations, type PluginToolInvocation } from "./plugin-tool-invocations";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 import { parseAllowedExternalUrl } from "./safe-open-external";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
@@ -96,6 +96,8 @@ export type RegisteredPluginTool = {
     args: unknown,
     ctx?: {
       sessionId?: string;
+      turnId?: string;
+      signal?: AbortSignal;
       mode?: "agent" | "plan" | "goal";
       modelKey?: string;
       thinkingLevel?: string;
@@ -414,8 +416,6 @@ const HOST_API_ALLOWLIST = new Set([
   "session.delete",
   "agent.complete",
 ]);
-
-const toolSession = new AsyncLocalStorage<string>();
 
 /** Load must finish (module eval + onLoad) inside this budget. */
 const PLUGIN_LOAD_TIMEOUT_MS = 15_000;
@@ -864,12 +864,7 @@ export class PluginRuntime {
   private restarts = new Map<string, RestartRecord>();
   private busSubscriptions = new Map<string, BusSubscription>();
   private busRate = new Map<string, { windowStart: number; count: number }>();
-  /**
-   * Session of an in-flight `tool.execute`. Child `pi.browser.*` calls arrive
-   * on a later `handleChildMessage` turn, so ALS around `sendToChild` is empty
-   * there — this map is the durable identity for that round trip.
-   */
-  private executingToolSessions = new Map<string, Array<{ sessionId: string; toolName: string }>>();
+  private readonly toolInvocations = new PluginToolInvocations();
   private completeRate = new Map<string, { windowStart: number; count: number }>();
   /**
    * File accesses the user allowed for the rest of the run, keyed
@@ -1259,10 +1254,17 @@ export class PluginRuntime {
     return manifest;
   }
 
+  /** Abort this session's invocations without affecting sibling sessions. */
+  cancelSessionTools(sessionId: string, reason = "Session tool execution aborted"): void {
+    this.toolInvocations.cancelSession(sessionId, reason);
+  }
+
   /** Deregister contributions, run `onUnload` in the child, then stop it. */
   async unload(pluginId: string): Promise<void> {
     const loaded = this.loaded.get(pluginId);
     if (loaded) {
+      loaded.disposing = true;
+      this.toolInvocations.cancelOwner(loaded, "Plugin unloaded");
       // An explicit stop ends supervision; a supervisor-driven reload keeps it.
       if (!this.restarting.has(pluginId)) this.cancelRestarts(pluginId);
       await this.stopServices(loaded);
@@ -1346,6 +1348,7 @@ export class PluginRuntime {
     // stopping must already be covered by the guard in `handleChildExit`.
     for (const loaded of loadedPlugins) {
       loaded.disposing = true;
+      this.toolInvocations.cancelOwner(loaded, "Application shutting down");
       this.cancelRestarts(loaded.manifest.id);
     }
     this.disposeWatchers();
@@ -1438,6 +1441,15 @@ export class PluginRuntime {
   }
 
   async invokePanelBridge(
+    pluginId: string,
+    channel: string,
+    payload?: Record<string, unknown>,
+    context?: PluginPanelBridgeContext,
+  ): Promise<unknown> {
+    return this.toolInvocations.withoutContext(() => this.invokePanelWithoutToolContext(pluginId, channel, payload, context));
+  }
+
+  private async invokePanelWithoutToolContext(
     pluginId: string,
     channel: string,
     payload?: Record<string, unknown>,
@@ -1594,26 +1606,50 @@ export class PluginRuntime {
     loaded: LoadedPlugin,
     message: Record<string, unknown>,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<unknown> {
     const child = loaded.child;
     if (!child) {
       return Promise.reject(apiError("NOT_FOUND", `plugin host process gone: ${loaded.manifest.id}`));
     }
+    if (signal?.aborted) return Promise.reject(signal.reason);
     const id = `h${loaded.nextCallId++}`;
     return new Promise((resolvePromise, rejectPromise) => {
-      const timer = setTimeout(() => {
+      const cancelChild = (error: Error) => {
+        if (typeof message.invocationId !== "string") return;
+        try {
+          child.postMessage({ t: "cancel", invocationId: message.invocationId, reason: error.message });
+        } catch {
+          // The process may already be gone; the host still revokes the call.
+        }
+      };
+      const abort = () => {
+        const error = signal?.reason instanceof Error
+          ? signal.reason
+          : apiError("PLUGIN_TOOL_ABORTED", "Plugin tool execution aborted");
+        loaded.pending.get(id)?.reject(error);
+        cancelChild(error);
+      };
+      const cleanup = () => {
+        clearTimeout(timer);
         loaded.pending.delete(id);
-        rejectPromise(
-          apiError("TIMEOUT", `plugin ${loaded.manifest.id} did not answer ${String(message.t)}`),
-        );
+        signal?.removeEventListener("abort", abort);
+      };
+      const timer = setTimeout(() => {
+        const error = apiError("TIMEOUT", `plugin ${loaded.manifest.id} did not answer ${String(message.t)}`);
+        loaded.pending.get(id)?.reject(error);
+        cancelChild(error);
       }, timeoutMs);
-      loaded.pending.set(id, { resolve: resolvePromise, reject: rejectPromise, timer });
+      loaded.pending.set(id, {
+        resolve: (value) => { cleanup(); resolvePromise(value); },
+        reject: (error) => { cleanup(); rejectPromise(error); },
+        timer,
+      });
+      signal?.addEventListener("abort", abort, { once: true });
       try {
         child.postMessage({ ...message, id });
       } catch (error) {
-        clearTimeout(timer);
-        loaded.pending.delete(id);
-        rejectPromise(error instanceof Error ? error : new Error(String(error)));
+        loaded.pending.get(id)?.reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
@@ -1640,7 +1676,12 @@ export class PluginRuntime {
       return;
     }
     if (message.t === "call") {
-      void this.dispatchHostCall(loaded, String(message.api ?? ""), message.args ?? [])
+      void this.toolInvocations.run(loaded, message.invocationId, async () => {
+        if (this.loaded.get(loaded.manifest.id) !== loaded) {
+          throw apiError("PLUGIN_UNLOADED", "Plugin host process is no longer active");
+        }
+        return this.dispatchHostCall(loaded, String(message.api ?? ""), message.args ?? []);
+      })
         .then((value) =>
           loaded.child?.postMessage({ t: "res", id: message.id, ok: true, value: value ?? null }),
         )
@@ -1749,32 +1790,42 @@ export class PluginRuntime {
               }
             }
             const target = this.loaded.get(pluginId);
-            if (!target?.child) throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
+            if (!target?.child || target !== loaded || target.disposing) {
+              throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
+            }
             const sessionId = String(ctx?.sessionId ?? "");
-            const stack = this.executingToolSessions.get(pluginId) ?? [];
-            stack.push({ sessionId, toolName: name });
-            this.executingToolSessions.set(pluginId, stack);
+            const invocation = this.toolInvocations.begin(target, {
+              pluginId,
+              sessionId,
+              toolName: name,
+              turnId: ctx?.turnId,
+              signal: ctx?.signal,
+            });
             try {
-              return await toolSession.run(sessionId, () =>
-                this.sendToChild(
+              return await this.sendToChild(
                   target,
                   {
                     t: "call",
                     method: "tool.execute",
+                    invocationId: invocation.id,
                     payload: {
                       name,
                       args: toolArgs,
                       sessionId,
+                      turnId: ctx?.turnId,
+                      mode: ctx?.mode,
                       modelKey: ctx?.modelKey,
                       thinkingLevel: ctx?.thinkingLevel,
                     },
                   },
                   PLUGIN_TOOL_TIMEOUT_MS,
-                ),
+                  invocation.signal,
               );
+            } catch (error) {
+              this.toolInvocations.cancel(invocation, error);
+              throw error;
             } finally {
-              stack.pop();
-              if (stack.length === 0) this.executingToolSessions.delete(pluginId);
+              this.toolInvocations.finish(invocation);
             }
           },
         });
@@ -1909,6 +1960,7 @@ export class PluginRuntime {
   }
 
   private handleChildExit(loaded: LoadedPlugin, code: number): void {
+    this.toolInvocations.cancelOwner(loaded, "Plugin host process exited");
     if (loaded.disposing) return;
     if (this.loaded.get(loaded.manifest.id) !== loaded) return;
     const pluginId = loaded.manifest.id;
@@ -2782,8 +2834,9 @@ export class PluginRuntime {
     );
   }
 
-  private inFlightTool(pluginId: string): { sessionId: string; toolName: string } | undefined {
-    return this.executingToolSessions.get(pluginId)?.at(-1);
+  private inFlightTool(pluginId: string): PluginToolInvocation | undefined {
+    const loaded = this.loaded.get(pluginId);
+    return loaded ? this.toolInvocations.current(loaded) : undefined;
   }
 
   private completeRateExceeded(pluginId: string): boolean {
@@ -2852,7 +2905,7 @@ export class PluginRuntime {
         errorCode: "RATE_LIMITED",
         ts: Date.now(),
       });
-      throw apiError("RATE_LIMITED", "advisor complete rate exceeded");
+      throw apiError("RATE_LIMITED", "plugin completion rate exceeded");
     }
     const includeSessionContext = input.includeSessionContext === true;
     if (includeSessionContext) {
@@ -2890,7 +2943,7 @@ export class PluginRuntime {
           errorCode: "TIMEOUT",
           ts: Date.now(),
         });
-        throw apiError("TIMEOUT", "advisor complete timed out");
+        throw apiError("TIMEOUT", "plugin completion timed out");
       }
       throw error;
     } finally {
@@ -2919,11 +2972,7 @@ export class PluginRuntime {
   }
 
   private browserSessionId(pluginId?: string): string | undefined {
-    const als = toolSession.getStore()?.trim();
-    if (als) return als;
-    if (!pluginId) return undefined;
-    const stack = this.executingToolSessions.get(pluginId);
-    return stack?.at(-1)?.sessionId?.trim() || undefined;
+    return pluginId ? this.inFlightTool(pluginId)?.sessionId.trim() || undefined : undefined;
   }
 
   private async invokeBrowser(
@@ -2985,6 +3034,7 @@ export class PluginRuntime {
   }
 
   private assertPermission(loaded: LoadedPlugin, perm: string): void {
+    this.toolInvocations.current(loaded);
     if (!loaded.permissions.has(perm)) {
       this.services.audit?.({
         pluginId: loaded.manifest.id,
@@ -3465,6 +3515,26 @@ export class PluginRuntime {
           if (!this.services.desktopControl) {
             throw apiError("UNSUPPORTED", "host api not available: desktop.invoke");
           }
+          if (operation === "session/create") {
+            const createInput = args[0];
+            const inheritedParent =
+              createInput && typeof createInput === "object" && !Array.isArray(createInput)
+                ? (createInput as Record<string, unknown>).inheritPermissionFromSessionId
+                : undefined;
+            if (inheritedParent !== undefined && inheritedParent !== null) {
+              const callerSessionId = this.inFlightTool(pluginId)?.sessionId?.trim();
+              if (
+                typeof inheritedParent !== "string" ||
+                !callerSessionId ||
+                inheritedParent.trim() !== callerSessionId
+              ) {
+                throw apiError(
+                  "PERMISSION_DENIED",
+                  "permission inheritance must name the current parent session",
+                );
+              }
+            }
+          }
           const operationInfo = this.services.desktopControl.operations.find(
             (candidate) => candidate.id === operation,
           );
@@ -3512,10 +3582,19 @@ export class PluginRuntime {
             }
           }
           try {
+            const invocation = this.inFlightTool(pluginId);
             const result = await this.services.desktopControl.invoke({
               operation,
               args,
               confirm: input.confirm === true,
+              source: "plugin",
+              pluginContext: {
+                pluginId,
+                ...(invocation?.sessionId ? { sessionId: invocation.sessionId } : {}),
+                ...(invocation?.turnId ? { turnId: invocation.turnId } : {}),
+                ...(invocation ? { invocationId: invocation.id } : {}),
+              },
+              ...(invocation ? { signal: invocation.signal } : {}),
             } satisfies McpControlInvokeInput);
             this.services.audit?.({
               pluginId,

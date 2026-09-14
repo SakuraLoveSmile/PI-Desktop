@@ -1,7 +1,6 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -10,6 +9,7 @@ import type { ProjectRecord } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { Button, Select, TooltipButton, cx } from "../ui";
+import { AnchoredMenu } from "./AnchoredMenu";
 import {
   IconChevronDown,
   IconFolder,
@@ -362,7 +362,8 @@ export function CapabilityGroupHeader({
   action,
 }: {
   label: string;
-  path: string;
+  /** Resolved `.agents` path; omit for shipped sources that have no file. */
+  path?: string;
   count: number;
   action?: ReactNode;
 }) {
@@ -370,9 +371,13 @@ export function CapabilityGroupHeader({
   return (
     <div className="agent-capability-group" role="presentation">
       <span className="agent-capability-group-label">{label}</span>
-      <code className="agent-capability-group-path" title={path}>
-        {path}
-      </code>
+      {path ? (
+        <code className="agent-capability-group-path" title={path}>
+          {path}
+        </code>
+      ) : (
+        <span className="agent-capability-group-path" aria-hidden="true" />
+      )}
       <span
         className="agent-capability-group-count"
         title={t("settings.capabilityCount", { count })}
@@ -473,40 +478,31 @@ export function CapabilityRowMenu({
   disabled?: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!wrapRef.current?.contains(event.target as Node)) onOpenChange(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onOpenChange(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, onOpenChange]);
-
   return (
-    <div className="agent-capability-menu-wrap" ref={wrapRef}>
-      <TooltipButton
-        type="button"
-        className="settings-icon-button"
-        tooltip={label}
-        ariaLabel={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => onOpenChange(!open)}
-      >
-        <IconMore size={16} />
-      </TooltipButton>
-      {open ? (
-        <div className="agent-capability-menu" role="menu">
+    <AnchoredMenu
+      className="agent-capability-menu-wrap"
+      open={open}
+      onClose={() => onOpenChange(false)}
+      menuClassName="agent-capability-menu"
+      label={label}
+      role="menu"
+      align="end"
+      trigger={(ref) => (
+        <TooltipButton
+          ref={ref}
+          type="button"
+          className="settings-icon-button"
+          tooltip={label}
+          ariaLabel={label}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          disabled={disabled}
+          onClick={() => onOpenChange(!open)}
+        >
+          <IconMore size={16} />
+        </TooltipButton>
+      )}
+    >
           {items.map((item) => (
             <button
               key={item.key}
@@ -520,9 +516,7 @@ export function CapabilityRowMenu({
               {item.label}
             </button>
           ))}
-        </div>
-      ) : null}
-    </div>
+    </AnchoredMenu>
   );
 }
 
