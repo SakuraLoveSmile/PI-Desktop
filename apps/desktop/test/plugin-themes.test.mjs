@@ -1,4 +1,5 @@
 import { readAppSourceSync, readSettingsSourceSync, readStoreSourceSync, readMainSourceSync } from "./helpers/source-contracts.mjs";
+import { sanitizeThemeCss } from "@pi-desktop/plugin-sdk";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
@@ -69,4 +70,14 @@ test("settings offers plugin themes in the searchable picker", () => {
   assert.match(themeRowSrc, /kind: "plugin"/);
   assert.doesNotMatch(settingsSrc, /settings-theme-grid/);
   assert.doesNotMatch(settingsSrc, /settings-theme-card/);
+});
+
+test("the shipped example theme survives sanitation", () => {
+  const css = readFileSync(
+    join(repoRoot, "examples/plugins/hello/themes/midnight.css"),
+    "utf8",
+  );
+  // The file only *names* the banned token, inside its header comment.
+  assert.match(css, /@import/);
+  assert.equal(sanitizeThemeCss(css).ok, true);
 });

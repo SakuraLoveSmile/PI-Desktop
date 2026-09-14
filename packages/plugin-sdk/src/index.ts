@@ -1225,6 +1225,7 @@ export {
 } from "./skills.js";
 export {
   decodeCssEscapes,
+  maskNonCodeCss,
   sanitizeThemeCss,
   THEME_CSS_MAX_BYTES,
   type ThemeCssResult,

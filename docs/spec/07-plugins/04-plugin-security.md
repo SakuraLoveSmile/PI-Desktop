@@ -84,6 +84,11 @@ A theme contribution (`ui.theme`) is the one case where plugin-authored content
 runs inside the host renderer, so it crosses a sanitizer in the main process
 before it is ever sent to the UI:
 
+- Only CSS the browser applies is inspected: comment bodies and string literals
+  are blanked first, with one space per masked character so any offset still
+  points at the source, and each `url(...)` argument is kept verbatim and judged
+  by its target. A sheet that merely *mentions* a banned token in a comment or a
+  string is therefore accepted
 - Rejected: `@import`, any `url()` target that is not a `data:` URI, a `url(`
   the parser cannot resolve, `javascript:`, `expression(`, and markup sequences
   (`<style`, `</style`, `<!--`); an empty sheet is refused too

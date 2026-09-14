@@ -4892,3 +4892,16 @@ D193, and D194.
 - host-core keeps the `inherit` token so inherit-only documents load and
   Settings round-trips them. See ADR 0246, issue #215, PR #319, and
   E2E-SUBAGENT-inherit-parent-tools.
+
+## 2026-09-14 — Theme CSS validation only inspects CSS that runs (D416)
+
+- The `ui.theme` sanitizer masks comment bodies and string literals before the
+  `@import`, markup, and script keyword checks, one space per masked character so
+  offsets still point at the source, and keeps every `url(...)` argument verbatim
+  so a real reference is still judged by its target.
+- A character-level three-state scan, not a `/* … */` strip: in
+  `content: "/*";` the browser sees a string, and a naive strip would read a
+  comment there and hide the real `@import "x.css";` behind it.
+- `examples/plugins/hello/themes/midnight.css` loads again. Only the false
+  rejection narrows: no new capability, no format change, and sheets that never
+  name a banned token behave exactly as before. See issue #334 and E2E-024J.
