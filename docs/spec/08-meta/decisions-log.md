@@ -4905,3 +4905,21 @@ D193, and D194.
 - `examples/plugins/hello/themes/midnight.css` loads again. Only the false
   rejection narrows: no new capability, no format change, and sheets that never
   name a banned token behave exactly as before. See issue #334 and E2E-024J.
+
+## 2026-09-14 — Themed package assets and native window backgrounds (D417)
+
+- `contributes.themes[].assets` declares package-relative image and font files
+  (whitelisted extensions, 4 MB summed). The host resolves each inside the plugin
+  package, refuses the dependency directory, rewrites every matching `url()` to
+  `plugin-asset://<pluginId>/<path>`, and serves it through a privileged
+  host-owned scheme whose handler answers only from the loaded plugin's declared
+  list. An undeclared reference is still refused and the raw path never reaches
+  the renderer, so the `data:`-only rule and every existing rejection are
+  unchanged. Permission stays `ui.theme`.
+- `contributes.windowAppearance.backgroundColor.{light,dark}` accepts
+  `#rrggbb` / `#rrggbbaa` behind the new `ui.window.appearance` grant. It applies
+  only while one of that plugin's themes is the selected theme and only off
+  macOS, and it is restored by derivation: the renderer recomputes the colour
+  from the persisted preference and the live catalog, so a switch, a disable, and
+  an uninstall all converge on the host palette with no stored value to unwind.
+  See ADR 0247, issue #335, and E2E-024J.

@@ -3984,3 +3984,16 @@ D193 和 D194。
   朴素剥离会把它当成注释，从而藏掉其后的真实 `@import "x.css";`。
 - `examples/plugins/hello/themes/midnight.css` 恢复加载。只是收窄了误拒面：没有新增能力、
   没有格式变化，对从不出现被禁关键字的样式表行为完全不变。见 issue #334 与 E2E-024J。
+
+## 2026-09-14 —— 主题包内资源与原生窗口背景（D417）
+
+- `contributes.themes[].assets` 声明插件包内的图片与字体文件（扩展名白名单、总量上限
+  4MB）。宿主在插件包内解析它们、拒绝依赖目录、把命中的 `url()` 改写为
+  `plugin-asset://<pluginId>/<path>`，并通过宿主自有的特权协议提供；该处理器只按已加载
+  插件自己声明的清单应答。未声明的引用仍被拒绝，原始路径不会到达渲染器，因此
+  `data:`-only 规则与既有全部拒绝行为不变。权限仍沿用 `ui.theme`。
+- `contributes.windowAppearance.backgroundColor.{light,dark}` 接受
+  `#rrggbb` / `#rrggbbaa`，需要新增的 `ui.window.appearance` 授予。它只在该插件的某个
+  主题被选中时、且仅在非 macOS 上生效；还原靠推导而非记忆——渲染器每次根据持久化偏好与
+  实时主题目录重新计算，所以切换、禁用、卸载都会收敛回宿主背景，没有需要回滚的存储值。
+  见 ADR 0247、issue #335 与 E2E-024J。

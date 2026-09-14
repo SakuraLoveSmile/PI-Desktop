@@ -93,6 +93,17 @@ before it is ever sent to the UI:
   the parser cannot resolve, `javascript:`, `expression(`, and markup sequences
   (`<style`, `</style`, `<!--`); an empty sheet is refused too
 - Capped at 256KB per file, 8 themes per plugin
+- A theme may declare `assets` (package-relative, whitelisted image and font
+  extensions, 4MB summed). Each matching `url()` is rewritten to
+  `plugin-asset://<pluginId>/<path>` and served by a host handler that resolves
+  only through the loaded plugin's own declared list: read-only,
+  package-scoped, `nosniff`, and revoked when the plugin unloads. An undeclared
+  reference is still refused, and the raw path never reaches the renderer
+- `contributes.windowAppearance` (`#rrggbb` / `#rrggbbaa`) requires
+  `ui.window.appearance` and applies only while one of that plugin's themes is
+  the selected one; leaving the theme restores the host background, because the
+  colour is derived from the live catalog rather than remembered. macOS keeps
+  `vibrancy` and is never sent one
 - The CSS is read from disk at load time and delivered whole over IPC; the
   renderer injects it into a single dedicated `<style>` element appended after
   the app's own stylesheets, so it can override tokens but never inject markup
