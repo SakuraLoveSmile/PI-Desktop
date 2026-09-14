@@ -3520,7 +3520,8 @@ and identify the platform validation still needed.
   the renderer while its native window is already maximized and inspect the
   initial queried glyph/state. 6) Attempt unknown menu/window IPC actions
   while a window exists and after it closes. 7) Build each target on its
-  native runner from a clean release-host directory.
+  native runner from a clean release-host directory. On Windows, inspect the
+  installed app's taskbar button and Start menu shortcut icon.
 - **Expected**: macOS development and packaged launches show PI-Desktop as the
   native application identity, and the About panel uses the canonical
   PI-Desktop icon; neither surface exposes the stock Electron name or icon.
@@ -3547,9 +3548,11 @@ and identify the platform validation still needed.
   plugin detail sheet close button. The titlebar and right-side control band
   share one continuous 1px `border-subtle` separator; the control band's
   leading divider uses the same token and its bottom edge does not disappear
-  under the window buttons. Unknown actions fail closed. Each package contains
-  the target-native host binary (`.exe` only on Windows). Passing this scenario
-  on Windows/Linux proves shell readiness, not first-release qualification.
+  under the window buttons. Unknown actions fail closed. The installed Windows
+  taskbar button and Start menu shortcut use the PI-Desktop icon, never
+  Electron's default icon. Each package contains the target-native host binary
+  (`.exe` only on Windows). Passing this scenario on Windows/Linux proves
+  shell readiness, not first-release qualification.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `04-ux/01-ui-ia.md`, `04-ux/02-i18n-english-first.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,

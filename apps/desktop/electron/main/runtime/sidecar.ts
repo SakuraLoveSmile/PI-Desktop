@@ -86,6 +86,7 @@ export function createSidecarRuntime({
     runtimeState.agentHostBridge?.ingest(envelope);
     sendToRenderer(IPC.event.agentMessage, envelope);
   };
+  const activeToolNames = new Map<string, string>();
   const wireSidecar = (s: AgentSidecar) => {
 
   s.onNotification((method, params) => {
@@ -93,16 +94,22 @@ export function createSidecarRuntime({
       const envelope = params as AgentEventEnvelope;
       const event = envelope.event;
       if (event.type === "tool_start") {
+        activeToolNames.set(event.toolCallId, event.toolName);
         logger.app("tool", "info", "tool start", {
           sessionId: envelope.sessionId,
-          toolCallId: (event as any).toolCallId,
-          data: { toolName: (event as any).toolName },
+          toolCallId: event.toolCallId,
+          data: { toolName: event.toolName },
         });
       } else if (event.type === "tool_end") {
+        const toolName = activeToolNames.get(event.toolCallId);
+        activeToolNames.delete(event.toolCallId);
         logger.app("tool", "info", "tool end", {
           sessionId: envelope.sessionId,
-          toolCallId: (event as any).toolCallId,
-          data: { isError: (event as any).isError === true },
+          toolCallId: event.toolCallId,
+          data: {
+            ...(toolName ? { toolName } : {}),
+            isError: event.isError === true,
+          },
         });
       }
       emitAgentEvent(envelope);
@@ -124,6 +131,7 @@ export function createSidecarRuntime({
   s.onExit(({ code, signal, intentional, stderrTail }) => {
     if (runtimeState.sidecar !== s) return;
     logger.flushChild("agent");
+    activeToolNames.clear();
     runtimeState.sidecar = null;
     steeringReplies.clear();
     if (intentional || isQuitting()) return;

@@ -28,6 +28,16 @@ import {
 } from "../work-panel-window";
 import { readWindowState, writeWindowState } from "../window-preferences";
 
+function windowsIconPath(): string | undefined {
+  if (process.platform !== "win32") return undefined;
+
+  const resourceRoot = app.isPackaged
+    ? process.resourcesPath
+    : join(app.getAppPath(), "build");
+  const iconPath = join(resourceRoot, app.isPackaged ? "app-icon.ico" : "icon.ico");
+  return existsSync(iconPath) ? iconPath : undefined;
+}
+
 export type WindowLifecycleState = {
   mainWindow: BrowserWindow | null;
   notificationViewingSessionId: string | null;
@@ -160,6 +170,11 @@ export async function createWindow({
             nativeTheme.shouldUseDarkColors ? "dark" : "light",
           ),
         }),
+    ...(process.platform === "win32"
+      ? {
+          icon: windowsIconPath(),
+        }
+      : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       contextIsolation: true,
