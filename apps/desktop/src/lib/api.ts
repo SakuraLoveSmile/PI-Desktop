@@ -1087,6 +1087,12 @@ export const api = {
       listener((payload ?? {}) as { reason?: string; pluginId?: string }),
     );
   },
+  onSettingsChanged: (listener: (patch: Record<string, unknown>) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.settingsChanged, (payload) =>
+      listener((payload ?? {}) as Record<string, unknown>),
+    );
+  },
   onPluginLauncherShown: (listener: () => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.pluginLauncherShown, () => listener());

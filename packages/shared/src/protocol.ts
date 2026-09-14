@@ -248,6 +248,8 @@ export const IPC = {
   },
   event: {
     pluginChanged: "pi-desktop/event/pluginChanged",
+    /** Host-originated app settings mutation (e.g. plugin `app.setTheme`). */
+    settingsChanged: "pi-desktop/app/event/settingsChanged",
     extensionsUiPrompt: "pi-desktop/extensions/event/uiPrompt",
     extensionsStatus: "pi-desktop/extensions/event/status",
     pluginLauncherShown: "pi-desktop/pluginLauncher/event/shown",
