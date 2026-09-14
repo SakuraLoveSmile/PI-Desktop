@@ -3390,6 +3390,67 @@ export class PluginRuntime {
   }
 
   /**
+   * Resolve a request that names a file in another folder of the open project
+   * (ADR 0249, ADR 0252, ADR 0253). A view browsing a sibling folder can only
+   * address that folder's entries absolutely, and the two host-mediated actions
+   * it offers for them (fs.openDefault, fs.reveal) are the only requests that
+   * arrive that way. The widening is narrow: only for a plugin whose declared
+   * root is the workspace, only for an absolute path already inside one of the
+   * project's registered folder roots (resolved through links, so a symlink
+   * cannot carry it out of the folder that contains it), with the declared scope
+   * matched against the path relative to the folder that answered, and with the
+   * same protected-path and credential guards every other request passes. No
+   * file content travels back through this route: it asks the OS to show a file
+   * the user right-clicked. Null means it is not such a request, and the caller
+   * falls back to the ordinary rooted resolution and its refusal.
+   */
+  private async resolveRegisteredFolderRequest(
+    loaded: LoadedPlugin,
+    requestPath: string,
+  ): Promise<{ full: string; rel: string; root: string } | null> {
+    if (!isAbsolute(String(requestPath ?? ""))) return null;
+    const rule: PluginFsRule = loaded.fsPolicy.read ?? { root: "workspace", scope: [] };
+    if (rule.root !== "workspace") return null;
+    const roots = (this.services.getWorkspaceInfo?.()?.roots ?? [])
+      .map((entry) => entry?.path)
+      .filter((path): path is string => Boolean(path));
+    if (roots.length === 0) return null;
+    this.assertPermission(loaded, "fs.read");
+
+    const wanted = resolve(String(requestPath));
+    const matches: Array<{ full: string; rel: string; root: string }> = [];
+    for (const candidate of roots) {
+      const base = resolve(candidate);
+      const lexical = relative(base, wanted);
+      if (!lexical || lexical.startsWith("..") || isAbsolute(lexical)) continue;
+      const resolved = await resolveRealPathWithinRoot(base, lexical);
+      if (!resolved) continue;
+      const rootReal = realpathOrSelf(base);
+      matches.push({
+        full: resolved,
+        rel: normalizeFsPath(relative(rootReal, resolved)),
+        root: rootReal,
+      });
+    }
+    if (matches.length === 0) return null;
+    // Folders may be nested in one another; the innermost is the one the user is
+    // actually looking at.
+    const hit = matches.reduce((best, current) => (current.rel.length < best.rel.length ? current : best));
+    if (this.isProtectedPath(hit.full) || isDeniedFsPath(hit.rel)) {
+      this.auditFs(loaded, "read", requestPath, "PERMISSION_DENIED");
+      throw apiError(
+        "PERMISSION_DENIED",
+        `credentials and repository internals are never readable by plugins: ${hit.rel}`,
+      );
+    }
+    if (!isFsPathInScope(hit.rel, rule.scope)) {
+      this.auditFs(loaded, "read", requestPath, "PERMISSION_DENIED");
+      throw apiError("PERMISSION_DENIED", `outside manifest.fs.read.scope: ${hit.rel}`);
+    }
+    return hit;
+  }
+
+  /**
    * Whether the path lies under something the host keeps for itself. Both
    * sides are resolved through links, or a barrier reached the other way
    * around simply would not match.
@@ -4005,11 +4066,9 @@ export class PluginRuntime {
           return preview;
         },
         openDefault: async (pathFromRoot: string) => {
-          const { full, rel } = await this.resolveFsRequest(
-            loaded,
-            "read",
-            pathFromRoot,
-          );
+          const { full, rel } =
+            (await this.resolveRegisteredFolderRequest(loaded, pathFromRoot)) ??
+            (await this.resolveFsRequest(loaded, "read", pathFromRoot));
           if (!statSync(full).isFile()) {
             this.services.audit?.({
               pluginId,
@@ -4043,11 +4102,9 @@ export class PluginRuntime {
           });
         },
         reveal: async (pathFromRoot: string) => {
-          const { full, rel } = await this.resolveFsRequest(
-            loaded,
-            "read",
-            pathFromRoot,
-          );
+          const { full, rel } =
+            (await this.resolveRegisteredFolderRequest(loaded, pathFromRoot)) ??
+            (await this.resolveFsRequest(loaded, "read", pathFromRoot));
           if (!statSync(full).isFile()) {
             this.services.audit?.({
               pluginId,
