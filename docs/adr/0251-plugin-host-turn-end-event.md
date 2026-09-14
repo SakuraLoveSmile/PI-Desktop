@@ -69,8 +69,10 @@ host turn end, and a graceful stop keeps the existing `completed` boundary.
   failed or timed-out durable write does not suppress the announcement.
 - Turn-scoped cleanup that ignores `turnId` can settle the wrong turn;
   the tool context's `turnId` now makes correct scoping possible.
-- Hosts before 0.14.7 never emit the event, so a plugin that depends on it must
-  require that minimum host version.
+- No published release emits this event yet: the first release that contains it
+  has not shipped, and 0.14.8 does not include it. A plugin that depends on it
+  must require the release that actually ships it, and must not assume 0.14.7 or
+  0.14.8.
 
 ## Alternatives rejected
 

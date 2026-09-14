@@ -707,9 +707,9 @@ Delivered today:
   in-flight tool of that turn has exited — late results can still arrive — so a
   plugin must serialise or otherwise scope its cleanup by `turnId`. The event
   also needs no new permission: it travels on the existing event channel, and
-  subscribing to an unknown event name does not error. Only host 0.14.7 and
-  later emit it, so a plugin that depends on it must require that minimum host
-  version.
+  subscribing to an unknown event name does not error. No published host emits it
+  yet — 0.14.8 does not include it — so a plugin that depends on it must require
+  the release that actually ships it rather than assume 0.14.7 or 0.14.8.
 
 A throwing handler is logged and does not affect other listeners or the plugin.
 
