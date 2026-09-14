@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -160,8 +160,7 @@ describe("NativePiSessionService", () => {
   });
 });
 
-async function configuredFixture() {
-  const f = fixture();
+function configureModelFiles<T extends ReturnType<typeof fixture>>(f: T) {
   writeFileSync(join(f.agentDir, "models.json"), JSON.stringify({ providers: {
     "test-provider": { baseUrl: "http://127.0.0.1/unused", api: "openai-completions", models: [{
       id: "test-model", name: "Fixture", reasoning: false, input: ["text"],
@@ -173,6 +172,10 @@ async function configuredFixture() {
   return { ...f, modelRuntimeFactory: () => ModelRuntime.create({
     authPath: join(f.agentDir, "auth.json"), modelsPath: join(f.agentDir, "models.json"), allowModelNetwork: false,
   }) };
+}
+
+async function configuredFixture() {
+  return configureModelFiles(fixture());
 }
 
 function response(stopReason: "stop" | "error" = "stop"): AssistantMessage {
@@ -339,6 +342,220 @@ describe("native continuation review regressions", () => {
   });
 });
 
+
+describe("native side-chat forks", () => {
+  function forkFixture() {
+    const root = mkdtempSync(join(tmpdir(), "pi-desktop-native-fork-"));
+    roots.push(root);
+    const agentDir = join(root, "agent");
+    const sessionRoot = join(agentDir, "sessions");
+    const project = join(root, "project");
+    const group = join(sessionRoot, "--project--");
+    mkdirSync(group, { recursive: true });
+    mkdirSync(project);
+    const file = join(group, "fork.jsonl");
+    const assistant = (id: string, parentId: string, text: string, timestamp: string) => ({
+      type: "message", id, parentId, timestamp,
+      message: { role: "assistant", content: [{ type: "text", text }], provider: "test-provider", model: "test-model", stopReason: "stop", timestamp: Date.parse(timestamp), usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } },
+    });
+    const entries = [
+      { type: "session", version: 3, id: "native-id", timestamp: "2026-09-14T00:00:00.000Z", cwd: project },
+      { type: "message", id: "u1", parentId: null, timestamp: "2026-09-14T00:00:01.000Z", message: { role: "user", content: [{ type: "text", text: "hello" }], timestamp: 1 } },
+      assistant("sibling", "u1", "sibling answer", "2026-09-14T00:00:02.000Z"),
+      { type: "model_change", id: "m1", parentId: "u1", timestamp: "2026-09-14T00:00:03.000Z", provider: "test-provider", modelId: "test-model" },
+      { type: "thinking_level_change", id: "t1", parentId: "m1", timestamp: "2026-09-14T00:00:04.000Z", thinkingLevel: "off" },
+      { type: "custom", id: "c1", parentId: "t1", timestamp: "2026-09-14T00:00:05.000Z", customType: "fixture", data: { preserved: true } },
+      { type: "custom_message", id: "cm1", parentId: "c1", timestamp: "2026-09-14T00:00:06.000Z", customType: "fixture", content: "context", display: false },
+      assistant("a1", "cm1", "first answer", "2026-09-14T00:00:07.000Z"),
+      { type: "thinking_level_change", id: "t2", parentId: "a1", timestamp: "2026-09-14T00:00:08.000Z", thinkingLevel: "high" },
+      { type: "label", id: "lbl1", parentId: "t2", timestamp: "2026-09-14T00:00:09.000Z", targetId: "a1", label: "bookmark" },
+      { type: "compaction", id: "cp1", parentId: "lbl1", timestamp: "2026-09-14T00:00:10.000Z", summary: "compacted", firstKeptEntryId: "a1", tokensBefore: 10, retainedTail: [{ role: "user", content: "keep unknown" }] },
+      assistant("a2", "cp1", "second answer", "2026-09-14T00:00:11.000Z"),
+      { type: "future_entry", id: "future", parentId: "a2", timestamp: "2026-09-14T00:00:12.000Z", opaque: { untouched: true } },
+    ];
+    const text = entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n";
+    writeFileSync(file, text);
+    return { root, agentDir, sessionRoot, project, file, text, group };
+  }
+
+  const groupEntries = (group: string) =>
+    readdirSync(group).filter((name) => !name.endsWith(".pi-desktop.lock")).sort();
+
+  const errorCode = (fn: () => unknown) => {
+    try { fn(); return undefined; } catch (error) { return (error as { errorCode?: string }).errorCode; }
+  };
+
+  const newChildPath = (f: { group: string }, before: string[]) => {
+    const after = groupEntries(f.group);
+    const created = after.filter((name) => !before.includes(name));
+    expect(created.filter((name) => name.includes(".tmp"))).toEqual([]);
+    expect(created).toHaveLength(1);
+    return join(f.group, created[0]);
+  };
+
+  it("forks the current branch into one durable child without touching the parent", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const service = new NativePiSessionService(f);
+    try {
+      const [summary] = await service.list();
+      const parentBytes = readFileSync(f.file, "utf8");
+      const before = groupEntries(f.group);
+      const child = service.fork({ id: summary.id, title: "Side chat: hello" });
+
+      const childPath = newChildPath(f, before);
+      const childEntries = readFileSync(childPath, "utf8").trimEnd().split("\n").map((line) => JSON.parse(line));
+      const header = childEntries[0];
+      expect(header).toMatchObject({ type: "session", version: 3, cwd: f.project, parentSession: realpathSync(f.file) });
+      expect(header.id).not.toBe("native-id");
+      const ids = childEntries.map((entry) => entry.id).filter(Boolean);
+      expect(ids).not.toContain("sibling");
+      expect(ids).not.toContain("lbl1");
+      expect(childEntries.some((entry) => entry.id === "cp1" && entry.retainedTail?.[0]?.content === "keep unknown")).toBe(true);
+      expect(childEntries.some((entry) => entry.id === "future" && entry.opaque?.untouched === true)).toBe(true);
+      const label = childEntries.find((entry) => entry.type === "label");
+      expect(label).toMatchObject({ targetId: "a1", label: "bookmark" });
+      // The child continues the parent from the branch endpoint, and the
+      // parent is byte-identical after the fork.
+      expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+      expect(child.title).toBe("Side chat: hello");
+      expect(child.messages.map((message) => message.content)).toEqual(["hello", "first answer", "compacted", "second answer"]);
+      expect(child).toMatchObject({ source: "pi-native", modelId: "test-model", thinkingLevel: "high" });
+      expect(child.capabilities?.canPrompt).toBe(true);
+      expect(service.detail(child.id)?.title).toBe("Side chat: hello");
+    } finally { service.disposeAll(); }
+  });
+
+  it("anchored forks keep the branch ancestry and exclude later and sibling entries", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const service = new NativePiSessionService(f);
+    try {
+      const [summary] = await service.list();
+      const parentBytes = readFileSync(f.file, "utf8");
+      const child = service.fork({ id: summary.id, title: "Anchored", throughMessageId: "a1" });
+      expect(child.messages.map((message) => message.content)).toEqual(["hello", "first answer"]);
+      expect(child.messages.map((message) => message.id)).not.toContain("future");
+      expect(child.providerId).toBe("test-provider");
+      // The anchored branch saved thinking off explicitly; the parent's later
+      // high level is a different branch and must not leak into the child.
+      expect(child.thinkingLevel).toBe("off");
+      expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+    } finally { service.disposeAll(); }
+  });
+
+  it("makes a first-user fork durable immediately with the parent saved model and thinking", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const service = new NativePiSessionService(f);
+    try {
+      const [summary] = await service.list();
+      const parentBytes = readFileSync(f.file, "utf8");
+      const before = groupEntries(f.group);
+      const child = service.fork({ id: summary.id, title: "First user", throughMessageId: "u1" });
+      expect(child.messages.map((message) => message.content)).toEqual(["hello"]);
+      expect(child).toMatchObject({ providerId: "test-provider", modelId: "test-model", thinkingLevel: "high" });
+      const childPath = newChildPath(f, before);
+      // The saved-session fallback is recorded in the child itself, never in a
+      // Desktop provider or in the parent file.
+      const opened = SessionManager.open(childPath);
+      expect(opened.buildSessionContext().model).toEqual({ provider: "test-provider", modelId: "test-model" });
+      expect(opened.buildSessionContext().thinkingLevel).toBe("high");
+      expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+    } finally { service.disposeAll(); }
+  });
+
+  it("appends a reopened first-user child without rewriting either file", async () => {
+    const f = await configureModelFiles(forkFixture());
+    vi.spyOn(ModelRuntime.prototype, "streamSimple").mockImplementation(() => fauxStream());
+    const service = new NativePiSessionService(f);
+    try {
+      const [summary] = await service.list();
+      const parentBytes = readFileSync(f.file, "utf8");
+      const before = groupEntries(f.group);
+      const child = service.fork({ id: summary.id, title: "First user", throughMessageId: "u1" });
+      const childPath = newChildPath(f, before);
+      const childId = JSON.parse(readFileSync(childPath, "utf8").split("\n")[0]).id as string;
+      const childBytes = readFileSync(childPath, "utf8");
+      await service.prompt(child.id, "follow-up", () => {});
+      await expect.poll(() => service.status(child.id).status.isRunning).toBe(false);
+      const after = readFileSync(childPath, "utf8");
+      expect(after.startsWith(childBytes)).toBe(true);
+      expect(after.match(/follow-up/g)).toHaveLength(1);
+      expect(after.match(/fixture reply/g)).toHaveLength(1);
+      const reopened = SessionManager.open(childPath);
+      const branch = reopened.getBranch().filter((entry) => entry.type === "message");
+      expect(branch.map((entry) => entry.message.role)).toEqual(["user", "user", "assistant"]);
+      expect(new Set(branch.map((entry) => entry.id)).size).toBe(3);
+      expect(reopened.getSessionId()).toBe(childId);
+      expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+    } finally { service.disposeAll(); }
+  });
+  it("leaves the catalog unchanged for wrong-branch, read-only and busy forks", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const service = new NativePiSessionService(f);
+    try {
+      const [summary] = await service.list();
+      const before = groupEntries(f.group);
+      expect(errorCode(() => service.fork({ id: summary.id, throughMessageId: "sibling" }))).toBe("INVALID_ARGUMENT");
+      expect(errorCode(() => service.fork({ id: summary.id, throughMessageId: "missing" }))).toBe("INVALID_ARGUMENT");
+      expect(errorCode(() => service.fork({ id: "native-pi:unknown" }))).toBe("NOT_FOUND");
+      expect(groupEntries(f.group)).toEqual(before);
+
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      vi.spyOn(ModelRuntime.prototype, "streamSimple").mockImplementation(() => {
+        const stream = createAssistantMessageEventStream();
+        void gate.then(() => { const message = response(); stream.push({ type: "done", reason: "stop", message }); stream.end(message); });
+        return stream;
+      });
+      await service.prompt(summary.id, "hold the turn", () => {});
+      await expect.poll(() => service.status(summary.id).status.isRunning).toBe(true);
+      expect(errorCode(() => service.fork({ id: summary.id }))).toBe("AGENT_BUSY");
+      expect(groupEntries(f.group)).toEqual(before);
+      release();
+      await expect.poll(() => service.status(summary.id).status.isRunning).toBe(false);
+    } finally { service.disposeAll(); }
+
+
+    const readOnly = await configureModelFiles(fixture({ newline: false }));
+    const readOnlyService = new NativePiSessionService(readOnly);
+    try {
+      const [summary] = await readOnlyService.list();
+      expect(errorCode(() => readOnlyService.fork({ id: summary.id }))).toBe("NATIVE_PI_MISSING_TRAILING_NEWLINE");
+      expect(groupEntries(join(readOnly.sessionRoot, "--project--"))).toEqual(["fixture.jsonl"]);
+    } finally { readOnlyService.disposeAll(); }
+  });
+
+  it("emits a provisional stream row replaced by the durable entry id", async () => {
+    const f = await configureModelFiles(forkFixture());
+    vi.spyOn(ModelRuntime.prototype, "streamSimple").mockImplementation(() => {
+      const stream = createAssistantMessageEventStream();
+      queueMicrotask(() => {
+        const live = response();
+        live.content = [{ type: "text", text: "fixture " }];
+        stream.push({ type: "start", partial: live });
+        live.content = [{ type: "text", text: "fixture reply" }];
+        stream.push({ type: "text_delta", contentIndex: 0, delta: "reply", partial: live });
+        stream.push({ type: "done", reason: "stop", message: live });
+        stream.end(live);
+      });
+      return stream;
+    });
+    const service = new NativePiSessionService(f);
+    const events: import("@pi-desktop/shared").AgentEventEnvelope[] = [];
+    try {
+      const [summary] = await service.list();
+      await service.prompt(summary.id, "stream me", (envelope) => events.push(envelope), "optimistic-stream");
+      await expect.poll(() => service.status(summary.id).status.isRunning).toBe(false);
+      const started = events.find((envelope) => envelope.event.type === "message_start");
+      expect(started?.event).toMatchObject({ message: { role: "assistant", status: "streaming" } });
+      expect(events.some((envelope) => envelope.event.type === "message_update")).toBe(true);
+      const startedId = (started!.event as any).message.id as string;
+      const ended = events.find((envelope) => envelope.event.type === "message_end" && (envelope.event as any).message.role === "assistant");
+      const durableId = (ended!.event as any).message.id as string;
+      expect(durableId).not.toBe(startedId);
+      expect(events.filter((envelope) => envelope.event.type === "message_end" && (envelope.event as any).message.id === durableId)).toHaveLength(1);
+    } finally { service.disposeAll(); }
+  });
+});
 
 describe("independent native ownership, identity and tool regressions", () => {
   it("keeps an owned settled lease promptable across refreshes", async () => {

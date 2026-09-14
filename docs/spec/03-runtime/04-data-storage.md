@@ -1376,8 +1376,19 @@ A native prompt opens the original file only after exact-v3, newline, cwd,
 trust, saved-provider/auth, canonical-path, identity, and lease checks pass.
 `AgentSession` and `SessionManager` append the native entries. Desktop host turn
 and transcript append APIs are not invoked. Rename, delete, project move,
-revision, fork, Plan/Goal, collaboration, queue, and side-chat mutations are
+revision, Plan/Goal, collaboration, queue, and other side-chat mutations are
 unsupported for native sessions in this slice.
+
+A native fork writes exactly one new v3 JSONL child in the parent's session
+directory. Branch extraction runs against an in-memory manager over the parent
+snapshot, then child title/parent saved model/thinking fallbacks are appended in
+memory. Publication is a full write to an exclusive non-jsonl temporary file in
+the same directory, followed by a same-directory hardlink to the final
+`<timestamp>_<session-id>.jsonl` name; the temporary file is removed afterwards
+and only a file carrying this fork's own child id is cleaned up on failure. The
+parent file, its leaf, and any live runtime are never modified. The child header
+carries `parentSession` with the canonical source path; that path stays inside
+the sidecar.
 
 The first slice has no projection cache or async scan bound; every list still
 reads/parses complete files. Caching by canonical path/file identity/size/mtime

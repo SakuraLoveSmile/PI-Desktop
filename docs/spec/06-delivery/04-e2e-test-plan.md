@@ -11455,6 +11455,29 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs:** runtime §12; storage §12; security §12; ADR 0247.
 - **Status:** Documented; run after integration into main.
 
+### E2E-SESSION-native-side-chat-fork-survives-close
+
+- **Preconditions:** A writable synthetic native v3 session with branches,
+  compaction metadata, model/thinking entries, and a saved local model/auth
+  binding. No Desktop provider secret is configured.
+- **Steps:** Open the session, fork a side chat from an assistant answer and
+  from the first user message, send a prompt in the panel, stop one reply, close
+  the panel, reload, reopen the child from the sidebar and by title search, and
+  send while a native turn is running.
+- **Expected:** Each fork creates exactly one new v3 child JSONL anchored at the
+  selected message (or the current branch endpoint) with the child title; later
+  and sibling entries are excluded; parent bytes, leaf, and runtime are
+  unchanged; no temporary file remains. The first-user child is durable before
+  any reply and carries the parent's saved model/thinking when the branch saved
+  none (an explicit branch value wins; no Desktop fallback). The panel streams a
+  provisional assistant row that is replaced by exactly one durable SDK entry id
+  and the optimistic user row reconciles to the durable entry id; closing the
+  panel deletes neither the child nor its sidebar/search presence, and reopening
+  it as a conversation keeps one copy of every row. A send during a running
+  native turn fails visibly before the Desktop queue and keeps the draft.
+- **Specs:** IPC native routing; runtime §12; storage §12; UX side chat; ADR 0247.
+- **Status:** Documented; run after integration into main.
+
 ### E2E-SESSION-native-pi-incompatible-session-is-read-only
 
 - **Preconditions:** Fixtures cover missing cwd, missing trailing newline,

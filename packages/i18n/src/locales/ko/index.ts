@@ -284,6 +284,7 @@ export const ko = {
     abort: "중지",
     sendWhileRunning: "후속 메시지 보내기 · {{shortcut}}로 방향 수정",
     steeringUnavailable: "현재 턴에 지시를 추가할 수 없습니다. 초안은 유지됩니다.",
+    nativeSessionBusy: "이 네이티브 Pi 세션이 아직 응답 중입니다. 중지하거나 응답이 끝난 뒤 보내세요.",
     stopGenerating: "생성 중지",
     running: "작업 중…",
     loadingSession: "대화 불러오는 중…",

@@ -1,5 +1,5 @@
 import i18n from "i18next";
-import { reconcilePersistedUserMessage } from "../../lib/session-transcript";
+import { reconcilePersistedUserMessage, withoutProvisionalAssistantStream } from "../../lib/session-transcript";
 import type {
   AgentEventEnvelope,
   PlanningStateEvent,
@@ -185,6 +185,16 @@ export function createEventsSlice({
         ));
         set((state) => ({
           ...(state.activeSessionId === sessionId ? { messages: reconcile(state.messages) } : {}),
+          // Native side-chat children reconcile their optimistic row in the
+          // panel projection too; the durable entry is the only canonical row.
+          ...(state.sideChatTranscripts?.[sessionId]
+            ? {
+                sideChatTranscripts: {
+                  ...state.sideChatTranscripts,
+                  [sessionId]: reconcile(state.sideChatTranscripts[sessionId]),
+                },
+              }
+            : {}),
           retainedTranscripts: state.retainedTranscripts[sessionId]
             ? { ...state.retainedTranscripts, [sessionId]: reconcile(state.retainedTranscripts[sessionId]) }
             : state.retainedTranscripts,
@@ -471,6 +481,10 @@ export function createEventsSlice({
           break;
         case "message_end":
           set((state) => {
+            const settled = withoutProvisionalAssistantStream(
+              state.messages,
+              event.message,
+            );
             if (
               event.message.role === "assistant" &&
               (event.message.status === "error" ||
@@ -480,20 +494,20 @@ export function createEventsSlice({
               !event.message.error
             ) {
               return {
-                messages: state.messages.filter(
+                messages: settled.filter(
                   (message) => message.id !== event.message.id,
                 ),
               };
             }
-            const exists = state.messages.some(
+            const exists = settled.some(
               (message) => message.id === event.message.id,
             );
             return {
               messages: exists
-                ? state.messages.map((message) =>
+                ? settled.map((message) =>
                     message.id === event.message.id ? event.message : message,
                   )
-                : [...state.messages, event.message],
+                : [...settled, event.message],
             };
           });
           break;

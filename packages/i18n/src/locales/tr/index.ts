@@ -284,6 +284,7 @@ export const tr = {
     abort: "Durdur",
     sendWhileRunning: "Takip mesajı gönder · {{shortcut}} ile yönlendir",
     steeringUnavailable: "Bu tur artık yönlendirme kabul edemiyor. Taslağınız korundu.",
+    nativeSessionBusy: "Bu yerel Pi oturumu hâlâ yanıtlıyor. Göndermeden önce durdurun veya yanıtın bitmesini bekleyin.",
     stopGenerating: "Oluşturmayı durdur",
     running: "Çalışıyor…",
     loadingSession: "Sohbet yükleniyor…",

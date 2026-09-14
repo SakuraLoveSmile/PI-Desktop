@@ -1944,12 +1944,15 @@ startup failure is logged and does not prevent the desktop from launching.
 `pi-desktop/session/list` returns both Desktop and native summaries. Each summary
 may carry `source: "desktop" | "pi-native"`, capability flags, and a stable
 `readOnlyReason`; clients normalize omitted source to `desktop` for backward
-compatibility. `session/get`, `session/open`, `agent/prompt`, `agent/stop`, and
-`agent/abort` route opaque `native-pi:` ids to the Node sidecar. Native file
-paths never enter renderer payloads.
+compatibility. `session/get`, `session/open`, `session/fork`, `agent/prompt`,
+`agent/stop`, and `agent/abort` route opaque `native-pi:` ids to the Node
+sidecar. Native file paths never enter renderer payloads.
 
-Native rename/delete/move/fork/revision/configuration/scratch/Plan/Goal/queue/
+Native rename/delete/move/revision/configuration/scratch/Plan/Goal/queue/
 collaboration operations return an explicit unsupported/invalid-argument error.
+`session/fork` for a native id returns `{ session: SessionDetail }` for one new
+child JSONL and never mutates the parent; an anchor id that is not a message on
+the active branch is `INVALID_ARGUMENT`.
 Native continuation refusal codes include `NATIVE_PI_SESSION_BUSY`,
 `NATIVE_PI_SESSION_CHANGED`, `NATIVE_PI_PROVIDER_UNAVAILABLE`, and
 `NATIVE_PI_PROJECT_UNTRUSTED` plus format/newline/cwd-specific codes.

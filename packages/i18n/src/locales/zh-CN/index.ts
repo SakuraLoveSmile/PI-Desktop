@@ -277,6 +277,7 @@ export const zhCN = {
     abort: "停止",
     sendWhileRunning: "发送后续消息 · {{shortcut}} 立即转向",
     steeringUnavailable: "当前轮已无法接收转向输入，草稿已保留。",
+    nativeSessionBusy: "该原生 Pi 会话仍在回复中，请先停止或等待回复结束后再发送。",
     stopGenerating: "停止生成",
     running: "正在处理…",
     loadingSession: "正在加载会话…",

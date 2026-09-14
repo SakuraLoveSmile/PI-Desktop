@@ -44,6 +44,35 @@ export function optimisticUserMessage(
 }
 
 /**
+ * Drop a native streaming placeholder once its durable entry arrives.
+ *
+ * Native Pi sessions mint SDK entry ids when the message is appended, so the
+ * live row streams under a provisional id and the terminal `message_end`
+ * carries a different one. A durable assistant row supersedes any streaming
+ * assistant row in the same session; a same-id row is left for the caller's
+ * ordinary upsert (the Desktop runtime path).
+ */
+export function withoutProvisionalAssistantStream(
+  messages: UiMessage[],
+  durable: UiMessage,
+): UiMessage[] {
+  if (durable.role !== "assistant") return messages;
+  const stale = messages.some(
+    (message) =>
+      message.role === "assistant" &&
+      message.status === "streaming" &&
+      message.id !== durable.id,
+  );
+  return stale
+    ? messages.filter(
+        (message) =>
+          message.id === durable.id ||
+          !(message.role === "assistant" && message.status === "streaming"),
+      )
+    : messages;
+}
+
+/**
  * Collapse repeated transcript rows by their canonical message id.
  *
  * A retry or a stale page response can briefly put the same durable row in

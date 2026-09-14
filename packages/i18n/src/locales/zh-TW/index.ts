@@ -277,6 +277,7 @@ export const zhTW = {
     abort: "停止",
     sendWhileRunning: "傳送後續訊息 · {{shortcut}} 立即轉向",
     steeringUnavailable: "目前回合已無法接收轉向輸入，草稿已保留。",
+    nativeSessionBusy: "此原生 Pi 工作階段仍在回覆中，請先停止或等待回覆結束後再傳送。",
     stopGenerating: "停止生成",
     running: "正在處理…",
     loadingSession: "正在載入會話…",

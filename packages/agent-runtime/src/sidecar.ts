@@ -462,6 +462,15 @@ async function handle(method: string, params: any): Promise<unknown> {
           contentLimit: params.contentLimit,
         }),
       };
+    case "native.session.fork":
+      return {
+        session: nativePiService().fork({
+          id: String(params.id ?? ""),
+          title: typeof params.title === "string" ? params.title : undefined,
+          throughMessageId:
+            typeof params.throughMessageId === "string" ? params.throughMessageId : undefined,
+        }),
+      };
     case "agent.testRuntimeIdentity": {
       return testRuntimeIdentity(String(params.sessionId ?? ""));
     }

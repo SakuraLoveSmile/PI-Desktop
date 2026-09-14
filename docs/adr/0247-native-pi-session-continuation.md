@@ -29,3 +29,38 @@ PI-Desktop historically imports Pi sessions by flattening them into Desktop-owne
 - Desktop terminal completion follows SDK prompt settlement (after `agent_settled` hooks and final persistence), not intermediate `agent_end`. Durable user acknowledgements reconcile caller optimistic IDs to SDK IDs without changing native entry IDs or deduplicating text. Abort refreshes native detail and never rewrites/restores a durable user row.
 - Native compact and session-addressed queue push/list fail with `NATIVE_PI_UNSUPPORTED` before host access. Queue remove/prioritize retain the existing opaque **host turnId** contract, not a session/source contract. Native paths never create host queue entries; future native queue support requires an explicit source/session protocol extension.
 - Listing still synchronously parses complete changed and unchanged files. Projection caching and bounded async scanning are deferred; no responsiveness bound is claimed for large catalogs in this slice.
+
+## Amendment: native side-chat forks (2026-09-14)
+
+`session/fork` is now source-discriminated. Desktop sources keep the existing
+Rust `session.fork` contract; `native-pi:` sources route to a sidecar
+`native.session.fork`, which returns the child as an ordinary `SessionDetail`.
+The renderer never supplies or receives a file path.
+
+A native fork branches the parent snapshot through the SDK
+(`SessionManager.inMemory` + `createBranchedSession`), so ancestry, label
+re-chaining, compaction re-parenting, and unknown entries follow the SDK's own
+rules. The parent file and its live manager are never mutated; the child is a
+new v3 JSONL in the parent's session directory with a header `parentSession`
+pointing at the canonical source path. Child metadata (title, and a fallback
+model/thinking) is appended in memory. Publication writes a complete temporary
+file and then hardlinks it to the final name, so a failed fork never exposes a
+partial child, never clobbers an existing file, and only removes files that
+carry its own child id. The source bytes and our own running/opening state are
+re-checked immediately before publication; drift fails closed.
+
+When the selected branch saved no model, the child records the **parent
+session's saved** provider/model; when the branch saved no thinking-level change
+at all, it records the parent's saved level. An explicit branch value, including
+"off", always wins. There is no Desktop provider/auth fallback.
+
+The side-chat panel streams native replies: `NativePiRuntime` projects
+`message_start`/`message_update` under a provisional row id and the renderer
+replaces that placeholder when the durable SDK entry id arrives in
+`message_end` (active, cached/retained, and side-chat projections share the
+`withoutProvisionalAssistantStream` seam). Durable user acknowledgements also
+reconcile the side-chat projection. Closing the panel removes only the renderer
+registration and tab; the child remains a native session in the sidebar and in
+title/project search, and reopens as an ordinary conversation. A send while a
+native turn is running fails before the Desktop queue with a visible message and
+a preserved draft; native sessions still cannot enqueue.

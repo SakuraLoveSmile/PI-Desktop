@@ -12,6 +12,7 @@ import {
   mergeLiveSessionMessages,
   removeLiveSessionMessage,
   upsertLiveSessionMessage,
+  withoutProvisionalAssistantStream,
 } from "../../lib/session-transcript";
 import { sessionIsArchived, type SessionMeta } from "../../lib/sidebar-preferences";
 import {
@@ -272,10 +273,10 @@ export function createSessionRuntime({ get, set }: StoreAccess): SessionRuntime 
         const empty =
           !(event.message.content || "").trim() &&
           !(event.message.thinking || "").trim();
-        next =
-          failed && empty && !event.message.error
-            ? removeLiveSessionMessage(current, event.message.id)
-            : upsertLiveSessionMessage(current, event.message);
+        const settled = withoutProvisionalAssistantStream(current, event.message);
+        next = failed && empty && !event.message.error
+          ? removeLiveSessionMessage(settled, event.message.id)
+          : upsertLiveSessionMessage(settled, event.message);
         break;
       }
       case "tool_start":

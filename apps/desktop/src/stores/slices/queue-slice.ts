@@ -321,6 +321,16 @@ export function createQueueSlice({
           return { responseAnnotations };
         });
         if (get().runningSessions[sessionId]) {
+          // Native Pi children have no Desktop prompt queue. Reject the send
+          // here so the caller restores the draft instead of round-tripping a
+          // queue item the backend refuses.
+          if (
+            get().sessions.find((session) => session.id === sessionId)?.source ===
+            "pi-native"
+          ) {
+            get().showToast(i18n.t("chat.nativeSessionBusy"), { variant: "info" });
+            return false;
+          }
           const accepted = await get().enqueuePrompt(outgoing, draft, sessionId);
           if (accepted) consumeAnnotations();
           return accepted;

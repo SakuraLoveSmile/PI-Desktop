@@ -168,9 +168,34 @@ export function registerSessionIpc({
     async (
       input: { sessionId?: string; title?: string; throughMessageId?: string } = {},
     ) => {
-      if (!host) throw new Error("host unavailable");
       const sessionId = String(input.sessionId ?? "").trim();
-      rejectNativeMutation(sessionId, "fork");
+      if (sessionId.startsWith("native-pi:")) {
+        // Native forks read the canonical JSONL and publish a new child file in
+        // the sidecar; the Rust host and the Desktop queue are never involved.
+        if (!sidecar) throw new Error("sidecar unavailable");
+        const title = typeof input.title === "string" ? input.title.trim().replace(/\s+/g, " ").slice(0, 200) : "";
+        const throughMessageId =
+          typeof input.throughMessageId === "string" ? input.throughMessageId.trim() : "";
+        if (throughMessageId.length > 256) {
+          throw Object.assign(new Error("throughMessageId is too long"), {
+            errorCode: ErrorCodes.INVALID_ARGUMENT,
+          });
+        }
+        const result = await sidecar.call<{ session?: RuntimeSession | null }>(
+          "native.session.fork",
+          {
+            id: sessionId,
+            ...(title ? { title } : {}),
+            ...(throughMessageId ? { throughMessageId } : {}),
+          },
+        );
+        logger.app("session", "info", "native session forked", {
+          sessionId: (result.session as { id?: string } | null)?.id,
+          data: { sourceSessionId: sessionId },
+        });
+        return result;
+      }
+      if (!host) throw new Error("host unavailable");
       if (!sessionId) {
         throw Object.assign(new Error("sessionId required"), {
           errorCode: ErrorCodes.INVALID_ARGUMENT,

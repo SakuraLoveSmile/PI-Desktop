@@ -275,6 +275,7 @@ export const fr = {
     "abort": "Arrêter",
     sendWhileRunning: "Envoyer à la suite · {{shortcut}} pour réorienter",
     steeringUnavailable: "Ce tour ne peut plus recevoir de consignes. Votre brouillon a été conservé.",
+    nativeSessionBusy: "Cette session Pi native répond encore. Arrêtez-la ou attendez la fin de la réponse avant d'envoyer.",
     "stopGenerating": "Arrêter de générer",
     "running": "Travailler…",
     "loadingSession": "Chargement de la conversation…",

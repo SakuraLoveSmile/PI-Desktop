@@ -275,6 +275,7 @@ export const es = {
     "abort": "Detener",
     sendWhileRunning: "Enviar seguimiento · {{shortcut}} para orientar",
     steeringUnavailable: "Este turno ya no acepta indicaciones. Se conservó el borrador.",
+    nativeSessionBusy: "Esta sesión nativa de Pi sigue respondiendo. Detenla o espera a que termine antes de enviar.",
     "stopGenerating": "Dejar de generar",
     "running": "Trabajando...",
     "loadingSession": "Cargando conversación...",

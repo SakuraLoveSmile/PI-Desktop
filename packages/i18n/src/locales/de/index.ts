@@ -275,6 +275,7 @@ export const de = {
     "abort": "Stoppen",
     sendWhileRunning: "Folgenachricht senden · {{shortcut}} zum Lenken",
     steeringUnavailable: "Diese Runde nimmt keine weiteren Eingaben an. Dein Entwurf wurde behalten.",
+    nativeSessionBusy: "Diese native Pi-Sitzung antwortet noch. Stoppe sie oder warte auf die Antwort, bevor du sendest.",
     "stopGenerating": "Generieren stoppen",
     "running": "Funktioniert…",
     "loadingSession": "Konversation wird geladen…",

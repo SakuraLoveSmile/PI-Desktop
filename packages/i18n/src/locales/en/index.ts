@@ -282,6 +282,7 @@ export const en = {
     abort: "Stop",
     sendWhileRunning: "Send follow-up · {{shortcut}} to steer",
     steeringUnavailable: "This turn can no longer accept steering. Your draft was kept.",
+    nativeSessionBusy: "This native Pi session is still replying. Stop it or wait for the reply to finish before sending.",
     stopGenerating: "Stop generating",
     running: "Working…",
     loadingSession: "Loading conversation…",

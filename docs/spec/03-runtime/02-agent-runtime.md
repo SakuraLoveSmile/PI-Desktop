@@ -1191,6 +1191,16 @@ listeners are installed before startup appends. Binding failure disposes the
 session and releases ownership. Pi extensions remain trusted local code, not
 Desktop plugins.
 
+A native fork (`native.session.fork`) branches the parent snapshot in memory:
+the SDK extracts the anchored branch with the same label/compaction re-chaining
+rules as Desktop, drops later and sibling entries, and never touches the parent
+file or its manager. When the anchored branch recorded no model, the child
+records the parent session's saved provider/model; when it recorded no
+thinking-level change, it records the parent's saved level, while an explicit
+branch value (including off) wins. The child is published as a complete new
+file; the side-chat panel streams the child's provisional assistant row and
+replaces it with the durable SDK entry id on persistence.
+
 ModelRuntime performs its public offline initialization to restore the local
 catalog and auth snapshot. Native Composer readiness uses native `canPrompt`,
 not Desktop provider or secret availability. Owned idle leases remain usable;

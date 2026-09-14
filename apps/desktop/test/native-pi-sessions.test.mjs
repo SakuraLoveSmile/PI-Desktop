@@ -171,3 +171,186 @@ test("unknown or delayed durable acknowledgements never insert a duplicate rende
   assert.strictEqual(reconcilePersistedUserMessage(rows, "already-reconciled", user("durable")), rows);
   assert.strictEqual(reconcilePersistedUserMessage(rows, "unknown", user("new-id")), rows);
 });
+
+
+const { default: ts } = await import("typescript");
+const sharedForIpc = await import("@pi-desktop/shared");
+const { readFileSync } = await import("node:fs");
+const nodePath = await import("node:path");
+
+/**
+ * Load main-process TypeScript with injected CommonJS dependencies, matching
+ * the existing session IPC test harness.
+ */
+function loadSessionIpc(imports) {
+  const file = new URL("../electron/main/ipc/session-ipc.ts", import.meta.url);
+  const { outputText } = ts.transpileModule(readFileSync(file, "utf8"), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+    fileName: file.pathname,
+  });
+  const module = { exports: {} };
+  new Function("require", "exports", "module", outputText)(
+    (id) => {
+      assert.ok(Object.hasOwn(imports, id), `unexpected IPC dependency: ${id}`);
+      return imports[id];
+    },
+    module.exports,
+    module,
+  );
+  return module.exports;
+}
+
+function forkHarness({ host, sidecar }) {
+  const handlers = new Map();
+  const hostCalls = [];
+  const sidecarCalls = [];
+  const { registerSessionIpc } = loadSessionIpc({
+    electron: { shell: {} },
+    "node:path": nodePath,
+    "node:fs": { mkdirSync() {} },
+    "@pi-desktop/shared": sharedForIpc,
+    "../importers": { convertSession() {}, scanAllSources() {}, scanModelConfigs() {} },
+    "../services/session-collaboration": { readSessionCollaboration() {} },
+  });
+  registerSessionIpc({
+    registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
+    getHost: () => host(hostCalls),
+    getSidecar: () => sidecar(sidecarCalls),
+    dataDir: "/tmp/pi-desktop-test",
+    activeTurns: new Map(),
+    sessionProjects: new Map(),
+    persistenceOutbox: {},
+    logger: { app() {} },
+    plugins: { broadcastEvent() {} },
+    sessionCapabilityContext: async () => ({ providers: [], defaults: {} }),
+    enrichSession: (session) => session,
+    acquireSessionOperation: async () => () => {},
+    stripWinLongPrefix: (value) => value,
+  });
+  return { handle: handlers.get(IPC.invoke.sessionFork), hostCalls, sidecarCalls };
+}
+
+test("native fork routes to the sidecar and never to the Desktop host", async () => {
+  const { handle, hostCalls, sidecarCalls } = forkHarness({
+    host: () => ({ call: () => { throw new Error("native fork must not call the host"); } }),
+    sidecar: (calls) => ({
+      call: async (method, input) => {
+        calls.push({ method, input });
+        return { session: { id: "native-pi:child", title: "Side chat" } };
+      },
+    }),
+  });
+  const result = await handle({
+    sessionId: " native-pi:parent ",
+    title: " Side  chat ",
+    throughMessageId: " a1 ",
+  });
+  assert.equal(result.session.id, "native-pi:child");
+  assert.deepEqual(sidecarCalls, [{
+    method: "native.session.fork",
+    input: { id: "native-pi:parent", title: "Side chat", throughMessageId: "a1" },
+  }]);
+  assert.deepEqual(hostCalls, []);
+});
+
+test("native fork rejects an oversized anchor before calling the sidecar", async () => {
+  const { handle, sidecarCalls } = forkHarness({
+    host: () => ({ call: () => { throw new Error("native fork must not call the host"); } }),
+    sidecar: (calls) => ({ call: async (method, input) => { calls.push({ method, input }); } }),
+  });
+  await assert.rejects(handle({ sessionId: "native-pi:parent", throughMessageId: "x".repeat(257) }), {
+    errorCode: "INVALID_ARGUMENT",
+  });
+  assert.deepEqual(sidecarCalls, []);
+});
+
+test("desktop session fork keeps the existing host contract", async () => {
+  const { handle, hostCalls } = forkHarness({
+    host: (calls) => ({
+      call: async (method, input) => {
+        calls.push({ method, input });
+        return { session: { id: "desktop-child", title: "Child" } };
+      },
+    }),
+    sidecar: () => ({ call: () => { throw new Error("desktop fork must not call the sidecar"); } }),
+  });
+  const result = await handle({ sessionId: "desktop-parent", title: "Child", throughMessageId: "m1" });
+  assert.equal(result.session.id, "desktop-child");
+  assert.deepEqual(hostCalls, [{
+    method: "session.fork",
+    input: { sessionId: "desktop-parent", title: "Child", throughMessageId: "m1" },
+  }]);
+});
+
+const assistantRow = (id, status, content = "part") => ({
+  id,
+  role: "assistant",
+  content,
+  createdAt: "2026-09-14T00:00:00Z",
+  status,
+});
+
+test("a durable native assistant entry replaces its provisional stream row everywhere", async () => {
+  const { createSessionRuntime } = await import("../src/stores/runtime/session-runtime.ts");
+  const id = "native-pi:child";
+  const streaming = assistantRow("stream-1", "streaming");
+  const durable = assistantRow("entry-1", "complete", "fixture reply");
+  const state = {
+    activeSessionId: id,
+    messages: [streaming],
+    sideChats: { [id]: { sessionId: id, parentSessionId: "native-pi:parent", title: "Side chat", anchorMessageId: "a1" } },
+    sideChatTranscripts: { [id]: [streaming] },
+    retainedTranscripts: {},
+    runningSessions: { [id]: true },
+    isRunning: true,
+  };
+  const runtime = createSessionRuntime({
+    get: () => state,
+    set: (update) => Object.assign(state, typeof update === "function" ? update(state) : update),
+  });
+  const slice = createEventsSlice({ ...stateHarness(state), runtime });
+  slice.handleAgentEvent({ sessionId: id, ts: 5, event: { type: "message_end", message: durable } });
+  assert.deepEqual(state.messages.map((row) => row.id), ["entry-1"]);
+  assert.deepEqual(state.sideChatTranscripts[id].map((row) => row.id), ["entry-1"]);
+  assert.equal(state.messages.some((row) => row.status === "streaming"), false);
+});
+
+test("a durable native user entry reconciles the side-chat projection", () => {
+  const id = "native-pi:child";
+  const state = {
+    activeSessionId: "other-session",
+    messages: [],
+    sideChats: { [id]: { sessionId: id, parentSessionId: "native-pi:parent", title: "Side chat", anchorMessageId: "a1" } },
+    sideChatTranscripts: { [id]: [user("optimistic-1")] },
+    retainedTranscripts: {},
+  };
+  const runtime = {
+    liveSessionTranscripts: new Set(),
+    sessionTranscriptCache: new Map(),
+    cacheSessionTranscript: (key, rows) => runtime.sessionTranscriptCache.set(key, rows),
+  };
+  const slice = createEventsSlice({ ...stateHarness(state), runtime });
+  const event = { type: "user_message_persisted", optimisticMessageId: "optimistic-1", message: user("durable-1") };
+  slice.handleAgentEvent({ sessionId: id, ts: 1, event });
+  slice.handleAgentEvent({ sessionId: id, ts: 2, event });
+  assert.deepEqual(state.sideChatTranscripts[id].map((row) => row.id), ["durable-1"]);
+});
+
+const queueSlice = await read("../src/stores/slices/queue-slice.ts");
+
+test("a running native side-chat send fails before the Desktop queue", () => {
+  const guard = queueSlice.slice(
+    queueSlice.indexOf("?.source ==="),
+    queueSlice.indexOf("const accepted = await get().enqueuePrompt"),
+  );
+  assert.match(guard, /"pi-native"/);
+  assert.match(guard, /showToast\(i18n\.t\("chat\.nativeSessionBusy"\)/);
+  assert.match(guard, /return false/);
+});
+
+test("the native busy message is localized in every locale", async () => {
+  for (const locale of ["en", "zh-CN", "zh-TW", "de", "ko", "fr", "es", "tr"]) {
+    const source = await read(`../../../packages/i18n/src/locales/${locale}/index.ts`);
+    assert.match(source, /nativeSessionBusy:/, locale);
+  }
+});
