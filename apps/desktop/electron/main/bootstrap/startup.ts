@@ -53,7 +53,12 @@ export type StartupDependencies = {
   modelsDevCatalog: ModelsDevCatalog;
   plugins: PluginRuntime;
   activeTurns: Map<string, string>;
-  turnFinalizations: Map<string, Promise<void>>;
+  /**
+   * Shared busy check from `runtime/session-coordination.ts`. The queue must
+   * stay held while a turn's announcement is still running, so this cannot be
+   * derived here from `activeTurns` alone.
+   */
+  isSessionBusy: (sessionId: string) => boolean;
   getHost: () => HostProcess | null;
   getMainWindow: () => BrowserWindow | null;
   sendToRenderer: (channel: string, payload: unknown) => void;
@@ -101,7 +106,7 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       modelsDevCatalog,
       plugins,
       activeTurns,
-      turnFinalizations,
+      isSessionBusy,
       getHost,
       getMainWindow,
       sendToRenderer,
@@ -157,8 +162,7 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       invoke: invokeIpc,
       channels: IPC.invoke,
       getHost,
-      isSessionBusy: (sessionId) =>
-        activeTurns.has(sessionId) || turnFinalizations.has(sessionId),
+      isSessionBusy,
       onQueueChange: (event) => {
         sendToRenderer(IPC.event.agentQueueChanged, event);
         deps.onSessionQueueChange?.();

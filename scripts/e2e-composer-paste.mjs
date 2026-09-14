@@ -71,7 +71,11 @@ ipcMain.handle("pi-desktop/composer/pasteFiles", async (_event, input) => {
   for (let i = 0; i < files.length; i++) {
     assert.deepEqual(await fs.readFile(files[i].path), Buffer.from(input.files[i].data));
   }
-  saved.push({ sessionId: input.sessionId, files });
+  saved.push({
+    sessionId: input.sessionId,
+    files,
+    mimeTypes: input.files.map((entry) => entry.mimeType),
+  });
   return { ok: true, data: { files } };
 });
 ipcMain.handle("pi-desktop/clipboard/recordPaste", (_event, input) => {
@@ -91,7 +95,22 @@ app.whenReady().then(async () => {
     const { nodeId } = await window.webContents.debugger.sendCommand("DOM.querySelector", { nodeId: root.nodeId, selector: "#native-files" });
     await window.webContents.debugger.sendCommand("DOM.setFileInputFiles", { nodeId, files: [path.join(__dirname, "native-image.png"), path.join(__dirname, "native notes.txt")] });
     const result = await window.webContents.executeJavaScript("globalThis.composerPasteProbe()");
-    assert.equal(saved.length, 4, "text representation unexpectedly wrote image bytes");
+    const mimeSets = saved.map((entry) => entry.mimeTypes.join("+"));
+    assert.equal(
+      saved.length,
+      4,
+      "unexpected scratch writes (large text, image-only, native image, native files): " + JSON.stringify(mimeSets),
+    );
+    assert.deepEqual(
+      mimeSets.filter((mimes) => mimes === "text/plain"),
+      ["text/plain"],
+      "Word text must be the only text-only write: " + JSON.stringify(mimeSets),
+    );
+    assert.equal(
+      mimeSets.filter((mimes) => mimes.includes("image/png")).length,
+      3,
+      "image-only and native-file pastes must keep writing image bytes: " + JSON.stringify(mimeSets),
+    );
     assert(history.some(text => text.includes("Word paragraph")), "short text missing from clipboard history");
     console.log("COMPOSER_PASTE_PROBE " + JSON.stringify({ ...result, scratchBytesVerified: true }));
     app.quit();

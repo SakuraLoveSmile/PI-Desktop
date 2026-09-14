@@ -79,7 +79,7 @@ Each ADR includes:
 | 0056 | User-owned MCP servers and skills, with a shared activation scope | Accepted |
 | 0057 | Permission-gated external paths and portable native search | Accepted for implementation |
 | 0058 | Extensions Page Density and Theme-Readable Button Surfaces | Accepted |
-| 0059 | Persist Composer Clipboard Files in Session Scratch | Accepted |
+| 0059 | Persist Composer Clipboard Files in Session Scratch | Accepted (amended 2026-09-14 for #138: prefer editable clipboard text over generated image copies) |
 | 0060 | Archive the Regenerate Branch Under the RPC Lock | Accepted |
 | 0061 | Imperceptible background context compaction | Accepted (amends 0030 / 0049; clauses 2/4/6/7/8 amended by 0064) |
 | 0062 | Bounded Subagents Behind a Task Tool | Accepted for implementation |
@@ -273,3 +273,4 @@ Each ADR includes:
 | 0250 | [Structured, bounded, and redacted process logs](0250-structured-bounded-redacted-process-logs.md) | Accepted for implementation |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
+| 0252 | Host turn-end event for plugins | Accepted (D422) |

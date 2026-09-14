@@ -202,6 +202,11 @@ globalThis.composerPasteProbe = async () => {
       '<img src=x onerror="throw 1">\n<&> "quotes" \'single\'',
       "  leading \ntrailing  ",
       "line\n\n",
+      // A Word selection can start above the copied text, so the pasted string
+      // may begin with one or more line breaks.
+      "\nsecond",
+      "\n\nline",
+      "\nA\nB\n",
     ];
     for (const content of multilineCases) {
       editor = await paste(content, [image]);
@@ -240,6 +245,26 @@ globalThis.composerPasteProbe = async () => {
       editorSelectionRange(editor).start === 6,
       "empty editor paste caret moved",
     );
+
+    // Forced insertHTML failure: the raw-DOM fallback must still store the
+    // editor's LF draft model instead of the clipboard's CRLF bytes.
+    const realExecCommand = document.execCommand.bind(document);
+    document.execCommand = ((
+      commandId: string,
+      ...rest: [boolean?, string?]
+    ) =>
+      commandId === "insertHTML"
+        ? false
+        : realExecCommand(commandId, ...rest)) as typeof document.execCommand;
+    try {
+      editor = await paste("fallback\r\ntext", [image], true);
+      assert(
+        readEditorValue(editor) === "fallback\ntext",
+        `fallback kept clipboard line endings: ${JSON.stringify(readEditorValue(editor))}`,
+      );
+    } finally {
+      document.execCommand = realExecCommand;
+    }
 
     const beforeReplace = "one\nTWO\nthree";
     editor = await paste(beforeReplace, [image], true);
