@@ -56,6 +56,7 @@ import type {
   MarketPluginDetail,
   PluginInstallResult,
   ProjectRecord,
+  ProjectGroupRecord,
   ProjectMemory,
   ProjectMemoryEntry,
   ProjectWorkspace,
@@ -473,6 +474,20 @@ export const api = {
     invoke<{ workspace: ProjectWorkspace | null }>(IPC.invoke.projectGet),
   listProjects: () =>
     invoke<{ projects: ProjectRecord[] }>(IPC.invoke.projectList),
+  listProjectGroups: () =>
+    invoke<{ groups: ProjectGroupRecord[] }>(IPC.invoke.projectGroupList),
+  createProjectGroup: (name: string, folders: string[]) =>
+    invoke<{ group: ProjectGroupRecord }>(IPC.invoke.projectGroupCreate, { name, folders }),
+  renameProjectGroup: (groupId: string, name: string) =>
+    invoke<{ group: ProjectGroupRecord }>(IPC.invoke.projectGroupRename, { groupId, name }),
+  getProjectGroupMemory: (groupId: string) =>
+    invoke<{ memory: ProjectMemory }>(IPC.invoke.projectGroupMemoryGet, { groupId }),
+  saveProjectGroupMemory: (groupId: string, entries: ProjectMemory["entries"]) =>
+    invoke<{ memory: ProjectMemory }>(IPC.invoke.projectGroupMemorySave, { groupId, entries }),
+  getProjectGroupInstructions: (groupId: string) =>
+    invoke<{ content: string }>(IPC.invoke.projectGroupInstructionsGet, { groupId }),
+  saveProjectGroupInstructions: (groupId: string, content: string) =>
+    invoke<{ content: string }>(IPC.invoke.projectGroupInstructionsSave, { groupId, content }),
   openProject: () =>
     invoke<{ workspace: ProjectWorkspace | null; canceled?: boolean }>(
       IPC.invoke.projectOpen,
