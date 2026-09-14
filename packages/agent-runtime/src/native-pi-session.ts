@@ -34,6 +34,7 @@ import type {
   AgentEvent,
   AgentEventEnvelope,
   SessionDetail,
+  SessionSearchPage,
   SessionSummary,
   ThinkingLevel,
   UiMessage,
@@ -63,6 +64,19 @@ type NativeSessionRecord = {
   nativeId: string;
   cwd: string;
 };
+
+function searchContains(text: string, query: string): boolean {
+  return text.toLowerCase().includes(query.toLowerCase());
+}
+
+function searchExcerpt(text: string, query: string, budget = 180): string {
+  const characters = Array.from(text);
+  if (characters.length <= budget) return text;
+  const match = text.toLowerCase().indexOf(query.toLowerCase());
+  const start = match < 0 ? 0 : Math.max(0, match - Math.floor(budget / 3));
+  const end = Math.min(characters.length, start + budget);
+  return `${start > 0 ? "…" : ""}${characters.slice(start, end).join("")}${end < characters.length ? "…" : ""}`;
+}
 
 function stableId(path: string, nativeId: string): string {
   return `${NATIVE_PI_SESSION_PREFIX}${createHash("sha256")
@@ -531,7 +545,70 @@ export class NativePiSessionService {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  detail(id: string, options: { messageBefore?: number; messageLimit?: number; contentLimit?: number } = {}): SessionDetail | null {
+  async search(query: string): Promise<SessionSearchPage> {
+    const normalized = query.trim();
+    if (!normalized) return { hits: [], nextOffset: null };
+    if (normalized.length > 500) throw new Error("query exceeds 500 characters");
+
+    const sessions = await this.list();
+    const hits: SessionSearchPage["hits"] = [];
+    for (const session of sessions) {
+      const record = this.records.get(session.id);
+      if (!record) continue;
+      try {
+        const snapshot = nativePiSnapshot(record.path);
+        const entries = parseSessionEntries(snapshot.bytes.toString("utf8"));
+        const header = entries.find((entry) => entry.type === "session") as any;
+        this.validateIdentity(record, header);
+        const manager = SessionManager.inMemory(record.cwd, undefined, entries);
+        const messages = visibleMessages(manager).filter(
+          (message) =>
+            (message.role === "user" || message.role === "assistant") &&
+            searchContains(message.content, normalized),
+        );
+        const metadataMatch =
+          searchContains(session.title, normalized) || searchContains(record.cwd, normalized);
+        if (!metadataMatch && messages.length === 0) continue;
+        hits.push({
+          session,
+          projectName: null,
+          metadataMatch,
+          messageCount: messages.length,
+          matches: messages
+            .sort(
+              (left, right) =>
+                right.createdAt.localeCompare(left.createdAt) || left.id.localeCompare(right.id),
+            )
+            .slice(0, 2)
+            .map((message) => ({
+              messageId: message.id,
+              role: message.role as "user" | "assistant",
+              createdAt: message.createdAt,
+              snippet: searchExcerpt(message.content, normalized),
+            })),
+        });
+      } catch {
+        // A file changing during discovery is omitted from this read-only
+        // projection; the next refresh will retry it from a fresh snapshot.
+      }
+    }
+    hits.sort(
+      (left, right) =>
+        right.session.updatedAt.localeCompare(left.session.updatedAt) ||
+        left.session.id.localeCompare(right.session.id),
+    );
+    return { hits, nextOffset: null };
+  }
+
+  detail(
+    id: string,
+    options: {
+      messageBefore?: number;
+      messageAround?: string;
+      messageLimit?: number;
+      contentLimit?: number;
+    } = {},
+  ): SessionDetail | null {
     const record = this.record(id);
     const snap = nativePiSnapshot(record.path);
     const entries = parseSessionEntries(snap.bytes.toString("utf8"));
@@ -539,12 +616,21 @@ export class NativePiSessionService {
     this.validateIdentity(record, header);
     const manager = SessionManager.inMemory(record.cwd, undefined, entries);
     const all = visibleMessages(manager);
-    const before = Math.min(options.messageBefore ?? all.length, all.length);
     const limit = Math.max(1, Math.min(options.messageLimit ?? 100, 500));
-    const start = Math.max(0, before - limit);
+    const around = options.messageAround?.trim();
+    const aroundIndex = around ? all.findIndex((message) => message.id === around) : -1;
+    const start = aroundIndex >= 0
+      ? Math.max(0, aroundIndex - Math.floor(limit / 2))
+      : Math.max(0, Math.min(options.messageBefore ?? all.length, all.length) - limit);
+    const before = aroundIndex >= 0
+      ? Math.min(all.length, start + limit)
+      : Math.min(options.messageBefore ?? all.length, all.length);
     const messages = all.slice(start, before).map((message) => ({
       ...message,
-      content: options.contentLimit ? message.content.slice(0, options.contentLimit) : message.content,
+      content:
+        options.contentLimit && message.id !== around
+          ? message.content.slice(0, options.contentLimit)
+          : message.content,
     }));
     const context = manager.buildSessionContext();
     let reason = this.structuralReadOnlyReason(snap, header, record.cwd);
@@ -570,6 +656,7 @@ export class NativePiSessionService {
       updatedAt: manager.getBranch().at(-1)?.timestamp ?? new Date(snap.mtimeMs).toISOString(),
       messages,
       messageStart: start,
+      ...(aroundIndex >= 0 ? { messageEnd: before, hasMoreAfter: before < all.length } : {}),
       hasMoreBefore: start > 0,
     } as SessionDetail;
   }
