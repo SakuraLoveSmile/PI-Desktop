@@ -92,7 +92,12 @@ pi-ai 去发出 `x-opencode-session`。每个提供商行（AI 服务或 OAuth �
 路径上不显示名称、Base URL 或 API 格式。对话回合仍然使用选定的 pi-ai 适配器
 （`chat_completions`、`responses`、`anthropic_messages`、
 `google_generative_ai` 或 `opencode_go`）。智谱 / Z.AI 的 Completions 请求
-使用 `thinkingFormat: "zai"` 与 `zaiToolStream: true`。
+使用 `thinkingFormat: "zai"` 与 `zaiToolStream: true`。DeepSeek 系 Completions
+在 `vendorKey`、Base URL、模型 ID 或目录 `family` 能识别为 DeepSeek 时设置
+`requiresReasoningContentOnAssistantMessages: true`。pi-ai 只根据
+`provider === "deepseek"` 或 `deepseek.com` URL 自动检测，而 PI-Desktop 把 UUID
+存成 `model.provider`，因此聚合网关与自定义端点会在无思考内容的助手回合漏掉
+`reasoning_content`。该覆盖不改 `thinkingFormat`。
 
 ## 5. 内置供应商矩阵（发货意图）
 
@@ -305,7 +310,12 @@ type ThinkingLevel =
 `ModelBinding.availableForSubagents`（布尔值，默认 false）：这是一个选择加入
 的标志，让该模型可用于 AI 驱动的子代理委托。启用后，该模型会出现在注入父
 agent 系统提示的委托目录中。父 agent 随后就能通过 Task 工具的 `model` 参数
-选中它。
+选中它。为某个定义解析固定模型不代表授予此许可。启动载荷通过独立的
+`subagentModelKeys` 传递允许覆盖的模型键；仅供定义固定使用的绑定仍只通过
+正常的固定模型解析生效，包括 `Task.model` 重复该定义自己的固定键。按需匹配使用唯一
+provider id/vendor/name 查找，不得用另一账号凭据覆盖固定模型。多个账号的 vendor/model 别名冲突时，已勾选账号改用
+确切的提供商 ID 作为覆盖键。优先级保持 Task.model → 定义固定模型 → 会话模型
+（D278；ADR subagent-model-opt-in）。
 
 ## 8. 秘密
 
@@ -536,6 +546,17 @@ UI 可能会显示层级提示，但默认情况下不得硬阻止未知模型�
 这是**通用逃生舱**，保证超出原生集成之外的市场覆盖范围。
 
 目录条目还可以额外固定模型级 wire API（例如 `api: "openai-responses"`）。存在时它优先于 provider 级 `apiStyle`，因此 `opencode_go` 下的 responses-only 模型会走 Responses adapter 而非 Chat Completions；没有模型级固定时保持 provider 级风格不变。
+
+### 16.1 Responses 流终止（pi-ai 补丁）
+
+OpenAI Responses 适配器必须把 `response.completed`（以及
+`response.incomplete`）视为流的终点：完成响应收尾后即停止消费流，
+而不是继续等待服务端的 TCP FIN。上游 pi-ai 会一直迭代直到服务端关闭
+连接，在保持空闲连接不关的反向代理后面会导致整个回合挂起。在该修复
+随上游发布之前，`patches/` 通过 pnpm patch 修改
+`@earendil-works/pi-ai@0.85.1`，在终态事件处跳出事件循环（消费方停止
+迭代时 OpenAI SDK 会中止底层请求）。待 pi-ai 发布包含该修复的版本后
+移除补丁。
 
 ## 17. 多提供商产品规则
 

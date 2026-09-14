@@ -72,6 +72,7 @@ type PluginContributes = {
  commands?: PluginCommandContrib[];
  agentTools?: PluginAgentToolContrib[];
  skills?: Array<string | PluginSkillContrib>; // relative paths, or metadata overrides
+ agentExtensions?: string[]; // ExtensionAPI modules run in the agent sidecar; needs `agent.extension` (spec 16)
  settings?: PluginSettingContrib[];
  themes?: PluginThemeContrib[];
  mcpServers?: PluginMcpServerContrib[];
@@ -188,6 +189,8 @@ type PluginPermission =
  | "bus.publish"
  | "bus.subscribe"
  | "browser.cdp"
+ | "desktop.control"
+ | "ui.microphone"
  | "project.create"
  | "session.import"
  | "session.read.own"

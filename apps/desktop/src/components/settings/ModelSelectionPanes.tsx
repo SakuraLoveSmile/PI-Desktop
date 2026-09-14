@@ -22,7 +22,12 @@ import {
   type ModelInfo,
   type ThinkingLevel,
 } from "@pi-desktop/shared";
-import { Button, Field, Input, cx } from "../ui";
+import {
+  CONTEXT_WINDOW_PRESETS,
+  MAX_OUTPUT_PRESETS,
+  matchPresetIndex,
+} from "../../lib/model-limit-presets";
+import { Button, Field, Input, Tooltip, TooltipButton, cx } from "../ui";
 import { IconClose, IconHelp, IconPlus, IconRefresh, IconSearch } from "../icons";
 import { describeModelsFetchError } from "./model-fetch-error";
 import type { ProviderModelsState } from "./useProviderModels";
@@ -466,11 +471,11 @@ export function ModelSelectionPanes({
                     >
                       {t("settings.advanced")}
                     </button>
-                    <button
+                    <TooltipButton
                       type="button"
                       className="provider-chosen-remove"
-                      aria-label={t("settings.removeModel")}
-                      title={t("settings.removeModel")}
+                      ariaLabel={t("settings.removeModel")}
+                      tooltip={t("settings.removeModel")}
                       disabled={busy}
                       onClick={() =>
                         setModels((current) =>
@@ -479,7 +484,7 @@ export function ModelSelectionPanes({
                       }
                     >
                       <IconClose size={12} />
-                    </button>
+                    </TooltipButton>
                   </div>
                   {/* Dense sheet: 2xs labels, alias hint as a title tooltip. */}
                   <div
@@ -512,6 +517,41 @@ export function ModelSelectionPanes({
                         <span className="provider-chosen-field-label">
                           {t("settings.contextWindow")}
                         </span>
+                        {/* Preset ladder (#202): click writes the token count;
+                            the input stays hand-editable off the ladder. */}
+                        <div
+                          className="provider-limit-presets"
+                          role="group"
+                          aria-label={t("settings.contextWindow")}
+                        >
+                          {CONTEXT_WINDOW_PRESETS.map((preset, index) => {
+                            const on =
+                              matchPresetIndex(
+                                CONTEXT_WINDOW_PRESETS,
+                                binding.contextWindow,
+                              ) === index;
+                            return (
+                              <TooltipButton
+                                key={preset.label}
+                                type="button"
+                                className={cx(
+                                  "provider-thinking-chip",
+                                  on && "selected",
+                                )}
+                                ariaLabel={preset.label}
+                                tooltip={preset.label}
+                                aria-pressed={on}
+                                onClick={() =>
+                                  updateBinding(binding.id, {
+                                    contextWindow: preset.tokens,
+                                  })
+                                }
+                              >
+                                {preset.label}
+                              </TooltipButton>
+                            );
+                          })}
+                        </div>
                         <Input
                           type="number"
                           min={1}
@@ -528,6 +568,39 @@ export function ModelSelectionPanes({
                         <span className="provider-chosen-field-label">
                           {t("settings.maxOutput")}
                         </span>
+                        <div
+                          className="provider-limit-presets"
+                          role="group"
+                          aria-label={t("settings.maxOutput")}
+                        >
+                          {MAX_OUTPUT_PRESETS.map((preset, index) => {
+                            const on =
+                              matchPresetIndex(
+                                MAX_OUTPUT_PRESETS,
+                                binding.maxTokens,
+                              ) === index;
+                            return (
+                              <TooltipButton
+                                key={preset.label}
+                                type="button"
+                                className={cx(
+                                  "provider-thinking-chip",
+                                  on && "selected",
+                                )}
+                                ariaLabel={preset.label}
+                                tooltip={preset.label}
+                                aria-pressed={on}
+                                onClick={() =>
+                                  updateBinding(binding.id, {
+                                    maxTokens: preset.tokens,
+                                  })
+                                }
+                              >
+                                {preset.label}
+                              </TooltipButton>
+                            );
+                          })}
+                        </div>
                         <Input
                           type="number"
                           min={1}
@@ -573,7 +646,7 @@ export function ModelSelectionPanes({
                             >
                               {enabledLevels.map((level) => (
                                 <option key={level} value={level}>
-                                  {t(`thinkingLevel.${level}`)}
+                                  {level}
                                 </option>
                               ))}
                             </select>
@@ -588,12 +661,13 @@ export function ModelSelectionPanes({
                         {levelChoices.map((level) => {
                           const on = binding.thinkingLevels.includes(level);
                           return (
-                            <button
+                            <TooltipButton
                               key={level}
                               type="button"
                               className={cx("provider-thinking-chip", on && "selected")}
+                              ariaLabel={level}
+                              tooltip={level}
                               aria-pressed={on}
-                              title={t(`thinkingLevel.${level}`)}
                               onClick={() => {
                                 const next: ThinkingLevel[] = on
                                   ? binding.thinkingLevels.filter(
@@ -610,8 +684,8 @@ export function ModelSelectionPanes({
                                 });
                               }}
                             >
-                              {t(`thinkingLevel.${level}`)}
-                            </button>
+                              {level}
+                            </TooltipButton>
                           );
                         })}
                       </div>
@@ -651,12 +725,13 @@ export function ModelSelectionPanes({
                             />
                             <span>{t("settings.availableForSubagents")}</span>
                           </label>
-                          <span
+                          <Tooltip
                             className="provider-chosen-delegation-help"
-                            data-tip={t("settings.availableForSubagentsHint")}
+                            label={t("settings.availableForSubagentsHint")}
+                            ariaLabel={t("settings.availableForSubagentsHint")}
                           >
                             <IconHelp size={13} />
-                          </span>
+                          </Tooltip>
                         </span>
                       </div>
                     </div>

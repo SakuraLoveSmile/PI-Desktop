@@ -978,6 +978,20 @@
   gap: 8px;
 }
 
+/* Preset ladders above the two numeric limit inputs (#202): the same
+   segmented-track language as the thinking chips, five stops per ladder. */
+.provider-limit-presets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 3px;
+  width: 100%;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-chip);
+}
+
 .provider-chosen-thinking {
   display: flex;
   flex-direction: column;
@@ -1120,30 +1134,6 @@
   color: var(--ds-text-secondary);
 }
 
-.provider-chosen-delegation-help[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 5px);
-  left: 50%;
-  z-index: 8;
-  transform: translateX(-50%);
-  border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-sm);
-  background: var(--ds-bg-elevated-opaque);
-  box-shadow: var(--ds-shadow-composer);
-  padding: 3px 7px;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-2xs);
-  line-height: var(--leading-compact);
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.provider-chosen-delegation-help[data-tip]:hover::after {
-  opacity: 1;
-}
 
 .provider-custom-model {
   flex: none;

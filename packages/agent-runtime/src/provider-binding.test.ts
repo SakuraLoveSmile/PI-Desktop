@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { convertMessages } from "@earendil-works/pi-ai/api/openai-completions";
+import { modelConfigWithBinding } from "./model-capabilities.js";
 import type { ModelConfig } from "./thinking-level.js";
 import {
   apiBindingForStyle,
@@ -182,6 +183,105 @@ describe("buildProviderModel OpenAI-compatible role compatibility", () => {
     });
   });
 
+  it("fills missing reasoning_content for DeepSeek models on aggregator URLs", () => {
+    const model = buildProviderModel({
+      ...reasoningProvider,
+      id: "row-uuid",
+      vendorKey: "siliconflow-cn",
+      baseUrl: "https://api.siliconflow.cn/v1",
+      modelId: "deepseek-ai/DeepSeek-V3.2",
+      apiStyle: "chat_completions",
+      modelConfig: {
+        ...reasoningProvider.modelConfig!,
+        name: "DeepSeek V3.2",
+        family: "deepseek",
+        baseUrl: "https://api.siliconflow.cn/v1",
+      },
+    }) as any;
+
+    expect(model.provider).toBe("row-uuid");
+    expect(model.compat).toMatchObject({
+      requiresReasoningContentOnAssistantMessages: true,
+      supportsDeveloperRole: false,
+    });
+    expect(model.compat.thinkingFormat).toBeUndefined();
+
+    const messages = convertMessages(
+      model,
+      {
+        systemPrompt: "Follow the workspace rules.",
+        messages: [
+          { role: "user", content: "hello", timestamp: Date.now() },
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "answer without thinking" }],
+            api: "openai-completions",
+            provider: model.provider,
+            model: model.id,
+            usage: {
+              input: 1,
+              output: 1,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 2,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: "stop",
+            timestamp: Date.now(),
+          },
+        ],
+      },
+      {
+        supportsDeveloperRole: false,
+        requiresReasoningContentOnAssistantMessages: true,
+      } as any,
+    );
+
+    expect(messages).toEqual([
+      { role: "system", content: "Follow the workspace rules." },
+      { role: "user", content: "hello" },
+      {
+        role: "assistant",
+        content: "answer without thinking",
+        reasoning_content: "",
+      },
+    ]);
+  });
+
+  it("fills missing reasoning_content from catalog family when the model id is an endpoint", () => {
+    const model = buildProviderModel({
+      ...reasoningProvider,
+      id: "row-uuid",
+      vendorKey: "volcengine",
+      baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+      modelId: "ep-20250101-xyz",
+      apiStyle: "chat_completions",
+      modelConfig: {
+        ...reasoningProvider.modelConfig!,
+        name: "DeepSeek V4 Pro",
+        family: "deepseek-thinking",
+        baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+      },
+    }) as any;
+
+    expect(model.compat).toMatchObject({
+      requiresReasoningContentOnAssistantMessages: true,
+    });
+  });
+
+  it("does not mark unrelated OpenAI-compatible models as DeepSeek reasoning replay", () => {
+    const model = buildProviderModel({
+      ...reasoningProvider,
+      id: "row-uuid",
+      vendorKey: "custom",
+      baseUrl: "https://api.example.com/v1",
+      modelId: "gpt-4.1",
+      apiStyle: "chat_completions",
+    }) as any;
+
+    expect(model.compat.requiresReasoningContentOnAssistantMessages).toBeUndefined();
+  });
+
   it("preserves MiniMax M3 image input on its OpenAI-compatible endpoint", () => {
     const provider: RuntimeProviderConfig = {
       ...keyedProvider,
@@ -279,6 +379,66 @@ describe("createProviderModels auth resolution", () => {
       apiKey: "second-token",
       baseUrl: "https://per-account.acme.test",
     });
+  });
+});
+
+describe("explicit extended thinking levels", () => {
+  it("sends enabled xhigh and max values instead of clamping them to high", async () => {
+    const thinkingLevels = ["off", "low", "medium", "high", "xhigh", "max"] as const;
+    const configuredModel = modelConfigWithBinding(
+      {
+        source: "generic",
+        name: "Explicit reasoning model",
+        baseUrl: "https://api.acme.test/v1",
+        reasoning: true,
+        supportedThinkingLevels: ["low", "medium", "high"],
+        thinkingLevelMap: { xhigh: null, max: null },
+        input: ["text"],
+        contextWindow: 128_000,
+        maxTokens: 8_192,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      },
+      {
+        contextWindow: 128_000,
+        maxTokens: 8_192,
+        thinkingLevels: [...thinkingLevels],
+      },
+    );
+    const provider: RuntimeProviderConfig = {
+      ...keyedProvider,
+      supportsReasoning: true,
+      supportedThinkingLevels: [...thinkingLevels],
+      modelConfig: configuredModel,
+    };
+    const requests: Record<string, unknown>[] = [];
+    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response(
+        JSON.stringify({ choices: [{ delta: { content: "ok" }, finish_reason: "stop" }] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    const model = buildProviderModel(provider);
+
+    for (const reasoning of ["high", "xhigh", "max"] as const) {
+      await createProviderModels(provider, model)
+        .streamSimple(
+          model,
+          {
+            systemPrompt: "system",
+            messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
+            tools: [],
+          },
+          { reasoning, fetch },
+        )
+        .result();
+    }
+
+    expect(requests.map((request) => request.reasoning_effort)).toEqual([
+      "high",
+      "xhigh",
+      "max",
+    ]);
   });
 });
 

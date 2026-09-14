@@ -64,10 +64,32 @@ queued/running `plan_approvals` 执行状态已中断并中止它们
 因此 Linux AppImage 或没有活动 TTY 的 GUI 启动会继续监管 host/sidecar，而不是
 弹出 Electron 的未捕获异常对话框。
 
+主进程 JavaScript `uncaughtException` 同样不是 Electron 主进程崩溃（只有原生
+主进程 abort 才会退出应用）。Main 自行处理 `uncaughtException` /
+`unhandledRejection`，写入 `app/runtime` 记录并继续运行，从而抑制 Electron
+默认的 “A JavaScript error occurred in the main process” 对话框。可恢复的
+网络栈异常包括 Chromium 把非 Latin-1 HTTP 头拷进 `Headers.set`
+（`TypeError: Cannot convert argument to a ByteString`），常见于 Windows 系统
+代理或网关注入 Unicode 头。下一次 `net.fetch` 或更新检查不得再弹出该原生框。
+
 Linux 打包的 host-core 在 Ubuntu 22.04 上构建，需要 glibc 2.35 或更高版本
 （Ubuntu 22.04、Debian 12、Fedora 36+）。更低的 glibc 是致命 host 状态，而不是
 重启循环：界面会列出这些发行版，而不是只显示“无法连接本地服务”。Linux 标签
 作业不得换用会抬高所需 glibc 的更新 runner。
+
+另有两种启动结果会被明确命名，而不是笼统地当作服务不可用（D380）：
+
+- **降级安装。** 当数据目录的 SQLite schema 比当前构建支持的更新时，host-core
+  会拒绝打开（stderr 输出 `database schema version N is newer than supported
+  M`）。Electron 从退出前的最后一段 stderr 解析该行，首次失败即停止重启循环，
+  并推送 `message: "DB_SCHEMA_TOO_NEW"` 且带有两个版本号的 `hostStatus`。横幅
+  提示用户安装上次打开这些数据的更新版 PI-Desktop。不会向下迁移数据。
+- **非原生构建。** 启动时 Electron 比较 `process.arch` 与实际 CPU（macOS 通过
+  `sysctl.proc_translated` 判断，仅在 Rosetta 2 下为 `1`；其他平台用
+  `os.machine()`）。不匹配时即使启动成功，也会随启动 `hostStatus` 附带
+  `archMismatch`，渲染层显示可关闭的提示，说明当前构建（macOS 上为 Intel /
+  Apple Silicon）并指向对应下载。arm64 构建在 Intel Mac 上根本无法启动，因此
+  只能检测 Intel 构建跑在 Apple Silicon 上这一方向。
 
 Windows 安装包目标为 x64。Windows host-core 使用
 `x86_64-pc-windows-msvc` 目标和 `target-feature=+crt-static` 构建，因此 NSIS
@@ -78,6 +100,8 @@ Windows 安装包目标为 x64。Windows host-core 使用
 监管参数（在Electron main中实现）：
 
 - 子进程退出立即拒绝该子进程的所有正在进行的 RPC（无 130 秒超时等待）。
+- 超过 64 MiB 的 NDJSON 请求行以 `LIMIT_EXCEEDED` 应答，不结束 stdin 读取器（ADR 0216）。Electron 在写入 stdin 前拒绝同样大小的载荷（ADR 0217）。
+- Windows Alt+Space 钩子只保留 stdout 发送端的弱引用。stdin EOF 后 serve 丢弃最后一个强引用，host-core 退出；泄漏的发送端不能把关闭卡住超过 5 秒（ADR 0217）。
 - 使用指数退避 `0.5s → 1s → 2s` 自动重启（上限 4 秒）。
 - 每个孩子最多**每 2 分钟窗口** 3 次重新启动；除此之外，该应用程序
   保持降级并发出 `hostStatus { ok: false, component, fatal: true }`。
@@ -175,8 +199,9 @@ sidecar/host 关闭序列在更新程序替换应用程序之前运行。
 远程控制不会给 Rust host-core 或当前 renderer IPC 表面增加公共监听器。目标 Agent
 Host 是无头模块（`packages/agent-host`），拥有会话与回合准入、回合队列、审批代理和
 事件日志，与 Node pi sidecar、Rust host-core 一起受监督，其上是已认证的 RACP 服务
-（D376）。生产环境中 Host 发起出站 Gateway 链路；Gateway 负责路由已认证客户，
-但不拥有工作区状态。
+（D374）。首个远程部署（D375）把该模块作为无头 `pi-host` 运行在远端机器上，只绑定
+loopback，桌面经 SSH 端口转发连接。未排期的 Gateway 拓扑会增加出站 Host link；
+Gateway 负责路由已认证客户，但不拥有工作区状态。
 
 详细拓扑、所有权和迁移边界见
 [`02-architecture/05-remote-agent-control.md`](/zh-CN/spec/02-architecture/05-remote-agent-control)。

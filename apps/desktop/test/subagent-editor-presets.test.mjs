@@ -85,6 +85,15 @@ test("the editor applies a preset by overwriting the draft body and tools", () =
   assert.match(editorSource, /description: preset\.description/);
 });
 
+test("the editor can prefill a create draft from a catalog definition", () => {
+  assert.match(editorSource, /export function draftFromDefinition\(/);
+  assert.match(editorSource, /findSubagentPreset\(definition\.name\)/);
+  assert.match(editorSource, /body: definition\.prompt/);
+  assert.match(editorSource, /maxTurns: definition\.maxTurns \?\? 0/);
+  assert.match(editorSource, /initialPresetId\?: string/);
+  assert.match(editorSource, /copiedPreset && initialPresetId \? initialPresetId/);
+});
+
 test("the model picker uses the configured provider catalog", () => {
   // The picker uses the shared provider catalog and preserves an existing
   // orphan pin instead of silently changing it to session inheritance.
@@ -93,17 +102,27 @@ test("the model picker uses the configured provider catalog", () => {
   assert.match(editorSource, /subagentModelOrphanPin\(draft\.model, modelChoices\)/);
 });
 
-test("the model picker keeps existing pins visible", () => {
-  // A model that is no longer configured remains visible as an orphan option,
-  // so editing a definition does not silently clear its model pin.
+test("the model picker keeps existing pins visible", async () => {
+  // A model that is no longer configured remains selectable as an orphan row,
+  // so editing a definition does not silently clear its model pin. The option
+  // list moved into the picker component, so the orphan row is asserted there.
+  const pickerSource = await readFile(
+    new URL("../src/components/settings/SubagentModelPicker.tsx", import.meta.url),
+    "utf8",
+  );
   assert.match(editorSource, /subagentModelOrphanPin/);
-  assert.match(editorSource, /orphanModel \? \(/);
+  assert.match(editorSource, /orphanPin=\{orphanModel\}/);
+  assert.match(pickerSource, /orphanPin/);
 });
 
-test("the model picker keeps custom ids available without exposing opted-out bindings", () => {
-  assert.match(editorSource, /CUSTOM_SUBAGENT_MODEL_VALUE/);
-  assert.match(editorSource, /extensions\.subagents\.modelPickCustom/);
-  assert.match(editorSource, /extensions\.subagents\.modelPickCustomHint/);
+test("the model picker offers every configured provider model, with no free-text path", () => {
+  // The picker is the only way to set a model: every option comes from the
+  // configured provider catalog, so a saved pin is always resolvable.
+  assert.match(editorSource, /subagentModelChoices\(providers\)/);
+  assert.match(editorSource, /groupSubagentModelChoices\(modelChoices\)/);
+  assert.match(editorSource, /subagentModelOrphanPin\(draft\.model, modelChoices\)/);
+  assert.doesNotMatch(editorSource, /CUSTOM_SUBAGENT_MODEL_VALUE/);
+  assert.doesNotMatch(editorSource, /modelPickCustom/);
 });
 
 test("the editor styles ship with the picker", () => {
@@ -112,6 +131,9 @@ test("the editor styles ship with the picker", () => {
   assert.match(extensionsCss, /\.ext-preset-chip\.is-selected/);
   assert.match(extensionsCss, /\.ext-preset-desc/);
   assert.match(extensionsCss, /\.ext-sheet-advanced-toggle/);
+  assert.match(extensionsCss, /\.ext-sheet \.field-input,[\s\S]*?background: var\(--ds-tile\)/);
+  assert.match(extensionsCss, /\.ext-sheet \.field-input:focus,[\s\S]*?box-shadow: 0 0 0 2px/);
+  assert.match(extensionsCss, /\.ext-sheet \.ext-skill-body[\s\S]*?min-height: 166px/);
   assert.doesNotMatch(extensionsCss, /minmax\(220px/);
 });
 
@@ -161,4 +183,5 @@ test("the create sheet is a compact chip row with an Advanced disclosure", () =>
   assert.match(editorSource, /useState\(!!editing\)/);
   assert.doesNotMatch(editorSource, /extensions\.subagents\.presetApply/);
   assert.doesNotMatch(editorSource, /extensions\.subagents\.sheetSubtitle/);
+  assert.match(editorSource, /id="subagent-sheet-error" className="ext-sheet-error" role="alert"/);
 });

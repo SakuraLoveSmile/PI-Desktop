@@ -93,7 +93,8 @@ type PluginNotificationPermission = "granted" | "denied" | "unknown" | "unsuppor
 不暴露跨平台只读通知权限API，所以
 `unknown` 在第一次探测之前以及操作系统执行探测操作时返回
 不报告结果。本机交付是尽力而为：操作系统策略可能会抑制
-横幅而不更改持久任务通知收件箱。
+横幅而不更改持久任务通知收件箱。点击已交付的插件通知会恢复并聚焦主窗口，
+但不会激活会话或创建持久任务通知。
 
 ### 项目（需要 `project.create`）
 
@@ -296,6 +297,53 @@ Projects 页面也会据此刷新持久项目索引；插件不需要、也不�
 5 次批量导入和 20 次删除。写入前会移除工具 `__pi*` 与 `piDesktop.*` 对象键。
 P2/P3（会话创建、消息变更、任意重新绑定、provider/model 绑定、批量删除、标签）不属于本次接口。
 
+### 会话协作（需要 `desktop.control`）
+
+官方 Session Orchestrator 组合了已审查的 desktop-control 目录；这不是第二套 session API，
+也不会暴露 Electron 通道或本地 MCP bearer token。
+
+```ts
+type SessionCollaborationOperation =
+  | "session/collaboration/spawn"
+  | "session/collaboration/send"
+  | "session/collaboration/status"
+  | "session/collaboration/result"
+  | "session/collaboration/cancel"
+
+// 所有调用均使用 pi.desktop.invoke({ operation, args: [input] })。
+type SpawnInput = {
+  task: string
+  title?: string
+  modelKey?: string
+  notifyOnCompletion?: boolean
+  idempotencyKey?: string
+}
+type SendInput = {
+  sessionId: string
+  content: string
+  kind?: "task" | "message"
+  notifyOnCompletion?: boolean
+  idempotencyKey?: string
+}
+type StatusInput = { sessionId: string }
+type ResultInput = { sessionId: string; messageId?: string; turnId?: string }
+type CancelInput = { sessionId: string; messageId?: string }
+```
+
+`spawn` 返回真实持久目标 `sessionId` 和宿主投递 `messageId`。`send` 可以双向寻址已有
+Session ID，并复用该会话的项目、模型、上下文和权限配置；`messageId` 只标识一条投递，
+不是 worker 身份。`status` 和 `result` 是有界投影，不会加载完整转录本。`cancel` 只中断
+精确的排队投递或绑定回合，并保留目标会话及其历史。
+
+`spawn` 和 `send` 仅在插件当前 Agent 工具调用期间有效。broker 注入 `pluginId`、来源
+`sessionId`、来源 `turnId` 和调用身份；插件参数不能提供或覆盖这些字段。面向用户的插件
+面板可使用自有插件身份调用 `cancel`，但不能用该路径发送或创建工作。宿主执行来源权限
+上限、Agent 模式目标、收件箱和 worker 限制、幂等性以及有界自主跳数。请求的完成回调是
+宿主拥有的 `completion` 消息，链接到源投递，并且只在实际目标回合结算后最多创建一次。
+回调是会话数据，不是新的用户授权；完成消息不会触发另一个回调。
+
+渲染器可以读取单独的侧边栏协作投影，但插件面板不能绕过此网关调用变更操作。
+
 ### agent.complete（需要 `agent.complete`）
 ```ts
 pi.agent.complete(input: {
@@ -417,6 +465,52 @@ pi.net.fetch(input: {
 }): Promise<{ status: number; headers: Record<string, string>; bodyText: string }>
 ```
 
+### 桌面控制（需要 `desktop.control`）
+
+```ts
+pi.desktop.listOperations(): Promise<Array<{
+  id: string
+  description: string
+  risk: "read" | "write" | "dangerous"
+}>>
+
+pi.desktop.invoke(input: {
+  operation: string
+  args?: unknown[]
+  confirm?: boolean
+}): Promise<unknown>
+```
+
+这是第一方插件通往与可选启用的本地 MCP 控制平面共用同一份已审查操作目录的
+网关（ADR 0203 / D370）。两份目录的差异仅在于标记为 plugin-only 的操作：六个
+`session/collaboration/*` 操作可以通过该网关调用，却被刻意排除在 MCP 可见目录
+之外（`tools/list`、`pi_control_describe` 以及 `pi_desktop_invoke` 的枚举），
+因为它们需要已认证的插件调用上下文，且渲染器没有任何变更通道。返回的目录省略
+Electron 通道名，插件也永远拿不到 MCP bearer token。调用复用控制器、IPC 处理器、
+生命周期检查、完成事件和审计边界；插件无法触达任意 Electron IPC。
+
+`dangerous` 操作（删除会话、更改权限模式、批准工具）需要两次答复。
+`confirm: true` 是插件的知会，必须先给出（否则返回
+`CONFIRMATION_REQUIRED`）。随后宿主在原生对话框中询问用户，对话框点名目录中
+的操作 id、目录描述和一段参数预览；对话框绝不显示插件或模型撰写的文本，
+因此一份被提示注入的转录本无法把 `session/delete` 重新包装成无害的东西。
+对话框被关闭、被拒绝，或宿主没有对话框服务，都会在触达控制器之前以
+`PERMISSION_DENIED` 失败。调用会连同插件 id、操作、风险等级和结果状态一起
+记入日志；参数值不会复制进审计条目。
+
+### 麦克风面板（需要 `ui.microphone`）
+
+只有当清单声明且用户授予了 `ui.microphone` 时，隔离面板才可以通过浏览器
+媒体 API 请求麦克风音频：
+
+```ts
+navigator.mediaDevices.getUserMedia({ audio: true })
+```
+
+宿主的权限处理器为该面板放行 `media` 权限，并继续拒绝摄像头和其他所有
+设备权限。插件拿不到原生麦克风句柄或宿主密钥；浏览器的语音识别和语音合成
+仍由页面持有。面板应提供文本回退，并通过其无障碍状态播报权限或识别失败。
+
 ## 4. 错误模型
 
 ```ts
@@ -429,6 +523,7 @@ type PluginApiError = {
  | "UNSUPPORTED"
  | "LIMIT_EXCEEDED" // a per-plugin cap is full (e.g. bus subscriptions)
  | "RATE_LIMITED" // a rolling window is exhausted (e.g. bus publishes)
+ | "CONFIRMATION_REQUIRED" // a dangerous desktop operation without confirm: true
  | "INTERNAL"
  message: string
 }

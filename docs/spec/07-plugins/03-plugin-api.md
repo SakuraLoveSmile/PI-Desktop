@@ -18,6 +18,12 @@ declare const pi: PiPluginHostApi;
 
 ## 3. API overview (MVP)
 
+> Status legend: every section below is **shipped** and enforced by
+> `PluginRuntime` unless its heading or text says **Planned**. A planned
+> surface is documented ahead of implementation so plugin authors can see the
+> direction; it throws `UNSUPPORTED` until it lands (see §9 for the
+> per-surface list).
+
 ### app
 ```ts
 pi.app.getVersion(): Promise<string>
@@ -95,7 +101,9 @@ permission probe by showing a short confirmation notification; Electron does
 not expose a cross-platform read-only notification permission API, so
 `unknown` is returned before the first probe and when the operating system does
 not report a result. Native delivery is best-effort: an OS policy may suppress
-the banner without changing the durable task notification inbox.
+the banner without changing the durable task notification inbox. Clicking a
+delivered plugin notification restores and focuses the main window, but never
+activates a session or creates a durable task notification.
 
 ### project (requires `project.create`)
 
@@ -350,6 +358,73 @@ storage. P2/P3 operations (session create, message mutation, arbitrary re-bindin
 provider/model binding, batch delete, and tags) are intentionally not part of
 this contract.
 
+### session collaboration (requires `desktop.control`)
+
+The official Session Orchestrator composes the reviewed desktop-control
+catalog; this is not a second session API and it does not expose Electron
+channels or the local MCP bearer token.
+
+```ts
+type SessionCollaborationOperation =
+  | "session/collaboration/spawn"
+  | "session/collaboration/send"
+  | "session/collaboration/list"
+  | "session/collaboration/status"
+  | "session/collaboration/result"
+  | "session/collaboration/cancel"
+
+// All calls use pi.desktop.invoke({ operation, args: [input] }).
+type SpawnInput = {
+  task: string
+  title?: string
+  modelKey?: string
+  notifyOnCompletion?: boolean
+  idempotencyKey?: string
+}
+type SendInput = {
+  sessionId: string
+  content: string
+  kind?: "task" | "message"
+  notifyOnCompletion?: boolean
+  idempotencyKey?: string
+}
+type ListInput = {}
+type StatusInput = { sessionId: string }
+type ResultInput = { sessionId: string; messageId?: string; turnId?: string }
+type CancelInput = { sessionId: string; messageId?: string }
+```
+
+`spawn` returns a real durable target `sessionId` and host delivery
+`messageId`. `send` addresses an existing Session ID in either direction and
+reuses that session's project, model, context, and permission configuration;
+`messageId` identifies one delivery and is never a worker identity. `status`
+and `result` are bounded projections and do not load a full transcript.
+`cancel` interrupts only the exact queued delivery or bound turn and retains
+the target session and history.
+
+`list` returns at most 100 non-deleted Agent sessions that can receive a
+message, including sessions created independently of Session Orchestrator. Each
+entry contains only its Session ID, title, status, updated time, readable
+provider/model labels, and bounded creation links; it does not include a
+transcript, project path, credentials, or message previews. The caller can
+pass the returned Session ID to `send`, and `status`/`result` remain the
+authoritative detail reads.
+
+`spawn` and `send` are valid only during the plugin's active Agent tool
+invocation. The broker injects `pluginId`, source `sessionId`, source `turnId`,
+and an invocation identity; plugin arguments cannot supply or override those
+values. A user-facing plugin panel may use `cancel` with its own plugin
+identity, but cannot use that path to send or spawn work. The host enforces
+the source permission ceiling, Agent-mode target, inbox and worker limits,
+idempotency, and bounded autonomous hops. A requested completion callback is
+a host-owned `completion` message linked to the source delivery and is created
+at most once after the actual target turn settles.
+The callback is session data, not a new user authorization, and completion
+messages do not trigger another callback.
+
+The renderer may read the separate sidebar collaboration projection, but a
+plugin panel cannot invoke the mutation operations outside this gateway.
+
 ### agent.complete (requires `agent.complete`)
 ```ts
 pi.agent.complete(input: {
@@ -370,7 +445,7 @@ The host resolves credentials and runs a one-shot completion with `tools: []`
 through the same path as Composer prompt enhancement. The plugin never receives
 a secret. `includeSessionContext: true` also requires `session.read` and an
 in-flight tool session; the host serializes that context and, if `messages` is
-empty, appends `Please advise on the executor's situation above.` System prompt
+empty, appends `Please respond to the request.` System prompt
 ≤ 32 KiB; combined messages ≤ 200k characters; eight calls per plugin per
 rolling 60s (`RATE_LIMITED`); 90s budget (`TIMEOUT`). Empty model output is
 `INVALID_ARGUMENT`.
@@ -481,6 +556,66 @@ pi.net.fetch(input: {
 }): Promise<{ status: number; headers: Record<string, string>; bodyText: string }>
 ```
 
+### desktop control (requires `desktop.control`)
+
+```ts
+pi.desktop.listOperations(): Promise<Array<{
+  id: string
+  description: string
+  risk: "read" | "write" | "dangerous"
+}>>
+
+pi.desktop.invoke(input: {
+  operation: string
+  args?: unknown[]
+  confirm?: boolean
+}): Promise<unknown>
+```
+
+The reviewed catalog includes `session/open(sessionId)` for a plugin UI to
+open an existing durable session. Plugin-originated `session/create` and
+`agent/prompt` calls refresh session state without changing the active
+renderer session; `session/open` is explicit navigation.
+
+This is the first-party plugin gateway to the reviewed operation catalog shared
+with the opt-in local MCP control plane (ADR 0203 / D370). The two catalogs
+differ only for operations marked plugin-only: the six
+`session/collaboration/*` operations are callable through this gateway but are
+deliberately absent from the MCP-visible catalog (`tools/list`,
+`pi_control_describe`, and the `pi_desktop_invoke` enum), because they require
+an authenticated plugin invocation context and no renderer mutation channel
+exists for them. The returned catalog omits Electron channel names and the
+plugin never receives the MCP bearer token. Invocation reuses the controller,
+IPC handler, lifecycle checks, completion event, and audit boundary; a plugin
+cannot reach arbitrary Electron IPC.
+
+A `dangerous` operation (session delete, permission-mode change, tool
+approval) needs two answers. `confirm: true` is the plugin's acknowledgement
+and is required first (`CONFIRMATION_REQUIRED` otherwise). The host then asks
+the user in a native dialog that names the catalog operation id, its catalog
+description, and an argument preview; the dialog never shows plugin- or
+model-authored text, so a prompt-injected transcript cannot relabel
+`session/delete` as something benign. A dismissed dialog, a declined dialog,
+or a host without a dialog service all fail with `PERMISSION_DENIED` before
+the controller is reached. Calls are logged with the plugin id, operation,
+risk, and result status; argument values are not copied into the audit entry.
+
+### microphone panels (requires `ui.microphone`)
+
+An isolated panel may request microphone audio through the browser media API
+only when the manifest declares and the user grants `ui.microphone`:
+
+```ts
+navigator.mediaDevices.getUserMedia({ audio: true })
+```
+
+The host permission handler allows the `media` permission for that panel and
+continues to deny camera and every other device permission. The plugin does
+not receive a native microphone handle or a host secret; browser speech
+recognition and speech synthesis remain page-owned. A panel should provide a
+text fallback and announce permission or recognition failures through its
+accessible status.
+
 ## 4. Error model
 
 ```ts
@@ -493,6 +628,7 @@ type PluginApiError = {
  | "UNSUPPORTED"
  | "LIMIT_EXCEEDED" // a per-plugin cap is full (e.g. bus subscriptions)
  | "RATE_LIMITED" // a rolling window is exhausted (e.g. bus publishes)
+ | "CONFIRMATION_REQUIRED" // a dangerous desktop operation without confirm: true
  | "INTERNAL"
  message: string
 }
@@ -507,7 +643,11 @@ pi.events.on(event, handler)
 pi.events.off(event, handler)
 ```
 
-The host pushes events to the plugin process as one-way frames. Delivered today:
+The host pushes events to the plugin process as one-way frames. `pi.events`
+is not a separate channel: it is an alias over the same per-plugin bus stream
+that `pi.bus.subscribe` consumes (`plugin-host-process.mjs`), so an `on`
+handler sees every frame the host delivers to this plugin and nothing else.
+Delivered today:
 
 - `bus.message` — a bus delivery, with the `PluginBusMessage` as the single
   argument. `pi.bus.subscribe` is the normal way to receive these; `events.on`

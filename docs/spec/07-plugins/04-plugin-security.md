@@ -14,6 +14,7 @@ Main risks:
 4. Hijacking agent tools
 5. Phishing via the UI
 6. Spending the user's model quota, or sending the conversation to another model (`agent.complete` / `session.read`)
+7. Triggering work in another durable session or spoofing its sender/provenance
 
 ## 2. Default-deny principle
 
@@ -35,6 +36,12 @@ Main risks:
 4. The plugin-private data directory is separate from the host core library
 5. Session transcripts from `session.getLlmContext` are a bounded projection of
    the in-flight tool session only (D336 / D019)
+6. Session collaboration is available only through the reviewed
+   `desktop.control` catalog. The broker derives the source plugin, Session ID,
+   turn ID, and invocation ID from the active Agent tool call; plugin payloads
+   cannot provide those identities. Host-core owns the target Session ID,
+   delivery ledger, permission ceiling, turn binding, callback, cancellation,
+   and transcript provenance.
 
 Clipboard history is host-owned and remains in the Electron main process only.
 It is never written to the plugin data directory or the host database. The host
@@ -44,6 +51,27 @@ through `clipboard.read`, which is also the permission used by `readText`;
 every `getHistory` call is audited with its returned entry count. The bounded
 in-memory retention limits the privacy exposure to the current app run and is
 cleared on exit.
+
+### 3.2 Session collaboration boundary
+
+The Session Orchestrator may create bounded worker sessions, address existing
+Agent sessions, inspect bounded status/result projections, and cancel work when
+the user grants `desktop.control`. This capability deliberately does not grant
+the plugin direct `session.create`, `agent.prompt`, host RPC, SQLite, transcript
+file, or MCP-token access. A send or spawn call must run inside the plugin's
+currently executing Agent tool invocation; calls from a service, panel, or
+ordinary plugin code without that context fail closed. A plugin panel may
+request cancellation for that plugin's own deliveries as an explicit user
+control, but cancellation cannot create or retarget a delivery.
+
+Host-core snapshots the source permission ceiling and rejects targets above it,
+rechecks the target mode before beginning the turn, and enforces inbox,
+worker, and autonomous-hop limits. Existing target sessions retain their own
+project/model/context configuration. Completion callbacks are host-authored,
+at-most-once session messages and cannot authorize tools or trigger another
+callback. Restart recovery retains a durable queued delivery but never starts
+an interrupted turn unattended. Session-message provenance is immutable across
+transcript replacement and regeneration.
 
 ### Goals
 1. Plugin main runs in a separate process
@@ -252,7 +280,10 @@ outbound path the host owns answers to it.
   runs a `webRequest` filter, refuses every device permission, and denies
   `window.open`, which would otherwise mint a window outside the filtered session
 - **`pi.net.fetch`.** Checks the allowlist and follows redirects by hand, because
-  an allowed host that 30x-es to an undeclared one would carry the request out
+  an allowed host that 30x-es to an undeclared one would carry the request out.
+  The runtime's hop loop is the only fetch path: Electron main supplies no
+  alternative `fetch` service, so nothing can follow a redirect without the
+  per-hop re-check
 - **Remote MCP endpoints.** Answer to the same list, not to their permission alone.
   HTTP endpoints may be on a trusted LAN, but plain HTTP is unencrypted and is
   called out during configuration or plugin permission review. The MCP client
@@ -290,6 +321,32 @@ manifest did not name:
 - Connection budget: 10s to complete `initialize`, 100s per `tools/call`, 8
   `tools/list` pages, 4MB per stdio line. Servers are connected lazily and torn
   down when the plugin unloads or is disabled.
+
+## 8.2 Desktop control and device access
+
+`desktop.control` hands a plugin the reviewed operation catalog the local MCP
+control plane exposes (ADR 0203 / D370): project, session, Agent, and
+workspace operations, each tagged `read`, `write`, or `dangerous`. The
+plugin-only exception covers the six `session/collaboration/*` operations: they
+are callable through the plugin gateway but deliberately absent from the
+MCP-visible catalog, because they need an authenticated plugin invocation
+context and no renderer mutation channel exists for them. The plugin sees ids,
+descriptions, and risk, never Electron channel names or the MCP bearer token,
+and every invocation crosses the same IPC validation, lifecycle checks,
+completion event, and audit entry as an MCP call.
+
+A `dangerous` operation is decided by the user, not by the caller. The
+controller's `confirm: true` is only the plugin's acknowledgement (MCP treats
+it the same way, D372). After it, the host shows a native dialog that names
+the catalog operation id, the catalog description, and a bounded argument
+preview, and it deliberately shows no text the plugin or a model behind it
+authored, so a prompt-injected transcript cannot relabel `session/delete` as
+something benign. Escape and dismissal are refusals. A headless host with no
+dialog service refuses every dangerous operation outright.
+
+`ui.microphone` allows only the `media` permission, for audio, inside the
+plugin's isolated panel session. Camera and every other device permission stay
+denied, and the plugin receives no native handle: capture stays page-owned.
 
 ## 9. Auditing and emergency response
 
@@ -351,6 +408,14 @@ Current enforcement:
     owns (§8.0)
 12. Plugin deletions go to the OS trash, are non-recursive, and are rate-braked
     (§6.1)
+13. `manifest.main` and `ui.panel` are validated as relative paths at install
+    and resolved with the same inside-the-plugin containment as skills and
+    theme CSS before the host loads them
+14. A `dangerous` desktop operation from a plugin needs the user's answer to a
+    host-owned native dialog after the plugin's own `confirm: true`; the
+    dialog shows only catalog text (§8.2)
+15. `ui.microphone` grants audio capture only, inside the isolated panel
+    session (§8.2)
 
 Not enforced yet:
 

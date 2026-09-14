@@ -19,7 +19,7 @@ const examplePanelSource = await readFile(
   "utf8",
 );
 const hostCorePluginSource = await readFile(
-  new URL("../../../crates/host-core/src/plugins.rs", import.meta.url),
+  new URL("../../../crates/host-core/src/plugins/marketplace/catalog.rs", import.meta.url),
   "utf8",
 );
 const bundledPanelSources = [
@@ -124,6 +124,19 @@ test("plugin content is offset below the strict 46px host drag band", () => {
   assert.match(preloadSource, /host\.dataset\.theme = theme/);
   assert.match(preloadSource, /className = "drag-region"/);
   assert.match(preloadSource, /prefers-reduced-motion: reduce/);
+});
+
+test("plugin panel documents use the compact global scrollbar contract", () => {
+  assert.match(preloadSource, /function installPluginScrollbarStyle\(\)/);
+  assert.match(
+    preloadSource,
+    /::-webkit-scrollbar\s*\{[\s\S]*?width: 6px;[\s\S]*?height: 6px;/,
+  );
+  assert.match(preloadSource, /::-webkit-scrollbar-track[\s\S]*?background: transparent/);
+  assert.match(preloadSource, /:focus-within::\-webkit-scrollbar-thumb/);
+  assert.match(preloadSource, /\[data-scrolling\]::\-webkit-scrollbar-thumb/);
+  assert.match(preloadSource, /document\.addEventListener\("scroll", onScroll/);
+  assert.match(preloadSource, /installPluginScrollbarStyle\(\);/);
 });
 
 test("paint-through panels let page content draw and receive pointer events", () => {

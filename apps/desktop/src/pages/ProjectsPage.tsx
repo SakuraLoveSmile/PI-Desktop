@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { ProjectRecord, SessionSummary } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
-import { Button, cx } from "../components/ui";
+import { Button, Tooltip, TooltipButton, cx } from "../components/ui";
 import {
   IconArchive,
   IconArchiveRestore,
@@ -18,6 +18,7 @@ import {
   IconPlus,
   IconSearch,
   IconStar,
+  IconSparkles,
   IconX,
 } from "../components/icons";
 import {
@@ -31,7 +32,9 @@ import {
   sessionMatchesProject,
 } from "../lib/sidebar-session-groups";
 import { ProjectInstructionsDialog } from "../components/ProjectInstructionsDialog";
+import { ProjectMemoryDialog } from "../components/ProjectMemoryDialog";
 import { ProjectRenameDialog, SessionRenameDialog } from "../components/SessionRenameDialog";
+import { AnchoredMenu } from "../components/settings/AnchoredMenu";
 
 const INITIAL_VISIBLE_SESSION_COUNT = 8;
 
@@ -125,9 +128,12 @@ export function ProjectsPage() {
     path: string;
     name: string;
   } | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const [instructionsFor, setInstructionsFor] = useState<{
+    name: string;
+    path: string;
+  } | null>(null);
+  const [memoryFor, setMemoryFor] = useState<{
     name: string;
     path: string;
   } | null>(null);
@@ -146,24 +152,6 @@ export function ProjectsPage() {
       canceled = true;
     };
   }, [sessions]);
-
-  // Row menus are popovers: Escape or any outside press dismisses them so a menu
-  // never outlives the row the pointer left.
-  useEffect(() => {
-    if (!menuFor) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuFor(null);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuFor(null);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [menuFor]);
 
   const items = useMemo(() => {
     const byPath = new Map<string, RecentProject>();
@@ -431,18 +419,18 @@ export function ProjectsPage() {
             autoCapitalize="off"
           />
           {searching ? (
-            <button
+            <TooltipButton
               type="button"
               className="projects-search-clear"
-              aria-label={t("project.clearSearch")}
-              title={t("project.clearSearch")}
+              tooltip={t("project.clearSearch")}
+              ariaLabel={t("project.clearSearch")}
               onClick={() => {
                 setQuery("");
                 searchRef.current?.focus();
               }}
             >
               <IconX size={12} />
-            </button>
+            </TooltipButton>
           ) : null}
         </div>
         {searching ? (
@@ -627,34 +615,42 @@ export function ProjectsPage() {
                         {formatUpdated(project.openedAt, locale, t("project.updatedNever"))}
                       </span>
                       <div className="projects-row-actions">
-                        <button
+                        <TooltipButton
                           type="button"
                           className="projects-icon-btn"
-                          aria-label={t("project.newTask")}
-                          title={t("project.newTask")}
+                          tooltip={t("project.newTask")}
+                          ariaLabel={t("project.newTask")}
                           onClick={() => void startTask(project.path)}
                         >
                           <IconPlus size={15} />
-                        </button>
-                        <div
+                        </TooltipButton>
+                        <AnchoredMenu
                           className="projects-menu-wrap"
-                          ref={menuOpen ? menuRef : undefined}
+                          open={menuOpen}
+                          onClose={() => setMenuFor(null)}
+                          menuClassName="projects-menu"
+                          label={t("project.openActions", { name: project.name })}
+                          role="menu"
+                          align="end"
+                          trigger={(ref) => (
+                            <TooltipButton
+                              ref={ref}
+                              type="button"
+                              className="projects-icon-btn"
+                              tooltip={t("project.openActions", { name: project.name })}
+                              ariaLabel={t("project.openActions", { name: project.name })}
+                              aria-haspopup="menu"
+                              aria-expanded={menuOpen}
+                              onClick={() =>
+                                setMenuFor((cur) =>
+                                  cur === project.path ? null : project.path,
+                                )
+                              }
+                            >
+                              <IconMore size={16} />
+                            </TooltipButton>
+                          )}
                         >
-                          <button
-                            type="button"
-                            className="projects-icon-btn"
-                            aria-label={t("project.openActions", { name: project.name })}
-                            title={t("project.openActions", { name: project.name })}
-                            aria-haspopup="menu"
-                            aria-expanded={menuOpen}
-                            onClick={() =>
-                              setMenuFor((cur) => (cur === project.path ? null : project.path))
-                            }
-                          >
-                            <IconMore size={16} />
-                          </button>
-                          {menuOpen ? (
-                            <div className="projects-menu" role="menu">
                               <button
                                 type="button"
                                 role="menuitem"
@@ -679,6 +675,20 @@ export function ProjectsPage() {
                               >
                                 <IconFileText size={14} />
                                 {t("project.editInstructions")}
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setMenuFor(null);
+                                  setMemoryFor({
+                                    name: project.name,
+                                    path: project.path,
+                                  });
+                                }}
+                              >
+                                <IconSparkles size={14} />
+                                {t("project.editMemory")}
                               </button>
                               <button
                                 type="button"
@@ -733,9 +743,7 @@ export function ProjectsPage() {
                                   {t("project.close")}
                                 </button>
                               ) : null}
-                            </div>
-                          ) : null}
-                        </div>
+                        </AnchoredMenu>
                       </div>
                     </div>
                     {isOpen ? (
@@ -785,15 +793,15 @@ export function ProjectsPage() {
                                       )}
                                     </span>
                                   </button>
-                                  <button
+                                  <TooltipButton
                                     type="button"
                                     className="projects-detail-task-rename"
-                                    aria-label={t("session.renameAction", { title })}
-                                    title={t("session.renameAction", { title })}
+                                    tooltip={t("session.renameAction", { title })}
+                                    ariaLabel={t("session.renameAction", { title })}
                                     onClick={() => setRenameFor(s)}
                                   >
                                     <IconPencil size={13} aria-hidden />
-                                  </button>
+                                  </TooltipButton>
                                 </div>
                               );
                             })}
@@ -843,6 +851,18 @@ export function ProjectsPage() {
           project={instructionsFor}
           onClose={() => setInstructionsFor(null)}
           onSaved={() => showToast(t("project.instructionsSaved"), { variant: "success" })}
+          onError={(error) =>
+            showToast(error instanceof Error ? error.message : String(error), {
+              variant: "error",
+            })
+          }
+        />
+      ) : null}
+      {memoryFor ? (
+        <ProjectMemoryDialog
+          project={memoryFor}
+          onClose={() => setMemoryFor(null)}
+          onSaved={() => showToast(t("project.memorySaved"), { variant: "success" })}
           onError={(error) =>
             showToast(error instanceof Error ? error.message : String(error), {
               variant: "error",

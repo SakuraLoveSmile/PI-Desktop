@@ -95,6 +95,13 @@ showing Name, Base URL, or API format on the named-service path. Chat turns
 still use the selected pi-ai adapter (`chat_completions`, `responses`,
 `anthropic_messages`, `google_generative_ai`, or `opencode_go`). Zhipu / Z.AI
 Completions requests use `thinkingFormat: "zai"` and `zaiToolStream: true`.
+DeepSeek-family Completions requests set
+`requiresReasoningContentOnAssistantMessages: true` when the row's `vendorKey`,
+base URL, model id, or catalog `family` identifies DeepSeek. pi-ai only
+auto-detects `provider === "deepseek"` or a `deepseek.com` URL, and PI-Desktop
+stores a UUID as `model.provider`, so aggregators and custom gateways would
+otherwise omit `reasoning_content` on assistant turns that produced no thinking.
+The overlay does not change `thinkingFormat`.
 
 ## 5. Built-in vendor matrix (ship intent)
 
@@ -333,7 +340,14 @@ the next provider write.
 makes the model available for AI-driven subagent delegation. When enabled, the
 model appears in the delegation catalog injected into the parent agent's system
 prompt. The parent agent can then select it via the Task tool's `model`
-parameter.
+parameter. Resolving a model for a definition pin does not imply this opt-in.
+The launch payload carries the permitted override keys separately as
+`subagentModelKeys`; definition-only bindings remain available solely through
+normal pin resolution, including when `Task.model` repeats that definition's
+own pin key. On-demand matching uses unique provider id/vendor/name lookup and
+must not overwrite a pin with another account's credentials. If vendor/model aliases collide across accounts, the
+opted-in account uses its exact provider ID as the override key. Selection priority remains Task.model → definition pin
+→ session model (D278; ADR subagent-model-opt-in).
 
 ## 8. Secrets
 
@@ -602,6 +616,19 @@ through the Responses adapter instead of Chat Completions. Without a
 model-level pin the provider-wide style applies unchanged.
 
 This is the **universal escape hatch** guaranteeing market coverage beyond native integrations.
+
+### 16.1 Responses stream termination (pi-ai patch)
+
+The OpenAI Responses adapter must treat `response.completed` (and
+`response.incomplete`) as the end of the stream: after finalizing the
+response, it stops consuming the stream instead of awaiting the server's
+TCP FIN. Upstream pi-ai keeps iterating until the server closes the
+connection, which hangs the turn behind reverse proxies that hold the idle
+connection open. Until the fix ships upstream, `patches/` carries a pnpm
+patch on `@earendil-works/pi-ai@0.85.1` that breaks the event loop on the
+terminal event (the OpenAI SDK aborts the underlying request when the
+consumer stops iterating). Drop the patch once a pi-ai release includes the
+fix.
 
 ## 17. Multi-provider product rules
 

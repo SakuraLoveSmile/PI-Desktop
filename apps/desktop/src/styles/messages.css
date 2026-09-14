@@ -1010,39 +1010,6 @@
   padding-inline: 5px;
 }
 
-/* 8px matches other floating layers (composer menus, autocomplete). A 5px
-   gap let the tooltip border sit on --ds-bg-hover (6% dark / 5% light) so
-   the label looked clipped (#74). The compact raised shadow stays inside
-   that gap; the composer's 20px glow would still wash over the chip. */
-.copy-btn[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  z-index: 8;
-  transform: translateX(-50%);
-  border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-sm);
-  background: var(--ds-bg-elevated-opaque);
-  box-shadow: var(--ds-raised-shadow);
-  padding: 3px 7px;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-2xs);
-  line-height: var(--leading-compact);
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.copy-btn[data-tip]:hover::after,
-.copy-btn[data-tip]:focus-visible::after {
-  opacity: 1;
-}
-
-.copy-btn[data-tip]:disabled::after {
-  content: none;
-}
 
 .message-meta {
   display: inline-flex;
@@ -1444,6 +1411,68 @@
   line-height: inherit;
 }
 
+.message-row.session-message .message-col {
+  width: min(100%, 720px);
+  max-width: 100%;
+  align-items: stretch;
+}
+
+.message-row.session-message .message-bubble {
+  background: var(--ds-bg-hover);
+  border-radius: var(--radius-md-plus);
+  color: var(--ds-text-primary);
+}
+
+.session-message-origin {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.session-message-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: var(--font-weight-medium);
+}
+
+.session-message-source {
+  padding: 2px 0;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ds-accent);
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.session-message-source:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.session-message-source:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.session-message-session-id {
+  flex-basis: 100%;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-compact);
+  overflow-wrap: anywhere;
+}
+
 .message-attachments {
   display: flex;
   max-width: 100%;
@@ -1482,16 +1511,15 @@
   min-width: 0;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--ds-border-subtle);
   border-radius: var(--radius-md);
   padding: 3px;
-  background: var(--ds-bg-secondary);
+  background: var(--ds-tile);
   cursor: pointer;
   overflow: hidden;
 }
 
 .message-attachment-image:hover {
-  border-color: var(--ds-border-default);
+  background: var(--ds-raised);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 18%, transparent);
 }
 
@@ -1988,6 +2016,31 @@
 .subagent-topology-node.outcome-aborted .subagent-topology-status-icon,
 .subagent-topology-node.outcome-denied .subagent-topology-status-icon {
   background: var(--ds-text-muted);
+}
+
+.subagent-topology-node.outcome-creating .subagent-topology-status-icon {
+  background: var(--ds-purple);
+  animation: subagent-creating-pulse 1.4s var(--motion-ease-standard) infinite;
+}
+
+.subagent-topology-node.outcome-creating .subagent-topology-node-status {
+  color: var(--ds-purple);
+}
+
+@keyframes subagent-creating-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subagent-topology-node.outcome-creating .subagent-topology-status-icon {
+    animation: none;
+  }
 }
 
 .subagent-topology-node-title-row {

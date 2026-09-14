@@ -5,11 +5,12 @@ import {
   useRef,
   useState,
   type AnimationEventHandler as ReactAnimationEventHandler,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { cx } from "./ui";
+import { TooltipButton, cx } from "./ui";
 
 // --- Time-based session grouping ---
 type TimeGroup = "today" | "yesterday" | "thisWeek" | "older14d" | "archived";
@@ -36,20 +37,28 @@ const MAX_VISIBLE_SESSIONS = 10;
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
+import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
+import { useSessionHoverCard } from "../features/sessions/useSessionHoverCard";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import { normalizeProjectPath } from "../lib/sidebar-session-groups";
+import {
+  composerDropItems,
+  hasComposerFileDrag,
+} from "../lib/composer-drop";
+import {
+  projectGroupKeyFromPoint,
+  projectReorderInsertAfter,
+  projectReorderShouldArm,
+  sameProjectReorderBucket,
+} from "../lib/sidebar-project-reorder";
 import {
   sidebarSessionStatus,
   type SidebarSessionStatus,
 } from "../lib/sidebar-session-status";
-import type {
-  Mode,
-  PermissionMode,
-  ProjectWorkspace,
-  SessionSummary,
-} from "@pi-desktop/shared";
+import type { SessionSummary } from "@pi-desktop/shared";
 import type {
   ProjectMeta,
+  ProjectSort,
   SessionMeta,
   SessionSort,
 } from "../lib/sidebar-preferences";
@@ -70,7 +79,6 @@ import {
   IconBranch,
   IconCheck,
   IconChevronDown,
-  IconClock,
   IconCopy,
   IconCircleAlert,
   IconNewSession,
@@ -97,28 +105,10 @@ type ProjectEntry = {
   branch?: string;
 };
 
-type ProjectPathTooltip = {
-  id: string;
-  path: string;
-  top: number;
-  left: number;
-};
-
-type SessionHoverCard = {
-  id: string;
-  top: number;
-  left: number;
-  title: string;
-  mode: Mode;
-  permissionMode: PermissionMode;
-  space: string;
-  branch?: string;
-  updatedAt: string;
-  temporary: boolean;
-};
-
 const VIEWPORT_PADDING = 8;
 const SIDEBAR_RESIZE_STEP = 16;
+/** Private MIME so a sidebar session drag is never mistaken for an OS file drop. */
+const SESSION_DRAG_MIME = "application/x-pi-desktop-session";
 
 type SidebarResizeState = {
   pointerId: number;
@@ -127,6 +117,23 @@ type SidebarResizeState = {
   currentWidth: number;
   frame: number;
   handle: HTMLDivElement;
+};
+
+type ProjectReorderPointerState = {
+  pointerId: number;
+  projectKey: string;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  armed: boolean;
+  dropKey: string | null;
+  dropTop: number;
+  dropHeight: number;
+  insertAfter: boolean;
+  onMove: (event: PointerEvent) => void;
+  onUp: (event: PointerEvent) => void;
+  onCancel: (event: PointerEvent) => void;
 };
 
 function clearSidebarResizeStyles(): void {
@@ -228,7 +235,7 @@ export function Sidebar({
   className?: string;
   onAnimationEnd?: ReactAnimationEventHandler<HTMLElement>;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const selectingSessionId = useAppStore((s) => s.selectingSessionId);
@@ -252,6 +259,7 @@ export function Sidebar({
   const newSession = useAppStore((s) => s.newSession);
   const forkSessionAction = useAppStore((s) => s.forkSession);
   const openProject = useAppStore((s) => s.openProject);
+  const refreshProject = useAppStore((s) => s.refreshProject);
   const clearProject = useAppStore((s) => s.clearProject);
   const activateProject = useAppStore((s) => s.activateProject);
   const closeProjectAction = useAppStore((s) => s.closeProject);
@@ -262,12 +270,14 @@ export function Sidebar({
   const renameSession = useAppStore((s) => s.renameSession);
   const deleteSessionAction = useAppStore((s) => s.deleteSession);
   const setSessionSort = useAppStore((s) => s.setSessionSort);
+  const moveSessionProject = useAppStore((s) => s.moveSessionProject);
   const setSessionArchiveVisibility = useAppStore((s) => s.setSessionArchiveVisibility);
   const toggleProjectPinned = useAppStore((s) => s.toggleProjectPinned);
   const archiveProjectAction = useAppStore((s) => s.archiveProject);
   const restoreProject = useAppStore((s) => s.restoreProject);
   const setProjectCollapsed = useAppStore((s) => s.setProjectCollapsed);
   const setProjectSort = useAppStore((s) => s.setProjectSort);
+  const reorderProjects = useAppStore((s) => s.reorderProjects);
   const showToast = useAppStore((s) => s.showToast);
   const version = useAppStore((s) => s.version);
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
@@ -284,16 +294,32 @@ export function Sidebar({
     top: number;
     left: number;
   } | null>(null);
-  const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
-  const [sessionHoverCard, setSessionHoverCard] = useState<SessionHoverCard | null>(null);
+  const {
+    card: sessionHoverCard,
+    show: revealSessionHoverCard,
+    hide: hideSessionHoverCard,
+    scheduleHide: scheduleSessionHoverCardHide,
+    keepVisible: keepSessionHoverCardVisible,
+  } = useSessionHoverCard();
   const [expandedProjectSessions, setExpandedProjectSessions] = useState<Record<string, boolean>>({});
+  const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
+  const [dropProjectKey, setDropProjectKey] = useState<string | null>(null);
+  const [projectsDropActive, setProjectsDropActive] = useState(false);
   const [sidebarResizing, setSidebarResizing] = useState(false);
+  const [draggingProjectKey, setDraggingProjectKey] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{ key: string; insertAfter: boolean } | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
-  const projectPathTimerRef = useRef<number | undefined>(undefined);
-  const sessionHoverTimerRef = useRef<number | undefined>(undefined);
   const sidebarResizeRef = useRef<SidebarResizeState | null>(null);
+  const projectReorderRef = useRef<ProjectReorderPointerState | null>(null);
+  const suppressProjectTitleClickRef = useRef(false);
+  const projectEntriesRef = useRef<ProjectEntry[]>([]);
+  const reorderProjectEntriesRef = useRef<(
+    sourceKey: string,
+    targetKey: string,
+    insertAfter: boolean,
+  ) => void>(() => {});
 
   const finishSidebarResize = useCallback((cancelled: boolean) => {
     const state = sidebarResizeRef.current;
@@ -397,8 +423,7 @@ export function Sidebar({
   const sessionSort = sessionView.sort;
   const displaySessionSort: Exclude<SessionSort, "manual"> =
     sessionSort === "manual" ? "recent" : sessionSort;
-  const displayProjectSort: Exclude<SessionSort, "manual"> =
-    projectSort === "manual" ? "recent" : projectSort;
+  const displayProjectSort: ProjectSort = projectSort;
   const activeProjectPath = normalizeProjectPath(activeProjectPathState ?? workspace?.path);
   const selectedSessionId = selectingSessionId ?? activeSessionId;
   const openProjectPaths = useMemo(
@@ -448,48 +473,19 @@ export function Sidebar({
       setSortOpen(false);
       setProjectMenu(null);
       setSectionMenu(null);
-      window.clearTimeout(sessionHoverTimerRef.current);
-      setSessionHoverCard(null);
+      hideSessionHoverCard();
       setSessionMenu(sessionId);
     },
-    [],
+    [hideSessionHoverCard],
   );
 
   const openProjectRowMenu = useCallback(
     (projectKey: string, trigger: HTMLButtonElement | null) => {
       menuTriggerRef.current = trigger;
-      window.clearTimeout(projectPathTimerRef.current);
-      setProjectPathTooltip(null);
       setSortOpen(false);
       setSessionMenu(null);
       setSectionMenu(null);
       setProjectMenu(projectKey);
-    },
-    [],
-  );
-
-  // Match WorkBuddy's hover-card cadence: half a second is long enough for
-  // the pointer to settle on the row, but short enough that a deliberate
-  // hover does not feel sluggish.
-  const PROJECT_PATH_HOVER_DELAY_MS = 500;
-
-  const showProjectPath = useCallback(
-    (entry: ProjectEntry, target: HTMLButtonElement) => {
-      // Clear any pending timer so back-to-back hovers don't flash the card.
-      window.clearTimeout(projectPathTimerRef.current);
-      projectPathTimerRef.current = window.setTimeout(() => {
-        const rect = target.getBoundingClientRect();
-        const tooltipWidth = Math.min(420, window.innerWidth - 16);
-        setProjectPathTooltip({
-          id: `${projectDomId(entry.key)}-path-tooltip`,
-          path: entry.path,
-          top:
-            rect.bottom + 48 <= window.innerHeight
-              ? rect.bottom + 6
-              : Math.max(8, rect.top - 42),
-          left: Math.max(8, Math.min(rect.left, window.innerWidth - tooltipWidth - 8)),
-        });
-      }, PROJECT_PATH_HOVER_DELAY_MS);
     },
     [],
   );
@@ -536,44 +532,6 @@ export function Sidebar({
     if (!sessionMenu && !projectMenu && !sectionMenu && !sortOpen) return;
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
   }, [sessionMenu, projectMenu, sectionMenu, sortOpen]);
-
-  useEffect(() => {
-    if (!projectPathTooltip) return;
-    const hideTooltip = () => {
-      window.clearTimeout(projectPathTimerRef.current);
-      setProjectPathTooltip(null);
-    };
-    window.addEventListener("resize", hideTooltip);
-    return () => window.removeEventListener("resize", hideTooltip);
-  }, [projectPathTooltip]);
-
-  useEffect(() => {
-    if (!sessionHoverCard) return;
-    const hide = () => {
-      window.clearTimeout(sessionHoverTimerRef.current);
-      setSessionHoverCard(null);
-    };
-    window.addEventListener("resize", hide);
-    return () => window.removeEventListener("resize", hide);
-  }, [sessionHoverCard]);
-
-  // Cancel any pending session hover-card reveal when the sidebar scrolls;
-  // mirrors the project path tooltip behavior so the cards never anchor to a
-  // row that has scrolled out from under the cursor.
-  useEffect(() => {
-    if (!sessionHoverCard) return;
-    let frame = 0;
-    const onScroll = () => {
-      window.clearTimeout(sessionHoverTimerRef.current);
-      if (!sessionHoverCard) return;
-      frame = window.requestAnimationFrame(() => setSessionHoverCard(null));
-    };
-    window.addEventListener("scroll", onScroll, true);
-    return () => {
-      window.removeEventListener("scroll", onScroll, true);
-      window.cancelAnimationFrame(frame);
-    };
-  }, [sessionHoverCard]);
 
   // Footer utility bar: settings / plugins / notifications + build chip.
 
@@ -720,7 +678,12 @@ export function Sidebar({
       if (archiveOrder !== 0) return archiveOrder;
       const pinOrder = Number(!!b.meta.pinned) - Number(!!a.meta.pinned);
       if (pinOrder !== 0) return pinOrder;
-      if (displayProjectSort === "name") {
+      if (displayProjectSort === "manual") {
+        const byOrder =
+          (a.meta.order ?? Number.MAX_SAFE_INTEGER) -
+          (b.meta.order ?? Number.MAX_SAFE_INTEGER);
+        if (byOrder !== 0) return byOrder;
+      } else if (displayProjectSort === "name") {
         const byName = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
         if (byName !== 0) return byName;
       } else if (
@@ -763,84 +726,192 @@ export function Sidebar({
   // workspace name (and any other project metadata) for the hover card.
   const projectEntriesByPath = useMemo(() => {
     const map = new Map<string, ProjectEntry>();
-    for (const entry of projectEntries) map.set(entry.path, entry);
+    for (const entry of projectEntries) map.set(entry.key, entry);
     return map;
   }, [projectEntries]);
 
-  // Locale-aware absolute timestamp matching the WorkBuddy card shape:
-  // "2026-09-04 14:11:53" in zh-CN, "Sep 4, 2026, 2:11 PM" in en-US.
-  const formatHoverCardTimestamp = useCallback(
-    (value: string | undefined): string => {
-      if (!value) return "—";
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) return value;
-      try {
-        const locale = i18n.language || undefined;
-        const usesAbsoluteDateTime =
-          (locale || "").toLowerCase().startsWith("zh");
-        const fmt = new Intl.DateTimeFormat(locale, {
-          year: "numeric",
-          month: usesAbsoluteDateTime ? "2-digit" : "short",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: !usesAbsoluteDateTime,
-        });
-        return fmt.format(parsed);
-      } catch {
-        return parsed.toLocaleString();
-      }
-    },
-    [i18n],
-  );
+  projectEntriesRef.current = projectEntries;
 
-  const hideSessionHoverCard = useCallback(() => {
-    window.clearTimeout(sessionHoverTimerRef.current);
-    setSessionHoverCard(null);
+  const finishProjectReorderPress = useCallback((opts?: { keepClickSuppressed?: boolean }) => {
+    const state = projectReorderRef.current;
+    if (state) {
+      window.removeEventListener("pointermove", state.onMove, true);
+      window.removeEventListener("pointerup", state.onUp, true);
+      window.removeEventListener("pointercancel", state.onCancel, true);
+      projectReorderRef.current = null;
+    }
+    if (!opts?.keepClickSuppressed) suppressProjectTitleClickRef.current = false;
+    setDraggingProjectKey(null);
+    setDropIndicator(null);
+    document.documentElement.removeAttribute("data-project-reordering");
   }, []);
 
-  const showSessionHoverCard = useCallback(
-    (
-      session: SessionSummary,
-      target: HTMLElement,
-      temporary: boolean,
-    ) => {
-      // Clear any pending timer so back-to-back hovers don't flash the card.
-      window.clearTimeout(sessionHoverTimerRef.current);
-      sessionHoverTimerRef.current = window.setTimeout(() => {
-        // Skip if the row was torn down while we were waiting (project
-        // closed, list filtered, etc.) — nothing meaningful to point at.
-        if (!target.isConnected) return;
-        const rect = target.getBoundingClientRect();
-        const cardWidth = Math.min(320, window.innerWidth - 16);
-        const cardHeight = 168; // estimated; used for flip-below detection
-        const wantBelow = rect.bottom + cardHeight <= window.innerHeight;
-        const spaceEntry = temporary
-          ? null
-          : projectEntriesByPath.get(session.projectPath ?? "");
-        const spaceName = temporary
-          ? t("nav.hoverCardTemporarySpace")
-          : (spaceEntry?.name ?? projectName(session.projectPath ?? ""));
-        setSessionHoverCard({
-          id: `session-hover-${session.id}`,
-          top: wantBelow ? rect.bottom + 6 : Math.max(8, rect.top - cardHeight - 6),
-          left: Math.max(
-            8,
-            Math.min(rect.left, window.innerWidth - cardWidth - 8),
-          ),
-          title: taskTitle(session.title),
-          mode: session.mode,
-          permissionMode: session.permissionMode,
-          space: spaceName,
-          branch: spaceEntry?.branch,
-          updatedAt: formatHoverCardTimestamp(session.updatedAt),
-          temporary,
-        });
-      }, PROJECT_PATH_HOVER_DELAY_MS);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (!projectReorderRef.current) return;
+      event.preventDefault();
+      finishProjectReorderPress();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      finishProjectReorderPress();
+    };
+  }, [finishProjectReorderPress]);
+
+  const reorderProjectEntries = useCallback(
+    (sourceKey: string, targetKey: string, insertAfter: boolean) => {
+      if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+      const keys = projectEntries.map((entry) => entry.key);
+      const sourceIndex = keys.indexOf(sourceKey);
+      const targetIndex = keys.indexOf(targetKey);
+      if (sourceIndex < 0 || targetIndex < 0) return;
+      const source = projectEntries[sourceIndex];
+      const target = projectEntries[targetIndex];
+      if (!sameProjectReorderBucket(source.meta, target.meta)) {
+        return;
+      }
+      keys.splice(sourceIndex, 1);
+      const nextTargetIndex = keys.indexOf(targetKey) + (insertAfter ? 1 : 0);
+      keys.splice(nextTargetIndex, 0, sourceKey);
+      reorderProjects(keys);
     },
-    [projectEntriesByPath, t, taskTitle, formatHoverCardTimestamp],
+    [projectEntries, reorderProjects],
   );
+  reorderProjectEntriesRef.current = reorderProjectEntries;
+
+  const beginProjectReorderPress = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>, projectKey: string) => {
+      if (event.button !== 0 || event.pointerType === "touch" || projectReorderRef.current) {
+        return;
+      }
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const current = projectReorderRef.current;
+        if (!current || current.pointerId !== moveEvent.pointerId) return;
+        current.lastX = moveEvent.clientX;
+        current.lastY = moveEvent.clientY;
+        if (!current.armed) {
+          if (
+            !projectReorderShouldArm(
+              moveEvent.clientX - current.startX,
+              moveEvent.clientY - current.startY,
+            )
+          ) {
+            return;
+          }
+          current.armed = true;
+          suppressProjectTitleClickRef.current = true;
+          document.documentElement.setAttribute("data-project-reordering", "true");
+          setDraggingProjectKey(current.projectKey);
+        }
+        moveEvent.preventDefault();
+        const target = projectGroupKeyFromPoint(moveEvent.clientX, moveEvent.clientY);
+        const source = projectEntriesRef.current.find((entry) => entry.key === current.projectKey);
+        const destination = target
+          ? projectEntriesRef.current.find((entry) => entry.key === target.key)
+          : undefined;
+        if (
+          target &&
+          source &&
+          destination &&
+          target.key !== current.projectKey &&
+          sameProjectReorderBucket(source.meta, destination.meta)
+        ) {
+          const insertAfter = projectReorderInsertAfter(
+            moveEvent.clientY,
+            target.top,
+            target.height,
+          );
+          current.dropKey = target.key;
+          current.dropTop = target.top;
+          current.dropHeight = target.height;
+          current.insertAfter = insertAfter;
+          setDropIndicator({ key: target.key, insertAfter });
+        } else {
+          current.dropKey = null;
+          setDropIndicator(null);
+        }
+      };
+
+      const onUp = (upEvent: PointerEvent) => {
+        const current = projectReorderRef.current;
+        if (!current || current.pointerId !== upEvent.pointerId) return;
+        if (current.armed) {
+          upEvent.preventDefault();
+          if (current.dropKey) {
+            reorderProjectEntriesRef.current(
+              current.projectKey,
+              current.dropKey,
+              current.insertAfter,
+            );
+          }
+          finishProjectReorderPress({ keepClickSuppressed: true });
+          return;
+        }
+        finishProjectReorderPress();
+      };
+
+      const onCancel = (cancelEvent: PointerEvent) => {
+        const current = projectReorderRef.current;
+        if (!current || current.pointerId !== cancelEvent.pointerId) return;
+        finishProjectReorderPress();
+      };
+
+      const state: ProjectReorderPointerState = {
+        pointerId: event.pointerId,
+        projectKey,
+        startX: event.clientX,
+        startY: event.clientY,
+        lastX: event.clientX,
+        lastY: event.clientY,
+        armed: false,
+        dropKey: null,
+        dropTop: 0,
+        dropHeight: 0,
+        insertAfter: false,
+        onMove,
+        onUp,
+        onCancel,
+      };
+      projectReorderRef.current = state;
+      window.addEventListener("pointermove", onMove, true);
+      window.addEventListener("pointerup", onUp, true);
+      window.addEventListener("pointercancel", onCancel, true);
+    },
+    [finishProjectReorderPress],
+  );
+
+  const moveProjectWithKeyboard = useCallback(
+    (event: ReactKeyboardEvent<HTMLButtonElement>, projectKey: string) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      const index = projectEntries.findIndex((entry) => entry.key === projectKey);
+      const target = projectEntries[index + (event.key === "ArrowUp" ? -1 : 1)];
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+      reorderProjectEntries(projectKey, target.key, event.key === "ArrowDown");
+    },
+    [projectEntries, reorderProjectEntries],
+  );
+
+  const showSessionHoverCard = useCallback((
+    session: SessionSummary,
+    target: HTMLElement,
+    temporary: boolean,
+  ) => {
+    const projectPath = session.projectPath ?? "";
+    const normalizedProjectPath = normalizeProjectPath(projectPath);
+    const entry = projectEntriesByPath.get(normalizedProjectPath ?? "");
+    revealSessionHoverCard({
+      session: { ...session, title: taskTitle(session.title) },
+      target,
+      temporary,
+      space: temporary ? t("nav.hoverCardTemporarySpace") : entry?.name ?? projectName(projectPath),
+      branch: entry?.branch,
+    });
+  }, [projectEntriesByPath, revealSessionHoverCard, t, taskTitle]);
 
   const temporarySessions = useMemo(
     () => filtered
@@ -936,6 +1007,29 @@ export function Sidebar({
     window.clearTimeout(sessionPrefetchTimerRef.current);
     sessionPrefetchTimerRef.current = undefined;
   };
+
+  const openSessionFromHover = useCallback(async (sessionId: string) => {
+    cancelSessionPrefetch();
+    hideSessionHoverCard();
+    try {
+      // A dead reference must fail visibly instead of selecting an empty chat.
+      // The store's session list is the cheapest complete existence signal; an
+      // unknown id still gets one detail read so a stale list cannot block a
+      // session that really exists.
+      const known = useAppStore.getState().sessions.some((session) => session.id === sessionId);
+      if (!known) {
+        const detail = await api.getSession(sessionId);
+        if (!detail.session) {
+          reportError(new Error(t("sessionCollaboration.sessionMissing")));
+          return;
+        }
+      }
+      await selectSession(sessionId);
+      focusComposer();
+    } catch (error) {
+      reportError(error);
+    }
+  }, [focusComposer, hideSessionHoverCard, reportError, selectSession, t]);
 
   useEffect(() => cancelSessionPrefetch, []);
 
@@ -1152,6 +1246,169 @@ export function Sidebar({
     }
   };
 
+  const moveSessionToProject = useCallback(
+    async (sessionId: string, projectPath: string, projectName: string) => {
+      // A running turn owns the current project's instructions, tools, and
+      // working directory; the host rejects the move as well.
+      if (runningSessions[sessionId]) {
+        showToast(
+          t("nav.moveRunningSessionBlocked", {
+            defaultValue: "Stop the running session before moving it.",
+          }),
+          { variant: "warning" },
+        );
+        return;
+      }
+      try {
+        const moved = await moveSessionProject(sessionId, projectPath);
+        if (!moved) {
+          showToast(
+            t("nav.moveSessionUnavailable", {
+              defaultValue: "This session cannot move to that project.",
+            }),
+            { variant: "warning" },
+          );
+          return;
+        }
+        showToast(
+          t("nav.sessionMoved", {
+            name: projectName,
+            defaultValue: "Moved to " + projectName,
+          }),
+          { variant: "success" },
+        );
+      } catch (error) {
+        reportError(error);
+      }
+    },
+    [moveSessionProject, reportError, runningSessions, showToast, t],
+  );
+
+  const beginSessionDrag = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>, sessionId: string) => {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData(SESSION_DRAG_MIME, sessionId);
+      event.dataTransfer.setData("text/plain", sessionId);
+      setDraggingSessionId(sessionId);
+    },
+    [],
+  );
+
+  const endSessionDrag = useCallback(() => {
+    setDraggingSessionId(null);
+    setDropProjectKey(null);
+  }, []);
+
+  // A dragged row can unmount before its own `dragend` fires (sort refresh,
+  // archive, delete), which would otherwise leave the drag session and the
+  // group highlight active for the next, unrelated drag.
+  useEffect(() => {
+    if (!draggingSessionId) return;
+    const clearDragState = () => {
+      setDraggingSessionId(null);
+      setDropProjectKey(null);
+    };
+    window.addEventListener("dragend", clearDragState);
+    window.addEventListener("drop", clearDragState, true);
+    return () => {
+      window.removeEventListener("dragend", clearDragState);
+      window.removeEventListener("drop", clearDragState, true);
+    };
+  }, [draggingSessionId]);
+
+  const sessionIdFromDrag = (dataTransfer: DataTransfer): string | null => {
+    try {
+      return dataTransfer.getData(SESSION_DRAG_MIME) || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const sessionIdForDragOver = (
+    dataTransfer: DataTransfer,
+    localSessionId: string | null,
+  ): string | null => {
+    if (!Array.from(dataTransfer.types).includes(SESSION_DRAG_MIME)) return null;
+    return sessionIdFromDrag(dataTransfer) ?? localSessionId;
+  };
+
+  // A project group accepts a session row from another group. The current
+  // group is not a drop target so a drag within one project is a no-op.
+  const onProjectDropTargetOver = (
+    event: ReactDragEvent<HTMLElement>,
+    entry: ProjectEntry,
+  ) => {
+    const sessionId = sessionIdForDragOver(event.dataTransfer, draggingSessionId);
+    if (!sessionId) return;
+    const dragged = sessions.find((item) => item.id === sessionId);
+    if (!dragged || normalizeProjectPath(dragged.projectPath) === entry.key) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropProjectKey(entry.key);
+  };
+
+  const onProjectDropTargetLeave = (entry: ProjectEntry) => {
+    setDropProjectKey((current) => (current === entry.key ? null : current));
+  };
+
+  const onProjectDropTargetDrop = (
+    event: ReactDragEvent<HTMLElement>,
+    entry: ProjectEntry,
+  ) => {
+    // The transfer payload is authoritative: a stale dragging id must never
+    // move a session the user did not drag.
+    const sessionId = sessionIdFromDrag(event.dataTransfer);
+    setDraggingSessionId(null);
+    setDropProjectKey(null);
+    const dragged = sessionId
+      ? sessions.find((item) => item.id === sessionId)
+      : undefined;
+    // Without a session payload this is a native folder drop for the projects
+    // list, which the container handles.
+    if (!dragged) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void moveSessionToProject(dragged.id, entry.path, entry.name);
+  };
+
+  // Native folder drops on the projects list add or switch to that project.
+  const onProjectsAreaDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!hasComposerFileDrag(event.dataTransfer)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setProjectsDropActive(true);
+  };
+
+  const onProjectsAreaDragLeave = (event: ReactDragEvent<HTMLDivElement>) => {
+    const related = event.relatedTarget;
+    if (related instanceof Node && event.currentTarget.contains(related)) return;
+    setProjectsDropActive(false);
+  };
+
+  const onProjectsAreaDrop = async (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!hasComposerFileDrag(event.dataTransfer)) return;
+    event.preventDefault();
+    setProjectsDropActive(false);
+    const directories = composerDropItems(event.dataTransfer, api.getDroppedFilePath)
+      .filter((item) => item.isDirectory && item.path);
+    if (!directories.length) {
+      showToast(
+        t("nav.dropFolderToAddProject", {
+          defaultValue: "Drop a folder to add it as a project.",
+        }),
+        { variant: "warning" },
+      );
+      return;
+    }
+    for (const directory of directories) {
+      try {
+        await activateProject(directory.path!);
+      } catch (error) {
+        reportError(error);
+      }
+    }
+  };
+
   const renderSessionRows = (
     items: SessionSummary[],
     options?: { temporary?: boolean; projectPath?: string },
@@ -1170,8 +1427,17 @@ export function Sidebar({
     return (
       <div
         key={session.id}
-        className={`thread-item ${active ? "active" : ""} ${archived ? "archived" : ""}`}
+        className={`thread-item ${active ? "active" : ""} ${archived ? "archived" : ""} ${draggingSessionId === session.id ? "is-dragging" : ""}`}
         data-sidebar-session-row={session.id}
+        draggable={!running}
+        onDragStart={(event) => {
+          if (running) {
+            event.preventDefault();
+            return;
+          }
+          beginSessionDrag(event, session.id);
+        }}
+        onDragEnd={endSessionDrag}
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1194,11 +1460,11 @@ export function Sidebar({
           onMouseEnter={(event) =>
             showSessionHoverCard(session, event.currentTarget, options?.temporary ?? false)
           }
-          onMouseLeave={hideSessionHoverCard}
+          onMouseLeave={scheduleSessionHoverCardHide}
           onFocusCapture={(event) =>
             showSessionHoverCard(session, event.currentTarget, options?.temporary ?? false)
           }
-          onBlur={hideSessionHoverCard}
+          onBlur={scheduleSessionHoverCardHide}
           onClick={() => {
             cancelSessionPrefetch();
             hideSessionHoverCard();
@@ -1207,6 +1473,7 @@ export function Sidebar({
               : selectProjectSession(session));
           }}
           aria-current={active ? "page" : undefined}
+          aria-describedby={sessionHoverCard?.session.id === session.id ? `session-hover-${session.id}` : undefined}
         >
           {sessionPinned(session, meta) ? (
             <IconPin size={11} className="thread-item-pin" aria-hidden />
@@ -1214,11 +1481,12 @@ export function Sidebar({
           <span className="thread-item-title">{taskTitle(session.title)}</span>
         </button>
         <div className="sidebar-row-actions">
-          <button
+          <TooltipButton
             type="button"
             className="thread-item-more"
             data-action="session-menu"
-            aria-label={t("nav.sessionActions", { defaultValue: "Session actions" })}
+            tooltip={t("nav.sessionActions", { defaultValue: "Session actions" })}
+            ariaLabel={t("nav.sessionActions", { defaultValue: "Session actions" })}
             aria-haspopup="menu"
             aria-expanded={sessionMenu === session.id}
             onClick={(event) => {
@@ -1232,7 +1500,7 @@ export function Sidebar({
             }}
           >
             <IconMore size={14} />
-          </button>
+          </TooltipButton>
         </div>
       </div>
     );
@@ -1299,13 +1567,31 @@ export function Sidebar({
     return (
       <section
         key={entry.key}
-        className={`sidebar-session-group project-group ${entry.active ? "active" : ""} ${entry.meta.archived ? "archived" : ""}`}
+        className={`sidebar-session-group project-group ${entry.active ? "active" : ""} ${entry.meta.archived ? "archived" : ""} ${dropProjectKey === entry.key ? "is-drop-target" : ""} ${draggingProjectKey === entry.key ? "is-dragging" : ""} ${dropIndicator?.key === entry.key ? (dropIndicator.insertAfter ? "is-drop-after" : "is-drop-before") : ""}`}
         aria-labelledby={projectId}
         data-sidebar-project-group={entry.key}
+        onDragOver={(event) => {
+          onProjectDropTargetOver(event, entry);
+        }}
+        onDragLeave={(event) => {
+          const relatedTarget = event.relatedTarget;
+          if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
+            return;
+          }
+          onProjectDropTargetLeave(entry);
+        }}
+        onDrop={(event) => {
+          onProjectDropTargetDrop(event, entry);
+        }}
       >
         <div
           className="sidebar-session-group-header"
           onContextMenu={(event) => {
+            if (projectReorderRef.current) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
             event.preventDefault();
             event.stopPropagation();
             placeMenuAtPoint(event.clientX, event.clientY);
@@ -1317,29 +1603,33 @@ export function Sidebar({
             );
           }}
         >
-          <button
+          <TooltipButton
             type="button"
             id={projectId}
             className="sidebar-session-group-title project-toggle"
-            aria-label={entry.name}
+            tooltip={entry.path}
+            tooltipDelayMs={500}
+            tooltipClassName="ui-tooltip-path"
+            ariaLabel={entry.name}
             aria-describedby={`${projectId}-path-description`}
             aria-expanded={!collapsedProject}
             aria-controls={`${projectId}-sessions`}
+            aria-keyshortcuts="ArrowUp ArrowDown"
+            aria-grabbed={draggingProjectKey === entry.key}
             data-action="toggle-project-collapse"
-            onMouseEnter={(event) => showProjectPath(entry, event.currentTarget)}
-            onMouseLeave={() => {
-              window.clearTimeout(projectPathTimerRef.current);
-              setProjectPathTooltip(null);
+            onDragStart={(event) => event.preventDefault()}
+            onPointerDown={(event) => beginProjectReorderPress(event, entry.key)}
+            onKeyDown={(event) => moveProjectWithKeyboard(event, entry.key)}
+            onClick={() => {
+              if (suppressProjectTitleClickRef.current) {
+                suppressProjectTitleClickRef.current = false;
+                return;
+              }
+              void (async () => {
+                if (!entry.active && !(await selectProject(entry.path))) return;
+                setCollapsed(entry.path, !collapsedProject);
+              })();
             }}
-            onFocus={(event) => showProjectPath(entry, event.currentTarget)}
-            onBlur={() => {
-              window.clearTimeout(projectPathTimerRef.current);
-              setProjectPathTooltip(null);
-            }}
-            onClick={() => void (async () => {
-              if (!entry.active && !(await selectProject(entry.path))) return;
-              setCollapsed(entry.path, !collapsedProject);
-            })()}
           >
             <IconChevronDown
               size={13}
@@ -1357,15 +1647,18 @@ export function Sidebar({
             )}
             <span>{entry.name}</span>
             {entry.active ? <span className="sidebar-project-active-dot" aria-label={t("project.active", { defaultValue: "Active" })} /> : null}
-          </button>
+          </TooltipButton>
           <span id={`${projectId}-path-description`} className="sr-only">
             {entry.path}
+            {". "}
+            {t("project.reorder", { name: entry.name, defaultValue: "Reorder {{name}}" })}
           </span>
           <div className="sidebar-menu-wrap">
-            <button
+            <TooltipButton
               type="button"
               className="thread-item-more project-more"
-              aria-label={t("project.openActions", { name: entry.name })}
+              tooltip={t("project.openActions", { name: entry.name })}
+              ariaLabel={t("project.openActions", { name: entry.name })}
               aria-haspopup="menu"
               aria-expanded={isMenuOpen}
               onClick={(event) => {
@@ -1379,17 +1672,17 @@ export function Sidebar({
               }}
             >
               <IconMore size={14} />
-            </button>
+            </TooltipButton>
           </div>
-          <button
+          <TooltipButton
             type="button"
             className="sidebar-session-group-add"
-            title={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
-            aria-label={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
+            tooltip={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
+            ariaLabel={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
             onClick={() => void createProjectSession(entry.path)}
           >
             <IconNewSession size={13} />
-          </button>
+          </TooltipButton>
         </div>
         <div
           id={`${projectId}-sessions`}
@@ -1586,23 +1879,6 @@ export function Sidebar({
               ref={menuFirstItemRef}
               type="button"
               role="menuitem"
-              onClick={() =>
-                void selectProject(entry.path).then((ok) => {
-                  if (ok) {
-                    closeMenus(false);
-                    focusComposer();
-                  }
-                })
-              }
-            >
-              <IconFolder size={14} />
-              {entry.active
-                ? t("project.active", { defaultValue: "Active" })
-                : t("project.switch", { defaultValue: "Switch" })}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
               data-action="open-project-folder"
               onClick={() => void openProjectFolder(entry)}
             >
@@ -1662,129 +1938,39 @@ export function Sidebar({
     );
   };
 
-  const renderProjectPathTooltip = () => {
-    if (!projectPathTooltip || typeof document === "undefined") return null;
-    return createPortal(
-      <div
-        id={projectPathTooltip.id}
-        className="sidebar-project-path-tooltip"
-        role="tooltip"
-        style={{ top: projectPathTooltip.top, left: projectPathTooltip.left }}
-      >
-        {projectPathTooltip.path}
-      </div>,
-      document.body,
-    );
-  };
-
-  // Map a session mode to the secondary tag label. We only show one tag in
-  // addition to the always-on "Local task" badge so the row stays compact.
-  const modeTagLabel = (mode: Mode, permission: PermissionMode): string => {
-    if (mode === "plan") return t("chat.modePlan");
-    if (mode === "goal") return t("chat.modeGoal");
-    if (permission === "auto") return t("chat.permissionAuto");
-    if (permission === "accept-edits") return t("chat.permissionAcceptEdits");
-    if (permission === "ask") return t("chat.permissionAsk");
-    return t("chat.modeAgent");
-  };
-
-  const renderSessionHoverCard = () => {
-    if (!sessionHoverCard || typeof document === "undefined") return null;
-    return createPortal(
-      <div
-        id={sessionHoverCard.id}
-        className="sidebar-session-hover-card"
-        role="tooltip"
-        style={{ top: sessionHoverCard.top, left: sessionHoverCard.left }}
-      >
-        <div className="sidebar-session-hover-card-title">
-          {sessionHoverCard.title}
-        </div>
-        <div className="sidebar-session-hover-card-tags">
-          <span className="sidebar-session-hover-card-tag">
-            <IconBranch size={12} aria-hidden />
-            {t("nav.hoverCardLocalTask")}
-          </span>
-          <span className="sidebar-session-hover-card-tag sidebar-session-hover-card-tag-accent">
-            {modeTagLabel(sessionHoverCard.mode, sessionHoverCard.permissionMode)}
-          </span>
-        </div>
-        <div className="sidebar-session-hover-card-meta">
-          <div className="sidebar-session-hover-card-meta-row">
-            <span className="sidebar-session-hover-card-meta-icon" aria-hidden>
-              <IconFolder size={12} />
-            </span>
-            <span className="sidebar-session-hover-card-meta-label">
-              {t("nav.hoverCardSpace")}
-            </span>
-            <span className="sidebar-session-hover-card-meta-value">
-              {sessionHoverCard.space}
-            </span>
-          </div>
-          {sessionHoverCard.branch ? (
-            <div className="sidebar-session-hover-card-meta-row">
-              <span className="sidebar-session-hover-card-meta-icon" aria-hidden>
-                <IconBranch size={12} />
-              </span>
-              <span
-                className="sidebar-session-hover-card-meta-value"
-                aria-label={t("nav.hoverCardBranchAria", {
-                  name: sessionHoverCard.branch,
-                })}
-              >
-                {sessionHoverCard.branch}
-              </span>
-            </div>
-          ) : null}
-          <div className="sidebar-session-hover-card-meta-row">
-            <span className="sidebar-session-hover-card-meta-icon" aria-hidden>
-              <IconClock size={12} />
-            </span>
-            <span className="sidebar-session-hover-card-meta-label">
-              {t("nav.hoverCardUpdatedAt", {
-                when: sessionHoverCard.updatedAt,
-              })}
-            </span>
-          </div>
-        </div>
-      </div>,
-      document.body,
-    );
-  };
-
   return (
     <aside
       className={cx("sidebar", className)}
       onAnimationEnd={onAnimationEnd}
     >
       <div className="sidebar-header">
-        <button
+        <TooltipButton
           type="button"
           className="brand no-drag"
           data-nav="home"
-          title={t("nav.home")}
-          aria-label={t("nav.home")}
+          tooltip={t("nav.home")}
+          ariaLabel={t("nav.home")}
           onClick={() => setPage("chat")}
         >
           <BrandLogo size={20} />
           <span>{t("app.shellName")}</span>
-        </button>
+        </TooltipButton>
         <div className="sidebar-header-actions no-drag">
-          <button
+          <TooltipButton
             type="button"
             className="icon-btn"
-            title={
+            tooltip={
               sidebarToggleShortcut
                 ? `${t("nav.collapseSidebar")} (${sidebarToggleShortcut})`
                 : t("nav.collapseSidebar")
             }
-            aria-label={t("nav.collapseSidebar")}
+            ariaLabel={t("nav.collapseSidebar")}
             aria-expanded={true}
             data-nav="toggle-sidebar"
             onClick={onToggleSidebar}
           >
             <IconSidebar size={15} />
-          </button>
+          </TooltipButton>
         </div>
       </div>
 
@@ -1813,11 +1999,12 @@ export function Sidebar({
             </span>
             <div className="sidebar-toolbar-actions">
               <div className="sidebar-menu-wrap">
-                <button
+                <TooltipButton
                   type="button"
                   className={`sidebar-toolbar-button ${sortOpen ? "active" : ""}`}
                   data-action="session-sort"
-                  aria-label={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
+                  ariaLabel={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
+                  tooltip={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
                   aria-haspopup="menu"
                   aria-expanded={sortOpen}
                   onClick={(event) => {
@@ -1834,25 +2021,23 @@ export function Sidebar({
                   }}
                 >
                   <IconArrowUpDown size={14} />
-                </button>
+                </TooltipButton>
               </div>
-              <button
+              <TooltipButton
                 type="button"
                 className="sidebar-toolbar-button"
                 data-action="new-standalone-session"
-                title={t("nav.newTemporarySession")}
-                aria-label={t("nav.newTemporarySession")}
+                tooltip={t("nav.newTemporarySession")}
+                ariaLabel={t("nav.newTemporarySession")}
                 onClick={() => void createSession({ projectPath: null })}
               >
                 <IconNewSession size={14} />
-              </button>
+              </TooltipButton>
             </div>
           </div>
           <div
             className="sidebar-session-group-body standalone"
             onScroll={() => {
-              window.clearTimeout(projectPathTimerRef.current);
-              setProjectPathTooltip(null);
               if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
             }}
             onContextMenu={(event) => {
@@ -1881,23 +2066,21 @@ export function Sidebar({
           }}
         >
           <span className="sidebar-list-label">{t("nav.projects")}</span>
-          <button
+          <TooltipButton
             type="button"
             className="sidebar-toolbar-button"
             data-action="new-project"
-            title={t("nav.newProject")}
-            aria-label={t("nav.newProject")}
+            tooltip={t("nav.newProject")}
+            ariaLabel={t("nav.newProject")}
             onClick={() => void openProjectPicker()}
           >
             <IconNewProject size={14} />
-          </button>
+          </TooltipButton>
         </div>
 
         <div
-          className="sidebar-session-groups min-h-0 flex-1 overflow-auto px-0.5"
+          className={`sidebar-session-groups min-h-0 flex-1 overflow-auto px-0.5 ${projectsDropActive ? "is-drop-target" : ""}`}
           onScroll={() => {
-            window.clearTimeout(projectPathTimerRef.current);
-            setProjectPathTooltip(null);
             if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
           }}
           onContextMenu={(event) => {
@@ -1912,6 +2095,12 @@ export function Sidebar({
             event.stopPropagation();
             openSectionMenu("projects", event.clientX, event.clientY);
           }}
+          onDragEnter={(event) => {
+            if (hasComposerFileDrag(event.dataTransfer)) event.preventDefault();
+          }}
+          onDragOver={onProjectsAreaDragOver}
+          onDragLeave={onProjectsAreaDragLeave}
+          onDrop={onProjectsAreaDrop}
         >
           {projectEntries.length > 0 ? projectEntries.map(renderProjectGroup) : (
             <section className="sidebar-session-group" aria-labelledby="sidebar-project-group-label">
@@ -1927,35 +2116,35 @@ export function Sidebar({
 
         <div className="sidebar-footer no-drag">
           <div className="footer-actions">
-            <button
+            <TooltipButton
               type="button"
               className={`footer-action ${page === "settings" ? "active" : ""}`}
               data-nav="settings"
-              title={t("nav.settings")}
-              aria-label={t("nav.settings")}
+              tooltip={t("nav.settings")}
+              ariaLabel={t("nav.settings")}
               onClick={() => setPage("settings")}
             >
               <IconSettings size={14} aria-hidden />
-            </button>
-            <button
+            </TooltipButton>
+            <TooltipButton
               type="button"
               className={`footer-action ${page === "plugins" ? "active" : ""}`}
               data-nav="plugins"
-              title={t("nav.plugins")}
-              aria-label={t("nav.plugins")}
+              tooltip={t("nav.plugins")}
+              ariaLabel={t("nav.plugins")}
               onClick={() => setPage("plugins")}
             >
               <IconPlug size={14} aria-hidden />
-            </button>
+            </TooltipButton>
             <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
           </div>
 
-          <button
+          <TooltipButton
             type="button"
             className={`footer-build ${updateReady ? "has-update" : ""}`}
             data-nav="build"
-            title={buildTitle}
-            aria-label={buildTitle}
+            tooltip={buildTitle}
+            ariaLabel={buildTitle}
             onClick={() => {
               if (updateReady) {
                 setSettingsAnchor("updates.title");
@@ -1971,12 +2160,20 @@ export function Sidebar({
           >
             <span className="footer-build-version">{buildLabel}</span>
             {updateReady ? <span className="footer-build-dot" aria-hidden /> : null}
-          </button>
+          </TooltipButton>
         </div>
       </div>
       {renderFloatingMenu()}
-      {renderProjectPathTooltip()}
-      {renderSessionHoverCard()}
+      {sessionHoverCard ? (
+        <SessionHoverCard
+          key={sessionHoverCard.session.id}
+          card={sessionHoverCard}
+          refreshProject={refreshProject}
+          onOpenSession={openSessionFromHover}
+          keepVisible={keepSessionHoverCardVisible}
+          scheduleHide={scheduleSessionHoverCardHide}
+        />
+      ) : null}
       {renameFor ? (
         <SessionRenameDialog
           session={renameFor}

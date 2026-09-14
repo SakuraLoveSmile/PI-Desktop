@@ -160,6 +160,7 @@ type HandshakeResult = {
 - `app.handshake`
 - `app.health`
 - `app.getVersion`
+- `app.getOnboarding` — 内联引导清单状态（D031）
 
 `app.health` 返回诊断 `toolBudget` 对象：
 
@@ -229,6 +230,7 @@ type ToolBudgetHealth = {
   `throughMessageId` 返回 `NOT_FOUND`
 - `session.get`
 - `session.delete`
+- `session.getScratchPath` — 会话的 scratch 目录（D114），按需创建
 - `session.rename`
 - `session.configure` — 以原子方式持久保存 `mode`、`providerId`、`modelId`，
   以及可选的 `thinkingLevel` 用于下一个 pi 回合； omitting/null
@@ -251,13 +253,18 @@ type ToolBudgetHealth = {
 ids 和非负 `tokensBefore`；它不会插入 message/search 行
   或更改可见的转录本投影
 - `session.replaceMessages` — 原子记录重写（临时文件重命名 +
-  regenerate/edit 流使用的一项索引交易（D119）且未得到答复
-  渲染器智能停止撤消；它保留了
-  仅当其边界和可选的第一个保留的 id 时才是最新的检查点
-  在重写的前缀中仍然有效，并且它携带每个幸存消息的
-  拥有 `turn_id` 跨越重写。只有拥有以下权限的调用者才安全
-  通话期间的整个记录：快照的任何重写
-  在 RPC 锁之外采取的可以删除附加在其间的消息
+  一项索引事务，D119），用于删除消息和未得到答复的渲染器智能停止撤销；
+  仅当边界和可选的第一个保留 id 在重写前缀中仍然有效时才保留最新检查点，
+  并且跨重写携带每条幸存消息所属的 `turn_id`。只有在呼叫持续时间内拥有
+  整份记录的调用者才安全。重新生成和重试改走 `session.truncateFrom`，
+  因此保留前缀不再经过 JSON-RPC（ADR 0216）
+- `session.truncateFrom` — 主机拥有的后缀截断，供重新生成 / 重试 / 编辑重发：
+  `{ sessionId, fromMessageId?, truncateBefore? }`。身份优先；未知
+  `fromMessageId` 为 `NOT_FOUND`。在状态锁下中止残留的 running 回合、
+  归档被丢弃的重新生成尾巴、重写保留前缀，并删除进行中检查点。返回
+  `{ ok, keptCount, discardedCount, abortedTurnId, revision }`。请求和结果
+  都不携带转录本快照。协议 v11 增量方法（ADR 0216）
+
 - `session.saveRevision` — 将重新生成分支归档到
   `(sessionId, rootUserId)`。带 `revisionIndex` 时，就地刷新该已有变体的
   载荷（分支自归档后又生长了），而不是新建索引；DB 行保留身份和活动
@@ -278,6 +285,8 @@ ids 和非负 `tokensBefore`；它不会插入 message/search 行
   存在于持久转录本中时，恢复分支之前的前缀取自转录本而非调用方。幸存
   消息保留所属的 `turn_id`
 - `session.beginTurn`
+- `session.queuePush` / `session.queueList` / `session.queueRemove` —— Host 拥有的
+  回合队列（D386 / ADR 0213，架构 v15）；push 按主体与 key 幂等，每会话最多八条
 - `session.endTurn` — 以原子方式将正在运行的回合移动到其终止状态，并且
 有条件地返回新创建的 `completed`/`error` 通知；它还会落定该会话的进行中回复
   检查点（D299）：`completed`/`error` 移除它；`recoverInflight: true`（sidecar
@@ -383,6 +392,7 @@ off | minimal | low | medium | high | xhigh | max
 ### 权限
 - `permissions.evaluate`
 - `permissions.resolve`
+- `permissions.pending`（D374：待处理请求作为 Host 状态）
 - `permissions.listSessionGrants`
 - `permissions.clearSessionGrants`
 
@@ -390,14 +400,55 @@ off | minimal | low | medium | high | xhigh | max
 - `plugins.list`
 - `plugins.loadDev`
 - `plugins.installFromPath`
+- `plugins.installFromPackage` — 在校验和验证后安装 `.piplug` 归档
 - `plugins.enable`
 - `plugins.disable`
 - `plugins.uninstall`
 - `plugins.getPermissions`
+- `plugins.grantPermissions` / `plugins.revokePermissions` — 更改已授予集合；
+  运行时强制执行「已声明 ∩ 已授予」的交集
+- `plugins.setAutoUpdate`
+- `plugins.setScope` — 激活作用域（ADR 0056）
+- `plugins.resolveExecution` — 在回合开始前解析某会话所属项目激活了哪些
+  插件工具/技能/MCP 服务器
+
+### 市场
+- `market.refresh` — 从配置的 URL 拉取并缓存目录
+- `market.search` / `market.getDetail`
+- `market.install` — 下载、验证（`PLUGIN_INTEGRITY`、`PLUGIN_MARKET_*`）并安装
+  目录中的一个发布版本
+- `market.checkUpdates` / `market.applyUpdates`
+
+### 提供商与模型
+- `providers.list` / `providers.get` / `providers.create` /
+  `providers.update` / `providers.delete`
+- `providers.getSecret` — 仅限 main/host，渲染器永远无法触达
+- `providers.listModels` / `providers.cacheModels` — 已发现的模型行及其
+  宿主侧缓存（ADR 0027 / ADR 0134）
+- `providers.testConnection`
+
+### Agent 能力（技能、子代理、MCP 服务器）
+- `skills.list` / `skills.active` / `skills.read` / `skills.create` /
+  `skills.update` / `skills.remove` / `skills.import` /
+  `skills.setEnabled` / `skills.setScope` — 用户技能文档（校验失败返回
+  `SKILL_INVALID`）
+- `agents.list` / `agents.active` / `agents.read` / `agents.create` /
+  `agents.update` / `agents.remove` / `agents.setEnabled` /
+  `agents.setScope` — 用户子代理文档（`SUBAGENT_INVALID`）
+- `mcp.list` / `mcp.active` / `mcp.upsert` / `mcp.remove` /
+  `mcp.setEnabled` / `mcp.setScope` — 用户 MCP 服务器定义（`MCP_INVALID`）
+
+`*.active` 返回经激活作用域过滤后适用于给定项目的条目（未知作用域返回
+`CAPABILITY_INVALID`）。
+
+### 搜索、工件、键盘
+- `search.query` — 跨会话、项目和设置目的地的全局搜索（ADR 0034）
+- `artifacts.list` — 某会话的 Plan/Goal 检查点工件
+- `keyboard.setGlobalShortcut` — 在 Electron 无法注册插件启动器快捷键时，
+  由宿主持有的原生回退
 
 ### 审计
 - `audit.append`
-- `audit.query`（稍后可选）
 
 ### 通知 (D117)
 - `notification.list`
@@ -719,7 +770,12 @@ Agent 中的会话。进程纪元是内部的，不是线路或数据库
 ### 5. 2 Shell 目录
 
 ```ts
-type CommandShellId = "windows-powershell" | "cmd" | "git-bash" | "bash";
+type CommandShellId =
+  | "windows-powershell"
+  | "windows-pwsh"
+  | "cmd"
+  | "git-bash"
+  | "bash";
 
 type CommandShellOption = {
   id: CommandShellId;
@@ -778,35 +834,52 @@ params: {
 
 超时行为 (**D005**)：120 秒后未解决 → 拒绝。
 
+`permissions.pending` 把待处理请求作为 Host 状态返回（D374/D375）：
+`{ requests: PendingPermission[] }`，最早的在前，可按 `sessionId` 过滤。每一项包含与
+`permissions.request` 通知相同的字段，外加 `createdAt`、`expiresAt` 和 `remainingMs`；
+已超时的请求不会出现。在通知发出之后才接入的客户端读取此列表，并通过不变的
+`permissions.resolve` 作答；通知路径本身不变。
+
 ## 7. 错误代码
+
+JSON-RPC 错误携带一个数字 `code` 以及 `data.errorCode`，后者是来自
+[08-错误代码](/zh-CN/spec/03-runtime/08-error-codes) 的稳定字符串。多个字符串码
+共用同一个数字槽位；字符串才是契约，数字只是传输细节。
 
 | 代码 | 错误代码 | 意义 |
 |---|---|---|
-| 1000 | 内部 | 意外主机故障 |
-| 1001 | 未经授权 | missing/invalid 握手或功能 |
-| 1002 | 无效参数 | 架构验证失败 |
-| 1003 | PATH_OUTSIDE_WORKSPACE | 在明确的外部路径权限决策之前发生路径沙箱违规 |
-| 1004 | TOOL_DENIED | 许可被拒绝 |
-| 1005 | 工具超时 | 工具超出超时时间 |
-| 1006 | WORKSPACE_REQUIRED | 无工作空间限制 |
-| 1007 | 未找到 | 实体缺失 |
-| 1008 | 冲突 | busy/conflict 状态 |
+| 1000 | INTERNAL | 意外主机故障 |
+| 1001 | UNAUTHORIZED | missing/invalid 握手或功能 |
+| 1001 | HOST_SHUTTING_DOWN | 主机在 EOF 后正在排空，拒绝了该调用 |
+| 1002 | INVALID_PARAMS | 架构验证失败 |
+| 1002 | MODEL_ALIAS_TOO_LONG | 提供商行别名超过 60 个码点 |
+| 1003 | NOT_FOUND | 实体缺失（遗留槽位，为旧调用方保留） |
+| 1006 | RATE_LIMITED | 某个按调用方计的预算窗口已耗尽 |
+| 1007 | NOT_FOUND | 实体缺失 |
+| 1007 | SESSION_NOT_FOUND | 点名的会话不存在；工具请求永远不会回退到全局工作区 |
+| 1008 | CONFLICT | busy/conflict 状态 |
+| 1008 | AGENT_BUSY | 该会话有一个正在运行的回合 |
 | 1009 | PLUGIN_INVALID | manifest/validation 失败 |
 | 1010 | PLUGIN_LOAD_FAILED | enable/load 失败 |
-| 1011 | 协议_不匹配 | 握手版本不匹配 |
+| 1011 | PROTOCOL_MISMATCH | `app.handshake` 协议版本不匹配 |
+| 1012 | PLUGIN_INTEGRITY | 包 checksum/signature 不匹配 |
+| 1013 | PLUGIN_PERMISSION_DENIED | 插件缺少该调用所需的权限 |
+| 1014 | PLUGIN_NETWORK | 市场 download/catalog 拉取失败 |
+| 1015 | MCP_INVALID | 用户 MCP 服务器定义校验失败 |
+| 1015 | PLAN_* | 所有 Plan/Goal 检查点失败（`PLAN_APPROVAL_TIMEOUT`、`PLAN_APPROVAL_STALE`、`PLAN_APPROVAL_INTERRUPTED`、`PLAN_SESSION_NOT_FOUND`、`PLAN_WORKSPACE_REQUIRED`……）共用此槽位；由字符串码区分 |
+| 1016 | SKILL_INVALID | 用户技能文档校验失败 |
+| 1017 | SUBAGENT_INVALID | 用户子代理文档校验失败 |
+| 1018 | CAPABILITY_INVALID | Agent 能力 root/scope 设置校验失败 |
 | -32029 | HOST_OVERLOADED | RPC 调度程序容量已耗尽 |
-| 1012 | WRITE_DISABLED_IN_PLAN | Plan 和 Goal 中无法写入 |
-| 1013 | EDIT_DISABLED_IN_PLAN | 在 Plan 和 Goal 中无法进行编辑 |
-| 1014 | PLUGIN_DISABLED_IN_PLAN | 插件工具在 Plan 和 Goal 中不可用 |
-| 1015 | PLAN_APPROVAL_REQUIRED | SubmitPlan/SubmitGoal 正在等待批准 |
-| 1016 | 计划批准超时 | 绝对批准期限已过 |
-| 1017 | 计划批准_STALE | 响应与实时 proposal/session/turn/tool-call/version 不匹配 |
-| 1018 | 计划批准中断 | 等待批准失败，在 abort/recovery 期间关闭 |
-| 1019 | PLAN_REQUIRES_INTERACTIVE_SESSION | 无人值守的 Plan 或 Goal 无法运行 |
-| 1020 | PLAN_ARTIFACT_WRITE_FAILED | 无法将确切的字节写入新的 `.pi/<kind>/*.md` 工件 |
-| 1021 | 计划执行中断 | 批准的 queued/running Plan 或 Goal 执行被中断 |
-| 1022 | SHELL_NOT_FOUND | 没有有效的平台 shell 可用 |
-| 1023 | 命令_SHELL_CHANGED | 固定的 shell ID 或方言在执行前已更改 |
+| -32601 | — | 未知方法 |
+| -32700 | — | 无法解析的请求行 |
+| 1002 | LIMIT_EXCEEDED | 超过 64 MiB 的 NDJSON 请求行；Electron 在写入管道前拒绝；若主机仍读到该行，则读完余下部分、尽量从截断前缀取出请求 id 再应答，stdin 读取器继续运行 |
+
+
+工具结果（`TOOL_DENIED`、`TOOL_TIMEOUT`、`PATH_OUTSIDE_WORKSPACE`、
+`WORKSPACE_PATH_DENIED`、`WRITE_DISABLED_IN_PLAN`、`SHELL_NOT_FOUND`、
+`COMMAND_SHELL_CHANGED`……）不是 JSON-RPC 错误：`tools.execute` 在结果中返回
+`ok: false` 并附带 `errorCode`（§5）。
 
 ## 8. 并发/排序
 

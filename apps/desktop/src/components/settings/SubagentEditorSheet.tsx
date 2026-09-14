@@ -3,28 +3,33 @@ import { useTranslation } from "react-i18next";
 import {
   DEFAULT_SUBAGENT_TOOLS,
   GLOBAL_SCOPE,
+  MAX_SUBAGENT_MAX_TOKENS,
   MAX_SUBAGENT_MAX_TURNS,
   SUBAGENT_ASSIGNABLE_TOOLS,
   SUBAGENT_INHERIT_TOKEN,
   SUBAGENT_PRESETS,
   SUBAGENT_THINKING_LEVELS,
+  findSubagentPreset,
   isSubagentAssignableTool,
   isSubagentMutatingTool,
   resolveScope,
   type ActivationScope,
+  type SubagentDefinition,
   type SubagentPreset,
   type SubagentThinkingLevel,
   type UserSubagentRecord,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { Button, Field, Input, Select, Textarea, cx } from "../ui";
+import { Button, Field, Input, Select, Textarea, TooltipButton, cx } from "../ui";
 import { IconChevronRight, IconFolderOpen, IconX } from "../icons";
 import {
   groupSubagentModelChoices,
   subagentModelChoices,
   subagentModelOrphanPin,
+  subagentModelPinParts,
   subagentModelSelectValue,
 } from "./subagent-models";
+import { SubagentModelPicker } from "./SubagentModelPicker";
 
 /** Hard cap host-core enforces on a definition document. */
 export const MAX_SUBAGENT_BYTES = 32 * 1024;
@@ -43,6 +48,11 @@ export type SubagentDraft = {
   thinkingLevel: SubagentThinkingLevel | "";
   /** `0` means no limit, which is what a definition without `maxTurns` gets. */
   maxTurns: number;
+  /**
+   * Output-token cap for one delegate response. `0` means "follow the model's
+   * published limit", which is what a definition without `maxTokens` gets.
+   */
+  maxTokens: number;
   body: string;
   enabled: boolean;
   scope: ActivationScope;
@@ -107,6 +117,7 @@ export const SUBAGENT_PRESET_COPY = {
   "code-reviewer": { name: "presetReviewerName", desc: "presetReviewerDesc" },
   "test-runner": { name: "presetTestRunnerName", desc: "presetTestRunnerDesc" },
   fixer: { name: "presetFixerName", desc: "presetFixerDesc" },
+  "ui-designer": { name: "presetUiDesignerName", desc: "presetUiDesignerDesc" },
 } as const satisfies Record<SubagentPreset["id"], { name: string; desc: string }>;
 
 /** Full i18n path for a preset chip, or null when `id` is blank / unknown. */
@@ -129,6 +140,7 @@ export function emptySubagentDraft(): SubagentDraft {
     model: "",
     thinkingLevel: "",
     maxTurns: 0,
+    maxTokens: 0,
     body: "",
     enabled: true,
     scope: GLOBAL_SCOPE,
@@ -146,9 +158,34 @@ export function draftFromRecord(record: UserSubagentRecord, body: string): Subag
     model: record.model ?? "",
     thinkingLevel: record.thinkingLevel ?? "",
     maxTurns: record.maxTurns ?? 0,
+    maxTokens: record.maxTokens ?? 0,
     body,
     enabled: record.enabled,
     scope: resolveScope(record.scope),
+  };
+}
+
+/** Prefill the create sheet from a shipped definition (Copy as mine). */
+export function draftFromDefinition(definition: SubagentDefinition): SubagentDraft {
+  const preset = findSubagentPreset(definition.name);
+  const grant = splitSubagentToolGrant(
+    definition.inheritTools
+      ? [SUBAGENT_INHERIT_TOKEN, ...definition.tools]
+      : definition.tools,
+  );
+  return {
+    ...emptySubagentDraft(),
+    name: preset?.name ?? definition.name,
+    description: definition.description,
+    tools: grant.tools,
+    inheritTools: grant.inheritTools,
+    model: definition.model
+      ? `${definition.model.providerId}/${definition.model.modelId}`
+      : "",
+    thinkingLevel: definition.thinkingLevel ?? "",
+    maxTurns: definition.maxTurns ?? 0,
+    maxTokens: definition.maxTokens ?? 0,
+    body: definition.prompt,
   };
 }
 
@@ -208,9 +245,14 @@ export function subagentDraftError(draft: SubagentDraft): string | null {
   if (!draft.inheritTools && draft.tools.length === 0) {
     return "extensions.subagents.errorTools";
   }
-  // `provider/model` is the only shape main can resolve; a bare model id has no
-  // provider to look up, so it would be dropped with a diagnostic nobody reads.
-  if (draft.model.trim() && !/^[^/\s]+\/.+$/.test(draft.model.trim())) {
+  // `provider/model` is the only shape the runtime can resolve; a bare model id
+  // has no provider to look up, so it would be dropped with a diagnostic nobody
+  // reads. Only the slash is structural: the provider half is matched by a
+  // normalized alias, and a custom endpoint's display name may contain spaces —
+  // the picker offers those, so rejecting them here would make a selectable
+  // option impossible to save. This shares the picker's own splitter so the two
+  // can never disagree.
+  if (draft.model.trim() && !subagentModelPinParts(draft.model.trim())) {
     return "extensions.subagents.errorModel";
   }
   // 0 is the cleared state, not an invalid one: a definition may leave the turn
@@ -221,6 +263,17 @@ export function subagentDraftError(draft: SubagentDraft): string | null {
     draft.maxTurns > MAX_SUBAGENT_MAX_TURNS
   ) {
     return "extensions.subagents.errorMaxTurns";
+  }
+  // Same convention as the turn limit: cleared (`0`) is a valid state that
+  // means "no cap of our own", so only a value outside the accepted range is
+  // an error. The field only produces integers, so a fraction cannot reach
+  // here from the UI — the check keeps the draft honest anyway.
+  if (
+    !Number.isInteger(draft.maxTokens) ||
+    draft.maxTokens < 0 ||
+    draft.maxTokens > MAX_SUBAGENT_MAX_TOKENS
+  ) {
+    return "extensions.subagents.errorMaxTokens";
   }
   if (!draft.body.trim()) return "extensions.subagents.errorBody";
   if (new TextEncoder().encode(draft.body).length > MAX_SUBAGENT_BYTES) {
@@ -343,9 +396,14 @@ function ManagementScope({
   );
 }
 
-const CUSTOM_SUBAGENT_MODEL_VALUE = "__custom__";
-
-/** Model and thinking controls for a subagent definition. */
+/**
+ * Model and thinking controls for a subagent definition.
+ *
+ * The model list offers only models the user already configured, so the value
+ * saved is always resolvable in Settings; there is no free-text escape hatch.
+ * When no provider offers a runnable model the field explains that and links to
+ * Models instead of accepting a hand-typed id the runtime could not resolve.
+ */
 function ModelField({
   draft,
   setDraft,
@@ -360,10 +418,7 @@ function ModelField({
   orphanModel: string | null;
 }) {
   const { t } = useTranslation();
-  const [customModel, setCustomModel] = useState(false);
-  const modelValue = customModel
-    ? CUSTOM_SUBAGENT_MODEL_VALUE
-    : subagentModelSelectValue(draft.model, modelChoices);
+  const modelValue = subagentModelSelectValue(draft.model, modelChoices);
 
   return (
     <>
@@ -377,46 +432,25 @@ function ModelField({
           }
         >
           {modelChoices.length === 0 ? (
-            <Input
-              value={draft.model}
-              placeholder={t("extensions.subagents.modelPickPlaceholder")}
-              aria-label={t("extensions.subagents.model")}
-              onChange={(event) =>
-                setDraft({ ...draft, model: event.target.value })
-              }
-            />
+            <div className="ext-field-empty">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const store = useAppStore.getState();
+                  store.setSettingsTab("agent");
+                }}
+              >
+                {t("extensions.subagents.modelPickEmptyAction")}
+              </Button>
+            </div>
           ) : (
-            <Select
+            <SubagentModelPicker
               value={modelValue}
-              aria-label={t("extensions.subagents.model")}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value === CUSTOM_SUBAGENT_MODEL_VALUE) {
-                  setCustomModel(true);
-                  setDraft({ ...draft, model: "" });
-                } else {
-                  setCustomModel(false);
-                  setDraft({ ...draft, model: value });
-                }
-              }}
-            >
-              <option value="">{t("extensions.subagents.modelInherit")}</option>
-              {modelGroups.map((group) => (
-                <optgroup key={group.providerId} label={group.providerName}>
-                  {group.choices.map((choice) => (
-                    <option key={choice.value} value={choice.value}>
-                      {choice.modelId}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-              {orphanModel ? (
-                <option value={orphanModel}>{orphanModel}</option>
-              ) : null}
-              <option value={CUSTOM_SUBAGENT_MODEL_VALUE}>
-                {t("extensions.subagents.modelPickCustom")}
-              </option>
-            </Select>
+              groups={modelGroups}
+              orphanPin={orphanModel}
+              onChange={(next) => setDraft({ ...draft, model: next })}
+            />
           )}
         </Field>
         <Field
@@ -444,21 +478,6 @@ function ModelField({
           </Select>
         </Field>
       </div>
-      {modelChoices.length > 0 && customModel ? (
-        <Field
-          label={t("extensions.subagents.modelPickCustom")}
-          hint={t("extensions.subagents.modelPickCustomHint")}
-        >
-          <Input
-            value={draft.model}
-            placeholder={t("extensions.subagents.modelPickPlaceholder")}
-            aria-label={t("extensions.subagents.modelPickCustom")}
-            onChange={(event) =>
-              setDraft({ ...draft, model: event.target.value })
-            }
-          />
-        </Field>
-      ) : null}
     </>
   );
 }
@@ -520,6 +539,26 @@ function AdvancedFields({
             }
           />
         </Field>
+        <Field
+          label={t("extensions.subagents.maxTokens")}
+          hint={t("extensions.subagents.maxTokensHint", {
+            max: MAX_SUBAGENT_MAX_TOKENS.toLocaleString(),
+          })}
+        >
+          <Input
+            type="number"
+            min={1}
+            max={MAX_SUBAGENT_MAX_TOKENS}
+            placeholder={t("extensions.subagents.maxTokensDefault")}
+            value={draft.maxTokens > 0 ? String(draft.maxTokens) : ""}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                maxTokens: Number.parseInt(event.target.value, 10) || 0,
+              })
+            }
+          />
+        </Field>
         <div className="ext-field-group">
           <div className="ext-field-label">{t("settings.scope")}</div>
           <ManagementScope draft={draft} setDraft={setDraft} />
@@ -543,6 +582,7 @@ export function SubagentEditorSheet({
   setDraft,
   editing,
   saving,
+  initialPresetId,
   onClose,
   onSave,
   onReveal,
@@ -551,14 +591,19 @@ export function SubagentEditorSheet({
   setDraft: (next: SubagentDraft) => void;
   editing: UserSubagentRecord | null;
   saving: boolean;
+  /** Template chip to select on create, e.g. after Copy as mine. */
+  initialPresetId?: string;
   onClose: () => void;
   onSave: () => void;
   onReveal?: () => void;
 }) {
   const { t } = useTranslation();
   const providers = useAppStore((state) => state.providers);
-  const [nameTouched, setNameTouched] = useState(!!editing);
-  const [presetId, setPresetId] = useState<string | null>(BLANK_SUBAGENT_PRESET_ID);
+  const copiedPreset = Boolean(initialPresetId && findSubagentPreset(initialPresetId));
+  const [nameTouched, setNameTouched] = useState(!!editing || copiedPreset);
+  const [presetId, setPresetId] = useState<string | null>(
+    copiedPreset && initialPresetId ? initialPresetId : BLANK_SUBAGENT_PRESET_ID,
+  );
   const [advancedOpen, setAdvancedOpen] = useState(!!editing);
   const errorKey = subagentDraftError(draft);
   const pristine = !editing && !draft.name.trim() && !draft.description.trim();
@@ -639,14 +684,15 @@ export function SubagentEditorSheet({
                 : t("extensions.subagents.addTitle")}
             </h3>
           </div>
-          <button
+          <TooltipButton
             type="button"
             className="ext-sheet-close"
-            aria-label={t("common.close")}
+            ariaLabel={t("common.close")}
+            tooltip={t("common.close")}
             onClick={onClose}
           >
             <IconX size={14} />
-          </button>
+          </TooltipButton>
         </div>
 
         <div className="ext-sheet-body">
@@ -762,7 +808,11 @@ export function SubagentEditorSheet({
           />
         </div>
 
-        {errorKey && !pristine ? <p className="ext-sheet-error">{t(errorKey)}</p> : null}
+        {errorKey && !pristine ? (
+          <p id="subagent-sheet-error" className="ext-sheet-error" role="alert">
+            {t(errorKey)}
+          </p>
+        ) : null}
         <div className="ext-sheet-actions">
           {editing && onReveal ? (
             <Button variant="ghost" onClick={onReveal}>

@@ -12,7 +12,6 @@ import { open as openFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { homedir } from "node:os";
-import { AsyncLocalStorage } from "node:async_hooks";
 import {
   busTopicAllowed,
   isDeniedFsPath,
@@ -66,6 +65,7 @@ import {
   resolveWithinRoot,
 } from "./fs-panel";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
+import { PluginToolInvocations, type PluginToolInvocation } from "./plugin-tool-invocations";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 import { parseAllowedExternalUrl } from "./safe-open-external";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
@@ -87,9 +87,21 @@ export type RegisteredPluginTool = {
   description: string;
   risk?: string;
   schema?: unknown;
+  /**
+   * Action names that may run in Plan or Goal mode. Omitted or empty
+   * means the tool is hidden from the model in those modes (ADR 0211).
+   */
+  planSafeActions?: readonly string[];
   execute: (
     args: unknown,
-    ctx?: { sessionId?: string; modelKey?: string; thinkingLevel?: string },
+    ctx?: {
+      sessionId?: string;
+      turnId?: string;
+      signal?: AbortSignal;
+      mode?: "agent" | "plan" | "goal";
+      modelKey?: string;
+      thinkingLevel?: string;
+    },
   ) => Promise<unknown>;
 };
 
@@ -97,6 +109,21 @@ export type RegisteredPluginTool = {
  * A skill document a plugin taught the agent (spec 07 §3). Only the metadata
  * travels into the system prompt; the body is loaded on demand by the model.
  */
+/**
+ * One ExtensionAPI module a plugin contributes (spec 07-plugins/16). The
+ * module runs inside the agent sidecar; this record only says where it is
+ * and which plugin owns it.
+ */
+export type RegisteredAgentExtension = {
+  /** Realpath of the module; stable identity for the sidecar and diagnostics. */
+  id: string;
+  pluginId: string;
+  pluginName: string;
+  /** Absolute module path inside the plugin directory. */
+  entry: string;
+  root: string;
+};
+
 export type RegisteredPluginSkill = {
   /** `<pluginId>/<skillId>` — what the model passes to the Skill tool. */
   id: string;
@@ -179,8 +206,22 @@ export type PluginFsConsentRequest = {
  */
 export type PluginFsConsentAnswer = "once" | "session" | "deny";
 
+/** One dangerous desktop operation a plugin asked the host to run. */
+export type PluginDesktopConsentRequest = {
+  pluginId: string;
+  pluginName: string;
+  /** Operation id from the shared controller catalog, e.g. `session/delete`. */
+  operation: string;
+  /** Catalog description of the operation, for the dialog. */
+  description: string;
+  /** Positional arguments as the plugin supplied them (secret-stripped later). */
+  args: unknown[];
+};
+
 export type PluginHostServices = {
   getWorkspacePath: () => string | null;
+  /** The set of `contributes.agentExtensions` modules changed (load/unload). */
+  agentExtensionsChanged?: () => void;
   getLocale?: () => string;
   getAppVersion?: () => string;
   /**
@@ -216,6 +257,14 @@ export type PluginHostServices = {
   }) => Promise<{ status: number; headers: Record<string, string>; bodyText: string }>;
   /** The reviewed desktop operation controller shared with MCP. */
   desktopControl?: McpControlController;
+  /**
+   * Blocking, native consent for a plugin-originated dangerous desktop
+   * operation (session delete, permission-mode change, tool approval). The
+   * controller's `confirm` flag is only the caller's acknowledgement; the
+   * user decides here. Without this service every dangerous operation from a
+   * plugin is refused, which is the safe default for a headless host.
+   */
+  confirmDesktopControl?: (request: PluginDesktopConsentRequest) => Promise<boolean>;
   audit?: (entry: Record<string, unknown>) => void;
   /**
    * Blocking, native consent for a file access the manifest did not declare.
@@ -368,8 +417,6 @@ const HOST_API_ALLOWLIST = new Set([
   "agent.complete",
 ]);
 
-const toolSession = new AsyncLocalStorage<string>();
-
 /** Load must finish (module eval + onLoad) inside this budget. */
 const PLUGIN_LOAD_TIMEOUT_MS = 15_000;
 /** Lifecycle hooks time out per spec 05 §3. */
@@ -496,6 +543,67 @@ function apiError(code: string, message: string): PluginApiError {
   const err = new Error(message) as PluginApiError;
   err.code = code;
   return err;
+}
+
+function pluginActionEnum(schema: unknown): readonly string[] | null {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return null;
+  const properties = (schema as { properties?: unknown }).properties;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) return null;
+  const action = (properties as Record<string, unknown>).action;
+  if (!action || typeof action !== "object" || Array.isArray(action)) return null;
+  const enumValue = (action as { enum?: unknown }).enum;
+  if (!Array.isArray(enumValue)) return null;
+  const values: string[] = [];
+  for (const entry of enumValue) {
+    if (typeof entry !== "string") return null;
+    values.push(entry);
+  }
+  return values;
+}
+
+/**
+ * Normalize and validate a plugin tools `planSafeActions` declaration
+ * (ADR 0211). Every entry must be a string and, when the schema carries an
+ * `action` enum, must be one of that enum. The validation here is the
+ * final defense in depth: the runtime normally hides unsafe tools from the
+ * model in Plan mode, but a stray call must still be rejected.
+ */
+function normalizePlanSafeActions(
+  raw: unknown,
+  schema: unknown,
+  toolName: string,
+): readonly string[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) {
+    throw apiError(
+      "INVALID_ARGUMENT",
+      `plugin tool ${toolName} planSafeActions must be a string array`,
+    );
+  }
+  const cleaned: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "string" || !entry) {
+      throw apiError(
+        "INVALID_ARGUMENT",
+        `plugin tool ${toolName} planSafeActions entries must be non-empty strings`,
+      );
+    }
+    if (cleaned.includes(entry)) continue;
+    cleaned.push(entry);
+  }
+  const actionEnum = pluginActionEnum(schema);
+  if (actionEnum) {
+    const actionSet = new Set(actionEnum);
+    for (const action of cleaned) {
+      if (!actionSet.has(action)) {
+        throw apiError(
+          "INVALID_ARGUMENT",
+          `plugin tool ${toolName} planSafeActions entry ${action} is not in the schema action enum`,
+        );
+      }
+    }
+  }
+  return cleaned;
 }
 
 const PLUGIN_SESSION_MAX_PAYLOAD_BYTES = 32 * 1024 * 1024;
@@ -700,7 +808,7 @@ function realpathOrSelf(path: string): string {
  * directory. Manifest validation already rejects `..`, so this is defense in
  * depth against symlinked or oddly-cased contributions.
  */
-function resolveInsidePlugin(pluginPath: string, relative: string): string | null {
+export function resolveInsidePlugin(pluginPath: string, relative: string): string | null {
   const root = resolve(pluginPath);
   const target = resolve(root, relative);
   const prefix = root.endsWith(sep) ? root : root + sep;
@@ -749,18 +857,14 @@ export class PluginRuntime {
   private commands = new Map<string, RegisteredCommand>();
   private tools = new Map<string, RegisteredPluginTool>();
   private skills = new Map<string, RegisteredPluginSkill>();
+  private agentExtensions = new Map<string, RegisteredAgentExtension>();
   private themes = new Map<string, RegisteredPluginTheme>();
   private mcpClients = new Map<string, McpServerClient[]>();
   private serviceStates = new Map<string, PluginServiceStatus>();
   private restarts = new Map<string, RestartRecord>();
   private busSubscriptions = new Map<string, BusSubscription>();
   private busRate = new Map<string, { windowStart: number; count: number }>();
-  /**
-   * Session of an in-flight `tool.execute`. Child `pi.browser.*` calls arrive
-   * on a later `handleChildMessage` turn, so ALS around `sendToChild` is empty
-   * there — this map is the durable identity for that round trip.
-   */
-  private executingToolSessions = new Map<string, Array<{ sessionId: string; toolName: string }>>();
+  private readonly toolInvocations = new PluginToolInvocations();
   private completeRate = new Map<string, { windowStart: number; count: number }>();
   /**
    * File accesses the user allowed for the rest of the run, keyed
@@ -847,6 +951,11 @@ export class PluginRuntime {
 
   getTools(): RegisteredPluginTool[] {
     return [...this.tools.values()];
+  }
+
+  /** ExtensionAPI modules from loaded plugins holding `agent.extension`. */
+  getAgentExtensions(): RegisteredAgentExtension[] {
+    return [...this.agentExtensions.values()].sort((a, b) => a.id.localeCompare(b.id));
   }
 
   /** Catalog of active plugin skills, ordered by id for a stable prompt. */
@@ -1048,7 +1157,10 @@ export class PluginRuntime {
     const manifest = validated.manifest;
     await this.unload(manifest.id);
 
-    const mainPath = join(pluginPath, manifest.main);
+    const mainPath = resolveInsidePlugin(pluginPath, manifest.main);
+    if (!mainPath) {
+      throw new Error("PLUGIN_INVALID: main entry must stay inside the plugin directory");
+    }
     if (!existsSync(mainPath)) {
       throw new Error("PLUGIN_LOAD_FAILED: main entry missing");
     }
@@ -1129,6 +1241,7 @@ export class PluginRuntime {
     }
 
     this.registerSkills(loaded);
+    this.registerAgentExtensions(loaded);
     this.registerThemes(loaded);
     await this.registerMcpServers(loaded);
     await this.startServices(loaded);
@@ -1141,10 +1254,17 @@ export class PluginRuntime {
     return manifest;
   }
 
+  /** Abort this session's invocations without affecting sibling sessions. */
+  cancelSessionTools(sessionId: string, reason = "Session tool execution aborted"): void {
+    this.toolInvocations.cancelSession(sessionId, reason);
+  }
+
   /** Deregister contributions, run `onUnload` in the child, then stop it. */
   async unload(pluginId: string): Promise<void> {
     const loaded = this.loaded.get(pluginId);
     if (loaded) {
+      loaded.disposing = true;
+      this.toolInvocations.cancelOwner(loaded, "Plugin unloaded");
       // An explicit stop ends supervision; a supervisor-driven reload keeps it.
       if (!this.restarting.has(pluginId)) this.cancelRestarts(pluginId);
       await this.stopServices(loaded);
@@ -1228,6 +1348,7 @@ export class PluginRuntime {
     // stopping must already be covered by the guard in `handleChildExit`.
     for (const loaded of loadedPlugins) {
       loaded.disposing = true;
+      this.toolInvocations.cancelOwner(loaded, "Application shutting down");
       this.cancelRestarts(loaded.manifest.id);
     }
     this.disposeWatchers();
@@ -1320,6 +1441,15 @@ export class PluginRuntime {
   }
 
   async invokePanelBridge(
+    pluginId: string,
+    channel: string,
+    payload?: Record<string, unknown>,
+    context?: PluginPanelBridgeContext,
+  ): Promise<unknown> {
+    return this.toolInvocations.withoutContext(() => this.invokePanelWithoutToolContext(pluginId, channel, payload, context));
+  }
+
+  private async invokePanelWithoutToolContext(
     pluginId: string,
     channel: string,
     payload?: Record<string, unknown>,
@@ -1476,26 +1606,50 @@ export class PluginRuntime {
     loaded: LoadedPlugin,
     message: Record<string, unknown>,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<unknown> {
     const child = loaded.child;
     if (!child) {
       return Promise.reject(apiError("NOT_FOUND", `plugin host process gone: ${loaded.manifest.id}`));
     }
+    if (signal?.aborted) return Promise.reject(signal.reason);
     const id = `h${loaded.nextCallId++}`;
     return new Promise((resolvePromise, rejectPromise) => {
-      const timer = setTimeout(() => {
+      const cancelChild = (error: Error) => {
+        if (typeof message.invocationId !== "string") return;
+        try {
+          child.postMessage({ t: "cancel", invocationId: message.invocationId, reason: error.message });
+        } catch {
+          // The process may already be gone; the host still revokes the call.
+        }
+      };
+      const abort = () => {
+        const error = signal?.reason instanceof Error
+          ? signal.reason
+          : apiError("PLUGIN_TOOL_ABORTED", "Plugin tool execution aborted");
+        loaded.pending.get(id)?.reject(error);
+        cancelChild(error);
+      };
+      const cleanup = () => {
+        clearTimeout(timer);
         loaded.pending.delete(id);
-        rejectPromise(
-          apiError("TIMEOUT", `plugin ${loaded.manifest.id} did not answer ${String(message.t)}`),
-        );
+        signal?.removeEventListener("abort", abort);
+      };
+      const timer = setTimeout(() => {
+        const error = apiError("TIMEOUT", `plugin ${loaded.manifest.id} did not answer ${String(message.t)}`);
+        loaded.pending.get(id)?.reject(error);
+        cancelChild(error);
       }, timeoutMs);
-      loaded.pending.set(id, { resolve: resolvePromise, reject: rejectPromise, timer });
+      loaded.pending.set(id, {
+        resolve: (value) => { cleanup(); resolvePromise(value); },
+        reject: (error) => { cleanup(); rejectPromise(error); },
+        timer,
+      });
+      signal?.addEventListener("abort", abort, { once: true });
       try {
         child.postMessage({ ...message, id });
       } catch (error) {
-        clearTimeout(timer);
-        loaded.pending.delete(id);
-        rejectPromise(error instanceof Error ? error : new Error(String(error)));
+        loaded.pending.get(id)?.reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }
@@ -1522,7 +1676,12 @@ export class PluginRuntime {
       return;
     }
     if (message.t === "call") {
-      void this.dispatchHostCall(loaded, String(message.api ?? ""), message.args ?? [])
+      void this.toolInvocations.run(loaded, message.invocationId, async () => {
+        if (this.loaded.get(loaded.manifest.id) !== loaded) {
+          throw apiError("PLUGIN_UNLOADED", "Plugin host process is no longer active");
+        }
+        return this.dispatchHostCall(loaded, String(message.api ?? ""), message.args ?? []);
+      })
         .then((value) =>
           loaded.child?.postMessage({ t: "res", id: message.id, ok: true, value: value ?? null }),
         )
@@ -1589,10 +1748,16 @@ export class PluginRuntime {
           description?: string;
           risk?: string;
           schema?: unknown;
+          planSafeActions?: unknown;
         };
         const name = String(descriptor.name ?? "");
         if (!name) throw apiError("INVALID_ARGUMENT", "tool.name is required");
         const fullName = pluginToolName(pluginId, name);
+        const planSafeActions = normalizePlanSafeActions(
+          descriptor.planSafeActions,
+          descriptor.schema,
+          name,
+        );
         this.tools.set(fullName, {
           fullName,
           pluginId,
@@ -1600,34 +1765,67 @@ export class PluginRuntime {
           description: String(descriptor.description ?? ""),
           risk: descriptor.risk,
           schema: descriptor.schema,
+          planSafeActions,
           execute: async (toolArgs, ctx) => {
+            // Plan/Goal mode only allows declared plan-safe actions. The
+            // runtime normally hides unsafe tools from the model, but the
+            // host must still reject a stray call (ADR 0211).
+            if (ctx?.mode === "plan" || ctx?.mode === "goal") {
+              const allowed = planSafeActions;
+              if (allowed.length === 0) {
+                throw apiError(
+                  "PERMISSION_DENIED",
+                  `plugin tool ${name} is not available in ${ctx.mode} mode`,
+                );
+              }
+              const action =
+                toolArgs && typeof toolArgs === "object" && !Array.isArray(toolArgs)
+                  ? (toolArgs as { action?: unknown }).action
+                  : undefined;
+              if (typeof action !== "string" || !allowed.includes(action)) {
+                throw apiError(
+                  "PERMISSION_DENIED",
+                  `plugin tool ${name} action ${JSON.stringify(action)} is not allowed in ${ctx.mode} mode`,
+                );
+              }
+            }
             const target = this.loaded.get(pluginId);
-            if (!target?.child) throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
+            if (!target?.child || target !== loaded || target.disposing) {
+              throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
+            }
             const sessionId = String(ctx?.sessionId ?? "");
-            const stack = this.executingToolSessions.get(pluginId) ?? [];
-            stack.push({ sessionId, toolName: name });
-            this.executingToolSessions.set(pluginId, stack);
+            const invocation = this.toolInvocations.begin(target, {
+              pluginId,
+              sessionId,
+              toolName: name,
+              turnId: ctx?.turnId,
+              signal: ctx?.signal,
+            });
             try {
-              return await toolSession.run(sessionId, () =>
-                this.sendToChild(
+              return await this.sendToChild(
                   target,
                   {
                     t: "call",
                     method: "tool.execute",
+                    invocationId: invocation.id,
                     payload: {
                       name,
                       args: toolArgs,
                       sessionId,
+                      turnId: ctx?.turnId,
+                      mode: ctx?.mode,
                       modelKey: ctx?.modelKey,
                       thinkingLevel: ctx?.thinkingLevel,
                     },
                   },
                   PLUGIN_TOOL_TIMEOUT_MS,
-                ),
+                  invocation.signal,
               );
+            } catch (error) {
+              this.toolInvocations.cancel(invocation, error);
+              throw error;
             } finally {
-              stack.pop();
-              if (stack.length === 0) this.executingToolSessions.delete(pluginId);
+              this.toolInvocations.finish(invocation);
             }
           },
         });
@@ -1762,6 +1960,7 @@ export class PluginRuntime {
   }
 
   private handleChildExit(loaded: LoadedPlugin, code: number): void {
+    this.toolInvocations.cancelOwner(loaded, "Plugin host process exited");
     if (loaded.disposing) return;
     if (this.loaded.get(loaded.manifest.id) !== loaded) return;
     const pluginId = loaded.manifest.id;
@@ -1881,6 +2080,14 @@ export class PluginRuntime {
     for (const [id, skill] of this.skills) {
       if (skill.pluginId === pluginId) this.skills.delete(id);
     }
+    let droppedExtension = false;
+    for (const [id, extension] of this.agentExtensions) {
+      if (extension.pluginId === pluginId) {
+        this.agentExtensions.delete(id);
+        droppedExtension = true;
+      }
+    }
+    if (droppedExtension) this.services.agentExtensionsChanged?.();
     for (const [id, theme] of this.themes) {
       if (theme.pluginId === pluginId) this.themes.delete(id);
     }
@@ -1910,6 +2117,58 @@ export class PluginRuntime {
    * Skills predate the permission gate, so a plugin that declares them without
    * `agent.prompt.inject` still loads — it just teaches the agent nothing.
    */
+  /**
+   * Index `contributes.agentExtensions`. The modules are loaded by the agent
+   * sidecar at the next turn, so this only validates paths and records
+   * ownership. Without `agent.extension` the plugin loads but contributes no
+   * module, mirroring how skills behave without `agent.prompt.inject`.
+   */
+  private registerAgentExtensions(loaded: LoadedPlugin): void {
+    const declared = loaded.manifest.contributes?.agentExtensions ?? [];
+    if (!declared.length) return;
+    const pluginId = loaded.manifest.id;
+    if (!loaded.permissions.has("agent.extension")) {
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.agentExtensions.skipped",
+        ok: false,
+        errorCode: "PERMISSION_DENIED",
+        count: declared.length,
+        ts: Date.now(),
+      });
+      return;
+    }
+    let changed = false;
+    for (const relative of declared) {
+      const entry = resolveInsidePlugin(loaded.path, String(relative ?? "").trim());
+      if (!entry || !existsSync(entry)) {
+        this.services.audit?.({
+          pluginId,
+          api: "plugin.agentExtensions.skipped",
+          ok: false,
+          errorCode: "NOT_FOUND",
+          ts: Date.now(),
+        });
+        continue;
+      }
+      let id = entry;
+      try {
+        id = realpathSync(entry);
+      } catch {
+        // Fall back to the resolved path; the sidecar reports a load error.
+      }
+      this.agentExtensions.set(id, {
+        id,
+        pluginId,
+        pluginName: loaded.manifest.name,
+        entry,
+        root: loaded.path,
+      });
+      changed = true;
+    }
+    if (changed) this.services.agentExtensionsChanged?.();
+  }
+
   private registerSkills(loaded: LoadedPlugin): void {
     const declared = loaded.manifest.contributes?.skills ?? [];
     if (!declared.length) return;
@@ -2575,8 +2834,9 @@ export class PluginRuntime {
     );
   }
 
-  private inFlightTool(pluginId: string): { sessionId: string; toolName: string } | undefined {
-    return this.executingToolSessions.get(pluginId)?.at(-1);
+  private inFlightTool(pluginId: string): PluginToolInvocation | undefined {
+    const loaded = this.loaded.get(pluginId);
+    return loaded ? this.toolInvocations.current(loaded) : undefined;
   }
 
   private completeRateExceeded(pluginId: string): boolean {
@@ -2645,7 +2905,7 @@ export class PluginRuntime {
         errorCode: "RATE_LIMITED",
         ts: Date.now(),
       });
-      throw apiError("RATE_LIMITED", "advisor complete rate exceeded");
+      throw apiError("RATE_LIMITED", "plugin completion rate exceeded");
     }
     const includeSessionContext = input.includeSessionContext === true;
     if (includeSessionContext) {
@@ -2683,7 +2943,7 @@ export class PluginRuntime {
           errorCode: "TIMEOUT",
           ts: Date.now(),
         });
-        throw apiError("TIMEOUT", "advisor complete timed out");
+        throw apiError("TIMEOUT", "plugin completion timed out");
       }
       throw error;
     } finally {
@@ -2712,11 +2972,7 @@ export class PluginRuntime {
   }
 
   private browserSessionId(pluginId?: string): string | undefined {
-    const als = toolSession.getStore()?.trim();
-    if (als) return als;
-    if (!pluginId) return undefined;
-    const stack = this.executingToolSessions.get(pluginId);
-    return stack?.at(-1)?.sessionId?.trim() || undefined;
+    return pluginId ? this.inFlightTool(pluginId)?.sessionId.trim() || undefined : undefined;
   }
 
   private async invokeBrowser(
@@ -2778,6 +3034,7 @@ export class PluginRuntime {
   }
 
   private assertPermission(loaded: LoadedPlugin, perm: string): void {
+    this.toolInvocations.current(loaded);
     if (!loaded.permissions.has(perm)) {
       this.services.audit?.({
         pluginId: loaded.manifest.id,
@@ -3167,7 +3424,10 @@ export class PluginRuntime {
           this.assertPermission(loaded, "ui.panel");
           const panel = loaded.manifest.ui?.panel;
           if (!panel) throw apiError("NOT_FOUND", "plugin does not declare ui.panel");
-          const htmlPath = join(pluginPath, panel);
+          const htmlPath = resolveInsidePlugin(pluginPath, panel);
+          if (!htmlPath) {
+            throw apiError("INVALID_PARAMS", `panel html must stay inside the plugin: ${panel}`);
+          }
           if (!existsSync(htmlPath)) {
             throw apiError("NOT_FOUND", `panel html missing: ${panel}`);
           }
@@ -3255,14 +3515,86 @@ export class PluginRuntime {
           if (!this.services.desktopControl) {
             throw apiError("UNSUPPORTED", "host api not available: desktop.invoke");
           }
+          if (operation === "session/create") {
+            const createInput = args[0];
+            const inheritedParent =
+              createInput && typeof createInput === "object" && !Array.isArray(createInput)
+                ? (createInput as Record<string, unknown>).inheritPermissionFromSessionId
+                : undefined;
+            if (inheritedParent !== undefined && inheritedParent !== null) {
+              const callerSessionId = this.inFlightTool(pluginId)?.sessionId?.trim();
+              if (
+                typeof inheritedParent !== "string" ||
+                !callerSessionId ||
+                inheritedParent.trim() !== callerSessionId
+              ) {
+                throw apiError(
+                  "PERMISSION_DENIED",
+                  "permission inheritance must name the current parent session",
+                );
+              }
+            }
+          }
           const operationInfo = this.services.desktopControl.operations.find(
             (candidate) => candidate.id === operation,
           );
+          // The controller's `confirm` flag is an acknowledgement by the
+          // caller, not a decision by the user. A plugin can set it at will,
+          // so a dangerous operation additionally needs the host's native
+          // consent; a host without that service refuses outright.
+          if (operationInfo?.risk === "dangerous") {
+            if (input.confirm !== true) {
+              throw apiError(
+                "CONFIRMATION_REQUIRED",
+                `confirm=true is required for ${operation}`,
+              );
+            }
+            const consent = this.services.confirmDesktopControl;
+            const granted = consent
+              ? await consent({
+                  pluginId,
+                  pluginName: resolvePluginLocalizedString(
+                    loaded.manifest.name,
+                    this.services.getLocale?.(),
+                    pluginId,
+                  ),
+                  operation,
+                  description: operationInfo.description,
+                  args,
+                })
+              : false;
+            if (!granted) {
+              this.services.audit?.({
+                pluginId,
+                api: "desktop.invoke",
+                operation,
+                risk: operationInfo.risk,
+                ok: false,
+                errorCode: "PERMISSION_DENIED",
+                ts: Date.now(),
+              });
+              throw apiError(
+                "PERMISSION_DENIED",
+                consent
+                  ? `user declined ${operation}`
+                  : `${operation} needs a user confirmation this host cannot show`,
+              );
+            }
+          }
           try {
+            const invocation = this.inFlightTool(pluginId);
             const result = await this.services.desktopControl.invoke({
               operation,
               args,
               confirm: input.confirm === true,
+              source: "plugin",
+              pluginContext: {
+                pluginId,
+                ...(invocation?.sessionId ? { sessionId: invocation.sessionId } : {}),
+                ...(invocation?.turnId ? { turnId: invocation.turnId } : {}),
+                ...(invocation ? { invocationId: invocation.id } : {}),
+              },
+              ...(invocation ? { signal: invocation.signal } : {}),
             } satisfies McpControlInvokeInput);
             this.services.audit?.({
               pluginId,
@@ -3392,7 +3724,7 @@ export class PluginRuntime {
             });
             throw apiError("INVALID_ARGUMENT", "only files can be previewed");
           }
-          const preview = previewFile(full, rel);
+          const preview = await previewFile(full, rel);
           this.services.audit?.({
             pluginId,
             api: "fs.readPreview",

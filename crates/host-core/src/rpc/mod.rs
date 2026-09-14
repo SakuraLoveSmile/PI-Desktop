@@ -1,4 +1,4 @@
-use std::io::{self, BufRead, BufReader as StdBufReader, Write};
+use std::io::{self, BufRead, BufReader as StdBufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
@@ -13,7 +13,7 @@ use crate::agent_capabilities::CapabilityLevel;
 use crate::artifacts;
 use crate::audit;
 use crate::notifications;
-use crate::permissions::{PermissionDecision, PermissionManager};
+use crate::permissions::{PermissionDecision, PermissionEvaluationParams, PermissionManager};
 use crate::plans;
 use crate::plugin_sessions;
 use crate::providers::{self, DiscoveredModelInput, ProviderCreateInput, ProviderUpdateInput};
@@ -24,6 +24,7 @@ use crate::sessions::{self, UiMessage};
 use crate::state::{AppState, HOST_VERSION, PROTOCOL_VERSION};
 use crate::tools::{self, ToolsExecuteParams};
 use crate::transcripts::CompactionRecord;
+use crate::turn_queue;
 use crate::workspace;
 
 #[derive(Debug, Deserialize)]
@@ -68,8 +69,81 @@ struct CacheModelsParams {
 #[derive(Debug)]
 enum StdinEvent {
     Line(String),
+    Oversize { id: Value },
     Error(String),
 }
+
+/// Best-effort JSON-RPC id from a possibly truncated NDJSON prefix.
+///
+/// Electron matches host replies by id. A `LIMIT_EXCEEDED` reply with a null
+/// id is treated as a notification and the caller waits out the 130 s deadline.
+fn peek_jsonrpc_id(prefix: &str) -> Value {
+    let window = prefix.get(..prefix.len().min(2048)).unwrap_or(prefix);
+    if let Ok(value) = serde_json::from_str::<Value>(window) {
+        return value.get("id").cloned().unwrap_or(Value::Null);
+    }
+    let bytes = window.as_bytes();
+    let mut i = 0;
+    while i + 4 < bytes.len() {
+        if &bytes[i..i + 4] != b"\"id\"" {
+            i += 1;
+            continue;
+        }
+        let mut j = i + 4;
+        while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+            j += 1;
+        }
+        if j >= bytes.len() || bytes[j] != b':' {
+            i += 1;
+            continue;
+        }
+        j += 1;
+        while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+            j += 1;
+        }
+        if j >= bytes.len() {
+            return Value::Null;
+        }
+        if bytes[j] == b'"' {
+            j += 1;
+            let start = j;
+            while j < bytes.len() {
+                if bytes[j] == b'\\' {
+                    j = (j + 2).min(bytes.len());
+                    continue;
+                }
+                if bytes[j] == b'"' {
+                    return std::str::from_utf8(&bytes[start..j])
+                        .map(|text| Value::String(text.to_string()))
+                        .unwrap_or(Value::Null);
+                }
+                j += 1;
+            }
+            return Value::Null;
+        }
+        if bytes.get(j..j + 4) == Some(&b"null"[..]) {
+            return Value::Null;
+        }
+        let start = j;
+        if bytes[j] == b'-' {
+            j += 1;
+        }
+        while j < bytes.len() && bytes[j].is_ascii_digit() {
+            j += 1;
+        }
+        if j > start {
+            if let Ok(text) = std::str::from_utf8(&bytes[start..j]) {
+                if let Ok(n) = text.parse::<i64>() {
+                    return json!(n);
+                }
+            }
+        }
+        return Value::Null;
+    }
+    Value::Null
+}
+
+const STDOUT_WRITER_SHUTDOWN: Duration = Duration::from_secs(5);
 
 /// Tokio's stdio adapter delegates every read/write to the blocking pool. If
 /// the OS temporarily refuses another worker thread, Tokio panics instead of
@@ -82,6 +156,11 @@ fn is_transient_io_error(error: &io::Error) -> bool {
     ) || matches!(error.raw_os_error(), Some(11) | Some(35))
 }
 
+/// Largest single NDJSON request line the host accepts. A Write payload of a
+/// few megabytes fits comfortably; anything past this is a framing fault, not
+/// a request, and must not be buffered into memory line by line.
+const MAX_STDIN_LINE_BYTES: u64 = 64 * 1024 * 1024;
+
 fn spawn_stdin_reader(tx: mpsc::UnboundedSender<StdinEvent>) -> io::Result<thread::JoinHandle<()>> {
     thread::Builder::new()
         .name("pi-host-stdin".into())
@@ -91,8 +170,42 @@ fn spawn_stdin_reader(tx: mpsc::UnboundedSender<StdinEvent>) -> io::Result<threa
             let mut line = String::new();
 
             loop {
-                match reader.read_line(&mut line) {
+                let read = (&mut reader)
+                    .take(MAX_STDIN_LINE_BYTES + 1)
+                    .read_line(&mut line);
+                match read {
                     Ok(0) => break,
+                    Ok(_) if line.len() as u64 > MAX_STDIN_LINE_BYTES => {
+                        // Drain the rest of this NDJSON record so a too-large
+                        // replaceMessages cannot kill the control pipe. The
+                        // serve loop answers LIMIT_EXCEEDED and keeps running.
+                        if !line.ends_with('\n') {
+                            let mut discard = [0u8; 8192];
+                            loop {
+                                match reader.read(&mut discard) {
+                                    Ok(0) => break,
+                                    Ok(n) if discard[..n].contains(&b'\n') => break,
+                                    Ok(_) => {}
+                                    Err(error) if error.kind() == io::ErrorKind::Interrupted => {
+                                        continue;
+                                    }
+                                    Err(error) if is_transient_io_error(&error) => {
+                                        thread::sleep(Duration::from_millis(10));
+                                    }
+                                    Err(error) => {
+                                        let _ = tx.send(StdinEvent::Error(error.to_string()));
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        let id = peek_jsonrpc_id(&line);
+                        line.clear();
+                        if tx.send(StdinEvent::Oversize { id }).is_err() {
+                            break;
+                        }
+                    }
+
                     Ok(_) => {
                         if tx
                             .send(StdinEvent::Line(std::mem::take(&mut line)))
@@ -207,11 +320,28 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
                 };
                 let line = match event {
                     StdinEvent::Line(line) => line,
+                    StdinEvent::Oversize { id } => {
+                        let response = JsonRpcResponse {
+                            jsonrpc: "2.0",
+                            id,
+                            result: None,
+                            error: Some(rpc_err(
+                                1002,
+                                "request line exceeds 64 MiB",
+                                "LIMIT_EXCEEDED",
+                            )),
+                        };
+                        if let Ok(raw) = serde_json::to_string(&response) {
+                            let _ = tx.send(format!("{raw}\n"));
+                        }
+                        continue 'serve;
+                    }
                     StdinEvent::Error(error) => {
                         input_error = Some(format!("host stdin read failed: {error}"));
                         break 'serve;
                     }
                 };
+
                 let trimmed = line.trim();
                 if trimmed.is_empty() {
                     continue 'serve;
@@ -313,10 +443,16 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
     }
     drop(tx);
     if !writer_done {
-        input_error = match writer_done_rx.await {
-            Ok(Some(error)) => Some(format!("host stdout write failed: {error}")),
-            Ok(None) => input_error,
-            Err(_) => Some("host stdout writer status unavailable".to_string()),
+        input_error = match tokio::time::timeout(STDOUT_WRITER_SHUTDOWN, writer_done_rx).await {
+            Ok(Ok(Some(error))) => Some(format!("host stdout write failed: {error}")),
+            Ok(Ok(None)) => input_error,
+            Ok(Err(_)) => Some("host stdout writer status unavailable".to_string()),
+            Err(_) => {
+                tracing::warn!("host stdout writer did not stop after stdin closed");
+                input_error.or_else(|| {
+                    Some("host stdout writer did not stop after stdin closed".to_string())
+                })
+            }
         };
     }
     input_error
@@ -338,6 +474,19 @@ fn provider_rpc_err(error: impl ToString) -> JsonRpcError {
         return rpc_err(1002, message, "MODEL_ALIAS_TOO_LONG");
     }
     rpc_err(1000, message, "INTERNAL")
+}
+
+fn session_collaboration_rpc_err(error: impl ToString) -> JsonRpcError {
+    let message = error.to_string();
+    let code = message.split(':').next().unwrap_or("INTERNAL").trim();
+    let rpc_code = match code {
+        "INVALID_ARGUMENT" | "INVALID_PARAMS" | "LIMIT_EXCEEDED" => 1002,
+        "PERMISSION_DENIED" => 1003,
+        "NOT_FOUND" => 1007,
+        "CONFLICT" | "IDEMPOTENCY_CONFLICT" | "AGENT_BUSY" => 1008,
+        _ => return rpc_err(1000, message, "INTERNAL"),
+    };
+    rpc_err(rpc_code, message.clone(), code)
 }
 
 fn plugin_session_rpc_err(error: impl ToString) -> JsonRpcError {
@@ -385,6 +534,33 @@ fn thinking_level_param(params: &Value) -> Result<Option<String>, JsonRpcError> 
         ));
     }
     Ok(Some(level.to_string()))
+}
+
+/// Parse the optional parent session used for permission inheritance. The
+/// caller supplies an existing session id, never an arbitrary permission mode;
+/// the host resolves the persisted mode while holding its state lock.
+fn permission_parent_param(params: &Value) -> Result<Option<String>, JsonRpcError> {
+    let Some(value) = params.get("inheritPermissionFromSessionId") else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let Some(parent_id) = value.as_str() else {
+        return Err(rpc_err(
+            1002,
+            "inheritPermissionFromSessionId must be a string",
+            "INVALID_PARAMS",
+        ));
+    };
+    if parent_id.trim().is_empty() {
+        return Err(rpc_err(
+            1002,
+            "inheritPermissionFromSessionId must not be empty",
+            "INVALID_PARAMS",
+        ));
+    }
+    Ok(Some(parent_id.to_string()))
 }
 
 const DEFAULT_LARGE_PASTE_THRESHOLD: i64 = 600;
@@ -617,9 +793,9 @@ fn resolve_persisted_project_workspace(
 ) -> Result<Option<String>, JsonRpcError> {
     match sessions::get_session(&state.db, session_id) {
         Ok(Some(detail)) => Ok(detail.summary.project_path),
-        // Compatibility fallback for old callers that did not persist a
-        // session before dispatching a tool request.
-        Ok(None) => Ok(state.workspace.path.clone()),
+        // A tool request must name a persisted session: an unknown id never
+        // inherits the mutable global workspace.
+        Ok(None) => Err(rpc_err(1007, "session not found", "SESSION_NOT_FOUND")),
         Err(error) => Err(rpc_err(1000, error.to_string(), "INTERNAL")),
     }
 }
@@ -639,9 +815,9 @@ fn resolve_tool_workspace(
                 .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
             Ok(Some(scratch.to_string_lossy().into_owned()))
         }
-        // Compatibility fallback for old callers that did not persist a
-        // session before dispatching a tool request.
-        Ok(None) => Ok(state.workspace.path.clone()),
+        // A tool request must name a persisted session: an unknown id never
+        // inherits the mutable global workspace.
+        Ok(None) => Err(rpc_err(1007, "session not found", "SESSION_NOT_FOUND")),
         Err(error) => Err(rpc_err(1000, error.to_string(), "INTERNAL")),
     }
 }
@@ -755,6 +931,7 @@ async fn execute_plugin_tool(
     tx: &mpsc::UnboundedSender<String>,
     p: &ToolsExecuteParams,
     timeout_ms: u64,
+    session_mode: &str,
 ) -> tools::ToolsExecuteResult {
     let started = std::time::Instant::now();
     let execution_id = uuid::Uuid::new_v4().to_string();
@@ -769,9 +946,15 @@ async fn execute_plugin_tool(
         json!({
             "executionId": execution_id,
             "sessionId": p.session_id,
+            "turnId": p.turn_id,
             "toolCallId": p.tool_call_id,
             "toolName": p.tool_name,
             "args": p.args,
+            // Durable session mode, not the sidecar-supplied field: ADR 0052
+            // forbids a conflicting sidecar mode from authorizing a tool
+            // (ADR 0211).
+            "mode": session_mode,
+            "planSafeActions": p.plan_safe_actions,
         }),
     )
     .await;
@@ -957,6 +1140,11 @@ async fn handle_request(
     }
 
     match method {
+        method if method.starts_with("session.collaboration.") => {
+            let st = state.lock().await;
+            crate::session_collaboration::handle(&st.db, method, &params)
+                .map_err(session_collaboration_rpc_err)
+        }
         "app.handshake" => {
             let client_version = params
                 .get("protocolVersion")
@@ -1055,6 +1243,41 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                 .ok_or_else(|| rpc_err(1000, "project disappeared after creation", "INTERNAL"))?;
             Ok(json!({ "project": project }))
+        }
+        "project.memory.get" => {
+            let path = params
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let memory = st
+                .db
+                .get_project_memory(path)
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            Ok(json!({ "memory": memory }))
+        }
+        "project.memory.set" => {
+            let path = params
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            if let Some(entries) = params.get("entries") {
+                let memory = st
+                    .db
+                    .set_project_memory_entries(path, entries)
+                    .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+                return Ok(json!({ "memory": memory }));
+            }
+            let content = params
+                .get("content")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
+            let memory = st
+                .db
+                .set_project_memory(path, content)
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            Ok(json!({ "memory": memory }))
         }
         "workspace.set" => {
             let path = params
@@ -1320,30 +1543,43 @@ async fn handle_request(
         }
         "session.create" => {
             let thinking_level = thinking_level_param(&params)?;
+            let permission_parent = permission_parent_param(&params)?;
             let st = state.lock().await;
-            let session = sessions::create_session_with_thinking(
+            let permission_mode = if let Some(parent_id) = permission_parent {
+                Some(
+                    sessions::session_permission_mode(&st.db, &parent_id)
+                        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                        .ok_or_else(|| rpc_err(1007, "parent session not found", "NOT_FOUND"))?,
+                )
+            } else {
+                None
+            };
+            let session = sessions::create_session_with_options(
                 &st.db,
-                params
-                    .get("title")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string),
-                params
-                    .get("mode")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string),
-                params
-                    .get("providerId")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string),
-                params
-                    .get("modelId")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string),
-                params
-                    .get("projectPath")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string),
-                thinking_level,
+                sessions::SessionCreateOptions {
+                    title: params
+                        .get("title")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    mode: params
+                        .get("mode")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    provider_id: params
+                        .get("providerId")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    model_id: params
+                        .get("modelId")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    project_path: params
+                        .get("projectPath")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    thinking_level,
+                    permission_mode,
+                },
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "session": session }))
@@ -1368,6 +1604,33 @@ async fn handle_request(
                         return Err(rpc_err(1008, "session is running", "CONFLICT"))
                     }
                 };
+            Ok(json!({ "session": session }))
+        }
+        "session.moveProject" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let project_path = params
+                .get("projectPath")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let session = match sessions::move_session_project(&st.db, session_id, project_path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            {
+                sessions::MoveSessionProjectResult::Moved(session) => session,
+                sessions::MoveSessionProjectResult::NotFound => {
+                    return Err(rpc_err(1007, "session not found", "NOT_FOUND"))
+                }
+                sessions::MoveSessionProjectResult::Busy => {
+                    return Err(rpc_err(1008, "session is running", "CONFLICT"))
+                }
+            };
             Ok(json!({ "session": session }))
         }
         "session.get" => {
@@ -1559,6 +1822,33 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": true }))
         }
+        "session.truncateFrom" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let from_message_id = params
+                .get("fromMessageId")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|id| !id.is_empty());
+            let truncate_before = params.get("truncateBefore").and_then(|v| v.as_i64());
+            let st = state.lock().await;
+            let truncated =
+                sessions::truncate_from(&st.db, session_id, from_message_id, truncate_before)
+                    .map_err(|e| {
+                        let message = e.to_string();
+                        if message.starts_with("NOT_FOUND") {
+                            rpc_err(1007, message, "NOT_FOUND")
+                        } else if message.starts_with("INVALID_PARAMS") {
+                            rpc_err(1002, message, "INVALID_PARAMS")
+                        } else {
+                            rpc_err(1000, message, "INTERNAL")
+                        }
+                    })?;
+            serde_json::to_value(truncated).map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
+        }
+
         "session.saveRevision" => {
             let session_id = params
                 .get("sessionId")
@@ -1707,7 +1997,11 @@ async fn handle_request(
                 .ok_or_else(|| rpc_err(1002, "pluginId required", "INVALID_PARAMS"))?;
             let mut st = state.lock().await;
             if !st.allow_plugin_import(plugin_id, true) {
-                return Err(rpc_err(1006, "plugin batch import rate exceeded", "RATE_LIMITED"));
+                return Err(rpc_err(
+                    1006,
+                    "plugin batch import rate exceeded",
+                    "RATE_LIMITED",
+                ));
             }
             let result = plugin_sessions::import_batch(&st.db, plugin_id, &params)
                 .map_err(plugin_session_rpc_err)?;
@@ -1764,20 +2058,15 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
-            let turn_id = sessions::begin_turn(
-                &st.db,
-                session_id,
-                params.get("providerId").and_then(|v| v.as_str()),
-                params.get("modelId").and_then(|v| v.as_str()),
-            )
-            .map_err(|e| {
-                let message = e.to_string();
-                if message == "AGENT_BUSY" {
-                    rpc_err(1008, message, "AGENT_BUSY")
-                } else {
-                    rpc_err(1000, message, "INTERNAL")
-                }
-            })?;
+            let provider = params.get("providerId").and_then(Value::as_str);
+            let model = params.get("modelId").and_then(Value::as_str);
+            let turn_id = match params.get("sessionMessageId").and_then(Value::as_str) {
+                Some(message_id) => crate::session_collaboration::begin_turn(
+                    &st.db, session_id, message_id, provider, model,
+                ),
+                None => sessions::begin_turn(&st.db, session_id, provider, model),
+            }
+            .map_err(session_collaboration_rpc_err)?;
             Ok(json!({ "turnId": turn_id }))
         }
         "session.endTurn" => {
@@ -1814,6 +2103,56 @@ async fn handle_request(
                 response["recovered"] = json!(recovered);
             }
             Ok(response)
+        }
+
+        // The Host-owned turn queue (D375 / ADR 0213). Entries are durable so
+        // a restart restores them in order; the Agent Host decides when one
+        // starts, never the store.
+        "session.queuePush" => {
+            let input: turn_queue::QueuedTurnInput = serde_json::from_value(params.clone())
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let entry = turn_queue::push(&st.db, input).map_err(|e| {
+                let message = e.to_string();
+                if message == "QUEUE_FULL" {
+                    rpc_err(1008, message, "AGENT_BUSY")
+                } else if message == "IDEMPOTENCY_CONFLICT" {
+                    rpc_err(1008, message, "IDEMPOTENCY_CONFLICT")
+                } else if message.starts_with("session not found") {
+                    rpc_err(1007, message, "SESSION_NOT_FOUND")
+                } else {
+                    rpc_err(1000, message, "INTERNAL")
+                }
+            })?;
+            Ok(json!({ "entry": entry }))
+        }
+        "session.queueList" => {
+            let session_id = params.get("sessionId").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            let entries = turn_queue::list(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "entries": entries }))
+        }
+        "session.queueRemove" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let removed = turn_queue::remove(&st.db, id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "removed": removed }))
+        }
+        "session.queuePrioritize" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let entry = turn_queue::prioritize(&st.db, id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .ok_or_else(|| rpc_err(1007, "queue entry not found", "NOT_FOUND"))?;
+            Ok(json!({ "entry": entry }))
         }
 
         "notification.list" => {
@@ -2333,12 +2672,6 @@ async fn handle_request(
 
         "tools.list" => Ok(json!({ "tools": tools::builtin_tool_defs() })),
         "tools.execute" => {
-            // Segmented timing (D137): a slow tool call is almost never slow
-            // *inside* the tool — the wait is either the approval prompt or the
-            // model round trip that follows. Splitting the host's own share
-            // into approval / execution / bookkeeping is what makes the three
-            // distinguishable in host/timing.log instead of one opaque
-            // duration.
             let call_started = std::time::Instant::now();
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
@@ -2489,13 +2822,16 @@ async fn handle_request(
                     let mut auto = st
                         .permissions
                         .evaluate_auto_with_permission_mode_and_risk_and_path(
-                            &p.session_id,
-                            &p.tool_name,
-                            &durable_mode,
-                            &effective_pm,
-                            &st.session_grants,
-                            p.declared_risk.as_deref(),
-                            external_path_permission,
+                            PermissionEvaluationParams {
+                                session_id: &p.session_id,
+                                tool_name: &p.tool_name,
+                                mode: &durable_mode,
+                                permission_mode: &effective_pm,
+                                session_grants: &st.session_grants,
+                                declared_risk: p.declared_risk.as_deref(),
+                                requires_external_path_permission: external_path_permission,
+                                plan_safe_actions: p.plan_safe_actions.as_deref(),
+                            },
                         );
                     // Write/Edit targeting the session scratch dir never touch
                     // the user's project — skip the prompt (D114). The lexical
@@ -2664,19 +3000,6 @@ async fn handle_request(
                         Some(&p.session_id),
                         denied_audit,
                     );
-                    tracing::info!(
-                        tool = %p.tool_name,
-                        tool_call_id = %p.tool_call_id,
-                        session_id = %p.session_id,
-                        prompted,
-                        permission_wait_ms,
-                        execute_ms = 0,
-                        overhead_ms = 0,
-                        total_ms = call_started.elapsed().as_millis() as u64,
-                        command_shell_id = permission_shell_id.as_deref(),
-                        outcome = if cancelled { "aborted" } else { "denied" },
-                        "tool timing"
-                    );
                     let error_code = if cancelled {
                         "TOOL_ABORTED"
                     } else if sessions::is_contract_mode(&durable_mode)
@@ -2836,17 +3159,26 @@ async fn handle_request(
                 let mut result = if tools::is_desktop_dispatched(&p.tool_name) {
                     // Plugin dispatch keeps its existing bounded default timeout;
                     // command-shell timeout semantics apply only to Bash.
-                    execute_plugin_tool(&state, &tx, &p, p.timeout_ms.unwrap_or(60_000)).await
+                    execute_plugin_tool(
+                        &state,
+                        &tx,
+                        &p,
+                        p.timeout_ms.unwrap_or(60_000),
+                        &durable_mode,
+                    )
+                    .await
                 } else {
                     tools::execute_tool_with_path_access(
                         ws_path.as_deref(),
                         scratch_path.as_deref(),
                         &p.tool_name,
                         &p.args,
-                        execution_timeout_ms,
-                        bash_options,
-                        external_path_permission,
-                        Some(&hashline_ctx),
+                        tools::ToolExecutionOptions {
+                            timeout_ms: execution_timeout_ms,
+                            bash_options,
+                            allow_external_paths: external_path_permission,
+                            hashline: Some(hashline_ctx),
+                        },
                     )
                     .await
                 };
@@ -2931,19 +3263,6 @@ async fn handle_request(
                     execute_audit["commandShellId"] = json!(shell_id);
                 }
                 let _ = audit::append(&st.db, "tool_execute", Some(&p.session_id), execute_audit);
-                tracing::info!(
-                    tool = %p.tool_name,
-                    tool_call_id = %p.tool_call_id,
-                    session_id = %p.session_id,
-                    prompted,
-                    permission_wait_ms,
-                    execute_ms = result.duration_ms,
-                    overhead_ms,
-                    total_ms,
-                    command_shell_id = result.command_shell_id.as_deref(),
-                    outcome = if result.ok { "ok" } else { "error" },
-                    "tool timing"
-                );
 
                 serde_json::to_value(result).map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
             }
@@ -2983,6 +3302,16 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             let declared_risk = params.get("declaredRisk").and_then(|v| v.as_str());
+            let plan_safe_actions: Option<Vec<String>> = params
+                .get("planSafeActions")
+                .and_then(|v| v.as_array())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(str::to_string))
+                        .collect()
+                })
+                .filter(|items: &Vec<String>| !items.is_empty());
             let st = state.lock().await;
             let Some(mode) = sessions::session_mode(&st.db, session_id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
@@ -3020,15 +3349,16 @@ async fn handle_request(
             );
             let decision = st
                 .permissions
-                .evaluate_auto_with_permission_mode_and_risk_and_path(
+                .evaluate_auto_with_permission_mode_and_risk_and_path(PermissionEvaluationParams {
                     session_id,
                     tool_name,
-                    &mode,
-                    &effective_pm,
-                    &st.session_grants,
+                    mode: &mode,
+                    permission_mode: &effective_pm,
+                    session_grants: &st.session_grants,
                     declared_risk,
-                    external_path_permission,
-                );
+                    requires_external_path_permission: external_path_permission,
+                    plan_safe_actions: plan_safe_actions.as_deref(),
+                });
             Ok(json!({
                 "decision": decision,
                 "risk": PermissionManager::tool_risk_with_declared(tool_name, declared_risk),
@@ -3075,6 +3405,14 @@ async fn handle_request(
             let mut st = state.lock().await;
             st.session_grants.remove(session_id);
             Ok(json!({ "ok": true }))
+        }
+        "permissions.pending" => {
+            // Pending requests are Host state (D374/D375): a client that
+            // attaches after `permissions.request` was emitted reads the open
+            // set here and answers through the unchanged `permissions.resolve`.
+            let session_id = params.get("sessionId").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            Ok(json!({ "requests": st.permissions.pending_requests(session_id) }))
         }
 
         "plugins.list" => {
@@ -3646,7 +3984,7 @@ mod tests {
     use tokio::sync::{mpsc, Mutex};
 
     use super::{
-        capability_err, handle_request, parse_capability_query, provider_rpc_err,
+        capability_err, handle_request, parse_capability_query, peek_jsonrpc_id, provider_rpc_err,
         resolve_plan_workspace, resolve_tool_workspace, scope_err, skill_err,
     };
     use crate::plans::{PlanResolveParams, PlanSubmitParams};
@@ -3688,6 +4026,27 @@ mod tests {
     }
 
     #[test]
+    fn peek_jsonrpc_id_reads_a_string_id_from_a_truncated_prefix() {
+        let prefix =
+            r#"{"jsonrpc":"2.0","id":"abc-123","method":"session.replaceMessages","params":{"#;
+        assert_eq!(peek_jsonrpc_id(prefix), json!("abc-123"));
+    }
+
+    #[test]
+    fn peek_jsonrpc_id_reads_a_numeric_id() {
+        assert_eq!(
+            peek_jsonrpc_id(r#"{"jsonrpc":"2.0","id":7,"method":"x"}"#),
+            json!(7)
+        );
+    }
+
+    #[test]
+    fn peek_jsonrpc_id_is_null_when_the_prefix_has_no_id() {
+        assert_eq!(peek_jsonrpc_id("not json"), Value::Null);
+        assert_eq!(peek_jsonrpc_id(""), Value::Null);
+    }
+
+    #[test]
     fn provider_alias_validation_keeps_a_stable_error_code() {
         let error = provider_rpc_err("MODEL_ALIAS_TOO_LONG: alias is too long");
         assert_eq!(error.code, 1002);
@@ -3715,11 +4074,12 @@ mod tests {
         .await
         .unwrap();
         let project_id = result["project"]["id"].as_i64().unwrap();
-        let canonical_path = data_dir.path().canonicalize().unwrap();
-        assert_eq!(
-            result["project"]["path"],
-            canonical_path.to_string_lossy().as_ref()
-        );
+        // A stored project path has one canonical spelling: resolved, with
+        // forward slashes. Comparing against the raw platform spelling only
+        // holds where the separator happens to be `/`.
+        let canonical_path =
+            crate::db::canonical_project_path(&path).expect("canonical project path");
+        assert_eq!(result["project"]["path"], canonical_path.as_str());
         assert!(project_id > 0);
 
         let workspace = handle_request(
@@ -3731,6 +4091,129 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(workspace["workspace"], Value::Null);
+    }
+
+    #[tokio::test]
+    async fn project_memory_rpc_roundtrips_without_switching_workspace() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let path = data_dir.path().to_string_lossy().to_string();
+
+        let saved = handle_request(
+            state.clone(),
+            "project.memory.set",
+            json!({ "path": path, "content": "Use the staging database." }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved["memory"]["content"], "Use the staging database.");
+
+        let loaded = handle_request(
+            state.clone(),
+            "project.memory.get",
+            json!({ "path": data_dir.path() }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(loaded["memory"]["content"], "Use the staging database.");
+
+        let structured = handle_request(
+            state,
+            "project.memory.set",
+            json!({
+                "path": path,
+                "entries": [{
+                    "id": "deployment",
+                    "title": "Deployment",
+                    "content": "Use the staging database."
+                }]
+            }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            structured["memory"]["content"],
+            "## Deployment\n\nUse the staging database."
+        );
+        assert_eq!(structured["memory"]["entries"][0]["id"], "deployment");
+    }
+
+    #[tokio::test]
+    async fn session_create_rpc_inherits_optional_permission_mode() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let parent_id = sessions::create_session_with_options(
+            &app_state.db,
+            sessions::SessionCreateOptions {
+                permission_mode: Some("ask".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .id;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let explicit = handle_request(
+            state.clone(),
+            "session.create",
+            json!({
+                "mode": "agent",
+                "thinkingLevel": "high",
+                "inheritPermissionFromSessionId": parent_id
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(explicit["session"]["thinkingLevel"], "high");
+        assert_eq!(explicit["session"]["permissionMode"], "ask");
+
+        let legacy = handle_request(
+            state.clone(),
+            "session.create",
+            json!({ "mode": "agent" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(legacy["session"]["permissionMode"], "inherit");
+
+        let arbitrary_permission = handle_request(
+            state.clone(),
+            "session.create",
+            json!({ "mode": "agent", "permissionMode": "auto" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(arbitrary_permission["session"]["permissionMode"], "inherit");
+
+        let invalid = handle_request(
+            state.clone(),
+            "session.create",
+            json!({ "inheritPermissionFromSessionId": true }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(invalid.data.unwrap()["errorCode"], "INVALID_PARAMS");
+
+        let malformed = handle_request(
+            state,
+            "session.create",
+            json!({ "inheritPermissionFromSessionId": "" }),
+            tx,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(malformed.data.unwrap()["errorCode"], "INVALID_PARAMS");
     }
 
     #[tokio::test]
@@ -4007,8 +4490,8 @@ mod tests {
         );
 
         assert_eq!(
-            resolved.canonicalize().unwrap(),
-            project_a.canonicalize().unwrap()
+            crate::workspace::simple_canonicalize(&resolved).unwrap(),
+            crate::workspace::simple_canonicalize(&project_a).unwrap()
         );
     }
 
@@ -4046,8 +4529,11 @@ mod tests {
             "PLAN_WORKSPACE_REQUIRED"
         );
         assert_eq!(
-            resolve_tool_workspace(&state, "legacy-missing-session").unwrap(),
-            state.workspace.path
+            resolve_tool_workspace(&state, "legacy-missing-session")
+                .expect_err("unknown sessions must not inherit the global workspace")
+                .data
+                .unwrap()["errorCode"],
+            "SESSION_NOT_FOUND"
         );
     }
 
@@ -4079,10 +4565,12 @@ mod tests {
             Some(&scratch),
             "Write",
             &json!({ "path": "notes.txt", "content": "temporary" }),
-            None,
-            None,
-            false,
-            None,
+            crate::tools::ToolExecutionOptions {
+                timeout_ms: None,
+                bash_options: None,
+                allow_external_paths: false,
+                hashline: None,
+            },
         )
         .await;
         assert!(written.ok);
@@ -4097,10 +4585,12 @@ mod tests {
             Some(&scratch),
             "Read",
             &json!({ "path": "notes.txt" }),
-            None,
-            None,
-            false,
-            None,
+            crate::tools::ToolExecutionOptions {
+                timeout_ms: None,
+                bash_options: None,
+                allow_external_paths: false,
+                hashline: None,
+            },
         )
         .await;
         assert!(read.ok);
@@ -4787,6 +5277,119 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn permissions_pending_lists_the_open_request_until_resolved() {
+        let Some(shell_id) = available_test_shell_id() else {
+            return;
+        };
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Pending permission read".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        sessions::configure_session_with_thinking(
+            &app_state.db,
+            &session.id,
+            "agent",
+            None,
+            None,
+            None,
+            Some("ask"),
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let session_id = session.id.clone();
+        let pending_state = state.clone();
+        let pending_task = tokio::spawn(async move {
+            handle_request(
+                pending_state,
+                "tools.execute",
+                json!({
+                    "sessionId": session_id,
+                    "toolCallId": "pending-read",
+                    "toolName": "Bash",
+                    "args": { "command": sleeping_bash_command() },
+                    "expectedCommandShellId": shell_id,
+                    "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&shell_id),
+                    "mode": "agent"
+                }),
+                tx,
+            )
+            .await
+        });
+        let permission = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let permission: Value = serde_json::from_str(&permission).unwrap();
+        assert_eq!(permission["method"], "permissions.request");
+        let request_id = permission["params"]["requestId"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let listed = handle_request(
+            state.clone(),
+            "permissions.pending",
+            json!({ "sessionId": session.id }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        let requests = listed["requests"].as_array().unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0]["requestId"], request_id);
+        assert_eq!(requests[0]["sessionId"], session.id);
+        assert_eq!(requests[0]["toolName"], "Bash");
+        assert_eq!(requests[0]["timeoutMs"], 120000);
+        assert!(
+            requests[0]["expiresAt"].as_str().unwrap() > requests[0]["createdAt"].as_str().unwrap()
+        );
+        assert!(requests[0]["remainingMs"].as_u64().unwrap() <= 120000);
+
+        let other = handle_request(
+            state.clone(),
+            "permissions.pending",
+            json!({ "sessionId": "another-session" }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert!(other["requests"].as_array().unwrap().is_empty());
+
+        handle_request(
+            state.clone(),
+            "permissions.resolve",
+            json!({ "requestId": request_id, "decision": "deny" }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        let result = pending_task.await.unwrap().unwrap();
+        assert_eq!(result["errorCode"], "TOOL_DENIED");
+
+        let after = handle_request(
+            state.clone(),
+            "permissions.pending",
+            json!({}),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert!(after["requests"].as_array().unwrap().is_empty());
+        assert_bash_registry_empty(&state).await;
+    }
+
+    #[tokio::test]
     async fn tools_abort_during_permission_removes_the_pending_request() {
         let Some(shell_id) = available_test_shell_id() else {
             return;
@@ -5454,6 +6057,76 @@ mod tests {
         sessions::end_turn(&st.db, &first, "aborted", None, None, false).unwrap();
     }
 
+    #[tokio::test]
+    async fn truncate_from_rpc_cuts_without_shipping_the_kept_prefix() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Large".into()),
+            Some("agent".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let turn = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
+        let prefix: sessions::UiMessage = serde_json::from_value(json!({
+            "id": "u0",
+            "role": "user",
+            "content": "earlier",
+            "createdAt": "2025-05-01T00:00:00Z"
+        }))
+        .unwrap();
+        let root: sessions::UiMessage = serde_json::from_value(json!({
+            "id": "u1",
+            "role": "user",
+            "content": "retry me",
+            "createdAt": "2025-05-01T00:00:01Z"
+        }))
+        .unwrap();
+        sessions::append_message(&app_state.db, &session.id, &prefix, Some(&turn)).unwrap();
+        sessions::append_message(&app_state.db, &session.id, &root, Some(&turn)).unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let result = handle_request(
+            state.clone(),
+            "session.truncateFrom",
+            json!({ "sessionId": session.id, "fromMessageId": "u1" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["ok"], json!(true));
+        assert_eq!(result["keptCount"], json!(1));
+        assert_eq!(result["discardedCount"], json!(1));
+        assert_eq!(result["abortedTurnId"], json!(turn));
+
+        let detail = handle_request(
+            state.clone(),
+            "session.get",
+            json!({ "id": session.id, "messageLimit": 10 }),
+            tx,
+        )
+        .await
+        .unwrap();
+        let messages = detail["session"]["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0]["id"], json!("u0"));
+
+        let missing = handle_request(
+            state,
+            "session.truncateFrom",
+            json!({ "sessionId": session.id, "fromMessageId": "gone" }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(missing.data.unwrap()["errorCode"], "NOT_FOUND");
+    }
+
     /// D137: the audit row for a tool call must carry the three segments
     /// separately, so "the tool was slow" can be told apart from "the user
     /// took 20s to approve it".
@@ -5870,7 +6543,7 @@ mod tests {
         .unwrap();
         assert_eq!(result["ok"], true, "external auto Glob failed: {result}");
         // External Glob results are absolute rather than carrying a root field.
-        let canonical_outside_file = outside_file.canonicalize().unwrap();
+        let canonical_outside_file = crate::workspace::simple_canonicalize(&outside_file).unwrap();
         assert_eq!(
             result["content"]["matches"][0],
             json!(canonical_outside_file.to_string_lossy()),

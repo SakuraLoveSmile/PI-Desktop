@@ -77,9 +77,13 @@ accept_prompt
 
 1. Only one active turn per session
 2. A direct host prompt is rejected with `AGENT_BUSY` while
-   running/waiting_permission. The renderer's Send-while-running path stores
-   the next prompt in its per-session in-memory queue instead and releases it
-   only after `agent_end`, so normal user sends do not surface `AGENT_BUSY`.
+   running/waiting_permission. The renderer's Send-while-running path pushes
+   the next prompt into the Host-owned turn queue (schema v15, D375 / D386 /
+   ADR 0213) through `agent/queue/push` and mirrors the durable entries from
+   `agent/event/queueChanged`; the Agent Host module releases one entry after
+   `agent_end`, holds a restored queue until the owner attaches, and moves an
+   entry to the head on `agent/queue/prioritize`, so normal user sends do not
+   surface `AGENT_BUSY`.
 3. A graceful stop completes the current assistant/tool boundary as a normal
    `completed` turn before the renderer releases a queued prompt.
 4. Abort from running or waiting_permission is allowed. Renderer smart Stop

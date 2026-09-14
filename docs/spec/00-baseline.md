@@ -2,7 +2,7 @@
 
 - Baseline Version: `0.4.16`
 - Date: `2026-08-14`
-- Status: `Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v11 + schema v14 + host-owned plugin session import/read/update/delete P0/P1 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + edge-specific work-panel/chat resize ownership + models.dev model catalog with a bundled release snapshot + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions + custom global UI font)`
+- Status: `Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v11 + schema v16 + host-owned plugin session import/read/update/delete P0/P1 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + edge-specific work-panel/chat resize ownership + models.dev model catalog with a bundled release snapshot + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions + custom global UI font)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -81,16 +81,20 @@
 > The current post-baseline amendments add the P0/P1 host-owned plugin session
 > API through ADR 0200 / D367, explicit project ids plus host-owned session
 > refresh through ADR 0201 / D368, and the opt-in local MCP control plane
-> through ADR 0203 / D370 (catalog and bind tightened by D372). Protocol v11 remains unchanged; schema v14 adds the
+> through ADR 0203 / D370 (catalog and bind tightened by D372). Protocol v11 remains unchanged; schema v16 adds the host-owned session collaboration ledger
+> (D409 / ADR 0239) on top of schema v15. Schema v15 adds the Host-owned turn queue
+> (D386 / ADR 0213) on top of schema v14, which added the
 > plugin origin sidecar and soft-delete marker. Session mutation, arbitrary
 > re-binding, provider/model binding, batch-delete, and tag operations remain
 > deferred; an explicit `projectId` is the limited project-binding exception
 > for imported sessions. The local control plane is loopback-only and does not
 > reopen the deferred remote Gateway / WebUI scope. ADR 0205 / D373 defines the
 > remote Agent Host, Gateway, and multi-binding control-plane target for a
-> future post-MVP milestone; D376 amends that target to one normative
+> future post-MVP milestone; D374 amends that target to one normative
 > WebSocket binding, a headless Agent Host module, and the full local
-> approval vocabulary. Neither changes the current exclusion.
+> approval vocabulary, and D375 schedules the SSH-tunnel remote Host first
+> while Gateway and browser access stay unscheduled. None of them changes the
+> current exclusion.
 
 ## Frozen Decisions
 

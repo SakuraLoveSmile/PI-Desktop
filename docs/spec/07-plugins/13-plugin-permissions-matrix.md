@@ -22,6 +22,7 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `fs.delete.workspace` | high | — | Downgraded on load to `fs.delete` with `own: true` | Legacy name; only the plugin's own output goes without asking |
 | `agent.tool.register` | high | Register an agent tool | Confirm at install | Tool execution is audited separately |
 | `agent.prompt.inject` | high | Inject a system prompt; activates `contributes.skills` | Deny by default / strong confirmation | Easily leads to behavior hijacking |
+| `agent.extension` | high | Run `contributes.agentExtensions` modules inside the agent process | Explicit confirmation; local imports and development plugins only in v1.1 | Same access as the agent's own tools; the plugin sandbox does not apply (spec 16) |
 | `net.fetch` | high | `net.fetch` | Deny by default | Confined to `manifest.net.domains`; an empty or malformed list means no egress (§2A) |
 | `shell.openExternal` | medium | Open external link | Confirm on first use | Prevents phishing links |
 | `mcp.server.local` | high | Spawn a `transport: "stdio"` MCP server declared in the manifest | Deny by default | Runs a local executable; its tools reach the agent |
@@ -30,6 +31,8 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `bus.publish` | medium | `bus.publish` to declared topics | Confirm at install | Other plugins can act on the message |
 | `bus.subscribe` | medium | `bus.subscribe` to declared patterns | Confirm at install | Can observe another plugin's messages |
 | `browser.cdp` | high | `pi.browser.*` against the host work-panel guest | Confirm at install | Guest bounds are clamped to the calling plugin view; CDP is allowlisted |
+| `desktop.control` | high | `pi.desktop.listOperations`, `pi.desktop.invoke`, including the reviewed `session/collaboration/*` operations | Confirm at install | Shared with the local MCP control plane's reviewed operation catalog, except for operations marked plugin-only: the six `session/collaboration/*` operations reach the plugin gateway but are deliberately absent from the MCP-visible catalog and have no renderer mutation channel; collaboration `spawn`/`send` additionally require an active plugin Agent tool invocation, whose source Session/turn/invocation identity is injected by the host; panel cancellation is limited to that plugin's own deliveries; a `dangerous` operation needs `confirm: true` from the plugin **and** the user's answer to a host-owned native dialog that names the catalog operation; the MCP bearer token and Electron channel names are never exposed |
+| `ui.microphone` | medium | `navigator.mediaDevices.getUserMedia({ audio: true })` inside the plugin's isolated panel | Confirm at install | Audio only; camera and every other device permission stay denied; no native handle or host secret reaches the plugin |
 | `models.list` | medium | `pi.models.list` | Confirm at install | Ready provider/model rows only; no secrets |
 | `project.create` | high | `pi.project.create` and explicit `projectId` on session import | Confirm at install | Creates or reuses a durable project row without activating the workspace; imported sessions remain unbound unless the id is supplied |
 | `session.read` | high | `pi.session.getLlmContext` | Confirm at install | In-flight tool session only; compaction-aware projection (D019 / D336) |
@@ -116,6 +119,7 @@ so "Modify the files it lists" is followed by the list.
 | `notify` | Show in-app and native notifications | 显示应用内和系统通知 |
 | `agent.tool.register` | Provide executable tools to the AI Agent | 向 AI Agent 提供可执行工具 |
 | `agent.prompt.inject` | Adjust agent instructions | 调整智能体指令 |
+| `agent.extension` | Run code inside the agent | 在 agent 内运行代码 |
 | `net.fetch` | Access the network | 访问网络 |
 | `shell.openExternal` | Open external links | 打开外部链接 |
 | `ui.theme` | Provide a theme | 提供主题 |
