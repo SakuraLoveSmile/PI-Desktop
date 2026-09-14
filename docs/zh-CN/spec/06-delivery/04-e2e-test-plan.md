@@ -4688,6 +4688,30 @@ IPC 请求无法关闭。
 - **里程碑**：M6+
 - **状态**：host-core 的 `a_bundled_plugin_keeps_the_update_the_user_installed`、`a_newer_shipped_version_replaces_an_older_user_install`、`a_plugin_a_build_stops_shipping_is_no_longer_bundled`、`market_entry_offers_an_update_only_when_the_catalog_is_newer` 已覆盖；完整打包旅程为草稿
 
+#### E2E-NAV-plugins-button-goes-back：插件按钮复用导航历史
+
+- **先决条件**：隔离配置中有具名会话及可见消息；不需要模型凭据或外部插件
+  市场连接。
+- **步骤**：1) 选择会话，输入未发送草稿，从页脚进入插件页，再次点击同一
+  按钮。2) 重开插件页，在已安装列表输入搜索文本，返回后再次打开。3) 在
+  导航测试中分别从 `pulls`、`scheduled` 和设置进入；再测试插件前同时存在
+  定时任务和设置的历史。4) 前进到插件页后再次点击插件按钮。5) 没有可后退
+  历史时打开插件页并点击按钮。
+- **预期**：第二次点击执行一次现有后退操作，不追加返回条目，也不跳过设置。
+  聊天历史条目复用现有会话选择和加载行为，返回后会话及未发送草稿仍可用。
+  无法后退时打开聊天页。按下状态反映插件页是否激活。插件浏览标签、搜索
+  文本和分类筛选跨页面卸载保留；对话框与监听正常释放，不在隐藏页继续
+  运行。设置导航保持不变。
+- **链接规格**：`04-ux/01-ui-ia.md` §2/§5、`04-ux/08-component-spec.md` §3
+- **验收**：C（会话导航）、G（插件浏览）、Quality
+- **里程碑**：M6+
+- **状态**：实际页脚事件、历史 slice 与浏览状态回归已通过。重新构建后的
+  历史后退实现通过真实 macOS UI 两轮打开/返回验收：相同的两条会话消息
+  和未发送草稿保留，返回后按钮取消激活，重开保留已安装列表的搜索筛选。
+  非聊天历史条目、前进和无历史兜底通过测试覆盖，未做原生 UI 验证。
+  不需要外部插件市场或真实模型。这些均为合并前结果；主线合并后 E2E
+  尚未运行。
+
 #### E2E-PROVIDER-copy-config-without-credentials：复制配置为独立提供商
 
 - **先决条件**：设置页有一个普通提供商，已保存 API 密钥、自定义请求头和两个
@@ -4727,6 +4751,7 @@ IPC 请求无法关闭。
 
 | 验收 | 应用场景 |
 |---|---|
+| C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | B / F / Security — 提供商复制 | E2E-PROVIDER-copy-config-without-credentials |
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |
 | B——模型配置 | E2E-005、E2E-005G、E2E-006、E2E-007、E2E-038、E2E-050、E2E-052、E2E-055、E2E-066、E2E-080、E2E-082、E2E-151、E2E-005J、E2E-199、E2E-201、E2E-202、E2E-203、E2E-209、E2E-166 |

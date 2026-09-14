@@ -6701,6 +6701,35 @@ and identify the platform validation still needed.
 - **Status**: Unit/source-contract covered; full provider-dialog journey Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-NAV-plugins-button-goes-back: Plugins footer reuses navigation history
+
+- **Preconditions**: An isolated profile has a named conversation and visible
+  messages. No model credentials or external marketplace access are required.
+- **Steps**: 1) Select the conversation, type an unsent draft, enter Plugins
+  from the footer, and click the same button again. 2) Reopen Plugins, type a
+  search in Installed, return and reopen. 3) In the navigation fixture, repeat
+  from `pulls`, `scheduled`, and Settings; test a history containing both
+  Scheduled and Settings before Plugins. 4) Exercise Forward then the Plugins
+  button again. 5) Open Plugins with no previous history entry and click it.
+- **Expected**: The second click performs the existing Back action exactly once;
+  it does not append a return entry or skip Settings. A chat history entry uses
+  existing session selection/loading behavior. The conversation and unsent draft
+  remain usable on return. If Back is unavailable, the button opens chat.
+  Its pressed state reflects whether Plugins is active. Plugin browsing tab,
+  search fields, and category survive route unmounts; dialogs and listeners
+  are released rather than kept hidden. Settings navigation is unchanged.
+- **Specs linked**: `04-ux/01-ui-ia.md` §2/§5, `04-ux/08-component-spec.md` §3
+- **Acceptance**: C (session navigation), G (plugin browsing), Quality
+- **Milestone**: M6+
+- **Status**: Actual footer-handler/history-slice and browse-state regression
+  tests passed. Real macOS UI validation of the rebuilt history-based revision
+  passed two open/back cycles: the same two conversation messages and unsent
+  draft remain, the button clears its active state on return, and reopening
+  retains the Installed search filter. Non-chat history entries, Forward, and
+  no-history fallback are covered by tests, not native UI. No external
+  marketplace or live model was required. These are pre-merge results;
+  post-integration main E2E is NOT RUN.
+
 #### E2E-PROVIDER-copy-config-without-credentials: Copy configuration into an independent provider
 
 - **Preconditions**: Settings contains an ordinary provider with a saved API
@@ -6751,6 +6780,7 @@ and identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
+| C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
