@@ -17,15 +17,8 @@ ownership rules.
 
 ## Decision
 
-1. The renderer materializes clipboard `File` objects through the attachment
-   flow. Amendment (2026-09-14, #138): when non-whitespace `text/plain` accompanies
-   only `image/*` files without native filesystem paths, prefer the editable text
-   representation (Word can supply an image of the same selection). Any native
-   file path, any non-image file, or absent/whitespace-only text preserves the
-   file/image flow. Selected text follows ADR 0131's existing large-paste
-   threshold. Short multiline text is escaped before native insertion as text
-   and line breaks, preserving paragraphs, selection, and undo without accepting
-   clipboard HTML. CRLF/CR line endings become editor LF line breaks.
+1. The renderer intercepts paste only when the clipboard contains one or more
+   `File` objects. Text-only paste remains native textarea behavior.
 2. The renderer transfers bounded file bytes plus the browser-provided name and
    MIME type to Electron main through `composer/pasteFiles`, together with the
    durable session id. A home composer creates or reuses a session before the
@@ -84,3 +77,24 @@ ownership rules.
   behavior handles the materialized files.
 - Large or malformed clipboard payloads fail visibly in the composer and do
   not partially write because bytes are validated before the first write.
+
+## Amendment (2026-09-14): clipboard text representation for mixed Word pastes
+
+Issue #138: Microsoft Word can place non-whitespace `text/plain` together with an
+`image/*` copy of the same selection on the clipboard, so the `File`-only rule of
+decision 1 discarded editable text and materialized the image instead. This
+amendment replaces that selection rule; the remaining decisions are unchanged.
+
+- The renderer selects the clipboard representation before the attachment flow.
+  It prefers the editable text when the text is not whitespace-only and every
+  accompanying clipboard file is `image/*` and resolves to no native filesystem
+  path.
+- Any native file path, any non-image file, absent or whitespace-only text, and
+  image-only pastes keep the file and image attachment flow of decision 1.
+- Selected text follows ADR 0131's existing `largePasteThreshold`: text at or
+  below the threshold stays editable inline, and larger text becomes a session
+  scratch `text/plain` reference.
+- Short multiline text is escaped and inserted as text plus generated line
+  breaks, so paragraphs, blank and trailing lines, the replaced selection, the
+  surrounding text, the caret, and native undo all survive. Clipboard HTML is
+  still never read, and CRLF/CR line endings become editor LF line breaks.
