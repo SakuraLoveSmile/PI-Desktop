@@ -406,13 +406,17 @@ async function resolveGroupAbsolute(rawPath, mode) {
 // projectKey 是 `p:<projectId>`（宿主给了 projectId 时）或 `r:<主根路径>`。视图
 // 与主进程都按它推导基点，所以切基点必须先把这份记忆落盘，再发下一个通道请求。
 //
-// 退化：老宿主不送 roots / projectId，rootsOf 会造出唯一的单根（就是
-// workspace.path），一切行为与 0.5.0 之前完全一致。
-
-/** 去尾部分隔符后的比较形态；末尾多一个斜杠不代表另一个目录。 */
+/**
+ * 去尾部分隔符、把反斜杠统一成正斜杠后的比较形态。
+ *
+ * 宿主给的目录是正斜杠（`C:/Users/me/Docs`），而这里（`sanitizePrefs`）会用 Node 的
+ * `path.resolve()` 把记忆里的值写成反斜杠（`C:\Users\me\Docs`）。同一个目录的这两种
+ * 写法必须算同一个目录，否则「切到 B 之后记住」在写盘那一刻就自己失效了：视图用原样
+ * 字符串还能匹配（头部名字会换），这里匹配不上就退回主目录（列表不换）。
+ */
 function canonicalPath(target) {
   const trimmed = String(target).replace(/[\\/]+$/, "");
-  return trimmed || String(target);
+  return (trimmed || String(target)).replace(/\\/g, "/");
 }
 
 /** 同一个目录的两种写法（Windows 盘符 / 路径大小写、末尾斜杠）。 */

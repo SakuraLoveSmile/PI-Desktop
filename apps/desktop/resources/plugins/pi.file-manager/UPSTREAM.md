@@ -9,13 +9,13 @@ every installation has a file view out of the box (ADR 0241).
 | Field | Value |
 | --- | --- |
 | Repository | https://github.com/Tioit-Wang/pi-desktop-plugin-file-manager |
-| Tag | `v0.5.1` |
-| Commit | `5499275284a1073be843f9be41420bdf3a156186` |
+| Tag | `v0.5.2` |
+| Commit | `d36ebe9f7fb82ee71e87670b0a65403660b18a00` |
 | License | MIT (see `LICENSE`; upstream ships no license file) |
-| Marketplace | published to the plugin center at <https://plugins.aiuo.net/console/publish/upload>: `pi.file-manager` 0.5.1, audit passed, artifact `b1bf74b8e56caa9f47ea9bedf85bd4bd0fe440bd9c5dd6f148c48344b223c89c` (1460149 bytes) |
+| Marketplace | published to the plugin center at <https://plugins.aiuo.net/console/publish/upload>: `pi.file-manager` 0.5.2, audit passed, artifact `c8416b755e5624ad30110176caa512cd433fdf699ef32c7a2ba2df7f2df2b0f5` (1462096 bytes) |
 
-The tag is pushed and the release is published, so a marketplace-installed 0.5.0
-is now offered 0.5.1 from the marketplace as well as from this bundled copy.
+The tag is pushed and the release is published, so a marketplace-installed 0.5.1
+is now offered 0.5.2 from the marketplace as well as from this bundled copy.
 Both paths ship the same bytes.
 
 > The published `.piplug` contains the seven files a plugin installs from
@@ -34,11 +34,11 @@ stores LF, and this repository's `.gitattributes` keeps it that way.
 
 | File | Bytes | sha256 |
 | --- | --- | --- |
-| `main.js` | 62931 | `e8941a31ada06b18264e509df01d0e4023744b819f185a26da25c7925f0ac03e` |
+| `main.js` | 63234 | `43cface10124728f16e72530e699678177f97353b57190532e89c03186e6960d` |
 | `README.md` | 20039 | `8c524f6d13eac557e286fa0ec9b9cf5138bed0bd66d4a7914f3484443e627a01` |
 | `views/index.html` | 345 | `771fd3d8afdea7fca75ed1f1918c1ce93ad1c87babdb321cfb85e910465cd2c1` |
-| `views/assets/index.js` | 1345397 | `e5b4708b037545a713039d4e405fb99ae0bf9839afb2e8f6b900fad3b06e28be` |
-| `manifest.json` | 13602 | `6e9117464115a6f023263685f7ccb14fee40579e82a8989fe4fc35234e6c7d6e` |
+| `views/assets/index.js` | 1345417 | `d0a1dc369764bed2ab12ce0e65fe983fe0b4f9919f2f8ff4546b736208d66dac` |
+| `manifest.json` | 14171 | `751a5c86d6e4901cf7fc7f5d9e1de99c90c6dc0798b316500d20781d779e4188` |
 
 `views-src/` from the upstream repository is deliberately not vendored: this
 directory carries the built view the plugin publishes, not its React source.
@@ -48,8 +48,8 @@ directory carries the built view the plugin publishes, not its React source.
 Two, so a re-sync stays a copy:
 
 - `manifest.json` gains `"license": "MIT"` (after `author`), making the vendored
-  copy 13622 bytes
-  (`d2357ebf9545b43e5280b01564fa62e45983090484bd0514663a25056fcc7055`). Every
+  copy 14191 bytes
+  (`ba8d60726a0227d7f5530addf885a9849949b86ca75d12786f23ecb82d10fe3e`). Every
   shipped plugin carries its license, and the upstream manifest predates that
   convention.
 - `package.json` is **added**, containing `{"type": "commonjs"}`. It is not in
@@ -79,6 +79,30 @@ Two, so a re-sync stays a copy:
    `node --test test/bundled-plugins.test.mjs` in `apps/desktop`.
 5. Leave the version in `manifest.json` untouched: it is the upstream version,
    and the marketplace offers an update from it.
+
+## What 0.5.2 adds
+
+A folder switch that looked like it worked but did not. The host reports a project
+folder with forward slashes (`C:/Users/.../Docs`) while this plugin's own process
+stores the remembered choice through Node's `path.resolve`, i.e. with backslashes
+(`C:\Users\...\Docs`). `samePath` / `matchRoot` compared the two forms literally and
+then case-insensitively, never separator-insensitively, so the value just written
+matched no root at all: the containment base fell back to the primary folder. The
+view's header still showed the sibling folder (it compares its own untouched copy of
+the host string), while the main process listed and read the primary folder - and
+reopening the view lost the choice entirely.
+
+`canonicalPath` now folds backslashes to forward slashes (trailing separators and the
+case-insensitive fallback stay as they were) in both implementations, so a memory
+written before this release heals as well; nobody has to switch again. The tests grew
+the shape they had missed: the jail harness now reports folder roots with forward
+slashes like the real host, with a section that fails without the fix, and the pure
+checks assert that the same directory in either spelling matches.
+
+> The published 0.5.2 package's `manifest.json` carries CRLF: it was packed from a
+> Windows checkout that had rewritten that one file. Every other file in the package,
+> and every file in this vendored copy, is LF - so a re-sync should expect the tag's
+> bytes, not the artifact's manifest.
 
 ## What 0.5.1 adds
 
