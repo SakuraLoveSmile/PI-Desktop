@@ -112,6 +112,17 @@ export function createSidecarRuntime({
   >();
   const toolKey = (sessionId: string, toolCallId: string) => `${sessionId}:${toolCallId}`;
   /**
+   * A crashed turn whose session moved on can never finalize: the newer turn's
+   * teardown is not this cleanup's to run, and the crashed turn's records must
+   * not be left behind. The finalizer refuses the settlement for a turn that no
+   * longer owns the session and drops exactly those records.
+   */
+  const releaseCrashedTurn = (sessionId: string, crashedTurnId: string) =>
+    finishTurn(sessionId, "aborted", "PLAN_APPROVAL_INTERRUPTED", {
+      turnId: crashedTurnId,
+    });
+
+  /**
    * Unwind one session after the agent sidecar exited unexpectedly. Its own
    * function so the ownership re-check after each await is explicit: the session
    * can start a newer turn while this cleanup is suspended.
@@ -125,7 +136,11 @@ export function createSidecarRuntime({
       await runtimeState.host.call("plans.abort", { sessionId }).catch(() => undefined);
     }
     // A newer turn may own the session by now; this cleanup is the old one's.
-    if (activeTurns.get(sessionId) !== crashedTurnId) return;
+    // It must still not leave the crashed turn's records behind.
+    if (activeTurns.get(sessionId) !== crashedTurnId) {
+      await releaseCrashedTurn(sessionId, crashedTurnId);
+      return;
+    }
     // No final row is coming from a dead sidecar: keep whatever the reply had
     // streamed so far as an aborted transcript row (D299).
     await inflightCheckpointer.flush(sessionId);
@@ -133,7 +148,10 @@ export function createSidecarRuntime({
     // while it ran. `settle` discards the session's pending checkpoint outright,
     // so it is reached only for the turn that still owns the session, and it is
     // called synchronously right after this check: no await in between.
-    if (activeTurns.get(sessionId) !== crashedTurnId) return;
+    if (activeTurns.get(sessionId) !== crashedTurnId) {
+      await releaseCrashedTurn(sessionId, crashedTurnId);
+      return;
+    }
     inflightCheckpointer.settle(sessionId);
     await finishTurn(sessionId, "aborted", "PLAN_APPROVAL_INTERRUPTED", {
       recoverInflight: true,

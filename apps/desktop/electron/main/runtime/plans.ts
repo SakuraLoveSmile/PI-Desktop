@@ -111,6 +111,7 @@ const {
   isActiveTurn,
   peekAbortReason,
   clearAbortReason,
+  releaseTurnClaims,
 } = coordination;
 /**
  * Settle one host turn: attempt its durable end, release its local state,
@@ -141,8 +142,16 @@ function finishTurn(
   const existing = turnFinalizations.get(finalizationKey);
   if (existing) return existing;
   // A turn that no longer owns its session was already settled by whoever took
-  // it over. Recreating a record here would release the newer turn's queue.
-  if (!isActiveTurn(id, turnId)) return Promise.resolve();
+  // it over. Recreating a record here would release the newer turn's queue, so
+  // the settlement is refused — but this turn can no longer finalize itself
+  // either, so its records are dropped rather than left behind: its settlement
+  // waiters would never resolve, and a later turn on this session would inherit
+  // its cancellation lock.
+  if (!isActiveTurn(id, turnId)) {
+    planSubmissionTurnIds.delete(finalizationKey);
+    releaseTurnClaims(id, turnId);
+    return Promise.resolve();
+  }
 
   // Set once the durable end settled, so the collaboration hook below only runs
   // for a turn whose durable row really was closed.

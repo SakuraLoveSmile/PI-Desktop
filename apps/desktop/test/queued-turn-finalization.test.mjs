@@ -173,6 +173,7 @@ function fixture() {
     announcements,
     writes,
     finish,
+    finishTurn: planRuntime.finishTurn,
     setQuitting: (value) => {
       quitting = value;
     },
@@ -311,4 +312,40 @@ test("a terminal event naming a turn that no longer owns the session settles not
   assert.equal(f.writes.length, 1, "no second durable endTurn may be issued");
   assert.equal(f.announcements.length, 1);
   assert.equal(f.turnFinalizations.size, 0);
+});
+
+test("a turn whose session moved on releases its waiters and its cancellation lock", async () => {
+  const f = fixture();
+  const NEXT_TURN = "next";
+  // The turn was cancelled while it ran, and a plan submission is waiting for it
+  // to settle before it may dispatch.
+  f.coordination.lockAbortReason(SESSION, FIRST_TURN);
+  const settlement = f.coordination.waitForTurnSettlement(SESSION, FIRST_TURN);
+  let settled = false;
+  void settlement.then(() => {
+    settled = true;
+  });
+
+  // The session moved on before this turn could finalize itself: the crash
+  // cleanup and the finalizer both refuse a settlement for a turn that no longer
+  // owns the session, so only the refusal path can drop its records.
+  f.activeTurns.set(SESSION, NEXT_TURN);
+  await f.finishTurn(SESSION, "aborted", "PLAN_APPROVAL_INTERRUPTED", {
+    turnId: FIRST_TURN,
+  });
+  await setImmediate();
+
+  assert.equal(settled, true, "the settlement waiter must not be stranded");
+  assert.equal(
+    f.coordination.peekAbortReason(SESSION, FIRST_TURN),
+    undefined,
+    "the cancellation lock must not outlive its turn",
+  );
+  assert.equal(f.turnFinalizations.size, 0, "no finalization record is opened");
+  assert.equal(f.announcements.length, 0, "a refused settlement announces nothing");
+  assert.equal(
+    f.coordination.isActiveTurn(SESSION, NEXT_TURN),
+    true,
+    "the newer turn keeps the session",
+  );
 });

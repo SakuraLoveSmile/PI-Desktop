@@ -11302,7 +11302,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Step 5 shows no new permission review, and subscribing to an unknown event
   name does not surface an error.
 - **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/13-plugin-permissions-matrix.md`,
-  ADR 0251
+  ADR 0252
 - **Acceptance**: Quality (protocol and plugin contract)
 - **Milestone**: M6+
 - **Status**: Module-covered (`apps/desktop/test/session-turn-ended.test.mjs`,
