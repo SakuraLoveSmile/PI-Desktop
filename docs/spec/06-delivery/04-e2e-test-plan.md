@@ -10935,10 +10935,10 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 #### E2E-LAYOUT-work-panel-maximize
 
 - **Preconditions**: A desktop session is open with the work panel visible.
-- **Steps**:
-  1. Note the current panel width and sidebar state, then click the panel
-     header's preview toggle.
-  2. Inspect the shell: MainChat, then click the toggle again.
+  1. Note the current panel width. If the sidebar is expanded, collapse it;
+     then click the panel header's `+` action to open a real work-panel tab.
+  2. Click the panel header's preview toggle.
+  3. Inspect the shell and tab alignment, then click the toggle again.
 - **Expected**: Entering preview mode stops rendering MainChat and hands its
   width to the panel, so the panel spans the client area minus the expanded
   sidebar (the whole client area when the sidebar is collapsed). The native
@@ -10948,8 +10948,9 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   not persisted and ends when the panel closes. Preview mode keeps the shell's
   new-task, sidebar, and system-window actions reachable while MainChat is
   absent. On non-fullscreen macOS with the sidebar collapsed, the first preview
-  action starts at the 76px traffic-light safe inset; fullscreen releases that
-  inset.
+  action starts at the 76px traffic-light safe inset. After opening a real work
+  panel tab, its first tab starts at least 8px to the right of the preview action
+  group; fullscreen uses the 8px native inset but retains that action lane.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238 §6, issue #289

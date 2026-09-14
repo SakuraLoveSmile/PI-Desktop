@@ -239,6 +239,10 @@ combined model × reasoning selection (§11).
   while the panel is closed. While the panel is open, that 120px band plus the
   toggle overlay the panel header instead, and the header ends its box before
   the band so the panel tab strip and `+` stay clear of the native control band.
+  In macOS windowed preview mode, a collapsed sidebar also adds the 76px
+  traffic-light reserve and the preview action lane plus an 8px gap to the
+  panel header itself, keeping its first tab clear; fullscreen uses the 8px
+  native reserve but retains the preview action lane.
   Resource close actions stay in their tabs so a second header `×` does not echo
   the native Windows close control (D357).
 - Title cluster (task title) flexes and shows at most the first 10 Unicode
