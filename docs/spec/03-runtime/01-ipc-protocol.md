@@ -1421,6 +1421,10 @@ because no resolver could ever look it up. The provider half is matched by a
 normalized alias at both ends of the app, so a display name containing spaces
 is valid.
 
+The `tools` array may include the token `inherit` (ADR 0246). `inherit` alone
+is a valid grant; host-core must not drop the document. Settings round-trips
+the token as `tools: inherit` or `tools: [inherit, Bash]`.
+
 Electron's `subagent/list` IPC channel exposes the same global-only list to
 Settings > Agent > Subagents. `subagent/catalog` returns the effective Task
 catalog (enabled user documents merged with the five shipped builtins) so the

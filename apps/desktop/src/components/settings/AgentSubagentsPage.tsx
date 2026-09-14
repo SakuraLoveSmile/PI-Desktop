@@ -23,6 +23,7 @@ import {
   draftFromDefinition,
   draftFromRecord,
   emptySubagentDraft,
+  mergeSubagentToolGrant,
   subagentPresetCopyKey,
   type SubagentDraft,
 } from "./SubagentEditorSheet";
@@ -36,7 +37,6 @@ import {
   IconTrash,
 } from "../icons";
 import { TooltipButton } from "../ui";
-
 const GLOBAL_SUBAGENTS_PATH = "~/.agents/subagents";
 
 type SubagentEditorState = {
@@ -139,7 +139,7 @@ export function AgentSubagentsPage() {
       name: draft.name.trim(),
       description: draft.description.trim(),
       body: draft.body,
-      tools: draft.tools,
+      tools: mergeSubagentToolGrant(draft.inheritTools, draft.tools),
       // An empty string clears a pinned model; omitting it would keep the old one.
       model: draft.model.trim(),
       thinkingLevel: draft.thinkingLevel,

@@ -4880,3 +4880,15 @@ D193, and D194.
   redirects do not forward caller headers.
 - Manual user-owned MCP configuration keeps ADR 0142's explicit local/LAN
   endpoint policy. See ADR 0245 and E2E-MCP-MARKET-*.
+
+## 2026-09-14 — Opt-in subagent inheritance of the parent tool catalog (D415)
+
+- A subagent definition may declare `tools: inherit` (alone or with assignable
+  extras). Builtins stay on today's whitelist.
+- At spawn the runtime unions the live `toolCatalog` minus Task*, mode
+  switches, `asktool`, `new_context`, and `ToolSearch`. Skill/MCP/plugin tools
+  the parent is allowed to call are included; child ToolSearch/new_context do
+  not mutate parent runtime state.
+- host-core keeps the `inherit` token so inherit-only documents load and
+  Settings round-trips them. See ADR 0246, issue #215, PR #319, and
+  E2E-SUBAGENT-inherit-parent-tools.

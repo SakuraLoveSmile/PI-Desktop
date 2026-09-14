@@ -99,7 +99,9 @@ import {
   MAX_SUBAGENT_CONCURRENCY,
   normalizeSubagentName,
   proposalKindForMode,
+  resolveSubagentToolNames,
   subagentModelKey,
+  subagentToolsLabel,
   type ProposalKind,
   type SubagentPermission,
 } from "@pi-desktop/shared";
@@ -3346,7 +3348,9 @@ Delegation rules:
    * talk to, and its report format is set by `composeSubagentSystemPrompt`.
    */
   private subagentGuidance(definition: SubagentDefinition): string[] {
-    const tools = new Set(definition.tools);
+    const tools = new Set(
+      resolveSubagentToolNames(definition, [...this.toolCatalog.keys()]),
+    );
     const blocks: string[] = [];
     if (tools.has("Read") || tools.has("Grep") || tools.has("Glob")) {
       blocks.push(
@@ -3365,6 +3369,10 @@ Delegation rules:
       blocks.push(
         `Write temporary and intermediate files into the session scratch directory \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR) using absolute paths, never into the workspace.`,
       );
+    }
+    if (tools.has(SKILL_TOOL_NAME)) {
+      const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
+      if (skillsPrompt) blocks.push(skillsPrompt);
     }
     const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
     if (projectPrompt) blocks.push(projectPrompt);
@@ -3402,7 +3410,7 @@ Delegation rules:
         const defaultModel = definition.model
           ? `${subagentModelKey(definition.model)}; omit model or repeat this key to keep this default.`
           : "inherits the session.";
-        return `- ${definition.name} (tools: ${definition.tools.join(", ")}): ${definition.description} Default model: ${defaultModel}`;
+        return `- ${definition.name} (tools: ${subagentToolsLabel(definition)}): ${definition.description} Default model: ${defaultModel}`;
       })
       .join("\n");
     return {
@@ -3516,7 +3524,11 @@ Delegation rules:
             );
           }
         }
-        const tools = definition.tools
+        const declaredToolNames = resolveSubagentToolNames(
+          definition,
+          [...this.toolCatalog.keys()],
+        );
+        const tools = declaredToolNames
           .map((name) => this.toolCatalog.get(name))
           .filter((tool): tool is AgentTool => tool !== undefined);
         if (tools.length === 0) {
@@ -3585,6 +3597,7 @@ Delegation rules:
           systemPrompt: composeSubagentSystemPrompt({
             definition,
             guidance: this.subagentGuidance(definition),
+            toolNames: declaredToolNames,
           }),
           tools: scopedTools,
           onEvent: (envelope) => {

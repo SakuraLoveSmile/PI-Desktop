@@ -5431,6 +5431,57 @@ describe("DesktopAgentRuntime subagents", () => {
     await runtime.dispose();
   });
 
+  it("opts a definition with tools: inherit into the parent catalog minus the deny list", async () => {
+    const inheritor: SubagentDefinition = {
+      name: "worker",
+      description: "Uses the parent toolset.",
+      tools: [],
+      inheritTools: true,
+      prompt: "Do the job.",
+      source: "user",
+    };
+    const runtime = createRuntime({
+      subagents: [inheritor],
+      pluginSkills: [
+        {
+          id: "demo.hello/release-notes",
+          name: "Release notes",
+          description: "Draft release notes.",
+        },
+      ],
+      pluginTools: [
+        {
+          name: "plugin_demo_ping",
+          description: "Ping a plugin.",
+          parameters: {},
+        },
+      ],
+    });
+    subagentRuns.calls.length = 0;
+    subagentRuns.deferred = false;
+    await taskTool(runtime).execute("inherit-1", {
+      agent: "worker",
+      task: "Use Skill.",
+    });
+
+    expect(subagentRuns.calls).toHaveLength(1);
+    const names = subagentRuns.calls[0].tools.map((tool: { name: string }) => tool.name);
+    expect(names).toContain("Skill");
+    expect(names).toContain("plugin_demo_ping");
+    expect(names).toContain("Read");
+    expect(names).not.toContain("Task");
+    expect(names).not.toContain("TaskWait");
+    expect(names).not.toContain("ToolSearch");
+    expect(names).not.toContain("new_context");
+    expect(names).not.toContain("asktool");
+    expect(subagentRuns.calls[0].systemPrompt).toContain("Skill");
+    expect(subagentRuns.calls[0].systemPrompt).toContain("demo.hello/release-notes");
+    expect(subagentRuns.calls[0].systemPrompt).toContain("You may change files");
+    expect(taskTool(runtime).description).toContain("(tools: inherit)");
+
+    await runtime.dispose();
+  });
+
   it("keeps a private definition pin out of the override catalog and other delegates (#286)", async () => {
     const remote = { ...provider, id: "remote", name: "Remote", modelId: "remote-model", modelConfig: undefined };
     const host = { call: vi.fn().mockRejectedValue(new Error("not enabled for delegation")) };
