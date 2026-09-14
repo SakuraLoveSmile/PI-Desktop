@@ -129,6 +129,7 @@ The minimum selection is:
   `pnpm test:e2e:supervision`.
 - Subagent lifecycle: `pnpm test:e2e` and `pnpm test:e2e:subagents`.
 - Imported-extension dependency installation or registry-boundary changes: `pnpm test:e2e:plugin-import-deps`.
+- Trusted extension or plugin-extension changes: `pnpm test:e2e:trusted-extensions`.
 - Changes spanning multiple surfaces use the union of the applicable suites.
 
 `pnpm test:e2e` is the default cross-system smoke suite for host RPC, IPC,
@@ -10406,8 +10407,8 @@ browser milestones are scheduled.
 ## Trusted extension scenarios (R7 v1)
 
 The following scenarios are the acceptance targets of D387 / ADR 0214 and
-`07-plugins/16-trusted-extensions.md`. They use a fixture directory of
-sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
+`07-plugins/16-trusted-extensions.md`. The headless runner generates its six
+plugin-form fixtures in an isolated temporary directory at runtime.
 
 #### E2E-241: Discovery lists trusted extensions and enablement is explicit
 
@@ -10431,7 +10432,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §2, §3, §11; D007; D387
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); the headless journey covers plugin discovery/projection, project scope, load state, and diagnostics, while native picker import and explicit enablement remain renderer/platform validation.
 
 #### E2E-PLUGIN-imported-pi-package-skills: Explicit package import exposes skills through plugin grants
 
@@ -10507,7 +10508,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §6, §7; ADR 0214
 - **Acceptance**: B (agent), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); Agent-mode tool dispatch, ToolSearch deferral, hooks, blocking, and result replacement pass, while Plan-mode gating and core-tool collision remain additional validation.
 
 #### E2E-243: Extension commands and UI prompts round-trip through the renderer
 
@@ -10529,7 +10530,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   `07-plugins/09-plugin-command-palette.md`
 - **Acceptance**: A (app control), Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); global/composer command discovery, prompt broker round-trip, abort, session rename, exec, and Host-owned queue pass, while no-session and remote-control cases remain additional validation.
 
 #### E2E-244: Unsupported APIs, load errors, and handler timeouts degrade to diagnostics
 
@@ -10549,7 +10550,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §4.2, §4.4, §5, §6
 - **Acceptance**: Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Executed by the manual MCP-driven harness `apps/desktop/test/e2e/trusted-extensions` (2026-09-10, two sessions, all checks green; re-executed 2026-09-11 on plugin-form fixtures after D388); no CI journey
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); load errors and inert terminal-UI APIs degrade to diagnostics, while the stalled-handler timeout and disable-at-boundary journey remain additional validation.
 
 #### E2E-245: The packaged sidecar loads a TypeScript extension through jiti
 
@@ -10566,8 +10567,7 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §4.2, §13; ADR 0214
 - **Acceptance**: Quality, Release
 - **Milestone**: Post-MVP (R7 v1, delivered first as the bundling spike)
-- **Status**: Unit-covered by `packages/agent-runtime/src/extensions/bundle.test.ts`
-  (esbuild bundle run from a temp directory); packaged-app journey Draft
+- **Status**: Unit-covered by `packages/agent-runtime/src/extensions/bundle.test.ts` (esbuild bundle run from a temp directory); the packaged-app jiti journey remains Draft and is not faked by the headless runner.
 #### E2E-PLUGIN-import-extension-installs-dependencies: Importing an extension with npm dependencies installs them before first load
 
 - **Preconditions**: A local pi extension package with `package.json`, `pi.extensions`,
