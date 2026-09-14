@@ -1386,6 +1386,14 @@ Desktop-only skill market channels (not host RPC) live on Electron IPC:
   through existing `skills.create`. Catalog ids are sanitized to host
   `valid_capability_id` (`[a-z0-9][a-z0-9-]{0,63}`).
 
+Desktop-only MCP market channels (not host RPC) live on Electron IPC:
+
+- `pi-desktop/mcp/market/search` — `{ query?, sources[], more? }` →
+  `{ entries, failedSources, exhausted }`. Main validates source URLs, pins
+  each resolved public address, follows only bounded HTTPS redirects, and keeps
+  cursor state for browse and server-side search. One failed source does not
+  discard successful sources; the response and caches are bounded.
+
 ## 12c. Subagent API (D202)
 
 User-owned subagents are global-only Markdown documents under

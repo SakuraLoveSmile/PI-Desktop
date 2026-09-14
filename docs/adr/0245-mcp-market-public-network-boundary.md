@@ -1,4 +1,4 @@
-# ADR 0243: Harden the MCP market public-network boundary
+# ADR 0245: Harden the MCP market public-network boundary
 
 - Status: Accepted
 - Date: 2026-09-14

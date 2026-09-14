@@ -3967,3 +3967,10 @@ D193 和 D194。
 - 共享 `isSafePublicHttpsUrl` / `isPublicHostname` / `isPublicIpLiteral` 做语法分类；主进程再检查 DNS 与每一跳 redirect。
 - 扫描 id 净化为 host `valid_capability_id`。预览展示组装正文；超过 128 KiB 不写入。
 - 见 ADR 0243、E2E-SKILL-MARKET-*、issue #287。
+
+## 2026-09-14 —— 加固 MCP 市场公网网络边界（D414）
+
+- MCP 市场源和目录端点的校验由渲染器与 Electron Main 共享。只接受无凭据的公网 HTTPS，拒绝回环、私网、CGNAT、链路本地、组播、保留、文档、基准测试、ULA 和 site-local 地址范围，并覆盖 mapped/compatible IPv6 形式。
+- Main 在每次请求前解析主机名，并把选中的公网地址固定到 HTTPS socket。重定向手动跟随，在每一跳重新检查并固定地址，最多五跳。源响应上限为 4 MiB，每次最多处理 16 个源，browse/search 缓存按时间、key 数量和条目数量限制。
+- Registry 的 npm/PyPI 版本以及 runtime/package 参数会保留到安装模板。只映射 `streamable-http` 公网 HTTPS remote；远程 header 占位符变成明确的安装表单值。跨 origin 的 MCP 重定向不会转发调用方 header。
+- 手动配置的用户 MCP 仍保留 ADR 0142 的显式本地/LAN 端点策略。见 ADR 0245 和 E2E-MCP-MARKET-*。

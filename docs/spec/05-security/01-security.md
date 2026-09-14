@@ -106,6 +106,19 @@ re-validation. Loopback, RFC1918, ULA, link-local, and mapped IPv6 targets
 are rejected. Install writes markdown only through `skills.create`. The host
 document cap remains 128 KiB after sibling markdown is inlined.
 
+## 4.2 MCP market egress
+
+The MCP market accepts only credentials-free public HTTPS sources and catalog
+endpoints. Main resolves every hostname immediately before connecting and pins
+the selected public address to the HTTPS socket while retaining the original
+host for TLS SNI and HTTP Host. Redirects are manual, HTTPS-only, limited to
+five hops, and checked again before each connection. Responses are capped at
+4 MiB, requests share an 8-second deadline, and source/cache/entry counts are
+bounded. Cross-origin user-MCP redirects do not forward caller headers.
+
+Manual user-owned MCP configuration remains covered by ADR 0142 and may use
+explicit local/LAN endpoints; the market path does not widen that policy.
+
 ## 5. Command execution
 
 - Bash requires confirmation by default (risk-tiered permission cards); in
