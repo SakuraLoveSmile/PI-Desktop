@@ -3,9 +3,8 @@ import { register } from "node:module";
 import test from "node:test";
 
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
-const { clipboardFiles, preferClipboardText } = await import(
-  "../src/features/chat/composer/editor.ts"
-);
+const { clipboardFiles, normalizeClipboardLineEndings, preferClipboardText } =
+  await import("../src/features/chat/composer/editor.ts");
 const image = () =>
   new File(["image bytes"], "image.png", { type: "image/png" });
 const noPath = () => null;
@@ -74,4 +73,10 @@ test("clipboard FileList and item-only fallback both support text selection", ()
   }
   assert.deepEqual(clipboardFiles({ files: [], items: [] }), []);
   assert.equal(preferClipboardText("plain text", [], noPath), false);
+});
+
+test("clipboard line endings normalize to the editor LF draft model", () => {
+  assert.equal(normalizeClipboardLineEndings("a\r\nb\rc\nd"), "a\nb\nc\nd");
+  assert.equal(normalizeClipboardLineEndings("no breaks"), "no breaks");
+  assert.equal(normalizeClipboardLineEndings(""), "");
 });
