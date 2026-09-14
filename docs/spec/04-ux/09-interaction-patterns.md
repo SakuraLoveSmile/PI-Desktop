@@ -137,7 +137,9 @@ recency only breaks ties between equally relevant matches.
   (Cmd+Q, application-menu Quit, tray Quit) is a separate confirm step
   (D363): Cancel leaves the app running; Confirm runs the ordered shutdown.
   A D230 window-close Quit does not ask again. Automated boot, supervision,
-  and capture probes skip the dialog. macOS keeps the
+  and capture probes skip the dialog, as does the restart that installs an
+  already-downloaded update — its installer is already running and gives up
+  when the app stays alive. macOS keeps the
   native Dock lifecycle (close keeps the app in the Dock; activating recreates
   the window). The bounds watchdog never restores a minimized or tray-hidden
   window.
