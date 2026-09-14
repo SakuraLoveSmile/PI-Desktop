@@ -127,6 +127,7 @@ export const IPC = {
     projectList: "pi-desktop/project/list",
     projectSet: "pi-desktop/project/set",
     projectClear: "pi-desktop/project/clear",
+    projectRemove: "pi-desktop/project/remove",
     pullsList: "pi-desktop/pulls/list",
     scheduledList: "pi-desktop/scheduled/list",
     scheduledCreate: "pi-desktop/scheduled/create",
