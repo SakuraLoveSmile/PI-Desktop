@@ -308,6 +308,7 @@ export const tr = {
     errorProvider: "AI servisi",
     errorModel: "Model",
     previewFile: "Yan panelde önizle",
+    fileRefMissing: "{{name}} ile eşleşen dosya yok",
     previewUrl: "Yan tarayıcıda aç",
     openFile: "Varsayılan uygulamayla aç",
     retry: "Yeniden oluştur",

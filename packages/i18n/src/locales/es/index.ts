@@ -299,6 +299,7 @@ export const es = {
     "errorProvider": "Proveedor de IA",
     "errorModel": "Modelo",
     "previewFile": "Vista previa en el panel lateral",
+    "fileRefMissing": "Ningún archivo coincide con {{name}}",
     "previewUrl": "Abrir en el navegador lateral",
     "openFile": "Abrir con aplicación predeterminada",
     "retry": "Regenerar",

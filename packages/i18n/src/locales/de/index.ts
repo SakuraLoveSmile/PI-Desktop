@@ -299,6 +299,7 @@ export const de = {
     "errorProvider": "KI-Anbieter",
     "errorModel": "Modell",
     "previewFile": "Vorschau im Seitenbereich",
+    "fileRefMissing": "Keine Datei entspricht {{name}}",
     "previewUrl": "Im Seitenbrowser öffnen",
     "openFile": "Mit Standardanwendung öffnen",
     "retry": "Neu generieren",
