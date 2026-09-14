@@ -429,15 +429,17 @@ visually distinct from list content.
   one entry in the existing navigation history. If no previous entry exists,
   open chat instead. The pressed state reflects the current page and the
   localized label remains available on hover/focus.
-- This shortcut uses the same Back action as other navigation controls,
+- This shortcut reuses the existing Back action (also bound to `Cmd/Ctrl+[`),
   including its session selection and loading behavior. It does not skip
   Settings entries or track a separate return destination. Settings navigation
-  is unchanged; its existing Back to app control opens chat.
+  is unchanged; its existing Back to app control opens chat. Both footer
+  destination buttons report their active state to assistive technology.
 - Reopening Plugins retains its Installed/Marketplace tab, both search inputs,
   and category filter in renderer memory. Detail/settings/permission dialogs,
   transient menus, and pending-operation UI are not retained. The page still
-  unmounts normally, releasing listeners; this is not a hidden live workbench
-  or durable preference across application restart.
+  unmounts normally, releasing listeners, and an operation already in flight
+  still completes and reports through the normal toast channel; this is not a
+  hidden live workbench or durable preference across application restart.
 - The footer action group stays on the left and the build/version chip stays
   right-aligned; clicking the chip checks for updates or opens the available
   release in Settings

@@ -6694,7 +6694,7 @@ and identify the platform validation still needed.
   Its pressed state reflects whether Plugins is active. Plugin browsing tab,
   search fields, and category survive route unmounts; dialogs and listeners
   are released rather than kept hidden. Settings navigation is unchanged.
-- **Specs linked**: `04-ux/08-component-spec.md` §3
+- **Specs linked**: `04-ux/01-ui-ia.md` §2/§5, `04-ux/08-component-spec.md` §3
 - **Acceptance**: C (session navigation), G (plugin browsing), Quality
 - **Milestone**: M6+
 - **Status**: Actual footer-handler/history-slice and browse-state regression
@@ -6705,6 +6705,7 @@ and identify the platform validation still needed.
   no-history fallback are covered by tests, not native UI. No external
   marketplace or live model was required. These are pre-merge results;
   post-integration main E2E is NOT RUN.
+
 #### E2E-PROVIDER-copy-config-without-credentials: Copy configuration into an independent provider
 
 - **Preconditions**: Settings contains an ordinary provider with a saved API
