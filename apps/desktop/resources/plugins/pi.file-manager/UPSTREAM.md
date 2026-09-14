@@ -9,13 +9,13 @@ every installation has a file view out of the box (ADR 0241).
 | Field | Value |
 | --- | --- |
 | Repository | https://github.com/Tioit-Wang/pi-desktop-plugin-file-manager |
-| Tag | `v0.4.0` |
-| Commit | `6c7ee2fc2744e7af5a16be9b9c9cab6a9956830f` |
+| Tag | `v0.5.0` |
+| Commit | `cbd47b09bcad6a47edd093f82b3d037a533e3cfd` |
 | License | MIT (see `LICENSE`; upstream ships no license file) |
-| Marketplace | published to the plugin center at <https://plugins.aiuo.net/console/publish/upload>: `pi.file-manager` 0.4.0, audit passed, artifact `a8cbfd5a0c31c8685fb7d9ed2e0c57bcbd5871dcbbb701382bfaecfbc5ae83b` (1433256 bytes) |
+| Marketplace | published to the plugin center at <https://plugins.aiuo.net/console/publish/upload>: `pi.file-manager` 0.5.0, audit passed, artifact `e130e5d523d1e85be3624a6df152c87ddd69d328328aaf31455e4d3b456ac21b` (1460284 bytes) |
 
-The tag is pushed and the release is published, so a marketplace-installed 0.3.1
-is now offered 0.4.0 from the marketplace as well as from this bundled copy.
+The tag is pushed and the release is published, so a marketplace-installed 0.4.0
+is now offered 0.5.0 from the marketplace as well as from this bundled copy.
 Both paths ship the same bytes.
 
 > The published `.piplug` contains the seven files a plugin installs from
@@ -34,11 +34,11 @@ stores LF, and this repository's `.gitattributes` keeps it that way.
 
 | File | Bytes | sha256 |
 | --- | --- | --- |
-| `main.js` | 51876 | `1c73578170e1f80db8cbe1dd68f81d0a718edf20f8319c67ca330de86f61e001` |
-| `README.md` | 16267 | `209722413b16dcd5c96e5e4b239f0e9facad7643d8fc204c825313467ff277f8` |
+| `main.js` | 62931 | `e8941a31ada06b18264e509df01d0e4023744b819f185a26da25c7925f0ac03e` |
+| `README.md` | 19698 | `04f0a028fd8106a4b7e575f6e27b96bbd3fe7d32ea859429d364f05c13f2acf0` |
 | `views/index.html` | 345 | `771fd3d8afdea7fca75ed1f1918c1ce93ad1c87babdb321cfb85e910465cd2c1` |
-| `views/assets/index.js` | 1340220 | `f8f04492324e929980504cd783d475565c0887872824d87c131f799632295c76` |
-| `manifest.json` | 9765 | `81077974286c0c5bd934abaa31dce851d075fcaef183f400e07f4a27f620de5b` |
+| `views/assets/index.js` | 1345101 | `36121f1e6a92d4615e086ea591576240f2a5a7d8eb3664db3ca2a231c4e93ccc` |
+| `manifest.json` | 13026 | `8ec56c0dcfa36cd5a929f22b8e95e47e73690033db24d401b3c2ba20f9cc0460` |
 
 `views-src/` from the upstream repository is deliberately not vendored: this
 directory carries the built view the plugin publishes, not its React source.
@@ -48,8 +48,8 @@ directory carries the built view the plugin publishes, not its React source.
 Two, so a re-sync stays a copy:
 
 - `manifest.json` gains `"license": "MIT"` (after `author`), making the vendored
-  copy 9785 bytes
-  (`9145f39b6ce7eddf0511a4f1bf1ec0a16412d6f06a81f33b2ddf2f3e67c209bc`). Every
+  copy 13046 bytes
+  (`a672b93d3339c6d38fd351201ead684ddc014ea8cae1a094538686f75a622bfe`). Every
   shipped plugin carries its license, and the upstream manifest predates that
   convention.
 - `package.json` is **added**, containing `{"type": "commonjs"}`. It is not in
@@ -69,13 +69,34 @@ Two, so a re-sync stays a copy:
    the same bytes.
 2. Replace the four upstream files above (`main.js`, `README.md`,
    `views/index.html`, `views/assets/index.js`) plus `manifest.json` with the
-   tag's copies.
+   tag's copies, **as LF**: `git archive` applies the checkout's line-ending
+   conversion, so extract the blobs from the working tree (or with
+   `git cat-file blob`) instead of from an archive.
 3. Re-apply `"license": "MIT"` to `manifest.json`, and re-create
    `package.json` — the marker is local and the tag does not carry it.
-4. Update `Origin` and the checksum table here, then run
+4. Update `Origin`, the checksum table and the release section here, and the
+   commit hash `bundled-plugins.test.mjs` pins, then run
    `node --test test/bundled-plugins.test.mjs` in `apps/desktop`.
 5. Leave the version in `manifest.json` untouched: it is the upstream version,
    and the marketplace offers an update from it.
+
+## What 0.5.0 adds
+
+A project can be a group of local folder roots, and the view now learns that:
+`pi.workspace.get()` and the `workspace:changed` event carry `projectId` and
+`roots` (`{ path, name, primary }[]`, group order, primary first) beside the
+unchanged `path` / `name`. The folder name in the view's header becomes a switcher
+when the group holds more than one folder, and the choice is remembered per project
+in the view's own `prefs.projectRoots` — it never changes the workspace, the agent's
+tool roots, a session's primary path or project instructions.
+
+The containment base is still exactly one registered root at a time, never the
+union of the group: listing, reading, writing, search and SQLite all resolve against
+the selected folder, with the same symlink and junction refusals and the same
+credential deny list. An absolute path the host asks this view to open that lies
+under another folder of the same project switches the base to that folder first and
+is then resolved relative to it — which is what lets a chat file reference that
+completes into a sibling folder open in the view instead of as an external file.
 
 ## What 0.4.0 adds
 
