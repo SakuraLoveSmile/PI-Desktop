@@ -438,7 +438,6 @@ export const es = {
     "subagentStatus": {
       "running": "En ejecución",
       "completed": "Completado",
-      "truncated": "Límite de turnos alcanzado",
       "timed_out": "Tiempo de espera agotado",
       "aborted": "Detenido",
       "stopped": "Detenido por solicitud",
@@ -1959,7 +1958,6 @@ sklm: {
       "shadowedByProject": "El archivo del proyecto gana",
       "notHere": "No activo aquí",
       "tooBigTag": "Demasiado grande",
-      "turns": "{{turns}} gira al máximo",
       "thinkingMeta": "pensando: {{level}}",
       "providedTitle": "Integrado y proyecto",
       "sourceBuiltin": "Integrado",
@@ -1983,9 +1981,6 @@ sklm: {
       "thinkingHint": "Opcional y limitado por lo que admite el modelo.",
       "thinkingInherit": "Igual que la sesión",
       "thinkingOmit": "No enviar",
-      "maxTurns": "Límite de turnos",
-      "maxTurnsHint": "Detiene a un delegado que nunca termina. 1–{{max}}, o déjelo vacío para que no haya límite.",
-      "maxTurnsUnlimited": "Sin límite",
       "maxTokens": "Límite de salida",
       "maxTokensHint": "Limita una respuesta del delegado. 1–{{max}}, o déjelo vacío para seguir al modelo.",
       "maxTokensDefault": "Valor del modelo",
@@ -1998,7 +1993,6 @@ sklm: {
       "errorDescription": "Se requiere una descripción; sin ella, el agente nunca delega.",
       "errorTools": "Concede al menos una herramienta, o hereda el conjunto del padre.",
       "errorModel": "Escriba el modelo como proveedor/modelo, p.e. antrópico/claude-haiku-4-5.",
-      "errorMaxTurns": "El límite de turnos debe ser un número entero dentro del rango permitido.",
       "errorMaxTokens": "El límite de salida debe ser un número entero dentro del rango permitido.",
       "errorBody": "Las instrucciones están vacías.",
       "errorTooBig": "Las instrucciones superan el límite de tamaño."

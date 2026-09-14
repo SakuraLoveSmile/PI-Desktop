@@ -5532,9 +5532,10 @@ and identify the platform validation still needed.
 - **Milestone**: M6
 - **Status**: Covered by unit tests (2026-08-06): `packages/shared`
   `subagent-definition.test.ts` and `packages/agent-runtime`
-  `subagent-definitions.test.ts` (frontmatter, tool filtering, caps, malformed
-  documents, global-user-shadows-builtin); `subagent.test.ts` (report bounding, turn
-  cap, abort, event attribution, prompt framing) and `path-lock.test.ts`
+  `subagent-definitions.test.ts` (frontmatter, tool filtering, malformed
+  documents, global-user-shadows-builtin, legacy-`maxTurns` ignored);
+  `subagent.test.ts` (report bounding, abort, event attribution, prompt
+  framing) and `path-lock.test.ts`
   (same-path ordering, concurrency cap); desktop `permission-inline.test.mjs`
   (queue order, id-matched removal, tool-call removal, abort denying the queue,
   card copy), `subagent-wiring.test.mjs` (main-process discovery and model pins)
@@ -5544,6 +5545,34 @@ and identify the platform validation still needed.
   `subagent-topology.test.mjs` (delegate detection, structured outcomes and
   aggregate counts). Full multi-provider fan-out and rendered topology
   interaction remain manual.
+
+#### E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored
+
+- **Preconditions**: Agent mode. A user document
+  `~/.agents/subagents/legacy-worker.md` whose frontmatter declares
+  `maxTurns: 2` next to a valid `description` and `tools`, a second document
+  that spells the same key `max-turns: 2`, and a third that never mentions it.
+- **Steps**: 1) Open Settings → Subagents and confirm every row in the
+  Built-in and Global groups renders with its tool grant and that no
+  turn-limit field exists anywhere in the page or the editor's Advanced
+  disclosure. 2) Delegate to `legacy-worker` and let it make more than two
+  tool-calling turns. 3) Read the document back through the settings API and
+  again as a raw file. 4) Open the editor on that row, save it without
+  changing anything, and re-read the file.
+- **Expected**: Both spellings load as valid definitions. The declared key is
+  ignored exactly like any other unrecognized frontmatter key: no parse error,
+  no warning or diagnostic naming it, the definition still resolves, and the
+  file is not rewritten. The delegate is never stopped at two turns and never
+  reports `truncated`; it ends only when it finishes or is `TaskStop`'d. No
+  surface in the app, and no locale's `chat.subagentStatus` copy, reports a
+  turn limit or a “Turn limit reached” status.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
+  `04-ux/06-settings-ia.md` §7, ADR 0253, decisions-log D423
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6
+- **Status**: Draft — unit covered in `packages/shared`,
+  `packages/agent-runtime`, and the host-core `user_subagents` regression test;
+  the full UI journey needs a capable environment.
 
 #### E2E-SUBAGENT-inherit-parent-tools
 
@@ -6249,9 +6278,8 @@ and identify the platform validation still needed.
       Built-in badge, its tool grant, and no enablement switch, reveal, or
       delete. Confirm the Global group header carries the global level label
       and item count, that create/edit/delete/reveal all work from the page
-      for user-owned rows, that leaving the turn limit empty writes a
-      definition with no `maxTurns`, that leaving the output limit empty
-      writes a definition with no `maxTokens`, and that an empty user
+      for user-owned rows, that leaving the output limit empty writes a
+      definition with no `maxTokens`, and that an empty user
       directory still resolves `settings.subagentsEmpty` to localized
       empty-state copy under the Global group rather than displaying a raw
       translation key. Open New subagent and confirm the
@@ -6296,7 +6324,7 @@ and identify the platform validation still needed.
     id; saving writes `vendorKey-or-name/modelId` (using a unique provider name
     or id when aliases collide), and an unconfigured existing pin remains
     selected. The Advanced disclosure also carries the delegate's own output
-    limit beside its turn limit: it starts empty, shows the model-default
+    limit: it starts empty, shows the model-default
     placeholder rather than an unlimited one, and a value round-trips through
     the document's `maxTokens` frontmatter and back into the field — while
     clearing it removes the key so the delegate follows the model again.
@@ -6847,6 +6875,8 @@ and identify the platform validation still needed.
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
 | Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| C — Conversation & stream (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
+| Quality (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -8483,12 +8513,12 @@ This test plan spec is accepted when:
   2. Click the **Explorer** chip without touching any field. Confirm the
      form is pre-filled: name `Explorer`, the description from the
      builtin, the `Read / Glob / Grep / Bash` tool grant, and the full
-     Explorer system prompt. Expand Advanced and confirm max turns 60 and
-     that the model field is unchanged (still inherit).
+     Explorer system prompt. Expand Advanced and confirm the model field is
+     unchanged (still inherit).
   3. Reopen the sheet, click **Fixer**, and confirm the grant expands to
      `Read / Glob / Grep / Edit / Write / Bash` and the Fixer body. The
      mutating-hint line appears under the tools row. Expand Advanced and
-     confirm max turns 80.
+     confirm the output limit starts empty.
   4. Expand Advanced. Open the model picker. Confirm the picker lists every
      model of every configured, runnable provider, grouped by provider
      name. Choose one and confirm the draft's `model` field becomes
@@ -8522,8 +8552,8 @@ This test plan spec is accepted when:
   No free-text model id is accepted. When no provider offers a runnable model
   the field explains that and links to Models instead of asking the user to
   type an id the runtime could not resolve. Picking a
-  preset overwrites the draft wholesale (description, tools, body, max
-  turns) but never silently clears the user's other choices (model,
+  preset overwrites the draft wholesale (description, tools, body) but
+  never silently clears the user's other choices (model,
   thinking level, scope).
 - **Specs linked**: `04-ux/06-settings-ia.md` §7,
   `03-runtime/13-model-catalog-and-selection.md` §11,
@@ -8549,8 +8579,8 @@ This test plan spec is accepted when:
   2. Confirm the Global group still shows localized `settings.subagentsEmpty`
      copy and the New subagent action.
   3. Choose **Copy as mine** on explorer. Confirm the create sheet opens
-     pre-filled from that definition (name, description, tools, body, max
-     turns) with the Explorer template chip selected, not Blank. Save. Confirm
+     pre-filled from that definition (name, description, tools, body) with
+     the Explorer template chip selected, not Blank. Save. Confirm
      explorer now appears only as a user-owned Global row and is omitted from
      Built-in, and the next prompt's Task catalog uses the user document.
      row and is omitted from Built-in, and the next prompt's Task catalog
@@ -8679,8 +8709,9 @@ This test plan spec is accepted when:
   its report without the user sending “continue”. 3) Let a `TaskWait` expire
   while the delegate is still running and read the heartbeat the parent
   receives. 4) `TaskList` a running delegate and confirm elapsed / last-tool
-  fields. 5) `TaskStop` and user Stop still abort. 6) Explicit `maxTurns`
-  still returns `truncated`; `maxTurns: none` is unlimited. 7) Start a
+  fields. 5) `TaskStop` and user Stop still abort. 6) Run a delegate whose
+  document declares `maxTurns: 2` and let it pass two tool-calling turns;
+  confirm the key is ignored and the delegate keeps running. 7) Start a
   delegate on another model, exhaust the parent HTTP 429 budget, and click
   Continue; confirm leftover delegates abort, the session is idle, Continue
   is accepted, and the failed assistant error surface stays visible. 8) Define
@@ -8691,9 +8722,8 @@ This test plan spec is accepted when:
 - **Expected**: Idle and duration watchdogs never fire. Parent idle does not
   abort delegates. Completion reports are delivered into the same durable
   turn. `TaskWait` expiry reports “Still running after Ns”, includes a
-  heartbeat, and states that this is not a failure. Builtin turn backstops
-  (`explorer` 60, `code-reviewer` 50, `test-runner` 40, `fixer` 80) still end
-  a non-converging delegate as `truncated`. Explorer's catalog includes
+  heartbeat, and states that this is not a failure. No turn count ends a
+  delegate, and no status reports one. Explorer's catalog includes
   `Bash` while code-reviewer remains read-only. A terminal parent 429 aborts
   leftover delegates and Continue is not `AGENT_BUSY` (D352). In step 8 the
   capped delegate's request carries the declared output limit and the uncapped

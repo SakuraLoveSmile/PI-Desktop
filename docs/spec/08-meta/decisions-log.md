@@ -88,6 +88,7 @@ This log freezes previously open questions into concrete decisions.
 | D417 | Plugin runtime theme APIs + sidebar image token | **Add `pi.app.setTheme` and `pi.themes.upsert`/`remove`/`list` under `ui.theme` (ADR 0249 / issue #352). Remove `MAX_THEMES_PER_PLUGIN`. Runtime upsert sanitizes CSS like load-time registration and emits `pluginChanged` (`reason: "themes"`); `setTheme` persists `AppSettings.theme` and emits `settingsChanged`. Split sidebar paint: `--ds-bg-sidebar` stays a color; optional `--ds-bg-sidebar-image` holds gradients/images, with macOS vibrancy stacking sheen over the image layer.** | Theme editor plugins cannot apply a theme from their panel, cannot ship an unlimited library, and cannot live-edit production CSS without reload; sidebar gradients broke `color-mix` / vibrancy consumers when stuffed into the color token. |
 | D420 | Structured, bounded, and redacted process logs | **Amend ADR 0046 / ADR 0212: every app/host/agent NDJSON record has a stable event and top-level correlation fields. A normal tool call emits one completion/failure record, while an unexpected sidecar exit emits interruption records for active tools; the tool protocol and transcript remain unchanged. Central logging redacts credentials and local paths, bounds structured data to 8 KiB, summarizes tool results instead of copying output, and mirrors the same sanitized record to development console output.** | The old `tool start` / `tool end` rows were redundant and unclear, while free-form child/error details could leak secrets or consume unbounded storage. |
 | D422 | Host turn-end event for plugins | **`session:turnEnded` is a host event with payload `{ sessionId, turnId, reason }` (`completed` / `aborted` / `error`), broadcast once per turn actually started by `session.beginTurn` at the end of turn teardown, after the durable `session.endTurn` attempt. The emitted `turnId` is the identity the terminal runtime event carried rather than whichever turn is active, and the plugin tool context's `turnId` is populated with the same value. There is no ack and no replay: a live subscribed plugin receives it once, delivery that races a crash, reload, or host quit is not guaranteed, and receiving it does not mean every in-flight tool of that turn has exited, so cleanup must be serialised or scoped by `turnId`. No new permission is required, and no published host emits it yet (0.14.8 does not include it). See ADR 0252.** | Plugins driving a GUI had to guess turn completion with idle timers, which fire mid-turn and again after the turn ends. A host-owned once-per-turn terminal event with an explicit turn identity lets a plugin settle exactly once, and the same identity in the tool context lets it correlate late tool results. |
+| D423 | Remove the subagent turn limit | **Amend D328 / ADR 0062 / ADR 0063 / ADR 0119 / ADR 0126 / ADR 0166 / ADR 0210: `maxTurns` and `MAX_SUBAGENT_MAX_TURNS` leave the definition type, the frontmatter parser and its clamp/invalid warnings, `UserSubagentRecord` / `UserSubagentInput`, the host-core registry (record, input, frontmatter parse, document render, `MAX_TURNS_CEILING`), the five built-in documents, `SUBAGENT_PRESETS`, and the Subagent editor. A delegate ends only when it finishes, when the parent calls `TaskStop`, when the user Stops, or when a terminal parent error aborts it (ADR 0189). `maxTurns` / `max-turns` / `max_turns` in an existing document is now an unrecognized frontmatter key and is ignored like any other unknown key: no error, no warning, no definition-load failure, and no rewrite of the user's file. The `truncated` value leaves `SubagentRunStatus`, the renderer's `SubagentOutcome` union, the `chat.subagentStatus` catalog entry in every locale, and the delegation topology's warnings count; `timed_out` stays. No protocol version, schema version, or storage change. See ADR 0253, E2E-155, and E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored.** | The parent cannot see a delegate's live work, so it cannot size a turn cap, and the shipped 60 / 50 / 40 / 80 backstops had no derivation. The cap's only effect was to kill a delegate mid-task and surface it as `truncated` with a partial report — a state neither the user nor the parent model can resume. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -5032,3 +5033,31 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
   in-flight tool of the turn has exited. No published host emits it yet: the
   release that ships it has not been published.
 - Decision D422 is recorded by ADR 0252.
+
+## 2026-09-15 — Remove the subagent turn limit (D423)
+
+- `maxTurns` was the last definition-level kill switch left after ADR 0166
+  withdrew the idle and duration watchdogs, and the parent cannot size it: it
+  cannot see the delegate's live work, so it cannot tell a delegate that is one
+  turn from converging from one that never will. The shipped backstops (60, 50,
+  40, 80) had no derivation, and the editor's own starting state was unlimited.
+- Decision D423 removes the field from `SubagentDefinition`, the frontmatter
+  parser, `UserSubagentRecord` / `UserSubagentInput`, the host-core registry,
+  the five built-in documents, `SUBAGENT_PRESETS`, and the Subagent editor's
+  Advanced disclosure. A delegate ends only when it finishes, when the parent
+  calls `TaskStop`, when the user Stops, or when a terminal parent error aborts
+  it.
+- An existing document that declares `maxTurns` keeps loading: the key is now
+  unrecognized frontmatter and is ignored exactly like any other unknown key,
+  with no error, no warning, and no rewrite of the user's file. A definition
+  that relied on the cap therefore loses it silently.
+- The `truncated` subagent status leaves the shared run-status union, the
+  renderer outcome union, the `chat.subagentStatus` catalog entry in every
+  locale, and the delegation topology's warnings count. `timed_out` stays in
+  the type even though D328 withdrew the watchdogs that produced it.
+- No protocol version, schema version, or storage change: host-core's subagent
+  input struct still ignores unknown fields, and the registry parses Markdown
+  frontmatter rather than a table column.
+- See ADR 0253, `03-runtime/02-agent-runtime.md` §5f,
+  `04-ux/06-settings-ia.md` §7, E2E-155, and
+  E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored.

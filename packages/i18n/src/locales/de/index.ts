@@ -438,7 +438,6 @@ export const de = {
     "subagentStatus": {
       "running": "Läuft",
       "completed": "Abgeschlossen",
-      "truncated": "Zuglimit erreicht",
       "timed_out": "Zeitüberschreitung",
       "aborted": "Angehalten",
       "stopped": "Gestoppt durch Anfrage",
@@ -1959,7 +1958,6 @@ sklm: {
       "shadowedByProject": "Projektdatei gewinnt",
       "notHere": "Hier nicht aktiv",
       "tooBigTag": "Zu groß",
-      "turns": "{{turns}} dreht max",
       "thinkingMeta": "Denken: {{level}}",
       "providedTitle": "Eingebaut und Projekt",
       "sourceBuiltin": "Eingebaut",
@@ -1983,9 +1981,6 @@ sklm: {
       "thinkingHint": "Optional und begrenzt durch das, was das Modell unterstützt.",
       "thinkingInherit": "Identisch mit der Sitzung",
       "thinkingOmit": "Nicht senden",
-      "maxTurns": "Rundenlimit",
-      "maxTurnsHint": "Stoppt einen Delegaten, der nie beendet wird. 1–{{max}}, oder leer lassen, um keine Begrenzung zu erhalten.",
-      "maxTurnsUnlimited": "Keine Begrenzung",
       "maxTokens": "Ausgabelimit",
       "maxTokensHint": "Begrenzt eine Antwort des Delegaten. 1–{{max}}, oder leer lassen, um dem Modell zu folgen.",
       "maxTokensDefault": "Modellvorgabe",
@@ -1998,7 +1993,6 @@ sklm: {
       "errorDescription": "Eine Beschreibung ist erforderlich – ohne sie delegiert der Agent nie.",
       "errorTools": "Gewähren Sie mindestens ein Werkzeug, oder übernehmen Sie den Eltern-Satz.",
       "errorModel": "Schreiben Sie das Modell als Anbieter/Modell, z. B. anthropisch/claude-haiku-4-5.",
-      "errorMaxTurns": "Das Wendelimit muss eine ganze Zahl innerhalb des zulässigen Bereichs sein.",
       "errorMaxTokens": "Das Ausgabelimit muss eine ganze Zahl im zulässigen Bereich sein.",
       "errorBody": "Die Anweisungen sind leer.",
       "errorTooBig": "Die Anweisungen überschreiten die Größenbeschränkung."

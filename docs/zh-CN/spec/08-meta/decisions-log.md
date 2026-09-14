@@ -91,6 +91,7 @@
 | D417 | 插件运行时主题 API + 侧栏图像令牌 | **在 `ui.theme` 下新增 `pi.app.setTheme` 与 `pi.themes.upsert`/`remove`/`list`（ADR 0249 / issue #352）。移除 `MAX_THEMES_PER_PLUGIN`。运行时 upsert 与加载期相同的 CSS 消毒，并发出 `pluginChanged`（`reason: "themes"`）；`setTheme` 持久化 `AppSettings.theme` 并发出 `settingsChanged`。拆分侧栏绘制：`--ds-bg-sidebar` 保持颜色；可选 `--ds-bg-sidebar-image` 承载渐变/图片，macOS vibrancy 在图像层之上叠加 sheen。** | 主题编辑插件无法在面板内应用主题，无法提供不限量主题库，也无法在生产模式免重载实时改 CSS；把渐变塞进颜色令牌会破坏 `color-mix` / vibrancy 消费方。 |
 | D420 | 结构化、有界且脱敏的进程日志 | **修订 ADR 0046 / ADR 0212：每条 app/host/agent NDJSON 记录都有稳定 event 和顶层关联字段。正常工具调用只产生一条完成/失败记录；sidecar 意外退出时为活动工具产生中断记录；工具协议和成绩单保持不变。中心日志会脱敏凭据与本机路径，将结构化数据限制为 8 KiB，用工具结果摘要替代原始输出，并把同一份已脱敏记录镜像到开发控制台。** | 旧的 `tool start` / `tool end` 行重复且不清楚，自由文本的子进程/错误详情还可能泄露秘密或无限增长。 |
 | D422 | 插件的宿主回合结束事件 | **`session:turnEnded` 是宿主事件，载荷为 `{ sessionId, turnId, reason }`（`completed` / `aborted` / `error`），对 `session.beginTurn` 真正开始的每个回合，在回合拆除结束时、持久化的 `session.endTurn` 尝试之后广播一次。携带的 `turnId` 是终止运行时事件本身所标识的身份，而不是恰好活动的那个回合；插件工具上下文中的 `turnId` 也会填充同一值。没有 ack，也没有重放：存活且已订阅的插件只收到一次；与崩溃、重载或宿主退出竞态的投递不作保证；收到该事件也不代表该回合的所有在途工具都已退出，因此清理必须按 `turnId` 串行化或限定作用域。不需要新权限，目前尚无任何已发布宿主发出该事件（0.14.8 也尚未包含）。见 ADR 0252。** | 驱动 GUI 的插件此前只能用空闲计时器猜测回合是否结束，而计时器会在回合中途触发、在回合结束后再次触发。宿主拥有的「每个回合一次」终止事件加上明确的回合身份，让插件可以精确结算一次，工具上下文中的同一身份还能用来关联迟到的工具结果。 |
+| D423 | 移除子智能体轮次上限 | **修订 D328 / ADR 0062 / ADR 0063 / ADR 0119 / ADR 0126 / ADR 0166 / ADR 0210：`maxTurns` 与 `MAX_SUBAGENT_MAX_TURNS` 从定义类型、frontmatter 解析器及其钳制/非法告警、`UserSubagentRecord` / `UserSubagentInput`、host-core 注册表（记录、输入、frontmatter 解析、文档渲染、`MAX_TURNS_CEILING`）、五个内置文档、`SUBAGENT_PRESETS` 以及子智能体编辑器中移除。委托只在完成、父级调用 `TaskStop`、用户 Stop，或父级终态错误中止它时结束（ADR 0189）。既有文档中的 `maxTurns` / `max-turns` / `max_turns` 现在是无法识别的 frontmatter 键，会像其他未知键一样被忽略：不报错、不告警、不让定义加载失败，也不改写用户文件。`truncated` 从 `SubagentRunStatus`、渲染器 `SubagentOutcome` 联合类型、各语言 `chat.subagentStatus` 目录项以及委托拓扑的警告计数中移除；`timed_out` 保留。不改协议版本、schema 版本或存储。见 ADR 0253、E2E-155 与 E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored。** | 父级看不到委托的实时工作，因此无法给出合理的轮次上限，而 60 / 50 / 40 / 80 这些内置兜底值也没有推导依据。该上限的唯一效果是把委托中途杀死，并以带部分报告的 `truncated` 呈现 —— 用户和父级模型都无法从中恢复。 |
 | D244 | 紧凑的上下文用量摘要 | **修订 D103 / D184 / ADR 0047：保留上下文检查器的剩余容量触发器、已用/窗口计数、回合合计、已完成回合速度、精确的提供商数值、聚合的工具类型/调用数/令牌数以及检查点摘要，但把它们渲染为一段简短摘要。从默认面板中移除逐工具行、占比条、来源徽章、解释性估算段落和已用容量计量条。不改动协议、存储、运行时计费或模型元数据。** *（由 D347 修订：触发器移到输入框工具栏。）* | 之前的诊断式布局让一次例行的容量检查变得又高又密。保留聚合信号、移除下钻装饰，使默认状态界面可以快速浏览，同时不改变底层用量数据。参见 ADR 0103 与 E2E-060d / US-UI-61。 |
 | D347 | 输入框工具栏中的上下文用量检查器 | **修订 D103 / D184 / D244 / ADR 0047 / ADR 0103：紧凑上下文检查器放在输入框右侧工具栏、模型 × 推理芯片左侧，始终对应当前最新一条已报告用量的助手回合。触发器保留剩余容量圆环和百分比，去掉重复的 Context 文字。弹层标题为剩余 tokens + 百分比；下方行用同一套左标签/右数值节奏，只用留白分隔，不画内部分隔线（D297）。答案下方的助理元只保留模型徽章。仅渲染器改动。** | 挂在最新答案下方的检查器会随记录滚出视野。输入框只保留一个入口作为最新快照的权威位置；标题双线通过去掉多余说明文字解决，而不是加分隔线。参见 ADR 0184 与 E2E-060d / US-UI-61。 |
 | D355 | 上下文检查器按最后一次请求计算占用 | **修订 D103 / D184 / D244 / D347 / ADR 0047 / ADR 0103 / ADR 0184：剩余容量、已用/窗口计数、本轮合计，以及模型 input/output/cache/reasoning/命中率，都取最新一条已报告用量的助手消息（最后一次模型请求）。占用为该消息的 `input + output + reasoning + cacheRead + cacheWrite`。它们不是视觉工具循环里每一次请求的加总。已完成回合速度和聚合工具行仍描述该视觉回合。仅渲染器改动；宿主回合汇总和 Token Insights 仍做账单累加。** | 把工具循环里的缓存读取加总后，367k 缓存读取会紧挨着 55k 窗口。OpenCode 的上下文组件只用最后一条助手消息。参见 ADR 0193 与 E2E-060d。 |
@@ -4071,3 +4072,12 @@ D193 和 D194。
   保证，也不代表该回合的所有在途工具都已退出。目前尚无任何已发布宿主发出它，
   首个包含它的版本尚未发布。
 - 决策 D422 由 ADR 0252 记录。
+
+## 2026-09-15 —— 移除子智能体轮次上限（D423）
+
+- 在 ADR 0166 撤掉空闲与总时长看门狗之后，`maxTurns` 是最后一个定义级杀死开关，而父级无法为它定值：它看不到委托的实时工作，因此无法区分「再一轮就收敛」和「永远不会收敛」。内置兜底值（60、50、40、80）没有推导依据，而编辑器自己的初始状态本来就是不限制。
+- 决策 D423 把该字段从 `SubagentDefinition`、frontmatter 解析器、`UserSubagentRecord` / `UserSubagentInput`、host-core 注册表、五个内置文档、`SUBAGENT_PRESETS` 以及子智能体编辑器的「高级」折叠区中移除。委托只在完成、父级调用 `TaskStop`、用户 Stop，或父级终态错误中止它时结束。
+- 仍声明 `maxTurns` 的既有文档继续正常加载：该键现在是无法识别的 frontmatter，会像其他未知键一样被忽略，不报错、不告警、也不改写用户文件。因此依赖该上限的定义会静默失去它。
+- `truncated` 子智能体状态从共享运行状态联合类型、渲染器结果联合类型、各语言的 `chat.subagentStatus` 目录项以及委托拓扑的警告计数中一并移除。尽管 D328 已撤掉产生它的看门狗，`timed_out` 仍保留在类型中。
+- 不改协议版本、schema 版本或存储：host-core 的子智能体输入结构仍然忽略未知字段，注册表解析的是 Markdown frontmatter 而不是表列。
+- 见 ADR 0253、`03-runtime/02-agent-runtime.md` §5f、`04-ux/06-settings-ia.md` §7、E2E-155 与 E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored。
