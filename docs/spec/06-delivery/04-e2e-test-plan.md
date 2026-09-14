@@ -130,6 +130,7 @@ The minimum selection is:
 - Subagent lifecycle: `pnpm test:e2e` and `pnpm test:e2e:subagents`.
 - Imported-extension dependency installation or registry-boundary changes: `pnpm test:e2e:plugin-import-deps`.
 - Trusted extension or plugin-extension changes: `pnpm test:e2e:trusted-extensions`.
+- Session collaboration / Session Orchestrator: `pnpm test:e2e:collaboration`.
 - Changes spanning multiple surfaces use the union of the applicable suites.
 
 `pnpm test:e2e` is the default cross-system smoke suite for host RPC, IPC,
@@ -9944,10 +9945,11 @@ are withdrawn with ADR 0165.
   `03-runtime/04-data-storage.md`, ADR 0237, ADR 0239
 - **Acceptance**: C (parallel durable sessions), D (plugin security), Quality
 - **Milestone**: M6+
-- **Status**: marketplace plugin tests cover the plugin runtime; host-core and
-  desktop unit tests cover the additive host primitives. The full live
-  provider/Electron journey remains runner validation under the no-local-E2E
-  policy
+- **Status**: host ledger coverage is automated by
+  `pnpm test:e2e:collaboration`; marketplace plugin tests cover the plugin
+  runtime, and host-core/desktop unit tests cover the additive host primitives.
+  The full live provider/Electron journey remains runner validation under the
+  no-local-E2E policy
 
 #### E2E-SESSION-independent-top-level-communication: SessionTask discovers and communicates with existing sessions
 
@@ -9974,9 +9976,10 @@ are withdrawn with ADR 0165.
 - **Acceptance**: C (conversation & stream), D (plugin security),
   G (plugins), Quality
 - **Milestone**: M6+
-- **Status**: plugin and host-core regression coverage is automated; the live
-  multi-session provider/Electron journey remains runner validation under the
-  no-local-E2E policy
+- **Status**: host discovery and bidirectional delivery are automated by
+  `pnpm test:e2e:collaboration`; plugin and host-core regression coverage is
+  automated. The live multi-session provider/Electron journey remains runner
+  validation under the no-local-E2E policy
 
 #### E2E-SESSION-hover-card-model-and-links: Session hover cards expose readable model and creation navigation
 
