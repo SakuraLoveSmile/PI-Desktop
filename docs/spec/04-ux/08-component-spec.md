@@ -870,12 +870,20 @@ entirely inside the plugin's isolated page:
   binaries, oversized files, empty folders, and folders that fail to load each
   have a distinct localized state, and a failed directory can be retried in
   place.
+- The view chooses which folder of the open project it browses from a control in
+  its own top-left area: the project's primary folder by default, its other
+  folders after that in group order (ADR 0249), remembered per project and
+  independently of what the app shows as the workspace. The switch is
+  plugin-local — it changes neither the visible workspace, nor the agent's tool
+  roots, nor a session's primary path, nor project instructions or memory
+  (ADR 0252).
 - The page follows `app.getAppearance` and `appearance:changed` for base theme
   and English/Simplified Chinese copy, and `workspace:changed` for the open
-  project. `workspace.get`, `app.getAppearance`, `fs.openDefault`, and
-  `fs.reveal` are the only host channels it calls; its own reads and writes go
-  through its host process, which keeps the workspace path jail, refuses
-  credential paths, and records writes to its own audit log (ADR 0241).
+  project and its folder list. `workspace.get`, `app.getAppearance`,
+  `fs.openDefault`, and `fs.reveal` are the only host channels it calls; its own
+  reads and writes go through its host process, which keeps the jail of the one
+  folder the view is browsing — never the whole group — refuses credential
+  paths, and records writes to its own audit log (ADR 0241, ADR 0252).
 
 ### 5.3 States
 
@@ -1358,13 +1366,17 @@ Single message render — either user (plaintext) or assistant (markdown streami
   and one outside the workspace (or any home path) stays plain text rather
   than rendering a chip that could never open — containment is unchanged
   (D322). Clicking a chip
-  completes the reference through `pi-desktop/fs/resolveRef` and opens where it
-  resolved: a project file in the bundled `pi.file-manager` work-panel view (the
-  host `file:` tab when that view is unavailable), a session-scratch or
-  attachment file in the host `file:` tab, and a workspace `.html`/`.htm` in the
-  side browser. A resolved image thumbnail resolves and opens the same way. A
-  chip whose reference matches nothing opens nothing and reports itself; the OS
-  default application is no longer what this click does.
+   completes the reference through `pi-desktop/fs/resolveRef` — the whole open
+   project is searched, its group's folders primary first (ADR 0252) — and opens
+   where it resolved: a project file in the bundled `pi.file-manager` work-panel
+   view (the host `file:` tab when that view is unavailable), a session-scratch
+   or attachment file in the host `file:` tab, and a `.html`/`.htm` page of the
+   primary folder in the side browser. A primary-folder file is addressed to the
+   view as a project-relative path and a sibling-folder file as an absolute one,
+   which is also how scratch and attachment files are addressed. A resolved
+   image thumbnail resolves and opens the same way. A chip whose reference
+   matches nothing opens nothing and reports itself; the OS default application
+   is no longer what this click does.
   HTTP(S) URLs remain inline text links. Plain clicks follow the persisted
   Link open destination setting (Work panel browser by default, or the system
   default browser). Right-clicking a link opens a body-level context menu with
@@ -1375,10 +1387,11 @@ Single message render — either user (plaintext) or assistant (markdown streami
 - Assistant: transparent surface, left-aligned, markdown rendered at full
   content width. Workspace file paths in that markdown are previewable:
   inline code, markdown links, and bare path tokens (with a known
-  extension) complete and open like a chip: the resolved file in the bundled
-  `pi.file-manager` view (the host `file:` tab without it), a workspace
-  `.html`/`.htm` in the side browser, and nothing plus a report when the
-  reference matches no file. Local markdown images render
+  extension) complete and open like a chip against every folder of the open
+  project (ADR 0252): the resolved file in the bundled
+  `pi.file-manager` view (the host `file:` tab without it), a `.html`/`.htm`
+  page of the primary folder in the side browser, and nothing plus a report when
+  the reference matches no file. Local markdown images render
   inline via the same contained data-URL channel, with a chip fallback.
   Unprefixed relative paths
   resolve from the workspace root; `./` and `../` resolve from the workspace
@@ -2620,12 +2633,16 @@ Anatomy:
   chip from the message's `command` field instead of the expanded body.
 - Sent `@path` file references (quoted or unquoted) render as the same compact
   leaf-name chip as the draft. Clicking one completes the reference through
-  `pi-desktop/fs/resolveRef` and opens where it resolved: a workspace file in
-  the bundled `pi.file-manager` view (the host `file:` tab when that view is
+  `pi-desktop/fs/resolveRef` — against the whole open project, its group's
+  folders primary first (ADR 0252) — and opens where it resolved: a project file
+  in the bundled `pi.file-manager` view (the host `file:` tab when that view is
   unavailable), a session-scratch or attachment file in the host `file:` tab,
-  and a workspace `.html`/`.htm` in the side browser. A reference that matches
-  no file opens nothing and reports itself; the OS default application is no
-  longer what this click does. HTTP(S)
+  and a `.html`/`.htm` page of the primary folder in the side browser. A
+  primary-folder file is addressed to the view as a project-relative path and a
+  sibling-folder file as an absolute one, which is also how scratch and
+  attachment files are addressed. A reference that matches no file opens nothing
+  and reports itself; the OS default application is no longer what this click
+  does. HTTP(S)
   URLs stay text links. Plain clicks follow the Link open destination setting,
   and right-clicking exposes the same external, work-panel, and copy actions.
 - States: keyboard-active row uses the shared `kb-active` treatment; empty

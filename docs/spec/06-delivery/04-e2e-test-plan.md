@@ -6575,7 +6575,8 @@ and identify the platform validation still needed.
 
 - **Preconditions**: A packaged build (so `resources/plugins` is copied outside
   the asar) and a project with nested directories, a `node_modules`, a `.env`,
-  a binary file, an image, a CSV, and a Markdown file.
+  a binary file, an image, a CSV, and a Markdown file. The project is a group
+  whose second folder is registered as another root (ADR 0249).
 - **Steps**:
   1. Open the Plugins page. Confirm **File Manager** is listed as a bundled
      plugin, enabled, showing a work-panel-views capability, and that it offers
@@ -6585,7 +6586,10 @@ and identify the platform validation still needed.
      views. Trigger an agent edit and confirm Review opens itself under Open
      resources — it is an artifact surface, not a launcher entry.
   3. Open the File Manager view. Confirm the tree lists the project, expands
-     directories lazily, and omits `node_modules`, `.git`, and `.env`.
+     directories lazily, and omits `node_modules`, `.git`, and `.env`. Switch
+     the view's top-left folder control to the project's second folder and
+     confirm the tree follows it while the app's visible workspace does not,
+     then switch back to the project's primary folder.
   4. Right-click a file and confirm **Open with default app** and **Show in
      folder** are offered and work; right-click a directory and confirm they are
      not offered, because the host refuses the action for directories.
@@ -6609,11 +6613,12 @@ and identify the platform validation still needed.
 - **Expected**: A panel surface runs entirely on the public plugin contribution
   channel, is user-disableable, cannot be uninstalled, and survives restart. Its
   host-mediated actions obey the declared `fs.read` scope, and its own reads and
-  writes stay inside the plugin's workspace jail (ADR 0241).
+  writes stay inside the jail of the one project folder it is browsing
+  (ADR 0241, ADR 0252).
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
   `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0109, ADR 0111,
-  ADR 0169, ADR 0241
+  ADR 0169, ADR 0241, ADR 0249, ADR 0252
 - **Acceptance**: G (plugins), D (workspace), Security, Quality
 - **Milestone**: M6+
 - **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`
@@ -6656,6 +6661,48 @@ and identify the platform validation still needed.
 - **Status**: The bundle's manifest, entry page, and upstream checksum are
   unit-covered (`apps/desktop/test/bundled-plugins.test.mjs`); the plugin-side
   journey is Draft (run only in a capable environment when this surface changes)
+
+#### E2E-PLUGIN-file-view-switches-folder-per-project
+
+- **Preconditions**: A project group whose two folders each hold a text file the
+  other folder does not, and a second, single-folder project. The work panel is
+  open on the bundled File Manager view, browsing the first project's primary
+  folder.
+- **Steps**:
+  1. Switch the view's top-left folder control to the project's second folder.
+     Confirm the tree, the filename search, and open/save all follow it.
+  2. Save an edit in the text file only that second folder holds.
+  3. Close and reopen the view, then restart the app. Confirm the second folder
+     is still the one being browsed.
+  4. Switch to the other project and back. Confirm each project remembers its
+     own folder.
+  5. Click a chat reference that resolves in the project's second folder, then
+     one that resolves in its primary folder.
+  6. With the second folder selected, search the tree for the primary folder's
+     own file name, and try to open a `.env` and a symlink or junction inside
+     the second folder that points outside it.
+- **Expected**:
+  - The control lists the project's folders in group order, primary first, and
+    names the one being browsed; the tree, search, and editing all work inside
+    that one folder, and a single-folder project offers just its one folder.
+  - Switching folders changes only what this view browses: the app's visible
+    workspace, the agent's tool roots, the session's primary path, project
+    instructions, and project memory are all unchanged (ADR 0252).
+  - The choice is remembered per project: it survives closing and reopening the
+    view and a full app restart, and the other project keeps its own folder.
+  - Both chat references open in this view on the file they name — the one from
+    the second folder included, in that folder — with no host `file:` tab.
+  - The selected folder is the jail, not the group: the filename search does not
+    reach a file that only another project folder holds, and the credential path
+    and the symlink/junction escape are still refused (ADR 0241).
+- **Specs linked**: `07-plugins/03-plugin-api.md` §3,
+  `04-ux/08-component-spec.md` §5.2.2, ADR 0241, ADR 0249, ADR 0252
+- **Acceptance**: G (plugins), Security, Quality
+- **Milestone**: M6+
+- **Status**: The host-side resolution and addressing are unit-covered
+  (`apps/desktop/test/chat-ref-resolve.test.mjs`,
+  `apps/desktop/test/transcript-file-chips.test.mjs`); the plugin-side journey
+  is Draft (run only in a capable environment when this surface changes)
 
 #### E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update
 
@@ -6797,6 +6844,9 @@ and identify the platform validation still needed.
 | C — Conversation & stream (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
 | G — Plugins (Chat file references) | E2E-CHAT-file-ref-opens-the-surface-that-owns-it, E2E-PLUGIN-file-view-collapse-persists |
 | Quality (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it, E2E-PLUGIN-file-view-collapse-persists |
+| G — Plugins (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
+| Security (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
+| Quality (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
 
 | Milestone | Scenarios |
 |---|---|
@@ -6815,6 +6865,7 @@ and identify the platform validation still needed.
 | M6+ (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
 | M5 (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
 | M6+ (Chat file references) | E2E-PLUGIN-file-view-collapse-persists |
+| M6+ (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
@@ -9299,13 +9350,15 @@ are withdrawn with ADR 0165.
 #### E2E-180: Sent file references stay chips and open on click
 
 - **Preconditions**: An Agent session in a workspace that contains a nested
-  source file, an HTML file, and a file whose name contains whitespace. The
+  source file, an HTML file, and a file whose name contains whitespace, and a
+  project group whose second folder holds a source file of its own. The
   composer can also paste an OS file into session scratch. The bundled File
   Manager plugin is loaded.
 - **Steps**: 1) Attach a workspace source file, a workspace HTML file, a
   whitespace-named file, and a pasted scratch file via composer chips, then
   send. 2) Inspect the user bubble. 3) Click the HTML chip, then the workspace
-  source chip, then the scratch chip.
+  source chip, then the scratch chip. 4) Attach the file that lives in the
+  project's second folder and click its chip.
 - **Expected**:
   - Each sent reference renders as a compact leaf-name chip (icon + name),
     not as a full `@path`. The tooltip and accessible name keep the
@@ -9318,11 +9371,16 @@ are withdrawn with ADR 0165.
     no longer what a chip click opens.
   - Clicking the scratch chip opens the host `file:` tab on that file's
     absolute path, because it lives outside the File Manager's project root.
+  - Clicking the chip of the file in the project's second folder opens it in
+    the File Manager view on that file: completion searches the whole project
+    group, primary folder first, and a sibling-folder file is addressed by
+    absolute path because a relative path always means the primary folder
+    (ADR 0252).
   - The persisted user message still contains the canonical `@path` text for
     the agent.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3 / §11.8,
   `04-ux/09-interaction-patterns.md` §8a.2, `03-runtime/01-ipc-protocol.md`,
-  ADR 0163, ADR 0241, ADR 0251, `08-meta/decisions-log.md` (D320)
+  ADR 0163, ADR 0241, ADR 0251, ADR 0252, `08-meta/decisions-log.md` (D320)
 - **Acceptance**: C (conversation & stream), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`chat-links.test.mjs`, `transcript-file-chips.test.mjs`,
@@ -9330,17 +9388,19 @@ are withdrawn with ADR 0165.
 
 #### E2E-CHAT-shorthand-file-ref-opens-the-matching-file
 
-- **Preconditions**: A project whose tree holds `img/openimage.js`, `src/dir/a.ts`,
-  and a deeper second `dir/a.ts` such as `packages/app/dir/a.ts`. The open
-  session's scratch store holds a file with the same leaf name `openimage.js`
-  and one file no project folder has; the attachment store holds an
-  `attachments/<sha256>` blob. The transcript renders assistant markdown.
+- **Preconditions**: A project group whose primary folder holds
+  `img/openimage.js`, `src/dir/a.ts`, and a deeper second `dir/a.ts` such as
+  `packages/app/dir/a.ts`, and whose second folder holds `lib/only-here.ts`.
+  The open session's scratch store holds a file with the same leaf name
+  `openimage.js` and one file no project folder has; the attachment store holds
+  an `attachments/<sha256>` blob. The transcript renders assistant markdown.
 - **Steps**: 1) Prompt a turn whose reply names `openimage.js` as inline code
   and click it. 2) Prompt a turn that names `dir/a.ts` and click it. 3) Prompt
   a turn that names the scratch-only file, click it, then do the same for the
   `attachments/<sha256>` ref. 4) Prompt a turn that names an absolute path to a
   project file whose leaf name also exists in scratch, and click it. 5) Prompt
-  a turn that names `missing-helper.js` and click it.
+  a turn that names `missing-helper.js` and click it. 6) Prompt a turn that
+  names `only-here.ts` and click it.
 - **Expected**:
   - Clicking `openimage.js` opens the project's `img/openimage.js`, although the
     scratch store holds a file with that same leaf name: the project is
@@ -9354,12 +9414,20 @@ are withdrawn with ADR 0165.
     `attachments/<sha256>` ref opens that stored blob.
   - An absolute reference that names a real file inside a known root wins
     outright, whichever shorthand would otherwise have matched.
+  - `only-here.ts` opens the second folder's `lib/only-here.ts`: the primary
+    folder is searched first and to exhaustion, then the project group's other
+    folders in the group's own order, and the match names the folder that
+    answered (ADR 0252).
+  - A file that answered from a sibling folder is addressed to the work panel by
+    its absolute path, while a primary-folder file stays project-relative
+    (ADR 0252).
   - A reference that matches nothing raises an error toast reading
     `No file matches missing-helper.js` and opens nothing: no new work-panel
     tab, no empty panel, no blank side-browser page, and the work panel and
     transcript keep the content they already had.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` § fs,
-  `04-ux/09-interaction-patterns.md` §8a.2, ADR 0124, ADR 0163, ADR 0251
+  `04-ux/09-interaction-patterns.md` §8a.2, ADR 0124, ADR 0163, ADR 0249,
+  ADR 0251, ADR 0252
 - **Acceptance**: C (conversation & stream), D (workspace), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered
@@ -9370,15 +9438,17 @@ are withdrawn with ADR 0165.
 
 - **Preconditions**: The bundled File Manager plugin is loaded and enabled and
   the work panel is closed. The open session's scratch store holds one file and
-  the attachment store one blob. The project contains an `.html` page and a text
-  file.
+  the attachment store one blob. The project is a group whose primary folder
+  contains an `.html` page and a text file, and whose second folder holds a text
+  file of its own.
 - **Steps**: 1) Click a project file reference in an assistant reply. 2) Type an
   unsaved edit into that view and click the same reference again. 3) Click a
   reference that resolves into the session scratch store, then the
   `attachments/<sha256>` reference. 4) Click a workspace `.html` reference in an
   assistant reply and the same reference as a sent user chip. 5) Disable the
   File Manager plugin, click a project file reference again, then re-enable it
-  and click that reference once more.
+  and click that reference once more. 6) Click a reference that resolves in the
+  project's second folder, then one that resolves in its primary folder.
 - **Expected**:
   - A project file opens in the File Manager work-panel view on that file, with
     its ancestor folders expanded and the file selected; no host `file:` tab is
@@ -9387,14 +9457,22 @@ are withdrawn with ADR 0165.
     is still in the editor and no second tab appears.
   - A scratch or attachment file opens in the host `file:` tab under Open
     resources, addressed by its absolute path, never in the File Manager view.
-  - A workspace `.html` / `.htm` reference opens in the work-panel side browser,
-    from the assistant reply and the user chip alike.
+  - A `.html` / `.htm` page of the project's primary folder opens in the
+    work-panel side browser, from the assistant reply and the user chip alike; a
+    page in a sibling folder is a project file like any other and opens in the
+    File Manager view, because the side browser is rooted at the primary folder
+    (ADR 0252).
+  - A reference that resolved in the project's second folder opens in the File
+    Manager view on that file, reached by its absolute path, with no host
+    `file:` tab; the reference from the primary folder opens in that same view
+    addressed project-relative (ADR 0252).
   - With the plugin disabled, a project file reference falls back to the host
-    `file:` tab — the surface the click used before — instead of opening
-    nothing; re-enabling the plugin restores the File Manager destination.
+    `file:` tab — the surface the click used before, which now also reaches the
+    project's other folders — instead of opening nothing; re-enabling the plugin
+    restores the File Manager destination.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3,
   `04-ux/09-interaction-patterns.md` §8a.2, ADR 0104, ADR 0163, ADR 0241,
-  ADR 0251
+  ADR 0249, ADR 0251, ADR 0252
 - **Acceptance**: C (conversation & stream), G (plugins), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered

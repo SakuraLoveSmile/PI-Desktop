@@ -142,7 +142,12 @@ pi.project.create(input: { path: string }): Promise<{
 
 ### 工作区/fs
 ```ts
-pi.workspace.get(): Promise<{ path: string; name: string } | null>
+pi.workspace.get(): Promise<{
+  path: string;
+  name: string;
+  projectId?: string;
+  roots?: Array<{ path: string; name: string; primary: boolean }>;
+} | null>
 
 pi.fs.readText(pathFromRoot: string): Promise<string>
 pi.fs.readPreview(pathFromRoot: string): Promise<{
@@ -164,6 +169,12 @@ pi.fs.list(pathFromRoot: string): Promise<Array<{
 pi.fs.remove(pathFromRoot: string): Promise<void>
 pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
+
+`workspace.get` 回答主根——`path` 与其叶子 `name` 都保持不变——并在该文件夹属于某个项目组
+（ADR 0249）时额外给出 `projectId` 与 `roots`：项目组按自身顺序登记的全部文件夹，主文件夹在前，
+每项为 `{ path, name, primary }`（ADR 0252）。`workspace:changed` 携带同一对象，两者都由主机持有
+的项目组记录回答，因此事件与主动拉取不会互相矛盾。无法解析项目组的主机会省略 `projectId` 与
+`roots`，也就是插件本来就会处理的 `{ path, name }`；读取这些元数据不需要新权限，也不新增 SDK 方法。
 
 `fs.readPreview` 为一份已存在且可读取的文件做应用内预览分类。它与 `fs.readText`
 使用相同的 `fs.read` 检查，拒绝目录，并返回 `text`（上限 512 KiB）、`image`
@@ -571,8 +582,10 @@ pi.events.off(event, handler)
 - `bus.message` — 公交车交付，以 `PluginBusMessage` 作为单一
   论点。 `pi.bus.subscribe` 是接收这些信息的正常方式； `events.on`
 查看插件持有的每个订阅的原始流。
-- `workspace:changed` — 载荷为 `{ path: string; name: string } | null`，
-  与 `workspace.get()` 一致，在缓存的工作区路径变化时发送。
+- `workspace:changed` —— 载荷是 `workspace.get()` 的对象或 `null`，在缓存的工作区路径变化时发送：
+  主文件夹的 `path` 与 `name`，以及在该文件夹属于某个项目组时的 `projectId` 与 `roots`（ADR 0252）。
+  一次运行中的第一个工作区可能先不带文件夹发送一次、再带文件夹重发一次，因为项目组记录是在那次推送
+  之后才读取的。
 - `plugin:settingsChanged`（由插件设置页面编辑触发）
 - `session:modelChanged` — `{ sessionId, modelKey, thinkingLevel }`，在成功的
   `session.configure` 改变 provider、模型或 thinking level 之后发送
@@ -638,8 +651,8 @@ window.pluginBridge.on(event, handler)
 
 - `appearance:changed` —— 载荷是上面的 `PluginAppearance`，在应用的配色或
   语言发生变化时发送，因此面板可以实时重新着色和重新标注文案。
-- `workspace:changed` —— 载荷为 `{ path: string; name: string } | null`，
-  与 `workspace.get()` 一致，在打开的项目变化时发送。
+- `workspace:changed` —— 载荷是 `workspace.get()` 的对象或 `null`，在打开的项目变化时发送：
+  主文件夹的 `path` 与 `name`，以及在该文件夹属于某个项目组时的 `projectId` 与 `roots`（ADR 0252）。
 - `view:open`（仅限停靠的工作面板视图；独立 `ui.panel` 窗口不会收到）——载荷为
   `{ path: string }`，即主机要求该视图展示的 location。创建时就带 location 的视图
   已经从入口 URL 拿到它；这个事件投递的是之后的 location。

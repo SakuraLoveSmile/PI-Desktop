@@ -154,7 +154,12 @@ and never creates a project by itself.
 
 ### workspace / fs
 ```ts
-pi.workspace.get(): Promise<{ path: string; name: string } | null>
+pi.workspace.get(): Promise<{
+  path: string;
+  name: string;
+  projectId?: string;
+  roots?: Array<{ path: string; name: string; primary: boolean }>;
+} | null>
 
 pi.fs.readText(pathFromRoot: string): Promise<string>
 pi.fs.stat(pathFromRoot: string, grantId?: string): Promise<{
@@ -187,6 +192,16 @@ pi.fs.list(pathFromRoot: string): Promise<Array<{
 pi.fs.remove(pathFromRoot: string): Promise<void>
 pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
+
+`workspace.get` answers with the primary root — `path` and its leaf `name`,
+both unchanged — plus, when that folder belongs to a project group (ADR 0249),
+`projectId` and `roots`: every registered folder of the group in its own order,
+primary first, each `{ path, name, primary }` (ADR 0252). `workspace:changed`
+carries the same object, and main answers both from the host-owned group
+records, so the event and the pull cannot disagree. A host that cannot resolve
+the group omits `projectId` and `roots` — the same `{ path, name }` a plugin
+already handles — and reading this metadata needs no new permission and adds no
+SDK method.
 
 `fs.readPreview` classifies one existing readable file for in-app display. It
 uses the same `fs.read` checks as `fs.readText`, rejects directories, and
@@ -682,8 +697,12 @@ Delivered today:
 - `bus.message` — a bus delivery, with the `PluginBusMessage` as the single
   argument. `pi.bus.subscribe` is the normal way to receive these; `events.on`
   sees the raw stream of every subscription the plugin holds.
-- `workspace:changed` — payload is `{ path: string; name: string } | null`,
-  matching `workspace.get()`, sent when the cached workspace path changes.
+- `workspace:changed` — payload is the `workspace.get()` object or `null`,
+  sent when the cached workspace path changes: the primary `path` and `name`,
+  plus `projectId` and `roots` when the folder belongs to a project group
+  (ADR 0252). The first workspace of a run may arrive once without the folders
+  and repeat once with them, because the group records are read after that
+  first push.
 - `plugin:settingsChanged` is delivered after edits from the generated Plugins
   settings UI.
 - `session:modelChanged` — `{ sessionId, modelKey, thinkingLevel }`, sent after
@@ -761,8 +780,10 @@ Delivered today:
 
 - `appearance:changed` — payload is the `PluginAppearance` above, sent whenever
   the app's palette or language changes, so a panel can restyle and relabel live.
-- `workspace:changed` — payload is `{ path: string; name: string } | null`,
-  matching `workspace.get()`, sent when the open project changes.
+- `workspace:changed` — payload is the `workspace.get()` object or `null`,
+  sent when the open project changes: the primary `path` and `name`, plus
+  `projectId` and `roots` when the folder belongs to a project group
+  (ADR 0252).
 - `view:open` (docked work-panel views only; a detached `ui.panel` window never
   receives it) — payload is `{ path: string }`, the location the host asked this
   view to show. A view created with a location already carried it in its entry
