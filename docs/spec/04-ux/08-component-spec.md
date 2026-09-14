@@ -3070,6 +3070,13 @@ compatibility remains owned by pi-ai.
   a probe is in flight, or while saving. Idle-with-a-valid-URL (the edit
   debounce) stays enabled so the action can skip that window. Current rows
   stay on screen until the live answer replaces them.
+- The right-pane header carries its own search field that filters the
+  configured models as the user types. It matches the model id, its alias, and
+  the catalog display name case-insensitively, so a friendly name finds the id
+  it stands for. The count beside the title still reports every configured
+  model; a filter that matches nothing shows its own message rather than the
+  "nothing chosen yet" one. Adding a custom model clears the field, so a new
+  row is never added out of view.
 - Adding a custom model validates non-empty and duplicate IDs, adds it to the
   top-level option list, selects it, and applies 128,000 context / 8,192 max
   output / no thinking defaults. Removing its selection does not delete the
@@ -3109,6 +3116,8 @@ compatibility remains owned by pi-ai.
 - Model configuration rows expose `aria-expanded` and reference their details
   with `aria-controls`; collapsed details are removed from the tab order
 - Card actions keep visible text labels; thinking select has an accessible name
+- Both model-list search fields carry a localized accessible name, and the
+  chosen-list one is disabled while saving or when nothing is configured
 - Empty regions and account actions expose localized labels
 
 ### 19.6 MVP constraints
