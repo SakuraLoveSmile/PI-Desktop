@@ -59,6 +59,25 @@ test("runtime theme APIs and setTheme are allowlisted and wired", () => {
   assert.match(appSrc, /api\.onSettingsChanged/);
 });
 
+test("app.setTheme applies the theme alone, never other settings", () => {
+  const themeServicesSrc = readFileSync(
+    join(desktopRoot, "electron/main/plugin-theme-services.ts"),
+    "utf8",
+  );
+  const lifecycleSrc = readFileSync(
+    join(desktopRoot, "electron/main/bootstrap/app-lifecycle.ts"),
+    "utf8",
+  );
+  // `applyApplicationMenuSettings` treats absent fields as unset, so calling it
+  // with `{ theme }` would also reset the locale, keybindings, and dev-mode
+  // menu state. The plugin path must use the theme-only entry point instead.
+  assert.match(themeServicesSrc, /applyAppThemePreference/);
+  assert.doesNotMatch(themeServicesSrc, /applyApplicationMenuSettings/);
+  assert.match(lifecycleSrc, /function applyAppThemePreference\(preference: unknown\)/);
+  // The full-settings path reuses the same theme mapping.
+  assert.match(lifecycleSrc, /applyAppThemePreference\(settings\?\.theme\)/);
+});
+
 test("sidebar paints color and optional image layers separately", () => {
   const tokensSrc = readFileSync(join(desktopRoot, "src/styles/tokens.css"), "utf8");
   const chromeSrc = readFileSync(join(desktopRoot, "src/styles/chrome.css"), "utf8");

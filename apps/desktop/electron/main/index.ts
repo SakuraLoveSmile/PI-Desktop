@@ -932,6 +932,7 @@ const {
   applyDeveloperMode,
   applyNativeThemeSource,
   applyApplicationMenuSettings,
+  applyAppThemePreference,
   resolveAppearance,
   broadcastAppearance,
   flushPendingApplicationMenuCommands,
@@ -941,7 +942,7 @@ wirePluginThemeRuntimeServices({
   plugins,
   getHost: () => host,
   sendToRenderer,
-  applyApplicationMenuSettings,
+  applyAppThemePreference,
   broadcastAppearance,
 });
 

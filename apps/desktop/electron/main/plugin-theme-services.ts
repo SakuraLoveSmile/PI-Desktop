@@ -6,12 +6,7 @@ export type PluginThemeServiceWiring = {
   plugins: PluginRuntime;
   getHost: () => HostProcess | null;
   sendToRenderer: (channel: string, payload: unknown) => void;
-  applyApplicationMenuSettings: (settings?: {
-    language?: unknown;
-    theme?: unknown;
-    keybindings?: unknown;
-    developerMode?: unknown;
-  } | null) => void;
+  applyAppThemePreference: (theme: string) => void;
   broadcastAppearance: () => void;
 };
 
@@ -24,7 +19,7 @@ export function wirePluginThemeRuntimeServices({
   plugins,
   getHost,
   sendToRenderer,
-  applyApplicationMenuSettings,
+  applyAppThemePreference,
   broadcastAppearance,
 }: PluginThemeServiceWiring): void {
   plugins.setServices({
@@ -32,7 +27,7 @@ export function wirePluginThemeRuntimeServices({
       const host = getHost();
       if (!host) throw new Error("host unavailable");
       await host.call("settings.set", { theme });
-      applyApplicationMenuSettings({ theme });
+      applyAppThemePreference(theme);
       sendToRenderer(IPC.event.settingsChanged, { theme });
     },
     onPluginThemesChanged: (pluginId: string) => {

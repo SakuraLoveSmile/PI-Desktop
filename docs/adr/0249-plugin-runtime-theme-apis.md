@@ -30,10 +30,12 @@ pi.app.setTheme(themeId: "system" | "light" | "dark" | `plugin:${string}`): Prom
 ```
 
 Validates the id (built-in preference, or a currently registered plugin theme),
-persists `AppSettings.theme` through host-core `settings.set`, then runs the
-same `applyApplicationMenuSettings` reaction as the Settings picker. The
-renderer receives `settingsChanged` so its store stays in sync; panels receive
-`appearance:changed` as today.
+persists `AppSettings.theme` through host-core `settings.set`, then applies the
+theme-only appearance reaction (`applyAppThemePreference`) that the full
+settings path also reuses. That entry point touches nothing but theme state, so
+`setTheme` can never disturb the locale, keybindings, or developer-mode menu
+state. The renderer receives `settingsChanged` so its store stays in sync;
+panels receive `appearance:changed` as today.
 
 ### 2. Runtime theme lifecycle (permission `ui.theme`, own themes only)
 
