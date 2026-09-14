@@ -75,8 +75,9 @@ work-panel tab already carries was honoured by main for `pi.browser` only.
    This is deliberate and is why the plugin's `safetyNotes` states the exception
    instead of claiming the project-root containment still covers everything it
    reads.
-5. **The bundled copy moves to v0.4.0** through ADR 0241's re-sync procedure.
-   `UPSTREAM.md` records that the tag is local until it is published.
+5. **The bundled copy moves to v0.4.0** through ADR 0241's re-sync procedure, and
+   the same release is published to the plugin center: the marketplace and the
+   bundled copy ship the same bytes.
 
 ## Consequences
 

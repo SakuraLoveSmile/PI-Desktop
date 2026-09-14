@@ -12,14 +12,19 @@ every installation has a file view out of the box (ADR 0241).
 | Tag | `v0.4.0` |
 | Commit | `6c7ee2fc2744e7af5a16be9b9c9cab6a9956830f` |
 | License | MIT (see `LICENSE`; upstream ships no license file) |
-| Marketplace | not published yet — `v0.4.0` is a local tag, so the marketplace still offers 0.3.1 |
+| Marketplace | published to the plugin center at <https://plugins.aiuo.net/console/publish/upload>: `pi.file-manager` 0.4.0, audit passed, artifact `a8cbfd5a0c31c8685fb7d9ed2e0c57bcbd5871dcbbb701382bfaecfbc5ae83b` (1433256 bytes) |
 
-> The tag above is **not pushed**: the release exists only in the maintainer's
-> checkout, and no marketplace package has been built or uploaded for it. The
-> files here are byte-identical to that commit's artifacts. Publishing the tag
-> and the marketplace package is a separate, deliberate step; until it happens
-> a marketplace-installed 0.3.1 will be replaced by this bundled 0.4.0 on the
-> next launch, because this build ships the strictly newer version (ADR 0241).
+The tag is pushed and the release is published, so a marketplace-installed 0.3.1
+is now offered 0.4.0 from the marketplace as well as from this bundled copy.
+Both paths ship the same bytes.
+
+> The published `.piplug` contains the seven files a plugin installs from
+> (`manifest.json`, `main.js`, `README.md`, `CHANGELOG.md`, `.gitignore`,
+> `views/index.html`, `views/assets/index.js`) and **not** `views-src/`: the
+> artifact ships the built view, never its React source. `pi-plugin pack` on the
+> repository root includes `views-src/`, and the plugin center's audit rejects
+> such a package as four blockers before it can be submitted — pack from a copy
+> of the tagged tree with `views-src/` removed instead.
 
 The files below are byte-identical to that commit, except for the one manifest
 field listed under local changes. Line endings are LF: the upstream commit
