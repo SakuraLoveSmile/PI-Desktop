@@ -4817,6 +4817,15 @@ D193, and D194.
   not fail with observations the probe does not itself guarantee.
 - See ADR 0239, ADR 0240, E2E-SESSION-hover-card-model-and-links.
 
+### Global sidebar conversation pins (issue #306)
+
+[ADR global-sidebar-pins](/adr/global-sidebar-pins) amends ADR 0016: conversation
+pins occupy one global section above standalone and project history, including
+closed or collapsed projects. Archive visibility and session sorting still
+apply. Pins carry project context and are removed from normal history before
+date grouping and row limits. Persisted metadata and host ownership stay intact.
+Validation contract: E2E-SIDEBAR-global-pinned-conversations.
+
 ## 2026-09-13 — Vendor the file view as an updatable plugin (issue #304)
 
 - The work panel's file view is no longer `pi.files`. It is a vendored copy of
