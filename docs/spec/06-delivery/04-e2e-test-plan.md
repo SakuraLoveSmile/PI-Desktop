@@ -358,7 +358,9 @@ and identify the platform validation still needed.
 
 - **Preconditions**: App is running.
 - **Steps**: 1) Trigger an action that calls preload IPC (e.g. version query). 2) Observe result in renderer.
-- **Expected**: Main↔renderer IPC returns expected data; no error.
+- **Expected**: Main↔renderer IPC returns expected data; no error. The packaged
+  main and plugin-panel sandbox preloads are self-contained and do not require
+  an additional local runtime chunk.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: A (bridge normal)
 - **Milestone**: M1

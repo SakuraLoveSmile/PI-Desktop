@@ -13,7 +13,7 @@ import {
 } from "../shared/plugin-panel-chrome";
 // Bundled into the preload like everything else here, so the panel reads the
 // built-in window palette from the same table main and the panel host use.
-import { builtinWindowBackground } from "@pi-desktop/shared";
+import { builtinWindowBackground } from "@pi-desktop/shared/theme";
 
 const bridge = {
   invoke: async (channel: string, payload?: Record<string, unknown>) => {
