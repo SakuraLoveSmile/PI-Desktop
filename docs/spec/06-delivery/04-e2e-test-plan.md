@@ -1466,14 +1466,22 @@ and identify the platform validation still needed.
   5. Use Tab and Shift+Tab to traverse the controls. Close with Escape, then
      reopen and close by clicking outside; check focus after each close.
   6. Reopen, enter the name, add the folders, and create the project. Inspect
-     the in-flight controls and the resulting active workspace and project tabs.
+     the in-flight controls and the resulting active primary workspace and one
+     grouped project entry with both roots.
+  7. Start a session in the group and ask the agent to read a file using the
+     additional root's absolute path; then try an unrelated outside path.
 - **Expected**: The dialog traps focus, closes on Escape or outside click while
   idle, and keeps the name and selected folders visible without horizontal
   overflow. The native picker allows multiple directories in one selection.
   Removing a folder updates the count and never removes another row. Create is
-  disabled until both a name and one folder are present. On creation the
-  primary folder receives the entered display name and becomes the active
-  workspace; every selected folder is retained as an open project tab. The
+  disabled until both a name and one folder are present. On creation one
+  logical project group receives the entered display name; its primary folder
+  becomes the active workspace and every selected folder is retained as a group
+  root. The Project archive shows one group row, and its sessions, shared
+  instructions, and shared memory use the group identity. Read/Glob/Grep/
+  Write/Edit can use an explicitly addressed additional root only after host
+  canonical containment; an unrelated outside path still follows the normal
+  permission flow. The
   dialog is unavailable while creation is in flight and returns focus to the
   invoking control after close. The surface follows the shell's neutral gray
   theme with a 480px maximum width, 18px tokenized corners, shared dialog

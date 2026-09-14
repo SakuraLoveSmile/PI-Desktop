@@ -440,8 +440,11 @@ visually distinct from list content.
 - Click the `Projects` heading folder-plus action: open the Create project
   dialog. The dialog accepts a project name and one or more local folders,
   lists every selected folder with a remove action, and marks the first folder
-  as Primary. The primary folder is activated and named after creation; every
-  other selected folder is retained as an open project tab. The dialog follows
+  as Primary. Creation makes one logical project group: the primary folder is
+  activated and names the group, while every other selected folder is retained
+  as a group root and is shown in Project archive details, not as an open
+  project tab. Group chats, instructions, and memory use the same group
+  identity. The dialog follows
   the shell's neutral gray surfaces, with a 480px maximum width,
   `--radius-lg-plus` (18px) corners, and the shared `--ds-shadow-dialog`
   elevation. Its compact type hierarchy uses `--text-lg` for the title,

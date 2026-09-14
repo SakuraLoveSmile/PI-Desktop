@@ -1131,6 +1131,82 @@ fn goal_is_a_valid_persisted_session_mode() {
 }
 
 #[test]
+fn project_group_roundtrips_roots_and_shared_context() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("app");
+    let second = dir.path().join("docs");
+    std::fs::create_dir_all(&first).unwrap();
+    std::fs::create_dir_all(&second).unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+
+    let group = db
+        .create_project_group(
+            "Acme workspace",
+            &[
+                first.to_string_lossy().into(),
+                second.to_string_lossy().into(),
+            ],
+        )
+        .unwrap();
+    assert!(!group.legacy);
+    assert_eq!(group.name, "Acme workspace");
+    let canonical_first = crate::db::canonical_project_path(&first.to_string_lossy()).unwrap();
+    assert_eq!(group.primary_path, canonical_first);
+    assert_eq!(group.roots.len(), 2);
+    assert_eq!(db.list_project_groups().unwrap().len(), 1);
+
+    let memory = db
+        .set_project_group_memory(
+            &group.id,
+            &serde_json::json!([{
+                "id": "stack",
+                "title": "Stack",
+                "content": "Use Rust for services."
+            }]),
+        )
+        .unwrap();
+    assert_eq!(memory.content, "## Stack\n\nUse Rust for services.");
+    assert_eq!(
+        db.set_project_group_instructions(&group.id, "Keep changes backwards compatible.")
+            .unwrap(),
+        "Keep changes backwards compatible."
+    );
+    let context = db
+        .project_group_context_for_path(&second.to_string_lossy())
+        .unwrap()
+        .unwrap();
+    assert_eq!(context.group_id, group.id);
+    assert_eq!(context.instructions, "Keep changes backwards compatible.");
+    assert_eq!(context.memory.content, "## Stack\n\nUse Rust for services.");
+
+    let renamed = db
+        .rename_project_group(&group.id, "Renamed workspace")
+        .unwrap();
+    assert_eq!(renamed.name, "Renamed workspace");
+    assert!(db
+        .create_project_group("Duplicate", &[first.to_string_lossy().into()])
+        .is_err());
+}
+
+#[test]
+fn old_path_projects_are_legacy_single_root_groups() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("legacy");
+    std::fs::create_dir_all(&root).unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    db.ensure_project(&root.to_string_lossy(), false).unwrap();
+
+    let groups = db.list_project_groups().unwrap();
+    assert_eq!(groups.len(), 1);
+    assert!(groups[0].legacy);
+    assert_eq!(groups[0].roots.len(), 1);
+    assert!(db
+        .project_group_context_for_path(&root.to_string_lossy())
+        .unwrap()
+        .is_none());
+}
+
+#[test]
 fn ensure_project_upserts_by_path() {
     let dir = tempfile::tempdir().unwrap();
     let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
