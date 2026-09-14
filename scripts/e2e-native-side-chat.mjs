@@ -222,6 +222,7 @@ async function main() {
   // Bounded synthetic provider: the service still initializes the real offline
   // ModelRuntime from the temporary agent directory; only the streaming call is
   // replaced with a chunked synthetic response.
+  globalThis.fetch = () => Promise.reject(new Error("Network forbidden in native side-chat probe"));
   ModelRuntime.prototype.streamSimple = function streamSimple(_model, _context, options) {
     return chunkedStream(piAi, options?.signal);
   };

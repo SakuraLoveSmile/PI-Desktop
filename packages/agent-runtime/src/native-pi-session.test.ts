@@ -848,7 +848,7 @@ describe("native side-chat forks", () => {
         expect(readFileSync(childPath, "utf8")).toContain('"mutan"');
         expect(groupEntries(f.group).some((name) => name.endsWith(".tmp"))).toBe(true);
         expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
-        expect(() => service.list()).not.toThrow();
+        await expect(service.list()).resolves.toEqual(expect.any(Array));
       } finally { service.disposeAll(); }
     } finally {
       vi.doUnmock("node:fs");

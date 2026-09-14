@@ -82,8 +82,10 @@ function createChecks() {
 const panelHost = () => document.querySelector(".side-chat");
 const composer = () => document.querySelector("form.side-chat-composer") as HTMLFormElement;
 const textarea = () => document.querySelector("textarea.side-chat-input") as HTMLTextAreaElement;
-const sideChatRow = () =>
-  document.querySelector('button[role="option"][title^="Side chat"]');
+const sideChatRow = (title: string) =>
+  Array.from(document.querySelectorAll<HTMLButtonElement>(
+    '.search-dialog button[role="option"][title]',
+  )).find((row) => row.title === title);
 
 type Phase2Input = {
   childId: string;
@@ -134,7 +136,7 @@ type Phase2Input = {
     const mainNav = {
       page: useAppStore.getState().page,
       index: useAppStore.getState().navIndex,
-      length: useAppStore.getState().navStack.length,
+      stack: JSON.stringify(useAppStore.getState().navStack),
     };
     const mainDraftKey = draftKeyForSession(parent!.id);
     writeComposerDraft(mainDraftKey, {
@@ -201,17 +203,21 @@ type Phase2Input = {
       Boolean(useAppStore.getState().sessions.find((session) => session.id === firstUserId)),
     );
 
+    const searchTitle = childSummary()!.title;
+
     const host = document.createElement("div");
     document.body.appendChild(host);
     rootElements.push(host);
     createRoot(host).render(<SideChatTab sessionId={childId!} />);
     await until(() => panelHost(), 25_000, "panel");
     await until(
-      () => document.querySelector(".side-chat-thread")?.textContent?.includes("first answer"),
+      () => document.querySelector('.side-chat-thread')?.textContent?.includes('first answer'),
       25_000,
       "panel history",
     );
-    check("panel paints the anchored answer", true);
+    check("panel paints the anchored answer", Boolean(
+      document.querySelector('.side-chat-thread')?.textContent?.includes('first answer'),
+    ));
 
     setValue(textarea(), "probe question");
     composer().dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -231,6 +237,13 @@ type Phase2Input = {
     }, 25_000, "send");
     check("reply streams progressively into the panel", sendOutcome === "streaming", sendOutcome);
     const streamingId = rows().find((row) => row.status === "streaming")!.id;
+    const paintedWhileStreaming = await until(
+      () => rows().some((row) => row.id === streamingId && row.status === 'streaming') &&
+        Boolean(document.querySelector('.side-chat-thread')?.textContent?.includes('fixtu')),
+      10_000,
+      'partial reply DOM',
+    );
+    check('partial reply paints before settlement', paintedWhileStreaming);
 
     // A send while the child is running is rejected before the Desktop queue
     // and never overwrites text typed after the failed submission.
@@ -305,8 +318,11 @@ type Phase2Input = {
     // Delayed preflight failure: newer text typed while the send is awaiting
     // the transport must survive the failure restore.
     const originalPrompt = api.prompt;
+    useAppStore.setState({ toasts: [] });
+    let rejectionFinished = false;
     api.prompt = (async () => {
       await sleep(400);
+      rejectionFinished = true;
       throw Object.assign(new Error("delayed preflight failure"), {
         code: "NATIVE_PI_PROVIDER_UNAVAILABLE",
       });
@@ -316,7 +332,8 @@ type Phase2Input = {
     await sleep(120);
     setValue(textarea(), "typed during await");
     await until(
-      () => rows().some((row) => row.status === "error") || useAppStore.getState().toasts.length > 0,
+      () => rejectionFinished &&
+        useAppStore.getState().toasts.some((toast) => toast.message === 'delayed preflight failure'),
       10_000,
       "delayed failure",
     );
@@ -340,14 +357,16 @@ type Phase2Input = {
       "search input",
     );
     setValue(searchInput!, "zzz");
-    await until(() => !sideChatRow(), 10_000, "negative query");
-    check("negative query removes the child row", !sideChatRow());
+    await until(() => searchInput.value === 'zzz' && !sideChatRow(searchTitle), 10_000, "negative query");
+    check("negative query removes the child row", !sideChatRow(searchTitle));
     setValue(searchInput!, "side chat");
-    await until(() => sideChatRow(), 10_000, "title search");
-    check("title search finds the scoped child row", Boolean(sideChatRow()));
+    await until(() => sideChatRow(searchTitle), 10_000, "title search");
+    check("title search finds the scoped child row", Boolean(sideChatRow(searchTitle)));
+    setValue(searchInput!, "zzz-again");
+    await until(() => !sideChatRow(searchTitle), 10_000, "second negative query");
     setValue(searchInput!, "fixture-project");
-    await until(() => sideChatRow(), 10_000, "project search");
-    check("project search finds the scoped child row", Boolean(sideChatRow()));
+    await until(() => sideChatRow(searchTitle), 10_000, "project search");
+    check("project search finds the scoped child row", Boolean(sideChatRow(searchTitle)));
 
     // Main conversation, navigation and draft are untouched by child activity,
     // and close only drops the panel registration.
@@ -357,7 +376,7 @@ type Phase2Input = {
       "main navigation untouched",
       useAppStore.getState().page === mainNav.page &&
         useAppStore.getState().navIndex === mainNav.index &&
-        useAppStore.getState().navStack.length === mainNav.length,
+        JSON.stringify(useAppStore.getState().navStack) === mainNav.stack,
       JSON.stringify(mainNav),
     );
     check(
@@ -396,6 +415,9 @@ type Phase2Input = {
     );
 
     const freshParentBytes = await bridge.invoke("probe.parentBytes");
+    check('parent bytes unchanged after every phase-one operation',
+      freshParentBytes.ok && freshParentBytes.data.hash === parentBytes.data.initial,
+    );
     const expectedIds = [
       "u1",
       "a1",
@@ -415,7 +437,7 @@ type Phase2Input = {
         expectedIds,
         abortedId: abortedRow!.id,
         abortedPartial: String(abortedRow!.content),
-        parentHashBefore: freshParentBytes.data.hash,
+        parentHashBefore: parentBytes.data.initial,
       },
     } as ProbeResult & { phase2: Phase2Input };
   } catch (error) {
@@ -473,6 +495,9 @@ type Phase2Input = {
       "reopen selection",
     );
     const messages = useAppStore.getState().messages;
+    check('fresh history has exactly the durable rows in order',
+      JSON.stringify(messages.map((message) => message.id)) === JSON.stringify(input.expectedIds),
+    );
     for (const id of input.expectedIds) {
       check(
         `durable row ${id} loads exactly once`,

@@ -1376,8 +1376,9 @@ A native prompt opens the original file only after exact-v3, newline, cwd,
 trust, saved-provider/auth, canonical-path, identity, and lease checks pass.
 `AgentSession` and `SessionManager` append the native entries. Desktop host turn
 and transcript append APIs are not invoked. Rename, delete, project move,
-revision, Plan/Goal, collaboration, queue, and other side-chat mutations are
-unsupported for native sessions in this slice.
+revision, Plan/Goal, collaboration, and queue operations remain unsupported
+for native sessions in this slice. Forking and ordinary text-only side-chat
+send/stop are supported as described here and in the runtime spec.
 
 A native fork writes exactly one new v3 JSONL child in the parent's session
 directory. Branch extraction runs against an in-memory manager over the parent

@@ -1192,8 +1192,8 @@ session and releases ownership. Pi extensions remain trusted local code, not
 Desktop plugins.
 
 A native fork (`native.session.fork`) branches the parent snapshot in memory:
-the SDK extracts the anchored branch with the same label/compaction re-chaining
-rules as Desktop, drops later and sibling entries, and never touches the parent
+the SDK extracts the anchored branch using its native label/compaction
+re-chaining rules, drops later and sibling entries, and never touches the parent
 file or its manager. When the anchored branch recorded no model, the child
 records the parent session's saved provider/model; when it recorded no
 thinking-level change, it records the parent's saved level, while an explicit

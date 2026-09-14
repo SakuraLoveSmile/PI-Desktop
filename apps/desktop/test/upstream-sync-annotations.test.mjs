@@ -36,7 +36,7 @@ function queueHarness({ running = true, materialize } = {}) {
     activeSessionId: "s1", pendingPlans: {}, runningSessions: { s1: running },
     responseAnnotations: { s1: [annotation("a1"), annotation("a2")], s2: [annotation("other")] },
     sessions: [{ id: "s1", title: "Title" }], messages: [], queuedPrompts: {},
-    latestTurnResults: {}, sessionOutcomes: {},
+    latestTurnResults: {}, sessionOutcomes: {}, sideChats: {}, sideChatTranscripts: {},
     showToast: (...args) => notices.push(args),
   };
   const access = {
