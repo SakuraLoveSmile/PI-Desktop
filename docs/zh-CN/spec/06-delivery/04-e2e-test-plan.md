@@ -4741,6 +4741,9 @@ IPC 请求无法关闭。
 | G — 插件（独立会话通信） | E2E-SESSION-independent-top-level-communication |
 | 品质（独立会话通信） | E2E-SESSION-independent-top-level-communication、E2E-SESSION-hover-card-model-and-links |
 | C — 对话与流式（hover 卡片模型和链接） | E2E-SESSION-hover-card-model-and-links |
+| D — 工作区（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| F — 持久化（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| 品质（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 
 | 里程碑 | 应用场景 |
 |---|---|
@@ -4761,6 +4764,7 @@ IPC 请求无法关闭。
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
 | 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency |
+| M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策
@@ -5136,8 +5140,9 @@ IPC 请求无法关闭。
   完整的持久项目列表，包括存档行。
 - 行扩展以显示最近的任务；激活项目或其会话之一
   使用 `setProject` 而不通过对话框重新选择并保留 session/workspace
-上下文同步。侧边栏 pin/archive/close 元数据保留在本地
-  渲染器并且从不隐藏或删除持久的项目存档行。
+  上下文同步。侧边栏 pin、archive 和 close 元数据保留在渲染器本地；
+  只有显式的行菜单“删除项目”操作才会删除持久的项目存档行，并且会一并删除
+  该项目的会话（ADR 0251）。
 
 
 ### US-UI-48 Home starter 字形和标签缺失 (D206)
@@ -5261,6 +5266,28 @@ IPC 请求无法关闭。
   恢复它。成绩单和项目绑定保持不变。
 - 传统的 `manual` 首选项加载时不会出现拖动重新排序
   可供性。
+
+### E2E-PROJECT-delete-removes-project-and-owned-sessions
+
+- **前提条件**：三个持久项目 A、B 和 C，每个都至少有一个带转录本的会话；A 已归档并作为
+  侧边栏选项卡保留；B 是活动工作区；C 是一个已存储双文件夹项目组的根目录。
+- **步骤**：打开设置 → 项目存档，打开 A 的行菜单，选择删除项目，并在对话框中确认。然后
+  从侧边栏项目菜单对正处于活动工作区的 B 重复同一操作。接着对 C 尝试同一操作，最后对
+  一个宿主已不再知晓的路径尝试同一操作。
+- **预期**：对话框会指明项目名称，说明该项目及其会话与转录本会被永久移除，并说明磁盘上的
+  文件夹不会被删除；确认之前不会移除任何内容。确认后，持久项目行、该项目的会话、其转录本、
+  scratch 和 review 文件以及该项目的持久记忆均已消失，而磁盘上的文件夹保持原样。被删除的
+  项目会立即从设置 → 项目存档和侧边栏中消失，重新加载后依然如此：没有保留的选项卡、没有
+  最近项目条目、没有由会话推导的行，也没有残留的 pin、archive 或 order 偏好。其他所有项目
+  的会话与转录本不受影响。当被删除的项目曾是活动工作区时，工作区回退到另一个已打开的项目
+  或 Temporary，且下次启动不会重新打开已删除的路径。磁盘上文件夹已被移动或删除的项目仍可
+  移除。删除 C 会被拒绝并给出提示消息，该组保持不变；宿主已无持久行的路径仍会从项目存档与
+  侧边栏中移除，不会报出缺少项目的错误。
+- **链接规格**：`03-runtime/06-host-rpc-protocol.md` §项目、
+  `03-runtime/04-data-storage.md`、`04-ux/08-component-spec.md` §3.9、ADR 0251
+- **验收**：D（工作区）、F（持久化）、品质
+- **里程碑**：M6+
+- **状态**：单元/源合约已覆盖；完整旅程为草稿
 
 ### US-UI-59 基于会话的后台工具
 - 在项目 A 中启动可见轮次，在项目 B 运行时切换到项目 B，并且

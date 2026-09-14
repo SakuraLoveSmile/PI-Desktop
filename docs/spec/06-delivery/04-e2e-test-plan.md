@@ -6760,6 +6760,9 @@ and identify the platform validation still needed.
 | G — Plugins (Independent session communication) | E2E-SESSION-independent-top-level-communication |
 | Quality (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
 | C — Conversation & stream (Hover card model and links) | E2E-SESSION-hover-card-model-and-links |
+| D — Workspace (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| F — Persistence (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| Quality (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 
 | Milestone | Scenarios |
 |---|---|
@@ -6780,6 +6783,7 @@ and identify the platform validation still needed.
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
 | Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
+| M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -7207,8 +7211,10 @@ This test plan spec is accepted when:
   complete durable project list including archived rows.
 - Rows expand for recent tasks; activating a project or one of its sessions
   uses `setProject` without re-picking via dialog and keeps session/workspace
-  context synchronized. Sidebar pin/archive/close metadata remains local to
-  the renderer and never hides or deletes a durable Project-archive row.
+  context synchronized. Sidebar pin, archive, and close metadata remains local
+  to the renderer; only the explicit row-menu Delete project action removes a
+  durable Project-archive row, and it removes that project's sessions with it
+  (ADR 0251).
 
 
 ### US-UI-48 Home starter glyphs and labels are absent (D206)
@@ -7367,6 +7373,37 @@ This test plan spec is accepted when:
   Projects, and the footer remain reachable in light/dark themes at minimum
   supported window size. Existing hover cards, context menus, drag/drop, and
   project pinning retain their normal behavior.
+
+### E2E-PROJECT-delete-removes-project-and-owned-sessions
+
+- **Preconditions**: three durable projects A, B, and C, each with at least one
+  session that has a transcript; A archived and retained as a sidebar tab; B the
+  active workspace; C a root of a stored two-folder project group.
+- **Steps**: open Settings → Project archive, open A's row menu, choose Delete
+  project, and confirm in the dialog. Then repeat the same action from the
+  sidebar project menu for B while B is the active workspace. Then attempt the
+  same action for C, and finally for a path the host no longer knows.
+- **Expected**: the dialog names the project, states that the project and its
+  sessions with their transcripts are removed permanently, and states that the
+  folder on disk is not deleted; nothing is removed before the confirmation.
+  After confirming, the durable project row, that project's sessions, their
+  transcripts, scratch and review files, and its durable project memory are
+  gone, while the folder on disk is untouched. The deleted project disappears
+  from Settings → Project archive and from the sidebar immediately and again
+  after a reload: no retained tab, no recent-project entry, no session-derived
+  row, and no stale pin, archive, or order preference. Sessions and transcripts
+  of every other project are untouched. When the deleted project was the active
+  workspace, the workspace falls back to another open project or to Temporary,
+  and the next launch does not reopen the deleted path. A project whose folder
+  was moved or deleted on disk is still removable. Deleting C is refused with a
+  message and the group is unchanged; a path the host has no durable row for is
+  removed from the archive and the sidebar anyway, without a missing-project
+  error.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md` §Projects,
+  `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md` §3.9, ADR 0251
+- **Acceptance criterion**: D (workspace), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Unit/source-contract covered; full journey Draft
 
 ### US-UI-59 Session-rooted background tools
 - Start a visible turn in project A, switch to project B while it runs, and
