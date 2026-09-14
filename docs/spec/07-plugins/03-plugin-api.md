@@ -210,13 +210,19 @@ returns `text` (capped at 512 KiB), `image` (capped at 5 MiB, as a data URL),
 
 `fs.openDefault` opens one existing file with the operating system's default
 associated application. It uses the same `fs.read` root, symlink, protected-path,
-deny-list, and scope checks as `fs.readText`; directories are rejected. The
-host audits the operation and never accepts an absolute path from the plugin.
+deny-list, and scope checks as `fs.readText`; directories are rejected. The host
+audits the operation. A path is root-relative by default, and an absolute path is
+accepted only by this action and `fs.reveal` (no other mode takes one) when it lies
+inside a registered folder root of the open project — which then becomes the
+containment base for the request (ADR 0249 §5, ADR 0253). That is the shape a view
+uses to name a file in a project folder other than the primary one.
 
 `fs.reveal` reveals one existing readable file in the operating system's file
 manager and selects it when the platform supports that behavior. It uses the
 same `fs.read` checks, rejects directories, and audits both success and failure.
-The plugin receives and supplies only the root-relative path.
+It takes a path exactly as `fs.openDefault` does: root-relative by default, and
+absolute when the file lies inside another registered folder root of the open
+project (ADR 0253).
 
 `fs.stat` returns the size and modification time of one existing readable file
 without loading its contents. `fs.readRange` returns at most 8 MiB of bytes and

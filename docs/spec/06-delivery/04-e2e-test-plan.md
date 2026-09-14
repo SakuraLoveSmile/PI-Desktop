@@ -6680,7 +6680,11 @@ and identify the platform validation still needed.
      one that resolves in its primary folder.
   6. With the second folder selected, search the tree for the primary folder's
      own file name, and try to open a `.env` and a symlink or junction inside
-     the second folder that points outside it.
+     the second folder that points outside it. 7) With the second folder
+     selected, right-click the text file only that folder holds and use **Open
+     with default app**, then **Show in folder**; switch to the primary folder
+     and do the same for a file only *it* holds. 8) Back in the second folder,
+     use the same two actions on a file whose name both folders contain.
 - **Expected**:
   - The control lists the project's folders in group order, primary first, and
     names the one being browsed; the tree, search, and editing all work inside
@@ -6695,8 +6699,12 @@ and identify the platform validation still needed.
   - The selected folder is the jail, not the group: the filename search does not
     reach a file that only another project folder holds, and the credential path
     and the symlink/junction escape are still refused (ADR 0241).
+  - The two system actions reach the file that was clicked, in the folder being
+    browsed: a file only the second folder holds opens or reveals its real self
+    instead of reporting "not found", and the file whose name both folders share
+    opens the second folder's copy, not the primary folder's (ADR 0253).
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
-  `04-ux/08-component-spec.md` §5.2.2, ADR 0241, ADR 0249, ADR 0252
+  `04-ux/08-component-spec.md` §5.2.2, ADR 0241, ADR 0249, ADR 0252, ADR 0253
 - **Acceptance**: G (plugins), Security, Quality
 - **Milestone**: M6+
 - **Status**: The host-side resolution and addressing are unit-covered

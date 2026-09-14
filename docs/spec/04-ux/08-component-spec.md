@@ -876,7 +876,10 @@ entirely inside the plugin's isolated page:
   independently of what the app shows as the workspace. The switch is
   plugin-local — it changes neither the visible workspace, nor the agent's tool
   roots, nor a session's primary path, nor project instructions or memory
-  (ADR 0252).
+  (ADR 0252). Its own context-menu actions follow that choice: a file of a sibling
+  folder is handed to the host as an absolute path, so opening it with the system
+  default app or revealing it reaches the file in the folder being browsed
+  (ADR 0253).
 - The page follows `app.getAppearance` and `appearance:changed` for base theme
   and English/Simplified Chinese copy, and `workspace:changed` for the open
   project and its folder list. `workspace.get`, `app.getAppearance`,
