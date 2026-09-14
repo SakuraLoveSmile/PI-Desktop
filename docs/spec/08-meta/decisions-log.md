@@ -4906,6 +4906,21 @@ D193, and D194.
   rejection narrows: no new capability, no format change, and sheets that never
   name a banned token behave exactly as before. See issue #334 and E2E-024J.
 
+## 2026-09-14 — The dock column is a token, not a literal (D418)
+
+- The work-panel column and the bars inside it take their surface from
+  `--ds-bg-dock` and `--ds-bg-dock-raised`. In light those are `#fafafa` and
+  `#ffffff`; in dark they are `var(--ds-bg-secondary)` and `transparent`, which
+  is exactly what the base rules resolved to before.
+- Six `:root[data-theme="light"]` literals in `work-panel.css` used to raise
+  specificity above the base rule *and* skip the variable, so the whole column
+  stayed host-coloured under any contributed theme. Those overrides are gone.
+- The design-system surface table now records both tokens, and §6.4 states the
+  rule they exist to enforce: a surface colour the shell paints must come from a
+  token. A literal inside a `:root[data-theme]` override is the failure mode.
+- Same class of hole remains in `settings.css` (rail, search fields, toggle
+  knob, capability search) and a few other sheets; see issue #339.
+
 ## 2026-09-14 — Themed package assets and native window backgrounds (D417)
 
 - `contributes.themes[].assets` declares package-relative image and font files
