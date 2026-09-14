@@ -36,9 +36,14 @@ test("runtime theme APIs and setTheme are allowlisted and wired", () => {
   assert.match(runtimeSrc, /"themes\.list"/);
   assert.match(runtimeSrc, /setThemePreference/);
   assert.match(runtimeSrc, /onPluginThemesChanged/);
-  assert.match(mainSrc, /setThemePreference/);
-  assert.match(mainSrc, /IPC\.event\.settingsChanged/);
-  assert.match(mainSrc, /IPC\.event\.pluginChanged,\s*\{\s*reason: "themes"/);
+  assert.match(mainSrc, /wirePluginThemeRuntimeServices/);
+  const themeServicesSrc = readFileSync(
+    join(desktopRoot, "electron/main/plugin-theme-services.ts"),
+    "utf8",
+  );
+  assert.match(themeServicesSrc, /setThemePreference/);
+  assert.match(themeServicesSrc, /IPC\.event\.settingsChanged/);
+  assert.match(themeServicesSrc, /reason: "themes"/);
   // Child host process must expose the same surface.
   const childSrc = readFileSync(
     join(desktopRoot, "electron/main/plugin-host-process.mjs"),

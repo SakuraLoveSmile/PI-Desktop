@@ -26,6 +26,7 @@ declare const pi: PiPluginHostApi;
 pi.app.getVersion(): Promise<string>
 pi.app.getLocale(): Promise<string>
 pi.app.getAppearance(): Promise<PluginAppearance>
+pi.app.setTheme(themeId: "system" | "light" | "dark" | `plugin:${string}`): Promise<void>
 ```
 
 `app.getAppearance` 返回宿主当前正在呈现的外观，让插件（或它的面板）可以
@@ -43,6 +44,33 @@ type PluginAppearance = {
 面板通过桥通道 `app.getAppearance` 读取同一个值，并在 `appearance:changed`
 事件（见下文）上收到实时更新。在没有该通道的旧宿主上，调用以
 `UNSUPPORTED` 拒绝；面板应回退到操作系统偏好和它自己的面板内选择。
+
+`app.setTheme`（需要 `ui.theme`，ADR 0249）应用与设置选择器相同的
+`AppSettings.theme`。接受内置偏好或当前已注册的插件主题 id；未知 id 以
+`INVALID_ARGUMENT` 拒绝。宿主会持久化设置、刷新原生 chrome / 面板外观，
+并向渲染进程发出 `settingsChanged`。
+
+### 主题（需要 `ui.theme`）
+
+调用方插件自有主题的运行时注册表。生产模式可用，无需卸载/重载（ADR 0249）。
+
+```ts
+pi.themes.upsert(input: {
+  id: string;           // 本地 id，规则同 contributes.themes[].id
+  label: string;
+  base: "light" | "dark";
+  css: string;          // 使用 sanitizeThemeCss 消毒
+}): Promise<void>
+
+pi.themes.remove(themeId: string): Promise<void>
+pi.themes.list(): Promise<Array<{ id: string; themeId: string; label: string; base: "light" | "dark" }>>
+```
+
+- 完整 id 命名空间为 `plugin:<pluginId>:<themeId>`。
+- 对已有 id 的 `upsert` 覆盖 label / base / css。
+- 不再有单插件主题数量上限；CSS 体积上限与消毒器仍然生效。
+- upsert/remove 后宿主发出 `pluginChanged`（`reason: "themes"`）并刷新面板外观，
+  使**当前激活**主题立即重新着色。
 
 ### 插件
 ```ts
@@ -579,6 +607,7 @@ window.pluginBridge.on(event, handler)
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`、`workspace.get`、`app.getAppearance` | 无 |
+| `app.setTheme`、`themes.upsert`、`themes.remove`、`themes.list` | `ui.theme` |
 | `models.list` | `models.list` |
 | `fs.readText`、`fs.readPreview`、`fs.openDefault`、`fs.reveal`、`fs.glob`、`fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |

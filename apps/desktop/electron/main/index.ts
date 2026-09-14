@@ -129,6 +129,7 @@ import { createSessionCoordination } from "./runtime/session-coordination";
 import { createScheduledRuntime } from "./runtime/scheduled";
 import { createDesktopServices } from "./services/desktop-services";
 import { createPluginServices } from "./services/plugin-services";
+import { wirePluginThemeRuntimeServices } from "./plugin-theme-services";
 import { createSessionCollaborationService } from "./services/session-collaboration";
 import {
   createApplicationLifecycle,
@@ -936,19 +937,12 @@ const {
   flushPendingApplicationMenuCommands,
 } = applicationLifecycle;
 
-// Theme runtime APIs (`app.setTheme` / `themes.*`) need lifecycle reactions
-// that only exist after the application lifecycle is constructed.
-plugins.setServices({
-  setThemePreference: async (theme: string) => {
-    if (!host) throw new Error("host unavailable");
-    await host.call("settings.set", { theme });
-    applyApplicationMenuSettings({ theme });
-    sendToRenderer(IPC.event.settingsChanged, { theme });
-  },
-  onPluginThemesChanged: (pluginId: string) => {
-    sendToRenderer(IPC.event.pluginChanged, { reason: "themes", pluginId });
-    broadcastAppearance();
-  },
+wirePluginThemeRuntimeServices({
+  plugins,
+  getHost: () => host,
+  sendToRenderer,
+  applyApplicationMenuSettings,
+  broadcastAppearance,
 });
 
 closeBehaviorRuntime = createCloseBehaviorRuntime({
