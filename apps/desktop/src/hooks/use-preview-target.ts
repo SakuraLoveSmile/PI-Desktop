@@ -35,15 +35,15 @@ function isDotRelative(path: string): boolean {
  * only `openimage.js` in its reply, and the open project answers before the
  * session's own scratch store does.
  *
- * Completion also picks the destination. A project file goes to the bundled
- * file view (ADR 0241), which can read and edit it and shows it beside the
- * conversation that named it; a scratch or attachment file is addressed by
- * absolute path outside that plugin's project root, so it goes to the host
- * file tab, which already reaches both stores.
+ * Completion also picks how the file is addressed. A file in the project's
+ * **primary** folder travels as a project-relative path, exactly as before; a
+ * file in any other folder of the same project group (ADR 0249) can only be
+ * named by its absolute path, and the file view switches its own folder to the
+ * one that contains it. Scratch and attachment files are absolute too.
  *
- * A workspace `.html` page stays with the side browser (ADR 0163): it is a
- * page to run, not a file to read. A reference that matches nothing says so
- * instead of opening an empty panel.
+ * A workspace `.html` page in the primary folder stays with the side browser
+ * (ADR 0163): it is a page to run, not a file to read. A reference that matches
+ * nothing says so instead of opening an empty panel.
  */
 export function useOpenChatFileRef() {
   const { t } = useTranslation();
@@ -89,15 +89,20 @@ export function useOpenChatFileRef() {
           return;
         }
         if (match.root === "workspace") {
-          if (isHtmlFilePath(match.relativePath)) {
+          // A project group can hold several folders, and a relative path always
+          // means the primary one, so a file from a sibling folder travels by its
+          // absolute path and the file view switches to that folder (ADR 0252).
+          const inPrimary = match.projectRoot ? match.projectRoot.primary : true;
+          const target = inPrimary ? match.relativePath : match.absolutePath;
+          if (inPrimary && isHtmlFilePath(match.relativePath)) {
             openUrl(match.relativePath);
             return;
           }
           if (fileViewAvailable) {
-            openTab(fileManagerPluginTab(match.relativePath));
+            openTab(fileManagerPluginTab(target));
             return;
           }
-          openFile(match.relativePath, mimeType);
+          openFile(target, mimeType);
           return;
         }
         openFile(match.absolutePath, mimeType);

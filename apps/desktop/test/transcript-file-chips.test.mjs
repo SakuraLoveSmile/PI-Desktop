@@ -27,16 +27,22 @@ test("a file chip is routed by where the reference resolved, never optimisticall
   // replaced by a report.
   assert.match(hook, /api\.fsResolveRef\(/);
   assert.match(hook, /chat\.fileRefMissing/);
-  // A workspace HTML page is a page to run, not a file to read (ADR 0163).
-  assert.match(hook, /isHtmlFilePath\(match\.relativePath\)/);
+  // A project group can hold several folders (ADR 0249), so the address shape
+  // follows the folder that answered: relative for the primary one, absolute
+  // for its siblings, and the file view switches to the folder it is given.
+  assert.match(hook, /match\.projectRoot \? match\.projectRoot\.primary : true/);
+  assert.match(hook, /inPrimary \? match\.relativePath : match\.absolutePath/);
+  // A workspace HTML page is a page to run, not a file to read (ADR 0163), and
+  // only the primary folder has a workspace-relative address for the browser.
+  assert.match(hook, /inPrimary && isHtmlFilePath\(match\.relativePath\)/);
   assert.match(hook, /openUrl\(match\.relativePath\)/);
   // A project file prefers the bundled file view; without that plugin the
   // host file tab is the same surface this hook used before.
   assert.match(hook, /FILE_MANAGER_PLUGIN_TAB/);
-  assert.match(hook, /fileManagerPluginTab\(match\.relativePath\)/);
-  assert.match(hook, /openFile\(match\.relativePath, mimeType\)/);
+  assert.match(hook, /fileManagerPluginTab\(target\)/);
+  assert.match(hook, /openFile\(target, mimeType\)/);
   // Session scratch and attachment files live outside the plugin's project
-  // root, so they are addressed by absolute path on the host file tab.
+  // roots, so they are addressed by absolute path on the host file tab.
   assert.match(hook, /openFile\(match\.absolutePath, mimeType\)/);
   // The OS handoff is no longer what a chat click does; the channel itself
   // stays part of the public IPC surface.

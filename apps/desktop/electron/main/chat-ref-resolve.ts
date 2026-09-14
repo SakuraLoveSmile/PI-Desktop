@@ -3,6 +3,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type {
   FsChatRefMatch,
   FsChatRefMatchKind,
+  FsChatRefProjectRoot,
   FsChatRefRoot,
 } from "@pi-desktop/shared";
 import { isAttachmentBlobRef, isIgnoredName } from "./fs-panel.js";
@@ -32,9 +33,20 @@ import { getWorkspaceFileIndex } from "./fs-index.js";
  */
 
 export type ChatRefRoots = {
-  workspace?: string | null;
+  /**
+   * Every folder of the open project, primary first (ADR 0249). A single-folder
+   * project is a one-element list, so callers never special-case it.
+   */
+  project?: readonly FsChatRefProjectRoot[] | null;
   scratch?: string | null;
   attachments?: string | null;
+};
+
+/** A root to search, and — for a project folder — which folder it is. */
+type ChatRefRootEntry = {
+  kind: FsChatRefRoot;
+  path: string;
+  projectRoot?: FsChatRefProjectRoot;
 };
 
 const MAX_REF_LENGTH = 512;
@@ -112,12 +124,20 @@ export function parseChatRef(raw: string): ParsedChatRef | null {
   return { segments, absolute };
 }
 
-/** Product priority: open project, then session scratch, then attachments. */
-function orderedRoots(
-  roots: ChatRefRoots,
-): { kind: FsChatRefRoot; path: string }[] {
-  const list: { kind: FsChatRefRoot; path: string }[] = [];
-  for (const kind of ["workspace", "scratch", "attachments"] as const) {
+/**
+ * Product priority: the open project first, then session scratch, then
+ * attachments. Inside the project the order is the group's own order, primary
+ * first, so the folder the agent's tools default to answers before its siblings
+ * — and the first root that answers still wins outright.
+ */
+function orderedRoots(roots: ChatRefRoots): ChatRefRootEntry[] {
+  const list: ChatRefRootEntry[] = [];
+  for (const root of roots.project ?? []) {
+    const path = String(root?.path ?? "").trim();
+    if (!path) continue;
+    list.push({ kind: "workspace", path: resolve(path), projectRoot: root });
+  }
+  for (const kind of ["scratch", "attachments"] as const) {
     const value = roots[kind];
     if (typeof value !== "string" || !value.trim()) continue;
     list.push({ kind, path: resolve(value) });
@@ -269,6 +289,7 @@ export async function resolveChatFileRef(
           relativePath,
           absolutePath,
           matchedBy: "exact-absolute",
+          ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
         };
       }
     }
@@ -311,6 +332,7 @@ export async function resolveChatFileRef(
           relativePath: parsed.segments.join("/"),
           absolutePath,
           matchedBy: "exact-relative",
+          ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
         };
       }
     }
@@ -324,6 +346,7 @@ export async function resolveChatFileRef(
       relativePath: candidate.relativePath,
       absolutePath: join(root.path, ...segmentsOf(candidate.relativePath)),
       matchedBy: candidate.matchedBy,
+      ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
     };
   }
 
