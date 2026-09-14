@@ -220,6 +220,12 @@ type ToolBudgetHealth = {
   without changing the active workspace. A non-legacy root cannot belong to a
   second group.
 - `project.group.rename({ groupId, name })` — persists the group display name.
+- `project.group.update({ groupId, name, folders })` — edits the group name and
+  ordered roots. The primary root must remain first; duplicate roots are
+  removed, roots owned by another non-legacy group are rejected, and a root
+  with existing chats cannot be detached. Removed roots are retained as
+  suppressed historical paths rather than reappearing as standalone legacy
+  groups.
 - `project.group.memory.get/set({ groupId, entries })` — reads or normalizes
   shared group memory using the existing 32 KiB entry limit.
 - `project.group.instructions.get/set({ groupId, content })` — reads or stores

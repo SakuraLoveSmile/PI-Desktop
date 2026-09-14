@@ -453,7 +453,10 @@ visually distinct from list content.
   while distinct sections use a 16px gap and shared button/input metrics. One
   Create project title leads into an explicitly labeled filled name field and
   the workspace list with a softly filled Add folder action; the field does not
-  repeat its label as placeholder text. The folder section exposes the current
+  repeat its label as placeholder text. Edit project reuses the same surface,
+  loads the host-owned group, allows the name and non-primary folders to be
+  adjusted, keeps Primary first and non-removable, and rejects removal of a
+  folder that still owns chats. The folder section exposes the current
   local source as a compact source chip; a future remote source can replace
   that slot without changing the project name or workspace list contract. The
   dialog does not add explanatory copy for durable memory or multi-selection.

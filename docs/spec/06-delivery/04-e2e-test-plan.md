@@ -2697,25 +2697,28 @@ and identify the platform validation still needed.
 - **Status**: Unit-covered (`sidebar-preferences.test.mjs` for metadata,
   filtering, and sort behavior); full UI scenario Draft
 
-#### E2E-048b: Rename a project display name and retain it across restart
+#### E2E-048b: Edit a logical project name and folder roots
 
-- **Preconditions**: One retained project is visible in the sidebar and in
-  Settings → Project archive; its directory name is distinct from the desired
-  display name.
+- **Preconditions**: One retained logical project is visible in the sidebar and
+  in Settings → Project archive; it has a primary folder and one additional
+  folder.
 - **Steps**: 1) Open the project's overflow menu in the sidebar and choose
-  Rename project. 2) Enter a non-empty name and save. 3) Inspect the sidebar
-  row and Settings → Project archive. 4) Restart the app and inspect both
-  surfaces again. 5) Open the project folder and verify the filesystem path.
-- **Expected**: The rename action is available from both project menus and the
-  modal keeps focus contained, trims surrounding whitespace, and limits input
-  to 80 Unicode characters. The custom display name replaces the basename in
-  the sidebar and Project archive, survives restart, and does not alter the
-  normalized project path, workspace identity, sessions, or on-disk folder.
+  Edit project. 2) Change the name, remove the additional folder, and add it
+  again with the native folder picker. 3) Confirm the Primary row cannot be
+  removed. 4) Save and inspect the sidebar row, Project archive roots, and
+  active workspace. 5) Restart the app and inspect the group again.
+- **Expected**: Both project menus offer Edit project. The editor keeps focus
+  contained, trims the name, limits it to 80 Unicode characters, preserves the
+  Primary folder as the first row, and updates the root count without removing
+  another row. Saving persists one logical group with the adjusted roots; the
+  name survives restart, while normalized paths, workspace identity, sessions,
+  and on-disk folders remain unchanged. A root with existing chats is rejected
+  instead of orphaning those chats.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`
 - **Acceptance**: D (workspace identity), F (local presentation persistence)
 - **Milestone**: M5
-- **Status**: Unit-covered (`project-rename.test.mjs`,
+- **Status**: Unit-covered (`project-edit.test.mjs`,
   `sidebar-preferences.test.mjs`); rendered scenario Draft
 
 #### E2E-048A: Project session lists fold after the ten most recent rows

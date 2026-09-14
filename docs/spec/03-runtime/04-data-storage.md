@@ -36,9 +36,11 @@ Project groups use the existing `kv` extension boundary rather than a new
 relational schema. The host stores one JSON record per group in the
 `projectGroups` namespace, shared memory in `projectGroupMemory`, and shared
 instructions in `projectGroupInstructions`. The record contains the stable group
-id, display name, ordered canonical roots, primary root, and timestamps. Existing
-path projects are projected as legacy single-root groups at read time; their
-path-scoped memory and filesystem instructions remain readable.
+id, display name, ordered canonical roots, primary root, timestamps, and optional
+`detachedPaths`. Removed roots stay in `detachedPaths` so an old path project
+record is not recreated as a standalone legacy group; sessions and files are not
+deleted. Existing path projects are projected as legacy single-root groups at
+read time; their path-scoped memory and filesystem instructions remain readable.
 5. **Plan/Goal checkpoints are immutable host artifacts** with recorded path,
    hash, and size; the existing approval row also carries execution fields.
    Startup interruption is the process-epoch fence and no work is replayed.

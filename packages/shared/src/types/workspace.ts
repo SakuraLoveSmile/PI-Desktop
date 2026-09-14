@@ -52,6 +52,8 @@ export type ProjectGroupRecord = {
   lastOpenedAt: number;
   /** True for a compatibility projection of an old single-folder project. */
   legacy?: boolean;
+  /** Previously removed roots remain suppressed from legacy projections. */
+  detachedPaths?: string[];
 };
 
 export type ProjectGroupContext = {

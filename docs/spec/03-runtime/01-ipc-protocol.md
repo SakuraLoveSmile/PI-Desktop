@@ -60,6 +60,7 @@ Examples:
 - `pi-desktop/project-group/list`
 - `pi-desktop/project-group/create`
 - `pi-desktop/project-group/rename`
+- `pi-desktop/project-group/update`
 - `pi-desktop/project-group/memory/get` / `save`
 - `pi-desktop/project-group/instructions/get` / `save`
 - `pi-desktop/session/getScratchPath`

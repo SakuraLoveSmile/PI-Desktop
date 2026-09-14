@@ -1296,6 +1296,30 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             Ok(json!({ "group": group }))
         }
+        "project.group.update" => {
+            let group_id = params
+                .get("groupId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "groupId required", "INVALID_PARAMS"))?;
+            let name = params
+                .get("name")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "name required", "INVALID_PARAMS"))?;
+            let folders = params
+                .get("folders")
+                .and_then(Value::as_array)
+                .ok_or_else(|| rpc_err(1002, "folders required", "INVALID_PARAMS"))?
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            let st = state.lock().await;
+            let group = st
+                .db
+                .update_project_group(group_id, name, &folders)
+                .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            Ok(json!({ "group": group }))
+        }
         "project.group.rename" => {
             let id = params
                 .get("groupId")
@@ -4244,6 +4268,41 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(workspace["workspace"], Value::Null);
+    }
+
+    #[tokio::test]
+    async fn project_group_update_rpc_adjusts_folders() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let primary = data_dir.path().join("primary");
+        let extra = data_dir.path().join("extra");
+        fs::create_dir_all(&primary).unwrap();
+        fs::create_dir_all(&extra).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let created = handle_request(
+            state.clone(),
+            "project.group.create",
+            json!({ "name": "Editable", "folders": [primary] }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        let group_id = created["group"]["id"].as_str().unwrap();
+        let updated = handle_request(
+            state,
+            "project.group.update",
+            json!({
+                "groupId": group_id,
+                "name": "Adjusted",
+                "folders": [created["group"]["primaryPath"], extra]
+            }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(updated["group"]["name"], "Adjusted");
+        assert_eq!(updated["group"]["roots"].as_array().unwrap().len(), 2);
     }
 
     #[tokio::test]
