@@ -1,8 +1,8 @@
-# ADR 0247: Continue native Pi sessions in their canonical JSONL
+# ADR 0251: Continue native Pi sessions in their canonical JSONL
 
 - Status: Accepted
 - Date: 2026-09-14
-- Decision: D416
+- Decision: D421
 - Supersedes: baseline D007 only for session discovery; one-shot import remains available
 
 ## Context

@@ -146,6 +146,7 @@ PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
 |---|---|---|---|
 | `--color-bg-primary` | `#181818` | 法典 `gray-900` | 主表面 |
 | `--color-bg-sidebar`/下 | `#000000`（深色）/`#f3f3f3`（浅色） | 法典 `surface-under` / grey-75 | 侧栏导轨 |
+| `--ds-bg-sidebar-image` | `none`（可选 `<image>`） | — | 仅用于侧栏 `background-image`（渐变/图片）。`--ds-bg-sidebar` 保持颜色，供 glass tint、边框与 `color-mix` 使用 |
 | `--color-bg-secondary` | `#212121` | 法典 `gray-800` | 高架表面，输入框 |
 | `--color-bg-tertiary` | `#282828` | 法典 `gray-750` | 悬停/不透明升高 |
 | `--color-bg-inset` | `#0d0d0d` | 法典 `gray-1000` | 代码块，最深的插入 |
@@ -503,6 +504,10 @@ shadow-lg:  0 8px 24px rgba(0,0,0,0.12)
 | 页面 | `--ds-bg-primary` | 路由或对话框主体本身 |
 | 色块 | `--ds-tile`（文字色 3.5% 混合）；悬停 `--ds-tile-hover`（6%）；加深 `--ds-tile-deep`（8%） | 面板、列表行、卡片、表单字段、芯片、代码块、空状态 |
 | 抬起 | `--ds-raised` + `--ds-raised-shadow` | 分段控件的当前项、展开的详情块、录制键帽 |
+| 停靠列 | `--ds-bg-dock`（列本身）、`--ds-bg-dock-raised`（其标题栏与查看器条目栏） | 工作面板列及其内部条目栏。两者都是标记而非字面量，插件主题可以覆盖（D419） |
+
+外壳绘制的任何表面色都必须来自标记。`:root[data-theme="light"]` 覆写里写字面量
+会抬高特异度、压过读标记的基础规则，等于把该表面钉死在所有主题之外 —— 见 D419。
 
 | 场景 | 处理 |
 |---|---|

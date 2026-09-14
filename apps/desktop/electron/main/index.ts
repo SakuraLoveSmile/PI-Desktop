@@ -129,6 +129,7 @@ import { createSessionCoordination } from "./runtime/session-coordination";
 import { createScheduledRuntime } from "./runtime/scheduled";
 import { createDesktopServices } from "./services/desktop-services";
 import { createPluginServices } from "./services/plugin-services";
+import { wirePluginThemeRuntimeServices } from "./plugin-theme-services";
 import { createSessionCollaborationService } from "./services/session-collaboration";
 import {
   createApplicationLifecycle,
@@ -536,7 +537,8 @@ const agentExtensions = new AgentExtensionBridge({
 
 const logger = new Logger(
   dataDir,
-  process.env.NODE_ENV === "production" ? "info" : "debug",
+  isDevelopmentBuild ? "debug" : "info",
+  { mirrorConsole: isDevelopmentBuild },
 );
 installMainProcessErrorHandlers({
   emit: (record) => {
@@ -931,10 +933,19 @@ const {
   applyDeveloperMode,
   applyNativeThemeSource,
   applyApplicationMenuSettings,
+  applyAppThemePreference,
   resolveAppearance,
   broadcastAppearance,
   flushPendingApplicationMenuCommands,
 } = applicationLifecycle;
+
+wirePluginThemeRuntimeServices({
+  plugins,
+  getHost: () => host,
+  sendToRenderer,
+  applyAppThemePreference,
+  broadcastAppearance,
+});
 
 closeBehaviorRuntime = createCloseBehaviorRuntime({
   state: windowLifecycleState,

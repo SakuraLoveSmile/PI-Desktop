@@ -1172,7 +1172,7 @@ normalization and error-mapping source.
 Tracked gaps (post-MVP backlog): richer system prompt composition (§7) and
 provider/model catalog discovery beyond the currently wired paths.
 
-## 12. Native Pi continuation runtime (ADR 0247)
+## 12. Native Pi continuation runtime (ADR 0251)
 
 The sidecar selects runtime by session source. Desktop-owned ids continue to use
 `DesktopAgentRuntime`, host turn rows, and the host persistence outbox unchanged.

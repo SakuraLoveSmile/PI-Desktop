@@ -279,7 +279,7 @@ host-core. They do not change the loopback-only rule above.
     excludes secret writes and native pickers, and requires confirmation for
     session permission-mode changes
 
-## 12. Native Pi session boundary (ADR 0247)
+## 12. Native Pi session boundary (ADR 0251)
 
 Native session paths remain sidecar-private. Renderer-visible ids are opaque
 hashes of canonical path plus verified header id. Every discovery/open resolves
