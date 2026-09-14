@@ -37,6 +37,13 @@
 
   --ds-bg-primary: var(--gray-900);
   --ds-bg-sidebar: var(--ds-bg-under); /* Codex surface-under / sideBar */
+  /*
+   * Optional paint layer for the sidebar surface (gradients / images).
+   * `--ds-bg-sidebar` stays a color so color-mix, borders, and macOS glass
+   * tint keep working; themes set this to a CSS <image> value when they want
+   * a gradient or picture plate.
+   */
+  --ds-bg-sidebar-image: none;
   --ds-bg-secondary: var(--gray-800);
   --ds-bg-tertiary: var(--gray-750);
   --ds-bg-inset: var(--gray-1000);

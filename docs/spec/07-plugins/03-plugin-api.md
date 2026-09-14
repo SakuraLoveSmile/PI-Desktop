@@ -29,6 +29,7 @@ declare const pi: PiPluginHostApi;
 pi.app.getVersion(): Promise<string>
 pi.app.getLocale(): Promise<string>
 pi.app.getAppearance(): Promise<PluginAppearance>
+pi.app.setTheme(themeId: "system" | "light" | "dark" | `plugin:${string}`): Promise<void>
 ```
 
 `app.getAppearance` returns the appearance the host is currently showing so a
@@ -47,6 +48,35 @@ Panels read the same value through the bridge channel `app.getAppearance` and
 receive live updates on the `appearance:changed` event (below). On hosts older
 than the channel, the call rejects with `UNSUPPORTED`; panels should fall back
 to the OS preference and their own in-panel choice.
+
+`app.setTheme` (requires `ui.theme`, ADR 0249) applies the app theme
+preference the Settings picker writes. It accepts a built-in preference or a
+currently registered plugin theme id; unknown ids reject with
+`INVALID_ARGUMENT`. The host persists `AppSettings.theme`, refreshes native
+chrome / panel appearance, and emits `settingsChanged` to the renderer.
+
+### themes (requires `ui.theme`)
+
+Runtime registry for the calling plugin's own themes. Works in production
+without unload/reload (ADR 0249).
+
+```ts
+pi.themes.upsert(input: {
+  id: string;           // local id, same rules as contributes.themes[].id
+  label: string;
+  base: "light" | "dark";
+  css: string;          // sanitized with sanitizeThemeCss
+}): Promise<void>
+
+pi.themes.remove(themeId: string): Promise<void>
+pi.themes.list(): Promise<Array<{ id: string; themeId: string; label: string; base: "light" | "dark" }>>
+```
+
+- Full ids are namespaced `plugin:<pluginId>:<themeId>`.
+- `upsert` of an existing id replaces label / base / css.
+- There is no per-plugin theme count cap; the CSS size cap and sanitizer still apply.
+- After upsert/remove the host emits `pluginChanged` (`reason: "themes"`) and
+  refreshes panel appearance, so an updated **active** theme restyles immediately.
 
 ### plugin
 ```ts
@@ -696,6 +726,7 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`, `workspace.get`, `app.getAppearance` | None |
+| `app.setTheme`, `themes.upsert`, `themes.remove`, `themes.list` | `ui.theme` |
 | `models.list` | `models.list` |
 | `fs.readText`, `fs.stat`, `fs.readRange`, `fs.readPreview`, `fs.openDefault`, `fs.reveal`, `fs.glob`, `fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |

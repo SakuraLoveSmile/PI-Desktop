@@ -1438,7 +1438,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 
 - **先决条件**：新鲜的个人资料；提供商已配置；一轮聊天结束。
 - **步骤**：1) 通过工具调用运行提示。 2) 打开 `~/.pi-desktop/logs/`。 3) 检查 `app/`、`host/` 和 `agent/` 下的分类文件。
-- **预期**：NDJSON 记录与 `ts/level/channel/category/message` 一起存在；工具 start/end 携带 host-core/RPC；没有出现 API 密钥材料；每个类别文件的大小为 5 MB。生命周期、权限、工具、provider、plugin、持久化、更新器和错误记录仍可用，且正常运行不会创建独立的 timing 类别文件。
+- **预期**：NDJSON 记录与 `ts/level/channel/category/event/message` 一起存在；正常工具调用只产生一条携带 `sessionId`/`toolCallId`、安全工具元数据和有界结果/时长信息的完成或失败记录；中断工具仍可由同一 ID 追踪；没有出现 API key、Authorization 值、原始命令输出或本机绝对路径；每个类别文件在 5 MB 轮换。生命周期、权限、工具、provider、plugin、持久化、更新器和错误记录仍可用，且正常运行不会创建独立的 timing 类别文件。
 - **链接规格**：`03-runtime/09-logging-and-observability.md`
 - **接受**：H（诊断）
 - **里程碑**：M5
@@ -4669,6 +4669,37 @@ IPC 请求无法关闭。
 - **里程碑**：M6+
 - **状态**：host-core 的 `a_bundled_plugin_keeps_the_update_the_user_installed`、`a_newer_shipped_version_replaces_an_older_user_install`、`a_plugin_a_build_stops_shipping_is_no_longer_bundled`、`market_entry_offers_an_update_only_when_the_catalog_is_newer` 已覆盖；完整打包旅程为草稿
 
+#### E2E-PROVIDER-copy-config-without-credentials：复制配置为独立提供商
+
+- **先决条件**：设置页有一个普通提供商，已保存 API 密钥、自定义请求头和两个
+  模型绑定，绑定含不同别名、限制、思考级别及模态覆盖；另有一个 OAuth
+  账户。记录来源配置和全局默认提供商、模型。使用可捕获发现请求的确定性
+  端点，不使用真实密钥。
+- **步骤**：1) 复制普通提供商。2) 确认自定义服务草稿保留名称、地址、API
+  格式与模型绑定，密钥及自定义请求头为空，并显示未复制凭据和请求头的说明。
+  3) 修改 API 格式、某个模型的别名/限制及思考级别，然后取消。4) 确认
+  提供商数量、来源数据及全局默认值未变。5) 再次复制，在未填新密钥时触发
+  发现，再填写不同的测试密钥触发发现。6) 使用不同名称和修改后的 API
+  格式保存。7) 重新打开两份配置并编辑副本。8) 检查 OAuth 账户行没有
+  复制操作。9) 在草稿构建测试中为来源及模型加入未知字段，确认未被复制。
+  10) 复制 OpenCode Go，确认保留命名服务及固定格式，再切换到自定义服务
+  并选择其他普通 API 格式。
+- **预期**：取消不创建提供商或密钥。草稿模型对象、思考级别数组与来源不
+  共享引用。模型发现和连接测试不使用来源 provider id 或其已存凭据；需要
+  认证时只使用新草稿密钥。复制不读取秘密存储。保存经现有创建流程生成
+  独立提供商、模型绑定和凭据，来源与全局默认值保持不变。自定义请求头
+  和未知字段即使含类似凭据的值也不复制。OAuth 账户不能通过此操作复制。
+- **链接规格**：`03-runtime/12-provider-config-schema.md`、
+  `03-runtime/14-secrets-storage.md`
+- **验收**：B（模型配置）、F（独立持久化）、Security
+- **里程碑**：M2
+- **状态**：真实 Host/helper 测试已验证独立创建、编辑、删除、来源凭据及
+  默认值保持，以及重启后的持久化。隔离无密钥配置中的实际 UI 验证确认：
+  取消后仍只有一个提供商；复制后把 Responses 改为 Anthropic Messages，
+  并修改名称、别名，保存后有两个提供商且全局默认值不变。重新打开两行
+  确认来源仍为 Responses 和原别名，副本保存了 Anthropic Messages 与新
+  别名。未测试携带凭据的网络发现、外部模型请求及 OpenCode Go UI 分支。
+
 ## 8. 可追溯性矩阵
 
 
@@ -4677,6 +4708,7 @@ IPC 请求无法关闭。
 
 | 验收 | 应用场景 |
 |---|---|
+| B / F / Security — 提供商复制 | E2E-PROVIDER-copy-config-without-credentials |
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |
 | B——模型配置 | E2E-005、E2E-005G、E2E-006、E2E-007、E2E-038、E2E-050、E2E-052、E2E-055、E2E-066、E2E-080、E2E-082、E2E-151、E2E-005J、E2E-199、E2E-201、E2E-202、E2E-203、E2E-209、E2E-166 |
 | C — 对话和直播 | E2E-008、E2E-008d、E2E-008a、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-031、E2E-040、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-052、 E2E-053、E2E-054、E2E-055、E2E-059、E2E-059a、E2E-060c、E2E-060d、E2E-061、E2E-061a、E2E-062、E2E-064、E2E-065、E2E-068、E2E-071、 E2E-073、E2E-074、E2E-075、E2E-081、E2E-083、E2E-084、E2E-086、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-094、E2E-095、E2E-096、 E2E-097、E2E-098、E2E-099、E2E-102、E2E-102a、E2E-102b、E2E-106、E2E-109、E2E-111、E2E-114、E2E-116、E2E-117、E2E-118、E2E-119、 E2E-120、E2E-121、E2E-代理-001、E2E-142、E2E-144、E2E-145、E2E-146、E2E-147、E2E-151、E2E-199、E2E-250、E2E-166 |
@@ -4709,6 +4741,9 @@ IPC 请求无法关闭。
 | G — 插件（独立会话通信） | E2E-SESSION-independent-top-level-communication |
 | 品质（独立会话通信） | E2E-SESSION-independent-top-level-communication、E2E-SESSION-hover-card-model-and-links |
 | C — 对话与流式（hover 卡片模型和链接） | E2E-SESSION-hover-card-model-and-links |
+| D — 工作区（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| F — 持久化（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| 品质（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 
 | 里程碑 | 应用场景 |
 |---|---|
@@ -4729,6 +4764,7 @@ IPC 请求无法关闭。
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
 | 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency |
+| M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策
@@ -5106,8 +5142,9 @@ IPC 请求无法关闭。
   完整的持久项目列表，包括存档行。
 - 行扩展以显示最近的任务；激活项目或其会话之一
   使用 `setProject` 而不通过对话框重新选择并保留 session/workspace
-上下文同步。侧边栏 pin/archive/close 元数据保留在本地
-  渲染器并且从不隐藏或删除持久的项目存档行。
+  上下文同步。侧边栏 pin、archive 和 close 元数据保留在渲染器本地；
+  只有显式的行菜单“删除项目”操作才会删除持久的项目存档行，并且会一并删除
+  该项目的会话（ADR 0251）。
 
 
 ### US-UI-48 Home starter 字形和标签缺失 (D206)
@@ -5231,6 +5268,28 @@ IPC 请求无法关闭。
   恢复它。成绩单和项目绑定保持不变。
 - 传统的 `manual` 首选项加载时不会出现拖动重新排序
   可供性。
+
+### E2E-PROJECT-delete-removes-project-and-owned-sessions
+
+- **前提条件**：三个持久项目 A、B 和 C，每个都至少有一个带转录本的会话；A 已归档并作为
+  侧边栏选项卡保留；B 是活动工作区；C 是一个已存储双文件夹项目组的根目录。
+- **步骤**：打开设置 → 项目存档，打开 A 的行菜单，选择删除项目，并在对话框中确认。然后
+  从侧边栏项目菜单对正处于活动工作区的 B 重复同一操作。接着对 C 尝试同一操作，最后对
+  一个宿主已不再知晓的路径尝试同一操作。
+- **预期**：对话框会指明项目名称，说明该项目及其会话与转录本会被永久移除，并说明磁盘上的
+  文件夹不会被删除；确认之前不会移除任何内容。确认后，持久项目行、该项目的会话、其转录本、
+  scratch 和 review 文件以及该项目的持久记忆均已消失，而磁盘上的文件夹保持原样。被删除的
+  项目会立即从设置 → 项目存档和侧边栏中消失，重新加载后依然如此：没有保留的选项卡、没有
+  最近项目条目、没有由会话推导的行，也没有残留的 pin、archive 或 order 偏好。其他所有项目
+  的会话与转录本不受影响。当被删除的项目曾是活动工作区时，工作区回退到另一个已打开的项目
+  或 Temporary，且下次启动不会重新打开已删除的路径。磁盘上文件夹已被移动或删除的项目仍可
+  移除。删除 C 会被拒绝并给出提示消息，该组保持不变；宿主已无持久行的路径仍会从项目存档与
+  侧边栏中移除，不会报出缺少项目的错误。
+- **链接规格**：`03-runtime/06-host-rpc-protocol.md` §项目、
+  `03-runtime/04-data-storage.md`、`04-ux/08-component-spec.md` §3.9、ADR 0251
+- **验收**：D（工作区）、F（持久化）、品质
+- **里程碑**：M6+
+- **状态**：单元/源合约已覆盖；完整旅程为草稿
 
 ### US-UI-59 基于会话的后台工具
 - 在项目 A 中启动可见轮次，在项目 B 运行时切换到项目 B，并且
