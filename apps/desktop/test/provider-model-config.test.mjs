@@ -240,3 +240,41 @@ test("model ids are copyable and a configured model can carry an alias", () => {
   assert.match(pickerSource, /provider-chosen-row-alias/);
   assert.match(styles, /\.provider-chosen-row-alias\s*\{/);
 });
+
+test("the chosen pane narrows a long configured list with its own search", () => {
+  // Both panes of the shared picker own a search field, so finding one model
+  // inside fifty configured rows does not mean scrolling.
+  assert.match(pickerSource, /provider-chosen-search-wrap/);
+  assert.match(pickerSource, /provider-chosen-search"/);
+  assert.match(pickerSource, /settings\.searchChosenModels/);
+  assert.match(pickerSource, /visibleChosen\.map\(/);
+  // The filter is a view: the badge beside the title still reports every
+  // configured model, and removing a filtered row still removes the binding.
+  assert.match(pickerSource, /provider-chosen-count">\{models\.length\}/);
+  // Same matching rule as the discovered list, plus the alias and the catalog
+  // display name so a friendly name finds the id it stands for.
+  assert.match(pickerSource, /displayNameById/);
+  assert.match(pickerSource, /binding\.alias\?\.toLowerCase\(\)/);
+  // "Nothing matches" is a different message from "nothing chosen yet".
+  assert.match(pickerSource, /models\.length === 0 \? \(/);
+  assert.match(pickerSource, /visibleChosen\.length === 0 \? \(/);
+  assert.match(pickerSource, /settings\.noModelsChosen/);
+  assert.match(pickerSource, /settings\.noChosenModelMatches/);
+  // A model added by hand must not land behind a filter typed earlier.
+  assert.match(pickerSource, /setChosenQuery\(""\)/);
+  // No dead control: the field is off while saving or with nothing to search.
+  assert.match(pickerSource, /disabled=\{busy \|\| models\.length === 0\}/);
+  // One control, one rule: the two searches share declarations rather than
+  // drifting apart as two copies of the same box.
+  assert.match(
+    styles,
+    /\.provider-models-search-wrap,\s*\.provider-chosen-search-wrap\s*\{/,
+  );
+  assert.match(styles, /\.provider-models-search,\s*\.provider-chosen-search\s*\{/);
+  // Narrow panes give the field its own row instead of squeezing the header.
+  assert.match(styles, /\.provider-chosen-head\s*\{[\s\S]*?flex-wrap: wrap;/);
+  assert.match(
+    styles,
+    /@media \(max-width: 720px\)\s*\{[\s\S]*?\.provider-chosen-search-wrap/,
+  );
+});

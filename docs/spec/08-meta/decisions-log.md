@@ -84,6 +84,9 @@ This log freezes previously open questions into concrete decisions.
 | D410 | Independent session discovery and navigable collaboration projections | **Amend ADR 0239: add the reviewed read operation `session/collaboration/list`, bounded to 100 non-deleted Agent sessions and redacted to Session IDs, titles, status, updated time, readable provider/model labels, and bounded creation links. Extend the sidebar projection with readable model labels and at most eight created-session references. Render creator/created-session references as keyboard-focusable navigation buttons; independent sessions do not receive fabricated creator links. No renderer storage ownership or collaboration mutation boundary changes. See ADR 0240, E2E-SESSION-independent-top-level-communication, and E2E-SESSION-hover-card-model-and-links.** | Existing Session IDs were valid send targets but could be undiscoverable when they were not created by the plugin, while the hover card exposed only IDs and non-interactive provenance. A bounded host directory and navigable projection make durable sessions communicable and explainable without exposing transcripts or credentials. |
 | D413 | Skill market public-HTTPS catalog fetch | **Additive: Settings → Skills Market discovers SKILL.md catalogs in Electron main under a shared public-HTTPS policy (syntactic public host + DNS classification + per-hop redirect re-validation). The renderer does not fetch. Install remains `skills.create`. Catalog ids match host `valid_capability_id`. Expanded documents over 128 KiB are refused. Builtin titles are English. See ADR 0243, E2E-SKILL-MARKET-*, issue #287.** | Community skill discovery needs main-process egress without a plugin-marketplace host allowlist, and copied classifiers would collide with the MCP market. |
 | D412 | Delta-only coalesced streaming updates | **Amend the local `message_update` contract: append-only streaming frames carry `stream: delta` plus `deltaText`/`deltaThinking` (and reset flags) without growing `content`/`thinking`. Runtime coalesces those frames every 16ms and flushes before semantic boundaries. AgentHost, inflight checkpoints, and the renderer apply deltas; `message_start`/`message_end` remain full snapshots. Transcript activity parts keep object identity when only the tail token changes. Protocol version stays 11. See ADR 0242, E2E-STREAM-long-turn-keeps-realtime, and issue #299.** | Each token re-serialized the full assistant snapshot across sidecar, AgentHost, and IPC, so a long turn cost O(n²) bytes and backlogged later short chunks. |
+| D416 | Git clone accepts only syntactically public hosts | **Amend home git clone: `parseGitCloneUrl` reuses `isPublicHostname` so loopback, private, CGNAT, link-local, ULA, and `.local`/`.localhost` remotes are rejected before `git clone` runs. HTTPS/HTTP/SSH/`git@host:path` to public hosts remain valid. `file:` and URL passwords stay rejected. Git still performs its own DNS; this is not a market-style pin. See ADR 0247 and E2E-CLONE-public-hostname-rejects-private.** | Clone accepted `http://127.0.0.1/...` and RFC1918 literals, which is a LAN/SSRF hole the market fetchers already close for HTTPS catalogs. |
+| D417 | Plugin runtime theme APIs + sidebar image token | **Add `pi.app.setTheme` and `pi.themes.upsert`/`remove`/`list` under `ui.theme` (ADR 0249 / issue #352). Remove `MAX_THEMES_PER_PLUGIN`. Runtime upsert sanitizes CSS like load-time registration and emits `pluginChanged` (`reason: "themes"`); `setTheme` persists `AppSettings.theme` and emits `settingsChanged`. Split sidebar paint: `--ds-bg-sidebar` stays a color; optional `--ds-bg-sidebar-image` holds gradients/images, with macOS vibrancy stacking sheen over the image layer.** | Theme editor plugins cannot apply a theme from their panel, cannot ship an unlimited library, and cannot live-edit production CSS without reload; sidebar gradients broke `color-mix` / vibrancy consumers when stuffed into the color token. |
+| D420 | Structured, bounded, and redacted process logs | **Amend ADR 0046 / ADR 0212: every app/host/agent NDJSON record has a stable event and top-level correlation fields. A normal tool call emits one completion/failure record, while an unexpected sidecar exit emits interruption records for active tools; the tool protocol and transcript remain unchanged. Central logging redacts credentials and local paths, bounds structured data to 8 KiB, summarizes tool results instead of copying output, and mirrors the same sanitized record to development console output.** | The old `tool start` / `tool end` rows were redundant and unclear, while free-form child/error details could leak secrets or consume unbounded storage. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -4816,6 +4819,15 @@ D193, and D194.
   not fail with observations the probe does not itself guarantee.
 - See ADR 0239, ADR 0240, E2E-SESSION-hover-card-model-and-links.
 
+### Global sidebar conversation pins (issue #306)
+
+[ADR global-sidebar-pins](/adr/global-sidebar-pins) amends ADR 0016: conversation
+pins occupy one global section above standalone and project history, including
+closed or collapsed projects. Archive visibility and session sorting still
+apply. Pins carry project context and are removed from normal history before
+date grouping and row limits. Persisted metadata and host ownership stay intact.
+Validation contract: E2E-SIDEBAR-global-pinned-conversations.
+
 ## 2026-09-13 — Vendor the file view as an updatable plugin (issue #304)
 
 - The work panel's file view is no longer `pi.files`. It is a vendored copy of
@@ -4892,3 +4904,80 @@ D193, and D194.
 - host-core keeps the `inherit` token so inherit-only documents load and
   Settings round-trips them. See ADR 0246, issue #215, PR #319, and
   E2E-SUBAGENT-inherit-parent-tools.
+
+## 2026-09-14 — Git clone accepts only syntactically public hosts (D416)
+
+- Home Clone git project still accepts https/http/ssh/`git@host:path` remotes
+  without embedded passwords or `file:` URLs.
+- Hosts are classified with the shared `isPublicHostname` helper used by the
+  market guards. Private and loopback literals fail in the parser.
+- Git's own DNS/SSH is unchanged; there is no Electron Main pin.
+- See ADR 0247 and E2E-CLONE-public-hostname-rejects-private.
+
+## 2026-09-14 — Theme CSS validation only inspects CSS that runs (D417)
+
+- The `ui.theme` sanitizer masks comment bodies and string literals before the
+  `@import`, markup, and script keyword checks, one space per masked character so
+  offsets still point at the source, and keeps every `url(...)` argument verbatim
+  so a real reference is still judged by its target.
+- A character-level three-state scan, not a `/* … */` strip: in
+  `content: "/*";` the browser sees a string, and a naive strip would read a
+  comment there and hide the real `@import "x.css";` behind it.
+- `examples/plugins/hello/themes/midnight.css` loads again. Only the false
+  rejection narrows: no new capability, no format change, and sheets that never
+  name a banned token behave exactly as before. See issue #334 and E2E-024J.
+
+## 2026-09-14 — Themed package assets and native window backgrounds (D418)
+
+- `contributes.themes[].assets` declares package-relative image and font files
+  (whitelisted extensions, 4 MB summed). The host resolves each inside the plugin
+  package, refuses the dependency directory, rewrites every matching `url()` to
+  `plugin-asset://<pluginId>/<path>`, and serves it through a privileged
+  host-owned scheme whose handler answers only from the loaded plugin's declared
+  list. An undeclared reference is still refused and the raw path never reaches
+  the renderer, so the `data:`-only rule and every existing rejection are
+  unchanged. Permission stays `ui.theme`.
+- `contributes.windowAppearance.backgroundColor.{light,dark}` accepts
+  `#rrggbb` / `#rrggbbaa` behind the new `ui.window.appearance` grant. It applies
+  only while one of that plugin's themes is the selected theme and only off
+  macOS, and it is restored by derivation: the renderer recomputes the colour
+  from the persisted preference and the live catalog, so a switch, a disable, and
+  an uninstall all converge on the host palette with no stored value to unwind.
+- Built-in themes reach the same value through one shared table
+  (`packages/shared/src/theme.ts`): `BUILTIN_THEMES` holds each palette's
+  `windowBackground` once and `isThemeColorScheme` holds the built-in-id
+  question once, read by the renderer, main, the panel host, the panel preload,
+  and the theme picker. The pair `#ffffff` / `#181818` was restated in four
+  files before this, so the built-in and contributed paths could drift apart.
+  See ADR 0248, issue #335, and E2E-024J.
+
+## 2026-09-14 — The dock column is a token, not a literal (D419)
+
+- The work-panel column and the bars inside it take their surface from
+  `--ds-bg-dock` and `--ds-bg-dock-raised`. In light those are `#fafafa` and
+  `#ffffff`; in dark they are `var(--ds-bg-secondary)` and `transparent`, which
+  is exactly what the base rules resolved to before.
+- Six `:root[data-theme="light"]` literals in `work-panel.css` used to raise
+  specificity above the base rule *and* skip the variable, so the whole column
+  stayed host-coloured under any contributed theme. Those overrides are gone.
+- The design-system surface table now records both tokens, and §6.4 states the
+  rule they exist to enforce: a surface colour the shell paints must come from a
+  token. A literal inside a `:root[data-theme]` override is the failure mode.
+- Same class of hole remains in `settings.css` (rail, search fields, toggle
+  knob, capability search) and a few other sheets; see issue #339.
+
+## 2026-09-14 — Structured, bounded, and redacted process logs (D420)
+
+- Every app/host/agent NDJSON record has a stable dot-separated `event` and
+  top-level correlation fields. A normal tool call emits one completion or
+  failure record; an unexpected sidecar exit emits interruption records for
+  active tools. The tool protocol and transcript remain unchanged.
+- Central logging redacts credential formats, sensitive keys, and local paths;
+  bounds strings and structured values; and caps each record's `data` at 8 KiB.
+  Host-core audit payloads receive corresponding shaping and a serialized
+  payload cap.
+- Tool results retain outcome, error/code, duration, field names, content-block
+  count, and stdout/stderr sizes rather than copying raw arguments, output, or
+  plugin responses. Child stderr and main-process fallbacks use stable events;
+  development console mirrors contain the same sanitized record.
+- See ADR 0250 and E2E-034.
