@@ -85,6 +85,9 @@ accept_prompt
 `session:turnEnded` 插件事件宣告一次终止状态（见 ADR 0252，
 `docs/adr/0252-plugin-host-turn-end-event.md`）。
 
+转向输入按同一身份判定：命名了一个已取消、已开始收尾或已不再拥有该会话的回合的输入，
+会以「回合已结束」被拒绝。
+
 ## 3. 转换规则
 
 1. 每个会话只有一个有效回合

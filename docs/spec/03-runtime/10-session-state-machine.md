@@ -84,6 +84,10 @@ history. The host announces the terminal state once per started turn through
 the `session:turnEnded` plugin event (see ADR 0252,
 `docs/adr/0252-plugin-host-turn-end-event.md`).
 
+A steering input is judged by the same identity: one that names a turn which was
+cancelled, has started finalizing, or no longer owns the session is refused as a
+turn that has ended.
+
 ## 3. Transition rules
 
 1. Only one active turn per session
