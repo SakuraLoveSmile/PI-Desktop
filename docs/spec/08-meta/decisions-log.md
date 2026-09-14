@@ -4795,6 +4795,17 @@ D193, and D194.
   finalize only an indexed streaming assistant in place and retain completed
   message idempotency. See ADR active-turn-steering and E2E-AGENT-alt-enter-steers-active-turn.
 
+### Unified transcript reading and complete search navigation
+
+[ADR transcript-reading-ownership](/adr/transcript-reading-ownership) amends
+[ADR session-content-search](/adr/session-content-search) with one renderer
+reading view for ordinary history and search, shared by MainChat and the subagent
+dock. Live/model caches remain canonical. Nested targets receive capped parent
+Task context through additive `navigationParent`; parser source offsets locate
+hidden Markdown and file-chip matches. Read ownership rejects interrupted pages,
+and explicit message actions hydrate canonical input when history is partial or
+text is capped. Validation: E2E-SESSION-content-search-and-message-navigation.
+
 ## 2026-09-13 — Harden session collaboration navigation and delivery
 
 - Collaboration references now carry `available`. A reference to a session that was
