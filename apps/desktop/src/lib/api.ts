@@ -29,6 +29,7 @@ import type {
   ComposerCommand,
   ComposerPasteFile,
   ComposerPastedFile,
+  FsChatRefResolveResult,
   FsEntry,
   FsImageDataUrlResult,
   FsIndexResult,
@@ -902,6 +903,16 @@ export const api = {
   fsReveal: (path: string) => invoke(IPC.invoke.fsReveal, { path }),
   fsOpen: (path: string) => invoke(IPC.invoke.fsOpen, { path }),
   fsIndex: () => invoke<FsIndexResult>(IPC.invoke.fsIndex),
+  /**
+   * Complete a file reference from chat text to a real file (D320 follow-up).
+   * The main process owns the root order — project, session scratch,
+   * attachments — because only it can see the scratch store.
+   */
+  fsResolveRef: (ref: string, sessionId?: string) =>
+    invoke<FsChatRefResolveResult>(IPC.invoke.fsResolveRef, {
+      ref,
+      ...(sessionId ? { sessionId } : {}),
+    }),
   composerCommands: () =>
     invoke<{ commands: ComposerCommand[] }>(IPC.invoke.composerCommands),
   setWorkPanelReservation: (width: number) =>

@@ -21,9 +21,25 @@ test("sent user-message file refs render as composer-like chips", () => {
   assert.match(styles, /\.chat-file-chip[\s\S]*?appearance: none/);
 });
 
-test("user-message file chips open HTML in the browser and other files via fs/open", () => {
-  assert.match(hook, /isHtmlFilePath\(rel\)/);
-  assert.match(hook, /openUrl\(rel\)/);
-  assert.match(hook, /api\.fsOpen\(path\)/);
+test("a file chip is routed by where the reference resolved, never optimistically", () => {
+  // Completion happens in the main process first, so the click can no longer
+  // open a path that does not exist — the empty panel this used to produce is
+  // replaced by a report.
+  assert.match(hook, /api\.fsResolveRef\(/);
+  assert.match(hook, /chat\.fileRefMissing/);
+  // A workspace HTML page is a page to run, not a file to read (ADR 0163).
+  assert.match(hook, /isHtmlFilePath\(match\.relativePath\)/);
+  assert.match(hook, /openUrl\(match\.relativePath\)/);
+  // A project file prefers the bundled file view; without that plugin the
+  // host file tab is the same surface this hook used before.
+  assert.match(hook, /FILE_MANAGER_PLUGIN_TAB/);
+  assert.match(hook, /fileManagerPluginTab\(match\.relativePath\)/);
+  assert.match(hook, /openFile\(match\.relativePath, mimeType\)/);
+  // Session scratch and attachment files live outside the plugin's project
+  // root, so they are addressed by absolute path on the host file tab.
+  assert.match(hook, /openFile\(match\.absolutePath, mimeType\)/);
+  // The OS handoff is no longer what a chat click does; the channel itself
+  // stays part of the public IPC surface.
+  assert.doesNotMatch(hook, /api\.fsOpen\(/);
   assert.match(api, /fsOpen: \(path: string\) => invoke\(IPC\.invoke\.fsOpen, \{ path \}\)/);
 });

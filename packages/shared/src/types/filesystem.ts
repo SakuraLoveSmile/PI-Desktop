@@ -82,3 +82,32 @@ export type TokenUsageHistoryResult = {
     turnCount: number;
   };
 };
+
+/**
+ * A file referenced from chat text, resolved to a real file (D320 follow-up).
+ *
+ * `root` names which store answered, because the caller routes on it: a
+ * project file is expressed to the work panel as a root-relative path, while a
+ * scratch or attachment file can only be addressed by its absolute path.
+ */
+export type FsChatRefRoot = "workspace" | "scratch" | "attachments";
+
+/** Which rule produced the match; the shallow tiers are informational. */
+export type FsChatRefMatchKind =
+  | "exact-relative"
+  | "exact-absolute"
+  | "path-suffix"
+  | "basename";
+
+export type FsChatRefMatch = {
+  root: FsChatRefRoot;
+  /** POSIX path relative to the matched root. */
+  relativePath: string;
+  /** Native absolute path of the matched regular file. */
+  absolutePath: string;
+  matchedBy: FsChatRefMatchKind;
+};
+
+export type FsChatRefResolveResult = {
+  match: FsChatRefMatch | null;
+};

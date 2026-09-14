@@ -8,6 +8,7 @@ import {
   IPC,
   type ComposerCommand,
   type ComposerPasteFile,
+  type FsChatRefResolveResult,
 } from "@pi-desktop/shared";
 import {
   loadComposerTemplates,
@@ -32,6 +33,7 @@ import {
   resolveOpenablePath,
   resolveRealOpenablePath,
 } from "../fs-panel";
+import { resolveChatFileRef } from "../chat-ref-resolve";
 import { getWorkspaceFileIndex } from "../fs-index";
 import { BROWSER_PLUGIN_ID, type BrowserHost } from "../browser-host";
 import type { AgentSidecar } from "../agent-sidecar";
@@ -634,6 +636,28 @@ export function registerWorkspaceIpc({
     join(dataDir, "attachments"),
   ];
 
+  /**
+   * The session's own scratch directory (ADR 0124), or null when the session
+   * is not known. host-core owns that layout, so it is asked rather than
+   * re-derived here.
+   */
+  const sessionScratchRoot = async (
+    sessionId: string | undefined,
+  ): Promise<string | null> => {
+    const id = String(sessionId ?? "").trim();
+    if (!id || !host) return null;
+    try {
+      const result = await host.call<{ path: string }>(
+        "session.getScratchPath",
+        { sessionId: id },
+      );
+      const path = String(result?.path ?? "").trim();
+      return path || null;
+    } catch {
+      return null;
+    }
+  };
+
   const optionalWorkspaceRoot = async (): Promise<string | null> => {
     try {
       return await requireWorkspaceRoot();
@@ -718,5 +742,30 @@ export function registerWorkspaceIpc({
     if (!root) return { entries: [], truncated: false };
     return getWorkspaceFileIndex(root);
   });
+
+  /**
+   * Resolve a file reference from chat to a real file (D320 follow-up).
+   *
+   * The renderer knows the workspace but not where a session keeps its scratch
+   * files, and completion needs a filesystem walk, so every root is resolved
+   * here. Root order is the product contract inside `resolveChatFileRef`:
+   * project first, session scratch second, attachments last.
+   */
+  handle(
+    IPC.invoke.fsResolveRef,
+    async (
+      input: { ref?: string; sessionId?: string } = {},
+    ): Promise<FsChatRefResolveResult> => {
+      const ref = String(input.ref ?? "").trim();
+      if (!ref) return { match: null };
+      return {
+        match: await resolveChatFileRef(ref, {
+          workspace: await optionalWorkspaceRoot(),
+          scratch: await sessionScratchRoot(input.sessionId),
+          attachments: join(dataDir, "attachments"),
+        }),
+      };
+    },
+  );
 
 }

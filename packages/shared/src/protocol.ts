@@ -236,6 +236,7 @@ export const IPC = {
     fsReveal: "pi-desktop/fs/reveal",
     fsOpen: "pi-desktop/fs/open",
     fsIndex: "pi-desktop/fs/index",
+    fsResolveRef: "pi-desktop/fs/resolveRef",
     windowSetWorkPanelReservation:
       "pi-desktop/window/setWorkPanelReservation",
     windowSetWorkPanelChatWidth: "pi-desktop/window/setWorkPanelChatWidth",
