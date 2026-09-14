@@ -512,6 +512,7 @@ export const de = {
     "untitledTask": "Neue Aufgabe"
   },
   "sideChat": {
+    readOnly: "Diese native Pi-Sitzung ist derzeit schreibgeschützt.",
     "title": "Seitenchat",
     "sessionTitle": "Seitenchat: {{title}}",
     "placeholder": "Stellen Sie eine Rückfrage zu dieser Antwort",

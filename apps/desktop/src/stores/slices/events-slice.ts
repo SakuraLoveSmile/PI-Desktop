@@ -1,5 +1,5 @@
 import i18n from "i18next";
-import { reconcilePersistedUserMessage, withoutProvisionalAssistantStream } from "../../lib/session-transcript";
+import { projectMessageEnd, reconcilePersistedUserMessage } from "../../lib/session-transcript";
 import type {
   AgentEventEnvelope,
   PlanningStateEvent,
@@ -202,6 +202,31 @@ export function createEventsSlice({
         return;
       }
       runtime.projectSideChatEvent(envelope);
+      if (event.type === "message_end" && event.replacesMessageId) {
+        // Exact native stream re-key: the durable SDK entry replaces its own
+        // provisional row in the caches a reselect can paint from, while a
+        // generic Desktop completion never touches unrelated rows.
+        if (get().activeSessionId === envelope.sessionId) {
+          const cached = runtime.sessionTranscriptCache.get(envelope.sessionId);
+          if (cached) {
+            runtime.cacheSessionTranscript(
+              envelope.sessionId,
+              projectMessageEnd(cached, event),
+            );
+          }
+        }
+        if (get().retainedTranscripts[envelope.sessionId]) {
+          set((state) => ({
+            retainedTranscripts: {
+              ...state.retainedTranscripts,
+              [envelope.sessionId]: projectMessageEnd(
+                state.retainedTranscripts[envelope.sessionId],
+                event,
+              ),
+            },
+          }));
+        }
+      }
       if (
         event.type === "message_start" ||
         event.type === "message_update" ||
@@ -408,6 +433,28 @@ export function createEventsSlice({
         } else if (event.type === "agent_end") {
           void get().refreshSessions();
           void triggerAutoTitleSummarization(envelope.sessionId);
+        } else if (event.type === "error") {
+          // A running child turn can fail before its first assistant row. The
+          // panel is not the visible conversation, so surface it in the child
+          // projection and as a toast instead of a silent draft restore.
+          const childRows = get().sideChatTranscripts[envelope.sessionId];
+          if (get().sideChats[envelope.sessionId] && childRows) {
+            const errorRow = assistantErrorMessage(event.error);
+            set((state) => ({
+              sideChatTranscripts: {
+                ...state.sideChatTranscripts,
+                [envelope.sessionId]: [
+                  ...state.sideChatTranscripts[envelope.sessionId],
+                  errorRow,
+                ],
+              },
+            }));
+            const cached = runtime.sessionTranscriptCache.get(envelope.sessionId);
+            if (cached) {
+              runtime.cacheSessionTranscript(envelope.sessionId, [...cached, errorRow]);
+            }
+            get().showToast(event.error.message, { variant: "error" });
+          }
         } else if (event.type === "planning_state") {
           void get().refreshSessions();
         }
@@ -480,36 +527,9 @@ export function createEventsSlice({
           });
           break;
         case "message_end":
-          set((state) => {
-            const settled = withoutProvisionalAssistantStream(
-              state.messages,
-              event.message,
-            );
-            if (
-              event.message.role === "assistant" &&
-              (event.message.status === "error" ||
-                event.message.status === "aborted") &&
-              !event.message.content.trim() &&
-              !(event.message.thinking || "").trim() &&
-              !event.message.error
-            ) {
-              return {
-                messages: settled.filter(
-                  (message) => message.id !== event.message.id,
-                ),
-              };
-            }
-            const exists = settled.some(
-              (message) => message.id === event.message.id,
-            );
-            return {
-              messages: exists
-                ? settled.map((message) =>
-                    message.id === event.message.id ? event.message : message,
-                  )
-                : [...settled, event.message],
-            };
-          });
+          set((state) => ({
+            messages: projectMessageEnd(state.messages, event),
+          }));
           break;
         case "tool_start":
           set((state) => ({

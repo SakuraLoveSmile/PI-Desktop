@@ -519,6 +519,7 @@ export const en = {
     untitledTask: "New task",
   },
   sideChat: {
+    readOnly: "This native Pi session is read-only right now.",
     title: "Side chat",
     sessionTitle: "Side chat: {{title}}",
     placeholder: "Ask a follow-up about this answer",

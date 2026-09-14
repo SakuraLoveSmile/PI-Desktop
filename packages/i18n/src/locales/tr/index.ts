@@ -521,6 +521,7 @@ export const tr = {
     untitledTask: "Yeni görev",
   },
   sideChat: {
+    readOnly: "Bu yerel Pi oturumu şu anda salt okunur.",
     title: "Yan sohbet",
     sessionTitle: "Yan sohbet: {{title}}",
     placeholder: "Bu yanıtla ilgili ek soru sorun",

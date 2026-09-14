@@ -11474,7 +11474,9 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   and the optimistic user row reconciles to the durable entry id; closing the
   panel deletes neither the child nor its sidebar/search presence, and reopening
   it as a conversation keeps one copy of every row. A send during a running
-  native turn fails visibly before the Desktop queue and keeps the draft.
+  native turn fails visibly before the Desktop queue and keeps the draft; a
+  live foreign lease refuses the fork and a branch whose transcript exceeds the
+  general detail page still forks with its whole history.
 - **Specs:** IPC native routing; runtime §12; storage §12; UX side chat; ADR 0247.
 - **Status:** Documented; run after integration into main.
 

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   closeSync,
   existsSync,
+  fstatSync,
   fsyncSync,
   linkSync,
   lstatSync,
@@ -178,29 +179,105 @@ function walkJsonl(root: string): string[] {
 export type NativePiRuntimeNotifier = (envelope: AgentEventEnvelope) => void;
 
 /**
- * Persist a branch the SDK built but deliberately left unwritten because the
- * anchored path has no assistant message yet. The bytes come from the SDK's
- * own header and entries, so the child stays a valid v3 session file; `wx`
- * guarantees this never overwrites a file that appeared at the same path.
+ * A file this operation actually created. Cleanup proves ownership from the
+ * exact inode AND the exact content (hash for a complete file, prefix match
+ * for a partial staging write), so a same-size foreign rewrite or a path
+ * replacement is never deleted.
  */
-function writeNativeBranchFile(path: string, fileEntries: unknown[]): void {
-  const payload = fileEntries.map((entry) => `${JSON.stringify(entry)}\n`).join("");
-  let fd: number | undefined;
+type OwnedFile = {
+  path: string;
+  dev: number;
+  ino: number;
+};
+
+type CompleteOwnedFile = OwnedFile & {
+  size: number;
+  hash: string;
+};
+
+function hashBytes(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+/**
+ * Stage a branch the SDK built in memory (private non-jsonl temp, mode 0600).
+ * `wx` guarantees this never overwrites a file that appeared at the same path.
+ */
+function stageNativeBranchFile(path: string, fileEntries: unknown[]): CompleteOwnedFile {
+  const payload = Buffer.from(
+    fileEntries.map((entry) => `${JSON.stringify(entry)}\n`).join(""),
+    "utf8",
+  );
+  const fd = openSync(path, "wx", 0o600);
+  let owned: OwnedFile;
   try {
-    fd = openSync(path, "wx", 0o600);
+    const stats = fstatSync(fd);
+    owned = { path, dev: stats.dev, ino: stats.ino };
   } catch (error) {
+    try { closeSync(fd); } catch { /* nothing provable to clean */ }
     throw error;
   }
   try {
-    writeFileSync(fd, payload, "utf8");
+    writeFileSync(fd, payload);
     fsyncSync(fd);
     closeSync(fd);
   } catch (error) {
     try { closeSync(fd); } catch { /* already closed */ }
-    try { unlinkSync(path); } catch { /* best-effort cleanup of our own file */ }
+    removeOwnedPartialFile(owned, payload);
     throw error;
   }
+  return { ...owned, size: payload.length, hash: hashBytes(payload) };
 }
+
+/**
+ * Remove a file only while it is still this exact inode with the exact bytes
+ * this operation wrote.
+ */
+function removeOwnedCompleteFile(file: CompleteOwnedFile): boolean {
+  try {
+    const stats = lstatSync(file.path);
+    if (stats.dev !== file.dev || stats.ino !== file.ino || stats.size !== file.size) {
+      return false;
+    }
+    if (hashBytes(readFileSync(file.path)) !== file.hash) return false;
+    unlinkSync(file.path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clean up a staging file whose write failed part-way: the path must still be
+ * our inode and its bytes must be a prefix of the payload we were writing.
+ */
+function removeOwnedPartialFile(file: OwnedFile, payload: Buffer): boolean {
+  try {
+    const stats = lstatSync(file.path);
+    if (stats.dev !== file.dev || stats.ino !== file.ino || stats.size > payload.length) {
+      return false;
+    }
+    const bytes = readFileSync(file.path);
+    if (!bytes.equals(payload.subarray(0, bytes.length))) return false;
+    unlinkSync(file.path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const NATIVE_FORK_ERROR_CODES = new Set([
+  "AGENT_BUSY",
+  "INVALID_ARGUMENT",
+  "NOT_FOUND",
+  "PERMISSION_DENIED",
+  "NATIVE_PI_SESSION_BUSY",
+  "NATIVE_PI_SESSION_CHANGED",
+  "NATIVE_PI_INVALID_SESSION",
+  "NATIVE_PI_LEGACY_FORMAT",
+  "NATIVE_PI_MISSING_TRAILING_NEWLINE",
+  "NATIVE_PI_MISSING_CWD",
+]);
 
 const nativeServices = new Map<string, NativePiSessionService>();
 
@@ -336,6 +413,12 @@ class NativePiRuntime {
     if (projected.role === "user" && this.userMessageId) {
       this.emit({ type: "user_message_persisted", optimisticMessageId: this.userMessageId, message: projected });
       this.userMessageId = undefined;
+    } else if (projected.role === "assistant" && this.currentAssistant) {
+      // The durable SDK entry replaces the live provisional row; the renderer
+      // re-keys exactly that message id instead of guessing by role/status.
+      const replacesMessageId = this.currentAssistant.id;
+      this.currentAssistant = undefined;
+      this.emit({ type: "message_end", message: projected, replacesMessageId });
     } else {
       if (projected.role === "assistant") this.currentAssistant = undefined;
       this.emit({ type: "message_end", message: projected });
@@ -491,7 +574,26 @@ export class NativePiSessionService {
    * hardlink: a failed fork never exposes a partial child, never overwrites an
    * existing file, and leaves the parent untouched.
    */
+  /**
+   * Public fork entry point. Every failure, including precheck filesystem
+   * errors, leaves as a typed or path-free classified error: raw fs messages
+   * can contain absolute paths and must never cross the preload boundary.
+   */
   fork(input: { id: string; title?: string; throughMessageId?: string }): SessionDetail {
+    try {
+      return this.forkInternal(input);
+    } catch (error) {
+      const code = (error as { errorCode?: string })?.errorCode;
+      if (code && NATIVE_FORK_ERROR_CODES.has(code)) throw error;
+      // Keep the original (path-bearing) failure for local logs only.
+      console.error("[native-pi] fork failed:", error);
+      throw Object.assign(new Error("Native Pi fork could not create the child session"), {
+        errorCode: "NATIVE_PI_FORK_IO_ERROR",
+      });
+    }
+  }
+
+  private forkInternal(input: { id: string; title?: string; throughMessageId?: string }): SessionDetail {
     const record = this.record(input.id);
     if (this.opening.has(record.id) || this.runtimes.get(record.id)?.isRunning) {
       throw Object.assign(new Error("Native Pi session has an active turn"), { errorCode: "AGENT_BUSY" });
@@ -504,6 +606,22 @@ export class NativePiSessionService {
     if (structuralReason) {
       throw Object.assign(new Error(`Native Pi session is read-only: ${structuralReason}`), {
         errorCode: `NATIVE_PI_${structuralReason.toUpperCase().replaceAll("-", "_")}`,
+      });
+    }
+    // The same ownership state list()/detail() report also gates a fork. An
+    // owned idle runtime keeps its lease (it is ours and validated below); any
+    // other live, remote, or malformed writer refuses. A dead local owner with
+    // unchanged/complete append-only bytes stays reclaimable.
+    const ownedRuntime = this.runtimes.get(record.id);
+    const ownership = this.ownershipReadOnlyReason(record.id, record.path, before);
+    if (ownership === "changed-externally") {
+      throw Object.assign(new Error("Native Pi session changed in another client; reload before continuing"), {
+        errorCode: "NATIVE_PI_SESSION_CHANGED",
+      });
+    }
+    if (ownership === "busy") {
+      throw Object.assign(new Error("Native Pi session is already open for writing"), {
+        errorCode: "NATIVE_PI_SESSION_BUSY",
       });
     }
     const requestedTitle = typeof input.title === "string" ? input.title.trim().replace(/\s+/g, " ").slice(0, 200) : "";
@@ -531,16 +649,25 @@ export class NativePiSessionService {
       (firstUser ? textContent((firstUser.message as { content?: unknown }).content).text.trim().slice(0, 80) : "") ||
       record.nativeId;
 
-    const directory = dirname(record.path);
-    let childPath: string | undefined;
-    let childId: string | undefined;
-    let tempPath: string | undefined;
+    // Without an owned runtime, hold a short-lived lease over the exact source
+    // snapshot so another Desktop writer cannot interleave while the child is
+    // built. An owned runtime validates its own lease instead of stealing it.
+    const sourceLease = ownedRuntime ? undefined : NativePiSessionLease.acquire(record.path, before);
+    let staging: CompleteOwnedFile | undefined;
+    let published: CompleteOwnedFile | undefined;
     try {
+      const directory = realpathSync(dirname(record.path));
+      const root = realpathSync(this.root);
+      if (!inside(root, directory)) {
+        throw Object.assign(new Error("Native Pi session path is outside the allowed root"), {
+          errorCode: "PERMISSION_DENIED",
+        });
+      }
       branch.createBranchedSession(anchorId);
-      childId = branch.getSessionId();
-      const childContext = branch.buildSessionContext();
+      const childId = branch.getSessionId();
       const branchedEntries = branch.getBranch();
-      if (!childContext.model && parentContext.model) {
+      const branchContext = branch.buildSessionContext();
+      if (!branchContext.model && parentContext.model) {
         // A first-user anchor carries no model entry. Continue from the source
         // session's own saved model; never a Desktop provider or auth fallback.
         branch.appendModelChange(parentContext.model.provider, parentContext.model.modelId);
@@ -551,29 +678,50 @@ export class NativePiSessionService {
         branch.appendThinkingLevelChange(parentContext.thinkingLevel);
       }
       branch.appendSessionInfo(requestedTitle || defaultTitle);
+      // Context is read after the metadata appends so the child reports the
+      // fallback model/thinking it actually carries.
+      const childContext = branch.buildSessionContext();
       const childHeader = branch.getHeader();
       if (!childHeader) throw new Error("Native Pi fork produced no session header");
       // parentSession is the canonical source path; it stays inside the file
       // and never crosses the preload boundary.
       const fileEntries = [{ ...childHeader, parentSession: record.path }, ...branch.getEntries()];
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      childPath = join(directory, `${stamp}_${childId}.jsonl`);
-      tempPath = join(directory, `.${childId}.${randomUUID()}.tmp`);
-      writeNativeBranchFile(tempPath, fileEntries);
-      // Re-check the source right before publication: byte drift or a turn
-      // that started while this child was being built fails the fork closed.
+      const childPath = join(directory, `${stamp}_${childId}.jsonl`);
+      const tempPath = join(directory, `.${childId}.${randomUUID()}.tmp`);
+      staging = stageNativeBranchFile(tempPath, fileEntries);
+      // Re-check the source right before publication: byte drift, a replaced
+      // canonical path/root, or a turn that started while this child was being
+      // built fails the fork closed.
       if (this.opening.has(record.id) || this.runtimes.get(record.id)?.isRunning) {
         throw Object.assign(new Error("Native Pi session has an active turn"), { errorCode: "AGENT_BUSY" });
       }
+      if (ownedRuntime) ownedRuntime.assertUnchanged();
+      else sourceLease?.assertUnchanged();
       const afterSource = nativePiSnapshot(record.path);
-      if (afterSource.dev !== before.dev || afterSource.ino !== before.ino || afterSource.hash !== before.hash) {
+      if (
+        afterSource.dev !== before.dev ||
+        afterSource.ino !== before.ino ||
+        afterSource.hash !== before.hash ||
+        realpathSync(record.path) !== record.path ||
+        realpathSync(dirname(record.path)) !== directory
+      ) {
         throw Object.assign(new Error("Native Pi session changed while forking; reload before continuing"), {
           errorCode: "NATIVE_PI_SESSION_CHANGED",
         });
       }
-      linkSync(tempPath, childPath);
-      unlinkSync(tempPath);
-      tempPath = undefined;
+      // No-clobber publication: a foreign file at the final path makes link
+      // fail and is never removed. Only the exact published inode is tracked.
+      linkSync(staging.path, childPath);
+      published = {
+        path: childPath,
+        dev: staging.dev,
+        ino: staging.ino,
+        size: staging.size,
+        hash: staging.hash,
+      };
+      removeOwnedCompleteFile(staging);
+      staging = undefined;
       const childSnapshot = nativePiSnapshot(childPath);
       const writtenHeader = parseSessionEntries(childSnapshot.bytes.toString("utf8"))
         .find((entry) => entry.type === "session") as any;
@@ -581,26 +729,85 @@ export class NativePiSessionService {
         throw new Error("Native Pi fork produced an invalid session file");
       }
       const resolvedChild = realpathSync(childPath);
-      if (!inside(realpathSync(this.root), resolvedChild)) {
-        throw Object.assign(new Error("Native Pi fork path is outside the session root"), { errorCode: "PERMISSION_DENIED" });
+      if (resolvedChild !== childPath || !inside(root, resolvedChild)) {
+        throw Object.assign(new Error("Native Pi fork path is outside the session root"), {
+          errorCode: "PERMISSION_DENIED",
+        });
       }
-      const childRecord = { id: stableId(resolvedChild, childId), path: resolvedChild, nativeId: childId, cwd: record.cwd };
+      const childCwd = typeof writtenHeader.cwd === "string" ? writtenHeader.cwd : record.cwd;
+      const allMessages = visibleMessages(branch);
+      const childRecord = {
+        id: stableId(resolvedChild, childId),
+        path: resolvedChild,
+        nativeId: childId,
+        cwd: childCwd,
+      };
+      const childDetail = this.projectChildDetail(
+        childRecord,
+        childSnapshot,
+        writtenHeader,
+        childContext,
+        allMessages,
+        branch.getSessionName() ?? record.nativeId,
+      );
       this.records.set(childRecord.id, childRecord);
-      return this.detail(childRecord.id)!;
+      return childDetail;
     } catch (error) {
-      if (tempPath) {
-        try { unlinkSync(tempPath); } catch { /* the temp file was never published */ }
-      }
-      // Clean up only a file that carries this fork's own child id.
-      if (childPath && childId && existsSync(childPath)) {
-        try {
-          const written = parseSessionEntries(readFileSync(childPath, "utf8"))
-            .find((entry) => entry.type === "session") as any;
-          if (written?.id === childId) unlinkSync(childPath);
-        } catch { /* an unprovable file is left for the user */ }
-      }
+      if (staging) removeOwnedCompleteFile(staging);
+      if (published) removeOwnedCompleteFile(published);
       throw error;
+    } finally {
+      sourceLease?.release();
     }
+  }
+
+  /**
+   * Full fork response: the child's whole projected transcript (fork parity
+   * with the Desktop host contract), independent of general detail paging.
+   * ModelRuntime is read from the already initialized snapshot; a fork never
+   * performs model network initialization.
+   */
+  private projectChildDetail(
+    record: NativeSessionRecord,
+    snap: NativePiSnapshot,
+    header: any,
+    context: { model?: { provider: string; modelId: string } | null; thinkingLevel: string },
+    messages: UiMessage[],
+    title: string,
+  ): SessionDetail {
+    let reason = this.structuralReadOnlyReason(snap, header, record.cwd);
+    if (!reason && hasTrustRequiringProjectResources(record.cwd) && new ProjectTrustStore(this.agentDir).get(record.cwd) !== true) {
+      reason = "project-untrusted";
+    }
+    if (
+      !reason &&
+      (!context.model ||
+        !this.modelRuntime?.getModel(context.model.provider, context.model.modelId) ||
+        !this.modelRuntime.hasConfiguredAuth(context.model.provider))
+    ) {
+      reason = "provider-unavailable";
+    }
+    if (!reason && !NativePiSessionLease.canAcquire(record.path, snap)) {
+      reason = "busy";
+    }
+    return {
+      id: record.id,
+      title,
+      messageCount: messages.length,
+      ...(record.cwd && existsSync(record.cwd) ? { projectPath: record.cwd } : {}),
+      ...(context.model ? { providerId: context.model.provider, modelId: context.model.modelId } : {}),
+      mode: "agent",
+      thinkingLevel: thinkingLevel(context.thinkingLevel),
+      permissionMode: "inherit",
+      source: "pi-native",
+      capabilities: { canPrompt: !reason, canStop: false, canRefresh: true },
+      ...(reason ? { readOnlyReason: reason } : {}),
+      createdAt: typeof header.timestamp === "string" ? header.timestamp : new Date(snap.mtimeMs).toISOString(),
+      updatedAt: new Date(snap.mtimeMs).toISOString(),
+      messages,
+      messageStart: 0,
+      hasMoreBefore: false,
+    } as SessionDetail;
   }
 
   async prompt(id: string, content: string, notify: NativePiRuntimeNotifier, userMessageId?: string): Promise<{ accepted: true; turnId: string }> {

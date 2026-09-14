@@ -552,8 +552,301 @@ describe("native side-chat forks", () => {
       const ended = events.find((envelope) => envelope.event.type === "message_end" && (envelope.event as any).message.role === "assistant");
       const durableId = (ended!.event as any).message.id as string;
       expect(durableId).not.toBe(startedId);
+      // The terminal event names the exact provisional row it replaces; no
+      // renderer-side role/status heuristic is involved.
+      expect((ended!.event as any).replacesMessageId).toBe(startedId);
       expect(events.filter((envelope) => envelope.event.type === "message_end" && (envelope.event as any).message.id === durableId)).toHaveLength(1);
     } finally { service.disposeAll(); }
+  });
+
+  it("returns the whole child transcript and leaves general detail paging alone", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pi-desktop-native-longfork-"));
+    roots.push(root);
+    const agentDir = join(root, "agent");
+    const sessionRoot = join(agentDir, "sessions");
+    const project = join(root, "project");
+    const group = join(sessionRoot, "--project--");
+    mkdirSync(group, { recursive: true });
+    mkdirSync(project);
+    const file = join(group, "long.jsonl");
+    const entries: any[] = [
+      { type: "session", version: 3, id: "long-parent", timestamp: "2026-09-14T00:00:00.000Z", cwd: project },
+      { type: "model_change", id: "m1", parentId: null, provider: "test-provider", modelId: "test-model", timestamp: "2026-09-14T00:00:00.500Z" },
+    ];
+    let parentId = "m1";
+    for (let index = 0; index < 520; index += 1) {
+      entries.push({
+        type: "message", id: `u${index}`, parentId,
+        timestamp: new Date(1_700_000_000_000 + index * 1_000).toISOString(),
+        message: { role: "user", content: [{ type: "text", text: `row ${index}` }], timestamp: index },
+      });
+      parentId = `u${index}`;
+    }
+    writeFileSync(file, `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+    const f = await configureModelFiles({ root, agentDir, sessionRoot, project, file, text: "", group });
+    const service = new NativePiSessionService(f);
+    try {
+      const [summary] = await service.list();
+      const child = service.fork({ id: summary.id, title: "Long child" });
+      expect(child.messages).toHaveLength(520);
+      expect(child.messages[0].content).toBe("row 0");
+      expect(child.messages.at(-1)?.content).toBe("row 519");
+      expect(child.messageStart).toBe(0);
+      expect(child.hasMoreBefore).toBe(false);
+      expect(child.messageCount).toBe(520);
+      // Ordinary detail paging keeps its bounded newest-page contract.
+      const paged = service.detail(child.id);
+      expect(paged?.messages).toHaveLength(100);
+      expect(paged?.hasMoreBefore).toBe(true);
+    } finally { service.disposeAll(); }
+  });
+
+  it("normalizes the child cwd from the SDK header instead of the raw parent string", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pi-desktop-native-cwdfork-"));
+    roots.push(root);
+    const agentDir = join(root, "agent");
+    const sessionRoot = join(agentDir, "sessions");
+    const project = join(root, "project");
+    const group = join(sessionRoot, "--project--");
+    mkdirSync(group, { recursive: true });
+    mkdirSync(project);
+    const file = join(group, "raw-cwd.jsonl");
+    const rawCwd = `${project}//`;
+    const entries = [
+      { type: "session", version: 3, id: "raw-parent", timestamp: "2026-09-14T00:00:00.000Z", cwd: rawCwd },
+      { type: "model_change", id: "m1", parentId: null, provider: "test-provider", modelId: "test-model", timestamp: "2026-09-14T00:00:00.500Z" },
+      { type: "message", id: "u1", parentId: "m1", timestamp: "2026-09-14T00:00:01.000Z", message: { role: "user", content: [{ type: "text", text: "hello" }], timestamp: 1 } },
+    ];
+    writeFileSync(file, `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`);
+    const f = await configureModelFiles({ root, agentDir, sessionRoot, project, file, text: "", group });
+    const service = new NativePiSessionService(f);
+    try {
+      const [summary] = await service.list();
+      const child = service.fork({ id: summary.id, title: "Normalized cwd" });
+      expect(child.projectPath).toBe(project);
+      expect(service.detail(child.id)?.id).toBe(child.id);
+      const childPath = join(group, groupEntries(group).find((name) => name.endsWith(".jsonl") && name !== "raw-cwd.jsonl")!);  // eslint-disable-line no-restricted-syntax
+      const childHeader = JSON.parse(readFileSync(childPath, "utf8").split("\n")[0]);
+      expect(childHeader.cwd).toBe(project);
+      expect((await service.list()).some((row) => row.id === child.id)).toBe(true);
+    } finally { service.disposeAll(); }
+  });
+
+  it("refuses a live foreign lease and reclaims only a dead-owner lease", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const service = new NativePiSessionService(f);
+    try {
+      const [summary] = await service.list();
+      const before = groupEntries(f.group);
+      const parentBytes = readFileSync(f.file, "utf8");
+      const foreign = acquireNativePiSessionLease(f.file);
+      const lockPath = `${f.file}.pi-desktop.lock`;
+      const record = JSON.parse(readFileSync(lockPath, "utf8"));
+      try {
+        expect((await service.list()).find((row) => row.id === summary.id)?.readOnlyReason).toBe("busy");
+        expect(errorCode(() => service.fork({ id: summary.id, title: "blocked" }))).toBe("NATIVE_PI_SESSION_BUSY");
+        expect(groupEntries(f.group)).toEqual(before);
+        expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+      } finally { foreign.release(); }
+      writeFileSync(lockPath, `${JSON.stringify({ ...record, pid: 2_147_483_647 })}\n`);
+      const child = service.fork({ id: summary.id, title: "reclaimed" });
+      expect(child.title).toBe("reclaimed");
+      expect(existsSync(lockPath)).toBe(false);
+      expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+    } finally { service.disposeAll(); }
+  });
+
+  it("refuses a changed owned runtime but still forks a provider-unavailable parent as data", async () => {
+    const changed = await configureModelFiles(forkFixture());
+    vi.spyOn(ModelRuntime.prototype, "streamSimple").mockImplementation(() => fauxStream());
+    const changedService = new NativePiSessionService(changed);
+    try {
+      const [summary] = await changedService.list();
+      await changedService.prompt(summary.id, "open idle runtime", () => {});
+      await expect.poll(() => changedService.status(summary.id).status.isRunning).toBe(false);
+      const current = readFileSync(changed.file, "utf8");
+      writeFileSync(changed.file, `${current}${JSON.stringify({ type: "custom", id: "foreign-append", parentId: "future", timestamp: new Date().toISOString(), customType: "foreign" })}\n`);
+      const after = readFileSync(changed.file, "utf8");
+      expect(errorCode(() => changedService.fork({ id: summary.id, title: "stale" }))).toBe("NATIVE_PI_SESSION_CHANGED");
+      expect(readFileSync(changed.file, "utf8")).toBe(after);
+      expect(groupEntries(changed.group)).toEqual(["fork.jsonl"]);
+    } finally { changedService.disposeAll(); }
+
+    const noauth = await configureModelFiles(forkFixture());
+    rmSync(join(noauth.agentDir, "auth.json"));
+    const noauthService = new NativePiSessionService(noauth);
+    try {
+      const [summary] = await noauthService.list();
+      expect(summary.readOnlyReason).toBe("provider-unavailable");
+      const parentBytes = readFileSync(noauth.file, "utf8");
+      const child = noauthService.fork({ id: summary.id, title: "data only" });
+      expect(child.readOnlyReason).toBe("provider-unavailable");
+      expect(child.messages.map((message) => message.content)).toEqual(["hello", "first answer", "compacted", "second answer"]);
+      expect(readFileSync(noauth.file, "utf8")).toBe(parentBytes);
+      await expect(noauthService.prompt(child.id, "needs auth", () => {})).rejects.toMatchObject({ errorCode: "NATIVE_PI_PROVIDER_UNAVAILABLE" });
+    } finally { noauthService.disposeAll(); }
+  });
+
+  it("never deletes a foreign publication and classifies the failure path-free", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const parentBytes = readFileSync(f.file, "utf8");
+    const before = groupEntries(f.group);
+    let foreignPath = "";
+    vi.resetModules();
+    vi.doMock("node:fs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs")>();
+      return {
+        ...actual,
+        linkSync: (source: string, target: string) => {
+          actual.copyFileSync(source, target, actual.constants.COPYFILE_EXCL);
+          foreignPath = target;
+          throw Object.assign(new Error("fixture collision"), { code: "EEXIST" });
+        },
+      };
+    });
+    try {
+      const { NativePiSessionService: MockedService } = await import("./native-pi-session.js");
+      const service = new MockedService(f);
+      try {
+        const [summary] = await service.list();
+        let failure: any;
+        try { service.fork({ id: summary.id, title: "collision" }); } catch (error) { failure = error; }
+        expect(failure?.errorCode).toBe("NATIVE_PI_FORK_IO_ERROR");
+        expect(failure?.message).not.toContain(f.group);
+        expect(existsSync(foreignPath)).toBe(true);
+        expect(readFileSync(foreignPath, "utf8")).toContain("collision");
+        expect(groupEntries(f.group).sort()).toEqual(before.concat([foreignPath.split("/").at(-1)!]).sort());
+        expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+      } finally { service.disposeAll(); }
+    } finally {
+      vi.doUnmock("node:fs");
+      vi.resetModules();
+    }
+  });
+
+  it("cleans its own partial staging write without leaking the temp file", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const before = groupEntries(f.group);
+    const parentBytes = readFileSync(f.file, "utf8");
+    vi.resetModules();
+    vi.doMock("node:fs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs")>();
+      const paths = new Map<number, string>();
+      return {
+        ...actual,
+        openSync: (path: any, flags: any, mode: any) => {
+          const fd = actual.openSync(path, flags, mode);
+          paths.set(fd as number, String(path));
+          return fd;
+        },
+        writeFileSync: (fd: number, data: any, ...rest: any[]) => {
+          if (paths.get(fd)?.endsWith(".tmp")) {
+            actual.writeFileSync(fd, Buffer.from(data as string).subarray(0, 12));
+            throw Object.assign(new Error("fixture ENOSPC"), { code: "ENOSPC" });
+          }
+          return actual.writeFileSync(fd, data, ...rest);
+        },
+      };
+    });
+    try {
+      const { NativePiSessionService: MockedService } = await import("./native-pi-session.js");
+      const service = new MockedService(f);
+      try {
+        const [summary] = await service.list();
+        let failure: any;
+        try { service.fork({ id: summary.id, title: "partial" }); } catch (error) { failure = error; }
+        expect(failure?.errorCode).toBe("NATIVE_PI_FORK_IO_ERROR");
+        expect(groupEntries(f.group)).toEqual(before);
+        expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+      } finally { service.disposeAll(); }
+    } finally {
+      vi.doUnmock("node:fs");
+      vi.resetModules();
+    }
+  });
+
+  it("never deletes a staging file whose bytes were replaced", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const before = groupEntries(f.group);
+    let tempPath = "";
+    vi.resetModules();
+    vi.doMock("node:fs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs")>();
+      let replaced = false;
+      return {
+        ...actual,
+        openSync: (path: any, flags: any, mode: any) => {
+          const fd = actual.openSync(path, flags, mode);
+          if (String(path).endsWith(".tmp")) tempPath = String(path);
+          return fd;
+        },
+        fsyncSync: (fd: number) => {
+          if (!replaced && tempPath) {
+            replaced = true;
+            const bytes = actual.readFileSync(tempPath);
+            actual.writeFileSync(tempPath, Buffer.alloc(bytes.length, 0x78));
+            actual.appendFileSync(f.file, `${JSON.stringify({ type: "custom", id: "drift-2", parentId: "future", timestamp: new Date().toISOString(), customType: "drift" })}\n`);
+          }
+          return actual.fsyncSync(fd);
+        },
+      };
+    });
+    try {
+      const { NativePiSessionService: MockedService } = await import("./native-pi-session.js");
+      const service = new MockedService(f);
+      try {
+        const [summary] = await service.list();
+        let failure: any;
+        try { service.fork({ id: summary.id, title: "replaced" }); } catch (error) { failure = error; }
+        expect(failure?.errorCode).toBe("NATIVE_PI_SESSION_CHANGED");
+        // The modified staging file is not ours to delete; no child is published.
+        expect(tempPath).not.toBe("");
+        expect(existsSync(tempPath)).toBe(true);
+        expect(readFileSync(tempPath).equals(Buffer.alloc(1, 0x78))).toBe(false);
+        expect(groupEntries(f.group).filter((name) => name.endsWith(".jsonl"))).toEqual(before);
+      } finally { service.disposeAll(); }
+    } finally {
+      vi.doUnmock("node:fs");
+      vi.resetModules();
+    }
+  });
+
+  it("fails closed without publishing when the parent drifts during staging", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const before = groupEntries(f.group);
+    vi.resetModules();
+    vi.doMock("node:fs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs")>();
+      let appended = false;
+      return {
+        ...actual,
+        fsyncSync: (fd: number) => {
+          if (!appended) {
+            appended = true;
+            actual.appendFileSync(f.file, `${JSON.stringify({ type: "custom", id: "drift", parentId: "future", timestamp: new Date().toISOString(), customType: "drift" })}\n`);
+          }
+          return actual.fsyncSync(fd);
+        },
+      };
+    });
+    try {
+      const { NativePiSessionService: MockedService } = await import("./native-pi-session.js");
+      const service = new MockedService(f);
+      try {
+        const [summary] = await service.list();
+        const beforeDrift = readFileSync(f.file, "utf8");
+        let failure: any;
+        try { service.fork({ id: summary.id, title: "drift" }); } catch (error) { failure = error; }
+        expect(failure?.errorCode).toBe("NATIVE_PI_SESSION_CHANGED");
+        expect(groupEntries(f.group)).toEqual(before);
+        const afterDrift = readFileSync(f.file, "utf8");
+        expect(afterDrift.startsWith(beforeDrift)).toBe(true);
+        expect(afterDrift).toContain('"drift"');
+      } finally { service.disposeAll(); }
+    } finally {
+      vi.doUnmock("node:fs");
+      vi.resetModules();
+    }
   });
 });
 

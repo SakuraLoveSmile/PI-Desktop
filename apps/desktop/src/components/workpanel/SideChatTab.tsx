@@ -40,12 +40,20 @@ export function SideChatTab({ sessionId }: { sessionId: string }) {
   const closeSideChat = useAppStore((s) => s.closeSideChat);
   const addSideChatReplyToMain = useAppStore((s) => s.addSideChatReplyToMain);
   const selectSession = useAppStore((s) => s.selectSession);
+  const childSummary = useAppStore((s) =>
+    s.sessions.find((session) => session.id === sessionId),
+  );
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  // `busy` is a live-turn state, not a durable read-only state: it must not
+  // trap the composer once the turn has settled. Other reasons (provider,
+  // trust, externally changed) disable Send without touching Stop.
+  const readOnlyReason = childSummary?.readOnlyReason;
+  const sendBlocked = Boolean(readOnlyReason && readOnlyReason !== "busy");
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || sending) return;
+    if (!text || sending || sendBlocked) return;
     setSending(true);
     setDraft("");
     // The child session is the prompt target, so its stream never becomes the
@@ -55,7 +63,9 @@ export function SideChatTab({ sessionId }: { sessionId: string }) {
       { text, fileReferences: [] },
       sessionId,
     );
-    if (!accepted) setDraft(text);
+    // Text typed while the send was in flight is never overwritten by the
+    // failed draft; only an empty composer gets the old text back.
+    if (!accepted) setDraft((current) => (current ? current : text));
     setSending(false);
   };
 
@@ -142,7 +152,11 @@ export function SideChatTab({ sessionId }: { sessionId: string }) {
         />
         <div className="side-chat-composer-row">
           <span className="side-chat-hint">
-            {messages.length === 0 ? t("sideChat.empty") : null}
+            {sendBlocked
+              ? t("sideChat.readOnly")
+              : messages.length === 0
+                ? t("sideChat.empty")
+                : null}
           </span>
           {isRunning ? (
             <Button
@@ -161,7 +175,7 @@ export function SideChatTab({ sessionId }: { sessionId: string }) {
             variant="primary"
             size="sm"
             className="side-chat-action"
-            disabled={!draft.trim() || sending}
+            disabled={!draft.trim() || sending || sendBlocked}
           >
             {t("chat.send")}
           </Button>

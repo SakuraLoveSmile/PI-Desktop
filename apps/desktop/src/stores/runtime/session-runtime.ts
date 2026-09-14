@@ -10,9 +10,9 @@ import {
   dedupeSessionMessages,
   durableCoversLiveSessionMessages,
   mergeLiveSessionMessages,
+  projectMessageEnd,
   removeLiveSessionMessage,
   upsertLiveSessionMessage,
-  withoutProvisionalAssistantStream,
 } from "../../lib/session-transcript";
 import { sessionIsArchived, type SessionMeta } from "../../lib/sidebar-preferences";
 import {
@@ -268,15 +268,7 @@ export function createSessionRuntime({ get, set }: StoreAccess): SessionRuntime 
       }
         break;
       case "message_end": {
-        const failed =
-          event.message.status === "error" || event.message.status === "aborted";
-        const empty =
-          !(event.message.content || "").trim() &&
-          !(event.message.thinking || "").trim();
-        const settled = withoutProvisionalAssistantStream(current, event.message);
-        next = failed && empty && !event.message.error
-          ? removeLiveSessionMessage(settled, event.message.id)
-          : upsertLiveSessionMessage(settled, event.message);
+        next = projectMessageEnd(current, event);
         break;
       }
       case "tool_start":

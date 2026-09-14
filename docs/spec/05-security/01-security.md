@@ -304,3 +304,11 @@ Pi extensions still execute as trusted local code with the native resource
 lifecycle; they are not Desktop plugins and this is not a sandbox claim.
 Capability checks recognize this service's owned lease and reclaimable dead
 local owners without stealing live, remote, malformed, or uncertain leases.
+Native fork reuses the same source ownership gate: an owned idle runtime keeps
+its lease, an unowned source is held under a short-lived lease for the snapshot
+window, and a live/remote/malformed foreign lease or a changed source refuses
+the fork. The child is written as a private mode-0600 non-jsonl staging file in
+the parent's session directory (fsync, then a no-clobber hardlink to the final
+name); cleanup removes only files whose device/inode and content still match
+what this operation created, and unexpected filesystem failures cross the
+preload boundary only as a path-free classified error.

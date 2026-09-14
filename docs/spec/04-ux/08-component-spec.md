@@ -1048,7 +1048,14 @@ of session.
   tooltip and accessible name `chat.startSideChat`. Opening calls the existing
   `session.fork` with the anchor and does not activate the child, so the main
   conversation keeps its visible session. The child is durable on the host
-  exactly as an ordinary branch.
+  exactly as an ordinary branch. For a native Pi parent the same channel is
+  source-discriminated: the sidecar returns the child's whole anchored
+  transcript, the panel streams its reply under a provisional row that is
+  re-keyed to the durable SDK entry, and a native child that is read-only
+  (provider/trust/external change) disables Send with the `sideChat.readOnly`
+  hint, while a send during a running native turn is rejected before the
+  Desktop queue with a visible toast and the draft kept. Stop always stays
+  available for a running child.
 - Registration: the child is registered as a side chat of the parent session in
   renderer-owned state, and the panel opens one `sidechat` tab whose identity is
   `sidechat:<childSessionId>`. The tab reuses the upstream docked panel, its
@@ -1082,8 +1089,10 @@ of session.
   lists, and search. Entries are removed when the tab closes, when the child is
   opened as a conversation, and when the parent or child session is deleted.
 - Boundaries: side-chat state is renderer-owned and is not persisted across
-  restart (the durable child is). No host protocol, storage schema, IPC channel,
-  or permission changes.
+  restart (the durable child is). Native fork adds sidecar file creation but no
+  host protocol, storage schema, permission change, or native queue: the child
+  remains an ordinary Pi session in the sidebar, session lists, and title/
+  project search, and it reopens as a normal conversation.
 
 ---
 

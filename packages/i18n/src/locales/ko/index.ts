@@ -521,6 +521,7 @@ export const ko = {
     untitledTask: "새 작업",
   },
   sideChat: {
+    readOnly: "이 네이티브 Pi 세션은 현재 읽기 전용입니다.",
     title: "사이드 채팅",
     sessionTitle: "사이드 채팅: {{title}}",
     placeholder: "이 답변에 대해 이어서 질문하세요",

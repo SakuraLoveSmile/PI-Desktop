@@ -413,29 +413,57 @@ export function createQueueSlice({
           runtime.submittedComposerDrafts.delete(startedIn);
           runtime.retractOptimisticUserMessage(startedIn, optimisticMessage);
           const messageError = messageErrorFromUnknown(error);
-          set((state) => ({
-            isRunning:
-              state.activeSessionId === startedIn ? false : state.isRunning,
-            runningSessions: { ...state.runningSessions, [startedIn]: false },
-            latestTurnResults: {
-              ...state.latestTurnResults,
-              [startedIn]: {
-                status: "failed",
-                turnId: `${startedIn}:${Date.now()}`,
-                finishedAt: Date.now(),
-                errorCode: messageError.code,
+          const sideChatChild = Boolean(get().sideChats[startedIn]);
+          const errorRow = assistantErrorMessage(messageError);
+          set((state) => {
+            const childRows = state.sideChatTranscripts[startedIn];
+            return {
+              isRunning:
+                state.activeSessionId === startedIn ? false : state.isRunning,
+              runningSessions: { ...state.runningSessions, [startedIn]: false },
+              latestTurnResults: {
+                ...state.latestTurnResults,
+                [startedIn]: {
+                  status: "failed",
+                  turnId: `${startedIn}:${Date.now()}`,
+                  finishedAt: Date.now(),
+                  errorCode: messageError.code,
+                },
               },
-            },
-            sessionOutcomes: { ...state.sessionOutcomes, [startedIn]: "failed" },
-            ...(state.activeSessionId === startedIn
-              ? { messages: [...state.messages, assistantErrorMessage(messageError)] }
-              : {}),
-          }));
+              sessionOutcomes: { ...state.sessionOutcomes, [startedIn]: "failed" },
+              ...(state.activeSessionId === startedIn
+                ? { messages: [...state.messages, errorRow] }
+                : sideChatChild && childRows
+                  ? {
+                      sideChatTranscripts: {
+                        ...state.sideChatTranscripts,
+                        [startedIn]: [...childRows, errorRow],
+                      },
+                    }
+                  : {}),
+            };
+          });
+          if (sideChatChild && get().activeSessionId !== startedIn) {
+            // The panel is not the visible conversation: surface the failure in
+            // the child projection and as a toast instead of the main transcript.
+            const cached = runtime.sessionTranscriptCache.get(startedIn);
+            if (cached) {
+              runtime.cacheSessionTranscript(startedIn, [...cached, errorRow]);
+            }
+            get().showToast(messageError.message, { variant: "error" });
+          }
           return false;
         }
-      } catch {
+      } catch (error) {
         // Keep sendPrompt's Promise<boolean> contract so the composer can
         // restore a draft cleared before submission, even on unexpected setup errors.
+        const target = requestedSessionId ?? get().activeSessionId;
+        if (target && get().sideChats[target]) {
+          get().showToast(
+            error instanceof Error ? error.message : String(error),
+            { variant: "error" },
+          );
+        }
         return false;
       } finally {
         pendingSubmissions.delete(submissionKey);

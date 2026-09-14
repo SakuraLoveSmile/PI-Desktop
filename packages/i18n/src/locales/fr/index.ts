@@ -512,6 +512,7 @@ export const fr = {
     "untitledTask": "Nouvelle tâche"
   },
   "sideChat": {
+    readOnly: "Cette session Pi native est en lecture seule pour le moment.",
     "title": "Chat latéral",
     "sessionTitle": "Chat latéral : {{title}}",
     "placeholder": "Posez une question complémentaire sur cette réponse",

@@ -1,4 +1,4 @@
-import type { MessageAttachment, UiMessage } from "@pi-desktop/shared";
+import type { AgentEvent, MessageAttachment, UiMessage } from "@pi-desktop/shared";
 
 type OptimisticFileReference = {
   path: string;
@@ -44,32 +44,37 @@ export function optimisticUserMessage(
 }
 
 /**
- * Drop a native streaming placeholder once its durable entry arrives.
+ * Terminal projection for one `message_end` event.
  *
  * Native Pi sessions mint SDK entry ids when the message is appended, so the
- * live row streams under a provisional id and the terminal `message_end`
- * carries a different one. A durable assistant row supersedes any streaming
- * assistant row in the same session; a same-id row is left for the caller's
- * ordinary upsert (the Desktop runtime path).
+ * live row streams under a provisional id and the terminal event names that id
+ * in `replacesMessageId`. Only that exact row is re-keyed; a generic Desktop
+ * terminal event carries no metadata and must leave every other row alone
+ * (parallel delegate streams, replayed historical completions).
  */
-export function withoutProvisionalAssistantStream(
+export function projectMessageEnd(
   messages: UiMessage[],
-  durable: UiMessage,
+  event: Extract<AgentEvent, { type: "message_end" }>,
 ): UiMessage[] {
-  if (durable.role !== "assistant") return messages;
-  const stale = messages.some(
-    (message) =>
-      message.role === "assistant" &&
-      message.status === "streaming" &&
-      message.id !== durable.id,
-  );
-  return stale
-    ? messages.filter(
-        (message) =>
-          message.id === durable.id ||
-          !(message.role === "assistant" && message.status === "streaming"),
-      )
-    : messages;
+  let next = messages;
+  const replacesMessageId = event.replacesMessageId;
+  if (replacesMessageId && replacesMessageId !== event.message.id) {
+    const index = messages.findIndex(
+      (message) =>
+        message.id === replacesMessageId && message.role === "assistant",
+    );
+    if (index >= 0) {
+      next = [...messages.slice(0, index), ...messages.slice(index + 1)];
+    }
+  }
+  const failed =
+    event.message.status === "error" || event.message.status === "aborted";
+  const empty =
+    !(event.message.content || "").trim() &&
+    !(event.message.thinking || "").trim();
+  return failed && empty && !event.message.error
+    ? removeLiveSessionMessage(next, event.message.id)
+    : upsertLiveSessionMessage(next, event.message);
 }
 
 /**

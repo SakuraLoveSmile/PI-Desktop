@@ -517,6 +517,7 @@ export const zhTW = {
     untitledTask: "新建任務",
   },
   sideChat: {
+    readOnly: "此原生 Pi 工作階段目前為唯讀狀態。",
     title: "側邊聊天",
     sessionTitle: "側邊聊天：{{title}}",
     placeholder: "就這則回覆繼續追問",
