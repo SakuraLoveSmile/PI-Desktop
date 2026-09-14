@@ -11409,3 +11409,47 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Acceptance**: Quality
 - **Milestone**: M6+
 - **Status**: Automated (`pnpm test:e2e:skill-market`)
+
+### E2E-SESSION-native-pi-continue-appends-original-jsonl
+
+- **Preconditions:** A synthetic Pi v3 session contains branches, compaction
+  metadata (including `retainedTail`), model/thinking changes, custom and
+  context-bearing custom-message entries, and a valid project cwd. A faux local
+  model/auth binding is configured in the fixture Pi agent directory.
+- **Steps:** Start PI-Desktop with fixture-only agent/session directories;
+  refresh sessions; open the native row beside a Desktop row; submit one text
+  prompt; stop or let the faux response settle; reopen through a fresh Pi
+  `SessionManager`.
+- **Expected:** The original fixture JSONL receives native SDK entries whose
+  parent starts at the previous current leaf; all prior bytes/unknown entries
+  remain unchanged; the new leaf is visible after refresh; no Desktop SQLite
+  session or Desktop transcript copy is created; the Desktop-owned row still
+  follows its existing runtime and storage path.
+- **Specs:** runtime §12; storage §12; security §12; ADR 0247.
+- **Status:** Documented; run after integration into main.
+
+### E2E-SESSION-native-pi-external-change-fails-closed
+
+- **Preconditions:** A writable synthetic native v3 fixture is listed.
+- **Steps:** Acquire Desktop continuation ownership, then simulate a foreign
+  append/replacement before the next SDK append; also attempt a second Desktop
+  lease and a stale lease whose owner cannot be proven dead with unchanged
+  bytes.
+- **Expected:** The second writer is refused; external divergence tears down
+  continuation with a visible read-only/error reason; no requested entry is
+  appended and no bytes are truncated or rewritten; a lease releases on normal
+  dispose and is reclaimed after crash only with dead-owner plus unchanged-file
+  proof.
+- **Specs:** runtime §12; storage §12; security §12; ADR 0247.
+- **Status:** Documented; run after integration into main.
+
+### E2E-SESSION-native-pi-incompatible-session-is-read-only
+
+- **Preconditions:** Fixtures cover missing cwd, missing trailing newline,
+  v1/v2 header, unavailable saved provider/auth, and untrusted project resources.
+- **Steps:** Refresh and open each fixture.
+- **Expected:** Each remains browseable with a specific reason, the composer is
+  disabled, no migration/repair/fallback occurs, and source bytes and mtimes are
+  unchanged.
+- **Specs:** IPC native routing; runtime §12; storage §12; security §12.
+- **Status:** Documented; run after integration into main.

@@ -268,5 +268,6 @@ Each ADR includes:
 | 0244 | Bound dependency installation for imported extensions | Accepted |
 | 0245 | Harden the MCP market public-network boundary | Accepted |
 | 0246 | Opt-in subagent inheritance of the parent tool catalog | Accepted (amends 0062; issue #215 / PR #319) |
+| 0247 | Continue native Pi sessions in their canonical JSONL | Accepted (amends baseline D007) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |

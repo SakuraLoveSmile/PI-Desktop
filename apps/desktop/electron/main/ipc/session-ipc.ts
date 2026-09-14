@@ -68,6 +68,14 @@ function importSelectionKey(value: unknown): string | null {
   return `${source}:${externalId}`;
 }
 
+function rejectNativeMutation(sessionId: unknown, action: string): void {
+  if (typeof sessionId === "string" && sessionId.startsWith("native-pi:")) {
+    throw Object.assign(new Error(`Native Pi session ${action} is not supported`), {
+      errorCode: ErrorCodes.INVALID_ARGUMENT,
+    });
+  }
+}
+
 function modelConfigSelectionKey(value: unknown): string | null {
   if (!value || typeof value !== "object") return null;
   const source = Reflect.get(value, "source");
@@ -125,15 +133,22 @@ export function registerSessionIpc({
 
   handle(IPC.invoke.sessionList, async () => {
     if (!host) throw new Error("host unavailable");
-    const [result, { providers, defaults }] = await Promise.all([
+    const [result, native, { providers, defaults }] = await Promise.all([
       host.call<{ sessions: RuntimeSession[] }>("session.list"),
+      sidecar
+        ? sidecar.call<{ sessions: RuntimeSession[] }>("native.session.list").catch(() => ({ sessions: [] }))
+        : Promise.resolve({ sessions: [] }),
       sessionCapabilityContext(),
     ]);
     return {
       ...result,
-      sessions: result.sessions.map((session) =>
-        enrichSession(session, providers, defaults),
-      ),
+      sessions: [
+        ...result.sessions.map((session) => ({
+          ...enrichSession(session, providers, defaults),
+          source: "desktop",
+        })),
+        ...native.sessions,
+      ].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))),
     };
   });
   handle(IPC.invoke.sessionCreate, async (input = {}) => {
@@ -155,6 +170,7 @@ export function registerSessionIpc({
     ) => {
       if (!host) throw new Error("host unavailable");
       const sessionId = String(input.sessionId ?? "").trim();
+      rejectNativeMutation(sessionId, "fork");
       if (!sessionId) {
         throw Object.assign(new Error("sessionId required"), {
           errorCode: ErrorCodes.INVALID_ARGUMENT,
@@ -211,6 +227,10 @@ export function registerSessionIpc({
       const request = typeof input === "string" ? { id: input } : input ?? {};
       const id = String(request.id ?? "").trim();
       if (!id) throw new Error("session id required");
+      if (id.startsWith("native-pi:")) {
+        if (!sidecar) throw new Error("sidecar unavailable");
+        return sidecar.call("native.session.get", { id, ...request });
+      }
       const [result, { providers, defaults }] = await Promise.all([
         host.call<{ session?: RuntimeSession | null }>("session.get", {
           id,
@@ -234,6 +254,7 @@ export function registerSessionIpc({
   handle(IPC.invoke.sessionCollaboration, async (input?: { sessionId?: unknown }) => {
     if (!host) throw new Error("host unavailable");
     const sessionId = typeof input?.sessionId === "string" ? input.sessionId.trim() : "";
+    rejectNativeMutation(sessionId, "collaboration");
     if (!sessionId || sessionId.length > 256) {
       throw Object.assign(new Error("sessionId must be a non-empty string of at most 256 characters"), {
         errorCode: ErrorCodes.INVALID_ARGUMENT,
@@ -245,6 +266,10 @@ export function registerSessionIpc({
     if (!host) throw new Error("host unavailable");
     const sessionId = String(rawSessionId ?? "").trim();
     if (!sessionId) throw new Error("session id required");
+    if (sessionId.startsWith("native-pi:")) {
+      if (!sidecar) throw new Error("sidecar unavailable");
+      return sidecar.call("native.session.get", { id: sessionId, messageLimit: 1 });
+    }
     const [result, { providers, defaults }] = await Promise.all([
       host.call<{ session?: RuntimeSession | null }>("session.get", {
         id: sessionId,
@@ -260,6 +285,11 @@ export function registerSessionIpc({
     return { ...result, session: enrichSession(result.session, providers, defaults) };
   });
   handle(IPC.invoke.sessionDelete, async (id: string) => {
+    if (id.startsWith("native-pi:")) {
+      throw Object.assign(new Error("Native Pi sessions cannot be deleted from PI-Desktop"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
     if (!host) throw new Error("host unavailable");
     const res = await host.call("session.delete", { id });
     await persistenceOutbox.dropSession(id);
@@ -277,6 +307,11 @@ export function registerSessionIpc({
     return res;
   });
   handle(IPC.invoke.sessionRename, async (id: string, title: string) => {
+    if (id.startsWith("native-pi:")) {
+      throw Object.assign(new Error("Native Pi session rename is not supported"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
     if (!host) throw new Error("host unavailable");
     return host.call("session.rename", { id, title });
   });
@@ -285,6 +320,7 @@ export function registerSessionIpc({
     async (input: { sessionId?: string; projectPath?: string } = {}) => {
       if (!host) throw new Error("host unavailable");
       const sessionId = String(input.sessionId ?? "").trim();
+      rejectNativeMutation(sessionId, "project move");
       const projectPath = String(input.projectPath ?? "").trim();
       if (!sessionId) {
         throw Object.assign(new Error("sessionId required"), {
@@ -352,6 +388,7 @@ export function registerSessionIpc({
       if (!host) throw new Error("host unavailable");
       const sessionId = String(input?.sessionId || "");
       if (!sessionId) throw new Error("sessionId required");
+      rejectNativeMutation(sessionId, "transcript replacement");
       // Drop the live pi-agent so the next prompt reseeds from the truncated
       // transcript instead of replaying the discarded branch in memory.
       if (sidecar) {
@@ -376,6 +413,7 @@ export function registerSessionIpc({
       makeActive?: boolean;
     }) => {
       if (!host) throw new Error("host unavailable");
+      rejectNativeMutation(input?.sessionId, "revision save");
       return host.call("session.saveRevision", {
         sessionId: String(input?.sessionId || ""),
         rootUserId: String(input?.rootUserId || ""),
@@ -388,6 +426,7 @@ export function registerSessionIpc({
     IPC.invoke.sessionListRevisions,
     async (input: { sessionId: string; rootUserId: string }) => {
       if (!host) throw new Error("host unavailable");
+      rejectNativeMutation(input?.sessionId, "revision listing");
       return host.call("session.listRevisions", {
         sessionId: String(input?.sessionId || ""),
         rootUserId: String(input?.rootUserId || ""),
@@ -404,6 +443,7 @@ export function registerSessionIpc({
     }) => {
       if (!host) throw new Error("host unavailable");
       const sessionId = String(input?.sessionId || "");
+      rejectNativeMutation(sessionId, "revision activation");
       if (sidecar) {
         sidecar.clearProjectInstructionRoot(sessionId);
         sidecar.clearVendorAuthBindings(sessionId);
@@ -420,12 +460,14 @@ export function registerSessionIpc({
     },
   );
   handle(IPC.invoke.sessionGetScratchPath, async (input: { sessionId: string }) => {
+    rejectNativeMutation(input?.sessionId, "scratch access");
     if (!host) throw new Error("host unavailable");
     return host.call<{ path: string }>("session.getScratchPath", {
       sessionId: String(input?.sessionId || ""),
     });
   });
   handle(IPC.invoke.sessionOpenScratchPath, async (input: { sessionId: string }) => {
+    rejectNativeMutation(input?.sessionId, "scratch access");
     if (!host) throw new Error("host unavailable");
     const sessionId = String(input?.sessionId || "").trim();
     const result = await host.call<{ path: string }>("session.getScratchPath", {
@@ -456,6 +498,7 @@ export function registerSessionIpc({
         permissionMode?: "inherit" | "ask" | "accept-edits" | "auto";
       },
     ) => {
+      rejectNativeMutation(id, "configuration");
       if (!host) throw new Error("host unavailable");
       const result = await host.call<{ session?: RuntimeSession | null }>(
         "session.configure",

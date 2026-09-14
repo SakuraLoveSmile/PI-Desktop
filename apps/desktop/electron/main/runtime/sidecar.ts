@@ -89,6 +89,12 @@ export function createSidecarRuntime({
   const wireSidecar = (s: AgentSidecar) => {
 
   s.onNotification((method, params) => {
+    if (method === "native.agent.event") {
+      // Native AgentSession already persisted the event to its canonical Pi
+      // JSONL. It owns neither the Desktop outbox nor Host queue/turn state.
+      sendToRenderer(IPC.event.agentMessage, params as AgentEventEnvelope);
+      return;
+    }
     if (method === "agent.event") {
       const envelope = params as AgentEventEnvelope;
       const event = envelope.event;

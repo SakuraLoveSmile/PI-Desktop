@@ -90,6 +90,13 @@ export function Composer({
   const settings = useAppStore((s) => s.settings);
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const activeSessionSummary = sessions.find(
+    (session) => session.id === activeSessionId,
+  );
+  const nativeSession = activeSessionSummary?.source === "pi-native";
+  const nativeReadOnly =
+    nativeSession && activeSessionSummary.capabilities?.canPrompt === false;
+  const nativeInputBlocked = nativeReadOnly || (nativeSession && isRunning);
   const hasAnnotations = useAppStore((s) =>
     Boolean(s.activeSessionId && s.responseAnnotations[s.activeSessionId]?.length),
   );
@@ -150,7 +157,7 @@ export function Composer({
     prefill,
     t,
     invalidatePromptEnhancement,
-    inputBlocked: planCheckpoint?.status === "pending",
+    inputBlocked: planCheckpoint?.status === "pending" || nativeInputBlocked,
   });
   const {
     ref,
@@ -184,7 +191,7 @@ export function Composer({
     settings?.largePasteThreshold,
   );
   const attachments = useComposerAttachments({
-    inputBlocked: approvalPending,
+    inputBlocked: approvalPending || nativeSession,
     activeSessionId,
     draftKey,
     largePasteThreshold,
@@ -214,9 +221,9 @@ export function Composer({
   } = attachments;
   const executionActive = isActivePlanExecution(planCheckpoint);
   const runActive = isRunning || executionActive;
-  const inputBlocked = approvalPending || pasting;
-  const controlsBlocked = approvalPending;
-  const sendBlocked = approvalPending || pasting;
+  const inputBlocked = approvalPending || pasting || nativeInputBlocked;
+  const controlsBlocked = approvalPending || nativeSession;
+  const sendBlocked = approvalPending || pasting || nativeInputBlocked;
   const enhancementDraft = stripInlineComposerFileReferenceTokens(
     value,
     activeFileReferences,
@@ -495,6 +502,11 @@ export function Composer({
         ) : null}
         {pendingAsk ? (
           <AskToolCard request={pendingAsk} queued={queuedAsks} />
+        ) : null}
+        {nativeReadOnly ? (
+          <div className="composer-status" role="status">
+            Native Pi session is read-only: {activeSessionSummary?.readOnlyReason ?? "continuation unavailable"}.
+          </div>
         ) : null}
         <ComposerStatus
           t={t}

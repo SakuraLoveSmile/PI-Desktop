@@ -1356,3 +1356,25 @@ Late partial snapshots and duplicate terminal snapshots cannot overwrite the
 settled result. Recovery promotes the latest checkpoint in that same position.
 The outbox likewise keeps a newer snapshot that replaces an append while its
 host call is still pending. No schema migration is required.
+
+## 12. Native Pi session authority (ADR 0247)
+
+Native Pi v3 sessions under the Pi agent session root are a second, explicitly
+source-discriminated transcript authority owned by the Node agent sidecar. They
+are never inserted into SQLite and never copied to the Desktop transcript
+directory. `session.list` merges their bounded projections with Rust-owned
+Desktop summaries, and `session.get` routes by the opaque `native-pi:` id.
+
+Detail reads take an immutable byte snapshot, parse it into an in-memory
+`SessionManager`, and follow the current native branch. They must not call
+persistent `SessionManager.open`, because that API may repair a missing newline
+or rewrite an older format. Unknown/custom entries and unknown fields remain in
+the source bytes; context-bearing custom messages and native compaction/tree
+semantics are resolved by the pinned coding-agent SDK.
+
+A native prompt opens the original file only after exact-v3, newline, cwd,
+trust, saved-provider/auth, canonical-path, identity, and lease checks pass.
+`AgentSession` and `SessionManager` append the native entries. Desktop host turn
+and transcript append APIs are not invoked. Rename, delete, project move,
+revision, fork, Plan/Goal, collaboration, queue, and side-chat mutations are
+unsupported for native sessions in this slice.

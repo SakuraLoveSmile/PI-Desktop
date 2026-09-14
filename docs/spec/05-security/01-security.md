@@ -278,3 +278,19 @@ host-core. They do not change the loopback-only rule above.
 10. Local MCP control is loopback-only, bearer-authenticated, opt-in, bounded,
     excludes secret writes and native pickers, and requires confirmation for
     session permission-mode changes
+
+## 12. Native Pi session boundary (ADR 0247)
+
+Native session paths remain sidecar-private. Renderer-visible ids are opaque
+hashes of canonical path plus verified header id. Every discovery/open resolves
+the real path below the configured Pi session root and revalidates header id and
+cwd; path traversal and symlink escape are rejected.
+
+Writable continuation requires a mode-0600 cooperative PI-Desktop lease beside
+the session and full-byte identity checks before each SDK append. After an
+append, the adapter accepts only the unchanged prior prefix plus exactly one
+entry whose id and parent match the SDK operation. Any foreign/interleaved
+change disposes the runtime and requires reload. A stale lease is reclaimed only
+for a provably dead process on the same host and an unchanged target fingerprint.
+This lease is not treated as proof that Pi Web/CLI is absent because those
+clients do not yet share its protocol.

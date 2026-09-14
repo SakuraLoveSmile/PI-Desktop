@@ -1938,3 +1938,18 @@ startup failure is logged and does not prevent the desktop from launching.
 | `WORKSPACE_REQUIRED` | Project directory required |
 | `PATH_OUTSIDE_WORKSPACE` | Path out of bounds before an explicit outside-path permission decision |
 | `INTERNAL` | Uncategorized internal error |
+
+## Native Pi session routing (ADR 0247)
+
+`pi-desktop/session/list` returns both Desktop and native summaries. Each summary
+may carry `source: "desktop" | "pi-native"`, capability flags, and a stable
+`readOnlyReason`; clients normalize omitted source to `desktop` for backward
+compatibility. `session/get`, `session/open`, `agent/prompt`, `agent/stop`, and
+`agent/abort` route opaque `native-pi:` ids to the Node sidecar. Native file
+paths never enter renderer payloads.
+
+Native rename/delete/move/fork/revision/configuration/scratch/Plan/Goal/queue/
+collaboration operations return an explicit unsupported/invalid-argument error.
+Native continuation refusal codes include `NATIVE_PI_SESSION_BUSY`,
+`NATIVE_PI_SESSION_CHANGED`, `NATIVE_PI_PROVIDER_UNAVAILABLE`, and
+`NATIVE_PI_PROJECT_UNTRUSTED` plus format/newline/cwd-specific codes.

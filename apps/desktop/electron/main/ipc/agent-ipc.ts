@@ -233,7 +233,21 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentPrompt, async (req: AgentPromptRequest) => {
-    if (!host || !sidecar) throw new Error("backend unavailable");
+    if (!sidecar) throw new Error("sidecar unavailable");
+    if (req.sessionId.startsWith("native-pi:")) {
+      if (req.sessionMessageId || req.truncateFromMessageId || req.truncateBefore !== undefined || req.attachments?.length) {
+        throw Object.assign(new Error("Native Pi continuation currently supports text prompts only"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      setNotificationViewingSessionId(req.sessionId);
+      return sidecar.call("agent.prompt", {
+        sessionId: req.sessionId,
+        content: req.content,
+        userMessageId: req.messageId,
+      });
+    }
+    if (!host) throw new Error("host unavailable");
     const releaseSessionOperation = await acquireSessionOperation(req.sessionId);
     try {
     const sessionMessage = await resolveSessionMessageInput(host, req);

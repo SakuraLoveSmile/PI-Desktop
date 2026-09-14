@@ -1171,3 +1171,20 @@ normalization and error-mapping source.
 
 Tracked gaps (post-MVP backlog): richer system prompt composition (§7) and
 provider/model catalog discovery beyond the currently wired paths.
+
+## 12. Native Pi continuation runtime (ADR 0247)
+
+The sidecar selects runtime by session source. Desktop-owned ids continue to use
+`DesktopAgentRuntime`, host turn rows, and the host persistence outbox unchanged.
+Opaque `native-pi:` ids use a dedicated coding-agent `AgentSession` constructed
+with the original v3 `SessionManager`, Pi `ModelRuntime`, `SettingsManager`, and
+`DefaultResourceLoader`. Native context is built by the SDK from the active tree
+leaf, compaction, model/thinking changes, and context-bearing custom messages;
+it is never reconstructed from renderer `UiMessage` rows.
+
+The first native slice supports text prompt, stop/abort, and explicit refresh.
+The saved provider/model and configured Pi auth must resolve exactly; there is
+no Desktop provider fallback. Missing cwd, required project trust, unsupported
+format, repair-needing newline, unavailable provider/auth, active lease, or
+external byte change makes continuation fail closed while detail remains
+browseable.
