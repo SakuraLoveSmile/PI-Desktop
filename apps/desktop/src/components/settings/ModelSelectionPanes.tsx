@@ -8,7 +8,7 @@
  * guarantee lives here once instead of in a convention two files had to
  * remember.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   THINKING_LEVELS,
@@ -29,6 +29,7 @@ import {
 } from "../../lib/model-limit-presets";
 import { Button, Field, Input, Tooltip, TooltipButton, cx } from "../ui";
 import { IconClose, IconHelp, IconPlus, IconRefresh, IconSearch } from "../icons";
+import { filterChosenModels, hidesAddedBinding } from "./model-chosen-filter";
 import { describeModelsFetchError } from "./model-fetch-error";
 import type { ProviderModelsState } from "./useProviderModels";
 
@@ -237,50 +238,62 @@ export function ModelSelectionPanes({
     return byId;
   }, [rows]);
 
+  // An emptied list disables the field, so a filter still sitting in it could
+  // no longer be cleared by the user. Drop it with the last configured model.
+  useEffect(() => {
+    if (models.length === 0) setChosenQuery("");
+  }, [models.length]);
+
   /**
-   * The chosen pane filters with the same rule as the discovered list: a
-   * case-insensitive substring match over what the user can recognise the row
-   * by. A catalog display name is included, so searching "GPT-4o" still finds
-   * a binding stored under its full versioned id.
+   * The chosen list narrows with the discovered list's rule plus the binding's
+   * alias: a case-insensitive substring match over the id, the alias, and the
+   * catalog display name, so a friendly name finds the id it stands for. The
+   * rule lives in `model-chosen-filter`, so the pane, the add paths below, and
+   * the tests execute one implementation instead of three copies of it.
    */
-  const visibleChosen = useMemo(() => {
-    const needle = chosenQuery.trim().toLowerCase();
-    if (!needle) return models;
-    const displayNameById = new Map<string, string>();
-    for (const row of rows) {
-      displayNameById.set(row.id.toLowerCase(), row.displayName);
-    }
-    return models.filter((binding) => {
-      const key = binding.id.toLowerCase();
-      return (
-        key.includes(needle) ||
-        (binding.alias?.toLowerCase().includes(needle) ?? false) ||
-        (displayNameById.get(key)?.toLowerCase().includes(needle) ?? false)
-      );
-    });
-  }, [chosenQuery, models, rows]);
+  const visibleChosen = useMemo(
+    () => filterChosenModels(models, chosenQuery, rows),
+    [chosenQuery, models, rows],
+  );
+
+  /** A discovered row arrives enriched; a hand-typed id gets generic limits. */
+  const bindingForRow = (row: ModelRow): ModelBinding =>
+    row.info ? bindingFromModelInfo(row.info) : bindingForCustomModel(row.id);
+
+  /**
+   * The rule for a model that is being added: a filter is kept while it still
+   * shows the new row and dropped when the row would land out of view, so
+   * nothing the user just added hides behind a search typed earlier.
+   */
+  const keepAddedModelVisible = (added: ModelBinding[]) => {
+    if (hidesAddedBinding(added, chosenQuery, rows)) setChosenQuery("");
+  };
 
   const toggleModel = (row: ModelRow) => {
     const wanted = row.id.toLowerCase();
     const alreadyChosen = models.some(
       (binding) => binding.id.toLowerCase() === wanted,
     );
-    if (!alreadyChosen) setExpandedModelId((open) => open ?? row.id);
+    if (!alreadyChosen) {
+      setExpandedModelId((open) => open ?? row.id);
+      keepAddedModelVisible([bindingForRow(row)]);
+    }
     setModels((current) => {
       if (current.some((binding) => binding.id.toLowerCase() === wanted)) {
         return current.filter((binding) => binding.id.toLowerCase() !== wanted);
       }
-      // A discovered row arrives already enriched, so its published limits and
-      // thinking levels are adopted as-is.
-      return [
-        ...current,
-        row.info ? bindingFromModelInfo(row.info) : bindingForCustomModel(row.id),
-      ];
+      return [...current, bindingForRow(row)];
     });
   };
 
   const toggleVisibleModels = (select: boolean) => {
-    if (select) setExpandedModelId((open) => open ?? visibleRows[0]?.id ?? null);
+    if (select) {
+      setExpandedModelId((open) => open ?? visibleRows[0]?.id ?? null);
+      const added = visibleRows
+        .filter((row) => !selected.has(row.id.toLowerCase()))
+        .map((row) => bindingForRow(row));
+      keepAddedModelVisible(added);
+    }
     setModels((current) => applyVisibleModelSelection(current, visibleRows, select));
   };
 
@@ -299,13 +312,12 @@ export function ModelSelectionPanes({
       setCustomModelError(t("settings.modelAlreadyAdded"));
       return;
     }
-    setModels((current) => [...current, bindingForCustomModel(id)]);
+    const binding = bindingForCustomModel(id);
+    setModels((current) => [...current, binding]);
     setExpandedModelId(id);
     setCustomModelId("");
     setCustomModelError("");
-    // A filter left over from an earlier search would hide the model that was
-    // just added, so the new row always arrives in full view.
-    setChosenQuery("");
+    keepAddedModelVisible([binding]);
   };
 
   const fetchFailed = discovery.status === "error";
