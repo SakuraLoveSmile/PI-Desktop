@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { ErrorCodes } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { Button, TooltipButton } from "./ui";
 import { IconCircleAlert, IconClose, IconTrash } from "./icons";
@@ -69,8 +70,13 @@ export function ProjectDeleteDialog({
     try {
       await deleteProject(project.path);
       await onDeleted();
-      await onDeleted();
     } catch (error) {
+      // The host refuses the delete while a task of this project is running;
+      // show the same localized explanation the menu guard uses.
+      if ((error as { errorCode?: unknown } | null)?.errorCode === ErrorCodes.CONFLICT) {
+        onError(new Error(t("project.deleteRunningBlocked")));
+        return;
+      }
       onError(error);
     } finally {
       busyRef.current = false;

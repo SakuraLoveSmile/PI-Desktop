@@ -1329,6 +1329,7 @@ sklm: {
     "deleteSessions_one": "{{count}} gespeicherte Sitzung wird mit ihren Verläufen dauerhaft gelöscht.",
     "deleteSessions_other": "{{count}} gespeicherte Sitzungen werden mit ihren Verläufen dauerhaft gelöscht.",
     "deleteFolderKept": "Der Ordner auf dem Datenträger wird nicht gelöscht.",
+    "deleteRunningBlocked": "Stoppen Sie die laufenden Aufgaben dieses Projekts, bevor Sie es löschen.",
     "deleteConfirm": "Projekt löschen",
     "deleteCancel": "Abbrechen",
     "deleting": "Wird gelöscht…",

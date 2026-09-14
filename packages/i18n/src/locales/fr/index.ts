@@ -1329,6 +1329,7 @@ sklm: {
     "deleteSessions_one": "{{count}} session enregistrée sera supprimée définitivement avec ses transcriptions.",
     "deleteSessions_other": "{{count}} sessions enregistrées seront supprimées définitivement avec leurs transcriptions.",
     "deleteFolderKept": "Le dossier sur le disque n'est pas supprimé.",
+    "deleteRunningBlocked": "Arrêtez les tâches en cours de ce projet avant de le supprimer.",
     "deleteConfirm": "Supprimer le projet",
     "deleteCancel": "Annuler",
     "deleting": "Suppression…",

@@ -4047,5 +4047,9 @@ D193 和 D194。
   该行仍然可见，这也是此前的手动变通做法还需要清理渲染器存储的原因。
 - 作为已存储多文件夹项目组根目录的路径会被拒绝并给出提示消息，以便该组保留有效的
   Primary 根目录；遗留的单根投影照常删除。
+- 只要该项目下仍有会话在运行，删除就会被拒绝（1008 / `CONFLICT`，"project has running
+  sessions"）：运行中的轮次仍拥有其工具与工作目录，并且仍在追加自己的转录本，因此批量删除
+  会等项目空闲，而不是在事后复活出一个桩会话。渲染器也通过 `project.deleteRunningBlocked`
+  提前拦截同一操作。单会话删除保持现有语义。
 - 该操作被刻意排除在 `CONTROL_OPERATION_SPECS` 之外，因此本地 MCP 控制无法删除项目。
   见 ADR 0251 与 E2E-PROJECT-delete-removes-project-and-owned-sessions。

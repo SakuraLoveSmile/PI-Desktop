@@ -1348,6 +1348,7 @@ sklm: {
     deleteSessions_one: "{{count}} kayıtlı oturum, konuşma dökümleriyle birlikte kalıcı olarak silinir.",
     deleteSessions_other: "{{count}} kayıtlı oturum, konuşma dökümleriyle birlikte kalıcı olarak silinir.",
     deleteFolderKept: "Diskteki klasör silinmez.",
+    deleteRunningBlocked: "Bu projeyi silmeden önce çalışan görevleri durdurun.",
     deleteConfirm: "Projeyi sil",
     deleteCancel: "İptal",
     deleting: "Siliniyor…",

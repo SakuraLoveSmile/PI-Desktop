@@ -211,7 +211,9 @@ type ToolBudgetHealth = {
   and review files and the project's durable memory, and never touching the
   project folder on disk. Idempotent: an unknown path returns
   `{ removed: false, sessionsRemoved: 0 }`. A path that is a root of a stored
-  multi-folder project group is refused so the group keeps a valid primary root.
+  multi-folder project group is refused so the group keeps a valid primary root,
+  and the call is refused (1008 / `CONFLICT`) while any attached session has a
+  running turn, so a live turn never loses the transcript it is writing.
 - `project.memory.get({ path })` — returns the durable memory for the canonical
   project path, or an empty record when no memory has been saved
 - `project.memory.set({ path, entries })` — normalizes and stores visual memory
