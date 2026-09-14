@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::{repository, string};
 use crate::db::{ms_to_ts, now_ms, Database};
 use anyhow::{anyhow, Result};
@@ -7,18 +9,23 @@ use serde_json::{json, Value};
 const MAX_CREATED_SESSIONS: i64 = 8;
 const MAX_DISCOVERABLE_SESSIONS: i64 = 100;
 
+/// A ledger reference survives the deletion of the session it points at, so it
+/// reports availability instead of silently disappearing.
 fn creator(db: &Database, session_id: &str) -> Result<Option<Value>> {
-    let value: Option<(String, String)> = db
+    let value: Option<(String, String, bool)> = db
         .conn()
         .query_row(
-            "SELECT l.created_by_session_id,COALESCE(s.title,l.created_by_session_id)
+            "SELECT l.created_by_session_id,COALESCE(NULLIF(s.title,''),l.created_by_session_id),
+        (s.id IS NOT NULL AND s.deleted_at IS NULL)
         FROM session_collaboration_links l LEFT JOIN sessions s ON s.id=l.created_by_session_id
         WHERE l.session_id=?1",
             params![session_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
         .optional()?;
-    Ok(value.map(|(session_id, title)| json!({"sessionId":session_id,"title":title})))
+    Ok(value.map(|(session_id, title, available)| {
+        json!({"sessionId":session_id,"title":title,"available":available})
+    }))
 }
 
 fn created_sessions(db: &Database, session_id: &str) -> Result<Vec<Value>> {
@@ -29,9 +36,44 @@ fn created_sessions(db: &Database, session_id: &str) -> Result<Vec<Value>> {
         ORDER BY l.created_at DESC,l.session_id DESC LIMIT ?2",
     )?;
     let rows = statement.query_map(params![session_id, MAX_CREATED_SESSIONS], |row| {
-        Ok(json!({"sessionId":row.get::<_, String>(0)?,"title":row.get::<_, String>(1)?}))
+        Ok(json!({"sessionId":row.get::<_, String>(0)?,"title":row.get::<_, String>(1)?,"available":true}))
     })?;
     Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// The session on the far side of a ledger message, relative to `session_id`.
+fn peer_session_id<'a>(message: &'a repository::Message, session_id: &str) -> &'a str {
+    if message.target_session_id == session_id {
+        &message.source_session_id
+    } else {
+        &message.target_session_id
+    }
+}
+
+/// Availability of the referenced peer sessions. One bounded lookup resolves
+/// the distinct ids; it never scans or loads the sessions table.
+fn available_sessions(db: &Database, session_ids: &[String]) -> Result<HashSet<String>> {
+    let mut distinct: Vec<&str> = session_ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| !id.is_empty())
+        .collect();
+    distinct.sort_unstable();
+    distinct.dedup();
+    if distinct.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let placeholders = (1..=distinct.len())
+        .map(|index| format!("?{index}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let mut statement = db.conn().prepare_cached(&format!(
+        "SELECT id FROM sessions WHERE id IN ({placeholders}) AND deleted_at IS NULL"
+    ))?;
+    let rows = statement.query_map(rusqlite::params_from_iter(distinct), |row| {
+        row.get::<_, String>(0)
+    })?;
+    Ok(rows.collect::<rusqlite::Result<HashSet<_>>>()?)
 }
 
 fn model_fields(
@@ -145,22 +187,44 @@ pub(super) fn summary(db: &Database, id: &str) -> Result<Value> {
         Some("error") => "failed",
         Some("aborted") => "cancelled",
         _ => "idle",
-    };
+    }
+    .to_string();
     if let Some(message) = &current {
         if status != "running"
             && (turn.is_none()
                 || message.status == "queued"
                 || message.turn_id.as_deref() == turn.as_ref().map(|(id, _)| id.as_str()))
         {
-            status = &message.status;
+            status = message.status.clone();
         }
     }
     let (model_key, provider_name, model_name) = model_fields(db, id)?;
-    let exchanges: Vec<Value> = repository::recent(db,id,4)?.into_iter().map(|message| {
+    // Peer references come from the ledger, so resolve their availability with
+    // one bounded lookup for the at most five distinct referenced sessions.
+    let current_task = current.filter(|message| {
+        message.status == "queued"
+            || message.turn_id.as_deref() == turn.as_ref().map(|(id, _)| id.as_str())
+    });
+    let recent = repository::recent(db, id, 4)?;
+    let mut referenced: Vec<String> = recent
+        .iter()
+        .map(|message| peer_session_id(message, id).to_owned())
+        .collect();
+    if let Some(message) = &current_task {
+        referenced.push(message.source_session_id.clone());
+    }
+    let available = available_sessions(db, &referenced)?;
+    let exchanges: Vec<Value> = recent.into_iter().map(|message| {
         let incoming = message.target_session_id == id;
+        let peer_id = if incoming {
+            message.source_session_id.clone()
+        } else {
+            message.target_session_id.clone()
+        };
+        let peer_available = available.contains(&peer_id);
+        let peer_title = if incoming { &message.source_title } else { &message.target_title };
         json!({"messageId":message.id,"direction":if incoming {"incoming"}else{"outgoing"},
-            "peer":{"sessionId":if incoming {message.source_session_id}else{message.target_session_id},
-                "title":if incoming {message.source_title}else{message.target_title}},
+            "peer":{"sessionId":peer_id,"title":peer_title,"available":peer_available},
             "kind":message.kind,"status":message.status,"preview":repository::bounded(&message.content,240),"createdAt":message.created_at})
     }).collect();
     let mut value = json!({"sessionId":id,"title":title,"status":status,"observedAt":ms_to_ts(now_ms()),"recentExchanges":exchanges});
@@ -180,11 +244,9 @@ pub(super) fn summary(db: &Database, id: &str) -> Result<Value> {
     if !created.is_empty() {
         value["createdSessions"] = json!(created);
     }
-    if let Some(message) = current.filter(|message| {
-        message.status == "queued"
-            || message.turn_id.as_deref() == turn.as_ref().map(|(id, _)| id.as_str())
-    }) {
-        value["currentTask"] = json!({"messageId":message.id,"senderSession":{"sessionId":message.source_session_id,"title":message.source_title},
+    if let Some(message) = current_task {
+        let sender_available = available.contains(&message.source_session_id);
+        value["currentTask"] = json!({"messageId":message.id,"senderSession":{"sessionId":message.source_session_id,"title":message.source_title,"available":sender_available},
             "text":repository::bounded(&message.content,512),"status":message.status,"turnId":message.turn_id,"createdAt":message.created_at});
         if !matches!(message.status.as_str(), "queued" | "running")
             && message.turn_id.as_deref() == turn.as_ref().map(|(id, _)| id.as_str())

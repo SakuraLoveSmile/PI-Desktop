@@ -4,6 +4,10 @@ import type {
   PlanningStateEvent,
   UiMessage,
 } from "@pi-desktop/shared";
+import {
+  applyMessageUpdate,
+  mergeAgentEventEnvelopes,
+} from "@pi-desktop/shared";
 import { createFrameBatcher } from "../../lib/frame-batcher";
 import {
   clearSessionAsks,
@@ -155,6 +159,7 @@ export function createEventsSlice({
           streamUpdates.enqueue(
             `message:${envelope.sessionId}:${event.message.id}`,
             envelope,
+            mergeAgentEventEnvelopes,
           );
           return;
         }
@@ -427,16 +432,21 @@ export function createEventsSlice({
           break;
         case "message_update":
           set((state) => {
-            const exists = state.messages.some(
+            const index = state.messages.findIndex(
               (message) => message.id === event.message.id,
             );
-            return {
-              messages: exists
-                ? state.messages.map((message) =>
-                    message.id === event.message.id ? event.message : message,
+            const nextMessage = applyMessageUpdate(
+              index >= 0 ? state.messages[index] : undefined,
+              event,
+            );
+            if (index >= 0 && state.messages[index] === nextMessage) return state;
+            const messages =
+              index >= 0
+                ? state.messages.map((message, messageIndex) =>
+                    messageIndex === index ? nextMessage : message,
                   )
-                : [...state.messages, event.message],
-            };
+                : [...state.messages, nextMessage];
+            return { messages };
           });
           break;
         case "message_end":

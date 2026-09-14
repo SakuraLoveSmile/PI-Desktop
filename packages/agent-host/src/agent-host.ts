@@ -32,6 +32,8 @@ import {
   RACP_ACTIVE_TURN_STATUSES,
   RACP_DEFAULT_LIMITS,
   RACP_DEFAULT_POLICY,
+  applyMessageUpdate,
+  deltaStreamPayloadFits,
   effectiveRemotePermissionMode,
   racpKindForAgentEvent,
   rolesAllowOperation,
@@ -253,7 +255,12 @@ export class AgentHost {
       case "tool_update": {
         const itemId = event.type === "message_update" ? event.message.id : event.toolCallId;
         const item = state.activeItems.get(itemId);
-        if (item) item.content = event.type === "message_update" ? event.message : { ...(item.content as object), partialResult: event.partialResult };
+        if (item) {
+          item.content =
+            event.type === "message_update"
+              ? applyMessageUpdate(item.content as UiMessage | undefined, event)
+              : { ...(item.content as object), partialResult: event.partialResult };
+        }
         this.emit(state, mapping.kind, { itemType: mapping.itemType, itemId, event }, meta2);
         return;
       }
@@ -821,6 +828,7 @@ export class AgentHost {
   }
 
   private boundPayload(payload: unknown): unknown {
+    if (deltaStreamPayloadFits(payload, this.limits.maxFrameBytes)) return payload;
     const encoded = JSON.stringify(payload);
     if (encoded === undefined || encoded.length <= this.limits.maxFrameBytes) return payload;
     const record = (payload ?? {}) as { event?: { type?: string }; itemId?: string; itemType?: string };

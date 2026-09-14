@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useId,
   useLayoutEffect,
@@ -503,8 +504,7 @@ export function DisclosureCollapseRail({
   );
 }
 
-/** A thinking segment rendered like a tool row: one-line summary, expandable. */
-export function ThinkingRow({
+export const ThinkingRow = memo(function ThinkingRow({
   message,
   streaming,
   autoOpen = false,
@@ -562,4 +562,9 @@ export function ThinkingRow({
       ) : null}
     </div>
   );
-}
+}, (previous, next) =>
+  previous.message === next.message &&
+  previous.streaming === next.streaming &&
+  previous.autoOpen === next.autoOpen &&
+  previous.onUserInteraction === next.onUserInteraction,
+);

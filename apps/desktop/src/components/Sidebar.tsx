@@ -1012,12 +1012,24 @@ export function Sidebar({
     cancelSessionPrefetch();
     hideSessionHoverCard();
     try {
+      // A dead reference must fail visibly instead of selecting an empty chat.
+      // The store's session list is the cheapest complete existence signal; an
+      // unknown id still gets one detail read so a stale list cannot block a
+      // session that really exists.
+      const known = useAppStore.getState().sessions.some((session) => session.id === sessionId);
+      if (!known) {
+        const detail = await api.getSession(sessionId);
+        if (!detail.session) {
+          reportError(new Error(t("sessionCollaboration.sessionMissing")));
+          return;
+        }
+      }
       await selectSession(sessionId);
       focusComposer();
     } catch (error) {
       reportError(error);
     }
-  }, [focusComposer, hideSessionHoverCard, reportError, selectSession]);
+  }, [focusComposer, hideSessionHoverCard, reportError, selectSession, t]);
 
   useEffect(() => cancelSessionPrefetch, []);
 

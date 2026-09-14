@@ -12,7 +12,16 @@ const STATUS_KEYS = {
 } as const;
 
 export function collaborationStatusKey(status: SessionCollaborationSummary["status"]) {
-  return STATUS_KEYS[status];
+  // A host status this renderer does not know yet must not render as "undefined".
+  return STATUS_KEYS[status] ?? "sessionCollaboration.statusUnknown";
+}
+
+/**
+ * Only an explicit `available: false` from the host means the referenced
+ * session is gone; a host that predates the field stays navigable.
+ */
+export function sessionReferenceAvailable(reference: { available?: boolean }): boolean {
+  return reference.available !== false;
 }
 
 export function sessionPreview(value: string | undefined, limit = 300): string {

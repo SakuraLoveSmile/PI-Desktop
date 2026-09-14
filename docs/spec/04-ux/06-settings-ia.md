@@ -27,7 +27,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   5. **Models / 模型** — Lucide `Bot` (providers and default model)
   6. **Skills / 技能** — Lucide `BookOpen` (reusable agent instructions)
   7. **MCP** — Lucide `Server` (agent connections)
-  8. **Subagents / 子智能体** — Lucide `Bot` (personal parallel agents)
+  8. **Subagents / 子智能体** — Lucide `Bot` (built-in and personal parallel agents)
   9. **Import / 导入** — Lucide `Download` (bring sessions and model configuration in from other tools)
   10. **Projects / 项目** — Lucide `Archive` (durable project index)
   11. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
@@ -325,6 +325,18 @@ system while preserving their different data ownership:
   search field with a clear affordance, the selected-project picker, and the
   page's primary actions right-aligned. Subagents omits the filter and the
   picker because it is global-only, keeping only search and its actions.
+  The panel still uses two in-panel groups: **Built-in** (the five shipped
+  definitions `explorer`, `code-reviewer`, `test-runner`, `fixer`, and
+  `ui-designer`, rendered as read-only rows) and **Global**
+  (`~/.agents/subagents`, user-owned). An enabled user document of the same
+  name shadows that builtin in the Task catalog, so the Built-in row is omitted
+  while the user row remains. A disabled user document of the same name leaves
+  the builtin in the catalog (and on the Built-in list) because Task uses the
+  shipped definition again. Built-in rows carry a source badge and
+  **Copy as mine** (opens the create sheet pre-filled from that definition, with
+  the matching template chip selected); they have no enablement switch, reveal,
+  or delete because they are not files.
+  are not files.
 - The level filter narrows which groups the panel renders; it never hides the
   toolbar or moves the actions. New capabilities are created at the level the
   filter points at — Global under All or Global, Project under Project — and
@@ -363,6 +375,14 @@ system while preserving their different data ownership:
   the width with evenly divided segments, search sits below it, and the
   actions wrap left-aligned. Group headers drop the resolved path so row copy
   keeps the width.
+- Skills exposes a Market action beside New / Import. Market is a second view
+  of the same page, not a new Settings destination: browse catalog sources,
+  preview the assembled markdown (including inlined sibling `.md` files), and
+  install through `skills.create` into `~/.agents/skills`. Built-in picks are
+  English-titled offline fallback. Default GitHub sources are queried with
+  user-added sources; a remote badge uses `sourceId`, not id collision with
+  builtin rows. Documents that would exceed the 128 KiB host cap cannot be
+  installed. Back reloads the skill list.
 - The Subagents create/edit sheet pins a model with a searchable, provider-
   grouped anchored menu — the same option-menu control the service picker uses
   — over the configured, runnable models the Composer offers, plus an
@@ -393,7 +413,10 @@ system while preserving their different data ownership:
   explicit catalog map (`presetReviewerName` / `presetTestRunnerName` /
   `presetUiDesignerName`) — they must not be
   turned into keys by capitalizing the first letter. Picking a chip
-  replaces the draft's description, tools, max turns and body wholesale.
+  replaces the draft's description, tools, max turns and body wholesale and
+  clears inherit-parent-tools. The tool grant row includes an inherit checkbox
+  (`tools: inherit`) plus the seven assignable tools; inherit-only drafts may
+  leave the assignable boxes empty. Saving must keep the inherit token.
   The chip uses the same accent-tint pill as the tool grant row. Create
   omits the long subtitle and the per-chip Apply label; model, thinking,
   turn limit, output limit and scope sit behind an Advanced disclosure that
@@ -407,9 +430,9 @@ system while preserving their different data ownership:
   is a picker over the configured providers' models; the picker groups entries
   by provider and every option comes from the configured catalog, so there is
   no hand-typed pin entry (issue #60). With no providers configured it shows
-  an empty state whose action opens Models. Builtins and project shadows stay
-  on the existing read-only rows; the picker is for new and user-owned
-  subagents only.
+  an empty state whose action opens Models. Builtins stay on the existing
+  read-only Built-in rows; the picker is for new and user-owned subagents
+  only.
   The create/edit sheet stays compact at desktop sizes: form controls are
   local filled wells with restrained padding, the prompt editor is the only
   intentionally tall control, and Advanced remains a compact disclosure. Hover
@@ -610,6 +633,9 @@ system while preserving their different data ownership:
     if the host rejects the change
 26. Info exposes a Report a problem action that opens the GitHub bug form
     with version and OS filled in; Settings search indexes the row
+27. The Skills page Market view browses public-HTTPS catalogs, previews
+    the assembled document, and installs only through `skills.create`; oversized
+    expanded documents are refused and source badges follow `sourceId`
 
 ## 5. General chrome metrics
 

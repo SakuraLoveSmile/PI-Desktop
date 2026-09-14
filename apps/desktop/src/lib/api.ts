@@ -35,6 +35,9 @@ import type {
   FsReadResult,
   HostHealth,
   HostStatusEvent,
+  MarketSource,
+  McpCatalogEntry,
+  SkillCatalogEntry,
   ModelInfo,
   McpServerInput,
   McpServerRecord,
@@ -667,6 +670,25 @@ export const api = {
       imported: McpServerRecord[];
       failed: Array<{ id: string; reason: string }>;
     }>(IPC.invoke.mcpImport, { text }),
+  /** Query the configured market sources; `failedSources` names dead ones. */
+  searchMcpMarketRegistry: (query: string, sources: MarketSource[], options?: { more?: boolean }) =>
+    invoke<{ entries: McpCatalogEntry[]; failedSources?: string[]; exhausted?: boolean }>(
+      IPC.invoke.mcpMarketSearch,
+      { query, sources, ...options },
+    ),
+
+  // --- Skill market ----------------------------------------------------------
+  searchSkillMarket: (query: string, sources: { id: string; name: string; url: string }[]) =>
+    invoke<{ entries: SkillCatalogEntry[]; failedSources?: string[] }>(
+      IPC.invoke.skillMarketSearch,
+      { query, sources },
+    ),
+  /** Fetch one catalog document (frontmatter split off) for preview/install. */
+  fetchSkillMarketDocument: (entry: SkillCatalogEntry) =>
+    invoke<{ name?: string; description?: string; body: string; resources?: Array<{ path: string; body: string }> }>(
+      IPC.invoke.skillMarketFetch,
+      { entry },
+    ),
 
   // --- Skills the user owns -------------------------------------------------
   listUserSkills: (query?: AgentCapabilityQuery) =>
@@ -804,9 +826,19 @@ export const api = {
     ),
   /** Import a pi CLI extension file or directory as a development plugin (spec 16 §3). */
   importPiExtension: () =>
-    invoke<{ canceled: true } | { canceled: false; id: string; path: string; entries: string[] }>(
-      IPC.invoke.pluginImportExtension,
-    ),
+    invoke<
+      | { canceled: true }
+      | {
+          canceled: false;
+          id: string;
+          path: string;
+          entries: string[];
+          dependencies:
+            | { state: "skipped"; reason: "no-package-json" | "no-dependencies" }
+            | { state: "installed" }
+            | { state: "failed"; error: string };
+        }
+    >(IPC.invoke.pluginImportExtension),
   runExtensionCommand: (input: { sessionId: string; name: string; args: string }) =>
     invoke<{ ok: boolean }>(IPC.invoke.extensionsCommandRun, input),
   respondExtensionPrompt: (response: TrustedExtensionUiPromptResponse) =>

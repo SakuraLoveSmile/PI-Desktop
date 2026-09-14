@@ -2,7 +2,7 @@ export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
 export const APP_ID = "com.pi-desktop.app";
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.14.7-beta.1";
+export const APP_VERSION = "0.14.7-beta.2";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -178,9 +178,12 @@ export const IPC = {
     mcpSetScope: "pi-desktop/mcp/setScope",
     mcpTest: "pi-desktop/mcp/test",
     mcpImport: "pi-desktop/mcp/import",
+    mcpMarketSearch: "pi-desktop/mcp/market/search",
     skillList: "pi-desktop/skill/list",
     skillCreate: "pi-desktop/skill/create",
     skillImport: "pi-desktop/skill/import",
+    skillMarketSearch: "pi-desktop/skill/market/search",
+    skillMarketFetch: "pi-desktop/skill/market/fetch",
     skillUpdate: "pi-desktop/skill/update",
     skillRemove: "pi-desktop/skill/remove",
     skillSetEnabled: "pi-desktop/skill/setEnabled",

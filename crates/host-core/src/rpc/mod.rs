@@ -4125,11 +4125,12 @@ mod tests {
         .await
         .unwrap();
         let project_id = result["project"]["id"].as_i64().unwrap();
-        let canonical_path = crate::workspace::simple_canonicalize(data_dir.path()).unwrap();
-        assert_eq!(
-            result["project"]["path"],
-            canonical_path.to_string_lossy().as_ref()
-        );
+        // A stored project path has one canonical spelling: resolved, with
+        // forward slashes. Comparing against the raw platform spelling only
+        // holds where the separator happens to be `/`.
+        let canonical_path =
+            crate::db::canonical_project_path(&path).expect("canonical project path");
+        assert_eq!(result["project"]["path"], canonical_path.as_str());
         assert!(project_id > 0);
 
         let workspace = handle_request(

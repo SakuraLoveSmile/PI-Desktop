@@ -195,7 +195,7 @@ test("work panel header exposes a scrollable tab strip and direct new-page actio
   assert.match(panelSource, /toolWorkPanelTab\("review"\)/);
   assert.match(panelSource, /pluginViews\.map\(\(view\) =>/);
   assert.doesNotMatch(panelSource, /HEADER_TOOLS|headerToolTab|HeaderToolKind/);
-  // Launchable tools are plugin views (`pi.files`, `pi.browser`, …). The
+  // Launchable tools are plugin views (`pi.file-manager`, `pi.browser`, …). The
   // `file` *kind* remains: a `file:<path>` tab is a transcript artifact.
   assert.doesNotMatch(panelSource, /\{ kind: "file", Icon/);
   assert.match(panelSource, /onClick=\{openNewWorkPanelTab\}/);

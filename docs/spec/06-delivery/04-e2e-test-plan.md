@@ -11,8 +11,10 @@
 - Document every user-visible and protocol-visible behavior that MVP must verify.
 - Provide a scenario catalog that maps to acceptance criteria (A–H) and milestones (M1–M6).
 - Serve as the traceability backbone: scenario ID ↔ acceptance criterion ↔ spec.
-- Define the relevant E2E merge gate for code-bearing pull requests.
-- Keep validation evidence tied to the executable commit that is intended to merge.
+- Define the relevant E2E validation for code-bearing changes after they reach
+  `main`.
+- Keep validation evidence tied to the executable commit currently integrated
+  into `main`.
 
 ## 2. Non-goals
 
@@ -99,15 +101,18 @@ Each scenario is documented in this format:
 
 ---
 
-## E2E PR Merge Gate
+## E2E Main Integration Validation
 
-Every code-bearing pull request must pass the E2E suites relevant to its
-regression surface before merge. Code-bearing changes include Renderer,
+Every code-bearing change must pass the E2E suites relevant to its regression
+surface after its commits are merged into `main`. Code-bearing changes include Renderer,
 Electron Main, Preload, Agent Runtime, Rust host-core, sessions, transcripts,
 plans, plugins, MCP, permissions, provider/model runtime, persistence, process
 lifecycle, packaging/runtime startup, and build or CI behavior that affects
 application execution. Documentation-only changes are exempt when they do not
 alter executable behavior.
+
+Run the selected suites from the latest integrated `main` checkout and commit.
+Any pre-merge E2E run is exploratory and does not satisfy this requirement.
 
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
@@ -117,6 +122,7 @@ The minimum selection is:
   `pnpm test:e2e:boot`.
 - Session-list refresh or model capability lookup: `pnpm test:e2e` and
   `pnpm test:e2e:boot`, including the synthetic large-list responsiveness check.
+- Transcript render boundaries and cross-part delegation display: `pnpm test:e2e:transcript`.
 - Plan host/runtime behavior: `pnpm test:e2e` and `pnpm test:e2e:plan`.
 - Plan UI behavior: `pnpm test:e2e:plan` and `pnpm test:e2e:plan-ui`.
 - Host supervision, crash recovery, or restart behavior: `pnpm test:e2e` and
@@ -129,23 +135,24 @@ agent execution, plugins, persistence integration, and shared runtime
 contracts. A required suite that cannot run because of a missing display,
 platform, credential, hardware resource, or other environment capability must
 be recorded as `NOT RUN` with its reason, alternative validation, and remaining
-risk. Such a pull request is not merge-ready until the suite passes in a
+risk. The main integration may already be complete when that limitation is
+discovered, but delivery remains incomplete until the suite passes in a
 capable trusted environment.
 
-Required results must apply to the executable commit intended to merge. If
-executable code changes after E2E passes, rerun the affected suites. Report
-each command, result, tested commit, and any relevant environment limitation;
-never claim an unexecuted suite passed.
+Required results must apply to the executable commit currently integrated into
+`main`. If executable code changes after E2E passes, rerun the affected suites.
+Report each command, result, tested commit, and any relevant environment
+limitation; never claim an unexecuted suite passed.
 
 ## E2E Failure Policy
 
-A failed required E2E blocks merge until the failure is classified as an
-implementation regression, test regression, environment failure, or known
-flaky infrastructure. Fix the product or test defect and rerun the affected
-suite. Do not delete scenarios, weaken assertions, or add retries that hide a
-deterministic failure. When a scenario is not automated on the required
-platform, keep its status documented and identify the platform validation still
-needed.
+A failed required E2E blocks declaring the integrated delivery complete until
+the failure is classified as an implementation regression, test regression,
+environment failure, or known flaky infrastructure. Fix the product or test
+defect and rerun the affected suite against `main`. Do not delete scenarios,
+weaken assertions, or add retries that hide a deterministic failure. When a
+scenario is not automated on the required platform, keep its status documented
+and identify the platform validation still needed.
 
 ## 7. MVP Scenario Catalog
 
@@ -2461,6 +2468,27 @@ needed.
 - **Status**: Unit-covered (`logger-routing.test.mjs`); packaged AppImage
   journey Documented
 
+#### E2E-RUNTIME-non-ascii-http-header-does-not-show-main-exception-dialog
+
+- **Preconditions**: Packaged or development app on a machine whose system
+  HTTP proxy or gateway injects a non-Latin-1 response header (for example a
+  value starting with U+661F), or a test that delivers the same
+  `TypeError: Cannot convert argument to a ByteString` through Electron `net`.
+- **Steps**: 1) Launch so the auto-updater check or model discovery issues a
+  main-process `net.fetch` / Electron-updater request. 2) Confirm the native
+  exception dialog does not appear. 3) Dismiss nothing; wait for a later
+  updater or discovery request. 4) Open `~/.pi-desktop/logs/app/runtime.log`.
+- **Expected**: No Electron "A JavaScript error occurred in the main process"
+  dialog. The app stays running and does not quit. `runtime.log` contains an
+  error record with `code: "NON_ASCII_HTTP_HEADER"` and `recoverable: true`.
+  A later main-process HTTP request does not re-open the native dialog.
+- **Specs linked**: `03-runtime/07-process-model.md`,
+  `03-runtime/09-logging-and-observability.md`
+- **Acceptance**: H (diagnostics), Quality (main path no crash)
+- **Milestone**: M5
+- **Status**: Unit-covered (`main-process-errors.test.mjs`); packaged Windows
+  proxy journey Documented
+
 #### E2E-195: Linux glibc below 2.35 names supported distros
 
 - **Preconditions**: Linux x64 packaged app; the machine glibc is older than
@@ -4397,6 +4425,10 @@ needed.
   - Completed history remains in its stable render boundary while the active
     tail changes; history stays selectable, copyable, and anchored in the
     minimap without being rebuilt as a React subtree for every token.
+  - Within that same active turn, unchanged non-delegation activity groups do
+    not render again just because text updates rebuild turn-wide delegation
+    maps. Tool content changes still render; later TaskWait results update
+    the original Task group's terminal status and completion duration.
   - Pressing and releasing standard, icon, sidebar, send, stop, and message
     action controls uses one eased transform rather than a snapped scale;
     active streaming labels keep their readable text while their compact status
@@ -4414,8 +4446,41 @@ needed.
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`
 - **Acceptance**: C (chat stream), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`interaction-performance.test.mjs`); rendered
-  streaming scenario Draft
+- **Status**: Unit-covered (`interaction-performance.test.mjs`); automated
+  React/Chromium render regression via `pnpm test:e2e:transcript` (no provider
+  credentials; requires installed Electron and a graphical session, or Xvfb on
+  Linux). It mounts production transcript components, counts ActivityGroup
+  renders across 20 text updates with 100 completed groups, checks changed tool
+  content, and checks cross-part Task terminal status/timing updates. Styles
+  are omitted; full provider streaming and shell responsiveness remain Draft.
+
+#### E2E-STREAM-long-turn-keeps-realtime
+
+- **Preconditions**: Provider configured; an Agent session can run a long
+  autonomous turn with thinking, tools, and at least one subagent.
+- **Steps**:
+  1. Start a long Agent task that streams thinking and answer text at a high
+     upstream token rate and continues through many tool rounds.
+  2. Observe streaming latency of later short thinking/answer blocks in the
+     same turn, including a nested subagent.
+  3. Stop the turn, send a new prompt in the same session, and compare the
+     new turn's streaming latency.
+  4. Confirm historical activity rows in the still-running turn do not flash
+     or rebuild as the tail token updates.
+- **Expected**:
+  - Upstream 200+ tok/s streams stay visually caught up (batched to the
+    display refresh is allowed; a growing backlog is not).
+  - Later short chunks in the same long turn do not keep getting slower.
+  - Stop plus a new prompt is not required to restore speed.
+  - Parent and subagent streams both stay realtime.
+  - Transcript text after `message_end` matches the streamed content.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/02-agent-runtime.md`, ADR 0242, D412, issue #299
+- **Acceptance**: C (chat stream), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`message-stream.test.ts`,
+  `stream-coalescer.test.ts`, `streaming-benchmark.test.ts`,
+  `assistant-turns.test.mjs`); rendered long-turn scenario Draft
 
 #### E2E-084: Long tool loop compacts before the provider context limit
 
@@ -5424,6 +5489,40 @@ needed.
   aggregate counts). Full multi-provider fan-out and rendered topology
   interaction remain manual.
 
+#### E2E-SUBAGENT-inherit-parent-tools
+
+- **Preconditions**: Agent mode. A user document
+  `~/.agents/subagents/worker.md` with `tools: inherit` (no assignable extras),
+  at least one plugin or MCP tool in the parent catalog, and a non-empty Skill
+  catalog. Built-in `explorer` remains on its whitelist.
+- **Steps**:
+  1. Confirm Settings → Agent → Subagents lists `worker` and that Edit shows
+     Inherit parent tools on. Save without changing tools and reopen the file.
+  2. Delegate `Task` to `worker` with a brief that needs a Skill id and a plugin
+     tool the parent already had.
+  3. Delegate `Task` to builtin `explorer` in the same session.
+  4. Confirm `worker` cannot call `Task`, `ToolSearch`, `asktool`, or
+     `new_context`.
+- **Expected**:
+  - Step 1 round-trips `tools: inherit`; the document does not disappear from
+    `agents.active` and save does not rewrite it to `Read, Glob, Grep`.
+  - `worker` receives Skill, the plugin/MCP tool, and the parent builtins minus
+    the deny list. Its system prompt lists those names, includes the `# Skills`
+    catalog, and says it may change files when the parent catalog includes
+    Bash/Edit/Write.
+  - `explorer` still has only `Read, Glob, Grep, Bash` and cannot call Skill.
+  - The Task catalog line for `worker` reads `(tools: inherit)`.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md` §10.2,
+  `03-runtime/02-agent-runtime.md` §5f/§7.2b, ADR 0246, issue #215
+- **Acceptance**: E (tools & permissions), Security
+- **Milestone**: M6+
+- **Status**: Covered by unit tests: `packages/shared`
+  `subagent-definition.test.ts` (parse inherit, deny list), `packages/agent-runtime`
+  `runtime.test.ts` (spawn catalog minus deny, Skill prompt) and
+  `subagent.test.ts` (resolved mutation framing); host-core `user_subagents`
+  inherit round-trip. Full UI inherit checkbox journey Draft. Required suites:
+  `test:e2e`, `test:e2e:subagents`.
+
 #### E2E-145: Tool results read as structured blocks, never JSON
 
 - **Preconditions**: A project-bound Agent session with permissions allowed for
@@ -6080,13 +6179,18 @@ needed.
       a global file also removes its project overrides.
   11. Open Subagents. Confirm it is one global-only panel rooted at
       `~/.agents/subagents`, with no level filter, no project picker, and no
-      project-level controls. Confirm the group header carries the global level
-      label and item count, that create/edit/delete/reveal all work from the
-      page, that leaving the turn limit empty writes a definition with no
-      `maxTurns`, that leaving the output limit empty writes a definition with
-      no `maxTokens`, and that an empty directory resolves
-      `settings.subagentsEmpty` to localized empty-state copy rather than
-      displaying a raw translation key. Open New subagent and confirm the
+      project-level controls. Confirm a Built-in group lists the five shipped
+      defaults (`explorer`, `code-reviewer`, `test-runner`, `fixer`,
+      `ui-designer`) even when the user directory is empty, each with a
+      Built-in badge, its tool grant, and no enablement switch, reveal, or
+      delete. Confirm the Global group header carries the global level label
+      and item count, that create/edit/delete/reveal all work from the page
+      for user-owned rows, that leaving the turn limit empty writes a
+      definition with no `maxTurns`, that leaving the output limit empty
+      writes a definition with no `maxTokens`, and that an empty user
+      directory still resolves `settings.subagentsEmpty` to localized
+      empty-state copy under the Global group rather than displaying a raw
+      translation key. Open New subagent and confirm the
       Model field is a select of the same configured, runnable models as the
       Composer, grouped by provider, with an inherit-session option, not a
       free-typed `provider/model` input. Pin a configured model, save, and
@@ -6435,64 +6539,84 @@ needed.
   `packages/plugin-sdk` and host-core manifest validation; the desktop journey
   is Draft (run only in a capable environment when this surface changes)
 
-#### E2E-153: The bundled Files plugin replaces the built-in Files tool
+#### E2E-153: The vendored file manager replaces the built-in Files tool
 
 - **Preconditions**: A packaged build (so `resources/plugins` is copied outside
   the asar) and a project with nested directories, a `node_modules`, a `.env`,
-  and a binary file.
+  a binary file, an image, a CSV, and a Markdown file.
 - **Steps**:
-  1. Open the Plugins page. Confirm **Files** is listed with source "builtin",
-     enabled, showing a work-panel-views capability, and that it offers no
-     Uninstall action.
+  1. Open the Plugins page. Confirm **File Manager** is listed as a bundled
+     plugin, enabled, showing a work-panel-views capability, and that it offers
+     no Uninstall action.
   2. Reveal the work panel and click `+` to create a New launcher tab. Confirm
-     its rows include Review and the plugin-contributed Files and Browser views.
-     Trigger an agent edit and confirm Review opens itself under Open resources
-     — it is an artifact surface, not a launcher entry.
-  3. Open the Files view. Confirm the tree lists the project, expands
+     its rows include Review and the plugin-contributed File Manager and Browser
+     views. Trigger an agent edit and confirm Review opens itself under Open
+     resources — it is an artifact surface, not a launcher entry.
+  3. Open the File Manager view. Confirm the tree lists the project, expands
      directories lazily, and omits `node_modules`, `.git`, and `.env`.
-  4. Confirm the toolbar shows the project name, a search field, and Refresh.
-     Trigger Refresh and confirm the button locks with a restrained spinner until
-     the root and expanded folders finish loading. Expand a directory with the
-     mouse and keyboard; confirm rows expose expanded state, folders appear
-     before files, and a failed directory offers an inline Retry. Type a unique
-     filename into search and confirm matching files appear without walking the
-     whole tree first.
-  5. Click a text file. Confirm the tree is replaced by a single-column viewer
-     (not a side-by-side split) that shows Back, the relative path, file size,
-     line numbers, bounded text, **Open with default app**, and **Show in
-     folder**. Click Back and confirm the tree returns with that file still
-     selected. Open the file again. Click Show in folder and confirm the file
-     manager reveals the file. Click Open with default app and confirm the OS
-     associated application launches. Click the binary file and confirm it
-     reports as binary rather than printing replacement characters. Click an
-     image and confirm an in-app preview, not an unavailable placeholder. Switch
-     the app to Simplified Chinese and confirm the Files toolbar, search,
-     empty/loading/error, viewer, open, and reveal-action states are localized.
-     Switch projects and confirm the tree updates without waiting on a poll.
+  4. Right-click a file and confirm **Open with default app** and **Show in
+     folder** are offered and work; right-click a directory and confirm they are
+     not offered, because the host refuses the action for directories.
+  5. Open a text file, edit it, and save. Confirm the file on disk changed and
+     the editor keeps the saved content. Change the same file outside the app,
+     edit and save again, and confirm the conflict is reported instead of the
+     external change being overwritten. Click the binary file and confirm it
+     reports as unsupported rather than printing replacement characters; open
+     the image, the CSV, and the Markdown file and confirm each gets its own
+     viewer. Switch the app to Simplified Chinese and confirm the tree, viewer,
+     and context menu are localized. Switch projects and confirm the tree
+     updates without waiting on a poll.
   6. Click a file path in the conversation. Confirm it still opens a host
      `file:<path>` tab under Open resources — transcript artifacts did not move
      to the plugin.
-  7. Disable the Files plugin. Confirm the view disappears from the menu and the
-     panel, and that transcript file links still work.
+  7. Disable the File Manager plugin. Confirm the view disappears from the menu
+     and the panel, and that transcript file links still work.
   8. Re-enable it, then restart the app. Confirm the enabled state and the tree
      return, and that the registry did not gain a duplicate row.
-- **Expected**: A first-party panel surface runs entirely on the public plugin
-  contribution channel, is user-disableable, cannot be uninstalled, and survives
-  restart. Its file access obeys the declared `fs.read` scope and the standard
-  deny-lists.
+- **Expected**: A panel surface runs entirely on the public plugin contribution
+  channel, is user-disableable, cannot be uninstalled, and survives restart. Its
+  host-mediated actions obey the declared `fs.read` scope, and its own reads and
+  writes stay inside the plugin's workspace jail (ADR 0241).
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
-  `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0105, ADR 0109, ADR 0111,
-  ADR 0169
+  `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0109, ADR 0111,
+  ADR 0169, ADR 0241
 - **Acceptance**: G (plugins), D (workspace), Security, Quality
 - **Milestone**: M6+
-- **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`,
-  `apps/desktop/test/plugin-fs-scope.test.mjs` (`fs.list`, `fs.readPreview`,
-  `fs.openDefault`, and `fs.reveal` guards),
-  `apps/desktop/test/plugin-work-panel-views.test.mjs` (docked-view event
-  broadcast), `apps/desktop/test/fs-panel-guard.test.mjs` (classified preview),
-  and host-core `bundled_plugins_refresh_from_disk_but_keep_user_state`; the
-  packaged journey is Draft (run only in a capable environment when this surface changes)
+- **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`
+  (manifest contract, public-bridge-only page, vendored checksums),
+  `apps/desktop/test/plugin-fs-scope.test.mjs` (`fs.openDefault` and `fs.reveal`
+  guards), `apps/desktop/test/plugin-work-panel-views.test.mjs` (docked-view
+  event broadcast), and host-core
+  `bundled_plugins_refresh_from_disk_but_keep_user_state`; the packaged journey
+  is Draft (run only in a capable environment when this surface changes)
+
+#### E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update
+
+- **Preconditions**: A build that ships a bundled plugin whose marketplace entry
+  offers a newer version, and a data directory the user can install into.
+- **Steps**:
+  1. Open the Plugins page. Confirm the plugin is listed as bundled and enabled,
+     and that it offers no Uninstall action.
+  2. Update it from the marketplace. Confirm the row moves to the catalog
+     version and still offers no Uninstall action.
+  3. Restart the app. Confirm the updated version is still the installed one,
+     the plugin is still enabled, and the registry holds exactly one row for it.
+  4. Disable the plugin, restart again, and confirm it stays disabled at the
+     updated version.
+- **Expected**: Bundled means default and non-removable, not frozen. A user's
+  update outlives the launch that reconciles the shipped copy, an app that ships
+  a strictly newer version still wins, and a catalog version that is not newer
+  is never offered as an update.
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md`, ADR 0104, ADR 0241
+- **Acceptance**: G (plugins), Quality
+- **Milestone**: M6+
+- **Status**: Unit coverage in host-core
+  `a_bundled_plugin_keeps_the_update_the_user_installed`,
+  `a_newer_shipped_version_replaces_an_older_user_install`,
+  `a_plugin_a_build_stops_shipping_is_no_longer_bundled`, and
+  `market_entry_offers_an_update_only_when_the_catalog_is_newer`; the packaged
+  journey is Draft
 
 #### E2E-154: Model additions use models.dev metadata and generic unknown IDs
 
@@ -6537,7 +6661,7 @@ needed.
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills |
 | F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J, E2E-PLUGIN-session-orchestrator-real-workers |
 | F — Persistence (project ordering) | E2E-251 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196 |
 | Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills |
@@ -6554,6 +6678,8 @@ needed.
 | Quality (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | C — Conversation & stream (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | Quality (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
+| Security (imported extension dependencies) | E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
+| Quality (imported extension dependencies) | E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
 | C — Conversation & stream (Independent session communication) | E2E-SESSION-independent-top-level-communication |
 | D — Plugin security (Independent session communication) | E2E-SESSION-independent-top-level-communication |
 | G — Plugins (Independent session communication) | E2E-SESSION-independent-top-level-communication |
@@ -6578,7 +6704,7 @@ needed.
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills |
+| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -8197,6 +8323,39 @@ This test plan spec is accepted when:
   `apps/desktop/test/subagent-editor-presets.test.mjs`); full UI journey
   Draft (run only in a capable environment when this surface changes)
 
+#### E2E-SUBAGENT-settings-lists-builtin-defaults
+
+- **Preconditions**: A running app. `~/.agents/subagents` is empty. The five
+  shipped builtins are present and no user document shadows them.
+- **Steps**:
+  1. Open Settings → Agent → Subagents. Confirm a Built-in group lists
+     `explorer`, `code-reviewer`, `test-runner`, `fixer`, and `ui-designer`
+     with localized names, `Task(<handle>)` copy, tool grants, and a Built-in
+     badge. Confirm none of those rows has an enablement switch, Reveal, or
+     Delete.
+  2. Confirm the Global group still shows localized `settings.subagentsEmpty`
+     copy and the New subagent action.
+  3. Choose **Copy as mine** on explorer. Confirm the create sheet opens
+     pre-filled from that definition (name, description, tools, body, max
+     turns) with the Explorer template chip selected, not Blank. Save. Confirm
+     explorer now appears only as a user-owned Global row and is omitted from
+     Built-in, and the next prompt's Task catalog uses the user document.
+     row and is omitted from Built-in, and the next prompt's Task catalog
+     uses the user document.
+  4. Disable the user explorer and reload the page. Confirm the user row is
+     off and explorer reappears under Built-in (disabled user documents do
+     not reach the loader, so the shipped definition wins again).
+- **Expected**: Settings shows the defaults the agent can actually delegate
+  to. Copying a builtin is how a user retunes it; enablement, reveal, and
+  delete remain file-backed actions on user-owned rows only.
+- **Specs linked**: `04-ux/06-settings-ia.md` §2, `03-runtime/01-ipc-protocol.md`
+  §12c, `03-runtime/02-agent-runtime.md` §5f, ADR 0062, ADR 0063
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M6+
+- **Status**: Source/unit covered (`apps/desktop/test/agent-capability-settings.test.mjs`,
+  `packages/shared/src/subagent-presets.test.ts`); full UI journey Draft
+  (run only in a capable environment when this surface changes)
+
 #### E2E-198: A subagent task opens with a live conversation process
 
 - **Preconditions**: A project-bound Agent session with a mocked provider stream
@@ -8352,7 +8511,7 @@ This test plan spec is accepted when:
   row to confirm the focused list keeps its thumb available. 4) Scroll the
   list with the wheel or trackpad after moving the pointer away from the thumb.
   5) Open a long conversation and a long right-side work-panel view, including
-  the Files view when the bundled plugin is enabled, and compare their idle,
+  the file manager view when the bundled plugin is enabled, and compare their idle,
   hovered, focused, and scrolling states on Windows.
 - **Expected**: Both regions remain independently scrollable and the footer
   stays fixed. Every in-app scrollbar is trackless, 6px wide, and transparent
@@ -8717,12 +8876,17 @@ are withdrawn with ADR 0165.
   Task with no `model:` parameter and a definition that has no frontmatter
   model pin. 8) With no enabled delegation models, delegate a Task once with
   no `model:` and once with `model:` repeating the current session's
-  `provider/modelId`.
+  `provider/modelId`. 9) Pin an unselected model to one definition; attempt to
+  use it as another definition's explicit override, then invoke its owner with
+  no override. 10) Remove a previously enabled override key and start another
+  prompt in the same idle session.
 - **Expected**:
   1. Saving and reopening the provider preserves the
      `availableForSubagents` opt-in, including after an application restart.
   2. The delegation model summary appears in the parent's system prompt listing
-     every model marked `availableForSubagents`.
+     every successfully resolved model marked `availableForSubagents`, with
+     no definition-only pins. The Task definition catalog displays each default
+     model and recommends omitting `model` to preserve it.
   3. The Task tool accepts the `model` parameter and the delegate runs on the
      specified model, not the session model; its delegation node shows the
      effective model id immediately after the subagent name.
@@ -8735,13 +8899,27 @@ are withdrawn with ADR 0165.
   7. When no delegation model is configured, omitting `model:` and explicitly
      repeating the current session `provider/modelId` both start the delegate
      on the session model; the latter is not reported as an unavailable model.
+  8. A private pin remains usable by its definition when `model` is omitted
+     or when `Task.model` repeats that definition's own pin key, but cannot be
+     selected for another definition without opt-in. Rejection issues no child
+     provider request. On-demand authorization does not retire an idle runtime;
+     changed launch opt-in does, so a stale cached binding grants no selection
+     rights.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
   `03-runtime/11-provider-model-system.md` §7,
   `03-runtime/12-provider-config-schema.md` §2,
   `08-meta/decisions-log.md` (D278)
 - **Acceptance**: C (chat/stream) + B (model configuration) + E (tools)
 - **Milestone**: M6+
-- **Status**: Draft
+- **Status**: Partially automated. `pnpm test:e2e:subagent-models` drives the
+  built sidecar over real NDJSON and a local deterministic SSE model fixture:
+  private cross-definition rejection, own-pin echo, normal pin use, allowed override priority,
+  on-demand authorization without runtime rebuild, exact-session inheritance, and revocation across two
+  prompts all pass. Runtime unit tests cover the same selection gates and the
+  desktop launch test exercises independent opt-in, revocation, and accounts
+  sharing a vendor alias; the wiring test checks unique on-demand matching. The settings checkbox
+  UI/persistence journey and live external provider execution remain manual;
+  this fixture does not claim a complete native UI journey.
 
 #### E2E-170: Shell titlebars use borderless chrome
 
@@ -9811,17 +9989,26 @@ are withdrawn with ADR 0165.
 - **Steps**: 1) Hover or keyboard-focus the collaboration-created session.
   2) Inspect the model metadata, creator reference, and created-session list.
   3) Activate the creator and one created-session reference with the keyboard.
-  4) Inspect an independent session's card as well.
+  4) Delete (or otherwise remove) one referenced session, or use a session whose
+  reference is already stale, then revisit the card. 5) Inspect an independent
+  session's card as well.
 - **Expected**: The card shows the provider's readable name and model display
   name instead of the provider ID. A collaboration-created session shows its
-  creator, and a creator shows its bounded created-session list. Each reference
-  is a native keyboard-focusable button with an accessible open-session name;
-  activating it opens that durable session and focuses the Composer. An
-  independent session remains a valid local session without a fabricated
-  creator link. Hover polling remains bounded and does not load a transcript.
+  creator, and a creator shows its bounded created-session list. Each live
+  reference is a native keyboard-focusable button with an accessible
+  open-session name; activating it opens that durable session and focuses the
+  Composer. A reference whose session no longer exists is presented as text
+  with an "unavailable" indication and is not a keyboard-focusable navigation
+  control; activating a session that no longer exists (for example a session
+  deleted between the snapshot and the click) surfaces a visible error instead
+  of switching to an empty transcript. An independent session remains a valid
+  local session without a fabricated creator link. Hover polling remains
+  bounded and does not load a transcript: a read that exceeds its deadline is
+  abandoned, and an unfocused window keeps a slower idle poll instead of
+  stopping or overrunning.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §5.7,
-  `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
-  ADR 0240
+  `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`, ADR 0240
 - **Acceptance**: C (conversation & stream), Quality
 - **Milestone**: M6+
 - **Status**: source-contract and projection tests are automated; rendered
@@ -10287,7 +10474,8 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   `agent.prompt.inject`, and Host reports the `skills` capability while
   retaining both skill documents. Invalid declarations fail without importing
   outside data or retaining a partial copied plugin. Nothing automatically
-  imports `~/.pi` or runs npm/package lifecycle scripts.
+  imports `~/.pi` or runs npm lifecycle scripts; the explicit dependency path
+  may run the bounded npm installer described in E2E-PLUGIN-import-extension-installs-dependencies.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2;
   `07-plugins/02-plugin-manifest-schema.md`; D007
 - **Acceptance**: E (tools & permissions), G (plugins), Quality
@@ -10384,6 +10572,48 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Milestone**: Post-MVP (R7 v1, delivered first as the bundling spike)
 - **Status**: Unit-covered by `packages/agent-runtime/src/extensions/bundle.test.ts`
   (esbuild bundle run from a temp directory); packaged-app journey Draft
+#### E2E-PLUGIN-import-extension-installs-dependencies: Importing an extension with npm dependencies installs them before first load
+
+- **Preconditions**: A pi extension directory shipping a `package.json` with
+  `dependencies` (a pure-JavaScript package is sufficient) and no
+  `node_modules`; npm reachable; the import confirm accepted.
+- **Steps**: 1) Plugins → Import pi extension, pick the directory. 2)
+  Inspect `plugins/imported/<slug>/`. 3) Send a prompt that exercises the
+  extension.
+- **Expected**: The plugin root holds the copied `package.json` with any
+  `workspaces` field stripped. Dependency resolution first runs
+  `npm install --package-lock-only --omit=dev --legacy-peer-deps --no-audit
+  --no-fund --ignore-scripts`, validates registry-only sources, and then
+  creates `node_modules` with `npm ci --omit=dev --legacy-peer-deps --no-audit
+  --no-fund --ignore-scripts` (no install script ran); the extension row reaches
+  `loaded` with its tools, commands, and hooks registered, and they take effect
+  in the turn.
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §10.2; ADR 0244
+- **Acceptance**: Security, Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
+  and verified manually with `pi-hermes-memory` through the sidecar bundle
+  (tools, commands, and hooks registered, zero diagnostics); no CI journey yet
+
+#### E2E-PLUGIN-import-extension-reports-missing-dependency: A failed dependency install or unloadable dependency is surfaced, never silent
+
+- **Preconditions**: A pi extension directory whose `package.json` declares
+  a dependency that cannot install (npm offline or unresolvable); and one
+  whose dependency installs but fails to load (for example a native module
+  that needs a build script).
+- **Steps**: 1) Import the first directory with npm failing. 2) Inspect the
+  toast and the plugin row. 3) Import the second directory and start a turn.
+- **Expected**: The renderer shows a warning toast carrying the npm stderr
+  tail; the plugin still registers; the row reports the extension `error`
+  state with a `load_error` diagnostic; the session and all other extensions
+  keep working.
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §4.4, §10.2; ADR 0244
+- **Acceptance**: Security, Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
+  (skip, failure, and invalid-manifest paths); no CI journey yet
+
+
 ---
 
 #### E2E-233: Icon-only actions explain their purpose in the active language
@@ -10842,3 +11072,71 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   Existing commands, pages, settings, and keyboard navigation still work.
 - **Status**: Draft; Rust and renderer unit regressions cover the data/query
   boundaries. Full rendered E2E requires an explicitly authorized run.
+
+### MCP market scenarios (`pnpm test:e2e:mcp-market`, headless protocol-level)
+
+| ID | Scenario | Verification |
+|---|---|---|
+| E2E-MCP-MARKET-NET-BOUNDARY | URL guard rejects credentials, loopback, private, special-use IPv4, v4-mapped, ULA, site-local and link-local bypass forms (trailing dot included); Main pins the checked public address and rechecks HTTPS redirects | deterministic guard assertions; source-contract coverage for DNS pin and bounded responses |
+| E2E-MCP-MARKET-SEMANTICS | Registry records map to install templates preserving package versions, named/positional runtime/package arguments and required/optional env variables | deterministic mapping assertions |
+| E2E-MCP-MARKET-INSTALL | Builtin catalog entry resolves through `resolveCatalogEntry` and installs via the host `mcp.upsert` RPC; record lands in `~/.agents/servers/` | real host binary, isolated temp HOME |
+
+
+#### E2E-SKILL-MARKET-NET-BOUNDARY: Public-HTTPS skill sources reject private and loopback URLs
+
+- **Preconditions**: Shared public-network helpers and the main-process
+  public-HTTPS client with injectable fetch/DNS.
+- **Steps**: 1) Classify trailing-dot localhost, IPv4 loopback, IPv4-mapped
+  IPv6, ULA, link-local, RFC1918, and `http://` URLs. 2) Resolve a public
+  hostname to a private A record. 3) Follow a 302 whose Location is
+  `https://127.0.0.1/`.
+- **Expected**: Every bypass form is rejected. A public CDN URL is accepted.
+  DNS that yields a private address and a redirect onto loopback both throw a
+  policy error without fetching the private target. Policy failures are not
+  retried.
+- **Specs linked**: `05-security/01-security.md`, ADR 0243,
+  `03-runtime/01-ipc-protocol.md` §12b
+- **Acceptance**: Security, Quality
+- **Milestone**: M6+
+- **Status**: Automated (`pnpm test:e2e:skill-market`,
+  `apps/desktop/test/public-https-fetch.test.mjs`,
+  `packages/shared/src/public-network.test.ts`)
+
+#### E2E-SKILL-MARKET-EXPANSION: Adjacent markdown resources inline before install
+
+- **Preconditions**: A jsDelivr skill document whose directory lists FORMS.md
+  and REFERENCE.md (mocked listing in unit tests; expansion helper in E2E).
+- **Steps**: Split SKILL.md, expand listed sibling markdown files as fenced
+  appendices, and confirm a document over 128 KiB is flagged too large.
+- **Expected**: The preview/install body contains the skill text plus
+  `# Attached resource:` appendices. Non-markdown siblings are omitted. A
+  body that would exceed host `MAX_SKILL_BYTES` is not written.
+- **Specs linked**: `04-ux/06-settings-ia.md`, ADR 0243
+- **Acceptance**: Quality
+- **Milestone**: M6+
+- **Status**: Automated (`pnpm test:e2e:skill-market`,
+  `apps/desktop/test/skill-market-scan.test.mjs`)
+
+#### E2E-SKILL-MARKET-INSTALL: Market install writes a user skill through skills.create
+
+- **Preconditions**: Host binary; isolated HOME. A builtin catalog entry with
+  an assembled markdown body.
+- **Steps**: Handshake; `skills.create` with the assembled name/description/body;
+  read `~/.agents/skills/pdf.md`; `skills.list`.
+- **Expected**: The file has rendered frontmatter and the instruction body.
+  The skill appears in `skills.list`. No path besides `skills.create` is used.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §12b, ADR 0243
+- **Acceptance**: Quality
+- **Milestone**: M6+
+- **Status**: Automated (`pnpm test:e2e:skill-market`)
+
+#### E2E-SKILL-MARKET-ID-ALIGN: Scanned skill ids match host valid_capability_id
+
+- **Preconditions**: Shared `sanitizeSkillCatalogId`.
+- **Steps**: Sanitize `Frontend_Design`, `1-pdf`, and an empty remainder.
+- **Expected**: Host-legal slugs (`frontend-design`, `1-pdf`, `skill-7`) so
+  `installedIds` matches the created record.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §12b
+- **Acceptance**: Quality
+- **Milestone**: M6+
+- **Status**: Automated (`pnpm test:e2e:skill-market`)

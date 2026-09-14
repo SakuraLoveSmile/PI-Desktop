@@ -177,14 +177,23 @@ function activityGroupPropsEqual(
     previous.isActive !== next.isActive ||
     previous.endedAt !== next.endedAt ||
     previous.runtimeActivity !== next.runtimeActivity ||
-    previous.items.length !== next.items.length ||
-    previous.turnDelegationStatuses !== next.turnDelegationStatuses ||
-    previous.turnDelegationTimings !== next.turnDelegationTimings
+    previous.items.length !== next.items.length
   ) {
     return false;
   }
-  return previous.items.every((item, index) =>
-    activityItemsEqual(item, next.items[index]),
+  if (
+    !previous.items.every((item, index) =>
+      activityItemsEqual(item, next.items[index]),
+    )
+  ) {
+    return false;
+  }
+  // Text updates rebuild the turn's delegation maps. Only Task groups consume
+  // those maps; ordinary completed work must retain its render boundary.
+  return (
+    !previous.items.some(isDelegationActivityItem) ||
+    (previous.turnDelegationStatuses === next.turnDelegationStatuses &&
+      previous.turnDelegationTimings === next.turnDelegationTimings)
   );
 }
 

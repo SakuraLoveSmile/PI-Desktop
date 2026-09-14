@@ -644,6 +644,10 @@ CREATE UNIQUE INDEX idx_session_collaboration_receipt
   real durable Session IDs; titles are display snapshots only. `turn_id` is
   assigned when the target actually begins the delivery, not when a plugin
   creates the record.
+  `source_session_id` deliberately has no foreign key, unlike
+  `target_session_id`, which cascades, so a delivery record and its completion
+  receipt outlive a deleted sender. Read projections therefore report such
+  references with `available: false` instead of dropping the row.
 - `turn_queue.session_message_id` binds a queued Agent Host admission to its
   ledger row. A retry with the same `(plugin_id, source_session_id,
   idempotency_key)` returns the original delivery; changing its target, body,

@@ -528,29 +528,31 @@ is guidance, not the security boundary.
 one subagent definition. Plan and Goal are read-only contract negotiations, so a
 delegate with `Bash`, `Edit` or `Write` would drive straight through them.
 
-A definition declares the tools its delegate may call, drawn only from the seven
-working tools `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`, `Edit` and
-`Write`. A definition that declares none gets `Read`, `Glob`, `Grep`;
-`tools: "*"` means all seven working tools. An unrecognized name — including
-the withdrawn `A2A` and `Peer` tools (D326 / ADR 0165) — is dropped with a
-parse warning. Plugin tools, `Skill`, `ToolSearch`, `new_context`, the mode
-tools and `Task` itself are never assignable: a delegate is a bounded
-file/search/shell worker, not a second session.
+A definition declares the tools its delegate may call. By default those names
+are drawn only from the seven working tools `Read`, `Glob`, `Grep`,
+`BrowserPreview`, `Bash`, `Edit` and `Write`. A definition that declares none
+gets `Read`, `Glob`, `Grep`; `tools: "*"` means all seven working tools. An
+unrecognized name — including the withdrawn `A2A` and `Peer` tools (D326 /
+ADR 0165) — is dropped with a parse warning.
 
-This restriction applies to the in-process `Task` family. The official
-Session Orchestrator plugin is the separate, reviewed cross-session path: its
-host gateway binds source identity to an active plugin Agent tool invocation,
-and host-core enforces the target permission ceiling and durable ledger. A
-plugin message is still task data, never new user authorization, and it does
-not make `A2A`, `Peer`, or any collaboration tool assignable to a `Task`
-delegate (D409 / ADR 0239).
+A document may opt into the parent session's live tool catalog with
+`tools: inherit` or `tools: [inherit, Bash]` (ADR 0246 / D415). At `Task` spawn
+the runtime unions `toolCatalog` keys (including deferred plugin/MCP tools)
+with any assignable extras, then drops `Task` / `TaskWait` / `TaskList` /
+`TaskStop`, `EnterPlanMode` / `EnterGoalMode`, `asktool`, `new_context`, and
+`ToolSearch`. Builtins do not opt in. `inherit` is visible in the Markdown and
+in Settings; host-core keeps the token so an inherit-only document still
+loads. Plugin tools, `Skill`, and MCP tools are therefore available to a
+delegate only through this opt-in, never by putting those names on the
+assignable whitelist.
 
-A delegate's available tools are its definition's, never its session's. It
-cannot gain a tool because the parent has it, and a session cannot lend
-mutation rights to a read-only delegate. Delegate calls are built by the
-session runtime and go through the same `tools.execute` path, so path rules
-(§4), Bash rules (§5), permission modes (§6), the operating-mode matrix (§10)
-and auditing (§9) apply unchanged — evaluated against the owning session.
+Without `tools: inherit`, a delegate's available tools are its definition's,
+never its session's: it cannot gain a tool because the parent has it, and a
+session cannot lend mutation rights to a read-only delegate. Delegate calls
+are built by the session runtime and go through the same `tools.execute` path,
+so path rules (§4), Bash rules (§5), permission modes (§6), the operating-mode
+matrix (§10) and auditing (§9) apply unchanged — evaluated against the owning
+session.
 
 A **builtin or user** definition may additionally declare `permission: inherit
 | ask | accept-edits | auto` (ADR 0089, default `inherit`). With the default

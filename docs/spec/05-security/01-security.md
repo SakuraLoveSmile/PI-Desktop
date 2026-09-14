@@ -96,6 +96,29 @@ and byte size, and only then creates the `plan_approvals` record with
 structured title/question fields. Renderer and sidecar state cannot write or
 replace an artifact.
 
+## 4.1 Skill market egress
+
+The renderer does not fetch skill catalogs or SKILL.md documents. Electron
+main performs those HTTPS requests under the public-network policy (ADR 0243 /
+D413): `https` only, a shared syntactic public-host check, DNS classification
+of every resolved address, and `redirect: "manual"` with per-hop
+re-validation. Loopback, RFC1918, ULA, link-local, and mapped IPv6 targets
+are rejected. Install writes markdown only through `skills.create`. The host
+document cap remains 128 KiB after sibling markdown is inlined.
+
+## 4.2 MCP market egress
+
+The MCP market accepts only credentials-free public HTTPS sources and catalog
+endpoints. Main resolves every hostname immediately before connecting and pins
+the selected public address to the HTTPS socket while retaining the original
+host for TLS SNI and HTTP Host. Redirects are manual, HTTPS-only, limited to
+five hops, and checked again before each connection. Responses are capped at
+4 MiB, requests share an 8-second deadline, and source/cache/entry counts are
+bounded. Cross-origin user-MCP redirects do not forward caller headers.
+
+Manual user-owned MCP configuration remains covered by ADR 0142 and may use
+explicit local/LAN endpoints; the market path does not widen that policy.
+
 ## 5. Command execution
 
 - Bash requires confirmation by default (risk-tiered permission cards); in
@@ -234,6 +257,7 @@ host-core. They do not change the loopback-only rule above.
 | Prompt-injected destructive tool use | host-owned durable mode policy, permission confirmation, path boundary, secret isolation |
 | Dependency poisoning | lockfiles, few deps, native-module review |
 | Malicious local plugin | declared permissions, no secret access, process isolation tracked post-MVP (ADR 0008) |
+| Skill market SSRF via user source URL | public-HTTPS classifier + DNS + per-hop redirect checks in main; renderer CSP forbids the fetch (ADR 0243) |
 
 ## 11. Security acceptance gates
 

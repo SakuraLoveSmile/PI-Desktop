@@ -518,11 +518,11 @@ type SessionCollaborationSummary = {
   modelKey?: string;
   providerName?: string;
   modelName?: string;
-  createdBySession?: { sessionId: string; title: string };
-  createdSessions?: Array<{ sessionId: string; title: string }>;
+  createdBySession?: { sessionId: string; title: string; available?: boolean };
+  createdSessions?: Array<{ sessionId: string; title: string; available?: boolean }>;
   currentTask?: {
     messageId: string;
-    senderSession: { sessionId: string; title: string };
+    senderSession: { sessionId: string; title: string; available?: boolean };
     text: string;
     status: string;
     turnId?: string;
@@ -532,7 +532,7 @@ type SessionCollaborationSummary = {
   recentExchanges: Array<{
     messageId: string;
     direction: "incoming" | "outgoing";
-    peer: { sessionId: string; title: string };
+    peer: { sessionId: string; title: string; available?: boolean };
     kind: "task" | "message" | "completion";
     status: string;
     preview: string;
@@ -541,12 +541,28 @@ type SessionCollaborationSummary = {
 };
 ```
 
+`available` is `false` when the referenced session was deleted or is otherwise
+absent; the host then also falls back to the Session ID as the title. The
+renderer renders an unavailable reference as text rather than a
+keyboard-focusable navigation control, and activating a reference whose session
+no longer exists reports a visible error instead of committing an empty
+selection. Independently created sessions never receive a fabricated creator
+reference. `session_collaboration_messages.source_session_id` intentionally has
+no foreign key, so a delivery record survives deletion of its sender; such
+references are reported as unavailable rather than removed.
+
 Electron overlays live Agent status on the durable host projection, bounds the
 exchange previews, and fetches it only while a session row is hovered or
 focused. The renderer cannot invoke the host's mutating
 `session.collaboration.*` methods. The plugin's `desktop.control` gateway is
 the sole reviewed mutation surface and binds send/cancel authorization to the
 active plugin Agent tool invocation.
+
+A hover-card read that does not settle within the card's deadline is abandoned,
+its late result is ignored, and the next bounded read is scheduled. While the
+card is mounted but not visible (a hidden window, or a window without focus) the
+loop keeps polling at a slower idle interval so a later focus change is picked
+up. Polling still never overlaps reads and stops on unmount.
 
 ## 6. Agent Events
 
@@ -571,7 +587,8 @@ type AgentEvent =
  | { type: "turn_end"; subagentUsage?: MessageUsage }
  | { type: "message_start"; message: UiMessage }
  | { type: "message_update"; message: UiMessage;
-     deltaText?: string; deltaThinking?: string }
+     deltaText?: string; deltaThinking?: string;
+     stream?: "delta"; resetText?: boolean; resetThinking?: boolean }
  | { type: "message_end"; message: UiMessage }
  | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
  | { type: "tool_update"; toolCallId: string; partialResult?: unknown }
@@ -595,6 +612,15 @@ type AgentEvent =
 
 > These are **UI-normalized events**, not a pass-through of raw pi events.
 > `packages/agent-runtime` is responsible for mapping pi events to this model.
+
+Append-only `message_update` frames set `stream: \"delta\"` and omit growing
+`content` / `thinking` from `message`. Consumers apply `deltaText` /
+`deltaThinking` onto the live row (replace instead of append when `resetText`
+or `resetThinking` is set). The runtime coalesces those frames on an ~16ms
+interval and flushes immediately before tool, terminal, abort, error, and
+retry events. `message_start` and `message_end` still carry a full
+`UiMessage`. Snapshot replacements omit `stream`. These fields are additive
+in protocol v11 (D412).
 
 `status` events include an optional runtime-owned `activity` phase while a turn
 is active. `starting` is the prompt handoff; `waiting-model` is the interval
@@ -1363,6 +1389,26 @@ Only the description enters the prompt, and the body is fetched when the model
 invokes `Skill` (D174). A missing file is removed from the list and its local
 state is pruned during the next scan.
 
+Desktop-only skill market channels (not host RPC) live on Electron IPC:
+
+- `pi-desktop/skill/market/search` — `{ query, sources[] }` → `{ entries, failedSources }`.
+  Main aggregates builtin-safe catalog JSON and GitHub repo SKILL.md scans.
+  Source URLs must pass the public-HTTPS policy (ADR 0243). One failing source
+  is dropped; the rest still return.
+- `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`.
+  Main fetches the document over the same policy, splits frontmatter, and may
+  attach sibling `.md` files from a jsDelivr listing. The renderer installs
+  through existing `skills.create`. Catalog ids are sanitized to host
+  `valid_capability_id` (`[a-z0-9][a-z0-9-]{0,63}`).
+
+Desktop-only MCP market channels (not host RPC) live on Electron IPC:
+
+- `pi-desktop/mcp/market/search` — `{ query?, sources[], more? }` →
+  `{ entries, failedSources, exhausted }`. Main validates source URLs, pins
+  each resolved public address, follows only bounded HTTPS redirects, and keeps
+  cursor state for browse and server-side search. One failed source does not
+  discard successful sources; the response and caches are bounded.
+
 ## 12c. Subagent API (D202)
 
 User-owned subagents are global-only Markdown documents under
@@ -1390,9 +1436,15 @@ because no resolver could ever look it up. The provider half is matched by a
 normalized alias at both ends of the app, so a display name containing spaces
 is valid.
 
+The `tools` array may include the token `inherit` (ADR 0246). `inherit` alone
+is a valid grant; host-core must not drop the document. Settings round-trips
+the token as `tools: inherit` or `tools: [inherit, Bash]`.
+
 Electron's `subagent/list` IPC channel exposes the same global-only list to
-Settings > Agent > Subagents. The runtime catalog combines these global user
-documents with its builtins; it does not scan `.pi/agents` or any project
+Settings > Agent > Subagents. `subagent/catalog` returns the effective Task
+catalog (enabled user documents merged with the five shipped builtins) so the
+page can render those defaults as read-only rows. The runtime catalog
+combines the same sources; it does not scan `.pi/agents` or any project
 capability directory.
 
 ## 12d. Capability level and local activation
@@ -1864,6 +1916,13 @@ plan-resolution tools require `confirm: true`. That flag is an agent
 acknowledgement, not a desktop user prompt. All calls still pass through the
 existing IPC handler validation, host permissions, workspace boundaries, and
 error model. Both the text payload and `structuredContent` are size-bounded.
+
+The six `session/collaboration/*` operations are first-party-plugin-only: they
+require an authenticated plugin tool invocation context, so they appear in
+`pi.desktop.listOperations` and are callable through `pi.desktop.invoke`, but
+they are excluded from the MCP-visible catalog (`tools/list`,
+`pi_control_describe`, and the `pi_desktop_invoke` operation enum) and an MCP
+caller cannot invoke them.
 
 After successful **mutating** external calls, Electron Main may emit the existing
 `pi-desktop/session/event/changed` event with additive fields:

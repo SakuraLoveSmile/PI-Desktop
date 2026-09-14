@@ -451,10 +451,11 @@ type SessionCollaborationSummary = {
    "queued" | "running" | "completed" | "failed" | "cancelled" | "interrupted";
  observedAt: string;
  modelKey?: string;
- createdBySession?: { sessionId: string; title: string };
+ createdBySession?: { sessionId: string; title: string; available?: boolean };
+ createdSessions?: Array<{ sessionId: string; title: string; available?: boolean }>;
  currentTask?: {
    messageId: string;
-   senderSession: { sessionId: string; title: string };
+   senderSession: { sessionId: string; title: string; available?: boolean };
    text: string;
    status: string;
    turnId?: string;
@@ -464,7 +465,7 @@ type SessionCollaborationSummary = {
  recentExchanges: Array<{
    messageId: string;
    direction: "incoming" | "outgoing";
-   peer: { sessionId: string; title: string };
+   peer: { sessionId: string; title: string; available?: boolean };
    kind: "task" | "message" | "completion";
    status: string;
    preview: string;
@@ -473,10 +474,20 @@ type SessionCollaborationSummary = {
 };
 ```
 
+`available` 在被引用的会话已删除或因其他原因不存在时为 `false`；此时宿主还会回退使用
+Session ID 作为标题。渲染器把不可用的引用渲染为文本，而不是可键盘聚焦的导航控件；激活
+一个会话已不存在的引用会报告可见错误，而不是提交一个空选择。独立创建的会话绝不会获得
+伪造的创建者引用。`session_collaboration_messages.source_session_id` 有意不设外键，因此
+投递记录在发送者被删除后仍然保留；此类引用报告为不可用，而不是被移除。
+
 Electron 将实时 Agent 状态叠加到宿主持久投影上，限制交换预览的大小，且只在会话行
 获得悬停或焦点时读取。渲染器不能调用宿主可变的 `session.collaboration.*` 方法。
 插件的 `desktop.control` 网关是唯一经过审查的变更入口，并将发送/取消授权绑定到
 插件当前的 Agent 工具调用。
+
+卡片的一次读取若未在其截止时间内完成即被放弃，迟到的结果被忽略，并安排下一次有界读取。
+卡片仍挂载但不可见时（窗口隐藏，或窗口没有焦点），循环以更慢的空闲间隔继续轮询，以便之后
+的焦点变化能被捕获。轮询仍然绝不重叠读取，并在卸载时停止。
 
 ## 6. Agent 事件
 
@@ -1150,6 +1161,18 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 进入提示，模型调用 `Skill` 时才读取正文 (D174)。缺失文件会在下一次扫描时
 从列表移除，并清理其本地状态。
 
+桌面专用技能市场通道（不是 host RPC）走 Electron IPC：
+
+- `pi-desktop/skill/market/search` — `{ query, sources[] }` → `{ entries, failedSources }`。
+  主进程聚合目录 JSON 与 GitHub 仓库 SKILL.md 扫描。源 URL 必须通过公网 HTTPS 策略（ADR 0243）。单源失败只丢掉该源。
+- `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`。
+  主进程按同一策略拉取文档、拆 frontmatter，并可能附上 jsDelivr 目录中的兄弟 `.md`。渲染层通过现有 `skills.create` 安装。目录 id 会净化为 host `valid_capability_id`。
+
+
+桌面专用 MCP 市场通道（不是 host RPC）走 Electron IPC：
+
+- `pi-desktop/mcp/market/search` — `{ query?, sources[], more? }` →
+  `{ entries, failedSources, exhausted }`。Main 校验源 URL，固定每个解析出的公网地址，只跟随有界的 HTTPS 重定向，并为 browse 与服务端搜索保留 cursor 状态。单个源失败不会丢弃成功源；响应和缓存均有界。
 ## 12c. 子代理 API (D202)
 
 用户拥有的子代理仅是全局 Markdown 文档：`~/.agents/subagents/<id>.md`。
@@ -1174,8 +1197,9 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 匹配，因此包含空格的显示名是合法的。
 
 Electron 的 `subagent/list` IPC 通道向设置 > 智能体 > 子代理暴露同一份全局
-列表。运行时目录把这些全局用户文档与内置定义合并；不会扫描 `.pi/agents`
-或任何项目能力目录。
+列表。`subagent/catalog` 返回当前 `Task` 目录（已启用的用户文档与五个内置定义
+合并后的结果），供设置页把默认子智能体渲染为只读行。运行时目录使用同一套来源；
+不会扫描 `.pi/agents` 或任何项目能力目录。
 
 ## 12d. 能力级别与本地启用状态
 
@@ -1609,6 +1633,11 @@ Electron 等待主机关闭之前会停止服务，并将清单标记为非活�
 计划工具，都要求 `confirm: true`。该标志是 Agent 确认，不是桌面用户弹窗。所有调用
 仍会经过现有 IPC 处理器的校验、主机权限、工作区边界和错误模型。文本负载和
 `structuredContent` 都有大小上限。
+
+六个 `session/collaboration/*` 操作仅限第一方插件：它们要求经过认证的插件工具调用上下文，
+因此会出现在 `pi.desktop.listOperations` 中并可通过 `pi.desktop.invoke` 调用，但被排除在
+MCP 可见目录（`tools/list`、`pi_control_describe` 以及 `pi_desktop_invoke` 的操作枚举）之外，
+MCP 调用方无法调用它们。
 
 **变更性** 外部调用成功后，Electron Main 可以通过现有的
 `pi-desktop/session/event/changed` 事件发送附加字段：

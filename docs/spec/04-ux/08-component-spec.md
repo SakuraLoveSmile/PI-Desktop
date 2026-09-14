@@ -742,7 +742,8 @@ reading surface of the workstation.
 
 Docked right work column for inspecting and steering the agent's workspace.
 Launchable surfaces are the host-owned Review row and plugin views (ADR 0104),
-including bundled `pi.files` (project browsing) and bundled `pi.browser`
+including the vendored file manager `pi.file-manager` (project browsing and
+editing) and bundled `pi.browser`
 (work-panel browser chrome; the guest page stays host-owned, ADR 0170). File
 resources are *artifact* surfaces: the host renders them, but the conversation
 opens them, so they are absent from the launcher. There is no interactive
@@ -818,38 +819,37 @@ singleton without duplicating it:
   Copy wraps at 34ch rather than 48ch because the panel can be 244px wide. No
   hero art, cards, or marketing framing (design-system §14, D206)
 
-### 5.2.2 Files plugin surface
+### 5.2.2 File manager plugin surface
 
-The bundled `pi.files` view keeps the former Files tool's focused browsing
-workflow while rendering entirely inside the plugin's isolated page:
+The vendored `pi.file-manager` view browses, opens, and edits the project
+entirely inside the plugin's isolated page:
 
-- The compact toolbar identifies the active project and offers search, collapse,
-  and refresh. Refresh disables itself and shows the same restrained spinner
-  language used by the host while the root and expanded folders are reloaded.
-  The tree loads one directory at a time, keeps directories
-  above files, preserves expanded folders, and shows file sizes without
-  walking the whole workspace up front. Search uses `fs.glob` and lists matching
-  files without expanding the whole tree first.
-- Directory rows use `role="treeitem"` with `aria-expanded`; Enter/Space opens
-  the row and Arrow/Home/End keys move through visible rows. Hover and active
-  fills are neutral theme surfaces, with the caret and folder/file SVGs carrying
-  the hierarchy instead of emoji or text glyphs. A context menu and
-  double-click open the selected file with the OS default app.
-- Selecting a file replaces the tree with a focused viewer page: Back, the
-  root-relative path, file size, line numbers, and a bounded preview. The viewer
-  offers **Open with default app**, **Show in folder**, and copy path through
-  the scoped plugin bridge. Back and Escape return to the same tree selection.
-  Loading, read failures, binary content, image
-  previews, oversized files, empty folders, and folders that fail to load each
-  have a distinct localized state; a failed directory can be retried in place.
+- The tree loads one directory at a time, keeps directories above files,
+  preserves expanded folders, and shows per-file-type icons and file sizes
+  without walking the whole workspace up front. Search (`fs.glob`-equivalent
+  filename matching) lists hits without expanding the tree, and refresh
+  disables itself while it reloads the root and the expanded folders.
+- A context menu on a row offers create, rename/move, **Open with default app**,
+  and **Show in folder**. The last two are offered for files only: the host
+  refuses them for directories.
+- Selecting a file replaces the tree with a focused viewer: syntax-highlighted
+  editing with save, a Markdown preview toggle, image and audio/video viewing,
+  CSV/TSV tables with paging and sorting, a JSON tree, and read-only SQLite
+  browsing with a SQL query box. Binaries report that they cannot be previewed
+  rather than being decoded, and every viewer names its own bound — 2 MiB for
+  text, 8 MiB for images, 24 MiB for media, none for databases, whose bytes stay
+  out of the page.
+- Saving is atomic and refuses to overwrite a file that changed on disk since it
+  was opened until the user confirms. Loading, read failures, unsupported
+  binaries, oversized files, empty folders, and folders that fail to load each
+  have a distinct localized state, and a failed directory can be retried in
+  place.
 - The page follows `app.getAppearance` and `appearance:changed` for base theme
   and English/Simplified Chinese copy, and `workspace:changed` for the open
-  project. Its only data access remains the public `workspace.get`, `fs.list`,
-  `fs.readPreview`, `fs.glob`, `fs.openDefault`, and `fs.reveal` bridge, so the
-  richer surface does not add host-only capabilities. Text previews are capped
-  at 5,000 lines; images use a bounded data URL from `fs.readPreview`. The
-  palette stays monochrome like the main app rather than introducing a
-  plugin-specific blue accent.
+  project. `workspace.get`, `app.getAppearance`, `fs.openDefault`, and
+  `fs.reveal` are the only host channels it calls; its own reads and writes go
+  through its host process, which keeps the workspace path jail, refuses
+  credential paths, and records writes to its own audit log (ADR 0241).
 
 ### 5.3 States
 
@@ -1976,6 +1976,16 @@ in place:
   lifecycle status source, same as `TaskWait`/`TaskList` `delegations[]`; a
   snapshot that still says `running` is presented as `stopped`. A finished
   session therefore never keeps a live “Subagent working” card.
+- The brief spawn window before a delegate settles is presented as a creating
+  state rather than a generic running one. Because the parent `Task` returns
+  its structured handle (`delegationId`, `startedAt`) only at its own
+  `tool_end` (ADR 0089), a `Task` row that is `running` with no delegation
+  payload is identified as still being created: its node and dock badge read
+  `chat.subagentCreating` (“Starting subagent…”), the status icon pulses in
+  the subagent accent, and the elapsed clock ticks from the call's own
+  `createdAt` instead of waiting for the handle — so the creation phase never
+  reads as stalled. Once the result arrives the node transitions to the normal
+  `running` presentation and continues from its real `startedAt`.
 - The expanded card renders a low-noise dotted canvas with one main-agent root
   connected to the `Task` nodes in parent-row order. The runtime exposes no
   delegate dependencies and forbids nested `Task`, so the renderer must not

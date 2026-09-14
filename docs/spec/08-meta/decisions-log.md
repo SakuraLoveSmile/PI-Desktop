@@ -82,6 +82,8 @@ This log freezes previously open questions into concrete decisions.
 | D408 | Prioritize MainChat in the three-column shell | **Amend ADR 0226 / ADR 0151 / ADR 0033 for issue #267: MainChat keeps a hard 450px minimum, the work panel is capped by the live budget (`client width - 450px - expanded sidebar`, with no fixed maximum), and the expanded sidebar yields at that threshold — including while `sidebar-out` still occupies flex space. A manual sidebar reopen spends panel width first and otherwise targets 460px; closing the panel restores only a sidebar the layout collapsed. The native window never changes: the reservation seam stays at zero and no geometry is applied. Preview mode temporarily unmounts MainChat and uses a window-level chrome row; collapsed-sidebar macOS preview reserves 76px, or 8px in fullscreen, for traffic lights. See ADR 0238 and E2E-LAYOUT-three-column-width-priority.** | The fixed client area had no explicit width priority, so the side docks could pin MainChat to its floor and leave the composer unusable. Making the yield order explicit keeps the chat readable inside the fixed window without reintroducing native window growth (issue #267). |
 | D409 | Host-owned session collaboration messages | **Amend ADR 0237 / ADR 0165 / ADR 0213: Rust host-core owns a durable session-collaboration ledger keyed by message id and real source/target Session IDs. Plugin-mediated `spawn`, `send`, `status`, `result`, and `cancel` operations use the reviewed desktop-control gateway; the sender is bound to the active plugin Agent tool invocation, target turns retain their existing configuration, and each delivery is claimed by its actual durable turn. Completion callbacks are durable, at-most-once, and reference the settled turn. Provenance is persisted with transcript rows and cannot be forged, stripped, or edited through regeneration. The additive schema v16 migration retains queued work across restart without unattended replay, applies permission ceilings and bounded autonomous hops, and keeps the existing Task family unchanged. See ADR 0239 and E2E-PLUGIN-session-orchestrator-real-workers.** | The plugin's prior create/prompt polling path could infer neither a durable turn outcome nor a safe bidirectional sender identity. A host-owned ledger makes delivery, provenance, callback, cancellation, and restart behavior auditable without restoring the withdrawn A2A protocol. |
 | D410 | Independent session discovery and navigable collaboration projections | **Amend ADR 0239: add the reviewed read operation `session/collaboration/list`, bounded to 100 non-deleted Agent sessions and redacted to Session IDs, titles, status, updated time, readable provider/model labels, and bounded creation links. Extend the sidebar projection with readable model labels and at most eight created-session references. Render creator/created-session references as keyboard-focusable navigation buttons; independent sessions do not receive fabricated creator links. No renderer storage ownership or collaboration mutation boundary changes. See ADR 0240, E2E-SESSION-independent-top-level-communication, and E2E-SESSION-hover-card-model-and-links.** | Existing Session IDs were valid send targets but could be undiscoverable when they were not created by the plugin, while the hover card exposed only IDs and non-interactive provenance. A bounded host directory and navigable projection make durable sessions communicable and explainable without exposing transcripts or credentials. |
+| D413 | Skill market public-HTTPS catalog fetch | **Additive: Settings → Skills Market discovers SKILL.md catalogs in Electron main under a shared public-HTTPS policy (syntactic public host + DNS classification + per-hop redirect re-validation). The renderer does not fetch. Install remains `skills.create`. Catalog ids match host `valid_capability_id`. Expanded documents over 128 KiB are refused. Builtin titles are English. See ADR 0243, E2E-SKILL-MARKET-*, issue #287.** | Community skill discovery needs main-process egress without a plugin-marketplace host allowlist, and copied classifiers would collide with the MCP market. |
+| D412 | Delta-only coalesced streaming updates | **Amend the local `message_update` contract: append-only streaming frames carry `stream: delta` plus `deltaText`/`deltaThinking` (and reset flags) without growing `content`/`thinking`. Runtime coalesces those frames every 16ms and flushes before semantic boundaries. AgentHost, inflight checkpoints, and the renderer apply deltas; `message_start`/`message_end` remain full snapshots. Transcript activity parts keep object identity when only the tail token changes. Protocol version stays 11. See ADR 0242, E2E-STREAM-long-turn-keeps-realtime, and issue #299.** | Each token re-serialized the full assistant snapshot across sidecar, AgentHost, and IPC, so a long turn cost O(n²) bytes and backlogged later short chunks. |
 
 
 | D244 | Compact context usage summary | **Amend D103 / D184 / ADR 0047: keep the context inspector's remaining-capacity trigger, used/window counts, turn total, completed-turn speed, exact provider values, aggregate tool types/calls/tokens, and checkpoint summary, but render them as a short summary. Remove the per-tool rows, share bars, source badges, explanatory estimate paragraph, and used-capacity meter from the default panel. No protocol, storage, runtime accounting, or model metadata changes.** *(Amended by D347: the trigger moves to the composer toolbar.)* | The prior diagnostic layout made a routine capacity check tall and visually dense. Keeping the aggregate signal while removing drill-down chrome makes the default status surface scannable without changing the underlying usage data. See ADR 0103 and E2E-060d / US-UI-61. |
@@ -3032,6 +3034,16 @@ D193, and D194.
   exact repeat of the current session provider/model is treated as inheritance,
   equivalent to omitting `model`, so an empty delegation catalog does not turn
   the parent model into a false unavailable-model error.
+- Implementation clarification (2026-09-13, ADR subagent-model-opt-in):
+  `subagentProviders` may contain definition-only pins and is not an override
+  allowlist. The additive `subagentModelKeys` launch field carries opt-in
+  separately, defaults to empty, and participates in runtime reuse matching.
+  Only launch opt-in keys enter that reuse snapshot. Successfully authorized
+  on-demand results use a separate cache, must not overwrite a pin with a
+  different provider id, and do not retire an idle runtime. Repeating a
+  definition's own pin key is omit. On-demand matching uses unique provider
+  lookup. The Task catalog discloses each definition's default model.
+
 - Models not pre-resolved at sidecar launch are resolved on-demand via the
   `provider.resolveSubagentModel` RPC to Electron main, where credentials and
   the models.dev snapshot live.
@@ -4788,3 +4800,106 @@ Task context through additive `navigationParent`; parser source offsets locate
 hidden Markdown and file-chip matches. Read ownership rejects interrupted pages,
 and explicit message actions hydrate canonical input when history is partial or
 text is capped. Validation: E2E-SESSION-content-search-and-message-navigation.
+
+## 2026-09-13 — Harden session collaboration navigation and delivery
+
+- Collaboration references now carry `available`. A reference to a session that was
+  deleted or is otherwise gone is reported with `available: false`; the renderer renders
+  it as text instead of a navigation control, and opening a session that no longer exists
+  reports a visible error instead of committing an empty transcript.
+  `session_collaboration_messages.source_session_id` intentionally has no foreign key, so
+  a delivery record survives deletion of its sender and is reported as unavailable.
+- The six `session/collaboration/*` operations are first-party-plugin-only: they require
+  an authenticated plugin tool invocation context, so they are excluded from the
+  MCP-visible catalog while remaining available through `pi.desktop.listOperations` and
+  `pi.desktop.invoke`. This amends the "same reviewed operation catalog" claim of
+  ADR 0203 / D370 and the `desktop.control` row of the plugin permission matrix.
+- Settling a delivery now asserts that the conditional `queued` to `running` claim
+  actually changed a row, so losing that race cannot create a second turn for one
+  delivery, and `spawn` evaluates its worker limits inside the same transaction as the
+  session insert.
+- Electron delivery settlement no longer drops a settlement recorded before a host
+  restart, and a drain that is already running picks up settlements queued during it
+  instead of deferring them to an unrelated trigger. A persisted delivery failure keeps a
+  stable `CODE: message` form.
+- Review fixes for the orchestration refresh path bound the model-catalog lookup work per
+  read instead of relying on cache eviction, and replace E2E boot conditions that could
+  not fail with observations the probe does not itself guarantee.
+- See ADR 0239, ADR 0240, E2E-SESSION-hover-card-model-and-links.
+
+## 2026-09-13 — Vendor the file view as an updatable plugin (issue #304)
+
+- The work panel's file view is no longer `pi.files`. It is a vendored copy of
+  the third-party `pi.file-manager` release, shipped from
+  `apps/desktop/resources/plugins/` and recorded in its own `UPSTREAM.md`. The
+  old plugin is removed, and host-core drops its stale registry row on the next
+  launch.
+- Bundled means default and non-removable, not frozen: a bundled plugin can be
+  updated from the marketplace, that update survives the next launch, and a
+  build that ships a strictly newer version still wins. `uninstall` refuses by
+  ID against what the build ships, not by the row's `source`, so an updated
+  plugin stays uninstallable and a plugin dropped from a build is removable
+  again.
+- A marketplace entry is offered as an update only when it is strictly newer.
+  Equality is not an update, and an older catalog version is not one either.
+- Editing writes stay inside the plugin's own process, which keeps the workspace
+  path jail, atomic writes, conflict detection, and its write audit. The host
+  gateway does not mediate them: a manifest cannot declare a whole-tree write.
+- See ADR 0241 (supersedes ADR 0105), ADR 0104, E2E-153,
+  E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update.
+
+## 2026-09-14 — Delta-only coalesced streaming updates (D412)
+
+- Append-only `message_update` frames carry `stream: "delta"` and the new
+  chunk only. Growing `content`/`thinking` stay in the runtime accumulator and
+  in `message_end`. Retry replacements still send a full snapshot.
+- A 16ms coalescer concatenates pending deltas and flushes before tool,
+  terminal, abort, error, and retry events so order is preserved.
+- AgentHost applies deltas to live items and skips a hot-path `JSON.stringify`
+  for small delta frames. Inflight checkpoints reconstruct the snapshot from
+  the same deltas. The renderer concatenates same-frame deltas, then patches
+  the live row. Unchanged activity parts keep object identity.
+- Protocol version remains 11. See ADR 0242, E2E-STREAM-long-turn-keeps-realtime,
+  and issue #299.
+
+## 2026-09-13 — Skill market public-HTTPS catalog fetch (D413)
+
+- Skill Market search/fetch run in Electron main. Renderer CSP still forbids
+  the network. Install is existing `skills.create`.
+- Shared `isSafePublicHttpsUrl` / `isPublicHostname` / `isPublicIpLiteral` are
+  the syntactic classifier. Main re-checks DNS and every redirect hop.
+- Scanned ids are sanitized to host `valid_capability_id`. Preview shows the
+  assembled body; over 128 KiB is not written.
+- See ADR 0243, E2E-SKILL-MARKET-NET-BOUNDARY / EXPANSION / INSTALL / ID-ALIGN,
+  and issue #287.
+
+## 2026-09-14 — Harden the MCP market public-network boundary (D414)
+
+- MCP market source and catalog endpoint validation is shared by Renderer and
+  Electron Main. It accepts credentials-free public HTTPS only and rejects
+  loopback, private, CGNAT, link-local, multicast, reserved, documentation,
+  benchmark, ULA, and site-local address ranges, including mapped and
+  compatible IPv6 forms.
+- Main resolves each hostname immediately before the request and pins the
+  selected public address to the HTTPS socket. Redirects are followed manually,
+  checked and pinned at every hop, and limited to five hops. Source responses
+  are capped at 4 MiB, calls accept at most 16 sources, and browse/search
+  caches are bounded by age, key count, and entry count.
+- Registry npm/PyPI package versions and runtime/package arguments are retained
+  in install templates. Only `streamable-http` public HTTPS remotes are mapped;
+  remote header placeholders become explicit install values. Cross-origin MCP
+  redirects do not forward caller headers.
+- Manual user-owned MCP configuration keeps ADR 0142's explicit local/LAN
+  endpoint policy. See ADR 0245 and E2E-MCP-MARKET-*.
+
+## 2026-09-14 — Opt-in subagent inheritance of the parent tool catalog (D415)
+
+- A subagent definition may declare `tools: inherit` (alone or with assignable
+  extras). Builtins stay on today's whitelist.
+- At spawn the runtime unions the live `toolCatalog` minus Task*, mode
+  switches, `asktool`, `new_context`, and `ToolSearch`. Skill/MCP/plugin tools
+  the parent is allowed to call are included; child ToolSearch/new_context do
+  not mutate parent runtime state.
+- host-core keeps the `inherit` token so inherit-only documents load and
+  Settings round-trips them. See ADR 0246, issue #215, PR #319, and
+  E2E-SUBAGENT-inherit-parent-tools.

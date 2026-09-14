@@ -56,3 +56,14 @@ discovery. Plugin tests cover list discovery and bidirectional delivery. The
 relevant live journeys are tracked by
 `E2E-SESSION-independent-top-level-communication` and
 `E2E-SESSION-hover-card-model-and-links`.
+
+## Amendment (2026-09-13): reference availability
+
+`SessionReference` gained an optional `available` field. The host reports
+`available: false` for a `createdBySession`, `createdSessions`,
+`currentTask.senderSession`, or `recentExchanges[].peer` reference whose session row is
+deleted or absent, and falls back to the Session ID as the title. The renderer renders an
+unavailable reference as text and offers no navigation, and activating a reference whose
+session no longer exists reports a visible error instead of committing an empty
+selection. The field is additive and optional, so existing callers and persisted data are
+unaffected.

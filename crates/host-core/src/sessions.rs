@@ -4751,10 +4751,10 @@ mod tests {
         )
         .unwrap();
 
-        let target_path = simple_canonicalize(&target)
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
+        // The host stores the same canonical spelling it derives here: resolved,
+        // with forward slashes.
+        let target_path = crate::db::canonical_project_path(&target.to_string_lossy())
+            .expect("canonical project path");
         let moved = move_session_project(&db, &session.id, &target.to_string_lossy()).unwrap();
         let MoveSessionProjectResult::Moved(summary) = moved else {
             panic!("an idle session must move to the requested project");
