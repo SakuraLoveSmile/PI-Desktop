@@ -246,7 +246,14 @@ export function createSidecarRuntime({
       // late cleanup must not settle or abort that newer turn.
       const crashedTurnId = activeTurns.get(sessionId);
       if (!crashedTurnId) continue;
-      void settleCrashedSession(sessionId, crashedTurnId);
+      void settleCrashedSession(sessionId, crashedTurnId).catch((error: unknown) => {
+        // The crash handler cannot await this and the sidecar is already gone:
+        // log the failure instead of leaving the rejection unhandled.
+        logger.app("runtime", "warn", "crashed-turn settlement failed", {
+          sessionId,
+          data: String(error),
+        });
+      });
     }
     for (const [executionId] of claimedExecutionSessions) {
       void finishApprovedExecution(

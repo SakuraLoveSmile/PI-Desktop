@@ -10,6 +10,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 
 const { createHostRuntime } = await import("../electron/main/runtime/host.ts");
+const { createSessionCoordination } = await import(
+  "../electron/main/runtime/session-coordination.ts"
+);
 
 // `plugins.execute` crosses a language boundary: host-core writes the payload in
 // Rust, the main process reads it back by field name, and nothing type-checks the
@@ -54,10 +57,13 @@ function pluginExecutePayloadFields(source) {
 
 const FIELDS = pluginExecutePayloadFields(rustSource);
 
+const SESSION_ID = "session-1";
+const TURN_ID = "turn-1";
+
 const VALUE_BY_FIELD = {
   executionId: "exec-1",
-  sessionId: "session-1",
-  turnId: "turn-1",
+  sessionId: SESSION_ID,
+  turnId: TURN_ID,
   toolCallId: "call-1",
   toolName: "demo_echo",
   args: { message: "hello" },
@@ -67,10 +73,25 @@ const VALUE_BY_FIELD = {
 
 const TOOL_NAME = VALUE_BY_FIELD.toolName;
 
-function fixture() {
+/**
+ * The dispatch gate is the real coordination instance in the main process, and
+ * whether a call may run depends on the identity it carries, so the fixture
+ * builds the real instance instead of stubbing `isTurnDispatchable`: a stub would
+ * decide that question itself. `activeTurn` seeds the session's live turn;
+ * leaving it out models a session whose turn has already ended.
+ */
+function fixture({ activeTurn } = {}) {
   const calls = [];
   const invocations = [];
   let notification = null;
+
+  const activeTurns = new Map();
+  if (activeTurn !== undefined) activeTurns.set(SESSION_ID, activeTurn);
+  const coordination = createSessionCoordination({
+    activeTurns,
+    getMainWindow: () => null,
+    getViewingSessionId: () => null,
+  });
 
   const host = {
     onNotification: (handler) => {
@@ -112,9 +133,9 @@ function fixture() {
     emitAgentEvent() {},
     togglePluginLauncher: async () => undefined,
     finishTurn: async () => undefined,
-    isTurnDispatchable: () => true,
+    isTurnDispatchable: coordination.isTurnDispatchable,
     finishApprovedExecution: async () => undefined,
-    activeTurns: new Map(),
+    activeTurns,
     approvedExecutionIdsBySession: new Map(),
     claimedExecutionSessions: new Map(),
     importLegacyScheduled: async () => undefined,
@@ -130,6 +151,30 @@ function fixture() {
   };
 }
 
+function fullPayload() {
+  return Object.fromEntries(FIELDS.map((field) => [field, VALUE_BY_FIELD[field]]));
+}
+
+function payloadWithout(missing) {
+  return Object.fromEntries(
+    FIELDS.filter((field) => field !== missing).map((field) => [field, VALUE_BY_FIELD[field]]),
+  );
+}
+
+async function dispatch(f, payload) {
+  f.notify("plugins.execute", payload);
+  await setImmediate();
+  await setImmediate();
+  return f.calls.filter((call) => call.method === "plugins.resolveExecution");
+}
+
+function assertRefused(resolved, expectedExecutionId) {
+  assert.equal(resolved.length, 1, "host-core must be answered exactly once");
+  assert.equal(resolved[0].params.ok, false, "the call must be refused");
+  assert.equal(resolved[0].params.errorCode, "TOOL_TURN_CANCELLED");
+  assert.equal(resolved[0].params.executionId, expectedExecutionId);
+}
+
 test("the host-core notification carries every field the receiver reads", () => {
   for (const field of ["executionId", "sessionId", "toolCallId", "toolName", "args", "turnId"]) {
     assert.ok(FIELDS.includes(field), `plugins.execute no longer sends ${field}`);
@@ -141,15 +186,12 @@ test("the host-core notification carries every field the receiver reads", () => 
   );
 });
 
-test("a host-core plugins.execute payload runs the plugin tool and is answered", async () => {
-  const f = fixture();
-  const payload = Object.fromEntries(FIELDS.map((field) => [field, VALUE_BY_FIELD[field]]));
+test("the live turn's payload runs the plugin tool and is answered", async () => {
+  const f = fixture({ activeTurn: TURN_ID });
+  const payload = fullPayload();
 
-  f.notify("plugins.execute", payload);
-  await setImmediate();
-  await setImmediate();
+  const resolved = await dispatch(f, payload);
 
-  const resolved = f.calls.filter((call) => call.method === "plugins.resolveExecution");
   assert.equal(resolved.length, 1, "host-core must be answered exactly once");
   assert.equal(
     resolved[0].params.ok,
@@ -166,16 +208,61 @@ test("a host-core plugins.execute payload runs the plugin tool and is answered",
   assert.equal(f.invocations[0].ctx.sessionId, payload.sessionId);
 });
 
-test("an mcprefixed tool keeps its own path", async () => {
+// A turn that no longer owns the session was already settled: its cancel lock is
+// gone and its `session:turnEnded` has been announced, so nothing may start work
+// on its behalf. The refusal is answered on the original execution id, otherwise
+// host-core waits out its RPC timeout.
+test("a payload naming a turn that no longer owns the session is refused", async () => {
+  const f = fixture({ activeTurn: "turn-elsewhere" });
+  const payload = fullPayload();
+
+  assertRefused(await dispatch(f, payload), payload.executionId);
+  assert.equal(f.invocations.length, 0, "a settled turn must not start a plugin side effect");
+});
+
+test("a payload for a turn that already ended is refused", async () => {
+  // No live turn at all: the session's record was released when its
+  // `session:turnEnded` went out.
   const f = fixture();
-  const payload = {
-    ...Object.fromEntries(FIELDS.map((field) => [field, VALUE_BY_FIELD[field]])),
-    toolName: "mcp_demo",
-  };
-  f.notify("plugins.execute", payload);
-  await setImmediate();
-  await setImmediate();
-  const resolved = f.calls.filter((call) => call.method === "plugins.resolveExecution");
+  const payload = fullPayload();
+
+  assertRefused(await dispatch(f, payload), payload.executionId);
+  assert.equal(f.invocations.length, 0);
+});
+
+// host-core types the turn identity as optional (`ToolsExecuteParams.turn_id`),
+// but a call that names no turn cannot be attributed to one: main cannot tell it
+// apart from a call belonging to a turn that already ended, and any resource it
+// started could never be related to that turn's `session:turnEnded`. So the gate
+// stays closed and the caller gets a failure instead of a silent new turn.
+test("a payload without a turn identity is refused rather than executed", async () => {
+  // The session's turn is live on purpose: the refusal must come from the missing
+  // identity, not from an idle session.
+  const f = fixture({ activeTurn: TURN_ID });
+  const payload = payloadWithout("turnId");
+
+  assertRefused(await dispatch(f, payload), payload.executionId);
+  assert.equal(
+    f.invocations.length,
+    0,
+    "a call that names no turn must not start a plugin side effect",
+  );
+});
+
+test("a payload without a session identity is refused on the same grounds", async () => {
+  const f = fixture({ activeTurn: TURN_ID });
+  const payload = payloadWithout("sessionId");
+
+  assertRefused(await dispatch(f, payload), payload.executionId);
+  assert.equal(f.invocations.length, 0);
+});
+
+test("an mcprefixed tool keeps its own path", async () => {
+  const f = fixture({ activeTurn: TURN_ID });
+  const payload = { ...fullPayload(), toolName: "mcp_demo" };
+
+  const resolved = await dispatch(f, payload);
+
   assert.equal(resolved.length, 1);
   assert.equal(resolved[0].params.ok, true);
   assert.equal(f.invocations.length, 0, "an mcp tool never reaches the plugin runtime");

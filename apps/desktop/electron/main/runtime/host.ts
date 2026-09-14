@@ -216,11 +216,21 @@ export function createHostRuntime({
                 // Executor identity is best-effort; the tool can still run.
               }
             }
-            // Last synchronous gate before dispatch: the turn may have been
-            // cancelled or started finalizing while the session read above was
-            // awaited, and neither may start a plugin side effect. No await may
-            // sit between this check and the dispatch, and the rejection is
-            // answered on the original execution id rather than dropped.
+            // Last synchronous gate before dispatch: a turn that was cancelled or
+            // began finalizing while the session read above was awaited must not
+            // start a plugin side effect. No await may sit between this check and
+            // the dispatch, and the rejection is answered on the original
+            // execution id rather than dropped.
+            //
+            // The gate is closed rather than best-effort: a payload that names no
+            // turn cannot be attributed to one this process knows about, so it is
+            // indistinguishable from a call belonging to a turn that already ended
+            // (its cancel lock may be gone, its `session:turnEnded` already sent)
+            // and any resource it started could never be related to that event.
+            // The runtime always stamps both halves of the identity on
+            // `tools.execute`, so a call without one is not a supported shape; a
+            // standalone caller that ever needs the channel must be distinguished
+            // by an explicit origin instead of by an absent identity.
             if (!isTurnDispatchable(q.sessionId ?? "", q.turnId)) {
               payload = {
                 executionId: q.executionId,
@@ -300,6 +310,13 @@ export function createHostRuntime({
         if (interruptedTurnId) {
           void finishTurn(sessionId, "aborted", "PLAN_EXECUTION_INTERRUPTED", {
             turnId: interruptedTurnId,
+          }).catch((error: unknown) => {
+            // Nothing above can await this: the host is already gone. Log it
+            // rather than let the rejection surface as an unhandled one.
+            logger.app("runtime", "warn", "turn finalization failed after host exit", {
+              sessionId,
+              data: String(error),
+            });
           });
         }
       }
