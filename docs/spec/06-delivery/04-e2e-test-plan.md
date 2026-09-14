@@ -7068,7 +7068,9 @@ This test plan spec is accepted when:
 
 ### US-UI-44 Settings compact directory + merged sections
 - Open Settings light theme at ~1200×690.
-- Full-page shell: rail ~260px on `#f3f3f3`, main `#fff`; Back to app; search pill; General active pill with icon.
+- Full-page shell: rail ~260px on `#f3f3f3`, main `#fff`; search pill at the
+  rail top; Back to app pinned at the rail foot and vertically centred on the
+  main shell's sidebar footer icon line; General active pill with icon.
 - Rail order is exactly General / 常规, AI, Shortcuts / 快捷键,
   Instructions / 指令, Models / 模型, Skills / 技能, MCP,
   Subagents / 子智能体, Import / 导入, Projects / 项目, and Info / 信息;
