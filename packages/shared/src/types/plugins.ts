@@ -246,3 +246,32 @@ export type PluginAgentExtensionStatus = {
   commandNames: string[];
   diagnostics: TrustedExtensionDiagnostic[];
 };
+
+/**
+ * One folder root of the active project, as a plugin sees it (ADR 0252).
+ *
+ * A project may be a logical group of several local folders (ADR 0249), and
+ * only the primary root is the workspace the agent's tools default to. The flag
+ * is what tells a plugin which root the relative paths it is handed belong to.
+ */
+export type PluginWorkspaceRoot = {
+  path: string;
+  name: string;
+  /** The group's primary root — the one the visible workspace resolves to. */
+  primary: boolean;
+};
+
+/**
+ * The workspace a plugin is told about: the primary root plus the other folders
+ * of the same project group. Additive over the original `{ path, name }`, so a
+ * plugin that ignores `projectId` and `roots` behaves exactly as before, and a
+ * host that cannot resolve a group simply omits both.
+ */
+export type PluginWorkspaceInfo = {
+  path: string;
+  name: string;
+  /** Stable id of the project group this workspace belongs to. */
+  projectId?: string;
+  /** Every registered folder of that group, primary first. */
+  roots?: PluginWorkspaceRoot[];
+};

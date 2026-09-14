@@ -62,6 +62,7 @@ import {
   normalizeKeybinding,
   type PluginServiceStatus,
   type PluginSettingDefinition,
+  type PluginWorkspaceInfo,
 } from "@pi-desktop/shared";
 import {
   previewFile,
@@ -231,6 +232,11 @@ export type PluginDesktopConsentRequest = {
 
 export type PluginHostServices = {
   getWorkspacePath: () => string | null;
+  /**
+   * The workspace plus the project group behind it, when the caller can supply
+   * it. Additive: `workspace.get` falls back to `getWorkspacePath` alone.
+   */
+  getWorkspaceInfo?: () => PluginWorkspaceInfo | null;
   /** The set of `contributes.agentExtensions` modules changed (load/unload). */
   agentExtensionsChanged?: () => void;
   getLocale?: () => string;
@@ -3737,6 +3743,11 @@ export class PluginRuntime {
       },
       workspace: {
         get: async () => {
+          // The enriched payload carries the project group behind the visible
+          // workspace (ADR 0252); the path-only fallback keeps `get` working for
+          // any caller whose services never bound the richer provider.
+          const info = this.services.getWorkspaceInfo?.();
+          if (info !== undefined) return info;
           const path = this.services.getWorkspacePath();
           if (!path) return null;
           return { path, name: path.split(/[\\/]/).filter(Boolean).at(-1) || path };

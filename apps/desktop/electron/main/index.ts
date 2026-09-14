@@ -41,6 +41,11 @@ import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
 
 import { HostProcess } from "./host-process";
 import {
+  knownProjectGroups,
+  pluginWorkspaceInfo,
+  refreshProjectGroups,
+} from "./workspace-roots";
+import {
   shouldCreateTaskNotification as shouldCreateTaskNotificationPolicy,
   shouldShowNativeNotification,
 } from "./notification-policy";
@@ -760,13 +765,6 @@ function currentWorkspacePath(): string | null {
   return (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath ?? null;
 }
 
-function workspaceInfo(
-  path: string | null,
-): { path: string; name: string } | null {
-  if (!path) return null;
-  return { path, name: path.split(/[\\/]/).filter(Boolean).at(-1) || path };
-}
-
 /** Push a panel event to detached windows and docked views. */
 function broadcastPluginPanelEvent(event: string, payload: unknown): void {
   pluginPanels.broadcast(event, payload);
@@ -777,9 +775,21 @@ function setCurrentWorkspacePath(path: string | null): void {
   const previous = currentWorkspacePath();
   (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath = path;
   if (previous === path) return;
-  const payload = workspaceInfo(path);
+  const payload = pluginWorkspaceInfo(path);
   broadcastPluginPanelEvent("workspace:changed", payload);
   plugins.broadcastEvent("workspace:changed", [payload]);
+  // The group snapshot starts cold, so this first push can only carry the bare
+  // workspace. Fetch the project's folders once and repeat it, so a plugin that
+  // was already open sees them without waiting for the next switch; every later
+  // switch finds the snapshot warm and broadcasts exactly once (ADR 0252).
+  if (knownProjectGroups() === null) {
+    void refreshProjectGroups(host).then((changed) => {
+      if (!changed) return;
+      const enriched = pluginWorkspaceInfo(currentWorkspacePath());
+      broadcastPluginPanelEvent("workspace:changed", enriched);
+      plugins.broadcastEvent("workspace:changed", [enriched]);
+    });
+  }
 }
 
 /** One-line message for an error of unknown shape, for user-facing lists. */
