@@ -1410,10 +1410,11 @@ export function Sidebar({
     options?: { temporary?: boolean; projectPath?: string; global?: boolean },
   ) => items.map((session) => {
     const meta = sessionMeta[session.id] ?? {};
-    const temporary = options?.temporary ?? !normalizeProjectPath(session.projectPath);
-    const owningProject = options?.global && session.projectPath
-      ? projectEntriesByPath.get(normalizeProjectPath(session.projectPath)!)?.name
-        ?? projectName(session.projectPath, projectMetaFor(session.projectPath, projectMeta).name)
+    const normalizedProjectPath = normalizeProjectPath(session.projectPath);
+    const temporary = options?.temporary ?? !normalizedProjectPath;
+    const owningProject = options?.global && normalizedProjectPath
+      ? projectEntriesByPath.get(normalizedProjectPath)?.name
+        ?? projectName(normalizedProjectPath, projectMetaFor(normalizedProjectPath, projectMeta).name)
       : t("nav.hoverCardTemporarySpace");
     const active = page === "chat" && selectedSessionId === session.id;
     const archived = sessionArchived(session, meta);

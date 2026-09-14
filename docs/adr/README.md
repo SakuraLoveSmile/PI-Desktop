@@ -268,5 +268,6 @@ Each ADR includes:
 | 0247 | Git clone accepts only syntactically public hosts | Accepted (amends home git clone; D416) |
 | 0248 | [Package theme assets and contributed window backgrounds](0248-plugin-theme-assets-and-window-background.md) | Accepted (issue #335) |
 | 0249 | ChatGPT-style logical project groups | Accepted (amends ADR 0233 / ADR 0234 / ADR 0016) |
+| global-sidebar-pins | [Show pinned conversations in a global sidebar section](global-sidebar-pins.md) | Accepted (amends ADR 0016; issue #306) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
