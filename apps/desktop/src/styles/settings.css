@@ -2103,7 +2103,7 @@
 
 .extension-prompt-message {
   margin: 0 0 12px;
-  color: var(--ds-text);
+  color: var(--ds-text-primary);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
 }
