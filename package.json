@@ -40,7 +40,8 @@
     "clean": "pnpm -r --if-present clean && cargo clean",
     "lint:biome": "biome lint",
     "test:e2e:mcp-market": "node scripts/e2e-mcp-market.mjs",
-    "test:e2e:skill-market": "node scripts/e2e-skill-market.mjs"
+    "test:e2e:skill-market": "node scripts/e2e-skill-market.mjs",
+    "test:e2e:trusted-extensions": "node scripts/e2e-trusted-extensions.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",
