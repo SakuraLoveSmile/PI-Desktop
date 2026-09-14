@@ -44,21 +44,35 @@ rules. The parent file and its live manager are never mutated; the child is a
 new v3 JSONL in the parent's session directory with a header `parentSession`
 pointing at the canonical source path. Child metadata (title, and a fallback
 model/thinking) is appended in memory. Publication writes a complete temporary
-file and then hardlinks it to the final name, so a failed fork never exposes a
-partial child, never clobbers an existing file, and only removes files that
-carry its own child id. The source bytes and our own running/opening state are
-re-checked immediately before publication; drift fails closed.
+file (device/inode plus content hash captured from the exact payload), then
+hardlinks it to the final name after verifying that the staged file is still
+that inode with those exact bytes; the published child is verified against the
+same identity/hash before any projection or registration. A failed fork never
+exposes a partial child, never clobbers or renames an existing file, and
+removes only files whose device/inode and content still match what this
+operation itself wrote. An altered staging or published file fails closed with
+`NATIVE_PI_SESSION_CHANGED` and its uncertain bytes are preserved rather than
+deleted. The source bytes and our own running/opening state are re-checked
+immediately before publication; drift fails closed. As with the rest of the
+window, an uncooperative external writer that acts between verification and
+link is outside the cooperative-lease contract; the snapshot checks catch what
+they can and never touch the parent.
 
 When the selected branch saved no model, the child records the **parent
 session's saved** provider/model; when the branch saved no thinking-level change
 at all, it records the parent's saved level. An explicit branch value, including
-"off", always wins. There is no Desktop provider/auth fallback.
+"off", always wins. There is no Desktop provider/auth fallback. Forking is a
+data-only copy: it executes no model and loads no project resources, so it
+remains allowed while the parent is provider-unavailable or project-untrusted.
+That does not grant prompt readiness - the child reports the same read-only
+reason and keeps the existing auth/trust gate until it is satisfied.
 
 The side-chat panel streams native replies: `NativePiRuntime` projects
-`message_start`/`message_update` under a provisional row id and the renderer
-replaces that placeholder when the durable SDK entry id arrives in
-`message_end` (active, cached/retained, and side-chat projections share the
-`withoutProvisionalAssistantStream` seam). Durable user acknowledgements also
+`message_start`/`message_update` under a provisional row id and the terminal
+`message_end` names that exact id in the additive `replacesMessageId` field, so
+the renderer re-keys only that row through `projectMessageEnd` (active,
+cached/retained, and side-chat projections share the same seam); a generic
+Desktop completion carries no field and never touches another row. Durable user acknowledgements also
 reconcile the side-chat projection. Closing the panel removes only the renderer
 registration and tab; the child remains a native session in the sidebar and in
 title/project search, and reopens as an ordinary conversation. A send while a

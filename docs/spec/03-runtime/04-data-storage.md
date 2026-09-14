@@ -1384,8 +1384,13 @@ directory. Branch extraction runs against an in-memory manager over the parent
 snapshot, then child title/parent saved model/thinking fallbacks are appended in
 memory. Publication is a full write to an exclusive non-jsonl temporary file in
 the same directory, followed by a same-directory hardlink to the final
-`<timestamp>_<session-id>.jsonl` name; the temporary file is removed afterwards
-and only a file carrying this fork's own child id is cleaned up on failure. The
+`<timestamp>_<session-id>.jsonl` name. The staged file must still match the
+captured device/inode/size/hash before the link, and the published child must
+match that same identity and hash before the child detail is projected or
+registered; a mismatch fails closed without returning a child. Cleanup removes
+only files whose device/inode and content still match what this fork wrote
+(complete files by size+hash, partial staging writes by byte prefix); foreign
+files after a failed no-clobber link are never removed. The
 parent file, its leaf, and any live runtime are never modified. The child header
 carries `parentSession` with the canonical source path; that path stays inside
 the sidecar.

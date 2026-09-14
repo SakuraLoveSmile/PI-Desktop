@@ -187,7 +187,11 @@ function chunkedStream(piAi, signal) {
     if (settled) return;
     settled = true;
     clearInterval(timer);
-    const message = { ...assistantMessage("aborted", ""), content: [] };
+    const text = pieces.slice(0, index).join("");
+    const message = {
+      ...assistantMessage("aborted", text),
+      content: text ? [{ type: "text", text }] : [],
+    };
     stream.push({ type: "error", reason: "aborted", error: message });
     stream.end(message);
   };
@@ -221,10 +225,11 @@ async function main() {
   ModelRuntime.prototype.streamSimple = function streamSimple(_model, _context, options) {
     return chunkedStream(piAi, options?.signal);
   };
-  const service = new NativePiSessionService({
+  let service = new NativePiSessionService({
     agentDir: FIXTURE.agentDir,
     sessionRoot: FIXTURE.sessionRoot,
   });
+  let promptCount = 0;
   const window = new BrowserWindow({
     show: false,
     webPreferences: {
@@ -252,6 +257,7 @@ async function main() {
     }),
     "pi-desktop/agent/prompt": async (_event, request) => {
       const content = String(request.content ?? "");
+      promptCount += 1;
       return service.prompt(
         String(request.sessionId),
         content,
@@ -265,6 +271,19 @@ async function main() {
     },
   };
   const probes = {
+    "probe.sessionCount": async () => ({ count: (await service.list()).length }),
+    "probe.detail": async (_event, input) => ({ session: service.detail(String(input.id)) }),
+    "probe.promptCount": async () => ({ count: promptCount }),
+    "probe.restartService": async () => {
+      // Production-equivalent restart: dispose live runtimes and construct a
+      // fresh service that must rediscover everything from the JSONL files.
+      service.disposeAll();
+      service = new NativePiSessionService({
+        agentDir: FIXTURE.agentDir,
+        sessionRoot: FIXTURE.sessionRoot,
+      });
+      return { restarted: true };
+    },
     "probe.parentBytes": async () => ({
       initial: initialHash,
       hash: sha256(fs.readFileSync(FIXTURE.parentFile)),
@@ -316,8 +335,29 @@ async function main() {
       };
     }
   });
+  window.webContents.session.webRequest.onBeforeRequest(
+    { urls: ["http://*/*", "https://*/*"] },
+    (_details, callback) => callback({ cancel: true }),
+  );
   await window.loadFile(path.join(__dirname, "index.html"));
-  const result = await window.webContents.executeJavaScript("globalThis.nativeSideChatProbe()");
+  const phase1 = await window.webContents.executeJavaScript(
+    "globalThis.nativeSideChatProbePhase1()",
+  );
+  let result = phase1;
+  if (phase1?.ok && phase1.phase2) {
+    await probes["probe.restartService"]();
+    const loaded = new Promise((resolve) => window.webContents.once("did-finish-load", resolve));
+    window.webContents.reload();
+    await loaded;
+    const phase2 = await window.webContents.executeJavaScript(
+      "globalThis.nativeSideChatProbePhase2(" + JSON.stringify(phase1.phase2) + ")",
+    );
+    result = {
+      ok: Boolean(phase2?.ok),
+      error: phase2?.error,
+      checks: [...(phase1.checks ?? []), ...(phase2?.checks ?? [])],
+    };
+  }
   console.log("NATIVE_SIDE_CHAT_PROBE " + JSON.stringify(result));
   service.disposeAll();
   app.exit(result?.ok ? 0 : 1);
@@ -330,8 +370,20 @@ app.whenReady().then(main).catch((error) => {
 `,
   );
 
-  const env = { ...process.env, PI_OFFLINE: "1" };
+  // Standalone isolation: a temporary HOME/USERPROFILE so SDK default lookups
+  // (getAgentDir, trust-manager skills) cannot read the real profile, plus a
+  // scrub of inherited native session selectors for the probe process only.
+  const env = {
+    ...process.env,
+    HOME: temp,
+    USERPROFILE: temp,
+    PI_OFFLINE: "1",
+    PI_CODING_AGENT_DIR: agentDir,
+    PI_CODING_AGENT_SESSION_DIR: join(agentDir, "sessions"),
+  };
   delete env.ELECTRON_RUN_AS_NODE;
+  delete env.PI_SESSION_FILE;
+  delete env.PI_SESSION_ID;
   const child = spawn(electronBinary, [join(temp, "main.cjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
   let output = "";
   for (const stream of [child.stdout, child.stderr]) {

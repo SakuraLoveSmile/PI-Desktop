@@ -811,6 +811,90 @@ describe("native side-chat forks", () => {
     }
   });
 
+  it("refuses and preserves an in-place-altered staging payload", async () => {
+    // Converts the parent's staging-payload repro into a suite regression: the
+    // stage keeps its inode, size, and header id and only its bytes change, so
+    // dev/ino/size alone cannot catch it - the content hash must gate
+    // publication. A deterministic same-process tamper is not a claim that an
+    // uncooperative OS-level writer is impossible; the residual race is the
+    // documented snapshot-check limitation.
+    const f = await configureModelFiles(forkFixture());
+    const parentBytes = readFileSync(f.file, "utf8");
+    let childPath = "";
+    vi.resetModules();
+    vi.doMock("node:fs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs")>();
+      return {
+        ...actual,
+        linkSync: (source: any, target: any) => {
+          const changed = actual.readFileSync(source, "utf8").replace('"hello"', '"mutan"');
+          actual.writeFileSync(source, changed);
+          childPath = String(target);
+          return actual.linkSync(source, target);
+        },
+      };
+    });
+    try {
+      const { NativePiSessionService: MockedService } = await import("./native-pi-session.js");
+      const service = new MockedService(f);
+      try {
+        const [summary] = await service.list();
+        let failure: any;
+        try { service.fork({ id: summary.id, title: "tampered" }); } catch (error) { failure = error; }
+        expect(failure?.errorCode).toBe("NATIVE_PI_SESSION_CHANGED");
+        expect(failure?.message).not.toContain(f.group);
+        // Uncertain bytes are preserved under both names, never renamed or deleted.
+        expect(existsSync(childPath)).toBe(true);
+        expect(readFileSync(childPath, "utf8")).toContain('"mutan"');
+        expect(groupEntries(f.group).some((name) => name.endsWith(".tmp"))).toBe(true);
+        expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+        expect(() => service.list()).not.toThrow();
+      } finally { service.disposeAll(); }
+    } finally {
+      vi.doUnmock("node:fs");
+      vi.resetModules();
+    }
+  });
+
+  it("refuses a replaced staging inode even when the bytes match", async () => {
+    const f = await configureModelFiles(forkFixture());
+    const parentBytes = readFileSync(f.file, "utf8");
+    let childPath = "";
+    vi.resetModules();
+    vi.doMock("node:fs", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs")>();
+      return {
+        ...actual,
+        linkSync: (source: any, target: any) => {
+          // Same bytes, new inode: only the dev/ino comparison can catch this.
+          const previous = `${source}.previous`;
+          actual.renameSync(source, previous);
+          actual.copyFileSync(previous, source);
+          actual.unlinkSync(previous);
+          childPath = String(target);
+          return actual.linkSync(source, target);
+        },
+      };
+    });
+    try {
+      const { NativePiSessionService: MockedService } = await import("./native-pi-session.js");
+      const service = new MockedService(f);
+      try {
+        const [summary] = await service.list();
+        let failure: any;
+        try { service.fork({ id: summary.id, title: "replaced" }); } catch (error) { failure = error; }
+        expect(failure?.errorCode).toBe("NATIVE_PI_SESSION_CHANGED");
+        expect(failure?.message).not.toContain(f.group);
+        expect(existsSync(childPath)).toBe(true);
+        expect(readFileSync(childPath, "utf8")).toContain('"hello"');
+        expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
+      } finally { service.disposeAll(); }
+    } finally {
+      vi.doUnmock("node:fs");
+      vi.resetModules();
+    }
+  });
+
   it("fails closed without publishing when the parent drifts during staging", async () => {
     const f = await configureModelFiles(forkFixture());
     const before = groupEntries(f.group);

@@ -230,16 +230,26 @@ function stageNativeBranchFile(path: string, fileEntries: unknown[]): CompleteOw
 }
 
 /**
- * Remove a file only while it is still this exact inode with the exact bytes
- * this operation wrote.
+ * True while the path is still this exact inode with the exact bytes this
+ * operation wrote. Used both as a delete guard and as the payload-integrity
+ * gate before and after publication, so a same-inode/same-size rewrite cannot
+ * be returned as a child or deleted as ours.
  */
-function removeOwnedCompleteFile(file: CompleteOwnedFile): boolean {
+function ownsCompleteFile(file: CompleteOwnedFile): boolean {
   try {
     const stats = lstatSync(file.path);
     if (stats.dev !== file.dev || stats.ino !== file.ino || stats.size !== file.size) {
       return false;
     }
-    if (hashBytes(readFileSync(file.path)) !== file.hash) return false;
+    return hashBytes(readFileSync(file.path)) === file.hash;
+  } catch {
+    return false;
+  }
+}
+
+function removeOwnedCompleteFile(file: CompleteOwnedFile): boolean {
+  if (!ownsCompleteFile(file)) return false;
+  try {
     unlinkSync(file.path);
     return true;
   } catch {
@@ -710,6 +720,15 @@ export class NativePiSessionService {
           errorCode: "NATIVE_PI_SESSION_CHANGED",
         });
       }
+      // The staged payload is the exact bytes this fork intends to publish.
+      // Verify it before the no-clobber link so an in-place alteration (same
+      // inode, same size, same header id) is refused, not returned. Uncertain
+      // bytes stay on disk; the cleanup guards refuse to delete them.
+      if (!ownsCompleteFile(staging)) {
+        throw Object.assign(new Error("Native Pi session changed while forking; reload before continuing"), {
+          errorCode: "NATIVE_PI_SESSION_CHANGED",
+        });
+      }
       // No-clobber publication: a foreign file at the final path makes link
       // fail and is never removed. Only the exact published inode is tracked.
       linkSync(staging.path, childPath);
@@ -722,7 +741,21 @@ export class NativePiSessionService {
       };
       removeOwnedCompleteFile(staging);
       staging = undefined;
+      // Integrity gate after the link and before any projection or registry
+      // write: the final child must still be the published inode with exactly
+      // the staged bytes (dev/ino/size/hash). A mismatch fails closed and
+      // leaves the altered file untouched.
       const childSnapshot = nativePiSnapshot(childPath);
+      if (
+        childSnapshot.dev !== published.dev ||
+        childSnapshot.ino !== published.ino ||
+        childSnapshot.size !== published.size ||
+        childSnapshot.hash !== published.hash
+      ) {
+        throw Object.assign(new Error("Native Pi session changed while forking; reload before continuing"), {
+          errorCode: "NATIVE_PI_SESSION_CHANGED",
+        });
+      }
       const writtenHeader = parseSessionEntries(childSnapshot.bytes.toString("utf8"))
         .find((entry) => entry.type === "session") as any;
       if (!writtenHeader || writtenHeader.id !== childId || childSnapshot.bytes.at(-1) !== 0x0a) {
