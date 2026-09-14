@@ -1485,6 +1485,9 @@ export function Sidebar({
           {sessionPinned(session, meta) ? (
             <IconPin size={11} className="thread-item-pin" aria-hidden />
           ) : null}
+          {session.source === "pi-native" ? (
+            <span className="thread-item-source" title="Native Pi session">Pi</span>
+          ) : null}
           <span className="thread-item-title">{taskTitle(session.title)}</span>
           {options?.global ? (
             <span className="thread-item-project">
@@ -1791,19 +1794,21 @@ export function Sidebar({
       >
         {session ? (
           <>
-            <button
-              ref={menuFirstItemRef}
-              type="button"
-              role="menuitem"
-              data-action="rename-session"
-              onClick={() => {
-                closeMenus(false);
-                setRenameFor(session);
-              }}
-            >
-              <IconPencil size={14} />
-              {t("nav.renameTask", { defaultValue: "Rename task" })}
-            </button>
+            {session.source !== "pi-native" ? (
+              <button
+                ref={menuFirstItemRef}
+                type="button"
+                role="menuitem"
+                data-action="rename-session"
+                onClick={() => {
+                  closeMenus(false);
+                  setRenameFor(session);
+                }}
+              >
+                <IconPencil size={14} />
+                {t("nav.renameTask", { defaultValue: "Rename task" })}
+              </button>
+            ) : null}
             <button
               type="button"
               role="menuitem"
@@ -1830,16 +1835,18 @@ export function Sidebar({
                 ? t("nav.restoreTask", { defaultValue: "Restore" })
                 : t("nav.archiveTask", { defaultValue: "Archive" })}
             </button>
-            <button
-              type="button"
-              role="menuitem"
-              data-action="fork-session"
-              disabled={Boolean(runningSessions[session.id])}
-              onClick={() => void forkSession(session)}
-            >
-              <IconBranch size={14} />
-              {t("nav.createBranch")}
-            </button>
+            {session.source !== "pi-native" ? (
+              <button
+                type="button"
+                role="menuitem"
+                data-action="fork-session"
+                disabled={Boolean(runningSessions[session.id])}
+                onClick={() => void forkSession(session)}
+              >
+                <IconBranch size={14} />
+                {t("nav.createBranch")}
+              </button>
+            ) : null}
             {settings?.developerMode === true ? (
               <>
                 <button
@@ -1862,16 +1869,18 @@ export function Sidebar({
                 </button>
               </>
             ) : null}
-            <button
-              type="button"
-              role="menuitem"
-              className="danger"
-              data-action="delete-session"
-              onClick={() => void deleteSession(session)}
-            >
-              <IconX size={14} />
-              {t("nav.deleteTask", { defaultValue: "Delete" })}
-            </button>
+            {session.source !== "pi-native" ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="danger"
+                data-action="delete-session"
+                onClick={() => void deleteSession(session)}
+              >
+                <IconX size={14} />
+                {t("nav.deleteTask", { defaultValue: "Delete" })}
+              </button>
+            ) : null}
           </>
         ) : null}
         {entry ? (
