@@ -277,6 +277,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0245 | [加固 MCP 市场公网网络边界](/adr/0245-mcp-market-public-network-boundary) | 已接受 |
 | global-sidebar-pins | [在侧边栏全局显示置顶会话](/adr/global-sidebar-pins) | 已接受（修订 ADR 0016；issue #306） |
 | active-turn-steering | [用 Alt+Enter 向当前回合补充指令](/adr/active-turn-steering) | 已接受 |
+| 0251 | [删除项目会一并删除其拥有的会话](/adr/0251-project-delete-with-owned-sessions) | 已接受 |
 
 ## 什么时候看 ADR
 

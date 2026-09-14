@@ -55,6 +55,7 @@ import {
 import { BrandLogo } from "./BrandLogo";
 import { NotificationCenter } from "./NotificationCenter";
 import { ProjectEditDialog } from "./ProjectEditDialog";
+import { ProjectDeleteDialog } from "./ProjectDeleteDialog";
 import { SessionRenameDialog } from "./SessionRenameDialog";
 import { useUpdateState } from "../hooks/use-update-state";
 import {
@@ -76,6 +77,7 @@ import {
   IconSidebar,
   IconSettings,
   IconStar,
+  IconTrash,
   IconX,
 } from "./icons";
 
@@ -262,6 +264,7 @@ export function Sidebar({
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<SessionSummary | null>(null);
   const [editProjectFor, setEditProjectFor] = useState<ProjectEntry | null>(null);
+  const [deleteProjectFor, setDeleteProjectFor] = useState<ProjectEntry | null>(null);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
   const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
   const [menuPosition, setMenuPosition] = useState<{
@@ -1919,6 +1922,26 @@ export function Sidebar({
                 ? t("project.restore", { defaultValue: "Restore project" })
                 : t("project.archive", { defaultValue: "Archive project" })}
             </button>
+            <button
+              type="button"
+              role="menuitem"
+              className="danger"
+              data-action="delete-project"
+              onClick={() => {
+                closeMenus(false);
+                const runningCount = entry.sessions.filter(
+                  (session) => runningSessions[session.id] === true,
+                ).length;
+                if (runningCount > 0) {
+                  showToast(t("project.deleteRunningBlocked"), { variant: "warning" });
+                  return;
+                }
+                setDeleteProjectFor(entry);
+              }}
+            >
+              <IconTrash size={14} />
+              {t("project.delete", { defaultValue: "Delete project" })}
+            </button>
             {entry.open ? (
               <button
                 type="button"
@@ -2208,6 +2231,23 @@ export function Sidebar({
           project={editProjectFor}
           onClose={() => setEditProjectFor(null)}
           onSaved={(group) => editProjectEntry(editProjectFor, group.name)}
+          onError={reportError}
+        />
+      ) : null}
+      {deleteProjectFor ? (
+        <ProjectDeleteDialog
+          project={{
+            name: deleteProjectFor.name,
+            path: deleteProjectFor.path,
+            sessionCount: deleteProjectFor.sessions.length,
+          }}
+          onClose={() => setDeleteProjectFor(null)}
+          onDeleted={() => {
+            setDeleteProjectFor(null);
+            showToast(t("project.deleted", { name: deleteProjectFor.name }), {
+              variant: "success",
+            });
+          }}
           onError={reportError}
         />
       ) : null}

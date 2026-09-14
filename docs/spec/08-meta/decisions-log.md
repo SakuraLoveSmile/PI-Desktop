@@ -4981,3 +4981,31 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
   plugin responses. Child stderr and main-process fallbacks use stable events;
   development console mirrors contain the same sanitized record.
 - See ADR 0250 and E2E-034.
+
+## 2026-09-15 — Deleting a project removes its owned sessions (D421)
+
+- `projects.remove({ path })` is the new additive host RPC. It removes one
+  durable project row, every session attached to that row, those sessions'
+  transcript/scratch/review files, and the project's durable memory, and it
+  never touches the project folder on disk. An unknown path returns
+  `{ removed: false, sessionsRemoved: 0 }` instead of an error, and the desktop
+  removes its own record for that path anyway: a stale recent-project entry is
+  the only thing that can keep such a row visible.
+- The Projects index is a union of four sources (group projections of durable
+  rows, `pi.desktop.recentProjects`, session-derived projects, and the active
+  workspace). Deletion therefore removes the renderer-local record in the same
+  action; deleting only the database row leaves the row visible, which is why
+  the previous manual workaround also required clearing renderer storage.
+- A path that is a root of a stored multi-folder project group is refused with
+  a message so the group keeps a valid primary root; legacy single-root
+  projections delete normally.
+- The delete is refused while any attached session has a running turn (1008 /
+  `CONFLICT`, "project has running sessions"): a live turn still owns its tools
+  and working directory and is still appending to its transcript, so the bulk
+  delete waits for the project to be idle instead of resurrecting a stub
+  session afterwards. The renderer blocks the same action up front with
+  `project.deleteRunningBlocked`. Single-conversation delete keeps its current
+  semantics.
+- The action is deliberately absent from `CONTROL_OPERATION_SPECS`, so local
+  MCP control cannot delete projects. See ADR 0251 and
+  E2E-PROJECT-delete-removes-project-and-owned-sessions.
