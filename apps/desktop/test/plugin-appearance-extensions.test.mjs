@@ -32,6 +32,10 @@ test("settings destinations are permission-gated and use the isolated view host"
 test("settings extension surfaces are cleaned up on plugin lifecycle changes", () => {
   const services = read("electron/main/services/plugin-services.ts");
   const lifecycle = read("electron/main/ipc/plugin-ipc.ts");
+  const window = read("electron/main/bootstrap/window.ts");
+  const shutdown = read("electron/main/bootstrap/shutdown.ts");
   assert.match(services, /pluginSettingsViews\.closePlugin/);
   assert.match(lifecycle, /pluginSettingsViews\.closePlugin/);
+  assert.match(window, /pluginSettingsViews\.setWindow/);
+  assert.match(shutdown, /pluginSettingsViews\.dispose/);
 });
