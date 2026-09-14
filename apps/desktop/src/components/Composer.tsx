@@ -95,7 +95,7 @@ export function Composer({
   );
   const nativeSession = activeSessionSummary?.source === "pi-native";
   const nativeReadOnly =
-    nativeSession && activeSessionSummary.capabilities?.canPrompt === false;
+    nativeSession && activeSessionSummary.capabilities?.canPrompt !== true;
   const nativeInputBlocked = nativeReadOnly || (nativeSession && isRunning);
   const hasAnnotations = useAppStore((s) =>
     Boolean(s.activeSessionId && s.responseAnnotations[s.activeSessionId]?.length),
@@ -375,11 +375,12 @@ export function Composer({
     thinkingLevel,
     controlsBlocked,
   });
-  const modelReady =
-    !!provider &&
-    provider.enabled &&
-    !!modelId &&
-    (provider.hasSecret || provider.authKind === "none");
+  const modelReady = nativeSession
+    ? activeSessionSummary.capabilities?.canPrompt === true
+    : !!provider &&
+      provider.enabled &&
+      !!modelId &&
+      (provider.hasSecret || provider.authKind === "none");
   const enterToSend = settings?.enterToSend ?? true;
   // Chips occupy sentinel characters, which `trim()` preserves — text and
   // attachments share one content check.

@@ -225,6 +225,7 @@ export type AgentEvent =
       resetThinking?: boolean;
     }
   | { type: "message_end"; message: UiMessage; precedingAssistant?: UiMessage }
+  | { type: "user_message_persisted"; optimisticMessageId: string; message: UiMessage }
   | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
   | { type: "tool_update"; toolCallId: string; partialResult?: unknown }
   | {

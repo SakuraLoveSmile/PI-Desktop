@@ -87,6 +87,22 @@ export function upsertLiveSessionMessage(
   return next;
 }
 
+/** Replace only the acknowledged submission identity, never an equal-text row. */
+export function reconcilePersistedUserMessage(
+  messages: UiMessage[],
+  optimisticMessageId: string,
+  message: UiMessage,
+): UiMessage[] {
+  if (
+    message.role !== "user" ||
+    !messages.some((row) => row.id === optimisticMessageId && row.role === "user")
+  ) return messages;
+  return upsertLiveSessionMessage(
+    messages.map((row) => row.id === optimisticMessageId ? message : row),
+    message,
+  );
+}
+
 /**
  * Remove an in-memory row that was never durably useful (for example an empty
  * abort).

@@ -129,6 +129,16 @@ export class NativePiSessionLease {
     return lease;
   }
 
+  static canAcquire(path: string, current: NativePiSnapshot): boolean {
+    try {
+      const previous = JSON.parse(readFileSync(`${path}.pi-desktop.lock`, "utf8")) as LeaseRecord;
+      return previous?.hostname === hostname() && !processIsAlive(previous.pid) &&
+        Boolean(previous.target) && isCompleteAppendOnlyExtension(previous.target, current);
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT";
+    }
+  }
+
   private record(): LeaseRecord {
     return {
       token: this.token,
@@ -162,18 +172,7 @@ export class NativePiSessionLease {
           errorCode: "NATIVE_PI_SESSION_BUSY",
         });
       }
-      let previous: LeaseRecord | undefined;
-      try {
-        previous = JSON.parse(readFileSync(this.lockPath, "utf8")) as LeaseRecord;
-      } catch {
-        // An unreadable ownership record cannot be stolen safely.
-      }
-      const current = nativePiSnapshot(this.path);
-      const stale =
-        previous?.hostname === hostname() &&
-        !processIsAlive(previous.pid) &&
-        isCompleteAppendOnlyExtension(previous.target, current);
-      if (!stale) {
+      if (!NativePiSessionLease.canAcquire(this.path, nativePiSnapshot(this.path))) {
         throw Object.assign(new Error("Native Pi session is already open for writing"), {
           errorCode: "NATIVE_PI_SESSION_BUSY",
         });
@@ -184,7 +183,11 @@ export class NativePiSessionLease {
   }
 
   assertUnchanged(): void {
-    if (this.released || !sameSnapshot(this.expected, nativePiSnapshot(this.path))) {
+    let ownsLock = false;
+    try {
+      ownsLock = JSON.parse(readFileSync(this.lockPath, "utf8"))?.token === this.token;
+    } catch { /* Missing or uncertain ownership fails closed. */ }
+    if (!ownsLock || this.released || !sameSnapshot(this.expected, nativePiSnapshot(this.path))) {
       throw Object.assign(
         new Error("Native Pi session changed in another client; reload before continuing"),
         { errorCode: "NATIVE_PI_SESSION_CHANGED" },

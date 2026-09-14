@@ -1182,7 +1182,29 @@ with the original v3 `SessionManager`, Pi `ModelRuntime`, `SettingsManager`, and
 leaf, compaction, model/thinking changes, and context-bearing custom messages;
 it is never reconstructed from renderer `UiMessage` rows.
 
-The first native slice supports text prompt, stop/abort, and explicit refresh.
+The first native slice supports text prompt **without model tools**, stop/abort,
+and explicit refresh. `createAgentSession` receives `noTools: "all"`; neither
+built-in nor extension tools may bypass Desktop permissions. Tool parity awaits
+an explicit permission bridge. Native extension startup/resource discovery binds
+with the SDK headless UI and unsupported session-control actions; guards and
+listeners are installed before startup appends. Binding failure disposes the
+session and releases ownership. Pi extensions remain trusted local code, not
+Desktop plugins.
+
+ModelRuntime performs its public offline initialization to restore the local
+catalog and auth snapshot. Native Composer readiness uses native `canPrompt`,
+not Desktop provider or secret availability. Owned idle leases remain usable;
+active turns stay stoppable through retries/compaction, reject overlap without
+disposal, and publish exactly one terminal event after SDK prompt settlement
+and final persistence (including `agent_settled` hooks). An error rejection
+uses the error terminal path instead.
+
+The native dispatcher carries the optimistic `userMessageId`; a
+`user_message_persisted` event acknowledges the SDK-assigned durable entry ID
+after the guarded append. No caller ID is written into native JSONL. The
+renderer reconciles active, retained, and cached rows by identity, never text.
+Native abort refreshes the original transcript instead of smart-stop rewrite.
+
 The saved provider/model and configured Pi auth must resolve exactly; there is
 no Desktop provider fallback. Missing cwd, required project trust, unsupported
 format, repair-needing newline, unavailable provider/auth, active lease, or

@@ -471,6 +471,7 @@ async function handle(method: string, params: any): Promise<unknown> {
       if (sessionId.startsWith(NATIVE_PI_SESSION_PREFIX)) {
         return nativePiService().prompt(sessionId, content, (envelope) =>
           notify("native.agent.event", envelope),
+          typeof params.userMessageId === "string" ? params.userMessageId : undefined,
         );
       }
       const turnId =

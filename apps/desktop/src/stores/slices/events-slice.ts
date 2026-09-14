@@ -1,4 +1,5 @@
 import i18n from "i18next";
+import { reconcilePersistedUserMessage } from "../../lib/session-transcript";
 import type {
   AgentEventEnvelope,
   PlanningStateEvent,
@@ -171,6 +172,24 @@ export function createEventsSlice({
           return;
         }
         streamUpdates.flushNow();
+      }
+      if (event.type === "user_message_persisted") {
+        const sessionId = envelope.sessionId;
+        const reconcile = (messages: UiMessage[]) =>
+          reconcilePersistedUserMessage(messages, event.optimisticMessageId, event.message);
+        runtime.liveSessionTranscripts.add(sessionId);
+        runtime.cacheSessionTranscript(sessionId, reconcile(
+          runtime.sessionTranscriptCache.get(sessionId) ??
+          get().retainedTranscripts[sessionId] ??
+          (get().activeSessionId === sessionId ? get().messages : []),
+        ));
+        set((state) => ({
+          ...(state.activeSessionId === sessionId ? { messages: reconcile(state.messages) } : {}),
+          retainedTranscripts: state.retainedTranscripts[sessionId]
+            ? { ...state.retainedTranscripts, [sessionId]: reconcile(state.retainedTranscripts[sessionId]) }
+            : state.retainedTranscripts,
+        }));
+        return;
       }
       runtime.projectSideChatEvent(envelope);
       if (

@@ -1953,3 +1953,17 @@ collaboration operations return an explicit unsupported/invalid-argument error.
 Native continuation refusal codes include `NATIVE_PI_SESSION_BUSY`,
 `NATIVE_PI_SESSION_CHANGED`, `NATIVE_PI_PROVIDER_UNAVAILABLE`, and
 `NATIVE_PI_PROJECT_UNTRUSTED` plus format/newline/cwd-specific codes.
+
+Native compact and queue push/list reject with `NATIVE_PI_UNSUPPORTED` before
+Desktop host/queue access. Queue remove/prioritize continue to take an opaque
+host `turnId`, not a session id: native paths never create host queue entries.
+Supporting a native queue later requires an explicit source/session contract;
+a turn-id prefix is not source authentication.
+
+Native events include `user_message_persisted` with `optimisticMessageId` and a
+projected durable `message`. The renderer replaces that submission identity in
+live/cache/retained state before normal completion refresh. Identical-text
+submissions remain distinct; SDK entry IDs are never rewritten. Desktop event
+semantics are unchanged. Native terminal completion follows SDK settlement,
+not intermediate retry/compaction loop ends. Native abort never invokes
+`replaceSessionMessages` and reloads durable detail after abort returns.

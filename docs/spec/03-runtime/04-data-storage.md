@@ -1362,7 +1362,7 @@ host call is still pending. No schema migration is required.
 Native Pi v3 sessions under the Pi agent session root are a second, explicitly
 source-discriminated transcript authority owned by the Node agent sidecar. They
 are never inserted into SQLite and never copied to the Desktop transcript
-directory. `session.list` merges their bounded projections with Rust-owned
+directory. `session.list` merges their projections with Rust-owned
 Desktop summaries, and `session.get` routes by the opaque `native-pi:` id.
 
 Detail reads take an immutable byte snapshot, parse it into an in-memory
@@ -1378,3 +1378,7 @@ trust, saved-provider/auth, canonical-path, identity, and lease checks pass.
 and transcript append APIs are not invoked. Rename, delete, project move,
 revision, fork, Plan/Goal, collaboration, queue, and side-chat mutations are
 unsupported for native sessions in this slice.
+
+The first slice has no projection cache or async scan bound; every list still
+reads/parses complete files. Caching by canonical path/file identity/size/mtime
+and bounded asynchronous scanning remain deferred performance work.

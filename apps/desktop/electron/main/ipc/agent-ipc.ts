@@ -42,6 +42,12 @@ export type AgentIpcDependencies = {
   loadComposerTemplatesCached: (root: string | null) => Promise<ComposerTemplate[]>;
 };
 
+function rejectNativeAgentOperation(sessionId: string): void {
+  if (sessionId.startsWith("native-pi:")) {
+    throw Object.assign(new Error("Operation is unsupported for native Pi sessions"), { errorCode: "NATIVE_PI_UNSUPPORTED" });
+  }
+}
+
 /** Register prompt, agent lifecycle, queue, approval and plan channels. */
 export function registerAgentIpc({
   registrar,
@@ -533,6 +539,7 @@ export function registerAgentIpc({
   });
 
   handle(IPC.invoke.agentCompact, async (req: { sessionId: string }) => {
+    rejectNativeAgentOperation(req.sessionId);
     if (!host || !sidecar) throw new Error("backend unavailable");
     if (activeTurns.has(req.sessionId)) {
       throw Object.assign(new Error("Session already has an active turn"), {
@@ -618,10 +625,12 @@ export function registerAgentIpc({
   // The Host-owned turn queue (D375 / D386). The renderer mirrors it; the
   // headless module admits, orders, and drains it.
   handle(IPC.invoke.agentQueuePush, async (req: AgentQueuePushRequest) => {
+    rejectNativeAgentOperation(req.sessionId);
     if (!agentHostBridge) throw new Error("agent host unavailable");
     return agentHostBridge.queue.push(req);
   });
   handle(IPC.invoke.agentQueueList, async (req: { sessionId: string }) => {
+    rejectNativeAgentOperation(req.sessionId);
     if (!agentHostBridge) throw new Error("agent host unavailable");
     return { entries: agentHostBridge.queue.list(req.sessionId) };
   });

@@ -11415,16 +11415,25 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Preconditions:** A synthetic Pi v3 session contains branches, compaction
   metadata (including `retainedTail`), model/thinking changes, custom and
   context-bearing custom-message entries, and a valid project cwd. A faux local
-  model/auth binding is configured in the fixture Pi agent directory.
+  model/auth binding is configured in the fixture Pi agent directory; Desktop
+  provider secrets are absent. A fixture extension restores custom state in
+  `session_start` and contributes a skill through `resources_discover`.
 - **Steps:** Start PI-Desktop with fixture-only agent/session directories;
   refresh sessions; open the native row beside a Desktop row; submit one text
-  prompt; stop or let the faux response settle; reopen through a fresh Pi
-  `SessionManager`.
+  prompt; stop or let the faux response settle; send the same text again with
+  a retryable response before success; reselect/refresh repeatedly; reopen through
+  a fresh Pi `SessionManager`; invoke native compact and queue push/list.
 - **Expected:** The original fixture JSONL receives native SDK entries whose
   parent starts at the previous current leaf; all prior bytes/unknown entries
   remain unchanged; the new leaf is visible after refresh; no Desktop SQLite
   session or Desktop transcript copy is created; the Desktop-owned row still
-  follows its existing runtime and storage path.
+  follows its existing runtime and storage path. Native requests expose zero
+  built-in or extension model tools; startup and discovered skill are effective.
+  Exactly two durable SDK-ID user rows remain, including after abort; smart-stop
+  never rewrites native history. Retries/compaction remain running and stoppable
+  until one terminal completion; the owned idle lease accepts the second send.
+  Compact and queue push/list reject before host access. Opaque host-turn queue
+  remove/prioritize remain Desktop-only because native paths create no entries.
 - **Specs:** runtime §12; storage §12; security §12; ADR 0247.
 - **Status:** Documented; run after integration into main.
 
@@ -11433,13 +11442,16 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
 - **Preconditions:** A writable synthetic native v3 fixture is listed.
 - **Steps:** Acquire Desktop continuation ownership, then simulate a foreign
   append/replacement before the next SDK append; also attempt a second Desktop
-  lease and a stale lease whose owner cannot be proven dead with unchanged
-  bytes.
+  lease and stale leases whose owners are live, remote, malformed, or uncertain.
+  Refresh list/detail with a dead same-host owner and unchanged or complete
+  append-only extended bytes, then prompt through normal UI capabilities.
 - **Expected:** The second writer is refused; external divergence tears down
   continuation with a visible read-only/error reason; no requested entry is
   appended and no bytes are truncated or rewritten; a lease releases on normal
-  dispose and is reclaimed after crash only with dead-owner plus unchanged-file
-  proof.
+  dispose and is reclaimed after crash only with a dead same-host owner and an
+  unchanged target or same-file prefix-preserving complete parent-chain extension.
+  Uncooperative Pi clients can still race the OS append; no shared-lock guarantee
+  is claimed.
 - **Specs:** runtime §12; storage §12; security §12; ADR 0247.
 - **Status:** Documented; run after integration into main.
 

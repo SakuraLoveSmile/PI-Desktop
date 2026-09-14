@@ -179,9 +179,9 @@ export function nativePiService(options: { agentDir?: string; sessionRoot?: stri
 }
 
 class NativePiRuntime {
-  private readonly messageIds = new WeakMap<object, string>();
   private unsubscribe?: () => void;
   private turnId?: string;
+  private userMessageId?: string;
 
   constructor(
     readonly id: string,
@@ -193,19 +193,39 @@ class NativePiRuntime {
   }
 
   get isRunning(): boolean {
-    return this.session.isStreaming;
+    return this.turnId !== undefined;
   }
 
-  async prompt(content: string, turnId: string): Promise<void> {
-    if (this.session.isStreaming) {
+  async prompt(content: string, turnId: string, userMessageId?: string): Promise<void> {
+    if (this.isRunning) {
       throw Object.assign(new Error("session already has an active turn"), { errorCode: "AGENT_BUSY" });
     }
+    this.lease.assertUnchanged();
     this.turnId = turnId;
+    this.userMessageId = userMessageId;
     try {
       await this.session.prompt(content);
-    } finally {
+    } catch (error) {
       this.turnId = undefined;
+      this.userMessageId = undefined;
+      throw error;
     }
+    // SDK prompt resolves after agent_settled hooks and final persistence,
+    // including retries/compaction. A rejected run emits only the error path.
+    // Extension commands may also resolve without starting an agent run.
+    if (this.turnId === turnId) this.settle();
+  }
+
+  assertUnchanged(): void {
+    this.lease.assertUnchanged();
+  }
+
+  private settle(): void {
+    if (!this.turnId) return;
+    const turnId = this.turnId;
+    this.turnId = undefined;
+    this.userMessageId = undefined;
+    this.notify({ sessionId: this.id, turnId, ts: Date.now(), event: { type: "agent_end", messageIds: [] } });
   }
 
   async abort(): Promise<void> {
@@ -223,27 +243,10 @@ class NativePiRuntime {
   }
 
   private onEvent(event: AgentSessionEvent): void {
-    if (event.type === "message_end" && typeof event.message === "object" && event.message) {
-      // The renderer already owns its optimistic user row. Emit only rows whose
-      // durable native entry id is needed to replace/complete runtime output.
-      if (event.message.role === "user") return;
-      queueMicrotask(() => {
-        const id = this.messageIds.get(event.message as object);
-        if (!id) return;
-        const entry = this.session.sessionManager.getEntry(id);
-        if (entry?.type === "message") {
-          const message = uiMessage(entry);
-          if (message) this.emit({ type: "message_end", message });
-        }
-      });
-      return;
-    }
     if (event.type === "agent_start" || event.type === "turn_start") {
       this.emit({ type: event.type });
     } else if (event.type === "turn_end") {
       this.emit({ type: "turn_end" });
-    } else if (event.type === "agent_end") {
-      this.emit({ type: "agent_end", messageIds: [] });
     } else if (event.type === "tool_execution_start") {
       this.emit({ type: "tool_start", toolCallId: event.toolCallId, toolName: event.toolName, args: event.args });
     } else if (event.type === "tool_execution_update") {
@@ -253,8 +256,17 @@ class NativePiRuntime {
     }
   }
 
-  rememberMessage(message: object, id: string): void {
-    this.messageIds.set(message, id);
+  rememberMessage(id: string): void {
+    const entry = this.session.sessionManager.getEntry(id);
+    if (entry?.type !== "message") return;
+    const projected = uiMessage(entry);
+    if (!projected) return;
+    if (projected.role === "user" && this.userMessageId) {
+      this.emit({ type: "user_message_persisted", optimisticMessageId: this.userMessageId, message: projected });
+      this.userMessageId = undefined;
+    } else {
+      this.emit({ type: "message_end", message: projected });
+    }
   }
 }
 
@@ -263,6 +275,8 @@ export class NativePiSessionService {
   private readonly agentDir: string;
   private readonly records = new Map<string, NativeSessionRecord>();
   private readonly runtimes = new Map<string, NativePiRuntime>();
+  private readonly opening = new Set<string>();
+  private modelRuntime?: ModelRuntime;
   private readonly modelRuntimeFactory: () => Promise<ModelRuntime>;
 
   constructor(options: {
@@ -279,7 +293,7 @@ export class NativePiSessionService {
           authPath: join(this.agentDir, "auth.json"),
           modelsPath: join(this.agentDir, "models.json"),
           allowModelNetwork: false,
-          refreshOnCreate: false,
+          refreshOnCreate: true,
         }));
   }
 
@@ -291,6 +305,7 @@ export class NativePiSessionService {
       return [];
     }
     const modelRuntime = await this.modelRuntimeFactory().catch(() => undefined);
+    this.modelRuntime = modelRuntime;
     const trustStore = new ProjectTrustStore(this.agentDir);
     const summaries = await Promise.all(
       walkJsonl(root).map(async (candidate) => {
@@ -323,7 +338,7 @@ export class NativePiSessionService {
           ) {
             reason = "provider-unavailable";
           }
-          if (!reason && existsSync(`${path}.pi-desktop.lock`)) reason = "busy";
+          if (!reason) reason = this.ownershipReadOnlyReason(id, path, snap);
           return {
             id,
             title: manager.getSessionName() ?? (firstUser ? textContent((firstUser.message as any).content).text.slice(0, 80) : header.id),
@@ -334,7 +349,7 @@ export class NativePiSessionService {
             thinkingLevel: thinkingLevel(context.thinkingLevel),
             permissionMode: "inherit" as const,
             source: "pi-native" as const,
-            capabilities: { canPrompt: !reason, canStop: true, canRefresh: true },
+            capabilities: { canPrompt: !reason, canStop: this.runtimes.get(id)?.isRunning ?? false, canRefresh: true },
             ...(reason ? { readOnlyReason: reason } : {}),
             updatedAt,
             createdAt,
@@ -369,7 +384,9 @@ export class NativePiSessionService {
     if (!reason && hasTrustRequiringProjectResources(record.cwd) && new ProjectTrustStore(this.agentDir).get(record.cwd) !== true) {
       reason = "project-untrusted";
     }
-    if (!reason && existsSync(`${record.path}.pi-desktop.lock`)) reason = "busy";
+    if (!reason && (!context.model || !this.modelRuntime?.getModel(context.model.provider, context.model.modelId) ||
+        !this.modelRuntime.hasConfiguredAuth(context.model.provider))) reason = "provider-unavailable";
+    if (!reason) reason = this.ownershipReadOnlyReason(id, record.path, snap);
     return {
       id,
       title: manager.getSessionName() ?? record.nativeId,
@@ -380,7 +397,7 @@ export class NativePiSessionService {
       thinkingLevel: thinkingLevel(context.thinkingLevel),
       permissionMode: "inherit",
       source: "pi-native",
-      capabilities: { canPrompt: !reason, canStop: true, canRefresh: true },
+      capabilities: { canPrompt: !reason, canStop: this.runtimes.get(id)?.isRunning ?? false, canRefresh: true },
       ...(reason ? { readOnlyReason: reason } : {}),
       createdAt: typeof header.timestamp === "string" ? header.timestamp : new Date(snap.mtimeMs).toISOString(),
       updatedAt: manager.getBranch().at(-1)?.timestamp ?? new Date(snap.mtimeMs).toISOString(),
@@ -390,11 +407,18 @@ export class NativePiSessionService {
     } as SessionDetail;
   }
 
-  async prompt(id: string, content: string, notify: NativePiRuntimeNotifier): Promise<{ accepted: true; turnId: string }> {
+  async prompt(id: string, content: string, notify: NativePiRuntimeNotifier, userMessageId?: string): Promise<{ accepted: true; turnId: string }> {
     let runtime = this.runtimes.get(id);
-    if (!runtime) runtime = await this.openRuntime(id, notify);
+    if (runtime?.isRunning || this.opening.has(id)) {
+      throw Object.assign(new Error("session already has an active turn"), { errorCode: "AGENT_BUSY" });
+    }
+    if (!runtime) {
+      this.opening.add(id);
+      try { runtime = await this.openRuntime(id, notify); }
+      finally { this.opening.delete(id); }
+    }
     const turnId = randomUUID();
-    void runtime.prompt(content, turnId).catch((error) => {
+    void runtime.prompt(content, turnId, userMessageId).catch((error) => {
       notify({
         sessionId: id,
         turnId,
@@ -433,6 +457,16 @@ export class NativePiSessionService {
   disposeAll(): void {
     for (const runtime of this.runtimes.values()) runtime.dispose();
     this.runtimes.clear();
+  }
+
+  private ownershipReadOnlyReason(id: string, path: string, snap: NativePiSnapshot): NativePiReadOnlyReason | undefined {
+    const runtime = this.runtimes.get(id);
+    if (runtime) {
+      try { runtime.assertUnchanged(); }
+      catch { return "changed-externally"; }
+      return runtime.isRunning ? "busy" : undefined;
+    }
+    return this.opening.has(id) || !NativePiSessionLease.canAcquire(path, snap) ? "busy" : undefined;
   }
 
   private record(id: string): NativeSessionRecord {
@@ -490,11 +524,12 @@ export class NativePiSessionService {
     }
 
     const lease = NativePiSessionLease.acquire(record.path, snap);
+    let session: AgentSession | undefined;
+    let runtime: NativePiRuntime | undefined;
     try {
       lease.assertUnchanged();
       const manager = SessionManager.open(record.path);
-      let runtime: NativePiRuntime | undefined;
-      this.guardManagerWrites(manager, lease, (message, entryId) => runtime?.rememberMessage(message, entryId));
+      this.guardManagerWrites(manager, lease, (_message, entryId) => runtime?.rememberMessage(entryId));
       const settingsManager = SettingsManager.create(record.cwd, this.agentDir, { projectTrusted: true });
       const resourceLoader = new DefaultResourceLoader({ cwd: record.cwd, agentDir: this.agentDir, settingsManager });
       await resourceLoader.reload();
@@ -506,15 +541,46 @@ export class NativePiSessionService {
         resourceLoader,
         modelRuntime,
         model,
+        noTools: "all",
         thinkingLevel: thinkingLevel(context.thinkingLevel),
       });
       // The persistent manager has already parsed the complete native branch;
       // AgentSession owns all later appends to that same file.
-      runtime = new NativePiRuntime(id, created.session, lease, notify);
+      session = created.session;
+      runtime = new NativePiRuntime(id, session, lease, notify);
+      const unsupported = async (): Promise<never> => {
+        throw Object.assign(new Error("Native Pi session control is unsupported"), { errorCode: "NATIVE_PI_UNSUPPORTED" });
+      };
+      const startupErrors = created.extensionsResult.errors.map((error) => error.error);
+      let binding = true;
+      // createAgentSession has already wired extensionsResult.runtime. Omitting
+      // uiContext selects the SDK headless UI and correctly reports hasUI=false.
+      await session.bindExtensions({
+        mode: "print",
+        uiContext: undefined,
+        commandContextActions: {
+          waitForIdle: () => created.session.waitForIdle(),
+          newSession: unsupported, fork: unsupported, navigateTree: unsupported,
+          switchSession: unsupported, reload: unsupported,
+        },
+        abortHandler: () => { void created.session.abort(); },
+        shutdownHandler: () => { throw new Error("Native Pi shutdown is unsupported"); },
+        onError: (error) => {
+          if (binding) startupErrors.push(error.error);
+          else notify({ sessionId: id, ts: Date.now(), event: { type: "message_end", message: {
+            id: randomUUID(), role: "system", status: "error", createdAt: new Date().toISOString(),
+            content: `Native Pi extension ${error.extensionPath} (${error.event}): ${error.error}`,
+          } } });
+        },
+      });
+      binding = false;
+      if (startupErrors.length) throw new Error(`Native Pi extension startup failed: ${startupErrors.join("; ")}`);
       this.runtimes.set(id, runtime);
       return runtime;
     } catch (error) {
-      lease.release();
+      if (runtime) runtime.dispose();
+      else { session?.dispose(); lease.release(); }
+      this.runtimes.delete(id);
       throw error;
     }
   }

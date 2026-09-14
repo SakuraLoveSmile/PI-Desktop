@@ -294,3 +294,12 @@ change disposes the runtime and requires reload. A stale lease is reclaimed only
 for a provably dead process on the same host and an unchanged target fingerprint.
 This lease is not treated as proof that Pi Web/CLI is absent because those
 clients do not yet share its protocol.
+
+Native continuation passes `noTools: "all"` to the SDK: no built-in or extension
+model tools are exposed, including filesystem/shell tools. `permissionMode:
+"inherit"` is not a permission bridge. Enabling native tools requires an
+explicit Desktop permission integration and updated security decision. Native
+Pi extensions still execute as trusted local code with the native resource
+lifecycle; they are not Desktop plugins and this is not a sandbox claim.
+Capability checks recognize this service's owned lease and reclaimable dead
+local owners without stealing live, remote, malformed, or uncertain leases.
