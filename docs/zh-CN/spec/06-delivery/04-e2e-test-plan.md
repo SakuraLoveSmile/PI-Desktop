@@ -2492,7 +2492,8 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   当其本机窗口已经最大化时渲染器并检查
   初始查询glyph/state。 6) 尝试未知的 menu/window IPC 操作
   当窗口存在时以及窗口关闭后。 7) 在其基础上构建每个目标
-  来自干净的发布主机目录的本机运行器。
+  来自干净的发布主机目录的本机运行器。在 Windows 上检查已安装应用的
+  任务栏按钮和“开始”菜单快捷方式图标。
 - **预期**：macOS 开发和打包发布显示 PI-Desktop 作为
   本机应用程序标识，并且“关于”面板使用规范
 PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标。
@@ -2511,9 +2512,10 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   可在其完整的 46 像素高的命中目标上单击，匹配本机状态，并且
   有易于理解的名称；第一个用户或助理成绩单行从不
   在它们下面绘制，扩展页面标题操作或
-  插件详细信息表关闭按钮。未知操作失败关闭。每个包装包含
-  目标本机主机二进制文件（`.exe` 仅在 Windows 上）。通过这个场景
-  Windows/Linux 证明 shell 已准备就绪，而不是首次发布资格。
+  插件详细信息表关闭按钮。未知操作失败关闭。已安装 Windows 应用的任务栏按钮
+  和“开始”菜单快捷方式使用 PI-Desktop 图标，而不是 Electron 默认图标。每个包装
+  包含目标本机主机二进制文件（`.exe` 仅在 Windows 上）。通过这个场景 Windows/Linux
+  证明 shell 已准备就绪，而不是首次发布资格。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`，
   `04-ux/01-ui-ia.md`、`04-ux/02-i18n-english-first.md`、
   `04-ux/07-ui-design-system.md`、`04-ux/08-component-spec.md`、
