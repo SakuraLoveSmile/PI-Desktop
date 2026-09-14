@@ -1039,7 +1039,8 @@ Running turns and pending approvals continue to gate the controls.
 
 - Host acknowledgement, not an optimistic queue row, consumes annotations. The
   originating session retains any attachments added or edited during the wait;
-  rejection leaves them pending and does not overwrite a newer composer draft.
+  host rejection or an unexpected pre-host exception leaves them pending, returns
+  a rejected submission, and does not overwrite a newer composer draft.
 - **Alt+Enter**/steer sends only text and leaves pending annotations untouched;
   no text means no steering turn. **Shift+Enter** inserts a newline. The comment
   editor owns its own **Enter** (save only), **Shift+Enter** (newline), and IME

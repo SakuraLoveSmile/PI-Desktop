@@ -191,7 +191,8 @@ Ordinary send/queue snapshots this session's annotation objects and consumes onl
 unchanged submitted objects after host acknowledgement. Rejection retains them;
 concurrent additions and comment edits survive. The internal `enqueuePrompt`
 action returns `Promise<boolean>` so the existing composer rejection restoration
-also covers queue failures without replacing newer input. A per-session in-flight
+also covers queue failures and unexpected pre-host exceptions without replacing
+newer input. A per-session in-flight
 submission guard rejects duplicate submissions until acknowledgement settles,
 including the draft-to-created-session handoff. It does not block other sessions
 or steering and always releases on exit. No host API changes.

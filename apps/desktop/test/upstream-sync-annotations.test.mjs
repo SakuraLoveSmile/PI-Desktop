@@ -241,11 +241,11 @@ test("queue rejection releases the submission guard so a deliberate later attemp
   assert.equal(calls.length, 2, "second rejection came from a real attempt, not a stuck guard");
 });
 
-test("unexpected pre-host failure releases the submission guard", async () => {
+test("unexpected pre-host failure returns false and releases the submission guard", async () => {
   const { state, ack, calls } = queueHarness();
   const original = state.enqueuePrompt;
   state.enqueuePrompt = async () => { throw new Error("unexpected failure"); };
-  await assert.rejects(state.sendPrompt("request"), /unexpected failure/);
+  assert.equal(await state.sendPrompt("request"), false);
   state.enqueuePrompt = original;
   ack.resolve({ id: "queue-1" });
   assert.equal(await state.sendPrompt("retry"), true);

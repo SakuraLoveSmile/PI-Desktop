@@ -6961,14 +6961,16 @@ and identify the platform validation still needed.
 - **Steps**: Submit annotations with and without request text; delay acknowledgement,
   press Enter again (no duplicate), add another annotation, edit a submitted
   comment, and switch sessions. Resolve
-  success, then repeat with host rejection and new draft text typed during the wait.
+  success, then repeat with host rejection, an unexpected pre-host exception,
+  and new draft text typed during the wait.
   Send a text-only Alt+Enter steer and try annotation-only steering. In the comment
   editor, confirm an IME candidate, save with Enter, and insert a Shift+Enter newline.
   Inspect queue previews and edit seeds for annotation-only prompts and a request
   containing an ordinary `## My request: extra` heading. Close a side-chat tab both
   as the final resource and beside another tab; inspect its durable child session.
 - **Expected**: Nothing is consumed before acknowledgement. Success consumes only
-  unchanged submitted annotations in the original session; rejection retains them
+  unchanged submitted annotations in the original session; host rejection or an
+  unexpected setup exception returns a rejected submission, retains annotations,
   and restores a draft only into an unchanged/empty slot. New comments, attachments,
   and another session's state survive. Steering neither carries nor consumes
   annotations; no text means no steering turn. The comment editor never triggers
