@@ -1,9 +1,9 @@
-# ADR 0251: Host turn-end event for plugins
+# ADR 0252: Host turn-end event for plugins
 
 - Status: Accepted
 - Date: 2026-09-13
 - Deciders: PI-Desktop core
-- Related: [D421](../spec/08-meta/decisions-log.md) · [ADR 0005](0005-user-installable-plugin-system.md) · [ADR 0040](0040-plugin-resident-services-and-message-bus.md) · [ADR 0213](0213-persist-host-owned-turn-queue.md) · [ADR 0235](0235-domain-facades-and-architecture-budgets.md) · `07-plugins/03-plugin-api.md` · `07-plugins/13-plugin-permissions-matrix.md`
+- Related: [D422](../spec/08-meta/decisions-log.md) · [ADR 0005](0005-user-installable-plugin-system.md) · [ADR 0040](0040-plugin-resident-services-and-message-bus.md) · [ADR 0213](0213-persist-host-owned-turn-queue.md) · [ADR 0235](0235-domain-facades-and-architecture-budgets.md) · `07-plugins/03-plugin-api.md` · `07-plugins/13-plugin-permissions-matrix.md`
 
 ## Context
 
