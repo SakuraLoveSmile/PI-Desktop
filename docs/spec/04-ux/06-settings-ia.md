@@ -419,13 +419,13 @@ system while preserving their different data ownership:
   explicit catalog map (`presetReviewerName` / `presetTestRunnerName` /
   `presetUiDesignerName`) — they must not be
   turned into keys by capitalizing the first letter. Picking a chip
-  replaces the draft's description, tools, max turns and body wholesale and
+  replaces the draft's description, tools and body wholesale and
   clears inherit-parent-tools. The tool grant row includes an inherit checkbox
   (`tools: inherit`) plus the seven assignable tools; inherit-only drafts may
   leave the assignable boxes empty. Saving must keep the inherit token.
   The chip uses the same accent-tint pill as the tool grant row. Create
   omits the long subtitle and the per-chip Apply label; model, thinking,
-  turn limit, output limit and scope sit behind an Advanced disclosure that
+  output limit and scope sit behind an Advanced disclosure that
   starts closed on create and open on edit. The output limit caps one delegate
   response (issue #171). It defaults to an empty field, which reads as "follow
   the model" rather than "no limit" — empty is the only spelling of that, so

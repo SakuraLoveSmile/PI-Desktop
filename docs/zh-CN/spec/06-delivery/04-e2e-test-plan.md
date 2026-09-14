@@ -1514,9 +1514,9 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
   chips 只显示名称，选中项的一句话说明出现在整行下方；没有长副标题、没有每张卡片上的“套用”，
   “高级”默认收起。带连字符的 id（`code-reviewer`、`test-runner`）必须显示目录译名，而不是
   `presetCode-reviewerName` 这类原始 key。
-  2) 选择探索者，确认名称、描述、Read / Glob / Grep / Bash 工具和完整提示词均已填入；展开高级后
-  轮次上限为 60，模型仍沿用当前会话。3) 重新打开并选择修复者，确认工具和提示词更新，
-  且显示可修改工具的提示；展开高级后轮次上限为 80。4) 展开高级并打开模型选择器，确认每个已配置的
+  2) 选择探索者，确认名称、描述、Read / Glob / Grep / Bash 工具和完整提示词均已填入，
+  模型仍沿用当前会话。3) 重新打开并选择修复者，确认工具和提示词更新，且显示可修改工具的提示。
+  4) 展开高级并打开模型选择器，确认每个已配置的
   可运行提供商的模型都出现（按提供商分组），选择一个模型，确认保存值为
   `vendorKey-or-name/modelId`。4a) 配置一个显示名含空格的自定义端点（例如「My Gateway」），
   确认选择器会列出它；选中后确认表单能保存，固定值为 `<显示名>/<modelId>`，且保存按钮保持可用——
@@ -1530,7 +1530,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
   已翻译，且没有原始 i18n key。
 - **预期**：选择器只提供已配置、可运行的提供商模型；表单不提供任何手填模型 ID 的路径，
   因此保存的 pin 总能被解析。没有可运行模型时给出可操作的出口（跳转模型设置），
-  而不是让用户输入一个运行时无法解析的值。选择预设只覆盖描述、工具、正文和轮次上限，
+  而不是让用户输入一个运行时无法解析的值。选择预设只覆盖描述、工具和正文，
   不会悄悄清除模型、推理强度或作用域；选择空白开始会清除已选预设的这些模板字段。
 - **链接规格**：`04-ux/06-settings-ia.md` §7、`03-runtime/13-model-catalog-and-selection.md` §11、
   `03-runtime/11-provider-model-system.md` §6.4、ADR 0062、ADR 0089
@@ -4074,9 +4074,10 @@ IPC 请求无法关闭。
 - **里程碑**：M6
 - **状态**：由单元测试覆盖（2026-08-06）：`packages/shared`
   `subagent-definition.test.ts` 和 `packages/agent-runtime`
-  `subagent-definitions.test.ts`（frontmatter、工具过滤、上限、格式错误
-  文档、全局用户覆盖内置）； `subagent.test.ts`（报告边界，转
-  上限、中止、事件归因、提示框架）和 `path-lock.test.ts`
+  `subagent-definitions.test.ts`（frontmatter、工具过滤、格式错误
+  文档、全局用户覆盖内置、旧版 `maxTurns` 被忽略）；
+  `subagent.test.ts`（报告边界、中止、事件归因、提示框架）和
+  `path-lock.test.ts`
   （同路径排序、并发上限）；桌面 `permission-inline.test.mjs`
   （队列顺序、ID 匹配删除、工具调用删除、中止拒绝队列、
   卡副本），`subagent-wiring.test.mjs`（主进程发现和模型引脚）
@@ -4085,6 +4086,30 @@ IPC 请求无法关闭。
   下按数量措辞的聚合文案），加上 `subagent-topology.test.mjs`
   （委托检测、结构化结果和汇总计数）。满
   多提供商扇出和渲染拓扑交互仍然是手动的。
+
+#### E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored
+
+- **先决条件**：Agent 模式。一个用户文档
+  `~/.agents/subagents/legacy-worker.md`，其 frontmatter 在有效的 `description` 和
+  `tools` 旁声明 `maxTurns: 2`；第二个文档把同一个键拼作 `max-turns: 2`；
+  第三个文档从不提及它。
+- **步骤**：1) 打开设置 → 子智能体，确认内置分组和全局分组中的每一行都渲染出它的
+  工具授权，并且页面中以及编辑器的高级折叠区里都不存在回合上限字段。2) 委派给
+  `legacy-worker`，让它进行超过两轮的工具调用。3) 通过设置 API 读回该文档，并以
+  原始文件的形式再读一次。4) 在该行上打开编辑器，不做任何修改直接保存，然后重新
+  读取该文件。
+- **预期**：两种拼写都能作为有效定义加载。声明的键会像其他任何无法识别的
+  frontmatter 键一样被忽略：没有解析错误，没有点名它的警告或诊断，定义仍然能够
+  解析，文件也不会被改写。该委派永远不会在两轮处被停止，也永远不会报告
+  `truncated`；它只在完成或被 `TaskStop` 时结束。应用中的任何界面，以及任何
+  语言环境下 `chat.subagentStatus` 的文案，都不会报告回合上限或“已达到回合上限”
+  状态。
+- **链接规格**：`03-runtime/02-agent-runtime.md` §5f、
+  `04-ux/06-settings-ia.md` §7、ADR 0253、决策日志 D423
+- **验收**：C（对话）、品质
+- **里程碑**：M6
+- **状态**：草稿——单元测试覆盖在 `packages/shared`、`packages/agent-runtime`
+  以及 host-core 的 `user_subagents` 回归测试中；完整的 UI 旅程需要具备条件的环境。
 
 #### E2E-145：工具结果读取为结构化块，从不 JSON
 
@@ -4463,7 +4488,7 @@ IPC 请求无法关闭。
       子智能体（`explorer`、`code-reviewer`、`test-runner`、`fixer`、`ui-designer`），
       带「内置」徽标和工具授权，且没有启用开关、在文件夹中显示或删除。确认全局分组标题
       带有全局级别标签和数量，新建 / 编辑 / 删除 / 在文件管理器中显示都能对用户自建行
-      在页面内完成，回合上限留空会写出不含 `maxTurns` 的定义，且空的用户目录仍通过
+      在页面内完成，且空的用户目录仍通过
       `settings.subagentsEmpty` 在全局分组下解析为本地化空态文案，不显示原始翻译键。
       打开“新建子智能体”，确认模型字段是与 Composer 相同的已配置、
       可运行模型下拉列表（按提供商分组，带沿用会话选项），而不是手打
@@ -4809,6 +4834,8 @@ IPC 请求无法关闭。
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
 | 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency |
 | M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| C — 对话和直播（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
+| 品质（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策

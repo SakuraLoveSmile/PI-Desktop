@@ -438,7 +438,6 @@ export const fr = {
     "subagentStatus": {
       "running": "En cours d'exécution",
       "completed": "Terminé",
-      "truncated": "Limite de tours atteinte",
       "timed_out": "Délai dépassé",
       "aborted": "Arrêté",
       "stopped": "Arrêté par demande",
@@ -1959,7 +1958,6 @@ sklm: {
       "shadowedByProject": "Le dossier de projet gagne",
       "notHere": "Non actif ici",
       "tooBigTag": "Trop grand",
-      "turns": "{{turns}} tourne au maximum",
       "thinkingMeta": "en pensant : {{level}}",
       "providedTitle": "Intégré et projet",
       "sourceBuiltin": "Intégré",
@@ -1983,9 +1981,6 @@ sklm: {
       "thinkingHint": "Facultatif et plafonné par ce que le modèle prend en charge.",
       "thinkingInherit": "Identique à la session",
       "thinkingOmit": "Ne pas envoyer",
-      "maxTurns": "Limite de tours",
-      "maxTurnsHint": "Arrête un délégué qui ne termine jamais. 1–{{max}}, ou laissez vide pour aucune limite.",
-      "maxTurnsUnlimited": "Aucune limite",
       "maxTokens": "Limite de sortie",
       "maxTokensHint": "Limite une réponse du délégué. 1–{{max}}, ou laissez vide pour suivre le modèle.",
       "maxTokensDefault": "Valeur du modèle",
@@ -1998,7 +1993,6 @@ sklm: {
       "errorDescription": "Une description est requise — sans elle, l'agent ne délègue jamais.",
       "errorTools": "Accordez au moins un outil, ou héritez de l’ensemble du parent.",
       "errorModel": "Écrivez le modèle en tant que fournisseur/modèle, par ex. anthropique/claude-haïku-4-5.",
-      "errorMaxTurns": "La limite de tour doit être un nombre entier compris dans la plage autorisée.",
       "errorMaxTokens": "La limite de sortie doit être un nombre entier dans la plage autorisée.",
       "errorBody": "Les instructions sont vides.",
       "errorTooBig": "Les instructions dépassent la taille limite."
