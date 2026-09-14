@@ -16,4 +16,5 @@ export * from "./project-memory-prompt.js";
 export * from "./subagent.js";
 export * from "./subagent-definitions.js";
 export * from "./session-title-summarize.js";
+export * from "./stream-coalescer.js";
 export * from "./extensions/index.js";

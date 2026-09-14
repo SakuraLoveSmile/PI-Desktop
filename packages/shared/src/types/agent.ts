@@ -215,6 +215,14 @@ export type AgentEvent =
       message: UiMessage;
       deltaText?: string;
       deltaThinking?: string;
+      /**
+       * Append-only streaming frame. Growing `content` / `thinking` are omitted
+       * from `message`; apply `deltaText` / `deltaThinking` onto the live row.
+       * Snapshot replacements omit this field and still carry a full `message`.
+       */
+      stream?: "delta";
+      resetText?: boolean;
+      resetThinking?: boolean;
     }
   | { type: "message_end"; message: UiMessage; precedingAssistant?: UiMessage }
   | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }

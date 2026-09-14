@@ -1161,6 +1161,18 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 进入提示，模型调用 `Skill` 时才读取正文 (D174)。缺失文件会在下一次扫描时
 从列表移除，并清理其本地状态。
 
+桌面专用技能市场通道（不是 host RPC）走 Electron IPC：
+
+- `pi-desktop/skill/market/search` — `{ query, sources[] }` → `{ entries, failedSources }`。
+  主进程聚合目录 JSON 与 GitHub 仓库 SKILL.md 扫描。源 URL 必须通过公网 HTTPS 策略（ADR 0243）。单源失败只丢掉该源。
+- `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`。
+  主进程按同一策略拉取文档、拆 frontmatter，并可能附上 jsDelivr 目录中的兄弟 `.md`。渲染层通过现有 `skills.create` 安装。目录 id 会净化为 host `valid_capability_id`。
+
+
+桌面专用 MCP 市场通道（不是 host RPC）走 Electron IPC：
+
+- `pi-desktop/mcp/market/search` — `{ query?, sources[], more? }` →
+  `{ entries, failedSources, exhausted }`。Main 校验源 URL，固定每个解析出的公网地址，只跟随有界的 HTTPS 重定向，并为 browse 与服务端搜索保留 cursor 状态。单个源失败不会丢弃成功源；响应和缓存均有界。
 ## 12c. 子代理 API (D202)
 
 用户拥有的子代理仅是全局 Markdown 文档：`~/.agents/subagents/<id>.md`。
@@ -1185,8 +1197,9 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 匹配，因此包含空格的显示名是合法的。
 
 Electron 的 `subagent/list` IPC 通道向设置 > 智能体 > 子代理暴露同一份全局
-列表。运行时目录把这些全局用户文档与内置定义合并；不会扫描 `.pi/agents`
-或任何项目能力目录。
+列表。`subagent/catalog` 返回当前 `Task` 目录（已启用的用户文档与五个内置定义
+合并后的结果），供设置页把默认子智能体渲染为只读行。运行时目录使用同一套来源；
+不会扫描 `.pi/agents` 或任何项目能力目录。
 
 ## 12d. 能力级别与本地启用状态
 

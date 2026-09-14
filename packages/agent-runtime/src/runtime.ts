@@ -90,6 +90,7 @@ import {
   addUsage,
   checkpointGeneration,
   contextCompactionMark,
+  cumulativeDelta,
   DEFAULT_SUBAGENT_PERMISSION,
   formatAskToolOutput,
   formatSessionMessage,
@@ -98,10 +99,13 @@ import {
   MAX_SUBAGENT_CONCURRENCY,
   normalizeSubagentName,
   proposalKindForMode,
+  resolveSubagentToolNames,
   subagentModelKey,
+  subagentToolsLabel,
   type ProposalKind,
   type SubagentPermission,
 } from "@pi-desktop/shared";
+import { createStreamCoalescer, type StreamCoalescer } from "./stream-coalescer.js";
 import type { RuntimeHost } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
 import {
@@ -808,12 +812,14 @@ export type AgentRuntimeOptions = {
    */
   subagents?: SubagentDefinition[];
   /**
-   * Provider resolved for each definition that pins one, keyed by definition
-   * name. Main owns credential lookup, so a pinned provider that is missing
+   * Provider resolved for each definition that pins one, keyed by its model
+   * key. Main owns credential lookup, so a pinned provider that is missing
    * here is unavailable and the delegate must fail loudly rather than
    * silently run on the session's model.
    */
   subagentProviders?: Record<string, RuntimeProviderConfig>;
+  /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
+  subagentModelKeys?: string[];
 };
 
 export type RuntimeMatchConfig = {
@@ -829,6 +835,8 @@ export type RuntimeMatchConfig = {
   commandShell: CommandShellOption;
   subagents?: SubagentDefinition[];
   subagentProviders?: Record<string, RuntimeProviderConfig>;
+  /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
+  subagentModelKeys?: string[];
 };
 
 /** Tool calls ride in the assistant content array as `type: "toolCall"`. A
@@ -1379,6 +1387,7 @@ export class DesktopAgentRuntime {
   private thinkingLevel: ThinkingLevel;
   private host: RuntimeHost;
   private onEvent: (envelope: AgentEventEnvelope) => void;
+  private streamSink: StreamCoalescer;
   private baseSystemPrompt: string;
   private planningState: PlanningState;
   private pendingPlanId?: string;
@@ -1394,6 +1403,9 @@ export class DesktopAgentRuntime {
   /** Subagent definitions offered through the `Task` tool (ADR 0062). */
   private subagents: SubagentDefinition[];
   private subagentProviders: Record<string, RuntimeProviderConfig>;
+  private subagentModelKeys: Set<string>;
+  /** On-demand Task.model grants; never mixed into launch opt-in matching. */
+  private subagentOverrideProviders: Record<string, RuntimeProviderConfig>;
   /**
    * Background delegations of this session (ADR 0089). `Task` starts one and
    * returns; `TaskWait`/`TaskList`/`TaskStop` drive it afterwards.
@@ -1531,12 +1543,15 @@ export class DesktopAgentRuntime {
     this.hostCloseUnsubscribe = this.host.onClose?.(() => {
       this.cleanupActiveToolProgress();
     });
-    this.onEvent = opts.onEvent;
+    this.streamSink = createStreamCoalescer(opts.onEvent);
+    this.onEvent = (envelope) => this.streamSink.push(envelope);
     this.pluginTools = opts.pluginTools ?? [];
     this.pluginSkills = opts.pluginSkills ?? [];
     this.trustedExtensionSpecs = opts.trustedExtensions ?? [];
     this.subagents = opts.subagents ?? [];
     this.subagentProviders = opts.subagentProviders ?? {};
+    this.subagentModelKeys = new Set(opts.subagentModelKeys ?? []);
+    this.subagentOverrideProviders = {};
     if (!isCommandShellOption(opts.commandShell) || !opts.commandShell.available) {
       throw Object.assign(new Error("active command shell is invalid or unavailable"), {
         errorCode: "COMMAND_SHELL_INVALID",
@@ -2000,6 +2015,8 @@ Delegation rules:
       // are compared in full.
       safeJson(this.subagents) === safeJson(config.subagents ?? []) &&
       safeJson(this.subagentProviders) === safeJson(config.subagentProviders ?? {}) &&
+      safeJson([...this.subagentModelKeys].sort()) ===
+        safeJson([...new Set(config.subagentModelKeys ?? [])].sort()) &&
       // Enabling or disabling a trusted extension retires the runtime so the
       // next prompt reloads the set (spec 16 §4.3).
       trustedExtensionIds(this.trustedExtensionSpecs) ===
@@ -3203,13 +3220,45 @@ Delegation rules:
   }
 
   /**
+   * Repeating the target definition's own pin is omit, not an override. The
+   * Task catalog prints that key, and models copy it back into `model`.
+   */
+  private isDefinitionPinOverride(
+    definition: SubagentDefinition,
+    key: string,
+  ): boolean {
+    if (!definition.model) return false;
+    if (key === subagentModelKey(definition.model)) return true;
+    const slash = key.indexOf("/");
+    if (slash < 1) return false;
+    const requestedProvider = key
+      .slice(0, slash)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+    const requestedModel = key.slice(slash + 1).trim().toLowerCase();
+    const pinProvider = definition.model.providerId
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+    return (
+      Boolean(requestedProvider) &&
+      requestedProvider === pinProvider &&
+      requestedModel === definition.model.modelId.toLowerCase()
+    );
+  }
+
+  /**
    * On-demand model resolution for Task-time model overrides. Asks Electron
-   * main to resolve a `providerId/modelId` key that was not statically pinned
-   * by any definition. The result is cached for the life of this runtime.
+   * main to authorize and resolve a `providerId/modelId` key outside the
+   * opted-in launch catalog. Grants live in a separate cache so they cannot
+   * rewrite definition pins or change launch-time reuse matching.
    */
   private async resolveSubagentModel(
     key: string,
   ): Promise<RuntimeProviderConfig | undefined> {
+    const cached = this.subagentOverrideProviders[key];
+    if (cached) return cached;
     try {
       const result = await (this.host as any).call(
         "provider.resolveSubagentModel",
@@ -3217,6 +3266,11 @@ Delegation rules:
       );
       if (result && typeof result === "object" && "modelId" in result) {
         const provider = result as RuntimeProviderConfig;
+        const pinned = this.subagentProviders[key];
+        if (pinned && pinned.id !== provider.id) {
+          // Another account's opt-in must use its exact provider-id key.
+          return undefined;
+        }
         // Vendor-account (OAuth) providers need a resolveAuth callback so
         // pi-ai can obtain short-lived credentials per request. The JSON-RPC
         // result does not carry the callback, so we attach one that calls
@@ -3228,7 +3282,7 @@ Delegation rules:
               providerId: provider.id,
             });
         }
-        this.subagentProviders[key] = provider;
+        this.subagentOverrideProviders[key] = provider;
         return provider;
       }
     } catch {
@@ -3238,11 +3292,18 @@ Delegation rules:
   }
 
   /**
-   * Keys the parent agent can pass as `Task.model`. Includes both statically
-   * pinned providers and the `availableModels` catalog injected at launch.
+   * Keys explicitly enabled for Task.model at launch or authorized by main
+   * on demand. A binding resolved only for a definition pin is not an opt-in.
    */
   private availableSubagentModelKeys(): string[] {
-    return Object.keys(this.subagentProviders);
+    const keys = new Set<string>();
+    for (const key of this.subagentModelKeys) {
+      if (this.subagentProviders[key] || this.subagentOverrideProviders[key]) {
+        keys.add(key);
+      }
+    }
+    for (const key of Object.keys(this.subagentOverrideProviders)) keys.add(key);
+    return [...keys];
   }
 
   /**
@@ -3250,19 +3311,21 @@ Delegation rules:
    * agent can make informed model choices for Task.model overrides.
    */
   private subagentModelSummary(): string | undefined {
-    const keys = Object.keys(this.subagentProviders);
+    const keys = this.availableSubagentModelKeys();
     if (keys.length === 0) {
       return [
         "No delegation model overrides are configured.",
-        "Omit the `model` parameter on Task to inherit the parent conversation's selected model.",
-        "Never invent a provider/model key. Prefer omitting `model`; repeating the exact parent provider/model is safe but unnecessary.",
+        "Omit the `model` parameter on Task to use the definition's default model, or inherit the parent conversation's selected model when no default is pinned.",
+        "Repeating a definition's own Default model key is the same as omitting `model`. Never invent a provider/model key.",
       ].join(" ");
     }
     const lines: string[] = [
       "Available models for delegation (pass as `model` parameter on Task):\n",
     ];
     for (const key of keys) {
-      const provider = this.subagentProviders[key];
+      const provider =
+        this.subagentProviders[key] ?? this.subagentOverrideProviders[key];
+      if (!provider) continue;
       const reasoning = provider.supportsReasoning ? "reasoning" : "standard";
       const levels = provider.supportedThinkingLevels?.length
         ? provider.supportedThinkingLevels.join("/")
@@ -3285,7 +3348,9 @@ Delegation rules:
    * talk to, and its report format is set by `composeSubagentSystemPrompt`.
    */
   private subagentGuidance(definition: SubagentDefinition): string[] {
-    const tools = new Set(definition.tools);
+    const tools = new Set(
+      resolveSubagentToolNames(definition, [...this.toolCatalog.keys()]),
+    );
     const blocks: string[] = [];
     if (tools.has("Read") || tools.has("Grep") || tools.has("Glob")) {
       blocks.push(
@@ -3304,6 +3369,10 @@ Delegation rules:
       blocks.push(
         `Write temporary and intermediate files into the session scratch directory \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR) using absolute paths, never into the workspace.`,
       );
+    }
+    if (tools.has(SKILL_TOOL_NAME)) {
+      const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
+      if (skillsPrompt) blocks.push(skillsPrompt);
     }
     const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
     if (projectPrompt) blocks.push(projectPrompt);
@@ -3337,10 +3406,12 @@ Delegation rules:
   private buildSubagentTool(): AgentTool {
     const names = this.subagents.map((definition) => definition.name);
     const catalog = this.subagents
-      .map(
-        (definition) =>
-          `- ${definition.name} (tools: ${definition.tools.join(", ")}): ${definition.description}`,
-      )
+      .map((definition) => {
+        const defaultModel = definition.model
+          ? `${subagentModelKey(definition.model)}; omit model or repeat this key to keep this default.`
+          : "inherits the session.";
+        return `- ${definition.name} (tools: ${subagentToolsLabel(definition)}): ${definition.description} Default model: ${defaultModel}`;
+      })
       .join("\n");
     return {
       name: SUBAGENT_TOOL_NAME,
@@ -3351,10 +3422,10 @@ Delegation rules:
         "Do not delegate what you can finish in a couple of tool calls, and do not delegate anything that needs the user — a subagent cannot ask a question or propose a plan on your behalf.",
         ...(this.availableSubagentModelKeys().length
           ? [
-              "Only pass `model` when selecting a listed delegation model; otherwise omit it. Repeating the exact parent provider/model is also safe but unnecessary.",
+              "Only pass `model` when deliberately overriding the definition default with a listed delegation model; otherwise omit it. Repeating the definition's own Default model key, or the exact parent provider/model, is the same as omitting `model`.",
             ]
           : [
-              "No delegation model overrides are configured. Omit `model` so the subagent inherits the parent conversation's selected model; never invent a provider/model key.",
+              "No delegation model overrides are configured. Omit `model` to use the definition's default, or the parent model when no default is pinned. Repeating a definition's own Default model key is the same as omitting `model`; never invent a provider/model key.",
             ]),
         "`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.",
         "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time. You may keep working or talk to the user while they run; the runtime delivers their reports when they finish. Call TaskStop only to cancel.",
@@ -3377,7 +3448,7 @@ Delegation rules:
         model: Type.Optional(
           Type.String({
             description:
-              "Override the delegate's model for this run, e.g. 'anthropic/claude-sonnet-4-20250514'. Omit to use the subagent's default. Pick cheaper/faster models for simple searches; reserve expensive reasoning models for complex analysis.",
+              "Override the delegate's model for this run, e.g. 'anthropic/claude-sonnet-4-20250514'. Omit to use the subagent's default. Repeating the definition's own Default model key is the same as omitting this parameter. Only choose a different override from the available delegation model catalog.",
           }),
         ),
       }),
@@ -3412,19 +3483,26 @@ Delegation rules:
             : "";
         let provider: RuntimeProviderConfig | undefined;
         if (modelOverride) {
-          // Repeating the parent model is inheritance, not a request to select
-          // an additional delegation model. This also handles a model that was
-          // echoed by the parent despite an empty delegation catalog.
-          provider = this.isSessionModelOverride(modelOverride)
-            ? this.provider
-            : this.subagentProviders[modelOverride];
-          if (!provider) {
-            // On-demand resolution: ask Electron main for a provider the
-            // definitions did not statically pin but the user has configured.
-            try {
-              provider = await this.resolveSubagentModel(modelOverride);
-            } catch {
-              // Resolution failed; fall through to the error below.
+          if (this.isDefinitionPinOverride(definition, modelOverride)) {
+            provider = this.subagentProvider(definition);
+            if (!provider) {
+              return this.subagentToolError(
+                toolCallId,
+                `The ${definition.name} subagent pins ${definition.model?.providerId}/${definition.model?.modelId}, which is not configured in PI-Desktop. Do this work yourself or delegate to another subagent.`,
+              );
+            }
+          } else if (this.isSessionModelOverride(modelOverride)) {
+            provider = this.provider;
+          } else {
+            provider = this.subagentModelKeys.has(modelOverride)
+              ? this.subagentProviders[modelOverride]
+              : this.subagentOverrideProviders[modelOverride];
+            if (!provider) {
+              try {
+                provider = await this.resolveSubagentModel(modelOverride);
+              } catch {
+                // Resolution failed; fall through to the error below.
+              }
             }
           }
           if (!provider) {
@@ -3446,7 +3524,11 @@ Delegation rules:
             );
           }
         }
-        const tools = definition.tools
+        const declaredToolNames = resolveSubagentToolNames(
+          definition,
+          [...this.toolCatalog.keys()],
+        );
+        const tools = declaredToolNames
           .map((name) => this.toolCatalog.get(name))
           .filter((tool): tool is AgentTool => tool !== undefined);
         if (tools.length === 0) {
@@ -3515,6 +3597,7 @@ Delegation rules:
           systemPrompt: composeSubagentSystemPrompt({
             definition,
             guidance: this.subagentGuidance(definition),
+            toolNames: declaredToolNames,
           }),
           tools: scopedTools,
           onEvent: (envelope) => {
@@ -5843,16 +5926,12 @@ Delegation rules:
           const nextThinking = content.hasThinking
             ? content.thinking
             : previousThinking;
-          const deltaText = content.hasText
-            ? content.text.startsWith(previousText)
-              ? content.text.slice(previousText.length)
-              : content.text
-            : "";
-          const deltaThinking = content.hasThinking
-            ? content.thinking.startsWith(previousThinking)
-              ? content.thinking.slice(previousThinking.length)
-              : content.thinking
-            : "";
+          const textDelta = content.hasText
+            ? cumulativeDelta(previousText, content.text)
+            : { delta: "", reset: false };
+          const thinkingDelta = content.hasThinking
+            ? cumulativeDelta(previousThinking, content.thinking)
+            : { delta: "", reset: false };
           this.currentAssistant = {
             ...this.currentAssistant,
             content: nextText,
@@ -5863,12 +5942,21 @@ Delegation rules:
                 : {}),
             status: "streaming",
           };
-          this.emit({
-            type: "message_update",
-            message: this.currentAssistant,
-            deltaText,
-            ...(deltaThinking ? { deltaThinking } : {}),
-          });
+          if (
+            textDelta.delta ||
+            thinkingDelta.delta ||
+            textDelta.reset ||
+            thinkingDelta.reset
+          ) {
+            this.emit({
+              type: "message_update",
+              message: this.currentAssistant,
+              ...(textDelta.delta ? { deltaText: textDelta.delta } : {}),
+              ...(thinkingDelta.delta ? { deltaThinking: thinkingDelta.delta } : {}),
+              ...(textDelta.reset ? { resetText: true } : {}),
+              ...(thinkingDelta.reset ? { resetThinking: true } : {}),
+            });
+          }
         }
         break;
       }
@@ -6734,6 +6822,7 @@ Delegation rules:
     const runner = this.extensionRunner;
     this.extensionRunner = undefined;
     if (runner) await runner.dispose().catch(() => undefined);
+    this.streamSink.dispose();
     this.disposed = true;
     this.acceptingSteering = false;
     this.runCancelled = true;

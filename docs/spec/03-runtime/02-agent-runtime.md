@@ -559,6 +559,10 @@ criterion-by-criterion report of what was met and the evidence observed.
 - Pi `thinking` blocks become `UiMessage.thinking` and
   `message_update.deltaThinking`. They never append to `content` or
   `deltaText`.
+- Append-only `message_update` events set `stream: \"delta\"` and carry only the
+  new chunk. The runtime keeps the full `currentAssistant` in memory, coalesces
+  deltas every 16ms, and flushes before tool/terminal/abort/error/retry
+  boundaries. `message_end` is the authoritative snapshot (D412).
 - Restored assistant history reconstructs separate text and thinking blocks
   before the next turn.
 - Restored history also reconstructs tool call/result pairs from persisted
@@ -609,9 +613,11 @@ the launch.
 
 Frontmatter adds `permission: inherit | ask | accept-edits | auto` (default
 `inherit`), which controls the scope the delegate's tool calls resolve under
-instead of the session mode (§5f.1). `idle-timeout` and `max-duration` still
-parse for compatibility but no longer kill a run (D328). Only builtin and user definitions may
-declare a permission scope —
+instead of the session mode (§5f.1). `tools: inherit` (alone or with assignable
+extras) opts a definition into the parent session's live tool catalog minus a
+deny list (ADR 0246 / D415); builtins stay on today's whitelist. `idle-timeout`
+and `max-duration` still parse for compatibility but no longer kill a run
+(D328). Only builtin and user definitions may declare a permission scope —
 both express a choice the user already made, whereas a project definition
 arrives with the repository, so honoring its scope would let cloned code grant
 itself `auto`. A project document that declares a non-`inherit` scope keeps
@@ -640,10 +646,22 @@ core set rather than the on-demand catalog of §7.1:
   session model. The parent agent sees a model summary in the system prompt
   listing all models marked `availableForSubagents` in provider settings. If
   the delegation catalog is empty, the prompt tells the model to omit `model`
-  and inherit the session model; an explicit key that exactly names the current
-  session provider/model is treated as the same inheritance case. Other
-  explicit model keys must be configured and enabled for delegation. When a
-  model key is not pre-resolved, the runtime asks Electron main to resolve it
+  and use the definition pin, or inherit the session model when unpinned; an
+  explicit key that exactly names the current session provider/model is treated as the same inheritance case. Other
+  explicit model keys must be configured and enabled for delegation. Electron
+  sends `subagentModelKeys` separately from `subagentProviders`: the latter may
+  include definition-only pins, while only the former authorizes cached
+  overrides and the model summary. Missing keys default to an empty list;
+  successful on-demand resolution is cached separately from launch opt-in and
+  does not rewrite definition pins or runtime reuse matching. On-demand
+  provider matching uses the same unique id/vendor/name rule as pin resolution.
+  A changed opt-in list retires the idle runtime on the next launch. Pins remain usable
+  by their own definitions when `model` is omitted or when `Task.model` repeats
+  that definition's own pin key, even without an opt-in.
+  The Task definition catalog displays each default model and treats omitting
+  or repeating that key as keeping the default. See
+  [ADR subagent-model-opt-in](../../adr/subagent-model-opt-in.md).
+  When a model key is not pre-resolved, the runtime asks Electron main to resolve it
   on-demand via the `provider.resolveSubagentModel` RPC. The started `Task`
   result details record the effective `modelId` and resolved `thinkingLevel`
   used for that run. The level is resolved after inheritance and target-model
@@ -1035,22 +1053,25 @@ boundary blocks it.
 
 A delegate's system prompt is composed in the sidecar from three parts, in this
 order: the delegation framing, the definition's Markdown body, and the tool
-guidance its declared tools earn. The body sits ahead of the workspace guidance
+guidance its resolved tools earn. The body sits ahead of the workspace guidance
 so a project's own instructions still have the last word.
 
 The framing states the shape of the delegate's situation, which is not
 inferable from the body: it is one delegated task, the delegate cannot see the
 user, ask a question, or delegate further, it has exactly the listed tools, and
-its final message is the only thing the main agent receives. A read-only
+its final message is the only thing the main agent receives. Listed names are
+the spawn-time resolved set when `tools: inherit` is on. A read-only
 definition is additionally told never to report an edit it could not have made;
 a write-capable one is told to touch only the files the task is about.
+Mutation framing uses the resolved set, not the raw frontmatter extras.
 
 Guidance blocks are the same text the session prompt uses, included only when
-the definition declares the matching tool: search/read scoping for
+the resolved tools include the matching name: search/read scoping for
 Read/Grep/Glob, edit discipline for Edit/Write, the command shell contract for
-Bash, and the scratch-directory rule when the session has a scratch directory
-and the delegate can write. The project instruction chain (§7.3) is appended
-last, so a delegate follows the same project rules as its session.
+Bash, the `# Skills` catalog when `Skill` is present, and the scratch-directory
+rule when the session has a scratch directory and the delegate can write. The
+project instruction chain (§7.3) is appended last, so a delegate follows the
+same project rules as its session.
 
 ### 7.3 Project instruction chain
 

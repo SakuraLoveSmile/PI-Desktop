@@ -20,6 +20,7 @@ Each ADR includes:
 
 | ID | Title | Status |
 |---|---|---|
+| subagent-model-opt-in | [Separate Subagent Model Opt-In from Definition Pins](subagent-model-opt-in.md) | Accepted for implementation |
 | 0001 | Use Electron as the desktop shell | Accepted |
 | 0002 | Use the pi Agent Harness as the kernel | Accepted |
 | 0003 | Hybrid runtime — Rust host core + Node pi agent sidecar | Superseded in part |
@@ -124,7 +125,7 @@ Each ADR includes:
 | 0102 | Publisher-owned plugin source with a Git-hosted artifact store | Accepted for implementation (supersedes 0006) |
 | 0103 | Compact context usage summary | Accepted (amends 0047) |
 | 0104 | Plugin-contributed work panel views | Accepted |
-| 0105 | Ship Files as a bundled plugin; keep Review in the host | Accepted (Terminal clause superseded by 0108) |
+| 0105 | Ship Files as a bundled plugin; keep Review in the host | Superseded by 0241 |
 | 0106 | Keep only five core builtin commands | Accepted |
 | 0107 | Make current-session task notification suppression atomic | Accepted |
 | 0108 | Remove the built-in interactive terminal | Accepted |
@@ -258,4 +259,11 @@ Each ADR includes:
 | 0238 | Prioritize MainChat in the three-column shell | Accepted (amends ADR 0226) |
 | 0239 | Host-owned session collaboration messages | Accepted (amends ADR 0237 / 0165 / 0213) |
 | 0240 | Independent session discovery and navigable collaboration projections | Accepted (amends ADR 0239) |
+| 0241 | Ship the file view as a vendored, updatable plugin | Accepted (supersedes ADR 0105; issue #304) |
+| 0242 | Delta-only coalesced streaming updates | Accepted (amends 0127 / 0130 / 0149 / 0153; issue #299) |
+| 0243 | Skill market public-HTTPS catalog fetch | Accepted (amends 0009; issue #287 / PR #290) |
+| 0244 | Bound dependency installation for imported extensions | Accepted |
+| 0245 | Harden the MCP market public-network boundary | Accepted |
+| 0246 | Opt-in subagent inheritance of the parent tool catalog | Accepted (amends 0062; issue #215 / PR #319) |
+| active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
