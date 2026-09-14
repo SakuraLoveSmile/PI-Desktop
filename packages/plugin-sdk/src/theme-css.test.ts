@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   decodeCssEscapes,
+  isThemeAssetPath,
   maskNonCodeCss,
+  normalizeThemeAssetPath,
   sanitizeThemeCss,
+  themeAssetUrl,
   THEME_CSS_MAX_BYTES,
+  type ThemeCssAssetResolver,
 } from "./theme-css.js";
 
 function error(css: string): string {
@@ -159,6 +163,82 @@ describe("maskNonCodeCss", () => {
   it("does not mistake a url() inside a string for a reference", () => {
     expect(maskNonCodeCss('.a { content: "url(x)"; }')).toBe(
       `.a { content: ${" ".repeat(8)}; }`,
+    );
+  });
+});
+
+describe("theme assets", () => {
+  const resolveAsset: ThemeCssAssetResolver = (target) => {
+    const normalized = normalizeThemeAssetPath(target);
+    return normalized === "art/bg.png" ? themeAssetUrl("demo.hello", normalized) : null;
+  };
+
+  it("rewrites a declared reference to the host scheme", () => {
+    const result = sanitizeThemeCss(
+      ".a { background: url(./art/bg.png) no-repeat; }",
+      undefined,
+      resolveAsset,
+    );
+    expect(result).toEqual({
+      ok: true,
+      css: '.a { background: url("plugin-asset://demo.hello/art/bg.png") no-repeat; }',
+    });
+  });
+
+  it("rewrites a quoted reference written without the ./ prefix", () => {
+    const result = sanitizeThemeCss('.a { background: url("art/bg.png"); }', undefined, resolveAsset);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.css).toBe('.a { background: url("plugin-asset://demo.hello/art/bg.png"); }');
+    }
+  });
+
+  it("refuses an undeclared reference even when a resolver is supplied", () => {
+    const result = sanitizeThemeCss(
+      '.a { background: url("./art/other.png"); }',
+      undefined,
+      resolveAsset,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/declared assets/);
+  });
+
+  it("leaves data: urls alone", () => {
+    const result = sanitizeThemeCss(
+      '.a { background: url("data:image/png;base64,AA"); }',
+      undefined,
+      resolveAsset,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.css).toContain("data:image/png;base64,AA");
+  });
+
+  it("does not rewrite a reference inside a comment", () => {
+    const css = "/* url(./art/bg.png) */\n.a { color: red; }";
+    expect(sanitizeThemeCss(css, undefined, resolveAsset)).toEqual({ ok: true, css });
+  });
+
+  it("keeps offering assets to a caller that did not opt in", () => {
+    expect(isThemeAssetPath("art/bg.png")).toBe(true);
+    expect(normalizeThemeAssetPath("./art/bg.png")).toBe("art/bg.png");
+    expect(normalizeThemeAssetPath("art\\bg.png")).toBe("art/bg.png");
+    for (const refused of [
+      "../escape.png",
+      "/etc/passwd",
+      "art/../../x.png",
+      "art//bg.png",
+      "art/bg.gif",
+      "C:/x.png",
+      "",
+    ]) {
+      expect(normalizeThemeAssetPath(refused)).toBe("");
+      expect(isThemeAssetPath(refused)).toBe(false);
+    }
+  });
+
+  it("builds the host url", () => {
+    expect(themeAssetUrl("demo.hello", "./art/bg.png")).toBe(
+      "plugin-asset://demo.hello/art/bg.png",
     );
   });
 });

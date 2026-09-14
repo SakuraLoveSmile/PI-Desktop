@@ -1,6 +1,80 @@
 export const THEME_CSS_MAX_BYTES = 256 * 1024;
 
+/** Extensions a theme may reference out of its own package. */
+export const THEME_ASSET_EXTENSIONS = [
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "avif",
+  "svg",
+  "woff2",
+] as const;
+
+/** Declared assets of one theme, summed. */
+export const THEME_ASSET_MAX_BYTES = 4 * 1024 * 1024;
+
+/** Host-owned scheme that serves plugin package bytes to the shell renderer. */
+export const THEME_ASSET_SCHEME = "plugin-asset";
+
 export type ThemeCssResult = { ok: true; css: string } | { ok: false; error: string };
+
+/**
+ * Maps one `url(...)` target written by a theme onto the URL the host serves it
+ * from, or `null` when the target is not a declared, valid asset. Returning a
+ * URL both allows the reference and replaces it.
+ */
+export type ThemeCssAssetResolver = (target: string) => string | null;
+
+/**
+ * A `url(...)` construct found in code the browser would apply.
+ *
+ * `start` and `end` span the whole construct, including the `url(` and the
+ * closing paren. They are offsets in the text that was scanned, and because
+ * {@link maskNonCodeCss} keeps its length they also address the author's
+ * original text.
+ */
+export type ThemeCssUrlReference = { start: number; end: number; target: string };
+
+const THEME_ASSET_EXTENSION_PATTERN = new RegExp(
+  `\\.(${THEME_ASSET_EXTENSIONS.join("|")})$`,
+  "i",
+);
+
+/** `plugin-asset://<pluginId>/<assetPath>` — how a theme reaches package bytes. */
+export function themeAssetUrl(pluginId: string, assetPath: string): string {
+  return `${THEME_ASSET_SCHEME}://${pluginId}/${assetPath.trim().replace(/^\.\//, "")}`;
+}
+
+/**
+ * Normalize an asset reference to a package-relative, forward-slash path.
+ *
+ * Both the declaration in the manifest and the `url()` target inside the sheet
+ * go through this, so `./art/bg.png` and `art/bg.png` are one asset. Returns an
+ * empty string when the value cannot name one: absolute, a drive prefix, an
+ * empty or `.`/`..` segment, or an extension off the whitelist.
+ */
+export function normalizeThemeAssetPath(value: string): string {
+  const path = value
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\.\//, "");
+  if (!path || path.startsWith("/") || path.includes(":")) return "";
+  if (path.split("/").some((segment) => !segment || segment === "." || segment === "..")) {
+    return "";
+  }
+  return THEME_ASSET_EXTENSION_PATTERN.test(path) ? path : "";
+}
+
+/**
+ * `contributes.themes[].assets` entries must stay relative, inside the plugin
+ * package, and on the extension whitelist. The host re-resolves the path
+ * against the package root when it serves the file; this only rejects the
+ * obviously unusable before anything is read.
+ */
+export function isThemeAssetPath(value: string): boolean {
+  return normalizeThemeAssetPath(value) !== "";
+}
 
 /**
  * Decode CSS escape sequences (`\69` hex with an optional trailing space, and
@@ -33,8 +107,8 @@ type CssScanState = "code" | "comment" | "string" | "url";
  * the author never wrote either construct.
  *
  * Masking emits one space per masked character, so every offset in the result
- * still points at the same character of the input — the `url()` target reported
- * by the caller is the author's original spelling.
+ * still points at the same character of the input — the `url()` span and target
+ * reported by the caller are the author's original spelling.
  *
  * This cannot be a `/* … *\/` regex: in `content: "/*";` the browser sees a
  * string, a naive strip would read a comment, and everything up to the next
@@ -122,13 +196,33 @@ export function maskNonCodeCss(css: string): string {
 }
 
 /**
+ * Every `url(...)` the browser would resolve, with its span.
+ *
+ * Run this on masked text: a `url()` inside a comment or a string is not a
+ * reference, and the spans stay valid for the source because masking preserves
+ * length.
+ */
+export function findThemeCssUrlReferences(masked: string): ThemeCssUrlReference[] {
+  const references: ThemeCssUrlReference[] = [];
+  for (const match of masked.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/gi)) {
+    const start = match.index ?? 0;
+    references.push({ start, end: start + match[0].length, target: match[2] ?? "" });
+  }
+  return references;
+}
+
+/**
  * Find the first thing that makes a contributed sheet unacceptable.
  *
  * `css` must already be masked (and, on the escaped pass, escape-decoded):
  * these checks look for keywords, and text the browser would not apply has to
- * be gone before they run.
+ * be gone before they run. A reference is accepted when it is a `data:` URI or
+ * when `resolveAsset` claims it.
  */
-function findThemeCssViolation(css: string): string | undefined {
+function findThemeCssViolation(
+  css: string,
+  resolveAsset?: ThemeCssAssetResolver,
+): string | undefined {
   if (/@import\b/i.test(css)) {
     return "theme css must not use @import";
   }
@@ -138,20 +232,46 @@ function findThemeCssViolation(css: string): string | undefined {
   if (/javascript\s*:/i.test(css) || /expression\s*\(/i.test(css)) {
     return "theme css must not contain script expressions";
   }
-  let wellFormedUrls = 0;
-  for (const match of css.matchAll(/url\(\s*(['"]?)([^'")]*)\1\s*\)/gi)) {
-    wellFormedUrls += 1;
-    const target = match[2].trim();
-    if (!/^data:/i.test(target)) {
-      return `theme css may only reference data: urls (found "${target}")`;
-    }
+  const references = findThemeCssUrlReferences(css);
+  for (const reference of references) {
+    const target = reference.target.trim();
+    if (/^data:/i.test(target)) continue;
+    if (resolveAsset?.(target)) continue;
+    return `theme css may only reference data: urls or declared assets (found "${target}")`;
   }
   // A `url(` the regex above could not parse (unterminated, nested quotes) is a
   // reference we cannot reason about, so refuse the whole sheet.
-  if ((css.match(/url\(/gi) ?? []).length !== wellFormedUrls) {
+  if ((css.match(/url\(/gi) ?? []).length !== references.length) {
     return "theme css contains a malformed url() reference";
   }
   return undefined;
+}
+
+/**
+ * Replace each resolvable reference with the host URL that serves it.
+ *
+ * Only the `url(...)` construct is rewritten, so the file's own bytes never
+ * enter the sheet: the renderer gets a `plugin-asset://` URL it can fetch, and
+ * nothing else about the cascade changes.
+ */
+function rewriteThemeAssetReferences(
+  source: string,
+  masked: string,
+  resolveAsset: ThemeCssAssetResolver,
+): string {
+  const edits: Array<{ start: number; end: number; text: string }> = [];
+  for (const reference of findThemeCssUrlReferences(masked)) {
+    const target = reference.target.trim();
+    if (/^data:/i.test(target)) continue;
+    const url = resolveAsset(target);
+    if (!url) continue;
+    edits.push({ start: reference.start, end: reference.end, text: `url("${url}")` });
+  }
+  let out = source;
+  for (const edit of edits.sort((left, right) => right.start - left.start)) {
+    out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
+  }
+  return out;
 }
 
 /**
@@ -163,8 +283,17 @@ function findThemeCssViolation(css: string): string | undefined {
  * so only declarations and at-rules the browser would apply are inspected; the
  * second pass repeats it on a copy with CSS escapes decoded, because the
  * browser decodes `@\69mport` before parsing.
+ *
+ * `resolveAsset` opts into package assets: when it answers, the reference is
+ * allowed and the returned sheet points that `url(...)` at the host's own
+ * scheme. Omitting it keeps the `data:`-only rule, so a caller that cannot
+ * serve package bytes denies them instead of letting a relative path through.
  */
-export function sanitizeThemeCss(raw: string, maxBytes = THEME_CSS_MAX_BYTES): ThemeCssResult {
+export function sanitizeThemeCss(
+  raw: string,
+  maxBytes = THEME_CSS_MAX_BYTES,
+  resolveAsset?: ThemeCssAssetResolver,
+): ThemeCssResult {
   const css = raw.replace(/^\ufeff/, "");
   const bytes = new TextEncoder().encode(css).length;
   if (bytes > maxBytes) {
@@ -174,9 +303,15 @@ export function sanitizeThemeCss(raw: string, maxBytes = THEME_CSS_MAX_BYTES): T
     return { ok: false, error: "theme css is empty" };
   }
   const decoded = decodeCssEscapes(css);
+  const masked = maskNonCodeCss(css);
   const violation =
-    findThemeCssViolation(maskNonCodeCss(css)) ??
-    (decoded !== css ? findThemeCssViolation(maskNonCodeCss(decoded)) : undefined);
+    findThemeCssViolation(masked, resolveAsset) ??
+    (decoded !== css
+      ? findThemeCssViolation(maskNonCodeCss(decoded), resolveAsset)
+      : undefined);
   if (violation) return { ok: false, error: violation };
-  return { ok: true, css: css.trim() };
+  const rewritten = resolveAsset
+    ? rewriteThemeAssetReferences(css, masked, resolveAsset)
+    : css;
+  return { ok: true, css: rewritten.trim() };
 }

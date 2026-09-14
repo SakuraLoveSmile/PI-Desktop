@@ -893,10 +893,10 @@ export const api = {
       IPC.invoke.windowSetWorkPanelChatWidth,
       { width },
     ),
-  setWindowBackgroundColor: (theme: "light" | "dark") =>
-    invoke<{ applied: boolean; theme: "light" | "dark" }>(
+  setWindowBackgroundColor: (theme: "light" | "dark", color?: string) =>
+    invoke<{ applied: boolean; theme: "light" | "dark"; color?: string }>(
       IPC.invoke.windowSetBackgroundColor,
-      { theme },
+      { theme, color },
     ),
   windowControl: (action: WindowControlAction) =>
     invoke<{ maximized: boolean }>(IPC.invoke.windowControl, { action }),
