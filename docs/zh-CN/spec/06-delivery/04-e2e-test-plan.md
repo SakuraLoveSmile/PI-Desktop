@@ -110,6 +110,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - Plan UI：`pnpm test:e2e:plan` 和 `pnpm test:e2e:plan-ui`。
 - host/sidecar 监督、崩溃恢复或重启：`pnpm test:e2e` 和 `pnpm test:e2e:supervision`。
 - 子代理生命周期：`pnpm test:e2e` 和 `pnpm test:e2e:subagents`。
+- 会话通信 / Session Orchestrator：`pnpm test:e2e:collaboration`。
 - 同时涉及多个面的改动使用适用套件的并集。
 
 `pnpm test:e2e` 是 host RPC、IPC、Agent 执行、插件、持久化集成和共享运行时合约的默认跨系统烟雾测试。由于显示、平台、凭据、硬件或其他环境能力缺失而无法运行的必需套件，必须记录为 `NOT RUN`，并说明原因、替代验证和剩余风险。在具备条件且可信的环境中通过前，该 pull request 不具备合入条件。
@@ -6679,9 +6680,7 @@ IPC 请求无法关闭。
   `03-runtime/06-host-rpc-protocol.md`、ADR 0237
 - **接受**：C（并行持久化会话）、D（插件安全性）、品质
 - **里程碑**：M6+
-- **状态**：marketplace 插件测试覆盖插件运行时；host-core 和 desktop 单元测试覆盖新增的
-  宿主原子能力。完整真实 provider/Electron 旅程仍需在具备条件的 runner 中验证，遵循无本地
-  E2E 策略
+- **状态**：host ledger 覆盖由 `pnpm test:e2e:collaboration` 自动化；marketplace 插件测试覆盖插件运行时，host-core 和 desktop 单元测试覆盖新增的宿主原子能力。完整真实 provider/Electron 旅程仍需在具备条件的 runner 中验证，遵循无本地 E2E 策略
 
 #### E2E-SESSION-independent-top-level-communication：SessionTask 发现并与现有会话通信
 
@@ -6691,7 +6690,7 @@ IPC 请求无法关闭。
 - **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/04-plugin-security.md`、`03-runtime/01-ipc-protocol.md`、`03-runtime/04-data-storage.md`、ADR 0239、ADR 0240
 - **验收**：C（对话与流式）、D（插件安全）、G（插件）、品质
 - **里程碑**：M6+
-- **状态**：插件和 host-core 回归覆盖已自动化；真实 provider/Electron 多会话旅程仍需在具备条件的 runner 中验证，遵循无本地 E2E 策略
+- **状态**：host 发现和双向投递由 `pnpm test:e2e:collaboration` 自动化；插件和 host-core 回归覆盖已自动化。真实 provider/Electron 多会话旅程仍需在具备条件的 runner 中验证，遵循无本地 E2E 策略
 
 #### E2E-SESSION-hover-card-model-and-links：会话 hover 卡片展示可读模型并支持创建关系导航
 
