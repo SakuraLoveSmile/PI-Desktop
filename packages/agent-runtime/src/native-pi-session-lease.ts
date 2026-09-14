@@ -177,7 +177,15 @@ export class NativePiSessionLease {
           errorCode: "NATIVE_PI_SESSION_BUSY",
         });
       }
-      unlinkSync(this.lockPath);
+      try {
+        unlinkSync(this.lockPath);
+      } catch (unlinkError) {
+        if ((unlinkError as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw Object.assign(new Error("Native Pi session is already open for writing"), {
+            errorCode: "NATIVE_PI_SESSION_BUSY",
+          });
+        }
+      }
       this.createLock(false);
     }
   }

@@ -291,8 +291,9 @@ the session and full-byte identity checks before each SDK append. After an
 append, the adapter accepts only the unchanged prior prefix plus exactly one
 entry whose id and parent match the SDK operation. Any foreign/interleaved
 change disposes the runtime and requires reload. A stale lease is reclaimed only
-for a provably dead process on the same host and an unchanged target fingerprint.
-This lease is not treated as proof that Pi Web/CLI is absent because those
+for a provably dead process on the same host when the target is unchanged or is a
+complete same-file append-only extension with the original byte prefix and a
+continuous parent chain. This lease is not treated as proof that Pi Web/CLI is absent because those
 clients do not yet share its protocol.
 
 Native continuation passes `noTools: "all"` to the SDK: no built-in or extension
