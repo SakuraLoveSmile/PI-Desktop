@@ -92,7 +92,10 @@ export function installPluginAssetProtocol(resolve: PluginAssetResolver): void {
     } catch {
       return notFound();
     }
-    return new Response(body, {
+    // Copy into a plain view: `Buffer` is a `Uint8Array` subtype that the DOM
+    // `BodyInit` union does not accept, and this tsconfig loads both libs.
+    const bytes = new Uint8Array(body);
+    return new Response(bytes, {
       status: 200,
       headers: {
         "content-type": mime,

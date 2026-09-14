@@ -219,15 +219,18 @@ pub(crate) fn validate_contributions(root: &Path, manifest: &PluginManifest) -> 
                     if seen_assets.contains(&normalized) {
                         bail!("PLUGIN_INVALID: theme {id} declares asset {raw} twice");
                     }
-                    if normalized.split('/').any(|segment| segment == "node_modules") {
+                    if normalized
+                        .split('/')
+                        .any(|segment| segment == "node_modules")
+                    {
                         bail!(
                             "PLUGIN_INVALID: theme {id} asset {raw} may not come from a dependency directory"
                         );
                     }
                     let resolved = safe_join(root, &normalized)?;
-                    let metadata = resolved.metadata().map_err(|_| {
-                        anyhow!("PLUGIN_INVALID: theme {id} asset missing: {raw}")
-                    })?;
+                    let metadata = resolved
+                        .metadata()
+                        .map_err(|_| anyhow!("PLUGIN_INVALID: theme {id} asset missing: {raw}"))?;
                     if !metadata.is_file() {
                         bail!("PLUGIN_INVALID: theme {id} asset missing: {raw}");
                     }
@@ -263,7 +266,9 @@ pub(crate) fn validate_contributions(root: &Path, manifest: &PluginManifest) -> 
                     continue;
                 };
                 let color = value.as_str().ok_or_else(|| {
-                    anyhow!("PLUGIN_INVALID: windowAppearance.backgroundColor.{key} must be a string")
+                    anyhow!(
+                        "PLUGIN_INVALID: windowAppearance.backgroundColor.{key} must be a string"
+                    )
                 })?;
                 if !is_window_background_color(color) {
                     bail!(
@@ -562,7 +567,9 @@ fn is_window_background_color(value: &str) -> bool {
     if digits.len() != 6 && digits.len() != 8 {
         return false;
     }
-    digits.chars().all(|character| character.is_ascii_hexdigit())
+    digits
+        .chars()
+        .all(|character| character.is_ascii_hexdigit())
 }
 
 fn is_contrib_id(value: &str) -> bool {
