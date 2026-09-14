@@ -271,5 +271,6 @@ Each ADR includes:
 | global-sidebar-pins | [Show pinned conversations in a global sidebar section](global-sidebar-pins.md) | Accepted (amends ADR 0016; issue #306) |
 | 0250 | [Structured, bounded, and redacted process logs](0250-structured-bounded-redacted-process-logs.md) | Accepted for implementation |
 | 0251 | [Chat file references complete in main and open in the file view](0251-chat-file-refs-open-in-the-file-view.md) | Accepted (amends ADR 0163 / ADR 0241) |
+| 0252 | [Expose a project's folder roots and complete references across them](0252-project-folder-roots-for-plugin-views.md) | Accepted (amends ADR 0251; ADR 0249 §5) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
