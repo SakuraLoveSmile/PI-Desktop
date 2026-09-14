@@ -1144,6 +1144,8 @@ sklm: {
     availableForSubagentsHint: "서브에이전트에 작업을 위임할 때 AI가 이 모델을 사용하도록 허용",
     notSupported: "지원되지 않음",
     searchModelId: "모델 ID 검색…",
+    searchChosenModels: "추가된 모델 검색…",
+    noChosenModelMatches: "일치하는 추가된 모델이 없습니다.",
     selectAllVisibleModels: "모두 선택",
     deselectAllVisibleModels: "선택 해제",
     fetchModelList: "목록 가져오기",

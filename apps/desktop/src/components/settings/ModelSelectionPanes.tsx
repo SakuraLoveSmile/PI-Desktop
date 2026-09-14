@@ -197,6 +197,7 @@ export function ModelSelectionPanes({
   const { t } = useTranslation();
   const { rows, models, publishedLevelsById, setModels } = selection;
   const [modelQuery, setModelQuery] = useState("");
+  const [chosenQuery, setChosenQuery] = useState("");
   const [customModelId, setCustomModelId] = useState("");
   const [customModelError, setCustomModelError] = useState("");
   const [expandedModelId, setExpandedModelId] = useState<string | null>(
@@ -235,6 +236,29 @@ export function ModelSelectionPanes({
     for (const row of rows) if (row.info) byId.set(row.id.toLowerCase(), row.info);
     return byId;
   }, [rows]);
+
+  /**
+   * The chosen pane filters with the same rule as the discovered list: a
+   * case-insensitive substring match over what the user can recognise the row
+   * by. A catalog display name is included, so searching "GPT-4o" still finds
+   * a binding stored under its full versioned id.
+   */
+  const visibleChosen = useMemo(() => {
+    const needle = chosenQuery.trim().toLowerCase();
+    if (!needle) return models;
+    const displayNameById = new Map<string, string>();
+    for (const row of rows) {
+      displayNameById.set(row.id.toLowerCase(), row.displayName);
+    }
+    return models.filter((binding) => {
+      const key = binding.id.toLowerCase();
+      return (
+        key.includes(needle) ||
+        (binding.alias?.toLowerCase().includes(needle) ?? false) ||
+        (displayNameById.get(key)?.toLowerCase().includes(needle) ?? false)
+      );
+    });
+  }, [chosenQuery, models, rows]);
 
   const toggleModel = (row: ModelRow) => {
     const wanted = row.id.toLowerCase();
@@ -279,6 +303,9 @@ export function ModelSelectionPanes({
     setExpandedModelId(id);
     setCustomModelId("");
     setCustomModelError("");
+    // A filter left over from an earlier search would hide the model that was
+    // just added, so the new row always arrives in full view.
+    setChosenQuery("");
   };
 
   const fetchFailed = discovery.status === "error";
@@ -427,12 +454,29 @@ export function ModelSelectionPanes({
         <div className="provider-chosen-head">
           <h4 className="provider-chosen-title">{t("settings.modelConfigurations")}</h4>
           <span className="provider-chosen-count">{models.length}</span>
+          <div className="provider-chosen-search-wrap">
+            <IconSearch size={13} aria-hidden />
+            <input
+              className="provider-chosen-search"
+              value={chosenQuery}
+              placeholder={t("settings.searchChosenModels")}
+              aria-label={t("settings.searchChosenModels")}
+              disabled={busy || models.length === 0}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              autoComplete="off"
+              onChange={(event) => setChosenQuery(event.target.value)}
+            />
+          </div>
         </div>
         {models.length === 0 ? (
           <div className="provider-chosen-empty">{t("settings.noModelsChosen")}</div>
+        ) : visibleChosen.length === 0 ? (
+          <div className="provider-chosen-empty">{t("settings.noChosenModelMatches")}</div>
         ) : (
           <ul className="provider-chosen-list">
-            {models.map((binding) => {
+            {visibleChosen.map((binding) => {
               // The catalog is a baseline, not a capability gate. Always show
               // the canonical ladder so a proxy or newly released model can be
               // configured before models.dev catches up.
