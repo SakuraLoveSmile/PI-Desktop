@@ -155,15 +155,18 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
       event.error.code,
       { turnId: envelope.turnId ?? "" },
     );
-    if (executionId) {
-      void turnFinalization.then(() =>
-        finishApprovedExecution(
-          executionId,
-          "interrupted",
-          event.error.code,
-        ),
-      );
-    }
+    void turnFinalization
+      .then(() =>
+        executionId
+          ? finishApprovedExecution(executionId, "interrupted", event.error.code)
+          : undefined,
+      )
+      .catch((error: unknown) => {
+        logger.app("persistence", "warn", "turn finalization failed", {
+          sessionId: envelope.sessionId,
+          data: String(error),
+        });
+      });
     return;
   }
   if (event.type === "agent_end") {
@@ -173,11 +176,19 @@ function persistAgentEvent(envelope: AgentEventEnvelope): UiMessage | undefined 
     const turnFinalization = finishTurn(envelope.sessionId, "completed", undefined, {
       turnId: envelope.turnId ?? "",
     });
-    if (executionId) {
-      void turnFinalization.then(() =>
-        finishApprovedExecution(executionId, "completed"),
-      );
-    }
+    // The finalizer's promise can reject — its body attempts the durable end and
+    // its release handler no longer swallows a throwing body — so the chain is
+    // observed even when no approved execution follows this turn.
+    void turnFinalization
+      .then(() =>
+        executionId ? finishApprovedExecution(executionId, "completed") : undefined,
+      )
+      .catch((error: unknown) => {
+        logger.app("persistence", "warn", "turn finalization failed", {
+          sessionId: envelope.sessionId,
+          data: String(error),
+        });
+      });
     // Persist the completed branch as the active regenerate revision when the
     // latest user turn carries revision metadata (ChatGPT-style history).
     void (async () => {
