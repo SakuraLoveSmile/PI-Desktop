@@ -35,7 +35,6 @@ export function createInteractionSlice({
 }: InteractionSliceDependencies): Pick<
   AppState,
   | "setPage"
-  | "toggleUtilityPage"
   | "setSettingsTab"
   | "setSettingsAnchor"
   | "canNavBack"
@@ -53,10 +52,7 @@ export function createInteractionSlice({
       runtime.beginNavigationIntent();
       const record = opts?.record !== false;
       set((state) => {
-        const utilityReturnPage = state.page === "plugins" || state.page === "settings"
-          ? state.utilityReturnPage
-          : state.page;
-        if (!record) return { page, utilityReturnPage };
+        if (!record) return { page };
         const entry = {
           page,
           sessionId: page === "chat" ? state.activeSessionId : undefined,
@@ -68,16 +64,10 @@ export function createInteractionSlice({
         const nextStack = same ? stack : [...stack, entry].slice(-50);
         return {
           page,
-          utilityReturnPage,
           navStack: nextStack,
           navIndex: nextStack.length - 1,
         };
       });
-    },
-
-    toggleUtilityPage: (page) => {
-      const state = get();
-      state.setPage(state.page === page ? state.utilityReturnPage : page);
     },
 
     setSettingsTab: (settingsTab) => {
@@ -94,8 +84,7 @@ export function createInteractionSlice({
       if (state.navIndex <= 0) return;
       const index = state.navIndex - 1;
       const entry = state.navStack[index];
-      set({ navIndex: index, page: entry.page, utilityReturnPage:
-        state.page === "plugins" || state.page === "settings" ? state.utilityReturnPage : state.page });
+      set({ navIndex: index, page: entry.page });
       if (entry.page === "chat" && entry.sessionId) {
         void get().selectSession(entry.sessionId, {
           record: false,
@@ -111,8 +100,7 @@ export function createInteractionSlice({
       if (state.navIndex >= state.navStack.length - 1) return;
       const index = state.navIndex + 1;
       const entry = state.navStack[index];
-      set({ navIndex: index, page: entry.page, utilityReturnPage:
-        state.page === "plugins" || state.page === "settings" ? state.utilityReturnPage : state.page });
+      set({ navIndex: index, page: entry.page });
       if (entry.page === "chat" && entry.sessionId) {
         void get().selectSession(entry.sessionId, {
           record: false,

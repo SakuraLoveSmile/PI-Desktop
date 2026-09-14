@@ -71,7 +71,7 @@ export function SettingsPage() {
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
   const settingsAnchor = useAppStore((s) => s.settingsAnchor);
   const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
-  const toggleUtilityPage = useAppStore((s) => s.toggleUtilityPage);
+  const setPage = useAppStore((s) => s.setPage);
   const settings = useAppStore((s) => s.settings);
   const version = useAppStore((s) => s.version);
   const refreshProviders = useAppStore((s) => s.refreshProviders);
@@ -213,7 +213,7 @@ export function SettingsPage() {
           <button
             type="button"
             className="settings-back no-drag"
-            onClick={() => toggleUtilityPage("settings")}
+            onClick={() => setPage("chat")}
           >
             <IconChevronLeft size={15} />
             <span>{t("settings.backToApp")}</span>

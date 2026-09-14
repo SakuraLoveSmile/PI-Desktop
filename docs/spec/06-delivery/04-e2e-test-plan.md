@@ -6645,37 +6645,34 @@ and identify the platform validation still needed.
 - **Status**: Unit/source-contract covered; full provider-dialog journey Draft
   (run only in a capable environment when this surface changes)
 
-#### E2E-NAV-utility-buttons-return-to-source: Toggle Plugins and return from Settings
+#### E2E-NAV-plugins-button-goes-back: Plugins footer reuses navigation history
 
 - **Preconditions**: An isolated profile has a named conversation and visible
   messages. No model credentials or external marketplace access are required.
-- **Steps**: 1) Select the conversation, enter Plugins from the footer, and
-  click the same button again. 2) Reopen Plugins, type a search in Installed,
-  return and reopen. 3) Enter Settings from Plugins, change a settings tab,
-  and use Back to app. 4) Repeat utility entry/exit from `pulls` and
-  `scheduled` using the navigation fixture. 5) In the store fixture, delete
-  the active session or replace it with another selection while a utility
-  page is open, then return. 6) Exercise Back/Forward and direct Settings
-  navigation without a recorded history entry.
-- **Expected**: Plugins toggles its pressed/active state and restores the source
-  page. Settings returns through its existing back control; no footer is added
-  to its full-window layout. Cross-utility navigation preserves the last
-  non-utility destination. The session/workspace remain current without a
-  session reload or a stale session-id restoration. Plugin browsing tab,
+- **Steps**: 1) Select the conversation, type an unsent draft, enter Plugins
+  from the footer, and click the same button again. 2) Reopen Plugins, type a
+  search in Installed, return and reopen. 3) In the navigation fixture, repeat
+  from `pulls`, `scheduled`, and Settings; test a history containing both
+  Scheduled and Settings before Plugins. 4) Exercise Forward then the Plugins
+  button again. 5) Open Plugins with no previous history entry and click it.
+- **Expected**: The second click performs the existing Back action exactly once;
+  it does not append a return entry or skip Settings. A chat history entry uses
+  existing session selection/loading behavior. The conversation and unsent draft
+  remain usable on return. If Back is unavailable, the button opens chat.
+  Its pressed state reflects whether Plugins is active. Plugin browsing tab,
   search fields, and category survive route unmounts; dialogs and listeners
-  are released rather than kept hidden. A fresh utility entry defaults to chat.
-- **Specs linked**: `04-ux/08-component-spec.md` §3,
-  `04-ux/06-settings-ia.md`
+  are released rather than kept hidden. Settings navigation is unchanged.
+- **Specs linked**: `04-ux/08-component-spec.md` §3
 - **Acceptance**: C (session navigation), G (plugin browsing), Quality
 - **Milestone**: M6+
-- **Status**: Store/browse-state regression verified. Real macOS UI validation
-  with a synthetic session confirmed that a second Plugins click restores the
-  same two messages and unsent composer draft and clears the button's active
-  state; reopening retains the Installed search filter. Plugins → Settings →
-  Back to app restores the same conversation and draft. Non-chat routes and
-  deleted/replaced-session cases are store-tested, not native UI-tested.
-  No external marketplace or live model was required. These are pre-merge
-  results; post-integration main E2E is NOT RUN.
+- **Status**: Actual footer-handler/history-slice and browse-state regression
+  tests passed. Real macOS UI validation of the rebuilt history-based revision
+  passed two open/back cycles: the same two conversation messages and unsent
+  draft remain, the button clears its active state on return, and reopening
+  retains the Installed search filter. Non-chat history entries, Forward, and
+  no-history fallback are covered by tests, not native UI. No external
+  marketplace or live model was required. These are pre-merge results;
+  post-integration main E2E is NOT RUN.
 
 ## 8. Traceability Matrix
 
@@ -6685,7 +6682,7 @@ and identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
-| C / G / Quality — Utility navigation | E2E-NAV-utility-buttons-return-to-source |
+| C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
 | C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll |

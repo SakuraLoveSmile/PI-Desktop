@@ -162,8 +162,6 @@ export type AppState = {
   notifications: AppNotification[];
   unreadNotificationCount: number;
   page: "chat" | "pulls" | "scheduled" | "plugins" | "settings";
-  /** Utility pages return without restoring a potentially stale session id. */
-  utilityReturnPage: "chat" | "pulls" | "scheduled";
   /** Tab ids come from the shared settings index. */
   settingsTab: SettingsTabId;
   /** Pending row anchor (i18n key) to flash after landing on a settings tab. */
@@ -292,7 +290,6 @@ export type AppState = {
   handleAgentEvent: (envelope: AgentEventEnvelope) => void;
   handlePlansChanged: (event: PlanningStateEvent) => void;
   setPage: (page: AppState["page"], opts?: { record?: boolean }) => void;
-  toggleUtilityPage: (page: "plugins" | "settings") => void;
   setSettingsTab: (tab: AppState["settingsTab"]) => void;
   setSettingsAnchor: (key: string | null) => void;
   navBack: () => void;

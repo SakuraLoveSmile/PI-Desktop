@@ -1,16 +1,37 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { register } from "node:module";
 import test from "node:test";
+import ts from "typescript";
 
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const { createInteractionSlice } = await import("../src/stores/slices/interaction-slice.ts");
 const { usePluginBrowseState } = await import("../src/features/plugins/browse-state.ts");
 
+// Execute the actual footer handler against the real history slice. Native
+// rendering and retained composer behavior are covered by the manual UI journey.
+const source = ts.createSourceFile("Sidebar.tsx",
+  readFileSync(new URL("../src/components/Sidebar.tsx", import.meta.url), "utf8"),
+  ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const handlers = [];
+function visit(node) {
+  if (ts.isJsxAttribute(node) && node.name.getText(source) === "onClick" &&
+      ts.isJsxExpression(node.initializer) &&
+      node.initializer.expression?.getText(source).includes('page === "plugins"')) {
+    handlers.push(node.initializer.expression.getText(source));
+  }
+  ts.forEachChild(node, visit);
+}
+visit(source);
+assert.equal(handlers.length, 1, "identify the Plugins footer handler uniquely");
+const clickFooter = new Function("state",
+  `const { page, canNavBack, navBack, setPage } = state; return (${handlers[0]})();`);
+
 function harness(page = "chat") {
   let intents = 0;
   const selections = [];
   let state = {
-    page, utilityReturnPage: "chat", activeSessionId: "session-a",
+    page, activeSessionId: "session-a",
     navStack: [{ page, sessionId: page === "chat" ? "session-a" : undefined }], navIndex: 0,
     selectSession: (...args) => selections.push(args),
   };
@@ -21,60 +42,51 @@ function harness(page = "chat") {
     interactionRuntime: {},
   });
   state = { ...state, ...actions };
-  return { get: () => state, actions, selections, set: (patch) => { state = { ...state, ...patch }; } };
+  return { get: () => state, actions, selections, click: () => clickFooter(state),
+    set: (patch) => { state = { ...state, ...patch }; } };
 }
 
-for (const page of ["chat", "pulls", "scheduled"]) {
-  test(`utility toggle returns to ${page} without reloading the active session`, () => {
+for (const page of ["chat", "pulls", "scheduled", "settings"]) {
+  test(`Plugins footer goes back one history entry to ${page}`, () => {
     const h = harness(page);
-    h.actions.toggleUtilityPage("plugins");
+    h.click();
     assert.equal(h.get().page, "plugins");
-    h.actions.toggleUtilityPage("plugins");
+    assert.equal(h.get().navIndex, 1);
+    h.click();
     assert.equal(h.get().page, page);
-    assert.equal(h.get().activeSessionId, "session-a");
-    assert.deepEqual(h.selections, []);
+    assert.equal(h.get().navIndex, 0);
+    assert.equal(h.get().navStack.length, 2, "Back must not append a return entry");
+    if (page === "chat") {
+      assert.equal(h.selections.length, 1);
+      assert.equal(h.selections[0][0], "session-a");
+      assert.equal(h.selections[0][1].record, false);
+    } else {
+      assert.deepEqual(h.selections, []);
+    }
   });
 }
 
-test("switching utilities or settings tabs does not replace the return destination", () => {
+test("Plugins footer respects the immediate history entry, including Settings", () => {
   const h = harness("scheduled");
-  h.actions.toggleUtilityPage("plugins");
-  h.actions.toggleUtilityPage("settings");
-  h.actions.setSettingsTab("models");
-  h.actions.toggleUtilityPage("settings");
-  assert.equal(h.get().page, "scheduled");
-  h.actions.setPage("pulls");
-  h.actions.toggleUtilityPage("settings");
-  h.actions.toggleUtilityPage("settings");
-  assert.equal(h.get().page, "pulls");
+  h.actions.setPage("settings");
+  h.click();
+  h.click();
+  assert.equal(h.get().page, "settings");
+  assert.equal(h.get().navIndex, 1);
+  h.actions.navForward();
+  assert.equal(h.get().page, "plugins");
+  h.click();
+  assert.equal(h.get().page, "settings");
 });
 
-test("utility navigation preserves a newer or deleted active session instead of restoring an old id", () => {
-  for (const activeSessionId of ["session-b", undefined]) {
-    const h = harness();
-    h.actions.toggleUtilityPage("plugins");
-    h.set({ activeSessionId });
-    h.actions.toggleUtilityPage("plugins");
+test("Plugins without earlier history falls back to chat", () => {
+  for (const navStack of [[], [{ page: "plugins" }]]) {
+    const h = harness("plugins");
+    h.set({ navStack, navIndex: navStack.length - 1 });
+    h.click();
     assert.equal(h.get().page, "chat");
-    assert.equal(h.get().activeSessionId, activeSessionId);
     assert.deepEqual(h.selections, []);
   }
-});
-
-test("direct navigation, no-history navigation and browser history retain a usable return page", () => {
-  const h = harness("pulls");
-  h.actions.setPage("settings", { record: false });
-  h.actions.toggleUtilityPage("settings");
-  assert.equal(h.get().page, "pulls");
-  h.actions.setPage("plugins");
-  h.actions.navBack();
-  h.actions.navForward();
-  h.actions.toggleUtilityPage("plugins");
-  assert.equal(h.get().page, "pulls");
-  const fresh = harness();
-  fresh.set({ page: "plugins" });
-  fresh.actions.toggleUtilityPage("plugins");
-  assert.equal(fresh.get().page, "chat");
 });
 
 test("plugin browsing choices survive subscribers disconnecting without retaining dialogs or operations", () => {
