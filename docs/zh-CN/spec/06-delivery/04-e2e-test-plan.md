@@ -6422,12 +6422,12 @@ IPC 请求无法关闭。
 #### E2E-204：显式退出在关机前确认（D363）
 
 - **前提条件**：普通交互会话正在运行（不是 boot / supervision / capture 探针）。主窗口可见或已藏到托盘。
-- **步骤**：1) 从托盘菜单选择退出，或按 Cmd+Q / 应用菜单退出。2) 取消原生警告，确认窗口、托盘、host-core 和 sidecar 仍在。3) 再操作一次并确认退出，确认走有序关机。4) Windows/Linux 在关闭行为未设置时关窗，并在 D230 对话框选择退出；确认没有第二次警告。5) 以 `PI_DESKTOP_BOOT_PROBE=1`（及 supervision/capture 等价项）启动，确认 `app.quit()` 不弹对话框。
-- **预期**：误触显式退出可以取消。已经在关闭行为对话框选择退出的用户不会再被问一次。自动化探针不会被警告挡住。
-- **链接规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`、`08-meta/decisions-log.md`（D216、D230、D363）
+- **步骤**：1) 从托盘菜单选择退出，或按 Cmd+Q / 应用菜单退出。2) 取消原生警告，确认窗口、托盘、host-core 和 sidecar 仍在。3) 再操作一次并确认退出，确认走有序关机。4) Windows/Linux 在关闭行为未设置时关窗，并在 D230 对话框选择退出；确认没有第二次警告。5) 以 `PI_DESKTOP_BOOT_PROBE=1`（及 supervision/capture 等价项）启动，确认 `app.quit()` 不弹对话框。6) 在打包的 Windows NSIS 或 Linux AppImage 安装上，下载更新并选择“重启以更新”；确认退出警告不再出现，安装器完成升级并重新拉起应用。
+- **预期**：误触显式退出可以取消。已经在关闭行为对话框选择退出的用户不会再被问一次。自动化探针不会被警告挡住。应用内更新重启同样不会被警告推迟：平台安装器先于 `app.quit()` 启动，应用一旦超出其等待窗口安装器就会中止，因此更新触发的退出必须立即走有序关机 —— 用户选择该操作时已经确认了重启。见 ADR 0022。
+- **链接规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`、`08-meta/decisions-log.md`（D216、D230、D363）、ADR 0022
 - **验收**：A、质量
 - **里程碑**：M5
-- **状态**：单元已覆盖（`close-behavior-tray.test.mjs`）；原生对话框旅程为草稿
+- **状态**：单元已覆盖（`close-behavior-tray.test.mjs` 断言探针与更新重启两项豁免，`auto-update.test.mjs` 断言安装闩锁先于 `quitAndInstall` 设置）；原生对话框旅程为草稿
 
 #### E2E-209：从本地智能体存储导入模型配置
 

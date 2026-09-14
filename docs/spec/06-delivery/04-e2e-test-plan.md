@@ -3623,17 +3623,25 @@ and identify the platform validation still needed.
   unset, close the window and choose Quit on the D230 dialog; confirm no
   second warning. 5) Launch with `PI_DESKTOP_BOOT_PROBE=1` (and the
   supervision/capture equivalents) and confirm `app.quit()` exits without a
-  dialog.
+  dialog. 6) On a packaged Windows NSIS or Linux AppImage install, download an
+  update and choose Restart to update; confirm the quit warning never appears
+  and the installer finishes the upgrade and relaunch.
 - **Expected**: Accidental explicit quit is cancellable. A user who already
   chose Quit on the close-behavior dialog is not asked again. Probes used by
-  automation never block on the warning.
+  automation never block on the warning. An in-app update restart is never
+  deferred behind the warning either: the platform installer is spawned before
+  `app.quit()` and aborts once the app outlives its wait window, so the
+  update-triggered quit must run the ordered shutdown immediately — the user
+  already committed to the restart by choosing that action.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`, `08-meta/decisions-log.md` (D216, D230,
-  D363)
+  D363), ADR 0022
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`close-behavior-tray.test.mjs`); native dialog
-  journey Draft (run only in a capable environment when this surface changes)
+- **Status**: Unit-covered (`close-behavior-tray.test.mjs` asserts the
+  probe and update-restart exemptions; `auto-update.test.mjs` asserts the
+  install latch is set before `quitAndInstall`); native dialog journey Draft
+  (run only in a capable environment when this surface changes)
 
 #### E2E-067A: Prerelease install discovers newer stable release (D120)
 
