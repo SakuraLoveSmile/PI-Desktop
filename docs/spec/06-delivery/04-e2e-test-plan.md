@@ -10840,6 +10840,16 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   `git-clone.test.mjs`, `sidebar-preferences.test.mjs`); full UI scenario Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-CLONE-public-hostname-rejects-private
+
+- **Preconditions**: The home project switcher Clone git project action is available.
+- **Steps**: 1) Enter `https://127.0.0.1/org/repo.git`, `http://localhost/org/repo.git`, `https://10.0.0.5/org/repo.git`, and `git@127.0.0.1:org/repo.git`. 2) Enter `https://github.com/org/repo.git` and `git@github.com:org/repo.git`.
+- **Expected**: Private, loopback, and link-local remotes are rejected before `git clone` runs. Public GitHub HTTPS and SSH remotes still parse to a folder name. `file:` and password-bearing URLs remain rejected.
+- **Specs linked**: `04-ux/01-ui-ia.md`, ADR 0247, D416
+- **Acceptance**: Security, D (workspace)
+- **Milestone**: M5
+- **Status**: Unit-covered (`apps/desktop/test/git-clone.test.mjs`)
+
 #### E2E-257: Importing into an archived project restores its visibility
 
 - **Preconditions**: A durable project has been archived in the renderer

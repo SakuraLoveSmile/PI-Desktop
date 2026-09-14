@@ -6839,6 +6839,16 @@ IPC 请求无法关闭。
 - **里程碑**：M2
 - **状态**：单元覆盖（`packages/shared/src/composer-trigger.test.ts`、`apps/desktop/test/composer-ime.test.mjs`）；渲染桌面旅程为草稿（除非明确要求，不本地运行 E2E）
 
+#### E2E-CLONE-public-hostname-rejects-private
+
+- **前提条件**：首页项目切换菜单的「克隆 Git 项目」可用。
+- **步骤**：1）输入 `https://127.0.0.1/org/repo.git`、`http://localhost/org/repo.git`、`https://10.0.0.5/org/repo.git` 和 `git@127.0.0.1:org/repo.git`。2）输入 `https://github.com/org/repo.git` 和 `git@github.com:org/repo.git`。
+- **预期**：私网、回环和链路本地远程在 `git clone` 运行前被拒绝。公网 GitHub HTTPS 与 SSH 仍解析出文件夹名。`file:` 和带密码的 URL 继续被拒绝。
+- **链接规格**：`04-ux/01-ui-ia.md`、ADR 0247、D416
+- **验收**：安全、D（工作区）
+- **里程碑**：M5
+- **状态**：单元覆盖（`apps/desktop/test/git-clone.test.mjs`）
+
 #### E2E-257：导入到已归档项目后恢复其可见性
 
 - **前提条件**：一个持久项目已在渲染器侧边栏偏好中归档，并从默认侧边栏隐藏。一个核心导入候选携带该项目路径，测试插件可以使用明确的 host project id 导入会话。
