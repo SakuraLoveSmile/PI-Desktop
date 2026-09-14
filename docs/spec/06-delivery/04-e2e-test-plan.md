@@ -128,6 +128,7 @@ The minimum selection is:
 - Host supervision, crash recovery, or restart behavior: `pnpm test:e2e` and
   `pnpm test:e2e:supervision`.
 - Subagent lifecycle: `pnpm test:e2e` and `pnpm test:e2e:subagents`.
+- Imported-extension dependency installation or registry-boundary changes: `pnpm test:e2e:plugin-import-deps`.
 - Changes spanning multiple surfaces use the union of the applicable suites.
 
 `pnpm test:e2e` is the default cross-system smoke suite for host RPC, IPC,
@@ -10574,44 +10575,40 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   (esbuild bundle run from a temp directory); packaged-app journey Draft
 #### E2E-PLUGIN-import-extension-installs-dependencies: Importing an extension with npm dependencies installs them before first load
 
-- **Preconditions**: A pi extension directory shipping a `package.json` with
-  `dependencies` (a pure-JavaScript package is sufficient) and no
-  `node_modules`; npm reachable; the import confirm accepted.
-- **Steps**: 1) Plugins → Import pi extension, pick the directory. 2)
-  Inspect `plugins/imported/<slug>/`. 3) Send a prompt that exercises the
-  extension.
-- **Expected**: The plugin root holds the copied `package.json` with any
-  `workspaces` field stripped. Dependency resolution first runs
-  `npm install --package-lock-only --omit=dev --legacy-peer-deps --no-audit
-  --no-fund --ignore-scripts`, validates registry-only sources, and then
-  creates `node_modules` with `npm ci --omit=dev --legacy-peer-deps --no-audit
-  --no-fund --ignore-scripts` (no install script ran); the extension row reaches
-  `loaded` with its tools, commands, and hooks registered, and they take effect
-  in the turn.
+- **Preconditions**: A local pi extension package with `package.json`, `pi.extensions`,
+  a pinned pure-JavaScript `is-number@7.0.0` dependency, a `workspaces` field, and
+  no `node_modules`; the built workspace packages and npm are available.
+- **Steps**: 1) Generate the imported plugin from the local directory. 2) Run the
+  real bounded installer. 3) Inspect the copied package, lockfile, installed module,
+  lifecycle marker, and trusted-extension load report.
+- **Expected**: The plugin root holds the copied `package.json` with `workspaces`
+  stripped. The installer runs the two registry-only, `--ignore-scripts` npm steps;
+  every lockfile `resolved` URL is registry-only, `node_modules/is-number` exists,
+  no lifecycle marker is written, and the trusted-extension runner reports `loaded`
+  with the dependency-backed command registered.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §10.2; ADR 0244
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
-  and verified manually with `pi-hermes-memory` through the sidecar bundle
-  (tools, commands, and hooks registered, zero diagnostics); no CI journey yet
+- **Status**: Automated by `pnpm test:e2e:plugin-import-deps` for the deterministic
+  installer boundary; the full picker/renderer/turn journey remains a separate
+  validation surface.
 
 #### E2E-PLUGIN-import-extension-reports-missing-dependency: A failed dependency install or unloadable dependency is surfaced, never silent
 
-- **Preconditions**: A pi extension directory whose `package.json` declares
-  a dependency that cannot install (npm offline or unresolvable); and one
-  whose dependency installs but fails to load (for example a native module
-  that needs a build script).
-- **Steps**: 1) Import the first directory with npm failing. 2) Inspect the
-  toast and the plugin row. 3) Import the second directory and start a turn.
-- **Expected**: The renderer shows a warning toast carrying the npm stderr
-  tail; the plugin still registers; the row reports the extension `error`
-  state with a `load_error` diagnostic; the session and all other extensions
-  keep working.
+- **Preconditions**: Three local pi extension packages whose `package.json`
+  dependencies use unsupported `file:`, git, and HTTP tarball sources; none has
+  `node_modules` or a lockfile.
+- **Steps**: 1) Generate each imported plugin. 2) Invoke the real dependency
+  installer. 3) Inspect the returned error and the generated plugin directory.
+- **Expected**: Each failure is explicit and occurs before npm starts; the imported
+  plugin and manifest remain registered, while no loadable `node_modules` or generated
+  lockfile remains. The renderer toast/load-error journey is covered separately.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2, §4.4, §10.2; ADR 0244
 - **Acceptance**: Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Unit-covered by `apps/desktop/test/agent-extensions.test.mjs`
-  (skip, failure, and invalid-manifest paths); no CI journey yet
+- **Status**: Automated by `pnpm test:e2e:plugin-import-deps` for the deterministic
+  registry-source rejection boundary; renderer warning-toast and `load_error`
+  behavior remains a separate validation surface.
 
 
 ---
