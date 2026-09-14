@@ -242,9 +242,12 @@ async function main() {
   });
   const channels = {
     "pi-desktop/session/list": async () => ({ sessions: await service.list() }),
+    "pi-desktop/session/search": async (_event, input) =>
+      service.search(String(input?.query ?? "")),
     "pi-desktop/session/get": async (_event, input) => ({
       session: service.detail(String(input.id), {
         messageBefore: input.messageBefore,
+        messageAround: input.messageAround,
         messageLimit: input.messageLimit,
         contentLimit: input.contentLimit,
       }),

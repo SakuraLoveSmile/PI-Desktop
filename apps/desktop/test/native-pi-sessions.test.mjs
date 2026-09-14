@@ -48,6 +48,7 @@ const { register } = await import("node:module");
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
 const { IPC } = await import("@pi-desktop/shared");
 const { registerAgentIpc } = await import("../electron/main/ipc/agent-ipc.ts");
+const { searchSessionsAcrossSources } = await import("../electron/main/services/session-search.ts");
 const { createEventsSlice } = await import("../src/stores/slices/events-slice.ts");
 const { createTranscriptSlice } = await import("../src/stores/slices/transcript-slice.ts");
 const { api } = await import("../src/lib/api.ts");
@@ -211,6 +212,7 @@ function forkHarness({ host, sidecar }) {
     "@pi-desktop/shared": sharedForIpc,
     "../importers": { convertSession() {}, scanAllSources() {}, scanModelConfigs() {} },
     "../services/session-collaboration": { readSessionCollaboration() {} },
+    "../services/session-search": { searchSessionsAcrossSources },
   });
   registerSessionIpc({
     registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
@@ -227,8 +229,44 @@ function forkHarness({ host, sidecar }) {
     acquireSessionOperation: async () => () => {},
     stripWinLongPrefix: (value) => value,
   });
-  return { handle: handlers.get(IPC.invoke.sessionFork), hostCalls, sidecarCalls };
+  return {
+    handle: handlers.get(IPC.invoke.sessionFork),
+    search: handlers.get(IPC.invoke.sessionSearch),
+    hostCalls,
+    sidecarCalls,
+  };
 }
+
+const searchSession = (id, updatedAt) => ({
+  session: { id, title: id, updatedAt, source: id.startsWith("native") ? "pi-native" : "desktop" },
+  projectName: null,
+  metadataMatch: true,
+  messageCount: 0,
+  matches: [],
+});
+
+test("global session search merges native sidecar hits with Desktop results", async () => {
+  const nativeHit = searchSession("native-pi:child", "2026-09-14T00:00:02.000Z");
+  const desktopHit = searchSession("desktop-session", "2026-09-14T00:00:01.000Z");
+  const { search, hostCalls, sidecarCalls } = forkHarness({
+    host: (calls) => ({
+      call: async (method, input) => {
+        calls.push({ method, input });
+        return { hits: [desktopHit], nextOffset: null };
+      },
+    }),
+    sidecar: (calls) => ({
+      call: async (method, input) => {
+        calls.push({ method, input });
+        return { hits: [nativeHit], nextOffset: null };
+      },
+    }),
+  });
+  const result = await search({ query: "side chat", offset: 0 });
+  assert.deepEqual(result.hits.map((hit) => hit.session.id), ["native-pi:child", "desktop-session"]);
+  assert.deepEqual(sidecarCalls, [{ method: "native.session.search", input: { query: "side chat" } }]);
+  assert.deepEqual(hostCalls, [{ method: "search.sessions", input: { query: "side chat", offset: 0 } }]);
+});
 
 test("native fork routes to the sidecar and never to the Desktop host", async () => {
   const { handle, hostCalls, sidecarCalls } = forkHarness({
