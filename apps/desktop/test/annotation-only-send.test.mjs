@@ -106,7 +106,7 @@ test("the real store queues an annotation-only prompt while the session is runni
   visit(storeAst);
   assert.ok(handler);
   const queued = [];
-  const state = { activeSessionId: "s1", pendingPlans: {}, runningSessions: { s1: true },
+  const state = { activeSessionId: "s1", pendingPlans: {}, runningSessions: { s1: true }, sessions: [], sideChats: {},
     responseAnnotations: { s1: [annotation], s2: [annotation] },
     enqueuePrompt: async (...args) => { queued.push(args); return true; },
   };
