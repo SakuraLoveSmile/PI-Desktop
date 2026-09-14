@@ -241,6 +241,9 @@ Each ADR includes:
 | 0220 | Keep Windows work-panel chrome single-purpose | Accepted (amends D154 / D357 / ADR 0195) |
 | 0221 | Render canonical thinking-level values without translation | Accepted (amends D369 / ADR 0202) |
 | 0222 | Native file and folder drops in the Composer | Accepted (amends ADR 0101 / D397) |
+| message-quotes-and-side-chats | Message quotes and renderer-owned side chats | Accepted (preserves D097 / D128 / D134 / D154; amended by D-LOCAL-selection-overlay) |
+| response-annotations | Response annotations as prompt attachments | Accepted (amends D-LOCAL-message-quotes decision 3 for assistant turns; presentation amended by floating-annotation-index) |
+| floating-annotation-index | Floating annotation index and source locations | Accepted (amends D-LOCAL-response-annotations / response-annotations) |
 | 0223 | Context Usage Display Preference | Accepted (amends 0184) |
 | 0224 | Right panel tab strip and data-driven add menu | Accepted (issue #229) |
 | 0225 | Restore deferred tools from effective session context | Accepted (issue #225) |
@@ -272,6 +275,6 @@ Each ADR includes:
 | global-sidebar-pins | [Show pinned conversations in a global sidebar section](global-sidebar-pins.md) | Accepted (amends ADR 0016; issue #306) |
 | 0250 | [Structured, bounded, and redacted process logs](0250-structured-bounded-redacted-process-logs.md) | Accepted for implementation |
 | active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
-| active-turn-steering | Bind Composer steering to the active durable turn | Accepted (active-turn-steering; issue #164) |
 | 0252 | Host turn-end event for plugins | Accepted (D422) |
 | 0253 | [Remove the subagent turn limit](0253-remove-subagent-turn-limit.md) | Accepted (supersedes the `maxTurns` clauses of 0062 / 0063 / 0119 / 0126 / 0166 / 0210) |
+| 0254 | [Continue native Pi sessions in their canonical JSONL](0254-native-pi-session-continuation.md) | Accepted (amends baseline D007; D421) |

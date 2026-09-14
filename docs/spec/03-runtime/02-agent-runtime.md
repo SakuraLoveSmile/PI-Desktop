@@ -1170,3 +1170,58 @@ normalization and error-mapping source.
 
 Tracked gaps (post-MVP backlog): richer system prompt composition (§7) and
 provider/model catalog discovery beyond the currently wired paths.
+
+## 12. Native Pi continuation runtime (ADR 0254)
+
+The sidecar selects runtime by session source. Desktop-owned ids continue to use
+`DesktopAgentRuntime`, host turn rows, and the host persistence outbox unchanged.
+Opaque `native-pi:` ids use a dedicated coding-agent `AgentSession` constructed
+with the original v3 `SessionManager`, Pi `ModelRuntime`, `SettingsManager`, and
+`DefaultResourceLoader`. Native context is built by the SDK from the active tree
+leaf, compaction, model/thinking changes, and context-bearing custom messages;
+it is never reconstructed from renderer `UiMessage` rows.
+
+The first native slice supports text prompt **without model tools**, stop/abort,
+and explicit refresh. `createAgentSession` receives `noTools: "all"`; neither
+built-in nor extension tools may bypass Desktop permissions. Tool parity awaits
+an explicit permission bridge. Native extension startup/resource discovery binds
+with the SDK headless UI and unsupported session-control actions; guards and
+listeners are installed before startup appends. Binding failure disposes the
+session and releases ownership. Pi extensions remain trusted local code, not
+Desktop plugins.
+
+A native fork (`native.session.fork`) branches the parent snapshot in memory:
+the SDK extracts the anchored branch using its native label/compaction
+re-chaining rules, drops later and sibling entries, and never touches the parent
+file or its manager. When the anchored branch recorded no model, the child
+records the parent session's saved provider/model; when it recorded no
+thinking-level change, it records the parent's saved level, while an explicit
+branch value (including off) wins. The child is published as a complete new
+file whose staged and published bytes must still match the captured
+device/inode/size/hash before it is projected or registered; an altered file
+fails closed without returning a child. A fork is a data-only copy: it executes
+no model and loads no project resources, so it stays available while the parent
+is provider-unavailable or project-untrusted, without granting prompt
+readiness. The side-chat panel streams the child's provisional assistant row
+and re-keys exactly that row when persistence reports the durable SDK entry id
+through the additive `replacesMessageId` field.
+
+ModelRuntime performs its public offline initialization to restore the local
+catalog and auth snapshot. Native Composer readiness uses native `canPrompt`,
+not Desktop provider or secret availability. Owned idle leases remain usable;
+active turns stay stoppable through retries/compaction, reject overlap without
+disposal, and publish exactly one terminal event after SDK prompt settlement
+and final persistence (including `agent_settled` hooks). An error rejection
+uses the error terminal path instead.
+
+The native dispatcher carries the optimistic `userMessageId`; a
+`user_message_persisted` event acknowledges the SDK-assigned durable entry ID
+after the guarded append. No caller ID is written into native JSONL. The
+renderer reconciles active, retained, and cached rows by identity, never text.
+Native abort refreshes the original transcript instead of smart-stop rewrite.
+
+The saved provider/model and configured Pi auth must resolve exactly; there is
+no Desktop provider fallback. Missing cwd, required project trust, unsupported
+format, repair-needing newline, unavailable provider/auth, active lease, or
+external byte change makes continuation fail closed while detail remains
+browseable.

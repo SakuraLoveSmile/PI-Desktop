@@ -1250,6 +1250,276 @@ and identify the platform validation still needed.
 - **Status**: Source-level regression covered (`session-create.test.mjs`,
   `session-switch-performance.test.mjs`); full UI scenario Draft
 
+#### E2E-CHAT-quote-prefill: Quoting a message or a selection prefills the composer without sending
+
+- **Preconditions**: A session with at least one user message and one completed
+  assistant answer; a second configured session exists; no turn is running.
+- **Steps**: 1) Hover the user message and activate Quote. 2) Inspect the
+  composer draft, the transcript, and the sidebar. 3) Select a phrase inside the
+  assistant answer and activate Add to chat (`chat.addToChat`) in the overlay
+  that floats above the selection: on an assistant turn this opens the comment
+  editor instead of editing the draft (E2E-CHAT-annotation-attachments), so cancel it with Escape, then
+  select a phrase inside the user message and quote it through that message's
+  row Quote action. 4) Send the
+  quoted draft. 5) Repeat step 1 for an excerpt longer than 2000 characters,
+  stop the unanswered send, and switch sessions and back.
+- **Expected**: The draft gains `> ` on every excerpt line, one blank line, then
+  the localized attribution rendered from `chat.quoteSource`
+  ("Quoted from {{title}}" / "引用自 {{title}}") naming the source session's
+  title; step 3's cancelled editor adds no annotation and no draft text, and the
+  Quote action inserts only the live selection. No turn starts, no transcript row is
+  added, no session is created, and focus moves to the composer. The excerpt is
+  capped at 2000 characters with a trailing ellipsis, and no reference chip
+  appears. The send transmits ordinary prompt text, smart Stop restores the
+  quoted draft after the unanswered send, and the draft slot survives the
+  session switch. Step 3 shows exactly one overlay, centered above the
+  selection, clamped inside the transcript's bounds and above the composer band,
+  offering Add to chat, Ask in side chat, and Copy. It follows the selection when
+  the thread scrolls, hides on a press outside it, on selection collapse, and
+  after the action consumes the selection, and it is absent from the read-only
+  side-chat projection of the same message.
+- **Specs linked**: `04-ux/08-component-spec.md` §8.8, §11.9;
+  `04-ux/09-interaction-patterns.md` §7.5, §8a.2; ADR message-quotes-and-side-chats, D-LOCAL-message-quotes, D-LOCAL-selection-overlay
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-side-chat-fork: Opening a side chat forks the child without switching the visible session
+
+- **Preconditions**: A session with a completed assistant answer and a user
+  message; a provider ready for a child session.
+- **Steps**: 1) Hover the assistant turn and activate Open side chat
+  (`chat.startSideChat`). 2) Inspect the visible transcript, the sidebar
+  selection, and the work-panel header. 3) Repeat from a user message in the
+  same session. 4) List the host's sessions.
+- **Expected**: Each activation calls `session.fork` with the clicked message as
+  anchor and returns a durable child. The main conversation stays visible and
+  selected with an unchanged transcript and scroll position; no prompt is sent
+  and no permission is requested. The work panel opens one `sidechat` tab
+  (`sidechat:<childSessionId>`) labeled from `sideChat.title`. The children
+  appear as ordinary sessions in the sidebar, session lists, and search.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8, §8.8;
+  `04-ux/09-interaction-patterns.md` §1.8; `03-runtime/04-data-storage.md`;
+  ADR message-quotes-and-side-chats, ADR 0023, D-LOCAL-message-quotes
+- **Acceptance**: C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-side-chat-stream: The side-chat panel streams the child's turn live
+
+- **Preconditions**: A registered side chat whose child session has no turns
+  yet; permission mode Ask so one tool call is gated.
+- **Steps**: 1) Enter a prompt in the side-chat input and Send. 2) Watch the
+  panel while the child streams thinking, a tool call, and the answer. 3) Answer
+  the child's permission card from the panel, then answer its ask card when the
+  child asks a question. 4) Send a prompt that calls a gated tool and press Stop
+  while the child is answering.
+  gated tool and press Stop while the child is answering.
+- **Expected**: The panel renders the child's transcript with the existing
+  transcript components and updates on the same message/tool
+  start-update-end events the active transcript consumes, although the child is
+  never the active session; send and Stop target the child through the existing
+  prompt and abort paths and the main conversation gains no row. The permission
+  card and the ask card each resolve by their own request's session id, so a
+  child that needs approval or an answer never stalls behind an invisible prompt.
+  side-chat title, Add to main chat (`sideChat.addToMain`), Open as a
+  conversation (`sideChat.openAsSession`), and the shared close control; the
+  input uses `sideChat.placeholder` and `sideChat.empty`, Send reuses
+  `chat.send`, and Stop reuses `chat.stopGenerating`.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8, §11.2;
+  `03-runtime/10-session-state-machine.md`; ADR message-quotes-and-side-chats, ADR 0023
+- **Acceptance**: C (conversation), E (permissions), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-side-chat-add-to-main: Add to main chat prefills the main composer with the newest answer
+
+- **Preconditions**: A registered side chat whose child has at least one
+  completed assistant answer and whose panel is visible; the main composer is
+  empty.
+- **Steps**: 1) Activate Add to main chat (`sideChat.addToMain`) in the
+  side-chat header. 2) Inspect the main composer, the main transcript, and the
+  side-chat panel. 3) Send the draft. 4) Repeat for an answer longer than 2000
+  characters.
+- **Expected**: The main conversation's composer receives a Markdown blockquote
+  of the side chat's newest assistant answer under the same contract as message
+  quoting — `> ` on every line, one blank line, then the attribution naming the
+  side-chat title — capped at 2000 characters with a trailing ellipsis. Nothing
+  is sent automatically, no transcript row appears before the user sends, the
+  side chat keeps its registration and tab, and no reference chip is added.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8, §11.9; ADR message-quotes-and-side-chats, D-LOCAL-message-quotes
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-side-chat-promote: Open as a conversation activates the child and releases the panel entry
+
+- **Preconditions**: A registered side chat with streamed content and a
+  retained main-conversation panel context.
+- **Steps**: 1) Activate Open as a conversation (`sideChat.openAsSession`).
+  2) Inspect the active session, the sidebar selection, the composer, the
+  transcript, and the panel's context menu. 3) Send a follow-up prompt in the
+  activated child, then switch back to the main conversation.
+- **Expected**: The child becomes the visible session through the normal
+  session-selection path with its full durable transcript, composer, prompt
+  queue, and Stop controls. The side-chat registration and its `sidechat` tab
+  are released, so the panel no longer lists that resource, while the main
+  conversation's transcript and retained panel context are unchanged.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8;
+  `04-ux/09-interaction-patterns.md` §1.8; ADR message-quotes-and-side-chats, ADR 0023, D128
+- **Acceptance**: C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-side-chat-close: Closing the side-chat tab keeps the child session
+
+- **Preconditions**: A registered side chat whose tab is open and whose child
+  already appears in the sidebar; a second parent session for the deletion pass.
+- **Steps**: 1) Close the `sidechat` tab from its menu row or the header close
+  control. 2) Inspect the panel and the sidebar. 3) Search for the child, open
+  it, then restart the app and look for it again. 4) Register a fresh side chat,
+  delete its parent session, then repeat and delete the child session.
+- **Expected**: Closing the tab removes the registration and its transcript
+  projection and nothing streams into the panel afterwards, while the child
+  session is not deleted and stays in the sidebar, session lists, and search as
+  an ordinary conversation. After a restart the child session is still present
+  and no `sidechat` tab or projection is restored. Deleting the parent or the
+  child also removes the registration and its tab.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8;
+  `03-runtime/04-data-storage.md`; ADR message-quotes-and-side-chats, ADR 0023, D128
+- **Acceptance**: C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-selection-markdown: Quoting a formula, a table, and a code block recovers Markdown
+
+- **Preconditions**: A session with a completed assistant answer containing an
+  inline formula, a display formula, a GFM table, a fenced code block, a file
+  reference rendered as inline code, and a task list; no turn running.
+- **Steps**: 1) Drag-select part of the inline formula and activate the floating
+  quote affordance. 2) Select the display formula alone. 3) Select the whole
+  table and a code fence in one drag. 4) Inspect the composer draft after each
+  step, then select a phrase and scroll the thread, resize the window,
+  double-click a word, drag a selection across two messages, collapse the
+  selection, and open the same message in a side-chat projection.
+- **Expected**: Each draft carries the rendered text as Markdown: `$…$` TeX for
+  an inline formula and `$$…$$` for a display formula, never KaTeX's duplicated
+  MathML/HTML text; one `a | b` line per table row; a fenced block whose
+  delimiter outgrows any backtick run inside the snippet and keeps its language;
+  backticked inline code whose file-reference chip keeps its code text; and
+  `[x] `/`[ ] ` for a task list. Chrome (hover action rows, copy buttons, the
+  checkbox control) never appears in the excerpt. Each quote is one `> `-prefixed
+  blockquote plus the `chat.quoteSource` attribution, appended after any existing
+  draft, capped at 2000 characters, with no chip added and no turn started. The
+  overlay is the only one on screen, sits centered above the selection inside the
+  transcript bounds and above the composer band, follows the thread scroll rather
+  than disappearing, hides on a press outside it and on selection collapse, is
+  absent from a read-only side-chat projection, and never appears for a drag that
+  crosses two messages — such a range is clamped back to its own row instead.
+- **Specs linked**: `04-ux/08-component-spec.md` §8.8, §11.9;
+  `04-ux/09-interaction-patterns.md` §7.5; ADR message-quotes-and-side-chats, D-LOCAL-selection-overlay
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-selection-side-chat: Ask in side chat answers beside the conversation
+
+- **Preconditions**: A session with a completed assistant answer; a provider
+  ready for a child session; no turn running.
+- **Steps**: 1) Select a phrase in the answer and activate Ask in side chat
+  (`chat.askInSideChat`) in the floating overlay. 2) Inspect the visible
+  transcript, the composer draft, and the work panel. 3) Wait for the child's
+  answer, then repeat with a turn already running.
+- **Expected**: One `sidechat` tab opens for a child forked at that message and
+  the excerpt is sent as that child's own prompt, so the answer streams inside
+  the panel while the visible conversation, its draft, its scroll position, and
+  its run state are untouched. The overlay closes and the native selection is
+  cleared. The main conversation gains no row from this action, and the fork
+  refuses while the visible turn is running (the action is disabled then).
+- **Specs linked**: `04-ux/08-component-spec.md` §5.8, §8.8; ADR message-quotes-and-side-chats, D-LOCAL-message-quotes,
+  D-LOCAL-selection-overlay
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-annotation-attachments: Annotating a response attaches numbered prompt data, not draft text
+
+- **Preconditions**: A session with a completed answer containing at least two
+  distinct paragraphs; no turn running.
+- **Steps**: 1) Select a phrase in the first paragraph and activate Add to chat
+  in the floating overlay; the comment editor opens with that excerpt — type a
+  comment and Save. 2) Select a phrase in the second paragraph, add it with an
+  empty comment, then select the first phrase again, edit its comment, and Save.
+  3) Inspect the answer, the composer, and the editor draft; expand the floating
+  annotation index and inspect the list. 4) Send an instruction and inspect the request
+  the agent received.
+- **Expected**: Activating Add to chat opens the editor and sends nothing: no
+  turn starts, no draft text appears, and Save attaches the annotation with the
+  comment in its `annotation` field while Escape and Cancel attach nothing. The
+  editor shows the selected Markdown as its excerpt snapshot. The answer body is
+  unchanged: nothing is inserted into its Markdown. Independent source badges
+  show the same numbers as the floating index (ADR floating-annotation-index / E2E-CHAT-annotation-source-index).
+  The index lists `1. <excerpt>` and `2. <excerpt>`; step 2 leaves two entries (reopening the
+  first excerpt edits annotation 1's comment instead of adding a third), and the
+  attachment's list shows each excerpt with its comment and its own edit and
+  remove controls beside the clear-all control. Where the model cites an
+  annotation, that citation
+  renders as a small numbered reference whose tooltip is the excerpt, and no
+  marker joins a selection, a quote, or a copy of the answer. The draft text, the optimistic user row, the
+  sidebar title, and the composer's edit seed contain the user's own words only —
+  no excerpt, no blockquote, no attribution line. The request the agent receives
+  begins with `# Response annotations:` and the instruction sentence, carries
+  `<response-annotations>` with
+  `[{"text","annotation","source":{"messageId"}}]` in that order — annotation 1
+  with the edited comment, annotation 2 with an empty comment — and continues
+  under `## My request:` with the typed instruction. The attachment is gone after
+  the send, and the transcript shows the stored prompt as the typed instruction
+  only.
+- **Specs linked**: `04-ux/08-component-spec.md` §8.8, §11.10;
+  `04-ux/09-interaction-patterns.md` §7.5a; ADR response-annotations, D-LOCAL-response-annotations
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
+#### E2E-CHAT-annotation-session-state: Annotation state is session-scoped and never persisted
+
+- **Preconditions**: Two sessions; a completed answer in the first; no turn
+  running.
+- **Steps**: 1) Annotate one pass in the first session and save a comment, then
+  open the editor again and press Escape. 2) Switch to the second
+  session and inspect the transcript. 3) Switch back and expand the floating
+  annotation index. Verify per-item controls announce their annotation numbers.
+  4) Edit the comment from the list and remove one item from it;
+  annotate again, clear the annotations from
+  the floating index, and send a prompt. 5) Annotate again and restart the
+  app. 6) Open a new annotation editor, type with a CJK IME, and press Escape
+  while composing. Drag-select comment text and release outside the dialog.
+  Finish composing, then press Escape normally and inspect focus and run state.
+  7) Reopen the editor, type a comment with Shift+Enter between lines, and press
+  Enter to save. Repeat with the main composer's Enter-to-send preference disabled
+  and with an IME candidate-confirmation Enter.
+- **Expected**: Step 7 saves the multiline comment on plain Enter without sending
+  a prompt; Shift+Enter inserts a newline. IME confirmation keeps the editor open,
+  and the main composer's preference does not change these editor shortcuts.
+  Step 6 keeps the editor and typed text during IME Escape and
+  drag-selection overshoot. Normal Escape closes only the editor (never aborts
+  the run) and restores focus to its trigger or the rich composer. The attachment
+  belongs to the session it was made in: the second
+  session shows none, and switching back restores it unchanged. The cancelled
+  editor adds nothing, the list edits that annotation's comment in place, and
+  removing an item drops just that annotation while clear-all drops every
+  remaining one; the following send carries no block. After a restart no
+  annotation, marker, or attachment is restored, and the sessions are otherwise
+  unchanged — annotations never reach the host on their own, no session file
+  gains them, and no protocol, schema, or permission surface changes,
+  including the comment editor.
+- **Specs linked**: `04-ux/08-component-spec.md` §11.10;
+  `04-ux/09-interaction-patterns.md` §7.5a; `03-runtime/04-data-storage.md`;
+  ADR response-annotations, D-LOCAL-response-annotations
+- **Acceptance**: C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Draft
+
 ### Conversation Top Bar
 
 #### E2E-087: Conversation top bar renders on the chat route
@@ -6808,6 +7078,76 @@ and identify the platform validation still needed.
   Responses and its original alias, while the copy retained Anthropic Messages
   and its edited alias. Credential-bearing network discovery, external-model
   calls, and the OpenCode Go UI variant were not exercised.
+### E2E-CHAT-annotation-source-index: Floating annotation index and numbered source locations
+
+- **Status**: Draft (not run)
+- **Preconditions**: A long session with repeated phrases, a formula, and a code block;
+  another retained session; a writable main transcript and read-only side chat.
+- **Steps**: 1) Annotate two occurrences of identical words and add comments.
+  2) Inspect both saved ranges before clicking any item, then collapse and expand
+  the floating index. 3) Click each numbered item, then
+  its source badge. 4) Scroll, resize the work panel and composer, and revisit the
+  session after its source is outside the mounted history window. 5) Edit/remove
+  an item; clear or send the remaining annotations. Copy the answer and inspect
+  the outgoing prompt. 6) Repeat on formulas, split highlighted code, and a source
+  whose text changed or was removed. 7) Save an annotation, empty the composer,
+  and send using the button; repeat with Enter and while running. Try whitespace
+  only, no saved annotations, another session's annotations, and a blocked send.
+- **Expected**: One floating index stays above the composer. Collapse retains a
+  small count header and visible source badges. Both saved exact ranges stay
+  highlighted before any click, while collapsed, and when another item is selected;
+  deleting one removes only its highlight, clear/send removes all. Unresolved
+  ranges never highlight the whole answer. List and badge numbers agree with
+  prompt array order, renumbering after removal. Distinct occurrences remain
+  separate; repeating one selection edits that annotation. Locate releases follow
+  mode, loads/mounts history if needed, scrolls the same pane and overlays a highlight
+  on the exact range. Ambiguous/stale ranges fall back to the source response with
+  an explicit tooltip; absent rows never jump to another answer. Badges stack when
+  coincident and clip to the visible transcript, never the composer. Copied answer
+  text, Markdown, formulas and layout are unchanged. Anchor metadata is not in the
+  prompt. Hidden/read-only panes show no index or badges. Send/clear removes both;
+  no persistence, host protocol, schema, IPC or permission change. Step 7 enables
+  Send for saved annotations without request text (queues while running), carries
+  each excerpt/comment in the existing block, and consumes only that session's
+  sent annotations. No filler request is invented. Truly empty submissions remain
+  disabled; model/paste/approval blocks and rejection retain annotations. Trimmed
+  annotation-only prompts never display the internal block.
+- **Specs linked**: `04-ux/08-component-spec.md` §11.10;
+  `04-ux/09-interaction-patterns.md` §7.5a; ADR floating-annotation-index (amends D-LOCAL-response-annotations).
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6+
+
+### E2E-CHAT-annotation-ack-and-steering: Preserve annotation ownership across upstream send paths
+
+- **Preconditions**: An isolated fixture profile has two sessions, saved annotations,
+  a controllable prompt/queue acknowledgement, and an active turn for steering.
+- **Steps**: Submit annotations with and without request text; delay acknowledgement,
+  press Enter again (no duplicate), add another annotation, edit a submitted
+  comment, and switch sessions. Resolve
+  success, then repeat with host rejection, an unexpected pre-host exception,
+  and new draft text typed during the wait.
+  Send a text-only Alt+Enter steer and try annotation-only steering. In the comment
+  editor, confirm an IME candidate, save with Enter, and insert a Shift+Enter newline.
+  Inspect queue previews and edit seeds for annotation-only prompts and a request
+  containing an ordinary `## My request: extra` heading. Close a side-chat tab both
+  as the final resource and beside another tab; inspect its durable child session.
+- **Expected**: Nothing is consumed before acknowledgement. Success consumes only
+  unchanged submitted annotations in the original session; host rejection or an
+  unexpected setup exception returns a rejected submission, retains annotations,
+  and restores a draft only into an unchanged/empty slot. New comments, attachments,
+  and another session's state survive. Steering neither carries nor consumes
+  annotations; no text means no steering turn. The comment editor never triggers
+  steering or send, and IME confirmation never saves. Visible projections hide only
+  the generated block and preserve request headings; wire/storage remain intact.
+  Closing a side-chat tab releases its projection, keeps other resources/children,
+  and leaves the launcher visible when it was the final tab.
+- **Specs linked**: `04-ux/08-component-spec.md` §11.10,
+  `04-ux/09-interaction-patterns.md` §7.5a; ADR response-annotations,
+  ADR message-quotes-and-side-chats.
+- **Acceptance**: C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Unit/integration covered by `upstream-sync-annotations.test.mjs` and
+  `annotation-only-send.test.mjs`; post-main desktop journey not run in merge worktree.
 
 ## 8. Traceability Matrix
 
@@ -6821,16 +7161,16 @@ and identify the platform validation still needed.
 | B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
-| C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll |
+| C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-CHAT-quote-prefill, E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-stream, E2E-CHAT-side-chat-add-to-main, E2E-CHAT-side-chat-promote, E2E-CHAT-side-chat-close, E2E-CHAT-selection-markdown, E2E-CHAT-selection-side-chat, E2E-CHAT-annotation-attachments, E2E-CHAT-annotation-session-state, E2E-CHAT-annotation-source-index, E2E-CHAT-annotation-ack-and-steering |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153, E2E-158, E2E-182, E2E-187, E2E-252 |
 | D — Workspace (project ordering) | E2E-253 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills |
-| F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J, E2E-PLUGIN-session-orchestrator-real-workers |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills, E2E-CHAT-side-chat-stream |
+| F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J, E2E-PLUGIN-session-orchestrator-real-workers, E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-promote, E2E-CHAT-side-chat-close, E2E-CHAT-annotation-session-state |
 | F — Persistence (project ordering) | E2E-251 |
 | G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills, E2E-CHAT-quote-prefill, E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-stream, E2E-CHAT-side-chat-add-to-main, E2E-CHAT-side-chat-promote, E2E-CHAT-side-chat-close, E2E-CHAT-selection-markdown, E2E-CHAT-selection-side-chat, E2E-CHAT-annotation-attachments, E2E-CHAT-annotation-session-state, E2E-CHAT-annotation-source-index, E2E-CHAT-annotation-ack-and-steering |
 | Quality (project ordering) | E2E-253 |
 | C — Conversation & stream (IME slash alias) | E2E-255 |
 | E — Tools & permissions (Skill residency) | E2E-254 |
@@ -6866,7 +7206,7 @@ and identify the platform validation still needed.
 | M2 (IME slash alias) | E2E-255 |
 | M5 (Skill residency) | E2E-254 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103, E2E-172 |
-| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll |
+| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-210, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-CHAT-quote-prefill, E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-stream, E2E-CHAT-side-chat-add-to-main, E2E-CHAT-side-chat-promote, E2E-CHAT-side-chat-close, E2E-CHAT-selection-markdown, E2E-CHAT-selection-side-chat, E2E-CHAT-annotation-attachments, E2E-CHAT-annotation-session-state, E2E-CHAT-annotation-source-index, E2E-CHAT-annotation-ack-and-steering |
 | M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+ (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | M6+ (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
@@ -11418,3 +11758,84 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Status**: Module-covered (`apps/desktop/test/session-turn-ended.test.mjs`,
   `apps/desktop/test/queued-turn-finalization.test.mjs`); desktop journey Draft
   (run only in a capable environment when this surface changes)
+
+### E2E-SESSION-native-pi-continue-appends-original-jsonl
+
+- **Preconditions:** A synthetic Pi v3 session contains branches, compaction
+  metadata (including `retainedTail`), model/thinking changes, custom and
+  context-bearing custom-message entries, and a valid project cwd. A faux local
+  model/auth binding is configured in the fixture Pi agent directory; Desktop
+  provider secrets are absent. A fixture extension restores custom state in
+  `session_start` and contributes a skill through `resources_discover`.
+- **Steps:** Start PI-Desktop with fixture-only agent/session directories;
+  refresh sessions; open the native row beside a Desktop row; submit one text
+  prompt; stop or let the faux response settle; send the same text again with
+  a retryable response before success; reselect/refresh repeatedly; reopen through
+  a fresh Pi `SessionManager`; invoke native compact and queue push/list.
+- **Expected:** The original fixture JSONL receives native SDK entries whose
+  parent starts at the previous current leaf; all prior bytes/unknown entries
+  remain unchanged; the new leaf is visible after refresh; no Desktop SQLite
+  session or Desktop transcript copy is created; the Desktop-owned row still
+  follows its existing runtime and storage path. Native requests expose zero
+  built-in or extension model tools; startup and discovered skill are effective.
+  Exactly two durable SDK-ID user rows remain, including after abort; smart-stop
+  never rewrites native history. Retries/compaction remain running and stoppable
+  until one terminal completion; the owned idle lease accepts the second send.
+  Compact and queue push/list reject before host access. Opaque host-turn queue
+  remove/prioritize remain Desktop-only because native paths create no entries.
+- **Specs:** runtime §12; storage §12; security §12; ADR 0254.
+- **Status:** Documented; run after integration into main.
+
+### E2E-SESSION-native-pi-external-change-fails-closed
+
+- **Preconditions:** A writable synthetic native v3 fixture is listed.
+- **Steps:** Acquire Desktop continuation ownership, then simulate a foreign
+  append/replacement before the next SDK append; also attempt a second Desktop
+  lease and stale leases whose owners are live, remote, malformed, or uncertain.
+  Refresh list/detail with a dead same-host owner and unchanged or complete
+  append-only extended bytes, then prompt through normal UI capabilities.
+- **Expected:** The second writer is refused; external divergence tears down
+  continuation with a visible read-only/error reason; no requested entry is
+  appended and no bytes are truncated or rewritten; a lease releases on normal
+  dispose and is reclaimed after crash only with a dead same-host owner and an
+  unchanged target or same-file prefix-preserving complete parent-chain extension.
+  Uncooperative Pi clients can still race the OS append; no shared-lock guarantee
+  is claimed.
+- **Specs:** runtime §12; storage §12; security §12; ADR 0254.
+- **Status:** Documented; run after integration into main.
+
+### E2E-SESSION-native-side-chat-fork-survives-close
+
+- **Preconditions:** A writable synthetic native v3 session with branches,
+  compaction metadata, model/thinking entries, and a saved local model/auth
+  binding. No Desktop provider secret is configured.
+- **Steps:** Open the session, fork a side chat from an assistant answer and
+  from the first user message, send a prompt in the panel, stop one reply, close
+  the panel, reload, reopen the child from the sidebar and by title search, and
+  send while a native turn is running.
+- **Expected:** Each fork creates exactly one new v3 child JSONL anchored at the
+  selected message (or the current branch endpoint) with the child title; later
+  and sibling entries are excluded; parent bytes, leaf, and runtime are
+  unchanged; no temporary file remains. The first-user child is durable before
+  any reply and carries the parent's saved model/thinking when the branch saved
+  none (an explicit branch value wins; no Desktop fallback). The panel streams a
+  provisional assistant row that is replaced by exactly one durable SDK entry id
+  and the optimistic user row reconciles to the durable entry id; closing the
+  panel deletes neither the child nor its sidebar/search presence, and reopening
+  it as a conversation keeps one copy of every row. A send during a running
+  native turn fails visibly before the Desktop queue and keeps the draft; a
+  live foreign lease refuses the fork and a branch whose transcript exceeds the
+  general detail page still forks with its whole history.
+- **Specs:** IPC native routing; runtime §12; storage §12; UX side chat; ADR 0254.
+- **Status:** Documented; run after integration into main.
+
+### E2E-SESSION-native-pi-incompatible-session-is-read-only
+
+- **Preconditions:** Fixtures cover missing cwd, missing trailing newline,
+  v1/v2 header, unavailable saved provider/auth, and untrusted project resources.
+- **Steps:** Refresh and open each fixture.
+- **Expected:** Each remains browseable with a specific reason, the composer is
+  disabled, no migration/repair/fallback occurs, and source bytes and mtimes are
+  unchanged.
+- **Specs:** IPC native routing; runtime §12; storage §12; security §12.
+- **Status:** Documented; run after integration into main.

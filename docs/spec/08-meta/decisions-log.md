@@ -70,6 +70,8 @@ This log freezes previously open questions into concrete decisions.
 | D393 | User-invoked Skills in the composer | **Amend D123 / D174 / ADR 0024 / ADR 0039: active built-in, plugin, and user Skills appear in a separate `Skills` group at the end of the composer slash menu. Selecting one inserts its exact id; Electron main revalidates the active project scope at send time and asks the model to call the local `Skill` tool, preserving on-demand body loading and existing permissions. Existing command names win collisions; inactive Skills remain literal slash text. See ADR 0219 and E2E-088b.** | D174's model-invoked catalog remains the body-loading and security contract, while a final explicit entry makes known workflows discoverable without moving Skill bodies into the renderer, prompt, or host protocol. |
 | D394 | Windows work-panel chrome keeps one resource action cluster | **Amend D154 / D357 / ADR 0195: the open work-panel header keeps one compact resource switcher; resource close is owned by the existing keyboard-operable context-menu rows, the viewport-fixed toggle remains the only panel collapse control, and subagent detail returns with a back chevron. Windows/Linux native controls remain fixed at the window edge. Renderer-only; no panel state, window geometry, IPC, protocol, or storage change. See ADR 0220 and E2E-067.** | The header resource `X`, viewport-fixed toggle, and Windows native close cluster read as duplicate close actions and became cramped at narrow panel widths. |
 | D396 | Renderer and plugin-panel scrollbars share one compact contract | **Amend D300: every renderer scroll container uses one 6px, trackless, transparent-at-rest scrollbar with the same hover, focus-within, scroll-reveal, and dragged-thumb states. Remove the sidebar-specific width and opacity override. The plugin-panel preload applies the same contract and 300ms reveal mark to docked and detached plugin documents, including the bundled Files view. External pages loaded inside the Browser guest remain page-owned. Presentation-only; no protocol, storage, host runtime, or external-page behavior change. See E2E-157.** | Windows' classic scrollbar made the right-side work-panel Files view visibly heavier than the conversation, while the sidebar retained a second scrollbar treatment. |
+| D-LOCAL-message-quotes | Message quotes and renderer-owned side chats | **Amend D209 / D301: every user message and assistant turn gains a Quote action that inserts a `> `-prefixed Markdown blockquote plus a `chat.quoteSource` attribution into the active session's composer draft and focuses it, using the live selection inside that message row when one exists and the message's own text otherwise; it never sends and adds no chip kind, with a 2000-character cap. Open side chat forks the anchored message through `session.fork` without activating the child, registers the child as a renderer-owned side chat of the parent, and opens one `sidechat:<childSessionId>` tab in the existing docked panel that streams from the same event stream through the background-transcript reducer, with Add to main chat, Open as a conversation, a compact Send/Stop input, and the existing permission card. Closing the tab or activating the child removes the registration; the durable child stays an ordinary session. No protocol, schema, IPC, or permission change. See ADR message-quotes-and-side-chats and E2E-CHAT-quote-prefill through E2E-CHAT-side-chat-close.** | Users needed to reuse an exact earlier message or answer and to ask a side question without replacing the visible main conversation, and the existing fork path always activated its child. *(Amended by D-LOCAL-selection-overlay: the excerpt is recovered from the rendered DOM as Markdown, and a selection inside a transcript row offers Add to chat, Ask in side chat, and Copy from a selection-following overlay.)* |
+| D-LOCAL-response-annotations | Response annotations as prompt attachments | **Amend D-LOCAL-message-quotes (decision 3) for assistant turns: selecting text in a response and choosing Add to chat attaches a numbered annotation to that turn instead of editing the composer draft — the answer body is not decorated (only a citation the model writes renders, as a numbered reference), the composer shows one annotation attachment chip whose tooltip lists the excerpts plus one control that drops them, and the next prompt carries them as `# Response annotations:` + an instruction + `<response-annotations>` JSON (`[{text, annotation, source:{messageId}}]`) + `## My request:` before the user's own text, consuming them. The visible draft, optimistic row, title, and edit seed stay annotation free, and a stored prompt carrying the block is displayed as its request. *(Amended 2026-09-12: Add to chat opens a compact comment editor whose Save writes the user's optional comment into the annotation; re-annotating an attached excerpt reopens that editor instead of a silent no-op, and the composer attachment lists each item with edit and remove controls beside clear-all.)* Quoting a user message, and the side chat's Add to main chat, keep D-LOCAL-message-quotes's draft quote; no protocol, storage-schema, IPC, or permission change. See ADR response-annotations and E2E-CHAT-annotation-attachments, E2E-CHAT-annotation-session-state.** | The draft quote copied the model's words into the user's own prompt text, and several referenced passes had no numbering the model could address; the reference implementation attaches them as numbered prompt data instead. |
 | D398 | Context usage display preference | **Amend D347 / ADR 0184: the context usage inspector's leading figure — the trigger ring arc, percentage, token label, popover heading, tooltip, and `aria-label` — is configurable via `AppSettings.contextUsageDisplay` (`"remaining"` or `"used"`). Default and fallback for absent/unrecognised values is `"remaining"`. When `"used"`, the ring fills by `usedRatio`, and text shows the used-capacity pair. Warning and critical color thresholds (remaining ≤ 25 % / ≤ 10 %) stay based on remaining capacity regardless of display mode. Settings → AI → Defaults adds a segmented control (Remaining / Used) after Link open destination and before Enter-to-send. Renderer only; no protocol, storage, host, or migration change. See ADR 0222 and E2E-250.** | The remaining-only display gave weak signal at low occupancy and did not match users who reason in terms of "how much have I spent". Color must stay on remaining to avoid a misleading green ring at 90 % used. |
 | D399 | Project group manual ordering | *(amended by D402)* **Amend D093: retained project groups expose a visible-on-hover/focus grip. Native drag/drop and ArrowUp/ArrowDown on that grip write contiguous normalized-path `order` values and set `projectSort` to `manual` in renderer-local sidebar preferences. Archived and pinned priority remains ahead of manual order; project activation, host workspace identity, session ordering, and on-disk directories are unchanged.** | Users with several active repositories need a stable working order independent of recent activity or alphabetical names, while the existing path-keyed and host-owned project model remains untouched. |
 | D400 | Restore deferred tools from effective session context | **Amend D185 / ADR 0048: before each new prompt and after a mode switch, clear the in-memory deferred activation set, then restore names from successful `ToolSearch` results (`addedToolNames`) and successful deferred-tool results in the effective `buildSessionContext` projection. Keep only names still in the current deferred catalog and mode; ignore errors, interrupted or missing-result placeholders, and assistant/user prose. No host permission or workspace boundary changes.** | Clearing activations while retaining their successful transcript markers left the model able to see a capability that was absent from the next provider schema. Reconstructing only from effective successful evidence keeps the provider request coherent without parsing prose or reviving stale or disallowed tools. See ADR 0225 and E2E-008a. |
@@ -83,6 +85,7 @@ This log freezes previously open questions into concrete decisions.
 | D409 | Host-owned session collaboration messages | **Amend ADR 0237 / ADR 0165 / ADR 0213: Rust host-core owns a durable session-collaboration ledger keyed by message id and real source/target Session IDs. Plugin-mediated `spawn`, `send`, `status`, `result`, and `cancel` operations use the reviewed desktop-control gateway; the sender is bound to the active plugin Agent tool invocation, target turns retain their existing configuration, and each delivery is claimed by its actual durable turn. Completion callbacks are durable, at-most-once, and reference the settled turn. Provenance is persisted with transcript rows and cannot be forged, stripped, or edited through regeneration. The additive schema v16 migration retains queued work across restart without unattended replay, applies permission ceilings and bounded autonomous hops, and keeps the existing Task family unchanged. See ADR 0239 and E2E-PLUGIN-session-orchestrator-real-workers.** | The plugin's prior create/prompt polling path could infer neither a durable turn outcome nor a safe bidirectional sender identity. A host-owned ledger makes delivery, provenance, callback, cancellation, and restart behavior auditable without restoring the withdrawn A2A protocol. |
 | D410 | Independent session discovery and navigable collaboration projections | **Amend ADR 0239: add the reviewed read operation `session/collaboration/list`, bounded to 100 non-deleted Agent sessions and redacted to Session IDs, titles, status, updated time, readable provider/model labels, and bounded creation links. Extend the sidebar projection with readable model labels and at most eight created-session references. Render creator/created-session references as keyboard-focusable navigation buttons; independent sessions do not receive fabricated creator links. No renderer storage ownership or collaboration mutation boundary changes. See ADR 0240, E2E-SESSION-independent-top-level-communication, and E2E-SESSION-hover-card-model-and-links.** | Existing Session IDs were valid send targets but could be undiscoverable when they were not created by the plugin, while the hover card exposed only IDs and non-interactive provenance. A bounded host directory and navigable projection make durable sessions communicable and explainable without exposing transcripts or credentials. |
 | D413 | Skill market public-HTTPS catalog fetch | **Additive: Settings → Skills Market discovers SKILL.md catalogs in Electron main under a shared public-HTTPS policy (syntactic public host + DNS classification + per-hop redirect re-validation). The renderer does not fetch. Install remains `skills.create`. Catalog ids match host `valid_capability_id`. Expanded documents over 128 KiB are refused. Builtin titles are English. See ADR 0243, E2E-SKILL-MARKET-*, issue #287.** | Community skill discovery needs main-process egress without a plugin-marketplace host allowlist, and copied classifiers would collide with the MCP market. |
+| D421 | Native Pi session continuation | **Amend baseline D007: discover Pi v3 sessions as source-discriminated projections and continue them through coding-agent `AgentSession`/`SessionManager` against their canonical JSONL. Rust remains authoritative for Desktop SQLite/transcripts. Native continuation requires exact saved provider/auth, project trust, canonical path/header identity, and a cooperative lease plus byte/leaf validation; failures remain browseable/read-only. First slice excludes native rename/delete/move/revisions/Plan/Goal/queue/collaboration; the 2026-09-14 ADR 0254 amendment adds native fork and persistent side chats with exact stream re-keying and inode-tracked publication. See ADR 0254 and E2E-SESSION-native-pi-*/E2E-SESSION-native-side-chat-*.** | Importing a flattened copy cannot preserve Pi's tree or make later Desktop turns visible to Pi Web. |
 | D412 | Delta-only coalesced streaming updates | **Amend the local `message_update` contract: append-only streaming frames carry `stream: delta` plus `deltaText`/`deltaThinking` (and reset flags) without growing `content`/`thinking`. Runtime coalesces those frames every 16ms and flushes before semantic boundaries. AgentHost, inflight checkpoints, and the renderer apply deltas; `message_start`/`message_end` remain full snapshots. Transcript activity parts keep object identity when only the tail token changes. Protocol version stays 11. See ADR 0242, E2E-STREAM-long-turn-keeps-realtime, and issue #299.** | Each token re-serialized the full assistant snapshot across sidecar, AgentHost, and IPC, so a long turn cost O(n²) bytes and backlogged later short chunks. |
 | D416 | Git clone accepts only syntactically public hosts | **Amend home git clone: `parseGitCloneUrl` reuses `isPublicHostname` so loopback, private, CGNAT, link-local, ULA, and `.local`/`.localhost` remotes are rejected before `git clone` runs. HTTPS/HTTP/SSH/`git@host:path` to public hosts remain valid. `file:` and URL passwords stay rejected. Git still performs its own DNS; this is not a market-style pin. See ADR 0247 and E2E-CLONE-public-hostname-rejects-private.** | Clone accepted `http://127.0.0.1/...` and RFC1918 literals, which is a LAN/SSRF hole the market fetchers already close for HTTPS catalogs. |
 | D417 | Plugin runtime theme APIs + sidebar image token | **Add `pi.app.setTheme` and `pi.themes.upsert`/`remove`/`list` under `ui.theme` (ADR 0249 / issue #352). Remove `MAX_THEMES_PER_PLUGIN`. Runtime upsert sanitizes CSS like load-time registration and emits `pluginChanged` (`reason: "themes"`); `setTheme` persists `AppSettings.theme` and emits `settingsChanged`. Split sidebar paint: `--ds-bg-sidebar` stays a color; optional `--ds-bg-sidebar-image` holds gradients/images, with macOS vibrancy stacking sheen over the image layer.** | Theme editor plugins cannot apply a theme from their panel, cannot ship an unlimited library, and cannot live-edit production CSS without reload; sidebar gradients broke `color-mix` / vibrancy consumers when stuffed into the color token. |
@@ -974,6 +977,26 @@ section mirrors only marketplace/catalog items still blocking nothing.
   saving. No host RPC, protocol, workspace, or durable-schema change is added.
 - Decision D397 amends ADR 0101's previous drag/drop scope. See ADR 0222 and
   E2E-102i.
+## 2026-09-11 — Message quotes and renderer-owned side chats (D-LOCAL-message-quotes)
+
+- Every user message and every assistant turn gains a Quote action beside Copy,
+  Edit, Delete, Fork, and Retry. It inserts a `> `-prefixed Markdown blockquote
+  plus a `chat.quoteSource` attribution line into the active session's composer
+  draft, uses the live text selection when it lies inside the clicked message
+  row and the message's own text otherwise, caps the excerpt at 2000 characters
+  with a trailing ellipsis, focuses the composer, and never sends.
+- Open side chat forks the anchored assistant or user message through the
+  existing `session.fork` without activating the child, so the main conversation
+  keeps its visible session. The child is registered as a renderer-owned side
+  chat of the parent and the work panel opens one `sidechat` tab that streams
+  from the same event stream through the shared background-transcript reducer,
+  with Add to main chat, Open as a conversation, a compact Send/Stop input, and
+  the existing permission card.
+- Closing the tab or opening the child as a conversation removes the
+  registration and its transcript projection; the durable child remains an
+  ordinary session in the sidebar, session lists, and search. No protocol,
+  storage-schema, IPC channel, or permission change. See ADR message-quotes-and-side-chats and E2E-CHAT-quote-prefill
+  through E2E-CHAT-side-chat-close.
 
 ## 2026-09-11 — Context usage display preference (D398)
 
@@ -4635,6 +4658,77 @@ D193, and D194.
   `03-runtime/07-process-model.md`, `03-runtime/06-host-rpc-protocol.md` §7,
   and E2E-247.
 
+## 2026-09-11 — Selection overlay for quotes (D-LOCAL-selection-overlay)
+
+- Quote no longer has to be reached at the end of the answer: a non-empty text
+  selection inside one transcript row floats one overlay **above** it, centered
+  on the selection and clamped into its clipping ancestors' rects (the transcript
+  scroller is one) and capped by the top of the docked composer. It is portaled
+  like the app's other body-portaled popovers and follows the selection while the
+  thread scrolls, rather than hiding.
+- The overlay offers Add to chat (`chat.addToChat`), Ask in side chat
+  (`chat.askInSideChat`) and Copy (`chat.copy`). Add to chat writes the excerpt
+  into the active session's composer draft under D-LOCAL-message-quotes's quote contract; Ask in
+  side chat forks at that row and sends the excerpt as that child's prompt, so
+  the question is answered in the panel instead of the visible conversation; Copy
+  writes the Markdown to the clipboard. Every action clears the native selection,
+  a drag that crosses rows raises no overlay, and a read-only projection renders
+  none.
+- The excerpt is recovered from the rendered DOM instead of
+  `Selection.toString()`: a range touching a formula expands to the whole formula
+  and quotes KaTeX's `application/x-tex` annotation as `$…$` or `$$…$$`; a code
+  block becomes a fence with its language and a delimiter longer than any
+  backtick run inside it; a table row becomes one `a | b` line; inline code keeps
+  its backticks and file-reference chips keep their code text. The row action and
+  the overlay share this one recovery path.
+- The 2000-character cap, the `> ` blockquote, the `chat.quoteSource`
+  attribution, focus, and the no-send/no-session/no-transcript-write boundaries
+  are unchanged. Two deviations from the reference implementation are deliberate,
+  because the quote lands in a Markdown draft this app renders back: formulas use
+  `$…$` / `$$…$$` (remark-math), and table rows use `a | b`. Renderer-only; no
+  protocol, storage-schema, IPC, or permission change beyond the composer's
+  `data-composer-dock` hook. See ADR message-quotes-and-side-chats and E2E-CHAT-quote-prefill, E2E-CHAT-selection-markdown, E2E-CHAT-selection-side-chat.
+
+## 2026-09-11 — Response annotations as prompt attachments (D-LOCAL-response-annotations)
+
+- Selecting text in an assistant turn and choosing Add to chat attaches a
+  **numbered annotation** to that turn: an id, the anchored turn, the excerpt
+  (Markdown, 2000-character cap), an empty comment field, and capture order as
+  the numbering. Annotations are renderer-owned session state; re-annotating the
+  same excerpt is a no-op, and they are neither persisted nor sent on their own.
+- The answer body is left alone: this app never inserts a marker into the text the
+  user reads. A `:codex-annotation{index="N"}` directive the model writes (the
+  instruction asks it to cite every annotation it addresses) renders as a small
+  numbered reference whose tooltip is the excerpt, and no marker joins a
+  selection, quote, or copy. The composer shows one attachment chip with the
+  count, whose tooltip lists `N. excerpt`, plus one control that drops them all.
+  The chip never enters the editable text, so D209's smart Stop and D301's draft
+  retention are untouched.
+- A send with annotations composes `# Response annotations:` + the instruction +
+  `<response-annotations>` with `[{"text","annotation","source":{"messageId"}}]` +
+  `## My request:` + the user's text, and consumes them. The visible draft, the
+  optimistic row, the sidebar title, and the edit seed stay annotation free; a
+  stored prompt that carries the block is displayed as its request.
+- Quoting a user message and the side chat's Add to main chat keep D-LOCAL-message-quotes's draft
+  quote. No protocol, storage-schema, IPC channel, or permission change. See
+  ADR response-annotations and E2E-CHAT-annotation-attachments, E2E-CHAT-annotation-session-state.
+- *(Amended 2026-09-12.)* Add to chat, and the assistant turn's annotate action,
+  open a compact comment editor instead of attaching silently: the excerpt is
+  snapshotted before focus collapses the selection, the comment is multiline and
+  optional, Save attaches or updates the annotation with the comment in
+  `annotation`, and Cancel/Escape discards it without sending. Re-annotating an
+  excerpt that is already attached reopens that annotation's editor, and the
+  composer's count chip opens a list where each excerpt's comment can be edited
+  or that item removed beside the existing clear-all. The editor belongs to the
+  session it was opened in, and a save for an annotation that was already sent
+  or removed changes nothing. No protocol, storage-schema, IPC channel, or
+  permission change.
+- *(Floating-index amendment, ADR floating-annotation-index.)* The user-requested collapsible floating
+  index replaces the composer popover. Matching source badges and non-interactive
+  highlights use renderer-only text offsets, never inserted Markdown. Locate reveals
+  history and releases follow mode; duplicate identity now includes source row and
+  selected occurrence. List/badge/prompt numbering stays identical. Send-scoped
+  lifecycle and host boundaries remain unchanged. See E2E-CHAT-annotation-source-index.
 ## 2026-09-11 — Right panel uses a tab strip and data-driven add menu (D399)
 
 - Issue #229 replaces the right panel's combined resource menu with a
@@ -4917,6 +5011,36 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
 - host-core keeps the `inherit` token so inherit-only documents load and
   Settings round-trips them. See ADR 0246, issue #215, PR #319, and
   E2E-SUBAGENT-inherit-parent-tools.
+
+
+## 2026-09-14 — Preserve local annotation and side-chat contracts across upstream integration
+
+- Local ADRs now use semantic names `message-quotes-and-side-chats`,
+  `response-annotations`, and `floating-annotation-index`; former local 0223–0225
+  collided with upstream ADRs. Local D398–D400 references use `D-LOCAL-*`, and
+  local E2E-249–259 references use `E2E-CHAT-*`. Upstream identities are unchanged.
+- Upstream transcript modules, composer hooks, store slices, delta streaming,
+  work-panel tab strip/launcher, and text-only Alt+Enter steering remain canonical.
+  Quote/annotation controls and side-chat registrations have no upstream equivalent
+  and remain renderer-owned additions at those seams, not duplicate legacy modules.
+- Send/queue consumes only acknowledged unchanged annotations in the submitting
+  session. Failures retain them; concurrent edits/new attachments survive. Steering
+  leaves annotations pending, and annotation-only steering submits nothing.
+- Request-only queue previews/edit seeds hide the recognized annotation block;
+  ordinary headings and stored/wire content remain intact. Editing does not restore
+  consumed attachments. No native Pi session unification is introduced.
+- See ADR response-annotations and E2E-CHAT-annotation-ack-and-steering.
+
+## 2026-09-14 — Native Pi session continuation (D421)
+
+- Native Pi v3 sessions are discovered as source-discriminated projections and
+  continued through the coding-agent SDK against their original JSONL.
+- Rust host-core remains authoritative for Desktop SQLite and Desktop
+  transcripts; native turns never enter the Desktop outbox or create imports.
+- Exact version/newline/cwd/trust/provider/auth checks and a cooperative lease
+  with byte/leaf validation make uncertain ownership fail closed. Unsupported
+  native mutations remain explicit rather than silently succeeding.
+- See ADR 0254 and E2E-SESSION-native-pi-*.
 
 ## 2026-09-14 — Git clone accepts only syntactically public hosts (D416)
 

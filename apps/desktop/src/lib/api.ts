@@ -169,6 +169,7 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 function normalizeSession(session: SessionSummary): SessionSummary {
   return {
     ...session,
+    source: session.source ?? "desktop",
     mode: normalizeMode((session as { mode?: unknown }).mode),
   };
 }
