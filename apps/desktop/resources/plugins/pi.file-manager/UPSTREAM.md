@@ -9,13 +9,13 @@ every installation has a file view out of the box (ADR 0241).
 | Field | Value |
 | --- | --- |
 | Repository | https://github.com/Tioit-Wang/pi-desktop-plugin-file-manager |
-| Tag | `v0.5.0` |
-| Commit | `cbd47b09bcad6a47edd093f82b3d037a533e3cfd` |
+| Tag | `v0.5.1` |
+| Commit | `5499275284a1073be843f9be41420bdf3a156186` |
 | License | MIT (see `LICENSE`; upstream ships no license file) |
-| Marketplace | published to the plugin center at <https://plugins.aiuo.net/console/publish/upload>: `pi.file-manager` 0.5.0, audit passed, artifact `e130e5d523d1e85be3624a6df152c87ddd69d328328aaf31455e4d3b456ac21b` (1460284 bytes) |
+| Marketplace | published to the plugin center at <https://plugins.aiuo.net/console/publish/upload>: `pi.file-manager` 0.5.1, audit passed, artifact `b1bf74b8e56caa9f47ea9bedf85bd4bd0fe440bd9c5dd6f148c48344b223c89c` (1460149 bytes) |
 
-The tag is pushed and the release is published, so a marketplace-installed 0.4.0
-is now offered 0.5.0 from the marketplace as well as from this bundled copy.
+The tag is pushed and the release is published, so a marketplace-installed 0.5.0
+is now offered 0.5.1 from the marketplace as well as from this bundled copy.
 Both paths ship the same bytes.
 
 > The published `.piplug` contains the seven files a plugin installs from
@@ -35,10 +35,10 @@ stores LF, and this repository's `.gitattributes` keeps it that way.
 | File | Bytes | sha256 |
 | --- | --- | --- |
 | `main.js` | 62931 | `e8941a31ada06b18264e509df01d0e4023744b819f185a26da25c7925f0ac03e` |
-| `README.md` | 19698 | `04f0a028fd8106a4b7e575f6e27b96bbd3fe7d32ea859429d364f05c13f2acf0` |
+| `README.md` | 20039 | `8c524f6d13eac557e286fa0ec9b9cf5138bed0bd66d4a7914f3484443e627a01` |
 | `views/index.html` | 345 | `771fd3d8afdea7fca75ed1f1918c1ce93ad1c87babdb321cfb85e910465cd2c1` |
-| `views/assets/index.js` | 1345101 | `36121f1e6a92d4615e086ea591576240f2a5a7d8eb3664db3ca2a231c4e93ccc` |
-| `manifest.json` | 13026 | `8ec56c0dcfa36cd5a929f22b8e95e47e73690033db24d401b3c2ba20f9cc0460` |
+| `views/assets/index.js` | 1345397 | `e5b4708b037545a713039d4e405fb99ae0bf9839afb2e8f6b900fad3b06e28be` |
+| `manifest.json` | 13602 | `6e9117464115a6f023263685f7ccb14fee40579e82a8989fe4fc35234e6c7d6e` |
 
 `views-src/` from the upstream repository is deliberately not vendored: this
 directory carries the built view the plugin publishes, not its React source.
@@ -48,8 +48,8 @@ directory carries the built view the plugin publishes, not its React source.
 Two, so a re-sync stays a copy:
 
 - `manifest.json` gains `"license": "MIT"` (after `author`), making the vendored
-  copy 13046 bytes
-  (`a672b93d3339c6d38fd351201ead684ddc014ea8cae1a094538686f75a622bfe`). Every
+  copy 13622 bytes
+  (`d2357ebf9545b43e5280b01564fa62e45983090484bd0514663a25056fcc7055`). Every
   shipped plugin carries its license, and the upstream manifest predates that
   convention.
 - `package.json` is **added**, containing `{"type": "commonjs"}`. It is not in
@@ -79,6 +79,24 @@ Two, so a re-sync stays a copy:
    `node --test test/bundled-plugins.test.mjs` in `apps/desktop`.
 5. Leave the version in `manifest.json` untouched: it is the upstream version,
    and the marketplace offers an update from it.
+
+## What 0.5.1 adds
+
+Two defects of 0.5.0 on the folder switch:
+
+- Opening a file with the system default app, or revealing it in the file manager,
+  named the entry relative to the folder the view was browsing. The host resolves a
+  relative path against the **workspace** root, so with a sibling folder selected a
+  same-named file in the primary folder opened instead, and a file only the sibling
+  folder holds reported not found. The view now sends an absolute path whenever the
+  selected folder is not the primary one, and the host accepts an absolute path that
+  lies inside a registered folder root of the open project (ADR 0253) — for those two
+  actions only, with the declared scope, the credential deny list and the
+  protected-path guard unchanged.
+- The editor pane showed its empty state while its buffer still held the previous
+  folder's document, so switching back to a same-relative-path file or pressing
+  Ctrl+S met the other folder's content. The document is cleared when the open file
+  closes.
 
 ## What 0.5.0 adds
 
