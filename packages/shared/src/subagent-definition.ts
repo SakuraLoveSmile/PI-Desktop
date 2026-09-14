@@ -40,10 +40,11 @@ export type SubagentDefinition = {
   /** Tools the delegate may call; read-only by default. */
   tools: string[];
   /**
-   * When true, the delegate also receives the parent turn's enabled tool
-   * names minus {@link SUBAGENT_INHERIT_DENY_TOOLS}. Set by `tools: inherit`
+   * When true, the delegate also receives the parent session's live tool
+   * catalog minus {@link SUBAGENT_INHERIT_DENY_TOOLS}. Set by `tools: inherit`
    * (alone or alongside assignable extras). The session runtime resolves the
-   * inherited set at spawn time from its live tool catalog.
+   * inherited set at spawn time from `toolCatalog`, including deferred plugin
+   * and MCP tools the parent is allowed to call.
    */
   inheritTools?: boolean;
   /** Provider/model this definition pins, when it pins one. */
@@ -73,9 +74,9 @@ export type SubagentDefinition = {
   filePath?: string;
 };
 
-/** Tools a definition may declare. Plugin, skill, mode and meta tools stay out
- * of reach: a delegate is a bounded file/search/shell worker, not a second
- * full session. */
+/** Tools a definition may declare by name. Plugin, skill, mode and meta tools
+ * are not on this list; a document opts into the parent's live catalog with
+ * `tools: inherit` instead (ADR 0246). */
 export const SUBAGENT_ASSIGNABLE_TOOLS = [
   "Read",
   "Glob",
@@ -94,7 +95,9 @@ export const SUBAGENT_INHERIT_TOKEN = "inherit";
 /**
  * Tools that are never inherited, even with `tools: inherit`. Nested fan-out
  * and mode switches stay with the parent; the user-facing ask tool is out of
- * reach because a delegate has no user.
+ * reach because a delegate has no user. `ToolSearch` and `new_context` mutate
+ * the parent runtime's deferred-tool set and compaction flag, so they stay
+ * denied even though the child receives the full catalog without searching.
  */
 export const SUBAGENT_INHERIT_DENY_TOOLS: readonly string[] = [
   "Task",
@@ -104,14 +107,15 @@ export const SUBAGENT_INHERIT_DENY_TOOLS: readonly string[] = [
   "EnterPlanMode",
   "EnterGoalMode",
   "asktool",
-  "CompactContext",
+  "new_context",
+  "ToolSearch",
 ];
 
 /**
  * Resolve the tool-name set a delegate should receive at spawn time.
  *
  * - Without `inheritTools`, this is the declared list only (today's behavior).
- * - With `inheritTools`, the parent's live tool names are unioned in after
+ * - With `inheritTools`, the parent's live tool catalog is unioned in after
  *   dropping {@link SUBAGENT_INHERIT_DENY_TOOLS}. Explicit assignable extras
  *   are still included so a definition can add Bash on top of inherit.
  */
@@ -206,8 +210,27 @@ export function isSubagentMutatingTool(value: string): boolean {
 }
 
 /** Whether this delegate can change the workspace. */
-export function subagentCanMutate(definition: SubagentDefinition): boolean {
+export function subagentCanMutate(
+  definition: SubagentDefinition,
+  resolvedTools?: readonly string[],
+): boolean {
+  if (resolvedTools) return resolvedTools.some(isSubagentMutatingTool);
+  // Inherit is resolved at spawn. Until then, treat it as write-capable:
+  // Agent-mode parents always expose Bash/Edit/Write in the live catalog.
+  if (definition.inheritTools) return true;
   return definition.tools.some(isSubagentMutatingTool);
+}
+
+/** Compact `tools:` label for the Task catalog and fallback prompt text. */
+export function subagentToolsLabel(
+  definition: Pick<SubagentDefinition, "tools" | "inheritTools">,
+): string {
+  if (definition.inheritTools) {
+    return definition.tools.length > 0
+      ? `inherit + ${definition.tools.join(", ")}`
+      : "inherit";
+  }
+  return definition.tools.join(", ") || "none";
 }
 
 /** Filename (or frontmatter `name`) to definition id. */

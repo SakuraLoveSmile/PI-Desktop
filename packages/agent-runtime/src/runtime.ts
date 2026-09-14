@@ -82,6 +82,7 @@ import {
   proposalKindForMode,
   resolveSubagentToolNames,
   subagentModelKey,
+  subagentToolsLabel,
   type ProposalKind,
   type SubagentPermission,
 } from "@pi-desktop/shared";
@@ -2816,9 +2817,7 @@ Delegation rules:
    */
   private subagentGuidance(definition: SubagentDefinition): string[] {
     const tools = new Set(
-      definition.inheritTools
-        ? resolveSubagentToolNames(definition, [...this.toolCatalog.keys()])
-        : definition.tools,
+      resolveSubagentToolNames(definition, [...this.toolCatalog.keys()]),
     );
     const blocks: string[] = [];
     if (tools.has("Read") || tools.has("Grep") || tools.has("Glob")) {
@@ -2838,6 +2837,10 @@ Delegation rules:
       blocks.push(
         `Write temporary and intermediate files into the session scratch directory \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR) using absolute paths, never into the workspace.`,
       );
+    }
+    if (tools.has(SKILL_TOOL_NAME)) {
+      const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
+      if (skillsPrompt) blocks.push(skillsPrompt);
     }
     const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
     if (projectPrompt) blocks.push(projectPrompt);
@@ -2873,7 +2876,7 @@ Delegation rules:
     const catalog = this.subagents
       .map(
         (definition) =>
-          `- ${definition.name} (tools: ${definition.tools.join(", ")}): ${definition.description}`,
+          `- ${definition.name} (tools: ${subagentToolsLabel(definition)}): ${definition.description}`,
       )
       .join("\n");
     return {
@@ -2980,12 +2983,10 @@ Delegation rules:
             );
           }
         }
-        const declaredToolNames = definition.inheritTools
-          ? resolveSubagentToolNames(
-              definition,
-              [...this.toolCatalog.keys()],
-            )
-          : definition.tools;
+        const declaredToolNames = resolveSubagentToolNames(
+          definition,
+          [...this.toolCatalog.keys()],
+        );
         const tools = declaredToolNames
           .map((name) => this.toolCatalog.get(name))
           .filter((tool): tool is AgentTool => tool !== undefined);
@@ -3053,6 +3054,7 @@ Delegation rules:
           systemPrompt: composeSubagentSystemPrompt({
             definition,
             guidance: this.subagentGuidance(definition),
+            toolNames: declaredToolNames,
           }),
           tools: scopedTools,
           onEvent: (envelope) => {

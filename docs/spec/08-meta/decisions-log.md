@@ -4137,3 +4137,15 @@ D193, and D194.
   the Gateway identity source is decided at R3; and the first deployment is
   single-tenant. See the amended remote architecture, protocol, security,
   and rollout specifications and E2E-221 through E2E-230.
+
+## 2026-09-14 — Opt-in subagent inheritance of the parent tool catalog (D415)
+
+- A subagent definition may declare `tools: inherit` (alone or with assignable
+  extras). Builtins stay on today's whitelist.
+- At spawn the runtime unions the live `toolCatalog` minus Task*, mode
+  switches, `asktool`, `new_context`, and `ToolSearch`. Skill/MCP/plugin tools
+  the parent is allowed to call are included; child ToolSearch/new_context do
+  not mutate parent runtime state.
+- host-core keeps the `inherit` token so inherit-only documents load and
+  Settings round-trips them. See ADR 0246, issue #215, PR #319, and
+  E2E-SUBAGENT-inherit-parent-tools.

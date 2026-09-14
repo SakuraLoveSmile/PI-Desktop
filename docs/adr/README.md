@@ -217,3 +217,4 @@ Each ADR includes:
 | 0203 | Local MCP control plane for desktop operations | Accepted (amended by D372) |
 | 0204 | Explicit unsigned macOS first-launch helper | Accepted |
 | 0205 | Remote Agent Control uses a dedicated Host boundary | Accepted for implementation (post-MVP; amended by D376) |
+| 0246 | Opt-in subagent inheritance of the parent tool catalog | Accepted (amends 0062; issue #215 / PR #319) |

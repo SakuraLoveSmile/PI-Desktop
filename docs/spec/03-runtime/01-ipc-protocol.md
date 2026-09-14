@@ -1164,6 +1164,10 @@ be a canonical thinking level, `omit`, or the empty string. The empty string
 clears the override; `omit` is persisted as `thinkingLevel: omit` and tells the
 runtime not to send a provider thinking override.
 
+The `tools` array may include the token `inherit` (ADR 0246). `inherit` alone
+is a valid grant; host-core must not drop the document. Settings round-trips
+the token as `tools: inherit` or `tools: [inherit, Bash]`.
+
 Electron's `subagent/list` IPC channel exposes the same global-only list to
 Settings > Agent > Subagents. The runtime catalog combines these global user
 documents with its builtins; it does not scan `.pi/agents` or any project

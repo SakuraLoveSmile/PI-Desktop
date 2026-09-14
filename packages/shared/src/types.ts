@@ -1549,7 +1549,10 @@ export type UserSubagentRecord = {
   description: string;
   enabled: boolean;
   scope?: ActivationScope;
-  /** Resolved tool grant, never empty — what the delegate may actually call. */
+  /**
+   * Resolved tool grant, never empty. May start with `inherit` when the
+   * document opts into the parent session catalog (ADR 0246).
+   */
   tools: string[];
   /** `<provider>/<model>` pin, resolved against providers at launch. */
   model?: string;

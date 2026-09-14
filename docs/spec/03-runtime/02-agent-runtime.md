@@ -553,9 +553,11 @@ the launch.
 
 Frontmatter adds `permission: inherit | ask | accept-edits | auto` (default
 `inherit`), which controls the scope the delegate's tool calls resolve under
-instead of the session mode (§5f.1). `idle-timeout` and `max-duration` still
-parse for compatibility but no longer kill a run (D328). Only builtin and user definitions may
-declare a permission scope —
+instead of the session mode (§5f.1). `tools: inherit` (alone or with assignable
+extras) opts a definition into the parent session's live tool catalog minus a
+deny list (ADR 0246 / D415); builtins stay on today's whitelist. `idle-timeout`
+and `max-duration` still parse for compatibility but no longer kill a run
+(D328). Only builtin and user definitions may declare a permission scope —
 both express a choice the user already made, whereas a project definition
 arrives with the repository, so honoring its scope would let cloned code grant
 itself `auto`. A project document that declares a non-`inherit` scope keeps
@@ -918,22 +920,25 @@ boundary blocks it.
 
 A delegate's system prompt is composed in the sidecar from three parts, in this
 order: the delegation framing, the definition's Markdown body, and the tool
-guidance its declared tools earn. The body sits ahead of the workspace guidance
+guidance its resolved tools earn. The body sits ahead of the workspace guidance
 so a project's own instructions still have the last word.
 
 The framing states the shape of the delegate's situation, which is not
 inferable from the body: it is one delegated task, the delegate cannot see the
 user, ask a question, or delegate further, it has exactly the listed tools, and
-its final message is the only thing the main agent receives. A read-only
+its final message is the only thing the main agent receives. Listed names are
+the spawn-time resolved set when `tools: inherit` is on. A read-only
 definition is additionally told never to report an edit it could not have made;
 a write-capable one is told to touch only the files the task is about.
+Mutation framing uses the resolved set, not the raw frontmatter extras.
 
 Guidance blocks are the same text the session prompt uses, included only when
-the definition declares the matching tool: search/read scoping for
+the resolved tools include the matching name: search/read scoping for
 Read/Grep/Glob, edit discipline for Edit/Write, the command shell contract for
-Bash, and the scratch-directory rule when the session has a scratch directory
-and the delegate can write. The project instruction chain (§7.3) is appended
-last, so a delegate follows the same project rules as its session.
+Bash, the `# Skills` catalog when `Skill` is present, and the scratch-directory
+rule when the session has a scratch directory and the delegate can write. The
+project instruction chain (§7.3) is appended last, so a delegate follows the
+same project rules as its session.
 
 ### 7.3 Project instruction chain
 

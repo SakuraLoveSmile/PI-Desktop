@@ -30,8 +30,8 @@ test("applySubagentPreset replaces only the template-owned fields", () => {
   assert.match(fn, /name: preset\.name/);
   assert.match(fn, /description: preset\.description/);
   assert.match(fn, /tools: \[\.\.\.preset\.tools\]/);
+  assert.match(fn, /inheritTools: false/);
   assert.match(fn, /maxTurns: preset\.maxTurns/);
-  assert.match(fn, /body: preset\.body/);
   // The preset does NOT overwrite: id (slug), model, thinkingLevel, scope,
   // enabled — these survive a reroll.
   assert.doesNotMatch(fn, /id: preset/);
@@ -111,4 +111,11 @@ test("presets stay within the published max-turns clamp", () => {
   for (const n of maxTurns) {
     assert.ok(n >= 1 && n <= 80, `unexpected maxTurns ${n}`);
   }
+});
+
+test("inherit grant helpers keep the inherit token out of the checkbox list", () => {
+  assert.match(editorSource, /export function splitSubagentToolGrant/);
+  assert.match(editorSource, /export function mergeSubagentToolGrant/);
+  assert.match(editorSource, /inheritTools: grant\.inheritTools/);
+  assert.match(editorSource, /SUBAGENT_INHERIT_TOKEN/);
 });

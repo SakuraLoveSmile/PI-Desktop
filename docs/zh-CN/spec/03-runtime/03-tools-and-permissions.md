@@ -492,18 +492,25 @@ MVP 可以通过写入 SQLite 或日志文件来启动。
 一个子代理定义。 Plan 和 Goal 是只读合同协商，因此
 具有 `Bash`、`Edit` 或 `Write` 的代表将直接穿过它们。
 
-定义声明其委托可以调用的工具，仅从 `Read` 中提取，
-`Glob`、`Grep`、`BrowserPreview`、`Bash`、`Edit` 和 `Write`。一个定义
-声明没有获取 `Read`、`Glob`、`Grep`； `tools: "*"` 表示全部七个，即
-仍然只有那七个。无法识别的名称将被删除并带有解析警告。
-插件工具、`Skill`、`ToolSearch`、`new_context`、模式工具和 `Task`
-本身永远不可分配：委托是一个有界的 file/search/shell 工作人员，
-不是第二次会议。
+定义声明其委托可以调用的工具。默认名称仅来自七个工作工具 `Read`、
+`Glob`、`Grep`、`BrowserPreview`、`Bash`、`Edit` 和 `Write`。未声明
+`tools` 时得到 `Read`、`Glob`、`Grep`；`tools: "*"` 表示全部七个。
+无法识别的名称会被删除并带有解析警告。
 
-委托可用的工具来自其定义，而不是其会话。它无法因为父级拥有某个工具而获得
-该工具，会话也不能把修改权限借给只读委托。委托调用由会话运行时构建并通过相同
-的 `tools.execute` 路径，因此路径规则（§4）、Bash 规则（§5）、权限模式（§6）、
-操作模式矩阵（§10）和审计（§9）保持不变，并针对拥有该调用的会话评估。
+文档可以用 `tools: inherit` 或 `tools: [inherit, Bash]` 选择继承父会话的
+实时工具目录（ADR 0246 / D415）。`Task` 启动时运行时把 `toolCatalog`
+（含延迟的插件/MCP 工具）与可分配的额外工具取并集，再去掉 `Task` /
+`TaskWait` / `TaskList` / `TaskStop`、`EnterPlanMode` / `EnterGoalMode`、
+`asktool`、`new_context` 和 `ToolSearch`。内置定义不默认开启。`inherit`
+写在 Markdown 和设置里；host-core 会保留该标记，因此只有 inherit 的文档
+仍能加载。插件工具、`Skill` 和 MCP 工具只通过这一 opt-in 到达委托，
+不能写进可分配白名单。
+
+没有 `tools: inherit` 时，委托可用的工具来自其定义，而不是其会话：它
+无法因为父级拥有某个工具而获得该工具，会话也不能把修改权限借给只读
+委托。委托调用由会话运行时构建并通过相同的 `tools.execute` 路径，因此
+路径规则（§4）、Bash 规则（§5）、权限模式（§6）、操作模式矩阵（§10）
+和审计（§9）保持不变，并针对拥有该调用的会话评估。
 
 **内置定义与用户定义**还可以声明 `permission: inherit | ask | accept-edits |
 auto`（ADR 0089，默认 `inherit`）。使用默认的 `inherit`（包括所有内置定义）时，

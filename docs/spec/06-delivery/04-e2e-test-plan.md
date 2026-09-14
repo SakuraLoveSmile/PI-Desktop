@@ -5038,6 +5038,40 @@ Each scenario is documented in this format:
   aggregate counts). Full multi-provider fan-out and rendered topology
   interaction remain manual.
 
+#### E2E-SUBAGENT-inherit-parent-tools
+
+- **Preconditions**: Agent mode. A user document
+  `~/.agents/subagents/worker.md` with `tools: inherit` (no assignable extras),
+  at least one plugin or MCP tool in the parent catalog, and a non-empty Skill
+  catalog. Built-in `explorer` remains on its whitelist.
+- **Steps**:
+  1. Confirm Settings → Agent → Subagents lists `worker` and that Edit shows
+     Inherit parent tools on. Save without changing tools and reopen the file.
+  2. Delegate `Task` to `worker` with a brief that needs a Skill id and a plugin
+     tool the parent already had.
+  3. Delegate `Task` to builtin `explorer` in the same session.
+  4. Confirm `worker` cannot call `Task`, `ToolSearch`, `asktool`, or
+     `new_context`.
+- **Expected**:
+  - Step 1 round-trips `tools: inherit`; the document does not disappear from
+    `agents.active` and save does not rewrite it to `Read, Glob, Grep`.
+  - `worker` receives Skill, the plugin/MCP tool, and the parent builtins minus
+    the deny list. Its system prompt lists those names, includes the `# Skills`
+    catalog, and says it may change files when the parent catalog includes
+    Bash/Edit/Write.
+  - `explorer` still has only `Read, Glob, Grep, Bash` and cannot call Skill.
+  - The Task catalog line for `worker` reads `(tools: inherit)`.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md` §10.2,
+  `03-runtime/02-agent-runtime.md` §5f/§7.2b, ADR 0246, issue #215
+- **Acceptance**: E (tools & permissions), Security
+- **Milestone**: M6+
+- **Status**: Covered by unit tests: `packages/shared`
+  `subagent-definition.test.ts` (parse inherit, deny list), `packages/agent-runtime`
+  `runtime.test.ts` (spawn catalog minus deny, Skill prompt) and
+  `subagent.test.ts` (resolved mutation framing); host-core `user_subagents`
+  inherit round-trip. Full UI inherit checkbox journey Draft. Required suites:
+  `test:e2e`, `test:e2e:subagents`.
+
 #### E2E-145: Tool results read as structured blocks, never JSON
 
 - **Preconditions**: A project-bound Agent session with permissions allowed for

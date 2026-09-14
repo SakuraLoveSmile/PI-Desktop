@@ -21,6 +21,7 @@ import {
   SubagentEditorSheet,
   draftFromRecord,
   emptySubagentDraft,
+  mergeSubagentToolGrant,
   type SubagentDraft,
 } from "./SubagentEditorSheet";
 import { IconBot, IconFolderOpen, IconPencil, IconPlus, IconTrash } from "../icons";
@@ -128,7 +129,7 @@ export function AgentSubagentsPage() {
       name: draft.name.trim(),
       description: draft.description.trim(),
       body: draft.body,
-      tools: draft.tools,
+      tools: mergeSubagentToolGrant(draft.inheritTools, draft.tools),
       // An empty string clears a pinned model; omitting it would keep the old one.
       model: draft.model.trim(),
       thinkingLevel: draft.thinkingLevel,

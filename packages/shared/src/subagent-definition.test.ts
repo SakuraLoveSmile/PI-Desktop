@@ -13,6 +13,7 @@ import {
   resolveSubagentToolNames,
   subagentCanMutate,
   subagentPinnedProviders,
+  subagentToolsLabel,
   type SubagentDefinition,
 } from "./subagent-definition.js";
 
@@ -405,6 +406,8 @@ Do the job.`);
     expect(result.definition.inheritTools).toBe(true);
     expect(result.definition.tools).toEqual([]);
     expect(result.warnings).toEqual([]);
+    expect(subagentCanMutate(result.definition)).toBe(true);
+    expect(subagentToolsLabel(result.definition)).toBe("inherit");
   });
 
   it("parses tools: inherit with assignable extras", () => {
@@ -417,6 +420,7 @@ Do the job.`);
     if (!result.ok) return;
     expect(result.definition.inheritTools).toBe(true);
     expect(result.definition.tools).toEqual(["Bash"]);
+    expect(subagentToolsLabel(result.definition)).toBe("inherit + Bash");
   });
 
   it("does not treat inherit as a bare unknown tool", () => {
@@ -445,6 +449,7 @@ describe("resolveSubagentToolNames", () => {
     "TaskWait",
     "asktool",
     "EnterPlanMode",
+    "new_context",
     "mcp-foo",
   ];
 
@@ -461,8 +466,9 @@ describe("resolveSubagentToolNames", () => {
     );
     expect(resolved).toContain("Read");
     expect(resolved).toContain("Skill");
-    expect(resolved).toContain("ToolSearch");
     expect(resolved).toContain("mcp-foo");
+    expect(resolved).not.toContain("ToolSearch");
+    expect(resolved).not.toContain("new_context");
     for (const denied of SUBAGENT_INHERIT_DENY_TOOLS) {
       expect(resolved).not.toContain(denied);
     }
@@ -486,6 +492,21 @@ describe("resolveSubagentToolNames", () => {
     expect(resolved).toEqual([...SUBAGENT_ASSIGNABLE_TOOLS, "Read"].filter(
       (name, index, all) => all.indexOf(name) === index,
     ));
+  });
+
+  it("uses a resolved list to decide mutation, not the inherit token", () => {
+    expect(
+      subagentCanMutate(definition({ tools: [], inheritTools: true }), [
+        "Read",
+        "Glob",
+      ]),
+    ).toBe(false);
+    expect(
+      subagentCanMutate(definition({ tools: [], inheritTools: true }), [
+        "Read",
+        "Edit",
+      ]),
+    ).toBe(true);
   });
 });
 
