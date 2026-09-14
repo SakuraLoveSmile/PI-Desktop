@@ -1,7 +1,7 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.17`
-- Date: `2026-09-13`
+- Baseline Version: `0.4.18`
+- Date: `2026-09-14`
 - Status: `Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v11 + schema v16 + host-owned plugin session import/read/update/delete P0/P1 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + edge-specific work-panel/chat resize ownership + models.dev model catalog with a bundled release snapshot + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions + custom global UI font + ChatGPT-style logical project groups)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
@@ -83,6 +83,10 @@
 > grouped sessions; its first root remains the only visible host workspace.
 > The additive group data uses the existing `kv` extension boundary, so the
 > storage schema and host protocol versions remain unchanged.
+> `0.4.18` renames the project overflow action to Edit project and adds
+> host-backed adjustment of logical project roots. The editor keeps the Primary
+> root fixed, supports adding/removing eligible additional roots, and rejects
+> removal of roots that still own chats.
 
 > The current post-baseline amendments add the P0/P1 host-owned plugin session
 > API through ADR 0200 / D367, explicit project ids plus host-owned session

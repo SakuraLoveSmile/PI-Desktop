@@ -32,7 +32,8 @@ import {
 } from "../lib/sidebar-session-groups";
 import { ProjectInstructionsDialog } from "../components/ProjectInstructionsDialog";
 import { ProjectMemoryDialog } from "../components/ProjectMemoryDialog";
-import { ProjectRenameDialog, SessionRenameDialog } from "../components/SessionRenameDialog";
+import { ProjectEditDialog } from "../components/ProjectEditDialog";
+import { SessionRenameDialog } from "../components/SessionRenameDialog";
 import { AnchoredMenu } from "../components/settings/AnchoredMenu";
 
 const INITIAL_VISIBLE_SESSION_COUNT = 8;
@@ -140,10 +141,11 @@ export function ProjectsPage() {
   const [visibleSessionCounts, setVisibleSessionCounts] = useState<Record<string, number>>({});
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<SessionSummary | null>(null);
-  const [renameProjectFor, setRenameProjectFor] = useState<{
+  const [editProjectFor, setEditProjectFor] = useState<{
     path: string;
     name: string;
     groupId?: string;
+    roots?: ProjectGroupRecord["roots"];
     legacy?: boolean;
   } | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -758,17 +760,20 @@ export function ProjectsPage() {
                               <button
                                 type="button"
                                 role="menuitem"
-                                data-action="rename-project"
+                                data-action="edit-project"
                                 onClick={() => {
                                   setMenuFor(null);
-                                  setRenameProjectFor({
+                                  setEditProjectFor({
                                     path: project.path,
                                     name: project.name,
+                                    groupId: project.groupId,
+                                    roots: project.roots,
+                                    legacy: project.legacy,
                                   });
                                 }}
                               >
                                 <IconPencil size={14} />
-                                {t("project.rename", { defaultValue: "Rename project" })}
+                                {t("project.edit", { defaultValue: "Edit project" })}
                               </button>
                               <div className="projects-menu-sep" role="separator" />
                               <button
@@ -958,16 +963,17 @@ export function ProjectsPage() {
           }
         />
       ) : null}
-      {renameProjectFor ? (
-        <ProjectRenameDialog
-          project={renameProjectFor}
-          onClose={() => setRenameProjectFor(null)}
-          onSave={async (name) => {
-            const group = items.find((item) => item.path === renameProjectFor.path);
-            if (group && !group.legacy) {
-              await api.renameProjectGroup(group.groupId, name);
-            }
-            renameProject(renameProjectFor.path, name);
+      {editProjectFor ? (
+        <ProjectEditDialog
+          project={editProjectFor}
+          onClose={() => setEditProjectFor(null)}
+          onSaved={(group) => {
+            renameProject(group.primaryPath, group.name);
+            setDurableProjects((current) =>
+              current.map((item) =>
+                item.id === group.id || item.id === editProjectFor.groupId ? group : item,
+              ),
+            );
           }}
           onError={(error) =>
             showToast(error instanceof Error ? error.message : String(error), {

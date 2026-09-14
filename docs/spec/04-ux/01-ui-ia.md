@@ -188,12 +188,13 @@ destination, chat as the home surface, tools and permissions inline.
   dense tree rather than detached cards. Hovering or focusing the project title
   reveals the full project path. Pressing the title and moving 8px reorders
   the group.
-- **Project actions**: open folder reveals the primary project directory; rename
-  edits the host-owned logical group name (and keeps renderer metadata in sync);
-  pin/unpin changes presentation priority; archive/restore hides or restores
-  the group in the default view; close removes the retained primary tab without
-  deleting or archiving group roots, sessions, or memory. Expanded Project
-  archive details list every group root.
+- **Project actions**: open folder reveals the primary project directory; Edit
+  project changes the host-owned logical group name and adjusts eligible
+  non-primary roots (keeping renderer metadata in sync); pin/unpin changes
+  presentation priority; archive/restore hides or restores the group in the
+  default view; close removes the retained primary tab without deleting or
+  archiving group roots, sessions, or memory. Expanded Project archive details
+  list every group root.
 - **Conversation actions**: rename, pin/unpin, archive/restore, fork, and
   delete remain separate actions. Rename edits the task label only; archive
   never removes the transcript. Open folder is a project action, not a

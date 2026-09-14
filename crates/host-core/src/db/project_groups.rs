@@ -35,6 +35,9 @@ pub struct ProjectGroupRecord {
     pub last_opened_at: i64,
     #[serde(default)]
     pub legacy: bool,
+    /// Roots removed from the group remain suppressed as legacy projections.
+    #[serde(default)]
+    pub detached_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -75,6 +78,7 @@ fn legacy_group(project: &ProjectRecord) -> ProjectGroupRecord {
         pinned: project.pinned,
         last_opened_at: project.last_opened_at,
         legacy: true,
+        detached_paths: Vec::new(),
     }
 }
 
@@ -105,6 +109,11 @@ impl Database {
                 let path = canonical_project_path(&root.path)
                     .ok_or_else(|| anyhow!("project group root path must not be blank"))?;
                 used_paths.insert(path);
+            }
+            for path in &group.detached_paths {
+                if let Some(path) = canonical_project_path(path) {
+                    used_paths.insert(path);
+                }
             }
             groups.push(group);
         }
@@ -188,7 +197,156 @@ impl Database {
             pinned: false,
             last_opened_at: now,
             legacy: false,
+            detached_paths: Vec::new(),
         };
+        self.kv_set(GROUP_NAMESPACE, &group.id, &serde_json::to_value(&group)?)?;
+        Ok(group)
+    }
+
+    pub fn update_project_group(
+        &self,
+        id: &str,
+        name: &str,
+        paths: &[String],
+    ) -> Result<ProjectGroupRecord> {
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > MAX_PROJECT_GROUP_NAME_CHARS {
+            return Err(anyhow!("project group name is invalid"));
+        }
+        let Some(current) = self.group_by_id(id.trim())? else {
+            return Err(anyhow!("project group not found"));
+        };
+        let primary = canonical_project_path(&current.primary_path)
+            .ok_or_else(|| anyhow!("project group primary path is invalid"))?;
+        let mut selected = Vec::with_capacity(paths.len());
+        for raw in paths {
+            let path = canonical_project_path(raw)
+                .ok_or_else(|| anyhow!("project group root path must not be blank"))?;
+            if !Path::new(&path).is_dir() {
+                return Err(anyhow!("project group root is not a directory: {path}"));
+            }
+            if selected.iter().any(|candidate| candidate == &path) {
+                continue;
+            }
+            if let Some(other) = self.project_group_for_path(&path)? {
+                if other.id != current.id && !other.legacy {
+                    return Err(anyhow!("folder already belongs to a project group: {path}"));
+                }
+            }
+            selected.push(path);
+        }
+        if !selected.iter().any(|path| path == &primary) {
+            return Err(anyhow!("the primary folder cannot be removed"));
+        }
+        let mut ordered = vec![primary.clone()];
+        ordered.extend(selected.into_iter().filter(|path| path != &primary));
+
+        let removed = current
+            .roots
+            .iter()
+            .map(|root| root.path.as_str())
+            .filter(|path| !ordered.iter().any(|candidate| candidate == path))
+            .collect::<Vec<_>>();
+        for path in &removed {
+            let has_sessions: bool = self.conn.query_row(
+                "SELECT EXISTS(
+                    SELECT 1 FROM sessions s
+                    JOIN projects p ON p.id = s.project_id
+                    WHERE p.path = ?1
+                )",
+                params![path],
+                |row| row.get(0),
+            )?;
+            if has_sessions {
+                return Err(anyhow!(
+                    "cannot remove a folder that still has chats: {path}"
+                ));
+            }
+        }
+        for path in &ordered {
+            self.ensure_project(path, false)?;
+        }
+
+        if current.legacy && ordered.len() == 1 {
+            self.conn
+                .prepare_cached("UPDATE projects SET name = ?1 WHERE path = ?2")?
+                .execute(params![name, primary])?;
+            let mut legacy = current;
+            legacy.name = name.to_string();
+            return Ok(legacy);
+        }
+
+        let now = now_ms();
+        let roots = ordered
+            .iter()
+            .enumerate()
+            .map(|(position, path)| ProjectGroupRoot {
+                path: path.clone(),
+                name: project_display_name(path),
+                position: position as i64,
+            })
+            .collect::<Vec<_>>();
+        let mut detached_paths = current.detached_paths;
+        for path in removed {
+            if !detached_paths.iter().any(|candidate| candidate == path) {
+                detached_paths.push(path.to_string());
+            }
+        }
+        detached_paths.retain(|path| !ordered.iter().any(|candidate| candidate == path));
+
+        let group = ProjectGroupRecord {
+            id: if current.legacy {
+                Uuid::new_v4().to_string()
+            } else {
+                current.id
+            },
+            name: name.to_string(),
+            primary_path: primary,
+            roots,
+            created_at: current.created_at,
+            updated_at: now,
+            pinned: current.pinned,
+            last_opened_at: current.last_opened_at,
+            legacy: false,
+            detached_paths,
+        };
+        if current.legacy {
+            // A legacy project may already have path-scoped memory. Merge the
+            // memory of every selected legacy root into the new group so
+            // upgrading a project never silently discards user context.
+            let mut merged_entries = Vec::new();
+            for (root_index, path) in ordered.iter().enumerate() {
+                let memory = self.get_project_memory(path)?;
+                if let Some(entries) = memory.entries {
+                    merged_entries.extend(entries.into_iter().map(|entry| {
+                        ProjectMemoryEntryRecord {
+                            id: format!("root-{root_index}-{}", entry.id),
+                            title: entry.title,
+                            content: entry.content,
+                        }
+                    }));
+                } else if !memory.content.is_empty() {
+                    merged_entries.push(ProjectMemoryEntryRecord {
+                        id: format!("root-{root_index}-legacy"),
+                        title: project_display_name(path),
+                        content: memory.content,
+                    });
+                }
+            }
+            if !merged_entries.is_empty() {
+                let content = render_project_memory_entries(&merged_entries);
+                self.kv_set(
+                    GROUP_MEMORY_NAMESPACE,
+                    &group.id,
+                    &serde_json::json!({
+                        "format": "entries-v1",
+                        "content": content,
+                        "entries": merged_entries,
+                        "updatedAt": now_ms()
+                    }),
+                )?;
+            }
+        }
         self.kv_set(GROUP_NAMESPACE, &group.id, &serde_json::to_value(&group)?)?;
         Ok(group)
     }

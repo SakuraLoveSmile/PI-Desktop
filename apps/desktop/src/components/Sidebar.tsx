@@ -69,7 +69,8 @@ import {
 } from "../lib/sidebar-preferences";
 import { BrandLogo } from "./BrandLogo";
 import { NotificationCenter } from "./NotificationCenter";
-import { ProjectRenameDialog, SessionRenameDialog } from "./SessionRenameDialog";
+import { ProjectEditDialog } from "./ProjectEditDialog";
+import { SessionRenameDialog } from "./SessionRenameDialog";
 import { useUpdateState } from "../hooks/use-update-state";
 import {
   IconArchive,
@@ -287,7 +288,7 @@ export function Sidebar({
   const [sortOpen, setSortOpen] = useState(false);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<SessionSummary | null>(null);
-  const [renameProjectFor, setRenameProjectFor] = useState<ProjectEntry | null>(null);
+  const [editProjectFor, setEditProjectFor] = useState<ProjectEntry | null>(null);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
   const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
   const [menuPosition, setMenuPosition] = useState<{
@@ -1148,7 +1149,7 @@ export function Sidebar({
     }
   };
 
-  const renameProjectEntry = async (entry: ProjectEntry, name: string) => {
+  const editProjectEntry = (entry: ProjectEntry, name: string) => {
     renameProject(entry.path, name);
   };
 
@@ -1888,14 +1889,14 @@ export function Sidebar({
             <button
               type="button"
               role="menuitem"
-              data-action="rename-project"
+              data-action="edit-project"
               onClick={() => {
                 closeMenus(false);
-                setRenameProjectFor(entry);
+                setEditProjectFor(entry);
               }}
             >
               <IconPencil size={14} />
-              {t("project.rename", { defaultValue: "Rename project" })}
+              {t("project.edit", { defaultValue: "Edit project" })}
             </button>
             <button
               type="button"
@@ -2182,11 +2183,11 @@ export function Sidebar({
           onError={reportError}
         />
       ) : null}
-      {renameProjectFor ? (
-        <ProjectRenameDialog
-          project={renameProjectFor}
-          onClose={() => setRenameProjectFor(null)}
-          onSave={(name) => renameProjectEntry(renameProjectFor, name)}
+      {editProjectFor ? (
+        <ProjectEditDialog
+          project={editProjectFor}
+          onClose={() => setEditProjectFor(null)}
+          onSaved={(group) => editProjectEntry(editProjectFor, group.name)}
           onError={reportError}
         />
       ) : null}

@@ -200,11 +200,14 @@ may be retained while exactly one workspace supplies the visible shell context.
   blank values are not submittable. The title is metadata only, so the task's
   transcript, activity ordering, project binding, and empty-session state are
   unchanged. Escape, Cancel, or clicking the scrim dismisses the editor.
-- **Rename project** — the project overflow menu in the sidebar and Project
-  archive opens the same modal editor for the selected project. Saving trims
-  and persists a 1–80 Unicode-code-point display name in renderer-local
-  sidebar preferences. The normalized path remains authoritative, so the
-  workspace, sessions, transcript data, and on-disk folder are unchanged.
+- **Edit project** — the project overflow menu in the sidebar and Project
+  archive opens the same editor for the selected logical project. The editor
+  trims and persists a 1–80 Unicode-code-point group name and lists every
+  registered folder. The Primary folder stays first and cannot be removed;
+  additional folders can be added through the native multi-selection picker or
+  removed individually. Saving updates the host-owned group while preserving
+  the normalized paths, workspace identity, sessions, transcripts, and on-disk
+  folders. A folder with existing chats cannot be removed.
 - **Pin** toggles presentation priority. Pinned projects/conversations appear
   before unpinned rows within the selected secondary order. In the sidebar, a
   pinned project replaces its Folder glyph with a filled accent Star so its

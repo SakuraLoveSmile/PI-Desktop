@@ -480,6 +480,12 @@ export const api = {
     invoke<{ group: ProjectGroupRecord }>(IPC.invoke.projectGroupCreate, { name, folders }),
   renameProjectGroup: (groupId: string, name: string) =>
     invoke<{ group: ProjectGroupRecord }>(IPC.invoke.projectGroupRename, { groupId, name }),
+  updateProjectGroup: (groupId: string, name: string, folders: string[]) =>
+    invoke<{ group: ProjectGroupRecord }>(IPC.invoke.projectGroupUpdate, {
+      groupId,
+      name,
+      folders,
+    }),
   getProjectGroupMemory: (groupId: string) =>
     invoke<{ memory: ProjectMemory }>(IPC.invoke.projectGroupMemoryGet, { groupId }),
   saveProjectGroupMemory: (groupId: string, entries: ProjectMemory["entries"]) =>

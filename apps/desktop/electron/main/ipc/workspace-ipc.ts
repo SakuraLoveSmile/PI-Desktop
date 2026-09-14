@@ -204,6 +204,40 @@ export function registerWorkspaceIpc({
     },
   );
   handle(
+    IPC.invoke.projectGroupUpdate,
+    async (input: { groupId?: unknown; name?: unknown; folders?: unknown } = {}) => {
+      if (!host) throw new Error("host unavailable");
+      const groupId = typeof input.groupId === "string" ? input.groupId.trim() : "";
+      const name = typeof input.name === "string" ? input.name.trim() : "";
+      const folders = Array.isArray(input.folders)
+        ? input.folders.filter((path): path is string => typeof path === "string")
+        : [];
+      if (!groupId || !name || folders.length === 0) {
+        throw Object.assign(new Error("project group id, name and folders required"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      const safeFolders = [
+        ...new Set(
+          folders
+            .map((path) => path.trim())
+            .filter((path) => path.length > 0)
+            .map((path) => resolve(path)),
+        ),
+      ];
+      if (safeFolders.some((path) => !existsSync(path) || !statSync(path).isDirectory())) {
+        throw Object.assign(new Error("project group folders must be directories"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      return host.call("project.group.update", {
+        groupId,
+        name,
+        folders: safeFolders,
+      });
+    },
+  );
+  handle(
     IPC.invoke.projectGroupRename,
     async (input: { groupId?: unknown; name?: unknown } = {}) => {
       if (!host) throw new Error("host unavailable");

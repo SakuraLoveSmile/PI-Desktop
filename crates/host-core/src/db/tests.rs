@@ -1189,6 +1189,115 @@ fn project_group_roundtrips_roots_and_shared_context() {
 }
 
 #[test]
+fn project_group_update_adjusts_roots_without_orphaning_chats() {
+    let dir = tempfile::tempdir().unwrap();
+    let primary = dir.path().join("primary");
+    let first = dir.path().join("first");
+    let second = dir.path().join("second");
+    std::fs::create_dir_all(&primary).unwrap();
+    std::fs::create_dir_all(&first).unwrap();
+    std::fs::create_dir_all(&second).unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    let group = db
+        .create_project_group(
+            "Editable",
+            &[
+                primary.to_string_lossy().into(),
+                first.to_string_lossy().into(),
+            ],
+        )
+        .unwrap();
+
+    let updated = db
+        .update_project_group(
+            &group.id,
+            "Adjusted",
+            &[
+                primary.to_string_lossy().into(),
+                second.to_string_lossy().into(),
+            ],
+        )
+        .unwrap();
+    assert_eq!(updated.name, "Adjusted");
+    assert_eq!(updated.roots.len(), 2);
+    assert_eq!(updated.roots[0].path, group.primary_path);
+    assert_eq!(
+        updated.roots[1].path,
+        crate::db::canonical_project_path(&second.to_string_lossy()).unwrap()
+    );
+    assert_eq!(updated.detached_paths.len(), 1);
+    assert_eq!(db.list_project_groups().unwrap().len(), 1);
+
+    let session = crate::sessions::create_session(
+        &db,
+        Some("Existing chat".into()),
+        Some("agent".into()),
+        None,
+        None,
+        Some(second.to_string_lossy().into_owned()),
+    )
+    .unwrap();
+    assert!(db
+        .update_project_group(
+            &updated.id,
+            "Adjusted again",
+            &[second.to_string_lossy().into()],
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("primary folder"));
+    let canonical_second = crate::db::canonical_project_path(&second.to_string_lossy()).unwrap();
+    assert_eq!(
+        session.project_path.as_deref(),
+        Some(canonical_second.as_str())
+    );
+
+    assert!(db
+        .update_project_group(
+            &updated.id,
+            "Adjusted again",
+            &[primary.to_string_lossy().into()],
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("still has chats"));
+}
+
+#[test]
+fn editing_a_legacy_project_with_an_extra_folder_upgrades_it_to_a_group() {
+    let dir = tempfile::tempdir().unwrap();
+    let primary = dir.path().join("primary");
+    let extra = dir.path().join("extra");
+    std::fs::create_dir_all(&primary).unwrap();
+    std::fs::create_dir_all(&extra).unwrap();
+    let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+    db.ensure_project(&primary.to_string_lossy(), false)
+        .unwrap();
+    db.set_project_memory(&primary.to_string_lossy(), "Remember this.")
+        .unwrap();
+    let legacy = db.list_project_groups().unwrap().pop().unwrap();
+    db.set_project_memory(&extra.to_string_lossy(), "Remember the extra root too.")
+        .unwrap();
+    assert!(legacy.legacy);
+
+    let upgraded = db
+        .update_project_group(
+            &legacy.id,
+            "Upgraded",
+            &[
+                primary.to_string_lossy().into(),
+                extra.to_string_lossy().into(),
+            ],
+        )
+        .unwrap();
+    assert!(!upgraded.legacy);
+    let memory = db.get_project_group_memory(&upgraded.id).unwrap();
+    assert!(memory.content.contains("Remember this."));
+    assert!(memory.content.contains("Remember the extra root too."));
+    assert_eq!(db.list_project_groups().unwrap().len(), 1);
+}
+
+#[test]
 fn old_path_projects_are_legacy_single_root_groups() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("legacy");

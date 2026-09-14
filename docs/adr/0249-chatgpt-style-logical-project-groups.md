@@ -37,7 +37,11 @@ policy.
    file tools. A tool request using an absolute path under another registered
    group root is canonicalized and may use that root as its containment base;
    group membership never grants arbitrary external filesystem access.
-6. Group creation, rename, shared instruction editing, and shared memory editing
+6. The project overflow action is named **Edit project**. The editor can change
+   the group name and adjust its root list through the additive
+   `project.group.update` capability. The primary root remains first and cannot
+   be removed; a root with existing chats cannot be detached.
+7. Group creation, editing, shared instruction editing, and shared memory editing
    are additive IPC capabilities. Legacy path-scoped instruction and memory
    APIs remain available for legacy single-root groups.
 
@@ -48,8 +52,10 @@ policy.
 - Existing projects retain their paths, sessions, transcripts, and renderer
   presentation metadata.
 - The first folder remains meaningful as the default execution root and cannot
-  be reordered in this iteration. Additional roots are available only through
-  explicit absolute paths that pass host canonical containment.
+  be reordered in this iteration. Additional roots can be adjusted from Edit
+  project, subject to chat-preservation and host ownership checks, and are
+  available only through explicit absolute paths that pass host canonical
+  containment.
 - Selecting another group still changes the one visible host workspace; a
   background session remains bound to its own primary path.
 - The native picker remains local-only. Remote project sources are not implied.

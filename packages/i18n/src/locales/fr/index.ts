@@ -1288,6 +1288,12 @@ sklm: {
     "renameCancel": "Annuler",
     "renameSave": "Enregistrer",
     "renameSaving": "Enregistrement…",
+    "editTitle": "Modifier le projet",
+    "editDescription": "Mettez à jour le nom et les dossiers du projet.",
+    "editAction": "Enregistrer les modifications",
+    "editSaving": "Enregistrement…",
+    "editCancel": "Annuler",
+    "editPrimaryLocked": "Le dossier principal ne peut pas être supprimé",
     "editInstructions": "Instructions du projet",
     "instructionsSaved": "Instructions du projet enregistrées",
     "editMemory": "Mémoire du projet",
@@ -1314,6 +1320,8 @@ sklm: {
     "droppedFolder": "Dossier déposé",
     "openAsProject": "Ouvrir comme projet",
     "referenceFolder": "Référencer le dossier",
+    "foldersLabel": "Dossiers du projet",
+    "notFound": "Projet introuvable",
     "noProjects": "Aucun projet pour l'instant"
   },
   "pulls": {
