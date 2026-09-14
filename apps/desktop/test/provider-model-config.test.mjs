@@ -19,6 +19,7 @@ const hookSource = await read("../src/components/settings/useProviderModels.ts")
 const pageSource = await read("../src/components/settings/ModelConfigPage.tsx");
 const vendorDialogSource = await read("../src/components/settings/VendorAccountDialog.tsx");
 const pickerSource = await read("../src/components/settings/ModelSelectionPanes.tsx");
+const filterSource = await read("../src/components/settings/model-chosen-filter.ts");
 const vendorAccountsSource = await read("../src/components/settings/VendorAccountsSection.tsx");
 const apiSource = await read("../src/lib/api.ts");
 const catalogContractSource = await read("../../../packages/shared/src/model-catalog.ts");
@@ -251,17 +252,21 @@ test("the chosen pane narrows a long configured list with its own search", () =>
   // The filter is a view: the badge beside the title still reports every
   // configured model, and removing a filtered row still removes the binding.
   assert.match(pickerSource, /provider-chosen-count">\{models\.length\}/);
-  // Same matching rule as the discovered list, plus the alias and the catalog
-  // display name so a friendly name finds the id it stands for.
-  assert.match(pickerSource, /displayNameById/);
-  assert.match(pickerSource, /binding\.alias\?\.toLowerCase\(\)/);
+  // The rule itself is executed by model-chosen-filter.test.mjs; here the pane
+  // only has to delegate to it for the view and for every add path.
+  assert.match(filterSource, /export function filterChosenModels/);
+  assert.match(filterSource, /export function hidesAddedBinding/);
+  assert.match(pickerSource, /filterChosenModels\(models, chosenQuery, rows\)/);
   // "Nothing matches" is a different message from "nothing chosen yet".
   assert.match(pickerSource, /models\.length === 0 \? \(/);
   assert.match(pickerSource, /visibleChosen\.length === 0 \? \(/);
   assert.match(pickerSource, /settings\.noModelsChosen/);
   assert.match(pickerSource, /settings\.noChosenModelMatches/);
-  // A model added by hand must not land behind a filter typed earlier.
-  assert.match(pickerSource, /setChosenQuery\(""\)/);
+  // Every add path — checkbox, select-all, hand-typed — asks that same rule
+  // whether the new model would land behind the filter typed earlier, and an
+  // emptied list drops the filter instead of stranding it in a disabled field.
+  assert.equal([...pickerSource.matchAll(/keepAddedModelVisible\(/g)].length, 3);
+  assert.match(pickerSource, /if \(models\.length === 0\) setChosenQuery\(""\)/);
   // No dead control: the field is off while saving or with nothing to search.
   assert.match(pickerSource, /disabled=\{busy \|\| models\.length === 0\}/);
   // One control, one rule: the two searches share declarations rather than

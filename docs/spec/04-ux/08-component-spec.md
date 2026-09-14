@@ -3075,8 +3075,10 @@ compatibility remains owned by pi-ai.
   the catalog display name case-insensitively, so a friendly name finds the id
   it stands for. The count beside the title still reports every configured
   model; a filter that matches nothing shows its own message rather than the
-  "nothing chosen yet" one. Adding a custom model clears the field, so a new
-  row is never added out of view.
+  "nothing chosen yet" one. A model that is added — by checkbox, select-all, or
+  hand-typed id — keeps that field only while the filter still shows it; an
+  emptied list drops the filter, so a new row never arrives out of view and no
+  query is stranded in a field the user can no longer clear.
 - Adding a custom model validates non-empty and duplicate IDs, adds it to the
   top-level option list, selects it, and applies 128,000 context / 8,192 max
   output / no thinking defaults. Removing its selection does not delete the
