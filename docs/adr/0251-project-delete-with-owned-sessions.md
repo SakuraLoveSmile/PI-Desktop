@@ -39,7 +39,8 @@ Two integrity facts constrain the fix:
    `project_id` points at it, reusing the existing `sessions::delete_session`
    path so transcript, scratch, and review files are removed exactly as they are
    for a single conversation delete, and it clears the project's durable memory.
-   It is idempotent for an unknown path.
+   It is idempotent for an unknown path, and it is refused while any attached
+   session has a running turn (see 7).
 3. The RPC never touches the project's folder on disk. PI-Desktop deletes
    application records, never user files, and a project whose folder was moved
    or deleted is still removable.
@@ -57,8 +58,15 @@ Two integrity facts constrain the fix:
    is the only thing that can keep such a row visible.
 6. The action stays renderer-only. It is deliberately absent from
    `CONTROL_OPERATION_SPECS`, so local MCP control cannot delete projects.
-7. Session delete keeps its current semantics. Removing a project is the bulk
-   operation and inherits them, including removal while a turn is running.
+7. The bulk delete is refused while any attached session has a running turn
+   (1008 / `CONFLICT`). A live turn still owns its tools and working directory
+   and is still appending to the transcript the delete would remove, so the
+   operation is deliberately stricter than single-conversation delete, which
+   keeps its current semantics. The renderer blocks the same action up front, so
+   users normally meet a message instead of an error, and a refusal that
+   reaches the dialog is shown with the same localized copy. The check and the
+   deletes run in one host RPC under the host's single state lock, so no turn
+   can start between them.
 
 ## Consequences
 
@@ -73,6 +81,10 @@ Two integrity facts constrain the fix:
 - Composer/sidebar code that lists projects must treat the four index sources
   consistently; a future index source has to be cleaned by the same action, or
   the row will reappear.
+- A project with a running task must be stopped before it can be deleted, which
+  is one extra step in that case; the alternative was deleting under a live
+  writer, which can resurrect a session row for the transcript the user just
+  removed.
 
 ## Alternatives
 
@@ -88,3 +100,8 @@ Two integrity facts constrain the fix:
   for now: `project.group.update` refuses to detach a root that has chats, and
   silently rewriting group structure during a delete makes the outcome hard to
   predict. The refusal path can be relaxed by a later ADR.
+- **Abort the running turns inside the same call.** Rejected: host-core can
+  settle a turn's own bookkeeping but cannot stop the agent runtime that is
+  still streaming into that session, so an aborted-then-deleted session can
+  still be re-created as a stub by the next append (D318). Refusing the delete
+  keeps the timing decision with the user and leaves no window for that.

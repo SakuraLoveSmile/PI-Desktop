@@ -1346,6 +1346,7 @@ sklm: {
     deleteSessions_one: "{{count}} saved session and its transcripts is deleted permanently.",
     deleteSessions_other: "{{count}} saved sessions and their transcripts are deleted permanently.",
     deleteFolderKept: "The folder on disk is not deleted.",
+    deleteRunningBlocked: "Stop this project's running tasks before deleting it.",
     deleteConfirm: "Delete project",
     deleteCancel: "Cancel",
     deleting: "Deleting…",

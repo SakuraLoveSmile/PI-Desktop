@@ -1336,6 +1336,7 @@ sklm: {
     deleteSessions_one: "{{count}} 个会话及其对话记录将被永久删除。",
     deleteSessions_other: "{{count}} 个会话及其对话记录将被永久删除。",
     deleteFolderKept: "磁盘上的文件夹不会被删除。",
+    deleteRunningBlocked: "请先停止该项目中正在运行的任务，再删除项目。",
     deleteConfirm: "删除项目",
     deleteCancel: "取消",
     deleting: "删除中…",

@@ -1329,6 +1329,7 @@ sklm: {
     "deleteSessions_one": "{{count}} sesión guardada se eliminará de forma permanente junto con sus transcripciones.",
     "deleteSessions_other": "{{count}} sesiones guardadas se eliminarán de forma permanente junto con sus transcripciones.",
     "deleteFolderKept": "La carpeta del disco no se elimina.",
+    "deleteRunningBlocked": "Detenga las tareas en ejecución de este proyecto antes de eliminarlo.",
     "deleteConfirm": "Eliminar proyecto",
     "deleteCancel": "Cancelar",
     "deleting": "Eliminando…",

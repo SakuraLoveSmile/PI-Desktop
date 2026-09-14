@@ -1348,6 +1348,7 @@ sklm: {
     deleteSessions_one: "{{count}}개의 저장된 세션이 대화 기록과 함께 영구적으로 삭제됩니다.",
     deleteSessions_other: "{{count}}개의 저장된 세션이 대화 기록과 함께 영구적으로 삭제됩니다.",
     deleteFolderKept: "디스크의 폴더는 삭제되지 않습니다.",
+    deleteRunningBlocked: "이 프로젝트에서 실행 중인 작업을 중지한 후 프로젝트를 삭제하세요.",
     deleteConfirm: "프로젝트 삭제",
     deleteCancel: "취소",
     deleting: "삭제 중…",

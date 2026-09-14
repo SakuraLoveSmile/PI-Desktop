@@ -135,6 +135,7 @@ export function ProjectsPage() {
   const renameSession = useAppStore((s) => s.renameSession);
   const showToast = useAppStore((s) => s.showToast);
   const sessions = useAppStore((s) => s.sessions);
+  const runningSessions = useAppStore((s) => s.runningSessions);
   const [recents, setRecents] = useState<RecentProject[]>(() => loadRecentProjects());
   const [durableProjects, setDurableProjects] = useState<ProjectGroupRecord[]>([]);
   const [query, setQuery] = useState("");
@@ -813,6 +814,17 @@ export function ProjectsPage() {
                                 data-action="delete-project"
                                 onClick={() => {
                                   setMenuFor(null);
+                                  const runningCount = sessions.filter(
+                                    (session) =>
+                                      sessionMatchesIndexProject(session, project) &&
+                                      runningSessions[session.id] === true,
+                                  ).length;
+                                  if (runningCount > 0) {
+                                    showToast(t("project.deleteRunningBlocked"), {
+                                      variant: "warning",
+                                    });
+                                    return;
+                                  }
                                   setDeleteFor({
                                     name: project.name,
                                     path: project.path,

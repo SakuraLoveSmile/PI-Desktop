@@ -12,6 +12,7 @@ const DELETE_KEYS = [
   "deleteSessions_one",
   "deleteSessions_other",
   "deleteFolderKept",
+  "deleteRunningBlocked",
   "deleteConfirm",
   "deleteCancel",
   "deleting",
@@ -52,6 +53,20 @@ function projectValue(block, key) {
   const match = block.match(new RegExp(`^    "?${key}"?:\\s*"([^"]*)"`, "m"));
   assert.ok(match, `${key} is defined in the project block`);
   return match[1];
+}
+
+/**
+ * The delete menu item from its action attribute to the end of its opening
+ * tag, so a guard inside that handler is checked without matching sibling
+ * menus of the same surface.
+ */
+function deleteHandler(source) {
+  const start = source.indexOf('data-action="delete-project"');
+  assert.ok(start >= 0, "the delete action is present");
+  const rest = source.slice(start);
+  const end = rest.search(/\n\s+>\n/);
+  assert.ok(end > 0, "the delete action button closes");
+  return rest.slice(0, end);
 }
 
 test("the delete dialog is a real confirmation backed by the store action", () => {
@@ -121,6 +136,63 @@ test("both project menus expose a destructive delete action", () => {
   assert.match(sidebarSource, /onError=\{reportError\}/);
 });
 
+test("deleting a project is blocked while its tasks are running", () => {
+  for (const [surface, source, dialogSetter] of [
+    ["ProjectsPage", projectsSource, "setDeleteFor("],
+    ["Sidebar", sidebarSource, "setDeleteProjectFor("],
+  ]) {
+    const handler = deleteHandler(source);
+    const runningCheck = handler.indexOf("runningSessions[session.id]");
+    assert.ok(runningCheck >= 0, `${surface} consults runningSessions`);
+    assert.match(handler, /\.filter\(/, `${surface} filters the project sessions`);
+    assert.match(
+      handler,
+      /showToast\(\s*t\("project\.deleteRunningBlocked"\),\s*\{\s*variant: "warning",?\s*\},?\s*\)/,
+      `${surface} warns instead of deleting`,
+    );
+
+    // The guard must short-circuit before the dialog state is touched.
+    const dialogState = handler.indexOf(dialogSetter);
+    assert.ok(dialogState > runningCheck, `${surface} checks running tasks first`);
+    assert.match(
+      handler.slice(runningCheck, dialogState),
+      /return;/,
+      `${surface} returns before opening the dialog`,
+    );
+  }
+
+  // Each surface counts the sessions that belong to the project row itself.
+  assert.match(deleteHandler(projectsSource), /sessionMatchesIndexProject\(session, project\)/);
+  assert.match(deleteHandler(sidebarSource), /entry\.sessions\.filter\(/);
+
+  const englishBlock = projectBlock(catalogs.get("en"));
+  assert.equal(
+    projectValue(englishBlock, "deleteRunningBlocked"),
+    "Stop this project's running tasks before deleting it.",
+  );
+  assert.deepEqual(placeholders(projectValue(englishBlock, "deleteRunningBlocked")), []);
+  assert.equal(
+    projectValue(projectBlock(catalogs.get("zh-CN")), "deleteRunningBlocked"),
+    "请先停止该项目中正在运行的任务，再删除项目。",
+  );
+  assert.equal(
+    projectValue(projectBlock(catalogs.get("zh-TW")), "deleteRunningBlocked"),
+    "請先停止該專案中正在執行的任務，再刪除專案。",
+  );
+  for (const id of LOCALE_IDS) {
+    const value = projectValue(projectBlock(catalogs.get(id)), "deleteRunningBlocked");
+    assert.notEqual(value.trim(), "", `${id} deleteRunningBlocked`);
+    assert.deepEqual(placeholders(value), [], `${id} deleteRunningBlocked placeholders`);
+    if (id !== "en") {
+      assert.notEqual(
+        value,
+        projectValue(englishBlock, "deleteRunningBlocked"),
+        `${id} deleteRunningBlocked is translated`,
+      );
+    }
+  }
+});
+
 test("every shipped catalog defines the delete keys with matching placeholders", () => {
   const englishBlock = projectBlock(catalogs.get("en"));
   assert.equal(projectValue(englishBlock, "delete"), "Delete project");
@@ -172,4 +244,24 @@ test("a project the host does not know is still removed from the desktop", async
   assert.match(storeBlock, /removeRecentProject\(path\)/);
   assert.match(storeBlock, /clearLocalSessionState\(/);
   assert.doesNotMatch(dialogSource, /project\.notFound/);
+});
+
+test("the delete dialog reports success once and localizes the busy refusal", () => {
+  const confirmBlock =
+    dialogSource.match(/const confirm = async \(\) => \{[\s\S]*?\n  \};/)?.[0] ?? "";
+  assert.ok(confirmBlock, "confirm handler exists");
+  // A duplicated success call would fire two cleanup paths and two toasts.
+  assert.equal(
+    (confirmBlock.match(/await onDeleted\(\)/g) ?? []).length,
+    1,
+    "onDeleted is awaited exactly once",
+  );
+  assert.equal((confirmBlock.match(/onError\(/g) ?? []).length, 2);
+  // The host refuses with CONFLICT while a task runs; the dialog must show the
+  // same localized explanation the menu guard uses instead of the raw message.
+  assert.match(confirmBlock, /errorCode === ErrorCodes\.CONFLICT/);
+  assert.match(
+    confirmBlock,
+    /onError\(new Error\(t\("project\.deleteRunningBlocked"\)\)\)/,
+  );
 });

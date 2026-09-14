@@ -1927,6 +1927,13 @@ export function Sidebar({
               data-action="delete-project"
               onClick={() => {
                 closeMenus(false);
+                const runningCount = entry.sessions.filter(
+                  (session) => runningSessions[session.id] === true,
+                ).length;
+                if (runningCount > 0) {
+                  showToast(t("project.deleteRunningBlocked"), { variant: "warning" });
+                  return;
+                }
                 setDeleteProjectFor(entry);
               }}
             >
