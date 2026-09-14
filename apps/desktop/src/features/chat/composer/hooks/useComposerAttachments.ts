@@ -24,6 +24,7 @@ import {
   formatDroppedDirectoryPath,
   insertClipboardText,
   nextChipToken,
+  normalizeClipboardLineEndings,
   preferClipboardText,
   readEditorValue,
   type ComposerFileReference,
@@ -258,7 +259,9 @@ export function useComposerAttachments({
       if (!selection || selection.rangeCount === 0) return;
       const range = selection.getRangeAt(0);
       range.deleteContents();
-      range.insertNode(document.createTextNode(text));
+      range.insertNode(
+        document.createTextNode(normalizeClipboardLineEndings(text)),
+      );
       range.collapse(false);
       selection.removeAllRanges();
       selection.addRange(range);

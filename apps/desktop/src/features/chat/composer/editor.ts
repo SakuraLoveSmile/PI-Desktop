@@ -386,12 +386,17 @@ export function preferClipboardText(
   );
 }
 
+/** Clipboard text arrives with CRLF/CR; the draft model stores LF only. */
+export function normalizeClipboardLineEndings(text: string): string {
+  return text.replace(/\r\n?/g, "\n");
+}
+
 /** Keep native undo while inserting multiline text into the editor's Text/BR
  * model. insertText creates block wrappers whose offsets differ from the draft. */
 export function insertClipboardText(editor: HTMLElement, text: string): boolean {
   if (!/[\r\n]/.test(text)) return document.execCommand("insertText", false, text);
   const { start } = editorSelectionRange(editor);
-  const normalized = text.replace(/\r\n?/g, "\n");
+  const normalized = normalizeClipboardLineEndings(text);
   const escaped = document.createElement("div");
   escaped.textContent = normalized;
   // Only escaped plain text and our own line breaks enter insertHTML; clipboard
