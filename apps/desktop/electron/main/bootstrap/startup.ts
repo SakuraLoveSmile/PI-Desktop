@@ -279,12 +279,24 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
                    : await api.invoke(api.channels.invoke.windowControl, {
                        action: "getState",
                      });
+               // Project removal channel: a path that cannot have a durable row
+               // still has to survive preload -> main -> host-core and come back
+               // as the documented idempotent no-op.
+               const projectRemove = await api.invoke(
+                 api.channels.invoke.projectRemove,
+                 { path: "pi-desktop-boot-probe-unknown-project" },
+               );
                return {
                  ok: version?.ok === true,
                  version: version?.data?.version,
                  hostProtocol: version?.data?.hostProtocolVersion,
                  platform: api.platform,
                  maximized: windowState?.data?.maximized ?? null,
+                 projectRemove: {
+                   ok: projectRemove?.ok === true,
+                   removed: projectRemove?.data?.removed ?? null,
+                   sessionsRemoved: projectRemove?.data?.sessionsRemoved ?? null,
+                 },
                };
              })()`,
             );
