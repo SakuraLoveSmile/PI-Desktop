@@ -5516,12 +5516,7 @@ and identify the platform validation still needed.
   `03-runtime/02-agent-runtime.md` §5f/§7.2b, ADR 0246, issue #215
 - **Acceptance**: E (tools & permissions), Security
 - **Milestone**: M6+
-- **Status**: Covered by unit tests: `packages/shared`
-  `subagent-definition.test.ts` (parse inherit, deny list), `packages/agent-runtime`
-  `runtime.test.ts` (spawn catalog minus deny, Skill prompt) and
-  `subagent.test.ts` (resolved mutation framing); host-core `user_subagents`
-  inherit round-trip. Full UI inherit checkbox journey Draft. Required suites:
-  `test:e2e`, `test:e2e:subagents`.
+- **Status**: Automated by `test:e2e:subagents` (host-core create/read/on-disk/active/loader inherit round-trip) and `test:e2e:subagent-models` (real sidecar/local transport Task spawn, inherited Skill/plugin catalog minus the deny list, and builtin explorer isolation). Unit coverage remains in `packages/shared`, `packages/agent-runtime`, and host-core `user_subagents`; the UI inherit-checkbox journey remains Draft. Required suites: `test:e2e`, `test:e2e:subagents`, `test:e2e:subagent-models`.
 
 #### E2E-145: Tool results read as structured blocks, never JSON
 
