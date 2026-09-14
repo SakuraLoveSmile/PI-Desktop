@@ -8,6 +8,7 @@ import * as queued from "../src/lib/queued-prompts.ts";
 import * as sideChats from "../src/lib/side-chat.ts";
 import * as tabs from "../src/lib/work-panel-tabs.ts";
 import * as resize from "../src/lib/work-panel-resize.ts";
+import * as panes from "../src/lib/session-panes.ts";
 
 // Execute the real domain factories with a fake host; no app, database, or model.
 function load(path, imports) {
@@ -186,6 +187,7 @@ test("side-chat and background projections share upstream delta accumulation, in
     "../../lib/sidebar-preferences": {},
     "../../lib/sidebar-session-groups": {},
     "../../lib/tool-display": { formatToolValue: JSON.stringify },
+    "../../lib/session-panes": panes,
   });
   const state = {
     activeSessionId: "child", messages: [], retainedTranscripts: {}, sessionHistory: {},
