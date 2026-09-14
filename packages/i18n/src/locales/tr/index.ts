@@ -669,6 +669,7 @@ sklm: {
     groupAgent: "Ajan",
     groupWorkspace: "Çalışma alanı",
     groupSystem: "Sistem",
+    groupExtensions: "Uzantılar",
     nav: {
       general: "Genel",
       ai: "AI",

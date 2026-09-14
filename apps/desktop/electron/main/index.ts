@@ -674,6 +674,7 @@ const {
   emitBrowserState,
   pluginPanels,
   pluginViews,
+  pluginSettingsViews,
   browserHost,
   browserPane,
   announceTurnEnded,

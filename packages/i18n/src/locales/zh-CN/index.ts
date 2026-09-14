@@ -664,6 +664,7 @@ sklm: {
     groupAgent: "智能体",
     groupWorkspace: "工作区",
     groupSystem: "系统",
+    groupExtensions: "扩展",
     nav: {
       general: "常规",
       ai: "AI",

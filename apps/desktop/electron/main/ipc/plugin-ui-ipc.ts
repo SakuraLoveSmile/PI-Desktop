@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { IPC, type PluginViewMeta } from "@pi-desktop/shared";
+import { IPC, type PluginSettingsDestinationMeta, type PluginViewMeta } from "@pi-desktop/shared";
 import { resolvePluginLocalizedString } from "@pi-desktop/plugin-sdk";
 import type { BrowserHost } from "../browser-host";
 import { BROWSER_PLUGIN_ID, BROWSER_VIEW_ID } from "../browser-host";
@@ -16,6 +16,7 @@ export type PluginUiIpcDependencies = {
   plugins: PluginRuntime;
   browserHost: BrowserHost;
   pluginViews: PluginViewHost;
+  pluginSettingsViews: PluginViewHost;
   pluginPanels: PluginPanelHost;
   pluginActiveInProject: (pluginId: string, projectPath: string | null | undefined) => boolean;
   currentWorkspacePath: () => string | null;
@@ -29,6 +30,7 @@ export function registerPluginUiIpc({
   plugins,
   browserHost,
   pluginViews,
+  pluginSettingsViews,
   pluginPanels,
   pluginActiveInProject,
   currentWorkspacePath,
@@ -100,6 +102,47 @@ export function registerPluginUiIpc({
         a.pluginName.localeCompare(b.pluginName) ||
         a.viewId.localeCompare(b.viewId),
     );
+  });
+
+  handle(IPC.invoke.pluginSettingsDestinations, async () => {
+    const destinations: PluginSettingsDestinationMeta[] = [];
+    for (const loaded of plugins.listLoaded()) {
+      if (!loaded.permissions.has("ui.settings")) continue;
+      for (const destination of loaded.manifest.contributes?.settingsDestinations ?? []) {
+        const entry = resolveInsidePluginRoot(loaded.path, destination.entry);
+        if (!entry || !existsSync(entry)) continue;
+        destinations.push({
+          pluginId: loaded.manifest.id,
+          destinationId: destination.id,
+          ref: pluginViewKey(loaded.manifest.id, destination.id),
+          label: resolvePluginLocalizedString(destination.label, getUpdaterLocale(), destination.id),
+          pluginName: loaded.manifest.name,
+          icon: destination.icon,
+          keywords: (destination.keywords ?? []).map((keyword) => resolvePluginLocalizedString(keyword, getUpdaterLocale(), "")),
+        });
+      }
+    }
+    return destinations.sort((a, b) => a.pluginName.localeCompare(b.pluginName) || a.destinationId.localeCompare(b.destinationId));
+  });
+
+  handle(IPC.invoke.pluginSettingsViewOpen, async (payload: { pluginId?: string; destinationId?: string }) => {
+    const pluginId = String(payload?.pluginId ?? "");
+    const destinationId = String(payload?.destinationId ?? "");
+    const loaded = plugins.getLoaded(pluginId);
+    if (!loaded || !loaded.permissions.has("ui.settings")) throw new Error("PERMISSION_DENIED: ui.settings");
+    const destination = (loaded.manifest.contributes?.settingsDestinations ?? []).find((entry) => entry.id === destinationId);
+    const htmlPath = destination ? resolveInsidePluginRoot(loaded.path, destination.entry) : null;
+    if (!htmlPath || !existsSync(htmlPath)) throw new Error("settings destination entry missing");
+    pluginSettingsViews.open({ pluginId, viewId: destinationId, locale: getUpdaterLocale(), theme: getPluginPanelTheme(), htmlPath, netDomains: loaded.manifest.net?.domains?.map(String) });
+    return { ok: true };
+  });
+  handle(IPC.invoke.pluginSettingsViewSetBounds, async (bounds: { x: number; y: number; width: number; height: number }) => {
+    pluginSettingsViews.setBounds(bounds ?? { x: 0, y: 0, width: 0, height: 0 });
+    return { ok: true };
+  });
+  handle(IPC.invoke.pluginSettingsViewSetVisible, async (payload: { pluginId?: string; destinationId?: string; visible?: boolean }) => {
+    pluginSettingsViews.setVisible(String(payload?.pluginId ?? ""), String(payload?.destinationId ?? ""), payload?.visible === true);
+    return { ok: true };
   });
 
   handle(

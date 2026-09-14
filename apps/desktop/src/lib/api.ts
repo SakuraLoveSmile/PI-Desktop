@@ -51,6 +51,7 @@ import type {
   PluginSettingDefinition,
   PluginServiceStatus,
   PluginViewMeta,
+  PluginSettingsDestinationMeta,
   PluginTheme,
   MarketPluginSummary,
   MarketPluginDetail,
@@ -784,6 +785,7 @@ export const api = {
   togglePluginLauncher: () => invoke(IPC.invoke.pluginLauncherToggle),
   dismissPluginLauncher: () => invoke(IPC.invoke.pluginLauncherDismiss),
   listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
+  listPluginSettingsDestinations: () => invoke<PluginSettingsDestinationMeta[]>(IPC.invoke.pluginSettingsDestinations),
   listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),
   /**
    * Work panel views, already filtered by permission, activation scope, and
@@ -816,6 +818,12 @@ export const api = {
       visible,
       sessionId,
     }),
+  pluginSettingsViewOpen: (pluginId: string, destinationId: string) =>
+    invoke(IPC.invoke.pluginSettingsViewOpen, { pluginId, destinationId }),
+  pluginSettingsViewSetBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
+    invoke(IPC.invoke.pluginSettingsViewSetBounds, bounds),
+  pluginSettingsViewSetVisible: (pluginId: string, destinationId: string, visible: boolean) =>
+    invoke(IPC.invoke.pluginSettingsViewSetVisible, { pluginId, destinationId, visible }),
   marketRefresh: (force = true) =>
     invoke<{
       providerId: string;

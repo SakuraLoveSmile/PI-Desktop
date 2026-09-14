@@ -669,6 +669,7 @@ sklm: {
     groupAgent: "에이전트",
     groupWorkspace: "작업 공간",
     groupSystem: "시스템",
+    groupExtensions: "확장 기능",
     nav: {
       general: "일반",
       ai: "AI",
