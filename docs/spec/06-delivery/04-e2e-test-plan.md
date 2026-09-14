@@ -10665,10 +10665,10 @@ sample extensions under `apps/desktop/test/fixtures/pi-extensions/`.
   ADR 0211
 - **Acceptance**: Functional, Quality
 - **Milestone**: M6
-- **Status**: Unit/source-contract covered (`runtime.test.ts`
-  plan-safe filtering, `bundled-plugins.test.mjs` Browser
-  declaration, `mode-prompts.test.ts` updated wording); desktop
-  journey is Draft (run only in a capable environment when this surface changes)
+- **Status**: Partially automated: `test:e2e:plan` covers Plan-mode host
+  admission, durable-mode/action-list forwarding, and fixture-boundary
+  mutation denial; the full Electron Browser journey remains Draft (run only
+  in a capable environment when this surface changes)
 
 #### E2E-250: Context usage display preference switches the inspector's leading figure
 
