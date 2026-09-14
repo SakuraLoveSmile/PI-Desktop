@@ -91,15 +91,15 @@ export function createSessionCoordination({
   const activeToolCallKey = (sessionId: string, toolCallId: string) =>
     sessionId + ":" + toolCallId;
 
-/**
- * The composite (sessionId, turnId) key. Plan submission tracking, turn
- * settlements and turn finalizations all address a turn through this one rule,
- * so no module joins the two ids on its own. A session id never contains a
- * colon, which is what lets the busy check below find a session's turns by
- * prefix.
- */
-const planSubmissionTurnKey = (sessionId: string, turnId: string) =>
-  sessionId + ":" + turnId;
+  /**
+   * The composite (sessionId, turnId) key. Plan submission tracking, turn
+   * settlements and turn finalizations all address a turn through this one rule,
+   * so no module joins the two ids on its own. A session id never contains a
+   * colon, which is what lets the busy check below find a session's turns by
+   * prefix.
+   */
+  const planSubmissionTurnKey = (sessionId: string, turnId: string) =>
+    sessionId + ":" + turnId;
 
   function waitForTurnSettlement(sessionId: string, turnId: string): Promise<void> {
     if (activeTurns.get(sessionId) !== turnId) return Promise.resolve();
@@ -111,114 +111,114 @@ const planSubmissionTurnKey = (sessionId: string, turnId: string) =>
     });
   }
 
-/**
- * True while `turnId` still owns the session's live turn. A late terminal event
- * naming an older turn must not settle, release or answer for the current one.
- */
-function isActiveTurn(sessionId: string, turnId: string | null | undefined): boolean {
-  if (typeof turnId !== "string") return false;
-  const id = sessionId.trim();
-  const turn = turnId.trim();
-  if (!id || !turn) return false;
-  return activeTurns.get(id) === turn;
-}
-
-/**
- * Record that this turn was cancelled. Called before the cancel request is
- * issued, so a terminal event arriving while it is in flight cannot restate the
- * abort as a completion. A session without a live turn keeps its existing
- * cancel behaviour but locks nothing and therefore announces nothing.
- */
-function lockAbortReason(sessionId: string, turnId: string | null | undefined): void {
-  if (!isActiveTurn(sessionId, turnId)) return;
-  pendingAbortReasons.set(
-    planSubmissionTurnKey(sessionId.trim(), String(turnId).trim()),
-    "aborted",
-  );
-}
-
-/**
- * The reason locked for this turn, without consuming it: the lock lives until
- * the turn's teardown releases it, so an abort that is read by the finalization
- * is still visible to a terminal event arriving later in the same turn.
- * Only the turn the lock belongs to can read it.
- */
-function peekAbortReason(
-  sessionId: string,
-  turnId: string | null | undefined,
-): TurnEndReason | undefined {
-  if (typeof turnId !== "string") return undefined;
-  const id = sessionId.trim();
-  const turn = turnId.trim();
-  if (!id || !turn) return undefined;
-  return pendingAbortReasons.get(planSubmissionTurnKey(id, turn));
-}
-
-/** Drop a turn's lock. Called from that turn's own teardown, by identity. */
-function clearAbortReason(sessionId: string, turnId: string | null | undefined): void {
-  if (typeof turnId !== "string") return;
-  const id = sessionId.trim();
-  const turn = turnId.trim();
-  if (!id || !turn) return;
-  pendingAbortReasons.delete(planSubmissionTurnKey(id, turn));
-}
-
-/**
- * Last synchronous gate before a plugin side effect. A turn that is not the
- * session's live turn, has an abort decision recorded, or is already finalizing
- * must not start one. Callers must not await between this check and the
- * dispatch.
- */
-function isTurnDispatchable(
-  sessionId: string,
-  turnId: string | null | undefined,
-): boolean {
-  if (!isActiveTurn(sessionId, turnId)) return false;
-  const key = planSubmissionTurnKey(sessionId.trim(), String(turnId).trim());
-  return !pendingAbortReasons.has(key) && !turnFinalizations.has(key);
-}
-
-/**
- * Whether the session is still occupied by a turn or by its teardown. The queue
- * must stay held across the window where `activeTurns` has already forgotten the
- * turn but its announcement has not run yet, so the finalization records are
- * part of the answer. That table only holds the turns still finalizing, so a
- * prefix scan is bounded by the number of concurrent finalizations and needs no
- * second index.
- */
-function isSessionBusy(sessionId: string): boolean {
-  const id = sessionId.trim();
-  if (!id) return false;
-  if (activeTurns.has(id)) return true;
-  const prefix = id + ":";
-  for (const key of turnFinalizations.keys()) {
-    if (key.startsWith(prefix)) return true;
+  /**
+   * True while `turnId` still owns the session's live turn. A late terminal event
+   * naming an older turn must not settle, release or answer for the current one.
+   */
+  function isActiveTurn(sessionId: string, turnId: string | null | undefined): boolean {
+    if (typeof turnId !== "string") return false;
+    const id = sessionId.trim();
+    const turn = turnId.trim();
+    if (!id || !turn) return false;
+    return activeTurns.get(id) === turn;
   }
-  return false;
-}
 
-/**
- * A root terminal event (`agent_end` / `error`) may only change the live turn's
- * state when it carries the identity of the turn that still owns the session.
- * An event with no identity cannot be attributed to any turn, and one naming
- * another turn belongs to that turn: neither may finish this turn, resolve its
- * approvals or advance its queue. Message and tool rows are unaffected and are
- * still archived as history.
- *
- * Both event entry points call this: the fan-out to Agent Host and the renderer,
- * and the persistence pass, which is a separate call and would otherwise still
- * apply terminal state effects on behalf of a turn that no longer exists.
- */
-function isStaleTerminalEvent(envelope: AgentEventEnvelope): boolean {
-  const type = envelope.event.type;
-  if (type !== "agent_end" && type !== "error") return false;
-  // A delegate's terminal event settles the delegate. The agent runtime keeps a
-  // delegate's `agent_end`, `turn_end` and error events inside the delegate, so
-  // this is a guard rather than the normal path: a delegate finishing must never
-  // end its parent's turn.
-  if (envelope.parentToolCallId) return true;
-  return !isActiveTurn(envelope.sessionId, envelope.turnId);
-}
+  /**
+   * Record that this turn was cancelled. Called before the cancel request is
+   * issued, so a terminal event arriving while it is in flight cannot restate the
+   * abort as a completion. A session without a live turn keeps its existing
+   * cancel behaviour but locks nothing and therefore announces nothing.
+   */
+  function lockAbortReason(sessionId: string, turnId: string | null | undefined): void {
+    if (!isActiveTurn(sessionId, turnId)) return;
+    pendingAbortReasons.set(
+      planSubmissionTurnKey(sessionId.trim(), String(turnId).trim()),
+      "aborted",
+    );
+  }
+
+  /**
+   * The reason locked for this turn, without consuming it: the lock lives until
+   * the turn's teardown releases it, so an abort that is read by the finalization
+   * is still visible to a terminal event arriving later in the same turn.
+   * Only the turn the lock belongs to can read it.
+   */
+  function peekAbortReason(
+    sessionId: string,
+    turnId: string | null | undefined,
+  ): TurnEndReason | undefined {
+    if (typeof turnId !== "string") return undefined;
+    const id = sessionId.trim();
+    const turn = turnId.trim();
+    if (!id || !turn) return undefined;
+    return pendingAbortReasons.get(planSubmissionTurnKey(id, turn));
+  }
+
+  /** Drop a turn's lock. Called from that turn's own teardown, by identity. */
+  function clearAbortReason(sessionId: string, turnId: string | null | undefined): void {
+    if (typeof turnId !== "string") return;
+    const id = sessionId.trim();
+    const turn = turnId.trim();
+    if (!id || !turn) return;
+    pendingAbortReasons.delete(planSubmissionTurnKey(id, turn));
+  }
+
+  /**
+   * Last synchronous gate before a plugin side effect. A turn that is not the
+   * session's live turn, has an abort decision recorded, or is already finalizing
+   * must not start one. Callers must not await between this check and the
+   * dispatch.
+   */
+  function isTurnDispatchable(
+    sessionId: string,
+    turnId: string | null | undefined,
+  ): boolean {
+    if (!isActiveTurn(sessionId, turnId)) return false;
+    const key = planSubmissionTurnKey(sessionId.trim(), String(turnId).trim());
+    return !pendingAbortReasons.has(key) && !turnFinalizations.has(key);
+  }
+
+  /**
+   * Whether the session is still occupied by a turn or by its teardown. The queue
+   * must stay held across the window where `activeTurns` has already forgotten the
+   * turn but its announcement has not run yet, so the finalization records are
+   * part of the answer. That table only holds the turns still finalizing, so a
+   * prefix scan is bounded by the number of concurrent finalizations and needs no
+   * second index.
+   */
+  function isSessionBusy(sessionId: string): boolean {
+    const id = sessionId.trim();
+    if (!id) return false;
+    if (activeTurns.has(id)) return true;
+    const prefix = id + ":";
+    for (const key of turnFinalizations.keys()) {
+      if (key.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * A root terminal event (`agent_end` / `error`) may only change the live turn's
+   * state when it carries the identity of the turn that still owns the session.
+   * An event with no identity cannot be attributed to any turn, and one naming
+   * another turn belongs to that turn: neither may finish this turn, resolve its
+   * approvals or advance its queue. Message and tool rows are unaffected and are
+   * still archived as history.
+   *
+   * Both event entry points call this: the fan-out to Agent Host and the renderer,
+   * and the persistence pass, which is a separate call and would otherwise still
+   * apply terminal state effects on behalf of a turn that no longer exists.
+   */
+  function isStaleTerminalEvent(envelope: AgentEventEnvelope): boolean {
+    const type = envelope.event.type;
+    if (type !== "agent_end" && type !== "error") return false;
+    // A delegate's terminal event settles the delegate. The agent runtime keeps a
+    // delegate's `agent_end`, `turn_end` and error events inside the delegate, so
+    // this is a guard rather than the normal path: a delegate finishing must never
+    // end its parent's turn.
+    if (envelope.parentToolCallId) return true;
+    return !isActiveTurn(envelope.sessionId, envelope.turnId);
+  }
 
   function shouldCreateTaskNotification(sessionId: string): boolean {
     const window = getMainWindow();
