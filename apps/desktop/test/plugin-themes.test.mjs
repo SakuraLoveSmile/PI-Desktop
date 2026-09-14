@@ -20,7 +20,7 @@ const protocolSrc = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts
 
 test("contributed css is sanitized in the main process, not the renderer", () => {
   const register = runtimeSrc.slice(runtimeSrc.indexOf("private registerThemes"));
-  assert.match(register, /sanitizeThemeCss\(raw\)/);
+  assert.match(register, /sanitizeThemeCss\(raw,\s*THEME_CSS_MAX_BYTES,/);
   assert.match(register, /resolveInsidePlugin/);
   assert.match(register, /INVALID_CSS/);
   assert.match(runtimeSrc, /MAX_THEMES_PER_PLUGIN = 8/);
