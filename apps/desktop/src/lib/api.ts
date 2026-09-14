@@ -67,6 +67,9 @@ import type {
   ProviderUpdateInput,
   Result,
   SessionDetail,
+  SessionSearchPage,
+  SessionSearchContext,
+  SessionSearchContextRequest,
   SessionSummary,
   SessionCollaborationSummary,
   ToolPermissionResolution,
@@ -180,6 +183,8 @@ function normalizeSessionDetail(detail: SessionDetail | null): SessionDetail | n
 }
 
 export type SessionHistoryReadOptions = {
+  /** Center a bounded read on this stable ID and retain its original text. */
+  messageAround?: string;
   /** Return the newest page ending before this zero-based message offset. */
   messageBefore?: number;
   /** Maximum number of messages in the returned page. */
@@ -339,6 +344,10 @@ export const api = {
       title,
       throughMessageId,
     }).then((result) => ({ ...result, session: normalizeSessionDetail(result.session)! })),
+  searchSessions: (query: string, offset = 0) =>
+    invoke<SessionSearchPage>(IPC.invoke.sessionSearch, { query, offset }),
+  getSearchContext: (request: SessionSearchContextRequest) =>
+    invoke<SessionSearchContext>(IPC.invoke.sessionSearchContext, request),
   getSession: (id: string, options?: SessionHistoryReadOptions) =>
     invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, {
       id,
