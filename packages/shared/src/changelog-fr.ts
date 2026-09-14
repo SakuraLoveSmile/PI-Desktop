@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const frEntries: ChangelogEntry[] = [
   {
+    "version": "0.14.8",
+    "date": "2026-09-14",
+    "highlights": [
+      "Renforce les préchargements du bac à sable pour que l’application et les panneaux de plugins démarrent de manière fiable sans erreur de résolution des paquets partagés."
+    ]
+  },
+  {
     "version": "0.14.7",
     "date": "2026-09-14",
     "highlights": [

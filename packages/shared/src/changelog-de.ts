@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    "version": "0.14.8",
+    "date": "2026-09-14",
+    "highlights": [
+      "Robustere Sandbox-Preloads sorgen dafür, dass App und Plugin-Panels ohne Fehler bei der Auflösung gemeinsamer Pakete zuverlässig starten."
+    ]
+  },
+  {
     "version": "0.14.7",
     "date": "2026-09-14",
     "highlights": [

@@ -29,6 +29,13 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.14.8",
+    date: "2026-09-14",
+    highlights: [
+      "Harden packaged sandbox preloads so the app and plugin panels start reliably without shared-package resolution failures.",
+    ],
+  },
+  {
     version: "0.14.7",
     date: "2026-09-14",
     highlights: [
@@ -759,6 +766,13 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    version: "0.14.8",
+    date: "2026-09-14",
+    highlights: [
+      "加固打包后的沙箱预加载脚本，让应用和插件面板无需解析共享包也能可靠启动。",
+    ],
+  },
+  {
     version: "0.14.7",
     date: "2026-09-14",
     highlights: [
@@ -1487,6 +1501,13 @@ const zhCNEntries: ChangelogEntry[] = [
 ];
 
 const zhTWEntries: ChangelogEntry[] = [
+  {
+    version: "0.14.8",
+    date: "2026-09-14",
+    highlights: [
+      "強化打包後的沙箱預載入腳本，讓應用程式與外掛面板無需解析共享套件也能可靠啟動。",
+    ],
+  },
   {
     version: "0.14.7",
     date: "2026-09-14",

@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const esEntries: ChangelogEntry[] = [
   {
+    "version": "0.14.8",
+    "date": "2026-09-14",
+    "highlights": [
+      "Refuerza las precargas del sandbox para que la aplicación y los paneles de plugins se inicien de forma fiable sin fallos al resolver paquetes compartidos."
+    ]
+  },
+  {
     "version": "0.14.7",
     "date": "2026-09-14",
     "highlights": [

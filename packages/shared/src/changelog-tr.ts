@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    "version": "0.14.8",
+    "date": "2026-09-14",
+    "highlights": [
+      "Paketlenmiş sandbox ön yüklemeleri güçlendirildi; uygulama ve eklenti panelleri paylaşılan paket çözümleme hataları olmadan güvenilir şekilde açılır."
+    ]
+  },
+  {
     "version": "0.14.7",
     "date": "2026-09-14",
     "highlights": [

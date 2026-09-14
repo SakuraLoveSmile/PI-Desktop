@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    version: "0.14.8",
+    date: "2026-09-14",
+    highlights: [
+      "샌드박스 프리로드를 강화해 공유 패키지 확인 오류 없이 앱과 플러그인 패널이 안정적으로 시작됩니다.",
+    ],
+  },
+  {
     version: "0.14.7",
     date: "2026-09-14",
     highlights: [
