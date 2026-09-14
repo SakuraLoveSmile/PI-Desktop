@@ -6726,9 +6726,10 @@ and identify the platform validation still needed.
   passed two open/back cycles: the same two conversation messages and unsent
   draft remain, the button clears its active state on return, and reopening
   retains the Installed search filter. Non-chat history entries, Forward, and
-  no-history fallback are covered by tests, not native UI. No external
-  marketplace or live model was required. These are pre-merge results;
-  post-integration main E2E is NOT RUN.
+  no-history fallback are covered by tests, not native UI. The layout journey
+  also activates the footer button a second time and asserts the previous
+  destination; it passed 37/37 checks from integrated main `d6ffaa3b`. No
+  external marketplace or live model was required.
 
 #### E2E-PROVIDER-copy-config-without-credentials: Copy configuration into an independent provider
 
