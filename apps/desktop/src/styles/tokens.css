@@ -120,6 +120,9 @@
   --ds-work-panel-toggle-size: 28px;
   --ds-work-panel-toggle-inset: 12px;
   --ds-work-panel-toggle-gap: 20px;
+  /* Preview-mode shell actions are two 22px buttons with a 4px gap and an
+     additional 8px buffer before the panel's first tab. */
+  --ds-preview-action-lane-width: 56px;
   /* Keep an 8px visual buffer between work-panel actions and window chrome. */
   --ds-window-controls-width: 120px;
   --ds-composer-radius: var(--radius-xl);

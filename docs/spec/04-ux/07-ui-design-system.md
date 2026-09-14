@@ -965,7 +965,9 @@ Preview mode is a transient shell state: MainChat is unmounted and the work
 panel occupies the client width beside the sidebar. A window-level 46px chrome
 row owns the drag area, New Task/sidebar actions, and native window controls.
 Collapsed-sidebar preview reserves 76px on the left for macOS traffic lights in
-windowed mode and 8px in fullscreen.
+windowed mode and 8px in fullscreen. The maximized panel header retains that
+native reserve, then adds the preview action lane and an 8px gap before its
+first tab.
 
 ### 10.1 Responsive collapse
 
