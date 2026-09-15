@@ -6759,6 +6759,31 @@ and identify the platform validation still needed.
 - **Status**: Source-contract and focused integration coverage; full desktop
   journey Draft (run only in a capable environment when this surface changes)
 
+#### E2E-OAUTH-anthropic-rate-limit-retry: Bounded token retries preserve the account
+
+- **Preconditions**: A local HTTP fixture intercepts only Anthropic's token URL;
+  the production pi-ai flow and Desktop `VendorOAuth` run with an in-memory Host
+  RPC fixture. No real account, browser authorization or remote endpoint is used.
+- **Steps**: Run `pnpm test:e2e:oauth-retry`. Exercise exchange and refresh
+  429 → success, repeated 429, seconds/date/malformed/over-budget `Retry-After`,
+  invalid grants (including after 429), 5xx, socket disconnect, invalid success
+  JSON, cancellation during request/body/wait, and an earlier caller deadline.
+  Resolve the same account concurrently and retry after a failed refresh.
+- **Expected**: At most three requests share one deadline and original signal;
+  no retry precedes a server hint. Only explicit 429 is retried; grant rejection
+  and ambiguous failures stop. Request grant fields and custom headers remain
+  unchanged. Failed refresh retains the old credential and releases its lock;
+  concurrent resolves rotate/write once. Failed/cancelled login removes only
+  its newly created row. HTTP/token-JSON errors contain no token-body canary, URL
+  or embedded stack and provide recovery guidance without claiming every 429
+  consumes code. Existing network-error diagnostics are unchanged.
+- **Specs linked**: `03-runtime/11-provider-model-system.md` §8a; ADR 0095.
+- **Acceptance**: B (vendor accounts), Security, Quality.
+- **Status**: All 20 local HTTP scenarios passed against the installed patch;
+  the existing 20 login/session regressions also passed. This is a pre-merge
+  transport and orchestration integration test, not live OAuth, visual UI or
+  Host persistence validation. Post-integration main E2E is NOT RUN.
+
 #### E2E-151: Multiple vendor accounts stay isolated through login, use, and removal
 
 - **Preconditions**: A build with `registerBunOAuthFlows()` running at startup
