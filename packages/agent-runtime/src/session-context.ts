@@ -57,11 +57,13 @@ export function sessionEntryToContextMessages(
           entry.tokensBefore,
           entry.timestamp,
         ),
-        ...retainedReasoningToMessages(
-          retainedReasoningFromDetails(entry.details),
-          entry.timestamp,
-          identity,
-        ),
+        ...(identity?.requiresCompletionsReasoningReplay === false
+          ? []
+          : retainedReasoningToMessages(
+              retainedReasoningFromDetails(entry.details),
+              entry.timestamp,
+              identity,
+            )),
         ...entry.retainedTail.filter(isContextMessage),
       ];
     case "branch_summary":

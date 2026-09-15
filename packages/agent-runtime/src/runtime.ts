@@ -2201,6 +2201,13 @@ Delegation rules:
    * Failed assistant turns stay transcript-only. */
   private historyToEntries(history: UiMessage[]): MessageEntry[] {
     const api = apiBindingForProviderModel(this.provider).api;
+    const deepSeekCompletionsReplay =
+      api === "openai-completions" &&
+      (
+        this.model.compat as
+          | { requiresReasoningContentOnAssistantMessages?: boolean }
+          | undefined
+      )?.requiresReasoningContentOnAssistantMessages === true;
     const entries: MessageEntry[] = [];
     const append = (id: string, message: AgentMessage): MessageEntry => {
       const entry: MessageEntry = {
@@ -2256,7 +2263,9 @@ Delegation rules:
           content.push({
             type: "thinking" as const,
             thinking: m.thinking,
-            thinkingSignature: "reasoning_content",
+            ...(deepSeekCompletionsReplay
+              ? { thinkingSignature: "reasoning_content" as const }
+              : {}),
           });
         }
         if (m.content?.trim()) {
@@ -5314,10 +5323,18 @@ Delegation rules:
 
 
   private reasoningReplayIdentity(): ReasoningReplayIdentity {
+    const requiresCompletionsReasoningReplay =
+      this.model.api === "openai-completions" &&
+      (
+        this.model.compat as
+          | { requiresReasoningContentOnAssistantMessages?: boolean }
+          | undefined
+      )?.requiresReasoningContentOnAssistantMessages === true;
     return {
       api: this.model.api,
       provider: this.model.provider,
       model: this.model.id,
+      requiresCompletionsReasoningReplay,
     };
   }
 

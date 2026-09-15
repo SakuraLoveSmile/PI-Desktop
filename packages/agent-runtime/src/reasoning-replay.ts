@@ -14,7 +14,7 @@
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 
 /** Cap how many pre-compaction thinking turns ride inside the checkpoint. */
 export const MAX_RETAINED_REASONING_TURNS = 3;
@@ -44,6 +44,8 @@ export type ReasoningReplayIdentity = {
   api: AssistantMessage["api"];
   provider: string;
   model: string;
+  /** Only compatible Completions requests need synthetic reasoning replay. */
+  requiresCompletionsReasoningReplay?: boolean;
 };
 
 export type RetainedReasoningTurn = {
@@ -232,9 +234,9 @@ export function retainedReasoningToMessages(
  * pi-ai transformMessages only preserves thinking blocks for same-model replay.
  */
 export function alignRetainedReasoningIdentity(
-  messages: readonly AgentMessage[],
+  messages: readonly Message[],
   identity: ReasoningReplayIdentity,
-): AgentMessage[] {
+): Message[] {
   return messages.map((message) => {
     if (message.role !== "assistant") return message;
     const assistant = message as AssistantMessage;
@@ -244,6 +246,6 @@ export function alignRetainedReasoningIdentity(
       api: identity.api,
       provider: identity.provider,
       model: identity.model,
-    } as AgentMessage;
+    } as AssistantMessage;
   });
 }

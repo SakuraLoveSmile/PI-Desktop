@@ -125,4 +125,27 @@ describe("buildSessionContext", () => {
     expect(JSON.stringify(messages)).not.toContain("old answer");
   });
 
+  it("does not replay DeepSeek reasoning into a different provider", () => {
+    const keptUser = user("u2", "keep me", 3).message;
+    const entry = compaction("c1", 2, [keptUser]);
+    entry.details = {
+      retainedReasoning: [{ thinking: "prior DeepSeek plan", text: "answer" }],
+    };
+    const messages = buildSessionContext(
+      [entry, user("u3", "next", 4)],
+      {
+        api: "anthropic-messages",
+        provider: "anthropic",
+        model: "claude-opus-4-6",
+        requiresCompletionsReasoningReplay: false,
+      },
+    ).messages;
+    expect(messages.map((message) => message.role)).toEqual([
+      "compactionSummary",
+      "user",
+      "user",
+    ]);
+    expect(JSON.stringify(messages)).not.toContain("prior DeepSeek plan");
+  });
+
 });

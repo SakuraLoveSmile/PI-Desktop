@@ -24,12 +24,16 @@ the #223 empty backfill fills `""` — which strict relays reject.
 
 ## Decision
 
-1. History rebuild stamps `thinkingSignature: "reasoning_content"` on restored
-   thinking blocks so usable reasoning survives restart.
+1. History rebuild stamps `thinkingSignature: "reasoning_content"` only for
+   DeepSeek-compatible OpenAI Completions rows. Other APIs keep unsigned
+   thinking so pi-ai preserves their existing plain-text fallback; their
+   provider-native signatures are not interchangeable with Completions fields.
 2. Checkpoints for models with `requiresReasoningContentOnAssistantMessages`
    store the last few thinking turns in opaque `details.retainedReasoning`
    (text + thinking only, no tool calls). Session context injects those turns
-   between the compaction summary and the user tail.
+   between the compaction summary and the user tail only for the live
+   DeepSeek-compatible Completions binding; other providers do not receive
+   synthetic DeepSeek reasoning.
 3. The pi-ai patch backfills the reasoning field already present on the history
    (`reasoning_content` | `reasoning_text` | `reasoning`). Official DeepSeek
    URLs keep empty-string fill. Non-official DeepSeek-family Completions rows
