@@ -61,6 +61,47 @@ describe("NativePiSessionService", () => {
     expect(readFileSync(f.file)).toEqual(before);
   });
 
+  it("searches native metadata and active-branch message text without rewriting JSONL", async () => {
+    const f = fixture();
+    const service = new NativePiSessionService({ agentDir: f.agentDir, sessionRoot: f.sessionRoot });
+    const [summary] = await service.list();
+    const before = readFileSync(f.file);
+
+    const titlePage = await service.search("hello");
+    expect(titlePage.nextOffset).toBeNull();
+    expect(titlePage.hits).toHaveLength(1);
+    expect(titlePage.hits[0]).toMatchObject({
+      session: { id: summary.id },
+      metadataMatch: true,
+    });
+
+    const messagePage = await service.search("active branch");
+    expect(messagePage.hits[0]).toMatchObject({
+      metadataMatch: false,
+      messageCount: 1,
+      matches: [{ messageId: "branch", role: "assistant" }],
+    });
+    expect(await service.search("not present")).toEqual({ hits: [], nextOffset: null });
+    expect(readFileSync(f.file)).toEqual(before);
+  });
+
+  it("centers native detail reads on a requested search message", async () => {
+    const f = fixture();
+    const service = new NativePiSessionService({ agentDir: f.agentDir, sessionRoot: f.sessionRoot });
+    const [summary] = await service.list();
+    const detail = service.detail(summary.id, {
+      messageAround: "branch",
+      messageLimit: 1,
+      contentLimit: 1,
+    });
+    expect(detail).toMatchObject({
+      messages: [{ id: "branch", content: "active branch" }],
+      messageStart: 1,
+      messageEnd: 2,
+      hasMoreBefore: true,
+    });
+  });
+
   it("keeps a newline-less session browseable but read-only and byte-pure", async () => {
     const f = fixture({ newline: false });
     const service = new NativePiSessionService({ agentDir: f.agentDir, sessionRoot: f.sessionRoot });

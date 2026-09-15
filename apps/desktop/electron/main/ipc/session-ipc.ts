@@ -27,6 +27,7 @@ import type { Logger } from "../logger";
 import type { PersistenceOutbox } from "../persistence-outbox";
 import type { PluginRuntime } from "../plugin-runtime";
 import { readSessionCollaboration } from "../services/session-collaboration";
+import { searchSessionsAcrossSources } from "../services/session-search";
 import type { IpcRegistrar } from "./types";
 
 type RuntimeSession = {
@@ -133,7 +134,7 @@ export function registerSessionIpc({
 
   handle(IPC.invoke.sessionSearch, async (input) => {
     if (!host) throw new Error("host unavailable");
-    return host.call("search.sessions", input);
+    return searchSessionsAcrossSources(host, sidecar, input);
   });
   handle(IPC.invoke.sessionSearchContext, async (input) => {
     if (!host) throw new Error("host unavailable");

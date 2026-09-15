@@ -454,11 +454,14 @@ async function handle(method: string, params: any): Promise<unknown> {
       return { ok: true, runtimes: runtimes.size };
     case "native.session.list":
       return { sessions: await nativePiService().list() };
+    case "native.session.search":
+      return nativePiService().search(String(params.query ?? ""));
     case "native.session.get":
       return {
         session: nativePiService().detail(String(params.id ?? ""), {
           messageBefore: params.messageBefore,
           messageLimit: params.messageLimit,
+          messageAround: params.messageAround,
           contentLimit: params.contentLimit,
         }),
       };
