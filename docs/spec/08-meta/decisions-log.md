@@ -5322,7 +5322,36 @@ unmounted, the window lost focus, or the pointer left the window without a
 leave event) and a session row whose hidden overflow control silently opened
 its menu instead of the conversation.
 
-## 2026-09-16 — A manual disclosure keeps the reader's place (D429)
+## 2026-09-15 — Turn-queue priority block and row actions (D429)
+
+- "Send now" becomes a priority block instead of a head jump: a promoted entry
+  takes `MAX(priority) + 1` inside its session (schema v18, nullable `priority`),
+  so several promotions are delivered in the order they were clicked and the
+  waiting queue keeps its own `position` order behind them. Promoting an entry
+  that already carries a priority is `CONFLICT`, not another move.
+- The queued row gains move up, move down, and edit beside Send now and remove.
+  Move up/down swaps a waiting entry with its adjacent waiting neighbour through
+  `session.queueReorder` and never crosses the promoted block; editing removes
+  the row and returns its captured draft (text plus inline file references) to
+  the composer, and is refused while the input is non-empty.
+- A promoted row is locked until the Host delivers it: move up/down, edit, and
+  remove are disabled, and Send now reads as already decided.
+- The promoted block is delivered as adjacent user messages: the first promoted
+  entry starts the turn at the boundary and the rest are injected into that same
+  turn through the steering channel, so the model answers once for the whole
+  block instead of once per row. An injected entry's own turn is canceled; an
+  entry the runtime refuses to accept stays queued and leaves at the next
+  boundary as its own turn.
+- A settled turn is authoritative for the queue. A terminal event can be dropped
+  (Main never forwards one that names a turn it no longer owns) or never
+  emitted, and a turn left active inside the Host held its session's queue
+  forever — the "Send now, then Stop" stall. The settlement now closes the turn,
+  and a drain request that arrives while a pass is running is retried instead of
+  dropped. See ADR 0265, `03-runtime/01-ipc-protocol.md` (§5.6),
+  `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md` (§11), and
+  E2E-QUEUE-promote-orders-delivery-by-click.
+
+## 2026-09-16 — A manual disclosure keeps the reader's place (D430)
 
 - **A manual disclosure hands its own title to the scroller that owns it,
   synchronously, before the expansion state changes.** The content

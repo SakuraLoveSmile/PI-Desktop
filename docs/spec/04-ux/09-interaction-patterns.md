@@ -1251,6 +1251,13 @@ Project drag/drop follows these patterns:
   chip whose reference matches nothing opens nothing and reports itself; the OS
   default application is no longer what this click does, though that action
   stays reachable from the file view's own context menu.
+- The same destination rule governs every other surface of the transcript that
+  names a file, because one opener serves them all: clicking the file path in a
+  tool row's summary (Read, Write, Edit, fetch) and clicking a path in a tool
+  result's file or match list both complete the reference the same way and open
+  where it resolved (ADR 0262). A tool surface therefore picks no destination of
+  its own, and a reference it cannot resolve reports itself instead of opening a
+  panel.
 
 ### 8a.3 Keyboard while open
 
@@ -1310,7 +1317,7 @@ Project drag/drop follows these patterns:
 - Leaving follow for a disclosure is not a re-pin: after a toggle the transcript
   stays where the reader put it, with the jump-to-latest control visible, until
   real scroll input, that control, a new turn or a navigation releases the hold.
-  There is no delayed "take the bottom back" correction (D429).
+  There is no delayed "take the bottom back" correction (D430).
 - Scroll input is attributed to the scroller that can consume it. A press on a
   row, a control or an editable field is an ordinary click rather than the start
   of a scroll; a keystroke inside a text field belongs to that field; and input a
