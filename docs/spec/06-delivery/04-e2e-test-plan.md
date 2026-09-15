@@ -10215,14 +10215,18 @@ are withdrawn with ADR 0165.
   the work panel is closed. The open session's scratch store holds one file and
   the attachment store one blob. The project is a group whose primary folder
   contains an `.html` page and a text file, and whose second folder holds a text
-  file of its own.
+  file of its own. The same session's transcript carries a `Read` row whose
+  summary names a project file, a `Glob` result listing project paths, and a
+  `Grep` result grouping its hits by file.
 - **Steps**: 1) Click a project file reference in an assistant reply. 2) Type an
   unsaved edit into that view and click the same reference again. 3) Click a
   reference that resolves into the session scratch store, then the
   `attachments/<sha256>` reference. 4) Click a workspace `.html` reference in an
-  assistant reply and the same reference as a sent user chip. 5) Disable the
-  File Manager plugin, click a project file reference again, then re-enable it
-  and click that reference once more. 6) Click a reference that resolves in the
+  assistant reply and the same reference as a sent user chip. 5) Click the file
+  path in the tool row's summary, then a path in the `Glob` result's file list
+  and a path heading of the `Grep` result. 6) Disable the File Manager plugin,
+  click a project file reference and the tool row summary again, then re-enable
+  it and click both once more. 7) Click a reference that resolves in the
   project's second folder, then one that resolves in its primary folder.
 - **Expected**:
   - A project file opens in the File Manager work-panel view on that file, with
@@ -10237,22 +10241,30 @@ are withdrawn with ADR 0165.
     page in a sibling folder is a project file like any other and opens in the
     File Manager view, because the side browser is rooted at the primary folder
     (ADR 0263).
+  - A tool surface reaches the destination of the file it names, not one of its
+    own: the tool row's summary path and the paths of the `Glob` file list and
+    the `Grep` path headings open the same project file in the File Manager view.
+    A summary path that is a link opens the file without expanding the row, and
+    only a summary without a resolvable target falls through to the row's own
+    disclosure.
   - A reference that resolved in the project's second folder opens in the File
     Manager view on that file, reached by its absolute path, with no host
     `file:` tab; the reference from the primary folder opens in that same view
     addressed project-relative (ADR 0263).
-  - With the plugin disabled, a project file reference falls back to the host
-    `file:` tab — the surface the click used before, which now also reaches the
-    project's other folders — instead of opening nothing; re-enabling the plugin
-    restores the File Manager destination.
-- **Specs linked**: `04-ux/08-component-spec.md` §8.3,
+  - With the plugin disabled, a project file reference — from the reply and from
+    a tool row or result list alike — falls back to the host `file:` tab, the
+    surface those clicks used before, which now also reaches the project's other
+    folders; re-enabling the plugin restores the File Manager destination.
+- **Specs linked**: `04-ux/08-component-spec.md` §8.3, §9.6,
   `04-ux/09-interaction-patterns.md` §8a.2, ADR 0104, ADR 0163, ADR 0241,
   ADR 0249, ADR 0262, ADR 0263
 - **Acceptance**: C (conversation & stream), G (plugins), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered
-  (`apps/desktop/test/transcript-file-chips.test.mjs`); full UI journey Draft
-  (run only in a capable environment when this surface changes)
+  (`apps/desktop/test/transcript-file-chips.test.mjs` for the wiring and
+  `apps/desktop/test/tool-row-file-refs.test.mjs` for the work-panel entry each
+  shape of resolution produces); full UI journey Draft (run only in a capable
+  environment when this surface changes)
 
 #### E2E-181: An imported skill is listed in the next session catalog
 

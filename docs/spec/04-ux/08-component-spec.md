@@ -1993,6 +1993,16 @@ twice.
 - Click the row: expand/collapse the result blocks. Tool-call details are
   collapsed by default while a live group is open; historical and failed rows
   remain collapsed until the user opens them.
+- A file path that a row or its result names is a link, not decoration: clicking
+  the summary path of a `Read`, `Write`, `Edit`, or `fetch` row, or a path in a
+  result's file list or match groups, completes the reference through the same
+  opener a chat chip uses (`pi-desktop/fs/resolveRef`) and opens where it
+  resolved — a project file in the bundled `pi.file-manager` view, a
+  session-scratch or attachment file in the host `file:` tab, and a `.html` /
+  `.htm` page of the project's primary folder in the side browser (ADR 0262,
+  ADR 0263). Such a click opens the file instead of toggling the row's
+  disclosure, and a reference that matches nothing reports itself without
+  opening a panel. A tool surface picks no destination of its own.
 - Click the processing header: expand/collapse the ordered activity list.
   Historical groups default collapsed; the latest active group opens while the
   turn is running and closes when it settles if the user has not touched it.
