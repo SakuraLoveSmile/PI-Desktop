@@ -120,6 +120,7 @@ import { registerIpcHandlers } from "./ipc/register";
 import {
   type WindowLifecycleState,
 } from "./bootstrap/window";
+import { registerApplicationActivation } from "./bootstrap/app-activation";
 import type { RuntimeState } from "./runtime/context";
 import { createHostRuntime } from "./runtime/host";
 import { createSidecarRuntime } from "./runtime/sidecar";
@@ -1482,33 +1483,9 @@ registerShutdownHandlers({
   confirmQuitDialog,
 });
 
-app.on("activate", () => {
-  restoreMainWindow();
+registerApplicationActivation({
+  restoreMainWindow,
+  isQuitting: () => quitting,
+  isApplicationBooted: () => applicationLifecycleState.applicationBooted,
+  hasVisibleWindow,
 });
-
-// Launching PI-Desktop again is a request to see the app that is already
-// running, not to start another one. The duplicate process quits before it
-// boots anything, and Electron hands its launch to the lock holder here, so the
-// visible result is the same as the tray's Show action — including a window
-// that was closed or hidden into the tray, which `restoreMainWindow` recreates.
-app.on("second-instance", () => {
-  restoreMainWindow();
-});
-
-// macOS only emits `activate` from `applicationShouldHandleReopen:` — a Dock
-// click or a relaunch. Cmd+Tab, App Exposé, and Spotlight activation do not
-// reach it, and macOS traffic-light minimize hides the window into the tray
-// (ADR 0078), so the app could be focused with nothing on screen and no way
-// back except the tray.
-// Restore only when no window is visible: activating the plugin launcher or a
-// plugin panel must not drag the main window up with it (ADR 0086).
-if (process.platform === "darwin") {
-  app.on("did-become-active", () => {
-    if (
-      quitting ||
-      !applicationLifecycleState.applicationBooted ||
-      hasVisibleWindow()
-    ) return;
-    restoreMainWindow();
-  });
-}
