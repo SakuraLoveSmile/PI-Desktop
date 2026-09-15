@@ -285,6 +285,8 @@ export function Sidebar({
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const [draggingProjectKey, setDraggingProjectKey] = useState<string | null>(null);
   const [dropIndicator, setDropIndicator] = useState<{ key: string; insertAfter: boolean } | null>(null);
+  const [windowFocused, setWindowFocused] = useState(true);
+
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
@@ -395,6 +397,19 @@ export function Sidebar({
       sidebarResizeRef.current = null;
     };
   }, [onWidthChange]);
+
+  // Mirror window focus onto the sidebar; a blurred window can keep CSS :hover
+  // latched on the row under the cursor.
+  useEffect(() => {
+    const onWindowFocus = () => setWindowFocused(document.hasFocus());
+    const onWindowBlur = () => setWindowFocused(false);
+    window.addEventListener("focus", onWindowFocus);
+    window.addEventListener("blur", onWindowBlur);
+    return () => {
+      window.removeEventListener("focus", onWindowFocus);
+      window.removeEventListener("blur", onWindowBlur);
+    };
+  }, []);
 
   const showArchived = sessionView.archived;
   const sessionSort = sessionView.sort;
@@ -1445,6 +1460,19 @@ export function Sidebar({
           beginSessionDrag(event, session.id);
         }}
         onDragEnd={endSessionDrag}
+        onClick={(event) => {
+          // The row's own controls are the only click targets spelled out in
+          // markup; a click on the row container or its gap to the actions
+          // column - including where a hidden overflow control would sit -
+          // still opens the conversation instead of dying on the wrapper.
+          const target = event.target as HTMLElement | null;
+          if (target?.closest("button, [data-action]")) return;
+          cancelSessionPrefetch();
+          hideSessionHoverCard();
+          void (temporary
+            ? selectTemporarySession(session.id)
+            : selectProjectSession(session));
+        }}
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -1590,6 +1618,17 @@ export function Sidebar({
       >
         <div
           className="sidebar-session-group-header"
+          onClick={(event) => {
+            // Same one-target rule as a session row: the header's own controls
+            // stay the only spelled-out targets, so the gutter next to a hidden
+            // control still activates and toggles the group.
+            const target = event.target as HTMLElement | null;
+            if (target?.closest("button, [data-action]")) return;
+            void (async () => {
+              if (!entry.active && !(await selectProject(entry.path))) return;
+              setCollapsed(entry.path, !collapsedProject);
+            })();
+          }}
           onContextMenu={(event) => {
             if (projectReorderRef.current) {
               event.preventDefault();
@@ -1971,6 +2010,7 @@ export function Sidebar({
   return (
     <aside
       className={cx("sidebar", className)}
+      data-window-blur={windowFocused ? undefined : "true"}
       onAnimationEnd={onAnimationEnd}
     >
       <div className="sidebar-header">

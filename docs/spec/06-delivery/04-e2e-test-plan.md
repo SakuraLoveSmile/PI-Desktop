@@ -4419,6 +4419,64 @@ identify the platform validation still needed.
 - **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
   interaction scenario Draft
 
+#### E2E-UI-tooltip-never-outlives-its-trigger: A themed tooltip always retreats
+
+- **Preconditions**: PI-Desktop is open on a session with at least one message
+  toolbar, a sidebar with two retained projects, and a window that can lose
+  focus (another application or an OS dialog).
+- **Steps**: 1) Hover an icon-only action and wait for its tooltip. 2) With the
+  tooltip visible, move the pointer straight out of the window without clicking
+  and then return it. 3) Hover one action, then move the pointer quickly across
+  a row of adjacent actions. 4) Hover an action, then trigger a sidebar
+  re-order or a project expand/collapse that moves its row in the DOM. 5) Hover an
+  action, then press Escape. 6) Hover an action, switch to another application,
+  then return to PI-Desktop. 7) Repeat step 1 for the project path tooltip
+  (long absolute path), a session row's overflow control, and a message-toolbar
+  chip.
+- **Expected**: Each tooltip appears after its delay (300ms, 500ms for the
+  project path) and retreats when the pointer leaves. No tooltip survives its
+  trigger unmounting, a window blur, a hidden document, or Escape, and none is
+  left painted after the pointer leaves the window entirely. Crossing adjacent
+  actions shows at most one tooltip at a time. A move that keeps the same row
+  element (list re-order, expand/collapse) keeps the tooltip instead of
+  blinking it; a row that React truly unmounts and replaces drops it.
+  placement near the top edge.
+- **Specs linked**: `04-ux/09-interaction-patterns.md §6.4`
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`icon-tooltip.test.mjs` source contract); rendered
+  pointer/Escape/blur validation Draft
+
+#### E2E-UI-row-actions-do-not-swallow-the-row-click: A hidden row action is inert
+
+- **Preconditions**: PI-Desktop is open with two retained projects, each with
+  at least three sessions, and one active conversation.
+- **Steps**: 1) Without hovering it, click the right-hand gutter of an idle
+  session row where its overflow control will appear, and note which
+  conversation opens. 2) Repeat on an idle project header row. 3) Hover a row
+  and activate the revealed overflow control on the first click. 4) Tab through
+  the sidebar until a row action receives focus and activate it. 5) Repeat step
+  1 with an emulated coarse pointer / touch device. 6) With the pointer resting
+  on a row and its action revealed, switch focus to another application, then
+  return without moving the pointer.
+- **Expected**: The idle gutter belongs to the row — the first click there
+  opens that conversation (a project header gutter activates and toggles that
+  group) instead of an invisible menu, and a coarse pointer never meets a
+  hidden control. The hover-revealed control still opens its menu on the first
+  click, and keyboard focus reveals and keeps it operable. On window blur the
+  row (and the project title tile) drops its hover paint and hides its revealed
+  action; moving the pointer back over the row re-arms it.
+- **Specs linked**: `04-ux/09-interaction-patterns.md §9.1c`
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Source-contract and style assertions cover the hidden/revealed
+  `pointer-events` states and the blur release
+  (`sidebar-navigation.test.mjs`); rendered pointer/touch validation Draft
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`sidebar-navigation.test.mjs`,
+  `interaction-polish.test.mjs`); rendered pointer/touch validation Draft
+
 #### E2E-070: Native select menus follow the Windows theme across the app
 
 - **Preconditions**: PI-Desktop is running on Windows with light and dark

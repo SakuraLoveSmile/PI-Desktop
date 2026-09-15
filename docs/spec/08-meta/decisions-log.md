@@ -5272,3 +5272,36 @@ not an unreviewed upstream registry passthrough.
 It deliberately does not include plugin OAuth: the `provider.oauth` permission
 and a Host-owned plugin login flow are future work, so a declared provider has no
 OAuth login, token refresh, or account label today.
+
+## 2026-09-15 — A tooltip never outlives its trigger (D428)
+
+- **The shared tooltip hook in `apps/desktop/src/components/ui.tsx` gains one
+  lifecycle contract: at most one themed tooltip is painted at a time
+  (claiming the slot closes the previous owner), and a visible tooltip closes
+  when its anchor unmounts, when the window loses focus, when the document is
+  hidden, on Escape, or when the pointer that revealed it leaves the anchor.
+  Every close also cancels a show that has not painted yet, so Escape or a
+  window blur inside the delay no longer paints a tooltip on an unfocused
+  window. A trigger that moves in the DOM within a quarter second without being
+  replaced keeps the tooltip instead of blinking it, and a tooltip revealed by
+  keyboard focus is not closed by unrelated pointer movement. The guard
+  listeners (window blur, visibility, Escape, pointer) are installed once for
+  the whole renderer instead of once per trigger. No delay, offset, placement,
+  or text behavior changes.**
+- **Row-level hover paint and hover-revealed row actions now follow the same
+  "still relevant?" rule: an idle row's hidden overflow control is
+  pointer-inert so the space it occupies belongs to the row — a click there
+  opens the conversation, or activates and toggles the project group, as the
+  title does — and a no-hover pointer gets the controls revealed under
+  `@media (hover: none)` so it never meets a hidden target. A window that loses
+  focus drops the row's and the project title's hover paint and hides the
+  revealed actions instead of leaving them latched.**
+- Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/09-interaction-patterns.md` §6.4 and §9.1c,
+  E2E-UI-tooltip-never-outlives-its-trigger, and
+  E2E-UI-row-actions-do-not-swallow-the-row-click.
+
+Users reported a tooltip that occasionally never went away (the trigger
+unmounted, the window lost focus, or the pointer left the window without a
+leave event) and a session row whose hidden overflow control silently opened
+its menu instead of the conversation.
