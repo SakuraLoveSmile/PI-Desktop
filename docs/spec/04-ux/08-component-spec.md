@@ -1157,6 +1157,15 @@ of session.
 
 ---
 
+#### Send availability
+
+Drafts use the parent session's live availability. A running/busy parent disables
+first Send with a visible explanation; a read-only parent also disables it.
+The submission action shares the same gate and reports blocked programmatic
+submissions without creating a child or clearing text. After creation, the
+submission action checks the child's current availability again before sending.
+Existing children keep their normal queue and Stop behavior. Recovery re-enables Send automatically.
+
 ## 6. SessionList
 
 ### 6.1 Purpose
@@ -3598,12 +3607,3 @@ Sidebar footer                                        Popover (360px max)
     panel width (ADR 0151)
 19. Expanded sidebar session titles, project/group titles, and empty-state copy
     use the 13px compact token while primary sidebar actions remain at 14px
-
-### Side-chat Send availability (#421 review follow-up)
-
-Drafts use the parent session's live availability. A running/busy parent disables
-first Send with a visible explanation; a read-only parent also disables it.
-The submission action shares the same gate and reports blocked programmatic
-submissions without creating a child or clearing text. After creation, check
-the child's current availability again before sending. Existing children keep
-their normal queue and Stop behavior. Recovery re-enables Send automatically.

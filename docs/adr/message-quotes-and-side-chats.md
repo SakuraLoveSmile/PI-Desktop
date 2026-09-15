@@ -44,8 +44,8 @@ main transcript leaves the screen, and coming back costs a session switch.
    chip kind and no file reference.
 4. **Open side chat** is offered on an assistant turn (fork anchored at that
    assistant message) and on a user message (fork anchored at that user
-   message), with the tooltip and accessible name `chat.startSideChat`. It calls
-   renderer-only draft path, anchored at the selected message. Opening and
+   message), with the tooltip and accessible name `chat.startSideChat`. It opens
+   a renderer-only draft anchored at the selected message. Opening and
    typing do not call `session.fork`. First explicit Send with nonempty text
    forks the child without activating it, then sends through the existing prompt
    path. Concurrent sends share one creation. The resulting child is durable.
@@ -219,26 +219,25 @@ Side-chat registrations use the upstream work-panel tab strip and launcher.
 Closing the final tab leaves the launcher open; closing a side chat removes only
 its registration/projection, never its durable child or unrelated tabs. The
 shared upstream delta-aware transcript reducer also feeds docked children.
-Registered transcripts persist across tab switches; compact draft and scroll
-state are component-local and may reset on remount. No restart persistence or
-native-session unification is introduced.
+Registered transcripts and drafts persist across tab switches in renderer-owned
+state. Scroll position is component-local and may reset on remount. Side-chat
+registrations and drafts do not persist across application restarts.
 
 ## First-send creation amendment (Issue #421)
 
 Opening a side chat is a reversible draft interaction. Selection-overlay
-Ask in side chat prefills a Markdown blockquote and never sends automatically;
-this supersedes the earlier selection-overlay immediate-send behavior.
+Ask in side chat prefills a Markdown blockquote and never sends automatically.
 Open as a conversation and Add to main chat are unavailable until a child
 exists. A successful fork followed by a failed send keeps that child for retry
 rather than creating another one. Closing after an explicit Send may retain the
 created child even if the provider rejects the prompt. Existing sessions are
 never deleted as cleanup. No IPC, host ownership, or database schema changes.
 
-### Side-chat Send availability (#421 review follow-up)
+### Side-chat Send availability
 
 Drafts use the parent session's live availability. A running/busy parent disables
 first Send with a visible explanation; a read-only parent also disables it.
 The submission action shares the same gate and reports blocked programmatic
-submissions without creating a child or clearing text. After creation, check
-the child's current availability again before sending. Existing children keep
-their normal queue and Stop behavior. Recovery re-enables Send automatically.
+submissions without creating a child or clearing text. After creation, the
+submission action checks the child's current availability again before sending.
+Existing children keep their normal queue and Stop behavior. Recovery re-enables Send automatically.

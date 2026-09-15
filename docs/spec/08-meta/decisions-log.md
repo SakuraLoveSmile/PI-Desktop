@@ -5278,5 +5278,6 @@ OAuth login, token refresh, or account label today.
 Side-chat opening and selection quote prefill are renderer-only drafts. The
 first explicit nonempty Send creates the anchored child, with concurrent
 submissions deduplicated and failed drafts retained. Closing unsent drafts
-creates no history; existing children remain. See ADR
-message-quotes-and-side-chats and E2E-CHAT-side-chat-fork.
+creates no history; existing children remain. See the
+[message quotes and side chats ADR](../../adr/message-quotes-and-side-chats.md)
+and E2E-CHAT-side-chat-fork.
