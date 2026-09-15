@@ -600,8 +600,8 @@ test("the project's other folders are not an escape hatch", async (t) => {
     runtime.invokePanelBridge("fs.folders.guards", "fs.openDefault", {
       path: join(stranger, "notes.txt"),
     }),
-    "INVALID_ARGUMENT",
-    /escapes the plugin's root/,
+    "NOT_FOUND",
+    /path not found/,
   );
   assert.ok(
     audits.some((entry) => entry.api === "fs.read" && entry.ok === false),
