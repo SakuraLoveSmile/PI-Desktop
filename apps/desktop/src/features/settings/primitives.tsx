@@ -12,7 +12,8 @@ import {
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { resolveContextUsageDisplay } from "../../lib/context-usage";
-import { Input, Select, cx } from "../../components/ui";
+import { Input, cx } from "../../components/ui";
+import { SettingsMenuSelect } from "../../components/settings/SettingsMenuSelect";
 
 export function SettingsRow({
   title,
@@ -157,22 +158,22 @@ export function CommandShellRow({
             {t("settings.commandShellNoChoices")}
           </span>
         ) : (
-          <Select
+          <SettingsMenuSelect
             className="settings-command-shell-select"
+            label={t("settings.commandShell")}
             value={selectedId}
-            disabled={saving}
-            aria-label={t("settings.commandShell")}
-            onChange={(event) => void onChange(event.target.value)}
-          >
-            {catalog.choices.map((choice) => (
-              <option key={choice.id} value={choice.id} disabled={!choice.available}>
-                {choice.label}
-                {!choice.available
-                  ? ` - ${t("settings.commandShellUnavailable")}`
-                  : ""}
-              </option>
-            ))}
-          </Select>
+            busy={saving}
+            onChange={(value) => void onChange(value)}
+            options={catalog.choices.map((choice) => ({
+              id: choice.id,
+              label: `${choice.label}${
+                choice.available
+                  ? ""
+                  : ` - ${t("settings.commandShellUnavailable")}`
+              }`,
+              disabled: !choice.available,
+            }))}
+          />
         )}
         {effectiveStatus ? (
           <span className="settings-command-shell-status">{effectiveStatus}</span>
