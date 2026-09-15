@@ -662,6 +662,15 @@ sklm: {
     testConnection: "Bağlantıyı dene",
     hasSecret: "API anahtarı kaydedildi",
     noSecret: "Henüz API anahtarı yok",
+    pluginProviderBadge: "Eklenti",
+    pluginProviderBy: "{{plugin}} tarafından sağlanır",
+    pluginProviderManaged:
+      "Bu servis, uç noktasını ve modellerini sağlayan “{{plugin}}” eklentisinden gelir. “Uzantılar” sayfasından açıp kapatabilirsiniz.",
+    pluginProviderKey: "API anahtarı",
+    pluginProviderKeyHint: "PI-Desktop’ta saklanır ve çalışma zamanı tarafından kullanılır. Eklenti bu anahtarı asla almaz.",
+    pluginProviderKeyRemove: "Anahtarı kaldır",
+    pluginProviderKeySaved: "API anahtarı kaydedildi",
+    pluginProviderKeyRemoved: "API anahtarı kaldırıldı",
     delete: "Sil",
     theme: "Tema",
     mode: "Varsayılan kip",
@@ -1791,6 +1800,7 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "agent.prompt.inject": "Ajan yönergelerini ayarla",
       "agent.complete": "Modellerinizle tek seferlik tamamlatma çalıştır",
       "agent.extension": "Ajanın içinde kod çalıştır",
+      "provider.register": "Model listesine servis ekle",
       "desktop.control": "Masaüstünü kontrol et",
       "models.list": "Kimliği doğrulanmış modelleri listele",
       "session.read": "Modele gönderilen geçerli konuşmayı oku",
@@ -1832,6 +1842,8 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "agent.complete":
         "Model kotanızı tek seferlik bir tamamlatma için harcayabilir. Eklenti API anahtarlarınızı almaz.",
       "agent.extension": "ExtensionAPI modüllerini ajan sürecinde, ajanın kendi araçlarıyla aynı erişimle çalıştırır. Yalnızca güvendiğiniz kodu etkinleştirin.",
+      "provider.register":
+        "Bu eklentinin tanımladığı servisleri Ayarlar’daki servis listesine ekler. Uç noktayı ve modelleri eklenti sağlar; API anahtarınız PI-Desktop’ta kalır.",
       "desktop.control":
         "Eklentinin incelenmiş PI-Desktop denetim kataloğunu çağırmasını sağlar. Yıkıcı işlemler yine confirm=true gerektirir; MCP bearer token eklentiye verilmez.",
       "models.list": "Oturum açtığınız modelleri görebilir. Anahtar almaz.",
