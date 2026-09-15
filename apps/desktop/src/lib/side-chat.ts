@@ -1,7 +1,8 @@
 /**
  * Side chats: a follow-up conversation opened from a message.
  *
- * A side chat is an ordinary forked child session on the host, but the renderer
+ * A side chat starts as a renderer-only draft. First Send materializes an
+ * ordinary forked child session on the host, and the renderer
  * keeps it out of the visible conversation: it is registered against its parent
  * session and shown in the docked work panel, so the main transcript, its
  * composer draft, and its run state are never replaced (ADR message-quotes-and-side-chats / D-LOCAL-message-quotes).
@@ -9,7 +10,7 @@
 import type { WorkPanelTab } from "./work-panel-tabs";
 
 export type SideChatEntry = {
-  /** Child session created by `session.fork`. */
+  /** Renderer draft id until first Send; then the durable child session id. */
   sessionId: string;
   /** Conversation the side chat was opened from. */
   parentSessionId: string;
@@ -18,6 +19,10 @@ export type SideChatEntry = {
   /** Message the fork was anchored at, when it was opened from one. */
   anchorMessageId?: string;
   createdAt: number;
+  pending?: boolean;
+  draft?: string;
+  sending?: boolean;
+  error?: string;
 };
 
 export type SideChatMap = Record<string, SideChatEntry>;
@@ -57,6 +62,8 @@ export function sideChatEntry(
     title: input.title,
     ...(input.anchorMessageId ? { anchorMessageId: input.anchorMessageId } : {}),
     createdAt: input.createdAt ?? Date.now(),
+    ...(input.pending ? { pending: true } : {}),
+    ...(input.draft !== undefined ? { draft: input.draft } : {}),
   };
 }
 

@@ -45,16 +45,17 @@ main transcript leaves the screen, and coming back costs a session switch.
 4. **Open side chat** is offered on an assistant turn (fork anchored at that
    assistant message) and on a user message (fork anchored at that user
    message), with the tooltip and accessible name `chat.startSideChat`. It calls
-   the existing `session.fork` with the anchor and does **not** activate the
-   child: the main conversation keeps its visible session. The child is durable
-   on the host exactly as an ordinary branch and keeps appearing in session
-   lists and search.
-5. The child is registered as a side chat of the parent session in
-   renderer-owned state, and the work panel opens a new `sidechat` resource tab
-   bound to the child session id (`id: sidechat:<childSessionId>`). The tab
-   reuses the existing docked panel, its width clamp, resize, and
-   native-reservation lifecycle, its header switcher, and D128's per-session
-   panel-context switch rule.
+   renderer-only draft path, anchored at the selected message. Opening and
+   typing do not call `session.fork`. First explicit Send with nonempty text
+   forks the child without activating it, then sends through the existing prompt
+   path. Concurrent sends share one creation. The resulting child is durable.
+5. Before first Send the work panel uses a renderer-only draft id. Creation
+   replaces that tab with `sidechat:<childSessionId>` in place, including the
+   parent's retained panel context. Switching sessions or closing during
+   creation must not reopen a panel. Draft text lives in the side-chat entry,
+   survives panel switches and failed creation/sends, and is cleared after
+   acceptance only if the user has not edited it in the meantime.
+
 6. While a side chat is registered, the child's agent events are projected into
    a renderer-owned per-session transcript map from the same event stream the
    active transcript consumes (message and tool start / update / end), reusing
@@ -79,7 +80,8 @@ main transcript leaves the screen, and coming back costs a session switch.
    session-selection path, so the full composer, prompt queue, and stop controls
    apply, and releases the side-chat registration and its tab.
 10. Closing the tab removes the registration and its transcript projection. The
-    child session is not deleted and remains an ordinary session in the sidebar,
+    unsent draft leaves no host record. An already created child session is
+    not deleted and remains an ordinary session in the sidebar,
     session lists, and search.
 11. Side-chat entries are removed when the tab closes, when the child is opened
     as a conversation, and when the parent or child session is deleted.
@@ -221,3 +223,14 @@ shared upstream delta-aware transcript reducer also feeds docked children.
 Registered transcripts persist across tab switches; compact draft and scroll
 state are component-local and may reset on remount. No restart persistence or
 native-session unification is introduced.
+
+## First-send creation amendment (Issue #421)
+
+Opening a side chat is a reversible draft interaction. Selection-overlay
+Ask in side chat prefills a Markdown blockquote and never sends automatically;
+this supersedes the earlier selection-overlay immediate-send behavior.
+Open as a conversation and Add to main chat are unavailable until a child
+exists. A successful fork followed by a failed send keeps that child for retry
+rather than creating another one. Closing after an explicit Send may retain the
+created child even if the provider rejects the prompt. Existing sessions are
+never deleted as cleanup. No IPC, host ownership, or database schema changes.

@@ -1490,3 +1490,12 @@ This does not prevent state changes — it makes them instant.
     the expanded sidebar yields at the threshold and returns when the panel
     closes, and divider cancellation restores the prior panel width
     (ADR 0033 / ADR 0151 / ADR 0238)
+
+### Side-chat draft lifecycle (Issue #421)
+
+Open side chat and selection Ask in side chat create a renderer-only draft.
+Selection text is prefilled as a blockquote, without sending. First nonempty
+Send creates the anchored child and sends once; failure keeps the draft and
+reuses any already-created child. Closing before Send creates no history.
+Existing child sessions remain after close. This supersedes earlier immediate
+fork/send descriptions.

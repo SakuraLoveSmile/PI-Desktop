@@ -1091,6 +1091,15 @@ It does not render separate Details or Output tabs.
 
 ### 5.8 Side chat (D-LOCAL-message-quotes)
 
+First-send lifecycle (Issue #421): opening creates only a renderer draft;
+no persistent child exists until the user sends nonempty content. Selection
+Ask in side chat only prefills a Markdown blockquote. Closing an unsent draft
+leaves no session record. Creation replaces the draft tab in its own parent's
+panel context; repeated sends cannot create duplicate children. Creation or
+send failure retains the draft; a created child is reused on retry. Promotion
+and Add to main chat are disabled for drafts. This supersedes the immediate
+fork/send wording below, which describes the materialized child only.
+
 A side chat is one more work-panel resource: a live view of another session's
 transcript beside the main conversation, not a second panel and not a new kind
 of session.

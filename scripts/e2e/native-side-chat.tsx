@@ -153,15 +153,16 @@ type Phase2Input = {
 
     // Concurrent clicks on one anchor share one open through the real slice.
     const sessionCountBefore = (await bridge.invoke("probe.sessionCount")).data.count;
-    const [childId, secondChildId] = await Promise.all([
+    const [draftId, secondChildId] = await Promise.all([
       useAppStore.getState().openSideChat("a1"),
       useAppStore.getState().openSideChat("a1"),
     ]);
-    check("concurrent open shares one child", Boolean(childId) && childId === secondChildId, String(childId));
+    let childId = draftId;
+    check("concurrent open shares one draft", Boolean(draftId) && draftId === secondChildId, String(draftId));
     const sessionCountAfter = (await bridge.invoke("probe.sessionCount")).data.count;
     check(
-      "concurrent open publishes exactly one child file",
-      sessionCountAfter === sessionCountBefore + 1,
+      "opening does not publish a child file",
+      sessionCountAfter === sessionCountBefore,
       `${sessionCountBefore} -> ${sessionCountAfter}`,
     );
     const rows = () =>
@@ -169,46 +170,23 @@ type Phase2Input = {
     check("anchored history seeded whole", rows().length === 2, JSON.stringify(rows().map((r) => r.id)));
     const childSummary = () =>
       useAppStore.getState().sessions.find((session) => session.id === childId);
-    check("child title is the side-chat title", String(childSummary()?.title).startsWith("Side chat"), String(childSummary()?.title));
+    check("draft is absent from session list", !childSummary());
 
-    // First-user anchor: durable immediately, one user row, no assistant, and
-    // no model request while the provider context comes from the parent.
-    const promptCountBeforeFirstUser =
-      (await bridge.invoke("probe.promptCount")).data.count;
-    const firstUserId = await useAppStore.getState().openSideChat("u1");
-    check("first-user side chat opened", Boolean(firstUserId) && firstUserId !== childId);
-    const firstUserDetail = (await bridge.invoke("probe.detail", { id: firstUserId })).data.session;
-    check(
-      "first-user child is durable with only the user row",
-      firstUserDetail.messageCount === 1 &&
-        firstUserDetail.messages.filter((row: any) => row.role === "assistant").length === 0,
-      JSON.stringify(firstUserDetail.messages.map((row: any) => [row.role, row.id])),
-    );
-    check(
-      "first-user child inherits the parent saved model",
-      firstUserDetail.providerId === "test-provider" && firstUserDetail.modelId === "test-model",
-      JSON.stringify([firstUserDetail.providerId, firstUserDetail.modelId]),
-    );
-    const promptCountAfterFirstUser =
-      (await bridge.invoke("probe.promptCount")).data.count;
-    check(
-      "first-user fork made no model request",
-      promptCountAfterFirstUser === promptCountBeforeFirstUser,
-      `${promptCountBeforeFirstUser} -> ${promptCountAfterFirstUser}`,
-    );
+    // Closing an unsubmitted first-user draft leaves no session file.
+    const firstUserId = await useAppStore.getState().openSideChat("u1", "quoted question");
+    check("selection prefills without sending", useAppStore.getState().sideChats[firstUserId!]?.draft === "> quoted question\n\n");
     useAppStore.getState().closeSideChat(firstUserId!);
-    await useAppStore.getState().refreshSessions();
-    check(
-      "first-user child stays listed after close",
-      Boolean(useAppStore.getState().sessions.find((session) => session.id === firstUserId)),
-    );
-
-    const searchTitle = childSummary()!.title;
+    check("unsent draft stays absent after close", (await bridge.invoke("probe.sessionCount")).data.count === sessionCountBefore);
+    await useAppStore.getState().openSideChat("a1");
 
     const host = document.createElement("div");
     document.body.appendChild(host);
     rootElements.push(host);
-    createRoot(host).render(<SideChatTab sessionId={childId!} />);
+    function ActiveSideChat() {
+      const id = useAppStore((state) => state.workPanelTabs.find((tab) => tab.kind === "sidechat")?.resource);
+      return id ? <SideChatTab sessionId={id} /> : null;
+    }
+    createRoot(host).render(<ActiveSideChat />);
     await until(() => panelHost(), 25_000, "panel");
     await until(
       () => document.querySelector('.side-chat-thread')?.textContent?.includes('first answer'),
@@ -221,6 +199,12 @@ type Phase2Input = {
 
     setValue(textarea(), "probe question");
     composer().dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    childId = await until(() => Object.values(useAppStore.getState().sideChats).find(
+      (entry) => entry.anchorMessageId === "a1" && !entry.pending,
+    )?.sessionId, 25_000, "first Send creates child") as string;
+    check("first Send creates exactly one child", (await bridge.invoke("probe.sessionCount")).data.count === sessionCountBefore + 1);
+    check("child title is the side-chat title", String(childSummary()?.title).startsWith("Side chat"));
+    const searchTitle = childSummary()!.title;
     const sendOutcome = await until(() => {
       if (rows().some((row) => row.status === "streaming" && String(row.content).length > 0)) {
         return "streaming";
