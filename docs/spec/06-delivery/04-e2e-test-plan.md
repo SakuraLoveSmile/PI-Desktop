@@ -11537,10 +11537,17 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Host headers. `registerProvider` with the same plugin-owned stream shape has
   equivalent behavior.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §5, §10; ADR 0258;
-  D425
+  D426
 - **Acceptance**: B (agent), C (conversation & stream), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Documented; automation pending
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`): the loaded
+  contract, both registration forms (`registerAgent` and the `registerProvider`
+  alias, in each call form), the custom-agent names on the plugin row, the
+  redacted registry, idle `setModel` persistence under the `extension-agent:` id,
+  and the next turn restored through the plugin's own transport pass.
+  Cancellation through `options.signal`, the `stream`-form callback's
+  model/context/options inspection, and cross-session module sharing remain
+  additional validation.
 
 #### E2E-243: Extension commands and UI prompts round-trip through the renderer
 
@@ -12356,4 +12363,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Acceptance**: B (model config), E (tools & permissions), F (persistence),
   G (plugins), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
-- **Status**: Documented; automation pending
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`): the
+  declared row materializing as `plugin:<pluginId>:<declaredId>` in the native
+  provider list with its `ownerPluginId`, endpoint and models, and no row owned
+  by any other plugin, pass. Ownership refusal (`PROVIDER_OWNED_BY_PLUGIN`),
+  disable/enable, undeclare and uninstall cleanup, and the manifest refusals are
+  covered by host-core unit tests; the renderer's read-only row presentation
+  remains additional validation.
