@@ -2205,14 +2205,17 @@ identify the platform validation still needed.
   The header shows its localized processing label, elapsed time, and step count
   without an additional status capsule. When the turn settles, the automatic
   thinking disclosure closes, while a group or row touched by the user keeps
-  its chosen state. Expanded calls use transparent semantic activity rows with
-  an action icon, natural-language verb, monospace primary argument, and quiet
-  disclosure. The processing group uses the full assistant-column width, so a
-  short label or payload does not shrink expanded details into a content-sized
-  chip. Each expanded-content vertical rule is a pointer and keyboard-focusable
-  collapse control for its owning disclosure. Nested expansion shows output
-  before raw input in clamped scroll regions. Live partial output updates in
-  place. Reloaded rows preserve the tool name, arguments, result, and status.
+  its chosen state. A user-expanded tool call keeps its detail heading and
+  content aligned with the tool row rather than introducing another horizontal
+  indent; the collapse rail remains usable beside the body. Expanded calls use
+  transparent semantic activity rows with an action icon, natural-language verb,
+  monospace primary argument, and quiet disclosure. The processing group uses
+  the full assistant-column width, so a short label or payload does not shrink
+  expanded details into a content-sized chip. Each expanded-content vertical rule
+  is a pointer and keyboard-focusable collapse control for its owning disclosure.
+  Nested expansion shows output before raw input in clamped scroll regions. Live
+  partial output updates in place. Reloaded rows preserve the tool name,
+  arguments, result, and status.
 - **Specs linked**: `04-ux/01-ui-ia.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`
