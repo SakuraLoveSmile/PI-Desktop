@@ -521,6 +521,7 @@ export const en = {
     untitledTask: "New task",
   },
   sideChat: {
+    parentBusy: "The main conversation is still replying. Wait for it to finish before starting this side chat.",
     readOnly: "This native Pi session is read-only right now.",
     title: "Side chat",
     sessionTitle: "Side chat: {{title}}",

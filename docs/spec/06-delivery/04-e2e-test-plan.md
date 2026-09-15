@@ -1318,20 +1318,18 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Draft
 
-#### E2E-CHAT-side-chat-fork: Opening a side chat forks the child without switching the visible session
+#### E2E-CHAT-side-chat-fork: First Send creates the child without switching the visible session
 
-- **Preconditions**: A session with a completed assistant answer and a user
-  message; a provider ready for a child session.
-- **Steps**: 1) Hover the assistant turn and activate Open side chat
-  (`chat.startSideChat`). 2) Inspect the visible transcript, the sidebar
-  selection, and the work-panel header. 3) Repeat from a user message in the
-  same session. 4) List the host's sessions.
-- **Expected**: Each activation calls `session.fork` with the clicked message as
-  anchor and returns a durable child. The main conversation stays visible and
-  selected with an unchanged transcript and scroll position; no prompt is sent
-  and no permission is requested. The work panel opens one `sidechat` tab
-  (`sidechat:<childSessionId>`) labeled from `sideChat.title`. The children
-  appear as ordinary sessions in the sidebar, session lists, and search.
+- **Preconditions**: A session with completed messages and a configured provider.
+- **Steps**: 1) Open a side chat twice from the same message. 2) Type but do
+  not send; inspect persistent sessions. 3) Close it and inspect again.
+  4) Reopen and Send nonempty text twice concurrently. 5) Repeat with fork
+  failure and prompt rejection; retry. 6) Switch parent or close during creation.
+- **Expected**: Open/type/close create zero sessions. First Send creates one
+  anchored child and submits once. The main conversation stays selected.
+  Failure keeps the draft and retries reuse any created child. A changed draft
+  is never overwritten. The original parent's retained tab is replaced in place;
+  closing during creation never resurrects it. Promotion is disabled for drafts.
 - **Specs linked**: `04-ux/08-component-spec.md` §5.8, §8.8;
   `04-ux/09-interaction-patterns.md` §1.8; `03-runtime/04-data-storage.md`;
   ADR message-quotes-and-side-chats, ADR 0023, D-LOCAL-message-quotes
@@ -1456,20 +1454,16 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Draft
 
-#### E2E-CHAT-selection-side-chat: Ask in side chat answers beside the conversation
+#### E2E-CHAT-selection-side-chat: Selection prefills a side-chat draft
 
-- **Preconditions**: A session with a completed assistant answer; a provider
-  ready for a child session; no turn running.
-- **Steps**: 1) Select a phrase in the answer and activate Ask in side chat
-  (`chat.askInSideChat`) in the floating overlay. 2) Inspect the visible
-  transcript, the composer draft, and the work panel. 3) Wait for the child's
-  answer, then repeat with a turn already running.
-- **Expected**: One `sidechat` tab opens for a child forked at that message and
-  the excerpt is sent as that child's own prompt, so the answer streams inside
-  the panel while the visible conversation, its draft, its scroll position, and
-  its run state are untouched. The overlay closes and the native selection is
-  cleared. The main conversation gains no row from this action, and the fork
-  refuses while the visible turn is running (the action is disabled then).
+- **Preconditions**: A session with a completed answer; no turn running.
+- **Steps**: 1) Select a phrase and choose Ask in side chat. 2) Inspect the
+  panel input, persistent session count, and model request count. 3) Add a
+  question and explicitly Send.
+- **Expected**: The selection is a Markdown blockquote in the side input.
+  Opening creates no child and sends no model request. Explicit Send creates
+  one child and sends the edited draft. The main draft and transcript remain
+  unchanged; selecting another quote appends without erasing existing text.
 - **Specs linked**: `04-ux/08-component-spec.md` §5.8, §8.8; ADR message-quotes-and-side-chats, D-LOCAL-message-quotes,
   D-LOCAL-selection-overlay
 - **Acceptance**: C (conversation), Quality
@@ -12393,3 +12387,21 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   disable/enable, undeclare and uninstall cleanup, and the manifest refusals are
   covered by host-core unit tests; the renderer's read-only row presentation
   remains additional validation.
+
+### Issue #421 validation scope
+
+E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-close, and
+E2E-CHAT-selection-side-chat cover deferred creation and quote prefill.
+`pnpm test:e2e:native-side-chat` exercises renderer draft opening/closing,
+first-send native materialization and subsequent streaming/persistence.
+`side-chat-draft.test.mjs` covers deterministic failure and navigation races.
+Native E2E uses a fixture transport, not a live provider account.
+
+### E2E-CHAT-side-chat-fork availability extension (#421)
+
+Open a draft, type a question, then make the parent busy and read-only in turn.
+Expect a disabled Send button, visible reason, unchanged draft and no new host
+session or model request. Restore availability and send; exactly one child
+is created. A child returning read-only from an in-flight fork must not be
+prompted. `test:e2e:native-side-chat` covers the rendered parent gate and its
+recovery; `side-chat-draft.test.mjs` covers action-level guards and child drift.

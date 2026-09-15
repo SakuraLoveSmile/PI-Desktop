@@ -1091,13 +1091,21 @@ It does not render separate Details or Output tabs.
 
 ### 5.8 Side chat (D-LOCAL-message-quotes)
 
+First-send lifecycle (Issue #421): opening creates only a renderer draft;
+no persistent child exists until the user sends nonempty content. Selection
+Ask in side chat only prefills a Markdown blockquote. Closing an unsent draft
+leaves no session record. Creation replaces the draft tab in its own parent's
+panel context; repeated sends cannot create duplicate children. Creation or
+send failure retains the draft; a created child is reused on retry. Promotion
+and Add to main chat are disabled for drafts.
+
 A side chat is one more work-panel resource: a live view of another session's
 transcript beside the main conversation, not a second panel and not a new kind
 of session.
 
 - Entry: **Open side chat** on an assistant turn (fork anchored at that assistant
   message) and on a user message (fork anchored at that user message), with the
-  tooltip and accessible name `chat.startSideChat`. Opening calls the existing
+  tooltip and accessible name `chat.startSideChat`. First Send calls the existing
   `session.fork` with the anchor and does not activate the child, so the main
   conversation keeps its visible session. The child is durable on the host
   exactly as an ordinary branch. For a native Pi parent the same channel is
@@ -1137,7 +1145,8 @@ of session.
   session-selection path, so the full composer, prompt queue, and stop controls
   apply, and releases the side-chat registration and its tab.
 - Close: closing the tab removes the registration and its transcript projection.
-  The child session is not deleted and keeps appearing in the sidebar, session
+  Unsent drafts leave no session record. An existing child session is not
+  deleted and keeps appearing in the sidebar, session
   lists, and search. Entries are removed when the tab closes, when the child is
   opened as a conversation, and when the parent or child session is deleted.
 - Boundaries: side-chat state is renderer-owned and is not persisted across
@@ -1147,6 +1156,15 @@ of session.
   project search, and it reopens as a normal conversation.
 
 ---
+
+#### Send availability
+
+Drafts use the parent session's live availability. A running/busy parent disables
+first Send with a visible explanation; a read-only parent also disables it.
+The submission action shares the same gate and reports blocked programmatic
+submissions without creating a child or clearing text. After creation, the
+submission action checks the child's current availability again before sending.
+Existing children keep their normal queue and Stop behavior. Recovery re-enables Send automatically.
 
 ## 6. SessionList
 

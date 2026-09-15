@@ -514,6 +514,7 @@ export const de = {
     "untitledTask": "Neue Aufgabe"
   },
   "sideChat": {
+    parentBusy: "Das Hauptgespräch antwortet noch. Warte auf das Ende, bevor du diesen Seitenchat startest.",
     readOnly: "Diese native Pi-Sitzung ist derzeit schreibgeschützt.",
     "title": "Seitenchat",
     "sessionTitle": "Seitenchat: {{title}}",
