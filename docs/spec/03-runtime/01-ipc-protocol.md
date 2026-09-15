@@ -509,7 +509,7 @@ type AgentStatus = {
 The Host owns the per-session prompt queue; the renderer mirrors it. A
 Send-while-running pushes through `pi-desktop/agent/queue/push` and the
 headless Agent Host module admits, orders, and drains the durable entries
-(`turn_queue`, schema v15). Every change is fanned out as
+(`turn_queue`, schema v18). Every change is fanned out as
 `pi-desktop/agent/event/queueChanged`.
 
 ```ts
@@ -526,6 +526,7 @@ type QueuedTurnSummary = {
   content: string;
   attachments?: AgentPromptAttachment[];
   position: number;   // 1-based queue position
+  priority?: number;  // set only for a promoted entry; the click order
   createdAt: string;
 };
 
@@ -533,16 +534,39 @@ type QueuedTurnSummary = {
 // pi-desktop/agent/queue/list       -> { entries: QueuedTurnSummary[] }
 // pi-desktop/agent/queue/remove     -> { ok: true }   (turnId)
 // pi-desktop/agent/queue/prioritize -> { ok: true }   (turnId; "send now")
+// pi-desktop/agent/queue/reorder    -> { moved: boolean } (turnId, direction)
 // pi-desktop/agent/event/queueChanged -> { sessionId, entries }
 ```
 
 `push` returns `AGENT_BUSY` with `queueFull` once a session holds eight
 entries and `IDEMPOTENCY_CONFLICT` when a key is reused with other input.
-`prioritize` moves an entry to the head without touching the running turn;
-the renderer's "send now" then requests a graceful stop so the entry starts
-at the next boundary. `remove` cancels an entry that has not started. A
-restored queue stays held until the desktop attaches as the owner, so a
-reboot never starts work unattended.
+`entries` arrive in delivery order: promoted entries first in ascending
+`priority` (the order they were promoted), then every remaining entry by
+`position`. `prioritize` appends an entry to the end of that priority block
+without touching the running turn, refuses an entry that already carries a
+priority with `CONFLICT`, and refuses a turn that is no longer queued. The
+renderer's "send now" then requests a graceful stop so the entry starts at
+the next boundary. `reorder` swaps one non-promoted entry with its adjacent
+non-promoted neighbour and reports `moved: false` for a promoted entry, a
+missing entry, or a block/queue edge; a promoted entry is never a neighbour.
+`remove` cancels an entry that has not started. A restored queue stays held
+until the desktop attaches as the owner, so a reboot never starts work
+unattended.
+
+The promoted block is delivered as adjacent messages rather than as separate
+turns: the first promoted entry starts the turn at the boundary and every later
+promoted entry is injected into that same turn through the steering channel
+(`pi-desktop/agent/steer` with the running turn's id), so the transcript shows
+the user rows one after another and the model answers once. An injected entry
+leaves the queue and its own turn is canceled because it never runs on its own.
+An entry the runtime refuses to accept stays queued and leaves at the next
+boundary as its own turn.
+
+The queue's delivery contract is frozen by ADR 0265. A turn's own settlement is
+authoritative for the queue: the terminal event can be dropped (a terminal event
+naming a turn Main no longer owns never reaches the module) or never emitted, so
+the settlement closes the turn inside the module and releases the queue the turn
+was holding.
 
 ### 5.7 Session collaboration projection
 
