@@ -659,6 +659,7 @@ sklm: {
     "groupAgent": "Agente",
     "groupWorkspace": "Espacio de trabajo",
     "groupSystem": "Sistema",
+    "groupExtensions": "Extensiones",
     "nav": {
       "general": "General",
       "ai": "AI",

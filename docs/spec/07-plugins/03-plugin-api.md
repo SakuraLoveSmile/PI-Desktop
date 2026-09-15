@@ -1,5 +1,13 @@
 # 03. Plugin API
 
+## Theme variables
+
+`pi.themes.setVariables(themeId, values)` requires `ui.theme`. The host accepts
+only values for declared variables on one of the caller's themes, persists them
+in private plugin settings, and refreshes an active theme without selecting a
+new theme or reloading the renderer. It never accepts stylesheet text, URLs,
+selectors, images, fonts, or arbitrary property names.
+
 ## 1. Design principles
 
 1. Small and stable

@@ -36,6 +36,9 @@ import {
   sanitizeThemeCss,
   skillIdFromPath,
   themeAssetUrl,
+  formatPluginThemeVariables,
+  normalizePluginThemeVariableValues,
+  validatePluginThemeVariables,
   THEME_ASSET_MAX_BYTES,
   THEME_CSS_MAX_BYTES,
   WINDOW_BACKGROUND_COLOR_PATTERN,
@@ -57,6 +60,7 @@ import {
   type PluginServiceContrib,
   type PluginSettingContrib,
   type PluginSkillContrib,
+  type PluginThemeVariableContrib,
 } from "@pi-desktop/plugin-sdk";
 import {
   isAllowedKeybinding,
@@ -161,6 +165,8 @@ export type RegisteredPluginTheme = {
   /** Palette the overrides layer on; drives `data-theme` in the renderer. */
   base: "light" | "dark";
   css: string;
+  /** Host-generated declarations from manifest-validated variable values. */
+  variablesCss?: string;
   /**
    * Native window background while this theme is selected, per resolved
    * palette. Absent unless the plugin declared it and holds
@@ -392,6 +398,7 @@ const HOST_API_ALLOWLIST = new Set([
   "themes.upsert",
   "themes.remove",
   "themes.list",
+  "themes.setVariables",
   "plugin.getSettings",
   "plugin.setSettings",
   "plugin.getDataPath",
@@ -490,6 +497,7 @@ const MAX_SKILL_DESCRIPTION_CHARS = 240;
  * Namespaced form `plugin:<pluginId>:<themeId>` is built by `pluginThemeId`.
  */
 const THEME_LOCAL_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/;
+const THEME_VARIABLES_SETTINGS_KEY = "__pi_themeVariables";
 /** A plugin may bring at most this many MCP servers. */
 const MAX_MCP_SERVERS_PER_PLUGIN = 8;
 /** A plugin may keep at most this many resident services alive. */
@@ -1730,6 +1738,12 @@ export class PluginRuntime {
         return { ok: true };
       case "themes.list":
         return api.themes.list();
+      case "themes.setVariables":
+        await api.themes.setVariables(
+          String(payload?.themeId ?? ""),
+          (payload?.values as Record<string, number | string> | undefined) ?? {},
+        );
+        return { ok: true };
       case "workspace.get":
         return api.workspace.get();
       case "models.list":
@@ -2551,6 +2565,9 @@ export class PluginRuntime {
         label: String(contrib.label ?? "").trim() || themeId,
         base: contrib.base === "light" ? "light" : "dark",
         css: sanitized.css,
+        ...(contrib.variables?.length
+          ? { variablesCss: this.themeVariablesCss(loaded, id, contrib.variables) }
+          : {}),
         ...(windowBackground ? { windowBackground } : {}),
       });
       accepted += 1;
@@ -2563,6 +2580,41 @@ export class PluginRuntime {
         count: accepted,
         ts: Date.now(),
       });
+    }
+  }
+
+  private themeVariablesCss(
+    loaded: LoadedPlugin,
+    themeId: string,
+    declarations: readonly PluginThemeVariableContrib[],
+  ): string {
+    const values = this.readThemeVariableValues(loaded, themeId);
+    try {
+      return formatPluginThemeVariables(
+        themeId,
+        declarations,
+        normalizePluginThemeVariableValues(declarations, values),
+      );
+    } catch {
+      // An old/corrupt private record cannot make a declared theme unavailable.
+      return formatPluginThemeVariables(
+        themeId,
+        declarations,
+        normalizePluginThemeVariableValues(declarations, {}),
+      );
+    }
+  }
+
+  private readThemeVariableValues(loaded: LoadedPlugin, themeId: string): Record<string, unknown> {
+    try {
+      const file = join(this.pluginDataDir(loaded.manifest.id), "settings.json");
+      const settings = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+      const all = settings?.[THEME_VARIABLES_SETTINGS_KEY];
+      return all && typeof all === "object" && !Array.isArray(all) && all[themeId] && typeof all[themeId] === "object"
+        ? all[themeId] as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
     }
   }
 
@@ -3708,6 +3760,48 @@ export class PluginRuntime {
               base: theme.base,
             }));
         },
+        setVariables: async (themeId: string, values: Record<string, number | string>) => {
+          this.assertPermission(loaded, "ui.theme");
+          const localThemeId = String(themeId ?? "").replace(`plugin:${pluginId}:`, "");
+          const contribution = (loaded.manifest.contributes?.themes ?? []).find(
+            (theme) => theme.id === localThemeId,
+          );
+          if (!contribution) throw apiError("NOT_FOUND", `theme not found: ${themeId}`);
+          const declarations = contribution.variables ?? [];
+          if (!declarations.length) throw apiError("INVALID_ARGUMENT", "theme declares no runtime variables");
+          let patch: Record<string, number | string>;
+          try {
+            patch = validatePluginThemeVariables(declarations, values);
+          } catch (error) {
+            throw apiError("INVALID_ARGUMENT", error instanceof Error ? error.message : "invalid theme variables");
+          }
+          const id = pluginThemeId(pluginId, localThemeId);
+          // Read the raw private record here. `plugin.getSettings()` intentionally
+          // removes host-reserved state before exposing it to plugin code.
+          const settingsFile = join(this.pluginDataDir(pluginId), "settings.json");
+          let current: Record<string, unknown> = {};
+          try {
+            if (existsSync(settingsFile)) current = JSON.parse(readFileSync(settingsFile, "utf8"));
+          } catch {
+            current = {};
+          }
+          const existing = current[THEME_VARIABLES_SETTINGS_KEY];
+          const stored = existing && typeof existing === "object" && !Array.isArray(existing) ? existing as Record<string, unknown> : {};
+          const previous = stored[id] && typeof stored[id] === "object" && !Array.isArray(stored[id]) ? stored[id] as Record<string, unknown> : {};
+          const next = {
+            ...current,
+            [THEME_VARIABLES_SETTINGS_KEY]: { ...stored, [id]: { ...previous, ...patch } },
+          };
+          const dir = this.pluginDataDir(pluginId);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(settingsFile, JSON.stringify(next, null, 2), "utf8");
+          const registered = this.themes.get(id);
+          if (registered) {
+            registered.variablesCss = this.themeVariablesCss(loaded, id, declarations);
+            this.services.onPluginThemesChanged?.(pluginId);
+          }
+          this.services.audit?.({ pluginId, api: "themes.setVariables", ok: true, themeId: localThemeId, ts: Date.now() });
+        },
       },
       plugin: {
         getId: () => pluginId,
@@ -3720,7 +3814,9 @@ export class PluginRuntime {
           const file = join(dataPath(), "settings.json");
           if (!existsSync(file)) return defaults;
           try {
-            return { ...defaults, ...JSON.parse(readFileSync(file, "utf8")) };
+            const stored = JSON.parse(readFileSync(file, "utf8"));
+            if (stored && typeof stored === "object") delete stored[THEME_VARIABLES_SETTINGS_KEY];
+            return { ...defaults, ...stored };
           } catch {
             return defaults;
           }

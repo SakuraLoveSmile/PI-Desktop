@@ -221,6 +221,13 @@
   margin: 0;
 }
 
+/* The renderer owns this measured hole; the sandboxed WebContentsView paints
+   only here, never over the rail, titlebar, or native window controls. */
+.plugin-settings-destination {
+  min-height: min(720px, calc(100vh - 150px));
+  width: 100%;
+}
+
 .settings-section-title {
   margin: 0 0 28px;
   color: var(--ds-text-primary);

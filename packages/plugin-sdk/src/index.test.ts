@@ -105,6 +105,30 @@ describe("validateManifest", () => {
       }).error,
     ).toMatch(/duplicate session source/);
   });
+
+  it("validates typed theme variables and sandboxed settings destinations", () => {
+    expect(
+      validateContributions({
+        themes: [{
+          id: "scenic",
+          label: "Scenic",
+          path: "themes/scenic.css",
+          variables: [{ name: "--nexus-backdrop-blur", type: "length", unit: "px", min: 0, max: 20, default: 6 }],
+        }],
+        settingsDestinations: [{
+          id: "scenic-themes",
+          label: { en: "Scenic themes", "zh-CN": "风景主题" },
+          icon: "palette",
+          entry: "settings/index.html",
+        }],
+      }),
+    ).toBeUndefined();
+    expect(
+      validateContributions({
+        themes: [{ id: "scenic", label: "Scenic", path: "themes/scenic.css", variables: [{ name: "--pi-bg", type: "color", default: "#000000" }] }],
+      }),
+    ).toMatch(/variable declaration/);
+  });
 });
 
 describe("validateContributions", () => {
