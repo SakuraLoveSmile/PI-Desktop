@@ -122,6 +122,8 @@ The minimum selection is:
   `pnpm test:e2e:boot`.
 - Session-list refresh or model capability lookup: `pnpm test:e2e` and
   `pnpm test:e2e:boot`, including the synthetic large-list responsiveness check.
+- Settings/composer/plugin search theme surfaces: `pnpm build:js` followed by
+  `pnpm test:e2e:theme-surfaces`.
 - Composer clipboard representation and text insertion: `pnpm test:e2e:composer-paste`.
 - Transcript render boundaries and cross-part delegation display: `pnpm test:e2e:transcript`.
 - Plan host/runtime behavior: `pnpm test:e2e` and `pnpm test:e2e:plan`.
@@ -4640,16 +4642,27 @@ and identify the platform validation still needed.
   3. Open the work panel (Review / Files / Browser) beside a chat session.
   4. Hover file-tree rows or diff headers; focus the browser URL field.
   5. Open a confirmation/provider dialog and inspect the scrim.
+  6. In both light and dark palettes, inspect the settings rail, search, selected
+     item, on-state knob, composer shell, and plugin/capability searches. Apply
+     custom surface variables, keyboard-focus both searches, then remove the
+     custom theme.
 - **Expected**:
   - Work panel body reads as quiet `#fafafa` inset paper with a white header band.
   - Settings fields, browser URL, segment tracks, and shortcut keycaps use light inset fills; focused fields lift with a neutral ring.
   - Toggle on-state keeps a white knob on the near-black track.
   - Hover fills on file-tree/diff/resize ease with shared motion tokens.
   - Light dialog scrim is softer than the dark 45% veil (~28% ink).
+  - Custom variables repaint the corresponding fills and search focus states;
+    removing them restores the built-in 8-bit RGBA paint and existing shadows/
+    focus rings. This batch does not migrate prose or scrims or change plugin APIs.
 - **Specs linked**: `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: D148
 - **Milestone**: M5
-- **Status detail**: Source-level coverage for CSS contracts; visual surface checks remain manual.
+- **Status detail**: `pnpm test:e2e:theme-surfaces` exercises these ordinary fills,
+  focus states, and built-in restoration with real Chromium, production CSS,
+  and deterministic DOM fixtures; plugin installation/lifecycle is not covered.
+  Branch runs do not replace post-integration E2E. Other surfaces in this
+  scenario retain manual visual checks.
 
 #### E2E-079: User-facing catalog copy in English and Chinese
 
@@ -6759,6 +6772,31 @@ and identify the platform validation still needed.
 - **Status**: Source-contract and focused integration coverage; full desktop
   journey Draft (run only in a capable environment when this surface changes)
 
+#### E2E-OAUTH-anthropic-rate-limit-retry: Bounded token retries preserve the account
+
+- **Preconditions**: A local HTTP fixture intercepts only Anthropic's token URL;
+  the production pi-ai flow and Desktop `VendorOAuth` run with an in-memory Host
+  RPC fixture. No real account, browser authorization or remote endpoint is used.
+- **Steps**: Run `pnpm test:e2e:oauth-retry`. Exercise exchange and refresh
+  429 → success, repeated 429, seconds/date/malformed/over-budget `Retry-After`,
+  invalid grants (including after 429), 5xx, socket disconnect, invalid success
+  JSON, cancellation during request/body/wait, and an earlier caller deadline.
+  Resolve the same account concurrently and retry after a failed refresh.
+- **Expected**: At most three requests share one deadline and original signal;
+  no retry precedes a server hint. Only explicit 429 is retried; grant rejection
+  and ambiguous failures stop. Request grant fields and custom headers remain
+  unchanged. Failed refresh retains the old credential and releases its lock;
+  concurrent resolves rotate/write once. Failed/cancelled login removes only
+  its newly created row. HTTP/token-JSON errors contain no token-body canary, URL
+  or embedded stack and provide recovery guidance without claiming every 429
+  consumes code. Existing network-error diagnostics are unchanged.
+- **Specs linked**: `03-runtime/11-provider-model-system.md` §8a; ADR 0095.
+- **Acceptance**: B (vendor accounts), Security, Quality.
+- **Status**: All 20 local HTTP scenarios passed against the installed patch;
+  the existing 20 login/session regressions also passed. This is a pre-merge
+  transport and orchestration integration test, not live OAuth, visual UI or
+  Host persistence validation. Post-integration main E2E is NOT RUN.
+
 #### E2E-151: Multiple vendor accounts stay isolated through login, use, and removal
 
 - **Preconditions**: A build with `registerBunOAuthFlows()` running at startup
@@ -7725,6 +7763,9 @@ This test plan spec is accepted when:
 - With the stack overlapping the frameless titlebar band, hover still pauses
   the countdown and every X remains clickable instead of dragging the window.
 - Repeating the same action restarts the existing toast instead of stacking a duplicate; stack never exceeds 4.
+- Toast message text is selectable: dragging across a card highlights only
+  its message text and `Cmd/Ctrl+C` copies it, while the card icon and its X
+  dismiss control expose no selection.
 - Capture rig scenes `pi-toasts-light` / `pi-toasts-dark` show the stack in both themes.
 
 ### US-UI-55 Composer textarea growth (D089)
