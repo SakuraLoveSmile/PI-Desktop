@@ -20,6 +20,7 @@ import {
   isValidBusTopic,
   isValidBusTopicPattern,
   isNetUrlAllowed,
+  isNetSocketUrlAllowed,
   matchesBusTopic,
   matchFsGlob,
   normalizeFsPath,
@@ -82,6 +83,11 @@ import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 import { parseAllowedExternalUrl } from "./safe-open-external";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 import type { McpControlController, McpControlInvokeInput } from "./mcp-control";
+import {
+  PluginSocketError,
+  type PluginSocketEvent,
+  type PluginWebSocketRegistry,
+} from "./plugin-websocket";
 import {
   PluginShortcutError,
   type PluginShortcutEntry,
@@ -340,6 +346,12 @@ export type PluginHostServices = {
   hostEntry?: string;
   /** Overrides how a plugin host process is created; defaults to Electron utilityProcess. */
   spawnProcess?: PluginProcessSpawner;
+  /**
+   * Real-time sockets. Like the shortcut registry this is host-owned, so the
+   * egress allowlist, the bounds and the release path are all decided in the
+   * runtime rather than by plugin code.
+   */
+  pluginSockets?: PluginWebSocketRegistry;
   /** Transport overrides for plugin-declared MCP servers; tests inject stubs. */
   mcp?: Pick<
     McpServerClientOptions,
@@ -460,6 +472,9 @@ const HOST_API_ALLOWLIST = new Set([
   "browser.fill",
   "browser.evaluate",
   "browser.console",
+  "net.websocket.connect",
+  "net.websocket.send",
+  "net.websocket.close",
   "browser.cdp",
   "models.list",
   "session.getLlmContext",
@@ -1999,6 +2014,125 @@ export class PluginRuntime {
           registered: true,
         }));
       }
+      case "net.websocket.connect": {
+        this.assertPermission(loaded, "net.websocket");
+        const descriptor = (args[0] ?? {}) as {
+          url?: string;
+          headers?: Record<string, string>;
+          protocols?: string[];
+          timeoutMs?: number;
+        };
+        const url = String(descriptor.url ?? "");
+        const registry = this.services.pluginSockets;
+        if (!registry) {
+          throw apiError("UNSUPPORTED", "real-time connections are unavailable in this host");
+        }
+        // Same allowlist, same chokepoint: a socket to an undeclared host is
+        // refused before the transport is asked to open anything.
+        this.assertSocketEgress(loaded, url);
+        try {
+          const result = await registry.connect({
+            pluginId,
+            url,
+            headers: descriptor.headers,
+            protocols: descriptor.protocols,
+            timeoutMs:
+              typeof descriptor.timeoutMs === "number" ? descriptor.timeoutMs : undefined,
+          });
+          this.services.audit?.({
+            pluginId,
+            api: "net.websocket.connect",
+            ok: true,
+            ts: Date.now(),
+            url,
+            socketId: result.socketId,
+          });
+          return result;
+        } catch (error) {
+          const code =
+            error instanceof PluginSocketError ? error.code : "CONNECT_FAILED";
+          this.services.audit?.({
+            pluginId,
+            api: "net.websocket.connect",
+            ok: false,
+            errorCode: code,
+            ts: Date.now(),
+            url,
+          });
+          throw apiError(code, (error as Error).message);
+        }
+      }
+      case "net.websocket.send": {
+        this.assertPermission(loaded, "net.websocket");
+        const registry = this.services.pluginSockets;
+        if (!registry) {
+          throw apiError("UNSUPPORTED", "real-time connections are unavailable in this host");
+        }
+        const descriptor = (args[0] ?? {}) as {
+          socketId?: string;
+          data?: string | Uint8Array;
+        };
+        try {
+          registry.send({
+            pluginId,
+            socketId: String(descriptor.socketId ?? ""),
+            data: descriptor.data ?? "",
+          });
+          return { ok: true };
+        } catch (error) {
+          // Sends are frequent enough that auditing every one would drown the
+          // log; only refusals are recorded, and they name no payload.
+          if (error instanceof PluginSocketError) {
+            this.services.audit?.({
+              pluginId,
+              api: "net.websocket.send",
+              ok: false,
+              errorCode: error.code,
+              ts: Date.now(),
+            });
+            throw apiError(error.code, error.message);
+          }
+          throw error;
+        }
+      }
+      case "net.websocket.close": {
+        this.assertPermission(loaded, "net.websocket");
+        const registry = this.services.pluginSockets;
+        if (!registry) {
+          throw apiError("UNSUPPORTED", "real-time connections are unavailable in this host");
+        }
+        const descriptor = (args[0] ?? {}) as {
+          socketId?: string;
+          code?: number;
+          reason?: string;
+        };
+        try {
+          registry.close({
+            pluginId,
+            socketId: String(descriptor.socketId ?? ""),
+            code: typeof descriptor.code === "number" ? descriptor.code : undefined,
+            reason: typeof descriptor.reason === "string" ? descriptor.reason : undefined,
+          });
+          this.services.audit?.({
+            pluginId,
+            api: "net.websocket.close",
+            ok: true,
+            ts: Date.now(),
+            socketId: descriptor.socketId,
+          });
+          return { ok: true };
+        } catch (error) {
+          const code = error instanceof PluginSocketError ? error.code : "NOT_FOUND";
+          this.services.audit?.({
+            pluginId,
+            api: "net.websocket.close",
+            ok: false,
+            errorCode: code,
+            ts: Date.now(),
+          });
+          throw apiError(code, (error as Error).message);
+        }
+      }
       case "agent.registerTool": {
         this.assertPermission(loaded, "agent.tool.register");
         const descriptor = (args[0] ?? {}) as {
@@ -2526,6 +2660,9 @@ export class PluginRuntime {
     // A system-wide accelerator outlives every renderer, so it is released on
     // the same path that clears commands — disable, unload, and crash alike.
     this.services.pluginShortcuts?.releasePlugin(pluginId);
+    // Same for a real-time connection: the host owns the socket, so a plugin
+    // that is gone keeps neither the connection nor the frames still arriving.
+    this.services.pluginSockets?.releasePlugin(pluginId);
   }
 
   /**
@@ -3307,6 +3444,27 @@ export class PluginRuntime {
   private assertEgress(loaded: LoadedPlugin, url: string, api: string): void {
     const domains = this.netDomains(loaded);
     if (isNetUrlAllowed(url, domains)) return;
+    this.refuseEgress(loaded, url, api, domains);
+  }
+
+  /**
+   * The socket half of the same check: `ws` and `wss` are admissible schemes,
+   * the allowlist and the audit entry are identical, and refusing here means
+   * the transport never opens a connection to an undeclared host.
+   */
+  private assertSocketEgress(loaded: LoadedPlugin, url: string): void {
+    const domains = this.netDomains(loaded);
+    if (isNetSocketUrlAllowed(url, domains)) return;
+    this.refuseEgress(loaded, url, "net.websocket.connect", domains);
+  }
+
+  /** One refusal path for both schemes: same audit shape, same message. */
+  private refuseEgress(
+    loaded: LoadedPlugin,
+    url: string,
+    api: string,
+    domains: readonly string[],
+  ): void {
     let host = url;
     try {
       host = new URL(url).hostname || url;
@@ -3327,6 +3485,34 @@ export class PluginRuntime {
         ? `host not in manifest.net.domains: ${host}`
         : `plugin declares no manifest.net.domains; ${host} is unreachable`,
     );
+  }
+
+  /**
+   * Forward one socket event to the plugin that owns the socket, when it is
+   * still loaded. A frame that arrives after unload is dropped rather than
+   * queued for a process that no longer exists.
+   */
+  deliverSocketEvent(pluginId: string, event: PluginSocketEvent): void {
+    const loaded = this.loaded.get(pluginId);
+    if (!loaded?.child) return;
+    // Addressed to the owner only: frames are one plugin's data and must never
+    // reach another plugin's process, which a fan-out would do.
+    try {
+      loaded.child.postMessage({
+        t: "event",
+        event: `net:websocket:${event.type}`,
+        args: [event],
+      });
+    } catch (error) {
+      this.services.audit?.({
+        pluginId,
+        api: "net.websocket.deliver",
+        ok: false,
+        errorCode: "PLUGIN_UNREACHABLE",
+        message: (error as Error).message,
+        ts: Date.now(),
+      });
+    }
   }
 
   private inFlightTool(pluginId: string): PluginToolInvocation | undefined {

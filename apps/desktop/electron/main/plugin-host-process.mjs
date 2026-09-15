@@ -346,6 +346,14 @@ function buildApi() {
     },
     net: {
       fetch: (input) => call("net.fetch", [input]),
+      // Real-time connections (`net.websocket`). Frames arrive back as
+      // `net:websocket:message` host events, so a plugin subscribes with
+      // `pi.events.on` exactly as it does for any other host event.
+      websocket: {
+        connect: (input) => call("net.websocket.connect", [input ?? {}]),
+        send: (input) => call("net.websocket.send", [input ?? {}]),
+        close: (input) => call("net.websocket.close", [input ?? {}]),
+      },
     },
     // System-wide accelerators. The arrow handlers live in the host: this
     // object only carries requests across the boundary.

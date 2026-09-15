@@ -33,6 +33,7 @@ import { pluginWorkspaceInfo } from "../workspace-roots";
 import { createDesktopConsentService } from "../plugin-desktop-consent";
 import { PluginRuntime } from "../plugin-runtime";
 import { PluginShortcutRegistry } from "../plugin-shortcut-registry";
+import { PluginWebSocketRegistry } from "../plugin-websocket";
 import { hostGlobalShortcutBindings } from "../bootstrap/launcher";
 import { UserMcpRuntime } from "../user-mcp";
 import {
@@ -180,6 +181,7 @@ export function createPluginServices({
       globalShortcut.unregister(accelerator);
     },
     // Late-bound: the runtime is constructed just below, and a trigger can
+    // Late-bound: the runtime is constructed just below, and a trigger can
     // only arrive once the app is running and a plugin holds a shortcut.
     onTrigger: (entry) => {
       void plugins.triggerPluginShortcut(entry);
@@ -187,8 +189,17 @@ export function createPluginServices({
     onRefused: (info) =>
       logger.app("plugin", "warn", "plugin global shortcut refused", { data: info }),
   });
+  /**
+   * Real-time sockets for plugins. The transport is `ws`, wrapped by a registry
+   * that owns the budget, the bounds, and the release path; events are routed
+   * to the owning plugin's process only.
+   */
+  const pluginSockets = new PluginWebSocketRegistry({
+    onEvent: (pluginId, event) => plugins.deliverSocketEvent(pluginId, event),
+  });
   const plugins: PluginRuntime = new PluginRuntime({
     pluginShortcuts,
+    pluginSockets,
     getWorkspacePath: () => {
       // Filled after host boots; temporary stub until services rebinding.
       return null;

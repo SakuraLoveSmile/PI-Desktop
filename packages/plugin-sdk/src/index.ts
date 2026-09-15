@@ -1656,6 +1656,7 @@ export {
   isLocalNetDomain,
   isNetHostAllowed,
   isNetUrlAllowed,
+  isNetSocketUrlAllowed,
   parseNetDomains,
   type PluginNetDomain,
 } from "./net-policy.js";
