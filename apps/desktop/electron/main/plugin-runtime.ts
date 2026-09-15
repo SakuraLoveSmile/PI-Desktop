@@ -475,6 +475,16 @@ const HOST_API_ALLOWLIST = new Set([
   "net.websocket.connect",
   "net.websocket.send",
   "net.websocket.close",
+  "audio.getInputDevices",
+  "audio.openInput",
+  "audio.closeInput",
+  "audio.getCaptureState",
+  "audio.onInputFrame",
+  "audio.offInputFrame",
+  "audio.openOutput",
+  "audio.writeOutput",
+  "audio.stopOutput",
+  "audio.closeOutput",
   "browser.cdp",
   "models.list",
   "session.getLlmContext",
@@ -4116,6 +4126,27 @@ export class PluginRuntime {
   }
 
   /** Host-side implementation of the allowlisted APIs; shared with panel bridge. */
+  /**
+   * The audio surface fails closed. The permission gate runs first, so an
+   * ungranted plugin gets the same `PERMISSION_DENIED` as any other API, and a
+   * granted one gets an audited `UNSUPPORTED` instead of a silent success or an
+   * uncoded crash. Nothing here touches a device.
+   */
+  private refuseAudio(loaded: LoadedPlugin, api: string): never {
+    this.assertPermission(
+      loaded,
+      AUDIO_PLAYBACK_APIS.has(api) ? "audio.playback.background" : "audio.capture.background",
+    );
+    this.services.audit?.({
+      pluginId: loaded.manifest.id,
+      api,
+      ok: false,
+      errorCode: "UNSUPPORTED",
+      ts: Date.now(),
+    });
+    throw apiError("UNSUPPORTED", `host api not available: ${api}`);
+  }
+
   private hostApi(loaded: LoadedPlugin) {
     const pluginId = loaded.manifest.id;
     const pluginPath = loaded.path;
@@ -4984,6 +5015,25 @@ export class PluginRuntime {
           });
         },
       },
+      /**
+       * Background audio is declared, gated, and not implemented: the host has
+       * no device backend yet, so every call runs the permission gate and then
+       * answers with a coded `UNSUPPORTED`. That is the contract a plugin can
+       * branch on — without it a call would fail as a bare `TypeError` with no
+       * `code` at all, and nothing would reach the audit log.
+       */
+      audio: {
+        getInputDevices: async () => this.refuseAudio(loaded, "audio.getInputDevices"),
+        openInput: async () => this.refuseAudio(loaded, "audio.openInput"),
+        closeInput: async () => this.refuseAudio(loaded, "audio.closeInput"),
+        getCaptureState: async () => this.refuseAudio(loaded, "audio.getCaptureState"),
+        onInputFrame: async () => this.refuseAudio(loaded, "audio.onInputFrame"),
+        offInputFrame: async () => this.refuseAudio(loaded, "audio.offInputFrame"),
+        openOutput: async () => this.refuseAudio(loaded, "audio.openOutput"),
+        writeOutput: async () => this.refuseAudio(loaded, "audio.writeOutput"),
+        stopOutput: async () => this.refuseAudio(loaded, "audio.stopOutput"),
+        closeOutput: async () => this.refuseAudio(loaded, "audio.closeOutput"),
+      },
       net: {
         fetch: async (input: {
           url: string;
@@ -5208,3 +5258,15 @@ export class PluginRuntime {
     };
   }
 }
+
+/**
+ * Which audio permission each declared method belongs to. Capture and playback
+ * are separate grants, so a playback-only plugin must not be told that a
+ * capture method exists.
+ */
+const AUDIO_PLAYBACK_APIS = new Set([
+  "audio.openOutput",
+  "audio.writeOutput",
+  "audio.stopOutput",
+  "audio.closeOutput",
+]);
