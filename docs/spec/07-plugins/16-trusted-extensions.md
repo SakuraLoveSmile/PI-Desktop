@@ -201,7 +201,7 @@ unsupported ones.
 
 | Class | Members |
 |---|---|
-| Supported | `registerTool`, `registerCommand`, `registerAgent`, `registerProvider` (plugin-owned streaming compatibility alias), `unregisterAgent`, `unregisterProvider`, `on(...)` for every event in §6, `exec`, `getActiveTools`, `getAllTools`, `setActiveTools`, `getCommands`, `setModel` (configured models and plugin agents; idle-only; persists the current session binding), `getThinkingLevel`, `setThinkingLevel`, `setSessionName`, `getSessionName`, `sendUserMessage` (Host-owned queue, D386), `getFlag` |
+| Supported | `registerTool`, `registerCommand`, `registerAgent`, `registerProvider` (plugin-owned compatibility alias; same shape as `registerAgent`), `unregisterAgent`, `unregisterProvider`, `on(...)` for every event in §6, `exec`, `getActiveTools`, `getAllTools`, `setActiveTools`, `getCommands`, `setModel` (configured models and plugin agents; idle-only; persists the current session binding), `getThinkingLevel`, `setThinkingLevel`, `setSessionName`, `getSessionName`, `sendUserMessage` (Host-owned queue, D386), `getFlag` |
 | Supported on context | `ui.notify`, `ui.confirm`, `ui.select`, `ui.input`, `ui.setStatus`, `ui.setWorkingMessage`, `cwd`, `modelRegistry`, `isIdle`, `abort`, `hasPendingMessages`, `getContextUsage`, `compact`, `getSystemPrompt`, `waitForIdle`, `newSession`, `fork` |
 | Deferred to v2 | `sendMessage`, `appendEntry`, `setLabel`, `sessionManager` read API, `switchSession`, `registerShortcut`, `registerMarkdownTransformer`, `ui.setEditorText`, `ui.getEditorText`, `ui.addAutocompleteProvider`, `registerFlag` value editing |
 | Unsupported | `ui.setWidget`, `ui.setFooter`, `ui.setHeader`, `ui.setTitle`, `ui.custom`, `ui.overlay`, `ui.onTerminalInput`, `ui.setWorkingVisible`, `ui.setWorkingIndicator`, `ui.setHiddenThinkingLabel`, `ui.pasteToEditor`, `ui.editor`, `registerMessageRenderer`, `registerEntryRenderer`, `navigateTree`, `shutdown` |
@@ -219,8 +219,10 @@ successful idle `setModel` persists that provider/model pair through
 agent implementation. `modelRegistry` exposes only models and auth availability;
 it never exposes Host API keys, secret refs, OAuth tokens, arbitrary Host headers,
 or Host provider internals. `registerProvider` and its unregister counterpart
-accept the same plugin-owned stream shape as a compatibility alias; provider
-credentials in the upstream config are ignored by Host and are not persisted.
+accept the same plugin-owned shape as a compatibility alias — a `stream` or
+`complete` implementation, in the upstream `(id, config)` form and in the object
+form; provider credentials in the upstream config are ignored by Host and are
+not persisted.
 
 Neutral values: `getFlag` returns the declared default; `registerFlag` records
 the declaration so `getFlag` works but exposes no CLI or UI in v1;
