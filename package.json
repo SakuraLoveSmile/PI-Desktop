@@ -25,6 +25,7 @@
     "test:e2e:plan-ui": "node scripts/e2e-plan-ui.mjs",
     "test:e2e:composer-paste": "node scripts/e2e-composer-paste.mjs",
     "test:e2e:transcript": "node scripts/e2e-transcript-render.mjs",
+    "test:e2e:provider-api-style": "node scripts/e2e-provider-api-style.mjs",
     "test:e2e:native-side-chat": "node scripts/e2e-native-side-chat.mjs",
     "test:e2e:boot": "node scripts/e2e-electron-boot.mjs",
     "test:e2e:layout": "node scripts/e2e-three-column-layout.mjs",

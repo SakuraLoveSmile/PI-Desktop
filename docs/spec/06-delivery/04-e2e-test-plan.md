@@ -7037,6 +7037,34 @@ and identify the platform validation still needed.
   destination; it passed 37/37 checks from integrated main `d6ffaa3b`. No
   external marketplace or live model was required.
 
+#### E2E-PROVIDER-custom-form-excludes-account-formats: Keep account APIs out of new custom services
+
+- **Preconditions**: Isolated profile, English and Simplified Chinese. Seed
+  non-OAuth legacy rows using Codex and Pi account formats, including an OpenAI
+  preset URL; use synthetic models and no real credentials.
+- **Steps**: 1) Add a Custom service and inspect its format choices. 2) Edit each
+  legacy row and save unchanged, then explicitly select Responses and save.
+  3) Copy each original legacy row, inspect the current format and explanatory
+  hint, wait past discovery debounce, and cancel. 4) Copy again, choose Anthropic
+  Messages and save. 5) Check saved payloads and the unchanged source row.
+- **Expected**: New custom choices are the four general protocols; Codex and Pi
+  are available through vendor accounts, not as new API-key choices. Legacy
+  editing preserves format, name, URL and authentication unless explicitly
+  changed. A copied account format is visible but cannot be newly selected;
+  saving and discovery are blocked until an explicit supported choice. The
+  explanation is localized. Cancel performs no create; a valid copy never uses
+  the source id or credentials. Named OpenCode Go and OAuth account flows remain
+  unchanged.
+- **Automation**: `pnpm test:e2e:provider-api-style` renders the production React
+  form in Electron/Chromium with a stubbed API boundary and checks exact create,
+  update and discovery payloads. This does not verify Host storage or live OAuth.
+- **Specs linked**: `03-runtime/12-provider-config-schema.md`, ADR 0095.
+- **Acceptance**: B (model configuration), Security.
+- **Status**: Helper/copy regressions passed. The branch Electron/React scenario
+  passed in English and Simplified Chinese: six scenario groups, four creates
+  and eight updates through the stubbed API. Host persistence, live OAuth/model
+  calls and visual layout were not exercised. Post-integration main E2E is NOT RUN.
+
 #### E2E-PROVIDER-copy-config-without-credentials: Copy configuration into an independent provider
 
 - **Preconditions**: Settings contains an ordinary provider with a saved API
