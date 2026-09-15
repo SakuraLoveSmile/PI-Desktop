@@ -2583,7 +2583,7 @@ identify the platform validation still needed.
 - **Preconditions**: A plugin with `ui.theme` that can drive `pi.app.setTheme` and `pi.themes.upsert` / `remove` (panel or command). Settings → General shows the searchable theme picker.
 - **Steps**: 1) From the plugin UI, call `themes.upsert` with a new theme id and distinct CSS. 2) Confirm the theme appears in Settings without reload/disable. 3) Call `app.setTheme` to select it. 4) Call `themes.upsert` again with different CSS while it is active. 5) Call `themes.remove` on an inactive theme. 6) Call `app.setTheme` with an unknown id. 7) Upsert a ninth theme (former hard cap was 8).
 - **Expected**: The new theme is listed and applies immediately through the same path as Settings; live CSS edits restyle the shell without plugin reload; remove drops the picker row and the event refreshes the list; an unknown id rejects with `INVALID_ARGUMENT` and leaves the preference unchanged; the ninth theme is accepted. `settingsChanged` reaches the renderer store; `appearance:changed` reaches open panels.
-- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/12-plugin-ipc-and-host-services.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0249, D417
+- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/12-plugin-ipc-and-host-services.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0260, D417
 - **Acceptance**: G (theme contribution) + Security
 - **Status**: Unit-covered (`plugin-themes.test.mjs`); interactive scenario Draft
 
@@ -2592,7 +2592,7 @@ identify the platform validation still needed.
 - **Preconditions**: A plugin theme that sets `--ds-bg-sidebar` to a solid color and `--ds-bg-sidebar-image` to a `linear-gradient(...)`; Windows/Linux and macOS shells.
 - **Steps**: 1) Select the theme. 2) Inspect the sidebar plate and rail. 3) Confirm borders/glass tint still resolve from the color token. 4) Switch back to a built-in theme.
 - **Expected**: The gradient paints as `background-image` over the color plate on all platforms; macOS sheen still overlays the image layer; borders and `color-mix` consumers do not break; clearing the token returns the plain sidebar.
-- **Specs linked**: `04-ux/07-ui-design-system.md`, ADR 0249, D417
+- **Specs linked**: `04-ux/07-ui-design-system.md`, ADR 0260, D417
 - **Acceptance**: Visual / platform
 - **Status**: CSS unit contracts in `plugin-themes.test.mjs`; visual scenario Draft
 
@@ -7022,11 +7022,11 @@ identify the platform validation still needed.
   channel, is user-disableable, cannot be uninstalled, and survives restart. Its
   host-mediated actions obey the declared `fs.read` scope, and its own reads and
   writes stay inside the jail of the one project folder it is browsing
-  (ADR 0241, ADR 0252).
+  (ADR 0241, ADR 0263).
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
   `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0109, ADR 0111,
-  ADR 0169, ADR 0241, ADR 0249, ADR 0252
+  ADR 0169, ADR 0241, ADR 0249, ADR 0263
 - **Acceptance**: G (plugins), D (workspace), Security, Quality
 - **Milestone**: M6+
 - **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`
@@ -7063,7 +7063,7 @@ identify the platform validation still needed.
   restart, and a manual expansion holds until the next host open request
   collapses it again.
 - **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4/§5,
-  `04-ux/08-component-spec.md` §5.2.2, ADR 0104, ADR 0241, ADR 0251
+  `04-ux/08-component-spec.md` §5.2.2, ADR 0104, ADR 0241, ADR 0262
 - **Acceptance**: G (plugins), Quality
 - **Milestone**: M6+
 - **Status**: The bundle's manifest, entry page, and upstream checksum are
@@ -7099,7 +7099,7 @@ identify the platform validation still needed.
     that one folder, and a single-folder project offers just its one folder.
   - Switching folders changes only what this view browses: the app's visible
     workspace, the agent's tool roots, the session's primary path, project
-    instructions, and project memory are all unchanged (ADR 0252).
+    instructions, and project memory are all unchanged (ADR 0263).
   - The choice is remembered per project: it survives closing and reopening the
     view and a full app restart, and the other project keeps its own folder.
   - Both chat references open in this view on the file they name — the one from
@@ -7110,9 +7110,9 @@ identify the platform validation still needed.
   - The two system actions reach the file that was clicked, in the folder being
     browsed: a file only the second folder holds opens or reveals its real self
     instead of reporting "not found", and the file whose name both folders share
-    opens the second folder's copy, not the primary folder's (ADR 0253).
+    opens the second folder's copy, not the primary folder's (ADR 0264).
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
-  `04-ux/08-component-spec.md` §5.2.2, ADR 0241, ADR 0249, ADR 0252, ADR 0253
+  `04-ux/08-component-spec.md` §5.2.2, ADR 0241, ADR 0249, ADR 0263, ADR 0264
 - **Acceptance**: G (plugins), Security, Quality
 - **Milestone**: M6+
 - **Status**: The host-side resolution and addressing are unit-covered
@@ -10081,12 +10081,12 @@ are withdrawn with ADR 0165.
     the File Manager view on that file: completion searches the whole project
     group, primary folder first, and a sibling-folder file is addressed by
     absolute path because a relative path always means the primary folder
-    (ADR 0252).
+    (ADR 0263).
   - The persisted user message still contains the canonical `@path` text for
     the agent.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3 / §11.8,
   `04-ux/09-interaction-patterns.md` §8a.2, `03-runtime/01-ipc-protocol.md`,
-  ADR 0163, ADR 0241, ADR 0251, ADR 0252, `08-meta/decisions-log.md` (D320)
+  ADR 0163, ADR 0241, ADR 0262, ADR 0263, `08-meta/decisions-log.md` (D320)
 - **Acceptance**: C (conversation & stream), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`chat-links.test.mjs`, `transcript-file-chips.test.mjs`,
@@ -10123,17 +10123,17 @@ are withdrawn with ADR 0165.
   - `only-here.ts` opens the second folder's `lib/only-here.ts`: the primary
     folder is searched first and to exhaustion, then the project group's other
     folders in the group's own order, and the match names the folder that
-    answered (ADR 0252).
+    answered (ADR 0263).
   - A file that answered from a sibling folder is addressed to the work panel by
     its absolute path, while a primary-folder file stays project-relative
-    (ADR 0252).
+    (ADR 0263).
   - A reference that matches nothing raises an error toast reading
     `No file matches missing-helper.js` and opens nothing: no new work-panel
     tab, no empty panel, no blank side-browser page, and the work panel and
     transcript keep the content they already had.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` § fs,
   `04-ux/09-interaction-patterns.md` §8a.2, ADR 0124, ADR 0163, ADR 0249,
-  ADR 0251, ADR 0252
+  ADR 0262, ADR 0263
 - **Acceptance**: C (conversation & stream), D (workspace), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered
@@ -10167,18 +10167,18 @@ are withdrawn with ADR 0165.
     work-panel side browser, from the assistant reply and the user chip alike; a
     page in a sibling folder is a project file like any other and opens in the
     File Manager view, because the side browser is rooted at the primary folder
-    (ADR 0252).
+    (ADR 0263).
   - A reference that resolved in the project's second folder opens in the File
     Manager view on that file, reached by its absolute path, with no host
     `file:` tab; the reference from the primary folder opens in that same view
-    addressed project-relative (ADR 0252).
+    addressed project-relative (ADR 0263).
   - With the plugin disabled, a project file reference falls back to the host
     `file:` tab — the surface the click used before, which now also reaches the
     project's other folders — instead of opening nothing; re-enabling the plugin
     restores the File Manager destination.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3,
   `04-ux/09-interaction-patterns.md` §8a.2, ADR 0104, ADR 0163, ADR 0241,
-  ADR 0249, ADR 0251, ADR 0252
+  ADR 0249, ADR 0262, ADR 0263
 - **Acceptance**: C (conversation & stream), G (plugins), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered

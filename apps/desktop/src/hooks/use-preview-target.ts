@@ -91,7 +91,7 @@ export function useOpenChatFileRef() {
         if (match.root === "workspace") {
           // A project group can hold several folders, and a relative path always
           // means the primary one, so a file from a sibling folder travels by its
-          // absolute path and the file view switches to that folder (ADR 0252).
+          // absolute path and the file view switches to that folder (ADR 0263).
           const inPrimary = match.projectRoot ? match.projectRoot.primary : true;
           const target = inPrimary ? match.relativePath : match.absolutePath;
           if (inPrimary && isHtmlFilePath(match.relativePath)) {

@@ -891,17 +891,17 @@ entirely inside the plugin's isolated page:
   independently of what the app shows as the workspace. The switch is
   plugin-local — it changes neither the visible workspace, nor the agent's tool
   roots, nor a session's primary path, nor project instructions or memory
-  (ADR 0252). Its own context-menu actions follow that choice: a file of a sibling
+  (ADR 0263). Its own context-menu actions follow that choice: a file of a sibling
   folder is handed to the host as an absolute path, so opening it with the system
   default app or revealing it reaches the file in the folder being browsed
-  (ADR 0253).
+  (ADR 0264).
 - The page follows `app.getAppearance` and `appearance:changed` for base theme
   and English/Simplified Chinese copy, and `workspace:changed` for the open
   project and its folder list. `workspace.get`, `app.getAppearance`,
   `fs.openDefault`, and `fs.reveal` are the only host channels it calls; its own
   reads and writes go through its host process, which keeps the jail of the one
   folder the view is browsing — never the whole group — refuses credential
-  paths, and records writes to its own audit log (ADR 0241, ADR 0252).
+  paths, and records writes to its own audit log (ADR 0241, ADR 0263).
 
 ### 5.3 States
 
@@ -1498,7 +1498,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   than rendering a chip that could never open — containment is unchanged
   (D322). Clicking a chip
    completes the reference through `pi-desktop/fs/resolveRef` — the whole open
-   project is searched, its group's folders primary first (ADR 0252) — and opens
+   project is searched, its group's folders primary first (ADR 0263) — and opens
    where it resolved: a project file in the bundled `pi.file-manager` work-panel
    view (the host `file:` tab when that view is unavailable), a session-scratch
    or attachment file in the host `file:` tab, and a `.html`/`.htm` page of the
@@ -1519,7 +1519,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   content width. Workspace file paths in that markdown are previewable:
   inline code, markdown links, and bare path tokens (with a known
   extension) complete and open like a chip against every folder of the open
-  project (ADR 0252): the resolved file in the bundled
+  project (ADR 0263): the resolved file in the bundled
   `pi.file-manager` view (the host `file:` tab without it), a `.html`/`.htm`
   page of the primary folder in the side browser, and nothing plus a report when
   the reference matches no file. Local markdown images render
@@ -2824,7 +2824,7 @@ Anatomy:
 - Sent `@path` file references (quoted or unquoted) render as the same compact
   leaf-name chip as the draft. Clicking one completes the reference through
   `pi-desktop/fs/resolveRef` — against the whole open project, its group's
-  folders primary first (ADR 0252) — and opens where it resolved: a project file
+  folders primary first (ADR 0263) — and opens where it resolved: a project file
   in the bundled `pi.file-manager` view (the host `file:` tab when that view is
   unavailable), a session-scratch or attachment file in the host `file:` tab,
   and a `.html`/`.htm` page of the primary folder in the side browser. A

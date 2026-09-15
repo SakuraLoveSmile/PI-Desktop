@@ -1562,7 +1562,7 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   `attachments/<sha256>` blobs and absolute paths already inside the
   workspace, `<data_dir>/scratch/`, or `<data_dir>/attachments/` are also
   accepted after a realpath check (D334 / ADR 0172), as is an absolute path in
-  another folder of the same project group (ADR 0249 §5, ADR 0252). A known
+  another folder of the same project group (ADR 0249 §5, ADR 0263). A known
   image extension wins over `mimeType`; extension-less blobs accept only the
   image MIME allowlist. Traversal, `~`, and other escapes are rejected
   (`INVALID_ARGUMENT`).
@@ -1589,12 +1589,12 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   (`<data_dir>/scratch/<sessionId>/`, ADR 0124) second, the attachment store
   last — and the first root that answers wins. The project is the folder group
   behind the open workspace (ADR 0249): its primary folder answers before its
-  other folders, which are then searched in the group's own order (ADR 0252),
+  other folders, which are then searched in the group's own order (ADR 0263),
   so a shorthand resolves in a sibling folder as readily as in the primary one,
   and the match names the folder that answered. Inside one root an exact path
   beats a shorthand; among shorthands the longest matching tail wins, then the
   shallowest path. The files-panel ignore set applies. A reference that matches
-  nothing returns `match: null`; resolving never opens anything (ADR 0251).
+  nothing returns `match: null`; resolving never opens anything (ADR 0262).
 - `fs/list` stays workspace-only; traversal outside is rejected
   (`INVALID_ARGUMENT`).
 
