@@ -61,6 +61,14 @@ function skip(id, detail) {
   console.log(`SKIP ${id} — ${detail}`);
 }
 
+// The Host stores a project path in its canonical spelling
+// (`db::canonical_project_path`): the directory is resolved and the separators are
+// normalized, so `projects.list` reports forward slashes on every platform.
+// Compare list output against that spelling — a native `realpathSync` path never
+// equals it on Windows, which is how the project "removed / still there" clauses
+// passed for the wrong reason.
+const storedProjectPath = (path) => realpathSync(path).replace(/\\/g, "/");
+
 class Host {
   constructor(bin, dataDir) {
     if (process.env.DEBUG_HOST) {
@@ -416,6 +424,10 @@ async function main() {
       await host.call("projects.create", { path: removedProjectDir });
       await host.call("projects.create", { path: keptProjectDir });
       // projects.list stores the canonical spelling (db.rs canonical_project_path).
+      // Keep the request paths platform-native, the way a real client sends them,
+      // and compare list output against the stored spelling (`storedProjectPath`).
+      const removedProjectStored = storedProjectPath(removedProjectDir);
+      const keptProjectStored = storedProjectPath(keptProjectDir);
       const removedProjectPath = realpathSync(removedProjectDir);
       const keptProjectPath = realpathSync(keptProjectDir);
 
@@ -482,10 +494,10 @@ async function main() {
           removal.removed === true &&
           removal.sessionsRemoved === 2 &&
           projectsAfter.projects.every(
-            (project) => project.path !== removedProjectPath,
+            (project) => project.path !== removedProjectStored,
           ) &&
           projectsAfter.projects.some(
-            (project) => project.path === keptProjectPath,
+            (project) => project.path === keptProjectStored,
           ) &&
           sessionsAfter.sessions.every(
             (session) => !deletedSessionIds.includes(session.id),
@@ -510,6 +522,7 @@ async function main() {
       mkdirSync(busyProjectDir, { recursive: true });
       await host.call("projects.create", { path: busyProjectDir });
       const busyProjectPath = realpathSync(busyProjectDir);
+      const busyProjectStored = storedProjectPath(busyProjectDir);
       const busySession = await host.call("session.create", {
         title: "E2E busy session",
         mode: "agent",
@@ -531,7 +544,7 @@ async function main() {
         refusal?.code === 1008 && refusal?.data?.errorCode === "CONFLICT";
       const nothingDeleted =
         projectsWhileBusy.projects.some(
-          (project) => project.path === busyProjectPath,
+          (project) => project.path === busyProjectStored,
         ) &&
         sessionsWhileBusy.sessions.some(
           (session) => session.id === busySession.session.id,

@@ -1251,6 +1251,13 @@ Project drag/drop follows these patterns:
   chip whose reference matches nothing opens nothing and reports itself; the OS
   default application is no longer what this click does, though that action
   stays reachable from the file view's own context menu.
+- The same destination rule governs every other surface of the transcript that
+  names a file, because one opener serves them all: clicking the file path in a
+  tool row's summary (Read, Write, Edit, fetch) and clicking a path in a tool
+  result's file or match list both complete the reference the same way and open
+  where it resolved (ADR 0262). A tool surface therefore picks no destination of
+  its own, and a reference it cannot resolve reports itself instead of opening a
+  panel.
 
 ### 8a.3 Keyboard while open
 

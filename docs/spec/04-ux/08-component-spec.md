@@ -1993,6 +1993,16 @@ twice.
 - Click the row: expand/collapse the result blocks. Tool-call details are
   collapsed by default while a live group is open; historical and failed rows
   remain collapsed until the user opens them.
+- A file path that a row or its result names is a link, not decoration: clicking
+  the summary path of a `Read`, `Write`, `Edit`, or `fetch` row, or a path in a
+  result's file list or match groups, completes the reference through the same
+  opener a chat chip uses (`pi-desktop/fs/resolveRef`) and opens where it
+  resolved — a project file in the bundled `pi.file-manager` view, a
+  session-scratch or attachment file in the host `file:` tab, and a `.html` /
+  `.htm` page of the project's primary folder in the side browser (ADR 0262,
+  ADR 0263). Such a click opens the file instead of toggling the row's
+  disclosure, and a reference that matches nothing reports itself without
+  opening a panel. A tool surface picks no destination of its own.
 - Click the processing header: expand/collapse the ordered activity list.
   Historical groups default collapsed; the latest active group opens while the
   turn is running and closes when it settles if the user has not touched it.
@@ -2552,14 +2562,29 @@ reasoning-level control.
   timer, and clearing or sending a draft never changes the guidance.
 - Escape: when textarea focused, clears input or blurs (not abort)
 - Send while running: clears the current draft and appends one FIFO row to the
-  active session's in-memory queue when the draft has content or saved annotations. The row is sent
-  as a new normal prompt only after the current run reaches `agent_end`; a
-  different session's queue is not affected by switching sessions. Running
-  with an empty draft and no saved annotations changes this same submit slot to
-  Stop. Clear both draft and annotations to expose the immediate-stop action.
-- Send now: moves the selected row to the head, requests `agent/stop`, and
-  releases it after the current reply/tool batch completes normally. It then
-  starts before the remaining FIFO rows. When idle, Send now sends immediately.
+  active session's Host-owned queue when the draft has content or saved
+  annotations. The row is sent as a new normal prompt only after the current run
+  reaches `agent_end`; a different session's queue is not affected by switching
+  sessions. Running with an empty draft and no saved annotations changes this
+  same submit slot to Stop. Clear both draft and annotations to expose the
+  immediate-stop action.
+- Queued row: the text, then move up, move down, Send now, edit, and remove.
+  Move up/down swaps the row with its adjacent waiting neighbour and mirrors the
+  Host's durable `position`; at the waiting-block boundary it is a no-op and
+  never crosses into the promoted block. Edit removes the row and returns its
+  captured draft — text plus inline file-reference chips — to the composer;
+  while the input is non-empty (or holds attachments) the action is refused with
+  a toast and nothing changes. Remove drops the row immediately.
+- Send now: promotes the row to the end of the session's priority block, so a
+  second Send now leaves behind the first instead of replacing it at the head.
+  It then requests `agent/stop`, and the promoted block is released after the
+  current reply/tool batch completes normally, before every waiting row. The
+  first promoted row starts the turn and the rest join it as adjacent user
+  messages, so the block is answered once. When idle it starts immediately.
+- A promoted row is locked: move up/down, edit, and remove are disabled with
+  their tooltip and `aria-disabled` state intact, and the Send now button reads
+  as already decided (`chat.sendNowPending`). The row carries a distinct
+  promoted surface so it is not mistaken for another waiting row.
 - Stop: the single submit slot is shown only while a turn is running and the
   draft is empty and there are no saved annotations. It stops the running turn
   and cancels pending permission.
@@ -2569,8 +2594,9 @@ reasoning-level control.
   returns to the textarea and file references return as leaf-name chips; their
   canonical paths never become textarea text. After a reply begins, Abort keeps
   the partial transcript and restores no draft.
-- Stop never clears queued prompts. Removing a row is explicit, and queue state
-  is renderer-local and intentionally not persisted across restart.
+- Stop never clears queued prompts. Removing a row is explicit; the queue itself
+  is Host-owned and durable (D386 / ADR 0213, ADR 0265), so a restart restores it
+  in delivery order, held until the desktop attaches as the owner.
 - `turn_end` is not an idle signal. Send and host persistence remain blocked
   through subsequent tool turns and blocking automatic checkpoint generation
   until `agent_end` or `error`; the draft and runtime selectors stay editable
