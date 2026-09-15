@@ -108,6 +108,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - 设置/输入框/插件搜索的主题表面：先运行 `pnpm build:js`，再运行
   `pnpm test:e2e:theme-surfaces`。
 - 输入框剪贴板表示与文本插入：`pnpm test:e2e:composer-paste`。
+- 输入框斜杠菜单名称/描述布局：先运行 `pnpm build:js`，再运行
+  `pnpm test:e2e:composer-autocomplete`。
 - 聊天记录渲染边界和跨活动段委派显示：`pnpm test:e2e:transcript`。
 - Plan host/runtime：`pnpm test:e2e` 和 `pnpm test:e2e:plan`。
 - Plan UI：`pnpm test:e2e:plan` 和 `pnpm test:e2e:plan-ui`。
@@ -672,16 +674,23 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - **先决条件**：英文和简体中文语言环境可用；已配置提供商；可以打开空首页和两个会话。
 - **步骤**：1）在空首页记录欢迎占位符，并等待超过 4 秒确认其不变。2）打开会话 A，记录提示，
   输入并清空文本、聚焦并失焦文本区域后等待，确认文案不变。3）切换到会话 B，再切回 A，
-  分别记录提示变化。4）在首页和会话间切换，检查命令/文件和快捷键提示。5）输入 `/` 并检查斜杠菜单。
+  分别记录提示变化。4）在首页和会话间切换，检查命令/文件和快捷键提示。5）输入 `/` 并检查斜杠菜单，包含英文/中文长描述、短描述、无描述、
+  独立标题和参数提示以及超长斜杠名称的 Skill；再检查 `@` 模式中的长文件名。
+  在 1040px 和 1680px 视口、320px 和 640px 输入框宽度下重复。
   6）切换到 zh-CN，重复上下文切换检查。
 - **预期**：首次渲染的上下文从欢迎语开始，在页面/会话上下文变化前保持不变。每次上下文切换才推进到
   下一条本地化命令/文件或快捷键提示，并使用透明度渐变；不存在计时器驱动的变化。快捷键提示包含
   Shift+Enter 和提交提示，命令/文件提示包含 `/` 和 `@`。斜杠菜单仍包含 `/new`、`/compact`、`/agent-mode`、
   `/plan-mode` 和 `/goal-mode`。zh-CN 显示对应文案，包括 `Shift+Enter 换行 · 点击发送提交`。
+  长描述只使用命令名称和提示之后的剩余空间，短名称始终完整可见。描述和超长名称
+  在行内省略，不产生横向溢出；文件名仍使用可用行宽。名称高亮、点击接受及输入框
+  保持焦点的行为不变。
 - **链接规格**：`04-ux/08-component-spec.md`（§11）、`04-ux/04-builtin-commands.md`（§7）
 - **验收**：C（发送/UI）、本地化、质量
 - **里程碑**：M2
-- **状态**：源代码覆盖（`composer-placeholder-context.test.mjs`）；完整 UI 场景草案
+- **状态**：源代码覆盖（`composer-placeholder-context.test.mjs`）；斜杠菜单布局由 `pnpm build:js`
+  后运行 `pnpm test:e2e:composer-autocomplete` 覆盖（真实 React/Chromium、生产 CSS、
+  确定性命令夹具，无需提供商）。完整提供商/会话场景仍为草案；分支执行不替代合并后 E2E
 
 #### E2E-089：Composer 模型菜单向上打开并切换模型
 
