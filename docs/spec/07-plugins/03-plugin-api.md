@@ -57,7 +57,7 @@ receive live updates on the `appearance:changed` event (below). On hosts older
 than the channel, the call rejects with `UNSUPPORTED`; panels should fall back
 to the OS preference and their own in-panel choice.
 
-`app.setTheme` (requires `ui.theme`, ADR 0249) applies the app theme
+`app.setTheme` (requires `ui.theme`, ADR 0260) applies the app theme
 preference the Settings picker writes. It accepts a built-in preference or a
 currently registered plugin theme id; unknown ids reject with
 `INVALID_ARGUMENT`. The host persists `AppSettings.theme`, refreshes native
@@ -66,7 +66,7 @@ chrome / panel appearance, and emits `settingsChanged` to the renderer.
 ### themes (requires `ui.theme`)
 
 Runtime registry for the calling plugin's own themes. Works in production
-without unload/reload (ADR 0249).
+without unload/reload (ADR 0260).
 
 ```ts
 pi.themes.upsert(input: {
@@ -204,7 +204,7 @@ pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 `workspace.get` answers with the primary root — `path` and its leaf `name`,
 both unchanged — plus, when that folder belongs to a project group (ADR 0249),
 `projectId` and `roots`: every registered folder of the group in its own order,
-primary first, each `{ path, name, primary }` (ADR 0252). `workspace:changed`
+primary first, each `{ path, name, primary }` (ADR 0263). `workspace:changed`
 carries the same object, and main answers both from the host-owned group
 records, so the event and the pull cannot disagree. A host that cannot resolve
 the group omits `projectId` and `roots` — the same `{ path, name }` a plugin
@@ -222,7 +222,7 @@ deny-list, and scope checks as `fs.readText`; directories are rejected. The host
 audits the operation. A path is root-relative by default, and an absolute path is
 accepted only by this action and `fs.reveal` (no other mode takes one) when it lies
 inside a registered folder root of the open project — which then becomes the
-containment base for the request (ADR 0249 §5, ADR 0253). That is the shape a view
+containment base for the request (ADR 0249 §5, ADR 0264). That is the shape a view
 uses to name a file in a project folder other than the primary one.
 
 `fs.reveal` reveals one existing readable file in the operating system's file
@@ -230,7 +230,7 @@ manager and selects it when the platform supports that behavior. It uses the
 same `fs.read` checks, rejects directories, and audits both success and failure.
 It takes a path exactly as `fs.openDefault` does: root-relative by default, and
 absolute when the file lies inside another registered folder root of the open
-project (ADR 0253).
+project (ADR 0264).
 
 `fs.stat` returns the size and modification time of one existing readable file
 without loading its contents. `fs.readRange` returns at most 8 MiB of bytes and
@@ -833,7 +833,7 @@ Delivered today:
 - `workspace:changed` — payload is the `workspace.get()` object or `null`,
   sent when the cached workspace path changes: the primary `path` and `name`,
   plus `projectId` and `roots` when the folder belongs to a project group
-  (ADR 0252). The first workspace of a run may arrive once without the folders
+  (ADR 0263). The first workspace of a run may arrive once without the folders
   and repeat once with them, because the group records are read after that
   first push.
 - `plugin:settingsChanged` is delivered after edits from the generated Plugins
@@ -934,7 +934,7 @@ Delivered today:
 - `workspace:changed` — payload is the `workspace.get()` object or `null`,
   sent when the open project changes: the primary `path` and `name`, plus
   `projectId` and `roots` when the folder belongs to a project group
-  (ADR 0252).
+  (ADR 0263).
 - `view:open` (docked work-panel views only; a detached `ui.panel` window never
   receives it) — payload is `{ path: string }`, the location the host asked this
   view to show. A view created with a location already carried it in its entry

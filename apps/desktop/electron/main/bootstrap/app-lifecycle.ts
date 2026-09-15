@@ -414,7 +414,7 @@ export function createApplicationLifecycle({
   /**
    * Apply only the `AppSettings.theme` preference to the host's appearance
    * state. Reused by `applyApplicationMenuSettings` so the full-settings path
-   * and the narrow plugin `app.setTheme` path (ADR 0249) agree.
+   * and the narrow plugin `app.setTheme` path (ADR 0260) agree.
    *
    * Deliberately narrower than `applyApplicationMenuSettings`: theme changes
    * never touch the locale, keybindings, or developer-mode menu state, so a

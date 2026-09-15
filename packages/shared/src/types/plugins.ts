@@ -261,7 +261,7 @@ export type PluginAgentExtensionStatus = {
 };
 
 /**
- * One folder root of the active project, as a plugin sees it (ADR 0252).
+ * One folder root of the active project, as a plugin sees it (ADR 0263).
  *
  * A project may be a logical group of several local folders (ADR 0249), and
  * only the primary root is the workspace the agent's tools default to. The flag

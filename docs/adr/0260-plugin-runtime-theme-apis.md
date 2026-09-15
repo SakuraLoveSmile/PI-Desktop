@@ -1,4 +1,4 @@
-# ADR 0249 — Plugin runtime theme APIs and sidebar image token
+# ADR 0260 — Plugin runtime theme APIs and sidebar image token
 
 - **Status**: Accepted for implementation
 - **Date**: 2026-09-15

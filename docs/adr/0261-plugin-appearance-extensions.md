@@ -1,4 +1,4 @@
-# 0255 — Plugin Appearance Extensions
+# ADR 0261: Plugin Appearance Extensions
 
 ## Status
 
