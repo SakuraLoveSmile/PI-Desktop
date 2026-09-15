@@ -414,3 +414,64 @@ fn the_declaration_shape_is_validated() {
     );
     assert!(read_manifest_err(&root).contains("not supported in this release"));
 }
+
+/// A row id already in use by something other than this plugin cannot arise
+/// through the sync itself — the id embeds the plugin id — but it can exist in
+/// a database that was edited by hand or written by an older scheme. The upsert
+/// would skip such a row silently, so the sync refuses instead.
+#[test]
+fn a_row_another_owner_holds_makes_the_sync_fail_rather_than_no_op() {
+    let (_dir, db, secrets) = test_context();
+    let declared = declared_providers(&manifest());
+    sync_plugin_providers(&db, &secrets, "demo.provider", &declared, true).unwrap();
+    let row_id = "plugin:demo.provider:demo";
+
+    db.conn()
+        .execute(
+            "UPDATE providers SET owner_plugin_id = 'other.plugin' WHERE id = ?1",
+            params![row_id],
+        )
+        .unwrap();
+    let error = sync_plugin_providers(&db, &secrets, "demo.provider", &declared, true)
+        .expect_err("a foreign owner must fail the sync")
+        .to_string();
+    assert!(error.contains("owned by plugin other.plugin"), "{error}");
+
+    db.conn()
+        .execute(
+            "UPDATE providers SET owner_plugin_id = NULL WHERE id = ?1",
+            params![row_id],
+        )
+        .unwrap();
+    let error = sync_plugin_providers(&db, &secrets, "demo.provider", &declared, true)
+        .expect_err("an unowned row must fail the sync")
+        .to_string();
+    assert!(error.contains("is not owned by"), "{error}");
+    // The refused sync left the row alone rather than half-written.
+    let row = providers::get_provider(&db, &secrets, row_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.name, "Demo");
+}
+
+#[test]
+fn startup_reconciliation_removes_a_row_whose_plugin_is_gone() {
+    let (dir, db, secrets) = test_context();
+    let declared = declared_providers(&manifest());
+    sync_plugin_providers(&db, &secrets, "demo.provider", &declared, true).unwrap();
+    let key_ref = crate::secrets::secret_ref_for_provider("plugin:demo.provider:demo");
+    secrets.set(&key_ref, "sk-demo").unwrap();
+    // No plugin is registered in this data directory, so the row has no owner
+    // to answer for it.
+    let plugins = PluginManager::new(dir.path(), None);
+    assert_eq!(
+        crate::plugins::reconcile_all(&db, &secrets, &plugins).unwrap(),
+        1
+    );
+    assert!(
+        providers::get_provider(&db, &secrets, "plugin:demo.provider:demo")
+            .unwrap()
+            .is_none()
+    );
+    assert!(!secrets.has(&key_ref));
+}

@@ -204,12 +204,19 @@ pub(crate) fn sync_plugin_providers(
     let mut written = 0usize;
     for provider in declared {
         let row_id = plugin_provider_row_id(plugin_id, &provider.id);
-        if let Some(owner) = provider_owner_plugin(db, &row_id)? {
-            if owner != plugin_id {
-                bail!(
-                    "PLUGIN_INVALID: provider {row_id} is owned by plugin {owner}, not {plugin_id}"
-                );
-            }
+        // A row already sitting on this id that another plugin — or the user —
+        // owns must fail loudly. The upsert's own guard would turn it into a
+        // silent no-op, and a provider that claims to be synced but is not is
+        // worse than a refused load.
+        match provider_owner_plugin(db, &row_id)? {
+            Some(owner) if owner == plugin_id => {}
+            Some(owner) => bail!(
+                "PLUGIN_INVALID: provider {row_id} is owned by plugin {owner}, not {plugin_id}"
+            ),
+            None if provider_row_exists(db, &row_id)? => bail!(
+                "PLUGIN_INVALID: provider {row_id} already exists and is not owned by {plugin_id}"
+            ),
+            None => {}
         }
         let existing_config: String = db
             .conn()
@@ -341,6 +348,7 @@ pub(crate) fn reconcile_all(
     secrets: &SecretStore,
     plugins: &PluginManager,
 ) -> Result<usize> {
+    let registered: Vec<String> = plugins.list().into_iter().map(|p| p.id).collect();
     let mut written = 0usize;
     for plugin in plugins.list() {
         let declared = match plugins.manifest_for(&plugin.id) {
@@ -353,7 +361,38 @@ pub(crate) fn reconcile_all(
         };
         written += sync_plugin_providers(db, secrets, &plugin.id, &declared, plugin.enabled)?;
     }
+    // A plugin removed while the host was down — or an uninstall whose row
+    // cleanup did not finish — would otherwise leave a provider nobody can
+    // account for. Its owner is no longer registered, so the row goes.
+    for owner in orphaned_owner_plugin_ids(db, &registered)? {
+        tracing::warn!(plugin = %owner, "removing provider rows of an unregistered plugin");
+        written += remove_plugin_providers(db, secrets, &owner)?;
+    }
     Ok(written)
+}
+
+/// Owner ids present on provider rows that no longer name a registered plugin.
+fn orphaned_owner_plugin_ids(db: &Database, registered: &[String]) -> Result<Vec<String>> {
+    let mut stmt = db.conn().prepare_cached(
+        "SELECT DISTINCT owner_plugin_id FROM providers WHERE owner_plugin_id IS NOT NULL",
+    )?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let owners = rows.collect::<rusqlite::Result<Vec<String>>>()?;
+    Ok(owners
+        .into_iter()
+        .filter(|owner| !registered.iter().any(|id| id == owner))
+        .collect())
+}
+
+/// Whether a provider row exists at all, whatever owns it.
+fn provider_row_exists(db: &Database, id: &str) -> Result<bool> {
+    db.conn()
+        .query_row("SELECT 1 FROM providers WHERE id = ?1", params![id], |_| {
+            Ok(())
+        })
+        .optional()
+        .map(|found| found.is_some())
+        .map_err(Into::into)
 }
 
 impl PluginManager {
