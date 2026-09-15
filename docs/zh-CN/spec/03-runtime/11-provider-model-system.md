@@ -70,9 +70,9 @@ OpenCode Go 以一个名为 `opencode_go` 的 API 风格预设暴露。它仍然
 `https://opencode.ai/zen/go/v1`，使用 Bearer API key 认证，从 `/models` 发现
 模型，并通过 pi-ai 的 OpenAI Chat Completions 适配器发送对话回合。它不会另建
 第二条传输链路，也不会形成封闭的模型许可名单。Agent 运行时会在每一次 LLM
-请求上注入 OpenCode 路由标头（会话回合、子代理、提示增强以及插件的一次性
-调用）：`x-opencode-session` 是持久的对话 id（调用方没有会话时则是按次生成的
-UUID），`x-opencode-client` 为 `pi-desktop`，`User-Agent` 为
+请求上注入 OpenCode 路由标头（会话回合、子代理、上下文压缩摘要、提示增强以及
+插件的一次性调用）：`x-opencode-session` 是持久的对话 id（调用方没有会话时则是
+按次生成的 UUID），`x-opencode-client` 为 `pi-desktop`，`User-Agent` 为
 `pi-desktop/<APP_VERSION>`，除非该行设置了 `headers["User-Agent"]`。base URL
 主机为 `opencode.ai` 的自定义 OpenAI 兼容行也会收到同样的标头。系统不依赖
 pi-ai 去发出 `x-opencode-session`。每个提供商行（AI 服务或 OAuth 账户）都可以

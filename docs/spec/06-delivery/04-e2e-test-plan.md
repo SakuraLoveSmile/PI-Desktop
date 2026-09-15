@@ -519,20 +519,24 @@ identify the platform validation still needed.
 - **Steps**: 1) Start an Agent turn in a session against OpenCode Go. 2)
   Capture the provider request headers. 3) Send a follow-up in the same
   session. 4) Run prompt enhancement and a plugin `agent.complete` one-shot
-  against the same provider. 5) Repeat a turn against the generic
+  against the same provider. 5) Run `/compact` in the same session and capture
+  the summary request. 6) Repeat a turn against the generic
   OpenAI-compatible provider.
 - **Expected**: Every OpenCode Go LLM request includes `x-opencode-session`
   equal to the conversation id (or a stable per-call id when no session
   exists), `x-opencode-client: pi-desktop`, and a `User-Agent` identifying
-  PI-Desktop. Follow-up turns reuse the same session header. The generic
-  OpenAI-compatible provider does not receive these headers. The gateway does
-  not return `MissingSessionID`.
+  PI-Desktop. Follow-up turns reuse the same session header, and so does the
+  compaction summary request, which the harness would otherwise send with no
+  headers at all. The generic OpenAI-compatible provider does not receive
+  these headers. The gateway does
+  not return `MissingSessionID`, and `/compact` does not fail with a 400.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`,
   `03-runtime/11-provider-model-system.md`,
   `03-runtime/12-provider-config-schema.md`, ADR 0116
 - **Acceptance**: B (model configuration), F (runtime provider requests)
 - **Milestone**: M2
-- **Status**: Unit-covered (header merge and one-shot stream options)
+- **Status**: Unit-covered (header merge, one-shot stream options, and the
+  compaction summary request)
 
 #### E2E-005E: Model-level wire API wins over the provider style
 
