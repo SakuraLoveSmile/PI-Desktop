@@ -269,9 +269,10 @@ type PluginNetDomains = string[]; // "api.example.com" 或 "*.example.com"
 无论 `net.fetch` 怎么声明。条目是裸主机名：没有 scheme、没有端口、没有路径，
 也不允许裸 `*`。前缀 `*.` 同时覆盖该域名及其子域名。
 
-`pi.net.websocket` 被规定听同一份列表（`net.websocket`，
-[03-plugin-api.md](/zh-CN/spec/07-plugins/03-plugin-api) §3），但这
-条分支里没有任何宿主实现：连接会以 `UNSUPPORTED` 失败即关闭。
+`pi.net.websocket` 听同一份列表（`net.websocket`，
+[03-plugin-api.md](/zh-CN/spec/07-plugins/03-plugin-api) §3）。该权限已实现：
+连接被限定在 `manifest.net.domains` 之内，未被声明的主机会在传输被要求
+打开任何东西之前就被拒绝。
 
 ## 5. 1 总线主题语法
 

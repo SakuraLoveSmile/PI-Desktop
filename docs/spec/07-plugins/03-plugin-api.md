@@ -630,13 +630,21 @@ pi.net.websocket.send(input: { socketId: string; data: string | Uint8Array }): P
 pi.net.websocket.close(input: { socketId: string; code?: number; reason?: string }): Promise<void>
 ```
 
-**Planned — not implemented in this branch.** The SDK declares these
-signatures and the `net.websocket` permission exists, but this branch ships no
-host service, so every `pi.net.websocket.*` call fails closed with
-`UNSUPPORTED`. When it lands, a connect will be confined to
-`manifest.net.domains` exactly like `fetch`, the host will close every socket
-the plugin still holds when it unloads, and `connect` / `close` will be
-audited.
+Requires `net.websocket`. `connect` is confined to `manifest.net.domains`
+exactly like `fetch`, and `connect` / `close` are audited. Frames arrive as host
+events: `net:websocket:open`, `net:websocket:message`, `net:websocket:close`,
+`net:websocket:error`, each carrying the owning `socketId`, subscribed to with
+`pi.events.on`. Only the owning plugin receives them.
+
+The host owns the socket, so a plugin cannot exceed four sockets, send or
+receive a frame above 1 MiB, or queue more than 4 MiB of unsent data; each of
+those is refused (`LIMIT_EXCEEDED`) or closes the connection rather than growing
+the host's memory. A connect carries `headers` and `protocols`, so an endpoint
+that authenticates per connection works without exposing the credential to
+plugin code. Refusals name the reason: `INVALID_ARGUMENT` for a non-`ws(s)` URL
+or a malformed protocol token, `TIMEOUT` when the handshake does not finish,
+`CONNECT_FAILED` when it fails, `NOT_FOUND` for a socket this plugin does not
+hold, and `PERMISSION_DENIED` when the host is not in the allowlist.
 
 ### desktop control (requires `desktop.control`)
 
@@ -971,10 +979,11 @@ The desktop plugin runtime now implements the MVP host API surface used by local
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`
 - `keyboard.registerGlobalShortcut` / `unregisterGlobalShortcut` / `listGlobalShortcuts`
   (`keyboard.globalShortcut`; the host owns Electron `globalShortcut`)
+- `net.websocket.connect` / `send` / `close` (`net.websocket`; host-owned
+  sockets, allowlist-confined, bounded, released with the plugin)
 
-`pi.audio.*` and `pi.net.websocket.*` are declared in the SDK and gated by
-their permissions, but this branch ships no host implementation: every call
-fails closed with `UNSUPPORTED`.
+`pi.audio.*` is declared in the SDK and gated by its permissions, but this
+branch ships no host implementation: every call fails closed with `UNSUPPORTED`.
 
 Native plugin notifications use the Electron main-process notification surface;
 they do not create durable rows in the task notification inbox and do not

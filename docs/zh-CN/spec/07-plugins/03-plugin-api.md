@@ -523,11 +523,19 @@ pi.net.websocket.send(input: { socketId: string; data: string | Uint8Array }): P
 pi.net.websocket.close(input: { socketId: string; code?: number; reason?: string }): Promise<void>
 ```
 
-**已规划 —— 本条分支尚未实现。** SDK 声明了这些签名，`net.websocket`
-权限也已存在，但这条分支没有任何宿主服务，所以每次
-`pi.net.websocket.*` 调用都以 `UNSUPPORTED` 失败即关闭。等它落地后，
-连接会和 `fetch` 一样被限制在 `manifest.net.domains` 之内，插件卸载时
-宿主会关闭它仍持有的每个套接字，`connect` / `close` 会记入审计。
+需要 `net.websocket`。`connect` 会和 `fetch` 一样被严格限制在
+`manifest.net.domains` 之内，`connect` / `close` 会记入审计。帧以宿主事件的
+形式到达：`net:websocket:open`、`net:websocket:message`、`net:websocket:close`、
+`net:websocket:error`，每个都带着持有它的 `socketId`，用 `pi.events.on` 订阅。
+只有持有该套接字的那个插件会收到它们。
+
+套接字由宿主持有，所以插件不能超过四个套接字，不能发送或接收大于 1 MiB 的帧，
+也不能排队超过 4 MiB 的未发送数据；每一种都会被拒绝（`LIMIT_EXCEEDED`），或者
+直接关闭连接，而不是让宿主的内存继续增长。一次 connect 会带上 `headers` 与
+`protocols`，所以按连接认证的端点无需把凭证暴露给插件代码。拒绝会说明原因：
+非 `ws(s)` 的 URL 或畸形的协议令牌是 `INVALID_ARGUMENT`，握手没有完成是
+`TIMEOUT`，握手失败是 `CONNECT_FAILED`，套接字不属于该插件是 `NOT_FOUND`，
+主机不在白名单内是 `PERMISSION_DENIED`。
 
 ### 桌面控制（需要 `desktop.control`）
 
@@ -815,9 +823,11 @@ window.pluginBridge.on(event, handler)
 - `services.register` / `unregister`、`bus.publish` / `subscribe`、`events.on` / `off`
 - `keyboard.registerGlobalShortcut` / `unregisterGlobalShortcut` / `listGlobalShortcuts`
   （`keyboard.globalShortcut`；Electron 的 `globalShortcut` 由宿主持有）
+- `net.websocket.connect` / `send` / `close`（`net.websocket`；套接字由宿主
+  持有，受白名单限制，有界，随插件一起释放）
 
-`pi.audio.*` 和 `pi.net.websocket.*` 已在 SDK 中声明并由各自权限把关，
-但这条分支没有任何宿主实现：每次调用都以 `UNSUPPORTED` 失败即关闭。
+`pi.audio.*` 已在 SDK 中声明并由其权限把关，但这条分支没有任何宿主实现：
+每次调用都以 `UNSUPPORTED` 失败即关闭。
 
 本机插件通知使用 Electron 主进程通知界面；
 他们不会在任务通知收件箱中创建持久行，并且不会

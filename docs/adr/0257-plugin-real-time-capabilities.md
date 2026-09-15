@@ -80,9 +80,10 @@ audit model rather than widening what plugin code may touch.
 
 9. Delivery is staged under this single decision. The first change implements
    the permission plumbing for all four capabilities and the full
-   `keyboard.globalShortcut` runtime. The audio and WebSocket host services
-   follow; until they land, their SDK surface is declared but the host answers
-   `UNSUPPORTED`, so a plugin fails closed rather than silently degrading.
+   `keyboard.globalShortcut` runtime; `net.websocket` ships in the same line of
+   work. The two audio permissions stay declared-only until their host service
+   lands, so their SDK surface fails closed with `UNSUPPORTED` rather than
+   silently degrading.
 
 ## Consequences
 

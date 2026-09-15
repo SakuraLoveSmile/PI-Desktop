@@ -289,9 +289,10 @@ malformed list means no egress at all, whatever `net.fetch` says. Entries are
 bare hostnames: no scheme, no port, no path, and no bare `*`. A leading `*.`
 covers the domain and its subdomains.
 
-`pi.net.websocket` is specified to answer to the same list (`net.websocket`,
-[03-plugin-api.md](03-plugin-api.md) §3), but no host implementation ships in
-this branch: a connect fails closed with `UNSUPPORTED`.
+`pi.net.websocket` answers to the same list (`net.websocket`,
+[03-plugin-api.md](03-plugin-api.md) §3). The permission is implemented: a
+connect is confined to `manifest.net.domains`, and a host that is not declared
+is refused before the transport is asked to open anything.
 
 ## 5.1 Bus topic grammar
 

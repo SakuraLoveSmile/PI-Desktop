@@ -306,11 +306,14 @@ outbound path the host owns answers to it.
   called out during configuration or plugin permission review. The MCP client
   follows redirects manually, allows at most five HTTP(S) hops, and re-checks
   the allowlist before every hop.
-- **`pi.net.websocket` (planned, not implemented in this branch).** No socket
-  exists to check yet. The specified behavior is the same list: a `ws://` or
-  `wss://` target whose host is not in `manifest.net.domains` is refused at the
-  egress chokepoint, and the host closes every socket the plugin still holds
-  when it unloads or is disabled
+- **`pi.net.websocket`.** A `ws://` or `wss://` target whose host is not in
+  `manifest.net.domains` is refused at the egress chokepoint before the
+  transport is asked to open anything, and the host — which owns the socket,
+  not the plugin — closes every socket the plugin still holds when it unloads,
+  is disabled, or crashes. Sockets are bounded per plugin (4), inbound and
+  outbound frames are capped at 1 MiB, an oversized frame closes the connection
+  instead of being buffered, and a send queue above 4 MiB is refused rather
+  than grown. Frames are addressed to the owning plugin only.
 
 An absent, empty, or malformed list means no egress at all, and a bare `*` is
 refused at install so nobody declares their way out. This is what makes a
@@ -470,10 +473,11 @@ Current enforcement:
     run the owning plugin's own command, and every entry dies on the same
     teardown path as the plugin's commands and tools (§8.2)
 
-`audio.capture.background`, `audio.playback.background`, and `net.websocket`
-have permissions and SDK types in this branch but no host implementation, so
-every `pi.audio.*` / `pi.net.websocket.*` call fails closed with `UNSUPPORTED`
-and nothing yet reaches a device or a socket.
+`audio.capture.background` and `audio.playback.background` have permissions and
+SDK types in this branch but no host implementation, so every `pi.audio.*` call
+fails closed with `UNSUPPORTED` and nothing yet reaches a device.
+`net.websocket` is implemented: connections are host-owned, allowlist-checked,
+bounded, and released with the plugin (§8.1).
 
 Not enforced yet:
 

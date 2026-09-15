@@ -654,7 +654,7 @@ export default function (pi) {
 | 中等 | `clipboard.read`、`clipboard.write`、`fs.read`、`shell.openExternal`、`background.service`、`bus.publish`、`bus.subscribe`、`audio.playback.background`、`keyboard.globalShortcut` |
 | 高 | `fs.write`、`fs.delete`、`agent.tool.register`、`agent.prompt.inject`、`net.fetch`、`mcp.server.local`、`mcp.server.remote`、`audio.capture.background`、`net.websocket` |
 
-`keyboard.globalShortcut` 已实现。`pi.audio.*` 和 `pi.net.websocket.*` 已声明
+`keyboard.globalShortcut` 与 `net.websocket` 已实现。`pi.audio.*` 已声明
 并受权限把关，但尚未实现：在宿主服务落地之前，每次调用都以 `UNSUPPORTED`
 失败即关闭。
 

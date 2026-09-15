@@ -7391,9 +7391,10 @@ and identify the platform validation still needed.
   `audio.capture.background`, `audio.playback.background`, and `net.websocket`.
 - **Expected**: Undeclared and declared-but-ungranted calls are refused with
   `PERMISSION_DENIED` and an audit entry, so an ungranted capability fails
-  closed instead of degrading. After a grant the same call is allowed, and the
-  not-yet-implemented audio and WebSocket APIs answer `UNSUPPORTED` until their
-  runtime lands — never a silent success. Revoking the permission with the
+  closed instead of degrading. After a grant the same call is allowed — for
+  `net.websocket` that is a connect that proceeds past the gate — while the
+  not-yet-implemented audio APIs answer `UNSUPPORTED` until their runtime lands,
+  never a silent success. Revoking the permission with the
   plugin loaded stops the accelerator immediately and the host releases it. The
   four permissions appear with their risk tiers (high for
   `audio.capture.background` and `net.websocket`, medium for
@@ -7434,10 +7435,10 @@ and identify the platform validation still needed.
   `07-plugins/12-plugin-ipc-and-host-services.md`, ADR 0257
 - **Acceptance**: G (plugins), Security, Quality
 - **Milestone**: M6+
-- **Status**: NOT IMPLEMENTED — the host answers `UNSUPPORTED` for
-  `pi.audio.*` and `pi.net.websocket.*` in this branch; this scenario is the
-  acceptance target for the audio and WebSocket phases and must be automated
-  once those land.
+- **Status**: Partially implemented — the socket half is implemented and
+  unit-covered by `apps/desktop/test/plugin-websocket.test.mjs` (allowlist,
+  bounds, lifecycle); the background-audio half remains unimplemented and
+  answers `UNSUPPORTED`, so this scenario stays Draft until audio lands.
 
 ## 8. Traceability Matrix
 

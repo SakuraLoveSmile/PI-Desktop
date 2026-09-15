@@ -139,11 +139,17 @@ plugin runtime
 `keyboard.globalShortcut.unregister` 和 `keyboard.globalShortcut.trigger`
 （快捷键被触发）。注册与触发的条目会记录加速键和命令；按键事件与输入文本绝不记录。
 
-设备与套接字能力已经规定但本条分支尚未实现，所以它们的名字只是预留、
-并未进入白名单，每次调用都以 `UNSUPPORTED` 失败即关闭。预留的审计操作名：
+套接字能力已实现：`net.websocket.connect` / `net.websocket.send` /
+`net.websocket.close` 已注册进同一份白名单，由 `net.websocket` 把关。它的审计
+操作是 `net.websocket.connect` 与 `net.websocket.close`（记录插件 id 与结果，
+从不记录载荷、请求头或密钥），外加被拒绝的 `net.websocket.send`；成功的
+`send` 不记入审计。帧只回到持有它的插件，以宿主事件 `net:websocket:open`、
+`net:websocket:message`、`net:websocket:close` 和 `net:websocket:error` 的形式送达。
+
+设备能力已经规定但本条分支尚未实现，所以它们的名字只是预留、并未进入白名单，
+每次调用都以 `UNSUPPORTED` 失败即关闭。预留的审计操作名：
 `audio.input.open` / `audio.input.close`、`audio.output.open` /
-`audio.output.stop` / `audio.output.close`，以及 `net.websocket.connect` /
-`net.websocket.close`（ADR 0257）。
+`audio.output.stop` / `audio.output.close`（ADR 0257）。
 
 ## 7. PanelHost交互
 

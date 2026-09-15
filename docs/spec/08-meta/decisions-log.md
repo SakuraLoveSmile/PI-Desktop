@@ -5248,8 +5248,9 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
   `SHORTCUT_CONFLICT`, `SHORTCUT_UNAVAILABLE`, `INVALID_ACCELERATOR`,
   `LIMIT_EXCEEDED`. An accelerator can only run one of the owning plugin's own
   commands — no key monitoring, no raw events, no hooks.
-- Implemented in this change: `keyboard.globalShortcut`. The audio and WebSocket
-  host services are specified here and their SDK surface fails closed with
-  `UNSUPPORTED` until they land. See ADR 0257, `07-plugins/03-plugin-api.md`,
-  `07-plugins/04-plugin-security.md`, and
+- Implemented in this change: `keyboard.globalShortcut` and `net.websocket`
+  (host-owned sockets, confined to `manifest.net.domains`, bounded, and released
+  with the plugin). The audio host services are specified here and their SDK
+  surface fails closed with `UNSUPPORTED` until they land. See ADR 0257,
+  `07-plugins/03-plugin-api.md`, `07-plugins/04-plugin-security.md`, and
   E2E-PLUGIN-global-shortcut-owns-only-its-own-command.
