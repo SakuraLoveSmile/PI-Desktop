@@ -100,4 +100,29 @@ describe("buildSessionContext", () => {
     expect(JSON.stringify(messages)).toContain("next");
     expect(JSON.stringify(messages)).not.toContain("old answer");
   });
+
+  it("replays retained reasoning between the summary and the user tail", () => {
+    // #296
+    const keptUser = user("u2", "keep me", 3).message;
+    const entry = compaction("c1", 2, [keptUser]);
+    entry.details = {
+      retainedReasoning: [{ thinking: "prior plan", text: "prior answer" }],
+    };
+    const messages = buildSessionContext([
+      user("u0", "old", 0),
+      assistant("a0", "old answer", 1),
+      entry,
+      user("u3", "next", 3),
+    ]).messages;
+    expect(messages.map((message) => message.role)).toEqual([
+      "compactionSummary",
+      "assistant",
+      "user",
+      "user",
+    ]);
+    expect(JSON.stringify(messages)).toContain("prior plan");
+    expect(JSON.stringify(messages)).toContain("keep me");
+    expect(JSON.stringify(messages)).not.toContain("old answer");
+  });
+
 });

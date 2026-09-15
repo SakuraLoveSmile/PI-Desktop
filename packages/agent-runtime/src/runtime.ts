@@ -143,6 +143,7 @@ import {
   DEFAULT_RUNTIME_SYSTEM_PROMPT,
 } from "./mode-prompts.js";
 import { clampThinkingLevel } from "./thinking-level.js";
+import { harvestRetainedReasoning } from "./reasoning-replay.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
 import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
@@ -2242,7 +2243,13 @@ Delegation rules:
         if (m.status === "error" || m.isError || m.error) continue;
         const content: AssistantMessage["content"] = [];
         if (m.thinking?.trim()) {
-          content.push({ type: "thinking" as const, thinking: m.thinking });
+          // Completions DeepSeek replay needs thinkingSignature so convertMessages
+          // maps the block to reasoning_content instead of dropping it (#296).
+          content.push({
+            type: "thinking" as const,
+            thinking: m.thinking,
+            thinkingSignature: "reasoning_content",
+          });
         }
         if (m.content?.trim()) {
           content.push({ type: "text" as const, text: m.content });
@@ -2683,7 +2690,7 @@ Delegation rules:
           failureKey !== undefined &&
           typeof result.errorCode === "string" &&
           RECOVERABLE_MUTATION_ERROR_CODES.has(result.errorCode)
-            ? `${failureKey} ${result.errorCode}`
+            ? `${failureKey}${result.errorCode}`
             : undefined;
         const grantedRecoveryGrace =
           graceKey !== undefined && !this.mutationRecoveryGraces.has(graceKey);
@@ -2713,7 +2720,7 @@ Delegation rules:
           if (succeededKey !== undefined) {
             this.mutationFailureCounts.delete(succeededKey);
             for (const key of this.mutationRecoveryGraces) {
-              if (key.startsWith(`${succeededKey} `)) {
+              if (key.startsWith(`${succeededKey}`)) {
                 this.mutationRecoveryGraces.delete(key);
               }
             }
@@ -5297,6 +5304,25 @@ Delegation rules:
     });
   }
 
+
+  /**
+   * When the bound model requires DeepSeek-style reasoning replay, keep the
+   * last few thinking turns inside opaque checkpoint details so post-compaction
+   * context can echo real reasoning without restoring tool-call pairs (#296).
+   */
+  private retainedReasoningForCheckpoint(preparation: ShapedPreparation): {
+    retainedReasoning?: ReturnType<typeof harvestRetainedReasoning>;
+  } {
+    const compat = this.model.compat as
+      | { requiresReasoningContentOnAssistantMessages?: boolean }
+      | undefined;
+    if (!compat?.requiresReasoningContentOnAssistantMessages) return {};
+    const retainedReasoning = harvestRetainedReasoning(
+      preparation.messagesToSummarize,
+    );
+    return retainedReasoning.length > 0 ? { retainedReasoning } : {};
+  }
+
   private checkpointDetails(preparation: ShapedPreparation) {
     return {
       readFiles: [...preparation.fileOps.read].sort(),
@@ -5401,6 +5427,7 @@ Delegation rules:
         fallback: "retained_tail" satisfies ContextCompactionFallback,
         failureCode: "CONTEXT_COMPACTION_FAILED",
         retainedTailMode: retentionMode,
+        ...this.retainedReasoningForCheckpoint(preparation),
       },
     );
   }
@@ -5725,6 +5752,7 @@ Delegation rules:
           ...(isRecord(result.value.details) ? result.value.details : {}),
           strategy: "summary" satisfies CompactionStrategy,
           retainedTailMode: retentionMode,
+          ...this.retainedReasoningForCheckpoint(preparation.value),
         },
       ),
     };

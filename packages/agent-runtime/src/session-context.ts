@@ -7,7 +7,9 @@
  * synchronous and keeps the `{ messages }` shape the runtime already uses.
  *
  * The slice-from-latest-compaction and compactionSummary-before-retainedTail
- * order are copied from pi-agent-core; D203 depends on that order.
+ * order are copied from pi-agent-core; D203 depends on that order. Retained
+ * reasoning turns (#296) sit between the summary and the user tail so strict
+ * DeepSeek relays still see real thinking without replaying tool-call pairs.
  */
 
 import {
@@ -16,6 +18,10 @@ import {
   type AgentMessage,
   type Entry,
 } from "@earendil-works/pi-agent-core";
+import {
+  retainedReasoningFromDetails,
+  retainedReasoningToMessages,
+} from "./reasoning-replay.js";
 
 function isContextMessage(message: AgentMessage): boolean {
   return (
@@ -45,6 +51,10 @@ export function sessionEntryToContextMessages(entry: Entry): AgentMessage[] {
         createCompactionSummaryMessage(
           entry.summary,
           entry.tokensBefore,
+          entry.timestamp,
+        ),
+        ...retainedReasoningToMessages(
+          retainedReasoningFromDetails(entry.details),
           entry.timestamp,
         ),
         ...entry.retainedTail.filter(isContextMessage),
