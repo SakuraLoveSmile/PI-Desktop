@@ -122,6 +122,8 @@ The minimum selection is:
   `pnpm test:e2e:boot`.
 - Session-list refresh or model capability lookup: `pnpm test:e2e` and
   `pnpm test:e2e:boot`, including the synthetic large-list responsiveness check.
+- Settings/composer/plugin search theme surfaces: `pnpm build:js` followed by
+  `pnpm test:e2e:theme-surfaces`.
 - Composer clipboard representation and text insertion: `pnpm test:e2e:composer-paste`.
 - Transcript render boundaries and cross-part delegation display: `pnpm test:e2e:transcript`.
 - Plan host/runtime behavior: `pnpm test:e2e` and `pnpm test:e2e:plan`.
@@ -4640,16 +4642,27 @@ and identify the platform validation still needed.
   3. Open the work panel (Review / Files / Browser) beside a chat session.
   4. Hover file-tree rows or diff headers; focus the browser URL field.
   5. Open a confirmation/provider dialog and inspect the scrim.
+  6. In both light and dark palettes, inspect the settings rail, search, selected
+     item, on-state knob, composer shell, and plugin/capability searches. Apply
+     custom surface variables, keyboard-focus both searches, then remove the
+     custom theme.
 - **Expected**:
   - Work panel body reads as quiet `#fafafa` inset paper with a white header band.
   - Settings fields, browser URL, segment tracks, and shortcut keycaps use light inset fills; focused fields lift with a neutral ring.
   - Toggle on-state keeps a white knob on the near-black track.
   - Hover fills on file-tree/diff/resize ease with shared motion tokens.
   - Light dialog scrim is softer than the dark 45% veil (~28% ink).
+  - Custom variables repaint the corresponding fills and search focus states;
+    removing them restores the built-in 8-bit RGBA paint and existing shadows/
+    focus rings. This batch does not migrate prose or scrims or change plugin APIs.
 - **Specs linked**: `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: D148
 - **Milestone**: M5
-- **Status detail**: Source-level coverage for CSS contracts; visual surface checks remain manual.
+- **Status detail**: `pnpm test:e2e:theme-surfaces` exercises these ordinary fills,
+  focus states, and built-in restoration with real Chromium, production CSS,
+  and deterministic DOM fixtures; plugin installation/lifecycle is not covered.
+  Branch runs do not replace post-integration E2E. Other surfaces in this
+  scenario retain manual visual checks.
 
 #### E2E-079: User-facing catalog copy in English and Chinese
 
