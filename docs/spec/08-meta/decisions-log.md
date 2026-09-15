@@ -5254,3 +5254,11 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
   surface fails closed with `UNSUPPORTED` until they land. See ADR 0257,
   `07-plugins/03-plugin-api.md`, `07-plugins/04-plugin-security.md`, and
   E2E-PLUGIN-global-shortcut-owns-only-its-own-command.
+
+## 2026-09-15 — Trusted extension custom agents (D425)
+
+**Add the PI-Desktop `registerAgent` ExtensionAPI contract for trusted extensions. A plugin registers bounded model metadata and a `stream` or `complete` callback; the plugin owns endpoint and authentication. The sidecar exposes a redacted model registry, assigns `extension-agent:<encoded-agent-key>` ids, and routes idle `setModel` through Electron main to the existing host-owned `session.configure` binding. The host never receives or persists plugin transport credentials, and `registerProvider` is a compatibility alias for the same plugin-owned stream shape. See ADR 0256, `07-plugins/16-trusted-extensions.md`, and E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding.**
+
+The pinned upstream pi-coding-agent package has `registerProvider` but no
+`registerAgent`; the PI-Desktop member is therefore an explicit adapter contract,
+not an unreviewed upstream registry passthrough.

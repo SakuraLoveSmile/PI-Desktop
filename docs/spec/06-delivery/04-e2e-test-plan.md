@@ -7514,7 +7514,7 @@ and identify the platform validation still needed.
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
+| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | Quality (model fallback isolation) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
@@ -11509,6 +11509,29 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Acceptance**: B (agent), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); Agent-mode tool dispatch, ToolSearch deferral, hooks, blocking, and result replacement pass, while Plan-mode gating and core-tool collision remain additional validation.
+
+#### E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding: Plugin-owned agent streams and session binding
+
+- **Preconditions**: An enabled trusted extension calls `registerAgent` with one
+  model and a fixture `stream`/`complete` implementation. The fixture provider
+  has no Host provider row or Host secret.
+- **Steps**: 1) Load the extension and inspect `ctx.modelRegistry` for the
+  redacted model. 2) Call `pi.setModel(model)` while idle. 3) Run a turn and
+  inspect the callback's model/context/options. 4) Restart or create the next
+  turn. 5) Attempt to read Host provider keys/secret refs through the registry.
+- **Expected**: `registerAgent` appears in the loaded contract and the model is
+  selectable; `setModel` persists only the current session binding under an
+  `extension-agent:` provider id; the plugin callback streams the assistant
+  response and receives cancellation; the next turn reloads the extension and
+  restores the same agent implementation; the registry exposes model metadata
+  and auth availability but no Host key, secret ref, OAuth token or arbitrary
+  Host headers. `registerProvider` with the same plugin-owned stream shape has
+  equivalent behavior.
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §5, §10; ADR 0256;
+  D425
+- **Acceptance**: B (agent), C (conversation & stream), Security, Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Documented; automation pending
 
 #### E2E-243: Extension commands and UI prompts round-trip through the renderer
 
