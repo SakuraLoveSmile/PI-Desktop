@@ -28,11 +28,12 @@ import {
   matchPresetIndex,
 } from "../../lib/model-limit-presets";
 import { Button, Field, Input, Tooltip, TooltipButton, cx } from "../ui";
-import { IconClose, IconHelp, IconPlus, IconRefresh, IconSearch } from "../icons";
+import { IconClose, IconGripVertical, IconHelp, IconPlus, IconRefresh, IconSearch } from "../icons";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";
 import { filterChosenModels, hidesAddedBinding } from "./model-chosen-filter";
 import { describeModelsFetchError } from "./model-fetch-error";
 import type { ProviderModelsState } from "./useProviderModels";
+import { useModelReorder } from "./useModelReorder";
 
 /** One row of the model list: what the service returned, plus its binding. */
 export type ModelRow = {
@@ -256,6 +257,7 @@ export function ModelSelectionPanes({
     () => filterChosenModels(models, chosenQuery, rows),
     [chosenQuery, models, rows],
   );
+  const reorder = useModelReorder(visibleChosen, setModels, busy);
 
   /** A discovered row arrives enriched; a hand-typed id gets generic limits. */
   const bindingForRow = (row: ModelRow): ModelBinding =>
@@ -511,8 +513,27 @@ export function ModelSelectionPanes({
               const expanded = expandedModelId === binding.id;
               const advancedId = `model-advanced-${binding.id}`;
               return (
-                <li className="provider-chosen-row" key={binding.id}>
+                <li
+                  className={cx(
+                    "provider-chosen-row",
+                    reorder.draggingId === binding.id && "is-dragging",
+                  )}
+                  key={binding.id}
+                  data-drop-placement={
+                    reorder.dropTarget?.id === binding.id ? reorder.dropTarget.placement : undefined
+                  }
+                  {...reorder.rowEvents(binding.id)}
+                >
                   <div className="provider-chosen-row-head">
+                    <button
+                      type="button"
+                      className="provider-chosen-reorder"
+                      aria-label={t("settings.reorderModel", { name: binding.id })}
+                      title={t("settings.reorderModel", { name: binding.id })}
+                      {...reorder.handleEvents(binding.id)}
+                    >
+                      <IconGripVertical size={14} aria-hidden />
+                    </button>
                     <span className="provider-chosen-row-id font-mono selectable">
                       {binding.id}
                     </span>

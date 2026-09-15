@@ -1106,6 +1106,7 @@ sklm: {
     modelAlreadyAdded: "该模型已添加",
     modelConfigurations: "模型设置",
     removeModel: "移除模型",
+    reorderModel: "调整 {{name}} 的顺序。拖动或使用上下方向键。",
     modelAlias: "别名",
     modelAliasHint: "在显示模型名称的地方生效；请求仍使用模型 ID。",
     modelAliasPlaceholder: "例如 fast",
