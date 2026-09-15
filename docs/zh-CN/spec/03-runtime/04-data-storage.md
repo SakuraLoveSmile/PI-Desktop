@@ -1,4 +1,4 @@
-# 04. 数据存储（架构 v16）
+# 04. 数据存储（架构 v17）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -302,8 +302,14 @@ CREATE TABLE providers (
   default_model_id TEXT,
   config_json      TEXT NOT NULL DEFAULT '{}',
   created_at       INTEGER NOT NULL,
-  updated_at       INTEGER NOT NULL
+  updated_at       INTEGER NOT NULL,
+  -- 插件在 `contributes.providers` 中声明该行时的所属插件 id
+  --（架构 v17，ADR 0259）。NULL 表示用户自有的行：插件每次加载都会刷新
+  -- 自己的字段，而用户路径只能编辑或删除自己拥有的行。
+  owner_plugin_id  TEXT
 );
+CREATE INDEX idx_providers_owner ON providers(owner_plugin_id)
+  WHERE owner_plugin_id IS NOT NULL;
 ```
 
 ### 4.4 models — 目录缓存
@@ -1088,7 +1094,11 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 - **架构 v16 是增量的。** 它增加会话协作 link 和投递表、生命周期索引，以及可为空的
   `turn_queue.session_message_id` 绑定（D409 / ADR 0239）。既有会话、回合、队列条目和
   插件数据保持有效。迁移前保留 `pi.sqlite.v15.bak`；启动恢复保留持久排队投递，但不会
-  自动重放已中断工作。
+- **架构 v17 是增量的。** 它增加可为空的 `providers.owner_plugin_id` 归属列及其部分索引
+  （ADR 0259），从而把插件在 `contributes.providers` 中声明的 provider 行与用户创建的行区分开
+  —— 所有 v17 之前的行保持 NULL 归属。该步骤之前保留 `pi.sqlite.v16.bak` 副本。
+  v15→v16 会话协作步骤现在写入 `16`（它自己的版本）而不是最新的架构常量，
+  因此 v15 文件可以在一次启动中走完两个步骤。
 - **架构 v7 首先到达 v8，然后使用受保护的路径。** v7→v8
   迁移之后是相同的受保护的 v8→v15 迁移；架构-v9 和
   schema-v10 数据库采用相同的受保护路径并接收精确的可读数据
