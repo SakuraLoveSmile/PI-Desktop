@@ -251,6 +251,30 @@ describe("provider rate-limit retry", () => {
     expect(snapshot).toBeUndefined();
   });
 
+  it("reports the request body size even when the request dies first", async () => {
+    const seen: Array<[number | undefined, number | undefined]> = [];
+    const body = JSON.stringify({ model: "gpt-5.6-sol", input: "hello" });
+    const wrapped = captureProviderResponse(
+      async () => {
+        throw new Error("fetch failed");
+      },
+      (response, requestBytes) => {
+        seen.push([response?.status, requestBytes]);
+      },
+    );
+
+    await expect(
+      wrapped("https://provider.invalid", { method: "POST", body }),
+    ).rejects.toThrow("fetch failed");
+
+    // The clearing call, then the failure: only the size survives, never the
+    // body content, and a request that never got headers still reports it.
+    expect(seen).toEqual([
+      [undefined, undefined],
+      [undefined, Buffer.byteLength(body, "utf8")],
+    ]);
+  });
+
   it("rejects an abortable retry delay without waiting for the timer", async () => {
     vi.useFakeTimers();
     const controller = new AbortController();

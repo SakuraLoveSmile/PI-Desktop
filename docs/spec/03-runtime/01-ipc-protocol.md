@@ -710,8 +710,12 @@ context. Manual compaction never silently falls back.
 
 Provider `error` events may include bounded diagnostic fields in
 `AppError.details`: `phase` (`request` or `stream`), `providerStatus`,
-`providerCode`, `providerWaitMs`, `streamMs`, and `retryAttempt`. These fields
+`providerCode`, `providerWaitMs`, `streamMs`, `retryAttempt`, and, for a
+network failure, `networkCategory`, `networkCode`, `networkSyscall` and
+`networkHost` plus the request correlation fields `requestMessages`,
+`requestBytes` and `compactionGeneration`. These fields
 are additive and redacted; they never carry credentials or an unrestricted
+provider response, and the request fields are counts and byte sizes only.
 provider response. A transient stream failure may be replayed once inside the
 same turn without a terminal `error` event or a duplicate assistant message.
 The second failure emits the terminal normalized `STREAM_FAILED` error.

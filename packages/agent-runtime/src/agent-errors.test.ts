@@ -57,9 +57,139 @@ describe("classifyAgentError", () => {
     expect(classifyAgentError(err)).toMatchObject({
       code: "NETWORK_ERROR",
       retriable: true,
+      details: { networkCategory: "refused", networkCode: "ECONNREFUSED" },
     });
     expect(classifyAgentError("getaddrinfo ENOTFOUND api.example.com"))
-      .toMatchObject({ code: "NETWORK_ERROR" });
+      .toMatchObject({
+        code: "NETWORK_ERROR",
+        details: {
+          networkCategory: "dns",
+          networkCode: "ENOTFOUND",
+          networkHost: "api.example.com",
+        },
+      });
+  });
+
+  it("names the failing layer behind a nested DNS cause", () => {
+    const err = new TypeError("fetch failed");
+    (err as any).cause = Object.assign(
+      new Error("getaddrinfo ENOTFOUND api.example.com"),
+      {
+        code: "ENOTFOUND",
+        syscall: "getaddrinfo",
+        hostname: "api.example.com",
+      },
+    );
+
+    // `providerCode` repeats the same errno, so it is folded into the
+    // network-namespaced key instead of being logged twice.
+    expect(classifyAgentError(err).details).toEqual({
+      networkCategory: "dns",
+      networkCode: "ENOTFOUND",
+      networkSyscall: "getaddrinfo",
+      networkHost: "api.example.com",
+    });
+  });
+
+  it("reads the errno out of an undici aggregate cause", () => {
+    const aggregate = new AggregateError(
+      [
+        Object.assign(new Error("connect ECONNREFUSED ::1:443"), {
+          code: "ECONNREFUSED",
+        }),
+        Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:443"), {
+          code: "ECONNREFUSED",
+        }),
+      ],
+      "all connection attempts failed",
+    );
+    const err = Object.assign(new TypeError("fetch failed"), {
+      cause: aggregate,
+    });
+
+    expect(classifyAgentError(err)).toMatchObject({
+      code: "NETWORK_ERROR",
+      details: { networkCategory: "refused", networkCode: "ECONNREFUSED" },
+    });
+  });
+
+  it("separates TLS, timeout and dropped-socket causes", () => {
+    const tls = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("self signed certificate"), {
+        code: "DEPTH_ZERO_SELF_SIGNED_CERT",
+      }),
+    });
+    const tlsProto = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("write EPROTO"), { code: "EPROTO" }),
+    });
+    const timeout = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("Connect Timeout Error"), {
+        code: "UND_ERR_CONNECT_TIMEOUT",
+      }),
+    });
+    const reset = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("other side closed"), {
+        code: "UND_ERR_SOCKET",
+      }),
+    });
+    const proxy = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("proxy connection failed"), {
+        code: "ERR_PROXY_CONNECTION_FAILED",
+      }),
+    });
+
+    expect(classifyAgentError(tls).details).toMatchObject({
+      networkCategory: "tls",
+      networkCode: "DEPTH_ZERO_SELF_SIGNED_CERT",
+    });
+    expect(classifyAgentError(tlsProto).details).toMatchObject({
+      networkCategory: "tls",
+      networkCode: "EPROTO",
+    });
+    expect(classifyAgentError(timeout).details).toMatchObject({
+      networkCategory: "timeout",
+      networkCode: "UND_ERR_CONNECT_TIMEOUT",
+    });
+    expect(classifyAgentError(reset).details).toMatchObject({
+      networkCategory: "reset",
+      networkCode: "UND_ERR_SOCKET",
+    });
+    expect(classifyAgentError(proxy).details).toMatchObject({
+      networkCategory: "proxy",
+      networkCode: "ERR_PROXY_CONNECTION_FAILED",
+    });
+  });
+
+  it("says the layer is unknown rather than guessing when no cause survives", () => {
+    // The reporter's shape: a bare `fetch failed` with no cause chain kept.
+    expect(classifyAgentError(new TypeError("fetch failed"))).toMatchObject({
+      code: "NETWORK_ERROR",
+      retriable: true,
+      details: { networkCategory: "unknown" },
+    });
+  });
+
+  it("never leaks credentials through network diagnostics", () => {
+    const err = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(
+        new Error(
+          "connect ECONNRESET https://api.example.com/v1/chat?api_key=sk-live-secret Authorization: Bearer token-secret",
+        ),
+        { code: "ECONNRESET", hostname: "user:pass@api.example.com" },
+      ),
+    });
+    const classified = classifyAgentError(err);
+    const serialized = JSON.stringify(classified);
+
+    expect(serialized).not.toContain("sk-live-secret");
+    expect(serialized).not.toContain("token-secret");
+    expect(serialized).not.toContain("user:pass");
+    expect(serialized).not.toContain("?api_key");
+    // Only the errno survives: no hostname, no port, no URL, no query.
+    expect(classified.details).toEqual({
+      networkCategory: "reset",
+      networkCode: "ECONNRESET",
+    });
   });
 
   it("classifies aborts, timeouts and unknown errors", () => {
