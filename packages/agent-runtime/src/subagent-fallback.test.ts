@@ -6,6 +6,7 @@ import { Type } from "typebox";
 import { SubagentRun, type SubagentRunOptions } from "./subagent.js";
 import { genericModelConfig } from "./model-capabilities.js";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
+import { PROVIDER_RATE_LIMIT_MAX_RETRIES, PROVIDER_TRANSIENT_MAX_RETRIES } from "./provider-retry.js";
 
 type Request = { model: string; messages: Array<{ role: string; content: unknown }>; reasoning_effort?: string };
 const cleanups: Array<() => Promise<void>> = [];
@@ -24,6 +25,7 @@ function answer(res: ServerResponse, model: string, tool = false) {
 
 async function fixture(options: {
   fail?: string[];
+  failureStatus?: Record<string, number>;
   editFirst?: boolean;
   onRequest?: (request: Request) => void;
 } = {}) {
@@ -37,11 +39,13 @@ async function fixture(options: {
     requests.push(request);
     headers.push(req.headers.authorization);
     options.onRequest?.(request);
+    const status = options.failureStatus?.[request.model]
+      ?? ((options.fail ?? ["primary"]).includes(request.model) ? 404 : undefined);
     if (options.editFirst && requests.length === 1) {
       answer(res, request.model, true);
-    } else if ((options.fail ?? ["primary"]).includes(request.model)) {
-      res.writeHead(404, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: { message: "model not found" } }));
+    } else if (status) {
+      res.writeHead(status, { "content-type": "application/json", "retry-after": "0" });
+      res.end(JSON.stringify({ error: { message: status === 404 ? "model not found" : `Fixture HTTP ${status}` } }));
     } else {
       answer(res, request.model);
     }
@@ -75,21 +79,103 @@ async function fixture(options: {
 }
 
 describe("subagent model fallback over real transport", () => {
-  it("changes credentials and model, preserving completed tool work and usage", async () => {
-    const f = await fixture({ editFirst: true });
-    const result = await f.run();
+  const chain = ["primary", "secondary", "third", "fourth", "unused"];
+
+  it.each([0, 1, 2, 3])("succeeds after %i unavailable models and stops at the first working model", async (failedCount) => {
+    const failedModels = chain.slice(0, failedCount);
+    const attempts = chain.slice(0, failedCount + 1);
+    const f = await fixture({ fail: failedModels });
+    const changes: string[] = [];
+    const result = await f.run({
+      fallbackModels: chain.slice(1).map((id) => ({ key: `${id}/${id}`, provider: f.provider(id) })),
+      onModelChange: (provider) => changes.push(provider.modelId),
+    });
     expect(result.status).toBe("completed");
-    expect(result.modelId).toBe("secondary");
-    expect(f.requests.map((request) => request.model)).toEqual(["primary", "primary", "secondary"]);
-    expect(f.headers).toEqual(["Bearer fixture-primary", "Bearer fixture-primary", "Bearer fixture-secondary"]);
+    expect(result.modelId).toBe(chain[failedCount]);
+    expect(result.report).toContain("Completed with retained work.");
+    expect(result.error).toBeUndefined();
+    expect(f.requests.map((request) => request.model)).toEqual(attempts);
+    expect(f.headers).toEqual(attempts.map((id) => `Bearer fixture-${id}`));
+    expect(changes).toEqual(attempts.slice(1));
+    expect(result.modelFailures ?? []).toEqual(failedModels.map((id) =>
+      expect.objectContaining({ model: `${id}/${id}`, code: "MODEL_NOT_CONFIGURED" })));
+    for (const request of f.requests) {
+      const users = request.messages.filter((message) => message.role === "user");
+      expect(users).toHaveLength(1);
+      expect(JSON.stringify(users[0].content)).toContain("Finish the work.");
+      expect(request.messages.some((message) => message.role === "assistant")).toBe(false);
+    }
+  });
+
+  it.each([1, 2, 3])("preserves completed tool work and credentials through %i unavailable models", async (failedCount) => {
+    const failedModels = chain.slice(0, failedCount);
+    const attempts = ["primary", ...chain.slice(0, failedCount + 1)];
+    const finalModel = chain[failedCount];
+    const f = await fixture({ editFirst: true, fail: failedModels });
+    const result = await f.run({
+      fallbackModels: chain.slice(1).map((id) => ({ key: `${id}/${id}`, provider: f.provider(id) })),
+    });
+    expect(result.status).toBe("completed");
+    expect(result.modelId).toBe(finalModel);
+    expect(f.requests.map((request) => request.model)).toEqual(attempts);
+    expect(f.headers).toEqual(attempts.map((id) => `Bearer fixture-${id}`));
     expect(f.edits()).toBe(1);
-    expect(f.requests[2].messages.filter((message) => message.role === "user")).toHaveLength(1);
-    expect(f.requests[2].messages.some((message) => message.role === "tool" && String(message.content).includes("Saved exactly once"))).toBe(true);
+    for (const request of f.requests.slice(1)) {
+      expect(request.messages.filter((message) => message.role === "user")).toHaveLength(1);
+      const tools = request.messages.filter((message) => message.role === "tool");
+      expect(tools).toHaveLength(1);
+      expect(String(tools[0].content)).toContain("Saved exactly once");
+    }
     expect(result.toolCalls).toBe(1);
     expect(result.usage?.outputTokens).toBe(10);
-    expect(result.modelFailures).toEqual([expect.objectContaining({ model: "primary/primary", code: "MODEL_NOT_CONFIGURED" })]);
+    expect(result.modelFailures).toEqual(failedModels.map((id) =>
+      expect.objectContaining({ model: `${id}/${id}`, code: "MODEL_NOT_CONFIGURED" })));
     expect(f.events.every((event) => event.parentToolCallId === "task")).toBe(true);
-    expect(f.events.some((event) => event.event.type === "message_end" && event.event.message.modelId === "secondary")).toBe(true);
+    expect(f.events.some((event) => event.event.type === "message_end" && event.event.message.modelId === finalModel)).toBe(true);
+  });
+
+  it("fails explicitly after four unavailable models without wrapping around", async () => {
+    const failedModels = chain.slice(0, 4);
+    const f = await fixture({ fail: failedModels });
+    const result = await f.run({
+      fallbackModels: failedModels.slice(1).map((id) => ({ key: `${id}/${id}`, provider: f.provider(id) })),
+    });
+    expect(result.status).toBe("failed");
+    expect(result.modelId).toBe("fourth");
+    expect(result.error?.code).toBe("MODEL_NOT_CONFIGURED");
+    expect(f.requests.map((request) => request.model)).toEqual(failedModels);
+    expect(result.modelFailures?.map((failure) => failure.model)).toEqual(failedModels.map((id) => `${id}/${id}`));
+    expect(result.report).not.toContain("Completed with retained work.");
+    for (const id of failedModels) expect(result.report).toContain(`Model ${id}/${id} failed`);
+  });
+
+  it("continues through unauthorized, forbidden, and missing models", async () => {
+    const f = await fixture({ failureStatus: { primary: 401, secondary: 403, third: 404 } });
+    const result = await f.run({
+      fallbackModels: chain.slice(1).map((id) => ({ key: `${id}/${id}`, provider: f.provider(id) })),
+    });
+    expect(result.status).toBe("completed");
+    expect(result.modelId).toBe("fourth");
+    expect(f.requests.map((request) => request.model)).toEqual(chain.slice(0, 4));
+    expect(result.modelFailures?.map((failure) => failure.code)).toEqual([
+      "PROVIDER_UNAUTHORIZED", "PROVIDER_UNAUTHORIZED", "MODEL_NOT_CONFIGURED",
+    ]);
+  });
+
+  it.each([429, 503])("exhausts HTTP %i retries separately for two models before the third succeeds", async (status) => {
+    const f = await fixture({ failureStatus: { primary: status, secondary: status } });
+    const result = await f.run({
+      fallbackModels: chain.slice(1).map((id) => ({ key: `${id}/${id}`, provider: f.provider(id) })),
+    });
+    const retries = status === 429 ? PROVIDER_RATE_LIMIT_MAX_RETRIES : PROVIDER_TRANSIENT_MAX_RETRIES;
+    expect(result.status).toBe("completed");
+    expect(result.modelId).toBe("third");
+    expect(f.requests.map((request) => request.model)).toEqual([
+      ...Array(retries + 1).fill("primary"), ...Array(retries + 1).fill("secondary"), "third",
+    ]);
+    expect(result.modelFailures).toEqual(["primary", "secondary"].map((id) => expect.objectContaining({
+      model: `${id}/${id}`, code: status === 429 ? "PROVIDER_RATE_LIMITED" : "PROVIDER_ERROR",
+    })));
   });
 
   it("tries alternatives in order once, skips unresolved bindings visibly, and reports exhaustion", async () => {

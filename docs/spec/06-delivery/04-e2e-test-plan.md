@@ -11845,14 +11845,18 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 
 ### E2E-SUBAGENT-ordered-model-fallback-preserves-work
 
-- **Preconditions**: A configured primary and two alternatives use deterministic
-  local transports; one definition declares the ordered alternatives. A second
-  definition has no alternatives, and none are opted in for Task overrides.
+- **Preconditions**: A configured primary and at least three alternatives use
+  deterministic local transports; one definition declares the ordered
+  alternatives. A second definition has no alternatives, and none are opted
+  in for Task overrides.
 - **Steps**: Add two alternatives in Settings, reorder them, save and reopen;
   change another field without changing the list. Run the child, complete one
   tool call, then fail the primary request. Fail the first alternative and
-  complete the second. Repeat with exhausted transient/429 retries, all models
-  failing, unavailable/duplicate pins, an explicit authorized Task primary,
+  complete the second. Run a matrix with zero, one, two, and three unavailable
+  models before a successful model, leaving an unused model after success.
+  Repeat with all four models unavailable, mixed 401/403/404 failures,
+  exhausted transient/429 retries on two consecutive models,
+  unavailable/duplicate pins, an explicit authorized Task primary,
   and Stop during recovery. Remove all alternatives, save, and reopen.
 - **Expected**: List order and clear/preserve semantics round-trip. Provider
   retry budgets precede fallback; each distinct configured binding is used
@@ -11869,7 +11873,12 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Acceptance criterion**: C — Conversation & stream; Quality (compatibility
   and permission isolation).
 - **Milestone**: M6+.
-- **Status**: Partially automated by shared/runtime regression tests and
-  `test:e2e:subagents` / `test:e2e:subagent-models`; full desktop editor/reload
-  journey documented. Required post-integration suites: `test:e2e`,
+- **Status**: Automated registry and runtime coverage through shared/runtime
+  regression tests and `test:e2e:subagents` / `test:e2e:subagent-models`. The
+  sidecar suite checks the zero-to-three failure matrix and four-model
+  exhaustion against actual HTTP request order, live/settled Task metadata,
+  ordered failure diagnostics, and the successful child report. Completed-tool
+  preservation and independent retry budgets use real-transport runtime tests.
+  The configuration-editor journey passed under WSL; task-transcript reload
+  acceptance remains outstanding. Required post-integration suites: `test:e2e`,
   `test:e2e:subagents`, `test:e2e:subagent-models`.
