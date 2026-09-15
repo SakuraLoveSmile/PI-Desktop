@@ -1948,7 +1948,10 @@ twice.
 
 - Outer row: transparent, borderless, shadowless, approximately 24px high
 - Icon: 15–16px; disclosure chevron: 12px
-- Header gap: 4px; expanded body inset: 24px
+- Header gap: 4px; expanded tool-call details align with the row's own content
+  start and do not add a second horizontal inset. The collapse rail remains
+  available beside the expanded body. Thinking disclosures and subagent
+  topology nodes retain their dedicated hierarchy insets.
 - Chips: monospace `--text-2xs`, `--ds-tile-deep` fill (no border, D297), error hue for exit codes
 - Code, file list, match list and field blocks: `font-mono text-sm`,
   independently copyable, capped at 260px with internal scrolling
