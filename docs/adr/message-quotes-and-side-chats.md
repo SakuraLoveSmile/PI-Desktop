@@ -233,3 +233,12 @@ exists. A successful fork followed by a failed send keeps that child for retry
 rather than creating another one. Closing after an explicit Send may retain the
 created child even if the provider rejects the prompt. Existing sessions are
 never deleted as cleanup. No IPC, host ownership, or database schema changes.
+
+### Side-chat Send availability (#421 review follow-up)
+
+Drafts use the parent session's live availability. A running/busy parent disables
+first Send with a visible explanation; a read-only parent also disables it.
+The submission action shares the same gate and reports blocked programmatic
+submissions without creating a child or clearing text. After creation, check
+the child's current availability again before sending. Existing children keep
+their normal queue and Stop behavior. Recovery re-enables Send automatically.

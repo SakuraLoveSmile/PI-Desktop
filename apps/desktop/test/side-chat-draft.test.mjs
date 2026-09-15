@@ -9,6 +9,8 @@ function fixture() {
   const state = {
     activeSessionId: 'parent', sessions: [{ id: 'parent', title: 'Main' }],
     messages: [{ id: 'a1', role: 'assistant', content: 'Anchor' }],
+    toasts: [],
+    showToast(message) { state.toasts.push(message); },
     runningSessions: {}, sideChats: {}, sideChatTranscripts: {},
     workPanelTabs: [], activeWorkPanelTabId: null, workPanelContexts: {},
     openWorkPanelTabForSession(parent, tab) {
@@ -127,5 +129,48 @@ test('closing during an authorized send never resurrects its panel', async () =>
   finish({ session: { id: 'child', title: 'Side', messages: [] } });
   await sending;
   assert.deepEqual(state.sideChats, {}); assert.deepEqual(state.workPanelTabs, []);
+  assert.equal(state.sessions.length, 2);
+});
+
+
+test('a parent that starts replying blocks first Send with feedback and recovers', async () => {
+  const { state, forks, sends } = fixture();
+  const id = await state.openSideChat('a1');
+  state.updateSideChatDraft(id, 'keep question');
+  state.runningSessions.parent = true;
+  assert.equal(await state.sendSideChatPrompt(id), false);
+  assert.equal(forks.length, 0); assert.equal(sends.length, 0);
+  assert.equal(state.toasts.length, 1);
+  assert.equal(state.sideChats[id].draft, 'keep question');
+  state.runningSessions.parent = false;
+  assert.equal(await state.sendSideChatPrompt(id), true);
+  assert.equal(forks.length, 1);
+});
+
+test('read-only parents never create a child; recovery permits first Send', async () => {
+  for (const reason of ['provider-unavailable', 'untrusted', 'externally-changed', 'busy']) {
+    const { state, forks, sends } = fixture();
+    const id = await state.openSideChat('a1');
+    state.updateSideChatDraft(id, 'keep question');
+    state.sessions[0].readOnlyReason = reason;
+    assert.equal(await state.sendSideChatPrompt(id), false, reason);
+    assert.equal(forks.length, 0); assert.equal(sends.length, 0);
+    assert.equal(state.toasts.length, 1);
+    assert.equal(state.sideChats[id].draft, 'keep question');
+    delete state.sessions[0].readOnlyReason;
+    assert.equal(await state.sendSideChatPrompt(id), true);
+  }
+});
+
+test('a child that becomes unavailable during creation is not prompted and is reused', async () => {
+  const { state, sends } = fixture();
+  const id = await state.openSideChat('a1');
+  state.updateSideChatDraft(id, 'keep question');
+  api.forkSession = async () => ({session: {id: 'child', title: 'Side', readOnlyReason: 'provider-unavailable', messages: []}});
+  assert.equal(await state.sendSideChatPrompt(id), false);
+  assert.equal(sends.length, 0); assert.equal(state.toasts.length, 1);
+  assert.equal(state.sideChats.child.draft, 'keep question');
+  delete state.sessions.find(s => s.id === 'child').readOnlyReason;
+  assert.equal(await state.sendSideChatPrompt('child'), true);
   assert.equal(state.sessions.length, 2);
 });

@@ -5,6 +5,7 @@ import { PermissionCard } from "../PermissionCard";
 import { AskToolCard } from "../AskToolCard";
 import { Button } from "../ui";
 import { useAppStore } from "../../stores/app-store";
+import { sideChatSendBlockReason } from "../../lib/side-chat";
 import { headAsk, queuedAskCount } from "../../lib/pending-asks";
 import { headPermission, sessionPermissions } from "../../lib/pending-permissions";
 
@@ -42,16 +43,12 @@ export function SideChatTab({ sessionId }: { sessionId: string }) {
   const closeSideChat = useAppStore((s) => s.closeSideChat);
   const addSideChatReplyToMain = useAppStore((s) => s.addSideChatReplyToMain);
   const selectSession = useAppStore((s) => s.selectSession);
-  const childSummary = useAppStore((s) =>
-    s.sessions.find((session) => session.id === sessionId),
-  );
   const draft = entry?.draft ?? "";
   const sending = entry?.sending ?? false;
-  // `busy` is a live-turn state, not a durable read-only state: it must not
-  // trap the composer once the turn has settled. Other reasons (provider,
-  // trust, externally changed) disable Send without touching Stop.
-  const readOnlyReason = childSummary?.readOnlyReason;
-  const sendBlocked = Boolean(readOnlyReason && readOnlyReason !== "busy");
+  const blockedReason = useAppStore((state) => sideChatSendBlockReason(
+    state.sideChats[sessionId], state.sessions, state.runningSessions,
+  ));
+  const sendBlocked = Boolean(blockedReason);
 
   const send = async () => {
     const text = draft.trim();
@@ -145,8 +142,8 @@ export function SideChatTab({ sessionId }: { sessionId: string }) {
         />
         <div className="side-chat-composer-row">
           <span className="side-chat-hint">
-            {sendBlocked
-              ? t("sideChat.readOnly")
+            {blockedReason
+              ? t(blockedReason)
               : messages.length === 0
                 ? t("sideChat.empty")
                 : null}

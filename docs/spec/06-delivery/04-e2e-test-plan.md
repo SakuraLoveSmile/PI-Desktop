@@ -12373,3 +12373,12 @@ E2E-CHAT-selection-side-chat cover deferred creation and quote prefill.
 first-send native materialization and subsequent streaming/persistence.
 `side-chat-draft.test.mjs` covers deterministic failure and navigation races.
 Native E2E uses a fixture transport, not a live provider account.
+
+### E2E-CHAT-side-chat-fork availability extension (#421)
+
+Open a draft, type a question, then make the parent busy and read-only in turn.
+Expect a disabled Send button, visible reason, unchanged draft and no new host
+session or model request. Restore availability and send; exactly one child
+is created. A child returning read-only from an in-flight fork must not be
+prompted. `test:e2e:native-side-chat` covers the rendered parent gate and its
+recovery; `side-chat-draft.test.mjs` covers action-level guards and child drift.

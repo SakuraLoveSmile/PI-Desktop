@@ -523,6 +523,7 @@ export const tr = {
     untitledTask: "Yeni görev",
   },
   sideChat: {
+    parentBusy: "Ana sohbet hâlâ yanıt veriyor. Yan sohbeti başlatmadan önce bitmesini bekleyin.",
     readOnly: "Bu yerel Pi oturumu şu anda salt okunur.",
     title: "Yan sohbet",
     sessionTitle: "Yan sohbet: {{title}}",

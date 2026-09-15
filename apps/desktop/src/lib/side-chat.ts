@@ -7,6 +7,7 @@
  * session and shown in the docked work panel, so the main transcript, its
  * composer draft, and its run state are never replaced (ADR message-quotes-and-side-chats / D-LOCAL-message-quotes).
  */
+import type { SessionSummary } from "@pi-desktop/shared";
 import type { WorkPanelTab } from "./work-panel-tabs";
 
 export type SideChatEntry = {
@@ -131,4 +132,25 @@ export function sideChatsForParent(
 
 export function sideChatSessionIds(chats: SideChatMap): string[] {
   return Object.keys(chats);
+}
+
+/** One send gate for both the panel and programmatic submissions. */
+export function sideChatSendBlockReason(
+  entry: SideChatEntry | undefined,
+  sessions: readonly Pick<SessionSummary, "id" | "readOnlyReason">[],
+  runningSessions: Readonly<Record<string, boolean>>,
+): "errors.noActiveSession" | "sideChat.parentBusy" | "sideChat.readOnly" | undefined {
+  if (!entry) return "errors.noActiveSession";
+  const ownerId = entry.pending ? entry.parentSessionId : entry.sessionId;
+  const owner = sessions.find((session) => session.id === ownerId);
+  if (!owner) return "errors.noActiveSession";
+  if (entry.pending && (runningSessions[ownerId] || owner.readOnlyReason === "busy")) {
+    return "sideChat.parentBusy";
+  }
+  if (owner.readOnlyReason && owner.readOnlyReason !== "busy") {
+    return "sideChat.readOnly";
+  }
+  // Existing children retain their queue/Stop behavior. Native busy sends are
+  // rejected with the existing explanation in sendPrompt.
+  return undefined;
 }

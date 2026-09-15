@@ -197,6 +197,20 @@ type Phase2Input = {
       document.querySelector('.side-chat-thread')?.textContent?.includes('first answer'),
     ));
 
+    // The draft gate follows the parent live, before any child exists.
+    setValue(textarea(), "guarded question");
+    useAppStore.setState({ runningSessions: { [parent!.id]: true } });
+    await until(() => composer().querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled, 5_000, "busy draft disabled");
+    check("busy parent explanation visible", Boolean(panelHost()?.textContent?.includes("main conversation is still replying")));
+    check("busy parent creates no child", (await bridge.invoke("probe.sessionCount")).data.count === sessionCountBefore);
+    useAppStore.setState({ runningSessions: {}, sessions: useAppStore.getState().sessions.map((row) => row.id === parent!.id ? { ...row, readOnlyReason: "provider-unavailable" } : row) });
+    await until(() => panelHost()?.textContent?.includes("read-only"), 5_000, "read-only draft explanation");
+    check("read-only parent disables Send", Boolean(composer().querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled));
+    check("read-only parent creates no child", (await bridge.invoke("probe.sessionCount")).data.count === sessionCountBefore);
+    useAppStore.setState({ sessions: useAppStore.getState().sessions.map((row) => row.id === parent!.id ? { ...row, readOnlyReason: undefined } : row) });
+    await until(() => !composer().querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled, 5_000, "draft Send recovers");
+    check("guard changes preserve draft", textarea().value === "guarded question");
+
     setValue(textarea(), "probe question");
     composer().dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     childId = await until(() => Object.values(useAppStore.getState().sideChats).find(

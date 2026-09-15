@@ -3,7 +3,7 @@ import type { AppState } from "../app-state";
 import type { StoreAccess } from "./types";
 import { api } from "../../lib/api";
 import { forkedSessionMessages } from "../../lib/session-fork";
-import { registerSideChat, removeSideChat, sideChatEntry, sideChatWorkPanelTab, sideChatsForParent } from "../../lib/side-chat";
+import { sideChatSendBlockReason, registerSideChat, removeSideChat, sideChatEntry, sideChatWorkPanelTab, sideChatsForParent } from "../../lib/side-chat";
 import type { SessionSliceDependencies } from "./session-slice";
 
 export function createSideChatSlice({ get, set, commitForkedSession, withoutRecordKey }: StoreAccess &
@@ -57,13 +57,16 @@ export function createSideChatSlice({ get, set, commitForkedSession, withoutReco
       const entry = get().sideChats[id];
       const text = entry?.draft?.trim();
       if (!entry || !text || entry.sending) return false;
+      const blocked = sideChatSendBlockReason(entry, get().sessions, get().runningSessions);
+      if (blocked) {
+        get().showToast(i18n.t(blocked), { variant: "info" });
+        return false;
+      }
       updateEntry(id, { sending: true, error: undefined });
       const request = (async () => {
         let targetId = id;
         try {
           if (entry.pending) {
-            const parent = get().sessions.find((session) => session.id === entry.parentSessionId);
-            if (!parent || get().runningSessions[entry.parentSessionId]) return false;
             const result = await api.forkSession(entry.parentSessionId, entry.title, entry.anchorMessageId);
             const child = result.session;
             targetId = child.id;
@@ -94,6 +97,17 @@ export function createSideChatSlice({ get, set, commitForkedSession, withoutReco
                 }])),
               };
             });
+          }
+          // Forking may await auth/host work. Check the returned child's live
+          // availability, including when its panel was closed during creation.
+          const blocked = sideChatSendBlockReason(
+            { ...entry, sessionId: targetId, pending: false },
+            get().sessions,
+            get().runningSessions,
+          );
+          if (blocked) {
+            get().showToast(i18n.t(blocked), { variant: "info" });
+            return false;
           }
           const accepted = await get().sendPrompt(text, { text, fileReferences: [] }, targetId);
           if (accepted && get().sideChats[targetId]?.draft === entry.draft) {
