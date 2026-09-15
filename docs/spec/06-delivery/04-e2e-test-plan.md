@@ -10925,7 +10925,9 @@ are withdrawn with ADR 0165.
   using the exact returned `sessionId`, and stop another worker. 10) Restart
   the host/plugin with a queued delivery and confirm it remains held, while an
   interrupted turn is not replayed. Repeat the parallel creation step with a
-  large existing session list while keeping the parent visible.
+  large existing session list while keeping the parent visible. 11) With one
+  model's «Available for AI delegation» left off, ask the parent to spawn a
+  worker on it by `modelKey`, then spawn again with no `modelKey`.
 - **Expected**: Each worker is a real durable session with the parent's
   project/model/thinking/permission ceiling and an independent empty
   transcript at creation. The host ledger binds every delivery to the actual
@@ -10940,7 +10942,10 @@ are withdrawn with ADR 0165.
   interrupts only the selected delivery/turn without deleting the session.
   Sends without an active plugin tool invocation, forged source ids, targets
   above the source permission ceiling, worker fan-out overflow, inbox overflow,
-  and autonomous callback loops fail closed. Unrelated sessions and the
+  and autonomous callback loops fail closed. A `spawn` naming a model the user
+  has not enabled for AI delegation is refused with `PERMISSION_DENIED` before
+  a worker exists, while omitting `modelKey` — or naming the default model's
+  own key — still inherits. Unrelated sessions and the
   existing Task family are unchanged, and no localhost MCP call or token
   access occurs. Bursts of worker notifications serialize and coalesce
   session-list refreshes while preserving the final worker list and the
@@ -10948,7 +10953,8 @@ are withdrawn with ADR 0165.
 - **Specs linked**: `07-plugins/03-plugin-api.md`,
   `07-plugins/04-plugin-security.md`, `07-plugins/11-plugin-storage-isolation.md`,
   `03-runtime/01-ipc-protocol.md`, `03-runtime/06-host-rpc-protocol.md`,
-  `03-runtime/04-data-storage.md`, ADR 0237, ADR 0239
+  `03-runtime/04-data-storage.md`, `03-runtime/11-provider-model-system.md`,
+  ADR 0237, ADR 0239, ADR subagent-model-opt-in
 - **Acceptance**: C (parallel durable sessions), D (plugin security), Quality
 - **Milestone**: M6+
 - **Status**: host ledger coverage is automated by

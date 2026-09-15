@@ -3072,6 +3072,13 @@ D193, and D194.
   different provider id, and do not retire an idle runtime. Repeating a
   definition's own pin key is omit. On-demand matching uses unique provider
   lookup. The Task catalog discloses each definition's default model.
+- Scope clarification (2026-09-15, issue #386): the opt-in governs every entry
+  point through which the AI picks a model for delegated work, not only
+  `Task.model`. A `session/collaboration/spawn` `modelKey` naming a model
+  without the opt-in is refused with `PERMISSION_DENIED` before a worker is
+  created; omitting the key, or naming the default model's own key, remains
+  inheritance. `models.list` still reports every ready model with its flag —
+  the flag advises the caller and is authoritative only in Electron main.
 
 - Models not pre-resolved at sidecar launch are resolved on-demand via the
   `provider.resolveSubagentModel` RPC to Electron main, where credentials and

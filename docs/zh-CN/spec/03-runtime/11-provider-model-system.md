@@ -318,7 +318,9 @@ agent 系统提示的委托目录中。父 agent 随后就能通过 Task 工具�
 正常的固定模型解析生效，包括 `Task.model` 重复该定义自己的固定键。按需匹配使用唯一
 provider id/vendor/name 查找，不得用另一账号凭据覆盖固定模型。多个账号的 vendor/model 别名冲突时，已勾选账号改用
 确切的提供商 ID 作为覆盖键。优先级保持 Task.model → 定义固定模型 → 会话模型
-（D278；ADR subagent-model-opt-in）。
+（D278；ADR subagent-model-opt-in）。该许可约束所有让 AI 为委派工作挑选模型的入口，
+而不只是 `Task.model`：`session/collaboration/spawn` 的 `modelKey` 指向未勾选的模型时
+以 `PERMISSION_DENIED` 拒绝，省略该键或写出默认模型自己的键仍按继承处理。
 
 ## 8. 秘密
 

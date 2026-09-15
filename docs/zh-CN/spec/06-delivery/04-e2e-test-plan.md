@@ -6956,12 +6956,15 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   上下文，不创建替代会话。状态和面板刷新使用有界的轻量轮询；`wait` 在其等待上限内返回
   `timedOut`，不占满宿主工具超时时间。`cancel` 中止但不删除，无关会话和现有 Task 系列
   保持不变，且不发生 localhost MCP 调用或 token 访问。Worker 不能再创建 Worker，
-  不属于调用方的 Session ID 必须被拒绝，并发上限超出时必须安全失败。Worker 创建和
+  不属于调用方的 Session ID 必须被拒绝，并发上限超出时必须安全失败。`spawn` 指定用户
+  未勾选「可供 AI 自动调度」的模型时，在创建 Worker 之前以 `PERMISSION_DENIED` 拒绝；
+  省略 `modelKey`，或写出默认模型自己的键，仍按继承处理。Worker 创建和
   prompt 通知突发时，会话列表刷新串行执行并合并，同时保留最终 Worker 列表和前台会话。
   后到达的通知等待后续读取，不会因复用 Worker 创建之前已开始的读取而丢失。
 - **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/04-plugin-security.md`、
   `07-plugins/11-plugin-storage-isolation.md`、`03-runtime/01-ipc-protocol.md`、
-  `03-runtime/06-host-rpc-protocol.md`、ADR 0237
+  `03-runtime/06-host-rpc-protocol.md`、`03-runtime/11-provider-model-system.md`、
+  ADR 0237、ADR subagent-model-opt-in
 - **接受**：C（并行持久化会话）、D（插件安全性）、品质
 - **里程碑**：M6+
 - **状态**：host ledger 覆盖由 `pnpm test:e2e:collaboration` 自动化；marketplace 插件测试覆盖插件运行时，host-core 和 desktop 单元测试覆盖新增的宿主原子能力。完整真实 provider/Electron 旅程仍需在具备条件的 runner 中验证，遵循无本地 E2E 策略

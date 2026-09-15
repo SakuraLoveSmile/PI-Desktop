@@ -2684,6 +2684,11 @@ D193 和 D194。
   只有启动许可键进入复用快照。按需授权写入独立缓存，不得用不同 provider id
   覆盖固定模型，也不会替换空闲运行时。重复定义自己的固定键视为省略 `model`。
   按需匹配使用唯一提供商查找。Task 目录同时展示各定义的默认模型。
+- 范围澄清（2026-09-15，issue #386）：该许可约束所有让 AI 为委派工作挑选模型
+  的入口，不只是 `Task.model`。`session/collaboration/spawn` 的 `modelKey`
+  指向未勾选的模型时，在创建 worker 之前以 `PERMISSION_DENIED` 拒绝；省略该键
+  或写出默认模型自己的键仍按继承处理。`models.list` 依旧返回全部就绪模型及其
+  标志——该标志只是给调用方的提示，权威判断仅在 Electron main。
 - sidecar 启动时未预解析的模型通过发往 Electron main 的
   `provider.resolveSubagentModel` RPC 按需解析，凭据和 models.dev 快照都在
   那里。
