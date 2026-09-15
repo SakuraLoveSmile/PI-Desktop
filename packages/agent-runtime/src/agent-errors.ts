@@ -135,13 +135,21 @@ const SAFE_NETWORK_SYSCALL_PATTERN = /^[a-z][a-z_]{0,31}$/;
  */
 const SAFE_HOSTNAME_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+/**
+ * A hostname read out of the *message* is untrusted text, so it additionally
+ * has to be dotted: a bare API-key-shaped token, or the `user` left over when
+ * `getaddrinfo ENOTFOUND user:pass@host` is truncated at the colon, is not a
+ * hostname and must not be reported as one.
+ */
+const SAFE_MESSAGE_HOSTNAME_PATTERN =
+  /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 
 const NETWORK_CATEGORY_PATTERNS: ReadonlyArray<
   readonly [RegExp, NetworkFailureCategory]
 > = [
-  // Proxy first: a proxy-authored code names the layer that failed even when
-  // the socket errno underneath it belongs to another category.
-  [/PROXY/i, "proxy"],
+  // Anchored on the code, not on any occurrence of "proxy" inside it, so a
+  // provider body word cannot be read as a proxy layer.
+  [/(?:^|_)PROXY(?:_|$)|^EPROXY/i, "proxy"],
   [/^(?:ENOTFOUND|EAI_(?:AGAIN|FAIL|NODATA|NONAME))$|^ERR_DNS_/i, "dns"],
   [
     /(?:^|_)(?:CERT|TLS|SSL)(?:_|$)|^EPROTO$|^UNABLE_TO_|^HPE_|^CERT_|^DEPTH_ZERO_SELF_SIGNED_CERT$|^SELF_SIGNED_CERT_IN_CHAIN$/i,
@@ -166,6 +174,27 @@ function networkCategoryForCode(
     if (pattern.test(code)) return category;
   }
   return undefined;
+}
+
+/**
+ * Pick the errno worth reporting and its category. A code naming the proxy wins
+ * wherever it sits in the chain, because that is the layer that actually failed
+ * — undici reports the proxy's own socket errno as a deeper cause.
+ */
+function pickNetworkCode(codes: readonly string[]): {
+  code?: string;
+  category?: NetworkFailureCategory;
+} {
+  for (const candidate of codes) {
+    if (networkCategoryForCode(candidate) === "proxy") {
+      return { code: candidate, category: "proxy" };
+    }
+  }
+  for (const candidate of codes) {
+    const category = networkCategoryForCode(candidate);
+    if (category !== undefined) return { code: candidate, category };
+  }
+  return { code: codes.find((candidate) => NETWORK_PATTERN.test(candidate)) };
 }
 
 /**
@@ -259,30 +288,28 @@ export function describeNetworkFailure(
   };
   visit(err, 0);
 
+  // The message is untrusted provider text, so a candidate must look like an
+  // errno (bounded, errno-shaped) before it can be reported; the object chain
+  // above is probed first and its codes are kept.
   for (const match of message.matchAll(
     /\b(?:E[A-Z]{3,}|UND_ERR_[A-Z_]+|ERR_[A-Z0-9_]+|HPE_[A-Z_]+)\b/g,
   )) {
-    codes.push(match[0]);
+    if (codes.length >= 16) break;
+    if (SAFE_NETWORK_CODE_PATTERN.test(match[0])) codes.push(match[0]);
   }
   if (hostname === undefined) {
     const dnsHost = message.match(
       /(?:ENOTFOUND|EAI_AGAIN|EAI_NONAME|EAI_FAIL)\s+([A-Za-z0-9][A-Za-z0-9.-]{0,252})/,
     );
-    if (dnsHost && SAFE_HOSTNAME_PATTERN.test(dnsHost[1])) {
+    if (dnsHost && SAFE_MESSAGE_HOSTNAME_PATTERN.test(dnsHost[1])) {
       hostname = dnsHost[1];
     }
   }
 
-  const categorized = codes.find(
-    (candidate) => networkCategoryForCode(candidate) !== undefined,
-  );
-  const code =
-    categorized ?? codes.find((candidate) => NETWORK_PATTERN.test(candidate));
+  const picked = pickNetworkCode(codes);
   return {
-    category:
-      (categorized ? networkCategoryForCode(categorized) : undefined) ??
-      networkCategoryFromText(message),
-    ...(code ? { code } : {}),
+    category: picked.category ?? networkCategoryFromText(message),
+    ...(picked.code ? { code: picked.code } : {}),
     ...(syscall ? { syscall } : {}),
     ...(hostname ? { hostname } : {}),
   };

@@ -606,8 +606,7 @@ type AgentEvent =
 时的 `networkCategory`、`networkCode`、`networkSyscall`、`networkHost` 和请求
 关联字段 `requestMessages`、`requestBytes`、`compactionGeneration`。这些字段
 都是新增且经过编辑的；它们从不携带凭据或不受限制的提供商响应，请求字段
-只有计数与字节大小。
-提供商响应。瞬时流故障可能会在内部重播
+只有计数与字节大小。瞬时流故障可能会在内部重播
 同一回合，没有终端 `error` 事件或重复的辅助消息。
 第二次失败会发出终端标准化 `STREAM_FAILED` 错误。
 

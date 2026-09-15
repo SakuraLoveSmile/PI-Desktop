@@ -275,6 +275,30 @@ describe("provider rate-limit retry", () => {
     ]);
   });
 
+  it("reports no request size when the body cannot be measured unread", async () => {
+    const sizes: Array<number | undefined> = [];
+    const wrapped = captureProviderResponse(
+      async () => new Response("ok", { status: 200 }),
+      (_response, requestBytes) => {
+        sizes.push(requestBytes);
+      },
+    );
+
+    // A body the transport does not expose as a string/buffer/blob reports no
+    // size instead of throwing or being read.
+    await wrapped("https://provider.invalid", {
+      method: "POST",
+      body: new FormData(),
+    });
+    expect(sizes.at(-1)).toBeUndefined();
+
+    await wrapped("https://provider.invalid", {
+      method: "POST",
+      body: new Uint8Array([1, 2, 3, 4]),
+    });
+    expect(sizes.at(-1)).toBe(4);
+  });
+
   it("rejects an abortable retry delay without waiting for the timer", async () => {
     vi.useFakeTimers();
     const controller = new AbortController();

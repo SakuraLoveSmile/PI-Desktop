@@ -338,7 +338,7 @@ error. The assistant error message shows a localized summary and stable code,
 with an accessible details disclosure containing the redacted provider response,
 provider ID, and model ID. Provider detail is capped at 600 characters and
 common credential/header values are redacted before event emission or
-When available, the details disclosure may also show bounded
+persistence. When available, the details disclosure may also show bounded
 `phase`, `providerStatus`, `providerCode`, `providerWaitMs`, `streamMs`,
 `retryAttempt`, `networkCategory`, `networkCode`, `networkSyscall`,
 `networkHost`, `requestMessages`, `requestBytes`, and `compactionGeneration`
@@ -348,7 +348,7 @@ content. While a transient provider failure retries, the activity indicator's
 reason popover shows the localized summary, the stable code, and — for a
 network failure — the transport errno (`NETWORK_ERROR · ENOTFOUND`), so the
 failing layer is visible during the retry loop as well as in the log record.
-`retryAttempt` fields. The assistant error card offers a localized
+The assistant error card offers a localized
 Continue action that resends the continuation prompt (`继续当前任务` /
 `Continue the current task`) in the same session without truncating the failed
 turn. The session-scoped failed-turn recovery card is used only when no

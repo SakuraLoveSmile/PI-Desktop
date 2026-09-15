@@ -327,7 +327,7 @@ UI/host 超时在内部发出 `PERMISSION_TIMEOUT`，工具结果向代理显示
 助手错误消息显示本地化摘要和稳定代码，并带有
 包含经过编辑的提供商响应的可访问详细信息披露，
 提供商 ID 和模型 ID。提供商详细信息上限为 600 个字符，并且
-公共 credential/header 值在事件发射之前进行编辑或
+公共 credential/header 值在事件发射或持久化之前进行编辑。
 详细信息披露也可能显示有界的 `phase`、`providerStatus`、`providerCode`、
 `providerWaitMs`、`streamMs`、`retryAttempt`、`networkCategory`、
 `networkCode`、`networkSyscall`、`networkHost`、`requestMessages`、
