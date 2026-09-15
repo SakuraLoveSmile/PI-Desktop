@@ -381,6 +381,12 @@ Session ID，并复用该会话的项目、模型、上下文和权限配置；`
 不是 worker 身份。`status` 和 `result` 是有界投影，不会加载完整转录本。`cancel` 只中断
 精确的排队投递或绑定回合，并保留目标会话及其历史。
 
+`spawn` 中显式指定的 `modelKey` 属于 AI 自动调度的模型选择，需要该模型自身的
+`ModelBinding.availableForSubagents` 许可；对用户未勾选的模型，宿主在创建 worker 之前
+返回 `PERMISSION_DENIED`。省略 `modelKey` 仍然是继承——先取已勾选的模型，否则取默认
+模型——显式写出默认模型自己的键同样按继承处理，而不是一次选择
+（ADR subagent-model-opt-in）。
+
 `spawn` 和 `send` 仅在插件当前 Agent 工具调用期间有效。broker 注入 `pluginId`、来源
 `sessionId`、来源 `turnId` 和调用身份；插件参数不能提供或覆盖这些字段。面向用户的插件
 面板可使用自有插件身份调用 `cancel`，但不能用该路径发送或创建工作。宿主执行来源权限

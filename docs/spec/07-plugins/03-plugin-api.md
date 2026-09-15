@@ -464,6 +464,13 @@ and `result` are bounded projections and do not load a full transcript.
 `cancel` interrupts only the exact queued delivery or bound turn and retains
 the target session and history.
 
+A named `spawn` `modelKey` is an AI-driven delegation choice and needs that
+model's own `ModelBinding.availableForSubagents` opt-in; the host answers
+`PERMISSION_DENIED` for a model the user has not enabled, before creating a
+worker. Omitting `modelKey` still inherits — the first enabled model, else the
+default — and naming the default model's own key is that same inheritance
+rather than a selection (ADR subagent-model-opt-in).
+
 `list` returns at most 100 non-deleted Agent sessions that can receive a
 message, including sessions created independently of Session Orchestrator. Each
 entry contains only its Session ID, title, status, updated time, readable
