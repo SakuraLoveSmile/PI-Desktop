@@ -1957,6 +1957,12 @@ sklm: {
       "errorTooBig": "El documento supera el límite de tamaño."
     },
     "subagents": {
+      fallbackModels: "Modelos de respaldo",
+      fallbackModelsHint: "Se prueban en orden cuando fallan los reintentos. Se conservan los resultados de herramientas; Detener cancela toda la tarea.",
+      fallbackAdd: "Añadir modelo de respaldo",
+      fallbackMoveUp: "Subir {{model}}",
+      fallbackMoveDown: "Bajar {{model}}",
+      fallbackRemove: "Eliminar {{model}}",
       "title": "Subagentes",
       "add": "Nuevo subagente",
       "addTitle": "Nuevo subagente",

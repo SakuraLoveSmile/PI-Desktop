@@ -1965,6 +1965,12 @@ sklm: {
       errorTooBig: "正文超過了大小上限。",
     },
     subagents: {
+      fallbackModels: "備用模型",
+      fallbackModelsHint: "目前模型重試失敗後依序切換，保留已完成的工具結果；停止會取消整個子任務。",
+      fallbackAdd: "新增備用模型",
+      fallbackMoveUp: "上移 {{model}}",
+      fallbackMoveDown: "下移 {{model}}",
+      fallbackRemove: "移除 {{model}}",
       title: "子智慧體",
       add: "新建子智慧體",
       addTitle: "新建子智慧體",

@@ -1993,6 +1993,12 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       errorTooBig: "The document is over the size limit.",
     },
     subagents: {
+      fallbackModels: "Fallback models",
+      fallbackModelsHint: "Try in order after model retries fail. Completed tool results are kept; Stop cancels the whole task.",
+      fallbackAdd: "Add fallback model",
+      fallbackMoveUp: "Move {{model}} up",
+      fallbackMoveDown: "Move {{model}} down",
+      fallbackRemove: "Remove {{model}}",
       title: "Subagents",
       add: "New subagent",
       addTitle: "New subagent",

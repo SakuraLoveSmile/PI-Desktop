@@ -7215,6 +7215,8 @@ and identify the platform validation still needed.
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
 | Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
+| Quality (model fallback isolation) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | C — Conversation & stream (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | Quality (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 
@@ -11839,3 +11841,35 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   unchanged.
 - **Specs:** IPC native routing; runtime §12; storage §12; security §12.
 - **Status:** Documented; run after integration into main.
+
+
+### E2E-SUBAGENT-ordered-model-fallback-preserves-work
+
+- **Preconditions**: A configured primary and two alternatives use deterministic
+  local transports; one definition declares the ordered alternatives. A second
+  definition has no alternatives, and none are opted in for Task overrides.
+- **Steps**: Add two alternatives in Settings, reorder them, save and reopen;
+  change another field without changing the list. Run the child, complete one
+  tool call, then fail the primary request. Fail the first alternative and
+  complete the second. Repeat with exhausted transient/429 retries, all models
+  failing, unavailable/duplicate pins, an explicit authorized Task primary,
+  and Stop during recovery. Remove all alternatives, save, and reopen.
+- **Expected**: List order and clear/preserve semantics round-trip. Provider
+  retry budgets precede fallback; each distinct configured binding is used
+  once. The original task and completed tool results reach the next model;
+  completed tools are not replayed. Adapter/auth/headers and thinking match
+  each selected model. Failure diagnostics and total usage survive settlement;
+  effective model/thinking survive reload. Stop cancels the chain; host/tool
+  errors do not switch models. Exhaustion fails explicitly. Alternatives never
+  authorize a Task override for the second definition. No alternatives retains
+  the existing single-model behavior.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
+  `03-runtime/13-model-catalog-and-selection.md` §Subagent editor,
+  ADR subagent-model-fallback.
+- **Acceptance criterion**: C — Conversation & stream; Quality (compatibility
+  and permission isolation).
+- **Milestone**: M6+.
+- **Status**: Partially automated by shared/runtime regression tests and
+  `test:e2e:subagents` / `test:e2e:subagent-models`; full desktop editor/reload
+  journey documented. Required post-integration suites: `test:e2e`,
+  `test:e2e:subagents`, `test:e2e:subagent-models`.

@@ -1994,6 +1994,12 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       errorTooBig: "Belge boyut sınırının üzerinde.",
     },
     subagents: {
+      fallbackModels: "Yedek modeller",
+      fallbackModelsHint: "Model yeniden denemeleri başarısız olursa sırayla denenir. Tamamlanan araç sonuçları korunur; Durdur tüm görevi iptal eder.",
+      fallbackAdd: "Yedek model ekle",
+      fallbackMoveUp: "{{model}} yukarı taşı",
+      fallbackMoveDown: "{{model}} aşağı taşı",
+      fallbackRemove: "{{model}} kaldır",
       title: "Alt ajanlar",
       add: "Yeni alt ajan",
       addTitle: "Yeni alt ajan",
