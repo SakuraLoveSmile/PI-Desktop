@@ -301,6 +301,7 @@ export const fr = {
     "errorProvider": "Fournisseur d'IA",
     "errorModel": "Modèle",
     "previewFile": "Aperçu dans le panneau latéral",
+    "fileRefMissing": "Aucun fichier ne correspond à {{name}}",
     "previewUrl": "Ouvrir dans le navigateur latéral",
     "openFile": "Ouvrir avec l'application par défaut",
     "retry": "Régénérer la branche",

@@ -308,6 +308,7 @@ export const en = {
     errorProvider: "AI provider",
     errorModel: "Model",
     previewFile: "Preview in the side panel",
+    fileRefMissing: "No file matches {{name}}",
     previewUrl: "Open in the side browser",
     openFile: "Open with default application",
     retry: "Regenerate",

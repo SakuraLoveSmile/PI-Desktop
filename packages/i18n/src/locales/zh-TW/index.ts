@@ -303,6 +303,7 @@ export const zhTW = {
     errorProvider: "AI 服務",
     errorModel: "模型",
     previewFile: "在側邊面板預覽",
+    fileRefMissing: "沒有匹配 {{name}} 的檔案",
     previewUrl: "在側邊瀏覽器中開啟",
     openFile: "用系統預設應用開啟",
     retry: "重新生成",

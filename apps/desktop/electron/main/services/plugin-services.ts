@@ -28,6 +28,7 @@ import {
   type RuntimeProviderConfig,
 } from "@pi-desktop/agent-runtime";
 import { createFsConsentService } from "../plugin-fs-consent";
+import { pluginWorkspaceInfo } from "../workspace-roots";
 import { createDesktopConsentService } from "../plugin-desktop-consent";
 import { PluginRuntime } from "../plugin-runtime";
 import { UserMcpRuntime } from "../user-mcp";
@@ -505,6 +506,12 @@ export function createPluginServices({
     browserHost.setChromeSurface(surface);
   };
   plugins.setServices({
+    /**
+     * The richer workspace payload, so `pi.workspace.get` and the
+     * `workspace:changed` event both expose the open project's folder roots
+     * (ADR 0252) instead of the bare primary path.
+     */
+    getWorkspaceInfo: () => pluginWorkspaceInfo(getWorkspacePath()),
     agentExtensionsChanged: () =>
       sendToRenderer(IPC.event.pluginChanged, { reason: "agentExtensions" }),
     browser: {
