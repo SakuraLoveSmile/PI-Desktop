@@ -306,7 +306,7 @@ describe("planSafeActions contract (ADR 0211)", () => {
 });
 
 describe("contributed theme assets and window appearance", () => {
-  it("accepts a whitelisted relative asset list", () => {
+  it("accepts a whitelisted absolute asset list", () => {
     expect(
       validateContributions({
         themes: [
@@ -314,15 +314,24 @@ describe("contributed theme assets and window appearance", () => {
             id: "midnight",
             label: "Midnight",
             path: "a.css",
-            assets: ["./art/bg.png", "font/ui.woff2"],
+            assets: ["C:/art/bg.png", "file:///C:/font/ui.woff2", "/art/sheen.svg"],
           },
         ],
       }),
     ).toBeUndefined();
   });
 
-  it("rejects an asset outside the package or off the whitelist", () => {
-    for (const asset of ["../bg.png", "/bg.png", "art/bg.gif", "art/../bg.png", "C:/bg.png"]) {
+  it("rejects a relative path, an escape, an unknown scheme or a wrong extension", () => {
+    for (const asset of [
+      "art/bg.png",
+      "./art/bg.png",
+      "../bg.png",
+      "art/../bg.png",
+      "C:/art/../bg.png",
+      "C:/art/bg.gif",
+      "https://x/bg.png",
+      "",
+    ]) {
       expect(
         validateContributions({
           themes: [{ id: "midnight", label: "Midnight", path: "a.css", assets: [asset] }],
@@ -334,7 +343,14 @@ describe("contributed theme assets and window appearance", () => {
   it("rejects the same asset declared twice", () => {
     expect(
       validateContributions({
-        themes: [{ id: "m", label: "M", path: "a.css", assets: ["bg.png", "./bg.png"] }],
+        themes: [
+          {
+            id: "m",
+            label: "M",
+            path: "a.css",
+            assets: ["C:/art/bg.png", "file:///C:/art/bg.png"],
+          },
+        ],
       }),
     ).toMatch(/twice/);
   });
