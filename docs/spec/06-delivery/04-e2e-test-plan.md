@@ -12041,6 +12041,51 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Acceptance**: Quality
 - **Milestone**: M6+
 - **Status**: Automated (`pnpm test:e2e:skill-market`)
+
+#### E2E-TRAY-bounded-session-navigation
+
+- **Scope**: Native tray groups, hidden/recreated window activation, and unread
+  semantics (issue #293, ADR tray-session-shortcuts).
+- **Preconditions**: At least four running, four unread, and four pinned
+  sessions across two projects; include overlaps, read-latest/older-unread
+  notifications, archived/deleted sessions, an archived project, empty titles,
+  multiline titles, long CJK/emoji titles, and literal ampersands. Also cover
+  a single populated group of seven and one of more than nine, with the other
+  two groups empty, to exercise reclaimed share. Use an
+  isolated profile. Repeat native activation on macOS and Windows/Linux.
+- **Steps**: Hide the main window and open the tray menu. Inspect group order,
+  counts, duplicates, titles, and unchanged unread records. Choose the third
+  row from another project, then View more from Settings with a collapsed
+  sidebar and a retained search query. Finish/abort tasks while hidden;
+  read a result, pin/unpin, rename, archive/restore, and delete a session.
+  Close the macOS window while a task runs and let it finish, then activate
+  its tray row while the new renderer bootstraps a pending plan. Delay a Host
+  read while a newer preference update, delete, or Host restart arrives.
+  Retry a transient read failure by hovering/right-clicking the tray.
+  Repeat after clearing all group memberships and changing shipped locales.
+  Choose Quit then Cancel, then Quit and confirm.
+- **Expected**: Running → Unread → Pinned; at most nine rows in total. Each
+  non-empty group keeps up to three rows and overflowing groups reclaim the
+  share smaller groups leave unused, in priority order: seven running sessions
+  with no unread or pinned show all seven, and a single group holding more than
+  nine shows nine behind View more. Deduplicate before limits, so hidden
+  Running overflow cannot
+  appear as Unread/Pinned. Empty groups and stale shortcuts disappear. Unread
+  uses the latest terminal result per session, newest first. Titles remain
+  one line within the cap, including literal ampersands. Opening the macOS
+  menu leaves the window hidden and records unread. A row opens exactly that
+  session/project, acknowledges it normally, and wins over startup navigation.
+  View more returns from Settings, closes search, and expands session navigation. Hidden/closed windows receive fresh groups;
+  stale reads, archived/deleted targets, and a failed backend cannot restore
+  stale shortcuts. Open, localization, quit cancellation, and shutdown work.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13b,
+  `03-runtime/07-process-model.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`, ADR tray-session-shortcuts.
+- **Acceptance**: A (app/window lifecycle), C (conversation navigation),
+  F (unread persistence), Quality (bounded localized menu).
+- **Milestone**: Post-M6 desktop shell maintenance.
+- **Status**: Draft; native E2E requires an explicitly authorized run.
+
 #### E2E-PLUGIN-turn-ended-once-per-host-turn: A plugin observes exactly one turn-end event per host turn
 
 - **Preconditions**: A plugin with a tool and an event listener for
@@ -12190,41 +12235,3 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   The configuration-editor journey passed under WSL; task-transcript reload
   acceptance remains outstanding. Required post-integration suites: `test:e2e`,
   `test:e2e:subagents`, `test:e2e:subagent-models`.
-
-#### E2E-TRAY-bounded-session-navigation
-
-- **Scope**: Native tray groups, hidden/recreated window activation, and unread
-  semantics (issue #293, ADR tray-session-shortcuts).
-- **Preconditions**: At least four running, four unread, and four pinned
-  sessions across two projects; include overlaps, read-latest/older-unread
-  notifications, archived/deleted sessions, an archived project, empty titles,
-  multiline titles, long CJK/emoji titles, and literal ampersands. Use an
-  isolated profile. Repeat native activation on macOS and Windows/Linux.
-- **Steps**: Hide the main window and open the tray menu. Inspect group order,
-  counts, duplicates, titles, and unchanged unread records. Choose the third
-  row from another project, then View more from Settings with a collapsed
-  sidebar and a retained search query. Finish/abort tasks while hidden;
-  read a result, pin/unpin, rename, archive/restore, and delete a session.
-  Close the macOS window while a task runs and let it finish, then activate
-  its tray row while the new renderer bootstraps a pending plan. Delay a Host
-  read while a newer preference update, delete, or Host restart arrives.
-  Retry a transient read failure by hovering/right-clicking the tray.
-  Repeat after clearing all group memberships and changing shipped locales.
-  Choose Quit then Cancel, then Quit and confirm.
-- **Expected**: Running → Unread → Pinned; at most three rows per group and
-  nine total. Deduplicate before limits, so hidden Running overflow cannot
-  appear as Unread/Pinned. Empty groups and stale shortcuts disappear. Unread
-  uses the latest terminal result per session, newest first. Titles remain
-  one line within the cap, including literal ampersands. Opening the macOS
-  menu leaves the window hidden and records unread. A row opens exactly that
-  session/project, acknowledges it normally, and wins over startup navigation.
-  View more returns from Settings, closes search, and expands session navigation. Hidden/closed windows receive fresh groups;
-  stale reads, archived/deleted targets, and a failed backend cannot restore
-  stale shortcuts. Open, localization, quit cancellation, and shutdown work.
-- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13b,
-  `03-runtime/07-process-model.md`, `04-ux/08-component-spec.md`,
-  `04-ux/09-interaction-patterns.md`, ADR tray-session-shortcuts.
-- **Acceptance**: A (app/window lifecycle), C (conversation navigation),
-  F (unread persistence), Quality (bounded localized menu).
-- **Milestone**: Post-M6 desktop shell maintenance.
-- **Status**: Draft; native E2E requires an explicitly authorized run.
