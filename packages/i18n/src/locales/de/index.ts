@@ -1961,6 +1961,12 @@ sklm: {
       "errorTooBig": "Das Dokument überschreitet die Größenbeschränkung."
     },
     "subagents": {
+      fallbackModels: "Ersatzmodelle",
+      fallbackModelsHint: "Nach fehlgeschlagenen Modellwiederholungen der Reihe nach versuchen. Werkzeugergebnisse bleiben erhalten; Stopp beendet die gesamte Aufgabe.",
+      fallbackAdd: "Ersatzmodell hinzufügen",
+      fallbackMoveUp: "{{model}} nach oben",
+      fallbackMoveDown: "{{model}} nach unten",
+      fallbackRemove: "{{model}} entfernen",
       "title": "Subagenten",
       "add": "Neuer Subagent",
       "addTitle": "Neuer Subagent",

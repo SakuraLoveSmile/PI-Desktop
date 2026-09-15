@@ -1998,6 +1998,12 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       errorTooBig: "문서가 크기 제한을 초과했습니다.",
     },
     subagents: {
+      fallbackModels: "대체 모델",
+      fallbackModelsHint: "모델 재시도 실패 후 순서대로 시도합니다. 완료된 도구 결과는 유지되며 중지하면 전체 작업이 취소됩니다.",
+      fallbackAdd: "대체 모델 추가",
+      fallbackMoveUp: "{{model}} 위로 이동",
+      fallbackMoveDown: "{{model}} 아래로 이동",
+      fallbackRemove: "{{model}} 제거",
       title: "서브에이전트",
       add: "새 서브에이전트",
       addTitle: "새 서브에이전트",
