@@ -164,6 +164,7 @@ import {
   openCodeEndpointFromProvider,
   withOpenCodeSessionHeaders,
 } from "./opencode-session-headers.js";
+import { withCompactionRequestHeaders } from "./compaction-request.js";
 import {
   mergeProviderHeaders,
   providerHeadersEqual,
@@ -5777,7 +5778,10 @@ Delegation rules:
   ): Promise<Awaited<ReturnType<typeof compact>>> {
     return compact(
       preparation,
-      this.models,
+      // The summary is a provider request like any other turn, but
+      // pi-agent-core builds its options itself and never reaches `streamFn`,
+      // so the headers have to ride on the collection.
+      withCompactionRequestHeaders(this.models, this.provider, this.sessionId),
       this.model,
       undefined,
       this.thinkingLevel,
