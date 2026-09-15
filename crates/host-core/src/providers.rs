@@ -26,6 +26,7 @@ pub use model::{
 pub use repository::{
     create_provider, delete_provider, get_provider, list_providers, update_provider,
 };
+pub(crate) use repository::{delete_provider_row, provider_owner_plugin};
 
 pub(crate) use catalog::{
     config_model_bindings, config_thinking_levels_override, config_with_model_bindings,

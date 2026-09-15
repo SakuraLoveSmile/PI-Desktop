@@ -56,6 +56,7 @@ pub(crate) fn provider_from_row(
             .get::<_, String>(11)
             .ok()
             .and_then(|raw| config_limit_f64(&raw, "temperature")),
+        owner_plugin_id: row.get(14)?,
         created_at: ms_to_ts(row.get(12)?),
         updated_at: ms_to_ts(row.get(13)?),
     })
@@ -162,9 +163,16 @@ pub fn update_provider(
     secrets: &SecretStore,
     input: ProviderUpdateInput,
 ) -> Result<Option<ProviderPublic>> {
-    let existing = get_provider(db, secrets, &input.id)?;
-    if existing.is_none() {
+    let Some(current) = get_provider(db, secrets, &input.id)? else {
         return Ok(None);
+    };
+    // A plugin-declared row is refreshed from its manifest on every load, so a
+    // generic edit would be silently reverted. The plugin path owns it.
+    if let Some(owner) = current.owner_plugin_id.as_deref() {
+        bail!(
+            "PROVIDER_OWNED_BY_PLUGIN: provider {} belongs to plugin {owner}",
+            input.id
+        );
     }
     // Validate before any side effect: a rejected alias must not replace the
     // stored secret.
@@ -262,7 +270,31 @@ pub fn update_provider(
     get_provider(db, secrets, &input.id)
 }
 
+/// Delete a user-owned provider row. A plugin-declared row is refused here:
+/// only its plugin (or the user disabling/uninstalling it) may remove it.
 pub fn delete_provider(db: &Database, secrets: &SecretStore, id: &str) -> Result<bool> {
+    if let Some(owner) = provider_owner_plugin(db, id)? {
+        bail!("PROVIDER_OWNED_BY_PLUGIN: provider {id} belongs to plugin {owner}");
+    }
+    delete_provider_row(db, secrets, id)
+}
+
+/// The plugin that owns a provider row, or `None` for a user-owned row.
+pub(crate) fn provider_owner_plugin(db: &Database, id: &str) -> Result<Option<String>> {
+    db.conn()
+        .query_row(
+            "SELECT owner_plugin_id FROM providers WHERE id = ?1",
+            params![id],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()
+        .map(Option::flatten)
+        .map_err(Into::into)
+}
+
+/// Row deletion without the ownership guard, for callers that already checked
+/// it — the plugin provider sync and the plugin-scoped RPC methods.
+pub(crate) fn delete_provider_row(db: &Database, secrets: &SecretStore, id: &str) -> Result<bool> {
     // Both credential channels are provider-scoped, so deleting the row must
     // take the OAuth credential with it or a re-created provider could inherit
     // a stranger's refresh token.

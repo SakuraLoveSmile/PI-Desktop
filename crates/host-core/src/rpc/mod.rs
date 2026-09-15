@@ -3736,6 +3736,13 @@ async fn handle_request(
                     rpc_err(1010, msg, "PLUGIN_LOAD_FAILED")
                 }
             })?;
+            // A development plugin owns its declared provider rows the same way
+            // an installed one does.
+            if let Err(error) =
+                crate::plugins::reconcile_plugin(&st.db, &st.secrets, &st.plugins, &plugin.id, true)
+            {
+                tracing::warn!(plugin = %plugin.id, %error, "plugin provider sync failed");
+            }
             Ok(json!({ "plugin": plugin }))
         }
         "plugins.enable" => {
@@ -3748,6 +3755,17 @@ async fn handle_request(
                 .plugins
                 .set_enabled(id, true)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            if let Some(current) = plugin.as_ref() {
+                if let Err(error) = crate::plugins::reconcile_plugin(
+                    &st.db,
+                    &st.secrets,
+                    &st.plugins,
+                    &current.id,
+                    true,
+                ) {
+                    tracing::warn!(plugin = %current.id, %error, "plugin provider sync failed");
+                }
+            }
             Ok(json!({ "plugin": plugin }))
         }
         "plugins.disable" => {
@@ -3760,6 +3778,14 @@ async fn handle_request(
                 .plugins
                 .set_enabled(id, false)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            // The declaration still exists, so the rows stay and are turned
+            // off: a re-enable restores the credential the user already gave.
+            if plugin.is_some() {
+                if let Err(error) = crate::plugins::set_plugin_providers_enabled(&st.db, id, false)
+                {
+                    tracing::warn!(plugin = id, %error, "plugin provider disable failed");
+                }
+            }
             Ok(json!({ "plugin": plugin }))
         }
         "plugins.uninstall" => {
@@ -3772,6 +3798,12 @@ async fn handle_request(
                 .plugins
                 .uninstall(id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            if ok {
+                if let Err(error) = crate::plugins::remove_plugin_providers(&st.db, &st.secrets, id)
+                {
+                    tracing::warn!(plugin = id, %error, "plugin provider removal failed");
+                }
+            }
             Ok(json!({ "ok": ok }))
         }
         "plugins.getPermissions" => {
