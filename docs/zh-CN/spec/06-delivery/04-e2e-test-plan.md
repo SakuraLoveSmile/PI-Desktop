@@ -105,6 +105,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - Electron 启动、preload 或窗口生命周期：`pnpm test:e2e` 和 `pnpm test:e2e:boot`。
 - 会话列表刷新或模型能力查询：`pnpm test:e2e` 和 `pnpm test:e2e:boot`，
   包括合成大列表的响应性检查。
+- 设置/输入框/插件搜索的主题表面：先运行 `pnpm build:js`，再运行
+  `pnpm test:e2e:theme-surfaces`。
 - 输入框剪贴板表示与文本插入：`pnpm test:e2e:composer-paste`。
 - 聊天记录渲染边界和跨活动段委派显示：`pnpm test:e2e:transcript`。
 - Plan host/runtime：`pnpm test:e2e` 和 `pnpm test:e2e:plan`。
@@ -3064,16 +3066,22 @@ IPC 请求无法关闭。
   3. 打开聊天会话旁边的工作面板（审阅/文件/浏览器）。
   4. 将鼠标悬停在文件树行或 diff 标头上；聚焦浏览器 URL 字段。
   5. 打开 confirmation/provider 对话框并检查稀松布。
+  6. 在明暗主题中分别检查设置导航轨、搜索、选中项、开启状态旋钮、输入框壳及
+     插件/能力搜索。应用自定义表面变量，使用键盘聚焦两类搜索，再移除自定义主题。
 - **预期**：
   - 工作面板主体读取为安静的 `#fafafa` 插页纸，带有白色标题带。
   - 设置字段、浏览器 URL、分段轨道和快捷键键帽使用浅色嵌入填充；聚焦场通过中性环提升。
   - 切换开启状态使白色旋钮保持在近乎黑色的轨道上。
   - 悬停可通过共享运动令牌轻松填充 file-tree/diff/resize。
-- 浅色对话稀松布比深色 45% 面纱（约 28% 墨水）更柔软。
+  - 浅色对话稀松布比深色 45% 面纱（约 28% 墨水）更柔软。
+  - 自定义变量改变对应表面及搜索焦点填充；移除后恢复内置 8-bit RGBA 配色与
+    原有阴影/焦点环。本批不迁移正文或遮罩，不改插件主题 API。
 - **链接规格**：`04-ux/07-ui-design-system.md`、`04-ux/08-component-spec.md`
 - **接受**：D148
 - **里程碑**：M5
-- **状态详细信息**：CSS 合约的源代码级别覆盖范围；目视表面检查仍然是手动的。
+- **状态详细信息**：`pnpm test:e2e:theme-surfaces` 使用真实 Chromium、生产 CSS
+  和确定性 DOM 夹具覆盖上述普通表面、焦点状态及内置配色恢复，不覆盖插件安装/
+  生命周期。分支执行不能替代合并后 E2E；本场景其余表面仍需人工检查。
 
 #### E2E-079：面向用户的英文和中文目录副本
 
