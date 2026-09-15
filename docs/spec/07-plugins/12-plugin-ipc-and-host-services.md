@@ -132,6 +132,35 @@ plugin runtime
  → response
 ```
 
+### 6.1 Allowlist names and audit operations for the real-time capabilities
+
+The broker's `HOST_API_ALLOWLIST` gains three implemented entries, all gated on
+`keyboard.globalShortcut`:
+
+- `keyboard.registerGlobalShortcut`
+- `keyboard.unregisterGlobalShortcut`
+- `keyboard.listGlobalShortcuts`
+
+Their audit operations are `keyboard.globalShortcut.register`,
+`keyboard.globalShortcut.unregister`, and `keyboard.globalShortcut.trigger` (a
+shortcut that fired). Register and trigger entries record the accelerator and
+command; no key events and no input text are ever recorded.
+
+The socket capability is implemented: `net.websocket.connect` /
+`net.websocket.send` / `net.websocket.close` are registered in the same
+allowlist, gated on `net.websocket`. Its audit operations are
+`net.websocket.connect` and `net.websocket.close` (plugin id and result, never
+payloads, headers, or keys), plus a refused `net.websocket.send`; a successful
+send is not audited. Frames travel back to the owning plugin only, as the host
+events `net:websocket:open`, `net:websocket:message`, `net:websocket:close`,
+and `net:websocket:error`.
+
+The device capabilities are specified but not implemented in this branch, so
+their names are reserved rather than allowlisted, and every call fails closed
+with `UNSUPPORTED`. Reserved audit-operation names: `audio.input.open` /
+`audio.input.close`, `audio.output.open` / `audio.output.stop` /
+`audio.output.close` (ADR 0257).
+
 ## 7. PanelHost interaction
 
 - Create an isolated view when opening a panel

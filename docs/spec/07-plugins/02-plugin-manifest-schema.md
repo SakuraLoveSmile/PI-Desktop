@@ -95,6 +95,7 @@ type PluginContributes = {
   bus?: PluginBusContrib;
   views?: PluginViewContrib[];
   sessionSources?: PluginSessionSourceContrib[];
+  globalShortcuts?: PluginGlobalShortcutContrib[]; // needs `keyboard.globalShortcut`
 };
 
 type PluginCommandContrib = {
@@ -140,6 +141,13 @@ type PluginViewContrib = {
 type PluginSessionSourceContrib = {
   id: string; // ^[a-zA-Z][a-zA-Z0-9._-]{0,63}$, unique within the plugin
   label?: string | { en: string; "zh-CN": string };
+};
+
+/** One system-wide accelerator a plugin declares (`keyboard.globalShortcut`). */
+type PluginGlobalShortcutContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9._-]{0,63}$, unique within the plugin
+ command: string; // must be declared in contributes.commands
+ default?: string; // accelerator the host registers after load; omitted means `pi.keyboard` registers it later
 };
 
 type PluginThemeContrib = {
@@ -217,7 +225,11 @@ type PluginPermission =
  | "session.import"
  | "session.read.own"
  | "session.update.own"
- | "session.delete.own";
+ | "session.delete.own"
+ | "audio.capture.background"
+ | "audio.playback.background"
+ | "keyboard.globalShortcut"
+ | "net.websocket";
 ```
 
 Unknown permission = validation failure.
@@ -276,6 +288,11 @@ HTTP MCP endpoints — is confined to these hostnames. An omitted, empty, or
 malformed list means no egress at all, whatever `net.fetch` says. Entries are
 bare hostnames: no scheme, no port, no path, and no bare `*`. A leading `*.`
 covers the domain and its subdomains.
+
+`pi.net.websocket` answers to the same list (`net.websocket`,
+[03-plugin-api.md](03-plugin-api.md) §3). The permission is implemented: a
+connect is confined to `manifest.net.domains`, and a host that is not declared
+is refused before the transport is asked to open anything.
 
 ## 5.1 Bus topic grammar
 
@@ -351,6 +368,12 @@ MVP may implement only:
     `zh-CN`. `views[].icon` is **not** validated against the token list: an
     unknown token degrades to a letter tile, so refusing one would break a
     plugin over a cosmetic detail. The packaging check warns about it instead
+
+18. `contributes.globalShortcuts` allows at most 8 entries and needs
+   `keyboard.globalShortcut`. Each `id` matches
+   `[a-zA-Z][a-zA-Z0-9._-]{0,63}` and is unique; `command` must be declared in
+   `contributes.commands`; `default`, when present, uses the same
+   modifier-plus-key / F-key grammar as `shortcut` settings
 
 ## 8. Example: minimal plugin
 

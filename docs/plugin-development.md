@@ -746,8 +746,12 @@ Undeclared or ungranted API calls fail with `PERMISSION_DENIED`.
 | Risk | Permissions |
 |---|---|
 | Low | `ui.panel`, `ui.view`, `ui.theme`, `notify` |
-| Medium | `clipboard.read`, `clipboard.write`, `fs.read`, `shell.openExternal`, `background.service`, `bus.publish`, `bus.subscribe` |
-| High | `fs.write`, `fs.delete`, `agent.tool.register`, `agent.prompt.inject`, `net.fetch`, `mcp.server.local`, `mcp.server.remote` |
+| Medium | `clipboard.read`, `clipboard.write`, `fs.read`, `shell.openExternal`, `background.service`, `bus.publish`, `bus.subscribe`, `audio.playback.background`, `keyboard.globalShortcut` |
+| High | `fs.write`, `fs.delete`, `agent.tool.register`, `agent.prompt.inject`, `net.fetch`, `mcp.server.local`, `mcp.server.remote`, `audio.capture.background`, `net.websocket` |
+
+`keyboard.globalShortcut` and `net.websocket` are implemented. `pi.audio.*` is
+declared and gated but not implemented yet: every call fails closed with
+`UNSUPPORTED` until the host service lands.
 
 Two permissions carry a declared range as well as a name, and the user is shown
 both: `manifest.fs` for the file modes (§6.5) and `manifest.net.domains` for

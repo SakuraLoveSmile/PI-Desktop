@@ -7338,6 +7338,108 @@ and identify the platform validation still needed.
 - **Status**: Unit/integration covered by `upstream-sync-annotations.test.mjs` and
   `annotation-only-send.test.mjs`; post-main desktop journey not run in merge worktree.
 
+#### E2E-PLUGIN-global-shortcut-owns-only-its-own-command
+
+- **Preconditions**: Two local fixture plugins are installed in an isolated
+  profile. Plugin A declares `keyboard.globalShortcut`, `contributes.commands`
+  with one command, and `contributes.globalShortcuts` mapping `Alt+Shift+V` to
+  it. Plugin B declares the same permission and asks for `Alt+Shift+V` while A
+  holds it. A second application is available for a cross-application keypress.
+- **Steps**: 1) Install and load A and confirm the accelerator is held through
+  `listGlobalShortcuts`. 2) Focus another application, press `Alt+Shift+V`, and
+  confirm A's command runs; drive the registered handler through the host's
+  test seam when no cross-application input is available. 3) Attempt a shortcut
+  whose `command` belongs to another plugin. 4) Attempt B's registration of
+  `Alt+Shift+V` and inspect the answer. 5) Disable and uninstall A and confirm
+  the accelerator becomes free and B can take it; repeat after terminating A's
+  runtime (crash) and while A's panel is closed. 6) Attempt the app's own
+  launcher accelerator `Alt+Space`, the `Mod+Shift+W` summon binding, a
+  reserved binding such as `Mod+C`, an invalid accelerator, and a ninth
+  shortcut for one plugin.
+- **Expected**: Only A's own command runs for the accelerator; a shortcut whose
+  `command` is not registered by the plugin is refused with `INVALID_ARGUMENT`.
+  B receives a refusal (`registered: false`, code `SHORTCUT_CONFLICT`) and keeps
+  no accelerator while A holds it. The host's own `Alt+Space` launcher and
+  `Mod+Shift+W` summon shortcuts and OS-reserved bindings are refused with
+  `SHORTCUT_CONFLICT` or `SHORTCUT_UNAVAILABLE`; an invalid accelerator is
+  refused with `INVALID_ACCELERATOR` and the ninth per-plugin shortcut with
+  `LIMIT_EXCEEDED`. Disabling, unloading, or crashing a plugin releases every
+  accelerator it held, after which another plugin can take it, and app quit
+  releases all shortcuts. Audit records each register/unregister attempt with
+  the plugin id and result, and never records key contents.
+- **Specs linked**: `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`,
+  `07-plugins/13-plugin-permissions-matrix.md`, ADR 0257
+- **Acceptance**: G (plugins), Security, Quality
+- **Milestone**: M6+
+- **Status**: Registry, host wiring, and manifest validation are unit-covered
+  (`apps/desktop/test/plugin-shortcuts.test.mjs`,
+  `packages/plugin-sdk/src/index.test.ts`,
+  `crates/host-core/src/plugins/tests.rs`); the cross-application keypress
+  journey is Draft and needs a capable desktop environment.
+
+#### E2E-PLUGIN-permission-gate-for-real-time-capabilities
+
+- **Preconditions**: A fixture plugin whose manifest can be changed between
+  runs, and a data directory in which the user can re-grant permissions.
+- **Steps**: 1) Install a build that requires `keyboard.globalShortcut` and
+  inspect the install dialog. 2) Load a plugin that calls
+  `pi.keyboard.listGlobalShortcuts()` without declaring the permission.
+  3) Declare but do not grant the permission, then call the same API. 4) Grant
+  the permission and call the same API again. 5) Revoke the permission with the
+  plugin loaded and press the accelerator. 6) Repeat steps 2–5 for
+  `audio.capture.background`, `audio.playback.background`, and `net.websocket`.
+- **Expected**: Undeclared and declared-but-ungranted calls are refused with
+  `PERMISSION_DENIED` and an audit entry, so an ungranted capability fails
+  closed instead of degrading. After a grant the same call is allowed — for
+  `net.websocket` that is a connect that proceeds past the gate — while the
+  not-yet-implemented audio APIs answer `UNSUPPORTED` until their runtime lands,
+  never a silent success. Revoking the permission with the
+  plugin loaded stops the accelerator immediately and the host releases it. The
+  four permissions appear with their risk tiers (high for
+  `audio.capture.background` and `net.websocket`, medium for
+  `audio.playback.background` and `keyboard.globalShortcut`) and localized copy
+  in the install dialog and in the plugin detail sheet, ordered by descending
+  risk.
+- **Specs linked**: `07-plugins/04-plugin-security.md`,
+  `07-plugins/13-plugin-permissions-matrix.md`, ADR 0257
+- **Acceptance**: G (plugins), Security
+- **Milestone**: M6+
+- **Status**: The gates and validator behaviour are unit-covered
+  (`packages/plugin-sdk/src/index.test.ts`,
+  `packages/plugin-devkit/src/check.test.ts`,
+  `crates/host-core/src/plugins/tests.rs`); the dialog journey is Draft.
+
+#### E2E-PLUGIN-background-audio-and-realtime-connection
+
+- **Preconditions**: A voice-assistant fixture plugin holding
+  `background.service`, `audio.capture.background`,
+  `audio.playback.background`, `keyboard.globalShortcut`, `net.websocket`, and
+  `desktop.control`, with a mock audio backend and a local mock WebSocket
+  server so CI never needs a real microphone.
+- **Steps**: 1) Load the plugin with no panel open and confirm that its
+  background service starts. 2) Register the push-to-talk accelerator. 3) Open
+  the input device and receive PCM frames. 4) Connect the mock server and send
+  PCM. 5) Receive the response audio and play it. 6) Interrupt playback with
+  `stopOutput`. 7) Call `pi.desktop.invoke({ operation: "session/create" })`
+  and then `agent/prompt`. 8) Unload the plugin.
+- **Expected**: Frames flow with bounded buffering and no unbounded queue
+  growth, and `stopOutput` clears queued audio immediately. Egress to a host
+  outside `manifest.net.domains` is refused. On unload the microphone, the
+  audio output, the socket, and the accelerator are all released with no orphan
+  process, listener, or timer. `session/delete`-class dangerous desktop
+  operations still require the host's native confirmation even when the plugin
+  passes `confirm: true`.
+- **Specs linked**: `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`,
+  `07-plugins/12-plugin-ipc-and-host-services.md`, ADR 0257
+- **Acceptance**: G (plugins), Security, Quality
+- **Milestone**: M6+
+- **Status**: Partially implemented — the socket half is implemented and
+  unit-covered by `apps/desktop/test/plugin-websocket.test.mjs` (allowlist,
+  bounds, lifecycle); the background-audio half remains unimplemented and
+  answers `UNSUPPORTED`, so this scenario stays Draft until audio lands.
+
 ## 8. Traceability Matrix
 
 
@@ -7356,7 +7458,7 @@ and identify the platform validation still needed.
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills, E2E-CHAT-side-chat-stream |
 | F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J, E2E-PLUGIN-session-orchestrator-real-workers, E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-promote, E2E-CHAT-side-chat-close, E2E-CHAT-annotation-session-state |
 | F — Persistence (project ordering) | E2E-251 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196 |
 | Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills, E2E-CHAT-quote-prefill, E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-stream, E2E-CHAT-side-chat-add-to-main, E2E-CHAT-side-chat-promote, E2E-CHAT-side-chat-close, E2E-CHAT-selection-markdown, E2E-CHAT-selection-side-chat, E2E-CHAT-annotation-attachments, E2E-CHAT-annotation-session-state, E2E-CHAT-annotation-source-index, E2E-CHAT-annotation-ack-and-steering |
@@ -7389,6 +7491,7 @@ and identify the platform validation still needed.
 | D — Workspace (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | F — Persistence (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | Quality (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
 
 | Milestone | Scenarios |
 |---|---|

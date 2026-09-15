@@ -5232,3 +5232,25 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
   replay it after the summary; set `requiresNonEmptyReasoningReplay` for
   non-official DeepSeek Completions rows so the pi-ai patch fills a documented
   placeholder instead of `""`. See ADR 0256 and E2E-005E.
+
+## 2026-09-15 — Plugin real-time capabilities (D425)
+
+- Plugins gain four host-mediated capabilities: background microphone capture,
+  background playback, system-wide accelerators, and real-time bidirectional
+  connections. The host owns every device and transport; plugins exchange typed
+  frames and never receive a device handle, a raw socket, or a Node stream.
+- New permissions `audio.capture.background` (high),
+  `audio.playback.background` (medium), `keyboard.globalShortcut` (medium),
+  `net.websocket` (high), plus `contributes.globalShortcuts` (at most 8
+  accelerator → own-command entries) as the declarative form. `ui.microphone`
+  keeps its panel-scoped meaning and is not widened.
+- Shortcut registration is refused rather than taken over:
+  `SHORTCUT_CONFLICT`, `SHORTCUT_UNAVAILABLE`, `INVALID_ACCELERATOR`,
+  `LIMIT_EXCEEDED`. An accelerator can only run one of the owning plugin's own
+  commands — no key monitoring, no raw events, no hooks.
+- Implemented in this change: `keyboard.globalShortcut` and `net.websocket`
+  (host-owned sockets, confined to `manifest.net.domains`, bounded, and released
+  with the plugin). The audio host services are specified here and their SDK
+  surface fails closed with `UNSUPPORTED` until they land. See ADR 0257,
+  `07-plugins/03-plugin-api.md`, `07-plugins/04-plugin-security.md`, and
+  E2E-PLUGIN-global-shortcut-owns-only-its-own-command.
