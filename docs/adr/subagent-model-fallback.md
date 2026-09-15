@@ -48,6 +48,13 @@ thinking, and additive `modelFailures` diagnostics. Exhausting the chain
 returns `failed` with the final provider error; it never selects an unlisted
 model or silently inherits the parent as recovery.
 
+## Settings example
+
+The Advanced section keeps one primary model and lists fallback models in
+priority order. Each fallback can be moved up/down or removed.
+
+![Subagent editor showing the primary model and two ordered fallback models](../public/screenshots/app/zh/subagent-model-fallback.png)
+
 ## Validation
 
 Shared parser and provider-resolution tests, host registry round trips,
