@@ -7514,7 +7514,7 @@ and identify the platform validation still needed.
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
+| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | Quality (model fallback isolation) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
@@ -12315,3 +12315,36 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   The configuration-editor journey passed under WSL; task-transcript reload
   acceptance remains outstanding. Required post-integration suites: `test:e2e`,
   `test:e2e:subagents`, `test:e2e:subagent-models`.
+
+#### E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list: A plugin-declared provider is a Host-owned, read-only row
+
+- **Preconditions**: An installed local plugin declares one provider in
+  `contributes.providers` with the `provider.register` permission, one model, a
+  fixture `baseUrl`, and a key the user stores once through Settings.
+- **Steps**: 1) Enable the plugin and open Settings → Providers. 2) Select the
+  row as the session model and run a turn. 3) Try to edit it, then delete it,
+  through the user path. 4) Disable the plugin, inspect the list and the stored
+  credential, and re-enable it. 5) Uninstall the plugin; reinstall and enable
+  it, then remove the declaration from its manifest and reload. 6) Load a
+  manifest that declares providers without `provider.register`. 7) Load a
+  manifest that declares an `oauth` block and `authKind: "oauth"`.
+- **Expected**: Step 1 shows one row in the native provider list with
+  `ownerPluginId` set to the plugin and the row id
+  `plugin:<pluginId>:<declaredId>`. Step 2 binds the session like any provider
+  row. Step 3 refuses both actions with an error whose message begins
+  `PROVIDER_OWNED_BY_PLUGIN` and leaves the row unchanged. Step 4 keeps the row
+  and sets `enabled = 0` while `secret:provider:<id>:api_key` stays stored, so
+  re-enabling restores the credential. Step 5 deletes the rows and both
+  credential refs (`:api_key` and `:oauth`) in both orders — uninstall, and a
+  manifest that no longer declares the provider. Steps 6 and 7 fail manifest
+  validation as `PLUGIN_INVALID` — the missing-permission message and
+  `plugin OAuth providers are not supported in this release` /
+  `unsupported authKind oauth` — and neither failure changes plugin enablement.
+- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4, §5.4, §7;
+  `07-plugins/13-plugin-permissions-matrix.md`; `03-runtime/04-data-storage.md`
+  §4.3, §7; `03-runtime/12-provider-config-schema.md` §2, §9;
+  `03-runtime/06-host-rpc-protocol.md`; ADR 0257; D426
+- **Acceptance**: B (model config), E (tools & permissions), F (persistence),
+  G (plugins), Security, Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Documented; automation pending

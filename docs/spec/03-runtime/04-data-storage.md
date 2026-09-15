@@ -1,4 +1,4 @@
-# 04. Data Storage (Schema v16)
+# 04. Data Storage (Schema v17)
 
 ## 0. Ownership decision
 
@@ -330,8 +330,15 @@ CREATE TABLE providers (
   default_model_id TEXT,
   config_json      TEXT NOT NULL DEFAULT '{}',
   created_at       INTEGER NOT NULL,
-  updated_at       INTEGER NOT NULL
+  updated_at       INTEGER NOT NULL,
+  -- Owning plugin id for a row a plugin declared in `contributes.providers`
+  -- (schema v17, ADR 0257). NULL is a user-owned row: the plugin refreshes its
+  -- own fields on every load, while the user path may edit or delete only the
+  -- rows it owns.
+  owner_plugin_id  TEXT
 );
+CREATE INDEX idx_providers_owner ON providers(owner_plugin_id)
+  WHERE owner_plugin_id IS NOT NULL;
 ```
 
 ### 4.4 models — catalog cache
@@ -1242,6 +1249,13 @@ truncating at a guessed position.
   conversations, turns, queue entries, and plugin data remain valid. A
   `pi.sqlite.v15.bak` copy precedes the migration; boot recovery retains
   durable queued deliveries but never replays interrupted work automatically.
+- **Schema v17 is additive.** It adds the nullable `providers.owner_plugin_id`
+  ownership column and its partial index (ADR 0257), so a provider row a plugin
+  declares in `contributes.providers` is distinguishable from a user-created one
+  — every pre-v17 row keeps a NULL owner. A `pi.sqlite.v16.bak` copy precedes the
+  step. The v15→v16 session-collaboration step now stamps `16` (its own version)
+  instead of the latest schema constant, so a v15 file can walk both steps in one
+  launch.
 - **Schema v14 is additive.** It adds nullable `sessions.deleted_at`, the
   partial deletion index, and `session_import_origins`. Existing sessions stay
   active and have no origin rows. The migration runs in the same guarded

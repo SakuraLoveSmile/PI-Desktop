@@ -16,6 +16,12 @@ which PI-Desktop adopts alongside the `pi-ai` and `pi-agent-core` kernel
 contributes. D388 folded the earlier standalone "trusted extensions"
 registry into this contribution; the engine below is unchanged.
 
+Provider declarations are a separate manifest surface rather than part of this
+contract: `contributes.providers` materializes Host-owned provider rows
+([02-plugin-manifest-schema.md](02-plugin-manifest-schema.md) §5.4, ADR 0257),
+so it is neither an `ExtensionAPI` member nor a row in the §5 support matrix.
+`registerProvider` (§5) remains the session-scoped extension counterpart.
+
 | Term | Meaning |
 |---|---|
 | Agent extension | One module a plugin lists in `contributes.agentExtensions`, written against `ExtensionAPI`, running with the trust level of the Agent sidecar |

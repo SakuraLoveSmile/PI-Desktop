@@ -285,3 +285,4 @@ Each ADR includes:
 | 0254 | [Continue native Pi sessions in their canonical JSONL](0254-native-pi-session-continuation.md) | Accepted (amends baseline D007; D421) |
 | 0257 | [Host-mediated real-time capabilities for plugins](0257-plugin-real-time-capabilities.md) | Accepted for implementation |
 | 0256 | [Trusted extension custom agents](0256-trusted-extension-custom-agents.md) | Accepted for implementation (D425; issue #401) |
+| 0257 | [Plugin-declared providers are Host-owned rows](0257-plugin-declared-providers.md) | Accepted for implementation (D426) |

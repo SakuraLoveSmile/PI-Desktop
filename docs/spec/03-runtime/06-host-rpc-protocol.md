@@ -590,6 +590,10 @@ one after the final row would be wrong.
 ### Providers and models
 - `providers.list` / `providers.get` / `providers.create` /
   `providers.update` / `providers.delete`
+- a plugin-owned row (`ownerPluginId`) is refreshed from its manifest on every
+  load, so `providers.update` / `providers.delete` refuse it with a
+  `PROVIDER_OWNED_BY_PLUGIN` error; only the owning plugin's lifecycle changes
+  or removes it (ADR 0257)
 - `providers.getSecret` — main/host only, never reachable from the renderer
 - `providers.listModels` / `providers.cacheModels` — discovered model rows
   and their host-side cache (ADR 0027 / ADR 0134)

@@ -72,6 +72,7 @@ type PluginContributes = {
  agentTools?: PluginAgentToolContrib[];
  skills?: Array<string | PluginSkillContrib>; // relative paths, or metadata overrides
  agentExtensions?: string[]; // 在 agent sidecar 内运行的 ExtensionAPI 模块；需要 `agent.extension`（规格 16）
+ providers?: PluginProviderContrib[]; // 宿主拥有的 provider 行；需要 `provider.register`（规格 13）
  settings?: PluginSettingContrib[];
  themes?: PluginThemeContrib[];
  windowAppearance?: PluginWindowAppearanceContrib; // 原生窗口背景；需要 `ui.window.appearance`
@@ -176,6 +177,33 @@ type PluginBusContrib = {
  publish?: string[]; // concrete topics, e.g. `build.done`
  subscribe?: string[]; // patterns, e.g. `build.*` / `build.**`
 };
+
+type PluginProviderContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9_-]{0,63}$，插件内唯一
+ name: string; // 原生 provider 列表中的显示名
+ vendorKey?: string; // models.dev 供应商键，默认 `custom`
+ baseUrl?: string; // 绝对 http(s) URL
+ apiStyle?: PluginProviderApiStyle; // 线路风格，默认 `chat_completions`
+ authKind?: "api_key" | "none"; // 默认 `api_key`；`oauth` 暂被拒绝
+ models: PluginProviderModelContrib[]; // 1..64 条
+};
+
+type PluginProviderApiStyle =
+ | "chat_completions"
+ | "opencode_go"
+ | "responses"
+ | "anthropic_messages"
+ | "google_generative_ai"
+ | "openai_codex_responses"
+ | "pi_messages";
+
+type PluginProviderModelContrib = {
+ id: string; // 1..256 个字符，provider 内唯一
+ name?: string; // 模型绑定的显示标签
+ contextWindow?: number;
+ maxTokens?: number;
+ supportsImages?: boolean;
+};
 ```
 
 ## 5. 权限枚举
@@ -194,6 +222,7 @@ type PluginPermission =
  | "fs.delete"
  | "agent.tool.register"
  | "agent.prompt.inject"
+ | "provider.register"
  | "net.fetch"
  | "shell.openExternal"
  | "mcp.server.local"
@@ -290,6 +319,29 @@ type PluginNetDomains = string[]; // "api.example.com" 或 "*.example.com"
 }
 ```
 
+
+## 5.4 providers —— 插件声明的 provider 行
+
+`contributes.providers` 最多声明 8 个 provider，宿主会把每一项落成原生 provider
+列表中的一行，并归该插件所有（[ADR 0257](../../../adr/0257-plugin-declared-providers.md)）：
+
+- 声明的 `id` 匹配 `[a-zA-Z][a-zA-Z0-9_-]{0,63}` 且在插件内唯一；行 id 为
+  `plugin:<pluginId>:<declaredId>`
+- `name` 必填，是设置页显示的名称
+- `baseUrl` 可选，但必须是绝对 `http(s)` URL
+- `apiStyle` 可选，默认 `chat_completions`；可取值是 provider 配置中除 `auto`
+  以外的风格
+- `authKind` 可选，为 `api_key`（默认）或 `none`
+- `models` 要求 1..64 条，id 唯一且长度为 1..256
+
+非空的 `contributes.providers` 需要高风险权限 `provider.register`
+（[13-plugin-permissions-matrix.md](/zh-CN/spec/07-plugins/13-plugin-permissions-matrix)）。
+声明会在每次插件加载时重新读取，并对其自身字段具有权威；禁用插件会保留这些行并
+将其关闭，而删除声明或卸载插件会连同已存凭据一起删除该行。
+
+`oauth` **暂不支持**：宿主还没有插件 OAuth 登录流程，因此 `oauth` 块或
+`authKind: \"oauth\"` 会在清单元数据校验阶段被拒绝。计划中的 `provider.oauth`
+权限与宿主自有的登录流程属于未来工作，当前不可用。
 ## 6. activationEvents（可选）
 
 示例：
@@ -324,8 +376,8 @@ MVP 只能实现：
 11. `bus.publish` 条目必须是具体主题，`bus.subscribe` 条目必须是具体主题
    有效模式（§5.1）
 12. 需要权限的贡献在权限验证时失败
-   缺少：`themes` → `ui.theme`，`views` → `ui.view`，stdio 服务器 →
-   `mcp.server.local`，远程
+   缺少：`themes` → `ui.theme`，`views` → `ui.view`，`providers` →
+   `provider.register`，stdio 服务器 → `mcp.server.local`，远程
    服务器 → `mcp.server.remote`、`services` → `background.service`、
    `bus.publish` → `bus.publish`，`bus.subscribe` → `bus.subscribe`。
 `skills` 是一个例外 - 它早于权限门，因此清单

@@ -5262,3 +5262,11 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
 The pinned upstream pi-coding-agent package has `registerProvider` but no
 `registerAgent`; the PI-Desktop member is therefore an explicit adapter contract,
 not an unreviewed upstream registry passthrough.
+
+## 2026-09-15 — Plugin-declared providers are Host-owned rows (D426)
+
+**A plugin may declare `contributes.providers`, and the Host materializes each entry as a provider row in the native Settings → Provider list, owned by that plugin (`providers.owner_plugin_id`, schema v17; row id `plugin:<pluginId>:<declaredId>`). The declaration is re-read on every load and is authoritative for its own fields, so a dropped entry is deleted together with both credential references; `providers.update` / `providers.delete` refuse a plugin-owned row with `PROVIDER_OWNED_BY_PLUGIN`. A non-empty declaration needs the new high-risk `provider.register` permission, and an `oauth` block or `authKind: "oauth"` is refused until a Host-owned login flow exists. See ADR 0257, `07-plugins/02-plugin-manifest-schema.md` §5.4, `07-plugins/13-plugin-permissions-matrix.md`, `03-runtime/04-data-storage.md` §4.3/§7, and E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list.**
+
+It deliberately does not include plugin OAuth: the `provider.oauth` permission
+and a Host-owned plugin login flow are future work, so a declared provider has no
+OAuth login, token refresh, or account label today.
