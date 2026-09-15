@@ -1034,6 +1034,8 @@ sklm: {
     apiStyleAnthropic: "Anthropic Messages",
     apiStyleGoogle: "Google Generative AI",
     apiStyleCodexResponses: "OpenAI Codex (ChatGPT)",
+    apiStyleLegacyAccount: "此已儲存格式需要廠商帳戶。只有主動選擇其他格式時才會變更。",
+    apiStyleChooseCustom: "此格式需要廠商帳戶。請選擇支援的介面格式後儲存此服務。",
     apiStylePiMessages: "Pi Messages (Radius)",
     close: "關閉",
     vendorAccounts: "廠商賬戶",

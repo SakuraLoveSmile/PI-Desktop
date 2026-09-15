@@ -1042,6 +1042,8 @@ sklm: {
     apiStyleAnthropic: "Anthropic Messages",
     apiStyleGoogle: "Google Generative AI",
     apiStyleCodexResponses: "OpenAI Codex (ChatGPT)",
+    apiStyleLegacyAccount: "저장된 이 형식은 공급업체 계정이 필요합니다. 다른 형식을 선택하기 전까지 변경되지 않습니다.",
+    apiStyleChooseCustom: "이 형식은 공급업체 계정이 필요합니다. 이 서비스를 저장하려면 지원되는 API 형식을 선택하세요.",
     apiStylePiMessages: "Pi Messages (Radius)",
     close: "닫기",
     vendorAccounts: "벤더 계정",

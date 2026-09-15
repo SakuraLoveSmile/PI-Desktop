@@ -1040,6 +1040,8 @@ sklm: {
     apiStyleAnthropic: "Anthropic Messages",
     apiStyleGoogle: "Google Generative AI",
     apiStyleCodexResponses: "OpenAI Codex (ChatGPT)",
+    apiStyleLegacyAccount: "This saved format requires a vendor account. It stays unchanged unless you choose another format.",
+    apiStyleChooseCustom: "This format requires a vendor account. Choose a supported API format to save this service.",
     apiStylePiMessages: "Pi Messages (Radius)",
     close: "Close",
     vendorAccounts: "Vendor accounts",

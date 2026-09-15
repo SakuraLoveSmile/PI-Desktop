@@ -1027,6 +1027,8 @@ sklm: {
     "apiStyleAnthropic": "Anthropic Messages",
     "apiStyleGoogle": "Google Generative AI",
     "apiStyleCodexResponses": "OpenAI Codex (ChatGPT)",
+    apiStyleLegacyAccount: "Dieses gespeicherte Format erfordert ein Anbieterkonto. Es bleibt unverändert, bis Sie ein anderes Format wählen.",
+    apiStyleChooseCustom: "Dieses Format erfordert ein Anbieterkonto. Wählen Sie ein unterstütztes API-Format, um diesen Dienst zu speichern.",
     "apiStylePiMessages": "Pi Messages (Radius)",
     "close": "Schließen",
     "vendorAccounts": "Lieferantenkonten",

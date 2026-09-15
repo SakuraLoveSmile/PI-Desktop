@@ -1042,6 +1042,8 @@ sklm: {
     apiStyleAnthropic: "Anthropic Messages",
     apiStyleGoogle: "Google Generative AI",
     apiStyleCodexResponses: "OpenAI Codex (ChatGPT)",
+    apiStyleLegacyAccount: "Kaydedilmiş bu biçim bir sağlayıcı hesabı gerektirir. Başka bir biçim seçmediğiniz sürece değişmez.",
+    apiStyleChooseCustom: "Bu biçim bir sağlayıcı hesabı gerektirir. Bu hizmeti kaydetmek için desteklenen bir API biçimi seçin.",
     apiStylePiMessages: "Pi Messages (Radius)",
     close: "Kapat",
     vendorAccounts: "Satıcı hesapları",

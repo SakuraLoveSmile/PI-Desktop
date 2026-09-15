@@ -4775,6 +4775,28 @@ IPC 请求无法关闭。
   页脚按钮并断言回到上一目的地，已在集成主线 `d6ffaa3b` 上通过 37/37 项
   检查。不需要外部插件市场或真实模型。
 
+#### E2E-PROVIDER-custom-form-excludes-account-formats：新建自定义服务不提供账户专用格式
+
+- **先决条件**：隔离配置，英文及简体中文；构造使用 Codex、Pi 账户格式的
+  历史非 OAuth 行，其中包含 OpenAI 预设 URL，使用合成模型，不使用真实凭据。
+- **步骤**：1) 新建自定义服务，检查接口格式选项。2) 编辑两种历史行并原样
+  保存，再明确选择 Responses 保存。3) 复制原历史行，检查当前格式及说明，
+  等待超过发现防抖时间后取消。4) 再次复制，选择 Anthropic Messages 后保存。
+  5) 检查保存请求及原行未被改变。
+- **预期**：新建只提供四种通用协议；Codex 与 Pi 通过厂商账户使用，不能作为
+  新 API key 服务格式。历史行在未主动修改时保留协议、名称、URL 和认证。
+  复制时显示原账户格式但不可重新选择；必须主动选支持的格式后才能保存和
+  发现模型，并提供本地化说明。取消不创建行；有效副本不复用原行 ID 或凭据。
+  具名 OpenCode Go 与 OAuth 账户流程保持不变。
+- **自动化**：`pnpm test:e2e:provider-api-style` 在 Electron/Chromium 中渲染
+  实际 React 表单，以模拟 API 边界检查创建、更新及发现请求的准确内容。
+  不验证 Host 存储或真实 OAuth。
+- **链接规格**：`03-runtime/12-provider-config-schema.md`、ADR 0095。
+- **验收**：B（模型配置）、Security。
+- **状态**：helper/复制回归已通过。分支 Electron/React 场景在英文、简体中文
+  下通过：六组场景，经模拟 API 发出四次创建、八次更新。未验证 Host 持久化、
+  真实 OAuth/模型请求和视觉布局。主线合并后 E2E 尚未运行。
+
 #### E2E-PROVIDER-copy-config-without-credentials：复制配置为独立提供商
 
 - **先决条件**：设置页有一个普通提供商，已保存 API 密钥、自定义请求头和两个
