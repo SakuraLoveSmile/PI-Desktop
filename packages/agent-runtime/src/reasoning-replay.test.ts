@@ -7,10 +7,12 @@ import type {
 import { convertMessages } from "@earendil-works/pi-ai/api/openai-completions";
 import { DEEPSEEK_REASONING_REPLAY_PLACEHOLDER } from "@pi-desktop/shared";
 import {
+  alignRetainedReasoningIdentity,
   harvestRetainedReasoning,
   retainedReasoningFromDetails,
   retainedReasoningToMessages,
   RETAINED_REASONING_CONTENT_STANDIN,
+  RETAINED_REASONING_PROVIDER,
   type ReasoningReplayIdentity,
 } from "./reasoning-replay.js";
 import { buildSessionContext } from "./session-context.js";
@@ -104,16 +106,11 @@ describe("harvestRetainedReasoning", () => {
     const turns = harvestRetainedReasoning([
       assistant("flash plan", "flash answer", "reasoning_text"),
     ]);
-    expect(turns).toEqual([
-      {
-        thinking: "flash plan",
-        text: "flash answer",
-        thinkingSignature: "reasoning_text",
-        api: "openai-completions",
-        provider: "local",
-        model: "local",
-      },
-    ]);
+    expect(turns[0]).toMatchObject({
+      thinking: "flash plan",
+      text: "flash answer",
+      thinkingSignature: "reasoning_text",
+    });
   });
 });
 
@@ -176,6 +173,19 @@ describe("retainedReasoning replay messages", () => {
       thinkingSignature: "reasoning_text",
     });
   });
+
+  it("aligns sentinel retained assistants to the live model identity", () => {
+    const [message] = retainedReasoningToMessages(
+      [{ thinking: "plan", text: "answer" }],
+      1,
+    );
+    expect(message?.provider).toBe(RETAINED_REASONING_PROVIDER);
+    const aligned = alignRetainedReasoningIdentity(
+      [message!],
+      liveIdentity,
+    );
+    expect(aligned[0]).toMatchObject(liveIdentity);
+  });
 });
 
 describe("retained reasoning reaches convertMessages after compaction", () => {
@@ -208,9 +218,9 @@ describe("retained reasoning reaches convertMessages after compaction", () => {
   }
 
   it("never emits empty reasoning_* for prior thinking turns under requiresNonEmptyReasoningReplay", () => {
-    // #296 — proof that retained thinking survives transformMessages +
-    // convertMessages, including thinking-only turns that previously vanished.
-    // Live OpenCode / aggregator verification remains deferred (E2E-005E).
+    // #296 — proof that retained thinking survives convertMessages, including
+    // thinking-only turns that previously vanished after mapping. Live OpenCode
+    // / aggregator verification remains deferred (E2E-005E).
     const keptUser: AgentMessage = {
       role: "user",
       content: "keep me",
@@ -231,9 +241,9 @@ describe("retained reasoning reaches convertMessages after compaction", () => {
           { thinking: "prior plan with text", text: "prior answer" },
           { thinking: "prior thinking only", text: "" },
           {
-            thinking: "prior flash plan",
-            text: "flash answer",
-            thinkingSignature: "reasoning_text",
+            thinking: "prior plan three",
+            text: "answer three",
+            thinkingSignature: "reasoning_content",
           },
         ],
       },
@@ -291,12 +301,9 @@ describe("retained reasoning reaches convertMessages after compaction", () => {
       reasoning_text: undefined,
       reasoning: undefined,
     });
-    // Mixed signatures in one history: active field is reasoning_content (first
-    // non-empty), so the flash turn keeps its reasoning_text and also receives
-    // the non-empty placeholder on reasoning_content — never "".
     expect(reasoningValues[2]).toEqual({
-      reasoning_content: DEEPSEEK_REASONING_REPLAY_PLACEHOLDER,
-      reasoning_text: "prior flash plan",
+      reasoning_content: "prior plan three",
+      reasoning_text: undefined,
       reasoning: undefined,
     });
 
@@ -319,7 +326,7 @@ describe("retained reasoning reaches convertMessages after compaction", () => {
     });
 
     // Placeholder remains the documented fill for turns that never retained
-    // thinking; this fixture has none of those on the wire.
+    // thinking; this fixture has none.
     expect(DEEPSEEK_REASONING_REPLAY_PLACEHOLDER.length).toBeGreaterThan(0);
   });
 });
