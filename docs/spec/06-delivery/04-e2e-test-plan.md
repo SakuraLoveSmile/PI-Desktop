@@ -801,8 +801,9 @@ and identify the platform validation still needed.
   `03-runtime/12-provider-config-schema.md`
 - **Acceptance**: B (provider Completions compatibility)
 - **Milestone**: M2
-- **Status**: Unit-covered (compat inject + convertMessages empty fill);
-  rendered UI scenario pending
+- **Status**: Unit-covered (compat inject + convertMessages empty/non-empty fill +
+  compaction retained-reasoning wire proof); live OpenCode / aggregator
+  verification deferred; rendered UI scenario pending
 
 #### E2E-006: Key survives restart
 

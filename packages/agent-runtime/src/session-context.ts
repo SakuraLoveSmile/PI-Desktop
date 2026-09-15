@@ -21,6 +21,7 @@ import {
 import {
   retainedReasoningFromDetails,
   retainedReasoningToMessages,
+  type ReasoningReplayIdentity,
 } from "./reasoning-replay.js";
 
 function isContextMessage(message: AgentMessage): boolean {
@@ -42,7 +43,10 @@ export function buildContextEntries(pathEntries: readonly Entry[]): Entry[] {
   return [...pathEntries];
 }
 
-export function sessionEntryToContextMessages(entry: Entry): AgentMessage[] {
+export function sessionEntryToContextMessages(
+  entry: Entry,
+  identity?: ReasoningReplayIdentity,
+): AgentMessage[] {
   switch (entry.type) {
     case "message":
       return isContextMessage(entry.message) ? [entry.message] : [];
@@ -56,6 +60,7 @@ export function sessionEntryToContextMessages(entry: Entry): AgentMessage[] {
         ...retainedReasoningToMessages(
           retainedReasoningFromDetails(entry.details),
           entry.timestamp,
+          identity,
         ),
         ...entry.retainedTail.filter(isContextMessage),
       ];
@@ -74,12 +79,15 @@ export function sessionEntryToContextMessages(entry: Entry): AgentMessage[] {
   }
 }
 
-export function buildSessionContext(pathEntries: readonly Entry[]): {
+export function buildSessionContext(
+  pathEntries: readonly Entry[],
+  identity?: ReasoningReplayIdentity,
+): {
   messages: AgentMessage[];
 } {
   return {
-    messages: buildContextEntries(pathEntries).flatMap(
-      sessionEntryToContextMessages,
+    messages: buildContextEntries(pathEntries).flatMap((entry) =>
+      sessionEntryToContextMessages(entry, identity),
     ),
   };
 }

@@ -143,7 +143,11 @@ import {
   DEFAULT_RUNTIME_SYSTEM_PROMPT,
 } from "./mode-prompts.js";
 import { clampThinkingLevel } from "./thinking-level.js";
-import { harvestRetainedReasoning } from "./reasoning-replay.js";
+import {
+  alignRetainedReasoningIdentity,
+  harvestRetainedReasoning,
+  type ReasoningReplayIdentity,
+} from "./reasoning-replay.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
 import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
@@ -1704,7 +1708,11 @@ Delegation rules:
       // A vendor account has no long-lived key. Leaving it unset keeps pi-ai
       // from overriding the auth the provider just resolved for this request.
       getApiKey: async () => runtimeApiKey || undefined,
-      convertToLlm,
+      convertToLlm: (messages) =>
+        alignRetainedReasoningIdentity(
+          convertToLlm(messages),
+          this.reasoningReplayIdentity(),
+        ),
       prepareNextTurnWithContext: (context, signal) =>
         this.prepareNextTurn(context, signal),
       afterToolCall: async (context) => this.afterToolCall(context),
@@ -1713,7 +1721,7 @@ Delegation rules:
         model,
         tools,
         thinkingLevel: this.thinkingLevel,
-        messages: buildSessionContext(this.entriesWithCompaction()).messages,
+        messages: this.liveSessionContext().messages,
       },
       // Plan transitions must be the only tool call in an assistant batch.
       // Sequential execution also makes the host-confirmed mode change visible
@@ -2690,7 +2698,7 @@ Delegation rules:
           failureKey !== undefined &&
           typeof result.errorCode === "string" &&
           RECOVERABLE_MUTATION_ERROR_CODES.has(result.errorCode)
-            ? `${failureKey}${result.errorCode}`
+            ? `${failureKey} ${result.errorCode}`
             : undefined;
         const grantedRecoveryGrace =
           graceKey !== undefined && !this.mutationRecoveryGraces.has(graceKey);
@@ -2720,7 +2728,7 @@ Delegation rules:
           if (succeededKey !== undefined) {
             this.mutationFailureCounts.delete(succeededKey);
             for (const key of this.mutationRecoveryGraces) {
-              if (key.startsWith(`${succeededKey}`)) {
+              if (key.startsWith(`${succeededKey} `)) {
                 this.mutationRecoveryGraces.delete(key);
               }
             }
@@ -4277,7 +4285,7 @@ Delegation rules:
    */
   private restoreDeferredToolsFromContext(): void {
     if (this.deferredToolNames.size === 0) return;
-    const { messages } = buildSessionContext(this.entriesWithCompaction());
+    const { messages } = this.liveSessionContext();
     for (const message of messages) {
       if (message.role !== "toolResult" || message.isError) continue;
       if (isMissingToolResultPlaceholder(message.content)) continue;
@@ -4995,7 +5003,7 @@ Delegation rules:
   private automaticCompactionNeeded(
     additionalMessages: AgentMessage[] = [],
   ): boolean {
-    const context = buildSessionContext(this.entriesWithCompaction());
+    const context = this.liveSessionContext();
     const messages = [...context.messages, ...additionalMessages];
     const budget = this.contextBudget(messages);
     return this.compactionEnabled && budget.tokens >= budget.hardLimit;
@@ -5113,7 +5121,7 @@ Delegation rules:
   }
 
   private rebuiltAgentContext(): AgentContext {
-    const messages = buildSessionContext(this.entriesWithCompaction()).messages;
+    const messages = this.liveSessionContext().messages;
     const tools = this.activeTools();
     this.agent.state.messages = messages;
     this.agent.state.tools = tools;
@@ -5305,6 +5313,23 @@ Delegation rules:
   }
 
 
+  private reasoningReplayIdentity(): ReasoningReplayIdentity {
+    return {
+      api: this.model.api,
+      provider: this.model.provider,
+      model: this.model.id,
+    };
+  }
+
+  private liveSessionContext(
+    checkpoint: ContextCompactionRecord | undefined = this.activeCompaction,
+  ): { messages: AgentMessage[] } {
+    return buildSessionContext(
+      this.entriesWithCompaction(checkpoint),
+      this.reasoningReplayIdentity(),
+    );
+  }
+
   /**
    * When the bound model requires DeepSeek-style reasoning replay, keep the
    * last few thinking turns inside opaque checkpoint details so post-compaction
@@ -5493,7 +5518,7 @@ Delegation rules:
     fallback?: ContextCompactionFallback,
   ): Promise<CheckpointPersistResult> {
     const compactedBudget = this.contextBudget(
-      buildSessionContext(this.entriesWithCompaction(checkpoint)).messages,
+      this.liveSessionContext(checkpoint).messages,
     );
     if (
       mustFitSafeBudget &&
@@ -5517,9 +5542,7 @@ Delegation rules:
     // resetting its `claim_*` flags when the context window turns over.
     this.contextReminderClaimed = false;
     this.contextFallbackReminderClaimed = false;
-    this.agent.state.messages = buildSessionContext(
-      this.entriesWithCompaction(),
-    ).messages;
+    this.agent.state.messages = this.liveSessionContext().messages;
     this.emit({
       type: "compaction_end",
       reason,
@@ -5664,7 +5687,7 @@ Delegation rules:
     retentionMode: CompactionRetentionMode,
   ): Promise<CheckpointBuild> {
     const entries = this.entriesWithCompaction();
-    const context = buildSessionContext(entries);
+    const context = buildSessionContext(entries, this.reasoningReplayIdentity());
     const budget = this.contextBudget(context.messages);
     const preparation = this.prepareCompactionInput(
       entries,
@@ -6466,9 +6489,7 @@ Delegation rules:
     const userMessageId = this.pendingUserMessageId || randomUUID();
     this.pendingUserMessageId = undefined;
     this.appendLiveEntry(userMessageId, incomingUserMessage);
-    this.agent.state.messages = buildSessionContext(
-      this.entriesWithCompaction(),
-    ).messages;
+    this.agent.state.messages = this.liveSessionContext().messages;
   }
 
   private failBeforeProviderRequest(
@@ -6560,9 +6581,7 @@ Delegation rules:
       timestamp: Date.now(),
     };
     this.appendLiveEntry(internalId, internalMessage);
-    this.agent.state.messages = buildSessionContext(
-      this.entriesWithCompaction(),
-    ).messages;
+    this.agent.state.messages = this.liveSessionContext().messages;
     this.setAgentActivity({ phase: "starting", since: Date.now() });
     await this.agent.continue();
     await this.waitForIdleAndSteering();

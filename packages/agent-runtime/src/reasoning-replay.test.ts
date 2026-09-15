@@ -1,12 +1,35 @@
 import { describe, expect, it } from "vitest";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type {
+  AgentMessage,
+  CompactionEntry,
+  MessageEntry,
+} from "@earendil-works/pi-agent-core";
+import { convertMessages } from "@earendil-works/pi-ai/api/openai-completions";
+import { DEEPSEEK_REASONING_REPLAY_PLACEHOLDER } from "@pi-desktop/shared";
 import {
   harvestRetainedReasoning,
   retainedReasoningFromDetails,
   retainedReasoningToMessages,
+  RETAINED_REASONING_CONTENT_STANDIN,
+  type ReasoningReplayIdentity,
 } from "./reasoning-replay.js";
+import { buildSessionContext } from "./session-context.js";
 
-function assistant(thinking: string, text = "ok"): AgentMessage {
+const liveIdentity: ReasoningReplayIdentity = {
+  api: "openai-completions",
+  provider: "custom-relay",
+  model: "deepseek-relay",
+};
+
+function assistant(
+  thinking: string,
+  text = "ok",
+  thinkingSignature = "reasoning_content",
+): AgentMessage {
+  const content: unknown[] = [
+    { type: "thinking", thinking, thinkingSignature },
+  ];
+  if (text) content.push({ type: "text", text });
   return {
     role: "assistant",
     api: "openai-completions",
@@ -22,10 +45,7 @@ function assistant(thinking: string, text = "ok"): AgentMessage {
     },
     stopReason: "stop",
     timestamp: 1,
-    content: [
-      { type: "thinking", thinking, thinkingSignature: "reasoning_content" },
-      { type: "text", text },
-    ],
+    content,
   } as AgentMessage;
 }
 
@@ -60,8 +80,39 @@ describe("harvestRetainedReasoning", () => {
       3,
     );
     expect(turns).toEqual([
-      { thinking: "plan one", text: "answer one" },
-      { thinking: "plan two", text: "answer two" },
+      {
+        thinking: "plan one",
+        text: "answer one",
+        thinkingSignature: "reasoning_content",
+        api: "openai-completions",
+        provider: "local",
+        model: "local",
+      },
+      {
+        thinking: "plan two",
+        text: "answer two",
+        thinkingSignature: "reasoning_content",
+        api: "openai-completions",
+        provider: "local",
+        model: "local",
+      },
+    ]);
+  });
+
+  it("preserves a live Completions thinkingSignature when known", () => {
+    // #296
+    const turns = harvestRetainedReasoning([
+      assistant("flash plan", "flash answer", "reasoning_text"),
+    ]);
+    expect(turns).toEqual([
+      {
+        thinking: "flash plan",
+        text: "flash answer",
+        thinkingSignature: "reasoning_text",
+        api: "openai-completions",
+        provider: "local",
+        model: "local",
+      },
     ]);
   });
 });
@@ -75,8 +126,11 @@ describe("retainedReasoning replay messages", () => {
     const messages = retainedReasoningToMessages(
       retainedReasoningFromDetails(details),
       10,
+      liveIdentity,
     );
     expect(messages).toHaveLength(1);
+    expect(messages[0]?.provider).toBe(liveIdentity.provider);
+    expect(messages[0]?.model).toBe(liveIdentity.model);
     expect(messages[0]?.content).toEqual([
       {
         type: "thinking",
@@ -85,5 +139,187 @@ describe("retainedReasoning replay messages", () => {
       },
       { type: "text", text: "kept answer" },
     ]);
+  });
+
+  it("uses a non-empty content stand-in for thinking-only retained turns", () => {
+    // #296 — convertMessages would otherwise drop empty-text assistants
+    const messages = retainedReasoningToMessages(
+      [{ thinking: "think only", text: "" }],
+      1,
+      liveIdentity,
+    );
+    expect(messages[0]?.content).toEqual([
+      {
+        type: "thinking",
+        thinking: "think only",
+        thinkingSignature: "reasoning_content",
+      },
+      { type: "text", text: RETAINED_REASONING_CONTENT_STANDIN },
+    ]);
+  });
+
+  it("replays a preserved thinkingSignature instead of hardcoding reasoning_content", () => {
+    // #296
+    const messages = retainedReasoningToMessages(
+      [
+        {
+          thinking: "flash plan",
+          text: "flash answer",
+          thinkingSignature: "reasoning_text",
+        },
+      ],
+      1,
+      liveIdentity,
+    );
+    expect(messages[0]?.content[0]).toMatchObject({
+      type: "thinking",
+      thinkingSignature: "reasoning_text",
+    });
+  });
+});
+
+describe("retained reasoning reaches convertMessages after compaction", () => {
+  const strictCompat = {
+    supportsDeveloperRole: false,
+    supportsOpenAIGrammarTools: false,
+    requiresToolResultName: false,
+    requiresAssistantAfterToolResult: false,
+    requiresThinkingAsText: false,
+    requiresReasoningContentOnAssistantMessages: true,
+    requiresNonEmptyReasoningReplay: true,
+    thinkingFormat: "deepseek" as const,
+    deferredToolsMode: "none" as const,
+  };
+
+  function model() {
+    return {
+      id: liveIdentity.model,
+      name: "deepseek-relay",
+      api: liveIdentity.api,
+      provider: liveIdentity.provider,
+      baseUrl: "https://relay.example/v1",
+      reasoning: false,
+      input: ["text"],
+      contextWindow: 128_000,
+      maxTokens: 8_192,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      compat: {},
+    } as never;
+  }
+
+  it("never emits empty reasoning_* for prior thinking turns under requiresNonEmptyReasoningReplay", () => {
+    // #296 — proof that retained thinking survives transformMessages +
+    // convertMessages, including thinking-only turns that previously vanished.
+    // Live OpenCode / aggregator verification remains deferred (E2E-005E).
+    const keptUser: AgentMessage = {
+      role: "user",
+      content: "keep me",
+      timestamp: 3,
+    };
+    const compactionEntry: CompactionEntry = {
+      type: "compaction",
+      id: "c1",
+      parentId: null,
+      seq: 2,
+      timestamp: 2,
+      summary: "older work summarized",
+      tokensBefore: 1000,
+      retainedTail: [keptUser],
+      fromHook: false,
+      details: {
+        retainedReasoning: [
+          { thinking: "prior plan with text", text: "prior answer" },
+          { thinking: "prior thinking only", text: "" },
+          {
+            thinking: "prior flash plan",
+            text: "flash answer",
+            thinkingSignature: "reasoning_text",
+          },
+        ],
+      },
+    };
+    const older: MessageEntry = {
+      type: "message",
+      id: "u0",
+      parentId: null,
+      seq: 0,
+      timestamp: 0,
+      message: { role: "user", content: "old", timestamp: 0 },
+    };
+    const next: MessageEntry = {
+      type: "message",
+      id: "u3",
+      parentId: null,
+      seq: 4,
+      timestamp: 4,
+      message: { role: "user", content: "next", timestamp: 4 },
+    };
+
+    const context = buildSessionContext(
+      [older, compactionEntry, next],
+      liveIdentity,
+    );
+
+    const wire = convertMessages(
+      model(),
+      { systemPrompt: "", messages: context.messages, tools: [] } as never,
+      strictCompat as never,
+    ).filter((message) => message.role === "assistant");
+
+    expect(wire.length).toBeGreaterThanOrEqual(3);
+
+    const reasoningValues = wire.map((message) => {
+      const row = message as {
+        reasoning_content?: unknown;
+        reasoning_text?: unknown;
+        reasoning?: unknown;
+      };
+      return {
+        reasoning_content: row.reasoning_content,
+        reasoning_text: row.reasoning_text,
+        reasoning: row.reasoning,
+      };
+    });
+
+    expect(reasoningValues[0]).toEqual({
+      reasoning_content: "prior plan with text",
+      reasoning_text: undefined,
+      reasoning: undefined,
+    });
+    expect(reasoningValues[1]).toEqual({
+      reasoning_content: "prior thinking only",
+      reasoning_text: undefined,
+      reasoning: undefined,
+    });
+    // Mixed signatures in one history: active field is reasoning_content (first
+    // non-empty), so the flash turn keeps its reasoning_text and also receives
+    // the non-empty placeholder on reasoning_content — never "".
+    expect(reasoningValues[2]).toEqual({
+      reasoning_content: DEEPSEEK_REASONING_REPLAY_PLACEHOLDER,
+      reasoning_text: "prior flash plan",
+      reasoning: undefined,
+    });
+
+    for (const row of reasoningValues) {
+      const values = [
+        row.reasoning_content,
+        row.reasoning_text,
+        row.reasoning,
+      ].filter((value) => typeof value === "string");
+      expect(values.length).toBeGreaterThan(0);
+      for (const value of values) {
+        expect(value.length).toBeGreaterThan(0);
+        expect(value).not.toBe("");
+      }
+    }
+
+    expect(wire[1]).toMatchObject({
+      content: RETAINED_REASONING_CONTENT_STANDIN,
+      reasoning_content: "prior thinking only",
+    });
+
+    // Placeholder remains the documented fill for turns that never retained
+    // thinking; this fixture has none of those on the wire.
+    expect(DEEPSEEK_REASONING_REPLAY_PLACEHOLDER.length).toBeGreaterThan(0);
   });
 });

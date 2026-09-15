@@ -45,6 +45,8 @@ the #223 empty backfill fills `""` — which strict relays reject.
 - Official DeepSeek and #223 empty-backfill behaviour remain available.
 - Checkpoint `details` grow by a bounded reasoning excerpt; the visible
   transcript and host schema do not change.
+- Unit tests cover convertMessages + compaction retained-reasoning wire shape.
+  Live OpenCode / aggregator verification remains deferred (see E2E-005E).
 
 ## Alternatives
 

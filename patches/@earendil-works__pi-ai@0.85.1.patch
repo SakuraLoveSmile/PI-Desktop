@@ -1,8 +1,8 @@
 diff --git a/dist/api/openai-completions.js b/dist/api/openai-completions.js
-index 48464f2..fe0a5d0 100644
+index 48464f2bf56b9369d5c202e4f02fc4f13d35b412..4d7105cd6441115804517156c8c8584e02dde238 100644
 --- a/dist/api/openai-completions.js
 +++ b/dist/api/openai-completions.js
-@@ -1042,11 +1042,9 @@ export function convertMessages(model, context, compat, options) {
+@@ -1042,21 +1042,27 @@ export function convertMessages(model, context, compat, options) {
              if (preservedReasoningDetails) {
                  assistantMsg.reasoning_details = preservedReasoningDetails;
              }
@@ -17,7 +17,26 @@ index 48464f2..fe0a5d0 100644
              // Skip assistant messages that have no content and no tool calls.
              // Some providers require "either content or tool_calls, but not none".
              // Other providers also don't accept empty assistant messages.
-@@ -1141,6 +1139,41 @@ export function convertMessages(model, context, compat, options) {
+             // This handles aborted assistant responses that got no content.
++            // Keep reasoning-only assistants (#296 retained thinking): map a
++            // minimal content stand-in so the already-set reasoning_* field
++            // still reaches the wire.
+             const content = assistantMsg.content;
+             const hasContent = content !== null &&
+                 content !== undefined &&
+                 (typeof content === "string" ? content.length > 0 : content.length > 0);
++            const hasReasoningReplay = OPENAI_COMPLETIONS_REASONING_FIELDS.some((field) => typeof assistantMsg[field] === "string" &&
++                assistantMsg[field].length > 0);
+             if (!hasContent && !assistantMsg.tool_calls) {
+-                continue;
++                if (!hasReasoningReplay) {
++                    continue;
++                }
++                assistantMsg.content = ".";
+             }
+             params.push(assistantMsg);
+         }
+@@ -1141,6 +1147,41 @@ export function convertMessages(model, context, compat, options) {
          }
          lastRole = msg.role;
      }
@@ -60,7 +79,7 @@ index 48464f2..fe0a5d0 100644
  }
  function convertTools(tools, compat) {
 diff --git a/dist/api/openai-responses-shared.js b/dist/api/openai-responses-shared.js
-index 43e463d..364c8c0 100644
+index 43e463dbfd1e6cc437ebc680468036f47678de26..364c8c0426d12543c1b64daa8e6eaa22f35f6f60 100644
 --- a/dist/api/openai-responses-shared.js
 +++ b/dist/api/openai-responses-shared.js
 @@ -636,6 +636,10 @@ export async function processResponsesStream(openaiStream, output, stream, model
@@ -75,7 +94,7 @@ index 43e463d..364c8c0 100644
          else if (event.type === "error") {
              throw new Error(`Error Code ${event.code}: ${event.message}` || "Unknown error");
 diff --git a/dist/auth/oauth/anthropic.js b/dist/auth/oauth/anthropic.js
-index 8692e90..0291387 100644
+index 8692e906caa2609396bdccae98d4d593e024ecf6..029138715f58dbb2e5825f9a2d0c182ed7e81f2a 100644
 --- a/dist/auth/oauth/anthropic.js
 +++ b/dist/auth/oauth/anthropic.js
 @@ -140,21 +140,90 @@ async function startCallbackServer(expectedState) {

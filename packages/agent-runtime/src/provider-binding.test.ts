@@ -207,7 +207,9 @@ describe("buildProviderModel OpenAI-compatible role compatibility", () => {
     });
     expect(model.compat.thinkingFormat).toBeUndefined();
 
-    // Empty-string path (#223) still works when the non-empty flag is off.
+    // Empty-string path (#223): this convertMessages call uses a compat WITHOUT
+    // requiresNonEmptyReasoningReplay, so official-style "" fill still works.
+    // The SiliconFlow model itself sets requiresNonEmptyReasoningReplay (above).
     const messages = convertMessages(
       model,
       {

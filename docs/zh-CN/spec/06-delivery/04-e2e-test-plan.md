@@ -300,7 +300,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
   `03-runtime/12-provider-config-schema.md`
 - **验收**：B（提供商 Completions 兼容）
 - **里程碑**：M2
-- **状态**：单元覆盖（compat 注入 + convertMessages 空字段补全）；界面场景待完成
+- **状态**：单元覆盖（compat 注入 + convertMessages 空/非空补全 + 压缩保留推理上线证明）；现场 OpenCode/聚合端验证仍推迟；界面场景待完成
 
 #### E2E-005G：按供应商自定义 HTTP 请求头
 
