@@ -80,6 +80,7 @@ type PluginContributes = {
   bus?: PluginBusContrib;
   views?: PluginViewContrib[];
   sessionSources?: PluginSessionSourceContrib[];
+  globalShortcuts?: PluginGlobalShortcutContrib[]; // 需要 `keyboard.globalShortcut`
 };
 
 type PluginCommandContrib = {
@@ -123,6 +124,13 @@ type PluginViewContrib = {
 type PluginSessionSourceContrib = {
  id: string; // ^[a-zA-Z][a-zA-Z0-9._-]{0,63}$，插件内唯一
  label?: string | { en: string; "zh-CN": string };
+};
+
+/** 插件声明的一个系统级快捷键（`keyboard.globalShortcut`）。 */
+type PluginGlobalShortcutContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9._-]{0,63}$，插件内唯一
+ command: string; // 必须声明在 contributes.commands 里
+ default?: string; // 宿主在加载后注册的加速键；省略则由 `pi.keyboard` 稍后注册
 };
 
 type PluginThemeContrib = {
@@ -200,7 +208,11 @@ type PluginPermission =
  | "session.import"
  | "session.read.own"
  | "session.update.own"
- | "session.delete.own";
+ | "session.delete.own"
+ | "audio.capture.background"
+ | "audio.playback.background"
+ | "keyboard.globalShortcut"
+ | "net.websocket";
 ```
 
 未知权限=验证失败。
@@ -256,6 +268,11 @@ type PluginNetDomains = string[]; // "api.example.com" 或 "*.example.com"
 端点 —— 都被限定在这些主机名之内。列表缺失、为空或非法就完全不放行出网，
 无论 `net.fetch` 怎么声明。条目是裸主机名：没有 scheme、没有端口、没有路径，
 也不允许裸 `*`。前缀 `*.` 同时覆盖该域名及其子域名。
+
+`pi.net.websocket` 听同一份列表（`net.websocket`，
+[03-plugin-api.md](/zh-CN/spec/07-plugins/03-plugin-api) §3）。该权限已实现：
+连接被限定在 `manifest.net.domains` 之内，未被声明的主机会在传输被要求
+打开任何东西之前就被拒绝。
 
 ## 5. 1 总线主题语法
 
@@ -328,6 +345,11 @@ MVP 只能实现：
     为一个纯外观细节拒绝插件并不合理。打包检查会改为给出警告
 17. `sessionSources` id 必须匹配 `[a-zA-Z][a-zA-Z0-9._-]{0,63}` 且不能重复；
     本地化 label 必须同时提供 `en` 和 `zh-CN`
+18. `contributes.globalShortcuts` 最多允许 8 条，且需要
+   `keyboard.globalShortcut`。每个 `id` 匹配
+   `[a-zA-Z][a-zA-Z0-9._-]{0,63}` 且唯一；`command` 必须声明在
+   `contributes.commands` 里；`default` 若存在，使用与 `shortcut` 设置相同的
+   修饰键加按键 / F 键语法
 
 ## 8. 示例：最小插件
 

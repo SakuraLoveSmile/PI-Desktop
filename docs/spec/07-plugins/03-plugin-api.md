@@ -625,6 +625,34 @@ pi.net.fetch(input: {
 }): Promise<{ status: number; headers: Record<string, string>; bodyText: string }>
 ```
 
+```ts
+pi.net.websocket.connect(input: {
+  url: string
+  headers?: Record<string, string>
+  protocols?: string[]
+  timeoutMs?: number
+}): Promise<{ socketId: string }>
+
+pi.net.websocket.send(input: { socketId: string; data: string | Uint8Array }): Promise<void>
+pi.net.websocket.close(input: { socketId: string; code?: number; reason?: string }): Promise<void>
+```
+
+Requires `net.websocket`. `connect` is confined to `manifest.net.domains`
+exactly like `fetch`, and `connect` / `close` are audited. Frames arrive as host
+events: `net:websocket:open`, `net:websocket:message`, `net:websocket:close`,
+`net:websocket:error`, each carrying the owning `socketId`, subscribed to with
+`pi.events.on`. Only the owning plugin receives them.
+
+The host owns the socket, so a plugin cannot exceed four sockets, send or
+receive a frame above 1 MiB, or queue more than 4 MiB of unsent data; each of
+those is refused (`LIMIT_EXCEEDED`) or closes the connection rather than growing
+the host's memory. A connect carries `headers` and `protocols`, so an endpoint
+that authenticates per connection works without exposing the credential to
+plugin code. Refusals name the reason: `INVALID_ARGUMENT` for a non-`ws(s)` URL
+or a malformed protocol token, `TIMEOUT` when the handshake does not finish,
+`CONNECT_FAILED` when it fails, `NOT_FOUND` for a socket this plugin does not
+hold, and `PERMISSION_DENIED` when the host is not in the allowlist.
+
 ### desktop control (requires `desktop.control`)
 
 ```ts
@@ -684,6 +712,79 @@ not receive a native microphone handle or a host secret; browser speech
 recognition and speech synthesis remain page-owned. A panel should provide a
 text fallback and announce permission or recognition failures through its
 accessible status.
+
+### audio (requires `audio.capture.background` / `audio.playback.background`)
+
+**Planned — not implemented in this branch.** The SDK declares these signatures
+and the two permissions exist, but this branch ships no host service for them,
+so every call fails closed with `UNSUPPORTED`. `onInputFrame` registers a
+callback — it is not an event name — and the frame shape is
+`PluginAudioInputFrame` in `packages/plugin-sdk/src/index.ts`. When the host
+service lands, the host owns the device: a plugin exchanges PCM16 frames and
+never receives a device handle, `MediaStream`, OS device path, or Node stream,
+one input stream per plugin is allowed, and disable, unload, or crash stops
+capture and drops queued playback.
+
+```ts
+pi.audio.getInputDevices(): Promise<PluginAudioInputDevice[]>
+pi.audio.openInput(options?: PluginAudioOpenInputOptions): Promise<PluginAudioInputSession>
+pi.audio.closeInput(streamId: string): Promise<void>
+pi.audio.getCaptureState(): Promise<PluginAudioCaptureState>
+pi.audio.onInputFrame(handler: (frame: PluginAudioInputFrame) => void): void
+pi.audio.offInputFrame(handler: (frame: PluginAudioInputFrame) => void): void
+pi.audio.openOutput(options: PluginAudioOpenOutputOptions): Promise<PluginAudioOutputSession>
+pi.audio.writeOutput(input: { streamId: string; data: Uint8Array }): Promise<void>
+pi.audio.stopOutput(streamId: string): Promise<void>
+pi.audio.closeOutput(streamId: string): Promise<void>
+```
+
+### keyboard (requires `keyboard.globalShortcut`)
+
+```ts
+pi.keyboard.registerGlobalShortcut(input: {
+  id: string
+  accelerator: string
+  command: string
+}): Promise<PluginGlobalShortcut>
+
+pi.keyboard.unregisterGlobalShortcut(id: string): Promise<void>
+pi.keyboard.listGlobalShortcuts(): Promise<PluginGlobalShortcut[]>
+
+type PluginGlobalShortcut = {
+  id: string
+  accelerator: string
+  command: string
+  registered: boolean
+  error?: string
+}
+```
+
+The host, not the plugin, owns Electron's `globalShortcut`. A plugin maps an
+accelerator to one of its own commands, and the host registers, conflict-checks,
+triggers, and releases it; no keyboard hook, `before-input-event`, raw input
+device, or key event stream is ever exposed, and a trigger runs exactly one
+command belonging to that plugin.
+
+`command` must already be registered by the calling plugin; anything else fails
+`INVALID_ARGUMENT`. An accelerator reserved by the operating system, one
+PI-Desktop itself currently spends (by default `Alt+Space` opens the plugin
+launcher and `Mod+Shift+W` summons the window; once the user rebinds one of
+them, the freed accelerator is available again), or one held by another plugin
+is refused rather than taken over, and a refused re-registration leaves the
+previous binding in place.
+Refusals are returned, not thrown: `registerGlobalShortcut` resolves with
+`registered: false` and an `error` of `SHORTCUT_CONFLICT`, `SHORTCUT_UNAVAILABLE`
+(platform refusal), `INVALID_ACCELERATOR`, or `LIMIT_EXCEEDED` (at most 8
+entries per plugin). `UNSUPPORTED` and `INVALID_ARGUMENT` are thrown.
+Registering an `id` again replaces that entry's accelerator.
+
+Every `contributes.globalShortcuts` entry that declares a `default` is
+registered by the host after the plugin's load, but only when its command
+actually registered; an entry without a `default` waits for a
+`registerGlobalShortcut` call. `unregisterGlobalShortcut` drops one entry and
+does nothing for an unknown id; `listGlobalShortcuts` lists what the host
+currently holds for the calling plugin. Everything is released on disable,
+unload, and crash, and register / unregister are audited.
 
 ## 4. Error model
 
@@ -883,6 +984,13 @@ The desktop plugin runtime now implements the MVP host API surface used by local
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `browser.*` (guest CDP; `browser.cdp`)
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`
+- `keyboard.registerGlobalShortcut` / `unregisterGlobalShortcut` / `listGlobalShortcuts`
+  (`keyboard.globalShortcut`; the host owns Electron `globalShortcut`)
+- `net.websocket.connect` / `send` / `close` (`net.websocket`; host-owned
+  sockets, allowlist-confined, bounded, released with the plugin)
+
+`pi.audio.*` is declared in the SDK and gated by its permissions, but this
+branch ships no host implementation: every call fails closed with `UNSUPPORTED`.
 
 Native plugin notifications use the Electron main-process notification surface;
 they do not create durable rows in the task notification inbox and do not

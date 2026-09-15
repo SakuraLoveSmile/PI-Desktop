@@ -517,6 +517,32 @@ pi.net.fetch(input: {
 }): Promise<{ status: number; headers: Record<string, string>; bodyText: string }>
 ```
 
+```ts
+pi.net.websocket.connect(input: {
+  url: string
+  headers?: Record<string, string>
+  protocols?: string[]
+  timeoutMs?: number
+}): Promise<{ socketId: string }>
+
+pi.net.websocket.send(input: { socketId: string; data: string | Uint8Array }): Promise<void>
+pi.net.websocket.close(input: { socketId: string; code?: number; reason?: string }): Promise<void>
+```
+
+需要 `net.websocket`。`connect` 会和 `fetch` 一样被严格限制在
+`manifest.net.domains` 之内，`connect` / `close` 会记入审计。帧以宿主事件的
+形式到达：`net:websocket:open`、`net:websocket:message`、`net:websocket:close`、
+`net:websocket:error`，每个都带着持有它的 `socketId`，用 `pi.events.on` 订阅。
+只有持有该套接字的那个插件会收到它们。
+
+套接字由宿主持有，所以插件不能超过四个套接字，不能发送或接收大于 1 MiB 的帧，
+也不能排队超过 4 MiB 的未发送数据；每一种都会被拒绝（`LIMIT_EXCEEDED`），或者
+直接关闭连接，而不是让宿主的内存继续增长。一次 connect 会带上 `headers` 与
+`protocols`，所以按连接认证的端点无需把凭证暴露给插件代码。拒绝会说明原因：
+非 `ws(s)` 的 URL 或畸形的协议令牌是 `INVALID_ARGUMENT`，握手没有完成是
+`TIMEOUT`，握手失败是 `CONNECT_FAILED`，套接字不属于该插件是 `NOT_FOUND`，
+主机不在白名单内是 `PERMISSION_DENIED`。
+
 ### 桌面控制（需要 `desktop.control`）
 
 ```ts
@@ -562,6 +588,72 @@ navigator.mediaDevices.getUserMedia({ audio: true })
 宿主的权限处理器为该面板放行 `media` 权限，并继续拒绝摄像头和其他所有
 设备权限。插件拿不到原生麦克风句柄或宿主密钥；浏览器的语音识别和语音合成
 仍由页面持有。面板应提供文本回退，并通过其无障碍状态播报权限或识别失败。
+
+### 音频（需要 `audio.capture.background` / `audio.playback.background`）
+
+**已规划 —— 本条分支尚未实现。** SDK 声明了这些签名，两个权限也已存在，
+但这条分支没有为它们提供任何宿主服务，所以每次调用都以 `UNSUPPORTED`
+失败即关闭。`onInputFrame` 是注册回调 —— 它不是事件名 —— 帧形状见
+`packages/plugin-sdk/src/index.ts` 中的 `PluginAudioInputFrame`。等宿主服务
+落地后，设备由宿主持有：插件只交换 PCM16 帧，永远拿不到设备句柄、
+`MediaStream`、操作系统设备路径或 Node 流，每个插件只允许一条输入流，
+禁用、卸载或崩溃会停止采集并丢弃已排队的播放。
+
+```ts
+pi.audio.getInputDevices(): Promise<PluginAudioInputDevice[]>
+pi.audio.openInput(options?: PluginAudioOpenInputOptions): Promise<PluginAudioInputSession>
+pi.audio.closeInput(streamId: string): Promise<void>
+pi.audio.getCaptureState(): Promise<PluginAudioCaptureState>
+pi.audio.onInputFrame(handler: (frame: PluginAudioInputFrame) => void): void
+pi.audio.offInputFrame(handler: (frame: PluginAudioInputFrame) => void): void
+pi.audio.openOutput(options: PluginAudioOpenOutputOptions): Promise<PluginAudioOutputSession>
+pi.audio.writeOutput(input: { streamId: string; data: Uint8Array }): Promise<void>
+pi.audio.stopOutput(streamId: string): Promise<void>
+pi.audio.closeOutput(streamId: string): Promise<void>
+```
+
+### 键盘（需要 `keyboard.globalShortcut`）
+
+```ts
+pi.keyboard.registerGlobalShortcut(input: {
+  id: string
+  accelerator: string
+  command: string
+}): Promise<PluginGlobalShortcut>
+
+pi.keyboard.unregisterGlobalShortcut(id: string): Promise<void>
+pi.keyboard.listGlobalShortcuts(): Promise<PluginGlobalShortcut[]>
+
+type PluginGlobalShortcut = {
+  id: string
+  accelerator: string
+  command: string
+  registered: boolean
+  error?: string
+}
+```
+
+宿主 —— 而不是插件 —— 持有 Electron 的 `globalShortcut`。插件把一个加速键
+映射到自己的一条命令，由宿主完成注册、冲突检查、触发和释放；插件永远
+拿不到键盘钩子、`before-input-event`、原始输入设备或按键事件流，一次触发
+也只是属于该插件的一条命令。
+
+`command` 必须已经由调用插件注册；否则以 `INVALID_ARGUMENT` 失败。被操作
+系统保留、被 PI-Desktop 自己当前占用（默认 `Alt+Space` 打开插件启动器、
+`Mod+Shift+W` 唤起窗口；用户改绑后释放出来的加速键可以再次被插件使用）或
+已被另一个插件持有的加速键会被拒绝而不是被抢走，被拒绝的重新注册会保留原来
+的绑定。拒绝是返回的结果，不是抛出的异常：
+`registerGlobalShortcut` 以 `registered: false` 解析，并带 `error` 为
+`SHORTCUT_CONFLICT`、`SHORTCUT_UNAVAILABLE`（平台拒绝）、
+`INVALID_ACCELERATOR` 或 `LIMIT_EXCEEDED`（每个插件最多 8 条）。
+`UNSUPPORTED` 和 `INVALID_ARGUMENT` 会抛出。用同一个 `id` 再次注册会替换
+该条目的加速键。
+
+每条带 `default` 的 `contributes.globalShortcuts` 条目会在插件加载后由宿主
+注册，但仅当它的命令确实注册成功；没有 `default` 的条目等待
+`registerGlobalShortcut` 调用。`unregisterGlobalShortcut` 删除一条条目，
+未知 id 时什么都不做；`listGlobalShortcuts` 列出宿主当前为调用插件持有的
+条目。禁用、卸载和崩溃时全部释放，注册 / 注销都会记入审计。
 
 ## 4. 错误模型
 
@@ -735,6 +827,13 @@ window.pluginBridge.on(event, handler)
 - `clipboard.*`、`shell.openExternal`、`net.fetch`
 - `browser.*`（访客页 CDP；`browser.cdp`）
 - `services.register` / `unregister`、`bus.publish` / `subscribe`、`events.on` / `off`
+- `keyboard.registerGlobalShortcut` / `unregisterGlobalShortcut` / `listGlobalShortcuts`
+  （`keyboard.globalShortcut`；Electron 的 `globalShortcut` 由宿主持有）
+- `net.websocket.connect` / `send` / `close`（`net.websocket`；套接字由宿主
+  持有，受白名单限制，有界，随插件一起释放）
+
+`pi.audio.*` 已在 SDK 中声明并由其权限把关，但这条分支没有任何宿主实现：
+每次调用都以 `UNSUPPORTED` 失败即关闭。
 
 本机插件通知使用 Electron 主进程通知界面；
 他们不会在任务通知收件箱中创建持久行，并且不会

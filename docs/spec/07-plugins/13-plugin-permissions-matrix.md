@@ -25,6 +25,7 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `agent.prompt.inject` | high | Inject a system prompt; activates `contributes.skills` | Deny by default / strong confirmation | Easily leads to behavior hijacking |
 | `agent.extension` | high | Run `contributes.agentExtensions` modules inside the agent process | Explicit confirmation; local imports and development plugins only in v1.1 | Same access as the agent's own tools; the plugin sandbox does not apply (spec 16) |
 | `net.fetch` | high | `net.fetch` | Deny by default | Confined to `manifest.net.domains`; an empty or malformed list means no egress (§2A) |
+| `net.websocket` | high | `pi.net.websocket.connect` / `send` / `close` (host-owned sockets; at most 4 per plugin, 1 MiB frames) | Deny by default | Confined to `manifest.net.domains` like `net.fetch`; a refused host never reaches the transport, and every socket is closed when the plugin unloads, is disabled, or crashes |
 | `shell.openExternal` | medium | Open external link | Confirm on first use | Prevents phishing links |
 | `mcp.server.local` | high | Spawn a `transport: "stdio"` MCP server declared in the manifest | Deny by default | Runs a local executable; its tools reach the agent |
 | `mcp.server.remote` | high | Connect a `transport: "http"` MCP server | Deny by default | Sends tool arguments to a third-party endpoint; non-loopback HTTP is unencrypted |
@@ -34,6 +35,9 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `browser.cdp` | high | `pi.browser.*` against the host work-panel guest | Confirm at install | Guest bounds are clamped to the calling plugin view; CDP is allowlisted |
 | `desktop.control` | high | `pi.desktop.listOperations`, `pi.desktop.invoke`, including the reviewed `session/collaboration/*` operations | Confirm at install | Shared with the local MCP control plane's reviewed operation catalog, except for operations marked plugin-only: the six `session/collaboration/*` operations reach the plugin gateway but are deliberately absent from the MCP-visible catalog and have no renderer mutation channel; collaboration `spawn`/`send` additionally require an active plugin Agent tool invocation, whose source Session/turn/invocation identity is injected by the host; panel cancellation is limited to that plugin's own deliveries; a `dangerous` operation needs `confirm: true` from the plugin **and** the user's answer to a host-owned native dialog that names the catalog operation; the MCP bearer token and Electron channel names are never exposed |
 | `ui.microphone` | medium | `navigator.mediaDevices.getUserMedia({ audio: true })` inside the plugin's isolated panel | Confirm at install | Audio only; camera and every other device permission stay denied; no native handle or host secret reaches the plugin |
+| `audio.capture.background` | high | `pi.audio.getInputDevices`, `openInput`, `closeInput`, `getCaptureState`, `onInputFrame` / `offInputFrame` (SDK types only; no runtime in this branch) | Deny by default | Host owns the device; PCM16 frames only, no device handle or `MediaStream`. Every call fails closed with `UNSUPPORTED` until the host service lands |
+| `audio.playback.background` | medium | `pi.audio.openOutput`, `writeOutput`, `stopOutput`, `closeOutput` (SDK types only; no runtime in this branch) | Confirm at install | Host-owned playback queue, PCM16 only. Every call fails closed with `UNSUPPORTED` until the host service lands |
+| `keyboard.globalShortcut` | medium | `pi.keyboard.registerGlobalShortcut`, `unregisterGlobalShortcut`, `listGlobalShortcuts`; `contributes.globalShortcuts` | Confirm at install | Host owns Electron `globalShortcut`; a shortcut only runs the plugin's own command; conflicts are refused (`SHORTCUT_CONFLICT` / `SHORTCUT_UNAVAILABLE` / `INVALID_ACCELERATOR` / `LIMIT_EXCEEDED`, max 8 per plugin); released on unload/disable/crash |
 | `models.list` | medium | `pi.models.list` | Confirm at install | Ready provider/model rows only; no secrets |
 | `project.create` | high | `pi.project.create` and explicit `projectId` on session import | Confirm at install | Creates or reuses a durable project row without activating the workspace; imported sessions remain unbound unless the id is supplied |
 | `session.read` | high | `pi.session.getLlmContext` | Confirm at install | In-flight tool session only; compaction-aware projection (D019 / D336) |
@@ -143,6 +147,10 @@ so "Modify the files it lists" is followed by the list.
 | `session.update.own` | Rename sessions imported by this plugin | 重命名此插件导入的会话 |
 | `session.delete.own` | Trash or purge sessions imported by this plugin | 将此插件导入的会话移入回收站或清除 |
 | `agent.complete` | Run a one-shot completion with your models | 用你的模型发起一次补全 |
+| `audio.capture.background` | Use the microphone in the background | 后台使用麦克风 |
+| `audio.playback.background` | Play audio in the background | 后台播放声音 |
+| `keyboard.globalShortcut` | Register system-wide shortcuts | 注册系统级快捷键 |
+| `net.websocket` | Open real-time connections | 建立实时双向连接 |
 
 ## 5. Adding permissions on upgrade
 
