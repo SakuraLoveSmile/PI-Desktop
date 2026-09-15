@@ -2718,6 +2718,11 @@ Anatomy:
   user-global), app commands (builtin slash aliases), plugin commands.
   The core aliases remain `/new`, `/compact`, `/agent-mode`, `/plan-mode`, and
   `/goal-mode`; matched characters highlight in accent.
+- Command descriptions use the space left after the slash name and optional
+  title/argument hints. A long description truncates before it can squeeze a
+  short command name to an ellipsis, including in narrow composers. Names and
+  hints can still truncate when they themselves exceed the available row width;
+  neither command rows nor file rows overflow the menu.
 - File mode (`@` token at cursor, boundary-preceded): rows persistently show
   only the leaf file or directory name; directories get a trailing `/` and
   continue completion on accept. The complete relative path remains available

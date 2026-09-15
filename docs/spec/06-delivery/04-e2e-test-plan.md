@@ -123,6 +123,8 @@ The minimum selection is:
 - Session-list refresh or model capability lookup: `pnpm test:e2e` and
   `pnpm test:e2e:boot`, including the synthetic large-list responsiveness check.
 - Composer clipboard representation and text insertion: `pnpm test:e2e:composer-paste`.
+- Composer slash-menu name/description layout: `pnpm build:js` followed by
+  `pnpm test:e2e:composer-autocomplete`.
 - Transcript render boundaries and cross-part delegation display: `pnpm test:e2e:transcript`.
 - Plan host/runtime behavior: `pnpm test:e2e` and `pnpm test:e2e:plan`.
 - Plan UI behavior: `pnpm test:e2e:plan` and `pnpm test:e2e:plan-ui`.
@@ -1633,7 +1635,11 @@ and identify the platform validation still needed.
   confirm the copy is unchanged. 3) Switch to conversation B and then back to
   A, recording each guidance change. 4) Switch between home and a conversation
   and inspect the command/file and keyboard hints. 5) Type `/` and inspect the
-  slash menu. 6) Switch to zh-CN and repeat the context-switch checks.
+  slash menu. Include Skills with long English/CJK descriptions, short/no
+  descriptions, a separate title/argument hint, and an exceptionally long slash
+  name; also inspect a long filename in `@` mode. Repeat at 1040px and 1680px
+  viewport widths with 320px and 640px composer widths. 6) Switch to zh-CN and
+  repeat the context-switch checks.
 - **Expected**: The initially rendered context starts with its welcome copy and stays stable until
   the page/session context changes. Each context switch advances to the next
   localized command/file or keyboard hint with an opacity fade; no timer-driven
@@ -1644,12 +1650,20 @@ and identify the platform validation still needed.
   it keeps the typed command chip visible and the model calls `Skill` with that
   id before answering. zh-CN shows the matching localized copy, including
   `Shift+Enter for newline · Use Send to submit`.
+  Long descriptions use only the space remaining after command names and
+  hints, so short names stay fully visible. Descriptions and oversized names
+  ellipsize within the row without horizontal overflow; file names retain the
+  available row width. Name highlights and click acceptance with input focus
+  retained remain intact.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11),
   `04-ux/04-builtin-commands.md` (§7–8)
 - **Acceptance**: C (send/UI), Localization, Quality
 - **Milestone**: M2
 - **Status**: Source-covered (`composer-placeholder-context.test.mjs`);
-  full UI scenario Draft
+  slash-menu layout covered by `pnpm test:e2e:composer-autocomplete` after
+  `pnpm build:js` (real React/Chromium and production CSS, deterministic command
+  fixtures; no provider required). Full provider/session scenario Draft;
+  branch runs do not replace post-integration E2E
 
 #### E2E-089: Composer model menu opens upward and switches model
 
