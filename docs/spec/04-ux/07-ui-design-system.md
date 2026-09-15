@@ -52,6 +52,9 @@ selection is suppressed for chrome by default. The selection contract is:
   users can edit drafts, search, and use native `Cmd/Ctrl+A/C/V` behavior.
 - Transcript message bodies, rendered Markdown, code blocks, and tool
   input/output remain selectable for copy and inspection.
+- Transient surfaces whose text a user may need to keep — toast messages in
+  particular — remain selectable; a toast's icon and dismiss control stay
+  non-selectable chrome.
 - New document-like surfaces must opt into the shared `.selectable` class (or
   an equivalent explicit `user-select: text` rule).
 - The Electron renderer sets both `user-select` and `-webkit-user-select`;
