@@ -1232,21 +1232,31 @@ identify the platform validation still needed.
   button present. Send two more prompts and inspect the queue above the
   composer. 3) Remove the second queued row and switch to B. 4) Send a prompt
   in B, then return to A before either run completes. 5) Choose Send now on A's
-  remaining queued row. 6) Observe A through the current tool/reply boundary
-  and then the next turn. 7) Start another run in A, clear the draft to expose
-  the single Stop button, press Stop, and inspect the queue. 8) Repeat with
-  two queued prompts, let the active turn finish without Send now, and delay
-  its host `session.endTurn` response until after `agent_end` is delivered.
-  Release finalization and observe both follow-ups through their turn
-  boundaries. Repeat with a provider error and an immediate abort.
+  remaining queued row, then choose Send now on a second row. 6) Observe A
+  through the current tool/reply boundary and then the next turn. 7) Start
+  another run in A, clear the draft to expose the single Stop button, press
+  Stop, and inspect the queue. 8) Repeat with two queued prompts, let the active
+  turn finish without Send now, and delay its host `session.endTurn` response
+  until after `agent_end` is delivered. Release finalization and observe both
+  follow-ups through their turn boundaries. Repeat with a provider error and an
+  immediate abort. 9) With waiting rows, use move up and move down and confirm
+  the persisted order follows. 10) Edit a waiting row while the composer holds
+  text, then with an empty composer.
 - **Expected**: The single submit slot contains exactly one button in every
   state: disabled Send while idle and empty, enabled Send while running with
   content (which queues the prompt), and Stop while running with an empty
   draft. A's two prompts appear in FIFO order, the removed row never sends,
   and B's queue remains independent. Send now requests a graceful stop: the
   current batch completes with a normal `agent_end`/completed turn, then the
-  selected row starts before any remaining FIFO rows without `AGENT_BUSY`.
-  Immediate Stop aborts the current reply and preserves A's queued row;
+  promoted rows are delivered in the order they were promoted, before any
+  waiting row, without `AGENT_BUSY`: the first starts the turn and the rest join
+  it as adjacent user messages, so the model answers once for the whole block.
+  remove, and its Send now button reads as already decided; promotion is
+  one-way. Move up/down swaps only waiting rows, never crosses the promoted
+  block, and persists. Edit is refused with a visible message while the input
+  is non-empty, and otherwise removes the row and returns its text plus its
+  file-reference chips to the composer. Immediate Stop aborts the current reply
+  and preserves A's queued row;
   switching sessions preserves both queues. Ordinary completion, provider
   failure, and abort all resume queued sending automatically after durable
   finalization releases the session. No queued prompt starts while finalization
@@ -1254,14 +1264,79 @@ identify the platform validation still needed.
   click or session switch. Repeated terminal handling does not double-dispatch.
   Other sessions' queues remain unchanged, and quitting while finalization is
   pending preserves queued work without starting another turn.
-- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.2),
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
   `04-ux/08-component-spec.md` (§11),
-  `04-ux/09-interaction-patterns.md` (§3.4), ADR 0118, ADR 0213
+  `04-ux/09-interaction-patterns.md` (§3.4), ADR 0118, ADR 0213, ADR 0265
 - **Acceptance**: C (chat, stream, and session isolation), Quality
 - **Milestone**: M6+
 - **Status**: Source-level regression and deterministic desktop finalization /
-  Agent Host integration covered (`queued-turn-finalization.test.mjs`); full
-  UI scenario Draft
+  Agent Host integration covered (`queued-turn-finalization.test.mjs`);
+  promotion, reorder, and edit contracts covered at source level
+  (`composer-send-state.test.mjs`); full UI scenario Draft
+
+#### E2E-QUEUE-promote-orders-delivery-by-click: Two Send now clicks deliver in click order
+
+- **Preconditions**: Provider configured; session A is running a turn with at
+  least one completed tool batch; three prompts are queued behind it.
+  the first queued row. 3) Confirm the promoted block orders third → first, that
+  both rows lock their move/edit/remove actions, and that the remaining row is
+  still editable. 4) Let the boundary pass and observe the transcript.
+- **Expected**: The first click is delivered first and the second second — the
+  click order is the delivery order, not "last click wins" and not the original
+  queue order. Both rows appear as adjacent user messages in one turn and the
+  model answers once; the queue no longer lists either promoted row. Both
+  promoted rows show as already decided and cannot be edited, removed, or
+  reordered. The waiting row keeps its actions and is not delivered before
+  either promoted row.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
+  `04-ux/08-component-spec.md` (§11), ADR 0265
+- **Acceptance**: C (chat, stream)
+- **Milestone**: M6+
+- **Status**: Draft; ordering and the adjacent delivery are covered by
+  `turn_queue`, `turn-queue`, and `agent-host` unit tests
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
+  `04-ux/08-component-spec.md` (§11), ADR 0265
+- **Acceptance**: C (chat, stream)
+- **Milestone**: M6+
+- **Status**: Draft; underlying ordering covered by `turn_queue`,
+  `turn-queue`, and `agent-host` unit tests
+
+#### E2E-QUEUE-reorder-moves-plain-neighbours: Move up/down reorders the waiting queue
+
+- **Preconditions**: Provider configured; a turn is running with at least three
+  prompts queued and no promoted row.
+- **Steps**: 1) Move the third row up twice and confirm it becomes first. 2) Move
+  the first row up once and confirm nothing moves. 3) Promote a row, then try to
+  move the adjacent waiting row across it. 4) Reload the renderer and inspect the
+  queue order.
+- **Expected**: Each move swaps the row with its adjacent waiting neighbour and
+  the Host persists the new order, so a reload reproduces it. The waiting-block
+  boundary and the promoted block are immovable: a move at the block edge is a
+  no-op that never reaches the Host, and no move changes a promoted row's place.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6), ADR 0265
+- **Acceptance**: C (chat), F (persistence)
+- **Milestone**: M6+
+- **Status**: Draft; host-side reorder covered by `turn_queue` unit tests
+
+#### E2E-QUEUE-edit-restores-draft-only-when-input-empty: Edit restores the queued draft
+
+- **Preconditions**: Provider configured; a turn is running with a queued prompt
+  that carries text and a file-reference chip; the composer input is empty.
+- **Steps**: 1) Type a draft, then choose edit on the queued row. 2) Clear the
+  composer and choose edit again. 3) Confirm the queue no longer lists the row
+  and the composer holds the row's text and its file-reference chip. 4) Send it
+  and compare the transcript with the original queued prompt.
+- **Expected**: With a non-empty input (or an attachment chip) the edit is
+  refused with a visible message and the row stays queued. With an empty input
+  the row leaves the queue, the Host no longer lists it, and the composer holds
+  the exact text plus the original file-reference chip — not the
+  annotation-stripped inline content. Re-sending produces the same prompt as the
+  queued row would have.
+- **Specs linked**: `04-ux/08-component-spec.md` (§11), ADR 0265
+- **Acceptance**: C (chat, stream)
+- **Milestone**: M6+
+- **Status**: Draft; composer-side contract covered by
+  `composer-send-state.test.mjs`
 
 #### E2E-011g: New Task does not leave the previous transcript on screen
 
@@ -8257,7 +8332,7 @@ This test plan spec is accepted when:
   confirmation is still refused by the host, and the dialog reports that
   refusal with `project.deleteRunningBlocked` while removing nothing.
 - **Specs linked**: `03-runtime/06-host-rpc-protocol.md` §Projects,
-  `04-ux/08-component-spec.md` §3.9, ADR 0251, D421, D429
+  `04-ux/08-component-spec.md` §3.9, ADR 0251, D421, D431
 - **Acceptance criterion**: D (workspace), Quality
 - **Milestone**: M6+
 - **Status**: Partially automated — `apps/desktop/test/project-delete.test.mjs`
@@ -10247,14 +10322,18 @@ are withdrawn with ADR 0165.
   the work panel is closed. The open session's scratch store holds one file and
   the attachment store one blob. The project is a group whose primary folder
   contains an `.html` page and a text file, and whose second folder holds a text
-  file of its own.
+  file of its own. The same session's transcript carries a `Read` row whose
+  summary names a project file, a `Glob` result listing project paths, and a
+  `Grep` result grouping its hits by file.
 - **Steps**: 1) Click a project file reference in an assistant reply. 2) Type an
   unsaved edit into that view and click the same reference again. 3) Click a
   reference that resolves into the session scratch store, then the
   `attachments/<sha256>` reference. 4) Click a workspace `.html` reference in an
-  assistant reply and the same reference as a sent user chip. 5) Disable the
-  File Manager plugin, click a project file reference again, then re-enable it
-  and click that reference once more. 6) Click a reference that resolves in the
+  assistant reply and the same reference as a sent user chip. 5) Click the file
+  path in the tool row's summary, then a path in the `Glob` result's file list
+  and a path heading of the `Grep` result. 6) Disable the File Manager plugin,
+  click a project file reference and the tool row summary again, then re-enable
+  it and click both once more. 7) Click a reference that resolves in the
   project's second folder, then one that resolves in its primary folder.
 - **Expected**:
   - A project file opens in the File Manager work-panel view on that file, with
@@ -10269,22 +10348,30 @@ are withdrawn with ADR 0165.
     page in a sibling folder is a project file like any other and opens in the
     File Manager view, because the side browser is rooted at the primary folder
     (ADR 0263).
+  - A tool surface reaches the destination of the file it names, not one of its
+    own: the tool row's summary path and the paths of the `Glob` file list and
+    the `Grep` path headings open the same project file in the File Manager view.
+    A summary path that is a link opens the file without expanding the row, and
+    only a summary without a resolvable target falls through to the row's own
+    disclosure.
   - A reference that resolved in the project's second folder opens in the File
     Manager view on that file, reached by its absolute path, with no host
     `file:` tab; the reference from the primary folder opens in that same view
     addressed project-relative (ADR 0263).
-  - With the plugin disabled, a project file reference falls back to the host
-    `file:` tab — the surface the click used before, which now also reaches the
-    project's other folders — instead of opening nothing; re-enabling the plugin
-    restores the File Manager destination.
-- **Specs linked**: `04-ux/08-component-spec.md` §8.3,
+  - With the plugin disabled, a project file reference — from the reply and from
+    a tool row or result list alike — falls back to the host `file:` tab, the
+    surface those clicks used before, which now also reaches the project's other
+    folders; re-enabling the plugin restores the File Manager destination.
+- **Specs linked**: `04-ux/08-component-spec.md` §8.3, §9.6,
   `04-ux/09-interaction-patterns.md` §8a.2, ADR 0104, ADR 0163, ADR 0241,
   ADR 0249, ADR 0262, ADR 0263
 - **Acceptance**: C (conversation & stream), G (plugins), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered
-  (`apps/desktop/test/transcript-file-chips.test.mjs`); full UI journey Draft
-  (run only in a capable environment when this surface changes)
+  (`apps/desktop/test/transcript-file-chips.test.mjs` for the wiring and
+  `apps/desktop/test/tool-row-file-refs.test.mjs` for the work-panel entry each
+  shape of resolution produces); full UI journey Draft (run only in a capable
+  environment when this surface changes)
 
 #### E2E-181: An imported skill is listed in the next session catalog
 

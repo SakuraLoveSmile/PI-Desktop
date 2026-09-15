@@ -77,6 +77,7 @@ export const IPC = {
     agentQueueList: "pi-desktop/agent/queue/list",
     agentQueueRemove: "pi-desktop/agent/queue/remove",
     agentQueuePrioritize: "pi-desktop/agent/queue/prioritize",
+    agentQueueReorder: "pi-desktop/agent/queue/reorder",
     agentGetStatus: "pi-desktop/agent/getStatus",
     agentInstructionsGet: "pi-desktop/agent/instructions/get",
     agentInstructionsSave: "pi-desktop/agent/instructions/save",
