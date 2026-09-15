@@ -2727,6 +2727,12 @@
   color: var(--ds-text-secondary);
 }
 
+/* Tool details stay in the tool row's level rather than adding a second inset. */
+.tool-row:not(.thinking):not(.subagent-topology-node) > .tool-row-body {
+  margin-left: 0;
+  padding-left: 0;
+}
+
 .disclosure-collapse-rail {
   position: absolute;
   inset-block: 0;

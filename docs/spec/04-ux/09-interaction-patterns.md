@@ -476,8 +476,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   conversation hides the panel. Session/workspace identity remains attached to
   every relative resource, preventing cross-context reinterpretation.
 - A side chat (D-LOCAL-message-quotes) is one more resource in the same context: the message
-  action forks the child through `session.fork` without activating it and opens
-  one `sidechat:<childSessionId>` tab in the origin session's retained context.
+  action opens a renderer draft in the origin session's retained context.
+  First Send forks through `session.fork` without activating the child and
+  replaces the draft tab with `sidechat:<childSessionId>`.
   The tab label reuses `sideChat.title`, the body renders the child's transcript
   from the same event stream through the background-transcript reducer, and the
   compact input sends to and stops the child session, never the visible one.
@@ -487,8 +488,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   it does not survive relaunch, while the durable child session does.
 - Closing the final side-chat tab keeps the upstream panel launcher visible.
   Closing it beside other tabs leaves those resources and other sessions intact.
-  Registered child transcripts survive tab switches, but the compact side-chat
-  draft and scroll position belong to the mounted tab and may reset on remount.
+  Registered transcripts and side-chat drafts survive tab switches. Scroll
+  position belongs to the mounted tab and may reset on remount.
 - Relaunch discards every session context, including Browser resources; only
   the committed preferred panel width persists. Native window state is stored
   independently from normal bounds, including when the app closes while
@@ -1001,7 +1002,7 @@ Running turns and pending approvals continue to gate the controls.
   never renders in a read-only projection, and it does not steal the selection:
   the pointer press is prevented so the excerpt is whatever was selected,
   including a whole formula. Add to chat writes a composer draft and focuses the
-  composer; Ask in side chat sends the excerpt to the side chat anchored at that
+  composer; Ask in side chat prefills a blockquote in the side chat anchored at that
   row; neither sends into the conversation being read. On an assistant turn, Add
   to chat opens the annotation comment editor instead of writing draft text
   (D-LOCAL-response-annotations): the editor snapshots the excerpt, Save attaches one annotation to the
@@ -1523,3 +1524,11 @@ This does not prevent state changes — it makes them instant.
     the expanded sidebar yields at the threshold and returns when the panel
     closes, and divider cancellation restores the prior panel width
     (ADR 0033 / ADR 0151 / ADR 0238)
+
+### Side-chat draft lifecycle (Issue #421)
+
+Open side chat and selection Ask in side chat create a renderer-only draft.
+Selection text is prefilled as a blockquote, without sending. First nonempty
+Send creates the anchored child and sends once; failure keeps the draft and
+reuses any already-created child. Closing before Send creates no history.
+Existing child sessions remain after close.

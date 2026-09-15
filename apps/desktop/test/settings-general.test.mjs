@@ -131,9 +131,13 @@ test("Basics and AI tabs expose their respective app and AI controls", () => {
   assert.doesNotMatch(settingsPageSource, /commandShellConfigured/);
   assert.match(
     aiSource,
-    /defaultPermissionMode: e\.target\.value as GlobalPermissionMode/,
+    /defaultPermissionMode: mode as GlobalPermissionMode/,
   );
+  assert.match(aiSource, /<SettingsMenuSelect\b/);
   assert.match(aiSource, /"accept-edits"/);
+  // The AI tab keeps the Settings picker control: a native <select> popup is
+  // platform-drawn and cannot carry the shared menu surface or its check mark.
+  assert.doesNotMatch(aiSource, /<select/);
 });
 
 test("language persists as part of shared app settings", () => {

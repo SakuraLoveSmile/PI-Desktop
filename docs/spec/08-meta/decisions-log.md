@@ -3072,6 +3072,13 @@ D193, and D194.
   different provider id, and do not retire an idle runtime. Repeating a
   definition's own pin key is omit. On-demand matching uses unique provider
   lookup. The Task catalog discloses each definition's default model.
+- Scope clarification (2026-09-15, issue #386): the opt-in governs every entry
+  point through which the AI picks a model for delegated work, not only
+  `Task.model`. A `session/collaboration/spawn` `modelKey` naming a model
+  without the opt-in is refused with `PERMISSION_DENIED` before a worker is
+  created; omitting the key, or naming the default model's own key, remains
+  inheritance. `models.list` still reports every ready model with its flag —
+  the flag advises the caller and is authoritative only in Electron main.
 
 - Models not pre-resolved at sidecar launch are resolved on-demand via the
   `provider.resolveSubagentModel` RPC to Electron main, where credentials and
@@ -5272,6 +5279,15 @@ not an unreviewed upstream registry passthrough.
 It deliberately does not include plugin OAuth: the `provider.oauth` permission
 and a Host-owned plugin login flow are future work, so a declared provider has no
 OAuth login, token refresh, or account label today.
+
+## 2026-09-15 — Side chats materialize on first Send (#421)
+
+Side-chat opening and selection quote prefill are renderer-only drafts. The
+first explicit nonempty Send creates the anchored child, with concurrent
+submissions deduplicated and failed drafts retained. Closing unsent drafts
+creates no history; existing children remain. See the
+[message quotes and side chats ADR](../../adr/message-quotes-and-side-chats.md)
+and E2E-CHAT-side-chat-fork.
 
 ## 2026-09-15 — A tooltip never outlives its trigger (D428)
 

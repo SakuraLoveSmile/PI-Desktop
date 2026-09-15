@@ -519,6 +519,7 @@ export const zhTW = {
     untitledTask: "新建任務",
   },
   sideChat: {
+    parentBusy: "主對話仍在回覆中，請等待回覆結束後再傳送側邊問題。",
     readOnly: "此原生 Pi 工作階段目前為唯讀狀態。",
     title: "側邊聊天",
     sessionTitle: "側邊聊天：{{title}}",
