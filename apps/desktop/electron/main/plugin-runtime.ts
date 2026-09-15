@@ -8,6 +8,7 @@ import {
   statSync,
   rmSync,
 } from "node:fs";
+import type { Stats } from "node:fs";
 import { open as openFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -30,6 +31,7 @@ import {
   pluginToolName,
   resolveFsAccess,
   resolveMcpRefs,
+  isExternalThemeAssetPath,
   normalizeThemeAssetPath,
   sanitizeThemeCss,
   skillIdFromPath,
@@ -865,7 +867,7 @@ export function resolveInsidePlugin(pluginPath: string, relative: string): strin
  * referencing one is refused instead of served from a half-honoured list.
  */
 function resolveThemeAssets(
-  pluginPath: string,
+  _pluginPath: string,
   declared: readonly string[],
 ): { files: Map<string, string>; dropped: number } {
   const files = new Map<string, string>();
@@ -873,13 +875,16 @@ function resolveThemeAssets(
   let total = 0;
   let dropped = 0;
   for (const asset of declared) {
+    // A theme asset is an absolute path; `normalizeThemeAssetPath` rejects
+    // package-relative references, so nothing is resolved against the package
+    // root any more. The plugin is the one naming the file.
     const normalized = normalizeThemeAssetPath(asset);
-    if (!normalized || normalized.split("/").includes("node_modules")) {
+    if (!normalized) {
       dropped += 1;
       continue;
     }
-    const absolute = resolveInsidePlugin(pluginPath, normalized);
-    if (!absolute || !existsSync(absolute)) {
+    const absolute = normalized;
+    if (!existsSync(absolute)) {
       dropped += 1;
       continue;
     }
@@ -1084,6 +1089,36 @@ export class PluginRuntime {
    * plugin, an undeclared path, and a path outside the package all answer null
    * for the same reason.
    */
+  /**
+   * Serve an absolute local file to a theme that referenced it by path.
+   *
+   * A runtime-registered theme has no manifest entry to declare assets in, so the
+   * reference itself is the authorization: an absolute path on the extension
+   * whitelist that exists on disk is added to this plugin's asset map for as long
+   * as the plugin stays loaded (unloading a plugin clears the whole map).
+   *
+   * The upsert is a message, not a file write, so a theme can pick up a new image
+   * without the plugin reloading.
+   */
+  private externalThemeAsset(loaded: LoadedPlugin, target: string): string | null {
+    const key = normalizeThemeAssetPath(target);
+    if (!key || !isExternalThemeAssetPath(key)) return null;
+    let stats: Stats;
+    try {
+      stats = statSync(key);
+    } catch {
+      return null;
+    }
+    if (!stats.isFile() || stats.size > THEME_ASSET_MAX_BYTES) return null;
+    let registry = this.themeAssets.get(loaded.manifest.id);
+    if (!registry) {
+      registry = new Map();
+      this.themeAssets.set(loaded.manifest.id, registry);
+    }
+    registry.set(key, key);
+    return themeAssetUrl(loaded.manifest.id, key);
+  }
+
   resolveThemeAsset(pluginId: string, assetPath: string): string | null {
     const normalized = normalizeThemeAssetPath(assetPath);
     if (!normalized) return null;
@@ -3670,7 +3705,9 @@ export class PluginRuntime {
           const base = input?.base === "light" ? "light" : "dark";
           const label = String(input?.label ?? "").trim() || themeId;
           const rawCss = String(input?.css ?? "");
-          const sanitized = sanitizeThemeCss(rawCss, THEME_CSS_MAX_BYTES);
+          const sanitized = sanitizeThemeCss(rawCss, THEME_CSS_MAX_BYTES, (target) =>
+            this.externalThemeAsset(loaded, target),
+          );
           if (!sanitized.ok) {
             throw apiError("INVALID_ARGUMENT", sanitized.error);
           }

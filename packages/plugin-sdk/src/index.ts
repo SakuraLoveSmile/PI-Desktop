@@ -8,6 +8,7 @@ import {
 import { validateMcpServer } from "./mcp-config.js";
 import { parseNetDomains, type PluginNetDomain } from "./net-policy.js";
 import {
+  isExternalThemeAssetPath,
   isThemeAssetPath,
   normalizeThemeAssetPath,
   THEME_ASSET_EXTENSIONS,
@@ -1130,7 +1131,7 @@ export function validateContributions(
       const assetPaths = new Set<string>();
       for (const asset of theme.assets) {
         if (typeof asset !== "string" || !isThemeAssetPath(asset)) {
-          return `theme "${theme.id}" asset must be a relative ${THEME_ASSET_EXTENSIONS.join(
+          return `theme "${theme.id}" asset must be an absolute ${THEME_ASSET_EXTENSIONS.join(
             "/",
           )} path`;
         }
@@ -1388,6 +1389,7 @@ export {
 export {
   decodeCssEscapes,
   findThemeCssUrlReferences,
+  isExternalThemeAssetPath,
   isThemeAssetPath,
   maskNonCodeCss,
   normalizeThemeAssetPath,
