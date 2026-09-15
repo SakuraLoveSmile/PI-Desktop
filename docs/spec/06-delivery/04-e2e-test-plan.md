@@ -1232,21 +1232,31 @@ identify the platform validation still needed.
   button present. Send two more prompts and inspect the queue above the
   composer. 3) Remove the second queued row and switch to B. 4) Send a prompt
   in B, then return to A before either run completes. 5) Choose Send now on A's
-  remaining queued row. 6) Observe A through the current tool/reply boundary
-  and then the next turn. 7) Start another run in A, clear the draft to expose
-  the single Stop button, press Stop, and inspect the queue. 8) Repeat with
-  two queued prompts, let the active turn finish without Send now, and delay
-  its host `session.endTurn` response until after `agent_end` is delivered.
-  Release finalization and observe both follow-ups through their turn
-  boundaries. Repeat with a provider error and an immediate abort.
+  remaining queued row, then choose Send now on a second row. 6) Observe A
+  through the current tool/reply boundary and then the next turn. 7) Start
+  another run in A, clear the draft to expose the single Stop button, press
+  Stop, and inspect the queue. 8) Repeat with two queued prompts, let the active
+  turn finish without Send now, and delay its host `session.endTurn` response
+  until after `agent_end` is delivered. Release finalization and observe both
+  follow-ups through their turn boundaries. Repeat with a provider error and an
+  immediate abort. 9) With waiting rows, use move up and move down and confirm
+  the persisted order follows. 10) Edit a waiting row while the composer holds
+  text, then with an empty composer.
 - **Expected**: The single submit slot contains exactly one button in every
   state: disabled Send while idle and empty, enabled Send while running with
   content (which queues the prompt), and Stop while running with an empty
   draft. A's two prompts appear in FIFO order, the removed row never sends,
   and B's queue remains independent. Send now requests a graceful stop: the
   current batch completes with a normal `agent_end`/completed turn, then the
-  selected row starts before any remaining FIFO rows without `AGENT_BUSY`.
-  Immediate Stop aborts the current reply and preserves A's queued row;
+  promoted rows are delivered in the order they were promoted, before any
+  waiting row, without `AGENT_BUSY`: the first starts the turn and the rest join
+  it as adjacent user messages, so the model answers once for the whole block.
+  remove, and its Send now button reads as already decided; promotion is
+  one-way. Move up/down swaps only waiting rows, never crosses the promoted
+  block, and persists. Edit is refused with a visible message while the input
+  is non-empty, and otherwise removes the row and returns its text plus its
+  file-reference chips to the composer. Immediate Stop aborts the current reply
+  and preserves A's queued row;
   switching sessions preserves both queues. Ordinary completion, provider
   failure, and abort all resume queued sending automatically after durable
   finalization releases the session. No queued prompt starts while finalization
@@ -1254,14 +1264,79 @@ identify the platform validation still needed.
   click or session switch. Repeated terminal handling does not double-dispatch.
   Other sessions' queues remain unchanged, and quitting while finalization is
   pending preserves queued work without starting another turn.
-- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.2),
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
   `04-ux/08-component-spec.md` (§11),
-  `04-ux/09-interaction-patterns.md` (§3.4), ADR 0118, ADR 0213
+  `04-ux/09-interaction-patterns.md` (§3.4), ADR 0118, ADR 0213, ADR 0265
 - **Acceptance**: C (chat, stream, and session isolation), Quality
 - **Milestone**: M6+
 - **Status**: Source-level regression and deterministic desktop finalization /
-  Agent Host integration covered (`queued-turn-finalization.test.mjs`); full
-  UI scenario Draft
+  Agent Host integration covered (`queued-turn-finalization.test.mjs`);
+  promotion, reorder, and edit contracts covered at source level
+  (`composer-send-state.test.mjs`); full UI scenario Draft
+
+#### E2E-QUEUE-promote-orders-delivery-by-click: Two Send now clicks deliver in click order
+
+- **Preconditions**: Provider configured; session A is running a turn with at
+  least one completed tool batch; three prompts are queued behind it.
+  the first queued row. 3) Confirm the promoted block orders third → first, that
+  both rows lock their move/edit/remove actions, and that the remaining row is
+  still editable. 4) Let the boundary pass and observe the transcript.
+- **Expected**: The first click is delivered first and the second second — the
+  click order is the delivery order, not "last click wins" and not the original
+  queue order. Both rows appear as adjacent user messages in one turn and the
+  model answers once; the queue no longer lists either promoted row. Both
+  promoted rows show as already decided and cannot be edited, removed, or
+  reordered. The waiting row keeps its actions and is not delivered before
+  either promoted row.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
+  `04-ux/08-component-spec.md` (§11), ADR 0265
+- **Acceptance**: C (chat, stream)
+- **Milestone**: M6+
+- **Status**: Draft; ordering and the adjacent delivery are covered by
+  `turn_queue`, `turn-queue`, and `agent-host` unit tests
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
+  `04-ux/08-component-spec.md` (§11), ADR 0265
+- **Acceptance**: C (chat, stream)
+- **Milestone**: M6+
+- **Status**: Draft; underlying ordering covered by `turn_queue`,
+  `turn-queue`, and `agent-host` unit tests
+
+#### E2E-QUEUE-reorder-moves-plain-neighbours: Move up/down reorders the waiting queue
+
+- **Preconditions**: Provider configured; a turn is running with at least three
+  prompts queued and no promoted row.
+- **Steps**: 1) Move the third row up twice and confirm it becomes first. 2) Move
+  the first row up once and confirm nothing moves. 3) Promote a row, then try to
+  move the adjacent waiting row across it. 4) Reload the renderer and inspect the
+  queue order.
+- **Expected**: Each move swaps the row with its adjacent waiting neighbour and
+  the Host persists the new order, so a reload reproduces it. The waiting-block
+  boundary and the promoted block are immovable: a move at the block edge is a
+  no-op that never reaches the Host, and no move changes a promoted row's place.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6), ADR 0265
+- **Acceptance**: C (chat), F (persistence)
+- **Milestone**: M6+
+- **Status**: Draft; host-side reorder covered by `turn_queue` unit tests
+
+#### E2E-QUEUE-edit-restores-draft-only-when-input-empty: Edit restores the queued draft
+
+- **Preconditions**: Provider configured; a turn is running with a queued prompt
+  that carries text and a file-reference chip; the composer input is empty.
+- **Steps**: 1) Type a draft, then choose edit on the queued row. 2) Clear the
+  composer and choose edit again. 3) Confirm the queue no longer lists the row
+  and the composer holds the row's text and its file-reference chip. 4) Send it
+  and compare the transcript with the original queued prompt.
+- **Expected**: With a non-empty input (or an attachment chip) the edit is
+  refused with a visible message and the row stays queued. With an empty input
+  the row leaves the queue, the Host no longer lists it, and the composer holds
+  the exact text plus the original file-reference chip — not the
+  annotation-stripped inline content. Re-sending produces the same prompt as the
+  queued row would have.
+- **Specs linked**: `04-ux/08-component-spec.md` (§11), ADR 0265
+- **Acceptance**: C (chat, stream)
+- **Milestone**: M6+
+- **Status**: Draft; composer-side contract covered by
+  `composer-send-state.test.mjs`
 
 #### E2E-011g: New Task does not leave the previous transcript on screen
 

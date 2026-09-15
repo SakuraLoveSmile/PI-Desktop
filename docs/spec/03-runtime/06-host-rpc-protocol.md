@@ -397,9 +397,15 @@ to later refresh and inference; the vendor picker does not collect them.
   session, rechecks its permission ceiling, claims the delivery, and binds the
   new turn to its message id. A collaboration turn cannot be started from
   caller-supplied replacement text.
-- `session.queuePush` / `session.queueList` / `session.queueRemove` — the
-  Host-owned turn queue (D386 / ADR 0213, schema v15); push is idempotent per
-  principal and key, bounded at eight entries per session
+- `session.queuePush` / `session.queueList` / `session.queueRemove` /
+  `session.queuePrioritize` / `session.queueReorder` — the Host-owned turn queue
+  (D386 / ADR 0213 / ADR 0265, schema v18); push is idempotent per principal and
+  key, bounded at eight entries per session. `queuePrioritize` appends an entry
+  to the end of its session's priority block (`priority = MAX + 1`) and refuses
+  an already promoted entry with `CONFLICT`; `queueReorder` swaps one
+  non-promoted entry with its adjacent non-promoted neighbour and reports
+  `{ moved }`. Listing and delivery order is `priority ASC` for promoted entries
+  followed by `position ASC` for the rest
 - `session.endTurn` — atomically moves a running turn to its terminal state and
   conditionally returns the newly created notification for `completed`/`error`;
   returns no notification when `createNotification=false`, for `aborted`, or
