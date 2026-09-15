@@ -36,6 +36,30 @@ fn manifest() -> PluginManifest {
     .unwrap()
 }
 
+/// The same declared provider under a different auth kind.
+fn manifest_with_auth_kind(auth_kind: &str) -> PluginManifest {
+    let mut value = serde_json::to_value(manifest()).unwrap();
+    value["contributes"]["providers"][0]["authKind"] = json!(auth_kind);
+    serde_json::from_value(value).unwrap()
+}
+
+/// Several declared providers, so a shrink can leave a survivor behind.
+fn manifest_with_providers(ids: &[&str]) -> PluginManifest {
+    let mut value = serde_json::to_value(manifest()).unwrap();
+    let first = value["contributes"]["providers"][0].clone();
+    let declared: Vec<Value> = ids
+        .iter()
+        .map(|id| {
+            let mut entry = first.clone();
+            entry["id"] = json!(id);
+            entry["name"] = json!(id);
+            entry
+        })
+        .collect();
+    value["contributes"]["providers"] = json!(declared);
+    serde_json::from_value(value).unwrap()
+}
+
 fn write_plugin(root: &std::path::Path, manifest: Value) {
     fs::create_dir_all(root).unwrap();
     fs::write(root.join("main.js"), "export function onLoad() {}").unwrap();
@@ -474,4 +498,98 @@ fn startup_reconciliation_removes_a_row_whose_plugin_is_gone() {
             .is_none()
     );
     assert!(!secrets.has(&key_ref));
+}
+
+#[test]
+fn a_disabled_plugin_writes_its_rows_off() {
+    let (_dir, db, secrets) = test_context();
+    let declared = declared_providers(&manifest());
+    assert_eq!(
+        sync_plugin_providers(&db, &secrets, "demo.provider", &declared, false).unwrap(),
+        1
+    );
+    assert!(
+        !providers::get_provider(&db, &secrets, "plugin:demo.provider:demo")
+            .unwrap()
+            .unwrap()
+            .enabled
+    );
+    // Re-enabling restores it, and is the transition no other test exercises.
+    assert_eq!(
+        set_plugin_providers_enabled(&db, "demo.provider", true).unwrap(),
+        1
+    );
+    assert!(
+        providers::get_provider(&db, &secrets, "plugin:demo.provider:demo")
+            .unwrap()
+            .unwrap()
+            .enabled
+    );
+}
+
+#[test]
+fn a_shrinking_declaration_keeps_the_survivors() {
+    let (_dir, db, secrets) = test_context();
+    let two = manifest_with_providers(&["demo", "extra"]);
+    sync_plugin_providers(
+        &db,
+        &secrets,
+        "demo.provider",
+        &declared_providers(&two),
+        true,
+    )
+    .unwrap();
+    let extra_key = crate::secrets::secret_ref_for_provider("plugin:demo.provider:extra");
+    let demo_key = crate::secrets::secret_ref_for_provider("plugin:demo.provider:demo");
+    secrets.set(&extra_key, "sk-extra").unwrap();
+    secrets.set(&demo_key, "sk-demo").unwrap();
+
+    let one = declared_providers(&manifest());
+    sync_plugin_providers(&db, &secrets, "demo.provider", &one, true).unwrap();
+    // Only the dropped declaration goes, with its own credential.
+    assert!(
+        providers::get_provider(&db, &secrets, "plugin:demo.provider:extra")
+            .unwrap()
+            .is_none()
+    );
+    assert!(!secrets.has(&extra_key));
+    assert!(
+        providers::get_provider(&db, &secrets, "plugin:demo.provider:demo")
+            .unwrap()
+            .is_some()
+    );
+    assert!(secrets.has(&demo_key));
+}
+
+#[test]
+fn dropping_the_api_key_auth_kind_clears_the_stored_key() {
+    let (_dir, db, secrets) = test_context();
+    let declared = declared_providers(&manifest());
+    sync_plugin_providers(&db, &secrets, "demo.provider", &declared, true).unwrap();
+    let id = "plugin:demo.provider:demo";
+    providers::set_provider_secret(&db, &secrets, id, Some("sk-demo")).unwrap();
+    assert!(
+        providers::get_provider(&db, &secrets, id)
+            .unwrap()
+            .unwrap()
+            .has_secret
+    );
+
+    // The plugin update stops asking for a key, so the runtime must stop
+    // signing with one.
+    let keyless = manifest_with_auth_kind("none");
+    sync_plugin_providers(
+        &db,
+        &secrets,
+        "demo.provider",
+        &declared_providers(&keyless),
+        true,
+    )
+    .unwrap();
+    let row = providers::get_provider(&db, &secrets, id).unwrap().unwrap();
+    assert!(!row.has_secret);
+    assert!(!secrets.has(&crate::secrets::secret_ref_for_provider(id)));
+    assert!(providers::get_secret_for_provider(&db, &secrets, id)
+        .unwrap()
+        .is_none());
 }

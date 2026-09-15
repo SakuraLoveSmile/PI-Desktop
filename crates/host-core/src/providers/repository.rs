@@ -302,7 +302,10 @@ pub(crate) fn delete_provider_row(db: &Database, secrets: &SecretStore, id: &str
         secret_ref_for_provider(id),
         secret_ref_for_provider_oauth(id),
     ] {
-        let _ = secrets.delete(&sref);
+        // A credential that outlives its row would be inherited by a row that a
+        // later declaration recreates under the same id, so a failure here is
+        // reported rather than swallowed.
+        secrets.delete(&sref)?;
         db.conn()
             .prepare_cached("DELETE FROM secrets_meta WHERE secret_ref = ?1")?
             .execute(params![sref])?;

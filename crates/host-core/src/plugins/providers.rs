@@ -218,19 +218,37 @@ pub(crate) fn sync_plugin_providers(
             ),
             None => {}
         }
-        let existing_config: String = db
+        let (existing_config, existing_secret_ref): (Option<String>, Option<String>) = db
             .conn()
             .query_row(
-                "SELECT config_json FROM providers WHERE id = ?1",
+                "SELECT config_json, secret_ref FROM providers WHERE id = ?1",
                 params![row_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?
-            .unwrap_or_else(|| "{}".to_string());
+            .unwrap_or((None, None));
         let models = providers::normalize_model_bindings(&provider.models);
         // The merge replaces only the model bindings: headers and the OAuth
         // account label a login flow wrote are not this function's to drop.
-        let config = providers::config_with_model_bindings(&existing_config, &models)?;
+        let config = providers::config_with_model_bindings(
+            existing_config.as_deref().unwrap_or("{}"),
+            &models,
+        )?;
+        // A declaration that no longer asks for an API key keeps its credential
+        // only while it does: leaving the reference behind would keep the
+        // runtime signing requests with a key the endpoint stopped wanting.
+        let secret_ref = if provider.auth_kind == "api_key" {
+            existing_secret_ref
+        } else {
+            if existing_secret_ref.is_some() {
+                let api_key_ref = crate::secrets::secret_ref_for_provider(&row_id);
+                secrets.delete(&api_key_ref)?;
+                db.conn()
+                    .prepare_cached("DELETE FROM secrets_meta WHERE secret_ref = ?1")?
+                    .execute(params![api_key_ref])?;
+            }
+            None
+        };
         // The public projection derives the default from the first binding, so
         // the declared order is the plugin's choice of default.
         let default_model_id = models.first().map(|model| model.id.clone());
@@ -239,8 +257,9 @@ pub(crate) fn sync_plugin_providers(
                 "INSERT INTO providers (
                     id, name, vendor_key, type, protocol, enabled, base_url, auth_kind,
                     api_style, default_model_id, config_json, owner_plugin_id,
-                    created_at, updated_at
-                 ) VALUES (?1, ?2, ?3, 'openai_compatible', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)
+                    secret_ref, created_at, updated_at
+                 ) VALUES (?1, ?2, ?3, 'openai_compatible', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11,
+                           ?12, ?13, ?13)
                  ON CONFLICT(id) DO UPDATE SET
                     name = excluded.name,
                     vendor_key = excluded.vendor_key,
@@ -252,6 +271,7 @@ pub(crate) fn sync_plugin_providers(
                     default_model_id = excluded.default_model_id,
                     config_json = excluded.config_json,
                     owner_plugin_id = excluded.owner_plugin_id,
+                    secret_ref = excluded.secret_ref,
                     updated_at = excluded.updated_at
                  WHERE providers.owner_plugin_id = excluded.owner_plugin_id",
             )?
@@ -267,6 +287,7 @@ pub(crate) fn sync_plugin_providers(
                 default_model_id,
                 config,
                 plugin_id,
+                secret_ref,
                 now
             ])?;
         written += 1;
@@ -323,6 +344,22 @@ pub(crate) fn remove_plugin_providers(
     Ok(ids.len())
 }
 
+/// What a registered plugin declares, or `None` when its declaration cannot be
+/// read — a moved checkout, an unmounted volume, a manifest that does not
+/// belong to this row.
+///
+/// The distinction matters: an unreadable declaration is *not* an empty one.
+/// Treating it as empty would delete the plugin's rows and the credential the
+/// user stored with them, so callers leave the rows untouched instead.
+fn declared_providers_for(
+    plugins: &PluginManager,
+    plugin_id: &str,
+) -> Result<Option<Vec<DeclaredPluginProvider>>> {
+    Ok(plugins
+        .manifest_for(plugin_id)?
+        .map(|manifest| declared_providers(&manifest)))
+}
+
 /// Bring the database in line with what one plugin declares.
 ///
 /// Callers treat a failure as a warning: the plugin's enablement has already
@@ -334,9 +371,8 @@ pub(crate) fn reconcile_plugin(
     plugin_id: &str,
     enabled: bool,
 ) -> Result<usize> {
-    let declared = match plugins.manifest_for(plugin_id)? {
-        Some(manifest) => declared_providers(&manifest),
-        None => Vec::new(),
+    let Some(declared) = declared_providers_for(plugins, plugin_id)? else {
+        return Ok(0);
     };
     sync_plugin_providers(db, secrets, plugin_id, &declared, enabled)
 }
@@ -351,15 +387,22 @@ pub(crate) fn reconcile_all(
     let registered: Vec<String> = plugins.list().into_iter().map(|p| p.id).collect();
     let mut written = 0usize;
     for plugin in plugins.list() {
-        let declared = match plugins.manifest_for(&plugin.id) {
-            Ok(Some(manifest)) => declared_providers(&manifest),
-            Ok(None) => Vec::new(),
+        // One unreadable plugin must not stop the others from being reconciled,
+        // and must not stop the orphan sweep below from running.
+        let declared = match declared_providers_for(plugins, &plugin.id) {
+            Ok(Some(declared)) => declared,
+            Ok(None) => continue,
             Err(error) => {
                 tracing::warn!(plugin = %plugin.id, %error, "plugin manifest unreadable; providers left as they are");
                 continue;
             }
         };
-        written += sync_plugin_providers(db, secrets, &plugin.id, &declared, plugin.enabled)?;
+        match sync_plugin_providers(db, secrets, &plugin.id, &declared, plugin.enabled) {
+            Ok(count) => written += count,
+            Err(error) => {
+                tracing::warn!(plugin = %plugin.id, %error, "plugin provider sync failed");
+            }
+        }
     }
     // A plugin removed while the host was down — or an uninstall whose row
     // cleanup did not finish — would otherwise leave a provider nobody can
@@ -400,6 +443,13 @@ impl PluginManager {
     ///
     /// The declaration on disk is the source of truth for contributions, so a
     /// provider sync reads it rather than a copy captured at install time.
+    ///
+    /// `Ok(None)` means the declaration is unknown — no such row, no directory,
+    /// or a manifest that belongs to a different plugin. Only the last case
+    /// needs a guard: ids are only checked non-empty by the manifest while the
+    /// install directory is derived from a sanitized id, so two ids can share
+    /// one directory. Applying the wrong plugin's declaration would write its
+    /// endpoint onto this plugin's rows and then delete this plugin's own.
     pub(crate) fn manifest_for(&self, id: &str) -> Result<Option<PluginManifest>> {
         let Some(plugin) = self.runtime.iter().find(|p| p.id == id) else {
             return Ok(None);
@@ -413,7 +463,11 @@ impl PluginManager {
         if !path.is_dir() {
             return Ok(None);
         }
-        Ok(Some(Self::read_manifest(&path)?))
+        let manifest = Self::read_manifest(&path)?;
+        if manifest.id != id {
+            return Ok(None);
+        }
+        Ok(Some(manifest))
     }
 }
 
