@@ -27,10 +27,10 @@
 - Document every user-visible and protocol-visible behavior that MVP must verify.
 - Provide a scenario catalog that maps to acceptance criteria (A–H) and milestones (M1–M6).
 - Serve as the traceability backbone: scenario ID ↔ acceptance criterion ↔ spec.
-- Define the relevant E2E validation for code-bearing changes after they reach
-  `main`.
-- Keep validation evidence tied to the executable commit currently integrated
-  into `main`.
+- Define the required E2E gate for code-bearing changes on the integrated
+  `main` that precedes the pull request.
+- Keep validation evidence tied to the commit the gate ran on, plus any later
+  commit that changes the landed executable content.
 
 ## 2. Non-goals
 
@@ -120,15 +120,17 @@ Each scenario is documented in this format:
 ## E2E Main Integration Validation
 
 Every code-bearing change must pass the E2E suites relevant to its regression
-surface after its commits are merged into `main`. Code-bearing changes include Renderer,
-Electron Main, Preload, Agent Runtime, Rust host-core, sessions, transcripts,
-plans, plugins, MCP, permissions, provider/model runtime, persistence, process
-lifecycle, packaging/runtime startup, and build or CI behavior that affects
-application execution. Documentation-only changes are exempt when they do not
-alter executable behavior.
+surface on the integrated local `main` that carries the change, before the
+request branch is pushed and the pull request is opened. Code-bearing changes
+include Renderer, Electron Main, Preload, Agent Runtime, Rust host-core,
+sessions, transcripts, plans, plugins, MCP, permissions, provider/model
+runtime, persistence, process lifecycle, packaging/runtime startup, and build
+or CI behavior that affects application execution. Documentation-only changes
+are exempt when they do not alter executable behavior.
 
-Run the selected suites from the latest integrated `main` checkout and commit.
-Any pre-merge E2E run is exploratory and does not satisfy this requirement.
+Run the selected suites from the latest integrated local `main` checkout and
+commit. An E2E run on the request branch is exploratory and does not satisfy
+this gate.
 
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
@@ -159,24 +161,28 @@ agent execution, plugins, persistence integration, and shared runtime
 contracts. A required suite that cannot run because of a missing display,
 platform, credential, hardware resource, or other environment capability must
 be recorded as `NOT RUN` with its reason, alternative validation, and remaining
-risk. The main integration may already be complete when that limitation is
-discovered, but delivery remains incomplete until the suite passes in a
-capable trusted environment.
+risk. The pull request may still be opened with that record so the change can
+be validated in a capable environment, but the gate is not satisfied and
+delivery remains incomplete until the suite passes against the integrated
+`main` that carries the change.
 
-Required results must apply to the executable commit currently integrated into
-`main`. If executable code changes after E2E passes, rerun the affected suites.
-Report each command, result, tested commit, and any relevant environment
-limitation; never claim an unexecuted suite passed.
+Required results must apply to the executable commit the gate ran on, and any
+later commit that changes the landed executable content requires a rerun of
+the affected suites (landing fixes, conflict resolution, or commits added
+during review). Otherwise the recorded result stands. Report each command,
+result, tested commit, and any relevant environment limitation; never claim an
+unexecuted suite passed.
 
 ## E2E Failure Policy
 
-A failed required E2E blocks declaring the integrated delivery complete until
-the failure is classified as an implementation regression, test regression,
-environment failure, or known flaky infrastructure. Fix the product or test
-defect and rerun the affected suite against `main`. Do not delete scenarios,
-weaken assertions, or add retries that hide a deterministic failure. When a
-scenario is not automated on the required platform, keep its status documented
-and identify the platform validation still needed.
+A failed required E2E blocks the branch push, the pull request, and declaring
+the integrated delivery complete until the failure is classified as an
+implementation regression, test regression, environment failure, or known
+flaky infrastructure. Fix the product or test defect and rerun the affected
+suite against the integrated `main`. Do not delete scenarios, weaken
+assertions, or add retries that hide a deterministic failure. When a scenario
+is not automated on the required platform, keep its status documented and
+identify the platform validation still needed.
 
 ## 7. MVP Scenario Catalog
 
