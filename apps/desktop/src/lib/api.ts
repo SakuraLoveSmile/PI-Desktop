@@ -52,6 +52,7 @@ import type {
   PluginSettingDefinition,
   PluginServiceStatus,
   PluginViewMeta,
+  PluginSettingsDestinationMeta,
   PluginTheme,
   MarketPluginSummary,
   MarketPluginDetail,
@@ -68,6 +69,9 @@ import type {
   ProviderUpdateInput,
   Result,
   SessionDetail,
+  SessionSearchPage,
+  SessionSearchContext,
+  SessionSearchContextRequest,
   SessionSummary,
   SessionCollaborationSummary,
   ToolPermissionResolution,
@@ -167,6 +171,7 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
 function normalizeSession(session: SessionSummary): SessionSummary {
   return {
     ...session,
+    source: session.source ?? "desktop",
     mode: normalizeMode((session as { mode?: unknown }).mode),
   };
 }
@@ -181,6 +186,8 @@ function normalizeSessionDetail(detail: SessionDetail | null): SessionDetail | n
 }
 
 export type SessionHistoryReadOptions = {
+  /** Center a bounded read on this stable ID and retain its original text. */
+  messageAround?: string;
   /** Return the newest page ending before this zero-based message offset. */
   messageBefore?: number;
   /** Maximum number of messages in the returned page. */
@@ -340,6 +347,10 @@ export const api = {
       title,
       throughMessageId,
     }).then((result) => ({ ...result, session: normalizeSessionDetail(result.session)! })),
+  searchSessions: (query: string, offset = 0) =>
+    invoke<SessionSearchPage>(IPC.invoke.sessionSearch, { query, offset }),
+  getSearchContext: (request: SessionSearchContextRequest) =>
+    invoke<SessionSearchContext>(IPC.invoke.sessionSearchContext, request),
   getSession: (id: string, options?: SessionHistoryReadOptions) =>
     invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, {
       id,
@@ -532,6 +543,11 @@ export const api = {
   recordClipboardPaste: (text: string) =>
     invoke<{ ok: boolean }>(IPC.invoke.clipboardRecordPaste, { text }),
   clearProject: () => invoke(IPC.invoke.projectClear),
+  removeProject: (path: string) =>
+    invoke<{ removed: boolean; sessionsRemoved: number }>(
+      IPC.invoke.projectRemove,
+      { path },
+    ),
   setProject: (path: string) =>
     invoke<{ workspace: ProjectWorkspace | null }>(IPC.invoke.projectSet, path),
   listPullRequests: () =>
@@ -770,6 +786,7 @@ export const api = {
   togglePluginLauncher: () => invoke(IPC.invoke.pluginLauncherToggle),
   dismissPluginLauncher: () => invoke(IPC.invoke.pluginLauncherDismiss),
   listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
+  listPluginSettingsDestinations: () => invoke<PluginSettingsDestinationMeta[]>(IPC.invoke.pluginSettingsDestinations),
   listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),
   /**
    * Work panel views, already filtered by permission, activation scope, and
@@ -802,6 +819,12 @@ export const api = {
       visible,
       sessionId,
     }),
+  pluginSettingsViewOpen: (pluginId: string, destinationId: string) =>
+    invoke(IPC.invoke.pluginSettingsViewOpen, { pluginId, destinationId }),
+  pluginSettingsViewSetBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
+    invoke(IPC.invoke.pluginSettingsViewSetBounds, bounds),
+  pluginSettingsViewSetVisible: (pluginId: string, destinationId: string, visible: boolean) =>
+    invoke(IPC.invoke.pluginSettingsViewSetVisible, { pluginId, destinationId, visible }),
   marketRefresh: (force = true) =>
     invoke<{
       providerId: string;

@@ -34,6 +34,12 @@ import {
   isRecentScrollGesture,
   reduceTranscriptScroll,
 } from "../../../../lib/transcript-scroll";
+import type { TranscriptSearchTarget } from "../../../../lib/transcript-reading";
+import { useTranscriptSearchFocus } from "../../../../hooks/use-transcript-search-focus";
+
+import { useAppStore } from "../../../../stores/app-store";
+import type { ResponseAnnotation } from "../../../../lib/response-annotations";
+import { annotationRange, annotationRow } from "../../../../lib/response-annotation-anchor";
 
 const HISTORY_REVEAL_THRESHOLD_PX = 120;
 
@@ -49,6 +55,8 @@ type UseTranscriptScrollOptions = {
   approvalPending: boolean;
   planningState?: PlanningState;
   paneVisible: boolean;
+  searchTarget: TranscriptSearchTarget | null;
+  readingWindow: boolean;
 };
 
 export function useTranscriptScroll({
@@ -63,6 +71,8 @@ export function useTranscriptScroll({
   approvalPending,
   planningState,
   paneVisible,
+  searchTarget,
+  readingWindow,
 }: UseTranscriptScrollOptions) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -76,6 +86,9 @@ export function useTranscriptScroll({
   const prependHeightRef = useRef<number | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [showJump, setShowJump] = useState(false);
+  const [pendingAnnotation, setPendingAnnotation] = useState<ResponseAnnotation | null>(null);
+  const annotationPagesRef = useRef(new Set<number>());
+
   // Steady-state cap on mounted history rows (D261). Grows when the user
   // reaches the top of the window; reset per session below.
   const [windowSize, setWindowSize] = useState(TRANSCRIPT_WINDOW_MIN);
@@ -281,6 +294,12 @@ export function useTranscriptScroll({
     const el = scrollRef.current;
     if (!el) return;
     if (el.scrollTop <= HISTORY_REVEAL_THRESHOLD_PX) reachTop();
+    if (readingWindow) {
+      pinnedRef.current = false;
+      lastScrollTopRef.current = el.scrollTop;
+      setShowJump(true);
+      return;
+    }
     const wasPinned = pinnedRef.current;
     const transition = reduceTranscriptScroll({
       previousScrollTop: lastScrollTopRef.current,
@@ -317,7 +336,7 @@ export function useTranscriptScroll({
       pinnedRef.current = transition.pinned;
       setShowJump(transition.showJump);
     }
-  }, [cancelFollowScroll, reachTop, scheduleFollowScroll]);
+  }, [cancelFollowScroll, reachTop, readingWindow, scheduleFollowScroll]);
 
   // Send / retry / regenerate always re-pins follow mode so the new prompt and
   // its stream stay in view, even if the user had scrolled up through history.
@@ -384,7 +403,7 @@ export function useTranscriptScroll({
   const deferredMessages = useDeferredValue(messages);
   const deferredCompactions = useDeferredValue(compactions);
   const renderedMessages =
-    firstCommit || paneRevealed ? messages : deferredMessages;
+    readingWindow || firstCommit || paneRevealed ? messages : deferredMessages;
   const renderedCompactions =
     firstCommit || paneRevealed ? compactions : deferredCompactions;
   const { entries, visible } = useMemo(() => {
@@ -424,7 +443,7 @@ export function useTranscriptScroll({
   // its Markdown and highlighting for rows nobody was looking at.
   const [hydrationTick, setHydrationTick] = useState(0);
   const hydrationBounded =
-    firstCommit && allHistoryEntries.length > TRANSCRIPT_INITIAL_MOUNT;
+    !readingWindow && firstCommit && allHistoryEntries.length > TRANSCRIPT_INITIAL_MOUNT;
   // The bounded commit and the expansion must show the transcript at the same
   // place. A spacer sized from a per-entry guess cannot match the rows it stands
   // in for, so the expansion moved the visible text by the estimate error - the
@@ -467,7 +486,7 @@ export function useTranscriptScroll({
 
   const transcriptWindow = reduceTranscriptWindow({
     historyLength: allHistoryEntries.length,
-    windowSize,
+    windowSize: readingWindow ? allHistoryEntries.length : windowSize,
     initialCommit: hydrationBounded,
   });
   // Memoized so unrelated re-renders (jump pill, loading row) hand
@@ -480,6 +499,26 @@ export function useTranscriptScroll({
         : allHistoryEntries,
     [allHistoryEntries, transcriptWindow.bounded, transcriptWindow.mounted],
   );
+
+  const releaseSearchFollow = useCallback((fresh: boolean) => {
+    if (fresh) prependHeightRef.current = null;
+    cancelFollowScroll();
+    pinnedRef.current = false;
+    setShowJump(true);
+  }, [cancelFollowScroll]);
+  const recordSearchPosition = useCallback((top: number) => {
+    lastScrollTopRef.current = top;
+  }, []);
+  useTranscriptSearchFocus({
+    target: searchTarget,
+    source: messages.find((message) => message.id === searchTarget?.messageId)?.content ?? "",
+    visible: paneVisible,
+    scrollRef,
+    contentRef,
+    contentVersion: historyEntries,
+    onNavigate: releaseSearchFollow,
+    onPosition: recordSearchPosition,
+  });
 
   // Runs in the same layout phase the expansion commits in, before the browser
   // paints it, so mounting the remaining history cannot move the rows the user
@@ -546,6 +585,59 @@ export function useTranscriptScroll({
     [historyEntries, tailEntry, transcriptWindow.bounded, visible],
   );
   const hasEarlierHistory = transcriptWindow.hiddenAbove > 0 || hasMoreBefore;
+
+  const navigateAnnotation = useCallback((annotation: ResponseAnnotation) => {
+    cancelFollowScroll();
+    pinnedRef.current = false;
+    setShowJump(true);
+    annotationPagesRef.current.clear();
+    setPendingAnnotation(annotation);
+  }, [cancelFollowScroll]);
+
+  // An annotation can precede the mounted window (or a reloaded history page).
+  // Reveal its row before measuring, then scroll only this pane, not the window.
+  useEffect(() => {
+    if (!pendingAnnotation) return;
+    if (!paneVisible || !sessionId ||
+        !useAppStore.getState().responseAnnotations[sessionId]?.some((item) => item.id === pendingAnnotation.id)) {
+      setPendingAnnotation(null);
+      return;
+    }
+    const root = scrollRef.current;
+    if (!root || hydrationBounded) return;
+    const row = annotationRow(root, pendingAnnotation.messageId);
+    if (row) {
+      const range = annotationRange(row, pendingAnnotation.anchor);
+      const rect = range?.getBoundingClientRect() ?? row.getBoundingClientRect();
+      const dockTop = document.querySelector('[data-composer-dock="docked"]')?.getBoundingClientRect().top ?? window.innerHeight;
+      const top = root.getBoundingClientRect().top;
+      root.scrollTo({
+        top: Math.max(0, root.scrollTop + rect.top - top - Math.max(24, (dockTop - top) / 3)),
+        behavior: "auto",
+      });
+      lastScrollTopRef.current = root.scrollTop;
+      setPendingAnnotation(null);
+      return;
+    }
+    const index = allHistoryEntries.findIndex((entry) =>
+      entry.kind === "assistant-turn" && entry.anchorId === pendingAnnotation.messageId);
+    if (index >= 0) {
+      // Keep each history reveal bounded, just like scrolling upward (D261).
+      const frame = requestAnimationFrame(() => setWindowSize((size) =>
+        Math.min(Math.max(size, allHistoryEntries.length - index),
+          growTranscriptWindow(size, allHistoryEntries.length))));
+      return () => cancelAnimationFrame(frame);
+    }
+    if (loadingOlder) return;
+    if (!hasMoreBefore || !onLoadOlder || annotationPagesRef.current.has(messages.length)) {
+      setPendingAnnotation(null);
+      return;
+    }
+    annotationPagesRef.current.add(messages.length);
+    setLoadingOlder(true);
+    void onLoadOlder().catch(() => setPendingAnnotation(null))
+      .finally(() => setLoadingOlder(false));
+  }, [pendingAnnotation, paneVisible, hydrationBounded, allHistoryEntries, historyEntries, hasMoreBefore, loadingOlder, onLoadOlder, sessionId, messages.length]);
 
   const revealEarlierHistory = useCallback(() => {
     const el = scrollRef.current;
@@ -663,5 +755,6 @@ export function useTranscriptScroll({
     revealEarlierHistory,
     scrollToBottom,
     jumpToLatest,
+    navigateAnnotation,
   };
 }

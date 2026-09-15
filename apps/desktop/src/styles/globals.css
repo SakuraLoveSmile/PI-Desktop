@@ -20,6 +20,7 @@
 @import "./prose.css";
 @import "./ui-kit.css";
 @import "./overlays.css";
+@import "./session-search.css";
 @import "./theme-overrides.css";
 @import "./composer-menus.css";
 @import "./settings.css";
@@ -28,6 +29,7 @@
 @import "./project-create-dialog.css";
 @import "./sessions.css";
 @import "./work-panel.css";
+@import "./side-chat.css";
 @import "./providers.css";
 @import "./model-config.css";
 @import "./chat-links.css";

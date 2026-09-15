@@ -1,5 +1,13 @@
 # 03. Plugin API
 
+## Theme variables
+
+`pi.themes.setVariables(themeId, values)` requires `ui.theme`. The host accepts
+only values for declared variables on one of the caller's themes, persists them
+in private plugin settings, and refreshes an active theme without selecting a
+new theme or reloading the renderer. It never accepts stylesheet text, URLs,
+selectors, images, fonts, or arbitrary property names.
+
 ## 1. Design principles
 
 1. Small and stable
@@ -278,6 +286,9 @@ type ToolExecContext = {
  log: (msg: string) => void
 }
 ```
+
+`turnId` is populated for host-driven turns and matches the `turnId` of the
+corresponding `session:turnEnded` event (§5).
 
 ### models (requires `models.list`)
 ```ts
@@ -714,6 +725,24 @@ Delivered today:
 - `session:modelChanged` — `{ sessionId, modelKey, thinkingLevel }`, sent after
   a successful `session.configure` that changes provider, model, or thinking
   level.
+- `session:turnEnded` — payload is
+  `{ sessionId: string; turnId: string; reason: "completed" | "aborted" | "error" }`,
+  sent once per host turn at the end of its teardown, after the durable
+  `session.endTurn` attempt. A turn is the one `session.beginTurn` created: a
+  user submission, an approved plan execution, or a scheduled run, and a queued
+  item that never started produces no event. `completed`, `aborted`, and
+  `error` are the three terminal reasons. The event carries the `turnId` the
+  terminal runtime event identified, not whichever turn happens to be active,
+  so a late event from an earlier turn cannot settle a newer one. Delivery is
+  fire-and-forget: there is no ack and no replay, so a plugin that is alive and
+  subscribed receives it once, and a delivery that races a plugin crash,
+  reload, or host quit is not guaranteed. Receiving it does **not** mean every
+  in-flight tool of that turn has exited — late results can still arrive — so a
+  plugin must serialise or otherwise scope its cleanup by `turnId`. The event
+  also needs no new permission: it travels on the existing event channel, and
+  subscribing to an unknown event name does not error. No published host emits it
+  yet — 0.14.8 does not include it — so a plugin that depends on it must require
+  the release that actually ships it rather than assume 0.14.7 or 0.14.8.
 
 A throwing handler is logged and does not affect other listeners or the plugin.
 
@@ -794,6 +823,8 @@ Delivered today:
   receives it) — payload is `{ path: string }`, the location the host asked this
   view to show. A view created with a location already carried it in its entry
   URL; this event delivers a later one.
+- `session:turnEnded` — the same payload as the plugin-process event in §5,
+  sent when a host turn reaches a terminal state.
 
 ## 7. Call auditing
 

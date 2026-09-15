@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type {
   AppSettings,
   GlobalPermissionMode,
+  PluginSettingsDestinationMeta,
   ShortcutPlatform,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
@@ -52,6 +53,7 @@ import {
   UpdatesRow,
 } from "./agent-sections";
 import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
+import { PluginSettingsDestination } from "../../components/settings/PluginSettingsDestination";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
 
@@ -80,6 +82,21 @@ export function SettingsPage() {
   const [query, setQuery] = useState("");
   const [recoveringSettings, setRecoveringSettings] = useState(!settings);
   const [settingsRecoveryFailed, setSettingsRecoveryFailed] = useState(false);
+  const [extensions, setExtensions] = useState<PluginSettingsDestinationMeta[]>([]);
+  const [activeExtension, setActiveExtension] = useState<PluginSettingsDestinationMeta | null>(null);
+
+  useEffect(() => {
+    const refresh = () => void api.listPluginSettingsDestinations().then(setExtensions, () => setExtensions([]));
+    refresh();
+    return api.onPluginChanged(refresh);
+  }, []);
+
+  useEffect(() => {
+    if (activeExtension && !extensions.some((entry) => entry.ref === activeExtension.ref)) {
+      setActiveExtension(null);
+      setSettingsTab("general");
+    }
+  }, [activeExtension, extensions, setSettingsTab]);
 
   const recoverSettings = useCallback(async () => {
     setRecoveringSettings(true);
@@ -210,14 +227,6 @@ export function SettingsPage() {
       <div className="settings-titlebar" aria-hidden="true" />
       <aside className="settings-nav" aria-label={t("settings.title")}>
         <div className="settings-nav-top drag">
-          <button
-            type="button"
-            className="settings-back no-drag"
-            onClick={() => setPage("chat")}
-          >
-            <IconChevronLeft size={15} />
-            <span>{t("settings.backToApp")}</span>
-          </button>
           <div className="settings-search-wrap no-drag">
             <IconSearch size={14} />
             <input
@@ -255,12 +264,45 @@ export function SettingsPage() {
               </div>
             ))
           )}
+          {extensions.length > 0 && (
+            <div className="settings-nav-group">
+              <div className="settings-nav-group-label">{t("settings.groupExtensions")}</div>
+              {extensions.filter((entry) => {
+                const q = query.trim().toLowerCase();
+                return !q || [entry.label, ...entry.keywords].some((value) => value.toLowerCase().includes(q));
+              }).map((entry) => (
+                <button key={entry.ref} className={cx("settings-nav-item", activeExtension?.ref === entry.ref && "active")} onClick={() => setActiveExtension(entry)}>
+                  <span className="settings-nav-icon"><IconBookOpen size={14} /></span>
+                  <span className="settings-nav-label">{entry.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pinned to the rail's bottom so it lands on the same line as the
+            main shell's sidebar footer icon row. Both the band and the control
+            stay explicitly non-draggable, like the rail's other controls. */}
+        <div className="settings-nav-footer no-drag">
+          <button
+            type="button"
+            className="settings-back no-drag"
+            data-nav="back-to-app"
+            onClick={() => setPage("chat")}
+          >
+            <IconChevronLeft size={15} />
+            <span>{t("settings.backToApp")}</span>
+          </button>
         </div>
       </aside>
 
       <div className="settings-content">
         <div className="settings-content-inner">
-          <h1 className="settings-section-title">{t(activeTitleKey)}</h1>
+          <h1 className="settings-section-title">{activeExtension?.label ?? t(activeTitleKey)}</h1>
+
+          {activeExtension ? (
+            <PluginSettingsDestination pluginId={activeExtension.pluginId} destinationId={activeExtension.destinationId} label={activeExtension.label} />
+          ) : <>
 
           {tabNeedsSettings && !settings ? (
             <div className="settings-recovery" role="status" aria-live="polite">
@@ -440,6 +482,7 @@ export function SettingsPage() {
               )}
             </div>
           )}
+          </>}
 
         </div>
       </div>

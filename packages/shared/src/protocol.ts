@@ -2,7 +2,7 @@ export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
 export const APP_ID = "com.pi-desktop.app";
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.14.8";
+export const APP_VERSION = "0.14.8-native.1";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -84,6 +84,8 @@ export const IPC = {
     sessionCreate: "pi-desktop/session/create",
     sessionFork: "pi-desktop/session/fork",
     sessionMoveProject: "pi-desktop/session/moveProject",
+    sessionSearch: "pi-desktop/session/search",
+    sessionSearchContext: "pi-desktop/session/searchContext",
     sessionGet: "pi-desktop/session/get",
     sessionCollaboration: "pi-desktop/session/collaboration",
     /** Validate and select a durable session from a reviewed host operation. */
@@ -127,6 +129,7 @@ export const IPC = {
     projectList: "pi-desktop/project/list",
     projectSet: "pi-desktop/project/set",
     projectClear: "pi-desktop/project/clear",
+    projectRemove: "pi-desktop/project/remove",
     pullsList: "pi-desktop/pulls/list",
     scheduledList: "pi-desktop/scheduled/list",
     scheduledCreate: "pi-desktop/scheduled/create",
@@ -171,12 +174,16 @@ export const IPC = {
     pluginLauncherToggle: "pi-desktop/pluginLauncher/toggle",
     pluginLauncherDismiss: "pi-desktop/pluginLauncher/dismiss",
     pluginThemes: "pi-desktop/plugin/themes",
+    pluginSettingsDestinations: "pi-desktop/plugin/settings/destinations",
     pluginServices: "pi-desktop/plugin/services",
     pluginViews: "pi-desktop/plugin/views",
     pluginViewOpen: "pi-desktop/plugin/view/open",
     pluginViewClose: "pi-desktop/plugin/view/close",
     pluginViewSetBounds: "pi-desktop/plugin/view/setBounds",
     pluginViewSetVisible: "pi-desktop/plugin/view/setVisible",
+    pluginSettingsViewOpen: "pi-desktop/plugin/settings/view/open",
+    pluginSettingsViewSetBounds: "pi-desktop/plugin/settings/view/setBounds",
+    pluginSettingsViewSetVisible: "pi-desktop/plugin/settings/view/setVisible",
     mcpList: "pi-desktop/mcp/list",
     mcpUpsert: "pi-desktop/mcp/upsert",
     mcpRemove: "pi-desktop/mcp/remove",

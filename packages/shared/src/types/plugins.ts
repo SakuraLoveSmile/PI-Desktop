@@ -94,6 +94,17 @@ export type PluginViewMeta = {
   order: number;
 };
 
+/** A host-resolved, sandboxed plugin Settings destination. */
+export type PluginSettingsDestinationMeta = {
+  pluginId: string;
+  destinationId: string;
+  ref: string;
+  label: string;
+  pluginName: string;
+  icon: "sliders" | "sparkles" | "palette" | "plug" | "settings";
+  keywords: string[];
+};
+
 /**
  * Which files one file mode may touch, straight from `manifest.fs`. Declared
  * here rather than imported from the plugin SDK because this package sits under
@@ -173,6 +184,8 @@ export type PluginTheme = {
   /** Palette the overrides layer on; drives the `data-theme` attribute. */
   base: "light" | "dark";
   css: string;
+  /** Host-generated, manifest-validated variable layer for this theme only. */
+  variablesCss?: string;
   /**
    * Native window background for this theme, per resolved palette, as
    * `#rrggbb` or `#rrggbbaa`. Absent unless the providing plugin declared it

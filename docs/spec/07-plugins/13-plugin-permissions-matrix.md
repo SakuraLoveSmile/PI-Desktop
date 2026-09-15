@@ -96,6 +96,10 @@ plugin, so it carries three bounds the other modes do not:
   (`themes`, `mcpServers`, `services`, `bus`); `skills` is the exception and is
   skipped at load time instead (see
   [02-plugin-manifest-schema.md](02-plugin-manifest-schema.md) §7)
+- Lifecycle and state events need no permission: `workspace:changed`,
+  `session:modelChanged`, `session:turnEnded`, and `plugin:settingsChanged`
+  arrive on the existing plugin event channel, and subscribing to an unknown
+  event name does not error
 
 ## 3A. Plan operating-state rule
 
@@ -124,6 +128,7 @@ so "Modify the files it lists" is followed by the list.
 | `net.fetch` | Access the network | 访问网络 |
 | `shell.openExternal` | Open external links | 打开外部链接 |
 | `ui.theme` | Provide a theme | 提供主题 |
+| `ui.settings` | Add a sandboxed Settings entry in Extensions | 在“扩展”中添加沙盒设置项 |
 | `ui.window.appearance` | Set the window background | 设置窗口背景 |
 | `mcp.server.local` | Run a local MCP server | 运行本地 MCP 服务 |
 | `mcp.server.remote` | Reach a remote MCP server | 连接远端 MCP 服务 |

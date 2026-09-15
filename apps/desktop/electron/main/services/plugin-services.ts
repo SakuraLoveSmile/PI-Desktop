@@ -44,6 +44,7 @@ import { BrowserHost, BROWSER_PLUGIN_ID } from "../browser-host";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { ClipboardHistory } from "../clipboard-history";
+import type { TurnEndedPayload } from "../runtime/session-coordination";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { PluginAppearance } from "../../shared/plugin-panel-chrome";
@@ -361,6 +362,7 @@ export function createPluginServices({
       // surface. Drop it; the renderer re-opens it on the pluginChanged event if
       // the tab is still active and the plugin came back.
       pluginViews.closePlugin(pluginId);
+      pluginSettingsViews.closePlugin(pluginId);
       if (pluginId === BROWSER_PLUGIN_ID) browserHost.disposeGuest();
       sendToRenderer(IPC.event.pluginChanged,{ reason: "crash", pluginId });
     },
@@ -388,6 +390,7 @@ export function createPluginServices({
       });
       // Views were loaded from the previous revision of the plugin's files.
       pluginViews.closePlugin(pluginId);
+      pluginSettingsViews.closePlugin(pluginId);
       if (pluginId === BROWSER_PLUGIN_ID) browserHost.disposeGuest();
       sendToRenderer(IPC.event.pluginChanged,{ reason: "reload", pluginId });
     },
@@ -419,6 +422,41 @@ export function createPluginServices({
     pluginPanels.broadcast("browser:state", state);
     pluginViews.broadcast("browser:state", state);
   };
+  /**
+   * Tell the plugin surfaces that a host turn reached a terminal state. The
+   * three surfaces are independent: a failure to reach one of them must not
+   * suppress the other two, and inside each one an unreachable recipient is
+   * skipped by the host that owns the fan-out.
+   *
+   * Delivery is best-effort by contract — no acknowledgement, no replay, and no
+   * guarantee for a plugin that is loading, crashed or unloaded right now.
+   */
+  const announceTurnEnded = (payload: TurnEndedPayload): void => {
+    try {
+      plugins.broadcastEvent("session:turnEnded", [payload]);
+    } catch (error) {
+      logger.app("plugin", "warn", "turnEnded plugin broadcast failed", {
+        sessionId: payload.sessionId,
+        data: String(error),
+      });
+    }
+    try {
+      pluginPanels.broadcast("session:turnEnded", payload);
+    } catch (error) {
+      logger.app("plugin", "warn", "turnEnded panel broadcast failed", {
+        sessionId: payload.sessionId,
+        data: String(error),
+      });
+    }
+    try {
+      pluginViews.broadcast("session:turnEnded", payload);
+    } catch (error) {
+      logger.app("plugin", "warn", "turnEnded view broadcast failed", {
+        sessionId: payload.sessionId,
+        data: String(error),
+      });
+    }
+  };
   const browserPane = new BrowserPane(emitBrowserState);
   const pluginViews = new PluginViewHost(({ pluginId, url }) => {
     logger.app("plugin", "warn", "plugin.api", {
@@ -427,7 +465,17 @@ export function createPluginServices({
       data: { api: "view.egress", ok: false, url, ts: Date.now() },
     });
   });
+  // Settings extensions use the same sandboxed preload and egress policy as
+  // work-panel views, but have their own visible surface and lifecycle.
+  const pluginSettingsViews = new PluginViewHost(({ pluginId, url }) => {
+    logger.app("plugin", "warn", "plugin.api", {
+      pluginId,
+      code: "PERMISSION_DENIED",
+      data: { api: "settings.egress", ok: false, url, ts: Date.now() },
+    });
+  });
   pluginPanels.addSenderResolver((senderId) => pluginViews.pluginIdForSender(senderId));
+  pluginPanels.addSenderResolver((senderId) => pluginSettingsViews.pluginIdForSender(senderId));
   const browserHost = new BrowserHost({
     pane: browserPane,
     isPluginLoaded: (pluginId) => Boolean(plugins.getLoaded(pluginId)),
@@ -491,8 +539,10 @@ export function createPluginServices({
     pluginScopes,
     sessionProjects,
     emitBrowserState,
+    announceTurnEnded,
     pluginPanels,
     pluginViews,
+    pluginSettingsViews,
     browserHost,
     browserPane,
   };
