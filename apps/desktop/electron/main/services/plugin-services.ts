@@ -554,7 +554,7 @@ export function createPluginServices({
     /**
      * The richer workspace payload, so `pi.workspace.get` and the
      * `workspace:changed` event both expose the open project's folder roots
-     * (ADR 0252) instead of the bare primary path.
+     * (ADR 0263) instead of the bare primary path.
      */
     getWorkspaceInfo: () => pluginWorkspaceInfo(getWorkspacePath()),
     agentExtensionsChanged: () =>

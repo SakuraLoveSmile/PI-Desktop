@@ -45,14 +45,14 @@ type PluginAppearance = {
 事件（见下文）上收到实时更新。在没有该通道的旧宿主上，调用以
 `UNSUPPORTED` 拒绝；面板应回退到操作系统偏好和它自己的面板内选择。
 
-`app.setTheme`（需要 `ui.theme`，ADR 0249）应用与设置选择器相同的
+`app.setTheme`（需要 `ui.theme`，ADR 0260）应用与设置选择器相同的
 `AppSettings.theme`。接受内置偏好或当前已注册的插件主题 id；未知 id 以
 `INVALID_ARGUMENT` 拒绝。宿主会持久化设置、刷新原生 chrome / 面板外观，
 并向渲染进程发出 `settingsChanged`。
 
 ### 主题（需要 `ui.theme`）
 
-调用方插件自有主题的运行时注册表。生产模式可用，无需卸载/重载（ADR 0249）。
+调用方插件自有主题的运行时注册表。生产模式可用，无需卸载/重载（ADR 0260）。
 
 ```ts
 pi.themes.upsert(input: {
@@ -172,7 +172,7 @@ pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 
 `workspace.get` 回答主根——`path` 与其叶子 `name` 都保持不变——并在该文件夹属于某个项目组
 （ADR 0249）时额外给出 `projectId` 与 `roots`：项目组按自身顺序登记的全部文件夹，主文件夹在前，
-每项为 `{ path, name, primary }`（ADR 0252）。`workspace:changed` 携带同一对象，两者都由主机持有
+每项为 `{ path, name, primary }`（ADR 0263）。`workspace:changed` 携带同一对象，两者都由主机持有
 的项目组记录回答，因此事件与主动拉取不会互相矛盾。无法解析项目组的主机会省略 `projectId` 与
 `roots`，也就是插件本来就会处理的 `{ path, name }`；读取这些元数据不需要新权限，也不新增 SDK 方法。
 
@@ -184,12 +184,12 @@ pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 `fs.readText` 使用相同的 `fs.read` 根目录、符号链接、受保护路径、拒绝列表和范围检查；
 目录会被拒绝。主机会记录这次操作。路径默认相对根目录；只有「本项目已注册的另一个文件夹根」
 之内的绝对路径才会被接受，而且**只有这个动作与 `fs.reveal` 接受**（其他模式一律不接受
-绝对路径），该根随即成为这次请求的包含基点（ADR 0249 §5、ADR 0253）——这正是视图用来指
+绝对路径），该根随即成为这次请求的包含基点（ADR 0249 §5、ADR 0264）——这正是视图用来指
 名「非主文件夹里的文件」的形状。
 
 `fs.reveal` 在操作系统文件管理器中显示一个已存在且可读取的文件，并在平台支持时选中它。
 它使用相同的 `fs.read` 检查，拒绝目录，并记录成功和失败。路径的接受方式与 `fs.openDefault`
-完全一致：默认相对根目录，落在本项目另一个已注册文件夹根之内时可以是绝对路径（ADR 0253）。
+完全一致：默认相对根目录，落在本项目另一个已注册文件夹根之内时可以是绝对路径（ADR 0264）。
 
 路径相对于该模式的 root —— 工作区，或者当该模式声明
 `root: "userSelected"` 时，用户通过 `requestDirectory()` 选中的目录。
@@ -694,7 +694,7 @@ pi.events.off(event, handler)
   论点。 `pi.bus.subscribe` 是接收这些信息的正常方式； `events.on`
 查看插件持有的每个订阅的原始流。
 - `workspace:changed` —— 载荷是 `workspace.get()` 的对象或 `null`，在缓存的工作区路径变化时发送：
-  主文件夹的 `path` 与 `name`，以及在该文件夹属于某个项目组时的 `projectId` 与 `roots`（ADR 0252）。
+  主文件夹的 `path` 与 `name`，以及在该文件夹属于某个项目组时的 `projectId` 与 `roots`（ADR 0263）。
   一次运行中的第一个工作区可能先不带文件夹发送一次、再带文件夹重发一次，因为项目组记录是在那次推送
   之后才读取的。
 - `plugin:settingsChanged`（由插件设置页面编辑触发）
@@ -776,7 +776,7 @@ window.pluginBridge.on(event, handler)
 - `appearance:changed` —— 载荷是上面的 `PluginAppearance`，在应用的配色或
   语言发生变化时发送，因此面板可以实时重新着色和重新标注文案。
 - `workspace:changed` —— 载荷是 `workspace.get()` 的对象或 `null`，在打开的项目变化时发送：
-  主文件夹的 `path` 与 `name`，以及在该文件夹属于某个项目组时的 `projectId` 与 `roots`（ADR 0252）。
+  主文件夹的 `path` 与 `name`，以及在该文件夹属于某个项目组时的 `projectId` 与 `roots`（ADR 0263）。
 - `view:open`（仅限停靠的工作面板视图；独立 `ui.panel` 窗口不会收到）——载荷为
   `{ path: string }`，即主机要求该视图展示的 location。创建时就带 location 的视图
   已经从入口 URL 拿到它；这个事件投递的是之后的 location。

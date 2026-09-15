@@ -1230,7 +1230,7 @@ Project drag/drop follows these patterns:
   persisted message and model context stay canonical `@path` text. Clicking a
   chip completes the reference through `pi-desktop/fs/resolveRef`, which
   searches the whole open project — its group's folders, primary first
-  (ADR 0252) — and then opens where it resolved: a project file in the bundled
+  (ADR 0263) — and then opens where it resolved: a project file in the bundled
   `pi.file-manager` work-panel view (the host `file:` tab when that view is not
   available), a session-scratch or attachment file in the host `file:` tab, and
   a `.html`/`.htm` page of the project's primary folder in the side browser,

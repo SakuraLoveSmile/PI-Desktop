@@ -3910,7 +3910,7 @@ export class PluginRuntime {
 
   /**
    * Resolve a request that names a file in another folder of the open project
-   * (ADR 0249, ADR 0252, ADR 0253). A view browsing a sibling folder can only
+   * (ADR 0249, ADR 0263, ADR 0264). A view browsing a sibling folder can only
    * address that folder's entries absolutely, and the two host-mediated actions
    * it offers for them (fs.openDefault, fs.reveal) are the only requests that
    * arrive that way. The widening is narrow: only for a plugin whose declared
@@ -4391,7 +4391,7 @@ export class PluginRuntime {
       workspace: {
         get: async () => {
           // The enriched payload carries the project group behind the visible
-          // workspace (ADR 0252); the path-only fallback keeps `get` working for
+          // workspace (ADR 0263); the path-only fallback keeps `get` working for
           // any caller whose services never bound the richer provider.
           const info = this.services.getWorkspaceInfo?.();
           if (info !== undefined) return info;
