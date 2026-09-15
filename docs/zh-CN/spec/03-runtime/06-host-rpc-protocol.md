@@ -426,7 +426,13 @@ off | minimal | low | medium | high | xhigh | max
 
 ### 提供商与模型
 - `providers.list` / `providers.get` / `providers.create` /
-  `providers.update` / `providers.delete`
+- `providers.update` / `providers.delete` 拒绝插件自有的行
+  （`ownerPluginId`）：该行每次加载都由 manifest 刷新，因此只由其所属插件的
+  生命周期改动或删除，错误信息以 `PROVIDER_OWNED_BY_PLUGIN` 开头（ADR 0257）
+- `providers.setSecret({ id, secretValue })` — 写入或清除某一行 provider 的
+  API key（`secret:provider:<id>:api_key` 与行的 `secret_ref`）。这是插件自有行
+  接受的写入：只改声明要求的凭据，绝不改 manifest 拥有的字段。`secretValue`
+  为空或省略即删除已存 key。返回 `{ provider }`，未知 id 返回 `null`
 - `providers.getSecret` — 仅限 main/host，渲染器永远无法触达
 - `providers.listModels` / `providers.cacheModels` — 已发现的模型行及其
   宿主侧缓存（ADR 0027 / ADR 0134）
