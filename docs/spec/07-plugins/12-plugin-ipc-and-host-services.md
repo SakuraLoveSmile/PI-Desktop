@@ -155,9 +155,18 @@ send is not audited. Frames travel back to the owning plugin only, as the host
 events `net:websocket:open`, `net:websocket:message`, `net:websocket:close`,
 and `net:websocket:error`.
 
-The device capabilities are specified but not implemented in this branch, so
-their names are reserved rather than allowlisted, and every call fails closed
-with `UNSUPPORTED`. Reserved audit-operation names: `audio.input.open` /
+The audio names are registered in the same allowlist:
+`audio.getInputDevices`, `audio.openInput`, `audio.closeInput`,
+`audio.getCaptureState`, `audio.onInputFrame`, `audio.offInputFrame`,
+`audio.openOutput`, `audio.writeOutput`, `audio.stopOutput`, and
+`audio.closeOutput`. The permission gate runs first, so an ungranted call is
+refused with `PERMISSION_DENIED` under `audio.capture.background` /
+`audio.playback.background`, exactly like any other gated API. This host has no
+device backend yet, so every call that passes the gate is audited as an
+`UNSUPPORTED` refusal — `{ api: "audio.<method>", ok: false, errorCode: "UNSUPPORTED" }` —
+and rejected with that code; the two synchronous registration helpers
+`audio.onInputFrame` / `audio.offInputFrame` throw it synchronously. Reserved
+audit-operation names for the device service: `audio.input.open` /
 `audio.input.close`, `audio.output.open` / `audio.output.stop` /
 `audio.output.close` (ADR 0257).
 

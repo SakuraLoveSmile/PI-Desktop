@@ -7399,8 +7399,10 @@ identify the platform validation still needed.
   `PERMISSION_DENIED` and an audit entry, so an ungranted capability fails
   closed instead of degrading. After a grant the same call is allowed — for
   `net.websocket` that is a connect that proceeds past the gate — while the
-  not-yet-implemented audio APIs answer `UNSUPPORTED` until their runtime lands,
-  never a silent success. Revoking the permission with the
+  callable audio methods answer a coded `UNSUPPORTED` because the host has no
+  device backend yet, audited as
+  `{ api: "audio.<method>", ok: false, errorCode: "UNSUPPORTED" }`, never a
+  silent success. Revoking the permission with the
   plugin loaded stops the accelerator immediately and the host releases it. The
   four permissions appear with their risk tiers (high for
   `audio.capture.background` and `net.websocket`, medium for
@@ -7443,8 +7445,9 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Partially implemented — the socket half is implemented and
   unit-covered by `apps/desktop/test/plugin-websocket.test.mjs` (allowlist,
-  bounds, lifecycle); the background-audio half remains unimplemented and
-  answers `UNSUPPORTED`, so this scenario stays Draft until audio lands.
+  bounds, lifecycle); the background-audio half answers a coded `UNSUPPORTED`
+  because the host has no device backend yet, so this scenario stays Draft until
+  audio lands.
 
 ## 8. Traceability Matrix
 

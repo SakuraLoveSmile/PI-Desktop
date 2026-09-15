@@ -585,13 +585,25 @@ navigator.mediaDevices.getUserMedia({ audio: true })
 
 ### 音频（需要 `audio.capture.background` / `audio.playback.background`）
 
-**已规划 —— 本条分支尚未实现。** SDK 声明了这些签名，两个权限也已存在，
-但这条分支没有为它们提供任何宿主服务，所以每次调用都以 `UNSUPPORTED`
-失败即关闭。`onInputFrame` 是注册回调 —— 它不是事件名 —— 帧形状见
-`packages/plugin-sdk/src/index.ts` 中的 `PluginAudioInputFrame`。等宿主服务
-落地后，设备由宿主持有：插件只交换 PCM16 帧，永远拿不到设备句柄、
-`MediaStream`、操作系统设备路径或 Node 流，每个插件只允许一条输入流，
-禁用、卸载或崩溃会停止采集并丢弃已排队的播放。
+**可以调用，但本条分支尚未实现设备后端。** `pi.audio` 存在于插件宿主进程
+中，恰好暴露下面这十个方法。每个方法都保留自己的权限要求：六个采集方法
+（`getInputDevices`、`openInput`、`closeInput`、`getCaptureState`、
+`onInputFrame`、`offInputFrame`）需要 `audio.capture.background`，四个播放
+方法（`openOutput`、`writeOutput`、`stopOutput`、`closeOutput`）需要
+`audio.playback.background`。没有授权时调用会被拒绝为 `PERMISSION_DENIED`，
+并按权限名记入审计，与其他所有需要把关的 API 完全一致。拿到授权后宿主仍然
+没有设备后端，所以每次调用都会以带错误码的 `UNSUPPORTED` 拒绝：消息是
+`host api not available: audio.<method>`，审计条目是
+`{ api: "audio.<method>", ok: false, errorCode: "UNSUPPORTED" }`。八个异步
+方法用这个错误拒绝；`onInputFrame` / `offInputFrame` 是无法 reject 的同步
+注册辅助函数，因此它们直接抛出带同一个 `code: "UNSUPPORTED"` 的 `Error`，
+而不是注册一个永远不会触发的处理器。不会有任何东西接触设备，也不会产生
+任何帧。`onInputFrame` 是注册回调 —— 它不是事件名 —— 帧形状见
+`packages/plugin-sdk/src/index.ts` 中的 `PluginAudioInputFrame`。等设备服务
+落地后，权限和这个表面都保持不变，只有拒绝会被真实行为取代：设备由宿主
+持有，插件只交换 PCM16 帧，永远拿不到设备句柄、`MediaStream`、操作系统
+设备路径或 Node 流，每个插件只允许一条输入流，禁用、卸载或崩溃会停止采集
+并丢弃已排队的播放。
 
 ```ts
 pi.audio.getInputDevices(): Promise<PluginAudioInputDevice[]>
@@ -826,8 +838,11 @@ window.pluginBridge.on(event, handler)
 - `net.websocket.connect` / `send` / `close`（`net.websocket`；套接字由宿主
   持有，受白名单限制，有界，随插件一起释放）
 
-`pi.audio.*` 已在 SDK 中声明并由其权限把关，但这条分支没有任何宿主实现：
-每次调用都以 `UNSUPPORTED` 失败即关闭。
+`pi.audio.*` 已存在于插件宿主进程中并且可以调用：十个方法都由
+`audio.capture.background` / `audio.playback.background` 把关，而这条分支没有
+设备后端，所以获得授权的调用会以带错误码的 `UNSUPPORTED` 拒绝，并记入该方法
+自己的审计条目（`audio.<method>`、`ok: false`）；`onInputFrame` /
+`offInputFrame` 无法 reject，因此同步抛出同一个错误码。不会打开任何设备。
 
 本机插件通知使用 Electron 主进程通知界面；
 他们不会在任务通知收件箱中创建持久行，并且不会

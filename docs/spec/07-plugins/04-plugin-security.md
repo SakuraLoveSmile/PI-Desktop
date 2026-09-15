@@ -373,14 +373,18 @@ dialog service refuses every dangerous operation outright.
 plugin's isolated panel session. Camera and every other device permission stay
 denied, and the plugin receives no native handle: capture stays page-owned.
 
-`audio.capture.background` and `audio.playback.background` are specified but not
-implemented in this branch: the SDK declares the calls and the permissions
-exist, yet every `pi.audio.*` call fails closed with `UNSUPPORTED`, so no device
-is opened today. When the host service lands, the host owns the device: a plugin
-exchanges PCM16 frames and never receives a `MediaStream`, a device handle, an
-OS device path, or a Node stream, one input stream per plugin is allowed, and
-disable, unload, crash, or permission revocation stops capture and drops queued
-playback instead of leaving an orphaned device or timer.
+`audio.capture.background` and `audio.playback.background` gate a callable
+surface: the ten `pi.audio.*` methods exist in the plugin host process and keep
+their permission requirement, but this branch has no device backend, so an
+authorized call is refused with a coded `UNSUPPORTED` refusal that is audited
+under `audio.<method>` with `ok: false`, and no device is opened (the two
+synchronous registration helpers `onInputFrame` / `offInputFrame` throw the
+same code instead of registering a handler that could never fire). When the
+host service lands, the host owns the device: a plugin exchanges PCM16 frames
+and never receives a `MediaStream`, a device handle, an OS device path, or a
+Node stream, one input stream per plugin is allowed, and disable, unload,
+crash, or permission revocation stops capture and drops queued playback
+instead of leaving an orphaned device or timer.
 
 `keyboard.globalShortcut` is implemented and stays inside the host's
 registration model. The host owns Electron's `globalShortcut`; a plugin never
@@ -473,9 +477,10 @@ Current enforcement:
     run the owning plugin's own command, and every entry dies on the same
     teardown path as the plugin's commands and tools (§8.2)
 
-`audio.capture.background` and `audio.playback.background` have permissions and
-SDK types in this branch but no host implementation, so every `pi.audio.*` call
-fails closed with `UNSUPPORTED` and nothing yet reaches a device.
+`audio.capture.background` and `audio.playback.background` are declared and
+present in the plugin API: the methods are gated by those permissions and an
+authorized call is refused with a coded `UNSUPPORTED` refusal that is audited,
+because this host has no device backend yet, so nothing reaches a device.
 `net.websocket` is implemented: connections are host-owned, allowlist-checked,
 bounded, and released with the plugin (§8.1).
 

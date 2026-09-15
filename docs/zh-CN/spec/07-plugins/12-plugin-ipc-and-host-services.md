@@ -146,10 +146,17 @@ plugin runtime
 `send` 不记入审计。帧只回到持有它的插件，以宿主事件 `net:websocket:open`、
 `net:websocket:message`、`net:websocket:close` 和 `net:websocket:error` 的形式送达。
 
-设备能力已经规定但本条分支尚未实现，所以它们的名字只是预留、并未进入白名单，
-每次调用都以 `UNSUPPORTED` 失败即关闭。预留的审计操作名：
-`audio.input.open` / `audio.input.close`、`audio.output.open` /
-`audio.output.stop` / `audio.output.close`（ADR 0257）。
+音频能力的名字已注册进同一份白名单：`audio.getInputDevices`、
+`audio.openInput`、`audio.closeInput`、`audio.getCaptureState`、
+`audio.onInputFrame`、`audio.offInputFrame`、`audio.openOutput`、
+`audio.writeOutput`、`audio.stopOutput` 和 `audio.closeOutput`。权限把关先执行：
+没有授权的调用会与其他任何需要把关的 API 一样，以 `PERMISSION_DENIED` 拒绝，
+并归到 `audio.capture.background` / `audio.playback.background` 名下。当前宿主
+还没有设备后端，所以每个通过把关的调用都会作为 `UNSUPPORTED` 拒绝记入审计 ——
+`{ api: "audio.<method>", ok: false, errorCode: "UNSUPPORTED" }` —— 并以该错误码
+拒绝；两个同步注册辅助函数 `audio.onInputFrame` / `audio.offInputFrame` 会同步
+抛出它。为设备服务预留的审计操作名：`audio.input.open` / `audio.input.close`、
+`audio.output.open` / `audio.output.stop` / `audio.output.close`（ADR 0257）。
 
 ## 7. PanelHost交互
 

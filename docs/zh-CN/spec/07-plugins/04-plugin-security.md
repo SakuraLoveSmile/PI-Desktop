@@ -301,12 +301,15 @@ MCP 调用相同的 IPC 校验、生命周期检查、完成事件和审计条�
 摄像头和其他所有设备权限仍被拒绝，插件也拿不到任何原生句柄：采集始终由
 页面持有。
 
-`audio.capture.background` 和 `audio.playback.background` 已经规定但本条
-分支尚未实现：SDK 声明了这些调用，权限也存在，但每次 `pi.audio.*` 调用都以
-`UNSUPPORTED` 失败即关闭，所以今天不会打开任何设备。等宿主服务落地后，
-设备由宿主持有：插件只交换 PCM16 帧，永远拿不到 `MediaStream`、设备句柄、
-操作系统设备路径或 Node 流，每个插件只允许一条输入流；禁用、卸载、崩溃或
-撤销权限会停止采集并丢弃已排队的播放，而不会留下孤立的设备或计时器。
+`audio.capture.background` 和 `audio.playback.background` 把关一个可以调用的
+表面：十个 `pi.audio.*` 方法都存在于插件宿主进程中，并保留各自的权限要求，
+但这条分支没有设备后端，所以获得授权的调用会以带错误码的 `UNSUPPORTED`
+拒绝并记入审计（`audio.<method>`、`ok: false`），不会打开任何设备（两个同步
+注册辅助函数 `onInputFrame` / `offInputFrame` 改为抛出同一个错误码，而不是
+注册一个永远不会触发的处理器）。等宿主服务落地后，设备由宿主持有：插件只
+交换 PCM16 帧，永远拿不到 `MediaStream`、设备句柄、操作系统设备路径或 Node
+流，每个插件只允许一条输入流；禁用、卸载、崩溃或撤销权限会停止采集并丢弃
+已排队的播放，而不会留下孤立的设备或计时器。
 
 `keyboard.globalShortcut` 已实现，并且始终留在宿主的注册模型之内。宿主持有
 Electron 的 `globalShortcut`；插件永远拿不到键盘钩子、`before-input-event`、
@@ -386,10 +389,12 @@ PI-Desktop 自己当前占用（默认是 `Alt+Space` 与 `Mod+Shift+W`；用户
     自己占用或属于其他插件的加速键，快捷键只能运行持有插件自己的命令，
     每条条目都与插件的命令和工具走同一条清理路径（§8.2）
 
-`audio.capture.background` 和 `audio.playback.background` 在这条分支里有权限和
-SDK 类型，但没有宿主实现，所以每次 `pi.audio.*` 调用都以 `UNSUPPORTED` 失败即
-关闭，目前没有任何东西能到达设备。`net.websocket` 已实现：连接由宿主持有、
-经过白名单检查、有界，并随插件一起释放（§8.1）。
+`audio.capture.background` 和 `audio.playback.background` 已声明并且存在于
+插件 API 中：这些方法由这两个权限把关，获得授权的调用会以带错误码的
+`UNSUPPORTED` 拒绝并记入审计，因为当前宿主还没有设备后端，所以没有任何东西
+能到达设备。
+`net.websocket` 已实现：连接由宿主持有、经过白名单检查、有界，并随插件一起
+释放（§8.1）。
 
 尚未强制执行：
 

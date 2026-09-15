@@ -81,9 +81,12 @@ audit model rather than widening what plugin code may touch.
 9. Delivery is staged under this single decision. The first change implements
    the permission plumbing for all four capabilities and the full
    `keyboard.globalShortcut` runtime; `net.websocket` ships in the same line of
-   work. The two audio permissions stay declared-only until their host service
-   lands, so their SDK surface fails closed with `UNSUPPORTED` rather than
-   silently degrading.
+   work. The two audio permissions are declared and their `pi.audio` surface is
+   callable — the permission gate still runs first — but the device service is
+   not implemented, so every authorized call is answered with a coded
+   `UNSUPPORTED` refusal, audited, rather than silently degrading; the two
+   synchronous registration helpers throw the same code. That refusal is the
+   part a later change replaces.
 
 ## Consequences
 

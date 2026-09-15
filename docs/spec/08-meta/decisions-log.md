@@ -5250,8 +5250,10 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
   commands — no key monitoring, no raw events, no hooks.
 - Implemented in this change: `keyboard.globalShortcut` and `net.websocket`
   (host-owned sockets, confined to `manifest.net.domains`, bounded, and released
-  with the plugin). The audio host services are specified here and their SDK
-  surface fails closed with `UNSUPPORTED` until they land. See ADR 0257,
+  with the plugin). The two audio permissions are declared, present in the
+  plugin API, and gated: with the grant the host has no device backend, so every
+  call is answered with a coded `UNSUPPORTED` refusal that is audited, until the
+  device service lands. See ADR 0257,
   `07-plugins/03-plugin-api.md`, `07-plugins/04-plugin-security.md`, and
   E2E-PLUGIN-global-shortcut-owns-only-its-own-command.
 
