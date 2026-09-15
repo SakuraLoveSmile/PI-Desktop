@@ -104,6 +104,18 @@ test("tool block bodies stay bounded and role-coded", () => {
   assert.doesNotMatch(permissionArgs, /white-space|font-family/);
 });
 
+test("tool details do not add a second visual indent", () => {
+  const toolDetailStyles = stylesSource.match(
+    /\.tool-row:not\(\.thinking\):not\(\.subagent-topology-node\) > \.tool-row-body \{([^}]*)\}/
+  )?.[1];
+  assert.ok(toolDetailStyles);
+  assert.match(toolDetailStyles, /margin-left:\s*0;/);
+  assert.match(toolDetailStyles, /padding-left:\s*0;/);
+  // Thinking and topology have separate visual hierarchies and keep their
+  // dedicated layout rules rather than inheriting the flat tool detail rule.
+  assert.match(stylesSource, /\.subagent-topology-node > \.tool-row-body,[\s\S]*?margin-left:\s*38px;/);
+});
+
 test("assistant turns stay transparent full-width prose", () => {
   assert.match(
     stylesSource,

@@ -518,6 +518,7 @@ export const fr = {
     "untitledTask": "Nouvelle tâche"
   },
   "sideChat": {
+    parentBusy: "La conversation principale répond encore. Attendez la fin avant de démarrer cette discussion latérale.",
     readOnly: "Cette session Pi native est en lecture seule pour le moment.",
     "title": "Chat latéral",
     "sessionTitle": "Chat latéral : {{title}}",

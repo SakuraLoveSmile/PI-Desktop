@@ -909,17 +909,21 @@
   text-align: center;
 }
 
-/* Language and theme pickers (Appearance). Pill trigger matches the font
-   picker; the menu is an AnchoredMenu so the settings card cannot clip it. */
+/* Language and theme pickers (Appearance) plus the short-list menu selects on
+   the remaining tabs. Pill trigger matches the font picker; the menu is an
+   AnchoredMenu so the settings card cannot clip it, and one definition here
+   means a design change reaches every Settings picker together. */
 .settings-language-anchor,
-.settings-theme-anchor {
+.settings-theme-anchor,
+.settings-menu-select-anchor {
   position: relative;
   width: 100%;
   min-width: 0;
 }
 
 .settings-language-trigger,
-.settings-theme-trigger {
+.settings-theme-trigger,
+.settings-menu-select-trigger {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -935,12 +939,20 @@
 }
 
 .settings-language-trigger:hover,
-.settings-theme-trigger:hover {
+.settings-theme-trigger:hover,
+.settings-menu-select-trigger:hover {
   background: var(--ds-bg-hover);
 }
 
+/* A write in flight keeps the trigger readable but not re-openable. */
+.settings-menu-select-trigger:disabled {
+  color: var(--ds-text-secondary);
+  cursor: default;
+}
+
 .settings-language-trigger-label,
-.settings-theme-trigger-label {
+.settings-theme-trigger-label,
+.settings-menu-select-trigger-label {
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -950,13 +962,15 @@
 }
 
 .settings-language-trigger > svg,
-.settings-theme-trigger > svg {
+.settings-theme-trigger > svg,
+.settings-menu-select-trigger > svg {
   flex: 0 0 auto;
   color: var(--ds-text-muted);
 }
 
 .settings-language-menu,
-.settings-theme-menu {
+.settings-theme-menu,
+.settings-menu-select-menu {
   position: fixed;
   z-index: 60;
   width: min(240px, calc(100vw - 48px));
@@ -972,7 +986,8 @@
 }
 
 .settings-language-menu.is-open,
-.settings-theme-menu.is-open {
+.settings-theme-menu.is-open,
+.settings-menu-select-menu.is-open {
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
@@ -1017,7 +1032,8 @@
 }
 
 .settings-language-results,
-.settings-theme-results {
+.settings-theme-results,
+.settings-menu-select-results {
   min-height: 0;
   max-height: min(360px, calc(100vh - 220px));
   overflow-y: auto;
@@ -1026,14 +1042,16 @@
 }
 
 .settings-language-list,
-.settings-theme-list {
+.settings-theme-list,
+.settings-menu-select-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .settings-language-option,
-.settings-theme-option {
+.settings-theme-option,
+.settings-menu-select-option {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1048,12 +1066,25 @@
 .settings-language-option:hover,
 .settings-language-option.is-active,
 .settings-theme-option:hover,
-.settings-theme-option.is-active {
+.settings-theme-option.is-active,
+.settings-menu-select-option:hover,
+.settings-menu-select-option.is-active {
   background: var(--ds-bg-hover);
 }
 
+/* A host-reported unavailable shell stays listed but cannot be chosen. */
+.settings-menu-select-option:disabled {
+  color: var(--ds-text-muted);
+  cursor: default;
+}
+
+.settings-menu-select-option:disabled:hover {
+  background: transparent;
+}
+
 .settings-language-option.is-current .settings-language-option-native,
-.settings-theme-option.is-current .settings-theme-option-title {
+.settings-theme-option.is-current .settings-theme-option-title,
+.settings-menu-select-option.is-current .settings-menu-select-option-label {
   color: var(--ds-text-primary);
 }
 
@@ -1067,12 +1098,22 @@
 }
 
 .settings-language-option-native,
-.settings-theme-option-title {
+.settings-theme-option-title,
+.settings-menu-select-option-label {
   overflow: hidden;
   color: var(--ds-text-primary);
   font-size: var(--text-sm-plus);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.settings-menu-select-option:disabled .settings-menu-select-option-label {
+  color: var(--ds-text-muted);
+}
+
+.settings-menu-select-option-label {
+  min-width: 0;
+  flex: 1;
 }
 
 .settings-language-option-english,
@@ -1086,7 +1127,8 @@
 }
 
 .settings-language-check,
-.settings-theme-check {
+.settings-theme-check,
+.settings-menu-select-check {
   flex: 0 0 auto;
   color: var(--ds-accent);
 }

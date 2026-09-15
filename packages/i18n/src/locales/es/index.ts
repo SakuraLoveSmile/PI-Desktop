@@ -518,6 +518,7 @@ export const es = {
     "untitledTask": "Nueva tarea"
   },
   "sideChat": {
+    parentBusy: "La conversación principal sigue respondiendo. Espera a que termine antes de iniciar este chat lateral.",
     readOnly: "Esta sesión nativa de Pi es de solo lectura en este momento.",
     "title": "Chat lateral",
     "sessionTitle": "Chat lateral: {{title}}",

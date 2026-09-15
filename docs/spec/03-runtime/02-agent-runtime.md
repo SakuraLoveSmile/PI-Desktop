@@ -917,10 +917,10 @@ accepts the request.
 
 ### 6.2 OpenCode session routing headers
 
-Chat, subagent, prompt-enhancement, and plugin one-shot completions whose
-provider is `apiStyle: opencode_go`, whose `vendorKey` is `opencode` or
-`opencode-go`, whose pi-ai provider id is one of those values, or whose base
-URL host is `opencode.ai` send:
+Chat, subagent, context-compaction summary, prompt-enhancement, and plugin
+one-shot completions whose provider is `apiStyle: opencode_go`, whose
+`vendorKey` is `opencode` or `opencode-go`, whose pi-ai provider id is one of
+those values, or whose base URL host is `opencode.ai` send:
 
 - `x-opencode-session`: the durable conversation id, or a per-call UUID when
   the caller has no session
@@ -935,6 +935,13 @@ default and over adapter last-writes. Reserved keys cannot smash
 `x-opencode-session`. This is an agent-runtime concern, matching the
 official Pi coding-agent attribution layer; pi-ai's `sessionId` stream option
 does not emit `x-opencode-session`.
+
+The context-compaction summary is a provider request of the same kind, but the
+harness assembles its own stream options and never passes the session's stream
+function, so agent-runtime applies the header merge to the model collection it
+hands to compaction. That request carries the session's conversation id rather
+than the per-call id the harness would otherwise mint, so a summary reaches the
+same gateway backend as the conversation it summarizes.
 
 
 ## 7. System prompt composition

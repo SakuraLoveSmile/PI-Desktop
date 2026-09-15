@@ -476,8 +476,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   conversation hides the panel. Session/workspace identity remains attached to
   every relative resource, preventing cross-context reinterpretation.
 - A side chat (D-LOCAL-message-quotes) is one more resource in the same context: the message
-  action forks the child through `session.fork` without activating it and opens
-  one `sidechat:<childSessionId>` tab in the origin session's retained context.
+  action opens a renderer draft in the origin session's retained context.
+  First Send forks through `session.fork` without activating the child and
+  replaces the draft tab with `sidechat:<childSessionId>`.
   The tab label reuses `sideChat.title`, the body renders the child's transcript
   from the same event stream through the background-transcript reducer, and the
   compact input sends to and stops the child session, never the visible one.
@@ -487,8 +488,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   it does not survive relaunch, while the durable child session does.
 - Closing the final side-chat tab keeps the upstream panel launcher visible.
   Closing it beside other tabs leaves those resources and other sessions intact.
-  Registered child transcripts survive tab switches, but the compact side-chat
-  draft and scroll position belong to the mounted tab and may reset on remount.
+  Registered transcripts and side-chat drafts survive tab switches. Scroll
+  position belongs to the mounted tab and may reset on remount.
 - Relaunch discards every session context, including Browser resources; only
   the committed preferred panel width persists. Native window state is stored
   independently from normal bounds, including when the app closes while
@@ -932,6 +933,15 @@ Running turns and pending approvals continue to gate the controls.
 - Clicking an action dismisses its tooltip immediately and suppresses it until
   the pointer leaves or focus moves away; keyboard focus still reveals the
   tooltip before activation.
+- A tooltip is bound to one live trigger. It closes when that trigger unmounts
+  or is detached, when the window loses focus, when the document is hidden, and
+  on Escape; a trigger that moves in the DOM within a quarter second without
+  being replaced keeps the tooltip instead of blinking it. A tooltip revealed
+  by keyboard focus is not closed by unrelated pointer movement, and at most one
+  themed tooltip is ever painted, so a pointer crossing between two adjacent
+  buttons never shows both. The guard listeners behind this are shared by the
+  whole renderer, so a long transcript does not add one listener set per row.
+
 
 ## 7. Focus management
 
@@ -992,7 +1002,7 @@ Running turns and pending approvals continue to gate the controls.
   never renders in a read-only projection, and it does not steal the selection:
   the pointer press is prevented so the excerpt is whatever was selected,
   including a whole formula. Add to chat writes a composer draft and focuses the
-  composer; Ask in side chat sends the excerpt to the side chat anchored at that
+  composer; Ask in side chat prefills a blockquote in the side chat anchored at that
   row; neither sends into the conversation being read. On an assistant turn, Add
   to chat opens the annotation comment editor instead of writing draft text
   (D-LOCAL-response-annotations): the editor snapshots the excerpt, Save attaches one annotation to the
@@ -1351,13 +1361,37 @@ Project drag/drop follows these patterns:
   changing the selected conversation. If the read fails, the last cached
   branch is used.
 - The card is rendered through a portal at `document.body`, never widens
-  beyond 320px, never causes horizontal scroll on the underlying row, and
-  stays non-interactive so the row keeps receiving pointer events.
+  beyond 320px, and never causes horizontal scroll on the underlying row. It is
+  interactive only through its own session links (real buttons with an
+  accessible open-session name); the rest of the card is not a control, so a
+  click on the card's background never leaks into the row behind it.
 - The session row does not set a native `title` attribute. The hover card is
   the only full-title surface, so the browser tooltip never stacks on the
   card.
 - The card cancels on pointer leave, focus blur, scroll (any scroll
   container), resize, and the moment a context menu opens.
+
+### 9.1c Session row hover and row actions
+
+- A session row and a project header are each one click target. Their
+  hover-revealed actions (the row overflow control, the header's add and menu
+  controls) are inert while hidden: the space they occupy before they appear
+  never swallows a click that belonged to the row. A click in that space opens
+  the conversation, or activates and toggles the project group, exactly as a
+  click on the title does; a no-hover pointer gets the controls revealed so it
+  never meets a hidden target.
+- Hover paint belongs to the pointer that caused it. When the window loses
+  focus the row and the project title drop their hover background and their
+  revealed actions hide, so nothing is left lit or armed after the window
+  returns; moving the pointer over the row again re-arms it.
+- Revealed actions become clickable the moment the row is hovered or focused,
+  and remain reachable through keyboard focus (`:focus-within` /
+  `:focus-visible`) without a pointer. A spelled-out control never triggers the
+  row or header underneath it as well.
+- The hover card's own navigation controls are the only interactive surfaces
+  inside the card; the row keeps receiving pointer events everywhere else on
+  it.
+
 
 ### 9.2 Sidebar scrolling
 
@@ -1490,3 +1524,11 @@ This does not prevent state changes — it makes them instant.
     the expanded sidebar yields at the threshold and returns when the panel
     closes, and divider cancellation restores the prior panel width
     (ADR 0033 / ADR 0151 / ADR 0238)
+
+### Side-chat draft lifecycle (Issue #421)
+
+Open side chat and selection Ask in side chat create a renderer-only draft.
+Selection text is prefilled as a blockquote, without sending. First nonempty
+Send creates the anchored child and sends once; failure keeps the draft and
+reuses any already-created child. Closing before Send creates no history.
+Existing child sessions remain after close.

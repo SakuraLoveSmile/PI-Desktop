@@ -527,6 +527,7 @@ export const ko = {
     untitledTask: "새 작업",
   },
   sideChat: {
+    parentBusy: "기본 대화가 응답 중입니다. 응답이 끝난 후 사이드 채팅을 시작하세요.",
     readOnly: "이 네이티브 Pi 세션은 현재 읽기 전용입니다.",
     title: "사이드 채팅",
     sessionTitle: "사이드 채팅: {{title}}",

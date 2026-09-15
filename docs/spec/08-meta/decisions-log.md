@@ -89,7 +89,7 @@ This log freezes previously open questions into concrete decisions.
 | D421 | Native Pi session continuation | **Amend baseline D007: discover Pi v3 sessions as source-discriminated projections and continue them through coding-agent `AgentSession`/`SessionManager` against their canonical JSONL. Rust remains authoritative for Desktop SQLite/transcripts. Native continuation requires exact saved provider/auth, project trust, canonical path/header identity, and a cooperative lease plus byte/leaf validation; failures remain browseable/read-only. First slice excludes native rename/delete/move/revisions/Plan/Goal/queue/collaboration; the 2026-09-14 ADR 0254 amendment adds native fork and persistent side chats with exact stream re-keying and inode-tracked publication. See ADR 0254 and E2E-SESSION-native-pi-*/E2E-SESSION-native-side-chat-*.** | Importing a flattened copy cannot preserve Pi's tree or make later Desktop turns visible to Pi Web. |
 | D412 | Delta-only coalesced streaming updates | **Amend the local `message_update` contract: append-only streaming frames carry `stream: delta` plus `deltaText`/`deltaThinking` (and reset flags) without growing `content`/`thinking`. Runtime coalesces those frames every 16ms and flushes before semantic boundaries. AgentHost, inflight checkpoints, and the renderer apply deltas; `message_start`/`message_end` remain full snapshots. Transcript activity parts keep object identity when only the tail token changes. Protocol version stays 11. See ADR 0242, E2E-STREAM-long-turn-keeps-realtime, and issue #299.** | Each token re-serialized the full assistant snapshot across sidecar, AgentHost, and IPC, so a long turn cost O(n²) bytes and backlogged later short chunks. |
 | D416 | Git clone accepts only syntactically public hosts | **Amend home git clone: `parseGitCloneUrl` reuses `isPublicHostname` so loopback, private, CGNAT, link-local, ULA, and `.local`/`.localhost` remotes are rejected before `git clone` runs. HTTPS/HTTP/SSH/`git@host:path` to public hosts remain valid. `file:` and URL passwords stay rejected. Git still performs its own DNS; this is not a market-style pin. See ADR 0247 and E2E-CLONE-public-hostname-rejects-private.** | Clone accepted `http://127.0.0.1/...` and RFC1918 literals, which is a LAN/SSRF hole the market fetchers already close for HTTPS catalogs. |
-| D417 | Plugin runtime theme APIs + sidebar image token | **Add `pi.app.setTheme` and `pi.themes.upsert`/`remove`/`list` under `ui.theme` (ADR 0265 / issue #352). Remove `MAX_THEMES_PER_PLUGIN`. Runtime upsert sanitizes CSS like load-time registration and emits `pluginChanged` (`reason: "themes"`); `setTheme` persists `AppSettings.theme` and emits `settingsChanged`. Split sidebar paint: `--ds-bg-sidebar` stays a color; optional `--ds-bg-sidebar-image` holds gradients/images, with macOS vibrancy stacking sheen over the image layer.** | Theme editor plugins cannot apply a theme from their panel, cannot ship an unlimited library, and cannot live-edit production CSS without reload; sidebar gradients broke `color-mix` / vibrancy consumers when stuffed into the color token. |
+| D417 | Plugin runtime theme APIs + sidebar image token | **Add `pi.app.setTheme` and `pi.themes.upsert`/`remove`/`list` under `ui.theme` (ADR 0260 / issue #352). Remove `MAX_THEMES_PER_PLUGIN`. Runtime upsert sanitizes CSS like load-time registration and emits `pluginChanged` (`reason: "themes"`); `setTheme` persists `AppSettings.theme` and emits `settingsChanged`. Split sidebar paint: `--ds-bg-sidebar` stays a color; optional `--ds-bg-sidebar-image` holds gradients/images, with macOS vibrancy stacking sheen over the image layer.** | Theme editor plugins cannot apply a theme from their panel, cannot ship an unlimited library, and cannot live-edit production CSS without reload; sidebar gradients broke `color-mix` / vibrancy consumers when stuffed into the color token. |
 | D420 | Structured, bounded, and redacted process logs | **Amend ADR 0046 / ADR 0212: every app/host/agent NDJSON record has a stable event and top-level correlation fields. A normal tool call emits one completion/failure record, while an unexpected sidecar exit emits interruption records for active tools; the tool protocol and transcript remain unchanged. Central logging redacts credentials and local paths, bounds structured data to 8 KiB, summarizes tool results instead of copying output, and mirrors the same sanitized record to development console output.** | The old `tool start` / `tool end` rows were redundant and unclear, while free-form child/error details could leak secrets or consume unbounded storage. |
 | D422 | Host turn-end event for plugins | **`session:turnEnded` is a host event with payload `{ sessionId, turnId, reason }` (`completed` / `aborted` / `error`), broadcast once per turn actually started by `session.beginTurn` at the end of turn teardown, after the durable `session.endTurn` attempt. The emitted `turnId` is the identity the terminal runtime event carried rather than whichever turn is active, and the plugin tool context's `turnId` is populated with the same value. There is no ack and no replay: a live subscribed plugin receives it once, delivery that races a crash, reload, or host quit is not guaranteed, and receiving it does not mean every in-flight tool of that turn has exited, so cleanup must be serialised or scoped by `turnId`. No new permission is required, and no published host emits it yet (0.14.8 does not include it). See ADR 0252.** | Plugins driving a GUI had to guess turn completion with idle timers, which fire mid-turn and again after the turn ends. A host-owned once-per-turn terminal event with an explicit turn identity lets a plugin settle exactly once, and the same identity in the tool context lets it correlate late tool results. |
 | D423 | Remove the subagent turn limit | **Amend D328 / ADR 0062 / ADR 0063 / ADR 0119 / ADR 0126 / ADR 0166 / ADR 0210: `maxTurns` and `MAX_SUBAGENT_MAX_TURNS` leave the definition type, the frontmatter parser and its clamp/invalid warnings, `UserSubagentRecord` / `UserSubagentInput`, the host-core registry (record, input, frontmatter parse, document render, `MAX_TURNS_CEILING`), the five built-in documents, `SUBAGENT_PRESETS`, and the Subagent editor. A delegate ends only when it finishes, when the parent calls `TaskStop`, when the user Stops, or when a terminal parent error aborts it (ADR 0189). `maxTurns` / `max-turns` / `max_turns` in an existing document is now an unrecognized frontmatter key and is ignored like any other unknown key: no error, no warning, no definition-load failure, and no rewrite of the user's file. The `truncated` value leaves `SubagentRunStatus`, the renderer's `SubagentOutcome` union, the `chat.subagentStatus` catalog entry in every locale, and the delegation topology's warnings count; `timed_out` stays. No protocol version, schema version, or storage change. See ADR 0253, E2E-155, and E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored.** | The parent cannot see a delegate's live work, so it cannot size a turn cap, and the shipped 60 / 50 / 40 / 80 backstops had no derivation. The cap's only effect was to kill a delegate mid-task and surface it as `truncated` with a partial report — a state neither the user nor the parent model can resume. |
@@ -3072,6 +3072,13 @@ D193, and D194.
   different provider id, and do not retire an idle runtime. Repeating a
   definition's own pin key is omit. On-demand matching uses unique provider
   lookup. The Task catalog discloses each definition's default model.
+- Scope clarification (2026-09-15, issue #386): the opt-in governs every entry
+  point through which the AI picks a model for delegated work, not only
+  `Task.model`. A `session/collaboration/spawn` `modelKey` naming a model
+  without the opt-in is refused with `PERMISSION_DENIED` before a worker is
+  created; omitting the key, or naming the default model's own key, remains
+  inheritance. `models.list` still reports every ready model with its flag —
+  the flag advises the caller and is authoritative only in Electron main.
 
 - Models not pre-resolved at sidecar launch are resolved on-demand via the
   `provider.resolveSubagentModel` RPC to Electron main, where credentials and
@@ -5272,7 +5279,50 @@ not an unreviewed upstream registry passthrough.
 It deliberately does not include plugin OAuth: the `provider.oauth` permission
 and a Host-owned plugin login flow are future work, so a declared provider has no
 OAuth login, token refresh, or account label today.
-## 2026-09-15 — Turn-queue priority block and row actions (D428)
+
+## 2026-09-15 — Side chats materialize on first Send (#421)
+
+Side-chat opening and selection quote prefill are renderer-only drafts. The
+first explicit nonempty Send creates the anchored child, with concurrent
+submissions deduplicated and failed drafts retained. Closing unsent drafts
+creates no history; existing children remain. See the
+[message quotes and side chats ADR](../../adr/message-quotes-and-side-chats.md)
+and E2E-CHAT-side-chat-fork.
+
+## 2026-09-15 — A tooltip never outlives its trigger (D428)
+
+- **The shared tooltip hook in `apps/desktop/src/components/ui.tsx` gains one
+  lifecycle contract: at most one themed tooltip is painted at a time
+  (claiming the slot closes the previous owner), and a visible tooltip closes
+  when its anchor unmounts, when the window loses focus, when the document is
+  hidden, on Escape, or when the pointer that revealed it leaves the anchor.
+  Every close also cancels a show that has not painted yet, so Escape or a
+  window blur inside the delay no longer paints a tooltip on an unfocused
+  window. A trigger that moves in the DOM within a quarter second without being
+  replaced keeps the tooltip instead of blinking it, and a tooltip revealed by
+  keyboard focus is not closed by unrelated pointer movement. The guard
+  listeners (window blur, visibility, Escape, pointer) are installed once for
+  the whole renderer instead of once per trigger. No delay, offset, placement,
+  or text behavior changes.**
+- **Row-level hover paint and hover-revealed row actions now follow the same
+  "still relevant?" rule: an idle row's hidden overflow control is
+  pointer-inert so the space it occupies belongs to the row — a click there
+  opens the conversation, or activates and toggles the project group, as the
+  title does — and a no-hover pointer gets the controls revealed under
+  `@media (hover: none)` so it never meets a hidden target. A window that loses
+  focus drops the row's and the project title's hover paint and hides the
+  revealed actions instead of leaving them latched.**
+- Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/09-interaction-patterns.md` §6.4 and §9.1c,
+  E2E-UI-tooltip-never-outlives-its-trigger, and
+  E2E-UI-row-actions-do-not-swallow-the-row-click.
+
+Users reported a tooltip that occasionally never went away (the trigger
+unmounted, the window lost focus, or the pointer left the window without a
+leave event) and a session row whose hidden overflow control silently opened
+its menu instead of the conversation.
+
+## 2026-09-15 — Turn-queue priority block and row actions (D429)
 
 - "Send now" becomes a priority block instead of a head jump: a promoted entry
   takes `MAX(priority) + 1` inside its session (schema v18, nullable `priority`),

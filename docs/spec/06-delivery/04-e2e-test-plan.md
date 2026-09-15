@@ -519,20 +519,24 @@ identify the platform validation still needed.
 - **Steps**: 1) Start an Agent turn in a session against OpenCode Go. 2)
   Capture the provider request headers. 3) Send a follow-up in the same
   session. 4) Run prompt enhancement and a plugin `agent.complete` one-shot
-  against the same provider. 5) Repeat a turn against the generic
+  against the same provider. 5) Run `/compact` in the same session and capture
+  the summary request. 6) Repeat a turn against the generic
   OpenAI-compatible provider.
 - **Expected**: Every OpenCode Go LLM request includes `x-opencode-session`
   equal to the conversation id (or a stable per-call id when no session
   exists), `x-opencode-client: pi-desktop`, and a `User-Agent` identifying
-  PI-Desktop. Follow-up turns reuse the same session header. The generic
-  OpenAI-compatible provider does not receive these headers. The gateway does
-  not return `MissingSessionID`.
+  PI-Desktop. Follow-up turns reuse the same session header, and so does the
+  compaction summary request, which the harness would otherwise send with no
+  headers at all. The generic OpenAI-compatible provider does not receive
+  these headers. The gateway does
+  not return `MissingSessionID`, and `/compact` does not fail with a 400.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`,
   `03-runtime/11-provider-model-system.md`,
   `03-runtime/12-provider-config-schema.md`, ADR 0116
 - **Acceptance**: B (model configuration), F (runtime provider requests)
 - **Milestone**: M2
-- **Status**: Unit-covered (header merge and one-shot stream options)
+- **Status**: Unit-covered (header merge, one-shot stream options, and the
+  compaction summary request)
 
 #### E2E-005E: Model-level wire API wins over the provider style
 
@@ -1389,20 +1393,18 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Draft
 
-#### E2E-CHAT-side-chat-fork: Opening a side chat forks the child without switching the visible session
+#### E2E-CHAT-side-chat-fork: First Send creates the child without switching the visible session
 
-- **Preconditions**: A session with a completed assistant answer and a user
-  message; a provider ready for a child session.
-- **Steps**: 1) Hover the assistant turn and activate Open side chat
-  (`chat.startSideChat`). 2) Inspect the visible transcript, the sidebar
-  selection, and the work-panel header. 3) Repeat from a user message in the
-  same session. 4) List the host's sessions.
-- **Expected**: Each activation calls `session.fork` with the clicked message as
-  anchor and returns a durable child. The main conversation stays visible and
-  selected with an unchanged transcript and scroll position; no prompt is sent
-  and no permission is requested. The work panel opens one `sidechat` tab
-  (`sidechat:<childSessionId>`) labeled from `sideChat.title`. The children
-  appear as ordinary sessions in the sidebar, session lists, and search.
+- **Preconditions**: A session with completed messages and a configured provider.
+- **Steps**: 1) Open a side chat twice from the same message. 2) Type but do
+  not send; inspect persistent sessions. 3) Close it and inspect again.
+  4) Reopen and Send nonempty text twice concurrently. 5) Repeat with fork
+  failure and prompt rejection; retry. 6) Switch parent or close during creation.
+- **Expected**: Open/type/close create zero sessions. First Send creates one
+  anchored child and submits once. The main conversation stays selected.
+  Failure keeps the draft and retries reuse any created child. A changed draft
+  is never overwritten. The original parent's retained tab is replaced in place;
+  closing during creation never resurrects it. Promotion is disabled for drafts.
 - **Specs linked**: `04-ux/08-component-spec.md` §5.8, §8.8;
   `04-ux/09-interaction-patterns.md` §1.8; `03-runtime/04-data-storage.md`;
   ADR message-quotes-and-side-chats, ADR 0023, D-LOCAL-message-quotes
@@ -1527,20 +1529,16 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Draft
 
-#### E2E-CHAT-selection-side-chat: Ask in side chat answers beside the conversation
+#### E2E-CHAT-selection-side-chat: Selection prefills a side-chat draft
 
-- **Preconditions**: A session with a completed assistant answer; a provider
-  ready for a child session; no turn running.
-- **Steps**: 1) Select a phrase in the answer and activate Ask in side chat
-  (`chat.askInSideChat`) in the floating overlay. 2) Inspect the visible
-  transcript, the composer draft, and the work panel. 3) Wait for the child's
-  answer, then repeat with a turn already running.
-- **Expected**: One `sidechat` tab opens for a child forked at that message and
-  the excerpt is sent as that child's own prompt, so the answer streams inside
-  the panel while the visible conversation, its draft, its scroll position, and
-  its run state are untouched. The overlay closes and the native selection is
-  cleared. The main conversation gains no row from this action, and the fork
-  refuses while the visible turn is running (the action is disabled then).
+- **Preconditions**: A session with a completed answer; no turn running.
+- **Steps**: 1) Select a phrase and choose Ask in side chat. 2) Inspect the
+  panel input, persistent session count, and model request count. 3) Add a
+  question and explicitly Send.
+- **Expected**: The selection is a Markdown blockquote in the side input.
+  Opening creates no child and sends no model request. Explicit Send creates
+  one child and sends the edited draft. The main draft and transcript remain
+  unchanged; selecting another quote appends without erasing existing text.
 - **Specs linked**: `04-ux/08-component-spec.md` §5.8, §8.8; ADR message-quotes-and-side-chats, D-LOCAL-message-quotes,
   D-LOCAL-selection-overlay
 - **Acceptance**: C (conversation), Quality
@@ -2229,6 +2227,16 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Documented; native Windows validation pending
 
+#### E2E-SETTINGS-ai-tab-pickers-use-in-app-menus
+
+- **Preconditions**: App running with a host that reports at least one configured command shell and at least one catalog shell that is unavailable on this platform.
+- **Steps**: 1) Open Settings → General and open the Theme and Language pickers; note the pill trigger and the opened surface. 2) Open 全局 AI. 3) Open the Permissions card's permission-mode control and select ask, accept-edits, and auto in turn. 4) Open the Defaults card's Command shell control; inspect the unavailable entries and select an available shell. 5) Dismiss each open menu with Escape and then with an outside press. 6) Close Settings, reopen it, and read both rows.
+- **Expected**: Both rows open the same anchored menu surface as the Appearance pickers — the app-drawn frame with the shared radius, elevation, border, and theme tokens, a check mark on the current option, and a hover/keyboard highlight — and never a platform-drawn `<select>` popup. Unavailable shells stay listed with their suffix, are not selectable, and cannot become the current value. Escape and an outside press close the menu and restore focus to the trigger; arrow keys move between selectable options with wraparound. The selected permission mode and command shell persist across closing and reopening Settings, and the selected shell stays the only configured-state indicator.
+- **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/09-interaction-patterns.md`
+- **Acceptance**: A (core shell)
+- **Milestone**: M4
+- **Status**: Documented
+
 #### E2E-039: Settings titlebar drag moves the window
 
 - **Preconditions**: App running windowed on macOS with Settings open.
@@ -2270,14 +2278,17 @@ identify the platform validation still needed.
   The header shows its localized processing label, elapsed time, and step count
   without an additional status capsule. When the turn settles, the automatic
   thinking disclosure closes, while a group or row touched by the user keeps
-  its chosen state. Expanded calls use transparent semantic activity rows with
-  an action icon, natural-language verb, monospace primary argument, and quiet
-  disclosure. The processing group uses the full assistant-column width, so a
-  short label or payload does not shrink expanded details into a content-sized
-  chip. Each expanded-content vertical rule is a pointer and keyboard-focusable
-  collapse control for its owning disclosure. Nested expansion shows output
-  before raw input in clamped scroll regions. Live partial output updates in
-  place. Reloaded rows preserve the tool name, arguments, result, and status.
+  its chosen state. A user-expanded tool call keeps its detail heading and
+  content aligned with the tool row rather than introducing another horizontal
+  indent; the collapse rail remains usable beside the body. Expanded calls use
+  transparent semantic activity rows with an action icon, natural-language verb,
+  monospace primary argument, and quiet disclosure. The processing group uses
+  the full assistant-column width, so a short label or payload does not shrink
+  expanded details into a content-sized chip. Each expanded-content vertical rule
+  is a pointer and keyboard-focusable collapse control for its owning disclosure.
+  Nested expansion shows output before raw input in clamped scroll regions. Live
+  partial output updates in place. Reloaded rows preserve the tool name,
+  arguments, result, and status.
 - **Specs linked**: `04-ux/01-ui-ia.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`
@@ -2658,7 +2669,7 @@ identify the platform validation still needed.
 - **Preconditions**: A plugin with `ui.theme` that can drive `pi.app.setTheme` and `pi.themes.upsert` / `remove` (panel or command). Settings → General shows the searchable theme picker.
 - **Steps**: 1) From the plugin UI, call `themes.upsert` with a new theme id and distinct CSS. 2) Confirm the theme appears in Settings without reload/disable. 3) Call `app.setTheme` to select it. 4) Call `themes.upsert` again with different CSS while it is active. 5) Call `themes.remove` on an inactive theme. 6) Call `app.setTheme` with an unknown id. 7) Upsert a ninth theme (former hard cap was 8).
 - **Expected**: The new theme is listed and applies immediately through the same path as Settings; live CSS edits restyle the shell without plugin reload; remove drops the picker row and the event refreshes the list; an unknown id rejects with `INVALID_ARGUMENT` and leaves the preference unchanged; the ninth theme is accepted. `settingsChanged` reaches the renderer store; `appearance:changed` reaches open panels.
-- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/12-plugin-ipc-and-host-services.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0265, D417
+- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/12-plugin-ipc-and-host-services.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0260, D417
 - **Acceptance**: G (theme contribution) + Security
 - **Status**: Unit-covered (`plugin-themes.test.mjs`); interactive scenario Draft
 
@@ -2667,7 +2678,7 @@ identify the platform validation still needed.
 - **Preconditions**: A plugin theme that sets `--ds-bg-sidebar` to a solid color and `--ds-bg-sidebar-image` to a `linear-gradient(...)`; Windows/Linux and macOS shells.
 - **Steps**: 1) Select the theme. 2) Inspect the sidebar plate and rail. 3) Confirm borders/glass tint still resolve from the color token. 4) Switch back to a built-in theme.
 - **Expected**: The gradient paints as `background-image` over the color plate on all platforms; macOS sheen still overlays the image layer; borders and `color-mix` consumers do not break; clearing the token returns the plain sidebar.
-- **Specs linked**: `04-ux/07-ui-design-system.md`, ADR 0265, D417
+- **Specs linked**: `04-ux/07-ui-design-system.md`, ADR 0260, D417
 - **Acceptance**: Visual / platform
 - **Status**: CSS unit contracts in `plugin-themes.test.mjs`; visual scenario Draft
 
@@ -4493,6 +4504,64 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
   interaction scenario Draft
+
+#### E2E-UI-tooltip-never-outlives-its-trigger: A themed tooltip always retreats
+
+- **Preconditions**: PI-Desktop is open on a session with at least one message
+  toolbar, a sidebar with two retained projects, and a window that can lose
+  focus (another application or an OS dialog).
+- **Steps**: 1) Hover an icon-only action and wait for its tooltip. 2) With the
+  tooltip visible, move the pointer straight out of the window without clicking
+  and then return it. 3) Hover one action, then move the pointer quickly across
+  a row of adjacent actions. 4) Hover an action, then trigger a sidebar
+  re-order or a project expand/collapse that moves its row in the DOM. 5) Hover an
+  action, then press Escape. 6) Hover an action, switch to another application,
+  then return to PI-Desktop. 7) Repeat step 1 for the project path tooltip
+  (long absolute path), a session row's overflow control, and a message-toolbar
+  chip.
+- **Expected**: Each tooltip appears after its delay (300ms, 500ms for the
+  project path) and retreats when the pointer leaves. No tooltip survives its
+  trigger unmounting, a window blur, a hidden document, or Escape, and none is
+  left painted after the pointer leaves the window entirely. Crossing adjacent
+  actions shows at most one tooltip at a time. A move that keeps the same row
+  element (list re-order, expand/collapse) keeps the tooltip instead of
+  blinking it; a row that React truly unmounts and replaces drops it.
+  placement near the top edge.
+- **Specs linked**: `04-ux/09-interaction-patterns.md §6.4`
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`icon-tooltip.test.mjs` source contract); rendered
+  pointer/Escape/blur validation Draft
+
+#### E2E-UI-row-actions-do-not-swallow-the-row-click: A hidden row action is inert
+
+- **Preconditions**: PI-Desktop is open with two retained projects, each with
+  at least three sessions, and one active conversation.
+- **Steps**: 1) Without hovering it, click the right-hand gutter of an idle
+  session row where its overflow control will appear, and note which
+  conversation opens. 2) Repeat on an idle project header row. 3) Hover a row
+  and activate the revealed overflow control on the first click. 4) Tab through
+  the sidebar until a row action receives focus and activate it. 5) Repeat step
+  1 with an emulated coarse pointer / touch device. 6) With the pointer resting
+  on a row and its action revealed, switch focus to another application, then
+  return without moving the pointer.
+- **Expected**: The idle gutter belongs to the row — the first click there
+  opens that conversation (a project header gutter activates and toggles that
+  group) instead of an invisible menu, and a coarse pointer never meets a
+  hidden control. The hover-revealed control still opens its menu on the first
+  click, and keyboard focus reveals and keeps it operable. On window blur the
+  row (and the project title tile) drops its hover paint and hides its revealed
+  action; moving the pointer back over the row re-arms it.
+- **Specs linked**: `04-ux/09-interaction-patterns.md §9.1c`
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Source-contract and style assertions cover the hidden/revealed
+  `pointer-events` states and the blur release
+  (`sidebar-navigation.test.mjs`); rendered pointer/touch validation Draft
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`sidebar-navigation.test.mjs`,
+  `interaction-polish.test.mjs`); rendered pointer/touch validation Draft
 
 #### E2E-070: Native select menus follow the Windows theme across the app
 
@@ -11000,7 +11069,9 @@ are withdrawn with ADR 0165.
   using the exact returned `sessionId`, and stop another worker. 10) Restart
   the host/plugin with a queued delivery and confirm it remains held, while an
   interrupted turn is not replayed. Repeat the parallel creation step with a
-  large existing session list while keeping the parent visible.
+  large existing session list while keeping the parent visible. 11) With one
+  model's «Available for AI delegation» left off, ask the parent to spawn a
+  worker on it by `modelKey`, then spawn again with no `modelKey`.
 - **Expected**: Each worker is a real durable session with the parent's
   project/model/thinking/permission ceiling and an independent empty
   transcript at creation. The host ledger binds every delivery to the actual
@@ -11015,7 +11086,10 @@ are withdrawn with ADR 0165.
   interrupts only the selected delivery/turn without deleting the session.
   Sends without an active plugin tool invocation, forged source ids, targets
   above the source permission ceiling, worker fan-out overflow, inbox overflow,
-  and autonomous callback loops fail closed. Unrelated sessions and the
+  and autonomous callback loops fail closed. A `spawn` naming a model the user
+  has not enabled for AI delegation is refused with `PERMISSION_DENIED` before
+  a worker exists, while omitting `modelKey` — or naming the default model's
+  own key — still inherits. Unrelated sessions and the
   existing Task family are unchanged, and no localhost MCP call or token
   access occurs. Bursts of worker notifications serialize and coalesce
   session-list refreshes while preserving the final worker list and the
@@ -11023,7 +11097,8 @@ are withdrawn with ADR 0165.
 - **Specs linked**: `07-plugins/03-plugin-api.md`,
   `07-plugins/04-plugin-security.md`, `07-plugins/11-plugin-storage-isolation.md`,
   `03-runtime/01-ipc-protocol.md`, `03-runtime/06-host-rpc-protocol.md`,
-  `03-runtime/04-data-storage.md`, ADR 0237, ADR 0239
+  `03-runtime/04-data-storage.md`, `03-runtime/11-provider-model-system.md`,
+  ADR 0237, ADR 0239, ADR subagent-model-opt-in
 - **Acceptance**: C (parallel durable sessions), D (plugin security), Quality
 - **Milestone**: M6+
 - **Status**: host ledger coverage is automated by
@@ -12445,3 +12520,21 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   disable/enable, undeclare and uninstall cleanup, and the manifest refusals are
   covered by host-core unit tests; the renderer's read-only row presentation
   remains additional validation.
+
+### Issue #421 validation scope
+
+E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-close, and
+E2E-CHAT-selection-side-chat cover deferred creation and quote prefill.
+`pnpm test:e2e:native-side-chat` exercises renderer draft opening/closing,
+first-send native materialization and subsequent streaming/persistence.
+`side-chat-draft.test.mjs` covers deterministic failure and navigation races.
+Native E2E uses a fixture transport, not a live provider account.
+
+### E2E-CHAT-side-chat-fork availability extension (#421)
+
+Open a draft, type a question, then make the parent busy and read-only in turn.
+Expect a disabled Send button, visible reason, unchanged draft and no new host
+session or model request. Restore availability and send; exactly one child
+is created. A child returning read-only from an in-flight fork must not be
+prompted. `test:e2e:native-side-chat` covers the rendered parent gate and its
+recovery; `side-chat-draft.test.mjs` covers action-level guards and child drift.
