@@ -64,8 +64,14 @@ export type QueuedTurnRecord = {
   idempotencyKey?: string;
   /** Stable hash of the input, so a reused key with different input is a conflict. */
   inputHash: string;
+  /** Set only for promoted entries; the delivery order puts them first, in
+   * ascending priority (click order), then the rest in arrival order. */
+  priority?: number;
   createdAt: number;
 };
+
+/** Direction of one queue reorder step. */
+export type QueueReorderDirection = "up" | "down";
 
 /** Durable queue storage. The first implementation is in memory; host-core
  * persists the same records under its own ADR (D375). */
@@ -73,8 +79,11 @@ export interface QueueStore {
   listAll(): Promise<QueuedTurnRecord[]>;
   push(record: QueuedTurnRecord): Promise<void>;
   remove(id: string): Promise<boolean>;
-  /** Move one entry to the head of its session ("send now"). */
+  /** Promote one entry to the end of its session's priority block ("send now"). */
   prioritize?(id: string): Promise<void>;
+  /** Swap one entry with its adjacent non-prioritized neighbour; `false` when
+   * nothing moved. */
+  reorder?(id: string, direction: QueueReorderDirection): Promise<boolean>;
 }
 
 export type SessionSummary = {
@@ -114,8 +123,16 @@ export class RandomIds implements IdSource {
 export class MemoryQueueStore implements QueueStore {
   private readonly records = new Map<string, QueuedTurnRecord>();
 
+  /** Delivery order: promoted entries first in click order, then by arrival. */
   async listAll(): Promise<QueuedTurnRecord[]> {
-    return [...this.records.values()].sort((a, b) => a.createdAt - b.createdAt);
+    const records = [...this.records.values()];
+    const promoted = records
+      .filter((record): record is QueuedTurnRecord & { priority: number } => record.priority !== undefined)
+      .sort((a, b) => a.priority - b.priority);
+    const rest = records
+      .filter((record) => record.priority === undefined)
+      .sort((a, b) => a.createdAt - b.createdAt);
+    return [...promoted, ...rest];
   }
 
   async push(record: QueuedTurnRecord): Promise<void> {

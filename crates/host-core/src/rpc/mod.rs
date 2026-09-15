@@ -2406,9 +2406,41 @@ async fn handle_request(
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
             let entry = turn_queue::prioritize(&st.db, id)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .map_err(|e| {
+                    let message = e.to_string();
+                    if message == "ALREADY_PRIORITIZED" {
+                        rpc_err(1008, message, "CONFLICT")
+                    } else {
+                        rpc_err(1000, message, "INTERNAL")
+                    }
+                })?
                 .ok_or_else(|| rpc_err(1007, "queue entry not found", "NOT_FOUND"))?;
             Ok(json!({ "entry": entry }))
+        }
+        "session.queueReorder" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let direction = params
+                .get("direction")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "direction required", "INVALID_PARAMS"))?;
+            let direction = match direction {
+                "up" => turn_queue::ReorderDirection::Up,
+                "down" => turn_queue::ReorderDirection::Down,
+                other => {
+                    return Err(rpc_err(
+                        1002,
+                        format!("unknown direction: {other}"),
+                        "INVALID_PARAMS",
+                    ))
+                }
+            };
+            let st = state.lock().await;
+            let moved = turn_queue::reorder(&st.db, id, direction)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "moved": moved }))
         }
 
         "notification.list" => {

@@ -49,6 +49,7 @@ import {
   type Clock,
   type IdSource,
   type Principal,
+  type QueueReorderDirection,
   type QueueStore,
   type QueuedTurnRecord,
   type RuntimePort,
@@ -82,6 +83,8 @@ export type QueueEntryView = {
   content: string;
   sessionMessageId?: string;
   attachments?: AgentPromptAttachment[];
+  /** Set only for promoted entries; entries are already in delivery order. */
+  priority?: number;
 };
 
 export type StartTurnParams = {
@@ -553,7 +556,7 @@ export class AgentHost {
     });
   }
 
-  /** Move a queued turn to the head of its session's queue ("send now"). */
+  /** Promote a queued turn to the end of its session's priority block ("send now"). */
   async prioritizeTurn(principal: Principal, turnId: string): Promise<RacpTurn> {
     this.requireRole(principal, "turn/prioritize");
     const state = this.stateForTurn(turnId);
@@ -561,13 +564,43 @@ export class AgentHost {
     if (turn.status !== "queued") {
       throw racpError("CONFLICT", "only a queued turn can be prioritized");
     }
-    await this.queue.moveToHead(state.id, turn.id);
+    if (!(await this.queue.promote(state.id, turn.id))) {
+      throw racpError("CONFLICT", "the turn is already prioritized");
+    }
+    this.afterQueueMove(state, turn.id);
+    return this.toRacpTurn(state, turn);
+  }
+
+  /**
+   * Swap a queued turn with its adjacent plain-queue neighbour. A promoted
+   * entry, an entry already at that edge, or a missing entry is a no-op
+   * (`moved: false`). Reordering uses the same controller permission as
+   * prioritizing: RACP has no separate reorder operation.
+   */
+  async reorderTurn(
+    principal: Principal,
+    turnId: string,
+    direction: QueueReorderDirection,
+  ): Promise<{ moved: boolean }> {
+    this.requireRole(principal, "turn/prioritize");
+    const state = this.stateForTurn(turnId);
+    const turn = state.turns.get(turnId)!;
+    if (turn.status !== "queued") {
+      throw racpError("CONFLICT", "only a queued turn can be reordered");
+    }
+    if (!(await this.queue.reorder(state.id, turn.id, direction))) return { moved: false };
+    this.afterQueueMove(state, turn.id);
+    return { moved: true };
+  }
+
+  /** Publish one queue move and let an idle session drain the new head. */
+  private afterQueueMove(state: SessionState, turnId: string): void {
     this.renumberQueue(state);
-    this.emit(state, "turn.queued", { turn: this.toRacpTurn(state, turn) }, { turnId: turn.id });
+    const turn = state.turns.get(turnId);
+    if (turn) this.emit(state, "turn.queued", { turn: this.toRacpTurn(state, turn) }, { turnId });
     this.notifyQueue(state.id);
     this.queue.resume(state.id);
     void this.drain(state.id);
-    return this.toRacpTurn(state, turn);
   }
 
   async respondApproval(principal: Principal, response: RacpApprovalResponse): Promise<RacpApprovalResult> {
@@ -653,7 +686,7 @@ export class AgentHost {
     return this.queueEntries(sessionId).map((entry) => entry.turn);
   }
 
-  /** Queued turns with their prompts, in queue order. */
+  /** Queued turns with their prompts, in delivery order. */
   queueEntries(sessionId: string): QueueEntryView[] {
     const state = this.state(sessionId);
     return this.queue.list(sessionId).map((record) => ({
@@ -661,6 +694,7 @@ export class AgentHost {
       content: record.content,
       ...(record.sessionMessageId ? { sessionMessageId: record.sessionMessageId } : {}),
       ...(record.attachments ? { attachments: record.attachments } : {}),
+      ...(record.priority !== undefined ? { priority: record.priority } : {}),
     }));
   }
 

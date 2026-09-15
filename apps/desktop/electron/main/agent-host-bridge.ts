@@ -245,6 +245,13 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
     async prioritize(id) {
       await requireHost().call("session.queuePrioritize", { id });
     },
+    async reorder(id, direction) {
+      const result = await requireHost().call<{ moved?: boolean }>("session.queueReorder", {
+        id,
+        direction,
+      });
+      return result.moved === true;
+    },
   };
 
   const agentHost = new AgentHost({
@@ -305,6 +312,12 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
     },
     async prioritize(turnId: string): Promise<void> {
       await forIpc(() => agentHost.prioritizeTurn(DESKTOP_PRINCIPAL, turnId));
+    },
+    async reorder(
+      turnId: string,
+      direction: "up" | "down",
+    ): Promise<{ moved: boolean }> {
+      return forIpc(() => agentHost.reorderTurn(DESKTOP_PRINCIPAL, turnId, direction));
     },
   };
 
@@ -382,6 +395,7 @@ function toQueueSummary(entry: QueueEntryView): QueuedTurnSummary {
     ...(entry.sessionMessageId ? { sessionMessageId: entry.sessionMessageId } : {}),
     ...(entry.attachments ? { attachments: entry.attachments } : {}),
     position: entry.turn.queuePosition ?? 0,
+    ...(entry.priority !== undefined ? { priority: entry.priority } : {}),
     createdAt: entry.turn.startedAt ?? new Date().toISOString(),
   };
 }
@@ -397,6 +411,7 @@ type HostQueueEntry = {
   attachments?: unknown;
   permissionMode: string;
   position: number;
+  priority?: number;
   createdAt: string;
 };
 
@@ -413,6 +428,7 @@ function fromHostQueueEntry(entry: HostQueueEntry): QueuedTurnRecord {
     effectivePermissionMode: permissionMode,
     ...(entry.idempotencyKey ? { idempotencyKey: entry.idempotencyKey } : {}),
     inputHash: entry.inputHash,
+    ...(entry.priority !== undefined ? { priority: entry.priority } : {}),
     createdAt: Date.parse(entry.createdAt) || 0,
   };
 }

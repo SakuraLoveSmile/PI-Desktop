@@ -575,6 +575,9 @@ describe("AgentHost queue extras", () => {
     expect(host.queueEntries("s1").map((entry) => entry.content)).toEqual(["two", "one"]);
     expect(changes.at(-1)?.ids).toEqual([second.turn.id, first.turn.id]);
     await expect(host.prioritizeTurn(viewer, first.turn.id)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    // Promotion is one-way: the Host refuses a second click instead of moving it.
+    await expect(host.prioritizeTurn(owner, second.turn.id)).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(changes.at(-1)?.ids).toEqual([second.turn.id, first.turn.id]);
 
     runtimeBusy = false;
     host.kick("s1");
@@ -582,6 +585,47 @@ describe("AgentHost queue extras", () => {
     expect(runtime.prompts.map((prompt) => prompt.content)).toEqual(["two"]);
     expect(changes.at(-1)?.ids).toEqual([first.turn.id]);
     await expect(host.prioritizeTurn(owner, second.turn.id)).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+
+  it("reorders plain queued turns and guards the operation like prioritize", async () => {
+    const changes: Array<{ sessionId: string; ids: string[] }> = [];
+    const runtime = new FakeRuntime();
+    const sessions = new FakeSessions();
+    sessions.summaries.set("s1", summary("s1"));
+    let runtimeBusy = false;
+    (runtime as RuntimePort).isBusy = () => runtimeBusy;
+    const host = new AgentHost({
+      runtime,
+      sessions,
+      approvals: new FakeApprovals(),
+      clock: new FixedClock(),
+      ids: new SeqIds(),
+      onQueueChange: (sessionId, entries) => changes.push({ sessionId, ids: entries.map((entry) => entry.turn.id) }),
+    });
+    runtimeBusy = true;
+    const first = await host.startTurn(owner, { sessionId: "s1", admission: "queue", input: { text: "one" }, context: { requestId: "r1" } });
+    const second = await host.startTurn(owner, { sessionId: "s1", admission: "queue", input: { text: "two" }, context: { requestId: "r2" } });
+    const third = await host.startTurn(owner, { sessionId: "s1", admission: "queue", input: { text: "three" }, context: { requestId: "r3" } });
+
+    await expect(host.reorderTurn(viewer, third.turn.id, "up")).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(await host.reorderTurn(owner, first.turn.id, "up")).toEqual({ moved: false });
+    expect(await host.reorderTurn(owner, third.turn.id, "up")).toEqual({ moved: true });
+    expect(host.queueEntries("s1").map((entry) => entry.content)).toEqual(["one", "three", "two"]);
+    expect(changes.at(-1)?.ids).toEqual([first.turn.id, third.turn.id, second.turn.id]);
+
+    // A promoted entry keeps its place at the head of the priority block.
+    await host.prioritizeTurn(owner, second.turn.id);
+    expect(host.queueEntries("s1").map((entry) => entry.content)).toEqual(["two", "one", "three"]);
+    expect(host.queueEntries("s1")[0]?.priority).toBe(1);
+    expect(await host.reorderTurn(owner, second.turn.id, "down")).toEqual({ moved: false });
+    expect(host.queueEntries("s1").map((entry) => entry.content)).toEqual(["two", "one", "three"]);
+
+    runtimeBusy = false;
+    host.kick("s1");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(runtime.prompts.map((prompt) => prompt.content)).toEqual(["two"]);
+    await expect(host.reorderTurn(owner, second.turn.id, "down")).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("queues behind a pending contract approval and drains when planning leaves it", async () => {
