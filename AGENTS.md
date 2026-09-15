@@ -146,6 +146,21 @@ cd <worktree-path>
 
 Before integration, refresh against the latest `main` and resolve conflicts inside your own worktree.
 
+The delivery order for every request is fixed:
+
+```text
+1. implement and commit on the request branch in its worktree
+2. merge the request branch into local `main`
+3. run the required E2E suites on the integrated local `main` (§15)
+4. push the request branch and open the PR/MR
+5. merge into remote `main` through the PR/MR gates
+6. synchronize local `main`, remove the worktree, delete the merged branch
+```
+
+A code-bearing change must not be pushed for review, opened as a PR/MR, or
+declared delivered before step 3 has run against the integrated local `main`
+commit, or before its environment limitation is recorded per §15.
+
 ---
 
 ## 5. Keep Changes Small and Coherent
@@ -407,6 +422,9 @@ Relevant E2E is a post-integration validation step defined in §15. A failed
 or unavailable post-integration E2E blocks declaring the delivered change
 complete and must be recorded with its remaining risk.
 
+That gate runs on the integrated local `main` before the pull request is
+opened, per the fixed order in §4.
+
 ---
 
 ## 14. Testing Is Part of Implementation
@@ -422,9 +440,12 @@ implement
 → unit/integration validation
 → diff review
 → commit
+→ merge into local `main`
+→ relevant E2E on the integrated local `main`
+→ push branch + open PR
 → PR checks
-→ merge
-→ relevant E2E on integrated main
+→ merge into remote `main`
+→ synchronize local `main`
 ```
 
 Run validation appropriate to the affected source tree.
@@ -446,15 +467,17 @@ Never report a skipped command as passing.
 
 ---
 
-## 15. E2E Runs After Main Integration
+## 15. E2E Runs on Integrated `main` Before the PR
 
-Every **code-bearing change** must pass relevant E2E after its branch commits
-have been merged into `main`.
+Every **code-bearing change** must pass relevant E2E on the integrated `main`
+that contains its commits. That run happens before the request branch is
+pushed for review, and before a delivery that stops at local `main` is
+declared delivered.
 
-Run the suite from the latest integrated `main` checkout and commit. A task
-branch's pre-merge E2E result is exploratory only and does not satisfy this
-requirement. The same rule applies after local integration and after remote
-`main` integration.
+The order is fixed (§4): merge the request branch into local `main`, run the
+selected suites from that integrated checkout, and only then push the branch
+and open the PR/MR. An E2E run on the request branch itself is exploratory and
+does not satisfy this requirement.
 
 Required validation is part of an authorized integration request and needs no
 separate E2E permission.
@@ -467,13 +490,17 @@ Select suites according to the affected regression surface as defined in:
 
 The root `package.json` is the source of truth for available E2E commands.
 
-If the current environment cannot run required E2E:
+A failed required suite blocks the push, the PR/MR, and declaring the change
+delivered until the failure is classified and fixed (§16).
 
-* complete the requested main integration only when its other landing gates
-  pass
-* record the missing post-integration E2E as **NOT RUN**
-* keep delivery/release status incomplete until the suite runs in a capable
-  trusted environment
+If a required suite cannot run in the current environment:
+
+* record the suite, reason, alternative validation, and remaining risk as
+  **NOT RUN**
+* pushing the request branch and opening the PR/MR stay permitted so the change
+  can be validated in a capable environment, but the gate is not satisfied
+* keep delivery/release status incomplete until the suite passes against the
+  integrated `main` that carries the change
 
 Record:
 
@@ -485,12 +512,17 @@ Alternative validation:
 Remaining risk:
 ```
 
-Required E2E must pass in CI or another capable trusted environment after the
-change is present on `main`.
+Required E2E must pass against the integrated `main` commit that carries the
+change, in this checkout or in another capable trusted environment.
+
+After the PR/MR merges into remote `main`, rerun the affected suites when the
+landed executable content differs from the commit the gate ran on — landing
+fixes, conflict resolution, or commits added during review. Otherwise the
+recorded result stands.
+
+Always state the commit the recorded evidence applies to.
 
 Never claim an E2E suite passed unless it actually ran successfully.
-
-If executable code changes after E2E passes, rerun the affected suite.
 
 ---
 
@@ -625,6 +657,10 @@ local `main`. It does not authorize a direct push to `main` or a force-push.
 Report genuine validation, conflict, or access blockers; never bypass a merge
 gate to satisfy the delivery request.
 
+The remote route is the last step of the fixed order in §4: the request branch
+is merged into local `main` and the §15 E2E gate runs against that integrated
+commit before the branch is pushed and its PR/MR is opened.
+
 Before pushing, verify:
 
 * remote
@@ -646,17 +682,23 @@ Before integration:
 
 1. refresh against current `main`
 2. resolve conflicts carefully
-3. run required validation
+3. run the targeted pre-integration checks for the change on the request branch
 4. review the final diff
-5. verify required PR checks; post-integration E2E is handled after `main`
-   contains the change
+5. merge the request branch into local `main`
+6. run the §15 E2E gate from the integrated local `main`
+
+When remote publishing is authorized, continue in the fixed §4 order:
+
+7. push the request branch and open the PR/MR
+8. verify required PR/MR checks and reviews, then merge into remote `main`
+9. synchronize local `main` with the landed change
 
 After merge:
 
 1. verify expected commits are present in local `main`, and remote `main` for
    remote delivery
-2. run the relevant E2E suites from the integrated `main` checkout for any
-   code-bearing change
+2. rerun the affected E2E suites when the landed executable content differs
+   from the commit the §15 gate ran on
 3. remove your request worktree
 4. delete your merged local branch
 5. prune stale worktree metadata
@@ -710,9 +752,13 @@ A code task is Done only when all applicable conditions are true:
 * [ ] E2E documentation was updated when required
 * [ ] New E2E IDs use the multi-agent-safe semantic format
 * [ ] Relevant static / unit / integration checks pass
-* [ ] Relevant E2E passes after each code-bearing change is integrated into
-  `main`
-* [ ] E2E evidence applies to the executable commit currently on `main`
+* [ ] The fixed order in §4 was followed: branch → local `main` → §15 E2E →
+  push/PR → remote `main`
+* [ ] Relevant E2E ran against the integrated local `main` commit before the
+  branch was pushed, the PR/MR was opened, or a commit-only delivery was
+  declared delivered, or its NOT RUN limitation is recorded
+* [ ] E2E evidence applies to the executable commit currently on `main`, and
+  the affected suites were rerun when landed content changed after the gate
 * [ ] Complete diff was reviewed
 * [ ] No secrets, local data, or unrelated changes are included
 * [ ] Logical changes are committed
@@ -781,6 +827,8 @@ unless it actually was.
 > E2E IDs are stable semantic contract references, not sequence numbers.
 
 > A test that did not run did not pass.
+
+> Local `main` integration and E2E come before the pull request.
 
 > A refactor should reduce coupling, not move it into a differently named file.
 
