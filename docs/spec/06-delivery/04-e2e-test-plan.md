@@ -7697,6 +7697,9 @@ This test plan spec is accepted when:
 - With the stack overlapping the frameless titlebar band, hover still pauses
   the countdown and every X remains clickable instead of dragging the window.
 - Repeating the same action restarts the existing toast instead of stacking a duplicate; stack never exceeds 4.
+- Toast message text is selectable: dragging across a card highlights only
+  its message text and `Cmd/Ctrl+C` copies it, while the card icon and its X
+  dismiss control expose no selection.
 - Capture rig scenes `pi-toasts-light` / `pi-toasts-dark` show the stack in both themes.
 
 ### US-UI-55 Composer textarea growth (D089)

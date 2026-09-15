@@ -45,6 +45,8 @@ PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
   用户可以编辑草稿、搜索和使用本机 `Cmd/Ctrl+A/C/V` 行为。
 - 转录消息正文、渲染的 Markdown、代码块和工具
   input/output 仍然可以选择进行复制和检查。
+- 携带用户可能需要留存文本的瞬时表面——尤其是 toast 消息——仍然可以选择；
+  其图标与关闭控件属于不可选择的镶边。
 - 新的类文档表面必须选择共享 `.selectable` 类（或
   等效的显式 `user-select: text` 规则）。
 - Electron 渲染器设置 `user-select` 和 `-webkit-user-select`；
