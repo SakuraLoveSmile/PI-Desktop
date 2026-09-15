@@ -651,8 +651,12 @@ export default function (pi) {
 | 风险 | 权限 |
 |---|---|
 | 低 | `ui.panel`、`ui.theme`、`notify` |
-| 中等 | `clipboard.read`、`clipboard.write`、`fs.read`、`shell.openExternal`、`background.service`、`bus.publish`、`bus.subscribe` |
-| 高 | `fs.write`、`fs.delete`、`agent.tool.register`、`agent.prompt.inject`、`net.fetch`、`mcp.server.local`、`mcp.server.remote` |
+| 中等 | `clipboard.read`、`clipboard.write`、`fs.read`、`shell.openExternal`、`background.service`、`bus.publish`、`bus.subscribe`、`audio.playback.background`、`keyboard.globalShortcut` |
+| 高 | `fs.write`、`fs.delete`、`agent.tool.register`、`agent.prompt.inject`、`net.fetch`、`mcp.server.local`、`mcp.server.remote`、`audio.capture.background`、`net.websocket` |
+
+`keyboard.globalShortcut` 已实现。`pi.audio.*` 和 `pi.net.websocket.*` 已声明
+并受权限把关，但尚未实现：在宿主服务落地之前，每次调用都以 `UNSUPPORTED`
+失败即关闭。
 
 有两个权限除了名字之外还带一个声明出来的范围，并且两者都会展示给用户：
 文件模式看 `manifest.fs`（§6.5），出网看 `manifest.net.domains`（§6.6）。

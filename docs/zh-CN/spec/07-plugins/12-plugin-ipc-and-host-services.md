@@ -126,6 +126,25 @@ plugin runtime
  → response
 ```
 
+### 6.1 实时能力的白名单名称与审计操作
+
+代理的 `HOST_API_ALLOWLIST` 新增三个已实现的条目，全部由
+`keyboard.globalShortcut` 把关：
+
+- `keyboard.registerGlobalShortcut`
+- `keyboard.unregisterGlobalShortcut`
+- `keyboard.listGlobalShortcuts`
+
+对应的审计操作是 `keyboard.globalShortcut.register`、
+`keyboard.globalShortcut.unregister` 和 `keyboard.globalShortcut.trigger`
+（快捷键被触发）。注册与触发的条目会记录加速键和命令；按键事件与输入文本绝不记录。
+
+设备与套接字能力已经规定但本条分支尚未实现，所以它们的名字只是预留、
+并未进入白名单，每次调用都以 `UNSUPPORTED` 失败即关闭。预留的审计操作名：
+`audio.input.open` / `audio.input.close`、`audio.output.open` /
+`audio.output.stop` / `audio.output.close`，以及 `net.websocket.connect` /
+`net.websocket.close`（ADR 0257）。
+
 ## 7. PanelHost交互
 
 - 打开面板时创建独立视图
