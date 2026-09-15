@@ -1,14 +1,14 @@
-# ADR 0253: Host-Mediated File Actions Follow the Folder a View Is Browsing
+# ADR 0264: Host-Mediated File Actions Follow the Folder a View Is Browsing
 
 - **Status**: Accepted
-- **Date**: 2026-09-15 (amends [ADR 0252](0252-project-folder-roots-for-plugin-views.md))
+- **Date**: 2026-09-15 (amends [ADR 0263](0263-project-folder-roots-for-plugin-views.md))
 - **Related**: [ADR 0241](0241-vendored-updatable-file-view-plugin.md) ·
   [ADR 0249](0249-chatgpt-style-logical-project-groups.md) ·
   [07-plugins/03-plugin-api](../spec/07-plugins/03-plugin-api.md)
 
 ## Context
 
-ADR 0252 §6 let a contributed view browse one folder of a multi-folder project at
+ADR 0263 §6 let a contributed view browse one folder of a multi-folder project at
 a time, and made the view responsible for remembering which one. It said nothing
 about the two actions a view cannot perform itself: opening a file with the
 system default application (`fs.openDefault`) and revealing it in the OS file
@@ -28,7 +28,7 @@ reports not found. Both were reachable from the folder switcher.
 
 1. **A view addresses a file by an absolute path when the selected folder is not
    the primary one.** A relative path keeps meaning the workspace root, so the
-   primary-folder case is unchanged, byte for byte. This is the same rule ADR 0252
+   primary-folder case is unchanged, byte for byte. This is the same rule ADR 0263
    §4 already applies to chat file references: the address shape follows the folder
    that owns the file.
 2. **`fs.openDefault` and `fs.reveal` accept an absolute path inside any registered
@@ -70,7 +70,7 @@ reports not found. Both were reachable from the folder switcher.
 ### Widen the plugin's whole `fs` root to the selected folder
 
 Rejected: the host does not know which folder a view is browsing — that choice is
-plugin-local by design (ADR 0252 §6) — and a per-call base would let any plugin
+plugin-local by design (ADR 0263 §6) — and a per-call base would let any plugin
 claim another project folder for reading and writing, which is a grant ADR 0249 §5
 deliberately tied to a user-visible tool request.
 

@@ -12,7 +12,7 @@ pub(super) fn migrate(conn: &Connection, path: &Path) -> Result<()> {
     if !has_column {
         tx.execute_batch("ALTER TABLE turn_queue ADD COLUMN session_message_id TEXT;")?;
     }
-    tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    tx.pragma_update(None, "user_version", 16)?;
     tx.commit()
         .context("commit session collaboration migration")?;
     Ok(())

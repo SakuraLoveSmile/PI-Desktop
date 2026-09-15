@@ -87,6 +87,7 @@ type PluginContributes = {
  agentTools?: PluginAgentToolContrib[];
  skills?: Array<string | PluginSkillContrib>; // relative paths, or metadata overrides
  agentExtensions?: string[]; // ExtensionAPI modules run in the agent sidecar; needs `agent.extension` (spec 16)
+ providers?: PluginProviderContrib[]; // Host-owned provider rows; needs `provider.register` (spec 13)
  settings?: PluginSettingContrib[];
  themes?: PluginThemeContrib[];
  windowAppearance?: PluginWindowAppearanceContrib; // native window background; needs `ui.window.appearance`
@@ -95,6 +96,7 @@ type PluginContributes = {
   bus?: PluginBusContrib;
   views?: PluginViewContrib[];
   sessionSources?: PluginSessionSourceContrib[];
+  globalShortcuts?: PluginGlobalShortcutContrib[]; // needs `keyboard.globalShortcut`
 };
 
 type PluginCommandContrib = {
@@ -142,6 +144,13 @@ type PluginSessionSourceContrib = {
   label?: string | { en: string; "zh-CN": string };
 };
 
+/** One system-wide accelerator a plugin declares (`keyboard.globalShortcut`). */
+type PluginGlobalShortcutContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9._-]{0,63}$, unique within the plugin
+ command: string; // must be declared in contributes.commands
+ default?: string; // accelerator the host registers after load; omitted means `pi.keyboard` registers it later
+};
+
 type PluginThemeContrib = {
  id: string; // ^[a-zA-Z][a-zA-Z0-9_-]{0,63}$
  label: string;
@@ -185,6 +194,33 @@ type PluginBusContrib = {
  publish?: string[]; // concrete topics, e.g. `build.done`
  subscribe?: string[]; // patterns, e.g. `build.*` / `build.**`
 };
+
+type PluginProviderContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9_-]{0,63}$, unique within the plugin
+ name: string; // display name in the native provider list
+ vendorKey?: string; // models.dev vendor key, default `custom`
+ baseUrl?: string; // absolute http(s) URL
+ apiStyle?: PluginProviderApiStyle; // wire style, default `chat_completions`
+ authKind?: "api_key" | "none"; // default `api_key`; `oauth` is refused for now
+ models: PluginProviderModelContrib[]; // 1..64 entries
+};
+
+type PluginProviderApiStyle =
+ | "chat_completions"
+ | "opencode_go"
+ | "responses"
+ | "anthropic_messages"
+ | "google_generative_ai"
+ | "openai_codex_responses"
+ | "pi_messages";
+
+type PluginProviderModelContrib = {
+ id: string; // 1..256 characters, unique within the provider
+ name?: string; // display label for the model binding
+ contextWindow?: number;
+ maxTokens?: number;
+ supportsImages?: boolean;
+};
 ```
 
 ## 5. permissions enum
@@ -203,6 +239,7 @@ type PluginPermission =
  | "fs.delete"
  | "agent.tool.register"
  | "agent.prompt.inject"
+ | "provider.register"
  | "net.fetch"
  | "shell.openExternal"
  | "mcp.server.local"
@@ -217,7 +254,11 @@ type PluginPermission =
  | "session.import"
  | "session.read.own"
  | "session.update.own"
- | "session.delete.own";
+ | "session.delete.own"
+ | "audio.capture.background"
+ | "audio.playback.background"
+ | "keyboard.globalShortcut"
+ | "net.websocket";
 ```
 
 Unknown permission = validation failure.
@@ -277,6 +318,11 @@ malformed list means no egress at all, whatever `net.fetch` says. Entries are
 bare hostnames: no scheme, no port, no path, and no bare `*`. A leading `*.`
 covers the domain and its subdomains.
 
+`pi.net.websocket` answers to the same list (`net.websocket`,
+[03-plugin-api.md](03-plugin-api.md) §3). The permission is implemented: a
+connect is confined to `manifest.net.domains`, and a host that is not declared
+is refused before the transport is asked to open anything.
+
 ## 5.1 Bus topic grammar
 
 Topics are dot-separated segments matching `[a-zA-Z0-9][a-zA-Z0-9_-]*`, at most
@@ -292,6 +338,32 @@ and `**` matches one or more trailing segments (final segment only).
  }
 }
 ```
+
+## 5.4 providers — provider rows the plugin declares
+
+`contributes.providers` declares at most 8 providers that the Host materializes
+as rows in the native provider list, owned by the plugin ([ADR 0259](../../adr/0259-plugin-declared-providers.md)):
+
+- the declaration `id` matches `[a-zA-Z][a-zA-Z0-9_-]{0,63}` and is unique
+  within the plugin; the row id is `plugin:<pluginId>:<declaredId>`
+- `name` is required and is what Settings shows
+- `baseUrl` is optional, but must be an absolute `http(s)` URL
+- `apiStyle` is optional and defaults to `chat_completions`; the accepted values
+  are the provider-config styles except `auto`
+- `authKind` is optional, either `api_key` (default) or `none`
+- `models` requires 1..64 entries with unique ids of 1..256 characters
+
+A non-empty `contributes.providers` needs the high-risk `provider.register`
+permission ([13-plugin-permissions-matrix.md](13-plugin-permissions-matrix.md)).
+The declaration is re-read on every plugin load and is authoritative for its own
+fields; disabling the plugin keeps the rows and turns them off, while dropping a
+declaration or uninstalling the plugin deletes the row with its stored
+credentials.
+
+`oauth` is **not supported yet**: the Host has no plugin OAuth login flow, so an
+`oauth` block or `authKind: "oauth"` fails manifest validation. The planned
+`provider.oauth` permission and Host-owned login flow are future work, not
+available behavior.
 
 ## 6. activationEvents (optional)
 
@@ -328,8 +400,8 @@ MVP may implement only:
 11. `bus.publish` entries must be concrete topics and `bus.subscribe` entries
    valid patterns (§5.1)
 12. A contribution that needs a permission fails validation when the permission
-   is missing: `themes` → `ui.theme`, `views` → `ui.view`, stdio servers →
-   `mcp.server.local`, remote
+   is missing: `themes` → `ui.theme`, `views` → `ui.view`, `providers` →
+   `provider.register`, stdio servers → `mcp.server.local`, remote
    servers → `mcp.server.remote`, `services` → `background.service`,
    `bus.publish` → `bus.publish`, `bus.subscribe` → `bus.subscribe`.
    `skills` is the exception — it predates the permission gate, so a manifest
@@ -351,6 +423,12 @@ MVP may implement only:
     `zh-CN`. `views[].icon` is **not** validated against the token list: an
     unknown token degrades to a letter tile, so refusing one would break a
     plugin over a cosmetic detail. The packaging check warns about it instead
+
+18. `contributes.globalShortcuts` allows at most 8 entries and needs
+   `keyboard.globalShortcut`. Each `id` matches
+   `[a-zA-Z][a-zA-Z0-9._-]{0,63}` and is unique; `command` must be declared in
+   `contributes.commands`; `default`, when present, uses the same
+   modifier-plus-key / F-key grammar as `shortcut` settings
 
 ## 8. Example: minimal plugin
 

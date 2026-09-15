@@ -1,4 +1,4 @@
-# ADR 0251: Chat File References Complete in Main and Open in the File View
+# ADR 0262: Chat File References Complete in Main and Open in the File View
 
 - **Status**: Accepted
 - **Date**: 2026-09-14

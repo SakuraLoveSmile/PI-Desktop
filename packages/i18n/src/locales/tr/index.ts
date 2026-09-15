@@ -662,6 +662,15 @@ sklm: {
     testConnection: "Bağlantıyı dene",
     hasSecret: "API anahtarı kaydedildi",
     noSecret: "Henüz API anahtarı yok",
+    pluginProviderBadge: "Eklenti",
+    pluginProviderBy: "{{plugin}} tarafından sağlanır",
+    pluginProviderManaged:
+      "Bu servis, uç noktasını ve modellerini sağlayan “{{plugin}}” eklentisinden gelir. “Uzantılar” sayfasından açıp kapatabilirsiniz.",
+    pluginProviderKey: "API anahtarı",
+    pluginProviderKeyHint: "PI-Desktop’ta saklanır ve çalışma zamanı tarafından kullanılır. Eklenti bu anahtarı asla almaz.",
+    pluginProviderKeyRemove: "Anahtarı kaldır",
+    pluginProviderKeySaved: "API anahtarı kaydedildi",
+    pluginProviderKeyRemoved: "API anahtarı kaldırıldı",
     delete: "Sil",
     theme: "Tema",
     mode: "Varsayılan kip",
@@ -1791,6 +1800,7 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "agent.prompt.inject": "Ajan yönergelerini ayarla",
       "agent.complete": "Modellerinizle tek seferlik tamamlatma çalıştır",
       "agent.extension": "Ajanın içinde kod çalıştır",
+      "provider.register": "Model listesine servis ekle",
       "desktop.control": "Masaüstünü kontrol et",
       "models.list": "Kimliği doğrulanmış modelleri listele",
       "session.read": "Modele gönderilen geçerli konuşmayı oku",
@@ -1801,6 +1811,10 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "mcp.server.local": "Yerel bir MCP sunucusu çalıştır",
       "mcp.server.remote": "Uzak bir MCP sunucusuna ulaş",
       "background.service": "Arka plan servisini çalışır tut",
+      "audio.capture.background": "Mikrofonu arka planda kullan",
+      "audio.playback.background": "Sesi arka planda çal",
+      "keyboard.globalShortcut": "Sistem geneli klavye kısayolları kaydet",
+      "net.websocket": "Gerçek zamanlı bağlantılar aç",
       "bus.publish": "Diğer eklentilere ileti gönder",
       "bus.subscribe": "Diğer eklentilerden ileti al",
       "browser.cdp": "Çalışma paneli tarayıcısını kontrol et",
@@ -1828,6 +1842,8 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "agent.complete":
         "Model kotanızı tek seferlik bir tamamlatma için harcayabilir. Eklenti API anahtarlarınızı almaz.",
       "agent.extension": "ExtensionAPI modüllerini ajan sürecinde, ajanın kendi araçlarıyla aynı erişimle çalıştırır. Yalnızca güvendiğiniz kodu etkinleştirin.",
+      "provider.register":
+        "Bu eklentinin tanımladığı servisleri Ayarlar’daki servis listesine ekler. Uç noktayı ve modelleri eklenti sağlar; API anahtarınız PI-Desktop’ta kalır.",
       "desktop.control":
         "Eklentinin incelenmiş PI-Desktop denetim kataloğunu çağırmasını sağlar. Yıkıcı işlemler yine confirm=true gerektirir; MCP bearer token eklentiye verilmez.",
       "models.list": "Oturum açtığınız modelleri görebilir. Anahtar almaz.",
@@ -1841,6 +1857,10 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "mcp.server.remote":
         "Eklentinin bildirdiği uzak bir MCP uç noktasına araç çağrıları gönderir. Uç nokta şifresiz HTTP kullanabilir.",
       "background.service": "Eklenti açıkken bir işçiyi çalışır tutar.",
+      "audio.capture.background": "Eklenti arka planda çalışırken, hiçbir panel açık olmadan mikrofonu yakalar.",
+      "audio.playback.background": "Hiçbir panel açık olmasa bile eklentinin akışa verdiği sesi çalar.",
+      "keyboard.globalShortcut": "PI-Desktop odakta değilken bu eklentinin kendi komutlarını tetikleyen sistem geneli klavye kısayollarını kaydeder.",
+      "net.websocket": "Eklentinin bildirdiği ana makinelere gerçek zamanlı iki yönlü bağlantılar açar.",
       "bus.publish": "Bildirdiği konularda ileti gönderebilir.",
       "bus.subscribe": "Bildirdiği konularda ileti alabilir.",
       "browser.cdp":

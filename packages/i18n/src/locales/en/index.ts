@@ -660,6 +660,16 @@ sklm: {
     testConnection: "Test connection",
     hasSecret: "API key saved",
     noSecret: "No API key yet",
+    pluginProviderBadge: "Plugin",
+    pluginProviderBy: "Provided by {{plugin}}",
+    pluginProviderManaged:
+      "This provider comes from the plugin \"{{plugin}}\", which supplies its endpoint and models. Enable or disable it on the Plugins page.",
+    pluginProviderKey: "API key",
+    pluginProviderKeyHint:
+      "Stored in PI-Desktop and used by the runtime. The plugin never receives it.",
+    pluginProviderKeyRemove: "Remove key",
+    pluginProviderKeySaved: "API key saved",
+    pluginProviderKeyRemoved: "API key removed",
     delete: "Delete",
     theme: "Theme",
     mode: "Default mode",
@@ -1789,6 +1799,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "agent.prompt.inject": "Adjust agent instructions",
       "agent.complete": "Run a one-shot completion with your models",
       "agent.extension": "Run code inside the agent",
+      "provider.register": "Add providers to the model list",
       "desktop.control": "Control the desktop",
       "models.list": "List authenticated models",
       "session.read": "Read the current conversation sent to the model",
@@ -1799,6 +1810,10 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "mcp.server.local": "Run a local MCP server",
       "mcp.server.remote": "Reach a remote MCP server",
       "background.service": "Keep a background service running",
+      "audio.capture.background": "Use the microphone in the background",
+      "audio.playback.background": "Play audio in the background",
+      "keyboard.globalShortcut": "Register system-wide shortcuts",
+      "net.websocket": "Open real-time connections",
       "bus.publish": "Send messages to other plugins",
       "bus.subscribe": "Receive messages from other plugins",
       "browser.cdp": "Control the work-panel browser",
@@ -1827,6 +1842,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "agent.complete":
         "Can spend your model quota on a one-shot completion. The plugin never receives your API keys.",
       "agent.extension": "Runs ExtensionAPI modules inside the agent process with the same access as the agent's own tools. Enable only code you trust.",
+      "provider.register":
+        "Adds the providers this plugin defines to Settings' provider list. The plugin supplies the endpoint and models; your API key stays in PI-Desktop.",
       "desktop.control":
         "Lets the plugin invoke the reviewed PI-Desktop control catalog. Destructive operations still require confirm=true; the MCP bearer token is never exposed.",
       "models.list": "Can see which models you have signed in for. It does not receive keys.",
@@ -1840,6 +1857,10 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "mcp.server.remote":
         "Sends tool calls to a remote MCP endpoint the plugin declared. The endpoint may use unencrypted HTTP.",
       "background.service": "Keeps a worker running while the plugin is enabled.",
+      "audio.capture.background": "Captures the microphone while the plugin runs in the background, with no panel open.",
+      "audio.playback.background": "Plays audio the plugin streams, even when no panel is open.",
+      "keyboard.globalShortcut": "Registers system-wide keyboard shortcuts that trigger this plugin's own commands while PI-Desktop is not focused.",
+      "net.websocket": "Opens real-time two-way connections to the hostnames the plugin declared.",
       "bus.publish": "Can send messages on the topics it declared.",
       "bus.subscribe": "Can receive messages on the topics it declared.",
       "browser.cdp":

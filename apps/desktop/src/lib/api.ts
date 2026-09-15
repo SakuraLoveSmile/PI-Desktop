@@ -418,6 +418,15 @@ export const api = {
       input,
     ),
   deleteProvider: (id: string) => invoke(IPC.invoke.providersDelete, id),
+  /**
+   * Set or clear one provider's API key. The only write a plugin-declared row
+   * accepts from the user path, since `updateProvider` refuses it.
+   */
+  setProviderSecret: (input: { id: string; secretValue?: string }) =>
+    invoke<{ provider: ProviderPublic | null }>(
+      IPC.invoke.providersSetSecret,
+      input,
+    ),
   testProvider: (id: string) => invoke(IPC.invoke.providersTest, id),
   /**
    * Discover models from the provider's own endpoint. Saved providers pass

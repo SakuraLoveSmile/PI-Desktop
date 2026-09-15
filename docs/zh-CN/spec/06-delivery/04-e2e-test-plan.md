@@ -4732,8 +4732,8 @@ IPC 请求无法关闭。
   6. 点击对话中的项目文件路径，确认它在本视图中打开该文件——对话点击现在优先使用文件视图，而不是宿主的 `file:` 选项卡。
   7. 禁用文件管理器插件，确认视图从菜单和面板消失，且此时点击对话中的文件路径会退回宿主的 `file:<path>` 选项卡（位于「已打开项目」下）。
   8. 重新启用并重启应用，确认启用状态和文件树恢复，注册表没有重复行。
-- **预期**：这一面板完全通过公开插件贡献通道运行，可由用户禁用但不可卸载；由宿主代为执行的动作遵守声明的 `fs.read` 范围，插件自身的读写仍留在它当前浏览的那一个项目文件夹的牢笼内（ADR 0241、ADR 0252）。
-- **链接规格**：`07-plugins/03-plugin-api.md` §3、`07-plugins/13-plugin-permissions-matrix.md` §2、`04-ux/08-component-spec.md` §5、ADR 0104、ADR 0109、ADR 0111、ADR 0169、ADR 0241、ADR 0249、ADR 0252
+- **预期**：这一面板完全通过公开插件贡献通道运行，可由用户禁用但不可卸载；由宿主代为执行的动作遵守声明的 `fs.read` 范围，插件自身的读写仍留在它当前浏览的那一个项目文件夹的牢笼内（ADR 0241、ADR 0263）。
+- **链接规格**：`07-plugins/03-plugin-api.md` §3、`07-plugins/13-plugin-permissions-matrix.md` §2、`04-ux/08-component-spec.md` §5、ADR 0104、ADR 0109、ADR 0111、ADR 0169、ADR 0241、ADR 0249、ADR 0263
 - **接受**：G（插件）、D（工作区）、安全性、品质
 - **里程碑**：M6+
 - **状态**：`apps/desktop/test/bundled-plugins.test.mjs`（manifest 契约、页面只用公开桥接、vendored 校验和）、`apps/desktop/test/plugin-fs-scope.test.mjs`（`fs.openDefault`、`fs.reveal`）、`apps/desktop/test/plugin-work-panel-views.test.mjs`（停靠视图事件广播）已覆盖；完整打包旅程为草稿（适用变更合入前需在具备条件的环境中运行 E2E）
@@ -4748,7 +4748,7 @@ IPC 请求无法关闭。
   4. 收起文件列表，关闭并重新打开该视图，最后重启应用。
   5. 手动展开文件列表，再点击另一个对话文件引用。
 - **预期**：切换按钮收起视图自己的左侧文件列表，内容区占满整个宽度，且按钮始终可用键盘到达，无障碍名称在「隐藏文件列表」与「显示文件列表」之间切换。对话点击触发的宿主打开请求会显示请求的文件、展开其祖先目录并收起文件列表——无论视图本来已经打开，还是由这次点击打开。再次展开时恢复之前拖拽的分栏宽度、已展开的目录与被选中的文件，而不是默认分栏宽度或项目根。收起状态会被持久化：关闭并重新打开视图乃至重启应用后仍然保持；手动展开会一直保持到下一次宿主打开请求再次收起它。
-- **链接规格**：`07-plugins/02-plugin-manifest-schema.md` §4/§5、`04-ux/08-component-spec.md` §5.2.2、ADR 0104、ADR 0241、ADR 0251
+- **链接规格**：`07-plugins/02-plugin-manifest-schema.md` §4/§5、`04-ux/08-component-spec.md` §5.2.2、ADR 0104、ADR 0241、ADR 0262
 - **接受**：G（插件）、品质
 - **里程碑**：M6+
 - **状态**：随包副本的 manifest、入口页面与上游校验和已由 `apps/desktop/test/bundled-plugins.test.mjs` 覆盖；插件侧旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
@@ -4765,12 +4765,12 @@ IPC 请求无法关闭。
   6. 在选中第二个文件夹的情况下，用文件树搜索主文件夹里那个文件的名字，并试着打开 `.env`，以及第二个文件夹里指向外部的符号链接或 junction。7）在选中第二个文件夹的情况下，右键只有它才有的那个文本文件，依次用「用默认应用打开」与「在文件夹中显示」；再切到主文件夹，对只有**主文件夹**才有的文件做同样两步。8）切回第二个文件夹，对两个文件夹里都有同名的那份文件重复这两个动作。
 - **预期**：
   - 文件夹控件按项目组顺序列出项目的文件夹，主文件夹在前，并标出正在浏览的是哪一个；文件树、搜索与编辑都只在这一个文件夹内工作，单文件夹项目只提供它自己那一个文件夹。
-  - 切换文件夹只改变这个视图浏览的内容：应用显示的可见工作区、智能体的工具根、会话的主路径、项目指令与项目记忆都不变（ADR 0252）。
+  - 切换文件夹只改变这个视图浏览的内容：应用显示的可见工作区、智能体的工具根、会话的主路径、项目指令与项目记忆都不变（ADR 0263）。
   - 选择按项目记忆：关闭并重新打开视图乃至完整重启应用后仍然保持，另一个项目也保持它自己的文件夹。
   - 两个对话引用都在这个视图里打开所引用的文件——包括来自第二个文件夹的那个（在该文件夹里打开）——不会新增宿主 `file:` 选项卡。
   - 牢笼是所选文件夹，而不是整个项目组：按文件名搜索到不了只有别的项目文件夹才持有的文件，凭据类路径与符号链接/junction 逃逸依旧被拒绝（ADR 0241）。
-  - 这两个交给系统的动作落在被点击的那个文件、以及正在浏览的那个文件夹上：只有第二个文件夹才有的文件打开/显示的是它自己，而不是报「没找到」；两个文件夹同名的文件打开的是第二个文件夹里的那份，而不是主文件夹里的那份（ADR 0253）。
-- **链接规格**：`07-plugins/03-plugin-api.md` §3、`04-ux/08-component-spec.md` §5.2.2、ADR 0241、ADR 0249、ADR 0252、ADR 0253
+  - 这两个交给系统的动作落在被点击的那个文件、以及正在浏览的那个文件夹上：只有第二个文件夹才有的文件打开/显示的是它自己，而不是报「没找到」；两个文件夹同名的文件打开的是第二个文件夹里的那份，而不是主文件夹里的那份（ADR 0264）。
+- **链接规格**：`07-plugins/03-plugin-api.md` §3、`04-ux/08-component-spec.md` §5.2.2、ADR 0241、ADR 0249、ADR 0263、ADR 0264
 - **接受**：G（插件）、安全性、品质
 - **里程碑**：M6+
 - **状态**：宿主侧的补全与地址规则已由 `apps/desktop/test/chat-ref-resolve.test.mjs`、`apps/desktop/test/transcript-file-chips.test.mjs` 覆盖；插件侧旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
@@ -4884,7 +4884,7 @@ IPC 请求无法关闭。
 | E——工具和权限 | E2E-008a、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-024I、E2E-024K、E2E-040、E2E-049、E2E-074、E2E-093、E2E-097、 E2E-099、E2E-100、E2E-101、E2E-102、E2E-103、E2E-105、E2E-106、E2E-107、E2E-111、E2E-112、E2E-113、E2E-114、E2E-115、E2E-116、 E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-145、E2E-147、E2E-PLUGIN-imported-pi-package-skills、E2E-166 |
 | F——坚持 | E2E-020、E2E-021、E2E-036、E2E-037、E2E-038、E2E-040、E2E-042、E2E-047、E2E-048、E2E-051、E2E-054、E2E-056、E2E-061、E2E-062、 E2E-064、E2E-066、E2E-068、E2E-071、E2E-072、E2E-073、E2E-082、E2E-084、E2E-096、E2E-098、E2E-102、E2E-102b、E2E-103、E2E-代理-001、 E2E-061a、E2E-073a、E2E-104、E2E-106、E2E-107、E2E-108、E2E-109、E2E-110、E2E-112、E2E-118、E2E-119、E2E-120、E2E-121、E2E-123、E2E-142、E2E-146、E2E-148、E2E-151、E2E-171、E2E-005J |
 | F——持久化（项目排序） | E2E-253 |
-| G——插件 | E2E-022、E2E-022A、E2E-022B、E2E-022C、E2E-023、E2E-024、E2E-024B、E2E-024C、E2E-024D、E2E-024E、E2E-024W、E2E-024F、E2E-024G、E2E-024H、 E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M、E2E-024N、E2E-024O、E2E-024P、E2E-025、E2E-026、E2E-105、E2E-117、E2E-120、E2E-122、E2E-123、E2E-148、E2E-153、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency |
+| G——插件 | E2E-022、E2E-022A、E2E-022B、E2E-022C、E2E-023、E2E-024、E2E-024B、E2E-024C、E2E-024D、E2E-024E、E2E-024W、E2E-024F、E2E-024G、E2E-024H、 E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M、E2E-024N、E2E-024O、E2E-024P、E2E-025、E2E-026、E2E-105、E2E-117、E2E-120、E2E-122、E2E-123、E2E-148、E2E-153、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-global-shortcut-owns-only-its-own-command、E2E-PLUGIN-permission-gate-for-real-time-capabilities、E2E-PLUGIN-background-audio-and-realtime-connection |
 | H——诊断 | E2E-027、E2E-031、E2E-034、E2E-042、E2E-096、E2E-098、E2E-104、E2E-107、E2E-108、E2E-109、E2E-110、E2E-113、E2E-115、E2E-116、 E2E-118、E2E-121、E2E-146、E2E-194、E2E-195 |
 | 安全性 | E2E-028、E2E-029、E2E-030、E2E-024J、E2E-024K、E2E-024M、E2E-049、E2E-068、E2E-086、E2E-105、E2E-106、E2E-107、E2E-108、E2E-109、 E2E-110、E2E-112、E2E-113、E2E-115、E2E-116、E2E-117、E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-151、E2E-153 |
 | 品质 | E2E-032、E2E-033、E2E-039、E2E-043、E2E-044、E2E-045、E2E-046、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-050、E2E-053、E2E-055、 E2E-056、E2E-057、E2E-058、E2E-059、E2E-060、E2E-061、E2E-062、E2E-063、E2E-064、E2E-065、E2E-066、E2E-067、E2E-068、E2E-069、 E2E-070、E2E-071、E2E-072、E2E-073、E2E-074、E2E-075、E2E-076、E2E-077、E2E-078、E2E-079、E2E-080、E2E-081、E2E-082、E2E-083、 E2E-084、E2E-085、E2E-086、E2E-092、E2E-093、E2E-094、E2E-095、E2E-096、E2E-097、E2E-098、E2E-099、E2E-100、E2E-101、E2E-102、 E2E-102a、E2E-102b、E2E-103、E2E-AGENTS-001、E2E-024N、E2E-024O、E2E-059a、E2E-060b、E2E-060c、E2E-060d、E2E-061a、E2E-073a、E2E-111、 E2E-114、E2E-117、E2E-118、E2E-119、E2E-120、E2E-122、E2E-123、E2E-142、E2E-143、E2E-144、E2E-145、E2E-146、E2E-147、E2E-148、E2E-150、E2E-151、E2E-153、E2E-194、E2E-195、E2E-199、E2E-200、E2E-201、E2E-202、E2E-203、E2E-204、E2E-209、E2E-210、E2E-250、E2E-PLUGIN-imported-pi-package-skills |
@@ -4917,6 +4917,7 @@ IPC 请求无法关闭。
 | D — 工作区（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | F — 持久化（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | 品质（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command、E2E-PLUGIN-permission-gate-for-real-time-capabilities、E2E-PLUGIN-background-audio-and-realtime-connection |
 
 | 里程碑 | 应用场景 |
 |---|---|
@@ -4939,8 +4940,10 @@ IPC 请求无法关闭。
 | 后MVP | E2E-022A、E2E-022B、E2E-022C、E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M（插件路线图 R2/R3/R6） |
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
-| 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency |
+| 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| C — 对话和直播（模型回退） | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
+| 品质（模型回退隔离） | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | C — 对话和直播（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | 品质（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 
@@ -6384,11 +6387,11 @@ IPC 请求无法关闭。
   - 点击 HTML 芯片在工作面板浏览器打开该文件。
   - 点击工作区源文件芯片后，该文件在文件管理器工作面板视图中打开；芯片点击不再打开宿主的 `file:` 选项卡，也不再交给系统默认应用。
   - 点击临时目录芯片时，文件在宿主的 `file:` 选项卡中按其绝对路径打开——它位于文件管理器项目根之外。
-  - 点击项目第二个文件夹里那个文件的芯片时，该文件在文件管理器视图中打开：补全会搜索整个项目组、主文件夹优先，同级文件夹里的文件用绝对路径寻址，因为相对路径永远指主文件夹（ADR 0252）。
+  - 点击项目第二个文件夹里那个文件的芯片时，该文件在文件管理器视图中打开：补全会搜索整个项目组、主文件夹优先，同级文件夹里的文件用绝对路径寻址，因为相对路径永远指主文件夹（ADR 0263）。
   - 持久化用户消息仍包含给模型用的规范 `@path` 文本。
 - **链接规格**：`04-ux/08-component-spec.md` §8.3 / §11.8、
   `04-ux/09-interaction-patterns.md` §8a.2、`03-runtime/01-ipc-protocol.md`、
-  ADR 0163、ADR 0241、ADR 0251、ADR 0252、`08-meta/decisions-log.md`（D320）
+  ADR 0163、ADR 0241、ADR 0262、ADR 0263、`08-meta/decisions-log.md`（D320）
 - **验收**：C（对话和直播）、质量
 - **里程碑**：M5
 - **状态**：单元已覆盖（`chat-links.test.mjs`、`transcript-file-chips.test.mjs`、
@@ -6403,10 +6406,10 @@ IPC 请求无法关闭。
   - `dir/a.ts` 打开 `src/dir/a.ts`：精确路径优先于简写，更长的匹配尾优先于裸叶子名，尾长相同则更浅的路径胜出，因此更深的 `packages/app/dir/a.ts` 永远不会被选中。
   - 项目里找不到的引用回落到会话临时目录；两边都没有的再回落到附件目录，`attachments/<sha256>` 引用打开对应的已存 blob。
   - 指向已知根内真实文件的绝对引用直接命中，无论哪条简写规则本来会匹配。
-  - `only-here.ts` 打开第二个文件夹里的 `lib/only-here.ts`：先搜主文件夹并搜到底，再按项目组自身顺序搜索其余文件夹，命中结果也指出是哪个文件夹应答的（ADR 0252）。
-  - 由同级文件夹应答的文件交给工作面板时用绝对路径，主文件夹里的文件则保持项目内相对路径（ADR 0252）。
+  - `only-here.ts` 打开第二个文件夹里的 `lib/only-here.ts`：先搜主文件夹并搜到底，再按项目组自身顺序搜索其余文件夹，命中结果也指出是哪个文件夹应答的（ADR 0263）。
+  - 由同级文件夹应答的文件交给工作面板时用绝对路径，主文件夹里的文件则保持项目内相对路径（ADR 0263）。
   - 什么都匹配不上时弹出错误提示「没有匹配 missing-helper.js 的文件」，并且什么都不打开：不新增工作面板选项卡、不出现空面板、不出现空白旁浏览器页面，工作面板与对话保持原有内容。
-- **链接规格**：`03-runtime/01-ipc-protocol.md` § fs、`04-ux/09-interaction-patterns.md` §8a.2、ADR 0124、ADR 0163、ADR 0249、ADR 0251、ADR 0252
+- **链接规格**：`03-runtime/01-ipc-protocol.md` § fs、`04-ux/09-interaction-patterns.md` §8a.2、ADR 0124、ADR 0163、ADR 0249、ADR 0262、ADR 0263
 - **验收**：C（对话和直播）、D（工作区）、质量
 - **里程碑**：M5
 - **状态**：单元已覆盖（`apps/desktop/test/chat-ref-resolve.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）
@@ -6419,10 +6422,10 @@ IPC 请求无法关闭。
   - 项目文件在文件管理器工作面板视图中打开：该文件被选中、祖先目录已展开，不会为它新增宿主 `file:` 选项卡。
   - 再次点击同一引用不会重新加载视图：未保存的改动仍在编辑器里，也不会出现第二个选项卡。
   - 临时目录或附件里的文件在宿主的 `file:` 选项卡（位于「已打开项目」下）中按绝对路径打开，而不是在文件管理器视图中打开。
-  - 项目主文件夹里的 `.html` / `.htm` 页面在旁浏览器中打开，助手回复和用户芯片两条路径一致；同级文件夹里的页面和别的项目文件一样在文件管理器视图中打开，因为旁浏览器以主文件夹为根（ADR 0252）。
-  - 解析到项目第二个文件夹的引用在文件管理器视图中打开该文件，用绝对路径寻址，不会新增宿主 `file:` 选项卡；解析到主文件夹的引用也在同一视图中打开，按项目内相对路径寻址（ADR 0252）。
+  - 项目主文件夹里的 `.html` / `.htm` 页面在旁浏览器中打开，助手回复和用户芯片两条路径一致；同级文件夹里的页面和别的项目文件一样在文件管理器视图中打开，因为旁浏览器以主文件夹为根（ADR 0263）。
+  - 解析到项目第二个文件夹的引用在文件管理器视图中打开该文件，用绝对路径寻址，不会新增宿主 `file:` 选项卡；解析到主文件夹的引用也在同一视图中打开，按项目内相对路径寻址（ADR 0263）。
   - 插件被禁用时，项目文件引用退回到宿主的 `file:` 选项卡（也就是改动前点击所用的界面，现在也能覆盖项目里的其他文件夹），而不是什么都不打开；重新启用后恢复为文件管理器视图。
-- **链接规格**：`04-ux/08-component-spec.md` §8.3、`04-ux/09-interaction-patterns.md` §8a.2、ADR 0104、ADR 0163、ADR 0241、ADR 0249、ADR 0251、ADR 0252
+- **链接规格**：`04-ux/08-component-spec.md` §8.3、`04-ux/09-interaction-patterns.md` §8a.2、ADR 0104、ADR 0163、ADR 0241、ADR 0249、ADR 0262、ADR 0263
 - **验收**：C（对话和直播）、G（插件）、质量
 - **里程碑**：M5
 - **状态**：单元已覆盖（`apps/desktop/test/transcript-file-chips.test.mjs`）；完整 UI 旅程仍为草稿（除非用户明确要求，否则不要在本地跑 E2E）

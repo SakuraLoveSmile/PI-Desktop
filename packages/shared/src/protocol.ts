@@ -144,6 +144,12 @@ export const IPC = {
     providersCreate: "pi-desktop/providers/create",
     providersUpdate: "pi-desktop/providers/update",
     providersDelete: "pi-desktop/providers/delete",
+    /**
+     * Set or clear one provider's API key. Separate from `providersUpdate`
+     * because a plugin-declared row refuses a generic update while still
+     * needing the credential its declaration asks for.
+     */
+    providersSetSecret: "pi-desktop/providers/setSecret",
     providersTest: "pi-desktop/providers/testConnection",
     providersListModels: "pi-desktop/providers/listModels",
     providersRefreshModelCatalog: "pi-desktop/providers/refreshModelCatalog",

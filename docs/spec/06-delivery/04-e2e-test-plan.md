@@ -27,10 +27,10 @@
 - Document every user-visible and protocol-visible behavior that MVP must verify.
 - Provide a scenario catalog that maps to acceptance criteria (A–H) and milestones (M1–M6).
 - Serve as the traceability backbone: scenario ID ↔ acceptance criterion ↔ spec.
-- Define the relevant E2E validation for code-bearing changes after they reach
-  `main`.
-- Keep validation evidence tied to the executable commit currently integrated
-  into `main`.
+- Define the required E2E gate for code-bearing changes on the integrated
+  `main` that precedes the pull request.
+- Keep validation evidence tied to the commit the gate ran on, plus any later
+  commit that changes the landed executable content.
 
 ## 2. Non-goals
 
@@ -120,15 +120,17 @@ Each scenario is documented in this format:
 ## E2E Main Integration Validation
 
 Every code-bearing change must pass the E2E suites relevant to its regression
-surface after its commits are merged into `main`. Code-bearing changes include Renderer,
-Electron Main, Preload, Agent Runtime, Rust host-core, sessions, transcripts,
-plans, plugins, MCP, permissions, provider/model runtime, persistence, process
-lifecycle, packaging/runtime startup, and build or CI behavior that affects
-application execution. Documentation-only changes are exempt when they do not
-alter executable behavior.
+surface on the integrated local `main` that carries the change, before the
+request branch is pushed and the pull request is opened. Code-bearing changes
+include Renderer, Electron Main, Preload, Agent Runtime, Rust host-core,
+sessions, transcripts, plans, plugins, MCP, permissions, provider/model
+runtime, persistence, process lifecycle, packaging/runtime startup, and build
+or CI behavior that affects application execution. Documentation-only changes
+are exempt when they do not alter executable behavior.
 
-Run the selected suites from the latest integrated `main` checkout and commit.
-Any pre-merge E2E run is exploratory and does not satisfy this requirement.
+Run the selected suites from the latest integrated local `main` checkout and
+commit. An E2E run on the request branch is exploratory and does not satisfy
+this gate.
 
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
@@ -159,24 +161,28 @@ agent execution, plugins, persistence integration, and shared runtime
 contracts. A required suite that cannot run because of a missing display,
 platform, credential, hardware resource, or other environment capability must
 be recorded as `NOT RUN` with its reason, alternative validation, and remaining
-risk. The main integration may already be complete when that limitation is
-discovered, but delivery remains incomplete until the suite passes in a
-capable trusted environment.
+risk. The pull request may still be opened with that record so the change can
+be validated in a capable environment, but the gate is not satisfied and
+delivery remains incomplete until the suite passes against the integrated
+`main` that carries the change.
 
-Required results must apply to the executable commit currently integrated into
-`main`. If executable code changes after E2E passes, rerun the affected suites.
-Report each command, result, tested commit, and any relevant environment
-limitation; never claim an unexecuted suite passed.
+Required results must apply to the executable commit the gate ran on, and any
+later commit that changes the landed executable content requires a rerun of
+the affected suites (landing fixes, conflict resolution, or commits added
+during review). Otherwise the recorded result stands. Report each command,
+result, tested commit, and any relevant environment limitation; never claim an
+unexecuted suite passed.
 
 ## E2E Failure Policy
 
-A failed required E2E blocks declaring the integrated delivery complete until
-the failure is classified as an implementation regression, test regression,
-environment failure, or known flaky infrastructure. Fix the product or test
-defect and rerun the affected suite against `main`. Do not delete scenarios,
-weaken assertions, or add retries that hide a deterministic failure. When a
-scenario is not automated on the required platform, keep its status documented
-and identify the platform validation still needed.
+A failed required E2E blocks the branch push, the pull request, and declaring
+the integrated delivery complete until the failure is classified as an
+implementation regression, test regression, environment failure, or known
+flaky infrastructure. Fix the product or test defect and rerun the affected
+suite against the integrated `main`. Do not delete scenarios, weaken
+assertions, or add retries that hide a deterministic failure. When a scenario
+is not automated on the required platform, keep its status documented and
+identify the platform validation still needed.
 
 ## 7. MVP Scenario Catalog
 
@@ -2577,7 +2583,7 @@ and identify the platform validation still needed.
 - **Preconditions**: A plugin with `ui.theme` that can drive `pi.app.setTheme` and `pi.themes.upsert` / `remove` (panel or command). Settings → General shows the searchable theme picker.
 - **Steps**: 1) From the plugin UI, call `themes.upsert` with a new theme id and distinct CSS. 2) Confirm the theme appears in Settings without reload/disable. 3) Call `app.setTheme` to select it. 4) Call `themes.upsert` again with different CSS while it is active. 5) Call `themes.remove` on an inactive theme. 6) Call `app.setTheme` with an unknown id. 7) Upsert a ninth theme (former hard cap was 8).
 - **Expected**: The new theme is listed and applies immediately through the same path as Settings; live CSS edits restyle the shell without plugin reload; remove drops the picker row and the event refreshes the list; an unknown id rejects with `INVALID_ARGUMENT` and leaves the preference unchanged; the ninth theme is accepted. `settingsChanged` reaches the renderer store; `appearance:changed` reaches open panels.
-- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/12-plugin-ipc-and-host-services.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0249, D417
+- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/12-plugin-ipc-and-host-services.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0260, D417
 - **Acceptance**: G (theme contribution) + Security
 - **Status**: Unit-covered (`plugin-themes.test.mjs`); interactive scenario Draft
 
@@ -2586,7 +2592,7 @@ and identify the platform validation still needed.
 - **Preconditions**: A plugin theme that sets `--ds-bg-sidebar` to a solid color and `--ds-bg-sidebar-image` to a `linear-gradient(...)`; Windows/Linux and macOS shells.
 - **Steps**: 1) Select the theme. 2) Inspect the sidebar plate and rail. 3) Confirm borders/glass tint still resolve from the color token. 4) Switch back to a built-in theme.
 - **Expected**: The gradient paints as `background-image` over the color plate on all platforms; macOS sheen still overlays the image layer; borders and `color-mix` consumers do not break; clearing the token returns the plain sidebar.
-- **Specs linked**: `04-ux/07-ui-design-system.md`, ADR 0249, D417
+- **Specs linked**: `04-ux/07-ui-design-system.md`, ADR 0260, D417
 - **Acceptance**: Visual / platform
 - **Status**: CSS unit contracts in `plugin-themes.test.mjs`; visual scenario Draft
 
@@ -7016,11 +7022,11 @@ and identify the platform validation still needed.
   channel, is user-disableable, cannot be uninstalled, and survives restart. Its
   host-mediated actions obey the declared `fs.read` scope, and its own reads and
   writes stay inside the jail of the one project folder it is browsing
-  (ADR 0241, ADR 0252).
+  (ADR 0241, ADR 0263).
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
   `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0109, ADR 0111,
-  ADR 0169, ADR 0241, ADR 0249, ADR 0252
+  ADR 0169, ADR 0241, ADR 0249, ADR 0263
 - **Acceptance**: G (plugins), D (workspace), Security, Quality
 - **Milestone**: M6+
 - **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`
@@ -7057,7 +7063,7 @@ and identify the platform validation still needed.
   restart, and a manual expansion holds until the next host open request
   collapses it again.
 - **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4/§5,
-  `04-ux/08-component-spec.md` §5.2.2, ADR 0104, ADR 0241, ADR 0251
+  `04-ux/08-component-spec.md` §5.2.2, ADR 0104, ADR 0241, ADR 0262
 - **Acceptance**: G (plugins), Quality
 - **Milestone**: M6+
 - **Status**: The bundle's manifest, entry page, and upstream checksum are
@@ -7093,7 +7099,7 @@ and identify the platform validation still needed.
     that one folder, and a single-folder project offers just its one folder.
   - Switching folders changes only what this view browses: the app's visible
     workspace, the agent's tool roots, the session's primary path, project
-    instructions, and project memory are all unchanged (ADR 0252).
+    instructions, and project memory are all unchanged (ADR 0263).
   - The choice is remembered per project: it survives closing and reopening the
     view and a full app restart, and the other project keeps its own folder.
   - Both chat references open in this view on the file they name — the one from
@@ -7104,9 +7110,9 @@ and identify the platform validation still needed.
   - The two system actions reach the file that was clicked, in the folder being
     browsed: a file only the second folder holds opens or reveals its real self
     instead of reporting "not found", and the file whose name both folders share
-    opens the second folder's copy, not the primary folder's (ADR 0253).
+    opens the second folder's copy, not the primary folder's (ADR 0264).
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
-  `04-ux/08-component-spec.md` §5.2.2, ADR 0241, ADR 0249, ADR 0252, ADR 0253
+  `04-ux/08-component-spec.md` §5.2.2, ADR 0241, ADR 0249, ADR 0263, ADR 0264
 - **Acceptance**: G (plugins), Security, Quality
 - **Milestone**: M6+
 - **Status**: The host-side resolution and addressing are unit-covered
@@ -7338,6 +7344,111 @@ and identify the platform validation still needed.
 - **Status**: Unit/integration covered by `upstream-sync-annotations.test.mjs` and
   `annotation-only-send.test.mjs`; post-main desktop journey not run in merge worktree.
 
+#### E2E-PLUGIN-global-shortcut-owns-only-its-own-command
+
+- **Preconditions**: Two local fixture plugins are installed in an isolated
+  profile. Plugin A declares `keyboard.globalShortcut`, `contributes.commands`
+  with one command, and `contributes.globalShortcuts` mapping `Alt+Shift+V` to
+  it. Plugin B declares the same permission and asks for `Alt+Shift+V` while A
+  holds it. A second application is available for a cross-application keypress.
+- **Steps**: 1) Install and load A and confirm the accelerator is held through
+  `listGlobalShortcuts`. 2) Focus another application, press `Alt+Shift+V`, and
+  confirm A's command runs; drive the registered handler through the host's
+  test seam when no cross-application input is available. 3) Attempt a shortcut
+  whose `command` belongs to another plugin. 4) Attempt B's registration of
+  `Alt+Shift+V` and inspect the answer. 5) Disable and uninstall A and confirm
+  the accelerator becomes free and B can take it; repeat after terminating A's
+  runtime (crash) and while A's panel is closed. 6) Attempt the app's own
+  launcher accelerator `Alt+Space`, the `Mod+Shift+W` summon binding, a
+  reserved binding such as `Mod+C`, an invalid accelerator, and a ninth
+  shortcut for one plugin.
+- **Expected**: Only A's own command runs for the accelerator; a shortcut whose
+  `command` is not registered by the plugin is refused with `INVALID_ARGUMENT`.
+  B receives a refusal (`registered: false`, code `SHORTCUT_CONFLICT`) and keeps
+  no accelerator while A holds it. The host's own `Alt+Space` launcher and
+  `Mod+Shift+W` summon shortcuts and OS-reserved bindings are refused with
+  `SHORTCUT_CONFLICT` or `SHORTCUT_UNAVAILABLE`; an invalid accelerator is
+  refused with `INVALID_ACCELERATOR` and the ninth per-plugin shortcut with
+  `LIMIT_EXCEEDED`. Disabling, unloading, or crashing a plugin releases every
+  accelerator it held, after which another plugin can take it, and app quit
+  releases all shortcuts. Audit records each register/unregister attempt with
+  the plugin id and result, and never records key contents.
+- **Specs linked**: `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`,
+  `07-plugins/13-plugin-permissions-matrix.md`, ADR 0257
+- **Acceptance**: G (plugins), Security, Quality
+- **Milestone**: M6+
+- **Status**: Registry, host wiring, and manifest validation are unit-covered
+  (`apps/desktop/test/plugin-shortcuts.test.mjs`,
+  `packages/plugin-sdk/src/index.test.ts`,
+  `crates/host-core/src/plugins/tests.rs`); the cross-application keypress
+  journey is Draft and needs a capable desktop environment.
+
+#### E2E-PLUGIN-permission-gate-for-real-time-capabilities
+
+- **Preconditions**: A fixture plugin whose manifest can be changed between
+  runs, and a data directory in which the user can re-grant permissions.
+- **Steps**: 1) Install a build that requires `keyboard.globalShortcut` and
+  inspect the install dialog. 2) Load a plugin that calls
+  `pi.keyboard.listGlobalShortcuts()` without declaring the permission.
+  3) Declare but do not grant the permission, then call the same API. 4) Grant
+  the permission and call the same API again. 5) Revoke the permission with the
+  plugin loaded and press the accelerator. 6) Repeat steps 2–5 for
+  `audio.capture.background`, `audio.playback.background`, and `net.websocket`.
+- **Expected**: Undeclared and declared-but-ungranted calls are refused with
+  `PERMISSION_DENIED` and an audit entry, so an ungranted capability fails
+  closed instead of degrading. After a grant the same call is allowed — for
+  `net.websocket` that is a connect that proceeds past the gate — while the
+  callable audio methods answer a coded `UNSUPPORTED` because the host has no
+  device backend yet, audited as
+  `{ api: "audio.<method>", ok: false, errorCode: "UNSUPPORTED" }`, never a
+  silent success. Revoking the permission with the
+  plugin loaded stops the accelerator immediately and the host releases it. The
+  four permissions appear with their risk tiers (high for
+  `audio.capture.background` and `net.websocket`, medium for
+  `audio.playback.background` and `keyboard.globalShortcut`) and localized copy
+  in the install dialog and in the plugin detail sheet, ordered by descending
+  risk.
+- **Specs linked**: `07-plugins/04-plugin-security.md`,
+  `07-plugins/13-plugin-permissions-matrix.md`, ADR 0257
+- **Acceptance**: G (plugins), Security
+- **Milestone**: M6+
+- **Status**: The gates and validator behaviour are unit-covered
+  (`packages/plugin-sdk/src/index.test.ts`,
+  `packages/plugin-devkit/src/check.test.ts`,
+  `crates/host-core/src/plugins/tests.rs`); the dialog journey is Draft.
+
+#### E2E-PLUGIN-background-audio-and-realtime-connection
+
+- **Preconditions**: A voice-assistant fixture plugin holding
+  `background.service`, `audio.capture.background`,
+  `audio.playback.background`, `keyboard.globalShortcut`, `net.websocket`, and
+  `desktop.control`, with a mock audio backend and a local mock WebSocket
+  server so CI never needs a real microphone.
+- **Steps**: 1) Load the plugin with no panel open and confirm that its
+  background service starts. 2) Register the push-to-talk accelerator. 3) Open
+  the input device and receive PCM frames. 4) Connect the mock server and send
+  PCM. 5) Receive the response audio and play it. 6) Interrupt playback with
+  `stopOutput`. 7) Call `pi.desktop.invoke({ operation: "session/create" })`
+  and then `agent/prompt`. 8) Unload the plugin.
+- **Expected**: Frames flow with bounded buffering and no unbounded queue
+  growth, and `stopOutput` clears queued audio immediately. Egress to a host
+  outside `manifest.net.domains` is refused. On unload the microphone, the
+  audio output, the socket, and the accelerator are all released with no orphan
+  process, listener, or timer. `session/delete`-class dangerous desktop
+  operations still require the host's native confirmation even when the plugin
+  passes `confirm: true`.
+- **Specs linked**: `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`,
+  `07-plugins/12-plugin-ipc-and-host-services.md`, ADR 0257
+- **Acceptance**: G (plugins), Security, Quality
+- **Milestone**: M6+
+- **Status**: Partially implemented — the socket half is implemented and
+  unit-covered by `apps/desktop/test/plugin-websocket.test.mjs` (allowlist,
+  bounds, lifecycle); the background-audio half answers a coded `UNSUPPORTED`
+  because the host has no device backend yet, so this scenario stays Draft until
+  audio lands.
+
 ## 8. Traceability Matrix
 
 
@@ -7356,7 +7467,7 @@ and identify the platform validation still needed.
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills, E2E-CHAT-side-chat-stream |
 | F — Persistence | E2E-020, E2E-021, E2E-021a, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-102i, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-146a, E2E-148, E2E-151, E2E-158, E2E-160, E2E-168, E2E-171, E2E-177, E2E-178, E2E-183, E2E-186, E2E-005J, E2E-PLUGIN-session-orchestrator-real-workers, E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-promote, E2E-CHAT-side-chat-close, E2E-CHAT-annotation-session-state |
 | F — Persistence (project ordering) | E2E-251 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024W, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146, E2E-146a, E2E-155, E2E-159, E2E-176, E2E-194, E2E-195 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151, E2E-153, E2E-158, E2E-187, E2E-196c, E2E-196b, E2E-196 |
 | Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-021a, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151, E2E-153, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-168, E2E-172, E2E-173, E2E-174, E2E-011g, E2E-176, E2E-177, E2E-178, E2E-179, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-196, E2E-201, E2E-204, E2E-202, E2E-203, E2E-205, E2E-206, E2E-207, E2E-208, E2E-209, E2E-210, E2E-218, E2E-219, E2E-250, E2E-252, E2E-102i, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-imported-pi-package-skills, E2E-CHAT-quote-prefill, E2E-CHAT-side-chat-fork, E2E-CHAT-side-chat-stream, E2E-CHAT-side-chat-add-to-main, E2E-CHAT-side-chat-promote, E2E-CHAT-side-chat-close, E2E-CHAT-selection-markdown, E2E-CHAT-selection-side-chat, E2E-CHAT-annotation-attachments, E2E-CHAT-annotation-session-state, E2E-CHAT-annotation-source-index, E2E-CHAT-annotation-ack-and-steering |
@@ -7389,6 +7500,7 @@ and identify the platform validation still needed.
 | D — Workspace (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | F — Persistence (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | Quality (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
 
 | Milestone | Scenarios |
 |---|---|
@@ -7411,7 +7523,7 @@ and identify the platform validation still needed.
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
+| Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | Quality (model fallback isolation) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
@@ -9969,12 +10081,12 @@ are withdrawn with ADR 0165.
     the File Manager view on that file: completion searches the whole project
     group, primary folder first, and a sibling-folder file is addressed by
     absolute path because a relative path always means the primary folder
-    (ADR 0252).
+    (ADR 0263).
   - The persisted user message still contains the canonical `@path` text for
     the agent.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3 / §11.8,
   `04-ux/09-interaction-patterns.md` §8a.2, `03-runtime/01-ipc-protocol.md`,
-  ADR 0163, ADR 0241, ADR 0251, ADR 0252, `08-meta/decisions-log.md` (D320)
+  ADR 0163, ADR 0241, ADR 0262, ADR 0263, `08-meta/decisions-log.md` (D320)
 - **Acceptance**: C (conversation & stream), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`chat-links.test.mjs`, `transcript-file-chips.test.mjs`,
@@ -10011,17 +10123,17 @@ are withdrawn with ADR 0165.
   - `only-here.ts` opens the second folder's `lib/only-here.ts`: the primary
     folder is searched first and to exhaustion, then the project group's other
     folders in the group's own order, and the match names the folder that
-    answered (ADR 0252).
+    answered (ADR 0263).
   - A file that answered from a sibling folder is addressed to the work panel by
     its absolute path, while a primary-folder file stays project-relative
-    (ADR 0252).
+    (ADR 0263).
   - A reference that matches nothing raises an error toast reading
     `No file matches missing-helper.js` and opens nothing: no new work-panel
     tab, no empty panel, no blank side-browser page, and the work panel and
     transcript keep the content they already had.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` § fs,
   `04-ux/09-interaction-patterns.md` §8a.2, ADR 0124, ADR 0163, ADR 0249,
-  ADR 0251, ADR 0252
+  ADR 0262, ADR 0263
 - **Acceptance**: C (conversation & stream), D (workspace), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered
@@ -10055,18 +10167,18 @@ are withdrawn with ADR 0165.
     work-panel side browser, from the assistant reply and the user chip alike; a
     page in a sibling folder is a project file like any other and opens in the
     File Manager view, because the side browser is rooted at the primary folder
-    (ADR 0252).
+    (ADR 0263).
   - A reference that resolved in the project's second folder opens in the File
     Manager view on that file, reached by its absolute path, with no host
     `file:` tab; the reference from the primary folder opens in that same view
-    addressed project-relative (ADR 0252).
+    addressed project-relative (ADR 0263).
   - With the plugin disabled, a project file reference falls back to the host
     `file:` tab — the surface the click used before, which now also reaches the
     project's other folders — instead of opening nothing; re-enabling the plugin
     restores the File Manager destination.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3,
   `04-ux/09-interaction-patterns.md` §8a.2, ADR 0104, ADR 0163, ADR 0241,
-  ADR 0249, ADR 0251, ADR 0252
+  ADR 0249, ADR 0262, ADR 0263
 - **Acceptance**: C (conversation & stream), G (plugins), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered
@@ -11407,6 +11519,36 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); Agent-mode tool dispatch, ToolSearch deferral, hooks, blocking, and result replacement pass, while Plan-mode gating and core-tool collision remain additional validation.
 
+#### E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding: Plugin-owned agent streams and session binding
+
+- **Preconditions**: An enabled trusted extension calls `registerAgent` with one
+  model and a fixture `stream`/`complete` implementation. The fixture provider
+  has no Host provider row or Host secret.
+- **Steps**: 1) Load the extension and inspect `ctx.modelRegistry` for the
+  redacted model. 2) Call `pi.setModel(model)` while idle. 3) Run a turn and
+  inspect the callback's model/context/options. 4) Restart or create the next
+  turn. 5) Attempt to read Host provider keys/secret refs through the registry.
+- **Expected**: `registerAgent` appears in the loaded contract and the model is
+  selectable; `setModel` persists only the current session binding under an
+  `extension-agent:` provider id; the plugin callback streams the assistant
+  response and receives cancellation; the next turn reloads the extension and
+  restores the same agent implementation; the registry exposes model metadata
+  and auth availability but no Host key, secret ref, OAuth token or arbitrary
+  Host headers. `registerProvider` with the same plugin-owned stream shape has
+  equivalent behavior.
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §5, §10; ADR 0258;
+  D426
+- **Acceptance**: B (agent), C (conversation & stream), Security, Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`): the loaded
+  contract, both registration forms (`registerAgent` and the `registerProvider`
+  alias, in each call form), the custom-agent names on the plugin row, the
+  redacted registry, idle `setModel` persistence under the `extension-agent:` id,
+  and the next turn restored through the plugin's own transport pass.
+  Cancellation through `options.signal`, the `stream`-form callback's
+  model/context/options inspection, and cross-session module sharing remain
+  additional validation.
+
 #### E2E-243: Extension commands and UI prompts round-trip through the renderer
 
 - **Preconditions**: An enabled fixture extension registering command `greet`
@@ -12189,3 +12331,42 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   The configuration-editor journey passed under WSL; task-transcript reload
   acceptance remains outstanding. Required post-integration suites: `test:e2e`,
   `test:e2e:subagents`, `test:e2e:subagent-models`.
+
+#### E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list: A plugin-declared provider is a Host-owned, read-only row
+
+- **Preconditions**: An installed local plugin declares one provider in
+  `contributes.providers` with the `provider.register` permission, one model, a
+  fixture `baseUrl`, and a key the user stores once through Settings.
+- **Steps**: 1) Enable the plugin and open Settings → Providers. 2) Select the
+  row as the session model and run a turn. 3) Try to edit it, then delete it,
+  through the user path. 4) Disable the plugin, inspect the list and the stored
+  credential, and re-enable it. 5) Uninstall the plugin; reinstall and enable
+  it, then remove the declaration from its manifest and reload. 6) Load a
+  manifest that declares providers without `provider.register`. 7) Load a
+  manifest that declares an `oauth` block and `authKind: "oauth"`.
+- **Expected**: Step 1 shows one row in the native provider list with
+  `ownerPluginId` set to the plugin and the row id
+  `plugin:<pluginId>:<declaredId>`. Step 2 binds the session like any provider
+  row. Step 3 refuses both actions with an error whose message begins
+  `PROVIDER_OWNED_BY_PLUGIN` and leaves the row unchanged. Step 4 keeps the row
+  and sets `enabled = 0` while `secret:provider:<id>:api_key` stays stored, so
+  re-enabling restores the credential. Step 5 deletes the rows and both
+  credential refs (`:api_key` and `:oauth`) in both orders — uninstall, and a
+  manifest that no longer declares the provider. Steps 6 and 7 fail manifest
+  validation as `PLUGIN_INVALID` — the missing-permission message and
+  `plugin OAuth providers are not supported in this release` /
+  `unsupported authKind oauth` — and neither failure changes plugin enablement.
+- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4, §5.4, §7;
+  `07-plugins/13-plugin-permissions-matrix.md`; `03-runtime/04-data-storage.md`
+  §4.3, §7; `03-runtime/12-provider-config-schema.md` §2, §9;
+  `03-runtime/06-host-rpc-protocol.md`; ADR 0259; D427
+- **Acceptance**: B (model config), E (tools & permissions), F (persistence),
+  G (plugins), Security, Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`): the
+  declared row materializing as `plugin:<pluginId>:<declaredId>` in the native
+  provider list with its `ownerPluginId`, endpoint and models, and no row owned
+  by any other plugin, pass. Ownership refusal (`PROVIDER_OWNED_BY_PLUGIN`),
+  disable/enable, undeclare and uninstall cleanup, and the manifest refusals are
+  covered by host-core unit tests; the renderer's read-only row presentation
+  remains additional validation.

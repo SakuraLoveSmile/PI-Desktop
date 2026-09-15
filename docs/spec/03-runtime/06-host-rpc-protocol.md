@@ -590,6 +590,15 @@ one after the final row would be wrong.
 ### Providers and models
 - `providers.list` / `providers.get` / `providers.create` /
   `providers.update` / `providers.delete`
+- a plugin-owned row (`ownerPluginId`) is refreshed from its manifest on every
+  load, so `providers.update` / `providers.delete` refuse it with a
+  `PROVIDER_OWNED_BY_PLUGIN` error; only the owning plugin's lifecycle changes
+  or removes it (ADR 0259)
+- `providers.setSecret({ id, secretValue })` — stores or clears one provider's
+  API key (`secret:provider:<id>:api_key` and the row's `secret_ref`). It is the
+  write a plugin-owned row accepts: only the credential the declaration asks for
+  changes, never a field the manifest owns. An empty or omitted `secretValue`
+  deletes the stored key. Returns `{ provider }`, or `null` for an unknown id
 - `providers.getSecret` — main/host only, never reachable from the renderer
 - `providers.listModels` / `providers.cacheModels` — discovered model rows
   and their host-side cache (ADR 0027 / ADR 0134)

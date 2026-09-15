@@ -1,7 +1,7 @@
-# ADR 0252: Expose a Project's Folder Roots and Complete References Across Them
+# ADR 0263: Expose a Project's Folder Roots and Complete References Across Them
 
 - **Status**: Accepted
-- **Date**: 2026-09-14 (amends [ADR 0251](0251-chat-file-refs-open-in-the-file-view.md))
+- **Date**: 2026-09-14 (amends [ADR 0262](0262-chat-file-refs-open-in-the-file-view.md))
 - **Related**: [ADR 0016](0016-sidebar-organization-and-multi-project-tabs.md) ·
   [ADR 0233](0233-renderer-owned-multi-folder-project-creation.md) ·
   [ADR 0241](0241-vendored-updatable-file-view-plugin.md) ·
@@ -22,7 +22,7 @@ Nothing of that reached a plugin. `pi.workspace.get()` returned
 the single active workspace. So a contributed view could not learn that its
 project had other folders at all.
 
-ADR 0251 then made a chat file reference open in the bundled file view, and
+ADR 0262 then made a chat file reference open in the bundled file view, and
 handed it a **project-root-relative** path. With one folder that is
 unambiguous. With a group it is not: `src/a.ts` does not say which folder it
 belongs to, and the view's own containment base was the workspace root, so a
@@ -50,7 +50,7 @@ a file that is in fact part of the project.
    root that answers still wins outright, and the match now names the folder it
    answered from.
 4. **The address shape follows the folder.** A match in the primary root travels
-   as a project-relative path, byte-identical to ADR 0251. A match in any sibling
+   as a project-relative path, byte-identical to ADR 0262. A match in any sibling
    folder travels as an **absolute** path — the shape scratch and attachment
    files already use — which the file view maps back to the folder that contains
    it. This keeps the payload a single opaque string, so no view contract changes

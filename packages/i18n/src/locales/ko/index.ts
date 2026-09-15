@@ -662,6 +662,15 @@ sklm: {
     testConnection: "연결 테스트",
     hasSecret: "API 키가 저장됨",
     noSecret: "API 키가 아직 없음",
+    pluginProviderBadge: "플러그인",
+    pluginProviderBy: "{{plugin}} 제공",
+    pluginProviderManaged:
+      "이 프로바이더는 플러그인 “{{plugin}}”에서 제공하며 엔드포인트와 모델도 함께 제공합니다. “확장 기능” 페이지에서 켜거나 끌 수 있습니다.",
+    pluginProviderKey: "API 키",
+    pluginProviderKeyHint: "PI-Desktop에 저장되고 런타임에서 사용됩니다. 플러그인은 이 키를 받지 않습니다.",
+    pluginProviderKeyRemove: "키 제거",
+    pluginProviderKeySaved: "API 키가 저장됨",
+    pluginProviderKeyRemoved: "API 키 제거됨",
     delete: "삭제",
     theme: "테마",
     mode: "기본 모드",
@@ -1791,6 +1800,7 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       "agent.prompt.inject": "에이전트 지침 조정",
       "agent.complete": "모델로 일회성 완성 실행",
       "agent.extension": "에이전트 안에서 코드 실행",
+      "provider.register": "모델 목록에 프로바이더 추가",
       "desktop.control": "데스크톱 제어",
       "models.list": "인증된 모델 목록 표시",
       "session.read": "모델에 전송되는 현재 대화 읽기",
@@ -1801,6 +1811,10 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       "mcp.server.local": "로컬 MCP 서버 실행",
       "mcp.server.remote": "원격 MCP 서버에 연결",
       "background.service": "백그라운드 서비스 계속 실행",
+      "audio.capture.background": "백그라운드에서 마이크 사용",
+      "audio.playback.background": "백그라운드 오디오 재생",
+      "keyboard.globalShortcut": "시스템 전역 키보드 단축키 등록",
+      "net.websocket": "실시간 연결 열기",
       "bus.publish": "다른 플러그인에 메시지 보내기",
       "bus.subscribe": "다른 플러그인의 메시지 받기",
       "browser.cdp": "작업 패널 브라우저 제어",
@@ -1828,6 +1842,8 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       "agent.complete":
         "모델 할당량을 사용해 일회성 완성을 실행할 수 있습니다. 플러그인은 API 키를 받지 않습니다.",
       "agent.extension": "ExtensionAPI 모듈을 에이전트 프로세스 안에서 에이전트 자체 도구와 같은 권한으로 실행합니다. 신뢰하는 코드만 켜세요.",
+      "provider.register":
+        "이 플러그인이 정의한 프로바이더를 설정의 프로바이더 목록에 추가합니다. 플러그인은 엔드포인트와 모델을 제공하며, API 키는 PI-Desktop에 남습니다.",
       "desktop.control":
         "플러그인이 검토된 PI-Desktop 제어 카탈로그를 호출할 수 있습니다. 파괴적 작업에는 여전히 confirm=true가 필요하며 MCP bearer token은 노출되지 않습니다.",
       "models.list": "로그인한 모델을 볼 수 있지만 키는 받지 않습니다.",
@@ -1841,6 +1857,10 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       "mcp.server.remote":
         "플러그인이 선언한 원격 MCP 엔드포인트로 도구 호출을 보냅니다. 엔드포인트가 암호화되지 않은 HTTP를 사용할 수 있습니다.",
       "background.service": "플러그인이 활성화된 동안 작업자를 계속 실행합니다.",
+      "audio.capture.background": "플러그인이 백그라운드에서 실행되는 동안 패널이 열려 있지 않아도 마이크를 캡처합니다.",
+      "audio.playback.background": "패널이 열려 있지 않아도 플러그인이 스트리밍하는 오디오를 재생합니다.",
+      "keyboard.globalShortcut": "PI-Desktop이 포커스되지 않은 상태에서 이 플러그인 자체 명령을 실행하는 시스템 전역 키보드 단축키를 등록합니다.",
+      "net.websocket": "플러그인이 선언한 호스트로 실시간 양방향 연결을 엽니다.",
       "bus.publish": "선언한 주제로 메시지를 보낼 수 있습니다.",
       "bus.subscribe": "선언한 주제의 메시지를 받을 수 있습니다.",
       "browser.cdp":
