@@ -311,6 +311,52 @@ fn the_declaration_requires_the_permission() {
 }
 
 #[test]
+fn the_user_can_supply_the_key_a_plugin_row_asks_for() {
+    let (_dir, db, secrets) = test_context();
+    let declared = declared_providers(&manifest());
+    sync_plugin_providers(&db, &secrets, "demo.provider", &declared, true).unwrap();
+    let id = "plugin:demo.provider:demo";
+    assert!(
+        !providers::get_provider(&db, &secrets, id)
+            .unwrap()
+            .unwrap()
+            .has_secret
+    );
+
+    let stored = providers::set_provider_secret(&db, &secrets, id, Some("sk-demo"))
+        .unwrap()
+        .unwrap();
+    assert!(stored.has_secret);
+    // The key lands under the same provider-scoped ref any other row uses,
+    // so the runtime launch path resolves it without knowing about plugins.
+    assert_eq!(
+        providers::get_secret_for_provider(&db, &secrets, id)
+            .unwrap()
+            .as_deref(),
+        Some("sk-demo")
+    );
+    // The declaration still owns the row: a reload refreshes the fields it
+    // declares and keeps the credential.
+    sync_plugin_providers(&db, &secrets, "demo.provider", &declared, true).unwrap();
+    let reloaded = providers::get_provider(&db, &secrets, id).unwrap().unwrap();
+    assert!(reloaded.has_secret);
+    assert_eq!(reloaded.name, "Demo");
+
+    // An empty value clears it, which is what the user's "remove key" sends.
+    let cleared = providers::set_provider_secret(&db, &secrets, id, None)
+        .unwrap()
+        .unwrap();
+    assert!(!cleared.has_secret);
+    assert!(providers::get_secret_for_provider(&db, &secrets, id)
+        .unwrap()
+        .is_none());
+    assert!(
+        providers::set_provider_secret(&db, &secrets, "nope", Some("sk-x"))
+            .unwrap()
+            .is_none()
+    );
+}
+#[test]
 fn the_declaration_shape_is_validated() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("plugin");

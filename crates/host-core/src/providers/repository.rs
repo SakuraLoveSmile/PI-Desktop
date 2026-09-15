@@ -314,6 +314,52 @@ pub(crate) fn delete_provider_row(db: &Database, secrets: &SecretStore, id: &str
     Ok(n > 0)
 }
 
+/// Store or clear the API key of one provider row, whoever owns it.
+///
+/// A plugin-declared row is not editable through `update_provider`, but the
+/// credential it asks for is the *user's*: the plugin publishes an endpoint and
+/// this method is how the user hands over the key that endpoint needs. Only the
+/// `api_key` reference and the row's `secret_ref` change; no field the plugin's
+/// manifest owns is touched, so the next load still refreshes the declaration.
+///
+/// An empty value deletes the stored key and clears `secret_ref`.
+pub fn set_provider_secret(
+    db: &Database,
+    secrets: &SecretStore,
+    id: &str,
+    secret_value: Option<&str>,
+) -> Result<Option<ProviderPublic>> {
+    if get_provider(db, secrets, id)?.is_none() {
+        return Ok(None);
+    }
+    let api_key_ref = secret_ref_for_provider(id);
+    match secret_value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        Some(value) => {
+            let backend = secrets.set(&api_key_ref, value)?;
+            upsert_secret_meta(db, &api_key_ref, id, &backend)?;
+            db.conn()
+                .prepare_cached(
+                    "UPDATE providers SET secret_ref = ?2, updated_at = ?3 WHERE id = ?1",
+                )?
+                .execute(params![id, api_key_ref, now_ms()])?;
+        }
+        None => {
+            let _ = secrets.delete(&api_key_ref);
+            db.conn()
+                .prepare_cached("DELETE FROM secrets_meta WHERE secret_ref = ?1")?
+                .execute(params![api_key_ref])?;
+            db.conn()
+                .prepare_cached(
+                    "UPDATE providers SET secret_ref = NULL, updated_at = ?2 WHERE id = ?1",
+                )?
+                .execute(params![id, now_ms()])?;
+        }
+    }
+    get_provider(db, secrets, id)
+}
 pub fn get_provider(
     db: &Database,
     secrets: &SecretStore,

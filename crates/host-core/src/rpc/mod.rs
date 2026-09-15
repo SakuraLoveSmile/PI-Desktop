@@ -1739,6 +1739,20 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "value": value }))
         }
+        // The credential of a plugin-declared provider. `providers.update`
+        // refuses that row, so this is the one path that writes the key the
+        // declaration asks for without touching the declaration's own fields.
+        "providers.setSecret" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let secret_value = params.get("secretValue").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            let provider = providers::set_provider_secret(&st.db, &st.secrets, id, secret_value)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "provider": provider }))
+        }
         "providers.listModels" => {
             let provider_id = params.get("providerId").and_then(|v| v.as_str());
             let st = state.lock().await;
