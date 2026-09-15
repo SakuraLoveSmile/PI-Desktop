@@ -5250,7 +5250,25 @@ Validation contract: E2E-SIDEBAR-global-pinned-conversations.
   commands — no key monitoring, no raw events, no hooks.
 - Implemented in this change: `keyboard.globalShortcut` and `net.websocket`
   (host-owned sockets, confined to `manifest.net.domains`, bounded, and released
-  with the plugin). The audio host services are specified here and their SDK
-  surface fails closed with `UNSUPPORTED` until they land. See ADR 0257,
+  with the plugin). The two audio permissions are declared, present in the
+  plugin API, and gated: with the grant the host has no device backend, so every
+  call is answered with a coded `UNSUPPORTED` refusal that is audited, until the
+  device service lands. See ADR 0257,
   `07-plugins/03-plugin-api.md`, `07-plugins/04-plugin-security.md`, and
   E2E-PLUGIN-global-shortcut-owns-only-its-own-command.
+
+## 2026-09-15 — Trusted extension custom agents (D426)
+
+**Add the PI-Desktop `registerAgent` ExtensionAPI contract for trusted extensions. A plugin registers bounded model metadata and a `stream` or `complete` callback; the plugin owns endpoint and authentication. The sidecar exposes a redacted model registry, assigns `extension-agent:<encoded-agent-key>` ids, and routes idle `setModel` through Electron main to the existing host-owned `session.configure` binding. The host never receives or persists plugin transport credentials, and `registerProvider` is a compatibility alias for the same plugin-owned stream shape. See ADR 0258, `07-plugins/16-trusted-extensions.md`, and E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding.**
+
+The pinned upstream pi-coding-agent package has `registerProvider` but no
+`registerAgent`; the PI-Desktop member is therefore an explicit adapter contract,
+not an unreviewed upstream registry passthrough.
+
+## 2026-09-15 — Plugin-declared providers are Host-owned rows (D427)
+
+**A plugin may declare `contributes.providers`, and the Host materializes each entry as a provider row in the native Settings → Provider list, owned by that plugin (`providers.owner_plugin_id`, schema v17; row id `plugin:<pluginId>:<declaredId>`). The declaration is re-read on every load and is authoritative for its own fields, so a dropped entry is deleted together with both credential references; `providers.update` / `providers.delete` refuse a plugin-owned row with `PROVIDER_OWNED_BY_PLUGIN`. A non-empty declaration needs the new high-risk `provider.register` permission, and an `oauth` block or `authKind: "oauth"` is refused until a Host-owned login flow exists. See ADR 0259, `07-plugins/02-plugin-manifest-schema.md` §5.4, `07-plugins/13-plugin-permissions-matrix.md`, `03-runtime/04-data-storage.md` §4.3/§7, and E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list.**
+
+It deliberately does not include plugin OAuth: the `provider.oauth` permission
+and a Host-owned plugin login flow are future work, so a declared provider has no
+OAuth login, token refresh, or account label today.

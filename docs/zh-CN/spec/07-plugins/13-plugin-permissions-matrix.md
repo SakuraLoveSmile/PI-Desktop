@@ -27,6 +27,7 @@
 | `agent.tool.register` | 高 | 注册代理工具 | 安装时确认 | 工具执行情况单独审核 |
 | `agent.prompt.inject` | 高 | 注入系统提示符；激活 `contributes.skills` | 默认拒绝/强确认 | 容易导致行为劫持 |
 | `agent.extension` | 高 | 在 agent 进程内运行 `contributes.agentExtensions` 模块 | 显式确认；v1.1 仅限本地导入和开发插件 | 与 agent 自身工具同等权限；插件沙箱不适用（规格 16） |
+| `provider.register` | 高 | `contributes.providers` 成为原生 Provider 列表中的行，归插件所有并在每次加载时按 manifest 刷新 | 显式确认；v1.1 仅限本地导入和开发插件，与 `agent.extension` 一致 | 用户路径拒绝该行（`PROVIDER_OWNED_BY_PLUGIN`）；凭据仍存放在 Host secret store 的常规 provider 引用下；暂不启用 `oauth` 声明 |
 | `net.fetch` | 高 | `net.fetch` | 默认拒绝 | 限定在 `manifest.net.domains` 之内；列表为空或非法即完全不放行出网（§2A） |
 | `net.websocket` | 高 | `pi.net.websocket.connect` / `send` / `close`（套接字由宿主持有；每个插件最多 4 个，帧封顶 1 MiB） | 默认拒绝 | 与 `net.fetch` 一样被限制在 `manifest.net.domains` 之内；被拒绝的主机永远到不了传输层，插件卸载、被禁用或崩溃时每个套接字都会被关闭 |
 | `shell.openExternal` | 中等 | 打开外部链接 | 首次使用时确认 | 防止网络钓鱼链接 |
@@ -38,8 +39,8 @@
 | `browser.cdp` | 高 | 对宿主工作面板访客页调用 `pi.browser.*` | 安装时确认 | 访客页边界夹紧到调用插件视图；CDP 走白名单 |
 | `desktop.control` | 高 | `pi.desktop.listOperations`、`pi.desktop.invoke` | 安装时确认 | 与本地 MCP 控制平面共用同一份已审查的操作目录，但标记为 plugin-only 的操作例外：六个 `session/collaboration/*` 操作可以经由插件网关调用，却被刻意排除在 MCP 可见目录之外，且没有渲染器变更通道；`dangerous` 操作需要插件传 `confirm: true` **并且**用户在宿主拥有的原生对话框中作答，对话框点名目录中的操作；MCP bearer token 和 Electron 通道名永不暴露 |
 | `ui.microphone` | 中等 | 在插件的隔离面板内调用 `navigator.mediaDevices.getUserMedia({ audio: true })` | 安装时确认 | 仅音频；摄像头和其他所有设备权限仍被拒绝；插件拿不到原生句柄或宿主密钥 |
-| `audio.capture.background` | 高 | `pi.audio.getInputDevices`、`openInput`、`closeInput`、`getCaptureState`、`onInputFrame` / `offInputFrame`（仅 SDK 类型；本条分支没有运行时） | 默认拒绝 | 设备由宿主持有；只交换 PCM16 帧，没有设备句柄或 `MediaStream`。宿主服务落地之前每次调用都以 `UNSUPPORTED` 失败即关闭 |
-| `audio.playback.background` | 中等 | `pi.audio.openOutput`、`writeOutput`、`stopOutput`、`closeOutput`（仅 SDK 类型；本条分支没有运行时） | 安装时确认 | 播放队列由宿主持有，仅 PCM16。宿主服务落地之前每次调用都以 `UNSUPPORTED` 失败即关闭 |
+| `audio.capture.background` | 高 | `pi.audio.getInputDevices`、`openInput`、`closeInput`、`getCaptureState`、`onInputFrame` / `offInputFrame`（已注册在插件 API 中并由该权限把关；两个同步注册辅助函数同步抛出带错误码的拒绝） | 默认拒绝 | 设备由宿主持有；只交换 PCM16 帧，没有设备句柄或 `MediaStream`。宿主目前还没有设备后端，所以获得授权的调用会以带错误码的 `UNSUPPORTED` 拒绝并记入审计；不会打开任何设备 |
+| `audio.playback.background` | 中等 | `pi.audio.openOutput`、`writeOutput`、`stopOutput`、`closeOutput`（已注册在插件 API 中并由该权限把关） | 安装时确认 | 播放队列由宿主持有，仅 PCM16。宿主目前还没有设备后端，所以获得授权的调用会以带错误码的 `UNSUPPORTED` 拒绝并记入审计；不会打开任何设备 |
 | `keyboard.globalShortcut` | 中等 | `pi.keyboard.registerGlobalShortcut`、`unregisterGlobalShortcut`、`listGlobalShortcuts`；`contributes.globalShortcuts` | 安装时确认 | 宿主持有 Electron 的 `globalShortcut`；快捷键只能运行插件自己的命令；冲突会被拒绝（`SHORTCUT_CONFLICT` / `SHORTCUT_UNAVAILABLE` / `INVALID_ACCELERATOR` / `LIMIT_EXCEEDED`，每个插件最多 8 条）；卸载、禁用或崩溃时释放 |
 | `models.list` | 中等 | `pi.models.list` | 安装时确认 | 仅已就绪的 provider/model 行；不含密钥 |
 | `project.create` | 高 | `pi.project.create` 及会话导入中的显式 `projectId` | 安装时确认 | 创建或复用持久项目记录但不激活工作区；只有显式传入 id 的导入会绑定项目 |

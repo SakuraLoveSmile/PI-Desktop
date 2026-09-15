@@ -708,15 +708,30 @@ accessible status.
 
 ### audio (requires `audio.capture.background` / `audio.playback.background`)
 
-**Planned — not implemented in this branch.** The SDK declares these signatures
-and the two permissions exist, but this branch ships no host service for them,
-so every call fails closed with `UNSUPPORTED`. `onInputFrame` registers a
-callback — it is not an event name — and the frame shape is
-`PluginAudioInputFrame` in `packages/plugin-sdk/src/index.ts`. When the host
-service lands, the host owns the device: a plugin exchanges PCM16 frames and
-never receives a device handle, `MediaStream`, OS device path, or Node stream,
-one input stream per plugin is allowed, and disable, unload, or crash stops
-capture and drops queued playback.
+**Callable, but the device backend is not implemented in this branch.**
+`pi.audio` is present in the plugin host process and exposes exactly the ten
+methods below. Each one keeps its permission requirement: the six capture
+methods (`getInputDevices`, `openInput`, `closeInput`, `getCaptureState`,
+`onInputFrame`, `offInputFrame`) require `audio.capture.background` and the
+four playback methods (`openOutput`, `writeOutput`, `stopOutput`,
+`closeOutput`) require `audio.playback.background`. Without the grant the call
+is refused with `PERMISSION_DENIED` and audited under the permission name,
+exactly like every other gated API. With the grant the host still has no device
+backend, so every call is answered with a coded `UNSUPPORTED` refusal: the
+message is `host api not available: audio.<method>` and the audit entry is
+`{ api: "audio.<method>", ok: false, errorCode: "UNSUPPORTED" }`. The eight
+asynchronous methods reject with that error; `onInputFrame` / `offInputFrame`
+are synchronous registration helpers that cannot reject, so they throw an
+`Error` carrying the same `code: "UNSUPPORTED"` instead of registering a
+handler that could never fire. Nothing touches a device and no frame is ever
+produced. `onInputFrame` registers a callback — it is not an event name — and
+the frame shape is `PluginAudioInputFrame` in
+`packages/plugin-sdk/src/index.ts`. When the device service lands, the
+permission and this surface stay as they are and only the refusal is replaced
+by real behaviour: the host owns the device, a plugin exchanges PCM16 frames
+and never receives a device handle, `MediaStream`, OS device path, or Node
+stream, one input stream per plugin is allowed, and disable, unload, or crash
+stops capture and drops queued playback.
 
 ```ts
 pi.audio.getInputDevices(): Promise<PluginAudioInputDevice[]>
@@ -982,8 +997,12 @@ The desktop plugin runtime now implements the MVP host API surface used by local
 - `net.websocket.connect` / `send` / `close` (`net.websocket`; host-owned
   sockets, allowlist-confined, bounded, released with the plugin)
 
-`pi.audio.*` is declared in the SDK and gated by its permissions, but this
-branch ships no host implementation: every call fails closed with `UNSUPPORTED`.
+`pi.audio.*` is present in the plugin host process and callable: all ten
+methods are gated by `audio.capture.background` / `audio.playback.background`,
+and this branch ships no device backend, so an authorized call is answered with
+a coded `UNSUPPORTED` refusal under the method's own audit entry
+(`audio.<method>`, `ok: false`); `onInputFrame` / `offInputFrame` throw the same
+code synchronously because they cannot reject. No device is opened.
 
 Native plugin notifications use the Electron main-process notification surface;
 they do not create durable rows in the task notification inbox and do not

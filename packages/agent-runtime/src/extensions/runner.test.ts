@@ -107,7 +107,7 @@ export default function (pi: any) {
     const runner = new TrustedExtensionRunner({ specs: [ext], bridge, reservedToolNames: () => ["read"] });
     const reports = await runner.load();
     expect(reports).toEqual([
-      { extensionId: ext.id, state: "loaded", toolNames: ["fx_add"], commandNames: [], eventNames: ["before_agent_start", "tool_call", "session_start"] },
+      { extensionId: ext.id, state: "loaded", toolNames: ["fx_add"], commandNames: [], agentNames: [], eventNames: ["before_agent_start", "tool_call", "session_start"] },
     ]);
     expect((globalThis as { __started?: string }).__started).toBe("startuptrue");
 
@@ -126,6 +126,34 @@ export default function (pi: any) {
     const allowed = await runner.emit("tool_call", { type: "tool_call", toolName: "read", toolCallId: "t", input: {} });
     expect(allowed).toBeUndefined();
     expect(runner.getDiagnostics()).toEqual([]);
+  });
+
+  it("registers a plugin-owned agent and exposes its stream model", async () => {
+    const ext = spec(
+      "agent",
+      `export default function (pi: any) {
+  pi.registerAgent({
+    id: "commandcode",
+    name: "Command Code",
+    models: [{ id: "cc-1", name: "Command Code 1" }],
+    complete: async (model: any) => ({
+      role: "assistant", content: [{ type: "text", text: model.id }],
+      api: model.api, provider: model.provider, model: model.id,
+      usage: { input: 0, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 1,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: "stop", timestamp: Date.now(),
+    }),
+  });
+}`,
+    );
+    const { bridge } = fakeBridge();
+    const runner = new TrustedExtensionRunner({ specs: [ext], bridge });
+    await runner.load();
+    const [agent] = runner.getAgents();
+    expect(agent.name).toBe("Command Code");
+    expect(agent.models[0].id).toBe("cc-1");
+    const result = await agent.stream(agent.models[0], {} as any).result();
+    expect(result.content).toEqual([{ type: "text", text: "cc-1" }]);
   });
 
   it("keeps loading when one module throws and reports the error", async () => {

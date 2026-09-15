@@ -654,9 +654,10 @@ export default function (pi) {
 | 中等 | `clipboard.read`、`clipboard.write`、`fs.read`、`shell.openExternal`、`background.service`、`bus.publish`、`bus.subscribe`、`audio.playback.background`、`keyboard.globalShortcut` |
 | 高 | `fs.write`、`fs.delete`、`agent.tool.register`、`agent.prompt.inject`、`net.fetch`、`mcp.server.local`、`mcp.server.remote`、`audio.capture.background`、`net.websocket` |
 
-`keyboard.globalShortcut` 与 `net.websocket` 已实现。`pi.audio.*` 已声明
-并受权限把关，但尚未实现：在宿主服务落地之前，每次调用都以 `UNSUPPORTED`
-失败即关闭。
+`keyboard.globalShortcut` 与 `net.websocket` 已实现。`pi.audio.*` 已经存在并且
+可以调用，其方法仍由权限把关，但当前宿主还没有设备后端：获得授权的调用会以
+带错误码的 `UNSUPPORTED` 拒绝并记入审计，`onInputFrame` / `offInputFrame` 则
+同步抛出同一个错误码，直到设备服务落地并用真实的采集与播放取代这个拒绝。
 
 有两个权限除了名字之外还带一个声明出来的范围，并且两者都会展示给用户：
 文件模式看 `manifest.fs`（§6.5），出网看 `manifest.net.domains`（§6.6）。

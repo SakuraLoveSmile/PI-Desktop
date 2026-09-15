@@ -660,6 +660,16 @@ sklm: {
     testConnection: "Test connection",
     hasSecret: "API key saved",
     noSecret: "No API key yet",
+    pluginProviderBadge: "Plugin",
+    pluginProviderBy: "Provided by {{plugin}}",
+    pluginProviderManaged:
+      "This provider comes from the plugin \"{{plugin}}\", which supplies its endpoint and models. Enable or disable it on the Plugins page.",
+    pluginProviderKey: "API key",
+    pluginProviderKeyHint:
+      "Stored in PI-Desktop and used by the runtime. The plugin never receives it.",
+    pluginProviderKeyRemove: "Remove key",
+    pluginProviderKeySaved: "API key saved",
+    pluginProviderKeyRemoved: "API key removed",
     delete: "Delete",
     theme: "Theme",
     mode: "Default mode",
@@ -1789,6 +1799,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "agent.prompt.inject": "Adjust agent instructions",
       "agent.complete": "Run a one-shot completion with your models",
       "agent.extension": "Run code inside the agent",
+      "provider.register": "Add providers to the model list",
       "desktop.control": "Control the desktop",
       "models.list": "List authenticated models",
       "session.read": "Read the current conversation sent to the model",
@@ -1831,6 +1842,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "agent.complete":
         "Can spend your model quota on a one-shot completion. The plugin never receives your API keys.",
       "agent.extension": "Runs ExtensionAPI modules inside the agent process with the same access as the agent's own tools. Enable only code you trust.",
+      "provider.register":
+        "Adds the providers this plugin defines to Settings' provider list. The plugin supplies the endpoint and models; your API key stays in PI-Desktop.",
       "desktop.control":
         "Lets the plugin invoke the reviewed PI-Desktop control catalog. Destructive operations still require confirm=true; the MCP bearer token is never exposed.",
       "models.list": "Can see which models you have signed in for. It does not receive keys.",
