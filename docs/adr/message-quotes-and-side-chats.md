@@ -180,10 +180,9 @@ excerpt and the side-chat target stay PI-Desktop's own contracts (D-LOCAL-messag
 - Actions, in the reference overlay's order: **Add to chat**
   (`chat.addToChat`) writes the excerpt into the active session's composer draft
   through D-LOCAL-message-quotes decision 3's contract and focuses the composer via the existing
-  prefill path; **Ask in side chat** (`chat.askInSideChat`) opens the side chat
-  anchored at that row (`session.fork` through D-LOCAL-message-quotes decision 4) and sends the
-  excerpt as that child's prompt, so the question is answered beside the
-  conversation instead of inside it; **Copy** reuses `chat.copy` and writes the
+  prefill path; **Ask in side chat** (`chat.askInSideChat`) opens a renderer-only
+  side-chat draft and prefills the excerpt as a Markdown blockquote without
+  sending; **Copy** reuses `chat.copy` and writes the
   Markdown to the clipboard. The side-chat action is disabled while the visible
   session is running, because the host refuses a fork mid-turn. Every action
   clears the native selection first, so the overlay does not outlive its own

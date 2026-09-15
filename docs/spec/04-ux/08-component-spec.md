@@ -1097,8 +1097,7 @@ Ask in side chat only prefills a Markdown blockquote. Closing an unsent draft
 leaves no session record. Creation replaces the draft tab in its own parent's
 panel context; repeated sends cannot create duplicate children. Creation or
 send failure retains the draft; a created child is reused on retry. Promotion
-and Add to main chat are disabled for drafts. This supersedes the immediate
-fork/send wording below, which describes the materialized child only.
+and Add to main chat are disabled for drafts.
 
 A side chat is one more work-panel resource: a live view of another session's
 transcript beside the main conversation, not a second panel and not a new kind
@@ -1106,7 +1105,7 @@ of session.
 
 - Entry: **Open side chat** on an assistant turn (fork anchored at that assistant
   message) and on a user message (fork anchored at that user message), with the
-  tooltip and accessible name `chat.startSideChat`. Opening calls the existing
+  tooltip and accessible name `chat.startSideChat`. First Send calls the existing
   `session.fork` with the anchor and does not activate the child, so the main
   conversation keeps its visible session. The child is durable on the host
   exactly as an ordinary branch. For a native Pi parent the same channel is
@@ -1146,7 +1145,8 @@ of session.
   session-selection path, so the full composer, prompt queue, and stop controls
   apply, and releases the side-chat registration and its tab.
 - Close: closing the tab removes the registration and its transcript projection.
-  The child session is not deleted and keeps appearing in the sidebar, session
+  Unsent drafts leave no session record. An existing child session is not
+  deleted and keeps appearing in the sidebar, session
   lists, and search. Entries are removed when the tab closes, when the child is
   opened as a conversation, and when the parent or child session is deleted.
 - Boundaries: side-chat state is renderer-owned and is not persisted across
