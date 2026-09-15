@@ -118,6 +118,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### 全局 AI (`ai` tab)
 - **Permissions** card: the global permission-mode control
   (ask / accept-edits / auto) that governs how autonomously the agent acts.
+  The control is a menu select on the shared anchored-menu surface rather than
+  a platform-drawn `<select>` popup, so every Settings picker opens the same
+  way.
 - **Defaults** card: the host-backed default operating mode (Agent / Plan / Goal),
   command shell selection, Link open destination, context usage display
   (remaining or used), Enter-to-send control, and the large text paste
@@ -137,7 +140,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   and the fallback state is shown. When the selected shell is available, the
   selector is the only configured-state indicator; status text is reserved for
   the default, fallback, and no-effective-shell cases. A Bash turn verifies its
-  pinned ID/dialect before execution.
+  pinned ID/dialect before execution. The row renders the same menu select as
+  the Permissions card and the Appearance pickers.
 - Context management has **no card and no controls** (D200 / ADR 0061, kept by
   D203 / ADR 0064). Automatic protection is always on and its budgets and
   retention limits are derived from the active model's window, so there is

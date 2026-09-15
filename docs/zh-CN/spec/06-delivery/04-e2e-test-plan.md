@@ -1002,6 +1002,22 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - **里程碑**：M4
 - **状态**：已记录
 
+#### E2E-SETTINGS-ai-tab-pickers-use-in-app-menus：全局 AI 下拉使用应用内菜单
+
+- **先决条件**：应用正在运行，主机至少报告一个已配置的命令 Shell，以及至少一个在当前平台不可用的目录内 Shell。
+- **步骤**：
+  1) 打开设置 → 常规，展开主题和语言选择器，记下药丸触发器与展开后的表面。
+  2) 打开全局 AI。
+  3) 展开权限卡的权限模式控件，依次选择询问、接受编辑、自动。
+  4) 展开默认项卡的命令 Shell 控件；查看不可用条目并选择一个可用的 Shell。
+  5) 先用 Escape、再用外部点击分别关闭打开的菜单。
+  6) 关闭设置后重新打开，读取这两行。
+- **预期**：两行都展开与外观选择器相同的锚定菜单表面 —— 应用绘制的边框，使用共享的圆角、阴影、描边和主题 token，当前选项带勾选标记，并有悬浮/键盘高亮 —— 而不是平台绘制的 `<select>` 弹层。不可用的 Shell 仍会列出并带后缀，不可选择，也不会成为当前值。Escape 和外部点击都会关闭菜单并把焦点还给触发器；方向键在可选选项之间循环移动。所选权限模式和命令 Shell 在关闭并重新打开设置后保持，且选定的 Shell 仍是唯一的配置状态提示。
+- **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/09-interaction-patterns.md`
+- **验收**：A（核心壳）
+- **里程碑**：M4
+- **状态**：已记录
+
 #### E2E-039：设置标题栏拖动移动窗口
 
 - **先决条件**：应用程序在 macOS 上以窗口方式运行，并且打开“设置”。
@@ -6956,12 +6972,15 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   上下文，不创建替代会话。状态和面板刷新使用有界的轻量轮询；`wait` 在其等待上限内返回
   `timedOut`，不占满宿主工具超时时间。`cancel` 中止但不删除，无关会话和现有 Task 系列
   保持不变，且不发生 localhost MCP 调用或 token 访问。Worker 不能再创建 Worker，
-  不属于调用方的 Session ID 必须被拒绝，并发上限超出时必须安全失败。Worker 创建和
+  不属于调用方的 Session ID 必须被拒绝，并发上限超出时必须安全失败。`spawn` 指定用户
+  未勾选「可供 AI 自动调度」的模型时，在创建 Worker 之前以 `PERMISSION_DENIED` 拒绝；
+  省略 `modelKey`，或写出默认模型自己的键，仍按继承处理。Worker 创建和
   prompt 通知突发时，会话列表刷新串行执行并合并，同时保留最终 Worker 列表和前台会话。
   后到达的通知等待后续读取，不会因复用 Worker 创建之前已开始的读取而丢失。
 - **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/04-plugin-security.md`、
   `07-plugins/11-plugin-storage-isolation.md`、`03-runtime/01-ipc-protocol.md`、
-  `03-runtime/06-host-rpc-protocol.md`、ADR 0237
+  `03-runtime/06-host-rpc-protocol.md`、`03-runtime/11-provider-model-system.md`、
+  ADR 0237、ADR subagent-model-opt-in
 - **接受**：C（并行持久化会话）、D（插件安全性）、品质
 - **里程碑**：M6+
 - **状态**：host ledger 覆盖由 `pnpm test:e2e:collaboration` 自动化；marketplace 插件测试覆盖插件运行时，host-core 和 desktop 单元测试覆盖新增的宿主原子能力。完整真实 provider/Electron 旅程仍需在具备条件的 runner 中验证，遵循无本地 E2E 策略
