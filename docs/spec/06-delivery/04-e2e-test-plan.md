@@ -1244,8 +1244,9 @@ identify the platform validation still needed.
   draft. A's two prompts appear in FIFO order, the removed row never sends,
   and B's queue remains independent. Send now requests a graceful stop: the
   current batch completes with a normal `agent_end`/completed turn, then the
-  promoted rows start in the order they were promoted, before any waiting row,
-  without `AGENT_BUSY`. A promoted row disables move up, move down, edit, and
+  promoted rows are delivered in the order they were promoted, before any
+  waiting row, without `AGENT_BUSY`: the first starts the turn and the rest join
+  it as adjacent user messages, so the model answers once for the whole block.
   remove, and its Send now button reads as already decided; promotion is
   one-way. Move up/down swaps only waiting rows, never crosses the promoted
   block, and persists. Edit is refused with a visible message while the input
@@ -1261,7 +1262,7 @@ identify the platform validation still needed.
   pending preserves queued work without starting another turn.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
   `04-ux/08-component-spec.md` (§11),
-  `04-ux/09-interaction-patterns.md` (§3.4), ADR 0118, ADR 0213, ADR 0258
+  `04-ux/09-interaction-patterns.md` (§3.4), ADR 0118, ADR 0213, ADR 0265
 - **Acceptance**: C (chat, stream, and session isolation), Quality
 - **Milestone**: M6+
 - **Status**: Source-level regression and deterministic desktop finalization /
@@ -1273,17 +1274,24 @@ identify the platform validation still needed.
 
 - **Preconditions**: Provider configured; session A is running a turn with at
   least one completed tool batch; three prompts are queued behind it.
-- **Steps**: 1) Choose Send now on the third queued row. 2) Choose Send now on
   the first queued row. 3) Confirm the promoted block orders third → first, that
   both rows lock their move/edit/remove actions, and that the remaining row is
-  still editable. 4) Let the boundary pass and observe both promoted prompts.
-- **Expected**: The first click leaves first and the second leaves second — the
+  still editable. 4) Let the boundary pass and observe the transcript.
+- **Expected**: The first click is delivered first and the second second — the
   click order is the delivery order, not "last click wins" and not the original
-  queue order. Both promoted rows show as already decided and cannot be edited,
-  removed, or reordered. The waiting row keeps its actions and is not delivered
-  before either promoted row.
+  queue order. Both rows appear as adjacent user messages in one turn and the
+  model answers once; the queue no longer lists either promoted row. Both
+  promoted rows show as already decided and cannot be edited, removed, or
+  reordered. The waiting row keeps its actions and is not delivered before
+  either promoted row.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
-  `04-ux/08-component-spec.md` (§11), ADR 0258
+  `04-ux/08-component-spec.md` (§11), ADR 0265
+- **Acceptance**: C (chat, stream)
+- **Milestone**: M6+
+- **Status**: Draft; ordering and the adjacent delivery are covered by
+  `turn_queue`, `turn-queue`, and `agent-host` unit tests
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
+  `04-ux/08-component-spec.md` (§11), ADR 0265
 - **Acceptance**: C (chat, stream)
 - **Milestone**: M6+
 - **Status**: Draft; underlying ordering covered by `turn_queue`,
@@ -1301,7 +1309,7 @@ identify the platform validation still needed.
   the Host persists the new order, so a reload reproduces it. The waiting-block
   boundary and the promoted block are immovable: a move at the block edge is a
   no-op that never reaches the Host, and no move changes a promoted row's place.
-- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6), ADR 0258
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6), ADR 0265
 - **Acceptance**: C (chat), F (persistence)
 - **Milestone**: M6+
 - **Status**: Draft; host-side reorder covered by `turn_queue` unit tests
@@ -1320,7 +1328,7 @@ identify the platform validation still needed.
   the exact text plus the original file-reference chip — not the
   annotation-stripped inline content. Re-sending produces the same prompt as the
   queued row would have.
-- **Specs linked**: `04-ux/08-component-spec.md` (§11), ADR 0258
+- **Specs linked**: `04-ux/08-component-spec.md` (§11), ADR 0265
 - **Acceptance**: C (chat, stream)
 - **Milestone**: M6+
 - **Status**: Draft; composer-side contract covered by
@@ -2650,7 +2658,7 @@ identify the platform validation still needed.
 - **Preconditions**: A plugin with `ui.theme` that can drive `pi.app.setTheme` and `pi.themes.upsert` / `remove` (panel or command). Settings → General shows the searchable theme picker.
 - **Steps**: 1) From the plugin UI, call `themes.upsert` with a new theme id and distinct CSS. 2) Confirm the theme appears in Settings without reload/disable. 3) Call `app.setTheme` to select it. 4) Call `themes.upsert` again with different CSS while it is active. 5) Call `themes.remove` on an inactive theme. 6) Call `app.setTheme` with an unknown id. 7) Upsert a ninth theme (former hard cap was 8).
 - **Expected**: The new theme is listed and applies immediately through the same path as Settings; live CSS edits restyle the shell without plugin reload; remove drops the picker row and the event refreshes the list; an unknown id rejects with `INVALID_ARGUMENT` and leaves the preference unchanged; the ninth theme is accepted. `settingsChanged` reaches the renderer store; `appearance:changed` reaches open panels.
-- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/12-plugin-ipc-and-host-services.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0260, D417
+- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/12-plugin-ipc-and-host-services.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0265, D417
 - **Acceptance**: G (theme contribution) + Security
 - **Status**: Unit-covered (`plugin-themes.test.mjs`); interactive scenario Draft
 
@@ -2659,7 +2667,7 @@ identify the platform validation still needed.
 - **Preconditions**: A plugin theme that sets `--ds-bg-sidebar` to a solid color and `--ds-bg-sidebar-image` to a `linear-gradient(...)`; Windows/Linux and macOS shells.
 - **Steps**: 1) Select the theme. 2) Inspect the sidebar plate and rail. 3) Confirm borders/glass tint still resolve from the color token. 4) Switch back to a built-in theme.
 - **Expected**: The gradient paints as `background-image` over the color plate on all platforms; macOS sheen still overlays the image layer; borders and `color-mix` consumers do not break; clearing the token returns the plain sidebar.
-- **Specs linked**: `04-ux/07-ui-design-system.md`, ADR 0260, D417
+- **Specs linked**: `04-ux/07-ui-design-system.md`, ADR 0265, D417
 - **Acceptance**: Visual / platform
 - **Status**: CSS unit contracts in `plugin-themes.test.mjs`; visual scenario Draft
 

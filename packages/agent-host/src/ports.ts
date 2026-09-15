@@ -41,9 +41,26 @@ export type TurnStartRequest = {
   principal: Principal;
 };
 
+/**
+ * One more user message for a turn that is already running (`send now` keeps
+ * promoted messages adjacent, ADR 0265).
+ */
+export type TurnSteerRequest = {
+  sessionId: string;
+  /** The runtime id of the running turn that must receive the input. */
+  turnId: string;
+  content: string;
+  sessionMessageId?: string;
+  attachments?: AgentPromptAttachment[];
+  principal: Principal;
+};
+
 /** The pi runtime as the module drives it. Electron Main adapts its prompt,
  * stop, abort, and asktool paths to this port; nothing here knows about IPC. */
 export interface RuntimePort {
+  /** Inject one more user message into a running turn. Optional: a runtime that
+   * cannot steer delivers a promoted block as consecutive turns instead. */
+  steer?(request: TurnSteerRequest): Promise<{ accepted: boolean }>;
   prompt(request: TurnStartRequest): Promise<{ turnId: string }>;
   stop(sessionId: string): Promise<{ requested: boolean }>;
   abort(sessionId: string, turnId?: string): Promise<void>;

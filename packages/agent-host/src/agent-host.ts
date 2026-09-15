@@ -164,6 +164,8 @@ export class AgentHost {
   private readonly runtimeAliases = new Map<string, string>();
   private readonly idempotency = new Map<string, IdempotencyEntry>();
   private readonly draining = new Set<string>();
+  /** A pass that arrived while one was running: the queue must be looked at again. */
+  private readonly drainPending = new Set<string>();
   private readonly admissions = new Map<string, Promise<void>>();
 
   constructor(options: AgentHostOptions) {
@@ -224,26 +226,23 @@ export class AgentHost {
           this.emit(state, "turn.activity", { event }, meta2);
           return;
         }
-        if (turn) {
-          turn.status = event.type === "error" ? "failed" : meta.interrupted ? "interrupted" : "completed";
-          turn.endedAt = new Date(envelope.ts).toISOString();
-          if (event.type === "error") {
-            turn.error = { code: event.error.code, message: event.error.message, retriable: event.error.retriable ?? false, traceId: event.error.traceId ?? "" };
-          }
-        }
-        state.activeItems.clear();
-        state.activeTurnId = undefined;
-        state.status = "idle";
-        for (const closed of this.approvals.cancelForSession(state.id, state.revision + 1)) {
-          this.emit(state, "approval.resolved", closed, meta2);
-        }
-        for (const [inputId] of state.pendingInputs) {
-          state.pendingInputs.delete(inputId);
-          this.emit(state, "input.resolved", { inputId, status: "canceled" }, meta2);
-        }
-        this.emit(state, mapping.kind, { event }, meta2);
-        this.emitSessionChanged(state);
-        void this.drain(state.id);
+        this.closeTurn(state, turn, {
+          status: event.type === "error" ? "failed" : meta.interrupted ? "interrupted" : "completed",
+          endedAt: new Date(envelope.ts).toISOString(),
+          ...(event.type === "error"
+            ? {
+                error: {
+                  code: event.error.code,
+                  message: event.error.message,
+                  retriable: event.error.retriable ?? false,
+                  traceId: event.error.traceId ?? "",
+                },
+              }
+            : {}),
+          kind: mapping.kind,
+          payload: { event },
+          meta: meta2,
+        });
         return;
       }
       case "message_start":
@@ -698,6 +697,38 @@ export class AgentHost {
     }));
   }
 
+  /**
+   * Close one turn because its owner (Electron Main / the runtime) settled it.
+   *
+   * `ingest` only sees terminal *events*, and a real abort does not always
+   * produce one that is allowed to land: Main drops a terminal event for a turn
+   * it no longer owns (`isStaleTerminalEvent`), and the runtime need not emit one
+   * at all. The Host would then keep the turn active and never release the queue
+   * it holds, so the settlement itself closes the turn here. Idempotent: a turn
+   * that is already terminal only retries the drain.
+   */
+  endTurn(
+    sessionId: string,
+    turnId: string,
+    status: TurnRecord["status"],
+    options: { error?: NonNullable<TurnRecord["error"]> } = {},
+  ): void {
+    const state = this.state(sessionId);
+    const turn = state.turns.get(this.resolveTurnId(state, turnId));
+    if (turn && isActive(turn.status)) {
+      this.closeTurn(state, turn, {
+        status,
+        endedAt: new Date(this.clock.now()).toISOString(),
+        ...(options.error ? { error: options.error } : {}),
+        kind: turnEventKindForStatus(status),
+        payload: {},
+        meta: { turnId: turn.id },
+      });
+      return;
+    }
+    void this.drain(state.id);
+  }
+
   /** Let the queue of an idle session run, e.g. after the runtime became free. */
   kick(sessionId: string): void {
     void this.drain(sessionId);
@@ -707,22 +738,51 @@ export class AgentHost {
   // Internals
   // -------------------------------------------------------------------------
 
+  /**
+   * Apply one terminal turn state, release everything that turn held, publish
+   * it, and let the queue run. Both entry points — a terminal runtime event and
+   * a settlement reported by the turn's owner — funnel through here.
+   */
+  private closeTurn(
+    state: SessionState,
+    turn: TurnRecord | undefined,
+    outcome: {
+      status: TurnRecord["status"];
+      endedAt: string;
+      error?: NonNullable<TurnRecord["error"]>;
+      kind: Parameters<EventHub["publish"]>[0]["kind"];
+      payload: Record<string, unknown>;
+      meta: { turnId?: string; parentToolCallId?: string; agentName?: string };
+    },
+  ): void {
+    if (turn) {
+      turn.status = outcome.status;
+      turn.endedAt = outcome.endedAt;
+      if (outcome.error) turn.error = outcome.error;
+    }
+    if (turn === undefined || state.activeTurnId === turn.id) {
+      state.activeTurnId = undefined;
+    }
+    state.activeItems.clear();
+    state.status = "idle";
+    for (const closed of this.approvals.cancelForSession(state.id, state.revision + 1)) {
+      this.emit(state, "approval.resolved", closed, outcome.meta);
+    }
+    for (const [inputId] of state.pendingInputs) {
+      state.pendingInputs.delete(inputId);
+      this.emit(state, "input.resolved", { inputId, status: "canceled" }, outcome.meta);
+    }
+    this.emit(state, outcome.kind, outcome.payload, outcome.meta);
+    this.emitSessionChanged(state);
+    void this.drain(state.id);
+  }
+
   private notifyQueue(sessionId: string): void {
     if (!this.onQueueChange) return;
     try {
       this.onQueueChange(sessionId, this.queueEntries(sessionId));
     } catch {
       // A listener failure must not affect the queue.
-    }
-  }
-
-  private async drain(sessionId: string): Promise<void> {
-    if (this.draining.has(sessionId)) return;
-    this.draining.add(sessionId);
-    try {
-      await this.withAdmission(sessionId, () => this.drainAdmitted(sessionId));
-    } finally {
-      this.draining.delete(sessionId);
     }
   }
 
@@ -751,7 +811,12 @@ export class AgentHost {
           state.activeTurnId = turn.id;
           state.status = "running";
           this.renumberQueue(state);
+          this.renumberQueue(state);
           this.notifyQueue(sessionId);
+          // The rest of the promoted block joins this turn as user input, so the
+          // messages stay adjacent instead of waiting for their own turns
+          // (ADR 0265). A runtime without steering keeps the previous behavior.
+          void this.deliverPromotedBlock(state, started.turnId);
           return;
         } catch (error) {
           turn.status = "failed";
@@ -767,6 +832,88 @@ export class AgentHost {
           this.notifyQueue(sessionId);
         }
       }
+  }
+
+  private async drain(sessionId: string): Promise<void> {
+    if (this.draining.has(sessionId)) {
+      // The pass already running may have decided to stop before this request
+      // arrived — the session was still busy, or the queue had not been written
+      // yet. Dropping the request here is what strands a queue, so remember it
+      // and let the running pass take another look before it finishes.
+      this.drainPending.add(sessionId);
+      return;
+    }
+    this.draining.add(sessionId);
+    try {
+      do {
+        this.drainPending.delete(sessionId);
+        await this.withAdmission(sessionId, () => this.drainAdmitted(sessionId));
+      } while (this.drainPending.has(sessionId));
+    } finally {
+      this.draining.delete(sessionId);
+    }
+  }
+
+  /**
+   * Deliver the promoted entries that are still queued into the turn that just
+   * started, so "Send now" twice puts both messages in front of the model
+   * together instead of spreading them over two turns (ADR 0265).
+   *
+   * The runtime only accepts input for a turn whose run is live, so a refusal is
+   * retried a bounded number of times. Anything still undelivered stays queued
+   * and leaves at the next boundary as its own turn: the previous behavior is
+   * the fallback, never a lost prompt.
+   */
+  private async deliverPromotedBlock(state: SessionState, runtimeTurnId: string): Promise<void> {
+    const steer = this.runtime.steer?.bind(this.runtime);
+    if (!steer) return;
+    for (let attempt = 0; attempt < PROMOTED_DELIVERY_ATTEMPTS; attempt += 1) {
+      const head = this.queue.peek(state.id);
+      if (!head || head.priority === undefined) return;
+      const active = state.activeTurnId ? state.turns.get(state.activeTurnId) : undefined;
+      if (!active || active.runtimeTurnId !== runtimeTurnId) {
+        // The turn ended (or moved on) while the block was being delivered.
+        return;
+      }
+      let accepted = false;
+      try {
+        ({ accepted } = await steer({
+          sessionId: state.id,
+          turnId: runtimeTurnId,
+          content: head.content,
+          ...(head.sessionMessageId ? { sessionMessageId: head.sessionMessageId } : {}),
+          ...(head.attachments ? { attachments: head.attachments } : {}),
+          principal: { subject: head.principalSubject, roles: ["controller"] },
+        }));
+      } catch {
+        accepted = false;
+      }
+      if (!accepted) {
+        await delay(PROMOTED_DELIVERY_RETRY_MS);
+        continue;
+      }
+      await this.queue.remove(state.id, head.id);
+      this.markDeliveredIntoAnotherTurn(state, head.id);
+      this.renumberQueue(state);
+      this.notifyQueue(state.id);
+    }
+  }
+
+  /**
+   * An injected entry never runs its own turn: its input was delivered into the
+   * turn that was already running, and the transcript rows come from that turn's
+   * steering messages. Its RACP turn is canceled so no client is left believing a
+   * queued turn is still waiting.
+   */
+  private markDeliveredIntoAnotherTurn(state: SessionState, turnId: string): void {
+    const turn = state.turns.get(turnId);
+    // A delivered entry is queued, not active: it never occupied the session, so
+    // the check is "not already terminal" rather than `isActive`.
+    if (!turn || isTerminal(turn.status)) return;
+    turn.status = "canceled";
+    turn.queuePosition = undefined;
+    turn.endedAt = new Date(this.clock.now()).toISOString();
+    this.emit(state, "turn.canceled", { turn: this.toRacpTurn(state, turn) }, { turnId: turn.id });
   }
 
   /** Keep busy checks and queue writes atomic across concurrent senders. */
@@ -1096,6 +1243,29 @@ function isActive(status: RacpTurn["status"]): boolean {
   return RACP_ACTIVE_TURN_STATUSES.includes(status);
 }
 
+/** A turn that can no longer change: canceled or settled by its own run. */
+function isTerminal(status: TurnRecord["status"]): boolean {
+  return !isActive(status) && status !== "queued";
+}
+
+/** The RACP event kind that publishes one terminal turn state. */
+function turnEventKindForStatus(
+  status: RacpTurn["status"],
+): Parameters<EventHub["publish"]>[0]["kind"] {
+  switch (status) {
+    case "completed":
+      return "turn.completed";
+    case "failed":
+      return "turn.failed";
+    case "interrupted":
+      return "turn.interrupted";
+    case "canceled":
+      return "turn.canceled";
+    default:
+      throw new Error(`turn status ${status} is not terminal`);
+  }
+}
+
 function racpDurable(kind: Parameters<EventHub["publish"]>[0]["kind"]): boolean {
   return kind !== "turn.activity" && kind !== "item.delta" && kind !== "tool.progress" && kind !== "terminal.output";
 }
@@ -1127,3 +1297,12 @@ export function hashInput(input: StartTurnParams["input"]): string {
 }
 
 export type { UiMessage };
+
+/** Bounded attempts to fold a promoted entry into the turn that just started. */
+const PROMOTED_DELIVERY_ATTEMPTS = 8;
+/** Gap between those attempts: the runtime accepts input once its run is live. */
+const PROMOTED_DELIVERY_RETRY_MS = 150;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -2547,8 +2547,9 @@ reasoning-level control.
 - Send now: promotes the row to the end of the session's priority block, so a
   second Send now leaves behind the first instead of replacing it at the head.
   It then requests `agent/stop`, and the promoted block is released after the
-  current reply/tool batch completes normally, before every waiting row. When
-  idle it starts immediately.
+  current reply/tool batch completes normally, before every waiting row. The
+  first promoted row starts the turn and the rest join it as adjacent user
+  messages, so the block is answered once. When idle it starts immediately.
 - A promoted row is locked: move up/down, edit, and remove are disabled with
   their tooltip and `aria-disabled` state intact, and the Send now button reads
   as already decided (`chat.sendNowPending`). The row carries a distinct
@@ -2563,7 +2564,7 @@ reasoning-level control.
   canonical paths never become textarea text. After a reply begins, Abort keeps
   the partial transcript and restores no draft.
 - Stop never clears queued prompts. Removing a row is explicit; the queue itself
-  is Host-owned and durable (D386 / ADR 0213, ADR 0258), so a restart restores it
+  is Host-owned and durable (D386 / ADR 0213, ADR 0265), so a restart restores it
   in delivery order, held until the desktop attaches as the owner.
 - `turn_end` is not an idle signal. Send and host persistence remain blocked
   through subsequent tool turns and blocking automatic checkpoint generation
