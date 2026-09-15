@@ -284,5 +284,5 @@ Each ADR includes:
 | 0253 | [Remove the subagent turn limit](0253-remove-subagent-turn-limit.md) | Accepted (supersedes the `maxTurns` clauses of 0062 / 0063 / 0119 / 0126 / 0166 / 0210) |
 | 0254 | [Continue native Pi sessions in their canonical JSONL](0254-native-pi-session-continuation.md) | Accepted (amends baseline D007; D421) |
 | 0257 | [Host-mediated real-time capabilities for plugins](0257-plugin-real-time-capabilities.md) | Accepted for implementation |
-| 0256 | [Trusted extension custom agents](0256-trusted-extension-custom-agents.md) | Accepted for implementation (D425; issue #401) |
-| 0257 | [Plugin-declared providers are Host-owned rows](0257-plugin-declared-providers.md) | Accepted for implementation (D426) |
+| 0258 | [Trusted extension custom agents](0258-trusted-extension-custom-agents.md) | Accepted for implementation (D426; issue #401) |
+| 0259 | [Plugin-declared providers are Host-owned rows](0259-plugin-declared-providers.md) | Accepted for implementation (D427) |

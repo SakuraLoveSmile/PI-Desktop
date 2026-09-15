@@ -251,7 +251,7 @@ declaration is re-read from the plugin manifest on every plugin load and is
 authoritative for its own fields, while stored `headers`, the OAuth account
 label, and a credential the user entered are kept. Disabling the plugin keeps
 the row and turns it off; uninstalling it, or removing the declaration, deletes
-the row and both credential refs (ADR 0257,
+the row and both credential refs (ADR 0259,
 `07-plugins/02-plugin-manifest-schema.md` §5.4).
 ### Copy a provider into an independent draft
 

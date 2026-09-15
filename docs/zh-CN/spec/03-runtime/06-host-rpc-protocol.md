@@ -428,7 +428,7 @@ off | minimal | low | medium | high | xhigh | max
 - `providers.list` / `providers.get` / `providers.create` /
 - `providers.update` / `providers.delete` 拒绝插件自有的行
   （`ownerPluginId`）：该行每次加载都由 manifest 刷新，因此只由其所属插件的
-  生命周期改动或删除，错误信息以 `PROVIDER_OWNED_BY_PLUGIN` 开头（ADR 0257）
+  生命周期改动或删除，错误信息以 `PROVIDER_OWNED_BY_PLUGIN` 开头（ADR 0259）
 - `providers.setSecret({ id, secretValue })` — 写入或清除某一行 provider 的
   API key（`secret:provider:<id>:api_key` 与行的 `secret_ref`）。这是插件自有行
   接受的写入：只改声明要求的凭据，绝不改 manifest 拥有的字段。`secretValue`

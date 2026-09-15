@@ -1,7 +1,7 @@
 use super::*;
 
 /// v16 → v17: `providers.owner_plugin_id`, the ownership column that keeps a
-/// plugin-declared provider row apart from the user's own rows (ADR 0257).
+/// plugin-declared provider row apart from the user's own rows (ADR 0259).
 /// Additive — every existing row is a user row and keeps a NULL owner.
 pub(super) fn migrate(conn: &Connection, path: &Path) -> Result<()> {
     create_migration_backup(conn, path, 16)?;

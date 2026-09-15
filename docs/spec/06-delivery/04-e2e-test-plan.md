@@ -11527,7 +11527,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   and auth availability but no Host key, secret ref, OAuth token or arbitrary
   Host headers. `registerProvider` with the same plugin-owned stream shape has
   equivalent behavior.
-- **Specs linked**: `07-plugins/16-trusted-extensions.md` §5, §10; ADR 0256;
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §5, §10; ADR 0258;
   D425
 - **Acceptance**: B (agent), C (conversation & stream), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
@@ -12343,7 +12343,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4, §5.4, §7;
   `07-plugins/13-plugin-permissions-matrix.md`; `03-runtime/04-data-storage.md`
   §4.3, §7; `03-runtime/12-provider-config-schema.md` §2, §9;
-  `03-runtime/06-host-rpc-protocol.md`; ADR 0257; D426
+  `03-runtime/06-host-rpc-protocol.md`; ADR 0259; D427
 - **Acceptance**: B (model config), E (tools & permissions), F (persistence),
   G (plugins), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)

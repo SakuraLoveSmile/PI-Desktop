@@ -332,7 +332,7 @@ CREATE TABLE providers (
   created_at       INTEGER NOT NULL,
   updated_at       INTEGER NOT NULL,
   -- Owning plugin id for a row a plugin declared in `contributes.providers`
-  -- (schema v17, ADR 0257). NULL is a user-owned row: the plugin refreshes its
+  -- (schema v17, ADR 0259). NULL is a user-owned row: the plugin refreshes its
   -- own fields on every load, while the user path may edit or delete only the
   -- rows it owns.
   owner_plugin_id  TEXT
@@ -1250,7 +1250,7 @@ truncating at a guessed position.
   `pi.sqlite.v15.bak` copy precedes the migration; boot recovery retains
   durable queued deliveries but never replays interrupted work automatically.
 - **Schema v17 is additive.** It adds the nullable `providers.owner_plugin_id`
-  ownership column and its partial index (ADR 0257), so a provider row a plugin
+  ownership column and its partial index (ADR 0259), so a provider row a plugin
   declares in `contributes.providers` is distinguishable from a user-created one
   — every pre-v17 row keeps a NULL owner. A `pi.sqlite.v16.bak` copy precedes the
   step. The v15→v16 session-collaboration step now stamps `16` (its own version)

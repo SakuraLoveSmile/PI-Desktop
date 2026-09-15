@@ -1,8 +1,8 @@
-# ADR 0256: Trusted extensions may provide custom agents
+# ADR 0258: Trusted extensions may provide custom agents
 
 - Status: Accepted for implementation
 - Date: 2026-09-15
-- Decision: D425
+- Decision: D426
 - Related: ADR 0214, ADR 0215, `07-plugins/16-trusted-extensions.md`, Issue #401
 
 ## Context

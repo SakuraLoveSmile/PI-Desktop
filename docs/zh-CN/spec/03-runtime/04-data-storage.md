@@ -304,7 +304,7 @@ CREATE TABLE providers (
   created_at       INTEGER NOT NULL,
   updated_at       INTEGER NOT NULL,
   -- 插件在 `contributes.providers` 中声明该行时的所属插件 id
-  --（架构 v17，ADR 0257）。NULL 表示用户自有的行：插件每次加载都会刷新
+  --（架构 v17，ADR 0259）。NULL 表示用户自有的行：插件每次加载都会刷新
   -- 自己的字段，而用户路径只能编辑或删除自己拥有的行。
   owner_plugin_id  TEXT
 );
@@ -1095,7 +1095,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   `turn_queue.session_message_id` 绑定（D409 / ADR 0239）。既有会话、回合、队列条目和
   插件数据保持有效。迁移前保留 `pi.sqlite.v15.bak`；启动恢复保留持久排队投递，但不会
 - **架构 v17 是增量的。** 它增加可为空的 `providers.owner_plugin_id` 归属列及其部分索引
-  （ADR 0257），从而把插件在 `contributes.providers` 中声明的 provider 行与用户创建的行区分开
+  （ADR 0259），从而把插件在 `contributes.providers` 中声明的 provider 行与用户创建的行区分开
   —— 所有 v17 之前的行保持 NULL 归属。该步骤之前保留 `pi.sqlite.v16.bak` 副本。
   v15→v16 会话协作步骤现在写入 `16`（它自己的版本）而不是最新的架构常量，
   因此 v15 文件可以在一次启动中走完两个步骤。

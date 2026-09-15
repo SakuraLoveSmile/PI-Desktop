@@ -1,15 +1,15 @@
-# ADR 0257: Plugin-declared providers are Host-owned rows
+# ADR 0259: Plugin-declared providers are Host-owned rows
 
 - Status: Accepted for implementation
 - Date: 2026-09-15
-- Decision: D426
+- Decision: D427
 - Related: ADR 0011, `07-plugins/02-plugin-manifest-schema.md`, `07-plugins/13-plugin-permissions-matrix.md`, `03-runtime/04-data-storage.md`, `03-runtime/12-provider-config-schema.md`
 
 ## Context
 
 A plugin that integrates an LLM service has two surfaces today: an agent tool, or
 a session-scoped agent implementation registered through the trusted-extension
-API (ADR 0256). Neither puts the service in the native provider list, so the user
+API (ADR 0258). Neither puts the service in the native provider list, so the user
 cannot select it for a session and the plugin ends up keeping a private provider
 registry beside the Host's one.
 

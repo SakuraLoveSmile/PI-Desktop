@@ -32,7 +32,7 @@ CREATE TABLE providers (
   created_at       INTEGER NOT NULL,
   updated_at       INTEGER NOT NULL,
   -- Owning plugin id for a row a plugin declared in `contributes.providers`
-  -- (schema v17, ADR 0257). NULL is a user-owned row: the plugin refreshes its
+  -- (schema v17, ADR 0259). NULL is a user-owned row: the plugin refreshes its
   -- own fields on every load, while the user path may edit or delete only the
   -- rows it owns.
   owner_plugin_id  TEXT

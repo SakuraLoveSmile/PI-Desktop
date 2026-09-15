@@ -323,7 +323,7 @@ type PluginNetDomains = string[]; // "api.example.com" 或 "*.example.com"
 ## 5.4 providers —— 插件声明的 provider 行
 
 `contributes.providers` 最多声明 8 个 provider，宿主会把每一项落成原生 provider
-列表中的一行，并归该插件所有（[ADR 0257](../../../adr/0257-plugin-declared-providers.md)）：
+列表中的一行，并归该插件所有（[ADR 0259](../../../adr/0259-plugin-declared-providers.md)）：
 
 - 声明的 `id` 匹配 `[a-zA-Z][a-zA-Z0-9_-]{0,63}` 且在插件内唯一；行 id 为
   `plugin:<pluginId>:<declaredId>`

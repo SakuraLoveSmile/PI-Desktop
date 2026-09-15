@@ -342,7 +342,7 @@ and `**` matches one or more trailing segments (final segment only).
 ## 5.4 providers — provider rows the plugin declares
 
 `contributes.providers` declares at most 8 providers that the Host materializes
-as rows in the native provider list, owned by the plugin ([ADR 0257](../../adr/0257-plugin-declared-providers.md)):
+as rows in the native provider list, owned by the plugin ([ADR 0259](../../adr/0259-plugin-declared-providers.md)):
 
 - the declaration `id` matches `[a-zA-Z][a-zA-Z0-9_-]{0,63}` and is unique
   within the plugin; the row id is `plugin:<pluginId>:<declaredId>`

@@ -593,7 +593,7 @@ one after the final row would be wrong.
 - a plugin-owned row (`ownerPluginId`) is refreshed from its manifest on every
   load, so `providers.update` / `providers.delete` refuse it with a
   `PROVIDER_OWNED_BY_PLUGIN` error; only the owning plugin's lifecycle changes
-  or removes it (ADR 0257)
+  or removes it (ADR 0259)
 - `providers.setSecret({ id, secretValue })` — stores or clears one provider's
   API key (`secret:provider:<id>:api_key` and the row's `secret_ref`). It is the
   write a plugin-owned row accepts: only the credential the declaration asks for
