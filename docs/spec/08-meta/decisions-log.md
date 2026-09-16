@@ -5467,6 +5467,24 @@ that was sitting at the bottom — including after the turn had finished.
   See `04-ux/07-ui-design-system.md` §11.1 and `04-ux/08-component-spec.md`
   §3.7.
 
+## 2026-09-16 — One geometry for every chrome icon control
+
+- The preview- and route-band lane actions (`.title-nav-btn`) rendered as 22px
+  tiles with `--radius-2xs` and a `--ds-tile` seat, beside 28px siblings: the
+  same dock toggle in the conversation topbar, the viewport-fixed work-panel
+  toggle, and the work-panel's own actions. One control, two sizes and two
+  shapes, in the same 46px band.
+- Those actions now take the shared chrome-control geometry (the `.ct-icon-btn`
+  group): a 28px square from `--ds-work-panel-toggle-size`, `flex: 0 0` so a
+  crowded band cannot squeeze them out of square, `--radius-md`, a transparent
+  seat with the semantic hover wash, and the 15px glyph every other chrome
+  control uses. `.title-nav-btn` keeps only its press feedback and active tone.
+- The preview action lane is derived from the control it reserves room for:
+  `--ds-preview-action-lane-width: calc(2 * var(--ds-work-panel-toggle-size) + 4px + 8px)`,
+  so the panel header's reserve and the buttons cannot drift apart.
+- Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/08-component-spec.md` §2.
+
 ## 2026-09-16 — The macOS traffic-light reserve has one source (D433)
 
 - The renderer's windowed lead-in for the macOS traffic lights was a hand-copied

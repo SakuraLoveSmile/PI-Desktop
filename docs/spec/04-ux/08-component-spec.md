@@ -269,6 +269,11 @@ combined model × reasoning selection (§11).
   native drag rectangle is the border box. The control band continues the
   titlebar's `border-subtle` bottom rule and uses the same token for its
   leading divider.
+- Every chrome icon control is one 28px square (`--ds-work-panel-toggle-size`):
+  the topbar's dock toggle, the viewport-fixed work-panel toggle, and the
+  preview/route-band lane actions. The lane's two actions match their siblings
+  instead of rendering at a size of their own, and the panel header's lane
+  reserve is derived from that same control size rather than from a literal.
 - Band reservation is platform-independent (D269). The band is opaque and
   absolutely positioned, so scrolling route content passes underneath it on
   every platform, macOS included. Every route surface that starts its own

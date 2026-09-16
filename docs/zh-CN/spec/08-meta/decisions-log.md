@@ -4220,6 +4220,13 @@ the retained upstream work-panel lifecycle. See
 - `.composer-right .icon-btn` 不再设置水平内边距。带文字的模型/思考胶囊自己用 `!important` 设置内边距，所以那条声明只会把它旁边的纯图标控件撑宽；增强控件在加载态仍保留自己的带文字几何。
 - 仅渲染层：无协议、存储、宿主、权限或迁移改动。见 `04-ux/07-ui-design-system.md` §11.1 与 `04-ux/08-component-spec.md` §3.7。
 
+## 2026-09-16 —— 每个 chrome 图标控件共用一套几何
+
+- 预览态与路由带上的动作按钮（`.title-nav-btn`）此前渲染为 22px 的方块，使用 `--radius-2xs` 与 `--ds-tile` 底色，而它们的同级控件是 28px：会话顶栏里同一个侧边栏开关、视口固定的工作面板开关，以及工作面板自身的操作。同一个控件、同一个 46px 带内，却有两种尺寸和两种形状。
+- 这些动作按钮现在采用共享的 chrome 控件几何（`.ct-icon-btn` 组）：由 `--ds-work-panel-toggle-size` 得到的 28px 正方形、`flex: 0 0` 以免拥挤的带把它们挤扁、`--radius-md`、透明底座加语义化 hover 底色，以及其它 chrome 控件统一使用的 15px 图形。`.title-nav-btn` 只保留按压反馈与 active 色调。
+- 预览态动作组的车道宽度改为由它所预留的控件推导：`--ds-preview-action-lane-width: calc(2 * var(--ds-work-panel-toggle-size) + 4px + 8px)`，这样面板头部的预留与按钮本身不会再各自漂移。
+- 仅渲染层：无协议、存储、宿主、权限或迁移改动。见 `04-ux/08-component-spec.md` §2。
+
 ## 2026-09-16 —— macOS 交通灯预留量只有一个来源（D433）
 
 - 渲染层为 macOS 交通灯留出的窗口模式引导内缩，原本是一个手抄的 `76px`：散在 `apps/desktop/src/styles/chrome.css` 与 `apps/desktop/src/styles/work-panel.css` 里的五处声明 —— `.main-titlebar-left`（`64px`，即该值减去行自身的 12px 内边距）、`.conversation-topbar.ct-collapsed`（`--ct-lead-inset`）、`.sidebar-header`、`.window-chrome-row:not(.sidebar-expanded)`，以及预览态的 `.work-panel-header`（`calc(76px + var(--ds-preview-action-lane-width))`）—— 每一处还各有一个 `[data-fullscreen="true"]` 分身。它们谁都没有和主进程交给 Electron 的 `trafficLightPosition` 建立关联，因此任一侧单独改动都会与另一侧漂移。
