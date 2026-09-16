@@ -3761,6 +3761,24 @@ IPC 请求无法关闭。
   输入 CDP 或输出。默认无钥匙运行仍为 5/5 与现场案例
   明确跳过。
 
+#### E2E-CHAT-opaque-floating-decision-and-retry-surfaces：Plan 审批条与重试 hover 保持不透明
+
+- **状态**：已自动化（`apps/desktop/test/plan-mode-source-contract.test.mjs`、`apps/desktop/test/active-turn-surface.test.mjs`）
+- **优先级**：P2
+- **覆盖**：C、品质 / 浮动 Composer 与重试表面
+- **先决条件**：渲染器 CSS 为 `apps/desktop/src/styles` 下的生产源。
+- **步骤**：
+  1. 检查 Composer 停靠栏样式中的 `.plan-approval-bar`。
+  2. 检查记录样式中的 `.run-activity-error-popover.message-error`。
+  3. 在实时会话中悬停或聚焦正在重试的活动行。
+- **预期**：
+  - Plan/Goal 审批条使用 `--ds-bg-composer` 加 `--ds-shadow-composer`，而不是正文流里的 `--ds-tile` 薄洗，因此在透明停靠栏上仍可读。
+  - 重试 hover tooltip 把错误色混在 `--ds-bg-elevated-opaque` 上，记录正文不会透出。
+- **链接规格**：`04-ux/03-permission-ux.md`、`04-ux/08-component-spec.md`
+- **接受**：C、品质
+- **里程碑**：M6
+- **状态细节**：源码契约断言 CSS 标记。实时悬停仍为目视检查。
+
 #### E2E-107：Plan 批准使用一个绝对 30 分钟到期时间
 
 - **先决条件**：存在带有可控时钟的待处理 Plan 请求。
@@ -4980,6 +4998,9 @@ IPC 请求无法关闭。
 | M6+（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
 | E — 工具与权限（内置子智能体默认项） | E2E-SUBAGENT-settings-lists-builtin-defaults |
 | 品质（内置子智能体默认项） | E2E-SUBAGENT-settings-lists-builtin-defaults |
+| C — 对话与流式（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| 品质（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| M6（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策

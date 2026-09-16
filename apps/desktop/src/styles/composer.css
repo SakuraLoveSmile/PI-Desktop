@@ -552,7 +552,9 @@
 }
 
 /* Plan approval surface. Keep the gate in the composer layer so it remains
-   adjacent to the input and follows the same container width as the dock. */
+   adjacent to the input and follows the same container width as the dock.
+   The dock itself is transparent, so this plate uses the composer elevated
+   fill and shadow rather than the in-flow `--ds-tile` wash. */
 .plan-approval-bar {
   display: grid;
   width: 100%;
@@ -563,7 +565,8 @@
   margin-bottom: 8px;
   padding: 7px 9px;
   border-radius: var(--radius-md);
-  background: var(--ds-tile);
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
 }
 
 .plan-approval-copy {
