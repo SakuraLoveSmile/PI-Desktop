@@ -638,6 +638,14 @@ pi.net.fetch(input: {
 }): Promise<{ status: number; headers: Record<string, string>; bodyText: string }>
 ```
 
+`fetch` answers with the upstream response unchanged — `status`, `headers`, and
+`bodyText` — so a `429` is data your plugin can read, `Retry-After` included,
+rather than an error the host hides. The host does not retry, throttle, or
+re-issue the request: retry and backoff after a `429` are your plugin's own
+policy, and the response headers are the only backoff signal you get. A failed
+call (`status >= 400`) is audited as `ok: false`, together with the
+`retryAfter` it advertised when the response states one (§7).
+
 ```ts
 pi.net.websocket.connect(input: {
   url: string
@@ -991,6 +999,8 @@ Log fields:
 - ts
 - sessionId?
 - ok / errorCode
+- status / retryAfter (`net.fetch`: the upstream status of a completed call, and
+  for a failed one the `Retry-After` it stated — never the header set or body)
 
 ## 8. Versioning strategy
 

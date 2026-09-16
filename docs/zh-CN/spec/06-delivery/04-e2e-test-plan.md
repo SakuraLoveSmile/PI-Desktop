@@ -7075,15 +7075,20 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 - **前提条件**：一个声明 `net.domains: ["allowed.test"]` 和 `net.fetch` 的开发插件。
   `allowed.test` 上的本地服务器对 `/hop` 返回 302 到 `http://undeclared.test/leak`，
-  对 `/ok` 返回 200。
+  对 `/ok` 返回 200，对 `/limited` 返回 429 且带 `Retry-After: 2`。
 - **步骤**：1）调用 `pi.net.fetch({ url: "https://allowed.test/ok" })`。2）调用
-  `pi.net.fetch({ url: "https://allowed.test/hop" })`。
+  `pi.net.fetch({ url: "https://allowed.test/hop" })`。3）调用
+  `pi.net.fetch({ url: "https://allowed.test/limited" })`。
 - **预期**：步骤 1 返回 200。步骤 2 以点名 `undeclared.test` 的 `PERMISSION_DENIED`
-  失败，未声明的服务器没有记录到任何请求。审计日志显示被拒绝的那一跳。
-- **链接规格**：`07-plugins/04-plugin-security.md` §8.0
+  失败，未声明的服务器没有记录到任何请求。审计日志显示被拒绝的那一跳。步骤 3
+  原样返回 429 及其 `Retry-After` 头，服务器只记录到一次请求，审计日志记为
+  `ok: false` 并带有它通告的 `retryAfter` —— 宿主不重试任何东西。
+- **链接规格**：`07-plugins/04-plugin-security.md` §8.0、
+  `07-plugins/03-plugin-api.md` §7
 - **验收**：D、安全
 - **里程碑**：M4+
 - **状态**：由 `apps/desktop/test/plugin-egress.test.mjs` 运行时覆盖
+  （逐跳出网与失败调用的审计）
 
 #### E2E-238：未知会话的工具请求不会回退
 
