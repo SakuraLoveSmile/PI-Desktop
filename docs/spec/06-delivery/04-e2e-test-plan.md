@@ -2808,11 +2808,13 @@ identify the platform validation still needed.
   is up.
 - **Expected**: The card appears after a 500ms dwell, never appears during
   quick pointer passes, and re-targets to the latest hovered row when the
-  pointer changes. Each card shows: the localized session title, two tag
-  chips (Local task + mode/permission badge), the project name under
-  Workspace (or "Temporary" / "临时对话" for scratch rows), the latest
-  externally selected Git branch for the active project, and the row's
-  `Updated` timestamp formatted by the active locale. Refreshing the branch
+  pointer changes. Each card shows: the localized session title, the
+  mode/permission badge, live status, the readable model display name when
+  known, the project name (or "Temporary" / "临时对话" for scratch rows)
+  with the latest Git branch on the same row, and the row's `Updated`
+  timestamp formatted by the active locale without seconds. Ordinary
+  sessions do not show a Local task chip, session UUID, separate Provider
+  label, or a status-checked timestamp. Refreshing the branch
   does not activate a project or change the selected conversation. The session
   row has no native `title` tooltip; the hover card is the only full-title
   surface. The card never widens past 320px, never causes the underlying row
@@ -10980,8 +10982,8 @@ are withdrawn with ADR 0165.
   4) Delete (or otherwise remove) one referenced session, or use a session whose
   reference is already stale, then revisit the card. 5) Inspect an independent
   session's card as well.
-- **Expected**: The card shows the provider's readable name and model display
-  name instead of the provider ID. A collaboration-created session shows its
+- **Expected**: The card shows the model's display name, falling back to
+  the provider's readable name, instead of the provider ID. A collaboration-created session shows its
   creator, and a creator shows its bounded created-session list. Each live
   reference is a native keyboard-focusable button with an accessible
   open-session name; activating it opens that durable session and focuses the
