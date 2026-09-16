@@ -1,5 +1,5 @@
 import { dialog, shell } from "electron";
-import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityQuery, type UserSkillRecord, type UserSubagentRecord } from "@pi-desktop/shared";
+import { ErrorCodes, IPC, type ActivationScope, type AgentCapabilityMove, type AgentCapabilityQuery, type UserSkillRecord, type UserSubagentRecord } from "@pi-desktop/shared";
 import { loadSubagentDefinitions, type UserSubagentDocument } from "@pi-desktop/agent-runtime";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
@@ -191,6 +191,19 @@ export function registerSkillsIpc({
       return res;
     },
   );
+
+  /**
+   * Move a skill between the global and a project's `.agents/skills`.
+   *
+   * Ownership changes, so both levels change; the response carries the id the
+   * skill ended up under, because a move into an occupied destination renames it.
+   */
+  handle(IPC.invoke.skillTransfer, async (payload: AgentCapabilityMove) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call<{ skill: UserSkillRecord }>("skills.transfer", payload);
+    sendToRenderer(IPC.event.pluginChanged,{ reason: "skill" });
+    return res;
+  });
 
   /**
    * Show a skill document in the OS file manager. The level and project travel

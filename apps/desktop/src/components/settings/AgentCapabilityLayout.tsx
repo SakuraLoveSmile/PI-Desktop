@@ -194,17 +194,13 @@ export function CapabilityToggle({
 
 /**
  * Page shell. The heading is owned by SettingsPage, so this contributes the
- * description, the toolbar, and the single panel the rows live in.
+ * toolbar and the single panel the rows live in.
  */
 export function AgentCapabilityPage({
-  description: _description,
-  note: _note,
   toolbar,
   children,
   className,
 }: {
-  description: string;
-  note?: string;
   toolbar: ReactNode;
   children: ReactNode;
   className?: string;
