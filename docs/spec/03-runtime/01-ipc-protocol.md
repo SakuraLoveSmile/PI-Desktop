@@ -1127,8 +1127,9 @@ Non-sensitive config that can be returned to the UI:
   tools disabled
 - optional `AppSettings.networkProxy` (`system` / `direct` / `custom` plus a
   proxy URL and bypass list). Absent means System. Custom accepts `http`,
-  `https`, `socks5`, and `socks5h` URLs. Main applies Chromium
-  `session.setProxy` and Node env immediately; the agent sidecar is
+  `https`, `socks5`, and `socks5h` URLs, including userinfo. Main applies
+  Chromium `session.setProxy` (credentialed URLs through a loopback SOCKS5
+  relay; issue #490) and Node env immediately; the agent sidecar is
   reconfigured without a process restart. `pi-desktop/network/testProxy`
   runs one bounded Chromium fetch through the supplied config and does not
   persist it.
