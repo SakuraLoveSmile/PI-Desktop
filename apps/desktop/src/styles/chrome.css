@@ -389,28 +389,14 @@
   padding-left: max(0px, calc(var(--ds-window-lead-inset) - 12px));
 }
 
+/* Preview- and route-band actions take the shared chrome-control geometry from
+   the `.ct-icon-btn` group below (28px square, `--radius-md`, transparent seat,
+   hover wash). Only the press feedback belongs to the lane itself. */
 .title-nav-btn {
-  display: inline-flex;
-  height: 22px;
-  width: 22px;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-2xs);
-  color: color-mix(in oklab, var(--ds-text-primary) 55%, transparent);
-  background: var(--ds-tile);
   transition:
     background var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out),
     transform var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.title-nav-btn:hover:not(:disabled) {
-  color: var(--ds-text-primary);
-  background: var(--ds-bg-hover);
-}
-
-.title-nav-btn:disabled {
-  opacity: 0.28;
 }
 
 .title-nav-btn.active {
@@ -529,11 +515,17 @@
   line-height: var(--leading-compact);
 }
 
+/* One geometry for every chrome icon control: the topbar's dock toggle, the
+   viewport-fixed work-panel toggle, and the preview/route-band lane actions.
+   `flex: 0 0` keeps them square when a crowded band would otherwise squeeze
+   them. */
 .conversation-topbar .ct-icon-btn,
-.app-work-panel-toggle {
+.app-work-panel-toggle,
+.window-chrome-row .title-nav-btn {
   display: inline-flex;
   height: var(--ds-work-panel-toggle-size);
   width: var(--ds-work-panel-toggle-size);
+  flex: 0 0 var(--ds-work-panel-toggle-size);
   align-items: center;
   justify-content: center;
   border: none;
@@ -546,13 +538,15 @@
 }
 
 .conversation-topbar .ct-icon-btn:hover:not(:disabled),
-.app-work-panel-toggle:hover:not(:disabled) {
+.app-work-panel-toggle:hover:not(:disabled),
+.window-chrome-row .title-nav-btn:hover:not(:disabled) {
   background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
 }
 
 .conversation-topbar .ct-icon-btn:disabled,
-.app-work-panel-toggle:disabled {
+.app-work-panel-toggle:disabled,
+.window-chrome-row .title-nav-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }

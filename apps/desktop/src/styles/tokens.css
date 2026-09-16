@@ -164,9 +164,13 @@
   --ds-work-panel-toggle-size: 28px;
   --ds-work-panel-toggle-inset: 12px;
   --ds-work-panel-toggle-gap: 20px;
-  /* Preview-mode shell actions are two 22px buttons with a 4px gap and an
-     additional 8px buffer before the panel's first tab. */
-  --ds-preview-action-lane-width: 56px;
+  /* Preview-mode shell actions are two chrome controls (the same 28px square as
+     the toggle beside them) with a 4px gap and an additional 8px buffer before
+     the panel's first tab. Derived from the control it reserves room for, so the
+     lane and the buttons cannot drift apart. */
+  --ds-preview-action-lane-width: calc(
+    2 * var(--ds-work-panel-toggle-size) + 4px + 8px
+  );
   /* Keep an 8px visual buffer between work-panel actions and window chrome. */
   --ds-window-controls-width: 120px;
   /* macOS traffic lights sit at the window's top-left. Their footprint is

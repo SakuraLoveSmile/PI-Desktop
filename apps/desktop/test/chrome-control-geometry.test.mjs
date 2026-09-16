@@ -1,10 +1,14 @@
 /**
- * Icon-only control geometry.
+ * Chrome control geometry.
  *
- * `.icon-btn` is shared with label-driven pills, so its width comes from its
- * content — glyph plus padding — and an icon-only use must state the square
- * explicitly (`.icon-btn-square`). These are source contracts; the layout E2E
- * measures the rendered rectangles.
+ * Two families, one rule each:
+ *  - icon-only `.icon-btn` uses state the square explicitly (`.icon-btn-square`),
+ *    because `.icon-btn` is shared with label-driven pills and takes its width
+ *    from its content — glyph plus padding;
+ *  - the preview- and route-band lane actions take the shared chrome-control
+ *    geometry (`.ct-icon-btn` group) instead of restating their own size.
+ *
+ * These are source contracts; the layout E2E measures the rendered rectangles.
  */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -87,4 +91,35 @@ test("every icon-only .icon-btn states the square", async () => {
       );
     }
   }
+});
+
+test("the preview and route-band actions share the chrome control geometry", () => {
+  // The topbar's dock toggle, the viewport-fixed panel toggle, and the lane
+  // actions are the same control: one geometry, stated once.
+  const shared = styles.match(/\.window-chrome-row \.title-nav-btn \{([^}]*)\}/)?.[1] ?? "";
+  assert.ok(shared, "the shared chrome-control group does not cover the lane actions");
+  assert.match(shared, /height:\s*var\(--ds-work-panel-toggle-size\)/);
+  assert.match(shared, /width:\s*var\(--ds-work-panel-toggle-size\)/);
+  // `flex: 0 0` keeps the control square when a crowded band squeezes it.
+  assert.match(shared, /flex:\s*0 0 var\(--ds-work-panel-toggle-size\)/);
+  assert.match(shared, /border-radius:\s*var\(--radius-md\)/);
+
+  // The lane must not state its own size or seat again — that is what made it
+  // render 22px wide next to 28px siblings.
+  const lane = styles.match(/\n\.title-nav-btn \{([^}]*)\}/)?.[1] ?? "";
+  assert.ok(lane, ".title-nav-btn rule is missing");
+  for (const declaration of ["height", "width", "border-radius", "background"]) {
+    assert.doesNotMatch(
+      lane,
+      new RegExp(`(^|\\s)${declaration}:`),
+      `the lane restates ${declaration}, which the shared group owns`,
+    );
+  }
+});
+
+test("the preview action lane is derived from the control it reserves room for", () => {
+  assert.match(
+    styles,
+    /--ds-preview-action-lane-width:\s*calc\(\s*2 \* var\(--ds-work-panel-toggle-size\)\s*\+\s*4px\s*\+\s*8px\s*\)/,
+  );
 });

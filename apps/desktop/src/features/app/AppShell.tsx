@@ -136,7 +136,7 @@ export function AppShell() {
                   data-nav="new-task"
                   onClick={() => void runMenuCommand("newTask")}
                 >
-                  <IconNewSession size={13} />
+                  <IconNewSession size={15} />
                 </TooltipButton>
               )}
               <div className="window-chrome-drag" aria-hidden />
