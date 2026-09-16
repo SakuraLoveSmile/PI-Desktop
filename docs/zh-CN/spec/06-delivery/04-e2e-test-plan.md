@@ -7219,6 +7219,37 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **里程碑**：M6 之后的桌面外壳维护
 - **状态**：已自动化（`scripts/e2e-three-column-layout.mjs`，经 `pnpm test:e2e:layout` —— 固定窗口宽度不变、指针拖动全程 360px 下限、左栏让位/恢复、370px 重开目标）；单元覆盖见 `work-panel-resize.test.mjs`
 
+#### E2E-LAYOUT-work-panel-maximize
+
+- **Preconditions**: A desktop session has an open work panel with a real tab.
+- **Steps**:
+  1. Record the panel width and enter preview mode.
+  2. Inspect the header border box with the sidebar collapsed and expanded on
+     macOS windowed/fullscreen and Windows/Linux. Check row/spacer drag ownership.
+  3. With native pointer input, click centers and edges of sidebar and New Task
+     controls. Reenter preview and operate tabs, close, add, restore, panel toggle
+     and native controls. Drag empty header space. Repeat in light/dark themes.
+- **Expected**: MainChat is absent while preview fills the client area beside
+  the sidebar; native bounds and persisted preferred width are unchanged, the
+  divider is inert, and restore retains the last chosen sidebar state. The row
+  and spacer declare neither drag nor no-drag and pass pointer events through
+  outside controls. The panel header is the sole drag owner in the preview pane;
+  its border box and first tab start at least 8px after shell actions, including
+  expanded-sidebar New Task. Left inset is 8px except collapsed-sidebar windowed
+  macOS (76px); right native-control exclusion is unchanged. Controls receive
+  native clicks without window movement; empty-header drags move the window.
+  New Task exits preview to an editable composer. Header-height paint fills the
+  excluded lane without hiding panel controls.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
+  `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8, ADR 0238
+- **Acceptance**: F (persistence), Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Partially automated by `scripts/e2e-three-column-layout.mjs`
+  (preview entry/exit, DOM action behavior, header border-box exclusion,
+  row/spacer ownership, all-platform/fullscreen CSS fixtures in both sidebar
+  states). DOM/CDP clicks are not native hit-test proof. Native pointer, drag
+  and visual checks remain required; branch runs are exploratory only.
+
 #### E2E-AGENT-alt-enter-steers-active-turn：Enter 排队跟进，Alt+Enter 向当前回合补充指令
 
 - **前提条件**：会话已配置模型，能够控制流式回复或工具完成时机；附件场景使用支持图像的模型。

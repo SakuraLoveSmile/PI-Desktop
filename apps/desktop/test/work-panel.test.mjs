@@ -576,28 +576,19 @@ test("preview mode keeps shell actions and restores routes before navigation", (
     appSource,
     /case "newTask":[\s\S]*?if \(workPanelMaximizedRef\.current\) setWorkPanelMaximized\(false\);/,
   );
-  assert.match(
-    globalStyles,
-    /\.window-chrome-row \{[\s\S]*?-webkit-app-region: drag;/,
-  );
-  assert.match(
-    globalStyles,
-    /\.window-chrome-row\.sidebar-expanded \{[\s\S]*?left: var\(--ds-sidebar-width\);/,
-  );
-  assert.match(
-    globalStyles,
-    /:root\[data-platform="darwin"\] \.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*76px;/,
-  );
-  assert.match(
-    globalStyles,
-    /:root\[data-platform="darwin"\]\[data-fullscreen="true"\][\s\S]*?\.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*8px;/,
-  );
-  assert.match(
-    globalStyles,
-    /:root\[data-platform="darwin"\]:not\(\[data-fullscreen="true"\]\)[\s\S]*?\.app-shell\.work-panel-maximized\.sidebar-collapsed\s+\.work-panel-header\s*\{[^}]*padding-left:\s*calc\(76px \+ var\(--ds-preview-action-lane-width\)\);/,
-  );
-  assert.match(
-    globalStyles,
-    /:root\[data-platform="darwin"\]\[data-fullscreen="true"\][\s\S]*?\.app-shell\.work-panel-maximized\.sidebar-collapsed\s+\.work-panel-header\s*\{[^}]*padding-left:\s*calc\(8px \+ var\(--ds-preview-action-lane-width\)\);/,
-  );
+  const row = globalStyles.match(/\.window-chrome-row \{[^}]*\}/)?.[0] ?? "";
+  const spacer = globalStyles.match(/\.window-chrome-drag \{[^}]*\}/)?.[0] ?? "";
+  assert.match(row, /pointer-events:\s*none/);
+  assert.match(row, /padding-left:\s*var\(--preview-chrome-inset\)/);
+  assert.ok(spacer);
+  assert.doesNotMatch(row + spacer, /app-region:|background:/);
+  assert.match(globalStyles, /\.window-chrome-row button \{[^}]*pointer-events:\s*auto;[^}]*app-region:\s*no-drag;/);
+  assert.match(globalStyles, /\.window-chrome-row\.sidebar-expanded \{[^}]*left: var\(--ds-sidebar-width\);/);
+  assert.match(globalStyles, /\.app-shell\.work-panel-maximized \{[^}]*--preview-chrome-inset:\s*8px;[^}]*--preview-chrome-action-lane:\s*30px;/);
+  assert.match(globalStyles, /\.app-shell\.work-panel-maximized\.sidebar-collapsed \{[^}]*--preview-chrome-action-lane:\s*var\(--ds-preview-action-lane-width\);/);
+  assert.match(globalStyles, /:root\[data-platform="darwin"\] \.app-shell\.work-panel-maximized\.sidebar-collapsed \{[^}]*--preview-chrome-inset:\s*76px;/);
+  assert.match(globalStyles, /:root\[data-platform="darwin"\]\[data-fullscreen="true"\]\s+\.app-shell\.work-panel-maximized\.sidebar-collapsed \{[^}]*--preview-chrome-inset:\s*8px;/);
+  assert.match(globalStyles, /\.app-shell\.work-panel-maximized \.work-panel-header \{[^}]*margin-left:\s*calc\(var\(--preview-chrome-inset\) \+ var\(--preview-chrome-action-lane\)\);[^}]*padding-left:\s*0;/);
+  assert.match(globalStyles, /\.work-panel-header \{[^}]*app-region:\s*drag;/);
+  assert.match(globalStyles, /\.app-shell\.work-panel-maximized \.work-panel-main \{[^}]*var\(--ds-bg-dock-raised\) 0 var\(--ds-toolbar-height\)/);
 });

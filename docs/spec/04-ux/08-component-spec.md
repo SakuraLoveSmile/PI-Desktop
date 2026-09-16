@@ -65,9 +65,10 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   native window bounds stay unchanged.
 - Work panel preview: the header maximize action temporarily unmounts MainChat
   and expands the panel across the client area beside the sidebar. A window-level
-  46px chrome row owns the drag area, New Task/sidebar actions, and native
-  window controls. On macOS, collapsed-sidebar preview reserves 76px on the
-  left in windowed mode and 8px in fullscreen for the traffic lights.
+  46px chrome row keeps New Task/sidebar and native window controls, with
+  pointer passthrough and no drag/no-drag rectangle outside its controls.
+  The panel header alone owns dragging in the preview pane; its border box
+  excludes the shell action lane in both sidebar states on every platform.
 - Work panel resize: its inner left-edge handle changes the committed panel
   width in the renderer, so dragging left gives the panel more internal space
   and dragging right returns space to MainChat (§5.4)
@@ -239,10 +240,11 @@ combined model × reasoning selection (§11).
   while the panel is closed. While the panel is open, that 120px band plus the
   toggle overlay the panel header instead, and the header ends its box before
   the band so the panel tab strip and `+` stay clear of the native control band.
-  In macOS windowed preview mode, a collapsed sidebar also adds the 76px
-  traffic-light reserve and the preview action lane plus an 8px gap to the
-  panel header itself, keeping its first tab clear; fullscreen uses the 8px
-  native reserve but retains the preview action lane.
+  In preview mode the header's left border box starts after the shell actions
+  plus an 8px gap, including expanded-sidebar New Task, on every platform.
+  The left inset is 8px except collapsed-sidebar windowed macOS (76px).
+  Header-height background paint fills the excluded lane without an opaque
+  overlay hiding tabs or panel actions.
   Resource close actions stay in their tabs so a second header `×` does not echo
   the native Windows close control (D357).
 - Title cluster (task title) flexes and shows at most the first 10 Unicode

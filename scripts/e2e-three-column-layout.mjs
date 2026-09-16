@@ -477,35 +477,58 @@ async function main() {
       `window ${beforeMaximize.windowWidth} -> ${maximizing.windowWidth}`,
     );
 
-    const openedTabPreview = await cdp.evaluate(`(() => {
-      const actionGroup = document.querySelector(
-        ".window-chrome-row .titlebar-nav",
+    // CSS geometry and DOM behavior are not proof of native titlebar hit testing.
+    const checkPreviewHitRegions = async (label) => {
+      const geometry = await cdp.evaluate(`(() => {
+        const row = document.querySelector(".window-chrome-row");
+        const spacer = document.querySelector(".window-chrome-drag");
+        const header = document.querySelector(".work-panel-header");
+        const actions = [...row.querySelectorAll("[data-nav]")];
+        const headerBox = header.getBoundingClientRect();
+        const firstTab = document.querySelector(".work-panel-tab");
+        const controls = row.querySelector(".window-controls");
+        const sidebar = document.querySelector(".sidebar");
+        const platform = document.documentElement.dataset.platform;
+        const fullscreen = document.documentElement.dataset.fullscreen === "true";
+        const inset = platform === "darwin" && !fullscreen && !sidebar ? 76 : 8;
+        const actionRight = Math.max(...actions.map(el => el.getBoundingClientRect().right));
+        return {
+          headerLeft: headerBox.left,
+          headerRight: headerBox.right,
+          actionRight,
+          leftClear: actions.length > 0 && headerBox.left >= actionRight + 8,
+          insetClear: actions[0].getBoundingClientRect().left >= (sidebar?.getBoundingClientRect().right ?? 0) + inset,
+          rightClear: headerBox.right <= window.innerWidth -
+            (platform === "win32" || platform === "linux" ? 120 : 0) &&
+            (!controls || headerBox.right <= controls.getBoundingClientRect().left),
+          tabClear: !firstTab || firstTab.getBoundingClientRect().left >= actionRight + 8,
+          rowRegion: getComputedStyle(row).webkitAppRegion,
+          spacerRegion: getComputedStyle(spacer).webkitAppRegion,
+          headerRegion: getComputedStyle(header).webkitAppRegion,
+          passThrough: getComputedStyle(row).pointerEvents === "none",
+          actionsInteractive: actions.every(el => getComputedStyle(el).pointerEvents === "auto" && getComputedStyle(el).webkitAppRegion === "no-drag"),
+        };
+      })()`);
+      check(
+        geometry.leftClear && geometry.insetClear && geometry.rightClear && geometry.tabClear &&
+          geometry.rowRegion === "none" && geometry.spacerRegion === "none" &&
+          geometry.headerRegion === "drag" && geometry.passThrough && geometry.actionsInteractive,
+        `preview header border box excludes shell controls (${label}; geometry only)`,
+        JSON.stringify(geometry),
       );
-      const firstTab = document.querySelector(".work-panel-tab");
-      const header = document.querySelector(".work-panel-header");
-      const actionGroupBox = actionGroup?.getBoundingClientRect();
-      const firstTabBox = firstTab?.getBoundingClientRect();
-      return {
-        platform: window.piDesktop?.platform ?? "unknown",
-        fullscreen: document.documentElement.dataset.fullscreen === "true",
-        actionGroupRight: actionGroupBox
-          ? Math.round(actionGroupBox.right)
-          : null,
-        firstTabLeft: firstTabBox ? Math.round(firstTabBox.left) : null,
-        headerPaddingLeft: header
-          ? Math.round(parseFloat(getComputedStyle(header).paddingLeft))
-          : null,
-      };
-    })()`);
-    check(
-      openedTabPreview.firstTabLeft !== null &&
-        (openedTabPreview.platform !== "darwin" ||
-          openedTabPreview.actionGroupRight === null ||
-          openedTabPreview.firstTabLeft >=
-            openedTabPreview.actionGroupRight + 8),
-      "opened work-panel tabs clear the preview action group",
-      JSON.stringify(openedTabPreview),
-    );
+    };
+    const originalPlatform = await cdp.evaluate(`document.documentElement.dataset.platform`);
+    const originalFullscreen = await cdp.evaluate(`document.documentElement.dataset.fullscreen`);
+    for (const platform of ["darwin", "win32", "linux"]) {
+      for (const fullscreen of [false, true]) {
+        await cdp.evaluate(`document.documentElement.dataset.platform = ${JSON.stringify(platform)}; document.documentElement.dataset.fullscreen = "${fullscreen}"`);
+        for (let state = 0; state < 2; state += 1) {
+          await checkPreviewHitRegions(`${platform}, fullscreen=${fullscreen}, sidebar=${(await measure()).sidebarKind}`);
+          await clickSidebarToggle();
+        }
+      }
+    }
+    await cdp.evaluate(`document.documentElement.dataset.platform = ${JSON.stringify(originalPlatform)}; ${originalFullscreen === undefined ? "delete document.documentElement.dataset.fullscreen" : `document.documentElement.dataset.fullscreen = ${JSON.stringify(originalFullscreen)}`}`);
     const previewActions = await cdp.evaluate(`(() => {
       const firstAction =
         document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ??
@@ -807,19 +830,7 @@ async function main() {
       "preview actions clear the macOS traffic-light hit area",
       JSON.stringify(e2eChromePreview),
     );
-    check(
-      e2eChromePreview.platform !== "darwin" ||
-        e2eChromePreview.sidebarWidth !== null ||
-        (e2eChromePreview.panelHeaderPaddingLeft !== null &&
-          e2eChromePreview.previewActionGroupRight !== null &&
-          e2eChromePreview.panelHeaderPaddingLeft >=
-            e2eChromePreview.previewActionGroupRight + 8 &&
-          e2eChromePreview.panelTabStripLeft !== null &&
-          e2eChromePreview.panelTabStripLeft >=
-            e2eChromePreview.previewActionGroupRight + 8),
-      "maximized panel header clears the macOS preview action lane",
-      JSON.stringify(e2eChromePreview),
-    );
+    await checkPreviewHitRegions("reopened preview");
     check(
       e2eChromePreview.platform === "darwin" ||
         (e2eChromePreview.controlsPosition === "fixed" &&

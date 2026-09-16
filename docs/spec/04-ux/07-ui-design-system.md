@@ -1043,11 +1043,13 @@ retain the fade-and-slide exit.
 
 Preview mode is a transient shell state: MainChat is unmounted and the work
 panel occupies the client width beside the sidebar. A window-level 46px chrome
-row owns the drag area, New Task/sidebar actions, and native window controls.
-Collapsed-sidebar preview reserves 76px on the left for macOS traffic lights in
-windowed mode and 8px in fullscreen. The maximized panel header retains that
-native reserve, then adds the preview action lane and an 8px gap before its
-first tab.
+row is pointer-transparent outside New Task/sidebar and native window controls;
+it declares neither drag nor no-drag across the panel. The panel header alone
+owns the preview pane's drag area. Its border box, not just its padding, excludes
+the left action lane plus an 8px gap in both sidebar states on all platforms.
+The left inset is 8px except for collapsed-sidebar windowed macOS (76px).
+The right native-control exclusion remains unchanged. The panel paints the
+header-height background behind the excluded lane without covering its controls.
 
 ### 10.1 Responsive collapse
 

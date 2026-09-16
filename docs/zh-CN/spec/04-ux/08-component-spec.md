@@ -70,8 +70,14 @@
   工作面板标题带通过让自身盒子在该保留带之前结束来承载它——
   用外边距而非内边距——因为原生拖拽矩形就是边框盒。
 - 工作面板预览：标题栏最大化操作会临时卸载 MainChat，并让面板填充侧边栏
-  之外的客户区。窗口级 46px chrome 行负责拖动区域、新建任务、侧边栏和本机
-  窗口控件。macOS 侧边栏折叠时，窗口模式左侧预留 76px，全屏预留 8px 给交通灯。
+  之外的客户区。
+  The 46px chrome row keeps shell/native controls but has no drag/no-drag
+  rectangle and passes pointer events through outside controls. The panel
+  header alone owns dragging in the preview pane; its border box excludes
+  shell actions plus an 8px gap in both sidebar states on every platform.
+  The left inset is 8px except collapsed-sidebar windowed macOS (76px).
+  Right native-control exclusion is unchanged. Header-height paint fills the
+  left lane without an opaque overlay hiding tabs or panel actions.
 - 工作面板调整大小：左边缘拖动手柄（§5.4）
 - 窗口大小调整：本机边缘仅在打开作品时更改 MainChat 宽度
   面板保持其承诺的宽度；响应式布局如下

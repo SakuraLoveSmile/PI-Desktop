@@ -12221,7 +12221,15 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   1. Note the current panel width. If the sidebar is expanded, collapse it;
      then click the panel header's `+` action to open a real work-panel tab.
   2. Click the panel header's preview toggle.
-  3. Inspect the shell and tab alignment, then click the toggle again.
+  3. Inspect the header border box and tab alignment with the sidebar collapsed
+     and expanded on macOS windowed/fullscreen and Windows/Linux. Confirm the
+     overlay row and spacer declare neither drag nor no-drag and do not cover
+     the panel controls with opaque paint.
+  4. Using native pointer input, click the centers and edges of sidebar and
+     New Task controls; confirm sidebar toggles and New Task exits preview to
+     an editable composer. Reenter preview, operate tabs, close, add, restore,
+     panel toggle and native controls, then drag empty header space and confirm
+     the native window moves. Repeat in light/dark themes and both sidebar states.
 - **Expected**: Entering preview mode stops rendering MainChat and hands its
   width to the panel, so the panel spans the client area minus the expanded
   sidebar (the whole client area when the sidebar is collapsed). The native
@@ -12230,17 +12238,24 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   keeps whatever sidebar state the user chose last. The mode is transient: it is
   not persisted and ends when the panel closes. Preview mode keeps the shell's
   new-task, sidebar, and system-window actions reachable while MainChat is
-  absent. On non-fullscreen macOS with the sidebar collapsed, the first preview
-  action starts at the 76px traffic-light safe inset. After opening a real work
-  panel tab, its first tab starts at least 8px to the right of the preview action
-  group; fullscreen uses the 8px native inset but retains that action lane.
+  absent. The panel header is the sole drag owner in the preview pane. Its
+  actual border box and first tab start at least 8px after the shell actions,
+  including expanded-sidebar New Task, on every platform. Left inset is 8px
+  except collapsed-sidebar windowed macOS (76px). The right native-control
+  border exclusion remains intact. Controls receive native clicks without
+  moving the window; empty header space still drags it. Header-height background
+  paint fills the excluded lane without hiding panel controls.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238 §6, issue #289
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: Post-M6 desktop shell maintenance
-- **Status**: Automated (`scripts/e2e-three-column-layout.mjs` — preview mode
-  entry/exit widths, MainChat unmount, and window invariance)
+- **Status**: Partially automated (`scripts/e2e-three-column-layout.mjs` —
+  preview entry/exit, DOM action behavior, header border-box exclusion, row/spacer
+  drag ownership, and all-platform/fullscreen CSS fixtures in both sidebar
+  states). DOM clicks and CDP input are not native hit-test proof; native pointer,
+  window-drag and visual checks remain required on each platform. Branch runs
+  are exploratory and do not satisfy the integrated-main gate.
 
 #### E2E-AGENT-alt-enter-steers-active-turn: Enter follows up and Alt+Enter steers the active turn
 

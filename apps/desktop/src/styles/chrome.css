@@ -1108,15 +1108,22 @@
   user-select: none;
 }
 
-/* Window-level chrome for preview mode: the topbar that normally owns the drag
-   band and the window controls lives in MainChat, which preview mode does not
-   render, so the shell reserves the same 46px band itself. */
-.app-shell.work-panel-maximized .work-panel-header {
-  -webkit-app-region: drag;
+.app-shell.work-panel-maximized {
+  --preview-chrome-inset: 8px;
+  --preview-chrome-action-lane: 30px;
 }
 
-.app-shell.work-panel-maximized .work-panel-header button {
-  -webkit-app-region: no-drag;
+.app-shell.work-panel-maximized.sidebar-collapsed {
+  --preview-chrome-action-lane: var(--ds-preview-action-lane-width);
+}
+
+:root[data-platform="darwin"] .app-shell.work-panel-maximized.sidebar-collapsed {
+  --preview-chrome-inset: 76px;
+}
+
+:root[data-platform="darwin"][data-fullscreen="true"]
+  .app-shell.work-panel-maximized.sidebar-collapsed {
+  --preview-chrome-inset: 8px;
 }
 
 .window-chrome-row {
@@ -1128,54 +1135,21 @@
   display: flex;
   height: var(--ds-toolbar-height);
   align-items: center;
-  padding-left: 8px;
+  padding-left: var(--preview-chrome-inset);
   pointer-events: none;
-  -webkit-app-region: drag;
-  app-region: drag;
 }
 
 .window-chrome-row.sidebar-expanded {
   left: var(--ds-sidebar-width);
 }
 
-/* Native macOS traffic lights occupy the top-left ~76px of the window. Keep
- * preview actions outside that hit area while the sidebar is collapsed. */
-:root[data-platform="darwin"] .window-chrome-row:not(.sidebar-expanded) {
-  padding-left: 76px;
-}
-
-:root[data-platform="darwin"][data-fullscreen="true"]
-  .window-chrome-row:not(.sidebar-expanded) {
-  padding-left: 8px;
-}
-
 .window-chrome-row button {
   pointer-events: auto;
-}
-
-/* The system buttons keep their ordinary titlebar seat at the top right. */
-.window-chrome-row .window-controls {
-  margin-left: auto;
   -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .window-chrome-drag {
   flex: 1 1 auto;
   align-self: stretch;
-  -webkit-app-region: drag;
-  app-region: drag;
 }
-
-.window-chrome-row .window-controls,
-.window-chrome-row button {
-  -webkit-app-region: no-drag;
-}
-/* Preview mode: the top band replaces MainChat's titlebar, so the system
-   buttons join the band's own flow instead of floating over the panel as a
-   separate opaque block (their fixed seat is meant for the titlebar row). */
-
-
-
-
-/* Preview mode: the three shell actions sit tight at the band's left edge
- * (new task, restore the panel, toggle the panel), then the drag region. */

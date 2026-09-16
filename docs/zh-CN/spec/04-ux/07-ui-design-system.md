@@ -939,8 +939,13 @@ Linux 保留淡入淡出和滑动退出。
 - 面板 open/collapse/final 关闭和分隔符提交更新已提交
   首选宽度。本机边缘调整窗口大小并重排 MainChat。
 - 预览模式是临时的 shell 状态：卸载 MainChat，工作面板填充侧边栏之外的客户区。
-  窗口级 46px chrome 行保留拖动区域、新建任务、侧边栏和本机窗口控件。
-  侧边栏折叠时，macOS 窗口模式左侧预留 76px，全屏预留 8px 给交通灯。
+  The 46px chrome row retains shell and native controls but declares neither
+  drag nor no-drag across the panel and passes pointer events through outside
+  controls. The panel header alone owns dragging in the preview pane. Its
+  border box excludes shell actions plus an 8px gap in both sidebar states on
+  every platform. The left inset is 8px except collapsed-sidebar windowed macOS
+  (76px). Right native-control exclusion is unchanged. Header-height background
+  paint fills the excluded lane without covering panel controls.
 - 外层外壳在每个平台上都保留原生边缘/角落调整大小。无边框标题栏的
   拖动区域不会替代操作系统的调整大小所有权。300ms 的稳定边界等待窗口
   可避免恢复逻辑与慢速指针手势竞争，原生调整大小/移动事件停止 600ms 后

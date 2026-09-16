@@ -80,10 +80,13 @@ destination, chat as the home surface, tools and permissions inline.
   notification action; the durable local inbox opens from the sidebar footer
   bell instead (D130/D117). In work-panel preview mode, MainChat is unmounted
   and a window-level 46px chrome row keeps New Task, sidebar, and native window
-  controls available. In macOS collapsed-sidebar preview, the panel header
-  reserves the 76px windowed (8px fullscreen) traffic-light inset plus the
-  preview action lane and an 8px gap, so its first tab never overlaps either
-  the traffic lights or the preview controls.
+  controls available without owning a drag or no-drag rectangle across the
+  panel. The panel header alone owns dragging in the preview pane; its actual
+  border box starts after the shell action lane plus an 8px gap, including the
+  expanded-sidebar New Task button, on every platform. The left inset is 8px,
+  or 76px for collapsed-sidebar windowed macOS. Its right native-control
+  exclusion is unchanged. Header paint fills the excluded lane without an
+  opaque overlay hiding tabs or panel actions.
 - **Work panel**: docked right column (not an overlay) opened by an artifact,
   the viewport-fixed toggle, or `Cmd/Ctrl + J`. File, URL, browser-preview, and
   successful workspace-edit artifacts create their resources atomically. The
