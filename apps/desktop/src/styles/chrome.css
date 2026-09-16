@@ -383,16 +383,10 @@
   display: flex;
   align-items: center;
   margin-right: auto;
-  padding-left: 64px; /* traffic lights (76px) minus main-titlebar padding */
-}
-
-:root[data-platform="win32"] .main-titlebar-left,
-:root[data-platform="linux"] .main-titlebar-left {
-  padding-left: 0;
-}
-
-:root[data-platform="darwin"][data-fullscreen="true"] .main-titlebar-left {
-  padding-left: 0;
+  /* The row already pads 12px, so the title only adds the difference between
+     that and the traffic-light reserve. Platforms with no native traffic
+     lights, and fullscreen, resolve to the row's own padding. */
+  padding-left: max(0px, calc(var(--ds-window-lead-inset) - 12px));
 }
 
 .title-nav-btn {
@@ -624,16 +618,28 @@
   );
 }
 
-/* macOS traffic lights occupy the top-left ~76px; only reserve that space
- * when the sidebar is collapsed and the main pane reaches the window edge.
+/* The macOS traffic lights own the window's top-left corner. Everything below
+ * reads `--ds-window-lead-inset`: the cluster's right edge (native geometry,
+ * injected at boot from @pi-desktop/shared — see window-chrome.ts) plus the
+ * breathing room kept before the first shell control. Fullscreen hides the
+ * buttons, so the reserve falls back to the ordinary 8px gutter; Windows and
+ * Linux keep the 0px default from tokens.css and use their renderer-drawn
+ * controls instead.
+ *
  * Only the inset moves per platform — the collapsed padding below derives the
  * title's offset from it, so the two can never drift apart. */
-:root[data-platform="darwin"] .conversation-topbar.ct-collapsed {
-  --ct-lead-inset: 76px;
+:root[data-platform="darwin"] {
+  --ds-window-lead-inset: calc(
+    var(--ds-traffic-light-edge) + var(--ds-traffic-light-gap)
+  );
 }
 
-:root[data-platform="darwin"][data-fullscreen="true"] .conversation-topbar.ct-collapsed {
-  --ct-lead-inset: 8px;
+:root[data-platform="darwin"][data-fullscreen="true"] {
+  --ds-window-lead-inset: 8px;
+}
+
+:root[data-platform="darwin"] .conversation-topbar.ct-collapsed {
+  --ct-lead-inset: var(--ds-window-lead-inset);
 }
 
 /*
@@ -653,9 +659,9 @@
    * The title's edge is `padding-left`; this button must stay exactly 36px to
    * its left (28px button + .ct-left's 8px gap) at EVERY frame, not just at the
    * two endpoints. Deriving `left` from the same inset keeps both ranges
-   * identical (100px on darwin, 36px elsewhere), so the pair interpolates in
-   * lockstep. Offsetting instead of transitioning 12px->76px matters: that range
-   * is only 64px against padding's 100px, and the icon drifts onto the title
+   * identical (112px on darwin, 36px elsewhere), so the pair interpolates in
+   * lockstep. Offsetting instead of transitioning 12px->88px matters: that range
+   * is only 76px against padding's 112px, and the icon drifts onto the title
    * mid-flight. Expanded it lands off the pane's left edge, where it is
    * invisible anyway, and slides in rather than materialising over the title.
    */
@@ -666,7 +672,7 @@
   align-items: center;
   /*
    * Out of flow, so .ct-left's no-drag box no longer covers it: .ct-left starts
-   * at the padding edge (x=112 collapsed) while this sits at x=76. Without its
+   * at the padding edge (x=124 collapsed) while this sits at x=88. Without its
    * own carve-out the button falls inside the top bar's drag region, which on
    * macOS swallows the click and keeps the arrow cursor instead of the pointer.
    */
@@ -1052,15 +1058,11 @@
 }
 
 :root[data-platform="darwin"] .sidebar-header {
-  padding-left: 76px;
+  padding-left: var(--ds-window-lead-inset);
 }
 
 :root[data-platform="darwin"] .sidebar-header > .brand {
   display: none;
-}
-
-:root[data-platform="darwin"][data-fullscreen="true"] .sidebar-header {
-  padding-left: 8px;
 }
 
 .sidebar-header-actions {
@@ -1138,15 +1140,10 @@
   left: var(--ds-sidebar-width);
 }
 
-/* Native macOS traffic lights occupy the top-left ~76px of the window. Keep
- * preview actions outside that hit area while the sidebar is collapsed. */
+/* Keep preview actions outside the native traffic-light footprint while the
+ * sidebar is collapsed and this row reaches the window's left edge. */
 :root[data-platform="darwin"] .window-chrome-row:not(.sidebar-expanded) {
-  padding-left: 76px;
-}
-
-:root[data-platform="darwin"][data-fullscreen="true"]
-  .window-chrome-row:not(.sidebar-expanded) {
-  padding-left: 8px;
+  padding-left: var(--ds-window-lead-inset);
 }
 
 .window-chrome-row button {

@@ -586,18 +586,10 @@ test("preview mode keeps shell actions and restores routes before navigation", (
   );
   assert.match(
     globalStyles,
-    /:root\[data-platform="darwin"\] \.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*76px;/,
+    /:root\[data-platform="darwin"\] \.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*var\(--ds-window-lead-inset\);/,
   );
   assert.match(
     globalStyles,
-    /:root\[data-platform="darwin"\]\[data-fullscreen="true"\][\s\S]*?\.window-chrome-row:not\(\.sidebar-expanded\) \{[\s\S]*?padding-left:\s*8px;/,
-  );
-  assert.match(
-    globalStyles,
-    /:root\[data-platform="darwin"\]:not\(\[data-fullscreen="true"\]\)[\s\S]*?\.app-shell\.work-panel-maximized\.sidebar-collapsed\s+\.work-panel-header\s*\{[^}]*padding-left:\s*calc\(76px \+ var\(--ds-preview-action-lane-width\)\);/,
-  );
-  assert.match(
-    globalStyles,
-    /:root\[data-platform="darwin"\]\[data-fullscreen="true"\][\s\S]*?\.app-shell\.work-panel-maximized\.sidebar-collapsed\s+\.work-panel-header\s*\{[^}]*padding-left:\s*calc\(8px \+ var\(--ds-preview-action-lane-width\)\);/,
+    /:root\[data-platform="darwin"\][\s\S]*?\.app-shell\.work-panel-maximized\.sidebar-collapsed\s+\.work-panel-header\s*\{[^}]*padding-left:\s*calc\(\s*var\(--ds-window-lead-inset\) \+ var\(--ds-preview-action-lane-width\)\s*\);/,
   );
 });

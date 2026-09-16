@@ -507,6 +507,7 @@ async function main() {
       JSON.stringify(openedTabPreview),
     );
     const previewActions = await cdp.evaluate(`(() => {
+      const row = document.querySelector(".window-chrome-row");
       const firstAction =
         document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ??
         document.querySelector('.window-chrome-row [data-nav="new-task"]');
@@ -515,6 +516,13 @@ async function main() {
         platform: window.piDesktop?.platform ?? "unknown",
         fullscreen: document.documentElement.dataset.fullscreen === "true",
         firstActionLeft: firstActionBox ? Math.round(firstActionBox.left) : null,
+        // Read the reserve as the layout resolved it instead of restating the
+        // number: preview mode runs with the sidebar collapsed, so this row owns
+        // the macOS traffic-light reserve.
+        leadInset:
+          row && !row.classList.contains("sidebar-expanded")
+            ? Math.round(parseFloat(getComputedStyle(row).paddingLeft))
+            : null,
         newTask: !!document.querySelector('.window-chrome-row [data-nav="new-task"]'),
         sidebarToggle:
           !!document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ||
@@ -528,8 +536,11 @@ async function main() {
         (previewActions.controls || previewActions.platform === "darwin") &&
         (previewActions.platform !== "darwin" ||
           previewActions.fullscreen ||
+          // 88 = the native cluster's right edge (76) plus the shell's 12px gap.
           (previewActions.firstActionLeft !== null &&
-            previewActions.firstActionLeft >= 76)),
+            previewActions.leadInset !== null &&
+            previewActions.leadInset >= 88 &&
+            previewActions.firstActionLeft >= previewActions.leadInset)),
       "preview mode keeps new-task, sidebar, and window controls available",
       JSON.stringify(previewActions),
     );
@@ -722,6 +733,13 @@ async function main() {
         document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ??
         document.querySelector('.window-chrome-row [data-nav="new-task"]');
       const firstActionBox = firstAction?.getBoundingClientRect();
+      // Read the reserve as the layout resolved it instead of restating the
+      // number: preview mode runs with the sidebar collapsed, so this row owns
+      // the macOS traffic-light reserve.
+      const bandInset =
+        band && !band.classList.contains("sidebar-expanded")
+          ? Math.round(parseFloat(getComputedStyle(band).paddingLeft))
+          : null;
       const previewActionGroup = document.querySelector(
         ".window-chrome-row .titlebar-nav",
       );
@@ -733,6 +751,7 @@ async function main() {
         platform: window.piDesktop?.platform ?? "unknown",
         fullscreen: document.documentElement.dataset.fullscreen === "true",
         firstActionLeft: firstActionBox ? Math.round(firstActionBox.left) : null,
+        bandInset,
         controlsPosition: controls ? getComputedStyle(controls).position : null,
         controlsOnScreen: controlsBox
           ? controlsBox.width > 0 && controlsBox.right <= window.innerWidth + 1
@@ -802,8 +821,11 @@ async function main() {
     check(
       e2eChromePreview.platform !== "darwin" ||
         e2eChromePreview.fullscreen ||
+        // 88 = the native cluster's right edge (76) plus the shell's 12px gap.
         (e2eChromePreview.firstActionLeft !== null &&
-          e2eChromePreview.firstActionLeft >= 76),
+          e2eChromePreview.bandInset !== null &&
+          e2eChromePreview.bandInset >= 88 &&
+          e2eChromePreview.firstActionLeft >= e2eChromePreview.bandInset),
       "preview actions clear the macOS traffic-light hit area",
       JSON.stringify(e2eChromePreview),
     );

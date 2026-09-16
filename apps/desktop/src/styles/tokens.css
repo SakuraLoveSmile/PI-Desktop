@@ -166,6 +166,18 @@
   --ds-preview-action-lane-width: 56px;
   /* Keep an 8px visual buffer between work-panel actions and window chrome. */
   --ds-window-controls-width: 120px;
+  /* macOS traffic lights sit at the window's top-left. Their footprint is
+     native geometry, injected at boot from @pi-desktop/shared (window-chrome.ts)
+     so it cannot drift from the position electron/main/bootstrap/window.ts
+     gives the buttons; frames without native traffic lights keep the 0px
+     default. The gap is the breathing room the cluster's right edge keeps
+     before the first shell control. */
+  --ds-traffic-light-edge: 0px;
+  --ds-traffic-light-gap: 12px;
+  /* Left inset a window-level chrome row must leave clear for the traffic
+     lights. The platform policy that turns the two values above into this
+     reserve lives with the consumers in chrome.css. */
+  --ds-window-lead-inset: 0px;
   --ds-composer-radius: var(--radius-xl);
   --ds-composer-radius-lg: var(--radius-xl);
 
