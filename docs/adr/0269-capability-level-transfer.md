@@ -1,4 +1,4 @@
-# ADR 0267: Move capability documents between the global and project levels
+# ADR 0269: Move capability documents between the global and project levels
 
 - Status: Accepted for implementation
 - Date: 2026-09-16

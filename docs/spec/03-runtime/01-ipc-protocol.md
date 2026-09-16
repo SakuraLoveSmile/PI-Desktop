@@ -252,7 +252,7 @@ persisted marker protects accepted input from Smart Stop after renderer reload.
 A native Pi `message_end` may additionally carry the optional additive
 `replacesMessageId`: the provisional streaming row id whose durable SDK entry
 this event publishes. The renderer re-keys exactly that row (active, cache,
-retained, side chat) and a generic event without the field leaves every other
+retained) and a generic event without the field leaves every other
 row untouched. The field adds no event kind, RACP kind, or storage change.
 A user `message_end` can additionally
 carry `precedingAssistant`, a streaming snapshot that reserves the reply's
