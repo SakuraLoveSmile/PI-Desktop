@@ -3,11 +3,14 @@ import {
   ErrorCodes,
   PUBLIC_NETWORK_POLICY_ERROR,
   classifyIpLiteral,
+  classifyProxyRoute,
+  isAcceptableResolvedAddress,
   isPublicNetworkPolicyFailure,
   isSafePublicHttpsUrl,
   publicNetworkRefusalReason,
   type PublicNetworkAddressKind,
   type PublicNetworkRefusalReason,
+  type PublicNetworkRoute,
 } from "@pi-desktop/shared";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -20,6 +23,15 @@ export type PublicHttpsFetch = (
 ) => Promise<Response>;
 
 export type PublicHttpsLookup = (host: string) => Promise<Array<{ address: string }>>;
+
+/**
+ * The route the transport will actually take for one URL, as the session that
+ * carries `fetchImpl` reports it (`Session.resolveProxy`). Injectable so this
+ * module stays free of Electron: a caller wires the same session whose `fetch`
+ * it passes in, and a caller that wires nothing keeps the strict verdict
+ * (ADR 0272).
+ */
+export type PublicHttpsRouteLookup = (url: string) => Promise<string>;
 
 /** The resolver's own error code, for the log line. Never its message. */
 function resolverCode(error: unknown): string {
@@ -36,6 +48,8 @@ export type PublicNetworkRefusal = {
   address?: string;
   /** That address's class — `benchmark` for a TUN fake-IP, `private` for RFC1918. */
   addressKind?: PublicNetworkAddressKind;
+  /** The route the hop was judged on, when the transport could name one. */
+  route?: PublicNetworkRoute;
 };
 
 export class PublicNetworkPolicyError extends Error {
@@ -56,6 +70,8 @@ export class PublicNetworkPolicyError extends Error {
   readonly address?: string;
   /** The class of `address`, not just the address: it names the cause. */
   readonly addressKind?: PublicNetworkAddressKind;
+  /** The route the refusal was judged on, when the guard could read one. */
+  readonly route?: PublicNetworkRoute;
   constructor(message: string, refusal: PublicNetworkRefusal = { reason: "non-public-address" }) {
     super(message);
     this.name = PUBLIC_NETWORK_POLICY_ERROR;
@@ -63,6 +79,7 @@ export class PublicNetworkPolicyError extends Error {
     this.host = refusal.host;
     this.address = refusal.address;
     this.addressKind = refusal.addressKind;
+    this.route = refusal.route;
     this.errorCode =
       refusal.reason === "resolve-failed"
         ? ErrorCodes.NETWORK_RESOLVE_FAILED
@@ -80,24 +97,47 @@ export type PublicHttpsClient = {
 };
 
 /**
- * Main-process HTTPS client: syntactic guard, DNS classification, and
- * per-hop re-validation of redirects. Fetch and lookup are injectable so
- * tests can exercise the policy without Electron or the network.
+ * Main-process HTTPS client: syntactic guard, per-hop route and address
+ * classification, and per-hop re-validation of redirects. Fetch, lookup, and
+ * route are injectable so tests can exercise the policy without Electron or the
+ * network.
  *
  * Every branch still fails closed. The structured `reason` and the
  * `NETWORK_RESOLVE_FAILED` code change what the app can *say* about a block —
- * which host, and whether an address was judged at all — never whether it
- * blocks (issue #419).
+ * which host, which class of address, and which route it was judged on — never
+ * whether it blocks (issue #419).
+ *
+ * The address verdict follows the route the request will actually take. On a
+ * proxied route this app dials the proxy rather than the destination, so only
+ * the resolver-artifact class is tolerated there, and every class that names a
+ * real internal target still refuses. A route the transport cannot name keeps
+ * the strict verdict (ADR 0272).
  */
 export function createPublicHttpsClient(options: {
   fetchImpl: PublicHttpsFetch;
   lookupImpl?: PublicHttpsLookup;
+  /** Must be the session that carries `fetchImpl`; absent stays strict. */
+  routeImpl?: PublicHttpsRouteLookup;
   timeoutMs?: number;
 } ): PublicHttpsClient {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const lookupImpl =
     options.lookupImpl ??
     (async (host: string) => dnsLookup(host, { all: true }));
+
+  /**
+   * The route for one hop, asked immediately before that hop is dialed. A
+   * transport that cannot answer, or answers something this policy cannot read,
+   * is `unknown`, which is never permission (ADR 0272).
+   */
+  async function hopRoute(url: string): Promise<PublicNetworkRoute> {
+    if (!options.routeImpl) return "unknown";
+    try {
+      return classifyProxyRoute(await options.routeImpl(url));
+    } catch {
+      return "unknown";
+    }
+  }
 
   async function assertPublicUrl(url: string): Promise<void> {
     if (!isSafePublicHttpsUrl(url)) {
@@ -107,6 +147,7 @@ export function createPublicHttpsClient(options: {
     }
     const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
     if (host.startsWith("[") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return;
+    const route = await hopRoute(url);
     let addresses: Array<{ address: string }>;
     try {
       addresses = await lookupImpl(host);
@@ -118,23 +159,28 @@ export function createPublicHttpsClient(options: {
       throw new PublicNetworkPolicyError(`hostname does not resolve: ${host}${resolverCode(error)}`, {
         reason: "resolve-failed",
         host,
+        route,
       });
     }
     if (!addresses.length) {
       throw new PublicNetworkPolicyError(`hostname does not resolve: ${host}`, {
         reason: "resolve-failed",
         host,
+        route,
       });
     }
     for (const address of addresses) {
       const addressKind = classifyIpLiteral(address.address);
-      if (addressKind !== "public") {
+      if (!isAcceptableResolvedAddress(addressKind, route)) {
         // The class travels with the refusal: `benchmark` is a TUN fake-IP
         // (198.18.0.0/15) and `private` is a real RFC1918 target, and only the
-        // class tells those apart in the log and in the panel.
+        // class tells those apart in the log and in the panel. The route travels
+        // with it too: a fake-IP answer is tolerated on a proxied route because
+        // this app never dials it, and refused on a direct or unreadable route
+        // because this app would (ADR 0272).
         throw new PublicNetworkPolicyError(
-          `hostname resolves to a non-public address: ${host} -> ${address.address} (${addressKind})`,
-          { reason: "non-public-address", host, address: address.address, addressKind },
+          `hostname resolves to a non-public address: ${host} -> ${address.address} (${addressKind}, ${route} route)`,
+          { reason: "non-public-address", host, address: address.address, addressKind, route },
         );
       }
     }

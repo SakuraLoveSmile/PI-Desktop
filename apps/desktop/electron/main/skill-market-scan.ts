@@ -13,6 +13,7 @@ import {
   validateSkillCatalogFile,
   type PublicNetworkAddressKind,
   type PublicNetworkRefusalReason,
+  type PublicNetworkRoute,
   type SkillCatalogCategory,
   type SkillCatalogEntry,
   type SkillMarketSource,
@@ -48,6 +49,13 @@ export type SkillMarketFailureDetail = {
    * The address itself is deliberately not carried.
    */
   addressKind?: PublicNetworkAddressKind;
+  /**
+   * The route the guard judged the failing address on, when the transport could
+   * name one. A fake-IP answer is tolerated on a proxied route because this app
+   * never dials it, and refused on a direct or unreadable one because it would
+   * (ADR 0272).
+   */
+  route?: PublicNetworkRoute;
 };
 
 export type SkillMarketSearchResult = {
@@ -132,6 +140,7 @@ export function skillMarketFailureDetail(
     kind: classifySkillMarketFailure(error),
     ...(refusal ? { reason: refusal.reason } : {}),
     ...(refusal?.addressKind ? { addressKind: refusal.addressKind } : {}),
+    ...(refusal?.route ? { route: refusal.route } : {}),
   };
 }
 
@@ -311,6 +320,7 @@ export function createSkillMarketAggregator(request: CatalogRequest) {
           ...(host ? { host } : {}),
           ...(refusal ? { reason: refusal.reason } : {}),
           ...(refusal?.addressKind ? { addressKind: refusal.addressKind } : {}),
+          ...(refusal?.route ? { route: refusal.route } : {}),
         });
         return;
       }

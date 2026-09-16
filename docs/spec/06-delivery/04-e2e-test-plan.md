@@ -12190,11 +12190,14 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 #### E2E-SKILL-MARKET-NET-BOUNDARY: Public-HTTPS skill sources reject private and loopback URLs
 
 - **Preconditions**: Shared public-network helpers and the main-process
-  public-HTTPS client with injectable fetch/DNS.
+  public-HTTPS client with injectable fetch/DNS/route.
 - **Steps**: 1) Classify trailing-dot localhost, IPv4 loopback, IPv4-mapped
   IPv6, ULA, link-local, RFC1918, and `http://` URLs. 2) Resolve a public
   hostname to a private A record. 3) Follow a 302 whose Location is
-  `https://127.0.0.1/`.
+  `https://127.0.0.1/`. 4) Report a proxied route and a TUN fake-IP answer
+  (`198.18.0.1`), the same answer on a `DIRECT` route, on an unreadable route,
+  and on a route list that offers `DIRECT`. 5) Let a first hop be proxied and
+  its redirect target direct.
 - **Expected**: Every bypass form is rejected. A public CDN URL is accepted.
   DNS that yields a private address and a redirect onto loopback both throw a
   policy error without fetching the private target. A judged refusal is not
@@ -12202,16 +12205,21 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   `NETWORK_RESOLVE_FAILED` (`kind` `unresolved`) rather than as an address-check
   refusal — the guard reached no verdict, so nothing may claim it did. Every
   other refusal carries `NETWORK_POLICY_BLOCKED` (spec 08 §3.1) with its
-  `reason` and the class of the refused address, so the install sheet can name
-  the reason and offer a retry instead of leaving the install button disabled
-  with no explanation, and the market list can tell a refused source apart from
-  a merely unreachable one.
-- **Specs linked**: `05-security/01-security.md`, ADR 0243,
+  `reason`, the class of the refused address, and the route that address was
+  judged on, so the install sheet can name the reason and offer a retry instead
+  of leaving the install button disabled with no explanation, and the market
+  list can tell a refused source apart from a merely unreachable one. A proxied
+  hop whose answer is the RFC 2544 fake-IP class is refused on a direct or
+  unreadable route and accepted on the proxied one, every other non-public class
+  still refuses on all routes, and each redirect hop is judged on its own route
+  (ADR 0272).
+- **Specs linked**: `05-security/01-security.md`, ADR 0243, ADR 0272,
   `03-runtime/01-ipc-protocol.md` §12b
 - **Acceptance**: Security, Quality
 - **Milestone**: M6+
 - **Status**: Automated (`pnpm test:e2e:skill-market`,
   `apps/desktop/test/public-https-fetch.test.mjs`,
+  `apps/desktop/test/public-https-fetch-route.test.mjs`,
   `apps/desktop/test/skill-market-scan.test.mjs`,
   `apps/desktop/test/skill-market-failure.test.mjs`,
   `apps/desktop/test/skill-market-policy-refusal.test.mjs`,

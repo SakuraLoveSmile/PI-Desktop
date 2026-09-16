@@ -4272,7 +4272,15 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 每个内置行现在都带同一个开关。句柄存放在 `<data>/agent-capabilities/subagent-builtins.json` —— 一个独立文件，因为用户文档扫描会清理它永远看不到的 id 的状态 —— 并由 host-core 通过 `agents.disabledBuiltins` / `agents.setBuiltinEnabled` 暴露。Electron 主进程把被关闭的句柄交给 `loadSubagentDefinitions`，由它把它们从委派目录中剔除，而 `subagent/catalog` 仍会在其新增的 `builtins` 列表中返回该内置项，并标记 `enabled: false`。
 - 被关闭的内置项保留自己的行并变暗，因此这个开关就是重新打开的入口。同名的用户文档继续生效并继续遮蔽随应用发布的定义，在文件夹中显示与删除仍然没有，因为内置不是文件；宿主不可用时也不会贡献任何排除项。见 ADR 0270、`04-ux/06-settings-ia.md` §2、`03-runtime/01-ipc-protocol.md` §12c 与 E2E-SUBAGENT-settings-lists-builtin-defaults。
 
-## 2026-09-17 —— dock 内的问题卡是 composer 板（#360，D435）
+## 2026-09-17 —— 按请求实际会走的线路判定公网地址（D436）
+
+- 技能市场的主进程守卫此前用*本地*解析器判定目标主机，而 `net.fetch` 走的是 Chromium 的代理栈（ADR 0177）。在 TUN / fake-IP 解析器下，那个答案是应用永远不会建立的连接的合成地址（`198.18.0.0/15`），于是每个目录源都被判为「被应用的地址校验阻止」（issue #419）。
+- 现在每一跳都向承载 `net.fetch` 的会话询问它自己的判定（`Session.resolveProxy`），共享的 `classifyProxyRoute` 把该答案归为 `proxied` / `direct` / `unknown`。在 `proxied` 线路上，`isAcceptableResolvedAddress` 只容忍解析器自身产物的那一类（`benchmark`）；所有真实内网类别与「解析器没有应答」仍然拒绝。`direct` 线路与改动前逐字一致；列表里任何位置出现 `DIRECT` 都按 `unknown` 处理（Chromium 可能回退到它），而 `unknown` 走严格路径。
+- 拒绝与市场的 `failureDetails` 现在都带 `route`，因此「直连线路上的 fake-IP 拒绝」与「读不出线路的拒绝」在诊断里可以区分。
+- MCP 市场仍使用自己的地址钉定 Node HTTPS 守卫（ADR 0245），本次不变；fake-IP 环境下它的源仍会被拒绝。
+- 见 ADR 0272、`05-security/01-security.md` §4.1、`03-runtime/09-logging-and-observability.md` 与 `06-delivery/04-e2e-test-plan.md` 的 E2E-SKILL-MARKET-NET-BOUNDARY。
+
+## 2026-09-17 —— dock 内的问题卡是 composer 板（#360，D437）
 
 - asktool 问题卡挂在透明的 composer dock 里（`Composer.tsx` 把它渲染为 `.composer-stack` 的直接子节点，成绩单内的挂载已移除），但它仍在绘制流动层的 `--ds-tile` 洗色：3.5% 墨色混合、没有阴影。在浅色页面上这留下一块 `#f7f7f7` 面板加白色选项行，紧邻下方的 composer 板 —— 这正是 #360 第 1 项（“选择交互面板缺少背景色”）读到的样子。该 dock 规则自己的注释早已声称这张卡“使用与 Plan/Goal 批准相同的决策表面”，而同一槽位里的 `.plan-approval-bar` 绘制的是 `--ds-bg-composer` 加 `--ds-shadow-composer`（`04-ux/03-permission-ux.md` §9、`04-ux/08-component-spec.md` §11.5）。
 - `.composer-stack > .asktool-card` 现在绘制那块板：`--ds-bg-composer` 加 `--ds-shadow-composer`（浅色 `#ffffff`，深色 `color-mix(in oklab, #212121 96%, transparent)` 配合 composer 阴影）。

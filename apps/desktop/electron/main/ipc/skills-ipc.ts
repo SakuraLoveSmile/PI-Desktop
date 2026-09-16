@@ -79,6 +79,7 @@ export function registerSkillsIpc({
         kind: detail.kind,
         ...(detail.reason ? { reason: detail.reason } : {}),
         ...(detail.addressKind ? { addressKind: detail.addressKind } : {}),
+        ...(detail.route ? { route: detail.route } : {}),
       },
     });
   };
