@@ -75,7 +75,9 @@
   rectangle and passes pointer events through outside controls. The panel
   header alone owns dragging in the preview pane; its border box excludes
   shell actions plus an 8px gap in both sidebar states on every platform.
-  The left inset is 8px except collapsed-sidebar windowed macOS (76px).
+  The left inset is 8px except collapsed-sidebar windowed macOS (88px through
+  `--ds-window-lead-inset`: the shared 76px native cluster edge plus 12px).
+  Main uses the same native geometry from `@pi-desktop/shared`.
   Right native-control exclusion is unchanged. Header-height paint fills the
   left lane without an opaque overlay hiding tabs or panel actions.
 - 工作面板调整大小：左边缘拖动手柄（§5.4）
@@ -203,8 +205,8 @@ Composer 拥有 Agent/Plan/Goal 控件以及组合的模型 × 推理选择（§
 - 背景：bg-primary
 - 边框：边框-微妙底部
 - 位置：绝对46px无框带； `-webkit-app-region: drag` 与
-  交互式控件上的 `no-drag`； macOS 保留左侧约 76 像素的流量
-  灯亮（仅当侧边栏折叠时），Windows/Linux保留权利
+  交互式控件上的 `no-drag`； macOS 仅在侧边栏折叠时保留左侧 88px 的交通
+  灯空间，Windows/Linux保留权利
   本机窗口控件为 112px
 - 标题簇（任务标题）最多可显示前 10 个 Unicode
   字符加省略号；完整标题保留在本机工具提示中。
@@ -224,6 +226,10 @@ Composer 拥有 Agent/Plan/Goal 控件以及组合的模型 × 推理选择（§
   `--ds-toolbar-height` 填充。缺少这一保留时，页面标头会渲染到带的后面，
   标题行被遮挡。只有叠在带之上的表面（`z-index: 60` 的插件详情侧面板）
   可以跳过它。
+- 每个 chrome 图标控件都是同一个 28px 方形（`--ds-work-panel-toggle-size`）：
+  顶栏的侧边栏开关、视口固定的工作面板开关，以及预览态/路由带上的动作组。
+  因此那两颗动作按钮与其同级控件尺寸一致，不再使用自己更小的尺寸；面板头部
+  为动作组预留的车道宽度也由同一个控件尺寸推导，而不是写死的字面量。
 
 ### 2.4 状态
 
@@ -456,6 +462,11 @@ Collapsed (48px):
 
 - 可见shell名称为`PI-Desktop`； Codex 不用作渲染器
   身份。
+- 没有文字标签的控件声明 `.icon-btn-square`，它把两个轴都固定到
+  `--ds-control-size`（28px）。单独的 `.icon-btn` 宽度来自图形加左右各 8px 内边距 ——
+  这对带文字的胶囊按钮是正确的，对没有文字的控件则是错误的 —— 因此侧边栏收起控件、
+  会话顶栏开关，以及输入框的添加/增强/撤销控件，都呈现与顶栏和工作面板操作一致的
+  28px 正方形点击区，而不是"宽大于高"的胶囊。
 - `BrandLogo` 通过 Vite 导入从规范母版派生的渲染器尺寸标记：
   `src/assets/brand/logo-light.png` 用于浅色模式，
   `src/assets/brand/logo-dark.png` 用于深色模式（192x192，可覆盖 3x 下的

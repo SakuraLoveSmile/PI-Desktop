@@ -156,16 +156,35 @@
    * surface tone from the window top edge down. */
   --ds-settings-nav-width: 275px;
   --ds-toolbar-height: 46px;
+  /* Square icon-only control. `.icon-btn` takes its width from its label, so an
+     icon-only use pins both axes to this token instead. */
+  --ds-control-size: 28px;
   /* Work-panel controls share these geometry tokens so the header's safe lane
      cannot drift away from the viewport-fixed toggle. */
   --ds-work-panel-toggle-size: 28px;
   --ds-work-panel-toggle-inset: 12px;
   --ds-work-panel-toggle-gap: 20px;
-  /* Preview-mode shell actions are two 22px buttons with a 4px gap and an
-     additional 8px buffer before the panel's first tab. */
-  --ds-preview-action-lane-width: 56px;
+  /* Preview-mode shell actions are two chrome controls (the same 28px square as
+     the toggle beside them) with a 4px gap and an additional 8px buffer before
+     the panel's first tab. Derived from the control it reserves room for, so the
+     lane and the buttons cannot drift apart. */
+  --ds-preview-action-lane-width: calc(
+    2 * var(--ds-work-panel-toggle-size) + 4px + 8px
+  );
   /* Keep an 8px visual buffer between work-panel actions and window chrome. */
   --ds-window-controls-width: 120px;
+  /* macOS traffic lights sit at the window's top-left. Their footprint is
+     native geometry, injected at boot from @pi-desktop/shared (window-chrome.ts)
+     so it cannot drift from the position electron/main/bootstrap/window.ts
+     gives the buttons; frames without native traffic lights keep the 0px
+     default. The gap is the breathing room the cluster's right edge keeps
+     before the first shell control. */
+  --ds-traffic-light-edge: 0px;
+  --ds-traffic-light-gap: 12px;
+  /* Left inset a window-level chrome row must leave clear for the traffic
+     lights. The platform policy that turns the two values above into this
+     reserve lives with the consumers in chrome.css. */
+  --ds-window-lead-inset: 0px;
   --ds-composer-radius: var(--radius-xl);
   --ds-composer-radius-lg: var(--radius-xl);
 

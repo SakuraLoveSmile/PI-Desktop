@@ -856,7 +856,9 @@ Mode/provider/model/permission/shell 配置和新提示仍然存在
   no-drag across the panel and passes pointer events through outside controls.
   The panel header alone owns dragging in the preview pane; its border box
   excludes shell actions plus an 8px gap in both sidebar states on all platforms.
-  The left inset is 8px except collapsed-sidebar windowed macOS (76px).
+  The left inset is 8px except collapsed-sidebar windowed macOS (88px through
+  `--ds-window-lead-inset`: the 76px native cluster edge from
+  `@pi-desktop/shared` plus a 12px gap).
   Native clicks must operate controls and empty-header drags must move the
   window; DOM/CDP clicks alone are not native hit-test proof.
 

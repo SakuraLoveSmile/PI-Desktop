@@ -1100,9 +1100,10 @@ Work-panel and application-window resizing are implemented in MVP:
   declares neither drag nor no-drag across the panel. The panel header's drag
   border box starts after the shell actions plus an 8px gap, including expanded
   sidebar New Task. All platforms use an 8px left inset, except collapsed-sidebar
-  windowed macOS (76px). Native pointer clicks must operate the controls and
-  dragging empty header space must move the window; DOM/CDP clicks alone do
-  not establish native hit testing.
+  windowed macOS (88px). That reserve uses `--ds-window-lead-inset`: the
+  traffic-light cluster's 76px right edge (from `@pi-desktop/shared`) plus 12px.
+  Native pointer clicks must operate the controls and dragging empty header
+  space must move the window; DOM/CDP clicks alone do not establish native hit testing.
 
 The expanded sidebar is fixed at 275px. Collapse/open changes only whether the
 column is present; the historical resize handle is hidden and legacy width

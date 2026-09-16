@@ -1648,7 +1648,7 @@ identify the platform validation still needed.
   band renders instead (no chat top-bar controls) while retaining the same
   surface and alignment. The bar is draggable to move the window; interactive
   controls do not start a window drag.
-  macOS leaves the left ~76px clear for traffic lights only while the sidebar is
+  macOS leaves the left 88px clear for traffic lights only while the sidebar is
   collapsed (8px in fullscreen); Windows/Linux leave the right 120px clear for
   native window controls.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2 Topbar)
@@ -12241,10 +12241,13 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   absent. The panel header is the sole drag owner in the preview pane. Its
   actual border box and first tab start at least 8px after the shell actions,
   including expanded-sidebar New Task, on every platform. Left inset is 8px
-  except collapsed-sidebar windowed macOS (76px). The right native-control
-  border exclusion remains intact. Controls receive native clicks without
-  moving the window; empty header space still drags it. Header-height background
-  paint fills the excluded lane without hiding panel controls.
+  except collapsed-sidebar windowed macOS (88px). The preview row renders the
+  shared `--ds-window-lead-inset` (76px native cluster edge plus a 12px gap)
+  as its own left padding; the check reads the resolved padding rather than
+  restating the number. Fullscreen retains the action lane with an 8px inset.
+  The right native-control border exclusion remains intact. Controls receive
+  native clicks without moving the window; empty header space still drags it.
+  Header-height background paint fills the excluded lane without hiding controls.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238 §6, issue #289

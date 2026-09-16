@@ -315,6 +315,43 @@ async function main() {
       JSON.stringify(baseline),
     );
 
+    // Icon-only controls must render as squares in the live chrome, not only in
+    // the stylesheet: `.icon-btn` takes its width from its label, so an
+    // icon-only use states `.icon-btn-square`, and this is what proves the
+    // geometry actually stuck once flex layout and the cascade have run.
+    const iconControls = await cdp.evaluate(`(() => {
+      const expected = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--ds-control-size"),
+      );
+      const offenders = [];
+      let measured = 0;
+      for (const control of document.querySelectorAll(".icon-btn")) {
+        if (control.textContent.trim() !== "") continue;
+        const box = control.getBoundingClientRect();
+        if (box.width === 0 && box.height === 0) continue;
+        measured += 1;
+        if (
+          Math.round(box.width) !== Math.round(box.height) ||
+          Math.abs(box.width - expected) > 1
+        ) {
+          offenders.push({
+            classes: control.className,
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+          });
+        }
+      }
+      return { expected, measured, offenders };
+    })()`);
+    check(
+      Number.isFinite(iconControls.expected) &&
+        iconControls.expected > 0 &&
+        iconControls.measured > 0 &&
+        iconControls.offenders.length === 0,
+      "every rendered icon-only control is a square hit target",
+      JSON.stringify(iconControls),
+    );
+
     // 1. Opening the panel may not touch the native window.
     await rig(`window.__PI_DESKTOP__.openWorkPanel()`);
     await rig(`window.__PI_DESKTOP__.setWorkPanelWidth(720)`);
@@ -489,8 +526,7 @@ async function main() {
         const controls = row.querySelector(".window-controls");
         const sidebar = document.querySelector(".sidebar");
         const platform = document.documentElement.dataset.platform;
-        const fullscreen = document.documentElement.dataset.fullscreen === "true";
-        const inset = platform === "darwin" && !fullscreen && !sidebar ? 76 : 8;
+        const inset = parseFloat(getComputedStyle(row).paddingLeft);
         const actionRight = Math.max(...actions.map(el => el.getBoundingClientRect().right));
         return {
           headerLeft: headerBox.left,
@@ -530,6 +566,7 @@ async function main() {
     }
     await cdp.evaluate(`document.documentElement.dataset.platform = ${JSON.stringify(originalPlatform)}; ${originalFullscreen === undefined ? "delete document.documentElement.dataset.fullscreen" : `document.documentElement.dataset.fullscreen = ${JSON.stringify(originalFullscreen)}`}`);
     const previewActions = await cdp.evaluate(`(() => {
+      const row = document.querySelector(".window-chrome-row");
       const firstAction =
         document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ??
         document.querySelector('.window-chrome-row [data-nav="new-task"]');
@@ -538,6 +575,13 @@ async function main() {
         platform: window.piDesktop?.platform ?? "unknown",
         fullscreen: document.documentElement.dataset.fullscreen === "true",
         firstActionLeft: firstActionBox ? Math.round(firstActionBox.left) : null,
+        // Read the reserve as the layout resolved it instead of restating the
+        // number: preview mode runs with the sidebar collapsed, so this row owns
+        // the macOS traffic-light reserve.
+        leadInset:
+          row && !row.classList.contains("sidebar-expanded")
+            ? Math.round(parseFloat(getComputedStyle(row).paddingLeft))
+            : null,
         newTask: !!document.querySelector('.window-chrome-row [data-nav="new-task"]'),
         sidebarToggle:
           !!document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ||
@@ -551,8 +595,11 @@ async function main() {
         (previewActions.controls || previewActions.platform === "darwin") &&
         (previewActions.platform !== "darwin" ||
           previewActions.fullscreen ||
+          // 88 = the native cluster's right edge (76) plus the shell's 12px gap.
           (previewActions.firstActionLeft !== null &&
-            previewActions.firstActionLeft >= 76)),
+            previewActions.leadInset !== null &&
+            previewActions.leadInset >= 88 &&
+            previewActions.firstActionLeft >= previewActions.leadInset)),
       "preview mode keeps new-task, sidebar, and window controls available",
       JSON.stringify(previewActions),
     );
@@ -745,6 +792,13 @@ async function main() {
         document.querySelector('.window-chrome-row [data-nav="toggle-sidebar"]') ??
         document.querySelector('.window-chrome-row [data-nav="new-task"]');
       const firstActionBox = firstAction?.getBoundingClientRect();
+      // Read the reserve as the layout resolved it instead of restating the
+      // number: preview mode runs with the sidebar collapsed, so this row owns
+      // the macOS traffic-light reserve.
+      const bandInset =
+        band && !band.classList.contains("sidebar-expanded")
+          ? Math.round(parseFloat(getComputedStyle(band).paddingLeft))
+          : null;
       const previewActionGroup = document.querySelector(
         ".window-chrome-row .titlebar-nav",
       );
@@ -756,6 +810,7 @@ async function main() {
         platform: window.piDesktop?.platform ?? "unknown",
         fullscreen: document.documentElement.dataset.fullscreen === "true",
         firstActionLeft: firstActionBox ? Math.round(firstActionBox.left) : null,
+        bandInset,
         controlsPosition: controls ? getComputedStyle(controls).position : null,
         controlsOnScreen: controlsBox
           ? controlsBox.width > 0 && controlsBox.right <= window.innerWidth + 1
@@ -825,8 +880,11 @@ async function main() {
     check(
       e2eChromePreview.platform !== "darwin" ||
         e2eChromePreview.fullscreen ||
+        // 88 = the native cluster's right edge (76) plus the shell's 12px gap.
         (e2eChromePreview.firstActionLeft !== null &&
-          e2eChromePreview.firstActionLeft >= 76),
+          e2eChromePreview.bandInset !== null &&
+          e2eChromePreview.bandInset >= 88 &&
+          e2eChromePreview.firstActionLeft >= e2eChromePreview.bandInset),
       "preview actions clear the macOS traffic-light hit area",
       JSON.stringify(e2eChromePreview),
     );

@@ -507,10 +507,13 @@ followed by a divider and compact Settings / Logs / Theme rows.
 
 Toolbar rows are 46px. macOS places traffic lights at `{x:16,y:16}` and keeps
 the expanded sidebar's Collapse sidebar icon button right-aligned
-in that same row. The macOS row omits the sidebar logo/title, reserves `76px`
+in that same row. The macOS row omits the sidebar logo/title, reserves `88px`
 on the left for native chrome in windowed mode, and reclaims that padding in
-fullscreen. Windows/Linux keep the identity and sidebar actions in their first
-row and reserve the rightmost 120px for three frameless-window controls. The
+fullscreen. That reserve is the shared `--ds-window-lead-inset` token — the
+cluster's `76px` right edge (the same `@pi-desktop/shared` geometry the main
+process positions the buttons with) plus `12px` of breathing room. Windows/Linux
+keep the identity and sidebar actions in their first row and reserve the
+rightmost 120px for three frameless-window controls. The
 controls retain 112px of full-height hit targets, while the outer band adds an
 8px visual buffer before adjacent work-panel actions. The band paints an opaque
 `bg-primary` surface so page content never shows through the controls, and its
@@ -1047,7 +1050,12 @@ row is pointer-transparent outside New Task/sidebar and native window controls;
 it declares neither drag nor no-drag across the panel. The panel header alone
 owns the preview pane's drag area. Its border box, not just its padding, excludes
 the left action lane plus an 8px gap in both sidebar states on all platforms.
-The left inset is 8px except for collapsed-sidebar windowed macOS (76px).
+The left inset is 8px except for collapsed-sidebar windowed macOS (88px).
+That macOS reserve is the shared `--ds-window-lead-inset` token — the traffic-light
+cluster's 76px right edge (native geometry from `@pi-desktop/shared`, the same
+constants the main process positions the buttons with) plus a 12px gap.
+The action lane uses the shared 28px control size plus an 8px gap when expanded,
+and the shared preview action lane (two controls, 4px spacing, 8px gap) when collapsed.
 The right native-control exclusion remains unchanged. The panel paints the
 header-height background behind the excluded lane without covering its controls.
 
@@ -1081,7 +1089,16 @@ These are **token-level foundations** for common primitives. Detailed component 
 | Primary | px-3 py-1.5 | 32px | text-sm 500 | radius-sm | none | accent |
 | Secondary | px-3 py-1.5 | 32px | text-sm 400 | radius-sm | none (D297) | `--ds-tile`, hover `--ds-tile-hover` |
 | Ghost | px-2 py-1 | 28px | text-sm 400 | radius-sm | none | transparent |
+| Icon-only | none | 28px | — | radius-full | none | transparent; `.icon-btn-square` pins the width to `--ds-control-size` |
 | Danger | px-3 py-1.5 | 32px | text-sm 500 | radius-sm | none | error |
+
+An icon-only control states `.icon-btn-square`. `.icon-btn` alone takes its
+width from its content — glyph plus 8px of side padding — which is what a
+label-driven pill wants and what a control with no label must not inherit. The
+variant pins both axes to `--ds-control-size` (28px), keeps `flex: 0 0` so a
+crowded toolbar row cannot shrink it back out of square, and drops the side
+padding that under the global `border-box` would leave a 12px content box for a
+15px glyph.
 
 ### 11.2 Input / textarea
 

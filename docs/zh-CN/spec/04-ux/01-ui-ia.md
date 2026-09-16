@@ -70,7 +70,9 @@
   through outside controls. The panel header alone owns dragging in the preview
   pane. Its border box excludes the shell action lane plus an 8px gap in both
   sidebar states, including expanded-sidebar New Task, on every platform.
-  The left inset is 8px except collapsed-sidebar windowed macOS (76px).
+  The left inset is 8px except collapsed-sidebar windowed macOS (88px), using
+  `--ds-window-lead-inset`: the shared native cluster's 76px edge plus 12px.
+  The main process uses the same geometry from `@pi-desktop/shared`.
   Right native-control exclusion is unchanged; header-height background paint
   fills the left lane without an opaque overlay covering panel controls.
   Windows/Linux 使用无菜单的无框架 46px 行，并在

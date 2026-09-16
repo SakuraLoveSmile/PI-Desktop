@@ -69,6 +69,10 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   pointer passthrough and no drag/no-drag rectangle outside its controls.
   The panel header alone owns dragging in the preview pane; its border box
   excludes the shell action lane in both sidebar states on every platform.
+  On macOS, collapsed-sidebar preview reserves 88px in windowed mode and 8px
+  in fullscreen through the shared `--ds-window-lead-inset` token — the
+  traffic-light cluster's right edge (76px, from `@pi-desktop/shared`) plus a
+  12px gap. The main process uses that same shared geometry.
 - Work panel resize: its inner left-edge handle changes the committed panel
   width in the renderer, so dragging left gives the panel more internal space
   and dragging right returns space to MainChat (§5.4)
@@ -233,7 +237,7 @@ combined model × reasoning selection (§11).
   frameless drag band
 - Border: border-subtle bottom on every route-owned titlebar surface
 - Position: absolute 46px frameless band; `-webkit-app-region: drag` with
-  `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
+  `no-drag` on interactive controls; macOS reserves the left 88px for traffic
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   120px for native window controls (112px hit targets plus an 8px visual
   buffer). The conversation titlebar also reserves the 28px work-panel toggle
@@ -242,7 +246,8 @@ combined model × reasoning selection (§11).
   the band so the panel tab strip and `+` stay clear of the native control band.
   In preview mode the header's left border box starts after the shell actions
   plus an 8px gap, including expanded-sidebar New Task, on every platform.
-  The left inset is 8px except collapsed-sidebar windowed macOS (76px).
+  The left inset is 8px except collapsed-sidebar windowed macOS (88px through
+  the shared lead-inset token). Fullscreen retains the action lane.
   Header-height background paint fills the excluded lane without an opaque
   overlay hiding tabs or panel actions.
   Resource close actions stay in their tabs so a second header `×` does not echo
@@ -267,6 +272,11 @@ combined model × reasoning selection (§11).
   native drag rectangle is the border box. The control band continues the
   titlebar's `border-subtle` bottom rule and uses the same token for its
   leading divider.
+- Every chrome icon control is one 28px square (`--ds-work-panel-toggle-size`):
+  the topbar's dock toggle, the viewport-fixed work-panel toggle, and the
+  preview/route-band lane actions. The lane's two actions match their siblings
+  instead of rendering at a size of their own, and the panel header's lane
+  reserve is derived from that same control size rather than from a literal.
 - Band reservation is platform-independent (D269). The band is opaque and
   absolutely positioned, so scrolling route content passes underneath it on
   every platform, macOS included. Every route surface that starts its own
@@ -586,6 +596,13 @@ visually distinct from list content.
 
 - The visible shell name is `PI-Desktop`; Codex is not used as the renderer
   identity.
+- A control with no label states `.icon-btn-square`, which pins both axes to
+  `--ds-control-size` (28px). `.icon-btn` on its own takes its width from its
+  glyph plus 8px of side padding — right for a label-driven pill, wrong for a
+  control that carries no label — which is why the sidebar collapse control, the
+  conversation topbar toggle, and the composer's add/enhance/undo controls all
+  render the same 28px square target as the topbar and work-panel actions
+  instead of a wider-than-tall pill.
 - `BrandLogo` imports the renderer-sized marks derived from the canonical
   masters through Vite: `src/assets/brand/logo-light.png` for light mode and
   `src/assets/brand/logo-dark.png` for dark mode (192x192, covering the 64 px

@@ -85,7 +85,7 @@
 | D405 | 顿号打开斜杠菜单 | **修订 D123 / D139 / ADR 0024：当输入框为空时，第 1 个字符提交的「、」（U+3001）会在触发检测前改写为 `/`，中文输入法因此无需切换输入方式即可打开普通斜杠菜单。只改写该位置；其他位置的「、」仍是普通标点，`@` 文件菜单不受影响。仅共享语法与渲染器改动；不改 IPC、存储或补全数据源。见 ADR 0231 与 E2E-255。** | 要唤出 `/new`、`/compact`、模式别名或某个 Skill，中文输入法用户必须在书写中途切到 ASCII 输入再切回（issue #65）。 |
 | D406 | macOS DMG 只保留打开说明 | **修订 D371 / ADR 0204：macOS DMG 以 Finder 名称 `If app won't open, read this.txt` 展示打开说明，不再包含或暴露可执行的 `PI-Desktop-macOS-open.command`。macOS ZIP 安装包保留说明和助手。说明为可信未签名构建提供范围明确的终端备用命令；已签名和公证版本无需执行。见 ADR 0232 与 E2E-196b。** | DMG 应保持应用拖入 Applications 的正常安装路径简洁，同时在未签名应用打不开时提供可见且可执行的处理指引。 |
 | D407 | 导入会话后恢复已归档项目 | **针对 issue #250 的渲染器增量行为：核心或插件导入新增项目绑定会话时，导入触发的会话刷新会规范化项目路径，并清除该项目的渲染器归档状态。无路径会话、跳过的导入、没有活动绑定的插件历史路径和普通刷新保持归档状态不变。host 项目行、IPC 通道、插件方法、存储 schema 和数据格式不变。见 ADR 0236 与 E2E-257。** | host 可以在项目下成功生成导入会话，而渲染器仍将该项目侧边栏行隐藏为已归档。只恢复新导入绑定对应的项目，可以让结果可发现，同时不会在普通刷新时削弱用户的归档选择（issue #250）。 |
-| D408 | 三栏布局中优先保障 MainChat | **针对 issue #267 修订 ADR 0226 / ADR 0151 / ADR 0033：MainChat 保持 450px 硬下限；工作面板上限为动态预算（`客户端宽度 − 450px − 展开的左栏宽度`，无固定上限）；中栏到达阈值时展开的左栏立即让位（`sidebar-out` 退场期间仍计入预算）。手动重开左栏优先占用右栏宽度，否则以 460px 为目标；关闭右栏只恢复由布局机制收起的左栏。原生窗口不变：预留 seam 保持 0 且不套用任何面板几何。预览模式临时卸载 MainChat 并使用窗口级 chrome 行；侧边栏折叠时，macOS 窗口模式预留 76px、全屏预留 8px 给交通灯。见 ADR 0238 与 E2E-LAYOUT-three-column-width-priority。** | 固定客户区此前没有明确的宽度优先级，侧边停靠可以把 MainChat 压到下限、使 composer 不可用；显式化让位顺序后聊天在固定窗口内保持可读，且不重新引入原生窗口增长（issue #267）。 |
+| D408 | 三栏布局中优先保障 MainChat | **针对 issue #267 修订 ADR 0226 / ADR 0151 / ADR 0033：MainChat 保持 450px 硬下限；工作面板上限为动态预算（`客户端宽度 − 450px − 展开的左栏宽度`，无固定上限）；中栏到达阈值时展开的左栏立即让位（`sidebar-out` 退场期间仍计入预算）。手动重开左栏优先占用右栏宽度，否则以 460px 为目标；关闭右栏只恢复由布局机制收起的左栏。原生窗口不变：预留 seam 保持 0 且不套用任何面板几何。预览模式临时卸载 MainChat 并使用窗口级 chrome 行；侧边栏折叠时，macOS 窗口模式预留 88px、全屏预留 8px 给交通灯（D433）。见 ADR 0238 与 E2E-LAYOUT-three-column-width-priority。** | 固定客户区此前没有明确的宽度优先级，侧边停靠可以把 MainChat 压到下限、使 composer 不可用；显式化让位顺序后聊天在固定窗口内保持可读，且不重新引入原生窗口增长（issue #267）。 |
 | D409 | 宿主拥有的会话协作消息 | **修订 ADR 0237 / ADR 0165 / ADR 0213：Rust host-core 拥有以消息 id 和真实源/目标 Session ID 为键的持久会话协作 ledger。插件驱动的 `spawn`、`send`、`status`、`result` 和 `cancel` 使用已审查的 desktop-control 网关；发送者绑定当前插件 Agent 工具调用，目标回合保留原有配置，每条投递由实际持久回合认领。完成回调持久化且最多一次，并引用已结算回合。来源信息随转录行持久化，不能在重生成中伪造、剥离或编辑。增量架构 v16 迁移在重启后保留排队工作但不无人值守重放，执行权限上限和有界自主跳数，同时保持既有 Task 系列不变。见 ADR 0239 与 E2E-PLUGIN-session-orchestrator-real-workers。** | 插件之前的创建/提示轮询路径既无法推断持久回合结果，也无法安全确认双向发送者身份。宿主拥有的 ledger 让投递、来源、回调、取消和重启行为可审计，同时不恢复已撤回的 A2A 协议。 |
 | D410 | 独立会话发现与可导航协作投影 | **修订 ADR 0239：新增经审查的 `session/collaboration/list` 读取操作，限制为最多 100 个未删除 Agent 会话，并只返回 Session ID、标题、状态、更新时间、可读 provider/model 标签和有界创建关系。侧边栏投影增加可读模型标签和最多八个已创建会话引用。创建者/已创建会话引用渲染为可键盘聚焦的导航按钮；独立会话不伪造创建者链接。不改变渲染器存储归属或协作写入边界。见 ADR 0240、E2E-SESSION-independent-top-level-communication 和 E2E-SESSION-hover-card-model-and-links。** | 现有 Session ID 虽然是有效发送目标，但未由插件创建的会话可能不可发现；hover 卡片也只暴露 ID，来源信息不可交互。有界 host 目录和可导航投影让持久会话可通信、可解释，同时不暴露转录或凭据。 |
 | D413 | 技能市场公网 HTTPS 目录拉取 | **增量：设置 → 技能市场由 Electron 主进程按共享公网 HTTPS 策略发现 SKILL.md（公网主机语法 + DNS 分类 + 逐跳 redirect）。渲染层不发网。安装仍走 `skills.create`。目录 id 与 host `valid_capability_id` 对齐。展开后超过 128 KiB 拒绝写入。内置标题为英文。见 ADR 0243、E2E-SKILL-MARKET-*、issue #287。** | 社区技能发现需要主进程出网，且不能复用插件市场的主机允许列表；复制分类器会与 MCP 市场撞名。 |
@@ -3981,7 +3981,7 @@ D193 和 D194。
 - 手动重开左栏优先占用右栏宽度，否则以 460px 为目标。关闭右栏只恢复由布局机制收起的左栏；手动收起保持收起。
 - 原生窗口不参与：预留 seam 保持 0，不套用任何面板宽度或 x 偏移几何。
 - 预览模式卸载 MainChat，让工作面板填充侧边栏之外的客户区。AppShell 提供窗口级
-  chrome 行承载 shell 操作和本机控件；侧边栏折叠时，macOS 窗口模式预留 76px，
+  chrome 行承载 shell 操作和本机控件；侧边栏折叠时，macOS 窗口模式预留 88px，
   全屏预留 8px 给交通灯。
 - 决策 D408 记录 issue #267 的行为。见 ADR 0238 与 E2E-LAYOUT-three-column-width-priority。
 
@@ -4212,3 +4212,27 @@ the retained upstream work-panel lifecycle. See
 - 现在没有可见工作区时会话根也能解析，所以临时对话按会话各自继续工作，而不是所有会话一起失败；这种状态下的面板调用仍然失败关闭。于是 `workspace` 根的 `NOT_FOUND` 更窄：既没有解析出调用会话的项目，也没有可见工作区。
 - 权限、realpath 包含、拒绝名单、声明范围与运行时同意这四类闸门都没有改动，插件 API 表面也未变化：`pi.workspace.get` 仍然以可见工作区及其项目组作答。
 - 见 ADR 0266、`07-plugins/03-plugin-api.md` §3、`07-plugins/13-plugin-permissions-matrix.md` §6 与 E2E-PLUGIN-fs-root-follows-the-calling-session。
+
+## 2026-09-16 —— 没有文字的控件声明自己的正方形几何
+
+- `.icon-btn` 与带文字的胶囊按钮共用，宽度来自内容 —— 图形加左右各 8px 内边距。于是每一处只有图标的使用都变成了"高大于宽"：侧边栏收起控件与输入框的添加按钮渲染为 31×28，`.composer-right` 内的增强与撤销控件为 35×28，设置里的服务商操作按钮因 14px 图形而为 30×28。同一个功能在会话顶栏早就是 28×28 的正方形，也就是同一个功能存在两种尺寸。
+- 这些控件现在声明 `.icon-btn-square`：把两个轴都固定到新增的 `--ds-control-size`（28px）标记，保留 `flex: 0 0` 以免拥挤的工具条把控件压回非正方形，并去掉侧向内边距（在全局 `border-box` 下，那会给 15px 的图形只留 12px 内容区）。只有图标的控件现在与顶栏开关、工作面板操作、发送/停止控件一直以来的正方形保持一致。
+- `.composer-right .icon-btn` 不再设置水平内边距。带文字的模型/思考胶囊自己用 `!important` 设置内边距，所以那条声明只会把它旁边的纯图标控件撑宽；增强控件在加载态仍保留自己的带文字几何。
+- 仅渲染层：无协议、存储、宿主、权限或迁移改动。见 `04-ux/07-ui-design-system.md` §11.1 与 `04-ux/08-component-spec.md` §3.7。
+
+## 2026-09-16 —— 每个 chrome 图标控件共用一套几何
+
+- 预览态与路由带上的动作按钮（`.title-nav-btn`）此前渲染为 22px 的方块，使用 `--radius-2xs` 与 `--ds-tile` 底色，而它们的同级控件是 28px：会话顶栏里同一个侧边栏开关、视口固定的工作面板开关，以及工作面板自身的操作。同一个控件、同一个 46px 带内，却有两种尺寸和两种形状。
+- 这些动作按钮现在采用共享的 chrome 控件几何（`.ct-icon-btn` 组）：由 `--ds-work-panel-toggle-size` 得到的 28px 正方形、`flex: 0 0` 以免拥挤的带把它们挤扁、`--radius-md`、透明底座加语义化 hover 底色，以及其它 chrome 控件统一使用的 15px 图形。`.title-nav-btn` 只保留按压反馈与 active 色调。
+- 预览态动作组的车道宽度改为由它所预留的控件推导：`--ds-preview-action-lane-width: calc(2 * var(--ds-work-panel-toggle-size) + 4px + 8px)`，这样面板头部的预留与按钮本身不会再各自漂移。
+- 仅渲染层：无协议、存储、宿主、权限或迁移改动。见 `04-ux/08-component-spec.md` §2。
+
+## 2026-09-16 —— macOS 交通灯预留量只有一个来源（D433）
+
+- 渲染层为 macOS 交通灯留出的窗口模式引导内缩，原本是一个手抄的 `76px`：散在 `apps/desktop/src/styles/chrome.css` 与 `apps/desktop/src/styles/work-panel.css` 里的五处声明 —— `.main-titlebar-left`（`64px`，即该值减去行自身的 12px 内边距）、`.conversation-topbar.ct-collapsed`（`--ct-lead-inset`）、`.sidebar-header`、`.window-chrome-row:not(.sidebar-expanded)`，以及预览态的 `.work-panel-header`（`calc(76px + var(--ds-preview-action-lane-width))`）—— 每一处还各有一个 `[data-fullscreen="true"]` 分身。它们谁都没有和主进程交给 Electron 的 `trafficLightPosition` 建立关联，因此任一侧单独改动都会与另一侧漂移。
+- 原生几何现在只有一个归属地 `packages/shared/src/window-chrome.ts`：`MAC_TRAFFIC_LIGHT_POSITION`（`{x:16,y:16}`）与 `MAC_TRAFFIC_LIGHT_CLUSTER_WIDTH_DIP`（`60`），并由 `MAC_TRAFFIC_LIGHT_EDGE_DIP`（`16 + 60 = 76`）给出灯簇右缘。主进程用这些常量放置按钮，渲染层在启动时把右缘注入 `--ds-traffic-light-edge`。所有消费点都读 `--ds-window-lead-inset`，它由 `chrome.css` 针对 `:root[data-platform="darwin"]` 组合一次：`--ds-traffic-light-edge` + `--ds-traffic-light-gap`（`12px`）= `88px`。
+- 按钮此前紧贴绿灯右缘，间隙为 0。现在灯簇右缘与第一个 shell 控件之间保留了 `12px` 呼吸空间，这也是窗口模式从 `76px` 变为 `88px` 的原因。
+- 逐个选择器的 `[data-fullscreen="true"]` 覆盖规则已删除。全屏会隐藏按钮，同一个 token 的 `[data-fullscreen="true"]` 规则一次性把所有消费点的预留量降为普通的 `8px` 留白。
+- Windows 与 Linux 行为不变：`--ds-window-lead-inset` 保持 `0px` 默认值，这两个平台仍使用右侧 120px 带内由渲染层绘制的控件。插件面板窗口创建的是普通无框架 `BrowserWindow`，没有原生交通灯，因此不受影响。
+- 仅渲染层 + 共享常量：无协议、存储、宿主、权限或迁移改动，也没有新增默认值。
+- 见 `04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md` 与 E2E-LAYOUT-three-column-width-priority。
