@@ -7367,7 +7367,7 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 - **前提条件**：共享 public-network helper，以及可注入 fetch/DNS 的主进程公网 HTTPS 客户端。
 - **步骤**：1）分类 trailing-dot localhost、IPv4 回环、IPv4-mapped IPv6、ULA、link-local、RFC1918 与 `http://`。2）将公网主机名解析到私网 A 记录。3）跟随 Location 为 `https://127.0.0.1/` 的 302。
-- **预期**：上述绕过形态全部拒绝；公共 CDN 放行。解析到私网地址或 redirect 到回环会抛出策略错误，且不会请求私网目标。判定型拒绝不重试；本地解析没有返回答案时会重试,并且报为 `NETWORK_RESOLVE_FAILED`（`kind` 为 `unresolved`）,而不是报成地址校验拒绝——守卫并未得出判定,任何文案都不得声称它得出了。其余每次拒绝都带上 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1）及其 `reason` 与被拒地址的类别,使安装面板能给出原因并提供重试,而不是让安装按钮无解释地保持禁用；市场列表也能把被拒绝的源与单纯不可达的源区分开。
+- **预期**：上述绕过形态全部拒绝；公共 CDN 放行。解析到私网地址或 redirect 到回环会抛出策略错误，且不会请求私网目标。判定型拒绝不重试；本地解析没有返回答案时会重试,并且报为 `NETWORK_RESOLVE_FAILED`（`kind` 为 `unresolved`）；解析到本地代理伪造的 fake-IP（如 Clash 默认的 `198.18.0.0/15`）仍被拒绝且不重试,并以 `kind` 为 `fake-ip`、`reason` 为 `non-public-address`、`addressKind` 为 `benchmark` 记录,与真实私网目标（`kind` 为 `policy`、`addressKind` 为 `private`）清楚区分——对后者守卫判定了目标,对前者没有。其余每次拒绝都带上 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1）及其 `reason`、被解析到的地址与地址类别,使安装面板能给出原因并提供重试,而不是让安装按钮无解释地保持禁用；市场列表也能把被拒绝的源与单纯不可达的源区分开。
 - **链接规格**：`05-security/01-security.md`、ADR 0243、`03-runtime/01-ipc-protocol.md` §12b
 - **验收**：Security、Quality
 - **里程碑**：M6+

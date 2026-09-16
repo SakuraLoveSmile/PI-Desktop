@@ -1465,16 +1465,19 @@ Desktop-only skill market channels (not host RPC) live on Electron IPC:
   builtin-safe catalog JSON and GitHub repo SKILL.md scans. Source URLs must pass
   the public-HTTPS policy (ADR 0243). One failing source is dropped; the rest
   still return. `failureKinds` maps each name in `failedSources` to `policy`
-  (the public-network guard judged the target and refused it, so the request
-  never left the process), `unresolved` (the local DNS lookup returned no answer,
-  so no address was judged — a resolver or proxy condition, not a verdict on the
-  source), or `network`. `failureDetails` carries the same keys with the host
-  that actually failed, the guard's own `reason`, and the class of the refused
-  address, which is what lets the panel name *what* was refused instead of only
-  which source went quiet. A judged refusal also surfaces as
-  `NETWORK_POLICY_BLOCKED` and an unanswered resolver as `NETWORK_RESOLVE_FAILED`
-  (spec 08 §3.1); the install sheet classifies a failed preview on those two
-  codes.
+  (the guard judged the target's own non-public address), `fake-ip` (it judged a
+  fake-IP placeholder the local proxy invented for the name — Clash's
+  `198.18.0.0/15`; still refused, because the guard fails closed, but a condition
+  of the local network rather than a fact about the source), `unresolved` (the
+  local DNS lookup returned no answer, so no address was judged), or `network`.
+  `failureDetails` carries the same keys with the host that actually failed, the
+  address it resolved to, the guard's own `reason`, and that address's class,
+  which is what lets the panel name *what* was refused — "your proxy answered
+  github.com with 198.18.0.1" — instead of only which source went quiet. A judged
+  refusal and a fake-IP refusal both surface as `NETWORK_POLICY_BLOCKED` (both
+  are refusals the guard decided), and an unanswered resolver as
+  `NETWORK_RESOLVE_FAILED` (spec 08 §3.1); the install sheet classifies a failed
+  preview on those codes together with the structured `reason`.
 - `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`.
   Main fetches the document over the same policy, splits frontmatter, and may
   attach sibling `.md` files from a jsDelivr listing. The renderer installs
