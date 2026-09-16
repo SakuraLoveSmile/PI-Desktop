@@ -156,6 +156,7 @@ export const es = {
     "createBranch": "Rama desde aquí",
     "branchTitle": "{{title}} (rama)",
     "deleteTask": "Eliminar",
+    "deleteTaskConfirm": "¿Eliminar?",
     "copyConversationId": "Copiar ID de conversación",
     "openSessionPath": "Abrir ruta de sesión",
     "timeGroupYesterday": "Ayer",
@@ -1150,6 +1151,7 @@ sklm: {
     "archive": "Archivar proyecto",
     "restore": "Restaurar proyecto",
     "delete": "Eliminar proyecto",
+    "deleteMenuConfirm": "¿Eliminar?",
     "deleteTitle": "Eliminar proyecto",
     "deleteDescription": "{{name}} se eliminará de forma permanente y no se puede deshacer.",
     "deleteSessions_one": "{{count}} sesión guardada se eliminará de forma permanente junto con sus transcripciones.",
@@ -1237,6 +1239,15 @@ sklm: {
       "unanswered": "Pregunta {{number}} no respondida",
       "skipped": "Pregunta {{number}} omitida"
     }
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  "pluginPanelWidget": {
+    "alwaysOnTop": "Siempre visible",
+    "minimize": "Minimizar",
+    "close": "Cerrar el widget"
   },
   "panel": {
     "title": "Panel de trabajo",
@@ -1469,6 +1480,11 @@ sklm: {
     "permsMore": "+{{count}} más",
     "permissionsTitle": "Permisos",
     "permissionReview": "Revisión de permisos",
+    "devReviewTitle": "¿Cargar {{name}}?",
+    "devReviewNewTitle": "{{name}} ahora solicita más acceso",
+    "devReviewBody": "Este complemento de desarrollo proviene de una carpeta de este equipo. Revise lo que puede hacer: no se carga nada hasta que lo acepte.",
+    "devReviewAccept": "Cargar complemento",
+    "devReviewLoading": "Cargando…",
     "permissionReviewTitle": "¿Instalar {{name}}?",
     "permissionReviewBody": "Revise lo que puede hacer este complemento. Los permisos de mayor riesgo permanecen bloqueados hasta que los acepte.",
     "acceptInstall": "Aceptar e instalar",

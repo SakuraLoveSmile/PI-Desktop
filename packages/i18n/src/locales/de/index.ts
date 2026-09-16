@@ -156,6 +156,7 @@ export const de = {
     "createBranch": "Verzweigung von hier aus",
     "branchTitle": "{{title}} (Verzweigung)",
     "deleteTask": "Löschen",
+    "deleteTaskConfirm": "Löschen?",
     "copyConversationId": "Gesprächs-ID kopieren",
     "openSessionPath": "Sitzungspfad öffnen",
     "timeGroupYesterday": "Gestern",
@@ -1150,6 +1151,7 @@ sklm: {
     "archive": "Projekt archivieren",
     "restore": "Projekt wiederherstellen",
     "delete": "Projekt löschen",
+    "deleteMenuConfirm": "Löschen?",
     "deleteTitle": "Projekt löschen",
     "deleteDescription": "{{name}} wird dauerhaft entfernt und kann nicht wiederhergestellt werden.",
     "deleteSessions_one": "{{count}} gespeicherte Sitzung wird mit ihren Verläufen dauerhaft gelöscht.",
@@ -1237,6 +1239,15 @@ sklm: {
       "unanswered": "Frage {{number}} nicht beantwortet",
       "skipped": "Frage {{number}} übersprungen"
     }
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  "pluginPanelWidget": {
+    "alwaysOnTop": "Immer im Vordergrund",
+    "minimize": "Minimieren",
+    "close": "Widget schließen"
   },
   "panel": {
     "title": "Arbeitsfenster",
@@ -1469,6 +1480,11 @@ sklm: {
     "permsMore": "+{{count}} weitere",
     "permissionsTitle": "Berechtigungen",
     "permissionReview": "Berechtigungsüberprüfung",
+    "devReviewTitle": "{{name}} laden?",
+    "devReviewNewTitle": "{{name}} fordert mehr Zugriff",
+    "devReviewBody": "Dieses Entwicklungs-Plugin stammt aus einem Ordner auf diesem Rechner. Prüfen Sie, was es tun kann — bis Sie zustimmen, wird nichts geladen.",
+    "devReviewAccept": "Plugin laden",
+    "devReviewLoading": "Wird geladen…",
     "permissionReviewTitle": "{{name}} installieren?",
     "permissionReviewBody": "Sehen Sie sich an, was dieses Plugin leisten kann. Berechtigungen mit höherem Risiko bleiben blockiert, bis Sie sie akzeptieren.",
     "acceptInstall": "Akzeptieren und installieren",

@@ -165,6 +165,7 @@ export const tr = {
     createBranch: "Buradan dal oluştur",
     branchTitle: "{{title}} (dal)",
     deleteTask: "Sil",
+    deleteTaskConfirm: "Silinsin mi?",
     copyConversationId: "Konuşma kimliğini kopyala",
     openSessionPath: "Oturum yolunu aç",
     timeGroupYesterday: "Dün",
@@ -1167,6 +1168,7 @@ sklm: {
     archive: "Projeyi arşivle",
     restore: "Projeyi geri yükle",
     delete: "Projeyi sil",
+    deleteMenuConfirm: "Silinsin mi?",
     deleteTitle: "Projeyi sil",
     deleteDescription: "{{name}} kalıcı olarak silinir ve bu işlem geri alınamaz.",
     deleteSessions_one: "{{count}} kayıtlı oturum, konuşma dökümleriyle birlikte kalıcı olarak silinir.",
@@ -1254,6 +1256,15 @@ sklm: {
       unanswered: "Soru {{number}} yanıtlanmadı",
       skipped: "Soru {{number}} atlandı",
     },
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "Her zaman üstte",
+    minimize: "Küçült",
+    close: "Widget'ı kapat",
   },
   panel: {
     title: "Çalışma paneli",
@@ -1487,6 +1498,11 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
     permsMore: "+{{count}} daha",
     permissionsTitle: "İzinler",
     permissionReview: "İzin incelemesi",
+    devReviewTitle: "{{name}} yüklensin mi?",
+    devReviewNewTitle: "{{name}} artık daha fazla erişim istiyor",
+    devReviewBody: "Bu geliştirme eklentisi bu makinedeki bir klasörden geliyor. Neler yapabileceğini inceleyin — siz kabul edene kadar hiçbir şey yüklenmez.",
+    devReviewAccept: "Eklentiyi yükle",
+    devReviewLoading: "Yükleniyor…",
     permissionReviewTitle: "{{name}} kurulsun mu?",
     permissionReviewBody: "Bu eklentinin neler yapabileceğini inceleyin. Daha yüksek riskli izinler kabul edene kadar bloklu kalır.",
     acceptInstall: "Kabul et ve kur",

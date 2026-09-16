@@ -2924,10 +2924,11 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   状态，不参与冲突、不响应旧或默认组合、可跨重启保存，并会移除 macOS 加速器和
   Windows 启动器后备层；单项和全局恢复都返回共享默认值。仅修饰符和 IME 按键不
   会发送命令，长按历史组合每次物理按压只遍历一次。窗口可见性只有一个开关键
-  `Cmd/Ctrl + W` —— 可见且在前台的窗口隐藏到托盘，其余情况显示并获得焦点 ——
-  且绝不走关闭路径，因此不会弹出关闭行为询问、也不会退出应用；已弃用的
+  `Alt + Shift + W` —— 可见且在前台的窗口隐藏到托盘，其余情况显示并获得焦点 ——
+  且绝不走关闭路径，因此不会弹出关闭行为询问、也不会退出应用；该键刻意避开
+  `Cmd/Ctrl + W`，因为 macOS 把它用于自己的关闭窗口命令；已弃用的
   `Cmd/Ctrl + Shift + W` 组合键不再注册，已存储的 `closeWindow` / `summonWindow`
-  覆盖项会并入该开关键（D438）。
+  覆盖项会并入该开关键（D438、D439）。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/07-ui-design-system.md`、
   `03-runtime/01-ipc-protocol.md`
 - **接受**：F（设置持久性）、质量（键盘可访问性）
@@ -4968,6 +4969,7 @@ IPC 请求无法关闭。
 | D — 工作区（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | F — 持久化（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | 品质（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| 品质（两步删除） | E2E-SESSION-two-click-delete-arms-first |
 | Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command、E2E-PLUGIN-permission-gate-for-real-time-capabilities、E2E-PLUGIN-background-audio-and-realtime-connection |
 | C — 对话与流式（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
 | E — 工具与权限（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
@@ -4998,6 +5000,7 @@ IPC 请求无法关闭。
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
 | 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| M6+（两步删除） | E2E-SESSION-two-click-delete-arms-first |
 | C — 对话和直播（模型回退） | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | 品质（模型回退隔离） | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | C — 对话和直播（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
@@ -5524,14 +5527,16 @@ IPC 请求无法关闭。
 - **前提条件**：三个持久项目 A、B 和 C，每个都至少有一个带转录本的会话；A 已归档并作为
   侧边栏选项卡保留；B 是活动工作区；C 是一个已存储双文件夹项目组的根目录。
 - **步骤**：打开设置 → 项目存档，打开 A 的行菜单，选择删除项目，并在对话框中确认。然后
-  从侧边栏项目菜单对正处于活动工作区的 B 重复同一操作。接着对 C 尝试同一操作，然后对一个
-  宿主已不再知晓的路径尝试，最后在 D 的某个任务仍在运行时尝试删除 D。
+  从侧边栏项目菜单对正处于活动工作区的 B 重复同一操作：第一次点击只是武装该项，只有第二次
+  点击才会移除 B。接着对 C 尝试同一操作，然后对一个宿主已不再知晓的路径尝试，最后在 D 的
+  某个任务仍在运行时尝试删除 D。
 - **预期**：对话框会指明项目名称，说明该项目及其会话与转录本会被永久移除，并说明磁盘上的
-  文件夹不会被删除；确认之前不会移除任何内容。确认后，持久项目行、该项目的会话、其转录本、
-  scratch 和 review 文件以及该项目的持久记忆均已消失，而磁盘上的文件夹保持原样。被删除的
-  项目会立即从设置 → 项目存档和侧边栏中消失，重新加载后依然如此：没有保留的选项卡、没有
-  最近项目条目、没有由会话推导的行，也没有残留的 pin、archive 或 order 偏好。其他所有项目
-  的会话与转录本不受影响。当被删除的项目曾是活动工作区时，工作区回退到另一个已打开的项目
+  文件夹不会被删除；确认之前不会移除任何内容，被武装后放置不管的项会自行解除武装、不会移除
+  任何东西。确认后，持久项目行、该项目的会话、其转录本、scratch 和 review 文件以及该项目的
+  持久记忆均已消失，而磁盘上的文件夹保持原样。被删除的项目会立即从设置 → 项目存档和侧边栏
+  中消失，重新加载后依然如此：没有保留的选项卡、没有最近项目条目、没有由会话推导的行，也没有
+  残留的 pin、archive 或 order 偏好。其他所有项目的会话与转录本不受影响。当被删除的项目曾是
+  活动工作区时，工作区回退到另一个已打开的项目
   或 Temporary，且下次启动不会重新打开已删除的路径。磁盘上文件夹已被移动或删除的项目仍可
   移除。删除 C 会被拒绝并给出提示消息，该组保持不变；宿主已无持久行的路径仍会从项目存档与
   侧边栏中移除，不会报出缺少项目的错误。当 D 的任务仍在运行时删除 D 会打开确认对话框，而不是给出
@@ -5568,6 +5573,24 @@ IPC 请求无法关闭。
   当前运行会话 id 的情况下都能到达对话框、对话框的运行中会话行与“停止任务并删除”标签、abort 循环
   先于 `deleteProject` 执行、`CONFLICT` 兜底路径，以及所有已发布语言包中的新文案；端到端旅程仍为
   草稿
+
+### E2E-SESSION-two-click-delete-arms-first
+
+- **前提条件**：一个包含一个空闲会话和一个运行中会话的项目，二者都可从侧边栏会话菜单、侧边栏
+  项目菜单以及项目索引到达。
+- **步骤**：打开空闲会话的会话菜单，按一次删除，并让该项保持武装直到武装超时，然后再按一次以
+  确认移除。对来自侧边栏菜单与项目索引的项目行重复该操作。
+- **预期**：第一次按下不会移除任何东西，并把该项标签改为 `nav.deleteTaskConfirm` /
+  `project.deleteMenuConfirm`（"Delete?" / "确认删除？"）且带 `data-armed="true"`；菜单保持
+  打开，点击外部、按 Escape 或武装超时都会解除武装且不移除任何内容。只有第二次按下才会移除
+  该会话及其转录本和该行，也只有对项目行的第二次按下才会移除空闲项目。会话与项目永远不会共用
+  一次武装。删除仍有运行中轮次的项目时，仍会打开指明这些会话并停止它们的对话框（见
+  E2E-PROJECT-delete-running-sessions-are-named-and-stopped）。
+- **链接规格**：`04-ux/09-interaction-patterns.md` §1.6、D421、D431、D441
+- **验收**：品质
+- **里程碑**：M6+
+- **状态**：部分自动化 —— `apps/desktop/test/two-step-delete.test.mjs` 固定了共享的武装与它的
+  超时、所有已发布语言包中的两个标签，以及第一次按下只做武装；端到端旅程仍为草稿
 
 ### US-UI-59 基于会话的后台工具
 - 在项目 A 中启动可见轮次，在项目 B 运行时切换到项目 B，并且

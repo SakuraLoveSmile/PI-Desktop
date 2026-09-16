@@ -4294,11 +4294,12 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `closeWindow`（`Mod+W`）的「对称键」，并由 `04-ux/09-interaction-patterns.md` §1.1
   记载 —— 因此 D438 取代 D384 的这一半；同一条决策里的插件 Plan 安全动作选项不受影响。
   编号跳过 D435 与 D437，因为其它在途工作已先占用。
-- 快捷键目录现在只保留 `window` 组里的一个 `toggleWindow`，各平台默认值都是 `Mod+W`。
-  `closeWindow` 与 `summonWindow` 已从 `KEYBOARD_SHORTCUT_IDS` 移除，因此被弃用的
-  `Mod+Shift+W` 不再被任何东西占用：它既不是随应用发布的默认值，也不会注册到
-  `globalShortcut`，既不是设置行，也不是菜单加速键。插件快捷键注册表因此改为拒绝
-  `Alt+Space` 与 `Mod+W`，而被释放出来的 `Mod+Shift+W` 可以交给插件使用。
+- 快捷键目录现在只保留 `window` 组里的一个 `toggleWindow`；`closeWindow` 与
+  `summonWindow` 已从 `KEYBOARD_SHORTCUT_IDS` 移除，因此两个退役组合键都不再被任何
+  东西占用：它们既不是随应用发布的默认值，也不会注册到 `globalShortcut`，既不是设置行，
+  也不是菜单加速键，而被释放出来的 `Mod+Shift+W` 可以重新交给插件使用。D439 后来把
+  开关键自己的默认值从 D438 选的 `Mod+W` 挪开；合并后的 id、切换语义与下面的迁移规则
+  都不受这次改键影响。
 - 按下这个键是一次判定，而不是一次关闭。`windowToggleAction` 对可见且在前台的窗口执行
   `Window.hide()`，其余情况显示并获得焦点（已隐藏、已最小化、被其它应用挡在后面都算
   「不可见」）。`Window.hide()` 就是隐藏的全部路径，所以 Windows/Linux 的关闭行为询问、
@@ -4309,7 +4310,7 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `migrateKeybindingOverrides` 在读取时就折叠映射 —— Electron 主进程在注册加速键和构建
   菜单之前，渲染层 store 在任何消费方看到它之前 —— 因此没有任何表面会按退役 id 行事。
   规则有序且幂等：已存在的 `toggleWindow` 覆盖原样胜出；否则第一个带*绑定值*的退役项胜出，
-  `closeWindow` 优先，因为 `Mod+W` 正是开关键保留的那个键；只有在没有绑定值竞争时，
+  `closeWindow` 优先，因为隐藏才是开关键的主要职责；只有在没有绑定值竞争时，
   仅写入 `null` 的退役项才被尊重，所以明确的「未绑定」不会被随应用发布的默认值顶替；
   与自身退役默认值相同的存储值不携带任何意图（设置界面会删除等于发布默认值的覆盖项），
   因此 `Mod+W`/`Mod+Shift+W` 这类值会被丢弃而不是被复活。存储本身不做改写：折叠后的映射
@@ -4337,3 +4338,38 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `AppSettings.chatContentMaxWidth`。左右边缘各一条手柄（静止不可见、悬停光晕、拖拽时显示细线）同步改这个宽度，列保持居中。拖拽下限 560px。
 - 实际宽度是 `min(可用窗格减去两侧 24px, 首选值)`，侧栏或工作区挤压时自适应压缩，不改写偏好。收起侧栏不再把内容带到 640px。
 - 助手/工具/决策行跟随内容带；用户气泡仍是 `min(82%, 600px)`。仅渲染器。见 ADR 0274、E2E-208、E2E-CHAT-content-width-handles。
+
+## 2026-09-17 —— 窗口开关键避开 macOS 的关闭窗口组合键（#360，D439）
+
+- D438 把两个键合并到了 `Mod+W`，但这个键不能作为*系统级*全局加速键的默认值：
+  macOS 把 `Cmd+W` 用于自己的「关闭窗口」命令，全局占用它等于从所有其它应用程序
+  手里把这个组合键抢走，而不只是关闭本窗口。因此 `Mod+W` 正是开关键唯一不能持有的键。
+- 快捷键目录现在把 `toggleWindow` 发布在 `Alt+Shift+W` 上 —— 不含平台修饰键，因此在
+  macOS、Windows 与 Linux 上是同一个组合键 —— 它与任何发布默认值、保留的编辑组合键
+  以及平台命令都不冲突。合并本身、隐藏/显示语义、以及退役的
+  `closeWindow`/`summonWindow` 覆盖项的折叠规则，完全保持 D438 定义的样子。
+- 在 macOS 上 `Mod+W` 现在也拒绝交给插件（`isReservedKeybinding`），因此即使应用不再
+  使用它，平台仍然独占它自己的这个组合键。
+- 只重复「本版本发布默认值」或「已被取代的默认值」的 `toggleWindow` 存储值不携带用户
+  意图，折叠时会丢弃：曾经持久化过那个短命 `Mod+W` 默认值的配置会迁移到
+  `Alt+Shift+W`，而不是把 macOS 的组合键冻结住；真实改绑（`Ctrl+Alt+T`）与明确的
+  「未绑定」（`null`）原样保留，退役项的自定义值也仍然优先于被丢弃的旧默认值。
+- 编号取 D439，因为 D435 与 D437 已被其它在途工作占用。**注意**：本日志当前有两处
+  `D438` —— 本文件上方的窗口开关键合并决策（#360，重绑前）与紧随其后的 Git 检出决策
+  （ADR 0273）。后者是在开关键 D438 合入之后才追加的，编号需要由其作者改到 D440 或
+  之后的可用号；本条不代为改写他人决策正文。
+- 见 ADR 0211（再次修订）、`04-ux/09-interaction-patterns.md` §1.1 与 §1.4、
+  `04-ux/06-settings-ia.md`（快捷键选项卡）、`07-plugins/03-plugin-api.md`、
+  `07-plugins/04-plugin-security.md`、E2E-072 与
+  `apps/desktop/test/window-toggle-shortcut.test.mjs`。
+
+## 2026-09-17 —— 会话与项目行在第二次点击时才删除（D441）
+
+- 侧边栏的会话菜单项与两个项目菜单（侧边栏与项目索引）此前在第一次点击「删除」时就移除该行。应用内其他所有破坏性行操作 —— 设置里的模型服务行、厂商账户行以及能力表格 —— 都先武装再改写控件标签，于是最不能撤销的两个动作反而是唯一单击即生效的。
+- 这一模式现在由 `hooks/use-armed-delete.ts` 为整个渲染层拥有：同一个 `ARMED_DELETE_MS`（3200ms）失效时间与同一个 `useArmedDelete()`。能力页面继续从 `AgentCapabilityLayout` 导入它，而该布局改为再导出这个共享 hook，不再保留一份带自己超时的副本，因此这一模式不会在设置行与两个菜单之间漂移。
+- 会话菜单项以 `session.id` 作为武装键；两个项目菜单则以 `project:` 前缀的键武装，因此会话与项目永远不会共用一次武装。被武装的菜单项带 `data-armed="true"`、危险色淡底，并在八种语言里都把标签换成 `nav.deleteTaskConfirm` / `project.deleteMenuConfirm`（"Delete?" / "确认删除？"）。两次点击之间菜单保持打开；点击外部、按 Escape 或武装超时都会解除武装且不移除任何内容。
+- 这是对 D431 在空闲场景下的修订：仍有运行中轮次的项目依然打开 `ProjectDeleteDialog`，由它指明这些会话并先停止它们再删除；宿主的 1008 / `CONFLICT` 拒绝在两条路径上仍映射为 `project.deleteRunningBlocked`。没有运行中轮次的项目由对话框原本使用的同一个 store 动作移除，并发出同样的成功 toast，因此它的第二次点击就是用户已经给出的确认。
+- 编号取 D441：D438 已被两处占用 —— 窗口开关键合并（#360，D438 与后续的
+  D439 重绑）与 Git 检出决策（ADR 0273），后者本日志已标明要改到 D440。本条不
+  代为改写他人决策正文。
+- 仅渲染层：无协议、存储、宿主、权限或迁移改动，也没有新增默认值。磁盘上的文件夹仍永远不被触碰。见 `04-ux/09-interaction-patterns.md`、D421、D431、`06-delivery/04-e2e-test-plan.md` 的 E2E-PROJECT-delete-removes-project-and-owned-sessions，以及 `apps/desktop/test/two-step-delete.test.mjs`。

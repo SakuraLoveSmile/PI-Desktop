@@ -165,6 +165,7 @@ export const ko = {
     createBranch: "여기서 브랜치 만들기",
     branchTitle: "{{title}} (브랜치)",
     deleteTask: "삭제",
+    deleteTaskConfirm: "삭제할까요?",
     copyConversationId: "대화 ID 복사",
     openSessionPath: "세션 경로 열기",
     timeGroupYesterday: "어제",
@@ -1167,6 +1168,7 @@ sklm: {
     archive: "프로젝트 보관",
     restore: "프로젝트 복원",
     delete: "프로젝트 삭제",
+    deleteMenuConfirm: "삭제할까요?",
     deleteTitle: "프로젝트 삭제",
     deleteDescription: "{{name}}을(를) 영구적으로 삭제하며 되돌릴 수 없습니다.",
     deleteSessions_one: "{{count}}개의 저장된 세션이 대화 기록과 함께 영구적으로 삭제됩니다.",
@@ -1254,6 +1256,15 @@ sklm: {
       unanswered: "질문 {{number}}에 답변하지 않음",
       skipped: "질문 {{number}} 건너뜀",
     },
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "항상 위에 표시",
+    minimize: "최소화",
+    close: "위젯 닫기",
   },
   panel: {
     title: "작업 패널",
@@ -1487,6 +1498,11 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
     permsMore: "+{{count}}개 더",
     permissionsTitle: "권한",
     permissionReview: "권한 검토",
+    devReviewTitle: "{{name}}을(를) 불러올까요?",
+    devReviewNewTitle: "{{name}}이(가) 더 많은 권한을 요청합니다",
+    devReviewBody: "이 개발 플러그인은 이 컴퓨터의 폴더에서 옵니다. 무엇을 할 수 있는지 검토하세요. 승인하기 전에는 아무것도 로드되지 않습니다.",
+    devReviewAccept: "플러그인 불러오기",
+    devReviewLoading: "불러오는 중…",
     permissionReviewTitle: "{{name}}을(를) 설치할까요?",
     permissionReviewBody: "이 플러그인이 할 수 있는 작업을 검토하세요. 더 높은 위험의 권한은 승인할 때까지 차단됩니다.",
     acceptInstall: "동의하고 설치",

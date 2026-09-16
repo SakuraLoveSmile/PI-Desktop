@@ -163,6 +163,7 @@ export const en = {
     createBranch: "Branch from here",
     branchTitle: "{{title}} (branch)",
     deleteTask: "Delete",
+    deleteTaskConfirm: "Delete?",
     copyConversationId: "Copy conversation ID",
     openSessionPath: "Open session path",
     timeGroupYesterday: "Yesterday",
@@ -1166,6 +1167,7 @@ sklm: {
     archive: "Archive project",
     restore: "Restore project",
     delete: "Delete project",
+    deleteMenuConfirm: "Delete?",
     deleteTitle: "Delete project",
     deleteDescription: "This permanently removes {{name}} and cannot be undone.",
     deleteSessions_one: "{{count}} saved session and its transcripts is deleted permanently.",
@@ -1253,6 +1255,15 @@ sklm: {
       unanswered: "Question {{number}} not answered",
       skipped: "Question {{number}} skipped",
     },
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "Always on top",
+    minimize: "Minimize",
+    close: "Close widget",
   },
   panel: {
     title: "Work panel",
@@ -1486,6 +1497,11 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     permsMore: "+{{count}} more",
     permissionsTitle: "Permissions",
     permissionReview: "Permission review",
+    devReviewTitle: "Load {{name}}?",
+    devReviewNewTitle: "{{name}} now requests more access",
+    devReviewBody: "This development plugin comes from a folder on this machine. Review what it can do — nothing is loaded until you accept.",
+    devReviewAccept: "Load plugin",
+    devReviewLoading: "Loading…",
     permissionReviewTitle: "Install {{name}}?",
     permissionReviewBody: "Review what this plugin can do. Higher-risk permissions stay blocked until you accept them.",
     acceptInstall: "Accept and install",

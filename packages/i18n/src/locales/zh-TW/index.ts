@@ -158,6 +158,7 @@ export const zhTW = {
     createBranch: "從此處分支",
     branchTitle: "{{title}}（分支）",
     deleteTask: "刪除",
+    deleteTaskConfirm: "確認刪除？",
     copyConversationId: "複製對話 ID",
     openSessionPath: "開啟會話路徑",
     timeGroupYesterday: "昨天",
@@ -1153,6 +1154,7 @@ sklm: {
     archive: "歸檔專案",
     restore: "恢復專案",
     delete: "刪除專案",
+    deleteMenuConfirm: "確認刪除？",
     deleteTitle: "刪除專案",
     deleteDescription: "將永久刪除 {{name}}，此操作無法復原。",
     deleteSessions_one: "{{count}} 個會話及其對話記錄將被永久刪除。",
@@ -1240,6 +1242,15 @@ sklm: {
       unanswered: "第 {{number}} 題未回答",
       skipped: "第 {{number}} 題已跳過",
     },
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "永遠置頂",
+    minimize: "最小化",
+    close: "關閉小工具",
   },
   panel: {
     title: "工作面板",
@@ -1472,6 +1483,11 @@ sklm: {
     permsMore: "另有 {{count}} 項",
     permissionsTitle: "許可權",
     permissionReview: "許可權確認",
+    devReviewTitle: "載入 {{name}}？",
+    devReviewNewTitle: "{{name}} 要求更多許可權",
+    devReviewBody: "這是來自本機資料夾的開發外掛。請確認它可以執行的操作——在你同意前不會載入任何內容。",
+    devReviewAccept: "載入外掛",
+    devReviewLoading: "載入中…",
     permissionReviewTitle: "安裝 {{name}}？",
     permissionReviewBody: "請確認此外掛可以執行的操作。高風險許可權在你同意前會保持停用。",
     acceptInstall: "同意並安裝",

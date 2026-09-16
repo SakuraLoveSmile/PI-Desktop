@@ -168,7 +168,15 @@ export const IPC = {
     extensionsCommandRun: "pi-desktop/extensions/commands/run",
     extensionsUiRespond: "pi-desktop/extensions/ui/respond",
     pluginLoadDev: "pi-desktop/plugin/loadDev",
+    /**
+     * The answer to a development plugin's permission review. Loading a folder
+     * is a two-step: `pluginLoadDev` returns the declaration, and this commits
+     * the permissions the user accepted.
+     */
+    pluginLoadDevConfirm: "pi-desktop/plugin/loadDevConfirm",
     pluginReload: "pi-desktop/plugin/reload",
+    /** Commits a reviewed widening for an already-loaded development plugin. */
+    pluginReloadConfirm: "pi-desktop/plugin/reloadConfirm",
     pluginCreateFromTemplate: "pi-desktop/plugin/createFromTemplate",
     pluginInstallFromPath: "pi-desktop/plugin/installFromPath",
     pluginInstallFromPackage: "pi-desktop/plugin/installFromPackage",
