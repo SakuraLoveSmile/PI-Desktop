@@ -6866,6 +6866,85 @@ identify the platform validation still needed.
   full native-picker, rendered modal, project-switch, and runtime journey remain
   Draft (run only in a capable environment when this surface changes)
 
+#### E2E-CAPABILITY-move-across-levels: MCP servers and skills move between the global and project `.agents` levels
+
+- **Preconditions**: The app runs against a disposable global `.agents` root
+  (an isolated HOME, or `PI_DESKTOP_AGENTS_DIR` when the bare host is driven
+  directly). Projects A and B are registered. The global root owns
+  `~/.agents/servers/echo.json` (id `echo`, label `Echo`),
+  `~/.agents/skills/review.md` (frontmatter name `Review`), and nothing else
+  that uses the names used below. Project A owns no `echo` server and no
+  `review` skill, and owns `<project A>/.agents/skills/with-resources/` holding
+  `SKILL.md` plus `scripts/run.sh` and `templates/report.md`. The MCP and
+  Skills pages show the project picker described in the Settings IA spec.
+- **Steps**:
+  1. Open Settings > Agent > MCP with project A selected. Disable the global
+     `echo` row, then choose Move into A. Confirm the row leaves the global
+     group, appears under project A, and stays disabled there.
+  2. Confirm `~/.agents/servers/echo.json` no longer exists and
+     `<project A>/.agents/servers/echo.json` does, byte-identical. Read
+     `<data>/agent-capabilities/mcp.json` and confirm it holds no global `echo`
+     entry and no project-A override for the old id, and that project A's entry
+     carries the disabled value.
+  3. Create a new global `echo` server again (id `echo`, label `Echo`). With
+     project A selected choose Move into A and confirm the arriving row is
+     `echo-2` with label `Echo (2)`, that project A's original `echo.json` is
+     byte-identical to before the move, and that both project rows list.
+  4. Open Skills with project A selected. Create a project `review.md` whose
+     frontmatter carries `name: Review`, a description, and an extra custom
+     field, plus a body; disable it, then choose Move to Global. Confirm it
+     appears globally as `review-2`, arrives disabled, and leaves the global
+     `review.md` unchanged.
+  5. Diff the moved document against the project original: only the frontmatter
+     `name` line differs (`name: Review (2)`); the description, the custom
+     field, blank lines, line endings, and every body byte are identical.
+  6. Move project A's `with-resources` skill to Global. Confirm
+     `<project A>/.agents/skills/with-resources/` is gone and
+     `~/.agents/skills/with-resources/` holds `SKILL.md`, `scripts/run.sh`, and
+     `templates/report.md` with identical bytes, and that the Skill tool still
+     resolves the document's resources.
+  7. Reload the global and project pages. Confirm the moved rows keep the
+     enablement they had across the reload, that project B lists none of the
+     project-A capabilities, and that the moved global `review-2` applies to
+     project B with the value it had after the move.
+  8. Clear the project selection in the toolbar. Confirm Move into <project> is
+     no longer offered on the remaining global rows and the project group asks
+     for a project selection instead; re-select project B and confirm the
+     action returns.
+  9. Drive `mcp.transfer` and `skills.transfer` with `from` and `to` naming the
+     same directory and confirm the response returns the current record and
+     neither directory changes.
+- **Expected**:
+  - A move relocates the document: the destination directory gains the file,
+    the source level stops listing the entry, and no copy is left behind.
+  - Enablement follows the document. A global row disabled for project A
+    arrives in project A disabled; a project row arrives globally with its
+    visible value as the new global default. The source level keeps no state
+    entry — including project overrides — for the old id.
+  - A destination collision is resolved by renaming only the colliding name:
+    an id collision gives the arriving id a `-2`/`-3` suffix, a case-insensitive
+    display-name / label collision gives the display name a ` (2)`/` (3)`
+    suffix, and the existing entry is never overwritten or merged. Renaming a
+    skill rewrites only the frontmatter `name` line and preserves every other
+    byte.
+  - A directory-shaped skill moves as one unit with its sibling resources, and
+    a transfer whose two targets name the same directory is a no-op.
+  - Without a selected project the move action is unavailable with an explicit
+    explanation, and no capability file or state entry changes.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md` §4 (Agent
+  capabilities), `03-runtime/01-ipc-protocol.md` §12a–§12b,
+  `04-ux/06-settings-ia.md` §2 (Agent capability destinations), ADR 0112,
+  ADR 0267
+- **Acceptance**: E (tools & permissions), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Host-covered (`pnpm test:e2e:capability-move` drives the same RPC
+  surface Electron main calls against a real host-core and an isolated global
+  root, asserting the documents and the state file on disk; host-core
+  registry/state tests cover the rename, the id the scan derives, and directory
+  resources; the source contract is pinned by
+  `apps/desktop/test/agent-capability-settings.test.mjs`). The rendered Settings
+  journey — row menu, toggle, toast — remains Draft.
+
 #### E2E-120: Global plugin launch, next-turn editing, and stopped throughput
 
 - **Preconditions**: Install and enable a panel plugin whose Chinese display
@@ -7692,6 +7771,9 @@ identify the platform validation still needed.
 | Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
 | C — Conversation & stream (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
 | E — Tools & permissions (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
+| E — Tools & permissions (capability level move) | E2E-CAPABILITY-move-across-levels |
+| F — Persistence (capability level move) | E2E-CAPABILITY-move-across-levels |
+| Quality (capability level move) | E2E-CAPABILITY-move-across-levels |
 
 | Milestone | Scenarios |
 |---|---|
@@ -7721,6 +7803,7 @@ identify the platform validation still needed.
 | C — Conversation & stream (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | Quality (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | M6+ (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
+| M6+ (capability level move) | E2E-CAPABILITY-move-across-levels |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)

@@ -1173,6 +1173,40 @@ fn parse_capability_query(
     Ok((level, project_path))
 }
 
+/// Read one end of a move from a nested `{ level, projectPath }` object.
+///
+/// A move names two directories at once, so unlike the single-level queries it
+/// reads a named key instead of the flat params, and the two ends can never be
+/// confused for each other. `level` must be present and a string: defaulting a
+/// missing or non-string level to `global` would silently write a capability
+/// into the wrong directory, so it is rejected as invalid params instead.
+fn parse_capability_target(
+    params: &Value,
+    key: &str,
+) -> Result<crate::agent_capabilities::CapabilityTarget, JsonRpcError> {
+    let source = params
+        .get(key)
+        .ok_or_else(|| rpc_err(1002, format!("{key} required"), "INVALID_PARAMS"))?;
+    let level = match source.get("level") {
+        Some(Value::String(level)) => CapabilityLevel::parse(Some(level))
+            .map_err(|error| capability_err(error.to_string()))?,
+        _ => {
+            return Err(rpc_err(
+                1002,
+                format!("{key}.level must be 'global' or 'project'"),
+                "INVALID_PARAMS",
+            ))
+        }
+    };
+    let project_path = source
+        .get("projectPath")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .filter(|value| !value.trim().is_empty());
+    crate::agent_capabilities::CapabilityTarget::new(level, project_path.as_deref())
+        .map_err(|error| capability_err(error.to_string()))
+}
+
 async fn handle_request(
     state: Arc<Mutex<AppState>>,
     method: &str,
@@ -4045,6 +4079,17 @@ async fn handle_request(
             let server = st.mcp_servers.set_scope(&id, scope).map_err(scope_err)?;
             Ok(json!({ "server": server }))
         }
+        "mcp.transfer" => {
+            let id = require_id(&params)?;
+            let from = parse_capability_target(&params, "from")?;
+            let to = parse_capability_target(&params, "to")?;
+            let mut st = state.lock().await;
+            let server = st
+                .mcp_servers
+                .transfer(&id, &from, &to)
+                .map_err(scope_err)?;
+            Ok(json!({ "server": server }))
+        }
 
         "skills.list" => {
             let (level, project_path) = parse_capability_query(&params)?;
@@ -4139,6 +4184,17 @@ async fn handle_request(
             let scope = parse_scope(&params)?;
             let mut st = state.lock().await;
             let skill = st.user_skills.set_scope(&id, scope).map_err(skill_err)?;
+            Ok(json!({ "skill": skill }))
+        }
+        "skills.transfer" => {
+            let id = require_id(&params)?;
+            let from = parse_capability_target(&params, "from")?;
+            let to = parse_capability_target(&params, "to")?;
+            let mut st = state.lock().await;
+            let skill = st
+                .user_skills
+                .transfer(&id, &from, &to)
+                .map_err(skill_err)?;
             Ok(json!({ "skill": skill }))
         }
 
@@ -4348,10 +4404,11 @@ mod tests {
     use tokio::sync::{mpsc, Mutex};
 
     use super::{
-        capability_err, handle_request, parse_capability_query, peek_jsonrpc_id, provider_rpc_err,
-        resolve_plan_workspace, resolve_tool_workspace, resolve_tool_workspace_for_call, scope_err,
-        skill_err,
+        capability_err, handle_request, parse_capability_query, parse_capability_target,
+        peek_jsonrpc_id, provider_rpc_err, resolve_plan_workspace, resolve_tool_workspace,
+        resolve_tool_workspace_for_call, scope_err, skill_err,
     };
+    use crate::agent_capabilities::CapabilityLevel;
     use crate::plans::{PlanResolveParams, PlanSubmitParams};
     use crate::scheduled;
     use crate::sessions;
@@ -4388,6 +4445,39 @@ mod tests {
             capability_err("missing project").data.unwrap()["errorCode"],
             "CAPABILITY_INVALID"
         );
+    }
+
+    #[test]
+    fn capability_target_requires_an_explicit_string_level() {
+        // A missing or non-string level must not fall back to `global`: that
+        // would write the capability into the wrong directory without telling
+        // the caller.
+        let missing = parse_capability_target(&json!({ "to": { "projectPath": "/p" } }), "to")
+            .expect_err("a target without a level is invalid");
+        assert_eq!(missing.code, 1002);
+        assert_eq!(
+            missing.data.as_ref().unwrap()["errorCode"],
+            json!("INVALID_PARAMS")
+        );
+
+        let wrong_type = parse_capability_target(&json!({ "to": { "level": 5 } }), "to")
+            .expect_err("a non-string level is invalid");
+        assert_eq!(wrong_type.code, 1002);
+        assert_eq!(
+            wrong_type.data.as_ref().unwrap()["errorCode"],
+            json!("INVALID_PARAMS")
+        );
+
+        let absent = parse_capability_target(&json!({}), "from")
+            .expect_err("the named end of a move is required");
+        assert_eq!(absent.code, 1002);
+
+        let project =
+            parse_capability_target(&json!({ "to": { "level": "project", "projectPath": "/p" } }), "to")
+                .unwrap();
+        assert_eq!(project.level, CapabilityLevel::Project);
+        let global = parse_capability_target(&json!({ "to": { "level": "global" } }), "to").unwrap();
+        assert_eq!(global.level, CapabilityLevel::Global);
     }
 
     #[test]

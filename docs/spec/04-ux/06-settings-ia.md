@@ -373,10 +373,16 @@ system while preserving their different data ownership:
   the overflow menu stay quiet until the row is hovered, focused, or has its
   menu open; the switch is always visible because enablement is the state the
   list is read for. Without hover the quiet actions are always shown. The
-  overflow menu holds the level-aware destructive and out-of-app actions —
-  Reveal and Remove for skills and subagents, Test connection and Remove for
-  MCP — and Remove arms on first press, relabels to ask for confirmation, and
-  disarms on its own if the menu is dismissed or left alone.
+  overflow menu holds the level-aware destructive, move, and out-of-app
+  actions — Reveal and Remove for skills and subagents, Test connection and
+  Remove for MCP, and Move to Global / Move into <project> on MCP and Skill
+  rows — and Remove arms on first press, relabels to ask for confirmation,
+  and disarms on its own if the menu is dismissed or left alone. The move
+  direction follows the row's own level: a global row offers Move into the
+  project named by the page toolbar's project picker, and a project row offers
+  Move to Global. With no project selected the Move into <project> item is not
+  offered and the project group asks for a project selection instead, so a
+  capability is never sent to an unnamed project.
 - Skeleton rows appear on first paint only. A later refresh keeps the rows it
   already has and dims the list instead, announcing the refresh to assistive
   technology, so toggling a switch never replaces the list with skeletons.

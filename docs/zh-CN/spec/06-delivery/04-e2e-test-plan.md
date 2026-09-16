@@ -4935,6 +4935,9 @@ IPC 请求无法关闭。
 | Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command、E2E-PLUGIN-permission-gate-for-real-time-capabilities、E2E-PLUGIN-background-audio-and-realtime-connection |
 | C — 对话与流式（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
 | E — 工具与权限（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
+| E — 工具与权限（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
+| F — 持久化（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
+| 品质（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
 
 | 里程碑 | 应用场景 |
 |---|---|
@@ -4964,6 +4967,7 @@ IPC 请求无法关闭。
 | C — 对话和直播（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | 品质（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | M6+（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
+| M6+（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策
