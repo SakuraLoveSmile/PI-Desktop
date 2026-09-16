@@ -47,10 +47,45 @@ const GITHUB_REPO = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?(?:[
 const JSDELIVR_GH = /^https:\/\/cdn\.jsdelivr\.net\/gh\/([^/]+)\/([^/]+)@([^/]+)\/(.+)$/;
 const SKILL_FILE = /(?:^|\/)SKILL\.md$/;
 
-function classifyFailure(error: unknown): SkillMarketFailureKind {
+/**
+ * Why a request failed, exported so the IPC boundary and the aggregator share
+ * one classifier instead of re-deriving it (issue #419).
+ */
+export function classifySkillMarketFailure(error: unknown): SkillMarketFailureKind {
   // Structural check so this module keeps no dependency on the client's
   // `node:dns` import and stays testable as a pure module.
   return isPublicNetworkPolicyFailure(error) ? "policy" : "network";
+}
+
+/**
+ * Bare hostname for a diagnostics record, or undefined when the URL cannot be
+ * parsed. Never a path, query, port or credential: a catalog source URL is
+ * user-supplied and the log line only needs to name the host that was refused.
+ */
+export function skillMarketHost(url: unknown): string | undefined {
+  if (typeof url !== "string") return undefined;
+  try {
+    return new URL(url).hostname.toLowerCase() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The diagnostics payload for one failed catalog source. Built here, not at the
+ * call site, so the shape is unit-testable without Electron and so every
+ * failure record carries the same fields.
+ */
+export function skillMarketFailureDetail(
+  source: { name?: unknown; url?: unknown },
+  error: unknown,
+): { source?: string; host?: string; kind: SkillMarketFailureKind } {
+  const host = skillMarketHost(source.url);
+  return {
+    ...(typeof source.name === "string" && source.name ? { source: source.name } : {}),
+    ...(host ? { host } : {}),
+    kind: classifySkillMarketFailure(error),
+  };
 }
 
 const SKILL_CATEGORY_KEYWORDS: ReadonlyArray<readonly [SkillCatalogCategory, string[]]> = [
@@ -202,7 +237,7 @@ export function createSkillMarketAggregator(request: CatalogRequest) {
       if (result.status === "rejected") {
         const name = usable[index].name;
         failedSources.push(name);
-        markFailure(name, classifyFailure(result.reason));
+        markFailure(name, classifySkillMarketFailure(result.reason));
         return;
       }
       for (const entry of result.value) {

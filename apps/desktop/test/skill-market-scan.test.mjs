@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import test from "node:test";
-import { createSkillMarketAggregator } from "../electron/main/skill-market-scan.ts";
+import { fileURLToPath } from "node:url";
+import {
+  classifySkillMarketFailure,
+  createSkillMarketAggregator,
+  skillMarketFailureDetail,
+  skillMarketHost,
+} from "../electron/main/skill-market-scan.ts";
 import { PublicNetworkPolicyError } from "../electron/main/public-https-fetch.ts";
 
 const source = {
@@ -145,4 +153,70 @@ test("a repeated display name keeps the refusal, and a hostile name stays own", 
   assert.equal(Object.hasOwn(result.failureKinds, "__proto__"), true);
   assert.equal(result.failureKinds.__proto__, "policy");
   assert.deepEqual(Object.values(result.failureKinds), ["policy", "policy"]);
+});
+
+test("a diagnostics record names the host, never the URL or its credentials", () => {
+  // Issue #419: the market's failures wrote nothing to the app log, so a user
+  // behind a proxy had no way to report which host was refused. The record is
+  // built here so its shape is fixed and its redaction is testable.
+  assert.deepEqual(
+    skillMarketFailureDetail(
+      { name: "anthropics/skills", url: "https://user:secret@github.com:8443/org/repo?token=abc#x" },
+      new PublicNetworkPolicyError("hostname resolves to a private address"),
+    ),
+    { source: "anthropics/skills", host: "github.com", kind: "policy" },
+  );
+  // A transport failure is not a refusal.
+  assert.equal(
+    skillMarketFailureDetail(source, new Error("responded 502")).kind,
+    "network",
+  );
+  // A source the syntactic guard never let out still logs its name.
+  assert.deepEqual(
+    skillMarketFailureDetail({ name: "broken", url: "http://insecure.example" }, undefined),
+    { source: "broken", host: "insecure.example", kind: "network" },
+  );
+  // An unparseable or missing URL must not produce a host field, and must not
+  // throw while a failure is being reported.
+  assert.equal(skillMarketHost(undefined), undefined);
+  assert.equal(skillMarketHost("not a url"), undefined);
+  assert.equal(skillMarketHost(42), undefined);
+  assert.deepEqual(skillMarketFailureDetail({}, new Error("x")), { kind: "network" });
+});
+
+test("the classifier matches the aggregator's own classification", async () => {
+  // One classifier, so the log line and the panel can never disagree.
+  const policy = new PublicNetworkPolicyError("hostname does not resolve: x.example");
+  assert.equal(classifySkillMarketFailure(policy), "policy");
+  assert.equal(classifySkillMarketFailure(new Error("fetch failed")), "network");
+  const aggregator = createSkillMarketAggregator(async () => {
+    throw policy;
+  });
+  const result = await aggregator.search("", [source]);
+  assert.equal(result.failureKinds["anthropics/skills"], classifySkillMarketFailure(policy));
+});
+
+test("both market channels report their failures to the app log", () => {
+  // `skills-ipc.ts` imports Electron, so the wiring is asserted on the source:
+  // the refusal reason, the host and the stable code must all reach the log,
+  // and the log must not carry the full URL.
+  const src = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../electron/main/ipc/skills-ipc.ts"),
+    "utf8",
+  );
+  assert.match(src, /import type \{ Logger \} from "\.\.\/logger"/);
+  assert.match(src, /logger: Pick<Logger, "app">/);
+  assert.match(src, /logger\.app\("diagnostics", "warn", "skill market source produced no entries"/);
+  assert.match(src, /logger\.app\("diagnostics", "warn", "skill market document fetch failed"/);
+  assert.match(src, /event: "skillMarket\.sourceFailed"/);
+  assert.match(src, /event: "skillMarket\.documentFailed"/);
+  assert.match(src, /code: ErrorCodes\.NETWORK_POLICY_BLOCKED/);
+  assert.match(src, /host: skillMarketHost\(source\.url\)|const host = skillMarketHost\(source\.url\)/);
+  assert.doesNotMatch(src, /data: \{ url|url: source\.url/);
+  // The registration site must supply the logger, or the wiring above is dead.
+  const register = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "../electron/main/ipc/register.ts"),
+    "utf8",
+  );
+  assert.match(register, /registerSkillsIpc\(\{[\s\S]*?logger,[\s\S]*?\}\)/);
 });
