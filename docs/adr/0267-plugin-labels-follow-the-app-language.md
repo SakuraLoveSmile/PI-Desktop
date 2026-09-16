@@ -1,4 +1,4 @@
-# ADR 0268: Plugin Labels Follow the App Language
+# ADR 0267: Plugin Labels Follow the App Language
 
 - **Status**: Accepted
 - **Date**: 2026-09-16
