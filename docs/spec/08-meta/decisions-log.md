@@ -5629,3 +5629,33 @@ that was sitting at the bottom — including after the turn had finished.
   file, and an unavailable host contributes no exclusions. See ADR 0270,
   `04-ux/06-settings-ia.md` §2, `03-runtime/01-ipc-protocol.md` §12c, and
   E2E-SUBAGENT-settings-lists-builtin-defaults.
+
+## 2026-09-17 — The dock question card is a composer plate (#360, D435)
+
+- The asktool question card is mounted in the transparent composer dock
+  (`Composer.tsx` renders it as a direct `.composer-stack` child, and the
+  transcript mount is gone), yet it still painted the in-flow `--ds-tile` wash:
+  a 3.5% ink mix with no shadow. On the light page that leaves a `#f7f7f7`
+  panel with white option rows next to the composer plate below it, which is
+  how #360 item 1 ("选择交互面板缺少背景色") reads. The dock rule's own comment
+  already claimed the card "uses the same decision surface as Plan and Goal
+  approval", while `.plan-approval-bar` in that exact slot paints
+  `--ds-bg-composer` with `--ds-shadow-composer` (`04-ux/03-permission-ux.md`
+  §9, `04-ux/08-component-spec.md` §11.5).
+- `.composer-stack > .asktool-card` now paints that plate: `--ds-bg-composer`
+  with `--ds-shadow-composer` (light `#ffffff`, dark
+  `color-mix(in oklab, #212121 96%, transparent)` with the composer shadow).
+- Its controls move to the plate's inlaid tier, the layer `.plan-approval-split`
+  already uses on that same plate: `.asktool-option` and
+  `.asktool-custom-input` drop `--ds-raised` and `--ds-raised-shadow` for
+  `--ds-tile-deep`, and the hover/selected mix is rebased on `--ds-tile-deep`.
+  Without that flip the rows would be white on white in the light palette,
+  where `--ds-raised` and `--ds-bg-composer` are both `#ffffff`. The 15 px
+  option mark keeps `--ds-tile-deep` — the sidebar checkbox's mark — which
+  still reads against the inlaid row exactly as it does against the sidebar.
+- Renderer only: no protocol, storage, host, permission, migration, or
+  preference change, and no new default. Both layers are existing tokens in
+  both palettes, so a contributed theme moves the plate and the rows with
+  `--ds-bg-composer` / `--ds-tile-deep`. See
+  `04-ux/11-asktool-question-card.md`, `04-ux/07-ui-design-system.md` §6.4, and
+  E2E-078.

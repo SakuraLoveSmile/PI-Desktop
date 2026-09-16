@@ -4271,3 +4271,10 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 设置 > 智能体 > 子智能体把五个随应用发布的默认项列为只读行，而用户自建的文档带启用开关，于是有一个委派对象完全无法关闭：复制一个内置项再停用副本，随应用发布的定义仍留在目录里，因为被停用的用户文档在加载器合并前就被过滤掉，也就没有遮蔽任何东西。
 - 每个内置行现在都带同一个开关。句柄存放在 `<data>/agent-capabilities/subagent-builtins.json` —— 一个独立文件，因为用户文档扫描会清理它永远看不到的 id 的状态 —— 并由 host-core 通过 `agents.disabledBuiltins` / `agents.setBuiltinEnabled` 暴露。Electron 主进程把被关闭的句柄交给 `loadSubagentDefinitions`，由它把它们从委派目录中剔除，而 `subagent/catalog` 仍会在其新增的 `builtins` 列表中返回该内置项，并标记 `enabled: false`。
 - 被关闭的内置项保留自己的行并变暗，因此这个开关就是重新打开的入口。同名的用户文档继续生效并继续遮蔽随应用发布的定义，在文件夹中显示与删除仍然没有，因为内置不是文件；宿主不可用时也不会贡献任何排除项。见 ADR 0270、`04-ux/06-settings-ia.md` §2、`03-runtime/01-ipc-protocol.md` §12c 与 E2E-SUBAGENT-settings-lists-builtin-defaults。
+
+## 2026-09-17 —— dock 内的问题卡是 composer 板（#360，D435）
+
+- asktool 问题卡挂在透明的 composer dock 里（`Composer.tsx` 把它渲染为 `.composer-stack` 的直接子节点，成绩单内的挂载已移除），但它仍在绘制流动层的 `--ds-tile` 洗色：3.5% 墨色混合、没有阴影。在浅色页面上这留下一块 `#f7f7f7` 面板加白色选项行，紧邻下方的 composer 板 —— 这正是 #360 第 1 项（“选择交互面板缺少背景色”）读到的样子。该 dock 规则自己的注释早已声称这张卡“使用与 Plan/Goal 批准相同的决策表面”，而同一槽位里的 `.plan-approval-bar` 绘制的是 `--ds-bg-composer` 加 `--ds-shadow-composer`（`04-ux/03-permission-ux.md` §9、`04-ux/08-component-spec.md` §11.5）。
+- `.composer-stack > .asktool-card` 现在绘制那块板：`--ds-bg-composer` 加 `--ds-shadow-composer`（浅色 `#ffffff`，深色 `color-mix(in oklab, #212121 96%, transparent)` 配合 composer 阴影）。
+- 它的控件移到该板的内嵌层 —— 也就是 `.plan-approval-split` 在同一块板上已经使用的层：`.asktool-option` 与 `.asktool-custom-input` 去掉 `--ds-raised` 与 `--ds-raised-shadow`，改用 `--ds-tile-deep`，悬停/选中混合也以 `--ds-tile-deep` 为基底。不做这次翻转，浅色主题下选项行会白上加白，因为该调色板里 `--ds-raised` 与 `--ds-bg-composer` 都是 `#ffffff`。15 px 的选项标记保留 `--ds-tile-deep` —— 与侧边栏复选框同一枚标记 —— 它与内嵌行之间的对比，和它与侧边栏之间的对比完全一致。
+- 仅渲染层：无协议、存储、宿主、权限、迁移或偏好改动，也没有新增默认值。两层在两种调色板里都是既有 token，因此贡献主题可以分别用 `--ds-bg-composer` / `--ds-tile-deep` 移动板与行。见 `04-ux/11-asktool-question-card.md`、`04-ux/07-ui-design-system.md` §6.4 与 E2E-078。
