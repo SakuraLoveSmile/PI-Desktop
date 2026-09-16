@@ -19,6 +19,10 @@ import { createSkillMarketAggregator } from "../electron/main/skill-market-scan.
  * Nothing here changes *whether* the guard blocks. Every case below is still
  * refused, and the last test pins that. What is pinned is what the app says about
  * it — which host, and which of the two causes.
+ *
+ * Every client here wires no route resolver, so every case below keeps the
+ * strict pre-ADR-0272 verdict by construction; the route-aware policy has its
+ * own cover in `public-https-fetch-route.test.mjs`.
  */
 
 const composio = {
@@ -50,6 +54,9 @@ test("a resolver with no answer is not reported as an address-check refusal", as
     kind: "unresolved",
     reason: "resolve-failed",
     host: SCAN_HOST,
+    // This client wires no route resolver, and an unreadable route is never
+    // permission: it keeps the strict verdict (ADR 0272).
+    route: "unknown",
   });
 });
 
@@ -77,12 +84,15 @@ test("a resolver that throws is unresolved too, and that one is retried", async 
   assert.equal(lookups, 3);
 });
 
-test("a TUN fake-IP is still refused, and the refusal now names what it refused", async () => {
-  // Clash's default fake-IP range. The guard keeps refusing it — this is a
-  // refusal, not an exemption — but it is now its own cause rather than the same
-  // finding as a real private target, and the record carries the host, the
-  // reason, the address and its class instead of the one word "private" that fit
-  // none of the benchmark/CGNAT/loopback cases.
+test("an unreadable route still refuses a TUN fake-IP, and names what it refused", async () => {
+  // Clash's default fake-IP range on a client that wires no route resolver at
+  // all. The address verdict still lands on the address this app would dial, so
+  // it stays a refusal; with a proxied route reported for the hop the same
+  // answer is the resolver's artifact and is tolerated (ADR 0272). Either way
+  // the refusal carries the host, the reason, the address, its class, and the
+  // route it was judged on — and it is its own cause rather than the same
+  // finding as a real private target — instead of the one word "private" that
+  // fit none of the benchmark/CGNAT/loopback cases.
   const client = createPublicHttpsClient({
     fetchImpl: async () => {
       throw new Error("a refused request must never reach the network");
@@ -99,6 +109,7 @@ test("a TUN fake-IP is still refused, and the refusal now names what it refused"
     host: SCAN_HOST,
     address: "198.18.0.4",
     addressKind: "benchmark",
+    route: "unknown",
   });
 });
 
@@ -284,6 +295,7 @@ test("the refusal names the host and the address, not only the source label", as
     host: SCAN_HOST,
     address: "198.18.0.1",
     addressKind: "benchmark",
+    route: "unknown",
   });
   const privateTarget = await marketKindForAddress("10.1.2.3");
   assert.equal(privateTarget.failureDetails[composio.name].address, "10.1.2.3");

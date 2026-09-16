@@ -301,6 +301,22 @@ Node sidecar 将提供商 SDK 错误映射到：
 `TLS_ERROR`、`SOCKET_RESET` 等）：分类字段已能区分这些层，而无需为每一层
 增加用户可见的错误码与本地化文案。
 
+诊断来自 fetch 边界处的实时 cause 链，而不只是提供程序消息：pi-ai 会把被
+拒绝的请求摊平成 `errorMessage`，等到分类运行时 undici 存放在 `error.cause`
+里的 errno 已经消失，裸 `fetch failed` 只能被记为 `networkCategory: unknown`；
+而 fetch 包装层仍持有原始 Error，并从它给出同一组经过校验的字段。捕获到的
+cause 同时确定了阶段：没有任何响应到达时故障记为 `phase: request`，这正是它
+与「响应中途断流」的区别。`networkRoute`（`direct`、`environment-proxy`、
+`http-proxy`、`socks5-proxy`）指出请求实际走的链路，代理这一跳失败无需再从
+errno 猜测。
+
+同一来源在一轮内连续两次这样失败（完全没有响应）时，下一次尝试前会重建提供
+程序传输，而不是继续复用同一个 undici 连接池。重建是进程级的、且有明确边界：
+每个连续失败序列只重建一次，每 30 秒最多一次，且 `dns` 永不触发重建（新连接池
+无法改变名字解析结果）。替换在关闭旧 dispatcher 之前安装，旧的 dispatcher 采
+用优雅关闭，因此其他会话已派发的请求仍会在它原本使用的连接池上完成。生效的
+链路会被原样复现，绝不会悄悄降级为直连。
+
 ### 权限超时
 UI/host 超时在内部发出 `PERMISSION_TIMEOUT`，工具结果向代理显示为拒绝 (`TOOL_DENIED`)。
 
@@ -332,7 +348,7 @@ UI/host 超时在内部发出 `PERMISSION_TIMEOUT`，工具结果向代理显示
 公共 credential/header 值在事件发射或持久化之前进行编辑。
 详细信息披露也可能显示有界的 `phase`、`providerStatus`、`providerCode`、
 `providerWaitMs`、`streamMs`、`retryAttempt`、`networkCategory`、
-`networkCode`、`networkSyscall`、`networkHost`、`requestMessages`、
+`networkCode`、`networkSyscall`、`networkHost`、`networkRoute`、`requestMessages`、
 `requestBytes` 和 `compactionGeneration` 字段。请求字段只有计数与字节大小，
 压缩字段是检查点世代计数器，均不携带消息内容。当瞬时提供商故障正在重试时，
 活动指示器的原因气泡会显示本地化摘要、稳定错误码，并在网络故障时显示传输层

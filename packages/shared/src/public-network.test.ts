@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   classifyIpAddress,
   classifyIpLiteral,
+  classifyProxyRoute,
+  isAcceptableResolvedAddress,
   isPublicHttpsUrl,
   isPublicIpLiteral,
   PUBLIC_NETWORK_POLICY_ERROR,
@@ -161,5 +163,98 @@ describe("public network address policy", () => {
     ).toEqual({ reason: "non-public-address", addressKind: "benchmark" });
     expect(publicNetworkRefusalDetail(new Error("responded 502"))).toBeUndefined();
     expect(publicNetworkRefusalDetail(undefined)).toBeUndefined();
+  });
+
+  it("reads the route a proxy list proves, and refuses to guess", () => {
+    // ADR 0272: the address verdict follows the route the request will take, so
+    // the route has to be read strictly. Only a list with a proxy chain and no
+    // `DIRECT` entry proves the app's socket can be a proxy: Chromium may fall
+    // back to `DIRECT`, so an offered direct connection is `unknown`, never
+    // `proxied`.
+    const cases: Array<[unknown, ReturnType<typeof classifyProxyRoute>]> = [
+      ["DIRECT", "direct"],
+      ["direct", "direct"],
+      ["PROXY 127.0.0.1:7890", "proxied"],
+      ["SOCKS5 127.0.0.1:1080", "proxied"],
+      ["SOCKS 127.0.0.1:1080", "proxied"],
+      ["HTTPS proxy.example:443", "proxied"],
+      ["SOCKS5 a.example:1, PROXY b.example:2", "proxied"],
+      ["PROXY 127.0.0.1:7890; PROXY 127.0.0.1:7891", "proxied"],
+      ["PROXY 127.0.0.1:7890; DIRECT", "unknown"],
+      ["DIRECT; PROXY 127.0.0.1:7890", "unknown"],
+      ["", "unknown"],
+      ["   ", "unknown"],
+      ["MAGIC 127.0.0.1:7890", "unknown"],
+      ["PROXY", "unknown"],
+      ["PROXY 127.0.0.1:7890; MAGIC x", "unknown"],
+      [undefined, "unknown"],
+      [null, "unknown"],
+      [7890, "unknown"],
+    ];
+    for (const [proxyList, route] of cases) {
+      expect(classifyProxyRoute(proxyList), JSON.stringify(proxyList)).toBe(route);
+    }
+  });
+
+  it("accepts only the resolver artifact on a proxied route", () => {
+    // `benchmark` is a TUN fake-IP answer: an address this app never dials when
+    // it is dialing a proxy. Every class that names a real internal target still
+    // refuses on both routes, and a direct (or unreadable) route keeps the
+    // original rule for all of them.
+    expect(isAcceptableResolvedAddress("public", "direct")).toBe(true);
+    expect(isAcceptableResolvedAddress("public", "proxied")).toBe(true);
+    expect(isAcceptableResolvedAddress("public", "unknown")).toBe(true);
+    expect(isAcceptableResolvedAddress("benchmark", "proxied")).toBe(true);
+    expect(isAcceptableResolvedAddress("benchmark", "direct")).toBe(false);
+    expect(isAcceptableResolvedAddress("benchmark", "unknown")).toBe(false);
+    for (const kind of [
+      "invalid",
+      "unspecified",
+      "loopback",
+      "private",
+      "cgnat",
+      "link-local",
+      "multicast",
+      "reserved",
+      "documentation",
+      "ula",
+      "site-local",
+    ] as const) {
+      expect(isAcceptableResolvedAddress(kind, "proxied"), kind).toBe(false);
+    }
+  });
+
+  it("carries the judged route, and drops an unknown one", () => {
+    expect(
+      publicNetworkRefusalDetail({
+        name: PUBLIC_NETWORK_POLICY_ERROR,
+        reason: "non-public-address",
+        host: "cdn.jsdelivr.net",
+        address: "198.18.0.4",
+        addressKind: "benchmark",
+        route: "direct",
+      }),
+    ).toEqual({
+      reason: "non-public-address",
+      host: "cdn.jsdelivr.net",
+      address: "198.18.0.4",
+      addressKind: "benchmark",
+      route: "direct",
+    });
+    expect(
+      publicNetworkRefusalDetail({
+        name: PUBLIC_NETWORK_POLICY_ERROR,
+        reason: "resolve-failed",
+        host: "api.github.com",
+        route: "made-up",
+      }),
+    ).toEqual({ reason: "resolve-failed", host: "api.github.com" });
+    expect(
+      publicNetworkRefusalDetail({
+        name: PUBLIC_NETWORK_POLICY_ERROR,
+        reason: "url-syntax",
+        route: "proxied",
+      }),
+    ).toEqual({ reason: "url-syntax", route: "proxied" });
   });
 });

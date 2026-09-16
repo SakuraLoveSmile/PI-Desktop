@@ -309,6 +309,28 @@ omitted when it would repeat `networkCode`. Per-layer codes (`DNS_ERROR`,
 splits the layers without adding user-visible codes and locale strings for
 each of them.
 
+The diagnosis is read from the live cause chain at the fetch boundary, not only
+from the provider message. pi-ai flattens a rejected request into
+`errorMessage`, so by the time classification runs the errno undici keeps in
+`error.cause` is already gone and a bare `fetch failed` can only be reported as
+`networkCategory: unknown`; the fetch wrapper still holds the original Error and
+supplies the same validated fields from it. A captured cause also settles the
+phase: the fault is reported as `phase: request` because no response ever
+arrived, which is what distinguishes it from a stream that ended mid-response.
+`networkRoute` (`direct`, `environment-proxy`, `http-proxy`, `socks5-proxy`)
+names the hop the request was taking, so a failure at the proxy is readable
+without guessing from an errno.
+
+When one origin fails this way repeatedly inside a turn — twice in a row,
+without any response — the provider transport is rebuilt before the next attempt
+instead of replaying into the same undici pool. The rebuild is process-wide and
+deliberately bounded: one rebuild per streak, at most one every 30 seconds, and
+never for a `dns` failure, which a fresh pool cannot change. The replacement is
+installed before the previous dispatcher is closed, and the previous one is
+closed gracefully, so a request another session already dispatched finishes on
+the pool it started on. The route in effect is reproduced, never downgraded to a
+direct connection.
+
 ### Permission timeout
 UI/host timeout emits `PERMISSION_TIMEOUT` internally, tool result presented as denied (`TOOL_DENIED`) to agent.
 
@@ -343,7 +365,8 @@ common credential/header values are redacted before event emission or
 persistence. When available, the details disclosure may also show bounded
 `phase`, `providerStatus`, `providerCode`, `providerWaitMs`, `streamMs`,
 `retryAttempt`, `networkCategory`, `networkCode`, `networkSyscall`,
-`networkHost`, `requestMessages`, `requestBytes`, and `compactionGeneration`
+`networkHost`, `networkRoute`, `requestMessages`, `requestBytes`, and
+`compactionGeneration`
 fields. The request fields are counts and byte sizes only and the compaction
 field is the checkpoint generation counter; none of them carries message
 content. While a transient provider failure retries, the activity indicator's

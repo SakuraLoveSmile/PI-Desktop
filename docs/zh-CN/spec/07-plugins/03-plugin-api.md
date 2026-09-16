@@ -519,6 +519,12 @@ pi.net.fetch(input: {
 }): Promise<{ status: number; headers: Record<string, string>; bodyText: string }>
 ```
 
+`fetch` 原样返回上游响应 —— `status`、`headers`、`bodyText` —— 所以 `429`
+是插件能读到的数据（`Retry-After` 也在里面），而不是被主机藏起来的错误。宿主
+不重试、不限流、也不重新发起请求：遇到 `429` 之后的重试与退避是插件自己的
+策略，响应头就是插件唯一能拿到的退避信号。失败的调用（`status >= 400`）在
+审计里记为 `ok: false`，并在响应声明了延迟时附带它通告的 `retryAfter`（§7）。
+
 ```ts
 pi.net.websocket.connect(input: {
   url: string
@@ -654,7 +660,7 @@ type PluginGlobalShortcut = {
 
 `command` 必须已经由调用插件注册；否则以 `INVALID_ARGUMENT` 失败。被操作
 系统保留、被 PI-Desktop 自己当前占用（默认 `Alt+Space` 打开插件启动器、
-`Mod+Shift+W` 唤起窗口；用户改绑后释放出来的加速键可以再次被插件使用）或
+`Alt+Shift+W` 呼出或隐藏窗口；用户改绑后释放出来的加速键可以再次被插件使用）或
 已被另一个插件持有的加速键会被拒绝而不是被抢走，被拒绝的重新注册会保留原来
 的绑定。拒绝是返回的结果，不是抛出的异常：
 `registerGlobalShortcut` 以 `registered: false` 解析，并带 `error` 为
@@ -820,6 +826,8 @@ window.pluginBridge.on(event, handler)
 - TS
 - 会话 ID？
 - 好的/错误代码
+- status / retryAfter（仅 `net.fetch`：已完成调用的上游状态码，以及失败调用所
+  声明的 `Retry-After` —— 绝不记录整个头部集合或响应体）
 
 ## 8. 版本控制策略
 

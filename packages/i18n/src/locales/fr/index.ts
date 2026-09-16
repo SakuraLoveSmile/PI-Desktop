@@ -69,8 +69,7 @@ export const fr = {
     "newTask": "Nouvelle tâche",
     "openProject": "Ouvrir le projet…",
     "settings": "Paramètres…",
-    "closeWindow": "Fermer la fenêtre",
-    "summonWindow": "Ramener la fenêtre au premier plan",
+    "toggleWindow": "Afficher/Masquer la fenêtre",
     "refreshMarket": "Actualiser la place de marché",
     "search": "Recherche…",
     "toggleSidebar": "Barre latérale",
@@ -639,8 +638,7 @@ sklm: {
       "toggleSidebar": "Basculer la barre latérale",
       "openWorkPanel": "Basculer le panneau latéral",
       "abort": "Arrêter la tâche active",
-      "closeWindow": "Fermer la fenêtre",
-      "summonWindow": "Ramener la fenêtre au premier plan",
+      "toggleWindow": "Afficher ou masquer la fenêtre",
       "resetZoom": "Réinitialiser le zoom",
       "zoomIn": "Zoom avant",
       "zoomOut": "Zoom arrière",
@@ -1007,6 +1005,7 @@ sklm: {
     "imageInput": "Images",
     "documentInput": "PDF",
     "thinkingManualOverrideHint": "Pas dans le catalogue ; activer si pris en charge.",
+    "contextWindowCatalogHint": "Suit models.dev ; une modification fixe votre valeur.",
     "availableForSubagents": "Disponible pour la délégation de l'IA",
     "availableForSubagentsHint": "Autoriser l'IA à utiliser ce modèle lors de la délégation de tâches à des sous-agents",
     "searchModelId": "ID de modèle de recherche…",
@@ -1081,6 +1080,11 @@ sklm: {
     "createNameLabel": "Nom du projet",
     "createFoldersLabel": "Espace de travail",
     "createComputer": "Cet ordinateur",
+    "createSourceLabel": "Source",
+    "createSourceGit": "Dépôt Git",
+    "createRepositoryLabel": "URL du dépôt",
+    "createChooseLocation": "Choisir un dossier",
+    "createLocationHint": "Dossier d'enregistrement du clone",
     "createPrimary": "Principal",
     "createRemoveFolder": "Supprimer le dossier",
     "createAddFolder": "Ajouter un dossier",
@@ -1239,6 +1243,15 @@ sklm: {
       "unanswered": "Question {{number}} sans réponse",
       "skipped": "Question {{number}} ignorée"
     }
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  "pluginPanelWidget": {
+    "alwaysOnTop": "Toujours au-dessus",
+    "minimize": "Réduire",
+    "close": "Fermer le widget"
   },
   "panel": {
     "title": "Panneau de travail",
@@ -1471,6 +1484,11 @@ sklm: {
     "permsMore": "+{{count}} plus",
     "permissionsTitle": "Autorisations",
     "permissionReview": "Examen des autorisations",
+    "devReviewTitle": "Charger {{name}} ?",
+    "devReviewNewTitle": "{{name}} demande plus d'accès",
+    "devReviewBody": "Ce plugin de développement vient d'un dossier de cette machine. Vérifiez ce qu'il peut faire — rien n'est chargé tant que vous n'acceptez pas.",
+    "devReviewAccept": "Charger le plugin",
+    "devReviewLoading": "Chargement…",
     "permissionReviewTitle": "Installer {{name}} ?",
     "permissionReviewBody": "Vérifiez ce que ce plugin peut faire. Les autorisations à plus haut risque restent bloquées jusqu'à ce que vous les acceptiez.",
     "acceptInstall": "Accepter et installer",

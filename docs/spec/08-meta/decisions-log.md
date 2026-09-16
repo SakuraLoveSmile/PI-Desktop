@@ -4569,6 +4569,10 @@ D193, and D194.
 
 ## 2026-09-10 — Plan-safe plugin actions and summon-window shortcut (D384)
 
+*(the summon-window half is superseded by D438, which replaced the pair, and by
+D439, which moved the toggle off the macOS close-window chord; the plan-safe
+plugin-action opt-in below stays)*
+
 - Plan and Goal modes could not invoke plugin tools at all, even for
   read-only actions like fetching a URL through the bundled Browser
   plugin, and the keyboard shortcut catalog only exposed a close-window
@@ -4585,6 +4589,86 @@ D193, and D194.
   `closeWindow` (`Mod+W`), and the desktop main process registers it
   through `globalShortcut` and the native menu. See ADR 0211 and
   E2E-PLAN-005.
+
+## 2026-09-17 — One window toggle replaces the summon/close pair (#360, D438)
+
+- Issue #360 item 3 asks for the summon-window and hide/close-window global
+  shortcuts to become one key. D384 shipped the opposite arrangement —
+  `summonWindow` (`Mod+Shift+W`) as the "symmetrical counterpart" of
+  `closeWindow` (`Mod+W`), mirrored by `04-ux/09-interaction-patterns.md` §1.1 —
+  so D438 supersedes exactly that half of D384; the plan-safe plugin-action
+  opt-in from the same decision is untouched. The numbering skips D435 and D437,
+  which other in-flight work already claims.
+- The catalog ships one `toggleWindow` id in the `window` group, and
+  `closeWindow` and `summonWindow` leave `KEYBOARD_SHORTCUT_IDS`, so neither
+  retired chord is spent on anything: neither is a shipped default, registered
+  with `globalShortcut`, a settings row, or a menu accelerator, and the freed
+  `Mod+Shift+W` becomes available to plugins again. D439 later moved the
+  toggle's own default off `Mod+W`, which D438 had chosen; the merged id, the
+  toggle semantics, and the migration below are unchanged by that.
+- Pressing the key is a decision, not a close. `windowToggleAction` hides a
+  visible, focused window through `Window.hide()` and otherwise shows and
+  focuses it (hidden, minimized, or behind another application all count as
+  "not visible"). `Window.hide()` is the whole hide path, so the Windows/Linux
+  close-behaviour prompt, its `Quit` choice, `window-all-closed`, and
+  `before-quit` are never reached, no window is destroyed, and the app keeps
+  running; the tray icon, the same key, or macOS application activation brings
+  the window back. `windowControl("close")` remains the window's own close
+  button, which is still the only way into the close behaviour.
+- Persisted `settings.keybindings` can still name the two retired ids, and the
+  same rule applies in both processes: `migrateKeybindingOverrides` folds the
+  map as it is read — in Electron main before it registers accelerators or
+  builds the menu, and in the renderer store before any consumer sees it — so
+  no surface can act on the retired ids. The rules are ordered and idempotent:
+  an existing `toggleWindow` override wins unchanged; otherwise the first
+  retired entry that carries a *binding* wins, `closeWindow` first because
+  hiding is the toggle's primary job; a retired entry that is only `null` is
+  honoured when no binding competes, so an explicit unbind is never replaced by
+  a shipped default; and a stored value equal to its own retired default carries
+  no intent (the settings UI deletes overrides that match a shipped default), so
+  `Mod+W`/`Mod+Shift+W` values are dropped rather than resurrected. Nothing is
+  rewritten in storage: the folded map is what the next shortcut save persists,
+  and an older release reading a newer map simply ignores the unknown id.
+- The window-visibility key is a supported global shortcut on macOS, Windows,
+  and Linux, so it is documented as one: menu label and settings row are
+  localized in all eight catalogs, and the settings card shows a single Window
+  row instead of two contradictory ones.
+- See ADR 0211 (amended), `04-ux/09-interaction-patterns.md` §1.1 and §1.4,
+  `04-ux/06-settings-ia.md` (shortcuts tab), `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`, `03-runtime/01-ipc-protocol.md`
+  (`NATIVE_MENU_ACTIONS`), E2E-072, and
+  `apps/desktop/test/window-toggle-shortcut.test.mjs`.
+
+## 2026-09-17 — The window toggle avoids the macOS close-window chord (#360, D439)
+
+- D438 merged the pair onto `Mod+W`, but that binding cannot be the default of a
+  *process-wide* accelerator: macOS spends `Cmd+W` on its own close-window
+  command, so claiming it globally takes the chord away from every other
+  application instead of only closing this window. `Mod+W` is therefore the one
+  key the toggle must not hold.
+- The catalog now ships `toggleWindow` on `Alt+Shift+W` — no platform modifier,
+  so it is one chord on macOS, Windows, and Linux — which collides with no
+  shipped default, no reserved editing chord, and no platform command. The
+  merge, the hide/show semantics, and the fold of the retired
+  `closeWindow`/`summonWindow` overrides stay exactly as D438 defined them.
+- On macOS `Mod+W` is now also refused to plugins (`isReservedKeybinding`), so
+  the platform keeps the chord it owns even though the app no longer uses it.
+- A stored `toggleWindow` value that only repeats a default this release ships
+  or already superseded carries no user intent, so the fold drops it: a profile
+  that persisted the short-lived `Mod+W` default moves to `Alt+Shift+W` instead
+  of freezing the macOS chord, while a real rebind (`Ctrl+Alt+T`) and an
+  explicit unbind (`null`) survive untouched, and a retired customization still
+  wins over a dropped superseded default.
+- The number is D439 because D435 and D437 were already claimed by other
+  in-flight work. **Note**: this log currently carries two `D438` entries — the
+  window-toggle merge above (#360, the pre-rebind decision) and the Git-checkout
+  decision (ADR 0273) near the end of the file. The latter was appended after the
+  toggle's D438 had merged, so its number needs to move to D440 or the next free
+  id; this entry does not rewrite another decision's text.
+- See ADR 0211 (amended again), `04-ux/09-interaction-patterns.md` §1.1 and
+  §1.4, `04-ux/06-settings-ia.md` (shortcuts tab), `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`, E2E-072, and
+  `apps/desktop/test/window-toggle-shortcut.test.mjs`.
 
 ## 2026-09-10 — Remove diagnostic timing log streams (D385)
 
@@ -5629,3 +5713,80 @@ that was sitting at the bottom — including after the turn had finished.
   file, and an unavailable host contributes no exclusions. See ADR 0270,
   `04-ux/06-settings-ia.md` §2, `03-runtime/01-ipc-protocol.md` §12c, and
   E2E-SUBAGENT-settings-lists-builtin-defaults.
+
+## 2026-09-17 — Judge a public-network address on the route the request will dial (D436)
+
+- The skill market's main-process guard classified the target host with a
+  *local* resolver while `net.fetch` dials through Chromium's proxy stack
+  (ADR 0177). Under a TUN / fake-IP resolver that answer is a synthesized
+  `198.18.0.0/15` address for a connection the app never makes, so every
+  catalog source was refused as "blocked by the app's address check"
+  (issue #419).
+- Each hop now asks the session that carries `net.fetch`
+  (`Session.resolveProxy`) for its own decision, and the shared
+  `classifyProxyRoute` reduces that answer to `proxied` / `direct` / `unknown`.
+  On a `proxied` route `isAcceptableResolvedAddress` tolerates only the
+  resolver-artifact class (`benchmark`); every real internal class and an
+  unanswered resolver still refuse. A `direct` route keeps the pre-change
+  semantics byte for byte, a `DIRECT` entry anywhere in the list is read as
+  `unknown` because Chromium may fall back to it, and `unknown` stays strict.
+- Refusals and the market's `failureDetails` now carry `route`, so a fake-IP
+  refusal on a direct route reads apart from one on an unreadable route.
+- The MCP market keeps its pinned Node HTTPS guard (ADR 0245) and is unchanged;
+  a fake-IP environment still refuses its sources.
+- See ADR 0272, `05-security/01-security.md` §4.1,
+  `03-runtime/09-logging-and-observability.md`, and
+  `06-delivery/04-e2e-test-plan.md` E2E-SKILL-MARKET-NET-BOUNDARY.
+
+## 2026-09-17 — The dock question card is a composer plate (#360, D437)
+
+- The asktool question card is mounted in the transparent composer dock
+  (`Composer.tsx` renders it as a direct `.composer-stack` child, and the
+  transcript mount is gone), yet it still painted the in-flow `--ds-tile` wash:
+  a 3.5% ink mix with no shadow. On the light page that leaves a `#f7f7f7`
+  panel with white option rows next to the composer plate below it, which is
+  how #360 item 1 ("选择交互面板缺少背景色") reads. The dock rule's own comment
+  already claimed the card "uses the same decision surface as Plan and Goal
+  approval", while `.plan-approval-bar` in that exact slot paints
+  `--ds-bg-composer` with `--ds-shadow-composer` (`04-ux/03-permission-ux.md`
+  §9, `04-ux/08-component-spec.md` §11.5).
+- `.composer-stack > .asktool-card` now paints that plate: `--ds-bg-composer`
+  with `--ds-shadow-composer` (light `#ffffff`, dark
+  `color-mix(in oklab, #212121 96%, transparent)` with the composer shadow).
+- Its controls move to the plate's inlaid tier, the layer `.plan-approval-split`
+  already uses on that same plate: `.asktool-option` and
+  `.asktool-custom-input` drop `--ds-raised` and `--ds-raised-shadow` for
+  `--ds-tile-deep`, and the hover/selected mix is rebased on `--ds-tile-deep`.
+  Without that flip the rows would be white on white in the light palette,
+  where `--ds-raised` and `--ds-bg-composer` are both `#ffffff`. The 15 px
+  option mark keeps `--ds-tile-deep` — the sidebar checkbox's mark — which
+  still reads against the inlaid row exactly as it does against the sidebar.
+- Renderer only: no protocol, storage, host, permission, migration, or
+  preference change, and no new default. Both layers are existing tokens in
+  both palettes, so a contributed theme moves the plate and the rows with
+  `--ds-bg-composer` / `--ds-tile-deep`. See
+  `04-ux/11-asktool-question-card.md`, `04-ux/07-ui-design-system.md` §6.4, and
+  E2E-078.
+
+## 2026-09-17 — A git checkout is a Create project source (D438)
+
+- The Create project dialog only collected a project name and local folders
+  (ADR 0233), and the home switcher's Clone git project entry renders inside the
+  hero of a project-bound session. A fresh installation therefore had to open an
+  unrelated local folder before any repository could be cloned.
+- The dialog now owns a source selector with two equal peers: This computer and
+  Git repository. The git source keeps the one name field (seeded from the
+  repository name until the user types), adds a repository URL field and one
+  clone destination row, and parses URLs with the switcher's `parseGitCloneUrl`
+  rules, so private, loopback, link-local, credential-bearing, and malformed
+  remotes keep Create disabled (ADR 0247).
+- Main exposes additive `project/cloneCheckout({ url, parentPath })`: it clones
+  into the explicit parent folder and returns `{ path, name }` without touching
+  the active workspace and without opening a picker. `project/clone` keeps its
+  native-picker behavior for the home switcher.
+- Project creation is unchanged: both sources call one project-slice helper,
+  `project-group/create` still writes the only durable record, and a checkout
+  becomes the primary root of the same logical group (ADR 0233).
+- Renderer plus one narrow main-process capability: no protocol, schema, host
+  RPC, permission, storage, or preference change. See ADR 0273,
+  `03-runtime/01-ipc-protocol.md` §9, `04-ux/08-component-spec.md`, and E2E-258.
