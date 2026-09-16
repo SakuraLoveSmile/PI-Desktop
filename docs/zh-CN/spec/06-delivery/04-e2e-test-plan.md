@@ -4926,6 +4926,8 @@ IPC 请求无法关闭。
 | 验收 | 应用场景 |
 |---|---|
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
+| C / D / Quality — 侧边栏行状态 | E2E-LAYOUT-sidebar-row-states |
+| A / C / Quality — 侧栏材质与设置返回 | E2E-LAYOUT-sidebar-settings |
 | B / F / Security — 提供商复制 | E2E-PROVIDER-copy-config-without-credentials |
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |
 | B——模型配置 | E2E-005、E2E-005G、E2E-006、E2E-007、E2E-038、E2E-050、E2E-052、E2E-055、E2E-066、E2E-080、E2E-082、E2E-151、E2E-005J、E2E-199、E2E-201、E2E-202、E2E-203、E2E-209、E2E-166 |
@@ -7331,6 +7333,84 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   row/spacer ownership, all-platform/fullscreen CSS fixtures in both sidebar
   states). DOM/CDP clicks are not native hit-test proof. Native pointer, drag
   and visual checks remain required; branch runs are exploratory only.
+
+#### E2E-LAYOUT-sidebar-project-group-fold
+
+- **前提条件**：通过宿主预置四个保留的侧边栏项目分组：一个横跨四个日期桶共五个会话，一个只有单个会话，一个没有任何会话，一个带十个已固定会话。未设置 `prefers-reduced-motion`。
+- **步骤**：
+  1. 检查这些分组：主体分层、行数与日期标签数、空状态、每个展开分组贡献给下一个分组的尾部间距，
+     以及非项目列表的预算。
+  2. 用真实指针点击项目目录行（先滚动进视野并确认命中该按钮）折叠多行分组，在约半秒内逐帧读取
+     分组主体的高度、opacity、解析后的 `grid-template-rows`，以及到下一个分组的距离，
+     同时记录该折叠自身的 `transitionrun` / `transitionend`。
+  3. 再次展开，确认打开的几何形态恢复。
+  4. 在同一次运动中先折叠再展开。
+  5. 在模拟 `prefers-reduced-motion: reduce` 的情况下重复折叠。
+  6. 把固定列表滚动到它的最后一行。
+- **预期**：项目分组是一个网格行（`grid-template-rows: 1fr`），在 200ms 的正常时长内动画到
+  `0fr` —— 没有 `max-height` 夹取，也没有 opacity 过渡 —— 因此折叠是一条连续的高度斜坡，
+  不会先出现平台期再瞬间跳变，并且每一帧的 `opacity` 都保持为 1：行是被裁剪的，从不淡出。
+  一次折叠只触发一次过渡，其自身事件报告 200ms 的正常时长。行由内层带 `min-height: 0` 的盒
+  裁剪，1px 行间隙与分组的 2px / 7px 内缩量位于该裁剪层内部的列表上，因此内缩量随行一起移动。
+  展开分组的 7px 内缩量加上滚动容器的 1px 间隙，与下一个分组之间形成 8px 尾部间距；列表中的
+  最后一个分组没有邻居，因此改为校验它自身的内缩量与裁剪层。折叠分组的尾部随行一起消失，
+  其区块等于标题加上 1px 滚动容器间隙，行仍挂载在被裁剪的边缘之外，同时分组处于
+  `aria-hidden` 与 `inert`。中途反转会从它已经到达的那一帧转向，并回到打开高度而不越界；
+  空分组以同样方式折叠其空状态。在减弱动态效果下保留两端状态并去掉位移。固定列表在
+  `min(233px, 30vh)` 内显示八行并可滚动到其余行，独立列表保持其弹性列与 146px 预算。
+  分组的缩进、顺序与工作区状态均不变。
+- **链接规格**：`04-ux/01-ui-ia.md`、`04-ux/07-ui-design-system.md` §6.1 与 §13、
+  `04-ux/08-component-spec.md` §6.2、`08-meta/decisions-log.md`（2026-09-16 侧边栏列表节奏与项目分组折叠）
+- **验收**：品质
+- **里程碑**：Post-M6 desktop shell maintenance
+- **状态**：已自动化（`scripts/e2e-three-column-layout.mjs`，经 `pnpm test:e2e:layout`）：
+  宿主预置分组与固定项、经过命中校验的 CDP 指针点击、在真实折叠上逐帧采样高度与 opacity、
+  读取过渡自身报告的时长、中途反转，以及减弱动态效果模拟。
+  单元覆盖见 `apps/desktop/test/sidebar-collapse-animation.test.mjs` 与
+  `apps/desktop/test/sidebar-pinned-rendering.test.mjs`。采样值是渲染器几何数据，
+  不是人眼视觉验收。
+
+#### E2E-LAYOUT-sidebar-row-states
+
+- **前提条件**：宿主预置项目、置顶和独立会话，存在当前工作区；应用使用隔离的数据与 profile。
+- **步骤**：分别在深浅主题下选中项目会话，悬停项目标题、未选中和已选中会话；
+  检查失焦处理、拖拽目标样式、操作按钮悬停及 Tab/Shift+Tab 焦点；折叠后展开
+  选中会话的分组，切换置顶与独立会话，打开设置再返回；开启减少动态效果，
+  确认项目与会话行的悬停过渡均接近零时长。
+- **预期**：项目与会话共享整行悬停背景、圆角和过渡，标题按钮透明；选中背景
+  只属于会话且优先于悬停。工作区仅通过圆点表达，折叠不会转移选中态。
+  置顶和独立会话样式一致；焦点轮廓、独立操作按钮反馈和拖拽目标优先级保留。
+  失焦释放悬停而不清除选中；设置替换侧栏，返回后恢复会话与工作区上下文。
+  渲染测试另覆盖没有选中会话、切换中的目标和非聊天页状态。
+- **链接规格**：`04-ux/01-ui-ia.md`、`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md` §9.1c
+- **验收**：C、D、品质
+- **里程碑**：Post-M6 desktop shell maintenance
+- **状态**：经 `pnpm test:e2e:layout` 调用 `scripts/e2e/sidebar-row-states.mjs` 自动验证，
+  使用真实 CDP 指针/键盘输入及计算样式断言。失焦/聚焦事件与拖拽类由测试注入，
+  这两项不等同于原生窗口焦点或真实拖拽测试。单元覆盖：
+  `sidebar-navigation.test.mjs`、`sidebar-pinned-rendering.test.mjs`。
+
+#### E2E-LAYOUT-sidebar-settings
+
+- **前提条件**：构建后的桌面应用、隔离宿主与 profile，聊天侧栏可见。
+- **步骤**：在深浅主题及 darwin/win32/linux CSS 分支比较主侧栏与设置导航的颜色、
+  背景图、尺寸和位置，检查祖先透明度及右侧不透明背景；返回时记录挂载、宽度及
+  animationstart。重复快速往返、原本折叠、入场被设置打断和减少动态效果场景，
+  确认真实展开仍有动画。另验证旧主题色、标准侧栏色及背景图覆盖。
+- **预期**：两处导航共用材质，设置导航和外壳不播入场，只有不透明内容区内部动画。
+  macOS 下侧栏祖先透明，右侧内容和顶部条不透明。返回时展开侧栏始终为 275px，
+  无 sidebar-in；原本折叠则保持不显示。真实展开仍有动画与宽度变化；旧主题颜色
+  作为共享回退保留，显式标准 token 优先。
+- **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/07-ui-design-system.md`、
+  `04-ux/08-component-spec.md` §1.4、§1.7
+- **验收**：A、C、品质
+- **里程碑**：Post-M6 desktop shell maintenance
+- **状态**：`pnpm test:e2e:layout` 调用 `scripts/e2e/sidebar-settings.mjs`，使用可信
+  CDP 指针/键盘、挂载时与后续几何采样、动画事件及计算样式。测试启用 CDP 焦点模拟，
+  防止原生窗口被遮挡后 Chromium 冻结动画与悬停输入。平台和主题为渲染层模拟，
+  不等同于原生 Windows/Linux 或系统材质/主题验证。可通过 `PI_DESKTOP_LAYOUT_ARTIFACT_DIR`
+  保存渲染截图。`sidebar-settings-return.test.mjs` 覆盖首次显示、两种中断阶段、
+  隐藏时状态变化和反转；`pnpm test:e2e:theme-surfaces` 在真实 Chromium 验证不透明回退及旧主题覆盖。
 
 #### E2E-AGENT-alt-enter-steers-active-turn：Enter 排队跟进，Alt+Enter 向当前回合补充指令
 
