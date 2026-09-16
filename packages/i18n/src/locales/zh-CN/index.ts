@@ -544,6 +544,11 @@ sklm: {
       failureDetail: "详情: ",
       retryPreview: "重试",
       remoteErrorPolicy: "目录源被应用的地址校验阻止,已显示内置精选",
+      remoteErrorUnresolved: "本机 DNS 无法解析目录源,已显示内置精选",
+      previewResolveError: "应用的地址校验无法解析该主机,未安装任何内容。",
+      dnsHint:
+        "该校验在本机解析主机,而下载本身会走代理。如果你使用代理、VPN 或自定义 DNS,请检查 设置 → 通用 → 网络。",
+      failureSourceHost: "{{name}}（{{host}}）",
       remoteErrorQuery: "无法查询技能市场,已显示内置精选",
       remotePartial: "部分目录源不可用（{{names}}）",
     },

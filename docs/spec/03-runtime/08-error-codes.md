@@ -66,7 +66,8 @@ registered; reserved codes in §3.7 remain intentionally absent from
 | `APPROVAL_STALE` | no | RACP: the approval was already settled or belongs to an older turn |
 | `PAYLOAD_TOO_LARGE` | no | RACP: a frame exceeded the negotiated size bound |
 | `TIMEOUT` | yes | generic timeout |
-| `NETWORK_POLICY_BLOCKED` | no | the main-process public-network guard refused a fetch: the URL failed the syntactic public-HTTPS check, or the local DNS lookup could not classify the host as public (ADR 0243). A desktop-only code; retrying cannot succeed until the address or the resolver changes. |
+| `NETWORK_POLICY_BLOCKED` | no | the main-process public-network guard refused a fetch because it *judged* the target: the URL failed the syntactic public-HTTPS check, or the local DNS lookup returned an address the policy classifies as non-public (ADR 0243). A desktop-only code; a refusal is a verdict, so retrying cannot succeed until the address changes. A resolver that returned no answer at all is `NETWORK_RESOLVE_FAILED` instead (issue #419). |
+| `NETWORK_RESOLVE_FAILED` | yes | the main-process public-network guard could not classify the target host: the local DNS lookup returned no answer, or threw before returning one. The request is refused exactly as a policy refusal is, but no address was judged, so no page or log may report it as an address-check decision. Distinct from `NETWORK_ERROR`, which is a failure of the request itself. Retriable: a resolver or proxy that starts answering the same host makes the same request succeed (ADR 0243, issue #419). |
 | `HOST_SHUTTING_DOWN` | yes | the host received EOF and is draining; the call was refused rather than started |
 | `RATE_LIMITED` | yes | a per-caller host budget (plugin session import, batch operations) was exceeded inside its window |
 | `LIMIT_EXCEEDED` | no | a payload exceeded a fixed host bound (item count, byte size, or a 64 MiB NDJSON request line) and was refused |
