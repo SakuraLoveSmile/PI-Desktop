@@ -1675,7 +1675,8 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   until its matching closing fence arrives; partial streamed diagrams never
   enter the diagram parser.
 - **Plugins**: `remark-gfm` (tables, task lists, strikethrough, autolinks),
-  `remark-math` + `rehype-katex` (inline `$…$`, display `$$…$$`). Raw HTML is
+  `remark-math` + `rehype-katex` (inline `$…$` or `\(…\)`, display `$$…$$`
+  or `\[…\]`). Raw HTML is
   parsed by `rehype-raw` and immediately constrained by the extended
   `rehype-sanitize` default schema; only the renderer-owned audio/video/source
   additions are admitted. KaTeX's Vite-inlined WOFF2 fonts are allowed by the
