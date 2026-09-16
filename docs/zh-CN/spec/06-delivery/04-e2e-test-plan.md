@@ -3095,15 +3095,18 @@ IPC 请求无法关闭。
   4. 将鼠标悬停在文件树行或 diff 标头上；聚焦浏览器 URL 字段。
   5. 打开 confirmation/provider 对话框并检查稀松布。
   6. 在明暗主题中分别检查设置导航轨、搜索、选中项、开启状态旋钮、输入框壳、插件/
-     能力搜索、代码卡标题带、Mermaid 画布、工具输出、输入占位符与禁用发送芯片，
-     以及对话框遮罩和权限蒙层。应用自定义表面变量，使用键盘聚焦两类搜索，再移除
-     自定义主题。
+     能力搜索、代码卡标题带、Mermaid 画布、工具输出、输入占位符与禁用发送芯片、
+     对话框遮罩与权限蒙层，以及 dock 内的问题卡及其选项行。应用自定义表面变量，
+     使用键盘聚焦两类搜索，再移除自定义主题。
 - **预期**：
   - 工作面板主体读取为安静的 `#fafafa` 插页纸，带有白色标题带。
   - 设置字段、浏览器 URL、分段轨道和快捷键键帽使用浅色嵌入填充；聚焦场通过中性环提升。
   - 切换开启状态使白色旋钮保持在近乎黑色的轨道上。
   - 悬停可通过共享运动令牌轻松填充 file-tree/diff/resize。
   - 浅色对话稀松布比深色 45% 面纱（约 28% 墨水）更柔软。
+  - dock 内的问题卡在两种主题里都绘制 composer 板 —— 浅色 `#ffffff` 配 composer
+    阴影，深色 96% `#212121` —— 它的选项行是无抬升阴影的内嵌 `--ds-tile-deep` 填充。
+    自定义 `--ds-bg-composer` / `--ds-tile-deep` 会同时改变两者，移除后恢复内置配色。
   - 工具输出保持既有级联：浅色在错误输出与纯文本工具块上都绘制同一层较浅底纹，深色
     显示错误色调并让纯文本块保持透明。
   - 自定义变量改变对应表面、键帽墨色及搜索焦点填充；移除后恢复内置 8-bit RGBA
@@ -5573,7 +5576,7 @@ IPC 请求无法关闭。
   该会话及其转录本和该行，也只有对项目行的第二次按下才会移除空闲项目。会话与项目永远不会共用
   一次武装。删除仍有运行中轮次的项目时，仍会打开指明这些会话并停止它们的对话框（见
   E2E-PROJECT-delete-running-sessions-are-named-and-stopped）。
-- **链接规格**：`04-ux/09-interaction-patterns.md` §1.6、D421、D431、D437
+- **链接规格**：`04-ux/09-interaction-patterns.md` §1.6、D421、D431、D438
 - **验收**：品质
 - **里程碑**：M6+
 - **状态**：部分自动化 —— `apps/desktop/test/two-step-delete.test.mjs` 固定了共享的武装与它的
@@ -7094,15 +7097,20 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 - **前提条件**：一个声明 `net.domains: ["allowed.test"]` 和 `net.fetch` 的开发插件。
   `allowed.test` 上的本地服务器对 `/hop` 返回 302 到 `http://undeclared.test/leak`，
-  对 `/ok` 返回 200。
+  对 `/ok` 返回 200，对 `/limited` 返回 429 且带 `Retry-After: 2`。
 - **步骤**：1）调用 `pi.net.fetch({ url: "https://allowed.test/ok" })`。2）调用
-  `pi.net.fetch({ url: "https://allowed.test/hop" })`。
+  `pi.net.fetch({ url: "https://allowed.test/hop" })`。3）调用
+  `pi.net.fetch({ url: "https://allowed.test/limited" })`。
 - **预期**：步骤 1 返回 200。步骤 2 以点名 `undeclared.test` 的 `PERMISSION_DENIED`
-  失败，未声明的服务器没有记录到任何请求。审计日志显示被拒绝的那一跳。
-- **链接规格**：`07-plugins/04-plugin-security.md` §8.0
+  失败，未声明的服务器没有记录到任何请求。审计日志显示被拒绝的那一跳。步骤 3
+  原样返回 429 及其 `Retry-After` 头，服务器只记录到一次请求，审计日志记为
+  `ok: false` 并带有它通告的 `retryAfter` —— 宿主不重试任何东西。
+- **链接规格**：`07-plugins/04-plugin-security.md` §8.0、
+  `07-plugins/03-plugin-api.md` §7
 - **验收**：D、安全
 - **里程碑**：M4+
 - **状态**：由 `apps/desktop/test/plugin-egress.test.mjs` 运行时覆盖
+  （逐跳出网与失败调用的审计）
 
 #### E2E-238：未知会话的工具请求不会回退
 

@@ -539,6 +539,49 @@ const PANEL_SKILL_CHANNELS = new Set([
 const MAX_SKILLS_PER_PLUGIN = 32;
 /** Redirect hops `pi.net.fetch` follows; each one is re-checked against egress. */
 const NET_FETCH_MAX_REDIRECTS = 5;
+
+/**
+ * The delay a response advertises, verbatim — the value a plugin has to parse
+ * itself. `retry-after-ms` wins over `retry-after`, the same precedence the
+ * runtime's provider retry uses.
+ */
+function retryAfterHeader(headers: Record<string, string>): string | undefined {
+  let seconds: string | undefined;
+  for (const [name, value] of Object.entries(headers)) {
+    const lower = name.toLowerCase();
+    if (lower === "retry-after-ms") return value;
+    if (lower === "retry-after") seconds ??= value;
+  }
+  return seconds;
+}
+
+/**
+ * The audit entry for one completed `pi.net.fetch`. The response itself is
+ * passed to the plugin untouched, so the entry reports the upstream status
+ * verbatim: a 4xx/5xx is a failed call (`ok: false`), and that failed call
+ * records the delay it advertised instead of a bare `429`. The host never
+ * retries the plugin's request — retry and backoff are the plugin's own policy
+ * (`docs/spec/07-plugins/03-plugin-api.md` §7) — so this is observability, not
+ * a behaviour change: no field beyond these, and never a header set or a body.
+ */
+function netFetchAuditEntry(
+  pluginId: string,
+  url: string,
+  status: number,
+  headers: Record<string, string>,
+): Record<string, unknown> {
+  const retryAfter = status < 400 ? undefined : retryAfterHeader(headers);
+  return {
+    pluginId,
+    api: "net.fetch",
+    ok: status < 400,
+    ts: Date.now(),
+    url,
+    status,
+    ...(retryAfter === undefined ? {} : { retryAfter }),
+  };
+}
+
 /** Skill documents above this size are refused (prompt budget, not disk). */
 const MAX_SKILL_BYTES = 128 * 1024;
 /** Catalog lines stay short — the body carries the detail. */
@@ -5091,14 +5134,9 @@ export class PluginRuntime {
           this.assertEgress(loaded, input.url, "net.fetch");
           if (this.services.fetch) {
             const result = await this.services.fetch(input);
-            this.services.audit?.({
-              pluginId,
-              api: "net.fetch",
-              ok: true,
-              ts: Date.now(),
-              url: input.url,
-              status: result.status,
-            });
+            this.services.audit?.(
+              netFetchAuditEntry(pluginId, input.url, result.status, result.headers),
+            );
             return result;
           }
           const controller = new AbortController();
@@ -5130,14 +5168,7 @@ export class PluginRuntime {
               headers[key] = value;
             });
             const bodyText = await res.text();
-            this.services.audit?.({
-              pluginId,
-              api: "net.fetch",
-              ok: true,
-              ts: Date.now(),
-              url,
-              status: res.status,
-            });
+            this.services.audit?.(netFetchAuditEntry(pluginId, url, res.status, headers));
             return { status: res.status, headers, bodyText };
           } finally {
             clearTimeout(timer);
