@@ -237,8 +237,9 @@ a usage tab.
     action that re-probes the service immediately. Each selected model has an independent, compact
     configuration row for context window, max output, supported thinking
     levels, and the default thinking level. The row keeps the model ID,
-    source, capabilities, and token limits visible at a glance, and expands
-    in place for edits. The expanded body is a compact sheet, not a stacked
+    source, capabilities, and token limits visible at a glance in one shared
+    compact form that keeps neighbouring windows apart (`1.05M · 128K`), and
+    expands in place for edits. The expanded body is a compact sheet, not a stacked
     form dump: 2xs labels, dense numeric fields without native spinners, the
     alias hint as a title tooltip rather than a paragraph, the default
     thinking selector on the thinking label row, and attachments plus
