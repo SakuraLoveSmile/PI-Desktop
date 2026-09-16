@@ -616,9 +616,11 @@ type AgentEvent =
 
 提供程序 `error` 事件可能包括以下中的有限诊断字段：
 `AppError.details`：`phase`（`request` 或 `stream`）、`providerStatus`、
-`providerCode`、`providerWaitMs`、`streamMs` 和 `retryAttempt`。这些领域
-是添加和编辑的；他们从不携带凭证或不受限制的
-提供商响应。瞬时流故障可能会在内部重播
+`providerCode`、`providerWaitMs`、`streamMs`、`retryAttempt`，以及网络故障
+时的 `networkCategory`、`networkCode`、`networkSyscall`、`networkHost` 和请求
+关联字段 `requestMessages`、`requestBytes`、`compactionGeneration`。这些字段
+都是新增且经过编辑的；它们从不携带凭据或不受限制的提供商响应，请求字段
+只有计数与字节大小。瞬时流故障可能会在内部重播
 同一回合，没有终端 `error` 事件或重复的辅助消息。
 第二次失败会发出终端标准化 `STREAM_FAILED` 错误。
 
@@ -1209,8 +1211,11 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 
 桌面专用技能市场通道（不是 host RPC）走 Electron IPC：
 
-- `pi-desktop/skill/market/search` — `{ query, sources[] }` → `{ entries, failedSources }`。
+- `pi-desktop/skill/market/search` — `{ query, sources[] }` →
+  `{ entries, failedSources, failureKinds }`。
   主进程聚合目录 JSON 与 GitHub 仓库 SKILL.md 扫描。源 URL 必须通过公网 HTTPS 策略（ADR 0243）。单源失败只丢掉该源。
+  `failureKinds` 把 `failedSources` 中的每个名字映射到 `policy`（公网策略守卫拒绝,请求从未离开进程）或 `network`；面板据此区分策略/DNS 拒绝（即代理用户的典型情况）与单纯不可达。
+  守卫拒绝会以 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1）暴露,安装面板正是按该错误码分类。
 - `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`。
   主进程按同一策略拉取文档、拆 frontmatter，并可能附上 jsDelivr 目录中的兄弟 `.md`。渲染层通过现有 `skills.create` 安装。该策略即主进程公网网络客户端：语法 URL 防护、DNS 分类、逐跳重定向复核与响应上限——渲染层绝不直接触网。目录 id 会净化为 host `valid_capability_id`。
 

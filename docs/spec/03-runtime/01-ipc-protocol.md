@@ -734,9 +734,13 @@ context. Manual compaction never silently falls back.
 
 Provider `error` events may include bounded diagnostic fields in
 `AppError.details`: `phase` (`request` or `stream`), `providerStatus`,
-`providerCode`, `providerWaitMs`, `streamMs`, and `retryAttempt`. These fields
-are additive and redacted; they never carry credentials or an unrestricted
-provider response. A transient stream failure may be replayed once inside the
+`providerCode`, `providerWaitMs`, `streamMs`, `retryAttempt`, and, for a
+network failure, `networkCategory`, `networkCode`, `networkSyscall` and
+`networkHost` plus the request correlation fields `requestMessages`,
+`requestBytes` and `compactionGeneration`. These fields are additive and
+redacted; they never carry credentials or an unrestricted provider response,
+and the request fields are counts and byte sizes only. A transient stream
+failure may be replayed once inside the
 same turn without a terminal `error` event or a duplicate assistant message.
 The second failure emits the terminal normalized `STREAM_FAILED` error.
 
@@ -1456,10 +1460,16 @@ state is pruned during the next scan.
 
 Desktop-only skill market channels (not host RPC) live on Electron IPC:
 
-- `pi-desktop/skill/market/search` — `{ query, sources[] }` → `{ entries, failedSources }`.
-  Main aggregates builtin-safe catalog JSON and GitHub repo SKILL.md scans.
-  Source URLs must pass the public-HTTPS policy (ADR 0243). One failing source
-  is dropped; the rest still return.
+- `pi-desktop/skill/market/search` — `{ query, sources[] }` →
+  `{ entries, failedSources, failureKinds }`. Main aggregates builtin-safe
+  catalog JSON and GitHub repo SKILL.md scans. Source URLs must pass the
+  public-HTTPS policy (ADR 0243). One failing source is dropped; the rest still
+  return. `failureKinds` maps each name in `failedSources` to `policy` (the
+  public-network guard refused it, so the request never left the process) or
+  `network`, which is what lets the panel explain a policy/DNS refusal — the
+  case a proxied user hits — instead of reporting every source as unreachable.
+  A guard refusal also surfaces as `NETWORK_POLICY_BLOCKED` (spec 08 §3.1), the
+  code the install sheet classifies a failed preview on.
 - `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`.
   Main fetches the document over the same policy, splits frontmatter, and may
   attach sibling `.md` files from a jsDelivr listing. The renderer installs

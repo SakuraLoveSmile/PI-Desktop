@@ -4196,3 +4196,10 @@ the retained upstream work-panel lifecycle. See
 - 仅渲染层：无协议、存储、宿主、权限或迁移改动。见 `04-ux/09-interaction-patterns.md` §9.1 与 E2E-CHAT-disclosure-toggle-keeps-reading-position。
 
 有读者反馈：点击工具、思考或活动标题展开时，整个转录会被拽上去整整一个展开详情的高度，即使是停在底部、甚至该轮已经结束的会话也一样。
+## 2026-09-16 —— 运行中任务的拒绝归属删除对话框，而不是菜单（#360，D431）
+
+- 修订 D421 的渲染层一半。侧边栏菜单与项目索引菜单一旦发现该项目有任何会话在运行，就用一条转瞬即逝的 `project.deleteRunningBlocked` 警告拒绝「删除项目」，并在 `ProjectDeleteDialog` 挂载之前就返回。这条拒绝随 toast 一起消失，没有留下任何可继续的路径，于是带有一个在跑任务的项目根本无法删除 —— 这正是 #360（「项目管理中无法真正删除项目」）所描述的体感。
+- 现在两个菜单都始终打开该对话框。每个入口都会传入该项目当前在运行的会话 id（`runningSessions[session.id]`，作用于它本来就已匹配的行：侧边栏的 `entry.sessions`、索引的 `sessionMatchesIndexProject`），对话框在每次渲染时从该 prop 推导文案，因此对话框打开期间新开始或已结束的回合都会在用户确认之前被反映出来。
+- 对话框新增一行警告，点名有 `{{count}}` 个会话正在运行，并把确认按钮文案换成 `project.deleteRunningConfirm`（「停止任务并删除」）。确认会精确中止这些会话，然后才调用 `deleteProject`，所以删除一个正在运行的回合仍然是针对已陈述后果的第二次显式确认。取消不删除任何东西。
+- 宿主侧的守卫未改动：只要仍有关联会话存在运行中的回合，`projects.remove` 依旧以 1008 / `CONFLICT` 拒绝，对话框也依旧把该拒绝映射为 `project.deleteRunningBlocked`。中止循环之后才开始的回合，正是这条兜底覆盖的情况。
+- 仅渲染层：无协议、存储、宿主、权限或迁移改动，也没有新增默认值。`project.deleteRunningBlocked` 的含义、文案与全部翻译保持不变。见 ADR 0251、D421 与 E2E-PROJECT-delete-running-sessions-are-named-and-stopped。
