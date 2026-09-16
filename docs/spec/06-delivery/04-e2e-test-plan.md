@@ -7128,11 +7128,13 @@ identify the platform validation still needed.
   1. Load the plugin as a development plugin. Confirm the Plugins page shows a
      work-panel-views capability badge.
   2. Press `Cmd/Ctrl + J` to reveal the work panel, then click `+` to create a
-     New launcher tab. Confirm the fixed `+` trigger and the viewport-fixed
-     work-panel toggle have separate, non-overlapping hit regions with at least
-     24px of visual gap. Confirm the launcher lists the built-in Review row and
-     the plugin view's localized title and icon (or a lettered tile if the
-     manifest names an unknown token).
+     New launcher tab. Confirm the fixed `+` trigger, the maximize control, and
+     the viewport-fixed work-panel toggle resolve to one button group — one
+     4px control gap, no divider between maximize and the toggle — while the
+     `+` trigger and the toggle stay separate, non-overlapping hit regions with
+     more than 24px of visual gap. Confirm the launcher lists the built-in
+     Review row and the plugin view's localized title and icon (or a lettered
+     tile if the manifest names an unknown token).
   3. Activate the plugin row. Confirm the plugin's page renders inside the panel body
      with no window-control capsule and no reserved 46px band, and that its
      button reaches the host toast.
@@ -12203,7 +12205,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   may keep growing afterwards. A manual reopen spends panel width first;
   MainChat is preserved where possible and otherwise lands on the 460px reopen
   target. Closing the panel restores only a sidebar the layout collapsed. The
-  separator's ARIA minimum/maximum follow the same dynamic budget.
+  separator's ARIA minimum/maximum follow the same dynamic budget. The panel
+  header's `+`, maximize, and viewport-fixed collapse toggle resolve to a single
+  control gap (`--ds-work-panel-control-gap`) with no divider, inset, or margin
+  of the action group's own.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §1 and §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238
@@ -12212,7 +12217,8 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Status**: Automated (`scripts/e2e-three-column-layout.mjs` via
   `pnpm test:e2e:layout` — fixed-window width invariance, the 450px floor across
   a pointer drag, the unfolded composer row at that floor, sidebar
-  yield/restore, the 460px reopen target, and preview mode); unit coverage in
+  yield/restore, the 460px reopen target, the panel action group's shared
+  control gap, and preview mode); unit coverage in
   `work-panel-resize.test.mjs`
 
 #### E2E-LAYOUT-work-panel-maximize

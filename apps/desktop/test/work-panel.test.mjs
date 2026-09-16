@@ -69,15 +69,38 @@ test("a viewport-fixed toggle is the sole pointer collapse control", () => {
   );
   assert.match(
     globalStyles,
-    /--ds-work-panel-toggle-gap:\s*20px/,
+    /--ds-work-panel-control-gap:\s*4px/,
+  );
+  // One gap for the whole header row: the same token spaces the strip-to-actions
+  // gap, the `+`/maximize pair, and the reserve that ends the content one gap
+  // before the viewport-fixed toggle.
+  assert.doesNotMatch(globalStyles, /--ds-work-panel-toggle-gap/);
+  assert.match(
+    globalStyles,
+    /\.work-panel-header \{[^}]*gap:\s*var\(--ds-work-panel-control-gap\);/s,
   );
   assert.match(
     globalStyles,
-    /\.work-panel-header \{[^}]*padding:\s*0\s+calc\([\s\S]*?var\(--ds-work-panel-toggle-size\)[\s\S]*?var\(--ds-work-panel-toggle-inset\)[\s\S]*?var\(--ds-work-panel-toggle-gap\)[\s\S]*?\)\s+0 12px;/s,
+    /\.work-panel-header \{[^}]*padding:\s*0\s+calc\([\s\S]*?var\(--ds-work-panel-toggle-size\)[\s\S]*?var\(--ds-work-panel-toggle-inset\)[\s\S]*?var\(--ds-work-panel-control-gap\)[\s\S]*?\)\s+0 12px;/s,
   );
+  // The action group states spacing only: the divider, inset, and margin that
+  // used to set the three panel buttons apart are gone, so they read as one
+  // group with the fixed collapse toggle at the shared control gap.
   assert.match(
     globalStyles,
-    /\.work-panel-actions \{[^}]*margin-right:\s*8px;[^}]*padding-right:\s*8px;[^}]*border-right:\s*1px solid var\(--ds-border-subtle\);/s,
+    /\.work-panel-actions \{[^}]*gap:\s*var\(--ds-work-panel-control-gap\);/s,
+  );
+  assert.doesNotMatch(
+    globalStyles,
+    /\.work-panel-actions \{[^}]*margin-right:/s,
+  );
+  assert.doesNotMatch(
+    globalStyles,
+    /\.work-panel-actions \{[^}]*padding-right:/s,
+  );
+  assert.doesNotMatch(
+    globalStyles,
+    /\.work-panel-actions \{[^}]*border-right:/s,
   );
   assert.match(
     globalStyles,

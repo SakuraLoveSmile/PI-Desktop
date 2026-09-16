@@ -844,10 +844,15 @@ tab. The `+` button sits outside the scroller and remains visible when tabs
 overflow. Clicking it creates and activates a unique New launcher tab. The
 launcher body contains host-owned Review followed by every in-scope
 `contributes.views` entry as buttons; Files and Browser are not hardcoded in
-the renderer (ADR 0104). The header reserves a tokenized 60px right-side safe
-lane for the viewport-fixed work-panel toggle. The `+` trigger also sits in a
-separated action rail, so it keeps a distinct hit target with at least 24px of
-visual gap on every supported platform.
+the renderer (ADR 0104). The header reserves a tokenized 44px right-side safe
+lane for the viewport-fixed work-panel toggle: the 28px control, its 12px
+viewport inset, and the header's own 4px control gap
+(`--ds-work-panel-control-gap`). That one gap spaces the whole row — the tab
+strip to the action group, `+` to maximize, and maximize to the viewport-fixed
+toggle — so the three panel buttons read as one group instead of a rail behind
+a divider. Because maximize sits between them, the `+` trigger still keeps a
+distinct hit target with more than 24px of visual gap on every supported
+platform.
 
 With no resource the body remains open and becomes a concise **New** launcher.
 An explicit New tab uses the same data-driven tool list, so selecting a row

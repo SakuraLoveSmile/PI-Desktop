@@ -126,14 +126,16 @@
   height: var(--ds-toolbar-height);
   flex: 0 0 auto;
   align-items: center;
-  gap: 4px;
+  gap: var(--ds-work-panel-control-gap);
   background: var(--ds-bg-dock-raised);
-  /* Keep the fixed work-panel toggle in its own hit-target lane. The reserve
-     is shared with the toggle's size/inset tokens and leaves a real gap. */
+  /* Keep the fixed work-panel toggle in its own hit-target lane. The reserve is
+     spent from the toggle's size/inset tokens plus the header's own control
+     gap, so the last panel control ends exactly one button gap before the
+     toggle instead of behind a divider. */
   padding: 0
     calc(
       var(--ds-work-panel-toggle-size) + var(--ds-work-panel-toggle-inset) +
-        var(--ds-work-panel-toggle-gap)
+        var(--ds-work-panel-control-gap)
     )
     0 12px;
   -webkit-app-region: drag;
@@ -270,14 +272,14 @@
   color: var(--ds-text-primary);
 }
 
+/* One button group with the viewport-fixed collapse toggle: the same control
+   gap the header reserves for it, and no divider, inset, or margin of its own.
+   The rule owns spacing only — the controls keep their own sizes and seats. */
 .work-panel-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 4px;
-  margin-right: 8px;
-  padding-right: 8px;
-  border-right: 1px solid var(--ds-border-subtle);
+  gap: var(--ds-work-panel-control-gap);
 }
 
 .work-panel-subagent-back {
