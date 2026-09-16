@@ -1,5 +1,6 @@
 import type {
   ActivationScope,
+  AgentCapabilityMove,
   AgentCapabilityQuery,
   AgentEventEnvelope,
   AgentCompactRequest,
@@ -701,6 +702,13 @@ export const api = {
   ) => invoke(IPC.invoke.mcpSetEnabled, { id, enabled, ...query }),
   setMcpServerScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.mcpSetScope, { id, scope }),
+  /**
+   * Move one server to the other level. The document is moved, not copied, and
+   * the response carries the id it ended up under: a destination that already
+   * holds the same id or name renames the arriving server.
+   */
+  transferMcpServer: (move: AgentCapabilityMove) =>
+    invoke<{ server: McpServerRecord }>(IPC.invoke.mcpTransfer, move),
   /** Force one handshake and report what happened, for the editor's test button. */
   testMcpServer: (id: string, query?: Partial<AgentCapabilityQuery>) =>
     invoke<{ status: McpServerStatus }>(IPC.invoke.mcpTest, { id, ...query }),
@@ -760,6 +768,13 @@ export const api = {
   ) => invoke(IPC.invoke.skillSetEnabled, { id, enabled, ...query }),
   setUserSkillScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.skillSetScope, { id, scope }),
+  /**
+   * Move one skill to the other level. The document is moved, not copied, and
+   * the response carries the id it ended up under: a destination that already
+   * holds the same id or display name renames the arriving skill.
+   */
+  transferUserSkill: (move: AgentCapabilityMove) =>
+    invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillTransfer, move),
   /**
    * Level and project must travel with the id: a project skill has no global
    * counterpart to fall back to, so resolving by id alone would miss it.
