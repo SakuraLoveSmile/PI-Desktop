@@ -55,3 +55,4 @@ export * from "./session-collaboration.js";
 export * from "./session-presentation.js";
 export * from "./session-outcomes.js";
 export * from "./tray-sessions.js";
+export * from "./window-chrome.js";

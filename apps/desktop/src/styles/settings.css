@@ -270,13 +270,6 @@
   margin-bottom: 3px;
 }
 
-.settings-card-description {
-  margin: 0;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-sm);
-  line-height: var(--leading-body);
-}
-
 .settings-text-action {
   display: inline-flex;
   min-height: 28px;

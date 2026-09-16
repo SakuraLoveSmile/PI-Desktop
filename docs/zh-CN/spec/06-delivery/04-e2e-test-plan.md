@@ -426,21 +426,21 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 #### E2E-009：UI 中可见的流式令牌
 
 - **先决条件**：会话处于活动状态；消息已发送。
-- **步骤**：1) 请求包含 Markdown 和 inline/display 的长答案
-  数学。 2) 观察助理的响应。 3）让答案
-  完成并检查渲染器控制台。
-- **预期**：运行时块通过增量逐渐出现
-  Markdown 渲染器和最终响应完成。渲染器不
-启动第二个动画帧打字机循环，引发 React 错误 185，或者
-  拒绝 CSP 下的 Vite 内联 KaTeX 字体。
+- **步骤**：1) 请求包含 Markdown 和行内/块级数学公式的长答案，公式同时使用
+  美元符号（`$…$` / `$$…$$`）和 TeX 括号（`\(…\)` / `\[…\]`）分隔符。
+  2) 观察助理的流式响应。3) 让答案完成并检查渲染器控制台。
+- **预期**：运行时块通过增量 Markdown 渲染器逐渐出现，最终响应完整。
+  四种数学分隔符均由 KaTeX 渲染，其中 `\[…\]` 使用块级布局。渲染器不会
+  启动第二个动画帧打字机循环、触发 React 错误 185，或因 CSP 拒绝 Vite
+  内联的 KaTeX 字体。
 - **链接规格**：`03-runtime/02-agent-runtime.md`，
   `04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`、
   `05-security/01-security.md`
 - **验收**：C（流式输出），质量
 - **里程碑**：M2
-- **状态**：部分自动化（协议实时模型流加上渲染器
-  `renderer-stream-safety.test.mjs` 中的源回归；完整的UI观察
-  仍为草案）
+- **状态**：部分自动化（协议实时模型流、`renderer-stream-safety.test.mjs`
+  中的渲染器源回归，以及 `latex-math.test.mjs` 中的数学分隔符渲染；
+  完整 UI 观察仍为草案）
 
 #### E2E-010：中止生成
 
@@ -600,8 +600,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
   侧边栏控件的重复）。在所有其他路线上均采用无框拖曳
   band 会改为渲染（没有顶栏控件）。该栏可拖动以移动
   窗户；交互式控件不会启动窗口拖动。
-  macOS 仅在侧边栏打开时为交通灯保留左侧约 76px 的空间
-  折叠（全屏 8 像素）； Windows/Linux 将右侧 112px 留空
+  macOS 仅在侧边栏折叠时为交通灯保留左侧 88px 的空间
+  （全屏 8 像素）； Windows/Linux 将右侧 112px 留空
   本机窗口控件。
 - **链接规格**：`04-ux/08-component-spec.md`（§2 顶栏）
 - **验收**：C (send/UI)，质量
@@ -1567,20 +1567,28 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 
 #### E2E-SUBAGENT-settings-lists-builtin-defaults
 
-- **前提条件**：应用已运行。`~/.agents/subagents` 为空。五个内置定义存在，且没有用户文档覆盖它们。
+- **前提条件**：应用已运行。`~/.agents/subagents` 为空。五个内置定义存在，没有一个被关闭，且没有用户文档覆盖它们。
 - **步骤**：
   1. 打开设置 → 智能体 → 子智能体。确认内置分组列出 `explorer`、`code-reviewer`、
-     `test-runner`、`fixer`、`ui-designer`，带本地化名称、`Task(<handle>)`、工具授权和「内置」徽标；
-     这些行没有启用开关、在文件夹中显示或删除。
+     `test-runner`、`fixer`、`ui-designer`，带本地化名称、`Task(<handle>)`、工具授权、「内置」徽标、
+     「复制为我的定义」，以及处于打开位置的启用开关。确认这些行没有在文件夹中显示或删除。
   2. 确认全局分组仍显示本地化的 `settings.subagentsEmpty` 文案和「新建子智能体」。
-  3. 在 explorer 上选择「复制为我的定义」。确认新建表单按该定义预填，且选中的是探索者模板芯片而不是空白开始。保存后确认 explorer 只出现在全局用户行，并从内置分组消失。
-  4. 禁用该用户 explorer 并重新加载。确认用户行关闭，explorer 重新出现在内置分组（未启用的用户文档不会进入加载器，因此内置定义重新生效）。
-- **预期**：设置页展示主智能体实际可委派的默认子智能体。复制内置项是用户改写它的方式；启用、显示和删除只作用于用户自建文件。
+  3. 在内置行上关掉 `fixer`。确认该行随开关关闭而变暗，toast 指出它的名字，
+     `~/.agents/subagents` 中没有出现任何东西，且该行仍留在列表里，因为那个开关就是重新打开的入口。
+  4. 在 `fixer` 关闭的情况下发送一次提示。确认 `Task` 目录不再提供它，而其余四个仍在；然后把它重新打开，
+     确认下一次提示又提供它。
+  5. 在 explorer 上选择「复制为我的定义」。确认新建表单按该定义预填（名称、描述、工具、正文），
+     且选中的是探索者模板芯片而不是空白开始。保存后确认 explorer 只出现在全局用户行，并从内置分组
+     消失，且下一次提示的 `Task` 目录使用该用户文档。
+  6. 禁用该用户 explorer 并重新加载。确认用户行关闭，explorer 重新出现在内置分组（未启用的用户文档不会进入加载器，因此内置定义重新生效）。
+- **预期**：设置页展示主智能体实际可委派的默认子智能体，且每一个都能从自己的行上关闭。内置项的启用状态是应用本地状态而不是文档，因此被关闭的默认项保留自己的行；复制内置项仍是改写它的方式；在文件夹中显示与删除仍然只作用于用户自建的行，因为它们以文件为后端。
 - **链接规格**：`04-ux/06-settings-ia.md` §2、`03-runtime/01-ipc-protocol.md` §12c、
-  `03-runtime/02-agent-runtime.md` §5f、ADR 0062、ADR 0063
+  `03-runtime/02-agent-runtime.md` §5f、ADR 0062、ADR 0063、ADR 0270
 - **验收**：E（工具与权限）、品质
 - **里程碑**：M6+
-- **状态**：源代码/单元已覆盖；完整 UI 旅程为草稿
+- **状态**：源代码/单元已覆盖（`apps/desktop/test/agent-capability-settings.test.mjs`、
+  `apps/desktop/test/subagent-wiring.test.mjs`、`packages/agent-runtime/src/subagent-definitions.test.ts`、
+  `packages/shared/src/subagent-presets.test.ts`）；完整 UI 旅程为草稿
 
 #### E2E-200：Linux RPM 保留 Wayland 桌面身份
 
@@ -2023,8 +2031,10 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   被取代的成功不能带来陈旧的表现。没有过渡产生
   第二次调整大小或位置漂移。
   预览模式隐藏 MainChat，并将客户区宽度交给面板；本机窗口尺寸不变，分隔线不可操作。
-  预览外壳仍保留新建任务、侧边栏和系统窗口操作。macOS 非全屏且侧边栏折叠时，左侧第一个预览操作从
-  76px 交通灯安全内缩之后开始；全屏时恢复原始内边距。
+  预览外壳仍保留新建任务、侧边栏和系统窗口操作。macOS 非全屏且侧边栏折叠时，预览行把交通灯引导内缩
+  （`--ds-window-lead-inset`，即灯簇右缘 76px 加 12px 间隙，共 88px）作为自身的左内边距渲染出来，
+  左侧第一个预览操作从该渲染值起或之后开始；检查读取的是解析后的内边距，而不是重述这个数字。
+  打开真实工作面板标签后，其第一个标签从预览操作组右侧至少 8px 处开始；全屏时使用 8px 原生内缩但保留该操作带。
   以前的上下文面板覆盖不再存在。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`、`04-ux/01-ui-ia.md`、
   `04-ux/07-ui-design-system.md`、`04-ux/08-component-spec.md`、
@@ -2913,13 +2923,18 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   macOS 菜单；重复、无修饰符和保留组合以内联错误拒绝；“未绑定”是明确的本地化
   状态，不参与冲突、不响应旧或默认组合、可跨重启保存，并会移除 macOS 加速器和
   Windows 启动器后备层；单项和全局恢复都返回共享默认值。仅修饰符和 IME 按键不
-  会发送命令，长按历史组合每次物理按压只遍历一次。
+  会发送命令，长按历史组合每次物理按压只遍历一次。窗口可见性只有一个开关键
+  `Cmd/Ctrl + W` —— 可见且在前台的窗口隐藏到托盘，其余情况显示并获得焦点 ——
+  且绝不走关闭路径，因此不会弹出关闭行为询问、也不会退出应用；已弃用的
+  `Cmd/Ctrl + Shift + W` 组合键不再注册，已存储的 `closeWindow` / `summonWindow`
+  覆盖项会并入该开关键（D438）。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/07-ui-design-system.md`、
   `03-runtime/01-ipc-protocol.md`
 - **接受**：F（设置持久性）、质量（键盘可访问性）
 - **里程碑**：M5
 - **状态**：单位覆盖（`keyboard-shortcuts.test.ts`、
-  `settings-keyboard-shortcuts.test.mjs`、host 设置 RPC 测试）；渲染场景草稿
+  `settings-keyboard-shortcuts.test.mjs`、`window-toggle-shortcut.test.mjs`、
+  host 设置 RPC 测试）；渲染场景草稿
 
 #### E2E-073a：开发者模式控制开发者工具控制台
 
@@ -3085,15 +3100,18 @@ IPC 请求无法关闭。
   4. 将鼠标悬停在文件树行或 diff 标头上；聚焦浏览器 URL 字段。
   5. 打开 confirmation/provider 对话框并检查稀松布。
   6. 在明暗主题中分别检查设置导航轨、搜索、选中项、开启状态旋钮、输入框壳、插件/
-     能力搜索、代码卡标题带、Mermaid 画布、工具输出、输入占位符与禁用发送芯片，
-     以及对话框遮罩和权限蒙层。应用自定义表面变量，使用键盘聚焦两类搜索，再移除
-     自定义主题。
+     能力搜索、代码卡标题带、Mermaid 画布、工具输出、输入占位符与禁用发送芯片、
+     对话框遮罩与权限蒙层，以及 dock 内的问题卡及其选项行。应用自定义表面变量，
+     使用键盘聚焦两类搜索，再移除自定义主题。
 - **预期**：
   - 工作面板主体读取为安静的 `#fafafa` 插页纸，带有白色标题带。
   - 设置字段、浏览器 URL、分段轨道和快捷键键帽使用浅色嵌入填充；聚焦场通过中性环提升。
   - 切换开启状态使白色旋钮保持在近乎黑色的轨道上。
   - 悬停可通过共享运动令牌轻松填充 file-tree/diff/resize。
   - 浅色对话稀松布比深色 45% 面纱（约 28% 墨水）更柔软。
+  - dock 内的问题卡在两种主题里都绘制 composer 板 —— 浅色 `#ffffff` 配 composer
+    阴影，深色 96% `#212121` —— 它的选项行是无抬升阴影的内嵌 `--ds-tile-deep` 填充。
+    自定义 `--ds-bg-composer` / `--ds-tile-deep` 会同时改变两者，移除后恢复内置配色。
   - 工具输出保持既有级联：浅色在错误输出与纯文本工具块上都绘制同一层较浅底纹，深色
     显示错误色调并让纯文本块保持透明。
   - 自定义变量改变对应表面、键帽墨色及搜索焦点填充；移除后恢复内置 8-bit RGBA
@@ -3750,6 +3768,24 @@ IPC 请求无法关闭。
   并在批准后。 Main/Host/sidecar PID 保持稳定；凭据从不
   输入 CDP 或输出。默认无钥匙运行仍为 5/5 与现场案例
   明确跳过。
+
+#### E2E-CHAT-opaque-floating-decision-and-retry-surfaces：Plan 审批条与重试 hover 保持不透明
+
+- **状态**：已自动化（`apps/desktop/test/plan-mode-source-contract.test.mjs`、`apps/desktop/test/active-turn-surface.test.mjs`）
+- **优先级**：P2
+- **覆盖**：C、品质 / 浮动 Composer 与重试表面
+- **先决条件**：渲染器 CSS 为 `apps/desktop/src/styles` 下的生产源。
+- **步骤**：
+  1. 检查 Composer 停靠栏样式中的 `.plan-approval-bar`。
+  2. 检查记录样式中的 `.run-activity-error-popover.message-error`。
+  3. 在实时会话中悬停或聚焦正在重试的活动行。
+- **预期**：
+  - Plan/Goal 审批条使用 `--ds-bg-composer` 加 `--ds-shadow-composer`，而不是正文流里的 `--ds-tile` 薄洗，因此在透明停靠栏上仍可读。
+  - 重试 hover tooltip 把错误色混在 `--ds-bg-elevated-opaque` 上，记录正文不会透出。
+- **链接规格**：`04-ux/03-permission-ux.md`、`04-ux/08-component-spec.md`
+- **接受**：C、品质
+- **里程碑**：M6
+- **状态细节**：源码契约断言 CSS 标记。实时悬停仍为目视检查。
 
 #### E2E-107：Plan 批准使用一个绝对 30 分钟到期时间
 
@@ -4518,7 +4554,7 @@ IPC 请求无法关闭。
   11. 打开子代理，确认它是以 `~/.agents/subagents` 为根的单块全局面板，没有级别筛选、
       没有项目选择器、也没有项目级控制。确认即使用户目录为空，内置分组仍列出五个默认
       子智能体（`explorer`、`code-reviewer`、`test-runner`、`fixer`、`ui-designer`），
-      带「内置」徽标和工具授权，且没有启用开关、在文件夹中显示或删除。确认全局分组标题
+      带「内置」徽标、工具授权和启用开关，但没有在文件夹中显示或删除。确认全局分组标题
       带有全局级别标签和数量，新建 / 编辑 / 删除 / 在文件管理器中显示都能对用户自建行
       在页面内完成，且空的用户目录仍通过
       `settings.subagentsEmpty` 在全局分组下解析为本地化空态文案，不显示原始翻译键。
@@ -4936,6 +4972,9 @@ IPC 请求无法关闭。
 | Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command、E2E-PLUGIN-permission-gate-for-real-time-capabilities、E2E-PLUGIN-background-audio-and-realtime-connection |
 | C — 对话与流式（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
 | E — 工具与权限（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
+| E — 工具与权限（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
+| F — 持久化（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
+| 品质（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
 
 | 里程碑 | 应用场景 |
 |---|---|
@@ -4965,6 +5004,16 @@ IPC 请求无法关闭。
 | C — 对话和直播（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | 品质（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | M6+（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
+| M6+（能力跨级别迁移） | E2E-CAPABILITY-move-across-levels |
+| E — 工具与权限（内置子智能体默认项） | E2E-SUBAGENT-settings-lists-builtin-defaults |
+| 品质（内置子智能体默认项） | E2E-SUBAGENT-settings-lists-builtin-defaults |
+| C — 对话与流式（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| 品质（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| M6（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| B — 模型配置（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| F — 持久化（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| 品质（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| M6+（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策
@@ -6539,7 +6588,8 @@ IPC 请求无法关闭。
   2. 在工具执行之外调用 `pi.session.getLlmContext()`。确认 `INVALID_ARGUMENT`。
   3. 让 Agent 调用插件工具。在 `execute` 内调用 `getLlmContext()`，再调用 `agent.complete({ modelKey, includeSessionContext: true })`。确认工具结果含评审文本和 usage，不含密钥。
   4. 在 60 秒内重复 `agent.complete`，直到第 8 次成功、第 9 次返回 `RATE_LIMITED`。
-  5. 停止 host-core 后再调用 `pi.models.list()`。确认返回 `[]` 且没有 warn 日志。
+  5. 让该补全在供应商侧失败（例如使用一个用户已撤销凭据的模型）。确认插件读到的是分类后的错误码 `PROVIDER_UNAUTHORIZED`，而不是一个通用失败。
+  6. 停止 host-core 后再调用 `pi.models.list()`。确认返回 `[]` 且没有 warn 日志。
 - **预期**：凭据不离开 Electron main。审计行记录插件 id、模型 key、体积和 usage，不含转录或补全文本。Plan 仍对插件工具返回 `PLUGIN_DISABLED_IN_PLAN`。宿主传输不可用时模型列表为空且不记警告（D080）。
 - **链接规格**：`07-plugins/03-plugin-api.md`、`07-plugins/13-plugin-permissions-matrix.md`、ADR 0174、D336
 - **验收**：G（插件智能体工具）、安全
@@ -6568,14 +6618,14 @@ IPC 请求无法关闭。
   1. 打开设置 → 常规。确认网络卡提供系统 / 直连 / 自定义。从未配置过代理的配置文件默认是系统。
   2. 选择自定义。确认代理 URL、默认绕过列表和测试。输入 `not-a-proxy` 并失焦。确认内联错误且未保存。
   3. 输入 `socks5://127.0.0.1:1080` 或 `http://127.0.0.1:7890` 并失焦。确认 `settings.get` 中 `networkProxy.mode` 为 `custom`。
-  4. 对正在监听的代理点测试，确认已连接；对关闭的端口点测试，确认失败且不改已保存 URL。
+  4. 对正在监听的代理点测试，确认已连接；对关闭的端口点测试，确认失败且不改已保存 URL。对需要认证的 HTTP / SOCKS5 代理填入 `user:pass@` 后再测，确认是已连接而不是 `net::ERR_NO_SUPPORTED_PROXIES`（issue #490）。
   5. 保存自定义代理后，通过已配置供应商发送一条简短提示。确认供应商请求和响应经过代理；即使 SOCKS5 代理将完整 bind 响应合并在一个 TCP 数据块中，请求仍能完成。再确认扩展市场刷新和 models.dev 刷新走代理；绕过列表中的回环地址不走代理。
   6. 切到直连再切回系统。确认无需重启应用即可生效。
-- **预期**：自定义覆盖模型请求、市场、更新、插件 `net.fetch` 和内置浏览器。工作区 Bash 的 `env` 看不到该设置写入的 `HTTP_PROXY` / `ALL_PROXY`。OAuth 仍走系统浏览器。`file:` / `ftp:`、SOCKS4 以及百分号编码错误的认证信息均被拒绝。无协议/存储版本升级。
+- **预期**：自定义覆盖模型请求、市场、更新、插件 `net.fetch` 和内置浏览器。工作区 Bash 的 `env` 看不到该设置写入的 `HTTP_PROXY` / `ALL_PROXY`。OAuth 仍走系统浏览器。`file:` / `ftp:`、SOCKS4 以及百分号编码错误的认证信息均被拒绝。带账号密码的 HTTP / SOCKS5 测试与应用不再报 `net::ERR_NO_SUPPORTED_PROXIES`（issue #490）。无协议/存储版本升级。
 - **链接规格**：`04-ux/06-settings-ia.md`、`03-runtime/07-process-model.md`、ADR 0177、D340
 - **验收**：B（设置）、F（供应商）、安全
 - **里程碑**：M5
-- **状态**：单元已覆盖（`network-proxy.test.ts`、`node-proxy.test.ts`、`settings-general.test.mjs`、host-core `network_proxy`）；畸形认证信息和不支持的 SOCKS4 协议由共享解析器测试覆盖；完整 UI 旅程仍为草稿
+- **状态**：单元已覆盖（`network-proxy.test.ts`、`node-proxy.test.ts`、`authenticated-proxy-relay.test.ts`、`settings-general.test.mjs`、host-core `network_proxy`）；畸形认证信息和不支持的 SOCKS4 协议由共享解析器测试覆盖；完整 UI 旅程仍为草稿
 
 #### E2E-210：文档截图在 GitHub 与 VitePress 中都能解析
 
@@ -7035,15 +7085,20 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 - **前提条件**：一个声明 `net.domains: ["allowed.test"]` 和 `net.fetch` 的开发插件。
   `allowed.test` 上的本地服务器对 `/hop` 返回 302 到 `http://undeclared.test/leak`，
-  对 `/ok` 返回 200。
+  对 `/ok` 返回 200，对 `/limited` 返回 429 且带 `Retry-After: 2`。
 - **步骤**：1）调用 `pi.net.fetch({ url: "https://allowed.test/ok" })`。2）调用
-  `pi.net.fetch({ url: "https://allowed.test/hop" })`。
+  `pi.net.fetch({ url: "https://allowed.test/hop" })`。3）调用
+  `pi.net.fetch({ url: "https://allowed.test/limited" })`。
 - **预期**：步骤 1 返回 200。步骤 2 以点名 `undeclared.test` 的 `PERMISSION_DENIED`
-  失败，未声明的服务器没有记录到任何请求。审计日志显示被拒绝的那一跳。
-- **链接规格**：`07-plugins/04-plugin-security.md` §8.0
+  失败，未声明的服务器没有记录到任何请求。审计日志显示被拒绝的那一跳。步骤 3
+  原样返回 429 及其 `Retry-After` 头，服务器只记录到一次请求，审计日志记为
+  `ok: false` 并带有它通告的 `retryAfter` —— 宿主不重试任何东西。
+- **链接规格**：`07-plugins/04-plugin-security.md` §8.0、
+  `07-plugins/03-plugin-api.md` §7
 - **验收**：D、安全
 - **里程碑**：M4+
 - **状态**：由 `apps/desktop/test/plugin-egress.test.mjs` 运行时覆盖
+  （逐跳出网与失败调用的审计）
 
 #### E2E-238：未知会话的工具请求不会回退
 
@@ -7214,11 +7269,54 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   3. 在布局收起左栏后手动重开左栏。
   4. 关闭工作面板并确认左栏恢复；再在手动收起左栏后重复一次。
   5. 用 `ArrowLeft`、`ArrowRight`、`Home`、`End` 重复调整分隔线。
+  6. Navigate to the real Plugins, Pull requests, and Scheduled routes with the
+     work panel closed, then collapse the sidebar. In light and dark themes,
+     measure both titlebar actions and compare their rest/hover styling with the
+     shared work-panel toggle. Reopen the sidebar, collapse it again, and use
+     New Task to return to an editable chat composer on each route.
+- **Route chrome expected**: The ordinary `.main-titlebar` actions (without a
+  preview chrome ancestor) render as centered 28px square targets with the shared
+  transparent rest surface, secondary ink, radius, and semantic hover wash/primary
+  ink. Hover does not change geometry; sidebar and New Task remain usable.
+  Automated by `pnpm test:e2e:layout` using real route components and DOM/CDP
+  interaction. This is renderer evidence, not native Windows/Linux hit-test proof.
 - **预期**：原生窗口宽度全程不变。MainChat 永不低于 360px —— 包含拖动过程中以及 `sidebar-out` 仍占位弹性空间期间。工作面板有效上限为客户端宽度减去 360px 下限与展开的左栏宽度，且无固定像素上限。预算耗尽时展开的左栏立即收起，面板之后仍可继续增长。手动重开优先占用右栏宽度；能保住当前 MainChat 则保持，否则落在 370px 的重开目标。关闭面板只恢复由布局机制收起的左栏。分隔线的 ARIA 最小/最大值遵循同一动态预算。
 - **链接规格**：`04-ux/01-ui-ia.md`、`04-ux/07-ui-design-system.md` §10、`04-ux/08-component-spec.md` §1 与 §5、`04-ux/09-interaction-patterns.md` §8、ADR 0238
 - **验收**：F（持久化）、品质
 - **里程碑**：M6 之后的桌面外壳维护
 - **状态**：已自动化（`scripts/e2e-three-column-layout.mjs`，经 `pnpm test:e2e:layout` —— 固定窗口宽度不变、指针拖动全程 360px 下限、左栏让位/恢复、370px 重开目标）；单元覆盖见 `work-panel-resize.test.mjs`
+
+#### E2E-LAYOUT-work-panel-maximize
+
+- **Preconditions**: A desktop session has an open work panel with a real tab.
+- **Steps**:
+  1. Record the panel width and enter preview mode.
+  2. Inspect the header border box with the sidebar collapsed and expanded on
+     macOS windowed/fullscreen and Windows/Linux. Check row/spacer drag ownership.
+  3. With native pointer input, click centers and edges of sidebar and New Task
+     controls. Reenter preview and operate tabs, close, add, restore, panel toggle
+     and native controls. Drag empty header space. Repeat in light/dark themes.
+- **Expected**: MainChat is absent while preview fills the client area beside
+  the sidebar; native bounds and persisted preferred width are unchanged, the
+  divider is inert, and restore retains the last chosen sidebar state. The row
+  and spacer declare neither drag nor no-drag and pass pointer events through
+  outside controls. The panel header is the sole drag owner in the preview pane;
+  its border box and first tab start at least 8px after shell actions, including
+  expanded-sidebar New Task. Left inset is 8px except collapsed-sidebar windowed
+  macOS (88px through the shared lead-inset token); checks read resolved row
+  padding rather than duplicating native geometry. Right exclusion is unchanged. Controls receive
+  native clicks without window movement; empty-header drags move the window.
+  New Task exits preview to an editable composer. Header-height paint fills the
+  excluded lane without hiding panel controls.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
+  `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8, ADR 0238
+- **Acceptance**: F (persistence), Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Partially automated by `scripts/e2e-three-column-layout.mjs`
+  (preview entry/exit, DOM action behavior, header border-box exclusion,
+  row/spacer ownership, all-platform/fullscreen CSS fixtures in both sidebar
+  states). DOM/CDP clicks are not native hit-test proof. Native pointer, drag
+  and visual checks remain required; branch runs are exploratory only.
 
 #### E2E-AGENT-alt-enter-steers-active-turn：Enter 排队跟进，Alt+Enter 向当前回合补充指令
 
@@ -7307,13 +7405,13 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 #### E2E-SKILL-MARKET-NET-BOUNDARY：技能源公网 HTTPS 策略拒绝私网与回环
 
-- **前提条件**：共享 public-network helper，以及可注入 fetch/DNS 的主进程公网 HTTPS 客户端。
-- **步骤**：1）分类 trailing-dot localhost、IPv4 回环、IPv4-mapped IPv6、ULA、link-local、RFC1918 与 `http://`。2）将公网主机名解析到私网 A 记录。3）跟随 Location 为 `https://127.0.0.1/` 的 302。
-- **预期**：上述绕过形态全部拒绝；公共 CDN 放行。解析到私网地址或 redirect 到回环会抛出策略错误，且不会请求私网目标。策略失败不重试。每次拒绝都带上 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1），使安装面板能给出原因并提供重试,而不是让安装按钮无解释地保持禁用；市场列表也能把被拒绝的源与单纯不可达的源区分开。
-- **链接规格**：`05-security/01-security.md`、ADR 0243、`03-runtime/01-ipc-protocol.md` §12b
+- **前提条件**：共享 public-network helper，以及可注入 fetch/DNS/线路 的主进程公网 HTTPS 客户端。
+- **步骤**：1）分类 trailing-dot localhost、IPv4 回环、IPv4-mapped IPv6、ULA、link-local、RFC1918 与 `http://`。2）将公网主机名解析到私网 A 记录。3）跟随 Location 为 `https://127.0.0.1/` 的 302。4）报告 `proxied` 线路与 TUN fake-IP 答案（`198.18.0.1`），同一答案在 `DIRECT` 线路、读不出线路、以及列表中含 `DIRECT` 的线路上的表现。5）让第一跳为 `proxied`，其重定向目标为 `direct`。
+- **预期**：上述绕过形态全部拒绝；公共 CDN 放行。解析到私网地址或 redirect 到回环会抛出策略错误，且不会请求私网目标。判定型拒绝不重试；本地解析没有返回答案时会重试,并且报为 `NETWORK_RESOLVE_FAILED`（`kind` 为 `unresolved`）,而不是报成地址校验拒绝——守卫并未得出判定,任何文案都不得声称它得出了。其余每次拒绝都带上 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1）及其 `reason`、被拒地址的类别与判定该地址的线路,使安装面板能给出原因并提供重试,而不是让安装按钮无解释地保持禁用；市场列表也能把被拒绝的源与单纯不可达的源区分开。若 `proxied` 线路上的答案是 RFC 2544 的 fake-IP 类别，则在 `direct` 或读不出线路时拒绝、在 `proxied` 线路上放行；其他所有非公网类别在任何线路上都拒绝；每一个重定向跳都按自己的线路判定（ADR 0272）。
+- **链接规格**：`05-security/01-security.md`、ADR 0243、ADR 0272、`03-runtime/01-ipc-protocol.md` §12b
 - **验收**：Security、Quality
 - **里程碑**：M6+
-- **状态**：已自动化（`pnpm test:e2e:skill-market`、`apps/desktop/test/public-https-fetch.test.mjs`、`apps/desktop/test/skill-market-scan.test.mjs`、`apps/desktop/test/skill-market-failure.test.mjs`、`packages/shared/src/public-network.test.ts`）
+- **状态**：已自动化（`pnpm test:e2e:skill-market`、`apps/desktop/test/public-https-fetch.test.mjs`、`apps/desktop/test/public-https-fetch-route.test.mjs`、`apps/desktop/test/skill-market-scan.test.mjs`、`apps/desktop/test/skill-market-failure.test.mjs`、`apps/desktop/test/skill-market-policy-refusal.test.mjs`、`packages/shared/src/public-network.test.ts`）
 
 #### E2E-SKILL-MARKET-EXPANSION：相邻 markdown 资源在安装前内联
 
@@ -7446,3 +7544,31 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   F (unread persistence), Quality (bounded localized menu).
 - **Milestone**: Post-M6 desktop shell maintenance.
 - **Status**: Draft; native E2E requires an explicitly authorized run.
+#### E2E-MODEL-catalog-window-correction-reaches-saved-bindings：目录修正回流已保存绑定，且不覆盖用户手改值
+
+- **目标**：models.dev 修正某模型上限后回流到已保存的绑定（不必删除重建），
+  而用户在设置里手改的数值永不被覆盖。
+- **步骤**：
+  1. 配置一个提供商，勾选 models.dev 已发布 `limit.context` 的模型并保存。展开该行的
+     高级区，读取上下文窗口字段与其提示。
+  2. 用修正后的目录记录（不同的发布上限）替换该模型记录，重新打开设置，读取该行、
+     上下文检查器，以及新会话启动时使用的窗口。
+  3. 在高级区输入窗口——先用预设档位，再手输 `128000`——保存，然后再喂一次目录修正，
+     重新打开设置与检查器。
+  4. 保存并重新打开一个绑定不带 `contextWindowSource` 的提供商行：一次使用通用
+     `128000` 种子，一次使用任意其它已存值。
+- **预期**：步骤 1 显示发布值并带「跟随 models.dev」提示。步骤 2 在所有使用 effective
+  window 的地方（设置行、上下文检查器、会话启动）都显示修正后的值，无需删除重建。
+  步骤 3 在设置行、检查器和实际请求中都保留用户输入的值，包括在目录窗口更大时手输的
+  `128000`，且提示消失。步骤 4 表现确定：`128000` 种子跟随目录，其它值保持原样。
+  每一步中标记都能在提供商行的保存/读取往返后保留，早于该标记写出的配置仍可读。
+- **关联规范**：`03-runtime/13-model-catalog-and-selection.md` §9.1、
+  `03-runtime/12-provider-config-schema.md` §2、
+  `03-runtime/11-provider-model-system.md` §2、`04-ux/06-settings-ia.md` §2
+- **验收**：B（模型配置）、F（持久化）、Quality
+- **里程碑**：M6+
+- **状态**：部分自动化：`apps/desktop/test/model-binding-catalog-source.test.mjs` 驱动
+  主进程解析（目录来源的修正会到达对外暴露的行、用户值不受修正影响、通用种子仍跟随
+  目录、继承值保持 `catalog` 标记）；`packages/shared/src/model-catalog.test.ts` 覆盖
+  四条来源规则；`crates/host-core/src/providers/catalog.rs` 覆盖配置往返、无标记记录与
+  被丢弃的未知标记。端到端的设置旅程与实际启动窗口断言为草稿。
