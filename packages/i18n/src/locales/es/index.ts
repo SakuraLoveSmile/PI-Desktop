@@ -999,6 +999,7 @@ sklm: {
     "imageInput": "Imágenes",
     "documentInput": "PDF",
     "thinkingManualOverrideHint": "No en el catálogo; habilitar si es compatible.",
+    "contextWindowCatalogHint": "Sigue a models.dev; al editarlo se fija tu valor.",
     "availableForSubagents": "Disponible para delegación de AI",
     "availableForSubagentsHint": "Permitir que AI use este modelo al delegar tareas a subagentes",
     "searchModelId": "ID de modelo de búsqueda…",

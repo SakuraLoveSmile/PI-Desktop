@@ -5004,6 +5004,10 @@ IPC 请求无法关闭。
 | C — 对话与流式（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 | 品质（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 | M6（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| B — 模型配置（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| F — 持久化（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| 品质（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| M6+（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策
@@ -7490,3 +7494,32 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **验收**：G（插件）、安全性、品质
 - **里程碑**：M6+
 - **状态**：部分自动化（`apps/desktop/test/plugin-fs-session-root.test.mjs`）：工具调用在发起会话的项目下写入与读取，面板调用与宿主未跟踪的会话回退到可见工作区，`userSelected` 模式保留选定的目录，窗口不显示任何项目时会话根依然生效。双活会话的桌面旅程与面板步骤为草稿（仅在此表面变化时于具备条件的环境中运行）
+
+#### E2E-MODEL-catalog-window-correction-reaches-saved-bindings：目录修正回流已保存绑定，且不覆盖用户手改值
+
+- **目标**：models.dev 修正某模型上限后回流到已保存的绑定（不必删除重建），
+  而用户在设置里手改的数值永不被覆盖。
+- **步骤**：
+  1. 配置一个提供商，勾选 models.dev 已发布 `limit.context` 的模型并保存。展开该行的
+     高级区，读取上下文窗口字段与其提示。
+  2. 用修正后的目录记录（不同的发布上限）替换该模型记录，重新打开设置，读取该行、
+     上下文检查器，以及新会话启动时使用的窗口。
+  3. 在高级区输入窗口——先用预设档位，再手输 `128000`——保存，然后再喂一次目录修正，
+     重新打开设置与检查器。
+  4. 保存并重新打开一个绑定不带 `contextWindowSource` 的提供商行：一次使用通用
+     `128000` 种子，一次使用任意其它已存值。
+- **预期**：步骤 1 显示发布值并带「跟随 models.dev」提示。步骤 2 在所有使用 effective
+  window 的地方（设置行、上下文检查器、会话启动）都显示修正后的值，无需删除重建。
+  步骤 3 在设置行、检查器和实际请求中都保留用户输入的值，包括在目录窗口更大时手输的
+  `128000`，且提示消失。步骤 4 表现确定：`128000` 种子跟随目录，其它值保持原样。
+  每一步中标记都能在提供商行的保存/读取往返后保留，早于该标记写出的配置仍可读。
+- **关联规范**：`03-runtime/13-model-catalog-and-selection.md` §9.1、
+  `03-runtime/12-provider-config-schema.md` §2、
+  `03-runtime/11-provider-model-system.md` §2、`04-ux/06-settings-ia.md` §2
+- **验收**：B（模型配置）、F（持久化）、Quality
+- **里程碑**：M6+
+- **状态**：部分自动化：`apps/desktop/test/model-binding-catalog-source.test.mjs` 驱动
+  主进程解析（目录来源的修正会到达对外暴露的行、用户值不受修正影响、通用种子仍跟随
+  目录、继承值保持 `catalog` 标记）；`packages/shared/src/model-catalog.test.ts` 覆盖
+  四条来源规则；`crates/host-core/src/providers/catalog.rs` 覆盖配置往返、无标记记录与
+  被丢弃的未知标记。端到端的设置旅程与实际启动窗口断言为草稿。
