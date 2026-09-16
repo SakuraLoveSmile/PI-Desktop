@@ -82,7 +82,7 @@ This log freezes previously open questions into concrete decisions.
 | D405 | Ideographic comma opens the slash menu | **Amend D123 / D139 / ADR 0024: a `、` (U+3001) committed as the first character of an empty composer draft is rewritten to `/` before trigger detection, so a Chinese IME reaches the ordinary slash menu without switching input methods. Only that position is rewritten; a `、` anywhere else stays ordinary punctuation, and the `@` file menu is unaffected. Shared grammar and renderer only; no IPC, storage, or autocomplete-source change. See ADR 0231 and E2E-255.** | Reaching `/new`, `/compact`, a mode alias, or a Skill forced a Chinese IME user to switch to ASCII input mid-sentence and then switch back (issue #65). |
 | D406 | Keep macOS DMG opening guidance text-only | **Amend D371 / ADR 0204: macOS DMGs expose the opening-help note as `If app won't open, read this.txt` and no longer include the executable `PI-Desktop-macOS-open.command`. macOS ZIP packages retain both the note and the helper. The note provides the narrow Terminal fallback for trusted unsigned builds; signed and notarized builds do not need it. See ADR 0232 and E2E-196b.** | The DMG should keep the normal app-to-Applications flow focused while still giving users a visible, actionable answer when an unsigned app does not open. |
 | D407 | Restore archived projects after session import | **Additive renderer behavior for issue #250: when a core or plugin import adds a new project-bound session, the import-triggered session refresh normalizes its project path and clears the renderer's archived presentation state for that project. Pathless sessions, skipped imports, historical plugin paths without an active binding, and ordinary refreshes leave archive state unchanged. Host project rows, IPC channels, plugin methods, storage schema, and data formats do not change. See ADR 0236 and E2E-257.** | The host can successfully materialize an imported session under a project while the renderer still hides that project's sidebar row as archived. Restoring only the newly imported binding makes the result discoverable without weakening deliberate archive choices during ordinary refreshes (issue #250). |
-| D408 | Prioritize MainChat in the three-column shell | **Amend ADR 0226 / ADR 0151 / ADR 0033 for issue #267: MainChat keeps a hard 450px minimum, the work panel is capped by the live budget (`client width - 450px - expanded sidebar`, with no fixed maximum), and the expanded sidebar yields at that threshold — including while `sidebar-out` still occupies flex space. A manual sidebar reopen spends panel width first and otherwise targets 460px; closing the panel restores only a sidebar the layout collapsed. The native window never changes: the reservation seam stays at zero and no geometry is applied. Preview mode temporarily unmounts MainChat and uses a window-level chrome row; collapsed-sidebar macOS preview reserves 76px, or 8px in fullscreen, for traffic lights. See ADR 0238 and E2E-LAYOUT-three-column-width-priority.** | The fixed client area had no explicit width priority, so the side docks could pin MainChat to its floor and leave the composer unusable. Making the yield order explicit keeps the chat readable inside the fixed window without reintroducing native window growth (issue #267). |
+| D408 | Prioritize MainChat in the three-column shell | **Amend ADR 0226 / ADR 0151 / ADR 0033 for issue #267: MainChat keeps a hard 450px minimum, the work panel is capped by the live budget (`client width - 450px - expanded sidebar`, with no fixed maximum), and the expanded sidebar yields at that threshold — including while `sidebar-out` still occupies flex space. A manual sidebar reopen spends panel width first and otherwise targets 460px; closing the panel restores only a sidebar the layout collapsed. The native window never changes: the reservation seam stays at zero and no geometry is applied. Preview mode temporarily unmounts MainChat and uses a window-level chrome row; collapsed-sidebar macOS preview reserves 88px, or 8px in fullscreen, for traffic lights (D433). See ADR 0238 and E2E-LAYOUT-three-column-width-priority.** | The fixed client area had no explicit width priority, so the side docks could pin MainChat to its floor and leave the composer unusable. Making the yield order explicit keeps the chat readable inside the fixed window without reintroducing native window growth (issue #267). |
 | D409 | Host-owned session collaboration messages | **Amend ADR 0237 / ADR 0165 / ADR 0213: Rust host-core owns a durable session-collaboration ledger keyed by message id and real source/target Session IDs. Plugin-mediated `spawn`, `send`, `status`, `result`, and `cancel` operations use the reviewed desktop-control gateway; the sender is bound to the active plugin Agent tool invocation, target turns retain their existing configuration, and each delivery is claimed by its actual durable turn. Completion callbacks are durable, at-most-once, and reference the settled turn. Provenance is persisted with transcript rows and cannot be forged, stripped, or edited through regeneration. The additive schema v16 migration retains queued work across restart without unattended replay, applies permission ceilings and bounded autonomous hops, and keeps the existing Task family unchanged. See ADR 0239 and E2E-PLUGIN-session-orchestrator-real-workers.** | The plugin's prior create/prompt polling path could infer neither a durable turn outcome nor a safe bidirectional sender identity. A host-owned ledger makes delivery, provenance, callback, cancellation, and restart behavior auditable without restoring the withdrawn A2A protocol. |
 | D410 | Independent session discovery and navigable collaboration projections | **Amend ADR 0239: add the reviewed read operation `session/collaboration/list`, bounded to 100 non-deleted Agent sessions and redacted to Session IDs, titles, status, updated time, readable provider/model labels, and bounded creation links. Extend the sidebar projection with readable model labels and at most eight created-session references. Render creator/created-session references as keyboard-focusable navigation buttons; independent sessions do not receive fabricated creator links. No renderer storage ownership or collaboration mutation boundary changes. See ADR 0240, E2E-SESSION-independent-top-level-communication, and E2E-SESSION-hover-card-model-and-links.** | Existing Session IDs were valid send targets but could be undiscoverable when they were not created by the plugin, while the hover card exposed only IDs and non-interactive provenance. A bounded host directory and navigable projection make durable sessions communicable and explainable without exposing transcripts or credentials. |
 | D413 | Skill market public-HTTPS catalog fetch | **Additive: Settings → Skills Market discovers SKILL.md catalogs in Electron main under a shared public-HTTPS policy (syntactic public host + DNS classification + per-hop redirect re-validation). The renderer does not fetch. Install remains `skills.create`. Catalog ids match host `valid_capability_id`. Expanded documents over 128 KiB are refused. Builtin titles are English. See ADR 0243, E2E-SKILL-MARKET-*, issue #287.** | Community skill discovery needs main-process egress without a plugin-marketplace host allowlist, and copied classifiers would collide with the MCP market. |
@@ -4848,7 +4848,7 @@ D193, and D194.
   no panel width or x-offset geometry is applied.
 - Preview mode unmounts MainChat and gives the client area to the work panel
   beside the sidebar. AppShell supplies a window-level chrome row for shell
-  actions and native controls; macOS reserves 76px in windowed mode and 8px in
+  actions and native controls; macOS reserves 88px in windowed mode and 8px in
   fullscreen when the sidebar is collapsed.
 - Decision D408 records the issue #267 behavior. See ADR 0238 and
   E2E-LAYOUT-three-column-width-priority.
@@ -5443,3 +5443,40 @@ that was sitting at the bottom — including after the turn had finished.
 - See ADR 0266, `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §6, and
   E2E-PLUGIN-fs-root-follows-the-calling-session.
+
+## 2026-09-16 — The macOS traffic-light reserve has one source (D433)
+
+- The renderer's windowed lead-in for the macOS traffic lights was a hand-copied
+  `76px`: five declarations across `apps/desktop/src/styles/chrome.css` and
+  `apps/desktop/src/styles/work-panel.css` — `.main-titlebar-left` (`64px`, that
+  number minus the row's own 12px padding), `.conversation-topbar.ct-collapsed`
+  (`--ct-lead-inset`), `.sidebar-header`,
+  `.window-chrome-row:not(.sidebar-expanded)`, and the preview
+  `.work-panel-header` (`calc(76px + var(--ds-preview-action-lane-width))`) —
+  each with its own `[data-fullscreen="true"]` sibling. None of them was tied to
+  the `trafficLightPosition` the main process hands Electron, so either side
+  changing on its own would have drifted from the other.
+- The native geometry now has one home, `packages/shared/src/window-chrome.ts`:
+  `MAC_TRAFFIC_LIGHT_POSITION` (`{x:16,y:16}`) and
+  `MAC_TRAFFIC_LIGHT_CLUSTER_WIDTH_DIP` (`60`), with
+  `MAC_TRAFFIC_LIGHT_EDGE_DIP` (`16 + 60 = 76`) as the cluster's right edge. The
+  main process positions the buttons from those constants, and the renderer
+  injects the edge into `--ds-traffic-light-edge` at boot. Every consumer reads
+  `--ds-window-lead-inset`, which `chrome.css` composes once for
+  `:root[data-platform="darwin"]` as `--ds-traffic-light-edge` +
+  `--ds-traffic-light-gap` (`12px`) = `88px`.
+- The buttons used to sit flush against the green light, with a 0 gap. The
+  reserve now keeps `12px` of breathing room between the cluster's right edge and
+  the first shell control, which is why windowed mode moved from `76px` to
+  `88px`.
+- The per-selector `[data-fullscreen="true"]` overrides are gone. Fullscreen
+  hides the buttons, and the same token's `[data-fullscreen="true"]` rule drops
+  the reserve to the ordinary `8px` gutter for every consumer at once.
+- Windows and Linux are unchanged: `--ds-window-lead-inset` keeps its `0px`
+  default and those platforms still use the renderer-drawn controls in the 120px
+  right-side band. Plugin-panel windows create a plain frameless `BrowserWindow`
+  with no native traffic lights, so they are unaffected.
+- Renderer + shared constant only: no protocol, storage, host, permission, or
+  migration change, and no new default.
+- See `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`, and
+  E2E-LAYOUT-three-column-width-priority.

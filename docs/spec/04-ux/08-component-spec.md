@@ -66,8 +66,12 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 - Work panel preview: the header maximize action temporarily unmounts MainChat
   and expands the panel across the client area beside the sidebar. A window-level
   46px chrome row owns the drag area, New Task/sidebar actions, and native
-  window controls. On macOS, collapsed-sidebar preview reserves 76px on the
-  left in windowed mode and 8px in fullscreen for the traffic lights.
+  window controls. On macOS, collapsed-sidebar preview reserves 88px on the
+  left in windowed mode and 8px in fullscreen for the traffic lights. That
+  reserve is the shared `--ds-window-lead-inset` token — the traffic-light
+  cluster's right edge (76px, from `@pi-desktop/shared`) plus a 12px gap — and
+  the main process places the buttons from that same shared geometry, so the
+  reserve and the buttons cannot drift apart.
 - Work panel resize: its inner left-edge handle changes the committed panel
   width in the renderer, so dragging left gives the panel more internal space
   and dragging right returns space to MainChat (§5.4)
@@ -232,14 +236,14 @@ combined model × reasoning selection (§11).
   frameless drag band
 - Border: border-subtle bottom on every route-owned titlebar surface
 - Position: absolute 46px frameless band; `-webkit-app-region: drag` with
-  `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
+  `no-drag` on interactive controls; macOS reserves the left 88px for traffic
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   120px for native window controls (112px hit targets plus an 8px visual
   buffer). The conversation titlebar also reserves the 28px work-panel toggle
   while the panel is closed. While the panel is open, that 120px band plus the
   toggle overlay the panel header instead, and the header ends its box before
   the band so the panel tab strip and `+` stay clear of the native control band.
-  In macOS windowed preview mode, a collapsed sidebar also adds the 76px
+  In macOS windowed preview mode, a collapsed sidebar also adds the 88px
   traffic-light reserve and the preview action lane plus an 8px gap to the
   panel header itself, keeping its first tab clear; fullscreen uses the 8px
   native reserve but retains the preview action lane.

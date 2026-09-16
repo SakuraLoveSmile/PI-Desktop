@@ -65,8 +65,8 @@ MainChat to its floor while the expanded sidebar kept its full width.
    (never persisted, ends with the panel) and never changes native bounds.
    Because MainChat is absent in this mode, AppShell supplies a window-level
    46px chrome row with New Task, sidebar, and native window controls.
-   Collapsed-sidebar preview reserves 76px on the left for macOS traffic lights
-   in windowed mode and 8px in fullscreen.
+   Collapsed-sidebar preview reserves 88px on the left for macOS traffic lights
+   in windowed mode and 8px in fullscreen (D433).
 
 ## Consequences
 

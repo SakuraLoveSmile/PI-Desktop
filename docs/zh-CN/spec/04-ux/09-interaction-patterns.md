@@ -853,7 +853,9 @@ Mode/provider/model/permission/shell 配置和新提示仍然存在
 
 - 预览模式会卸载 MainChat，让工作面板填充侧边栏之外的客户区。窗口级 46px
   chrome 行保留新建任务、侧边栏和本机窗口控件；侧边栏折叠时，macOS 窗口模式
-  左侧预留 76px，全屏预留 8px 给交通灯。
+  左侧预留 88px，全屏预留 8px 给交通灯。这 88px 是共享 token
+  `--ds-window-lead-inset`：交通灯簇右缘 76px（来自 `@pi-desktop/shared` 的
+  原生几何）加 12px 间隙。
 
 展开侧边栏固定为 275px。折叠/展开只改变列是否存在；历史上的调整大小手柄
 会隐藏，旧的宽度偏好不会继续持久化。

@@ -81,9 +81,12 @@ destination, chat as the home surface, tools and permissions inline.
   bell instead (D130/D117). In work-panel preview mode, MainChat is unmounted
   and a window-level 46px chrome row keeps New Task, sidebar, and native window
   controls available. In macOS collapsed-sidebar preview, the panel header
-  reserves the 76px windowed (8px fullscreen) traffic-light inset plus the
+  reserves the 88px windowed (8px fullscreen) traffic-light inset plus the
   preview action lane and an 8px gap, so its first tab never overlaps either
-  the traffic lights or the preview controls.
+  the traffic lights or the preview controls. The inset is the shared
+  `--ds-window-lead-inset` token — the cluster's 76px right edge (from
+  `@pi-desktop/shared`) plus a 12px gap — and the main process positions the
+  buttons from that same shared geometry.
 - **Work panel**: docked right column (not an overlay) opened by an artifact,
   the viewport-fixed toggle, or `Cmd/Ctrl + J`. File, URL, browser-preview, and
   successful workspace-edit artifacts create their resources atomically. The

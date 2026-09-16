@@ -1648,7 +1648,7 @@ identify the platform validation still needed.
   band renders instead (no chat top-bar controls) while retaining the same
   surface and alignment. The bar is draggable to move the window; interactive
   controls do not start a window drag.
-  macOS leaves the left ~76px clear for traffic lights only while the sidebar is
+  macOS leaves the left 88px clear for traffic lights only while the sidebar is
   collapsed (8px in fullscreen); Windows/Linux leave the right 120px clear for
   native window controls.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2 Topbar)
@@ -12230,10 +12230,14 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   keeps whatever sidebar state the user chose last. The mode is transient: it is
   not persisted and ends when the panel closes. Preview mode keeps the shell's
   new-task, sidebar, and system-window actions reachable while MainChat is
-  absent. On non-fullscreen macOS with the sidebar collapsed, the first preview
-  action starts at the 76px traffic-light safe inset. After opening a real work
-  panel tab, its first tab starts at least 8px to the right of the preview action
-  group; fullscreen uses the 8px native inset but retains that action lane.
+  absent. On non-fullscreen macOS with the sidebar collapsed, the preview row
+  renders the traffic-light lead inset (`--ds-window-lead-inset` — the cluster's
+  76px right edge plus the 12px gap, so 88px) as its own left padding, and the
+  first preview action starts at or beyond that rendered value; the check reads
+  the resolved padding rather than restating the number. After opening a real
+  work panel tab, its first tab starts at least 8px to the right of the preview
+  action group; fullscreen uses the 8px native inset but retains that action
+  lane.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238 §6, issue #289

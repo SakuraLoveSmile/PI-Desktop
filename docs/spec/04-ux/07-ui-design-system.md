@@ -507,10 +507,13 @@ followed by a divider and compact Settings / Logs / Theme rows.
 
 Toolbar rows are 46px. macOS places traffic lights at `{x:16,y:16}` and keeps
 the expanded sidebar's Collapse sidebar icon button right-aligned
-in that same row. The macOS row omits the sidebar logo/title, reserves `76px`
+in that same row. The macOS row omits the sidebar logo/title, reserves `88px`
 on the left for native chrome in windowed mode, and reclaims that padding in
-fullscreen. Windows/Linux keep the identity and sidebar actions in their first
-row and reserve the rightmost 120px for three frameless-window controls. The
+fullscreen. That reserve is the shared `--ds-window-lead-inset` token — the
+cluster's `76px` right edge (the same `@pi-desktop/shared` geometry the main
+process positions the buttons with) plus `12px` of breathing room. Windows/Linux
+keep the identity and sidebar actions in their first row and reserve the
+rightmost 120px for three frameless-window controls. The
 controls retain 112px of full-height hit targets, while the outer band adds an
 8px visual buffer before adjacent work-panel actions. The band paints an opaque
 `bg-primary` surface so page content never shows through the controls, and its
@@ -1044,9 +1047,12 @@ retain the fade-and-slide exit.
 Preview mode is a transient shell state: MainChat is unmounted and the work
 panel occupies the client width beside the sidebar. A window-level 46px chrome
 row owns the drag area, New Task/sidebar actions, and native window controls.
-Collapsed-sidebar preview reserves 76px on the left for macOS traffic lights in
-windowed mode and 8px in fullscreen. The maximized panel header retains that
-native reserve, then adds the preview action lane and an 8px gap before its
+Collapsed-sidebar preview reserves 88px on the left for macOS traffic lights in
+windowed mode and 8px in fullscreen. That reserve is the shared
+`--ds-window-lead-inset` token — the traffic-light cluster's 76px right edge
+(native geometry from `@pi-desktop/shared`, the same constants the main process
+positions the buttons with) plus a 12px gap. The maximized panel header retains
+that native reserve, then adds the preview action lane and an 8px gap before its
 first tab.
 
 ### 10.1 Responsive collapse
