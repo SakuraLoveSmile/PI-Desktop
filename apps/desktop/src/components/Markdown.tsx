@@ -786,11 +786,15 @@ const markdownComponents: Components = {
 
 const staticRemarkPlugins = [remarkGfm, remarkMath];
 
-// Extend the default schema only for the media elements rendered above.
+// Extend the default schema only for the media elements rendered above, plus
+// `remark-math`'s math classes on `<code>`: the default `language-*` allow list
+// drops `math-display`, which leaves `rehype-katex` rendering TeX `\[ … \]`
+// (single-line or mid-paragraph) as inline math instead of display math.
 const sanitizeSchema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
+    code: [["className", /^language-./, "math-inline", "math-display"]],
     img: [...(defaultSchema.attributes?.img || []), "src", "alt", "title", "className"],
     audio: ["src", "controls", "preload", "className"],
     video: ["src", "controls", "preload", "className", "poster"],

@@ -1251,7 +1251,8 @@ Renderer： `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/s
   `remark-math` + `rehype-katex`（内联 `$…$` 或 `\(…\)`，显示 `$$…$$`
   或 `\[…\]`）。原始 HTML 是
   由 `rehype-raw` 解析并立即受扩展约束
-  `rehype-sanitize` 默认架构；仅渲染器拥有的 audio/video/source
+  `rehype-sanitize` 默认架构；仅渲染器拥有的 audio/video/source，以及
+  `code` 上的 `math-inline`/`math-display` 类（保证 TeX `\[…\]` 使用块级布局）
   允许添加。 KaTeX 的 Vite 内联 WOFF2 字体被允许
 渲染器的 `font-src 'self' data:` CSP 指令。
 - **美人鱼图（D165）**：助手中完成的 `mermaid` 围栏块

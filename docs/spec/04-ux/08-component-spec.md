@@ -1683,8 +1683,9 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   or `\[…\]`). Raw HTML is
   parsed by `rehype-raw` and immediately constrained by the extended
   `rehype-sanitize` default schema; only the renderer-owned audio/video/source
-  additions are admitted. KaTeX's Vite-inlined WOFF2 fonts are allowed by the
-  renderer's `font-src 'self' data:` CSP directive.
+  additions and the `math-inline`/`math-display` classes on `code` (which keep
+  TeX `\[…\]` in display layout) are admitted. KaTeX's Vite-inlined WOFF2 fonts
+  are allowed by the renderer's `font-src 'self' data:` CSP directive.
 - **Mermaid diagrams (D165)**: a completed `mermaid` fenced block in assistant
   answer prose renders through the official Mermaid package. The dependency is
   dynamically imported only when a diagram approaches the viewport; Mermaid's
