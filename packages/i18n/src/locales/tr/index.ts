@@ -512,8 +512,6 @@ export const tr = {
     permissionMode: "İzin kipi",
     reasoningLevel: "Akıl yürütme düzeyi",
     reasoningSupportedBy: "Geçerli model {{model}} bu akıl yürütme düzeylerini destekliyor",
-    reasoningLevelList: "Listeden seç",
-    reasoningSliderAdjust: "Kaydırıcıyla ayarla",
     permissionInherit: "Varsayılan",
     permissionAsk: "Her seferinde sor",
     permissionAcceptEdits: "Düzenlemeleri kabul et",

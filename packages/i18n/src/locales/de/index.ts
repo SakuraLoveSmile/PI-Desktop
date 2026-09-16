@@ -503,8 +503,6 @@ export const de = {
     "permissionMode": "Berechtigungsmodus",
     "reasoningLevel": "Argumentationsebene",
     "reasoningSupportedBy": "Aktuelles Modell {{model}} unterstützt diese Argumentationsebenen",
-    "reasoningLevelList": "Aus Liste wählen",
-    "reasoningSliderAdjust": "Mit Schieberegler anpassen",
     "permissionInherit": "Standard",
     "permissionAsk": "Immer nachfragen",
     "permissionAcceptEdits": "Änderungen akzeptieren",

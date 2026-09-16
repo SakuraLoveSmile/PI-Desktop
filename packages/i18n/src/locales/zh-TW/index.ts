@@ -508,8 +508,6 @@ export const zhTW = {
     permissionMode: "許可權模式",
     reasoningLevel: "推理等級",
     reasoningSupportedBy: "當前模型 {{model}} 支援的推理等級",
-    reasoningLevelList: "從列表選擇",
-    reasoningSliderAdjust: "滑動調整",
     permissionInherit: "跟隨預設",
     permissionAsk: "每次詢問",
     permissionAcceptEdits: "允許編輯",

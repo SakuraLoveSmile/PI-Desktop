@@ -235,41 +235,8 @@
   overflow-y: auto;
 }
 
-/* Reasoning slider (issue #417): the submenu leads with a drag slider; the
-   value label toggles the classic radio list for dropdown selection. */
-.composer-thinking-mode {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 4px 4px;
-}
-
-.composer-thinking-value {
-  display: inline-flex;
-  min-height: 24px;
-  align-items: center;
-  gap: 4px;
-  border-radius: var(--radius-sm);
-  padding: 0 8px;
-  background: var(--ds-tile-deep);
-  color: var(--ds-accent);
-  font-size: var(--text-sm);
-  line-height: var(--leading-compact);
-  cursor: pointer;
-  transition:
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.composer-thinking-value:hover,
-.composer-thinking-value:focus-visible {
-  background: var(--ds-bg-hover);
-  color: var(--ds-text-primary);
-}
-
-.composer-thinking-value > svg {
-  color: var(--ds-text-muted);
-}
-
+/* Reasoning slider (issue #417): the menu root carries the slider directly
+   under the Reasoning level entry; the entry opens the classic radio list. */
 .composer-thinking-slider {
   display: flex;
   flex-direction: column;

@@ -20,7 +20,6 @@ import {
   thinkingLevelForProvider,
   thinkingProviderForModel,
   type ComposerMenuView,
-  type ThinkingSelectionMode,
 } from "../model";
 
 type UseComposerModelMenuOptions = {
@@ -52,7 +51,6 @@ export function useComposerModelMenu({
   const [query, setQuery] = useState("");
   const [modelHighlight, setModelHighlight] = useState(-1);
   const [thinkingHighlight, setThinkingHighlight] = useState(-1);
-  const [thinkingMode, setThinkingMode] = useState<ThinkingSelectionMode>("slider");
   const rootMenuRef = useRef<HTMLDivElement>(null);
   const modelSearchRef = useRef<HTMLInputElement>(null);
   const modelListRef = useRef<HTMLDivElement>(null);
@@ -160,7 +158,6 @@ export function useComposerModelMenu({
     setQuery("");
     setModelHighlight(-1);
     setThinkingHighlight(-1);
-    setThinkingMode("slider");
   }, [open]);
 
   useEffect(() => {
@@ -172,28 +169,19 @@ export function useComposerModelMenu({
     requestAnimationFrame(() => {
       if (view === "root") rootMenuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
       if (view === "model") modelSearchRef.current?.focus();
-      if (view === "thinking") {
-        // The slider is the default surface: focus its input so arrows land
-        // in the slider instead of the radio list. A single-level binding
-        // renders the radio list directly, so focus its first row instead.
-        if (thinkingMode === "slider" && thinkingMenuLevels.length > 1) {
-          thinkingSliderRef.current?.focus();
-        } else {
-          thinkingListRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-        }
-      }
+      if (view === "thinking") thinkingListRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
       if (view === "model" && modelHighlight >= 0) {
         modelListRef.current
           ?.querySelector(`[data-model-index="${modelHighlight}"]`)
           ?.scrollIntoView({ block: "nearest" });
       }
-      if (view === "thinking" && thinkingMode === "list" && thinkingHighlight >= 0) {
+      if (view === "thinking" && thinkingHighlight >= 0) {
         thinkingListRef.current
           ?.querySelector(`[data-thinking-index="${thinkingHighlight}"]`)
           ?.scrollIntoView({ block: "nearest" });
       }
     });
-  }, [open, thinkingMenuLevels.length, thinkingMode, view]);
+  }, [open, view]);
 
   useEffect(() => {
     if (!open || view !== "model" || modelHighlight < 0) return;
@@ -213,8 +201,6 @@ export function useComposerModelMenu({
     setView(nextView);
     setModelHighlight(-1);
     setThinkingHighlight(-1);
-    // Entering the reasoning submenu always restarts on the slider (issue #417).
-    if (nextView === "thinking") setThinkingMode("slider");
     if (nextView !== "model") setQuery("");
   };
 
@@ -252,22 +238,10 @@ export function useComposerModelMenu({
   };
 
   /**
-   * Toggle the reasoning submenu between its slider and radio-list
-   * presentations. The list opens with the current level highlighted so
-   * Up/Down/Enter behave exactly as before the slider existed.
-   */
-  const showThinkingMode = (mode: ThinkingSelectionMode) => {
-    setThinkingMode(mode);
-    setThinkingHighlight(
-      mode === "list" ? thinkingMenuLevels.indexOf(thinkingLevel) : -1,
-    );
-  };
-
-  /**
-   * Commit a reasoning level while staying in the reasoning submenu, so a
-   * dragged slider or a tick click keeps its surface for further tweaks.
-   * Returns false when the configuration is rejected, mirroring the list
-   * selection path's error contract.
+   * Commit a reasoning level without leaving the menu surface, so a dragged
+   * root slider or a tick click keeps the menu where it is. Returns false
+   * when the configuration is rejected, mirroring the list selection path's
+   * error contract.
    *
    * A drag can emit one commit per crossed stop. Idle sessions persist each
    * configure directly, so concurrent promises could resolve out of order and
@@ -373,9 +347,7 @@ export function useComposerModelMenu({
     modelGroups: filteredModelGroups,
     flatModels,
     thinkingMenuLevels,
-    thinkingMode,
     showView,
-    showThinkingMode,
     selectModel,
     commitThinkingLevel,
     selectThinkingLevel,

@@ -69,12 +69,6 @@ export type ComposerFileReference = {
 
 export type ComposerMenuView = "root" | "model" | "thinking";
 
-/**
- * How the reasoning submenu presents its levels: a draggable slider by
- * default, with the radio list one value-label click away (issue #417).
- */
-export type ThinkingSelectionMode = "slider" | "list";
-
 export type PromptEnhancementError = {
   message: string;
   code: string;

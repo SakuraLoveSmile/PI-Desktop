@@ -3202,26 +3202,27 @@ identify the platform validation still needed.
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
   and one unknown free-form model id.
 - **Steps**: 1) Open the Composer model × reasoning chip. 2) Confirm the root
-  contains only Model and Reasoning level entries with current values. 3) Open
-  Model, search for a model, and select a model from a provider group. 4) Confirm
-  the menu remains open at the root, then open Reasoning level, drag and click
-  the slider across multiple supported levels, click a tick label, then click
-  the value label to reveal the radio list and choose a level from it. 5)
-  Repeat with a non-reasoning provider and an unknown free-form model id;
-  exercise Escape, outside click, Up/Down, Enter, Left, and the slider's
-  arrow keys.
+  contains the Model and Reasoning level entries with current values, plus a
+  slider with one labeled stop per supported level directly beneath the
+  Reasoning level entry. 3) Drag and click the slider across multiple
+  supported levels and click a tick label, confirming the chip updates while
+  the menu stays at the root. 4) Open Model, search for a model, and select a
+  model from a provider group; confirm the menu remains open at the root.
+  5) Open Reasoning level and choose a level from the radio list. 6) Repeat
+  with a non-reasoning provider and an unknown free-form model id; exercise
+  Escape, outside click, Up/Down, Enter, Left, and the slider's arrow keys.
 - **Expected**: The chip is in the right toolbar with a Bot icon, before the
   standalone prompt-enhancement Sparkles action and Send/Abort; Off omits the
   level text. The single anchored menu replaces its root
   with an in-place back row and submenu, never opens tabs or a second popover,
   and always reopens at the root. Model search filters sticky provider groups;
   reasoning levels come from the selected model binding's explicit binding
-  levels in canonical order. The submenu opens on a slider with one labeled
-  stop per level and the current level as a value label (a single-level
-  binding renders the radio list directly); slider and tick
-  commits update the chip immediately without leaving the submenu, and the
-  value label toggles the radio list, which uses radio semantics and a
-  trailing check and shows the current model support note. Selecting either
+  levels in canonical order. The root carries a drag slider with one labeled
+  stop per level directly beneath the Reasoning level entry when more than
+  one level is enabled (a single-level binding hides the slider); slider and
+  tick commits update the chip immediately while the menu stays at the root.
+  The Reasoning level entry opens the radio list, which uses radio semantics,
+  a trailing check, and the current model support note. Selecting either
   value immediately updates the chip and root value, clears model filtering,
   and keeps the menu open. A
   non-reasoning or unknown model starts at `off`, but an explicit Settings

@@ -905,16 +905,16 @@ The composer renders only controls connected to the active pi session:
   trigger shows a Bot icon, the current model, and reasoning level; `off` omits
   the level text. Its single `role="menu"`
   popover opens above the trigger at `bottom: calc(100% + 8px)` and starts with
-  exactly two current-value entries. Each entry replaces the menu contents
-  in-place with a back row and its submenu. The Model submenu contains search
-  plus sticky provider groups. Each model row begins at one tab stop beneath
-  its provider heading, making the provider → model hierarchy legible without
-  altering the model label. The Reasoning submenu leads with the current
-  level as a value label plus a drag slider across the selected provider's
-  real `supportedThinkingLevels`; the value label toggles the radio list with
-  a selected-row check. Slider commits apply without leaving the submenu,
-  while selecting from the list returns to the root without dismissing the
-  popover.
+  exactly two current-value entries. When the binding enables more than one
+  level, a drag slider across the selected provider's real
+  `supportedThinkingLevels` sits directly beneath the Reasoning level entry;
+  slider and tick commits apply without leaving the root. Each entry replaces
+  the menu contents in-place with a back row and its submenu. The Model
+  submenu contains search plus sticky provider groups. Each model row begins
+  at one tab stop beneath its provider heading, making the provider → model
+  hierarchy legible without altering the model label. The Reasoning submenu
+  lists the enabled levels as radio rows with a selected-row check; selecting
+  from the list returns to the root without dismissing the popover.
 - While the active session is running, the draft and runtime controls stay
   editable as next-turn choices; only Send is disabled. Host configuration
   remains pinned for the in-flight turn and the latest queued choice is

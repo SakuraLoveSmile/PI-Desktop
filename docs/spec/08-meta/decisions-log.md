@@ -5418,22 +5418,25 @@ that was sitting at the bottom — including after the turn had finished.
   and every translation. See ADR 0251, D421, and
   E2E-PROJECT-delete-running-sessions-are-named-and-stopped.
 
-## 2026-09-16 — The reasoning submenu leads with a slider (#417, D432)
+## 2026-09-16 — The menu root carries the reasoning slider (#417, D432)
 
-- The Composer's Reasoning level submenu opened directly into a vertical radio
-  list. Issue #417 asked for a Codex-desktop-style slider while keeping the
-  existing click-to-list interaction.
-- The submenu now opens with the support note, the current level as a value
-  label, and a native range input with one stop per enabled level plus a
-  clickable tick label per stop. Dragging the slider or clicking a tick
+- The Composer's Reasoning level selection lived only inside a vertical radio
+  list one submenu deep. Issue #417 asked for a Codex-desktop-style slider
+  while keeping the existing click-to-list interaction.
+- The combined model × reasoning menu root now shows a native range input with
+  one stop per enabled level plus a clickable tick label per stop, directly
+  beneath the Reasoning level entry. Dragging the slider or clicking a tick
   commits the level immediately through the same `configureActiveSession`
-  path and stays in the submenu for further tweaks; the value label toggles
-  the classic radio list, which keeps its radio semantics, trailing check,
+  path and leaves the menu where it is, so quick adjustments never cost a
+  submenu trip. The Reasoning level entry itself still opens the classic
+  radio list, which keeps its radio semantics, trailing check,
   Up/Down/Enter/Left contract, and root-return behavior.
-- The slider owns its arrow/Home/End/Enter keys while focused, so ArrowLeft
-  no longer leaves the submenu from the slider, while Escape still closes the
-  menu. Entering the submenu or reopening the menu always restarts on the
-  slider.
+- The slider owns its arrow/Home/End/Enter keys while focused, so those keys
+  adjust the level instead of driving menu navigation, while Escape still
+  closes the menu. A drag can emit one commit per crossed stop, so commits
+  serialize behind a promise chain and a local drag lead keeps the controlled
+  input from snapping back while the store confirmation lands; a binding with
+  a single enabled level hides the slider entirely.
 - Level values remain untranslated canonical strings, and the seven-level
   ladder, provider filtering, and clamping rules are unchanged. Renderer only:
   no protocol, storage, host, permission, or migration change. See

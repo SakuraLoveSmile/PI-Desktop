@@ -18,9 +18,9 @@ import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
 type ModelMenuController = ReturnType<typeof useComposerModelMenu>;
 
 /**
- * Keys the native range input must own while focused. Without stopping
- * propagation, ArrowLeft would leave the submenu for the menu root and
- * Enter would re-commit the radio-list highlight instead of the slider.
+ * Keys the native range input must own while focused. The menu root ignores
+ * arrows, but stopping propagation keeps the keys unambiguous — they adjust
+ * the level, never drive menu navigation — no matter where focus lands.
  */
 const THINKING_SLIDER_KEYS = new Set([
   "ArrowLeft",
@@ -76,9 +76,7 @@ export function ComposerModelPicker({
     modelGroups,
     flatModels,
     thinkingMenuLevels,
-    thinkingMode,
     showView,
-    showThinkingMode,
     selectModel,
     commitThinkingLevel,
     selectThinkingLevel,
@@ -180,6 +178,61 @@ export function ComposerModelPicker({
             <span className="composer-menu-entry-value">{thinkingLabel}</span>
             <IconChevronRight size={14} aria-hidden="true" />
           </button>
+          {/* The slider sits directly under the Reasoning level entry
+              (issue #417): one drag adjusts the level without entering the
+              submenu, while the entry itself opens the classic radio list. */}
+          {thinkingMenuLevels.length > 1 ? (
+            <div className="composer-thinking-slider">
+              <input
+                ref={thinkingSliderRef}
+                type="range"
+                className="composer-thinking-range"
+                min={0}
+                max={thinkingMenuLevels.length - 1}
+                step={1}
+                value={thinkingSliderValue}
+                aria-label={t("chat.reasoningLevel")}
+                aria-valuetext={thinkingMenuLevels[thinkingSliderValue] ?? thinkingLevel}
+                style={
+                  {
+                    "--composer-thinking-progress": `${thinkingSliderPercent}%`,
+                  } as CSSProperties
+                }
+                onChange={(event) => {
+                  const index = Number(event.target.value);
+                  setDragThinkingIndex(index);
+                  const level = thinkingMenuLevels[index];
+                  if (level && level !== thinkingLevel) void commitThinkingLevel(level);
+                }}
+                onBlur={() => setDragThinkingIndex(null)}
+                onKeyDown={(event) => {
+                  if (THINKING_SLIDER_KEYS.has(event.key)) event.stopPropagation();
+                }}
+              />
+              <div className="composer-thinking-ticks">
+                {thinkingMenuLevels.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    className={`composer-thinking-tick ${thinkingLevel === level ? "active" : ""}`}
+                    role="menuitemradio"
+                    aria-checked={thinkingLevel === level}
+                    title={level}
+                    onClick={() => {
+                      if (level !== thinkingLevel) void commitThinkingLevel(level);
+                    }}
+                    onKeyDown={(event) => {
+                      // Enter must commit this tick in place, not run the
+                      // menu's list selection.
+                      if (event.key === "Enter") event.stopPropagation();
+                    }}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <>
@@ -275,107 +328,23 @@ export function ComposerModelPicker({
               <div className="composer-thinking-heading">
                 {t("chat.reasoningSupportedBy", { model: modelLabel })}
               </div>
-              {/* The value label is the gateway to the dropdown list (issue
-                  #417): the slider is the default, but one click restores
-                  the classic radio list for explicit selection. A
-                  single-level binding has nothing to slide, so it renders
-                  the radio list directly. */}
-              {thinkingMenuLevels.length > 1 ? (
-                <div className="composer-thinking-mode">
+              <div className="composer-thinking-list" ref={thinkingListRef}>
+                {thinkingMenuLevels.map((level, index) => (
                   <button
+                    key={level}
                     type="button"
-                    className="composer-thinking-value"
-                    role="menuitem"
-                    aria-expanded={thinkingMode === "list"}
-                    title={
-                      thinkingMode === "list"
-                        ? t("chat.reasoningSliderAdjust")
-                        : t("chat.reasoningLevelList")
-                    }
-                    aria-label={`${t("chat.reasoningLevel")}: ${thinkingLevel}`}
-                    onClick={() =>
-                      showThinkingMode(thinkingMode === "list" ? "slider" : "list")
-                    }
-                    onKeyDown={(event) => {
-                      // Enter must toggle, not run the menu's list selection.
-                      if (event.key === "Enter") event.stopPropagation();
-                    }}
+                    data-thinking-index={index}
+                    className={`composer-plus-item ${thinkingLevel === level ? "active" : ""} ${thinkingHighlight === index ? "kb-active" : ""}`}
+                    role="menuitemradio"
+                    aria-checked={thinkingLevel === level}
+                    onMouseMove={() => setThinkingHighlight(index)}
+                    onClick={() => void selectThinkingLevel(level)}
                   >
-                    <span className="composer-thinking-value-level">{thinkingLevel}</span>
-                    <IconChevronDown size={12} aria-hidden="true" />
+                    <span className="flex-1">{level}</span>
+                    {thinkingLevel === level ? <IconCheck size={14} className="composer-model-check" aria-hidden="true" /> : null}
                   </button>
-                </div>
-              ) : null}
-              {thinkingMode === "slider" && thinkingMenuLevels.length > 1 ? (
-                <div className="composer-thinking-slider">
-                  <input
-                    ref={thinkingSliderRef}
-                    type="range"
-                    className="composer-thinking-range"
-                    min={0}
-                    max={thinkingMenuLevels.length - 1}
-                    step={1}
-                    value={thinkingSliderValue}
-                    aria-label={t("chat.reasoningLevel")}
-                    aria-valuetext={thinkingMenuLevels[thinkingSliderValue] ?? thinkingLevel}
-                    style={
-                      {
-                        "--composer-thinking-progress": `${thinkingSliderPercent}%`,
-                      } as CSSProperties
-                    }
-                    onChange={(event) => {
-                      const index = Number(event.target.value);
-                      setDragThinkingIndex(index);
-                      const level = thinkingMenuLevels[index];
-                      if (level && level !== thinkingLevel) void commitThinkingLevel(level);
-                    }}
-                    onBlur={() => setDragThinkingIndex(null)}
-                    onKeyDown={(event) => {
-                      if (THINKING_SLIDER_KEYS.has(event.key)) event.stopPropagation();
-                    }}
-                  />
-                  <div className="composer-thinking-ticks">
-                    {thinkingMenuLevels.map((level) => (
-                      <button
-                        key={level}
-                        type="button"
-                        className={`composer-thinking-tick ${thinkingLevel === level ? "active" : ""}`}
-                        role="menuitemradio"
-                        aria-checked={thinkingLevel === level}
-                        title={level}
-                        onClick={() => {
-                          if (level !== thinkingLevel) void commitThinkingLevel(level);
-                        }}
-                        onKeyDown={(event) => {
-                          // Enter must commit this tick in place, not run the
-                          // menu's list selection and return to the root.
-                          if (event.key === "Enter") event.stopPropagation();
-                        }}
-                      >
-                        {level}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="composer-thinking-list" ref={thinkingListRef}>
-                  {thinkingMenuLevels.map((level, index) => (
-                    <button
-                      key={level}
-                      type="button"
-                      data-thinking-index={index}
-                      className={`composer-plus-item ${thinkingLevel === level ? "active" : ""} ${thinkingHighlight === index ? "kb-active" : ""}`}
-                      role="menuitemradio"
-                      aria-checked={thinkingLevel === level}
-                      onMouseMove={() => setThinkingHighlight(index)}
-                      onClick={() => void selectThinkingLevel(level)}
-                    >
-                      <span className="flex-1">{level}</span>
-                      {thinkingLevel === level ? <IconCheck size={14} className="composer-model-check" aria-hidden="true" /> : null}
-                    </button>
-                  ))}
-                </div>
-              )}
+                ))}
+              </div>
             </>
           )}
         </>
