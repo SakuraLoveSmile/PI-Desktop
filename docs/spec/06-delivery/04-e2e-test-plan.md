@@ -10358,6 +10358,10 @@ are withdrawn with ADR 0165.
      a secret.
   4. Repeat `agent.complete` until the eighth call in 60s succeeds and the
      ninth returns `RATE_LIMITED`.
+  5. Make the completion fail at the provider (for example a model whose
+     credential the user has revoked). Confirm the plugin reads the classified
+     code — `PROVIDER_UNAUTHORIZED` — rather than a generic failure.
+  6. Stop host-core and call `pi.models.list()`. Confirm `[]` and no warn line.
   5. Stop host-core and call `pi.models.list()`. Confirm `[]` and no warn line.
 - **Expected**: Credentials never leave Electron main. Audit lines record
   plugin id, model key, sizes, and usage — not transcript or completion text.
