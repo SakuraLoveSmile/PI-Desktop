@@ -735,8 +735,9 @@ context. Manual compaction never silently falls back.
 Provider `error` events may include bounded diagnostic fields in
 `AppError.details`: `phase` (`request` or `stream`), `providerStatus`,
 `providerCode`, `providerWaitMs`, `streamMs`, `retryAttempt`, and, for a
-network failure, `networkCategory`, `networkCode`, `networkSyscall` and
-`networkHost` plus the request correlation fields `requestMessages`,
+network failure, `networkCategory`, `networkCode`, `networkSyscall`,
+`networkHost` and `networkRoute` plus the request correlation fields
+`requestMessages`,
 `requestBytes` and `compactionGeneration`. These fields are additive and
 redacted; they never carry credentials or an unrestricted provider response,
 and the request fields are counts and byte sizes only. A transient stream
