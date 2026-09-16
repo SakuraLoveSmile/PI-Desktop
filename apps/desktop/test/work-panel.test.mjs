@@ -102,9 +102,21 @@ test("a viewport-fixed toggle is the sole pointer collapse control", () => {
     globalStyles,
     /\.work-panel-actions \{[^}]*border-right:/s,
   );
+  // `+` and maximize are chrome icon controls: transparent at rest, hover wash
+  // only. A filled tile of their own re-seated the header's quiet group as two
+  // filled squares beside the toggle (chrome-control-geometry.test.mjs owns the
+  // family and its interaction states).
   assert.match(
     globalStyles,
-    /\.work-panel-new-tab \{[^}]*background:\s*var\(--ds-tile\);/s,
+    /\.work-panel-new-tab,\n\.work-panel-maximize \{[^}]*background:\s*transparent;/s,
+  );
+  assert.doesNotMatch(
+    globalStyles,
+    /\.work-panel-(?:new-tab|maximize)\s*\{[^}]*background:\s*var\(--ds-tile/,
+  );
+  assert.doesNotMatch(
+    globalStyles,
+    /\.app-work-panel-toggle\[aria-pressed="true"\] \{[^}]*box-shadow:/s,
   );
   assert.match(mainSource, /WORK_PANEL_HEADER_PROBE/);
   assert.match(mainSource, /querySelector\('\.work-panel-new-tab'\)/);

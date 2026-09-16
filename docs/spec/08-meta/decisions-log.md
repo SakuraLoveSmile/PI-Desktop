@@ -5546,3 +5546,31 @@ that was sitting at the bottom — including after the turn had finished.
   and no new default. See `04-ux/08-component-spec.md` §5.2,
   `04-ux/07-ui-design-system.md` §4.3, and
   E2E-LAYOUT-three-column-width-priority.
+
+## 2026-09-16 — The work-panel controls are quiet icons, not filled seats
+
+- The work-panel header's `+` and maximize controls were painted with a
+  `--ds-tile` seat of their own, and the viewport-fixed collapse toggle added
+  `--ds-tile-deep` plus `--ds-raised-shadow` while `aria-pressed="true"`. In the
+  light theme that turned a row of three 28px controls into filled squares, with
+  the toggle reading as a raised circular pill floating over the panel header —
+  nothing like the top-left dock toggle and new-task controls beside them.
+- `+` and maximize now join the shared chrome-control group in `chrome.css` —
+  the same rule that seats the topbar's dock toggle, the viewport-fixed panel
+  toggle, and the preview/route-band lane actions — so they take one geometry
+  (28px square, `--radius-md`, `flex: 0 0`), one transparent seat, the semantic
+  `--ds-bg-hover` wash on pointer, and the `opacity: 0.4` disabled state. Their
+  duplicated rules in `work-panel.css` are gone; the partial keeps only the
+  action group's spacing.
+- The toggle's pressed state drops the fill and the raised shadow and keeps the
+  engaged ink, so the open state is the glyph swap plus `--ds-text-primary`.
+  `aria-pressed` still carries the state to assistive technology, and
+  `.app-work-panel-toggle` keeps its viewport-fixed ownership and `no-drag`
+  carve-out.
+- Keyboard focus is unchanged: the global `:focus-visible` outline applies as it
+  does to every other chrome icon control, so removing the retired
+  `:focus-visible` background wash costs no focus affordance.
+- Renderer only: no geometry, gap, inset, protocol, storage, host, permission, or
+  migration change, and no new token. See `04-ux/08-component-spec.md` §2.3 and
+  §5.2, `04-ux/07-ui-design-system.md` §4.3, and
+  E2E-LAYOUT-three-column-width-priority.
