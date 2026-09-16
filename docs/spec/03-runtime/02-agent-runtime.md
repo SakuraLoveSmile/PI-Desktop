@@ -1241,9 +1241,6 @@ device/inode/size/hash before it is projected or registered; an altered file
 fails closed without returning a child. A fork is a data-only copy: it executes
 no model and loads no project resources, so it stays available while the parent
 is provider-unavailable or project-untrusted, without granting prompt
-readiness. The side-chat panel streams the child's provisional assistant row
-and re-keys exactly that row when persistence reports the durable SDK entry id
-through the additive `replacesMessageId` field.
 
 ModelRuntime performs its public offline initialization to restore the local
 catalog and auth snapshot. Native Composer readiness uses native `canPrompt`,
