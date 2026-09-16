@@ -54,7 +54,12 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   collapse and expand use a mounted-then-animated dock transition (entrance
   `sidebar-in`, exit `sidebar-out` keyframes) that mirrors the work-panel dock:
   the aside stays in the tree through the exit keyframe, then unmounts
-  (`is-exiting` flag + `animationend` guard, with a timeout fallback)
+  (`is-exiting` flag + `animationend` guard, with a timeout fallback).
+  Entrance requires an explicit `is-entering` phase from a collapsed-to-expanded
+  change on the presented main shell. Initial mounting and return from Settings
+  restore the full retained layout directly. Entering Settings cancels either
+  pending phase, including during rapid navigation; no hidden shell is kept
+  mounted solely to suppress animation.
 - Sidebar width: the expanded column is fixed at 275px. Collapse/open changes
   only whether the column is present; the historical resize handle is hidden
   and legacy persisted width preferences are ignored.
@@ -144,8 +149,10 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   (D348). `nativeTheme.themeSource` follows the app theme preference (`system` /
   `light` / `dark` / plugin base) so the material's light or dark plate matches
   the renderer. Vibrancy is re-applied only when that source changes; a missing
-  plugin theme falls back to `system`. Only the `.sidebar` and any rendered `.sidebar-rail` surface
-  are translucent; the renderer adds a thin theme tint
+  plugin theme falls back to `system`. Main and settings navigation share the
+  `.sidebar-surface` material, alongside any rendered `.sidebar-rail`; the
+  settings shell ancestry is transparent but its content pane and titlebar stay
+  opaque. The renderer adds a thin theme tint
   (`--ds-sidebar-glass-tint`, 40% dark / 55% light) plus a top/bottom sheen.
   The dock carries no seam or hairline: the glass meets the opaque main pane
   flush, so the only edge cue is the tint's natural change against the pane.
@@ -401,8 +408,10 @@ visually distinct from list content.
 | Session in progress | Orange breathing dot; static under reduced motion |
 | Session completed | Green check mark from the latest unread task notification when the row is not selected |
 | Session failed | Red circled alert mark from the latest unread task notification when the row is not selected |
-| Hover session | bg-tertiary background |
-| Active project | Header carries active state; topbar follows that workspace; composer exposes no workspace identity |
+| Hover row | Project headers and all conversation rows share one full-row `--ds-bg-hover` surface, radius and transition; selected conversation fill takes precedence |
+| Current workspace | Project header shows the workspace dot, never a persistent selection fill; topbar follows that workspace; composer exposes no workspace identity |
+| Navigation selection | Only the selected conversation on the chat page uses `--ds-bg-active`, including pinned and standalone rows; folding its group never transfers selection to the header. No conversation or a non-chat page means no selected conversation row |
+| Keyboard focus | The focused control keeps its visible outline; the project title stays transparent and independent action buttons retain their own hover feedback |
 | Collapsed project | Header remains visible; unpinned child conversations are hidden; global pins remain visible |
 | Archived row | Hidden by default; visible in the explicit archived view |
 | No retained project | Compact Open project entry; standalone Sessions rows remain available |
@@ -531,7 +540,7 @@ visually distinct from list content.
   Projects, independent of date buckets, project collapse, retained tabs, and
   each project's ten-row history limit. Each pin shows its project display
   name (full path on hover), or Temporary space for a path-less conversation.
-  The section is omitted when empty and scrolls within `min(224px, 30vh)` when
+  The section is omitted when empty and scrolls within `min(233px, 30vh)` when
   needed. Its rows reuse normal selection, status, hover, and overflow actions.
 - Pinning moves the existing row into that section; unpinning returns it to
   normal project or temporary history, subject to existing folding and closed
@@ -1166,6 +1175,49 @@ SESSIONS                                      [msg+][↕]
            Session title
 ```
 
+Rows inside a project group are dated. The today bucket draws no header;
+yesterday, the previous 7 days, the previous 14 days, and everything older each
+draw a muted uppercase label above their rows, and only a bucket that holds rows
+draws one:
+
+```text
+[folder] current-project                         [+]
+           YESTERDAY
+           Session title
+           Session title
+```
+
+That label is an ordinary row of the list rhythm — no disclosure, no state, no
+`aria-expanded` — unlike a project header, which is a real collapsible group.
+
+Spacing ladder in the sidebar lists (`space-0.25` / `space-0.5` / `space-2` per
+`04-ux/07-ui-design-system.md` §6.1):
+
+| Relation | Gap |
+|---|---|
+| Row to row, including a date label and the load-more row | 1px |
+| Project group header to its first row | 2px |
+| Last row of an expanded group to the next group | 8px |
+| Collapsed group to the next group | 1px |
+| Section label to its first row | 2px |
+| Sidebar section to sidebar section | 8px |
+
+The 8px tail belongs to the expanded group itself, so the spacing is decided by
+the preceding group alone: an expanded group is followed by 8px whether the next
+group is expanded or collapsed, and a collapsed group is followed by 1px either
+way.
+
+The fold is one motion, not two. A collapsed group is a single grid row that
+animates `1fr` → `0fr` over the 200ms normal duration, so every frame is a real
+fraction of the group's measured height instead of a `max-height` clamp that
+spends most of its curve above the content and then snaps. The rows are clipped
+by an inner box with `min-height: 0`, never faded — opacity stays 1 for the whole
+fold — and the 2px / 7px inset lives on the list inside that clip, so it travels
+with the rows instead of holding the closed row open. Under
+`prefers-reduced-motion: reduce` the fold keeps both endpoints and runs in a
+near-zero duration. A folded group keeps its rows mounted, `aria-hidden`, and
+`inert`, so they leave the tab order as well as the accessibility tree.
+
 ### 6.3 States
 
 | State | Appearance |
@@ -1235,7 +1287,8 @@ SESSIONS                                      [msg+][↕]
   local view controls rather than host queries.
 - Temporary means **not bound to a project**, not ephemeral storage; these
   sessions survive restart.
-- The standalone Sessions body shows at most five compact 28px rows and
+- The standalone Sessions body is a 146px window over five compact 28px rows,
+  their 1px row gaps, and the 2px label inset; it
   scrolls internally when more rows exist. The Projects list uses the remaining
   sidebar height and scrolls independently; neither region scrolls the footer
   or primary navigation. Both list scrollbars use the same global 6px,
