@@ -284,6 +284,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0251 | [删除项目会一并删除其拥有的会话](/adr/0251-project-delete-with-owned-sessions) | 已接受 |
 | 0253 | [移除子智能体轮次上限](/adr/0253-remove-subagent-turn-limit) | 已接受（取代 0062 / 0063 / 0119 / 0126 / 0166 / 0210 中关于 `maxTurns` 的条款） |
  | 0265 | [排队队列的优先区块与行内操作](/adr/0265-turn-queue-priority-block-and-row-actions) | 已接受待实现（修订 ADR 0213 / 0118） |
+ | 0268 | [插件标签跟随应用语言](/adr/0268-plugin-labels-follow-the-app-language) | 已接受（修订 ADR 0160；ADR 0182） |
 
 ## 什么时候看 ADR
 
