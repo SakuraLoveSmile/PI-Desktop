@@ -70,8 +70,16 @@
   工作面板标题带通过让自身盒子在该保留带之前结束来承载它——
   用外边距而非内边距——因为原生拖拽矩形就是边框盒。
 - 工作面板预览：标题栏最大化操作会临时卸载 MainChat，并让面板填充侧边栏
-  之外的客户区。窗口级 46px chrome 行负责拖动区域、新建任务、侧边栏和本机
-  窗口控件。macOS 侧边栏折叠时，窗口模式左侧预留 76px，全屏预留 8px 给交通灯。
+  之外的客户区。
+  The 46px chrome row keeps shell/native controls but has no drag/no-drag
+  rectangle and passes pointer events through outside controls. The panel
+  header alone owns dragging in the preview pane; its border box excludes
+  shell actions plus an 8px gap in both sidebar states on every platform.
+  The left inset is 8px except collapsed-sidebar windowed macOS (88px through
+  `--ds-window-lead-inset`: the shared 76px native cluster edge plus 12px).
+  Main uses the same native geometry from `@pi-desktop/shared`.
+  Right native-control exclusion is unchanged. Header-height paint fills the
+  left lane without an opaque overlay hiding tabs or panel actions.
 - 工作面板调整大小：左边缘拖动手柄（§5.4）
 - 窗口大小调整：本机边缘仅在打开作品时更改 MainChat 宽度
   面板保持其承诺的宽度；响应式布局如下
@@ -197,8 +205,8 @@ Composer 拥有 Agent/Plan/Goal 控件以及组合的模型 × 推理选择（§
 - 背景：bg-primary
 - 边框：边框-微妙底部
 - 位置：绝对46px无框带； `-webkit-app-region: drag` 与
-  交互式控件上的 `no-drag`； macOS 保留左侧约 76 像素的流量
-  灯亮（仅当侧边栏折叠时），Windows/Linux保留权利
+  交互式控件上的 `no-drag`； macOS 仅在侧边栏折叠时保留左侧 88px 的交通
+  灯空间，Windows/Linux保留权利
   本机窗口控件为 112px
 - 标题簇（任务标题）最多可显示前 10 个 Unicode
   字符加省略号；完整标题保留在本机工具提示中。
@@ -218,6 +226,17 @@ Composer 拥有 Agent/Plan/Goal 控件以及组合的模型 × 推理选择（§
   `--ds-toolbar-height` 填充。缺少这一保留时，页面标头会渲染到带的后面，
   标题行被遮挡。只有叠在带之上的表面（`z-index: 60` 的插件详情侧面板）
   可以跳过它。
+- 每个 chrome 图标控件都是同一个 28px 方形（`--ds-work-panel-toggle-size`），
+  并共用同一个透明底座：顶栏的侧边栏开关、视口固定的工作面板开关、
+  预览态/路由带上的动作组，以及工作面板头部的 `+` 与最大化/还原按钮。
+  控件与其同级保持一致，不再使用自己更小的尺寸，也不再自带表面，因此默认
+  由图标本身承载，只有语义化的悬停淡色才会在其下着色。面板头部为动作组
+  预留的车道宽度也由同一个控件尺寸推导，而不是写死的字面量；开关的打开
+  状态只改变图形与墨色，这一族控件都不绘制填充或抬升的“开启”胶囊。
+  With the sidebar collapsed, Plugins, Pull requests, and Scheduled render their
+  sidebar/New Task actions inside `.main-titlebar`, not the preview-only
+  `.window-chrome-row`. Both containers must share the same geometry, rest,
+  hover, and disabled rules; route actions must not duplicate those declarations.
 
 ### 2.4 状态
 
@@ -450,6 +469,11 @@ Collapsed (48px):
 
 - 可见shell名称为`PI-Desktop`； Codex 不用作渲染器
   身份。
+- 没有文字标签的控件声明 `.icon-btn-square`，它把两个轴都固定到
+  `--ds-control-size`（28px）。单独的 `.icon-btn` 宽度来自图形加左右各 8px 内边距 ——
+  这对带文字的胶囊按钮是正确的，对没有文字的控件则是错误的 —— 因此侧边栏收起控件、
+  会话顶栏开关，以及输入框的添加/增强/撤销控件，都呈现与顶栏和工作面板操作一致的
+  28px 正方形点击区，而不是"宽大于高"的胶囊。
 - `BrandLogo` 通过 Vite 导入从规范母版派生的渲染器尺寸标记：
   `src/assets/brand/logo-light.png` 用于浅色模式，
   `src/assets/brand/logo-dark.png` 用于深色模式（192x192，可覆盖 3x 下的
@@ -670,6 +694,14 @@ expanded/collapsed 侧边栏仍为 20px/18px 且启动画面为 64 像素。
 - 面板主体采用静音插页纸（`#fafafa`）； 46px 标题带和工具
   chrome（审阅工具栏、浏览器chrome、文件查看器标题）保持白色
 - 46px 标题是裁剪的标签条和紧贴的 `+` 入口。只有标签条滚动，入口始终固定。
+  头部为视口固定的折叠开关预留 44px 的右侧安全车道（28px 控件 + 12px 视口内缩
+  + 头部自身的 4px 控制间距 `--ds-work-panel-control-gap`），这一个间距同时
+  分隔整行：标签条到动作组、`+` 到最大化，以及最大化到开关。动作组不再有自己的
+  分隔线、内缩或外边距，因此三个按钮读作一组；`+` 与开关之间仍隔着最大化控件，
+  命中区域彼此独立且视觉间隔大于 24px。三者都是与其他 chrome 图标相同的控件：
+  28px 方形、透明底座，因此头部呈现的是安静的图标而不是填充方块。`+` 与最大化
+  从 `chrome.css` 的共享 chrome 控件组取得几何与悬停淡色，而不是自带的规则；
+  视口固定开关的 `aria-pressed` 状态只改变墨色与图形，绝不改变背景或阴影。
   菜单只有 Tools & panels 分组，Review 在前，插件视图按声明顺序排列；只有真实
   存在的快捷键才显示快捷键标签。
 - 标签在悬停、聚焦和活动时显示 `×`，中键也可关闭。面板溢出由标签条处理，

@@ -65,9 +65,14 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   native window bounds stay unchanged.
 - Work panel preview: the header maximize action temporarily unmounts MainChat
   and expands the panel across the client area beside the sidebar. A window-level
-  46px chrome row owns the drag area, New Task/sidebar actions, and native
-  window controls. On macOS, collapsed-sidebar preview reserves 76px on the
-  left in windowed mode and 8px in fullscreen for the traffic lights.
+  46px chrome row keeps New Task/sidebar and native window controls, with
+  pointer passthrough and no drag/no-drag rectangle outside its controls.
+  The panel header alone owns dragging in the preview pane; its border box
+  excludes the shell action lane in both sidebar states on every platform.
+  On macOS, collapsed-sidebar preview reserves 88px in windowed mode and 8px
+  in fullscreen through the shared `--ds-window-lead-inset` token — the
+  traffic-light cluster's right edge (76px, from `@pi-desktop/shared`) plus a
+  12px gap. The main process uses that same shared geometry.
 - Work panel resize: its inner left-edge handle changes the committed panel
   width in the renderer, so dragging left gives the panel more internal space
   and dragging right returns space to MainChat (§5.4)
@@ -232,17 +237,19 @@ combined model × reasoning selection (§11).
   frameless drag band
 - Border: border-subtle bottom on every route-owned titlebar surface
 - Position: absolute 46px frameless band; `-webkit-app-region: drag` with
-  `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
+  `no-drag` on interactive controls; macOS reserves the left 88px for traffic
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   120px for native window controls (112px hit targets plus an 8px visual
   buffer). The conversation titlebar also reserves the 28px work-panel toggle
   while the panel is closed. While the panel is open, that 120px band plus the
   toggle overlay the panel header instead, and the header ends its box before
   the band so the panel tab strip and `+` stay clear of the native control band.
-  In macOS windowed preview mode, a collapsed sidebar also adds the 76px
-  traffic-light reserve and the preview action lane plus an 8px gap to the
-  panel header itself, keeping its first tab clear; fullscreen uses the 8px
-  native reserve but retains the preview action lane.
+  In preview mode the header's left border box starts after the shell actions
+  plus an 8px gap, including expanded-sidebar New Task, on every platform.
+  The left inset is 8px except collapsed-sidebar windowed macOS (88px through
+  the shared lead-inset token). Fullscreen retains the action lane.
+  Header-height background paint fills the excluded lane without an opaque
+  overlay hiding tabs or panel actions.
   Resource close actions stay in their tabs so a second header `×` does not echo
   the native Windows close control (D357).
 - Title cluster (task title) flexes and shows at most the first 10 Unicode
@@ -265,6 +272,19 @@ combined model × reasoning selection (§11).
   native drag rectangle is the border box. The control band continues the
   titlebar's `border-subtle` bottom rule and uses the same token for its
   leading divider.
+- Every chrome icon control is one 28px square (`--ds-work-panel-toggle-size`)
+  with one transparent seat: the topbar's dock toggle, the viewport-fixed
+  work-panel toggle, the preview/route-band lane actions, and the work-panel
+  header's `+` and maximize/restore controls. A control matches its siblings
+  instead of rendering at a size or on a surface of its own, so the icon alone
+  carries it until the semantic hover wash paints a surface. The panel header's
+  lane reserve is derived from that same control size rather than from a
+  literal, and the toggle's open state is its glyph swap plus the engaged ink —
+  no control in this family paints a filled or raised "on" pill.
+  With the sidebar collapsed, Plugins, Pull requests, and Scheduled render their
+  sidebar/New Task actions inside `.main-titlebar`, not the preview-only
+  `.window-chrome-row`. Both containers must share the same geometry, rest,
+  hover, and disabled rules; route actions must not duplicate those declarations.
 - Band reservation is platform-independent (D269). The band is opaque and
   absolutely positioned, so scrolling route content passes underneath it on
   every platform, macOS included. Every route surface that starts its own
@@ -584,6 +604,13 @@ visually distinct from list content.
 
 - The visible shell name is `PI-Desktop`; Codex is not used as the renderer
   identity.
+- A control with no label states `.icon-btn-square`, which pins both axes to
+  `--ds-control-size` (28px). `.icon-btn` on its own takes its width from its
+  glyph plus 8px of side padding — right for a label-driven pill, wrong for a
+  control that carries no label — which is why the sidebar collapse control, the
+  conversation topbar toggle, and the composer's add/enhance/undo controls all
+  render the same 28px square target as the topbar and work-panel actions
+  instead of a wider-than-tall pill.
 - `BrandLogo` imports the renderer-sized marks derived from the canonical
   masters through Vite: `src/assets/brand/logo-light.png` for light mode and
   `src/assets/brand/logo-dark.png` for dark mode (192x192, covering the 64 px
@@ -825,10 +852,20 @@ tab. The `+` button sits outside the scroller and remains visible when tabs
 overflow. Clicking it creates and activates a unique New launcher tab. The
 launcher body contains host-owned Review followed by every in-scope
 `contributes.views` entry as buttons; Files and Browser are not hardcoded in
-the renderer (ADR 0104). The header reserves a tokenized 60px right-side safe
-lane for the viewport-fixed work-panel toggle. The `+` trigger also sits in a
-separated action rail, so it keeps a distinct hit target with at least 24px of
-visual gap on every supported platform.
+the renderer (ADR 0104). The header reserves a tokenized 44px right-side safe
+lane for the viewport-fixed work-panel toggle: the 28px control, its 12px
+viewport inset, and the header's own 4px control gap
+(`--ds-work-panel-control-gap`). That one gap spaces the whole row — the tab
+strip to the action group, `+` to maximize, and maximize to the viewport-fixed
+toggle — so the three panel buttons read as one group instead of a rail behind
+a divider. Because maximize sits between them, the `+` trigger still keeps a
+distinct hit target with more than 24px of visual gap on every supported
+platform. All three are the same control as every other chrome icon: 28px
+square with a transparent seat, so the header reads as quiet icons rather than
+filled squares. `+` and maximize take their geometry and hover wash from the
+shared chrome-control group in `chrome.css`, not from a rule of their own, and
+the viewport-fixed toggle's `aria-pressed` state changes ink and glyph only —
+never a background or a raised shadow.
 
 With no resource the body remains open and becomes a concise **New** launcher.
 An explicit New tab uses the same data-driven tool list, so selecting a row

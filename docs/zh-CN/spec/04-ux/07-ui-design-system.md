@@ -464,13 +464,21 @@ WebKit 与 Chromium 会忽略伪元素，该表面退回为常显的原生滚动
 
 工具栏行为 46 像素。 macOS 将交通信号灯放置在 `{x:16,y:16}` 处并保持
 展开侧边栏的折叠侧边栏图标按钮右对齐
-在同一行。 macOS 行省略侧边栏 logo/title，保留 `76px`
+在同一行。 macOS 行省略侧边栏 logo/title，保留 `88px`
 在窗口模式下的本机 chrome 左侧，并回收该填充
-全屏。 Windows/Linux 将身份和侧边栏操作保留在第一位置
+全屏。 该预留量是共享 token `--ds-window-lead-inset` —— 灯簇 `76px` 右缘
+（与主进程放置按钮所用的是同一份 `@pi-desktop/shared` 几何）加 `12px` 留白。
+Windows/Linux 将身份和侧边栏操作保留在第一位置
 行并为三个无框窗口控件保留最右边的 112px。每个
 control 拥有 46px 高保留带的全部份额。展开的工作面板标题使用可横向滚动的
 标签条和固定 `+` 入口，每个标签拥有自己的关闭操作，避免在 Windows 原生
-关闭控件旁重复第二个 `×`。主要、设置和
+关闭控件旁重复第二个 `×`。头部的 `+`、最大化与视口固定的折叠开关共用同一
+个控制间距（`--ds-work-panel-control-gap`，4px）：标签条到动作组、`+` 到
+最大化，以及动作组到开关的车道预留（`calc(size + inset + gap)`，44px）。
+动作组不再有自己的分隔线、内缩或外边距，因此这三个按钮读作一组。三者都是共享的
+chrome 图标控件：28px 方形、透明底座、指针悬停时显示语义化淡色、禁用时变暗，
+因此 `+`、最大化与折叠开关保持安静的图标形态，而不是填充或抬升的方块；开关的
+`aria-pressed` 状态只改变图形与墨色。主要、设置和
 工作面板拖动区域必须在此保留之前终止，而不是
 重叠它并仅依赖于后代 `no-drag`，因此每个可见控件
 像素仍然可点击。终止是几何意义上的：区域在元素的
@@ -939,8 +947,17 @@ Linux 保留淡入淡出和滑动退出。
 - 面板 open/collapse/final 关闭和分隔符提交更新已提交
   首选宽度。本机边缘调整窗口大小并重排 MainChat。
 - 预览模式是临时的 shell 状态：卸载 MainChat，工作面板填充侧边栏之外的客户区。
-  窗口级 46px chrome 行保留拖动区域、新建任务、侧边栏和本机窗口控件。
-  侧边栏折叠时，macOS 窗口模式左侧预留 76px，全屏预留 8px 给交通灯。
+  The 46px chrome row retains shell and native controls but declares neither
+  drag nor no-drag across the panel and passes pointer events through outside
+  controls. The panel header alone owns dragging in the preview pane. Its
+  border box excludes shell actions plus an 8px gap in both sidebar states on
+  every platform. The left inset is 8px except collapsed-sidebar windowed macOS
+  (88px through `--ds-window-lead-inset`: the shared 76px native cluster edge
+  plus 12px, from the same `@pi-desktop/shared` geometry used by main).
+  The expanded action lane uses the shared 28px control size plus 8px; the
+  collapsed lane uses two controls, 4px spacing and an 8px gap.
+  Right native-control exclusion is unchanged. Header-height background
+  paint fills the excluded lane without covering panel controls.
 - 外层外壳在每个平台上都保留原生边缘/角落调整大小。无边框标题栏的
   拖动区域不会替代操作系统的调整大小所有权。300ms 的稳定边界等待窗口
   可避免恢复逻辑与慢速指针手势竞争，原生调整大小/移动事件停止 600ms 后
@@ -958,7 +975,13 @@ Linux 保留淡入淡出和滑动退出。
 | 小学 | px-3 py-1.5 | 32像素 | 短信-sm 500 | 半径-sm | 无 | 口音 |
 | 中学 | px-3 py-1.5 | 32像素 | 短信-sm 400 | 半径-sm | 无（D297） | `--ds-tile`，悬停 `--ds-tile-hover` |
 | 幽灵 | px-2 py-1 | 28像素 | 短信-sm 400 | 半径-sm | 无 | 透明 |
+| 仅图标 | 无 | 28px | — | radius-full | 无 | 透明；`.icon-btn-square` 把宽度固定到 `--ds-control-size` |
 | 危险 | px-3 py-1.5 | 32像素 | 短信-sm 500 | 半径-sm | 无 | 错误 |
+
+仅图标的控件声明 `.icon-btn-square`。单独的 `.icon-btn` 宽度来自内容 —— 图形加左右各 8px
+内边距 —— 这是带文字的胶囊按钮想要的，而不是没有文字的控件该继承的。该变体把两个轴都固定
+到 `--ds-control-size`（28px），保留 `flex: 0 0` 以免拥挤的工具条把它压扁，并去掉侧向内边距
+（在全局 `border-box` 下，那会给 15px 的图形只留 12px 内容区）。
 
 ### 11. 2 输入/文本区域
 

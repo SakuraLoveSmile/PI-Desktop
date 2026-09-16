@@ -1385,7 +1385,7 @@ identify the platform validation still needed.
   band renders instead (no chat top-bar controls) while retaining the same
   surface and alignment. The bar is draggable to move the window; interactive
   controls do not start a window drag.
-  macOS leaves the left ~76px clear for traffic lights only while the sidebar is
+  macOS leaves the left 88px clear for traffic lights only while the sidebar is
   collapsed (8px in fullscreen); Windows/Linux leave the right 120px clear for
   native window controls.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2 Topbar)
@@ -6942,11 +6942,13 @@ identify the platform validation still needed.
   1. Load the plugin as a development plugin. Confirm the Plugins page shows a
      work-panel-views capability badge.
   2. Press `Cmd/Ctrl + J` to reveal the work panel, then click `+` to create a
-     New launcher tab. Confirm the fixed `+` trigger and the viewport-fixed
-     work-panel toggle have separate, non-overlapping hit regions with at least
-     24px of visual gap. Confirm the launcher lists the built-in Review row and
-     the plugin view's localized title and icon (or a lettered tile if the
-     manifest names an unknown token).
+     New launcher tab. Confirm the fixed `+` trigger, the maximize control, and
+     the viewport-fixed work-panel toggle resolve to one button group — one
+     4px control gap, no divider between maximize and the toggle — while the
+     `+` trigger and the toggle stay separate, non-overlapping hit regions with
+     more than 24px of visual gap. Confirm the launcher lists the built-in
+     Review row and the plugin view's localized title and icon (or a lettered
+     tile if the manifest names an unknown token).
   3. Activate the plugin row. Confirm the plugin's page renders inside the panel body
      with no window-control capsule and no reserved 46px band, and that its
      button reaches the host toast.
@@ -11933,7 +11935,16 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   4. Close the work panel and confirm the sidebar returns; repeat after
      manually collapsing the sidebar.
   5. Repeat divider changes with `ArrowLeft`, `ArrowRight`, `Home`, and `End`.
-- **Expected**: The native window width never changes. MainChat never measures
+  6. Navigate to the real Plugins, Pull requests, and Scheduled routes with the
+     work panel closed, then collapse the sidebar. In light and dark themes,
+     measure both titlebar actions and compare their rest/hover styling with the
+     shared work-panel toggle. Reopen the sidebar, collapse it again, and use
+     New Task to return to an editable chat composer on each route.
+- **Expected**: The ordinary `.main-titlebar` actions (without a preview chrome
+  ancestor) render as centered 28px square targets, with the shared transparent
+  rest surface, secondary ink, radius, and semantic hover wash/primary ink.
+  Hover does not change geometry; sidebar and New Task actions remain usable.
+  The native window width never changes. MainChat never measures
   below 450px — including mid-drag and while `sidebar-out` still occupies flex
   space. The effective panel maximum is the client width minus the 450px
   MainChat floor and the expanded sidebar width, with no fixed pixel cap. When that
@@ -11941,7 +11952,13 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   may keep growing afterwards. A manual reopen spends panel width first;
   MainChat is preserved where possible and otherwise lands on the 460px reopen
   target. Closing the panel restores only a sidebar the layout collapsed. The
-  separator's ARIA minimum/maximum follow the same dynamic budget.
+  separator's ARIA minimum/maximum follow the same dynamic budget. The panel
+  header's `+`, maximize, and viewport-fixed collapse toggle resolve to a single
+  control gap (`--ds-work-panel-control-gap`) with no divider, inset, or margin
+  of the action group's own, and all three are the shared chrome icon control:
+  28px square on a transparent seat with only a semantic hover wash, so the
+  header shows quiet icons rather than filled or raised squares. The collapse
+  toggle's open state changes its glyph and ink only.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §1 and §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238
@@ -11950,7 +11967,14 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Status**: Automated (`scripts/e2e-three-column-layout.mjs` via
   `pnpm test:e2e:layout` — fixed-window width invariance, the 450px floor across
   a pointer drag, the unfolded composer row at that floor, sidebar
-  yield/restore, the 460px reopen target, and preview mode); unit coverage in
+  yield/restore, the 460px reopen target, the panel action group's shared
+  control gap, preview mode, and ordinary Plugins/Pull requests/Scheduled titlebar
+  geometry, light/dark rest/hover styles, and sidebar/New Task DOM actions).
+  Source contracts in `chrome-control-geometry.test.mjs` also cover the shared
+  disabled state and panel controls' transparent seat; the panel surface still
+  needs the eyes-on pass above. DOM/CDP checks establish renderer behavior, not
+  native Windows/Linux hit testing; native platform checks remain separate.
+  Unit coverage in
   `work-panel-resize.test.mjs`
 
 #### E2E-LAYOUT-work-panel-maximize
@@ -11959,7 +11983,15 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   1. Note the current panel width. If the sidebar is expanded, collapse it;
      then click the panel header's `+` action to open a real work-panel tab.
   2. Click the panel header's preview toggle.
-  3. Inspect the shell and tab alignment, then click the toggle again.
+  3. Inspect the header border box and tab alignment with the sidebar collapsed
+     and expanded on macOS windowed/fullscreen and Windows/Linux. Confirm the
+     overlay row and spacer declare neither drag nor no-drag and do not cover
+     the panel controls with opaque paint.
+  4. Using native pointer input, click the centers and edges of sidebar and
+     New Task controls; confirm sidebar toggles and New Task exits preview to
+     an editable composer. Reenter preview, operate tabs, close, add, restore,
+     panel toggle and native controls, then drag empty header space and confirm
+     the native window moves. Repeat in light/dark themes and both sidebar states.
 - **Expected**: Entering preview mode stops rendering MainChat and hands its
   width to the panel, so the panel spans the client area minus the expanded
   sidebar (the whole client area when the sidebar is collapsed). The native
@@ -11968,17 +12000,27 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   keeps whatever sidebar state the user chose last. The mode is transient: it is
   not persisted and ends when the panel closes. Preview mode keeps the shell's
   new-task, sidebar, and system-window actions reachable while MainChat is
-  absent. On non-fullscreen macOS with the sidebar collapsed, the first preview
-  action starts at the 76px traffic-light safe inset. After opening a real work
-  panel tab, its first tab starts at least 8px to the right of the preview action
-  group; fullscreen uses the 8px native inset but retains that action lane.
+  absent. The panel header is the sole drag owner in the preview pane. Its
+  actual border box and first tab start at least 8px after the shell actions,
+  including expanded-sidebar New Task, on every platform. Left inset is 8px
+  except collapsed-sidebar windowed macOS (88px). The preview row renders the
+  shared `--ds-window-lead-inset` (76px native cluster edge plus a 12px gap)
+  as its own left padding; the check reads the resolved padding rather than
+  restating the number. Fullscreen retains the action lane with an 8px inset.
+  The right native-control border exclusion remains intact. Controls receive
+  native clicks without moving the window; empty header space still drags it.
+  Header-height background paint fills the excluded lane without hiding controls.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238 §6, issue #289
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: Post-M6 desktop shell maintenance
-- **Status**: Automated (`scripts/e2e-three-column-layout.mjs` — preview mode
-  entry/exit widths, MainChat unmount, and window invariance)
+- **Status**: Partially automated (`scripts/e2e-three-column-layout.mjs` —
+  preview entry/exit, DOM action behavior, header border-box exclusion, row/spacer
+  drag ownership, and all-platform/fullscreen CSS fixtures in both sidebar
+  states). DOM clicks and CDP input are not native hit-test proof; native pointer,
+  window-drag and visual checks remain required on each platform. Branch runs
+  are exploratory and do not satisfy the integrated-main gate.
 
 #### E2E-AGENT-alt-enter-steers-active-turn: Enter follows up and Alt+Enter steers the active turn
 

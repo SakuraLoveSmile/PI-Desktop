@@ -600,8 +600,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
   侧边栏控件的重复）。在所有其他路线上均采用无框拖曳
   band 会改为渲染（没有顶栏控件）。该栏可拖动以移动
   窗户；交互式控件不会启动窗口拖动。
-  macOS 仅在侧边栏打开时为交通灯保留左侧约 76px 的空间
-  折叠（全屏 8 像素）； Windows/Linux 将右侧 112px 留空
+  macOS 仅在侧边栏折叠时为交通灯保留左侧 88px 的空间
+  （全屏 8 像素）； Windows/Linux 将右侧 112px 留空
   本机窗口控件。
 - **链接规格**：`04-ux/08-component-spec.md`（§2 顶栏）
 - **验收**：C (send/UI)，质量
@@ -2023,8 +2023,10 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   被取代的成功不能带来陈旧的表现。没有过渡产生
   第二次调整大小或位置漂移。
   预览模式隐藏 MainChat，并将客户区宽度交给面板；本机窗口尺寸不变，分隔线不可操作。
-  预览外壳仍保留新建任务、侧边栏和系统窗口操作。macOS 非全屏且侧边栏折叠时，左侧第一个预览操作从
-  76px 交通灯安全内缩之后开始；全屏时恢复原始内边距。
+  预览外壳仍保留新建任务、侧边栏和系统窗口操作。macOS 非全屏且侧边栏折叠时，预览行把交通灯引导内缩
+  （`--ds-window-lead-inset`，即灯簇右缘 76px 加 12px 间隙，共 88px）作为自身的左内边距渲染出来，
+  左侧第一个预览操作从该渲染值起或之后开始；检查读取的是解析后的内边距，而不是重述这个数字。
+  打开真实工作面板标签后，其第一个标签从预览操作组右侧至少 8px 处开始；全屏时使用 8px 原生内缩但保留该操作带。
   以前的上下文面板覆盖不再存在。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`、`04-ux/01-ui-ia.md`、
   `04-ux/07-ui-design-system.md`、`04-ux/08-component-spec.md`、
@@ -7217,11 +7219,54 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   3. 在布局收起左栏后手动重开左栏。
   4. 关闭工作面板并确认左栏恢复；再在手动收起左栏后重复一次。
   5. 用 `ArrowLeft`、`ArrowRight`、`Home`、`End` 重复调整分隔线。
+  6. Navigate to the real Plugins, Pull requests, and Scheduled routes with the
+     work panel closed, then collapse the sidebar. In light and dark themes,
+     measure both titlebar actions and compare their rest/hover styling with the
+     shared work-panel toggle. Reopen the sidebar, collapse it again, and use
+     New Task to return to an editable chat composer on each route.
+- **Route chrome expected**: The ordinary `.main-titlebar` actions (without a
+  preview chrome ancestor) render as centered 28px square targets with the shared
+  transparent rest surface, secondary ink, radius, and semantic hover wash/primary
+  ink. Hover does not change geometry; sidebar and New Task remain usable.
+  Automated by `pnpm test:e2e:layout` using real route components and DOM/CDP
+  interaction. This is renderer evidence, not native Windows/Linux hit-test proof.
 - **预期**：原生窗口宽度全程不变。MainChat 永不低于 360px —— 包含拖动过程中以及 `sidebar-out` 仍占位弹性空间期间。工作面板有效上限为客户端宽度减去 360px 下限与展开的左栏宽度，且无固定像素上限。预算耗尽时展开的左栏立即收起，面板之后仍可继续增长。手动重开优先占用右栏宽度；能保住当前 MainChat 则保持，否则落在 370px 的重开目标。关闭面板只恢复由布局机制收起的左栏。分隔线的 ARIA 最小/最大值遵循同一动态预算。
 - **链接规格**：`04-ux/01-ui-ia.md`、`04-ux/07-ui-design-system.md` §10、`04-ux/08-component-spec.md` §1 与 §5、`04-ux/09-interaction-patterns.md` §8、ADR 0238
 - **验收**：F（持久化）、品质
 - **里程碑**：M6 之后的桌面外壳维护
 - **状态**：已自动化（`scripts/e2e-three-column-layout.mjs`，经 `pnpm test:e2e:layout` —— 固定窗口宽度不变、指针拖动全程 360px 下限、左栏让位/恢复、370px 重开目标）；单元覆盖见 `work-panel-resize.test.mjs`
+
+#### E2E-LAYOUT-work-panel-maximize
+
+- **Preconditions**: A desktop session has an open work panel with a real tab.
+- **Steps**:
+  1. Record the panel width and enter preview mode.
+  2. Inspect the header border box with the sidebar collapsed and expanded on
+     macOS windowed/fullscreen and Windows/Linux. Check row/spacer drag ownership.
+  3. With native pointer input, click centers and edges of sidebar and New Task
+     controls. Reenter preview and operate tabs, close, add, restore, panel toggle
+     and native controls. Drag empty header space. Repeat in light/dark themes.
+- **Expected**: MainChat is absent while preview fills the client area beside
+  the sidebar; native bounds and persisted preferred width are unchanged, the
+  divider is inert, and restore retains the last chosen sidebar state. The row
+  and spacer declare neither drag nor no-drag and pass pointer events through
+  outside controls. The panel header is the sole drag owner in the preview pane;
+  its border box and first tab start at least 8px after shell actions, including
+  expanded-sidebar New Task. Left inset is 8px except collapsed-sidebar windowed
+  macOS (88px through the shared lead-inset token); checks read resolved row
+  padding rather than duplicating native geometry. Right exclusion is unchanged. Controls receive
+  native clicks without window movement; empty-header drags move the window.
+  New Task exits preview to an editable composer. Header-height paint fills the
+  excluded lane without hiding panel controls.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
+  `04-ux/08-component-spec.md` §5, `04-ux/09-interaction-patterns.md` §8, ADR 0238
+- **Acceptance**: F (persistence), Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Partially automated by `scripts/e2e-three-column-layout.mjs`
+  (preview entry/exit, DOM action behavior, header border-box exclusion,
+  row/spacer ownership, all-platform/fullscreen CSS fixtures in both sidebar
+  states). DOM/CDP clicks are not native hit-test proof. Native pointer, drag
+  and visual checks remain required; branch runs are exploratory only.
 
 #### E2E-AGENT-alt-enter-steers-active-turn：Enter 排队跟进，Alt+Enter 向当前回合补充指令
 

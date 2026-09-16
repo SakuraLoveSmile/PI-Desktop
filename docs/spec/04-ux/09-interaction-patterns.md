@@ -1013,9 +1013,14 @@ Work-panel and application-window resizing are implemented in MVP:
 
 - Preview mode unmounts MainChat and lets the work panel fill the client area
   beside the sidebar. A window-level 46px chrome row keeps New Task, sidebar,
-  and native window controls available. In collapsed-sidebar macOS preview, the
-  panel header reserves the 76px windowed (8px fullscreen) traffic-light inset,
-  the preview action lane, and an 8px gap before its first tab.
+  and native window controls available through a pointer-transparent row that
+  declares neither drag nor no-drag across the panel. The panel header's drag
+  border box starts after the shell actions plus an 8px gap, including expanded
+  sidebar New Task. All platforms use an 8px left inset, except collapsed-sidebar
+  windowed macOS (88px). That reserve uses `--ds-window-lead-inset`: the
+  traffic-light cluster's 76px right edge (from `@pi-desktop/shared`) plus 12px.
+  Native pointer clicks must operate the controls and dragging empty header
+  space must move the window; DOM/CDP clicks alone do not establish native hit testing.
 
 The expanded sidebar is fixed at 275px. Collapse/open changes only whether the
 column is present; the historical resize handle is hidden and legacy width
