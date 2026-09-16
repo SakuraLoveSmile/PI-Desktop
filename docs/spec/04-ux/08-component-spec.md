@@ -272,11 +272,15 @@ combined model × reasoning selection (§11).
   native drag rectangle is the border box. The control band continues the
   titlebar's `border-subtle` bottom rule and uses the same token for its
   leading divider.
-- Every chrome icon control is one 28px square (`--ds-work-panel-toggle-size`):
-  the topbar's dock toggle, the viewport-fixed work-panel toggle, and the
-  preview/route-band lane actions. The lane's two actions match their siblings
-  instead of rendering at a size of their own, and the panel header's lane
-  reserve is derived from that same control size rather than from a literal.
+- Every chrome icon control is one 28px square (`--ds-work-panel-toggle-size`)
+  with one transparent seat: the topbar's dock toggle, the viewport-fixed
+  work-panel toggle, the preview/route-band lane actions, and the work-panel
+  header's `+` and maximize/restore controls. A control matches its siblings
+  instead of rendering at a size or on a surface of its own, so the icon alone
+  carries it until the semantic hover wash paints a surface. The panel header's
+  lane reserve is derived from that same control size rather than from a
+  literal, and the toggle's open state is its glyph swap plus the engaged ink —
+  no control in this family paints a filled or raised "on" pill.
 - Band reservation is platform-independent (D269). The band is opaque and
   absolutely positioned, so scrolling route content passes underneath it on
   every platform, macOS included. Every route surface that starts its own
@@ -852,7 +856,12 @@ strip to the action group, `+` to maximize, and maximize to the viewport-fixed
 toggle — so the three panel buttons read as one group instead of a rail behind
 a divider. Because maximize sits between them, the `+` trigger still keeps a
 distinct hit target with more than 24px of visual gap on every supported
-platform.
+platform. All three are the same control as every other chrome icon: 28px
+square with a transparent seat, so the header reads as quiet icons rather than
+filled squares. `+` and maximize take their geometry and hover wash from the
+shared chrome-control group in `chrome.css`, not from a rule of their own, and
+the viewport-fixed toggle's `aria-pressed` state changes ink and glyph only —
+never a background or a raised shadow.
 
 With no resource the body remains open and becomes a concise **New** launcher.
 An explicit New tab uses the same data-driven tool list, so selecting a row

@@ -12208,7 +12208,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   separator's ARIA minimum/maximum follow the same dynamic budget. The panel
   header's `+`, maximize, and viewport-fixed collapse toggle resolve to a single
   control gap (`--ds-work-panel-control-gap`) with no divider, inset, or margin
-  of the action group's own.
+  of the action group's own, and all three are the shared chrome icon control:
+  28px square on a transparent seat with only a semantic hover wash, so the
+  header shows quiet icons rather than filled or raised squares. The collapse
+  toggle's open state changes its glyph and ink only.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §10,
   `04-ux/08-component-spec.md` §1 and §5, `04-ux/09-interaction-patterns.md` §8,
   ADR 0238
@@ -12218,7 +12221,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   `pnpm test:e2e:layout` — fixed-window width invariance, the 450px floor across
   a pointer drag, the unfolded composer row at that floor, sidebar
   yield/restore, the 460px reopen target, the panel action group's shared
-  control gap, and preview mode); unit coverage in
+  control gap, and preview mode). The panel controls' transparent seat is pinned
+  by the source contracts in `chrome-control-geometry.test.mjs`; the rendered
+  surface needs the eyes-on pass above. Unit coverage in
   `work-panel-resize.test.mjs`
 
 #### E2E-LAYOUT-work-panel-maximize

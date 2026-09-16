@@ -4243,3 +4243,11 @@ the retained upstream work-panel lifecycle. See
 - 现在整行由同一个 token 控制间距。`--ds-work-panel-control-gap: 4px` 取代了 `--ds-work-panel-toggle-gap`，同时是头部的 flex 间距（标签条到动作组）、`.work-panel-actions` 的间距（`+` 到最大化），以及头部右侧内边距以 `calc(size + inset + control-gap)`（44px）形式花费的、动作组到固定折叠开关的间距。`.work-panel-actions` 只声明间距：分隔线、内缩与外边距都已移除。
 - 车道仍然为整个开关预留空间，`+` 触发按钮在车道内与开关之间仍有 36px（4px + 28px 的最大化控件 + 4px），因此 `WORK_PANEL_HEADER_PROBE` 的 24px 断言与 E2E-152 的命中区域契约依然成立。
 - 仅渲染层：无协议、存储、宿主、权限或迁移改动，也没有新增默认值。见 `04-ux/08-component-spec.md` §5.2、`04-ux/07-ui-design-system.md` §4.3 与 E2E-LAYOUT-three-column-width-priority。
+
+## 2026-09-16 —— 工作面板的控件是安静的图标，而不是填充的底座
+
+- 工作面板头部的 `+` 与最大化控件此前各有一个 `--ds-tile` 底座，视口固定的折叠开关在 `aria-pressed="true"` 时又叠加 `--ds-tile-deep` 与 `--ds-raised-shadow`。在浅色主题下，这一行三个 28px 控件读起来就是三个填充方块，开关更像一颗悬浮在面板头部之上的抬升圆形胶囊 —— 与旁边左上角的侧边栏开关、新任务控件完全不是同一种语言。
+- `+` 与最大化现在加入 `chrome.css` 中的共享 chrome 控件组 —— 也就是为顶栏侧边栏开关、视口固定的面板开关与预览态/路由带动作组提供底座的同一条规则 —— 因此它们共用一套几何（28px 方形、`--radius-md`、`flex: 0 0`）、同一个透明底座、指针悬停时的语义化 `--ds-bg-hover` 淡色，以及 `opacity: 0.4` 的禁用状态。它们在 `work-panel.css` 中重复的规则已删除，该分部只保留动作组的间距。
+- 开关的按下状态去掉填充与抬升阴影，保留被激活的墨色，因此打开状态就是图形切换加 `--ds-text-primary`。`aria-pressed` 仍向辅助技术传达状态，`.app-work-panel-toggle` 继续拥有视口固定定位与 `no-drag` 排除区。
+- 键盘焦点不变：全局 `:focus-visible` 轮廓与其他 chrome 图标控件一致地生效，因此移除已废弃的 `:focus-visible` 背景淡色不会损失任何焦点提示。
+- 仅渲染层：几何、间距、内缩、协议、存储、宿主、权限与迁移均无改动，也没有新增 token。见 `04-ux/08-component-spec.md` §2.3 与 §5.2、`04-ux/07-ui-design-system.md` §4.3 与 E2E-LAYOUT-three-column-width-priority。
