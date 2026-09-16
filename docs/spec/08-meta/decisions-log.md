@@ -5736,6 +5736,29 @@ that was sitting at the bottom — including after the turn had finished.
   `04-ux/11-asktool-question-card.md`, `04-ux/07-ui-design-system.md` §6.4, and
   E2E-078.
 
+## 2026-09-17 — A git checkout is a Create project source (D438)
+
+- The Create project dialog only collected a project name and local folders
+  (ADR 0233), and the home switcher's Clone git project entry renders inside the
+  hero of a project-bound session. A fresh installation therefore had to open an
+  unrelated local folder before any repository could be cloned.
+- The dialog now owns a source selector with two equal peers: This computer and
+  Git repository. The git source keeps the one name field (seeded from the
+  repository name until the user types), adds a repository URL field and one
+  clone destination row, and parses URLs with the switcher's `parseGitCloneUrl`
+  rules, so private, loopback, link-local, credential-bearing, and malformed
+  remotes keep Create disabled (ADR 0247).
+- Main exposes additive `project/cloneCheckout({ url, parentPath })`: it clones
+  into the explicit parent folder and returns `{ path, name }` without touching
+  the active workspace and without opening a picker. `project/clone` keeps its
+  native-picker behavior for the home switcher.
+- Project creation is unchanged: both sources call one project-slice helper,
+  `project-group/create` still writes the only durable record, and a checkout
+  becomes the primary root of the same logical group (ADR 0233).
+- Renderer plus one narrow main-process capability: no protocol, schema, host
+  RPC, permission, storage, or preference change. See ADR 0273,
+  `03-runtime/01-ipc-protocol.md` §9, `04-ux/08-component-spec.md`, and E2E-258.
+
 ## 2026-09-16 — Draggable chat content width (D439)
 
 - The centered conversation band, empty-home stack, and composer share one
@@ -5747,5 +5770,5 @@ that was sitting at the bottom — including after the turn had finished.
   so a squeezed sidebar or work panel compresses the band without rewriting
   the preference. The collapsed-sidebar 640px ceiling is removed.
 - Assistant, tool, and decision rows follow the band. User plates stay
-  `min(82%, 600px)`. Renderer only. See ADR 0273, E2E-208, and
+  `min(82%, 600px)`. Renderer only. See ADR 0274, E2E-208, and
   E2E-CHAT-content-width-handles.

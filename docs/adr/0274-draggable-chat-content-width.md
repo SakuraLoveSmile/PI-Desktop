@@ -1,4 +1,4 @@
-# ADR 0273: Draggable Chat Content Width
+# ADR 0274: Draggable Chat Content Width
 
 - Status: Accepted
 - Date: 2026-09-16
