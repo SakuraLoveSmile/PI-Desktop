@@ -4510,11 +4510,14 @@ mod tests {
             .expect_err("the named end of a move is required");
         assert_eq!(absent.code, 1002);
 
-        let project =
-            parse_capability_target(&json!({ "to": { "level": "project", "projectPath": "/p" } }), "to")
-                .unwrap();
+        let project = parse_capability_target(
+            &json!({ "to": { "level": "project", "projectPath": "/p" } }),
+            "to",
+        )
+        .unwrap();
         assert_eq!(project.level, CapabilityLevel::Project);
-        let global = parse_capability_target(&json!({ "to": { "level": "global" } }), "to").unwrap();
+        let global =
+            parse_capability_target(&json!({ "to": { "level": "global" } }), "to").unwrap();
         assert_eq!(global.level, CapabilityLevel::Global);
     }
 
