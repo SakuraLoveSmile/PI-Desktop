@@ -1540,8 +1540,8 @@ Single message render — either user (plaintext) or assistant (markdown streami
   selected assistant response, requires an idle source, and leaves that
   source's transcript, live runtime, and provider cache state untouched (D134).
   Edit belongs to the user turn: it swaps the prompt bubble for a focused
-  composer-plate editor (same `--ds-bg-composer` fill, `--ds-composer-radius`,
-  and shadow lift as the bottom composer; no stroke per D297). The textarea is
+  composer-plate editor (same `--ds-bg-composer` fill and `--ds-composer-radius`
+  as the bottom composer; no stroke per D297, no shadow). The textarea is
   unboxed inside that plate; localized Retry and Cancel sit in a 28px footer
   (Escape cancels, Cmd/Ctrl+Enter retries; slash turns seed the typed
   `command` form so retrying re-expands the template). Opening it widens the
