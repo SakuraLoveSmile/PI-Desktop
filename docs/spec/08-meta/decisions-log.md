@@ -5790,3 +5790,38 @@ that was sitting at the bottom — including after the turn had finished.
 - Renderer plus one narrow main-process capability: no protocol, schema, host
   RPC, permission, storage, or preference change. See ADR 0273,
   `03-runtime/01-ipc-protocol.md` §9, `04-ux/08-component-spec.md`, and E2E-258.
+
+## 2026-09-17 — Session and project rows delete on the second click (D441)
+
+- The sidebar's session item and both project menus (sidebar and Projects index)
+  removed the row on the first click of Delete. Every other destructive row
+  action — the settings provider rows, vendor accounts, and the capability
+  tables — arms first and relabels the control, so the two most destructive
+  actions were the only ones that fired on a single click.
+- `hooks/use-armed-delete.ts` now owns that pattern for the whole renderer: one
+  `ARMED_DELETE_MS` (3200ms) expiry and one `useArmedDelete()`. The capability
+  pages keep importing it from `AgentCapabilityLayout`, which re-exports the
+  shared hook instead of holding a second copy with a timeout of its own, so the
+  pattern cannot drift between the settings rows and the two menus.
+- A session item arms on `session.id`; both project menus arm on a
+  `project:`-prefixed key, so a session and a project can never share an arm. An
+  armed item carries `data-armed="true"`, a danger wash, and the label
+  `nav.deleteTaskConfirm` / `project.deleteMenuConfirm` ("Delete?" / "确认删除？")
+  in all eight catalogs. The menu stays open between the two clicks, and an
+  outside press, Escape, or the expiry clears the arm without removing anything.
+- Amends D431 for the idle case: a project whose turn is still live still opens
+  `ProjectDeleteDialog`, which names those sessions and stops them before it
+  deletes, and the host's 1008 / `CONFLICT` refusal is still mapped to
+  `project.deleteRunningBlocked` on both paths. A project with no live turn is
+  removed by the same store action the dialog used, with the same success toast,
+  so its second click is the confirmation the user already gave.
+- The number is D441 because D438 was already claimed twice — by the
+  window-toggle merge (#360, D438 with the D439 rebind) and by the
+  Git-checkout decision (ADR 0273), which this log flags to move to D440.
+  This entry does not rewrite another decision's text.
+- Renderer only: no protocol, storage, host, permission, or migration change,
+  and no new default. The folder on disk is still never touched. See
+  `04-ux/09-interaction-patterns.md`, D421, D431,
+  `06-delivery/04-e2e-test-plan.md`
+  E2E-PROJECT-delete-removes-project-and-owned-sessions, and
+  `apps/desktop/test/two-step-delete.test.mjs`.

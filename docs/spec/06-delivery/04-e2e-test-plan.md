@@ -7474,6 +7474,7 @@ identify the platform validation still needed.
 | D — Workspace (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | F — Persistence (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | Quality (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| Quality (two-click delete) | E2E-SESSION-two-click-delete-arms-first |
 | Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
 | C — Conversation & stream (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
 | E — Tools & permissions (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
@@ -7504,6 +7505,7 @@ identify the platform validation still needed.
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
 | Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| M6+ (Two-click delete) | E2E-SESSION-two-click-delete-arms-first |
 | C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | Quality (model fallback isolation) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | C — Conversation & stream (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
@@ -8115,12 +8117,14 @@ This test plan spec is accepted when:
   active workspace; C a root of a stored two-folder project group.
 - **Steps**: open Settings → Project archive, open A's row menu, choose Delete
   project, and confirm in the dialog. Then repeat the same action from the
-  sidebar project menu for B while B is the active workspace. Then attempt the
-  same action for C, then for a path the host no longer knows, and finally for a
+  sidebar project menu for B while B is the active workspace: the item arms on
+  the first click and only the second click removes B. Then attempt the same
+  action for C, then for a path the host no longer knows, and finally for a
   fourth project D while one of D's tasks is still running.
 - **Expected**: the dialog names the project, states that the project and its
   sessions with their transcripts are removed permanently, and states that the
-  folder on disk is not deleted; nothing is removed before the confirmation.
+  folder on disk is not deleted; nothing is removed before the confirmation, and
+  an armed item that is left alone disarms itself and removes nothing.
   After confirming, the durable project row, that project's sessions, their
   transcripts, scratch and review files, and its durable project memory are
   gone, while the folder on disk is untouched. The deleted project disappears
@@ -8180,6 +8184,31 @@ This test plan spec is accepted when:
   ids, the dialog's running-session line and stop-and-delete label, the abort
   loop running before `deleteProject`, the `CONFLICT` fallback, and the new
   copy in every shipped catalog; the end-to-end journey remains Draft
+
+### E2E-SESSION-two-click-delete-arms-first
+
+- **Preconditions**: a project with one idle session and one running session,
+  both reachable from the sidebar session menu, the sidebar project menu, and
+  the Projects index.
+- **Steps**: open the session menu of the idle session, press Delete once, and
+  leave the item armed until the arm expires before pressing it again to confirm
+  the removal. Repeat for a project row from the sidebar menu and from the
+  Projects index.
+- **Expected**: the first press removes nothing and relabels the item to
+  `nav.deleteTaskConfirm` / `project.deleteMenuConfirm` ("Delete?" / "确认删除？")
+  with `data-armed="true"`; the menu stays open, and an outside press, Escape, or
+  the expiry clears the arm without removing anything. Only the second press
+  removes the session with its transcript and its row, and only the second press
+  on a project row removes an idle project. A session and a project never share
+  an arm. Deleting a project whose turn is live still opens the dialog that names
+  those sessions and stops them (see
+  E2E-PROJECT-delete-running-sessions-are-named-and-stopped).
+- **Specs linked**: `04-ux/09-interaction-patterns.md` §1.6, D421, D431, D441
+- **Acceptance criterion**: Quality
+- **Milestone**: M6+
+- **Status**: Partially automated — `apps/desktop/test/two-step-delete.test.mjs`
+  pins the shared arm and its expiry, both labels in every shipped catalog, and
+  that the first press only arms; the end-to-end journey remains Draft
 ### US-UI-59 Session-rooted background tools
 - Start a visible turn in project A, switch to project B while it runs, and
   inspect both sidebar status indicators.
