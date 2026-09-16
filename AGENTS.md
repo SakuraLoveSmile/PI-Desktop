@@ -1,6 +1,14 @@
 # AGENTS.md
 
+Policy-Sync: 2026-02-16.1
+
 Mandatory rules for AI coding agents working in PI-Desktop.
+
+`CLAUDE.md` is the Claude Code / Claude Cowork entry point and a condensed
+mirror of the non-negotiables in this file. This file is authoritative.
+When you change either file, update the other so the non-negotiables stay
+aligned, and set the same `Policy-Sync:` token in both. The gate is
+`pnpm check:agent-policy` (`scripts/check-agent-policy-sync.mjs`).
 
 PI-Desktop is released software with real users. Treat every change as production maintenance, not prototype work.
 
