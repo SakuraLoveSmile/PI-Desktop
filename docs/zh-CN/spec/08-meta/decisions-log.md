@@ -4236,3 +4236,10 @@ the retained upstream work-panel lifecycle. See
 - Windows 与 Linux 行为不变：`--ds-window-lead-inset` 保持 `0px` 默认值，这两个平台仍使用右侧 120px 带内由渲染层绘制的控件。插件面板窗口创建的是普通无框架 `BrowserWindow`，没有原生交通灯，因此不受影响。
 - 仅渲染层 + 共享常量：无协议、存储、宿主、权限或迁移改动，也没有新增默认值。
 - 见 `04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md` 与 E2E-LAYOUT-three-column-width-priority。
+
+## 2026-09-16 —— 工作面板头部的按钮现在是一组
+
+- 工作面板头部此前读起来是两簇：头部内部的动作组（`+` 与最大化，相距 4px），以及头部之外视口固定的折叠开关。它们之间的分隔由 `.work-panel-actions` 上的四条声明叠加而成 —— `margin-right: 8px`、`padding-right: 8px`、1px 的 `--ds-border-subtle` 分隔线，以及另一个车道 token `--ds-work-panel-toggle-gap: 20px` —— 实际间距 37px 外加一条细线，于是同一个 46px 行内同样的三个 28px 方块看起来像两簇毫不相干的控件。
+- 现在整行由同一个 token 控制间距。`--ds-work-panel-control-gap: 4px` 取代了 `--ds-work-panel-toggle-gap`，同时是头部的 flex 间距（标签条到动作组）、`.work-panel-actions` 的间距（`+` 到最大化），以及头部右侧内边距以 `calc(size + inset + control-gap)`（44px）形式花费的、动作组到固定折叠开关的间距。`.work-panel-actions` 只声明间距：分隔线、内缩与外边距都已移除。
+- 车道仍然为整个开关预留空间，`+` 触发按钮在车道内与开关之间仍有 36px（4px + 28px 的最大化控件 + 4px），因此 `WORK_PANEL_HEADER_PROBE` 的 24px 断言与 E2E-152 的命中区域契约依然成立。
+- 仅渲染层：无协议、存储、宿主、权限或迁移改动，也没有新增默认值。见 `04-ux/08-component-spec.md` §5.2、`04-ux/07-ui-design-system.md` §4.3 与 E2E-LAYOUT-three-column-width-priority。

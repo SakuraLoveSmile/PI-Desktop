@@ -5521,3 +5521,28 @@ that was sitting at the bottom — including after the turn had finished.
   migration change, and no new default.
 - See `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`, and
   E2E-LAYOUT-three-column-width-priority.
+
+## 2026-09-16 — The work-panel header's buttons are one group
+
+- The work-panel header read as two clusters: the action group inside the header
+  (`+` and maximize, 4px apart) and the viewport-fixed collapse toggle outside
+  it. The separator between them was compounded from four declarations on
+  `.work-panel-actions` — `margin-right: 8px`, `padding-right: 8px`, a 1px
+  `--ds-border-subtle` divider, and a separate `--ds-work-panel-toggle-gap: 20px`
+  lane token — for a real 37px gap plus a hairline rule, so the same three
+  28px squares in the same 46px row looked like two unrelated clusters.
+- One token now spaces the whole row. `--ds-work-panel-control-gap: 4px`
+  replaces `--ds-work-panel-toggle-gap` and is the header's flex gap (tab strip
+  to action group), the `.work-panel-actions` gap (`+` to maximize), and — spent
+  by the header's right padding as
+  `calc(size + inset + control-gap)`, 44px — the gap from the action group to
+  the fixed collapse toggle. `.work-panel-actions` states spacing only: the
+  divider, inset, and margin are gone.
+- The lane still reserves the whole toggle, and the `+` trigger still clears the
+  toggle by 36px inside the lane (4px + the 28px maximize control + 4px), so the
+  `WORK_PANEL_HEADER_PROBE` 24px assertion and E2E-152's hit-region contract
+  still hold.
+- Renderer only: no protocol, storage, host, permission, or migration change,
+  and no new default. See `04-ux/08-component-spec.md` §5.2,
+  `04-ux/07-ui-design-system.md` §4.3, and
+  E2E-LAYOUT-three-column-width-priority.

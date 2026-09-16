@@ -94,8 +94,10 @@ destination, chat as the home surface, tools and permissions inline.
   the viewport-fixed toggle, or `Cmd/Ctrl + J`. File, URL, browser-preview, and
   successful workspace-edit artifacts create their resources atomically. The
   46px content header exposes a tablist and a fixed `+` trigger. Its tokenized
-  60px right-side safe lane plus separated action rail keep the trigger distinct
-  from the viewport-fixed work-panel toggle. Clicking `+` creates and activates
+  44px right-side safe lane (the 28px control, its 12px viewport inset, and the
+  header's 4px control gap) keeps the `+`, maximize, and viewport-fixed
+  work-panel toggle one button group, spaced by that same gap, while the trigger
+  keeps a distinct hit target. Clicking `+` creates and activates
   a unique New launcher tab; its body presents the same data-driven Review and
   plugin-view rows as buttons, so the user chooses a destination in the page
   instead of opening a dropdown. Selecting a row replaces that launcher tab with
