@@ -554,6 +554,14 @@ sklm: {
       dnsHint:
         "That check resolves the host locally, while the download itself would use your proxy. If you use a proxy, a VPN, or a custom DNS setup, check Settings → General → Network.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "Your proxy answered the catalog sources with fake-IP addresses — showing built-in picks",
+      previewFakeIpError:
+        "Your proxy resolved this host to a fake-IP address, so the app's address check refused it — nothing was installed.",
+      fakeIpHint:
+        "Your proxy answered {{host}} with {{address}} — a reserved benchmark range that proxies use as a fake-IP placeholder, not the source's real address. Switch the proxy to system-proxy mode, or check Settings → General → Network.",
+      fakeIpHintPlain:
+        "A local proxy resolved this host to a fake-IP placeholder in a reserved range, not to the source's real address. Switch the proxy to system-proxy mode, or check Settings → General → Network.",
       remoteErrorQuery: "Could not query the skill market — showing built-in picks",
       remotePartial: "Some catalog sources are unavailable ({{names}})",
     },

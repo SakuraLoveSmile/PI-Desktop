@@ -547,6 +547,14 @@ sklm: {
       dnsHint:
         "Esa comprobación resuelve el host localmente, mientras que la descarga usaría tu proxy. Si usas un proxy, una VPN o una configuración de DNS propia, revisa Ajustes → General → Red.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "Tu proxy respondió con direcciones fake-IP para las fuentes del catálogo: se muestran las selecciones integradas",
+      previewFakeIpError:
+        "Tu proxy resolvió este host a una dirección fake-IP, así que la comprobación de direcciones de la aplicación lo rechazó: no se instaló nada.",
+      fakeIpHint:
+        "Tu proxy respondió {{host}} con {{address}}, un rango de referencia reservado que los proxys usan como marcador fake-IP, no la dirección real de la fuente. Cambia el proxy al modo de proxy del sistema o revisa Ajustes → General → Red.",
+      fakeIpHintPlain:
+        "Un proxy local resolvió este host a un marcador fake-IP en un rango reservado, no a la dirección real de la fuente. Cambia el proxy al modo de proxy del sistema o revisa Ajustes → General → Red.",
       remoteErrorQuery: "No se pudo consultar el mercado de skills: se muestran las selecciones integradas",
       remotePartial: "Algunas fuentes del catálogo no están disponibles ({{names}})",
     },
