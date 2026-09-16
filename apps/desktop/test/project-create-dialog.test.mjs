@@ -100,6 +100,22 @@ test("clone checkout handler clones without touching the active workspace", () =
   assert.doesNotMatch(handler, /dialog\.showOpenDialog/);
 });
 
+test("the stylesheet keeps balanced blocks and no duplicated tail", () => {
+  // A stray trailing fragment still matched every surface assertion above while
+  // breaking the Tailwind build ("Missing opening {"), so the sheet's blocks are
+  // checked structurally instead of by pattern.
+  const open = (styles.match(/{/g) ?? []).length;
+  const close = (styles.match(/}/g) ?? []).length;
+  assert.equal(open, close, "every style block must be closed");
+  const tail = styles.slice(-200);
+  assert.equal(
+    (tail.match(/transition: none;/g) ?? []).length,
+    1,
+    "the reduced-motion block keeps exactly one declaration group",
+  );
+  assert.match(tail, /\}\s*\}\s*$/);
+});
+
 test("create project dialog remains usable on narrow screens and reduced motion", () => {
   assert.match(styles, /width: min\(100%, 480px\)/);
   assert.match(styles, /border-radius: var\(--radius-lg-plus\)/);
