@@ -286,10 +286,7 @@ export function SessionImportPanel() {
   return (
     <>
       <SettingsCard title={t("settings.importTitle")}>
-        <SettingsRow
-          title={t("settings.importScan")}
-          description={t("settings.importScanDesc")}
-        >
+        <SettingsRow title={t("settings.importScan")}>
           <Button variant="secondary" disabled={scanning} onClick={() => void scan()}>
             {scanning ? t("settings.importScanning") : t("settings.importScan")}
           </Button>
