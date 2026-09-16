@@ -4279,3 +4279,11 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 拒绝与市场的 `failureDetails` 现在都带 `route`，因此「直连线路上的 fake-IP 拒绝」与「读不出线路的拒绝」在诊断里可以区分。
 - MCP 市场仍使用自己的地址钉定 Node HTTPS 守卫（ADR 0245），本次不变；fake-IP 环境下它的源仍会被拒绝。
 - 见 ADR 0272、`05-security/01-security.md` §4.1、`03-runtime/09-logging-and-observability.md` 与 `06-delivery/04-e2e-test-plan.md` 的 E2E-SKILL-MARKET-NET-BOUNDARY。
+
+## 2026-09-17 —— 会话与项目行在第二次点击时才删除（D437）
+
+- 侧边栏的会话菜单项与两个项目菜单（侧边栏与项目索引）此前在第一次点击「删除」时就移除该行。应用内其他所有破坏性行操作 —— 设置里的模型服务行、厂商账户行以及能力表格 —— 都先武装再改写控件标签，于是最不能撤销的两个动作反而是唯一单击即生效的。
+- 这一模式现在由 `hooks/use-armed-delete.ts` 为整个渲染层拥有：同一个 `ARMED_DELETE_MS`（3200ms）失效时间与同一个 `useArmedDelete()`。能力页面继续从 `AgentCapabilityLayout` 导入它，而该布局改为再导出这个共享 hook，不再保留一份带自己超时的副本，因此这一模式不会在设置行与两个菜单之间漂移。
+- 会话菜单项以 `session.id` 作为武装键；两个项目菜单则以 `project:` 前缀的键武装，因此会话与项目永远不会共用一次武装。被武装的菜单项带 `data-armed="true"`、危险色淡底，并在八种语言里都把标签换成 `nav.deleteTaskConfirm` / `project.deleteMenuConfirm`（"Delete?" / "确认删除？"）。两次点击之间菜单保持打开；点击外部、按 Escape 或武装超时都会解除武装且不移除任何内容。
+- 这是对 D431 在空闲场景下的修订：仍有运行中轮次的项目依然打开 `ProjectDeleteDialog`，由它指明这些会话并先停止它们再删除；宿主的 1008 / `CONFLICT` 拒绝在两条路径上仍映射为 `project.deleteRunningBlocked`。没有运行中轮次的项目由对话框原本使用的同一个 store 动作移除，并发出同样的成功 toast，因此它的第二次点击就是用户已经给出的确认。
+- 仅渲染层：无协议、存储、宿主、权限或迁移改动，也没有新增默认值。磁盘上的文件夹仍永远不被触碰。见 `04-ux/09-interaction-patterns.md`、D421、D431、`06-delivery/04-e2e-test-plan.md` 的 E2E-PROJECT-delete-removes-project-and-owned-sessions，以及 `apps/desktop/test/two-step-delete.test.mjs`。
