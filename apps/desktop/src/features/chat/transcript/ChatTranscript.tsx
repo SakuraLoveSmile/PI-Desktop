@@ -22,6 +22,7 @@ import { ResponseAnnotationOverlay } from "../../../components/ResponseAnnotatio
 import { useTranscriptScroll } from "./hooks/useTranscriptScroll";
 import type { TranscriptSearchTarget } from "../../../lib/transcript-reading";
 import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
+import { DisclosureAnchorContext } from "../../../lib/disclosure-anchor-context";
 
 export const ChatTranscript = memo(function ChatTranscript({
   sessionId,
@@ -109,6 +110,7 @@ export const ChatTranscript = memo(function ChatTranscript({
     revealEarlierHistory,
     jumpToLatest,
     navigateAnnotation,
+    disclosureAnchorNotifier,
   } = useTranscriptScroll({
     sessionId,
     messages,
@@ -175,6 +177,7 @@ export const ChatTranscript = memo(function ChatTranscript({
 
   return (
     <TranscriptSearchContext.Provider value={searchTarget}>
+    <DisclosureAnchorContext.Provider value={disclosureAnchorNotifier}>
     <div
       className="thread-wrap"
       ref={wrapRef}
@@ -206,6 +209,7 @@ export const ChatTranscript = memo(function ChatTranscript({
       <div
         className="thread-scroll"
         ref={scrollRef}
+        data-scroll-owner="transcript"
         onScroll={handleScroll}
         role="log"
         aria-live="polite"
@@ -317,6 +321,7 @@ export const ChatTranscript = memo(function ChatTranscript({
         </TooltipButton>
       ) : null}
     </div>
+    </DisclosureAnchorContext.Provider>
     </TranscriptSearchContext.Provider>
   );
 });
