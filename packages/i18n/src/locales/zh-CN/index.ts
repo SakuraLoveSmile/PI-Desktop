@@ -1239,6 +1239,15 @@ sklm: {
       skipped: "第 {{number}} 题已跳过",
     },
   },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "始终置顶",
+    minimize: "最小化",
+    close: "关闭挂件",
+  },
   panel: {
     title: "工作面板",
     subagent: "子智能体",

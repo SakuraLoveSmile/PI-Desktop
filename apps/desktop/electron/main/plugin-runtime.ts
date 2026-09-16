@@ -195,6 +195,16 @@ export type PluginPanelRequest = {
   htmlPath: string;
   locale?: string;
   theme?: "light" | "dark";
+  /**
+   * `"panel"` (default) keeps the 46px host drag band and its capsule.
+   * `"widget"` is the transparent floating placement: no band, no capsule, a
+   * whole-window drag map, and a host context menu instead of the capsule.
+   */
+  shape?: "panel" | "widget";
+  /** Floating widget placement only: keep the surface above other windows. */
+  alwaysOnTop?: boolean;
+  /** Overrides the per-shape default: panels are resizable, widgets are not. */
+  resizable?: boolean;
   /** The plugin's egress allowlist; the panel session is confined to it. */
   netDomains?: readonly string[];
   /** Allows the isolated panel to request microphone audio, never camera access. */
@@ -4474,6 +4484,9 @@ export class PluginRuntime {
                 this.services.getLocale?.(),
                 loaded.manifest.name,
               ),
+            shape: loaded.manifest.ui?.shape,
+            alwaysOnTop: loaded.manifest.ui?.alwaysOnTop,
+            resizable: loaded.manifest.ui?.resizable,
             width: loaded.manifest.ui?.width ?? 480,
             height: loaded.manifest.ui?.height ?? 360,
             htmlPath,

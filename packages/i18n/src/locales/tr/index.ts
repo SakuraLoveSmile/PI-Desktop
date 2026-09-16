@@ -1253,6 +1253,15 @@ sklm: {
       skipped: "Soru {{number}} atlandı",
     },
   },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "Her zaman üstte",
+    minimize: "Küçült",
+    close: "Widget'ı kapat",
+  },
   panel: {
     title: "Çalışma paneli",
     subagent: "Alt ajan",
