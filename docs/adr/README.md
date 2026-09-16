@@ -300,3 +300,4 @@ Each ADR includes:
 | 0268 | Remove quotes, annotations, and side chats | Accepted (supersedes message-quotes-and-side-chats / response-annotations / floating-annotation-index) |
 | 0272 | [Judge a public-network address on the route the request will dial](0272-connection-time-public-network-route.md) | Accepted for implementation (amends ADR 0243; issue #419 / PR #473) |
 | 0273 | [Git checkout as a Create project source](0273-git-checkout-create-project-source.md) | Accepted for implementation (amends ADR 0233; ADR 0247) |
+| 0274 | [Official plugin channel and backup channels](0274-official-plugin-channel-and-backup-channels.md) | Accepted for implementation (amends ADR 0102; D438) |

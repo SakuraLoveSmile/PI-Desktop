@@ -230,6 +230,7 @@ export const IPC = {
     marketInstall: "pi-desktop/market/install",
     marketCheckUpdates: "pi-desktop/market/checkUpdates",
     marketApplyUpdates: "pi-desktop/market/applyUpdates",
+    marketCancelInstall: "pi-desktop/market/cancelInstall",
     commandPaletteSearch: "pi-desktop/commandPalette/search",
     commandPaletteExecute: "pi-desktop/commandPalette/execute",
     logOpenFolder: "pi-desktop/log/openFolder",
@@ -268,6 +269,8 @@ export const IPC = {
   },
   event: {
     pluginChanged: "pi-desktop/event/pluginChanged",
+    /** Progress of an install or update, while it is still running. */
+    pluginInstallProgress: "pi-desktop/plugin/event/installProgress",
     /** Host-originated app settings mutation (e.g. plugin `app.setTheme`). */
     settingsChanged: "pi-desktop/app/event/settingsChanged",
     extensionsUiPrompt: "pi-desktop/extensions/event/uiPrompt",
