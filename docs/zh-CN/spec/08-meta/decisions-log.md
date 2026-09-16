@@ -4322,3 +4322,11 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `07-plugins/04-plugin-security.md`、`03-runtime/01-ipc-protocol.md`
   （`NATIVE_MENU_ACTIONS`）、E2E-072 与
   `apps/desktop/test/window-toggle-shortcut.test.mjs`。
+
+## 2026-09-17 — Git 检出成为新建项目的来源（D438）
+
+- 新建项目对话框此前只收集项目名称与本地文件夹（ADR 0233），而首页「克隆 Git 项目」入口只在绑定项目的会话 hero 中渲染。全新安装因此必须先打开一个无关的本地文件夹才能克隆仓库。
+- 对话框现在拥有两种对等来源：此电脑与 Git 仓库。Git 来源保留同一个名称字段（在用户输入前用仓库名预填），增加仓库地址输入框和一个克隆保存位置行，并复用切换器的 `parseGitCloneUrl` 规则，因此私网、回环、链路本地、带凭据与非法远程都会让创建按钮保持禁用（ADR 0247）。
+- 主进程新增可加的 `project/cloneCheckout({ url, parentPath })`：它克隆到显式指定的父目录并返回 `{ path, name }`，不更改当前工作空间、也不弹出选择器。`project/clone` 为首页切换器保留原有的原生选择器行为。
+- 项目创建语义不变：两种来源调用同一个项目 slice 助手，`project-group/create` 仍写入唯一的持久记录，检出目录成为同一逻辑项目组的主要根（ADR 0233）。
+- 渲染器加一条窄的主进程能力：协议、schema、host RPC、权限、存储与偏好均无变化。见 ADR 0273、`03-runtime/01-ipc-protocol.md` §9、`04-ux/08-component-spec.md` 与 E2E-258。
