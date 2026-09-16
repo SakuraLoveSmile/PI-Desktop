@@ -508,6 +508,8 @@ export const zhCN = {
     permissionMode: "权限模式",
     reasoningLevel: "推理等级",
     reasoningSupportedBy: "当前模型 {{model}} 支持的推理等级",
+    reasoningLevelList: "从列表选择",
+    reasoningSliderAdjust: "滑动调整",
     permissionInherit: "跟随默认",
     permissionAsk: "每次询问",
     permissionAcceptEdits: "允许编辑",

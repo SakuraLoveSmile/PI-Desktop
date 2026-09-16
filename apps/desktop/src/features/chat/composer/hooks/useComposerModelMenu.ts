@@ -20,6 +20,7 @@ import {
   thinkingLevelForProvider,
   thinkingProviderForModel,
   type ComposerMenuView,
+  type ThinkingSelectionMode,
 } from "../model";
 
 type UseComposerModelMenuOptions = {
@@ -51,10 +52,12 @@ export function useComposerModelMenu({
   const [query, setQuery] = useState("");
   const [modelHighlight, setModelHighlight] = useState(-1);
   const [thinkingHighlight, setThinkingHighlight] = useState(-1);
+  const [thinkingMode, setThinkingMode] = useState<ThinkingSelectionMode>("slider");
   const rootMenuRef = useRef<HTMLDivElement>(null);
   const modelSearchRef = useRef<HTMLInputElement>(null);
   const modelListRef = useRef<HTMLDivElement>(null);
   const thinkingListRef = useRef<HTMLDivElement>(null);
+  const thinkingSliderRef = useRef<HTMLInputElement>(null);
 
   const thinkingProvider =
     resolvedThinkingProvider ??
@@ -157,6 +160,7 @@ export function useComposerModelMenu({
     setQuery("");
     setModelHighlight(-1);
     setThinkingHighlight(-1);
+    setThinkingMode("slider");
   }, [open]);
 
   useEffect(() => {
@@ -168,19 +172,28 @@ export function useComposerModelMenu({
     requestAnimationFrame(() => {
       if (view === "root") rootMenuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
       if (view === "model") modelSearchRef.current?.focus();
-      if (view === "thinking") thinkingListRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      if (view === "thinking") {
+        // The slider is the default surface: focus its input so arrows land
+        // in the slider instead of the radio list. A single-level binding
+        // renders the radio list directly, so focus its first row instead.
+        if (thinkingMode === "slider" && thinkingMenuLevels.length > 1) {
+          thinkingSliderRef.current?.focus();
+        } else {
+          thinkingListRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+        }
+      }
       if (view === "model" && modelHighlight >= 0) {
         modelListRef.current
           ?.querySelector(`[data-model-index="${modelHighlight}"]`)
           ?.scrollIntoView({ block: "nearest" });
       }
-      if (view === "thinking" && thinkingHighlight >= 0) {
+      if (view === "thinking" && thinkingMode === "list" && thinkingHighlight >= 0) {
         thinkingListRef.current
           ?.querySelector(`[data-thinking-index="${thinkingHighlight}"]`)
           ?.scrollIntoView({ block: "nearest" });
       }
     });
-  }, [open, view]);
+  }, [open, thinkingMenuLevels.length, thinkingMode, view]);
 
   useEffect(() => {
     if (!open || view !== "model" || modelHighlight < 0) return;
@@ -200,6 +213,8 @@ export function useComposerModelMenu({
     setView(nextView);
     setModelHighlight(-1);
     setThinkingHighlight(-1);
+    // Entering the reasoning submenu always restarts on the slider (issue #417).
+    if (nextView === "thinking") setThinkingMode("slider");
     if (nextView !== "model") setQuery("");
   };
 
@@ -236,22 +251,60 @@ export function useComposerModelMenu({
     }
   };
 
+  /**
+   * Toggle the reasoning submenu between its slider and radio-list
+   * presentations. The list opens with the current level highlighted so
+   * Up/Down/Enter behave exactly as before the slider existed.
+   */
+  const showThinkingMode = (mode: ThinkingSelectionMode) => {
+    setThinkingMode(mode);
+    setThinkingHighlight(
+      mode === "list" ? thinkingMenuLevels.indexOf(thinkingLevel) : -1,
+    );
+  };
+
+  /**
+   * Commit a reasoning level while staying in the reasoning submenu, so a
+   * dragged slider or a tick click keeps its surface for further tweaks.
+   * Returns false when the configuration is rejected, mirroring the list
+   * selection path's error contract.
+   *
+   * A drag can emit one commit per crossed stop. Idle sessions persist each
+   * configure directly, so concurrent promises could resolve out of order and
+   * land the store on a stale level. The chain serializes the sends: each
+   * configure starts only after the previous one has settled its store write.
+   */
+  const thinkingCommitChainRef = useRef<Promise<boolean | void>>(Promise.resolve());
+  const commitThinkingLevel = async (level: ThinkingLevel) => {
+    const send = async (): Promise<boolean> => {
+      try {
+        await configureActiveSession({
+          mode,
+          providerId: provider?.id,
+          modelId,
+          thinkingLevel: level,
+        });
+        return true;
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error), {
+          variant: "error",
+        });
+        return false;
+      }
+    };
+    const run = thinkingCommitChainRef.current.then(send);
+    thinkingCommitChainRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  };
+
   const selectThinkingLevel = async (level: ThinkingLevel) => {
-    try {
-      await configureActiveSession({
-        mode,
-        providerId: provider?.id,
-        modelId,
-        thinkingLevel: level,
-      });
-      setView("root");
-      setModelHighlight(-1);
-      setThinkingHighlight(-1);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), {
-        variant: "error",
-      });
-    }
+    if (!(await commitThinkingLevel(level))) return;
+    setView("root");
+    setModelHighlight(-1);
+    setThinkingHighlight(-1);
   };
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -316,11 +369,15 @@ export function useComposerModelMenu({
     modelSearchRef,
     modelListRef,
     thinkingListRef,
+    thinkingSliderRef,
     modelGroups: filteredModelGroups,
     flatModels,
     thinkingMenuLevels,
+    thinkingMode,
     showView,
+    showThinkingMode,
     selectModel,
+    commitThinkingLevel,
     selectThinkingLevel,
     onMenuKeyDown,
     controlsBlocked,

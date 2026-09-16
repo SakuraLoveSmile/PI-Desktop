@@ -5417,3 +5417,24 @@ that was sitting at the bottom — including after the turn had finished.
   and no new default. `project.deleteRunningBlocked` keeps its meaning, copy,
   and every translation. See ADR 0251, D421, and
   E2E-PROJECT-delete-running-sessions-are-named-and-stopped.
+
+## 2026-09-16 — The reasoning submenu leads with a slider (#417, D432)
+
+- The Composer's Reasoning level submenu opened directly into a vertical radio
+  list. Issue #417 asked for a Codex-desktop-style slider while keeping the
+  existing click-to-list interaction.
+- The submenu now opens with the support note, the current level as a value
+  label, and a native range input with one stop per enabled level plus a
+  clickable tick label per stop. Dragging the slider or clicking a tick
+  commits the level immediately through the same `configureActiveSession`
+  path and stays in the submenu for further tweaks; the value label toggles
+  the classic radio list, which keeps its radio semantics, trailing check,
+  Up/Down/Enter/Left contract, and root-return behavior.
+- The slider owns its arrow/Home/End/Enter keys while focused, so ArrowLeft
+  no longer leaves the submenu from the slider, while Escape still closes the
+  menu. Entering the submenu or reopening the menu always restarts on the
+  slider.
+- Level values remain untranslated canonical strings, and the seven-level
+  ladder, provider filtering, and clamping rules are unchanged. Renderer only:
+  no protocol, storage, host, permission, or migration change. See
+  `04-ux/08-component-spec.md`, `04-ux/07-ui-design-system.md`, and E2E-050.

@@ -503,6 +503,8 @@ export const es = {
     "permissionMode": "Modo de permiso",
     "reasoningLevel": "Nivel de razonamiento",
     "reasoningSupportedBy": "El modelo actual {{model}} admite estos niveles de razonamiento",
+    "reasoningLevelList": "Elegir de la lista",
+    "reasoningSliderAdjust": "Ajustar con el control deslizante",
     "permissionInherit": "Predeterminado",
     "permissionAsk": "Preguntar siempre",
     "permissionAcceptEdits": "Aceptar ediciones",
