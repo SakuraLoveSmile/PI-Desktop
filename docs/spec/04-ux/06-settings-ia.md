@@ -61,18 +61,19 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### General
 - **Appearance** card:
   - **Theme**: a searchable picker row (same anchored-menu pattern as
-    Language). The trigger fills the settings control column and shows the
-    current name. The menu pins System, Light, and Dark at the top, then lists
-    plugin themes after a divider with a "Provided by …" hint. Search matches
-    labels, descriptions, ids, and plugin ids. Selection updates
-    `settings.theme`.
-  - **Language**: a searchable picker row (not a card grid). The trigger fills
-    the settings control column and shows the current native name, or Match
-    system. The menu pins Auto at the top with the detected language inline
-    (e.g. "Currently 简体中文"), then lists every shipped locale with its
-    native name (endonym, never translated) and English name for search and
-    sort. Selection updates `settings.language`. Adding a locale is a catalog
-    plus a registry row; the picker does not hard-code the option list.
+    Language). The closed trigger sizes to the current label, capped by the
+    settings control column, and shows the current name. The menu pins System,
+    Light, and Dark at the top, then lists plugin themes after a divider with a
+    "Provided by …" hint. Search matches labels, descriptions, ids, and plugin
+    ids. Selection updates `settings.theme`.
+  - **Language**: a searchable picker row (not a card grid). The closed trigger
+    sizes to the current label, capped by the settings control column, and
+    shows the current native name, or Match system. The menu pins Auto at the
+    top with the detected language inline (e.g. "Currently 简体中文"), then
+    lists every shipped locale with its native name (endonym, never translated)
+    and English name for search and sort. Selection updates `settings.language`.
+    Adding a locale is a catalog plus a registry row; the picker does not
+    hard-code the option list.
   - **Font**: a searchable picker row (trigger shows the current family rendered
     in that face) offering the System default, bundled open-licensed families
     (Geist, Inter, Noto Sans SC, LXGW WenKai — SIL OFL 1.1, shipped locally),
@@ -120,7 +121,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   (ask / accept-edits / auto) that governs how autonomously the agent acts.
   The control is a menu select on the shared anchored-menu surface rather than
   a platform-drawn `<select>` popup, so every Settings picker opens the same
-  way.
+  way. The closed trigger sizes to the current label, capped by the settings
+  control column.
 - **Defaults** card: the host-backed default operating mode (Agent / Plan / Goal),
   command shell selection, Link open destination, context usage display
   (remaining or used), Enter-to-send control, and the large text paste
@@ -469,7 +471,9 @@ system while preserving their different data ownership:
   automatically (D007 / D342).
 - Sessions: review candidates through `SessionImportPanel`. Source and
   project-path grouping behavior follows
-  [08-component-spec §18](08-component-spec.md#18-sessionimportpanel)
+  [08-component-spec §18](08-component-spec.md#18-sessionimportpanel).
+  The Group-by control is the same in-app menu select as the Appearance and
+  Permissions pickers, not a platform-drawn `<select>`.
 - Model configuration: review provider drafts through
   `ModelConfigImportPanel`
   ([08-component-spec §18.5](08-component-spec.md#185-modelconfigimportpanel)).
