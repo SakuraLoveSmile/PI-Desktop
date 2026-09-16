@@ -551,6 +551,12 @@ sklm: {
       dnsHint:
         "該校驗在本機解析主機,而下載本身會走代理。如果你使用代理、VPN 或自訂 DNS,請檢查 設定 → 一般 → 網路。",
       failureSourceHost: "{{name}}（{{host}}）",
+      remoteErrorFakeIp: "代理以 fake-IP 位址回應了目錄源,已顯示內建精選",
+      previewFakeIpError: "代理將該主機解析成 fake-IP 位址,應用程式的地址校驗因此拒絕,未安裝任何內容。",
+      fakeIpHint:
+        "代理將 {{host}} 回應為 {{address}} —— 這是代理用作 fake-IP 佔位位址的保留基準測試段,不是該來源的真實位址。請將代理切換為系統代理模式,或檢查 設定 → 一般 → 網路。",
+      fakeIpHintPlain:
+        "本機代理將該主機解析成保留段中的 fake-IP 佔位位址,而不是該來源的真實位址。請將代理切換為系統代理模式,或檢查 設定 → 一般 → 網路。",
       remoteErrorQuery: "無法查詢技能市場,已顯示內建精選",
       remotePartial: "部分目錄源不可用（{{names}}）",
     },

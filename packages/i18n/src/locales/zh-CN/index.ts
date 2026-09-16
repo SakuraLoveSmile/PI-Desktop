@@ -551,6 +551,12 @@ sklm: {
       dnsHint:
         "该校验在本机解析主机,而下载本身会走代理。如果你使用代理、VPN 或自定义 DNS,请检查 设置 → 通用 → 网络。",
       failureSourceHost: "{{name}}（{{host}}）",
+      remoteErrorFakeIp: "代理用 fake-IP 地址应答了目录源,已显示内置精选",
+      previewFakeIpError: "代理把该主机解析成了 fake-IP 地址,应用的地址校验因此拒绝,未安装任何内容。",
+      fakeIpHint:
+        "代理把 {{host}} 应答为 {{address}} —— 这是代理用作 fake-IP 占位地址的保留基准测试段,不是该源的真实地址。请把代理切换为系统代理模式,或检查 设置 → 通用 → 网络。",
+      fakeIpHintPlain:
+        "本地代理把该主机解析成了保留段里的 fake-IP 占位地址,而不是该源的真实地址。请把代理切换为系统代理模式,或检查 设置 → 通用 → 网络。",
       remoteErrorQuery: "无法查询技能市场,已显示内置精选",
       remotePartial: "部分目录源不可用（{{names}}）",
     },

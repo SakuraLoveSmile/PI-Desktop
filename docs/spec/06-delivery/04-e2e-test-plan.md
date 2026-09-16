@@ -12316,16 +12316,20 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   policy error without fetching the private target. A judged refusal is not
   retried; a local resolver that answered nothing is, and is reported as
   `NETWORK_RESOLVE_FAILED` (`kind` `unresolved`) rather than as an address-check
-  refusal — the guard reached no verdict, so nothing may claim it did. Every
-  other refusal carries `NETWORK_POLICY_BLOCKED` (spec 08 §3.1) with its
-  `reason`, the class of the refused address, and the route that address was
-  judged on, so the install sheet can name the reason and offer a retry instead
-  of leaving the install button disabled with no explanation, and the market
-  list can tell a refused source apart from a merely unreachable one. A proxied
-  hop whose answer is the RFC 2544 fake-IP class is refused on a direct or
-  unreadable route and accepted on the proxied one, every other non-public class
-  still refuses on all routes, and each redirect hop is judged on its own route
-  (ADR 0272).
+  refusal — the guard reached no verdict, so nothing may claim it did. An address
+  in a proxy's fake-IP range (`198.18.0.0/15`, Clash's default) is refused and not
+  retried where the guard judged it — a direct or unreadable route — and is
+  accepted on the proxied one, and is reported as `kind` `fake-ip` with
+  `addressKind` `benchmark` and `reason` `non-public-address` — distinct from a
+  real private target (`kind` `policy`, `addressKind` `private`), because the guard
+  judged the target in the second case and only the proxy's placeholder in the
+  first. Every other refusal carries `NETWORK_POLICY_BLOCKED` (spec 08 §3.1) with
+  its `reason`, the address it resolved to, the class of that address, and the
+  route it was judged on, so the install sheet can name the reason and offer a
+  retry instead of leaving the install button disabled with no explanation, and the
+  market list can tell a refused source apart from a merely unreachable one. Every
+  other non-public class still refuses on all routes, and each redirect hop is
+  judged on its own route (ADR 0272).
 - **Specs linked**: `05-security/01-security.md`, ADR 0243, ADR 0272,
   `03-runtime/01-ipc-protocol.md` §12b
 - **Acceptance**: Security, Quality

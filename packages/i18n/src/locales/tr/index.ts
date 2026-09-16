@@ -558,6 +558,14 @@ sklm: {
       dnsHint:
         "Bu denetim ana bilgisayarı yerel olarak çözer, indirmenin kendisi ise proxy'nizden geçer. Proxy, VPN veya özel bir DNS kurulumu kullanıyorsanız Ayarlar → Genel → Ağ bölümünü kontrol edin.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "Proxy'niz katalog kaynaklarına fake-IP adresleriyle yanıt verdi – yerleşik seçkiler gösteriliyor",
+      previewFakeIpError:
+        "Proxy'niz bu ana bilgisayarı bir fake-IP adresine çözdü, bu yüzden uygulamanın adres denetimi reddetti – hiçbir şey yüklenmedi.",
+      fakeIpHint:
+        "Proxy'niz {{host}} için {{address}} yanıtını verdi; bu, proxy'lerin fake-IP yer tutucusu olarak kullandığı ayrılmış bir referans aralığıdır, kaynağın gerçek adresi değildir. Proxy'yi sistem proxy moduna alın veya Ayarlar → Genel → Ağ bölümünü kontrol edin.",
+      fakeIpHintPlain:
+        "Yerel bir proxy bu ana bilgisayarı ayrılmış bir aralıktaki fake-IP yer tutucusuna çözdü; kaynağın gerçek adresi değildir. Proxy'yi sistem proxy moduna alın veya Ayarlar → Genel → Ağ bölümünü kontrol edin.",
       remoteErrorQuery: "Skill market sorgulanamadı – yerleşik seçkiler gösteriliyor",
       remotePartial: "Bazı katalog kaynakları kullanılamıyor ({{names}})",
     },
