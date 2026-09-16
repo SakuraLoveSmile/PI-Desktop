@@ -11939,6 +11939,33 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Milestone**: M5
 - **Status**: Unit-covered (`apps/desktop/test/git-clone.test.mjs`)
 
+
+#### E2E-258: Create project dialog can start from a git repository
+
+- **Preconditions**: The Create project dialog opens from the Projects heading
+  (no existing project is required); `git` is installed.
+- **Steps**:
+  1. Switch the source selector to Git repository.
+  2. Paste `https://github.com/octocat/Hello-World.git` and confirm the project
+     name field is seeded with `Hello-World`, then type a custom name.
+  3. Choose a clone destination folder and confirm the destination row shows it.
+  4. Confirm Create and inspect the workspace, sidebar, and project archive.
+  5. Reopen the dialog, switch to Git repository, and paste a private or
+     malformed remote.
+- **Expected**: The dialog swaps the folder list for a repository URL field plus
+  a clone destination row and keeps one project name field; Create stays
+  disabled until the URL parses and a folder is chosen. Confirming runs
+  `git clone` into the chosen folder with the renderer still owning project
+  creation: the checkout becomes the primary root and the entered name names the
+  group. Private, loopback, link-local, credential-bearing, and malformed
+  remotes leave Create disabled (ADR 0247) and no folder is written.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §9, `04-ux/08-component-spec.md`,
+  ADR 0273, ADR 0233, ADR 0247
+- **Acceptance**: Quality (project entry), D (workspace)
+- **Milestone**: M5
+- **Status**: Unit-covered (`apps/desktop/test/project-create-dialog.test.mjs`,
+  `apps/desktop/test/git-clone.test.mjs`); full UI scenario Draft (run only in a
+  capable environment when this surface changes)
 #### E2E-257: Importing into an archived project restores its visibility
 
 - **Preconditions**: A durable project has been archived in the renderer

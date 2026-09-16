@@ -127,6 +127,7 @@ export const IPC = {
     projectGroupInstructionsGet: "pi-desktop/project-group/instructions/get",
     projectGroupInstructionsSave: "pi-desktop/project-group/instructions/save",
     projectClone: "pi-desktop/project/clone",
+    projectCloneCheckout: "pi-desktop/project/cloneCheckout",
     projectGet: "pi-desktop/project/get",
     projectList: "pi-desktop/project/list",
     projectSet: "pi-desktop/project/set",
