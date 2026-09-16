@@ -494,6 +494,42 @@ async function main() {
       () => cdp.evaluate(`!!document.querySelector(".work-panel-tab")`),
       "work panel tab mounted before preview mode",
     );
+    // The panel's `+`, maximize, and the viewport-fixed collapse toggle are one
+    // button group. Only the rendered box proves it: a stylesheet contract
+    // cannot catch a rule that re-states its own inset or divider.
+    const panelActionGroup = await cdp.evaluate(`(() => {
+      const actions = document.querySelector(".work-panel-actions");
+      const maximize = document.querySelector(".work-panel-maximize");
+      const toggle = document.querySelector(".app-work-panel-toggle");
+      if (!actions || !maximize || !toggle) return null;
+      const actionsStyle = getComputedStyle(actions);
+      return {
+        tokenGap: parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--ds-work-panel-control-gap",
+          ),
+        ),
+        groupGap: parseFloat(actionsStyle.rowGap),
+        gapToToggle: Math.round(
+          toggle.getBoundingClientRect().left - maximize.getBoundingClientRect().right,
+        ),
+        borderRight: parseFloat(actionsStyle.borderRightWidth),
+        paddingRight: parseFloat(actionsStyle.paddingRight),
+        marginRight: parseFloat(actionsStyle.marginRight),
+      };
+    })()`);
+    check(
+      panelActionGroup !== null &&
+        Number.isFinite(panelActionGroup.tokenGap) &&
+        panelActionGroup.tokenGap > 0 &&
+        panelActionGroup.groupGap === panelActionGroup.tokenGap &&
+        Math.abs(panelActionGroup.gapToToggle - panelActionGroup.tokenGap) <= 1 &&
+        panelActionGroup.borderRight === 0 &&
+        panelActionGroup.paddingRight === 0 &&
+        panelActionGroup.marginRight === 0,
+      "the panel actions and the fixed collapse toggle share one control gap",
+      JSON.stringify(panelActionGroup),
+    );
     const beforeMaximize = await measure();
     await cdp.evaluate(
       `document.querySelector(".work-panel-maximize")?.dispatchEvent(new MouseEvent("click", { bubbles: true }))`,
