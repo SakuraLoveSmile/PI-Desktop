@@ -895,7 +895,9 @@ singleton without duplicating it:
   strip rather than by a second resource list. Launcher rows use the same
   fast hover/focus feedback as other panel rows.
 - Active tabs, file-tree rows, diff headers, and the resize handle ease hover
-  fills with `--motion-duration-fast` / `--motion-ease-out`
+  fills with `--motion-duration-fast` / `--motion-ease-out`. The handle's 2px
+  line is a 50% accent tint while hovered or dragged — the solid accent is pure
+  white on the dark plate, so only keyboard focus paints it
 - Browser URL and empty-tool chrome share the light inset field treatment used
   by Settings controls (D148)
 - Every empty state in the panel — the no-resource body and each tab's own —
