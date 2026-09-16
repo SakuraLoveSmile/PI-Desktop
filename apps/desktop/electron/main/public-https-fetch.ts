@@ -7,6 +7,7 @@ import {
   isSafePublicHttpsUrl,
   publicNetworkRefusalReason,
   type PublicNetworkAddressKind,
+  type PublicNetworkRefusalDetail,
   type PublicNetworkRefusalReason,
 } from "@pi-desktop/shared";
 
@@ -56,6 +57,15 @@ export class PublicNetworkPolicyError extends Error {
   readonly address?: string;
   /** The class of `address`, not just the address: it names the cause. */
   readonly addressKind?: PublicNetworkAddressKind;
+  /**
+   * The same finding, shaped for the IPC boundary: `wrap()` forwards this object
+   * as the renderer's `error.details` (`register.ts`), which is how the panel
+   * tells a TUN fake-IP apart from a real private target without parsing an
+   * English message. Both arrive under one code — both are refusals the guard
+   * decided — so the structured reason is the only honest way to separate them
+   * (issue #419).
+   */
+  readonly data: PublicNetworkRefusalDetail;
   constructor(message: string, refusal: PublicNetworkRefusal = { reason: "non-public-address" }) {
     super(message);
     this.name = PUBLIC_NETWORK_POLICY_ERROR;
@@ -67,6 +77,12 @@ export class PublicNetworkPolicyError extends Error {
       refusal.reason === "resolve-failed"
         ? ErrorCodes.NETWORK_RESOLVE_FAILED
         : ErrorCodes.NETWORK_POLICY_BLOCKED;
+    this.data = {
+      reason: refusal.reason,
+      ...(refusal.host ? { host: refusal.host } : {}),
+      ...(refusal.address ? { address: refusal.address } : {}),
+      ...(refusal.addressKind ? { addressKind: refusal.addressKind } : {}),
+    };
   }
 }
 

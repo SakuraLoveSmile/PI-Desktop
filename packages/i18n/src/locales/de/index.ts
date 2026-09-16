@@ -547,6 +547,14 @@ sklm: {
       dnsHint:
         "Diese Prüfung löst den Host lokal auf, der Download selbst würde jedoch über deinen Proxy laufen. Wenn du einen Proxy, ein VPN oder ein eigenes DNS-Setup verwendest, prüfe Einstellungen → Allgemein → Netzwerk.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "Dein Proxy hat die Katalogquellen mit fake-IP-Adressen beantwortet – integrierte Auswahl wird angezeigt",
+      previewFakeIpError:
+        "Dein Proxy hat diesen Host auf eine fake-IP-Adresse aufgelöst, daher hat die Adressprüfung der App abgelehnt – es wurde nichts installiert.",
+      fakeIpHint:
+        "Dein Proxy hat {{host}} mit {{address}} beantwortet – einem reservierten Benchmark-Bereich, den Proxys als fake-IP-Platzhalter verwenden, nicht der echten Adresse der Quelle. Stelle den Proxy auf Systemproxy-Modus um oder prüfe Einstellungen → Allgemein → Netzwerk.",
+      fakeIpHintPlain:
+        "Ein lokaler Proxy hat diesen Host auf einen fake-IP-Platzhalter in einem reservierten Bereich aufgelöst, nicht auf die echte Adresse der Quelle. Stelle den Proxy auf Systemproxy-Modus um oder prüfe Einstellungen → Allgemein → Netzwerk.",
       remoteErrorQuery: "Der Skill-Markt konnte nicht abgefragt werden – integrierte Auswahl wird angezeigt",
       remotePartial: "Einige Katalogquellen sind nicht verfügbar ({{names}})",
     },

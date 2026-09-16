@@ -547,6 +547,14 @@ sklm: {
       dnsHint:
         "Ce contrôle résout l'hôte localement, alors que le téléchargement passerait par votre proxy. Si vous utilisez un proxy, un VPN ou une configuration DNS personnalisée, vérifiez Paramètres → Général → Réseau.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "Votre proxy a répondu avec des adresses fake-IP pour les sources du catalogue – sélection intégrée affichée",
+      previewFakeIpError:
+        "Votre proxy a résolu cet hôte en une adresse fake-IP ; le contrôle d'adresse de l'application l'a donc refusé – rien n'a été installé.",
+      fakeIpHint:
+        "Votre proxy a répondu {{host}} avec {{address}}, une plage de référence réservée que les proxys utilisent comme adresse factice, et non l'adresse réelle de la source. Passez le proxy en mode proxy système, ou vérifiez Paramètres → Général → Réseau.",
+      fakeIpHintPlain:
+        "Un proxy local a résolu cet hôte en une adresse factice d'une plage réservée, et non en l'adresse réelle de la source. Passez le proxy en mode proxy système, ou vérifiez Paramètres → Général → Réseau.",
       remoteErrorQuery: "Impossible d'interroger le marché de skills – sélection intégrée affichée",
       remotePartial: "Certaines sources du catalogue sont indisponibles ({{names}})",
     },
