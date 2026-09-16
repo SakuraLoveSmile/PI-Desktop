@@ -5340,6 +5340,24 @@ identify the platform validation still needed.
   entered CDP or output. The default no-key run remains 5/5 with the live case
   explicitly skipped.
 
+#### E2E-CHAT-opaque-floating-decision-and-retry-surfaces: Plan approval and retry hover stay opaque
+
+- **Status**: Automated (`apps/desktop/test/plan-mode-source-contract.test.mjs`, `apps/desktop/test/active-turn-surface.test.mjs`)
+- **Priority**: P2
+- **Covers**: C, Quality / floating composer and retry surfaces
+- **Preconditions**: Renderer CSS is the production source under `apps/desktop/src/styles`.
+- **Steps**:
+  1. Inspect `.plan-approval-bar` in the composer dock styles.
+  2. Inspect `.run-activity-error-popover.message-error` in the transcript styles.
+  3. Hover or focus a retrying active-turn row in a live session.
+- **Expected**:
+  - The Plan/Goal approval bar paints `--ds-bg-composer` with `--ds-shadow-composer` rather than the in-flow `--ds-tile` wash, so it remains a readable plate over the transparent composer dock.
+  - The retry hover tooltip mixes the error tint over `--ds-bg-elevated-opaque`, so transcript text does not show through.
+- **Specs linked**: `04-ux/03-permission-ux.md`, `04-ux/08-component-spec.md`
+- **Acceptance**: C, Quality
+- **Milestone**: M6
+- **Status detail**: Source contracts assert the CSS tokens. Live hover remains a visual check.
+
 #### E2E-107: Plan approval uses one absolute 30-minute expiry
 
 - **Preconditions**: A pending Plan request exists with a controllable clock.
@@ -7473,6 +7491,9 @@ identify the platform validation still needed.
 | M6+ (capability level move) | E2E-CAPABILITY-move-across-levels |
 | E — Tools & permissions (builtin subagent defaults) | E2E-SUBAGENT-settings-lists-builtin-defaults |
 | Quality (builtin subagent defaults) | E2E-SUBAGENT-settings-lists-builtin-defaults |
+| C — Conversation & stream (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| Quality (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| M6 (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
