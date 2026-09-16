@@ -515,13 +515,18 @@
   line-height: var(--leading-compact);
 }
 
-/* One geometry for every chrome icon control: the topbar's dock toggle, the
-   viewport-fixed work-panel toggle, and the preview/route-band lane actions.
+/* One geometry and one seat for every chrome icon control: the topbar's dock
+   toggle, the viewport-fixed work-panel toggle, the preview/route-band lane
+   actions, and the work-panel header's create and maximize controls. The seat is
+   transparent at rest, so the icon alone carries the control and only the pointer
+   hover wash paints a surface under it; keyboard focus keeps the global outline.
    `flex: 0 0` keeps them square when a crowded band would otherwise squeeze
    them. */
 .conversation-topbar .ct-icon-btn,
 .app-work-panel-toggle,
-.window-chrome-row .title-nav-btn {
+.window-chrome-row .title-nav-btn,
+.work-panel-new-tab,
+.work-panel-maximize {
   display: inline-flex;
   height: var(--ds-work-panel-toggle-size);
   width: var(--ds-work-panel-toggle-size);
@@ -539,14 +544,18 @@
 
 .conversation-topbar .ct-icon-btn:hover:not(:disabled),
 .app-work-panel-toggle:hover:not(:disabled),
-.window-chrome-row .title-nav-btn:hover:not(:disabled) {
+.window-chrome-row .title-nav-btn:hover:not(:disabled),
+.work-panel-new-tab:hover:not(:disabled),
+.work-panel-maximize:hover:not(:disabled) {
   background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
 }
 
 .conversation-topbar .ct-icon-btn:disabled,
 .app-work-panel-toggle:disabled,
-.window-chrome-row .title-nav-btn:disabled {
+.window-chrome-row .title-nav-btn:disabled,
+.work-panel-new-tab:disabled,
+.work-panel-maximize:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -581,10 +590,11 @@
   app-region: no-drag;
 }
 
+/* The open state is the glyph swap plus the engaged ink — the same transparent
+   seat as every other chrome icon control, so the toggle never floats over the
+   panel header as a raised pill. */
 .app-work-panel-toggle[aria-pressed="true"] {
-  background: var(--ds-tile-deep);
   color: var(--ds-text-primary);
-  box-shadow: var(--ds-raised-shadow);
 }
 
 .app-work-panel-toggle-icon {

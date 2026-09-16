@@ -274,7 +274,9 @@
 
 /* One button group with the viewport-fixed collapse toggle: the same control
    gap the header reserves for it, and no divider, inset, or margin of its own.
-   The rule owns spacing only — the controls keep their own sizes and seats. */
+   The rule owns spacing only — `+` and maximize take the shared chrome-control
+   geometry and transparent seat from chrome.css, beside the subagent back
+   control's own matching rule, so the group reads as quiet icon controls. */
 .work-panel-actions {
   display: flex;
   flex: 0 0 auto;
@@ -301,21 +303,6 @@
   color: var(--ds-text-primary);
 }
 
-.work-panel-new-tab {
-  display: inline-flex;
-  width: var(--ds-work-panel-toggle-size);
-  height: var(--ds-work-panel-toggle-size);
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--ds-tile);
-  color: var(--ds-text-secondary);
-  transition:
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
-}
-
 /* Preview mode: the panel takes MainChat's width as well, so the divider has no
    second column to trade width with and the dock fills its flex row. */
 .work-panel.is-maximized {
@@ -326,27 +313,6 @@
 
 .work-panel.is-maximized .work-panel-resize {
   cursor: default;
-}
-
-.work-panel-maximize {
-  display: inline-flex;
-  width: var(--ds-work-panel-toggle-size);
-  height: var(--ds-work-panel-toggle-size);
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--ds-tile);
-  color: var(--ds-text-secondary);
-  transition:
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.work-panel-new-tab:hover,
-.work-panel-new-tab:focus-visible {
-  background: var(--ds-bg-active);
-  color: var(--ds-text-primary);
 }
 
 .work-panel-subagent-heading {
