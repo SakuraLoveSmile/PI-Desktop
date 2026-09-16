@@ -165,7 +165,7 @@
 }
 
 .route-surface,
-.settings-shell-full {
+.settings-content-inner {
   animation: route-surface-in var(--motion-duration-normal) var(--motion-ease-out)
     both;
 }
