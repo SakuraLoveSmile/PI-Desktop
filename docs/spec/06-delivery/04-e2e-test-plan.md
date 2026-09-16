@@ -11051,16 +11051,23 @@ are withdrawn with ADR 0165.
 
 - **Preconditions**: A dev plugin with `net.domains: ["allowed.test"]` and
   `net.fetch`. A local server on `allowed.test` answers `/hop` with a 302 to
-  `http://undeclared.test/leak` and `/ok` with 200.
+  `http://undeclared.test/leak`, `/ok` with 200, and `/limited` with 429 and
+  `Retry-After: 2`.
 - **Steps**: 1) Call `pi.net.fetch({ url: "https://allowed.test/ok" })`. 2)
-  Call `pi.net.fetch({ url: "https://allowed.test/hop" })`.
+  Call `pi.net.fetch({ url: "https://allowed.test/hop" })`. 3) Call
+  `pi.net.fetch({ url: "https://allowed.test/limited" })`.
 - **Expected**: Step 1 returns 200. Step 2 fails with `PERMISSION_DENIED`
   naming `undeclared.test`, and the undeclared server records no request. The
-  audit log shows the denied hop.
-- **Specs linked**: `07-plugins/04-plugin-security.md` §8.0
+  audit log shows the denied hop. Step 3 returns 429 with its `Retry-After`
+  header intact, the server records exactly one request for it, and the audit
+  log shows `ok: false` with the advertised `retryAfter` — the host retries
+  nothing.
+- **Specs linked**: `07-plugins/04-plugin-security.md` §8.0,
+  `07-plugins/03-plugin-api.md` §7
 - **Acceptance**: D, Security
 - **Milestone**: M4+
 - **Status**: runtime-covered by `apps/desktop/test/plugin-egress.test.mjs`
+  (per-hop egress and failed-call audit)
 
 #### E2E-238: Tool requests for an unknown session do not fall back
 
