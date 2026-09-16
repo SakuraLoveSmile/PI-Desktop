@@ -350,8 +350,6 @@ export function AgentSubagentsPage() {
   return (
     <AgentCapabilityPage
       className="agent-subagents-page"
-      description={t("settings.subagentsDescription")}
-      note={t("settings.subagentsOnlyGlobal")}
       toolbar={
         <CapabilityToolbar
           search={search}
