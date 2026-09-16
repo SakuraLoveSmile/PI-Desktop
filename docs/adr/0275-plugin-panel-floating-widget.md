@@ -1,4 +1,4 @@
-# ADR 0273: A floating widget placement for plugin panels
+# ADR 0275: A floating widget placement for plugin panels
 
 - Status: Accepted for implementation
 - Date: 2026-09-17

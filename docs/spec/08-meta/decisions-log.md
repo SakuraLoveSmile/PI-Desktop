@@ -4569,6 +4569,9 @@ D193, and D194.
 
 ## 2026-09-10 — Plan-safe plugin actions and summon-window shortcut (D384)
 
+*(superseded by D438 for the summon-window shortcut; the plan-safe plugin
+action opt-in below stays)*
+
 - Plan and Goal modes could not invoke plugin tools at all, even for
   read-only actions like fetching a URL through the bundled Browser
   plugin, and the keyboard shortcut catalog only exposed a close-window
@@ -4582,6 +4585,55 @@ D193, and D194.
   declares `["navigate", "snapshot", "screenshot", "console"]`; the
   mutating actions stay Agent-only. The shortcut catalog gains
   `summonWindow` (`Mod+Shift+W`) in the `window` group, paired with
+
+## 2026-09-17 — One window toggle replaces the summon/close pair (#360, D438)
+
+- Issue #360 item 3 asks for the summon-window and hide/close-window global
+  shortcuts to become one key. D384 shipped the opposite arrangement —
+  `summonWindow` (`Mod+Shift+W`) as the "symmetrical counterpart" of
+  `closeWindow` (`Mod+W`), mirrored by `04-ux/09-interaction-patterns.md` §1.1 —
+  so D438 supersedes exactly that half of D384; the plan-safe plugin-action
+  opt-in from the same decision is untouched. The numbering skips D435 and D437,
+  which other in-flight work already claims.
+- The catalog ships one `toggleWindow` id in the `window` group, default
+  `Mod+W` on every platform. `closeWindow` and `summonWindow` leave
+  `KEYBOARD_SHORTCUT_IDS`, so the retired `Mod+Shift+W` chord is spent on
+  nothing: it is not a shipped default, not registered with `globalShortcut`,
+  not a settings row, and not a menu accelerator. The plugin shortcut registry
+  therefore now refuses `Alt+Space` and `Mod+W`, and the freed `Mod+Shift+W`
+  becomes available to plugins.
+- Pressing the key is a decision, not a close. `windowToggleAction` hides a
+  visible, focused window through `Window.hide()` and otherwise shows and
+  focuses it (hidden, minimized, or behind another application all count as
+  "not visible"). `Window.hide()` is the whole hide path, so the Windows/Linux
+  close-behaviour prompt, its `Quit` choice, `window-all-closed`, and
+  `before-quit` are never reached, no window is destroyed, and the app keeps
+  running; the tray icon, the same key, or macOS application activation brings
+  the window back. `windowControl("close")` remains the window's own close
+  button, which is still the only way into the close behaviour.
+- Persisted `settings.keybindings` can still name the two retired ids, and the
+  same rule applies in both processes: `migrateKeybindingOverrides` folds the
+  map as it is read — in Electron main before it registers accelerators or
+  builds the menu, and in the renderer store before any consumer sees it — so
+  no surface can act on the retired ids. The rules are ordered and idempotent:
+  an existing `toggleWindow` override wins unchanged; otherwise the first
+  retired entry that carries a *binding* wins, `closeWindow` first because
+  `Mod+W` is the key the toggle keeps; a retired entry that is only `null` is
+  honoured when no binding competes, so an explicit unbind is never replaced by
+  a shipped default; and a stored value equal to its own retired default carries
+  no intent (the settings UI deletes overrides that match a shipped default), so
+  `Mod+W`/`Mod+Shift+W` values are dropped rather than resurrected. Nothing is
+  rewritten in storage: the folded map is what the next shortcut save persists,
+  and an older release reading a newer map simply ignores the unknown id.
+- The window-visibility key is a supported global shortcut on macOS, Windows,
+  and Linux, so it is documented as one: menu label and settings row are
+  localized in all eight catalogs, and the settings card shows a single Window
+  row instead of two contradictory ones.
+- See ADR 0211 (amended), `04-ux/09-interaction-patterns.md` §1.1 and §1.4,
+  `04-ux/06-settings-ia.md` (shortcuts tab), `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`, `03-runtime/01-ipc-protocol.md`
+  (`NATIVE_MENU_ACTIONS`), E2E-072, and
+  `apps/desktop/test/window-toggle-shortcut.test.mjs`.
   `closeWindow` (`Mod+W`), and the desktop main process registers it
   through `globalShortcut` and the native menu. See ADR 0211 and
   E2E-PLAN-005.
@@ -5683,3 +5735,26 @@ that was sitting at the bottom — including after the turn had finished.
   `--ds-bg-composer` / `--ds-tile-deep`. See
   `04-ux/11-asktool-question-card.md`, `04-ux/07-ui-design-system.md` §6.4, and
   E2E-078.
+
+## 2026-09-17 — A git checkout is a Create project source (D438)
+
+- The Create project dialog only collected a project name and local folders
+  (ADR 0233), and the home switcher's Clone git project entry renders inside the
+  hero of a project-bound session. A fresh installation therefore had to open an
+  unrelated local folder before any repository could be cloned.
+- The dialog now owns a source selector with two equal peers: This computer and
+  Git repository. The git source keeps the one name field (seeded from the
+  repository name until the user types), adds a repository URL field and one
+  clone destination row, and parses URLs with the switcher's `parseGitCloneUrl`
+  rules, so private, loopback, link-local, credential-bearing, and malformed
+  remotes keep Create disabled (ADR 0247).
+- Main exposes additive `project/cloneCheckout({ url, parentPath })`: it clones
+  into the explicit parent folder and returns `{ path, name }` without touching
+  the active workspace and without opening a picker. `project/clone` keeps its
+  native-picker behavior for the home switcher.
+- Project creation is unchanged: both sources call one project-slice helper,
+  `project-group/create` still writes the only durable record, and a checkout
+  becomes the primary root of the same logical group (ADR 0233).
+- Renderer plus one narrow main-process capability: no protocol, schema, host
+  RPC, permission, storage, or preference change. See ADR 0273,
+  `03-runtime/01-ipc-protocol.md` §9, `04-ux/08-component-spec.md`, and E2E-258.

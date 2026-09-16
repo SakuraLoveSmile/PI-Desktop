@@ -50,6 +50,7 @@ import type {
   OAuthStartResult,
   OAuthVendor,
   PluginSummary,
+  PluginPermissionReview,
   PluginSettingDefinition,
   PluginServiceStatus,
   PluginViewMeta,
@@ -534,6 +535,11 @@ export const api = {
       IPC.invoke.projectClone,
       { url },
     ),
+  cloneProjectInto: (url: string, parentPath: string) =>
+    invoke<{ path: string; name: string }>(IPC.invoke.projectCloneCheckout, {
+      url,
+      parentPath,
+    }),
   pickFiles: () =>
     invoke<{ token: string | null; canceled?: boolean }>(IPC.invoke.composerPickFiles),
   getDroppedFilePath: (file: File) =>
@@ -651,8 +657,24 @@ export const api = {
     invoke<PlanResolutionResult>(IPC.invoke.plansResolve, resolution),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
-  loadDevPlugin: () => invoke(IPC.invoke.pluginLoadDev),
-  reloadPlugin: (id: string) => invoke(IPC.invoke.pluginReload, id),
+  /**
+   * Picking a folder only reports what it declares; the load happens in
+   * `confirmLoadDevPlugin` once the user has seen that.
+   */
+  loadDevPlugin: () =>
+    invoke<{ canceled?: boolean; review?: PluginPermissionReview }>(
+      IPC.invoke.pluginLoadDev,
+    ),
+  confirmLoadDevPlugin: (input: { path: string; grantedPermissions: string[] }) =>
+    invoke(IPC.invoke.pluginLoadDevConfirm, input),
+  /**
+   * A manifest that asks for more than the current approval comes back as a
+   * `review` instead of a reload, so the page asks before anything is granted.
+   */
+  reloadPlugin: (id: string) =>
+    invoke<{ review?: PluginPermissionReview }>(IPC.invoke.pluginReload, id),
+  confirmReloadPlugin: (input: { id: string; grantedPermissions: string[] }) =>
+    invoke(IPC.invoke.pluginReloadConfirm, input),
   createPluginFromTemplate: (template: string) =>
     invoke<{
       canceled?: boolean;
@@ -660,6 +682,7 @@ export const api = {
       name?: string;
       dir?: string;
       files?: string[];
+      review?: PluginPermissionReview;
     }>(IPC.invoke.pluginCreateFromTemplate, { template }),
   installPluginFromPath: () => invoke(IPC.invoke.pluginInstallFromPath),
   installPluginFromPackage: () => invoke(IPC.invoke.pluginInstallFromPackage),
