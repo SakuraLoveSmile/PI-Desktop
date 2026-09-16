@@ -954,20 +954,22 @@ identify the platform validation still needed.
 
 - **Preconditions**: Session active; message sent.
 - **Steps**: 1) Request a long answer containing Markdown and inline/display
-  math. 2) Observe the assistant response as it streams. 3) Let the answer
-  complete and inspect the renderer console.
+  math using both dollar (`$…$` / `$$…$$`) and TeX bracket (`\(…\)` /
+  `\[…\]`) delimiters. 2) Observe the assistant response as it streams. 3) Let
+  the answer complete and inspect the renderer console.
 - **Expected**: Runtime chunks appear progressively through the incremental
-  Markdown renderer and the final response is complete. The renderer does not
-  start a second animation-frame typewriter loop, raise React error 185, or
+  Markdown renderer and the final response is complete. All four math delimiter
+  forms render with KaTeX, with `\[…\]` using display layout. The renderer does
+  not start a second animation-frame typewriter loop, raise React error 185, or
   reject Vite-inlined KaTeX fonts under CSP.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
   `05-security/01-security.md`
 - **Acceptance**: C (streamed output), Quality
 - **Milestone**: M2
-- **Status**: Partially automated (protocol live-model stream plus renderer
-  source regression in `renderer-stream-safety.test.mjs`; full UI observation
-  remains Draft)
+- **Status**: Partially automated (protocol live-model stream, renderer source
+  regression in `renderer-stream-safety.test.mjs`, and math delimiter rendering
+  in `latex-math.test.mjs`; full UI observation remains Draft)
 
 #### E2E-010: Abort generation
 

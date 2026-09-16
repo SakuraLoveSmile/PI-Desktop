@@ -426,21 +426,21 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 #### E2E-009：UI 中可见的流式令牌
 
 - **先决条件**：会话处于活动状态；消息已发送。
-- **步骤**：1) 请求包含 Markdown 和 inline/display 的长答案
-  数学。 2) 观察助理的响应。 3）让答案
-  完成并检查渲染器控制台。
-- **预期**：运行时块通过增量逐渐出现
-  Markdown 渲染器和最终响应完成。渲染器不
-启动第二个动画帧打字机循环，引发 React 错误 185，或者
-  拒绝 CSP 下的 Vite 内联 KaTeX 字体。
+- **步骤**：1) 请求包含 Markdown 和行内/块级数学公式的长答案，公式同时使用
+  美元符号（`$…$` / `$$…$$`）和 TeX 括号（`\(…\)` / `\[…\]`）分隔符。
+  2) 观察助理的流式响应。3) 让答案完成并检查渲染器控制台。
+- **预期**：运行时块通过增量 Markdown 渲染器逐渐出现，最终响应完整。
+  四种数学分隔符均由 KaTeX 渲染，其中 `\[…\]` 使用块级布局。渲染器不会
+  启动第二个动画帧打字机循环、触发 React 错误 185，或因 CSP 拒绝 Vite
+  内联的 KaTeX 字体。
 - **链接规格**：`03-runtime/02-agent-runtime.md`，
   `04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`、
   `05-security/01-security.md`
 - **验收**：C（流式输出），质量
 - **里程碑**：M2
-- **状态**：部分自动化（协议实时模型流加上渲染器
-  `renderer-stream-safety.test.mjs` 中的源回归；完整的UI观察
-  仍为草案）
+- **状态**：部分自动化（协议实时模型流、`renderer-stream-safety.test.mjs`
+  中的渲染器源回归，以及 `latex-math.test.mjs` 中的数学分隔符渲染；
+  完整 UI 观察仍为草案）
 
 #### E2E-010：中止生成
 
