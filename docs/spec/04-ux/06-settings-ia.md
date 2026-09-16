@@ -104,10 +104,12 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     `net.fetch`, and the in-app browser). Workspace Bash and the system
     browser used for OAuth are not rewritten.
   - Custom shows a Proxy URL field (`socks5://127.0.0.1:1080` /
-    `http://127.0.0.1:7890`), a Bypass list defaulting to
-    `localhost,127.0.0.1,::1,<local>` so loopback MCP and local models stay
-    direct, and a Test action that issues one Chromium fetch through the
-    draft proxy. The URL is validated on blur; invalid schemes are rejected.
+    `http://127.0.0.1:7890`, including `user:pass@` userinfo), a Bypass
+    list defaulting to `localhost,127.0.0.1,::1,<local>` so loopback MCP
+    and local models stay direct, and a Test action that issues one
+    Chromium fetch through the draft proxy. Credentialed URLs are applied
+    to Chromium through a loopback SOCKS5 relay (issue #490). The URL is
+    validated on blur; invalid schemes are rejected.
   - The selection persists as optional `AppSettings.networkProxy`
     (`mode` / `url` / `bypass`). Absent means System. No host protocol or
     storage schema version bump (D340 / ADR 0177).

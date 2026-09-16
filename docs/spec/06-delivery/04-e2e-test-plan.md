@@ -10414,7 +10414,10 @@ are withdrawn with ADR 0165.
      `settings.get`.
   4. Click Test against a listening proxy. Confirm a Connected status. Click
      Test against a closed port. Confirm a failure status without changing
-     the saved URL.
+     the saved URL. Enter `http://user:pass@127.0.0.1:<auth-port>` and
+     `socks5://user:pass@127.0.0.1:<auth-port>` against proxies that require
+     those credentials. Confirm Test reports Connected rather than
+     `net::ERR_NO_SUPPORTED_PROXIES` (issue #490).
   5. With Custom saved, send a short prompt through the configured provider.
      Confirm the provider request and response pass through the proxy,
      including when a SOCKS5 proxy returns the complete bind response in one
@@ -10428,15 +10431,18 @@ are withdrawn with ADR 0165.
   `net.fetch`, and the in-app browser. Workspace Bash `env` does not show
   `HTTP_PROXY` / `ALL_PROXY` from the setting. OAuth still opens the system
   browser. Invalid schemes (`file:`, `ftp:`, and SOCKS4) and malformed
-  percent-encoded credentials are rejected. No protocol or schema version bump.
+  percent-encoded credentials are rejected. Authenticated HTTP and SOCKS5
+  URLs Test and apply without `net::ERR_NO_SUPPORTED_PROXIES` (issue #490).
+  No protocol or schema version bump.
 - **Specs linked**: `04-ux/06-settings-ia.md`,
   `03-runtime/07-process-model.md`, ADR 0177, D340
 - **Acceptance**: B (settings), F (providers), Security
 - **Milestone**: M5
 - **Status**: Unit-covered (`network-proxy.test.ts`, `node-proxy.test.ts`,
-  `settings-general.test.mjs`, host-core `network_proxy` tests); malformed
-  credentials and unsupported SOCKS4 schemes are covered by the shared parser
-  tests; full UI journey Draft (run only in a capable environment when this surface changes)
+  `authenticated-proxy-relay.test.ts`, `settings-general.test.mjs`,
+  host-core `network_proxy` tests); malformed credentials and unsupported
+  SOCKS4 schemes are covered by the shared parser tests; full UI journey
+  Draft (run only in a capable environment when this surface changes)
 
 #### E2E-191: Newly emitted AppError codes stay registered
 
