@@ -2204,8 +2204,8 @@ identify the platform validation still needed.
      unmatched locales disappear. Type a theme name into the theme search and
      confirm unmatched options disappear.
 - **Expected**: Theme and Language are searchable picker rows (not a card grid
-  and not a native select); each closed trigger fills the settings control
-  column without overflowing the row. Theme lists System, Light, and Dark,
+  and not a native select); each closed trigger sizes to the current label,
+  capped by the settings control column, without overflowing the row. Theme lists System, Light, and Dark,
   then any plugin themes after a divider. Auto resolves the OS locale through
   the main process (`app.getLocale()`), passes it safely through the sandboxed
   preload bridge, and reflects the detected native name inline in the menu;
@@ -2231,7 +2231,7 @@ identify the platform validation still needed.
 
 - **Preconditions**: App running with a host that reports at least one configured command shell and at least one catalog shell that is unavailable on this platform.
 - **Steps**: 1) Open Settings → General and open the Theme and Language pickers; note the pill trigger and the opened surface. 2) Open 全局 AI. 3) Open the Permissions card's permission-mode control and select ask, accept-edits, and auto in turn. 4) Open the Defaults card's Command shell control; inspect the unavailable entries and select an available shell. 5) Dismiss each open menu with Escape and then with an outside press. 6) Close Settings, reopen it, and read both rows.
-- **Expected**: Both rows open the same anchored menu surface as the Appearance pickers — the app-drawn frame with the shared radius, elevation, border, and theme tokens, a check mark on the current option, and a hover/keyboard highlight — and never a platform-drawn `<select>` popup. Unavailable shells stay listed with their suffix, are not selectable, and cannot become the current value. Escape and an outside press close the menu and restore focus to the trigger; arrow keys move between selectable options with wraparound. The selected permission mode and command shell persist across closing and reopening Settings, and the selected shell stays the only configured-state indicator.
+- **Expected**: Both rows open the same anchored menu surface as the Appearance pickers — the app-drawn frame with the shared radius, elevation, border, and theme tokens, a check mark on the current option, and a hover/keyboard highlight — and never a platform-drawn `<select>` popup. Closed triggers size to the current label, capped by the settings control column. Unavailable shells stay listed with their suffix, are not selectable, and cannot become the current value. Escape and an outside press close the menu and restore focus to the trigger; arrow keys move between selectable options with wraparound. The selected permission mode and command shell persist across closing and reopening Settings, and the selected shell stays the only configured-state indicator.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/09-interaction-patterns.md`
 - **Acceptance**: A (core shell)
 - **Milestone**: M4
@@ -4567,11 +4567,13 @@ identify the platform validation still needed.
 
 - **Preconditions**: PI-Desktop is running on Windows with light and dark
   themes available.
-- **Steps**: 1) In light theme, open native selects in Settings → Basics,
-  Settings → Model configuration, Settings → Import, and one scheduled-task
-  form. 2) Repeat every surface in dark theme. 3) Open each list after
+- **Steps**: 1) In light theme, open remaining native selects (scheduled-task
+  form) and confirm Settings pickers on General, 全局 AI, Model configuration,
+  and Import open as in-app menus rather than platform `<select>` popups. 2)
+  Repeat every remaining native list in dark theme. 3) Open each list after
   switching themes without restarting the app.
-- **Expected**: Every closed trigger and opened native option list uses the
+- **Expected**: Settings compact pickers use the shared anchored menu. Every
+  remaining closed native trigger and opened native option list uses the
   active theme's readable foreground/background pairing. No dark-theme list
   falls back to a light Windows surface with light text, no light-theme list
   uses dark-theme ink, and changing theme updates subsequent openings. The
