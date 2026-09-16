@@ -597,21 +597,39 @@ async function main() {
     );
 
     const composer = await cdp.evaluate(`(() => {
+      const stack = document.querySelector(".composer-stack");
       const bar = document.querySelector(".composer-toolbar");
       const left = document.querySelector(".composer-left");
       const right = document.querySelector(".composer-right");
-      if (!bar || !left || !right) return null;
-      return {
+      const modelChip = document.querySelector(".composer-model-thinking-chip");
+      const modelLabel = document.querySelector(".composer-model-thinking-model");
+      if (!stack || !bar || !left || !right || !modelChip || !modelLabel) return null;
+
+      const originalWidth = stack.style.width;
+      const originalTransition = stack.style.transition;
+      stack.style.transition = "none";
+      stack.style.width = "450px";
+      const modelLabelStyles = getComputedStyle(modelLabel);
+      const result = {
         width: Math.round(bar.getBoundingClientRect().width),
         clipped: bar.scrollWidth > bar.clientWidth + 1,
         sameRow:
           Math.round(left.getBoundingClientRect().top) ===
           Math.round(right.getBoundingClientRect().top),
+        modelLabelHidden: modelLabelStyles.display === "none",
+        modelChipWidth: Math.round(modelChip.getBoundingClientRect().width),
       };
+      stack.style.width = originalWidth;
+      stack.style.transition = originalTransition;
+      return result;
     })()`);
     check(
-      composer !== null && composer.clipped === false && composer.sameRow === true,
-      "the composer toolbar stays on one unfolded row at the MainChat floor",
+      composer !== null &&
+        composer.clipped === false &&
+        composer.sameRow === true &&
+        composer.modelLabelHidden === true &&
+        composer.modelChipWidth <= 32,
+      "the composer toolbar stays on one row and collapses the model to its icon at the 450px Composer floor",
       JSON.stringify(composer),
     );
 
