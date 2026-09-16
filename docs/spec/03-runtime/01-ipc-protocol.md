@@ -1469,9 +1469,11 @@ Desktop-only skill market channels (not host RPC) live on Electron IPC:
   never left the process), `unresolved` (the local DNS lookup returned no answer,
   so no address was judged — a resolver or proxy condition, not a verdict on the
   source), or `network`. `failureDetails` carries the same keys with the host
-  that actually failed, the guard's own `reason`, and the class of the refused
-  address, which is what lets the panel name *what* was refused instead of only
-  which source went quiet. A judged refusal also surfaces as
+  that actually failed, the guard's own `reason`, the class of the refused
+  address, and the route that address was judged on (`proxied`, `direct`, or
+  `unknown` when the transport reported no readable route, ADR 0272), which is
+  what lets the panel name *what* was refused instead of only which source went
+  quiet.
   `NETWORK_POLICY_BLOCKED` and an unanswered resolver as `NETWORK_RESOLVE_FAILED`
   (spec 08 §3.1); the install sheet classifies a failed preview on those two
   codes.
