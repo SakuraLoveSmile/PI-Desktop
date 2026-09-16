@@ -6524,8 +6524,8 @@ identify the platform validation still needed.
       project-level controls. Confirm a Built-in group lists the five shipped
       defaults (`explorer`, `code-reviewer`, `test-runner`, `fixer`,
       `ui-designer`) even when the user directory is empty, each with a
-      Built-in badge, its tool grant, and no enablement switch, reveal, or
-      delete. Confirm the Global group header carries the global level label
+      Built-in badge, its tool grant, and an enablement switch, but no reveal
+      or delete. Confirm the Global group header carries the global level label
       and item count, that create/edit/delete/reveal all work from the page
       for user-owned rows, that leaving the output limit empty writes a
       definition with no `maxTokens`, and that an empty user
@@ -7469,6 +7469,8 @@ identify the platform validation still needed.
 | Quality (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
 | M6+ (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
 | M6+ (capability level move) | E2E-CAPABILITY-move-across-levels |
+| E — Tools & permissions (builtin subagent defaults) | E2E-SUBAGENT-settings-lists-builtin-defaults |
+| Quality (builtin subagent defaults) | E2E-SUBAGENT-settings-lists-builtin-defaults |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -9190,33 +9192,42 @@ This test plan spec is accepted when:
 #### E2E-SUBAGENT-settings-lists-builtin-defaults
 
 - **Preconditions**: A running app. `~/.agents/subagents` is empty. The five
-  shipped builtins are present and no user document shadows them.
+  shipped builtins are present, none is switched off, and no user document
+  shadows them.
 - **Steps**:
   1. Open Settings → Agent → Subagents. Confirm a Built-in group lists
      `explorer`, `code-reviewer`, `test-runner`, `fixer`, and `ui-designer`
-     with localized names, `Task(<handle>)` copy, tool grants, and a Built-in
-     badge. Confirm none of those rows has an enablement switch, Reveal, or
-     Delete.
+     with localized names, `Task(<handle>)` copy, tool grants, a Built-in
+     badge, **Copy as mine**, and an enablement switch in the on position.
+     Confirm none of those rows has Reveal or Delete.
   2. Confirm the Global group still shows localized `settings.subagentsEmpty`
      copy and the New subagent action.
-  3. Choose **Copy as mine** on explorer. Confirm the create sheet opens
+  3. Switch `fixer` off from its Built-in row. Confirm the row dims with its
+     switch off, the toast names it, nothing appears in `~/.agents/subagents`,
+     and the row stays listed, because that switch is the way back on.
+  4. Send a prompt with `fixer` switched off. Confirm the Task catalog does not
+     offer it while the other four remain, then switch it back on and confirm
+     the next prompt offers it again.
+  5. Choose **Copy as mine** on explorer. Confirm the create sheet opens
      pre-filled from that definition (name, description, tools, body) with
      the Explorer template chip selected, not Blank. Save. Confirm
      explorer now appears only as a user-owned Global row and is omitted from
      Built-in, and the next prompt's Task catalog uses the user document.
-     row and is omitted from Built-in, and the next prompt's Task catalog
-     uses the user document.
-  4. Disable the user explorer and reload the page. Confirm the user row is
+  6. Disable the user explorer and reload the page. Confirm the user row is
      off and explorer reappears under Built-in (disabled user documents do
      not reach the loader, so the shipped definition wins again).
-- **Expected**: Settings shows the defaults the agent can actually delegate
-  to. Copying a builtin is how a user retunes it; enablement, reveal, and
-  delete remain file-backed actions on user-owned rows only.
+- **Expected**: Settings shows the defaults the agent can actually delegate to,
+  and every one of them can be turned off from its own row. Builtin activation
+  is app-local state rather than a document, so a switched-off default keeps its
+  row; copying a builtin stays the way to retune one, and reveal and delete
+  remain file-backed actions on user-owned rows only.
 - **Specs linked**: `04-ux/06-settings-ia.md` §2, `03-runtime/01-ipc-protocol.md`
-  §12c, `03-runtime/02-agent-runtime.md` §5f, ADR 0062, ADR 0063
+  §12c, `03-runtime/02-agent-runtime.md` §5f, ADR 0062, ADR 0063, ADR 0270
 - **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M6+
 - **Status**: Source/unit covered (`apps/desktop/test/agent-capability-settings.test.mjs`,
+  `apps/desktop/test/subagent-wiring.test.mjs`,
+  `packages/agent-runtime/src/subagent-definitions.test.ts`,
   `packages/shared/src/subagent-presets.test.ts`); full UI journey Draft
   (run only in a capable environment when this surface changes)
 
