@@ -544,6 +544,11 @@ sklm: {
       failureDetail: "詳情: ",
       retryPreview: "重試",
       remoteErrorPolicy: "目錄源被應用程式的地址校驗阻止,已顯示內建精選",
+      remoteErrorUnresolved: "本機 DNS 無法解析目錄源,已顯示內建精選",
+      previewResolveError: "應用程式的地址校驗無法解析該主機,未安裝任何內容。",
+      dnsHint:
+        "該校驗在本機解析主機,而下載本身會走代理。如果你使用代理、VPN 或自訂 DNS,請檢查 設定 → 一般 → 網路。",
+      failureSourceHost: "{{name}}（{{host}}）",
       remoteErrorQuery: "無法查詢技能市場,已顯示內建精選",
       remotePartial: "部分目錄源不可用（{{names}}）",
     },

@@ -7,6 +7,8 @@ import {
   PUBLIC_NETWORK_POLICY_ERROR,
   isPublicHostname,
   isPublicNetworkPolicyFailure,
+  publicNetworkRefusalDetail,
+  publicNetworkRefusalReason,
 } from "./public-network.js";
 
 describe("public network address policy", () => {
@@ -96,5 +98,45 @@ describe("public network address policy", () => {
     expect(isPublicNetworkPolicyFailure(null)).toBe(false);
     expect(isPublicNetworkPolicyFailure("PublicNetworkPolicyError")).toBe(false);
     expect(PUBLIC_NETWORK_POLICY_ERROR).toBe("PublicNetworkPolicyError");
+  });
+
+  it("reads a refusal's own reason, and treats an unnamed one as a refusal", () => {
+    // Issue #419: "the resolver answered nothing" and "the resolved address is
+    // not public" need different fixes, so a refusal has to say which one it is
+    // without the reader parsing its message.
+    expect(
+      publicNetworkRefusalDetail({
+        name: PUBLIC_NETWORK_POLICY_ERROR,
+        reason: "resolve-failed",
+        host: "api.github.com",
+      }),
+    ).toEqual({ reason: "resolve-failed", host: "api.github.com" });
+    // An unrecognized or absent reason is still a refusal — never permission —
+    // so a caller that needs the stricter reading gets `undefined`, not a pass.
+    expect(publicNetworkRefusalReason({ name: PUBLIC_NETWORK_POLICY_ERROR })).toBeUndefined();
+    expect(publicNetworkRefusalReason({ name: PUBLIC_NETWORK_POLICY_ERROR, reason: "made-up" })).toBeUndefined();
+    expect(publicNetworkRefusalDetail({ name: PUBLIC_NETWORK_POLICY_ERROR })).toBeUndefined();
+    expect(isPublicNetworkPolicyFailure({ name: PUBLIC_NETWORK_POLICY_ERROR })).toBe(true);
+    // The class travels, the address never does: `benchmark` is a TUN fake-IP
+    // and `private` is a real RFC1918 target, and only the class separates them.
+    expect(
+      publicNetworkRefusalDetail({
+        name: PUBLIC_NETWORK_POLICY_ERROR,
+        reason: "non-public-address",
+        host: "api.github.com",
+        address: "198.18.0.4",
+        addressKind: "benchmark",
+      }),
+    ).toEqual({ reason: "non-public-address", host: "api.github.com", addressKind: "benchmark" });
+    // An unknown class is dropped rather than passed through.
+    expect(
+      publicNetworkRefusalDetail({
+        name: PUBLIC_NETWORK_POLICY_ERROR,
+        reason: "non-public-address",
+        addressKind: "made-up",
+      }),
+    ).toEqual({ reason: "non-public-address" });
+    expect(publicNetworkRefusalDetail(new Error("responded 502"))).toBeUndefined();
+    expect(publicNetworkRefusalDetail(undefined)).toBeUndefined();
   });
 });

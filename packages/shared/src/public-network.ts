@@ -153,6 +153,87 @@ export function isPublicNetworkPolicyFailure(error: unknown): boolean {
   );
 }
 
+/**
+ * Why the guard refused, at the granularity a user can act on. Only
+ * `non-public-address` and `url-syntax` are verdicts on the URL itself;
+ * `resolve-failed` means the local resolver produced no answer at all, which is
+ * an environment condition — a proxied or offline resolver — rather than a
+ * policy decision about a resolved address (issue #419, ADR 0243).
+ */
+export type PublicNetworkRefusalReason =
+  | "url-syntax"
+  | "resolve-failed"
+  | "non-public-address"
+  | "redirect-limit";
+
+/**
+ * The structured reason a public-network refusal carries, or `undefined` for an
+ * unrecognized refusal. Callers that must keep the guard's fail-closed behavior
+ * but want to explain it — the skill market's classifier and its diagnostics —
+ * read this instead of re-parsing the message. `undefined` is never permission:
+ * a refusal that cannot name its reason is still a refusal.
+ */
+export function publicNetworkRefusalReason(error: unknown): PublicNetworkRefusalReason | undefined {
+  if (!isPublicNetworkPolicyFailure(error)) return undefined;
+  const reason = (error as { reason?: unknown }).reason;
+  return reason === "url-syntax" ||
+    reason === "resolve-failed" ||
+    reason === "non-public-address" ||
+    reason === "redirect-limit"
+    ? reason
+    : undefined;
+}
+/** A refusal's own account of itself, extractable without importing the client. */
+export type PublicNetworkRefusalDetail = {
+  reason: PublicNetworkRefusalReason;
+  /** The hostname the guard was classifying, when it got that far. */
+  host?: string;
+  /** The class of the address that failed the policy, never the address. */
+  addressKind?: PublicNetworkAddressKind;
+};
+
+const PUBLIC_NETWORK_ADDRESS_KINDS: ReadonlyArray<PublicNetworkAddressKind> = [
+  "public",
+  "invalid",
+  "unspecified",
+  "loopback",
+  "private",
+  "cgnat",
+  "link-local",
+  "multicast",
+  "reserved",
+  "documentation",
+  "benchmark",
+  "ula",
+  "site-local",
+];
+
+/**
+ * What a refusal says about itself: why, which host, and which class of address
+ * failed. Callers that must explain a block — the skill market's classifier and
+ * its diagnostics — read this instead of parsing the message. `addressKind`
+ * travels without the address: the class is what separates a resolver artifact
+ * (`benchmark`, a TUN fake-IP) from a real private target (`private`, RFC1918),
+ * and it is not a secret.
+ */
+export function publicNetworkRefusalDetail(error: unknown): PublicNetworkRefusalDetail | undefined {
+  const reason = publicNetworkRefusalReason(error);
+  if (!reason) return undefined;
+  const source = error as { host?: unknown; addressKind?: unknown };
+  const host = typeof source.host === "string" && source.host ? source.host : undefined;
+  const addressKind = PUBLIC_NETWORK_ADDRESS_KINDS.includes(
+    source.addressKind as PublicNetworkAddressKind,
+  )
+    ? (source.addressKind as PublicNetworkAddressKind)
+    : undefined;
+  return {
+    reason,
+    ...(host ? { host } : {}),
+    ...(addressKind ? { addressKind } : {}),
+  };
+}
+
+
 function parseIpv4(value: string): number | null {
   const parts = value.split(".");
   if (

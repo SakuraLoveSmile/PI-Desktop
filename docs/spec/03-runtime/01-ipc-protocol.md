@@ -1461,15 +1461,20 @@ state is pruned during the next scan.
 Desktop-only skill market channels (not host RPC) live on Electron IPC:
 
 - `pi-desktop/skill/market/search` — `{ query, sources[] }` →
-  `{ entries, failedSources, failureKinds }`. Main aggregates builtin-safe
-  catalog JSON and GitHub repo SKILL.md scans. Source URLs must pass the
-  public-HTTPS policy (ADR 0243). One failing source is dropped; the rest still
-  return. `failureKinds` maps each name in `failedSources` to `policy` (the
-  public-network guard refused it, so the request never left the process) or
-  `network`, which is what lets the panel explain a policy/DNS refusal — the
-  case a proxied user hits — instead of reporting every source as unreachable.
-  A guard refusal also surfaces as `NETWORK_POLICY_BLOCKED` (spec 08 §3.1), the
-  code the install sheet classifies a failed preview on.
+  `{ entries, failedSources, failureKinds, failureDetails }`. Main aggregates
+  builtin-safe catalog JSON and GitHub repo SKILL.md scans. Source URLs must pass
+  the public-HTTPS policy (ADR 0243). One failing source is dropped; the rest
+  still return. `failureKinds` maps each name in `failedSources` to `policy`
+  (the public-network guard judged the target and refused it, so the request
+  never left the process), `unresolved` (the local DNS lookup returned no answer,
+  so no address was judged — a resolver or proxy condition, not a verdict on the
+  source), or `network`. `failureDetails` carries the same keys with the host
+  that actually failed, the guard's own `reason`, and the class of the refused
+  address, which is what lets the panel name *what* was refused instead of only
+  which source went quiet. A judged refusal also surfaces as
+  `NETWORK_POLICY_BLOCKED` and an unanswered resolver as `NETWORK_RESOLVE_FAILED`
+  (spec 08 §3.1); the install sheet classifies a failed preview on those two
+  codes.
 - `pi-desktop/skill/market/fetch` — `{ entry }` → `{ name?, description?, body, resources? }`.
   Main fetches the document over the same policy, splits frontmatter, and may
   attach sibling `.md` files from a jsDelivr listing. The renderer installs
