@@ -233,6 +233,10 @@ Composer 拥有 Agent/Plan/Goal 控件以及组合的模型 × 推理选择（§
   由图标本身承载，只有语义化的悬停淡色才会在其下着色。面板头部为动作组
   预留的车道宽度也由同一个控件尺寸推导，而不是写死的字面量；开关的打开
   状态只改变图形与墨色，这一族控件都不绘制填充或抬升的“开启”胶囊。
+  With the sidebar collapsed, Plugins, Pull requests, and Scheduled render their
+  sidebar/New Task actions inside `.main-titlebar`, not the preview-only
+  `.window-chrome-row`. Both containers must share the same geometry, rest,
+  hover, and disabled rules; route actions must not duplicate those declarations.
 
 ### 2.4 状态
 

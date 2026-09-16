@@ -7215,6 +7215,17 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   3. 在布局收起左栏后手动重开左栏。
   4. 关闭工作面板并确认左栏恢复；再在手动收起左栏后重复一次。
   5. 用 `ArrowLeft`、`ArrowRight`、`Home`、`End` 重复调整分隔线。
+  6. Navigate to the real Plugins, Pull requests, and Scheduled routes with the
+     work panel closed, then collapse the sidebar. In light and dark themes,
+     measure both titlebar actions and compare their rest/hover styling with the
+     shared work-panel toggle. Reopen the sidebar, collapse it again, and use
+     New Task to return to an editable chat composer on each route.
+- **Route chrome expected**: The ordinary `.main-titlebar` actions (without a
+  preview chrome ancestor) render as centered 28px square targets with the shared
+  transparent rest surface, secondary ink, radius, and semantic hover wash/primary
+  ink. Hover does not change geometry; sidebar and New Task remain usable.
+  Automated by `pnpm test:e2e:layout` using real route components and DOM/CDP
+  interaction. This is renderer evidence, not native Windows/Linux hit-test proof.
 - **预期**：原生窗口宽度全程不变。MainChat 永不低于 360px —— 包含拖动过程中以及 `sidebar-out` 仍占位弹性空间期间。工作面板有效上限为客户端宽度减去 360px 下限与展开的左栏宽度，且无固定像素上限。预算耗尽时展开的左栏立即收起，面板之后仍可继续增长。手动重开优先占用右栏宽度；能保住当前 MainChat 则保持，否则落在 370px 的重开目标。关闭面板只恢复由布局机制收起的左栏。分隔线的 ARIA 最小/最大值遵循同一动态预算。
 - **链接规格**：`04-ux/01-ui-ia.md`、`04-ux/07-ui-design-system.md` §10、`04-ux/08-component-spec.md` §1 与 §5、`04-ux/09-interaction-patterns.md` §8、ADR 0238
 - **验收**：F（持久化）、品质

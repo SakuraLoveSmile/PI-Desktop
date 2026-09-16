@@ -12197,7 +12197,16 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   4. Close the work panel and confirm the sidebar returns; repeat after
      manually collapsing the sidebar.
   5. Repeat divider changes with `ArrowLeft`, `ArrowRight`, `Home`, and `End`.
-- **Expected**: The native window width never changes. MainChat never measures
+  6. Navigate to the real Plugins, Pull requests, and Scheduled routes with the
+     work panel closed, then collapse the sidebar. In light and dark themes,
+     measure both titlebar actions and compare their rest/hover styling with the
+     shared work-panel toggle. Reopen the sidebar, collapse it again, and use
+     New Task to return to an editable chat composer on each route.
+- **Expected**: The ordinary `.main-titlebar` actions (without a preview chrome
+  ancestor) render as centered 28px square targets, with the shared transparent
+  rest surface, secondary ink, radius, and semantic hover wash/primary ink.
+  Hover does not change geometry; sidebar and New Task actions remain usable.
+  The native window width never changes. MainChat never measures
   below 450px — including mid-drag and while `sidebar-out` still occupies flex
   space. The effective panel maximum is the client width minus the 450px
   MainChat floor and the expanded sidebar width, with no fixed pixel cap. When that
@@ -12221,9 +12230,13 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   `pnpm test:e2e:layout` — fixed-window width invariance, the 450px floor across
   a pointer drag, the unfolded composer row at that floor, sidebar
   yield/restore, the 460px reopen target, the panel action group's shared
-  control gap, and preview mode). The panel controls' transparent seat is pinned
-  by the source contracts in `chrome-control-geometry.test.mjs`; the rendered
-  surface needs the eyes-on pass above. Unit coverage in
+  control gap, preview mode, and ordinary Plugins/Pull requests/Scheduled titlebar
+  geometry, light/dark rest/hover styles, and sidebar/New Task DOM actions).
+  Source contracts in `chrome-control-geometry.test.mjs` also cover the shared
+  disabled state and panel controls' transparent seat; the panel surface still
+  needs the eyes-on pass above. DOM/CDP checks establish renderer behavior, not
+  native Windows/Linux hit testing; native platform checks remain separate.
+  Unit coverage in
   `work-panel-resize.test.mjs`
 
 #### E2E-LAYOUT-work-panel-maximize

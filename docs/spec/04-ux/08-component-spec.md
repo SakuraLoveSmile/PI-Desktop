@@ -281,6 +281,10 @@ combined model × reasoning selection (§11).
   lane reserve is derived from that same control size rather than from a
   literal, and the toggle's open state is its glyph swap plus the engaged ink —
   no control in this family paints a filled or raised "on" pill.
+  With the sidebar collapsed, Plugins, Pull requests, and Scheduled render their
+  sidebar/New Task actions inside `.main-titlebar`, not the preview-only
+  `.window-chrome-row`. Both containers must share the same geometry, rest,
+  hover, and disabled rules; route actions must not duplicate those declarations.
 - Band reservation is platform-independent (D269). The band is opaque and
   absolutely positioned, so scrolling route content passes underneath it on
   every platform, macOS included. Every route surface that starts its own

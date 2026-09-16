@@ -945,6 +945,99 @@ async function main() {
     await cdp.evaluate(`document.querySelector(".work-panel-maximize")?.click?.()`);
     await e2eChromeSettle(900);
 
+    await rig(`window.__PI_DESKTOP__.collapseWorkPanel()`);
+    const originalTheme = await cdp.evaluate(`document.documentElement.dataset.theme`);
+    const routeActionSelector = ".main-titlebar .title-nav-btn";
+    const readChromeAction = (selector) => cdp.evaluate(`(() => {
+      const control = document.querySelector(${JSON.stringify(selector)});
+      if (!control) throw new Error("Chrome action missing");
+      const box = control.getBoundingClientRect();
+      const style = getComputedStyle(control);
+      return {
+        width: box.width, height: box.height,
+        x: box.left + box.width / 2, y: box.top + box.height / 2,
+        background: style.backgroundColor, color: style.color,
+        radius: style.borderRadius, border: style.borderWidth,
+        display: style.display, align: style.alignItems, justify: style.justifyContent,
+        flex: style.flex, cursor: style.cursor,
+        hovered: control.matches(":hover"),
+      };
+    })()`);
+    const movePointer = async (x, y) => {
+      await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+      await delay(220);
+    };
+    for (const route of ["plugins", "pulls", "scheduled"]) {
+      if ((await measure()).sidebarKind !== "sidebar") await clickSidebarToggle();
+      await rig(`window.__PI_DESKTOP__.setPage(${JSON.stringify(route)})`);
+      await waitFor(
+        () => cdp.evaluate(`!!document.querySelector(".route-page .page-frame") && !!document.querySelector(".main-titlebar")`),
+        `${route} route mounted`,
+      );
+      await clickSidebarToggle();
+      await waitFor(
+        () => cdp.evaluate(`!document.querySelector(".sidebar") && document.querySelectorAll(${JSON.stringify(routeActionSelector)}).length === 2`),
+        `${route} collapsed-sidebar actions`,
+      );
+      check(
+        await cdp.evaluate(`!document.querySelector(".window-chrome-row")`),
+        `${route} exercises the ordinary titlebar, not preview chrome`,
+      );
+      for (const theme of ["light", "dark"]) {
+        await cdp.evaluate(`window.__PI_DESKTOP__.setThemeAttr(${JSON.stringify(theme)})`);
+        await movePointer(500, 300);
+        const reference = await readChromeAction(".app-work-panel-toggle");
+        await movePointer(reference.x, reference.y);
+        const referenceHover = await readChromeAction(".app-work-panel-toggle");
+        check(
+          reference.background === "rgba(0, 0, 0, 0)" &&
+            referenceHover.hovered && referenceHover.background !== reference.background,
+          `${route}/${theme} shared chrome reference has transparent rest and hover wash`,
+          JSON.stringify({ reference, referenceHover }),
+        );
+        for (const action of ["toggle-sidebar", "new-task"]) {
+          const selector = `${routeActionSelector}[data-nav="${action}"]`;
+          await movePointer(500, 300);
+          const rest = await readChromeAction(selector);
+          check(
+            Math.abs(rest.width - 28) < 0.1 && Math.abs(rest.height - 28) < 0.1 &&
+              ["background", "color", "radius", "border", "display", "align", "justify", "flex", "cursor"].every(
+                (property) => rest[property] === reference[property],
+              ),
+            `${route}/${theme} ${action} shares the rendered 28px chrome target and rest style`,
+            JSON.stringify(rest),
+          );
+          await movePointer(rest.x, rest.y);
+          const hover = await readChromeAction(selector);
+          check(
+            hover.hovered && hover.background === referenceHover.background &&
+              hover.color === referenceHover.color &&
+              hover.width === rest.width && hover.height === rest.height,
+            `${route}/${theme} ${action} shares the hover wash without changing geometry (CDP)`,
+            JSON.stringify(hover),
+          );
+        }
+      }
+      await cdp.evaluate(`document.querySelector('${routeActionSelector}[data-nav="toggle-sidebar"]').click()`);
+      await waitFor(
+        () => cdp.evaluate(`!!document.querySelector(".sidebar:not(.is-exiting)") && !document.querySelector(${JSON.stringify(routeActionSelector)})`),
+        `${route} sidebar reopens through its titlebar action`,
+      );
+      check(true, `${route} titlebar sidebar action reopens navigation (DOM)`);
+      await clickSidebarToggle();
+      await waitFor(
+        () => cdp.evaluate(`!document.querySelector(".sidebar") && !!document.querySelector('${routeActionSelector}[data-nav="new-task"]')`),
+        `${route} new-task action after recollapse`,
+      );
+      await cdp.evaluate(`document.querySelector('${routeActionSelector}[data-nav="new-task"]').click()`);
+      await waitFor(
+        () => cdp.evaluate(`!!document.querySelector(".conversation-topbar") && !!document.querySelector(".composer-input:not(:disabled)") && !document.querySelector(".route-page")`),
+        `${route} new task returns to an editable chat composer`,
+      );
+      check(true, `${route} titlebar new-task action returns to chat (DOM)`);
+    }
+    await cdp.evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(originalTheme)}`);
+
     const failed = results.filter((entry) => !entry.ok);
     console.log(
       `\nE2E-LAYOUT-three-column-width-priority: ${results.length - failed.length}/${results.length} checks passed`,

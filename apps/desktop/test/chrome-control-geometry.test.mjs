@@ -117,6 +117,15 @@ function sharedChromeControlMembers(suffix = "") {
 }
 
 test("the preview and route-band actions share the chrome control geometry", () => {
+  for (const suffix of ["", ":hover:not(:disabled)", ":disabled"]) {
+    const members = sharedChromeControlMembers(suffix);
+    for (const container of [".main-titlebar", ".window-chrome-row"]) {
+      assert.ok(
+        members.includes(`${container} .title-nav-btn${suffix}`),
+        `${container} actions are missing from the shared chrome-control ${suffix || "rest"} rule`,
+      );
+    }
+  }
   // The topbar's dock toggle, the viewport-fixed panel toggle, and the lane
   // actions are the same control: one geometry, stated once.
   const shared = sharedChromeControlRule().replace(/^[^{]*\{/, "");
