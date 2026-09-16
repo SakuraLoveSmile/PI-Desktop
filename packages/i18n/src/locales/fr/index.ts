@@ -1233,6 +1233,15 @@ sklm: {
       "skipped": "Question {{number}} ignorée"
     }
   },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  "pluginPanelWidget": {
+    "alwaysOnTop": "Toujours au-dessus",
+    "minimize": "Réduire",
+    "close": "Fermer le widget"
+  },
   "panel": {
     "title": "Panneau de travail",
     "subagent": "Sous-agent",

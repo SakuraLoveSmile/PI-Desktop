@@ -299,3 +299,4 @@ Each ADR includes:
 | 0269 | [Move capability documents between the global and project levels](0269-capability-level-transfer.md) | Accepted for implementation (amends ADR 0112) |
 | 0268 | Remove quotes, annotations, and side chats | Accepted (supersedes message-quotes-and-side-chats / response-annotations / floating-annotation-index) |
 | 0272 | [Judge a public-network address on the route the request will dial](0272-connection-time-public-network-route.md) | Accepted for implementation (amends ADR 0243; issue #419 / PR #473) |
+| 0273 | [A floating widget placement for plugin panels](0273-plugin-panel-floating-widget.md) | Accepted for implementation (amends ADR 0093 §4; ADR 0092 / ADR 0110) |

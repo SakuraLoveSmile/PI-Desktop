@@ -70,6 +70,17 @@ export type PluginUiMeta = {
   width?: number;
   height?: number;
   title?: string | PluginLocalizedString;
+  /**
+   * Panel placement. `"panel"` (default) keeps the host-owned 46px drag band
+   * and its three-control capsule. `"widget"` is a transparent, frameless
+   * floating surface with neither, sized from the inside: the page owns its
+   * whole rectangle and drags the window through a host-provided drag map.
+   */
+  shape?: "panel" | "widget";
+  /** Floating widget placement only: keep the surface above other windows. */
+  alwaysOnTop?: boolean;
+  /** Overrides the per-shape default: panels are resizable, widgets are not. */
+  resizable?: boolean;
 };
 
 /**

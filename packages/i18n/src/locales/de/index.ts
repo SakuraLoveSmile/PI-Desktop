@@ -1233,6 +1233,15 @@ sklm: {
       "skipped": "Frage {{number}} übersprungen"
     }
   },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  "pluginPanelWidget": {
+    "alwaysOnTop": "Immer im Vordergrund",
+    "minimize": "Minimieren",
+    "close": "Widget schließen"
+  },
   "panel": {
     "title": "Arbeitsfenster",
     "subagent": "Unteragent",

@@ -1250,6 +1250,15 @@ sklm: {
       skipped: "질문 {{number}} 건너뜀",
     },
   },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "항상 위에 표시",
+    minimize: "최소화",
+    close: "위젯 닫기",
+  },
   panel: {
     title: "작업 패널",
     subagent: "서브에이전트",
