@@ -638,15 +638,6 @@
   white-space: pre-wrap;
 }
 
-.empty-hero-subtitle {
-  max-width: 34rem;
-  margin: -2px 0 0;
-  color: var(--ds-text-muted);
-  font-size: var(--text-base);
-  line-height: var(--leading-relaxed);
-  text-align: center;
-}
-
 .empty-hero .home-project-switcher {
   display: inline-block;
   max-width: 100%;
