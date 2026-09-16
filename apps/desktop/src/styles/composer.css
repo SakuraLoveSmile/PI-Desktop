@@ -412,7 +412,11 @@
   min-width: 28px;
 }
 
-.composer-enhance-btn.is-loading {
+/* While enhancing, this control carries a label and leaves the square geometry
+   its idle state gets from `.icon-btn-square`. */
+.icon-btn.composer-enhance-btn.is-loading {
+  width: auto;
+  flex: 0 0 auto;
   cursor: wait;
   padding-inline: 8px;
 }
