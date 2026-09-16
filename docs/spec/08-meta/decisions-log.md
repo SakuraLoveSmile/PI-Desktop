@@ -5629,3 +5629,27 @@ that was sitting at the bottom — including after the turn had finished.
   file, and an unavailable host contributes no exclusions. See ADR 0270,
   `04-ux/06-settings-ia.md` §2, `03-runtime/01-ipc-protocol.md` §12c, and
   E2E-SUBAGENT-settings-lists-builtin-defaults.
+
+## 2026-09-17 — Judge a public-network address on the route the request will dial (D436)
+
+- The skill market's main-process guard classified the target host with a
+  *local* resolver while `net.fetch` dials through Chromium's proxy stack
+  (ADR 0177). Under a TUN / fake-IP resolver that answer is a synthesized
+  `198.18.0.0/15` address for a connection the app never makes, so every
+  catalog source was refused as "blocked by the app's address check"
+  (issue #419).
+- Each hop now asks the session that carries `net.fetch`
+  (`Session.resolveProxy`) for its own decision, and the shared
+  `classifyProxyRoute` reduces that answer to `proxied` / `direct` / `unknown`.
+  On a `proxied` route `isAcceptableResolvedAddress` tolerates only the
+  resolver-artifact class (`benchmark`); every real internal class and an
+  unanswered resolver still refuse. A `direct` route keeps the pre-change
+  semantics byte for byte, a `DIRECT` entry anywhere in the list is read as
+  `unknown` because Chromium may fall back to it, and `unknown` stays strict.
+- Refusals and the market's `failureDetails` now carry `route`, so a fake-IP
+  refusal on a direct route reads apart from one on an unreadable route.
+- The MCP market keeps its pinned Node HTTPS guard (ADR 0245) and is unchanged;
+  a fake-IP environment still refuses its sources.
+- See ADR 0272, `05-security/01-security.md` §4.1,
+  `03-runtime/09-logging-and-observability.md`, and
+  `06-delivery/04-e2e-test-plan.md` E2E-SKILL-MARKET-NET-BOUNDARY.

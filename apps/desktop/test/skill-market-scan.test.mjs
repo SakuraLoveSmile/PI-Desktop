@@ -105,8 +105,12 @@ test("main-process aggregator routes through the public-network client", async (
     new URL("../electron/main/skill-market-catalog.ts", import.meta.url),
     "utf8",
   );
-  assert.match(src, /import \{ createPublicHttpsClient \} from "\.\/public-https-fetch"/);
-  assert.match(src, /createPublicHttpsClient\(\{ fetchImpl: \(url, init\) => net\.fetch\(url, init\) \}\)/);
+  assert.match(src, /import \{ net, session \} from "electron"/);
+  assert.match(src, /fetchImpl: \(url, init\) => net\.fetch\(url, init\)/);
+  assert.match(
+    src,
+    /routeImpl: \(url\) => session\.defaultSession\.resolveProxy\(url\)/,
+  );
   assert.match(src, /createSkillMarketAggregator\(client\.request\)/);
   assert.doesNotMatch(src, /node:https|node:http|axios|got\(/);
 });
