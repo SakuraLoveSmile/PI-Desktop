@@ -251,6 +251,12 @@ a usage tab.
     outside settings container dismisses it before the trigger can become
     detached. Search results keep a dedicated no-match state instead of
     reusing the search placeholder.
+  - the context-window field states its provenance: while the number still
+    follows the published models.dev limit, a faint hint under the input says so
+    (`settings.contextWindowCatalogHint`), and the first edit — the preset
+    ladder or the numeric input — pins the value to the user, which removes the
+    hint. A value the user pinned is never replaced by a catalog refresh; an
+    unpublished model shows no hint because there is nothing to follow.
   - each model option and configuration row shows a compact text/vision
     capability state. Settings compares the checkbox with the published model
     record, while the Composer badge and runtime use the effective binding:

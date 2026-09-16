@@ -1016,6 +1016,7 @@ sklm: {
     imageInput: "Görüntüler",
     documentInput: "PDF",
     thinkingManualOverrideHint: "Katalogda yok; destekleniyorsa açın.",
+    contextWindowCatalogHint: "models.dev'i takip eder; düzenlerseniz değeriniz sabitlenir.",
     availableForSubagents: "AI devri için kullanılabilir",
     availableForSubagentsHint: "Görevler alt ajanlara devredilirken AI’nin bu modeli kullanmasına izin ver",
     searchModelId: "Model kimliği ara…",
