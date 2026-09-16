@@ -508,8 +508,6 @@ export function AgentMcpPage() {
 
   return (
     <AgentCapabilityPage
-      description={t("settings.mcpDescription")}
-      note={t("settings.capabilityPriority")}
       toolbar={
         <CapabilityToolbar
           filter={filter}

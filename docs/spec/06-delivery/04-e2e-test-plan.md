@@ -6669,7 +6669,7 @@ identify the platform validation still needed.
 - **Specs linked**: `03-runtime/06-host-rpc-protocol.md` §4 (Agent
   capabilities), `03-runtime/01-ipc-protocol.md` §12a–§12b,
   `04-ux/06-settings-ia.md` §2 (Agent capability destinations), ADR 0112,
-  ADR 0267
+  ADR 0269
 - **Acceptance**: E (tools & permissions), F (persistence), Quality
 - **Milestone**: M6+
 - **Status**: Host-covered (`pnpm test:e2e:capability-move` drives the same RPC

@@ -492,8 +492,6 @@ export function AgentSkillsPage() {
 
   return (
     <AgentCapabilityPage
-      description={t("settings.skillsDescription")}
-      note={t("settings.capabilityPriority")}
       toolbar={
         <CapabilityToolbar
           filter={filter}
