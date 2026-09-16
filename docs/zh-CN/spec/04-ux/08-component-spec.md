@@ -453,6 +453,11 @@ Collapsed (48px):
 
 - 可见shell名称为`PI-Desktop`； Codex 不用作渲染器
   身份。
+- 没有文字标签的控件声明 `.icon-btn-square`，它把两个轴都固定到
+  `--ds-control-size`（28px）。单独的 `.icon-btn` 宽度来自图形加左右各 8px 内边距 ——
+  这对带文字的胶囊按钮是正确的，对没有文字的控件则是错误的 —— 因此侧边栏收起控件、
+  会话顶栏开关，以及输入框的添加/增强/撤销控件，都呈现与顶栏和工作面板操作一致的
+  28px 正方形点击区，而不是"宽大于高"的胶囊。
 - `BrandLogo` 通过 Vite 导入从规范母版派生的渲染器尺寸标记：
   `src/assets/brand/logo-light.png` 用于浅色模式，
   `src/assets/brand/logo-dark.png` 用于深色模式（192x192，可覆盖 3x 下的

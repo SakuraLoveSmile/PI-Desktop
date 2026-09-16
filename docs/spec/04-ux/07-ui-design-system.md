@@ -1085,7 +1085,16 @@ These are **token-level foundations** for common primitives. Detailed component 
 | Primary | px-3 py-1.5 | 32px | text-sm 500 | radius-sm | none | accent |
 | Secondary | px-3 py-1.5 | 32px | text-sm 400 | radius-sm | none (D297) | `--ds-tile`, hover `--ds-tile-hover` |
 | Ghost | px-2 py-1 | 28px | text-sm 400 | radius-sm | none | transparent |
+| Icon-only | none | 28px | — | radius-full | none | transparent; `.icon-btn-square` pins the width to `--ds-control-size` |
 | Danger | px-3 py-1.5 | 32px | text-sm 500 | radius-sm | none | error |
+
+An icon-only control states `.icon-btn-square`. `.icon-btn` alone takes its
+width from its content — glyph plus 8px of side padding — which is what a
+label-driven pill wants and what a control with no label must not inherit. The
+variant pins both axes to `--ds-control-size` (28px), keeps `flex: 0 0` so a
+crowded toolbar row cannot shrink it back out of square, and drops the side
+padding that under the global `border-box` would leave a 12px content box for a
+15px glyph.
 
 ### 11.2 Input / textarea
 

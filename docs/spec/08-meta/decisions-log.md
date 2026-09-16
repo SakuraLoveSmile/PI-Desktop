@@ -5444,6 +5444,29 @@ that was sitting at the bottom — including after the turn had finished.
   `07-plugins/13-plugin-permissions-matrix.md` §6, and
   E2E-PLUGIN-fs-root-follows-the-calling-session.
 
+## 2026-09-16 — A control with no label states its square geometry
+
+- `.icon-btn` is shared with label-driven pills, so it takes its width from its
+  content — glyph plus 8px of side padding. Every icon-only use of it was
+  therefore taller than it was wide: the sidebar collapse control and the
+  composer's add button rendered 31×28, the composer's enhance and undo
+  controls 35×28 inside `.composer-right`, and the settings provider actions
+  30×28 from their 14px glyphs. The same control in the conversation topbar was
+  already a 28×28 square, so one function had two sizes.
+- Those controls now state `.icon-btn-square`, which pins both axes to the new
+  `--ds-control-size` (28px) token, keeps `flex: 0 0` so a crowded toolbar row
+  cannot shrink the control back out of square, and drops the side padding that
+  under the global `border-box` would leave a 12px content box for a 15px
+  glyph. Icon-only controls now match the square the topbar toggle, the
+  work-panel actions, and the send/stop controls already used.
+- `.composer-right .icon-btn` no longer sets inline padding. The label-driven
+  model/thinking chip sets its own padding with `!important`, so that
+  declaration only ever widened the icon-only controls beside it; the
+  maximizing enhance control keeps its label geometry while it is loading.
+- Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/07-ui-design-system.md` §11.1 and `04-ux/08-component-spec.md`
+  §3.7.
+
 ## 2026-09-16 — The macOS traffic-light reserve has one source (D433)
 
 - The renderer's windowed lead-in for the macOS traffic lights was a hand-copied
