@@ -4279,3 +4279,10 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 拒绝与市场的 `failureDetails` 现在都带 `route`，因此「直连线路上的 fake-IP 拒绝」与「读不出线路的拒绝」在诊断里可以区分。
 - MCP 市场仍使用自己的地址钉定 Node HTTPS 守卫（ADR 0245），本次不变；fake-IP 环境下它的源仍会被拒绝。
 - 见 ADR 0272、`05-security/01-security.md` §4.1、`03-runtime/09-logging-and-observability.md` 与 `06-delivery/04-e2e-test-plan.md` 的 E2E-SKILL-MARKET-NET-BOUNDARY。
+
+## 2026-09-17 —— dock 内的问题卡是 composer 板（#360，D437）
+
+- asktool 问题卡挂在透明的 composer dock 里（`Composer.tsx` 把它渲染为 `.composer-stack` 的直接子节点，成绩单内的挂载已移除），但它仍在绘制流动层的 `--ds-tile` 洗色：3.5% 墨色混合、没有阴影。在浅色页面上这留下一块 `#f7f7f7` 面板加白色选项行，紧邻下方的 composer 板 —— 这正是 #360 第 1 项（“选择交互面板缺少背景色”）读到的样子。该 dock 规则自己的注释早已声称这张卡“使用与 Plan/Goal 批准相同的决策表面”，而同一槽位里的 `.plan-approval-bar` 绘制的是 `--ds-bg-composer` 加 `--ds-shadow-composer`（`04-ux/03-permission-ux.md` §9、`04-ux/08-component-spec.md` §11.5）。
+- `.composer-stack > .asktool-card` 现在绘制那块板：`--ds-bg-composer` 加 `--ds-shadow-composer`（浅色 `#ffffff`，深色 `color-mix(in oklab, #212121 96%, transparent)` 配合 composer 阴影）。
+- 它的控件移到该板的内嵌层 —— 也就是 `.plan-approval-split` 在同一块板上已经使用的层：`.asktool-option` 与 `.asktool-custom-input` 去掉 `--ds-raised` 与 `--ds-raised-shadow`，改用 `--ds-tile-deep`，悬停/选中混合也以 `--ds-tile-deep` 为基底。不做这次翻转，浅色主题下选项行会白上加白，因为该调色板里 `--ds-raised` 与 `--ds-bg-composer` 都是 `#ffffff`。15 px 的选项标记保留 `--ds-tile-deep` —— 与侧边栏复选框同一枚标记 —— 它与内嵌行之间的对比，和它与侧边栏之间的对比完全一致。
+- 仅渲染层：无协议、存储、宿主、权限、迁移或偏好改动，也没有新增默认值。两层在两种调色板里都是既有 token，因此贡献主题可以分别用 `--ds-bg-composer` / `--ds-tile-deep` 移动板与行。见 `04-ux/11-asktool-question-card.md`、`04-ux/07-ui-design-system.md` §6.4 与 E2E-078。

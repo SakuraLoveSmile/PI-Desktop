@@ -4572,15 +4572,20 @@ identify the platform validation still needed.
   6. In both light and dark palettes, inspect the settings rail, search, selected
      item, on-state knob, composer shell, plugin/capability searches, the code
      card's head band, the Mermaid canvas, tool output, the composer placeholder
-     and disabled send chip, and the dialog scrim and permission backdrop. Apply
-     custom surface variables, keyboard-focus both searches, then remove the
-     custom theme.
+     and disabled send chip, the dialog scrim and permission backdrop, and the
+     dock question card with its option row. Apply custom surface variables,
+     keyboard-focus both searches, then remove the custom theme.
 - **Expected**:
   - Work panel body reads as quiet `#fafafa` inset paper with a white header band.
   - Settings fields, browser URL, segment tracks, and shortcut keycaps use light inset fills; focused fields lift with a neutral ring.
   - Toggle on-state keeps a white knob on the near-black track.
   - Hover fills on file-tree/diff/resize ease with shared motion tokens, and the divider's 2px line is a 50% accent tint while hovered or dragged, so it never paints a solid white hairline across the dark plate; keyboard focus keeps the full accent.
   - Light dialog scrim is softer than the dark 45% veil (~28% ink).
+  - The dock question card paints the composer plate in both palettes — light
+    `#ffffff` with the composer shadow, dark 96% `#212121` — and its option rows
+    are inlaid `--ds-tile-deep` fills with no raised shadow. A custom
+    `--ds-bg-composer` / `--ds-tile-deep` repaints both, and removing it
+    restores the built-in paint.
   - Tool output keeps its cascade: light paints the same lighter tile over error
     output and over plain tool blocks, while dark shows the error tint and leaves
     plain blocks transparent.
