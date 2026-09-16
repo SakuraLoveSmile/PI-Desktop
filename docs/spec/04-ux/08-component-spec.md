@@ -2684,7 +2684,7 @@ reasoning-level control.
 - The combined model × reasoning menu opens at `bottom: calc(100% + 8px)` with
   `role="menu"`. Its root has exactly two `role="menuitem"` entries and, when
   the binding enables more than one level, a drag slider with one labeled
-  stop per enabled level directly beneath the Reasoning level entry (D432).
+  stop per enabled level directly beneath the Reasoning level entry (D433).
   The Model submenu has a search input and sticky provider headings, while
   the Reasoning level submenu starts with `Current model <model> supports
   these reasoning levels` and lists the binding's enabled levels as the

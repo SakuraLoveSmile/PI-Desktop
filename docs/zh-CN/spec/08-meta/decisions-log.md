@@ -4203,3 +4203,19 @@ the retained upstream work-panel lifecycle. See
 - 对话框新增一行警告，点名有 `{{count}}` 个会话正在运行，并把确认按钮文案换成 `project.deleteRunningConfirm`（「停止任务并删除」）。确认会精确中止这些会话，然后才调用 `deleteProject`，所以删除一个正在运行的回合仍然是针对已陈述后果的第二次显式确认。取消不删除任何东西。
 - 宿主侧的守卫未改动：只要仍有关联会话存在运行中的回合，`projects.remove` 依旧以 1008 / `CONFLICT` 拒绝，对话框也依旧把该拒绝映射为 `project.deleteRunningBlocked`。中止循环之后才开始的回合，正是这条兜底覆盖的情况。
 - 仅渲染层：无协议、存储、宿主、权限或迁移改动，也没有新增默认值。`project.deleteRunningBlocked` 的含义、文案与全部翻译保持不变。见 ADR 0251、D421 与 E2E-PROJECT-delete-running-sessions-are-named-and-stopped。
+
+## 2026-09-16 —— 插件 `workspace` fs 根跟随发起调用的会话（D432）
+
+- 所有模式根为 `workspace` 的插件 `pi.fs.*` 调用都解析到窗口级唯一的可见工作区，因此从会话 B（项目 B）发起的插件智能体工具，在用户切换标签页后读到的是项目 A 的根；而在没有可见工作区时，所有会话会一起以 `NOT_FOUND` 失败（D093 已为内置工具执行定下同一条规则，却从未传到插件）。
+- `plugin-runtime.ts` 现在用新增的私有辅助函数 `fsRoot(loaded, rule)` 解析该根：由发起这次调用的工具会话所属项目决定，通过新增的宿主服务 `getWorkspacePathForSession` 询问。`plugin-services.ts` 用它本就维护的「会话到项目」映射完成接线，因此没有引入新的真相来源。
+- 未改动：面板桥调用没有工具会话，宿主不跟踪的会话也一样，它们的根仍是可见工作区；`userSelected` 模式依旧保留用户通过 `requestDirectory()` 选定的目录。
+- 现在没有可见工作区时会话根也能解析，所以临时对话按会话各自继续工作，而不是所有会话一起失败；这种状态下的面板调用仍然失败关闭。于是 `workspace` 根的 `NOT_FOUND` 更窄：既没有解析出调用会话的项目，也没有可见工作区。
+- 权限、realpath 包含、拒绝名单、声明范围与运行时同意这四类闸门都没有改动，插件 API 表面也未变化：`pi.workspace.get` 仍然以可见工作区及其项目组作答。
+- 见 ADR 0266、`07-plugins/03-plugin-api.md` §3、`07-plugins/13-plugin-permissions-matrix.md` §6 与 E2E-PLUGIN-fs-root-follows-the-calling-session。
+
+## 2026-09-16 —— 菜单根层直接承载推理滑块（#417，D433）
+
+- Composer 的推理等级此前只能在一个子菜单里的竖向单选列表中切换。Issue #417 希望参考 Codex 桌面版做成滑动条，同时保留原有的「点击值标签进入下拉列表」交互。
+- 合并后的「模型 × 推理」菜单根层现在直接展示一个原生 range 输入，每个已启用等级一个刻度，并配有可点击的刻度标签，位置就在「推理等级」条目正下方。拖动滑块或点击刻度都会通过同一条 `configureActiveSession` 路径立即提交等级，并停留在菜单原处，因此临时调整不必再往子菜单里跑一趟。「推理等级」条目本身仍然打开经典单选列表，保留其单选语义、末尾勾选、上/下/Enter/左键契约与返回根层的行为。
+- 滑块在获得焦点时自行掌管方向键/Home/End/Enter，因此这些按键用于调整等级而不再驱动菜单导航，Escape 仍然关闭菜单。一次拖动可能每穿过一个刻度就提交一次，因此提交串接在一条 promise 链上；同时用一个本地拖动前导值，避免受控输入在 store 确认回写之前被弹回。当绑定只启用了一个等级时，滑块整体隐藏。
+- 等级值仍是未翻译的规范字符串，七级阶梯、提供方过滤与钳制规则均未改动；仅渲染层：无协议、存储、宿主、权限或迁移改动。见 `04-ux/08-component-spec.md`、`04-ux/07-ui-design-system.md` 与 E2E-050。
