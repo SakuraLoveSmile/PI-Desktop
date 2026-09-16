@@ -99,7 +99,7 @@ Each ADR includes:
 | 0075 | Manual reload for development-plugin permission ceilings | Accepted |
 | 0076 | Capture the Windows-reserved plugin launcher chord in host-core | Accepted |
 | 0077 | Add an interactive multi-question asktool | Accepted for implementation |
-| 0078 | Cross-platform tray-resident minimize | Accepted for implementation (amended by 0117 and 0123) |
+| 0078 | Cross-platform tray-resident minimize | Accepted for implementation (amended by 0117, 0123, and tray-session-shortcuts) |
 | 0079 | Use VitePress for the bilingual documentation site | Accepted |
 | 0080 | Prewarm the global plugin launcher after boot | Accepted |
 | 0081 | Host-owned cross-platform plugin panel chrome | Accepted |
@@ -293,3 +293,4 @@ Each ADR includes:
 | session-content-search | [Discover sessions by indexed message text](session-content-search.md) | Accepted |
 | transcript-reading-ownership | [Share renderer history and search views](transcript-reading-ownership.md) | Accepted |
 | 0266 | [Plugin fs roots follow the calling session](0266-plugin-fs-root-follows-the-calling-session.md) | Accepted (D093) |
+| tray-session-shortcuts | [Bounded session navigation in the native tray](tray-session-shortcuts.md) | Accepted (amends ADR 0078; issue #293) |
