@@ -4152,8 +4152,8 @@ identify the platform validation still needed.
   streaming, its toolbar omits
   Copy; after the response settles, the assistant toolbar offers Copy, Fork,
   Regenerate. The user toolbar offers the pager (when variants exist), Copy,
-  Edit, Delete. Edit replaces the prompt bubble with a wider inline
-  textarea with Retry and Cancel controls; Escape or Cancel restores the bubble
+  Edit, Delete. Edit replaces the prompt bubble with a wider composer-matched
+  inline editor plate with Retry and Cancel controls; Escape or Cancel restores the bubble
   unchanged. Retry truncates the transcript from that prompt and streams a new
   answer whether or not the text changed, leaving a `current / total` pager on
   the user turn that restores the original prompt with its full answer tail in

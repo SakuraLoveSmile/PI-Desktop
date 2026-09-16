@@ -1540,14 +1540,16 @@ Single message render — either user (plaintext) or assistant (markdown streami
   selected assistant response, requires an idle source, and leaves that
   source's transcript, live runtime, and provider cache state untouched (D134).
   Edit belongs to the user turn: it swaps the prompt bubble for a focused
-  inline textarea (Escape cancels, Cmd/Ctrl+Enter retries; slash turns seed the
-  typed `command` form so retrying re-expands the template), widens the user
-  column to the assistant reading width while open, and hides the action
-  toolbar. The inline controls are localized Retry and Cancel actions. Retry
-  runs the Regenerate path with the current text in the same session, even when
-  the text is unchanged, so the replaced prompt and its whole answer tail are
-  archived as a D109 revision and the pager walks back to the original
-  exchange (D274).
+  composer-plate editor (same `--ds-bg-composer` fill, `--ds-composer-radius`,
+  and shadow lift as the bottom composer; no stroke per D297). The textarea is
+  unboxed inside that plate; localized Retry and Cancel sit in a 28px footer
+  (Escape cancels, Cmd/Ctrl+Enter retries; slash turns seed the typed
+  `command` form so retrying re-expands the template). Opening it widens the
+  user column to the assistant reading width and hides the action toolbar.
+  Retry runs the Regenerate path with the current text in the same session,
+  even when the text is unchanged, so the replaced prompt and its whole
+  answer tail are archived as a D109 revision and the pager walks back to
+  the original exchange (D274).
 - Tool-mediated assistant output uses one visual turn from the preceding user
   message to the next user message. Intermediate provider message boundaries
   remain visible as ordered markdown fragments around activity disclosures but
