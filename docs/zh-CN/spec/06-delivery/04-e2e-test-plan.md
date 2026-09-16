@@ -2923,13 +2923,18 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   macOS 菜单；重复、无修饰符和保留组合以内联错误拒绝；“未绑定”是明确的本地化
   状态，不参与冲突、不响应旧或默认组合、可跨重启保存，并会移除 macOS 加速器和
   Windows 启动器后备层；单项和全局恢复都返回共享默认值。仅修饰符和 IME 按键不
-  会发送命令，长按历史组合每次物理按压只遍历一次。
+  会发送命令，长按历史组合每次物理按压只遍历一次。窗口可见性只有一个开关键
+  `Cmd/Ctrl + W` —— 可见且在前台的窗口隐藏到托盘，其余情况显示并获得焦点 ——
+  且绝不走关闭路径，因此不会弹出关闭行为询问、也不会退出应用；已弃用的
+  `Cmd/Ctrl + Shift + W` 组合键不再注册，已存储的 `closeWindow` / `summonWindow`
+  覆盖项会并入该开关键（D438）。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/07-ui-design-system.md`、
   `03-runtime/01-ipc-protocol.md`
 - **接受**：F（设置持久性）、质量（键盘可访问性）
 - **里程碑**：M5
 - **状态**：单位覆盖（`keyboard-shortcuts.test.ts`、
-  `settings-keyboard-shortcuts.test.mjs`、host 设置 RPC 测试）；渲染场景草稿
+  `settings-keyboard-shortcuts.test.mjs`、`window-toggle-shortcut.test.mjs`、
+  host 设置 RPC 测试）；渲染场景草稿
 
 #### E2E-073a：开发者模式控制开发者工具控制台
 
