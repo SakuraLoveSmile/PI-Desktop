@@ -104,10 +104,12 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     `net.fetch`, and the in-app browser). Workspace Bash and the system
     browser used for OAuth are not rewritten.
   - Custom shows a Proxy URL field (`socks5://127.0.0.1:1080` /
-    `http://127.0.0.1:7890`), a Bypass list defaulting to
-    `localhost,127.0.0.1,::1,<local>` so loopback MCP and local models stay
-    direct, and a Test action that issues one Chromium fetch through the
-    draft proxy. The URL is validated on blur; invalid schemes are rejected.
+    `http://127.0.0.1:7890`, including `user:pass@` userinfo), a Bypass
+    list defaulting to `localhost,127.0.0.1,::1,<local>` so loopback MCP
+    and local models stay direct, and a Test action that issues one
+    Chromium fetch through the draft proxy. Credentialed URLs are applied
+    to Chromium through a loopback SOCKS5 relay (issue #490). The URL is
+    validated on blur; invalid schemes are rejected.
   - The selection persists as optional `AppSettings.networkProxy`
     (`mode` / `url` / `bypass`). Absent means System. No host protocol or
     storage schema version bump (D340 / ADR 0177).
@@ -181,6 +183,12 @@ a usage tab.
     on Windows/Linux; its native global registration follows the same override.
     An unbound launcher disables Electron registration, the Windows host hook,
     and the focused-window fallback
+  - the window-visibility row is one toggle on `Alt + Shift + W`: it hides a
+    visible, focused window to the tray and brings a hidden or minimized window
+    back. It is the only window key — the retired `Cmd/Ctrl + Shift + W` summon
+    row is gone — and it avoids `Cmd/Ctrl + W` because macOS spends that chord
+    on its own close-window command; a stored `closeWindow`/`summonWindow`
+    override is folded into it when the map is read (D438, D439)
 
 ### Model configuration (`agent` tab)
 - **Defaults** card: a compact settings row shows the provider name and exact
@@ -251,6 +259,12 @@ a usage tab.
     outside settings container dismisses it before the trigger can become
     detached. Search results keep a dedicated no-match state instead of
     reusing the search placeholder.
+  - the context-window field states its provenance: while the number still
+    follows the published models.dev limit, a faint hint under the input says so
+    (`settings.contextWindowCatalogHint`), and the first edit — the preset
+    ladder or the numeric input — pins the value to the user, which removes the
+    hint. A value the user pinned is never replaced by a catalog refresh; an
+    unpublished model shows no hint because there is nothing to follow.
   - each model option and configuration row shows a compact text/vision
     capability state. Settings compares the checkbox with the published model
     record, while the Composer badge and runtime use the effective binding:

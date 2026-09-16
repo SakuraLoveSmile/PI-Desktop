@@ -2923,13 +2923,19 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   macOS 菜单；重复、无修饰符和保留组合以内联错误拒绝；“未绑定”是明确的本地化
   状态，不参与冲突、不响应旧或默认组合、可跨重启保存，并会移除 macOS 加速器和
   Windows 启动器后备层；单项和全局恢复都返回共享默认值。仅修饰符和 IME 按键不
-  会发送命令，长按历史组合每次物理按压只遍历一次。
+  会发送命令，长按历史组合每次物理按压只遍历一次。窗口可见性只有一个开关键
+  `Alt + Shift + W` —— 可见且在前台的窗口隐藏到托盘，其余情况显示并获得焦点 ——
+  且绝不走关闭路径，因此不会弹出关闭行为询问、也不会退出应用；该键刻意避开
+  `Cmd/Ctrl + W`，因为 macOS 把它用于自己的关闭窗口命令；已弃用的
+  `Cmd/Ctrl + Shift + W` 组合键不再注册，已存储的 `closeWindow` / `summonWindow`
+  覆盖项会并入该开关键（D438、D439）。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/07-ui-design-system.md`、
   `03-runtime/01-ipc-protocol.md`
 - **接受**：F（设置持久性）、质量（键盘可访问性）
 - **里程碑**：M5
 - **状态**：单位覆盖（`keyboard-shortcuts.test.ts`、
-  `settings-keyboard-shortcuts.test.mjs`、host 设置 RPC 测试）；渲染场景草稿
+  `settings-keyboard-shortcuts.test.mjs`、`window-toggle-shortcut.test.mjs`、
+  host 设置 RPC 测试）；渲染场景草稿
 
 #### E2E-073a：开发者模式控制开发者工具控制台
 
@@ -5006,6 +5012,10 @@ IPC 请求无法关闭。
 | C — 对话与流式（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 | 品质（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 | M6（不透明浮动表面） | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| B — 模型配置（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| F — 持久化（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| 品质（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| M6+（目录窗口来源） | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策
@@ -5576,7 +5586,7 @@ IPC 请求无法关闭。
   该会话及其转录本和该行，也只有对项目行的第二次按下才会移除空闲项目。会话与项目永远不会共用
   一次武装。删除仍有运行中轮次的项目时，仍会打开指明这些会话并停止它们的对话框（见
   E2E-PROJECT-delete-running-sessions-are-named-and-stopped）。
-- **链接规格**：`04-ux/09-interaction-patterns.md` §1.6、D421、D431、D438
+- **链接规格**：`04-ux/09-interaction-patterns.md` §1.6、D421、D431、D441
 - **验收**：品质
 - **里程碑**：M6+
 - **状态**：部分自动化 —— `apps/desktop/test/two-step-delete.test.mjs` 固定了共享的武装与它的
@@ -6630,14 +6640,14 @@ IPC 请求无法关闭。
   1. 打开设置 → 常规。确认网络卡提供系统 / 直连 / 自定义。从未配置过代理的配置文件默认是系统。
   2. 选择自定义。确认代理 URL、默认绕过列表和测试。输入 `not-a-proxy` 并失焦。确认内联错误且未保存。
   3. 输入 `socks5://127.0.0.1:1080` 或 `http://127.0.0.1:7890` 并失焦。确认 `settings.get` 中 `networkProxy.mode` 为 `custom`。
-  4. 对正在监听的代理点测试，确认已连接；对关闭的端口点测试，确认失败且不改已保存 URL。
+  4. 对正在监听的代理点测试，确认已连接；对关闭的端口点测试，确认失败且不改已保存 URL。对需要认证的 HTTP / SOCKS5 代理填入 `user:pass@` 后再测，确认是已连接而不是 `net::ERR_NO_SUPPORTED_PROXIES`（issue #490）。
   5. 保存自定义代理后，通过已配置供应商发送一条简短提示。确认供应商请求和响应经过代理；即使 SOCKS5 代理将完整 bind 响应合并在一个 TCP 数据块中，请求仍能完成。再确认扩展市场刷新和 models.dev 刷新走代理；绕过列表中的回环地址不走代理。
   6. 切到直连再切回系统。确认无需重启应用即可生效。
-- **预期**：自定义覆盖模型请求、市场、更新、插件 `net.fetch` 和内置浏览器。工作区 Bash 的 `env` 看不到该设置写入的 `HTTP_PROXY` / `ALL_PROXY`。OAuth 仍走系统浏览器。`file:` / `ftp:`、SOCKS4 以及百分号编码错误的认证信息均被拒绝。无协议/存储版本升级。
+- **预期**：自定义覆盖模型请求、市场、更新、插件 `net.fetch` 和内置浏览器。工作区 Bash 的 `env` 看不到该设置写入的 `HTTP_PROXY` / `ALL_PROXY`。OAuth 仍走系统浏览器。`file:` / `ftp:`、SOCKS4 以及百分号编码错误的认证信息均被拒绝。带账号密码的 HTTP / SOCKS5 测试与应用不再报 `net::ERR_NO_SUPPORTED_PROXIES`（issue #490）。无协议/存储版本升级。
 - **链接规格**：`04-ux/06-settings-ia.md`、`03-runtime/07-process-model.md`、ADR 0177、D340
 - **验收**：B（设置）、F（供应商）、安全
 - **里程碑**：M5
-- **状态**：单元已覆盖（`network-proxy.test.ts`、`node-proxy.test.ts`、`settings-general.test.mjs`、host-core `network_proxy`）；畸形认证信息和不支持的 SOCKS4 协议由共享解析器测试覆盖；完整 UI 旅程仍为草稿
+- **状态**：单元已覆盖（`network-proxy.test.ts`、`node-proxy.test.ts`、`authenticated-proxy-relay.test.ts`、`settings-general.test.mjs`、host-core `network_proxy`）；畸形认证信息和不支持的 SOCKS4 协议由共享解析器测试覆盖；完整 UI 旅程仍为草稿
 
 #### E2E-210：文档截图在 GitHub 与 VitePress 中都能解析
 
@@ -7244,6 +7254,21 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **里程碑**：M5
 - **状态**：单元覆盖（`apps/desktop/test/git-clone.test.mjs`）
 
+
+#### E2E-258：新建项目对话框可以直接从 Git 仓库开始
+
+- **前提条件**：从「项目」标题栏打开新建项目对话框（不需要已有项目）；已安装 `git`。
+- **步骤**：
+  1. 将来源切换到「Git 仓库」。
+  2. 粘贴 `https://github.com/octocat/Hello-World.git`，确认项目名称自动填为 `Hello-World`，再改成自定义名称。
+  3. 选择克隆保存位置，确认位置行显示该文件夹。
+  4. 确认创建，检查工作空间、侧边栏与项目归档。
+  5. 重新打开对话框，切到「Git 仓库」，粘贴私网或非法远程地址。
+- **预期**：对话框把文件夹列表换成仓库地址输入框加克隆保存位置行，并保留同一个项目名称字段；地址解析成功且选定文件夹前，创建按钮保持禁用。确认后先在所选文件夹执行 `git clone`，项目创建仍由渲染器负责：克隆出的目录成为主要根，输入的名称命名该项目组。私网、回环、链路本地、带凭据和非法远程地址会让创建保持禁用（ADR 0247），且不写入任何文件夹。
+- **链接规格**：`03-runtime/01-ipc-protocol.md` §9、`04-ux/08-component-spec.md`、ADR 0273、ADR 0233、ADR 0247
+- **验收**：品质（项目入口）、D（工作区）
+- **里程碑**：M5
+- **状态**：单元覆盖（`apps/desktop/test/project-create-dialog.test.mjs`、`apps/desktop/test/git-clone.test.mjs`）；渲染桌面旅程为草稿（除非明确要求，不本地运行 E2E）
 #### E2E-257：导入到已归档项目后恢复其可见性
 
 - **前提条件**：一个持久项目已在渲染器侧边栏偏好中归档，并从默认侧边栏隐藏。一个核心导入候选携带该项目路径，测试插件可以使用明确的 host project id 导入会话。
@@ -7512,3 +7537,32 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **验收**：G（插件）、安全性、品质
 - **里程碑**：M6+
 - **状态**：部分自动化（`apps/desktop/test/plugin-fs-session-root.test.mjs`）：工具调用在发起会话的项目下写入与读取，面板调用与宿主未跟踪的会话回退到可见工作区，`userSelected` 模式保留选定的目录，窗口不显示任何项目时会话根依然生效。双活会话的桌面旅程与面板步骤为草稿（仅在此表面变化时于具备条件的环境中运行）
+
+#### E2E-MODEL-catalog-window-correction-reaches-saved-bindings：目录修正回流已保存绑定，且不覆盖用户手改值
+
+- **目标**：models.dev 修正某模型上限后回流到已保存的绑定（不必删除重建），
+  而用户在设置里手改的数值永不被覆盖。
+- **步骤**：
+  1. 配置一个提供商，勾选 models.dev 已发布 `limit.context` 的模型并保存。展开该行的
+     高级区，读取上下文窗口字段与其提示。
+  2. 用修正后的目录记录（不同的发布上限）替换该模型记录，重新打开设置，读取该行、
+     上下文检查器，以及新会话启动时使用的窗口。
+  3. 在高级区输入窗口——先用预设档位，再手输 `128000`——保存，然后再喂一次目录修正，
+     重新打开设置与检查器。
+  4. 保存并重新打开一个绑定不带 `contextWindowSource` 的提供商行：一次使用通用
+     `128000` 种子，一次使用任意其它已存值。
+- **预期**：步骤 1 显示发布值并带「跟随 models.dev」提示。步骤 2 在所有使用 effective
+  window 的地方（设置行、上下文检查器、会话启动）都显示修正后的值，无需删除重建。
+  步骤 3 在设置行、检查器和实际请求中都保留用户输入的值，包括在目录窗口更大时手输的
+  `128000`，且提示消失。步骤 4 表现确定：`128000` 种子跟随目录，其它值保持原样。
+  每一步中标记都能在提供商行的保存/读取往返后保留，早于该标记写出的配置仍可读。
+- **关联规范**：`03-runtime/13-model-catalog-and-selection.md` §9.1、
+  `03-runtime/12-provider-config-schema.md` §2、
+  `03-runtime/11-provider-model-system.md` §2、`04-ux/06-settings-ia.md` §2
+- **验收**：B（模型配置）、F（持久化）、Quality
+- **里程碑**：M6+
+- **状态**：部分自动化：`apps/desktop/test/model-binding-catalog-source.test.mjs` 驱动
+  主进程解析（目录来源的修正会到达对外暴露的行、用户值不受修正影响、通用种子仍跟随
+  目录、继承值保持 `catalog` 标记）；`packages/shared/src/model-catalog.test.ts` 覆盖
+  四条来源规则；`crates/host-core/src/providers/catalog.rs` 覆盖配置往返、无标记记录与
+  被丢弃的未知标记。端到端的设置旅程与实际启动窗口断言为草稿。

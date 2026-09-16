@@ -69,8 +69,7 @@ export const es = {
     "newTask": "Nueva tarea",
     "openProject": "Abrir proyecto…",
     "settings": "Configuración…",
-    "closeWindow": "Cerrar ventana",
-    "summonWindow": "Traer ventana al frente",
+    "toggleWindow": "Mostrar/Ocultar ventana",
     "refreshMarket": "Actualizar mercado",
     "search": "Buscar…",
     "toggleSidebar": "Barra lateral",
@@ -632,8 +631,7 @@ sklm: {
       "toggleSidebar": "Alternar barra lateral",
       "openWorkPanel": "Alternar panel lateral",
       "abort": "Detener tarea activa",
-      "closeWindow": "Cerrar ventana",
-      "summonWindow": "Traer ventana al frente",
+      "toggleWindow": "Mostrar u ocultar la ventana",
       "resetZoom": "Restablecer zoom",
       "zoomIn": "Acercar",
       "zoomOut": "Zoom out",
@@ -1000,6 +998,7 @@ sklm: {
     "imageInput": "Imágenes",
     "documentInput": "PDF",
     "thinkingManualOverrideHint": "No en el catálogo; habilitar si es compatible.",
+    "contextWindowCatalogHint": "Sigue a models.dev; al editarlo se fija tu valor.",
     "availableForSubagents": "Disponible para delegación de AI",
     "availableForSubagentsHint": "Permitir que AI use este modelo al delegar tareas a subagentes",
     "searchModelId": "ID de modelo de búsqueda…",
@@ -1074,6 +1073,11 @@ sklm: {
     "createNameLabel": "Nombre del proyecto",
     "createFoldersLabel": "Espacio de trabajo",
     "createComputer": "Este equipo",
+    "createSourceLabel": "Origen",
+    "createSourceGit": "Repositorio Git",
+    "createRepositoryLabel": "URL del repositorio",
+    "createChooseLocation": "Elegir carpeta",
+    "createLocationHint": "Carpeta donde se guarda el clon",
     "createPrimary": "Principal",
     "createRemoveFolder": "Quitar carpeta",
     "createAddFolder": "Añadir carpeta",
@@ -1233,6 +1237,15 @@ sklm: {
       "unanswered": "Pregunta {{number}} no respondida",
       "skipped": "Pregunta {{number}} omitida"
     }
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  "pluginPanelWidget": {
+    "alwaysOnTop": "Siempre visible",
+    "minimize": "Minimizar",
+    "close": "Cerrar el widget"
   },
   "panel": {
     "title": "Panel de trabajo",
@@ -1465,6 +1478,11 @@ sklm: {
     "permsMore": "+{{count}} más",
     "permissionsTitle": "Permisos",
     "permissionReview": "Revisión de permisos",
+    "devReviewTitle": "¿Cargar {{name}}?",
+    "devReviewNewTitle": "{{name}} ahora solicita más acceso",
+    "devReviewBody": "Este complemento de desarrollo proviene de una carpeta de este equipo. Revise lo que puede hacer: no se carga nada hasta que lo acepte.",
+    "devReviewAccept": "Cargar complemento",
+    "devReviewLoading": "Cargando…",
     "permissionReviewTitle": "¿Instalar {{name}}?",
     "permissionReviewBody": "Revise lo que puede hacer este complemento. Los permisos de mayor riesgo permanecen bloqueados hasta que los acepte.",
     "acceptInstall": "Aceptar e instalar",

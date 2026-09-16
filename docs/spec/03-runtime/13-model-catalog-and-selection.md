@@ -282,13 +282,25 @@ read.
 
 ### 9.1 Effective context window
 
-The runtime and context inspector use the same effective model window. A positive
-published `limit.context` from models.dev replaces the legacy `128,000` generic
-seed that older bindings may contain; this allows a refreshed catalog record such
-as `gpt-5.6-luna` (`1,050,000` tokens) to stop appearing as a 128k model. A
-non-default value entered through the per-model Advanced control remains the
-explicit user override. Unknown models still use the conservative 128k generic
-window and are never promoted from an ID pattern alone.
+The runtime, the context inspector and the settings surface resolve one effective
+model window. Every binding records where its `contextWindow` came from
+(`contextWindowSource`):
+
+- `catalog` — the number is a models.dev snapshot, so a later correction to the
+  published `limit.context` replaces it. A refreshed record such as
+  `gpt-5.6-luna` (`1,050,000` tokens) stops appearing as a 128k model, and a limit
+  that models.dev corrects reaches the binding without deleting and re-adding the
+  model.
+- `user` — the number was entered through the per-model Advanced control (or the
+  preset ladder in it) and is never replaced by the catalog, including the
+  `128,000` value that is otherwise the generic seed.
+
+Bindings written before the marker name no source. They keep the historical rule,
+deterministically: a published `limit.context` replaces exactly the generic
+`128,000` seed, and every other stored value stays the explicit value. Unknown
+models still use the conservative 128k generic window and are never promoted from
+an ID pattern alone. The marker is optional in the persisted record, so a config
+written by an older version stays readable and a downgrade ignores it.
 
 ### 9.2 Conversation Composer scope
 
@@ -464,6 +476,15 @@ same model to the check mark, the toggle and the duplicate guard.
       it uses the generic shape while pi-ai supplies only transport/OAuth
 - [ ] provider settings and cached discovery cannot replace known catalog
       capabilities; explicit binding edits remain persisted configuration
+- [ ] a models.dev limit correction reaches an already saved `catalog` binding
+      without deleting and re-adding the model, while a number the user entered in
+      Advanced (`user`) survives every correction, a hand-entered `128,000`
+      included
+- [ ] a binding saved before the provenance marker resolves deterministically:
+      the generic 128k seed follows the catalog and every other value stays as
+      stored
+- [ ] the provenance marker survives a provider save/read round trip and an
+      unmarked record keeps working
 - [ ] unknown free-form models remain runnable without invented capabilities
 - [ ] a models.dev record and an unknown generic record resolve through the same
       selected transport without sending provider credentials to the remote catalog

@@ -4382,6 +4382,14 @@ identify the platform validation still needed.
   old global binding, focused fallback, and Alt+Space host fallback are all
   inactive. 11) Press and release Ctrl/Command alone, confirm an IME candidate,
   and hold the back/forward chord long enough to generate repeats.
+  12) With the main window focused, press the window-visibility chord
+  `Alt + Shift + W` and confirm the window hides to the tray with no
+  close-behaviour prompt and with the app still running; from another
+  application, press it again and confirm the window returns and focuses.
+  13) Seed one profile with a stored customized `closeWindow` binding and one
+  with a customized `summonWindow` binding; confirm each profile keeps that
+  binding on the single toggle row after restart and that `Cmd/Ctrl + Shift +
+  W` registers nothing.
 - **Expected**: Actions are grouped as Navigation, Agent, and Window with
   platform-native key labels; recording has visible focus and `Escape` cancels;
   the custom Search chord takes effect immediately, replaces the old chord,
@@ -4392,13 +4400,21 @@ identify the platform validation still needed.
   macOS accelerator, and disables the Windows launcher fallback layers;
   individual and global reset restore the shared defaults; Keyboard shortcuts is
   its own Settings destination. Modifier-only and IME keydowns dispatch nothing,
-  and a held history chord traverses only once per physical press.
+  and a held history chord traverses only once per physical press. The
+  window-visibility key is one toggle on `Alt + Shift + W` — a visible, focused
+  window hides to the tray, anything else shows and focuses — and it never
+  enters the close path, so it raises no close-behaviour prompt and never quits;
+  it is globally registered and deliberately avoids `Cmd/Ctrl + W`, which macOS
+  spends on its own close-window command; the retired `Cmd/Ctrl + Shift + W`
+  chord registers nothing, and a stored `closeWindow`/`summonWindow` override
+  folds into the toggle (D438, D439).
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
   `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: F (settings persistence), Quality (keyboard accessibility)
 - **Milestone**: M5
 - **Status**: Unit-covered (`keyboard-shortcuts.test.ts`,
-  `settings-keyboard-shortcuts.test.mjs`, host settings RPC test); rendered scenario Draft
+  `settings-keyboard-shortcuts.test.mjs`, `window-toggle-shortcut.test.mjs`,
+  host settings RPC test); rendered scenario Draft
 
 #### E2E-073a: Developer mode gates the developer-tools console
 
@@ -7321,14 +7337,14 @@ identify the platform validation still needed.
   `Alt+Shift+V` and inspect the answer. 5) Disable and uninstall A and confirm
   the accelerator becomes free and B can take it; repeat after terminating A's
   runtime (crash) and while A's panel is closed. 6) Attempt the app's own
-  launcher accelerator `Alt+Space`, the `Mod+Shift+W` summon binding, a
+  launcher accelerator `Alt+Space`, the `Alt+Shift+W` window toggle, a
   reserved binding such as `Mod+C`, an invalid accelerator, and a ninth
   shortcut for one plugin.
 - **Expected**: Only A's own command runs for the accelerator; a shortcut whose
   `command` is not registered by the plugin is refused with `INVALID_ARGUMENT`.
   B receives a refusal (`registered: false`, code `SHORTCUT_CONFLICT`) and keeps
   no accelerator while A holds it. The host's own `Alt+Space` launcher and
-  `Mod+Shift+W` summon shortcuts and OS-reserved bindings are refused with
+  `Alt+Shift+W` window-toggle shortcuts and OS-reserved bindings are refused with
   `SHORTCUT_CONFLICT` or `SHORTCUT_UNAVAILABLE`; an invalid accelerator is
   refused with `INVALID_ACCELERATOR` and the ninth per-plugin shortcut with
   `LIMIT_EXCEEDED`. Disabling, unloading, or crashing a plugin releases every
@@ -7501,6 +7517,10 @@ identify the platform validation still needed.
 | C — Conversation & stream (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 | Quality (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 | M6 (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
+| B — Model config (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| F — Persistence (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| Quality (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| M6+ (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -8183,7 +8203,7 @@ This test plan spec is accepted when:
   an arm. Deleting a project whose turn is live still opens the dialog that names
   those sessions and stops them (see
   E2E-PROJECT-delete-running-sessions-are-named-and-stopped).
-- **Specs linked**: `04-ux/09-interaction-patterns.md` §1.6, D421, D431, D438
+- **Specs linked**: `04-ux/09-interaction-patterns.md` §1.6, D421, D431, D441
 - **Acceptance criterion**: Quality
 - **Milestone**: M6+
 - **Status**: Partially automated — `apps/desktop/test/two-step-delete.test.mjs`
@@ -10443,7 +10463,10 @@ are withdrawn with ADR 0165.
      `settings.get`.
   4. Click Test against a listening proxy. Confirm a Connected status. Click
      Test against a closed port. Confirm a failure status without changing
-     the saved URL.
+     the saved URL. Enter `http://user:pass@127.0.0.1:<auth-port>` and
+     `socks5://user:pass@127.0.0.1:<auth-port>` against proxies that require
+     those credentials. Confirm Test reports Connected rather than
+     `net::ERR_NO_SUPPORTED_PROXIES` (issue #490).
   5. With Custom saved, send a short prompt through the configured provider.
      Confirm the provider request and response pass through the proxy,
      including when a SOCKS5 proxy returns the complete bind response in one
@@ -10457,15 +10480,18 @@ are withdrawn with ADR 0165.
   `net.fetch`, and the in-app browser. Workspace Bash `env` does not show
   `HTTP_PROXY` / `ALL_PROXY` from the setting. OAuth still opens the system
   browser. Invalid schemes (`file:`, `ftp:`, and SOCKS4) and malformed
-  percent-encoded credentials are rejected. No protocol or schema version bump.
+  percent-encoded credentials are rejected. Authenticated HTTP and SOCKS5
+  URLs Test and apply without `net::ERR_NO_SUPPORTED_PROXIES` (issue #490).
+  No protocol or schema version bump.
 - **Specs linked**: `04-ux/06-settings-ia.md`,
   `03-runtime/07-process-model.md`, ADR 0177, D340
 - **Acceptance**: B (settings), F (providers), Security
 - **Milestone**: M5
 - **Status**: Unit-covered (`network-proxy.test.ts`, `node-proxy.test.ts`,
-  `settings-general.test.mjs`, host-core `network_proxy` tests); malformed
-  credentials and unsupported SOCKS4 schemes are covered by the shared parser
-  tests; full UI journey Draft (run only in a capable environment when this surface changes)
+  `authenticated-proxy-relay.test.ts`, `settings-general.test.mjs`,
+  host-core `network_proxy` tests); malformed credentials and unsupported
+  SOCKS4 schemes are covered by the shared parser tests; full UI journey
+  Draft (run only in a capable environment when this surface changes)
 
 #### E2E-191: Newly emitted AppError codes stay registered
 
@@ -11944,6 +11970,33 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Milestone**: M5
 - **Status**: Unit-covered (`apps/desktop/test/git-clone.test.mjs`)
 
+
+#### E2E-258: Create project dialog can start from a git repository
+
+- **Preconditions**: The Create project dialog opens from the Projects heading
+  (no existing project is required); `git` is installed.
+- **Steps**:
+  1. Switch the source selector to Git repository.
+  2. Paste `https://github.com/octocat/Hello-World.git` and confirm the project
+     name field is seeded with `Hello-World`, then type a custom name.
+  3. Choose a clone destination folder and confirm the destination row shows it.
+  4. Confirm Create and inspect the workspace, sidebar, and project archive.
+  5. Reopen the dialog, switch to Git repository, and paste a private or
+     malformed remote.
+- **Expected**: The dialog swaps the folder list for a repository URL field plus
+  a clone destination row and keeps one project name field; Create stays
+  disabled until the URL parses and a folder is chosen. Confirming runs
+  `git clone` into the chosen folder with the renderer still owning project
+  creation: the checkout becomes the primary root and the entered name names the
+  group. Private, loopback, link-local, credential-bearing, and malformed
+  remotes leave Create disabled (ADR 0247) and no folder is written.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §9, `04-ux/08-component-spec.md`,
+  ADR 0273, ADR 0233, ADR 0247
+- **Acceptance**: Quality (project entry), D (workspace)
+- **Milestone**: M5
+- **Status**: Unit-covered (`apps/desktop/test/project-create-dialog.test.mjs`,
+  `apps/desktop/test/git-clone.test.mjs`); full UI scenario Draft (run only in a
+  capable environment when this surface changes)
 #### E2E-257: Importing into an archived project restores its visibility
 
 - **Preconditions**: A durable project has been archived in the renderer
@@ -12549,3 +12602,43 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   picked directory, and a session root stands in when the window shows no
   project. The two-live-sessions desktop journey and the panel step are Draft
   (run only in a capable environment when this surface changes)
+
+#### E2E-MODEL-catalog-window-correction-reaches-saved-bindings
+
+- **Goal**: a models.dev limit correction reaches an already saved binding without
+  deleting and re-adding the model, while a number the user entered in Settings is
+  never overwritten.
+- **Steps**:
+  1. Configure a provider, select a model models.dev publishes a `limit.context`
+     for, and save. Open the row's Advanced body and read the context-window field
+     and its hint.
+  2. Serve a corrected catalog record for that model (a different published
+     window), reopen Settings, and read the row, the context inspector, and the
+     window a new session launches with.
+  3. Type a window in the Advanced field — the preset ladder once and a
+     hand-typed `128000` once — save, then serve another catalog correction and
+     reopen Settings and the inspector.
+  4. Save and reopen a provider row whose binding carries no
+     `contextWindowSource`: once with the generic `128000` seed, once with any
+     other stored value.
+- **Expected**: Step 1 shows the published number with the "follows models.dev"
+  hint. Step 2 shows the corrected number everywhere the effective window is used
+  (settings row, context inspector, session launch) with no delete and re-add.
+  Step 3 keeps the entered number in the settings row, in the inspector, and in
+  the launched request, including a hand-typed `128000` for a model whose
+  published window is larger, and the hint is gone. Step 4 resolves
+  deterministically: the `128000` seed follows the catalog, every other value
+  stays as stored. Every step keeps the marker across the save/read round trip of
+  the provider row, and a config written before the marker stays readable.
+- **Specs linked**: `03-runtime/13-model-catalog-and-selection.md` §9.1,
+  `03-runtime/12-provider-config-schema.md` §2,
+  `03-runtime/11-provider-model-system.md` §2, `04-ux/06-settings-ia.md` §2
+- **Acceptance**: B (model config), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Partially automated:
+  `apps/desktop/test/model-binding-catalog-source.test.mjs` drives the main-process
+  resolver (catalog-sourced correction reaches the exposed row, a user value
+  survives it, the generic seed still follows the catalog, an inherited value stays
+  marked); `packages/shared/src/model-catalog.test.ts` covers the four source rules;
+  `crates/host-core/src/providers/catalog.rs` covers the config round trip, the
+  unmarked record, and the dropped unknown marker. The end-to-end settings journey
