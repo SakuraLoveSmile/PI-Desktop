@@ -316,6 +316,7 @@ export const es = {
     "compactionRow": "Contexto compactado · #{{times}}",
     "compactionRowSummary": "resumen ≈{{tokens}} tokens",
     "compactionRowNoSummary": "no se generó ningún resumen",
+    "compactionRowSummaryFailed": "falló la generación del resumen · se conservó el contexto reciente",
     "scrollToBottom": "Saltar a la última",
     "minimap": "Esquema de la conversación",
     "resultNeedsAttention": "Esta tarea necesita atención",

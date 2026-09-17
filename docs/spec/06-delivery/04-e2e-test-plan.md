@@ -4966,8 +4966,15 @@ identify the platform validation still needed.
     overflow.
   - If automatic summary generation fails, a durable retained-tail fallback
     checkpoint is appended, the run stays active, and one warning explains
-    that older model context was reduced; if fallback persistence or the safe
-    budget guard fails, `CONTEXT_COMPACTION_FAILED` is emitted once.
+    that older model context was reduced; the transcript row for that
+    checkpoint reads "summary generation failed · recent context retained",
+    never `summary ≈N tokens` (ADR 0282). Before that fallback, the summary
+    request retries transient provider failures up to three times with
+    2s/4s/8s backoff, Stop cancels the backoff, deterministic failures do not
+    retry, and an input whose serialized prompt exceeds the window is sent
+    once more with tool results cut to a short prefix rather than skipping the
+    model. If fallback persistence or the safe budget guard fails,
+    `CONTEXT_COMPACTION_FAILED` is emitted once.
   - If the newest checkpoint is already the transcript leaf when a follow-up
     prompt crosses the hard budget, the runtime rebuilds a smaller tail from
     the full transcript and carries the existing summary forward instead of

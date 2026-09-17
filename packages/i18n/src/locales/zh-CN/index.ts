@@ -318,6 +318,7 @@ export const zhCN = {
     compactionRow: "上下文已压缩 · 第 {{times}} 次",
     compactionRowSummary: "摘要 ≈{{tokens}} tokens",
     compactionRowNoSummary: "未生成摘要",
+    compactionRowSummaryFailed: "摘要生成失败 · 已保留近期上下文",
     scrollToBottom: "回到最新",
     minimap: "对话大纲",
     resultNeedsAttention: "这次任务需要处理一下",

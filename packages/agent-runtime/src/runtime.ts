@@ -176,6 +176,11 @@ import {
 } from "./opencode-session-headers.js";
 import { withCompactionRequestHeaders } from "./compaction-request.js";
 import {
+  COMPACTION_SUMMARY_RETRY_POLICY,
+  estimateSummaryPromptTokens,
+  reduceSummaryInput,
+} from "./compaction-summary-input.js";
+import {
   mergeProviderHeaders,
   providerHeadersEqual,
   withProviderHeaders,
@@ -6120,15 +6125,32 @@ Delegation rules:
     // The summary now covers the whole boundary range, so its input is the
     // context that tripped the hard limit. On a window whose headroom leaves
     // less room for the summary request than the hard limit allows, this is the
-    // guard that routes the turn to retained-tail recovery instead.
-    const historyTokens = preparation.messagesToSummarize.reduce(
-      (total, message) => total + estimateTokens(message),
-      0,
-    );
-    const previousSummaryTokens = preparation.previousSummary
-      ? Math.ceil(preparation.previousSummary.length / 4)
-      : 0;
-    return historyTokens + previousSummaryTokens >= summaryInputLimit;
+    // guard that routes the turn to retained-tail recovery instead. It sizes
+    // the prompt the way pi serializes it — tool results already capped —
+    // rather than the raw messages, which overstated tool-heavy sessions by
+    // several times and skipped summaries that would have fit (#543).
+    return estimateSummaryPromptTokens(preparation) >= summaryInputLimit;
+  }
+
+  /**
+   * Fit the summary input under the provider budget. The full input is tried
+   * first; when it is too large, one reduced pass (tool results cut to a short
+   * prefix, thinking dropped) is tried before giving up. The reduced input
+   * still covers every message the checkpoint files behind its boundary, so
+   * nothing is silently dropped from the summary's scope (ADR 0282).
+   */
+  private fitSummaryInputToBudget(
+    preparation: ShapedPreparation,
+    budget: { hardLimit: number; requestHeadroom: number },
+  ): ShapedPreparation | undefined {
+    if (!this.compactionSummaryWouldExceedBudget(preparation, budget)) {
+      return preparation;
+    }
+    const reduced = reduceSummaryInput(preparation);
+    if (!reduced || this.compactionSummaryWouldExceedBudget(reduced, budget)) {
+      return undefined;
+    }
+    return reduced;
   }
 
   private async persistCheckpoint(
@@ -6294,7 +6316,10 @@ Delegation rules:
       this.model,
       undefined,
       this.thinkingLevel,
-      undefined,
+      // Without a policy pi-ai returns the first failed response as-is, which
+      // made a single dropped stream or 503 discard the whole summary (#543).
+      // pi's classifier decides what is transient; the waits honour `signal`.
+      COMPACTION_SUMMARY_RETRY_POLICY,
       undefined,
       withAbortSignal(signal, BACKGROUND_CONTEXT),
     );
@@ -6335,7 +6360,8 @@ Delegation rules:
       return this.buildRolloverCheckpoint(entries, budget, preparation.value);
     }
 
-    if (this.compactionSummaryWouldExceedBudget(preparation.value, budget)) {
+    const summaryInput = this.fitSummaryInputToBudget(preparation.value, budget);
+    if (!summaryInput) {
       return {
         ok: false,
         entries,
@@ -6349,7 +6375,7 @@ Delegation rules:
 
     let result: Awaited<ReturnType<typeof compact>>;
     try {
-      result = await this.generateCompaction(preparation.value, signal);
+      result = await this.generateCompaction(summaryInput, signal);
     } catch (error) {
       return {
         ok: false,

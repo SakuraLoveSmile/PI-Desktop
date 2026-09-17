@@ -116,7 +116,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0046 | [按类别拆分的进程日志文件](/adr/0046-categorized-process-logs) | 已接受 |
 | 0047 | [带精确与估算 token 来源的上下文用量检查器](/adr/0047-context-usage-inspector) | 已接受 |
 | 0048 | [按回合惰性激活工具](/adr/0048-lazy-per-turn-tool-activation) | 已接受 |
-| 0049 | [用保留尾部恢复自动上下文压缩失败](/adr/0049-context-compaction-failure-recovery) | 已接受 |
+| 0049 | [用保留尾部恢复自动上下文压缩失败](/adr/0049-context-compaction-failure-recovery) | 已接受（预检守卫由 ADR 0282 修订） |
 | 0050 | [有界的 provider 流恢复与诊断](/adr/0050-bounded-provider-stream-recovery) | 已接受 |
 | 0051 | [将 host RPC stdio 与 Tokio 阻塞池隔离](/adr/0051-host-rpc-stdio-resource-isolation) | 已接受 |
 | 0052 | [Plan 运行状态与审批边界](/adr/0052-plan-operating-state-and-approval-boundary) | 已被 ADR 0053 取代 |
@@ -290,6 +290,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0278 | [规范应用 ID `net.aiuo.pi-desktop`](/adr/0278-canonical-application-id) | 已接受（D443；修订 D141 / D371 / ADR 0204；issue #524） |
 | 0279 | [可恢复的子代理委托](/adr/0279-resumable-subagent-delegations) | 已接受待实现（修订 ADR 0062；ADR 0089；issue #513） |
 | 0280 | [插件自有界面按宿主语言自行本地化](/adr/0280-plugin-owned-ui-localizes-from-host-locale) | 已接受（修订 ADR 0267；ADR 0159） |
+| 0282 | [压缩摘要先重试并按实际提示大小预检，再回退保留尾部](/adr/0282-compaction-summary-retry-and-sizing) | 已接受（修订 ADR 0049；issue #543） |
 | turn-process-and-thinking-display | [回合过程与思考展示](/adr/turn-process-and-thinking-display) | 已接受 |
 
 ## 什么时候看 ADR
