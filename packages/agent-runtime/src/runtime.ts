@@ -131,6 +131,16 @@ import {
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
 import { PathMutex } from "./path-lock.js";
+import { DelegationChainRegistry } from "./delegation-chain.js";
+import {
+  extractReadFiles,
+  isReadOnlyToolName,
+  originalTaskFromTranscript,
+  rebuildChainsFromTranscript,
+  selectChainRows,
+  seedDelegateMessages,
+  type DelegationChain,
+} from "./delegation-history.js";
 import {
   composeSubagentSystemPrompt,
   SubagentRun,
@@ -308,8 +318,16 @@ function isMissingToolResultPlaceholder(
     content[0].text === MISSING_TOOL_RESULT_PLACEHOLDER
   );
 }
-export const ASK_TOOL_NAME = "asktool";
 
+/** Narrow view of the `tool_end` agent event; the envelope carries the rest. */
+type ToolEndEvent = {
+  type: "tool_end";
+  toolCallId: string;
+  result: unknown;
+  isError?: boolean;
+};
+
+export const ASK_TOOL_NAME = "asktool";
 /**
  * Delegation lifecycle (ADR 0089): `Task` starts a subagent in the background
  * and returns immediately; `TaskWait` converges on running delegations;
@@ -372,7 +390,14 @@ export type DelegationRecord = {
    * `TaskWait` result or the resume-after-idle prompt. Auto-delivery is a
    * single shot per record. */
   reportDelivered: boolean;
+  /** Stable chain identity; never appears in a tool parameter (ADR 0276). */
+  delegateSessionId: string;
+  /** Every `Task` toolCallId on this chain, oldest first. */
+  toolCallIdChain: string[];
+  /** Prior `delegationId` this run continues, when `Task.resume` was set. */
+  resumedFrom?: string;
 };
+
 
 function delegationSummary(record: DelegationRecord): Record<string, unknown> {
   return {
@@ -388,6 +413,7 @@ function delegationSummary(record: DelegationRecord): Record<string, unknown> {
     ...(record.completedAt ? { completedAt: record.completedAt } : {}),
     ...(record.result?.modelFailures ? { modelFailures: record.result.modelFailures } : {}),
     ...(record.result?.error ? { error: record.result.error } : {}),
+    ...(record.resumedFrom ? { resumedFrom: record.resumedFrom } : {}),
   };
 }
 
@@ -1428,6 +1454,16 @@ export class DesktopAgentRuntime {
    * returns; `TaskWait`/`TaskList`/`TaskStop` drive it afterwards.
    */
   private delegations = new Map<string, DelegationRecord>();
+  /** Resumable chains rebuilt from the transcript and updated as Task settles. */
+  private readonly delegationChains = new DelegationChainRegistry();
+  /** Transcript rows used to rebuild a resumed delegate's context (ADR 0276):
+   * the seed history at launch plus every row this session's delegates emit. */
+  private readonly transcriptHistory: UiMessage[];
+  /** Row ids already in `transcriptHistory` from live delegate events, so a
+   * retried stream appends once. */
+  private readonly appendedDelegationRowIds = new Set<string>();
+  /** `toolName` of a delegate's in-flight call; `tool_end` carries no name. */
+  private readonly delegateToolNames = new Map<string, string>();
   /** Set by `abort` / `dispose` so a finishing delegate cannot restart the parent. */
   private runCancelled = false;
   /**
@@ -1613,8 +1649,12 @@ export class DesktopAgentRuntime {
     this.models = models;
     const runtimeApiKey = providerRequestKey(this.provider);
 
-    this.fullEntries = this.historyToEntries(opts.history ?? []);
+    this.transcriptHistory = [...(opts.history ?? [])];
+    this.fullEntries = this.historyToEntries(this.transcriptHistory);
     this.activeCompaction = opts.compaction;
+    this.delegationChains.hydrate(
+      rebuildChainsFromTranscript(this.transcriptHistory),
+    );
     const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
     const defaultSystemPrompt = [
       DEFAULT_RUNTIME_SYSTEM_PROMPT,
@@ -1843,6 +1883,12 @@ Delegation rules:
     const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
     const memoryPrompt = projectMemoryPrompt(this.projectMemory);
     const optionalToolsPrompt = this.optionalToolsPrompt();
+    const resumablePrompt =
+      this.subagents.length > 0
+        ? this.delegationChains.promptBlock({
+            runningDelegationIds: this.runningDelegationIds(),
+          })
+        : "";
     return composeModeSystemPrompt(
       this.mode,
       [
@@ -1850,8 +1896,20 @@ Delegation rules:
         ...(optionalToolsPrompt ? [optionalToolsPrompt] : []),
         ...(projectPrompt ? [projectPrompt] : []),
         ...(memoryPrompt ? [memoryPrompt] : []),
+        ...(resumablePrompt ? [resumablePrompt] : []),
       ].join("\n\n"),
     );
+  }
+
+  /**
+   * The resumable list changes when a delegation settles, so the prompt the
+   * parent reads on its next turn reflects it. Recomposing is only worth it
+   * when subagents exist at all.
+   */
+  private refreshResumablePrompt(): void {
+    if (this.subagents.length === 0) return;
+    if (!this.agent) return;
+    this.agent.state.systemPrompt = this.composeSystemPrompt();
   }
 
   /**
@@ -3561,6 +3619,89 @@ Delegation rules:
     };
   }
 
+  /** Every delegation still working; a resume of one is a queueing attempt. */
+  private runningDelegationIds(): Set<string> {
+    return new Set(
+      this.runningDelegations().map((record) => record.delegationId),
+    );
+  }
+
+  /**
+   * Resolve a `Task.resume` id to its chain, or fail with a message that tells
+   * the model how to proceed (ADR 0276). The parent only ever sees
+   * `delegationId`; the chain identity behind it stays internal.
+   */
+  private resolveResumeChain(
+    resume: string,
+    agentName: string,
+  ):
+    | { ok: true; chain: DelegationChain }
+    | { ok: false; message: string } {
+    const lookup = this.delegationChains.resolveResume({
+      resume,
+      agentName,
+      runningDelegationIds: this.runningDelegationIds(),
+    });
+    if (lookup.ok) return lookup;
+    const error = lookup.error;
+    switch (error.kind) {
+      case "unknown":
+        return { ok: false, message: this.unknownResumeMessage(resume) };
+      case "running":
+        return {
+          ok: false,
+          message: `Delegation ${error.delegationId} is still running. Call TaskWait to converge with it first, or start a new delegation. Resuming a running delegation is not queued.`,
+        };
+      case "not-resumable":
+        return {
+          ok: false,
+          message: `Delegation ${resume} ended as "${error.status}" and cannot be resumed. Only completed or failed delegations continue; start a new delegation instead.`,
+        };
+      case "agent-mismatch":
+        return {
+          ok: false,
+          message: `Delegation ${resume} belongs to the ${error.expected} subagent, not ${error.actual}. Resume it with the matching agent name, or start a new delegation.`,
+        };
+      case "over-budget":
+        return {
+          ok: false,
+          message: `Delegation ${resume} has read too much to resume cheaply. Start a new delegation and point it at the specific files it should re-read.`,
+        };
+    }
+  }
+
+  private unknownResumeMessage(resume: string): string {
+    return this.delegationChains.unknownResumeError(
+      resume,
+      this.delegationChains.resumableList({
+        runningDelegationIds: this.runningDelegationIds(),
+      }),
+    );
+  }
+
+  /**
+   * Rebuild the delegate's prior conversation from its transcript rows. The
+   * rows carry `parentToolCallId` for exactly the chain's `Task` calls, so the
+   * replay never picks up the parent's own rows or a sibling delegate's.
+   */
+  private seedResumedDelegate(
+    chain: DelegationChain,
+    provider: RuntimeProviderConfig,
+  ): AgentMessage[] | undefined {
+    const originalTask =
+      chain.originalTask ??
+      originalTaskFromTranscript(this.transcriptHistory, chain);
+    if (!originalTask) return undefined;
+    const rows = selectChainRows(this.transcriptHistory, chain);
+    if (rows.length === 0) return undefined;
+    return seedDelegateMessages({
+      originalTask,
+      rows,
+      provider,
+      model: buildProviderModel(provider),
+    });
+  }
+
   /**
    * `Task`: delegate one bounded piece of work to a subagent (ADR 0062).
    *
@@ -3594,8 +3735,9 @@ Delegation rules:
             ]),
         "`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.",
         "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time. You may keep working or talk to the user while they run; the runtime delivers their reports when they finish. Call TaskStop only to cancel.",
-        `Available subagents:\n${catalog}`,
-      ].join("\n\n"),
+        "To continue a previous subagent, pass its `resume` id (the `delegationId` returned by Task). Saying \"reuse\" in prose is not enough. Do not pass `model` when resuming; start a new delegation to change models.",
+        `Available subagents:\\n${catalog}`,
+      ].join("\\n\\n"),
       parameters: Type.Object({
         agent: Type.String({
           description: `Name of the subagent to run: ${names.join(", ")}.`,
@@ -3613,7 +3755,13 @@ Delegation rules:
         model: Type.Optional(
           Type.String({
             description:
-              "Override the delegate's model for this run, e.g. 'anthropic/claude-sonnet-4-20250514'. Omit to use the subagent's default. Repeating the definition's own Default model key is the same as omitting this parameter. Only choose a different override from the available delegation model catalog.",
+              "Override the delegate's model for this run, e.g. 'anthropic/claude-sonnet-4-20250514'. Omit to use the subagent's default. Repeating the definition's own Default model key is the same as omitting this parameter. Only choose a different override from the available delegation model catalog. Forbidden when `resume` is set.",
+          }),
+        ),
+        resume: Type.Optional(
+          Type.String({
+            description:
+              "delegationId of a settled subagent in this conversation to continue. Omit to start a new session.",
           }),
         ),
       }),
@@ -3635,17 +3783,28 @@ Delegation rules:
           isRecord(params) && typeof params.task === "string"
             ? params.task.trim()
             : "";
+        const resume =
+          isRecord(params) && typeof params.resume === "string"
+            ? params.resume.trim()
+            : "";
+        // Model override: Task.model > definition.model pin > session model.
+        const modelOverride =
+          isRecord(params) && typeof params.model === "string"
+            ? params.model.trim()
+            : "";
+        // Resume keeps the chain's model; a new delegation is the way to switch.
+        if (resume && modelOverride) {
+          return this.subagentToolError(
+            toolCallId,
+            `Resuming a subagent cannot change its model. Omit \`model\` to continue ${resume}, or start a new delegation to pick a different model.`,
+          );
+        }
         if (!task) {
           return this.subagentToolError(
             toolCallId,
             `Delegating to ${definition.name} needs a non-empty \`task\` brief.`,
           );
         }
-        // Model override: Task.model > definition.model pin > session model.
-        const modelOverride =
-          isRecord(params) && typeof params.model === "string"
-            ? params.model.trim()
-            : "";
         let provider: RuntimeProviderConfig | undefined;
         if (modelOverride) {
           if (this.isDefinitionPinOverride(definition, modelOverride)) {
@@ -3712,6 +3871,31 @@ Delegation rules:
         }
         // The delegate runs in the background (ADR 0089): `Task` returns
         // immediately with a delegation id, and TaskWait converges later.
+        const resumeLookup = resume
+          ? this.resolveResumeChain(resume, definition.name)
+          : undefined;
+        if (resume && resumeLookup && !resumeLookup.ok) {
+          return this.subagentToolError(toolCallId, resumeLookup.message);
+        }
+        const resumedChain = resumeLookup?.ok ? resumeLookup.chain : undefined;
+        if (
+          resumedChain?.latestModelId &&
+          resumedChain.latestModelId !== provider.modelId
+        ) {
+          return this.subagentToolError(
+            toolCallId,
+            `Resuming ${resume} continues the ${resumedChain.latestModelId} model. Omit \`model\` to keep it, or start a new delegation to change models.`,
+          );
+        }
+        const initialMessages = resumedChain
+          ? this.seedResumedDelegate(resumedChain, provider)
+          : undefined;
+        if (resume && !initialMessages) {
+          return this.subagentToolError(
+            toolCallId,
+            this.unknownResumeMessage(resume),
+          );
+        }
         const delegationId = randomUUID();
         const controller = new AbortController();
         const thinkingLevel: SubagentThinkingLevel =
@@ -3729,6 +3913,20 @@ Delegation rules:
         let resolveCompletion: () => void = () => {};
         const completion = new Promise<void>((resolve) => {
           resolveCompletion = resolve;
+        });
+        const objective =
+          isRecord(params) && typeof params.description === "string"
+            ? params.description.trim()
+            : task;
+        const chain = this.delegationChains.start({
+          delegateSessionId: resumedChain?.delegateSessionId ?? delegationId,
+          delegationId,
+          toolCallId,
+          agentName: definition.name,
+          originalTask: resumedChain?.originalTask ?? task,
+          objective,
+          latestModelId: provider.modelId,
+          resumedFrom: resumedChain,
         });
         const record: DelegationRecord = {
           delegationId,
@@ -3748,6 +3946,9 @@ Delegation rules:
           lastPhase: "waiting-model",
           startedEpoch: this.turnEpoch,
           reportDelivered: false,
+          delegateSessionId: chain.delegateSessionId,
+          toolCallIdChain: [...chain.toolCallIds],
+          ...(resumedChain ? { resumedFrom: resume } : {}),
         };
         this.delegations.set(delegationId, record);
         const scopedTools = this.scopeDelegateTools(tools, definition);
@@ -3783,6 +3984,8 @@ Delegation rules:
           // through the same bookkeeping the parent uses.
           resolveToolOutcome: (context) => this.resolveOwnToolOutcome(context),
           signal: abortSignal,
+          // A resumed run replays its chain before this turn's `task` (ADR 0276).
+          ...(initialMessages ? { initialMessages } : {}),
         })
           .run()
           .then(
@@ -3826,6 +4029,7 @@ Delegation rules:
             startedAt,
             modelId: provider.modelId,
             thinkingLevel,
+            ...(resumedChain ? { resumedFrom: resume } : {}),
           },
         };
       },
@@ -3869,9 +4073,11 @@ Delegation rules:
     if (result.usage) {
       this.turnSubagentUsage = addUsage(this.turnSubagentUsage, result.usage);
     }
+    this.delegationChains.settle(record.delegateSessionId, record.status);
     this.publishDelegationSettlement(record);
     record.resolveCompletion();
     this.refreshDelegationWait();
+    this.refreshResumablePrompt();
     this.pruneFinishedDelegations();
   }
 
@@ -3981,11 +4187,16 @@ Delegation rules:
     if (event.type === "tool_start") {
       record.toolCalls += 1;
       this.touchDelegationPhase(record, "tool", event.toolName);
+      this.delegateToolNames.set(event.toolCallId, event.toolName);
       return;
     }
     if (event.type === "tool_end") {
       this.touchDelegationPhase(record, "waiting-model");
+      this.appendDelegationRow(record, envelope, this.toolRowFromEnvelope(envelope));
       return;
+    }
+    if (event.type === "message_end" && event.message.role === "assistant") {
+      this.appendDelegationRow(record, envelope, event.message);
     }
     if (
       (event.type === "message_start" || event.type === "message_update") &&
@@ -4001,6 +4212,56 @@ Delegation rules:
       );
       if (thinking && !text) this.touchDelegationPhase(record, "thinking");
     }
+  }
+
+  /**
+   * Keep `transcriptHistory` current with what a delegate produced, so a later
+   * `Task.resume` in the same session replays the chain without waiting on
+   * persistence (ADR 0276). A retried stream reuses the row id and appends once.
+   */
+  private appendDelegationRow(
+    record: DelegationRecord,
+    envelope: AgentEventEnvelope,
+    row: UiMessage,
+  ): void {
+    const tagged: UiMessage = {
+      ...row,
+      parentToolCallId: envelope.parentToolCallId ?? row.parentToolCallId,
+      agentName: envelope.agentName ?? row.agentName,
+    };
+    const key =
+      tagged.role === "tool"
+        ? `tool:${tagged.toolCallId ?? ""}`
+        : `message:${tagged.id ?? ""}`;
+    if (key.endsWith(":")) return;
+    if (this.appendedDelegationRowIds.has(key)) return;
+    this.appendedDelegationRowIds.add(key);
+    this.transcriptHistory.push(tagged);
+    if (tagged.role === "tool" && isReadOnlyToolName(tagged.toolName ?? "")) {
+      const { files, lineCount } = extractReadFiles([tagged]);
+      this.delegationChains.noteReads(record.delegateSessionId, files, lineCount);
+    }
+  }
+
+  private toolRowFromEnvelope(envelope: AgentEventEnvelope): UiMessage {
+    const event = envelope.event as ToolEndEvent;
+    const toolName = this.delegateToolNames.get(event.toolCallId) ?? "";
+    const ts = new Date(envelope.ts ?? Date.now()).toISOString();
+    return {
+      id: `delegate-tool-${event.toolCallId}`,
+      role: "tool",
+      content: "",
+      createdAt: ts,
+      toolCompletedAt: ts,
+      toolCallId: event.toolCallId,
+      toolName,
+      toolArgs: undefined,
+      toolResult: event.result,
+      toolStatus: event.isError ? "error" : "success",
+      isError: Boolean(event.isError),
+      parentToolCallId: envelope.parentToolCallId,
+      agentName: envelope.agentName,
+    };
   }
 
   private touchDelegationPhase(

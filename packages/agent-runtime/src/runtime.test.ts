@@ -6803,6 +6803,236 @@ describe("DesktopAgentRuntime subagents", () => {
 
     await runtime.dispose();
   });
+
+  describe("resume (ADR 0276)", () => {
+    /** Rows a delegate left in the transcript, tagged with its `Task` call. */
+    function delegateRow(
+      id: string,
+      parentToolCallId: string,
+      overrides: Partial<UiMessage> = {},
+    ): UiMessage {
+      return {
+        id,
+        role: "assistant",
+        content: "reading src/app.ts",
+        createdAt: "2026-08-06T00:00:01.000Z",
+        status: "complete",
+        parentToolCallId,
+        agentName: "explorer",
+        ...overrides,
+      };
+    }
+
+    async function startTask(
+      runtime: DesktopAgentRuntime,
+      toolCallId: string,
+      args: Record<string, unknown>,
+    ) {
+      return taskTool(runtime).execute(toolCallId, args);
+    }
+
+    it("seeds a resumed run with the chain's prior messages and keeps its model", async () => {
+      const history: UiMessage[] = [
+        delegateRow("child-1", "task-1"),
+        {
+          id: "tool-1",
+          role: "tool",
+          content: "",
+          createdAt: "2026-08-06T00:00:02.000Z",
+          toolCallId: "read-1",
+          toolName: "Read",
+          toolArgs: { path: "src/app.ts" },
+          toolResult: {
+            content: [{ type: "text", text: "line one\nline two" }],
+          },
+          toolStatus: "success",
+          parentToolCallId: "task-1",
+          agentName: "explorer",
+        },
+      ];
+      const runtime = createRuntime({ subagents: [explorer], history });
+      (runtime as any).transcriptHistory.push({
+        id: "task-1",
+        role: "tool",
+        content: "",
+        createdAt: "2026-08-06T00:00:00.000Z",
+        toolCallId: "task-1",
+        toolName: "Task",
+        toolArgs: { agent: "explorer", task: "Explore the parser." },
+        toolResult: { details: { delegationId: "del-1", agent: "explorer" } },
+        toolStatus: "success",
+      });
+      (runtime as any).delegationChains.hydrate(
+        (await import("./delegation-history.js")).rebuildChainsFromTranscript(
+          (runtime as any).transcriptHistory,
+        ),
+      );
+
+      subagentRuns.calls.length = 0;
+      subagentRuns.deferred = true;
+      const started = await startTask(runtime, "task-2", {
+        agent: "explorer",
+        task: "Now cover the lexer.",
+        resume: "del-1",
+      });
+      subagentRuns.deferred = false;
+
+      expect((started.details as any).resumedFrom).toBe("del-1");
+      expect(subagentRuns.calls).toHaveLength(1);
+      const options = subagentRuns.calls[0];
+      // The resumed delegate replays the original brief plus its own rows; the
+      // new brief is the user turn `prompt()` adds, not part of the seed.
+      expect(options.task).toBe("Now cover the lexer.");
+      expect(options.initialMessages[0]).toMatchObject({
+        role: "user",
+        content: [{ type: "text", text: "Explore the parser." }],
+      });
+      expect(
+        options.initialMessages.some(
+          (message: any) =>
+            message.role === "assistant" &&
+            message.content.some(
+              (block: any) => block.type === "toolCall" && block.name === "Read",
+            ),
+        ),
+      ).toBe(true);
+      const record = (runtime as any).delegations.get(
+        (started.details as any).delegationId,
+      );
+      expect(record.resumedFrom).toBe("del-1");
+      expect(record.delegateSessionId).toBe("del-1");
+      expect(record.toolCallIdChain).toEqual(["task-1", "task-2"]);
+
+      await runtime.dispose();
+    });
+
+    it("rejects a model override on resume", async () => {
+      const history: UiMessage[] = [delegateRow("child-1", "task-1")];
+      const runtime = createRuntime({ subagents: [explorer], history });
+      (runtime as any).transcriptHistory.push({
+        id: "task-1",
+        role: "tool",
+        content: "",
+        createdAt: "2026-08-06T00:00:00.000Z",
+        toolCallId: "task-1",
+        toolName: "Task",
+        toolArgs: { agent: "explorer", task: "Explore." },
+        toolResult: { details: { delegationId: "del-1" } },
+        toolStatus: "success",
+      });
+
+      subagentRuns.calls.length = 0;
+      const result = await startTask(runtime, "task-2", {
+        agent: "explorer",
+        task: "More.",
+        resume: "del-1",
+        model: "local/local-model",
+      });
+
+      expect(String((result.details as any).error)).toContain(
+        "cannot change its model",
+      );
+      expect(subagentRuns.calls).toHaveLength(0);
+      await runtime.dispose();
+    });
+
+    it("reports an unknown resume id without starting a delegate", async () => {
+      const runtime = createRuntime({ subagents: [explorer] });
+      subagentRuns.calls.length = 0;
+      const result = await startTask(runtime, "task-1", {
+        agent: "explorer",
+        task: "Continue.",
+        resume: "missing",
+      });
+      const message = String((result.details as any).error);
+      expect(message).toContain("Unknown delegation");
+      expect(message).toContain("No reusable subagent sessions");
+      expect(subagentRuns.calls).toHaveLength(0);
+      await runtime.dispose();
+    });
+
+    it("refuses to resume a running delegation", async () => {
+      const runtime = createRuntime({ subagents: [explorer] });
+      subagentRuns.calls.length = 0;
+      subagentRuns.deferred = true;
+      const first = await startTask(runtime, "task-1", {
+        agent: "explorer",
+        task: "Find it.",
+      });
+      const delegationId = (first.details as any).delegationId as string;
+      const second = await startTask(runtime, "task-2", {
+        agent: "explorer",
+        task: "Again.",
+        resume: delegationId,
+      });
+      expect(String((second.details as any).error)).toContain("still running");
+      expect(subagentRuns.calls).toHaveLength(1);
+      subagentRuns.resolveRun?.({
+        agentName: "explorer",
+        status: "completed",
+        report: "done",
+        turns: 1,
+        toolCalls: 0,
+      });
+      subagentRuns.deferred = false;
+      await runtime.dispose();
+    });
+
+    it("marks a chain resumable only after it settles", async () => {
+      const runtime = createRuntime({ subagents: [explorer] });
+      subagentRuns.calls.length = 0;
+      subagentRuns.deferred = true;
+      const started = await startTask(runtime, "task-1", {
+        agent: "explorer",
+        task: "Find it.",
+      });
+      const delegationId = (started.details as any).delegationId as string;
+      const internals = runtime as any;
+      expect(
+        internals.delegationChains.lookup(delegationId).latestStatus,
+      ).toBe("running");
+      subagentRuns.resolveRun?.({
+        agentName: "explorer",
+        status: "completed",
+        report: "done",
+        turns: 1,
+        toolCalls: 0,
+      });
+      await vi.waitFor(() => {
+        expect(
+          internals.delegationChains.lookup(delegationId).latestStatus,
+        ).toBe("completed");
+      });
+      subagentRuns.deferred = false;
+      await runtime.dispose();
+    });
+
+    it("lists a settled delegation in the parent's system prompt", async () => {
+      const runtime = createRuntime({ subagents: [explorer] });
+      subagentRuns.calls.length = 0;
+      subagentRuns.deferred = true;
+      const started = await startTask(runtime, "task-1", {
+        agent: "explorer",
+        task: "Find it.",
+        description: "find the bug",
+      });
+      const delegationId = (started.details as any).delegationId as string;
+      subagentRuns.resolveRun?.({
+        agentName: "explorer",
+        status: "completed",
+        report: "done",
+        turns: 1,
+        toolCalls: 0,
+      });
+      await vi.waitFor(() => {
+        expect((runtime as any).agent.state.systemPrompt).toContain(
+          `explorer / ${delegationId}: find the bug`,
+        );
+      });
+      subagentRuns.deferred = false;
+      await runtime.dispose();
+    });
+  });
 });
 
 describe("DesktopAgentRuntime deferred tool restore (#225)", () => {
