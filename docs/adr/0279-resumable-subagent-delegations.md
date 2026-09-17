@@ -1,4 +1,4 @@
-# ADR 0276: Resumable subagent delegations
+# ADR 0279: Resumable subagent delegations
 
 - Status: Accepted for implementation
 - Date: 2026-09-17
@@ -57,9 +57,10 @@ are keyed by `parentToolCallId`, so reconstructing a chain's context means
 selecting every row whose `parentToolCallId` is in the chain and whose
 `agentName` matches.
 
-`DelegationRecord` gains `delegateSessionId`, `toolCallIdChain`, `resumable`,
-`readFiles`, and `readLineCount`. The registry keeps a secondary index from
-`delegateSessionId` to the chain's live record.
+`DelegationRecord` gains `delegateSessionId`, plus `resumedFrom` and
+`modelChangedFrom` on a run that continues a chain. Read tracking lives on the
+chain, not the record: the registry keeps one entry per `delegateSessionId` and a
+secondary index from every `delegationId` on that chain to it.
 
 ### 3. Context reconstruction is a pure function
 
@@ -86,23 +87,37 @@ model can act on:
 | Condition | Error |
 |---|---|
 | unknown or evicted id | `Unknown delegation "<id>"` plus the current resumable list |
-| still running | `Delegation <id> is still running; call TaskWait to converge first` |
+| still running | `Delegation <id> is still running`, call TaskWait first — a resume is never queued |
 | `stopped` / `aborted` | not resumable; a future revive path (out of scope here) |
+| `interrupted` (the app closed mid-run) | not resumable; start a new delegation |
 | `Task.agent` differs from the chain's agent | name mismatch, lists available |
 | `Task.model` present on a resume | not allowed on a resumed run — start a new delegation to change models |
-| chain exceeds the read budget | the chain is excluded from the resumable list, so this surfaces as unknown id |
+| chain exceeds the read budget | `Delegation <id> has read too much to resume cheaply` |
+| the chain resolves but has no rows left to replay | the chain is dropped and reported as having no recorded history; the same id is never listed as reusable |
 
 No new error codes for "evicted" versus "never existed": both resolve to the
 same unknown-id error, because the model's only correct action is identical.
+
+A resume keeps the chain's own model binding. The `providerId/modelId` key the
+chain recorded is preferred; a chain rebuilt from the transcript only knows the
+model id, which is matched against what the session has configured. Changing the
+parent's own session model therefore does not strand a chain, and a delegate never
+swaps models by accident. If nothing resolves the recorded binding any more, the
+run continues on the binding the definition resolves to now and records the
+previous model id in the delegation's lifecycle details as `modelChangedFrom`:
+refusing instead would strand the chain forever, and swapping silently would hand
+the same conversation to a different model with no trace.
 
 ### 5. Only `completed` and `failed` are resumable
 
 A `failed` run's reads and findings still have value; its failed assistant row
 is dropped by the converter like any other error row. `stopped` and `aborted`
 encode the user's or the parent's decision to abandon that line of work, and
-resuming it would contradict the stop. (`timed_out` is a vestigial status —
-ADR 0119's timeouts were withdrawn by D328 — and is treated as `failed` for this
-purpose.)
+resuming it would contradict the stop. `interrupted` (the app closed while the
+run still worked) means the same thing for this purpose: the delegate never
+settled, so there is nothing trustworthy to continue. (`timed_out` is a vestigial
+status — ADR 0119's timeouts were withdrawn by D328 — and is treated as `failed`
+for this purpose.)
 
 ### 6. One live record per chain, ever
 
@@ -114,10 +129,13 @@ forking successors.
 ### 7. Resumable chains are bounded, LRU, per agent name
 
 `MAX_RESUMABLE_CHAINS_PER_AGENT = 2`. Chains are exempt from the existing
-`pruneFinishedDelegations` oldest-first sweep while under this bound; exceeding
-it evicts the least-recently-used whole chain (record, chain index, and reverse
-map entries together). Tombstones are unnecessary: `delegationId` is a random
-UUID, so an evicted id cannot collide with a future one.
+`pruneFinishedDelegations` oldest-first sweep. Exceeding the bound evicts the
+least-recently-used whole chain when a delegation settles — registry entry and
+every reverse-map entry together. A chain whose latest run is still working is
+never evicted: dropping it would strand the delegate writing into it, so the
+bound counts reusable chains and a live chain may momentarily push the group over
+it. Tombstones are unnecessary: `delegationId` is a random UUID, so an evicted id
+cannot collide with a future one.
 
 ### 8. Read budget gates chain growth
 
@@ -164,6 +182,19 @@ session launch the runtime scans the transcript's `Task` rows, groups them by
 their `resume` links into chains, and rehydrates the secondary index. Restart
 does not lose resumability.
 
+Two details make a rebuilt chain behave like a live one. Agent names are
+normalized on rebuild (`Explorer` and `explorer.md` both mean `explorer`), so the
+rebuilt chain still selects its own rows and still matches `Task.agent`. And each
+call carries the status its own `Task` row recorded: the settlement projection
+rewrites that row in place, so a chain knows whether its last run was `completed`
+or `failed`. A run the app closed while it still worked never settled: its row
+still says `running`, which rebuilds as `interrupted` — not resumable, rather
+than staying open forever. A row that records no status at all is trusted as
+settled, because every `Task` row this app writes carries one. The model binding
+itself is not persisted as a key, so a rebuilt chain is matched to a configured
+binding by model id; two accounts offering the same model id are
+indistinguishable at that point.
+
 ### 13. The transcript renders a chain as one continuous conversation
 
 A resumed delegation's card shows the whole chain's rows as consecutive turns
@@ -178,10 +209,9 @@ counters start at zero; `details.resumedFrom` keeps the link auditable.
   delegate's own context only; the parent still receives nothing but reports
   through `TaskWait`, and `parentToolCallId` rows are still skipped when the
   parent's context is rebuilt.
-- No new storage schema, tables, or event types. The required fields
-  (`delegateSessionId`, `toolCallIdChain`, `resumable`, read tracking) live on
-  the in-memory `DelegationRecord`; `resumedFrom` rides the existing lifecycle
-  details projection.
+- No new storage schema, tables, or event types. Chain identity, read tracking,
+  and the model binding live on the in-memory chain; `resumedFrom` and
+  `modelChangedFrom` ride the existing lifecycle details projection.
 - A resumed run is billed and bounded exactly like a fresh one — same concurrency
   slot, same permission scope, same fallback models, same abort sources.
 - Failure mode of the read budget is graceful degradation to a cold start, never

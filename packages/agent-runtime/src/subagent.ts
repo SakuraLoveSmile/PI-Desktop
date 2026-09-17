@@ -131,7 +131,7 @@ export type SubagentRunOptions = {
   ) => SubagentToolOutcome | undefined;
   signal?: AbortSignal;
   /**
-   * Prior chain messages that seed this run (ADR 0276). Omitted for a cold
+   * Prior chain messages that seed this run (ADR 0279). Omitted for a cold
    * start. The original `task` is still passed to `prompt()` as the new user
    * turn; these messages are everything that came before it.
    */

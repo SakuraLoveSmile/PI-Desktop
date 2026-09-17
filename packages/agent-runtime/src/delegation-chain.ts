@@ -1,5 +1,5 @@
 /**
- * In-memory chain registry for resumable delegations (ADR 0278).
+ * In-memory chain registry for resumable delegations (ADR 0279).
  *
  * The registry is rebuilt from the session transcript at launch, then updated
  * as `Task` calls settle. It never appears in a tool parameter: the parent
@@ -217,7 +217,7 @@ export class DelegationChainRegistry {
    * A chain resolved but has nothing left to replay: its rows are gone from the
    * transcript (a truncated branch, or a delegation that died before writing
    * any). The caller drops the chain first, so the id in the error can never
-   * also appear in its own "reusable" list (ADR 0278 §4).
+   * also appear in its own "reusable" list (ADR 0279 §4).
    */
   noHistoryResumeError(resume: string, list: readonly ResumableChain[]): string {
     const available = resumableSummary(list);
@@ -244,7 +244,7 @@ export class DelegationChainRegistry {
       // A working chain is never evicted: dropping it would strand the delegate
       // still writing into it, and the bound counts reusable chains anyway. Any
       // overflow those chains caused is resolved the moment they settle,
-      // because `settle` runs this again (ADR 0278 §7).
+      // because `settle` runs this again (ADR 0279 §7).
       const settled = group
         .filter((chain) => chain.latestStatus !== "running")
         .sort((left, right) => right.lastActivityAt - left.lastActivityAt);

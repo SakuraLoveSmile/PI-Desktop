@@ -105,7 +105,7 @@ function collectSubagentRuns(
   return runs;
 }
 
-// Map each Task call to the last call of its chain (ADR 0276): a resumed
+// Map each Task call to the last call of its chain (ADR 0279): a resumed
 // delegation is one delegate session continued by a later Task call, so the
 // chain's rows all belong on the latest card, where they read as one
 // continuing conversation rather than a card per call.

@@ -438,7 +438,7 @@ describe("resume error messages", () => {
 
   it("never advertises the dropped id as reusable", () => {
     const registry = registryWithChain();
-    // The caller drops the chain before composing the message (ADR 0278 §4),
+    // The caller drops the chain before composing the message (ADR 0279 §4),
     // so the id it names must not come back as its own suggestion.
     registry.drop("res-b");
     const list = registry.resumableList({ runningDelegationIds: NONE });

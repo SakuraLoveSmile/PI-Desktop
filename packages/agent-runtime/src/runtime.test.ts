@@ -6806,7 +6806,7 @@ describe("DesktopAgentRuntime subagents", () => {
     await runtime.dispose();
   });
 
-  describe("resume (ADR 0278)", () => {
+  describe("resume (ADR 0279)", () => {
     /** Rows a delegate left in the transcript, tagged with its `Task` call. */
     function delegateRow(
       id: string,
@@ -6903,7 +6903,7 @@ describe("DesktopAgentRuntime subagents", () => {
       const record = internals.delegations.get(delegationId);
       expect(record.resumedFrom).toBe("del-1");
       expect(record.delegateSessionId).toBe("del-1");
-      // The chain owns its calls now (ADR 0278); the id resolves to both.
+      // The chain owns its calls now (ADR 0279); the id resolves to both.
       expect(internals.delegationChains.lookup(delegationId).toolCallIds).toEqual([
         "task-1",
         "task-2",
@@ -7360,7 +7360,7 @@ describe("DesktopAgentRuntime subagents", () => {
 
       expect(message).toContain('Delegation "del-1" has no recorded history');
       // The chain is dropped before the message is composed, so the id it
-      // names can never come back as its own suggestion (ADR 0278 §4).
+      // names can never come back as its own suggestion (ADR 0279 §4).
       expect(message).not.toContain("Reusable: explorer / del-1");
       expect(message.split("Reusable: ")[1]).toBe("explorer / del-2.");
       expect(internals.delegationChains.lookup("del-1")).toBeUndefined();

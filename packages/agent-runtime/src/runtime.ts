@@ -398,11 +398,11 @@ export type DelegationRecord = {
    * `TaskWait` result or the resume-after-idle prompt. Auto-delivery is a
    * single shot per record. */
   reportDelivered: boolean;
-  /** Stable chain identity; never appears in a tool parameter (ADR 0278). */
+  /** Stable chain identity; never appears in a tool parameter (ADR 0279). */
   delegateSessionId: string;
   /** Prior `delegationId` this run continues, when `Task.resume` was set. */
   resumedFrom?: string;
-  /** Model the run kept before the resume could not re-resolve it (ADR 0278
+  /** Model the run kept before the resume could not re-resolve it (ADR 0279
    * §4): recorded so the parent can see that the delegate's binding moved. */
   modelChangedFrom?: string;
   /** `toolCallId`s of this run's calls that have not ended yet: dropped when the
@@ -1471,7 +1471,7 @@ export class DesktopAgentRuntime {
   private delegations = new Map<string, DelegationRecord>();
   /** Resumable chains rebuilt from the transcript and updated as Task settles. */
   private readonly delegationChains = new DelegationChainRegistry();
-  /** Transcript rows used to rebuild a resumed delegate's context (ADR 0278):
+  /** Transcript rows used to rebuild a resumed delegate's context (ADR 0279):
    * the seed history at launch plus every row this session's delegates emit. */
   private readonly transcriptHistory: UiMessage[];
   /** Row ids already in `transcriptHistory` from live delegate events, so a
@@ -3728,7 +3728,7 @@ Delegation rules:
 
   /**
    * A chain resolved but has nothing to replay. The caller drops it first, so
-   * the id can never be advertised as reusable in its own error (ADR 0278 §4).
+   * the id can never be advertised as reusable in its own error (ADR 0279 §4).
    */
   private noHistoryResumeMessage(resume: string): string {
     return this.delegationChains.noHistoryResumeError(
@@ -3740,7 +3740,7 @@ Delegation rules:
   }
 
   /**
-   * The binding a resumed run keeps (ADR 0278 §4). A live chain records the
+   * The binding a resumed run keeps (ADR 0279 §4). A live chain records the
    * `providerId/modelId` key it resolved, which is preferred here; a chain
    * rebuilt from the transcript only knows the model id, matched against what
    * is configured in this session. `undefined` means the binding is gone.
@@ -3981,7 +3981,7 @@ Delegation rules:
           return this.subagentToolError(toolCallId, resumeLookup.message);
         }
         const resumedChain = resumeLookup?.ok ? resumeLookup.chain : undefined;
-        // A resume keeps the chain's own binding (ADR 0278 §4): changing the
+        // A resume keeps the chain's own binding (ADR 0279 §4): changing the
         // parent's session model must not strand a chain, and a delegate must
         // never swap models by accident. When the recorded binding is gone the
         // run continues on the definition's current one and says so in its
@@ -4314,7 +4314,7 @@ Delegation rules:
       record.toolCalls += 1;
       this.touchDelegationPhase(record, "tool", event.toolName);
       // The row a later `resume` replays needs the call's arguments, and
-      // `tool_end` carries only the result (ADR 0278 §3).
+      // `tool_end` carries only the result (ADR 0279 §3).
       this.delegateToolCalls.set(event.toolCallId, {
         name: event.toolName,
         args: (envelope.event as ToolStartEvent).args,

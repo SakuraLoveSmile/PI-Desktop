@@ -770,7 +770,7 @@ also aborts leftover delegates,
 skips the resume prompt, and returns the session to idle so Continue is not
 `AGENT_BUSY` (D352).
 
-**Resumable delegations (ADR 0276).** `Task` accepts an optional `resume`
+**Resumable delegations (ADR 0279).** `Task` accepts an optional `resume`
 parameter carrying the `delegationId` of a settled delegation in the same
 conversation. The resumed delegate is a new `SubagentRun` seeded with the
 chain's prior messages — the original `task` brief plus every row the chain
@@ -785,26 +785,35 @@ event type, storage schema, or tool parameter is introduced.
 A chain is the sequence of `Task` calls that share one delegate session: the
 first call, plus every later call that passed the earlier `delegationId` as
 `resume`. The runtime rebuilds the chain index from the persisted transcript at
-launch — each `Task` row carries its own `delegationId` in `toolResult.details`
-and the resumed id in `toolArgs.resume` — so resumability survives a sidecar
-restart. Chain identity (`delegateSessionId`) stays internal; the parent only
+launch — each `Task` row carries its own `delegationId` and settled status in
+`toolResult.details` and the resumed id in `toolArgs.resume`, with the agent
+name normalized on rebuild — so resumability survives a sidecar restart.
+Chain identity (`delegateSessionId`) stays internal; the parent only
 ever passes a `delegationId`, and the reverse map resolves it.
 
-Only `completed` and `failed` chains are resumable; `stopped` and `aborted`
-runs are terminal and revive only by starting a new delegation. A chain whose
-read-only tool output exceeds `MAX_RESUMABLE_READ_LINES` (50000) leaves the
-reusable list without an in-chain trim, so a resume never silently drops
-history. The registry keeps at most `MAX_RESUMABLE_CHAINS_PER_AGENT` (2) chains
-per definition name, evicting least-recently-active ones.
+Only `completed` and `failed` chains are resumable; `stopped` and `aborted` runs
+are terminal and revive only by starting a new delegation, and a run the app
+closed while it still worked rebuilds as `interrupted`, which is not resumable
+either. A chain whose read-only tool output exceeds `MAX_RESUMABLE_READ_LINES`
+(50000) leaves the reusable list without an in-chain trim, so a resume never
+silently drops history. The registry keeps at most
+`MAX_RESUMABLE_CHAINS_PER_AGENT` (2) reusable chains per definition name and
+evicts least-recently-active ones whenever a delegation settles; a chain that is
+still working is never evicted, so the bound counts reusable chains and a live
+chain may sit above it until it settles.
 
 Resume is strictly same-session and never queues: resuming a running
 delegation is a tool error telling the parent to converge with `TaskWait`
 first, and a chain has at most one live record at a time. `model` and `resume`
-together are rejected — a resumed run keeps the chain's model, and changing
-models means starting a new delegation. An unknown id, an id belonging to
-another definition, a non-resumable status, and an over-budget chain each
-return a tool error naming the reason and, for an unknown id, the reusable ids
-when there are any.
+together are rejected, and a resumed run keeps the chain's recorded binding:
+the `providerId/modelId` key it resolved is preferred, a chain rebuilt from the
+transcript is matched by model id, and when nothing resolves it the run
+continues on the definition's current binding and records the previous model id
+as `modelChangedFrom` in its lifecycle details. Changing models on purpose means
+starting a new delegation. An unknown id, an id belonging to another definition,
+a non-resumable status, an over-budget chain, and a chain whose rows are gone
+each return a tool error naming the reason and, for an unknown id, the reusable
+ids when there are any.
 
 The parent discovers reusable chains through the system prompt, which lists
 each chain's latest `delegationId`, its objective, and up to

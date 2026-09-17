@@ -470,7 +470,7 @@ function resolveRebuilt(
   });
 }
 
-describe("rebuildChainsFromTranscript restart status (ADR 0278)", () => {
+describe("rebuildChainsFromTranscript restart status (ADR 0279)", () => {
   it("keeps a completed or failed status a settled Task row recorded", () => {
     for (const status of ["completed", "failed"]) {
       const chains = rebuildChainsFromTranscript([
@@ -546,7 +546,7 @@ describe("rebuildChainsFromTranscript restart status (ADR 0278)", () => {
   });
 });
 
-describe("rebuildChainsFromTranscript agent normalization (ADR 0278)", () => {
+describe("rebuildChainsFromTranscript agent normalization (ADR 0279)", () => {
   it("normalizes the recorded agent so a restarted session still selects its rows", () => {
     for (const recorded of ["Explorer", "explorer.md", "EXPLORER "]) {
       const task = restartedTaskRow(
@@ -579,7 +579,7 @@ describe("rebuildChainsFromTranscript agent normalization (ADR 0278)", () => {
   });
 });
 
-describe("rebuildChainsFromTranscript settled copies and replay (ADR 0278)", () => {
+describe("rebuildChainsFromTranscript settled copies and replay (ADR 0279)", () => {
   it("rebuilds a Task call once and lets the settled copy win", () => {
     const immediate = restartedTaskRow("call-1", {
       delegationId: "d1",

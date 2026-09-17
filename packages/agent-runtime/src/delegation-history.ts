@@ -1,6 +1,6 @@
 /**
  * Rebuild a delegate's model context from its persisted transcript rows
- * (ADR 0278).
+ * (ADR 0279).
  *
  * Every row a delegate emits lands in the session transcript with
  * `parentToolCallId` (the `Task` call that spawned it) and `agentName`. Those
@@ -62,11 +62,11 @@ export type DelegationChain = {
   latestObjective?: string;
   /** Provider/model used by the latest run; resume must keep it. */
   latestModelId?: string;
-  /** `providerId/modelId` key the latest run resolved (ADR 0278 §4). */
+  /** `providerId/modelId` key the latest run resolved (ADR 0279 §4). */
   latestModelKey?: string;
   /** Settled status of the latest run; `running` while it works. Owns the
    * resumability gate so pruning finished delegation records cannot make a
-   * stopped chain look reusable (ADR 0278). */
+   * stopped chain look reusable (ADR 0279). */
   latestStatus?: string;
   /** Latest activity timestamp, used for LRU eviction. */
   lastActivityAt: number;
@@ -406,7 +406,7 @@ export type RebuiltTaskCall = {
   status?: string;
 };
 /**
- * Status a rebuilt chain carries after a restart (ADR 0278 §12). The settled
+ * Status a rebuilt chain carries after a restart (ADR 0279 §12). The settled
  * status is the one the settlement projection wrote onto the `Task` row. A run
  * the app closed while it still worked never settled, and reads as
  * `interrupted` rather than staying open forever. A row that records no status
@@ -429,7 +429,7 @@ function chainStatusFromDetail(
 /**
  * Scan persisted `Task` tool rows and group them into chains by their
  * `resume` links. Used at session launch so a restart does not lose
- * resumability (ADR 0278 §12). Every call carries the status its own `Task`
+ * resumability (ADR 0279 §12). Every call carries the status its own `Task`
  * row recorded, so a chain rebuilt here is resumable exactly when the live
  * registry would consider it resumable.
  */
@@ -455,7 +455,7 @@ export function rebuildChainsFromTranscript(
     if (!delegationId) continue;
     // `agentName` is compared against the definition name and against the
     // transcript rows' `agentName`, so it is normalized the same way the tool
-    // normalizes `Task.agent` (ADR 0278 §12).
+    // normalizes `Task.agent` (ADR 0279 §12).
     const agentName = normalizeSubagentName(
       typeof args?.agent === "string"
         ? args.agent
