@@ -4,7 +4,9 @@ import type { AssistantTurnPart } from "../../../lib/assistant-turns";
 import { formatToolDuration } from "../../../lib/tool-display";
 import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
 import {
-  isThinkingActive,
+  hasFailedProcessTool,
+  isTurnThinking,
+  processContainsMessage,
   resolveThinkingDisplayMode,
   turnProcessTiming,
   visibleProcessSteps,
@@ -18,13 +20,13 @@ import {
 import { DisclosureCollapseRail, useAutomaticDisclosure } from "./shared";
 
 export function TurnProcess({
-  parts,
-  timingParts,
+  processParts,
+  turnParts,
   isActive,
   children,
 }: {
-  parts: readonly AssistantTurnPart[];
-  timingParts: readonly AssistantTurnPart[];
+  processParts: readonly AssistantTurnPart[];
+  turnParts: readonly AssistantTurnPart[];
   isActive: boolean;
   children: ReactNode;
 }) {
@@ -33,53 +35,26 @@ export function TurnProcess({
     resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode),
   );
   const search = useContext(TranscriptSearchContext);
-  const reveal =
-    search &&
-    parts.some((part) =>
-      part.kind === "message"
-        ? part.message.id === search.messageId
-        : part.items.some(
-            (item) =>
-              item.message.id === search.messageId ||
-              (item.kind === "tool" &&
-                item.delegate?.items.some(
-                  (row) => row.message.id === search.messageId,
-                )),
-          ),
-    )
+  const revealRequest =
+    search && processContainsMessage(processParts, search.messageId)
       ? search.requestId
       : undefined;
-  const failed = parts.some(
-    (part) =>
-      part.kind === "activity" &&
-      part.items.some(
-        (item) =>
-          item.kind === "tool" &&
-          (item.message.toolStatus === "error" ||
-            item.message.toolStatus === "denied" ||
-            item.message.isError),
-      ),
-  );
-  const latestPart = timingParts.at(-1);
-  const latestActivity =
-    latestPart?.kind === "activity" ? latestPart.items.at(-1) : undefined;
-  const thinkingNow =
-    latestActivity?.kind === "thinking" &&
-    isThinkingActive(latestActivity.message, isActive);
+  const hasToolFailure = hasFailedProcessTool(processParts);
+  const thinkingNow = isTurnThinking(turnParts, isActive);
   const disclosure = useAutomaticDisclosure(
-    isActive && (failed || mode === "detailed"),
-    reveal,
+    isActive && (hasToolFailure || mode === "detailed"),
+    revealRequest,
   );
   const detailsId = useId();
   const [now, setNow] = useState(Date.now);
-  const { startedAt, endedAt } = turnProcessTiming(timingParts);
+  const { startedAt, endedAt } = turnProcessTiming(turnParts);
   useEffect(() => {
     if (!isActive) return;
     setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [isActive]);
-  const count = visibleProcessSteps(parts, mode, isActive);
+  const count = visibleProcessSteps(processParts, mode, isActive);
   if (count === 0) return null;
   const seconds =
     startedAt === undefined
@@ -113,7 +88,7 @@ export function TurnProcess({
             { time: formatToolDuration(seconds) },
           )}
         </span>
-        {failed ? (
+        {hasToolFailure ? (
           <span className="turn-process-error" title={t("chat.toolFailed")}>
             <IconCircleAlert size={14} aria-label={t("chat.toolFailed")} />
           </span>

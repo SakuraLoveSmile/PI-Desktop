@@ -1,7 +1,7 @@
-import type { UiMessage } from "@pi-desktop/shared";
+import type { AppSettings, UiMessage } from "@pi-desktop/shared";
 import type { AssistantTurnEntry, AssistantTurnPart } from "./assistant-turns";
 
-export type ThinkingDisplayMode = "detailed" | "compact";
+type ThinkingDisplayMode = NonNullable<AppSettings["thinkingDisplayMode"]>;
 
 export function resolveThinkingDisplayMode(value: unknown): ThinkingDisplayMode {
   return value === "compact" ? "compact" : "detailed";
@@ -9,6 +9,49 @@ export function resolveThinkingDisplayMode(value: unknown): ThinkingDisplayMode 
 
 export function isThinkingActive(message: UiMessage, active: boolean): boolean {
   return active && message.status === "streaming" && !message.content.trim();
+}
+
+export function isTurnThinking(
+  parts: readonly AssistantTurnPart[],
+  active: boolean,
+): boolean {
+  const latestPart = parts.at(-1);
+  const latestActivity =
+    latestPart?.kind === "activity" ? latestPart.items.at(-1) : undefined;
+  return (
+    latestActivity?.kind === "thinking" &&
+    isThinkingActive(latestActivity.message, active)
+  );
+}
+
+export function processContainsMessage(
+  parts: readonly AssistantTurnPart[],
+  messageId: string,
+): boolean {
+  return parts.some((part) => {
+    if (part.kind === "message") return part.message.id === messageId;
+    return part.items.some((item) => {
+      if (item.message.id === messageId) return true;
+      return (
+        item.kind === "tool" &&
+        Boolean(item.delegate?.items.some((row) => row.message.id === messageId))
+      );
+    });
+  });
+}
+
+export function hasFailedProcessTool(parts: readonly AssistantTurnPart[]): boolean {
+  return parts.some(
+    (part) =>
+      part.kind === "activity" &&
+      part.items.some(
+        (item) =>
+          item.kind === "tool" &&
+          (item.message.toolStatus === "error" ||
+            item.message.toolStatus === "denied" ||
+            item.message.isError),
+      ),
+  );
 }
 
 /**
@@ -38,19 +81,23 @@ export function visibleProcessSteps(
   mode: ThinkingDisplayMode,
   active: boolean,
 ): number {
-  return parts.reduce(
-    (count, part) =>
-      count +
-      (part.kind === "message"
-        ? Number(Boolean(part.message.content.trim()))
-        : part.items.filter(
-            (item) =>
-              item.kind === "tool" ||
-              mode === "detailed" ||
-              isThinkingActive(item.message, active),
-          ).length),
-    0,
-  );
+  let count = 0;
+  for (const part of parts) {
+    if (part.kind === "message") {
+      if (part.message.content.trim()) count += 1;
+      continue;
+    }
+    for (const item of part.items) {
+      if (
+        item.kind === "tool" ||
+        mode === "detailed" ||
+        isThinkingActive(item.message, active)
+      ) {
+        count += 1;
+      }
+    }
+  }
+  return count;
 }
 
 /** Use recorded message/tool timing for history; elapsed live time is UI-only. */

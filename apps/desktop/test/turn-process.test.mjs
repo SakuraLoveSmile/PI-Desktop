@@ -132,14 +132,21 @@ test("user boundaries retain independent processes and delegation details stay a
   assert.equal(projectTurnProcess(entries[1]).process.length, 0);
 });
 
-
 test("settings writes validate the mode without changing other preferences", async () => {
   const { validateSettingsWrite } = await import("../src/lib/api.ts");
-  const settings = { defaultMode: "agent", theme: "dark", enterToSend: true, onboardingDismissed: false };
+  const settings = {
+    defaultMode: "agent",
+    theme: "dark",
+    enterToSend: true,
+    onboardingDismissed: false,
+  };
   assert.equal(validateSettingsWrite(settings), settings);
   for (const thinkingDisplayMode of ["detailed", "compact"]) {
     const next = { ...settings, thinkingDisplayMode };
     assert.equal(validateSettingsWrite(next), next);
   }
-  assert.throws(() => validateSettingsWrite({ ...settings, thinkingDisplayMode: "unknown" }), /thinkingDisplayMode is invalid/);
+  assert.throws(
+    () => validateSettingsWrite({ ...settings, thinkingDisplayMode: "unknown" }),
+    /thinkingDisplayMode is invalid/,
+  );
 });

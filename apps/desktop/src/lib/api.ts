@@ -221,9 +221,14 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
 }
 
 export function validateSettingsWrite(settings: AppSettings): AppSettings {
-  if (settings.thinkingDisplayMode !== undefined &&
-    settings.thinkingDisplayMode !== "detailed" && settings.thinkingDisplayMode !== "compact") {
-    throw Object.assign(new Error("thinkingDisplayMode is invalid"), { errorCode: "INVALID_PARAMS" });
+  if (
+    settings.thinkingDisplayMode !== undefined &&
+    settings.thinkingDisplayMode !== "detailed" &&
+    settings.thinkingDisplayMode !== "compact"
+  ) {
+    throw Object.assign(new Error("thinkingDisplayMode is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
   }
   const value = settings as AppSettings & {
     defaultCommandShell?: unknown;

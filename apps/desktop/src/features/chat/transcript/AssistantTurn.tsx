@@ -18,12 +18,14 @@ import {
   reuseReadonlyMap,
   subagentRunsEqual,
   type AssistantTurnEntry,
+  type AssistantTurnPart,
   type TranscriptEntry,
 } from "../../../lib/assistant-turns";
 import {
   collectDelegationStatuses,
   collectDelegationTimings,
 } from "../../../lib/subagent-topology";
+import { projectTurnProcess } from "../../../lib/turn-process";
 import { useAppStore } from "../../../stores/app-store";
 import { Markdown } from "../../../components/Markdown";
 import { IconBranch, IconReview } from "../../../components/icons";
@@ -36,8 +38,6 @@ import {
 import { activityItemsEqual, ActivityGroup } from "./ActivityGroup";
 import { MessageRow } from "./MessageRow";
 import { TurnProcess } from "./TurnProcess";
-import { projectTurnProcess } from "../../../lib/turn-process";
-import type { AssistantTurnPart } from "../../../lib/assistant-turns";
 
 type AssistantTurnProps = {
   entry: AssistantTurnEntry;
@@ -275,6 +275,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   statusesRef.current = turnDelegationStatuses;
   timingsRef.current = turnDelegationTimings;
   const { process, responses } = projectTurnProcess(entry);
+  const activePart = isActive ? entry.parts.at(-1) : undefined;
 
   const renderPart = (part: AssistantTurnPart) =>
     part.kind === "activity" ? (
@@ -283,12 +284,8 @@ export const AssistantTurn = memo(function AssistantTurn({
         key={`activity-${part.items[0].message.id}`}
         items={part.items}
         endedAt={part.endedAt}
-        isActive={isActive && part === entry.parts.at(-1)}
-        runtimeActivity={
-          isActive && part === entry.parts.at(-1)
-            ? runtimeActivity
-            : undefined
-        }
+        isActive={part === activePart}
+        runtimeActivity={part === activePart ? runtimeActivity : undefined}
         turnDelegationStatuses={turnDelegationStatuses}
         turnDelegationTimings={turnDelegationTimings}
       />
@@ -322,7 +319,7 @@ export const AssistantTurn = memo(function AssistantTurn({
       aria-label={t("chat.assistantMessage")}
     >
       <div className="message-col">
-        <TurnProcess parts={process} timingParts={entry.parts} isActive={isActive}>
+        <TurnProcess processParts={process} turnParts={entry.parts} isActive={isActive}>
           {process.map(renderPart)}
         </TurnProcess>
         {responses.map(renderPart)}
