@@ -5,11 +5,13 @@ type DataListener = (chunk: string) => void;
 type SignalListener = () => void;
 
 class FakeNdjsonInput {
+  encoding: "utf8" | undefined;
   private data: DataListener[] = [];
   private end: SignalListener[] = [];
   private close: SignalListener[] = [];
 
-  setEncoding(_encoding: "utf8") {
+  setEncoding(encoding: "utf8") {
+    this.encoding = encoding;
     return this;
   }
 
@@ -63,6 +65,7 @@ describe("readNdjsonLines", () => {
     const input = new FakeNdjsonInput();
     const lines: unknown[] = [];
     readNdjsonLines(input, (line) => lines.push(JSON.parse(line)));
+    expect(input.encoding).toBe("utf8");
     input.finish(new TextDecoder().decode(wire));
     expect(lines).toEqual([payload]);
   });
