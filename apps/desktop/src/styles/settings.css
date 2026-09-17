@@ -760,21 +760,26 @@
   font-size: var(--text-sm-plus);
 }
 
-/* Global UI font picker (Appearance card). Pill trigger mirrors the
-   shared settings select; the menu portals to document.body as a fixed
-   floating layer so the settings card's overflow cannot clip it. */
+/* Global UI font picker (Appearance card). Pill trigger mirrors language /
+   theme: hug the current label, capped by the settings control column. The
+   menu portals to document.body as a fixed floating layer so the settings
+   card's overflow cannot clip it. */
 .settings-font {
   position: relative;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .settings-font-trigger {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: 200px;
-  max-width: 280px;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
   height: 30px;
-  padding: 0 12px;
+  padding: 0 10px 0 12px;
   border-radius: var(--radius-full);
   background: var(--ds-raised);
   box-shadow: var(--ds-raised-shadow);
@@ -788,7 +793,7 @@
 
 .settings-font-trigger-label {
   min-width: 0;
-  flex: 1;
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
