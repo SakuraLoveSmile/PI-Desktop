@@ -5839,3 +5839,106 @@ that was sitting at the bottom — including after the turn had finished.
   `06-delivery/04-e2e-test-plan.md`
   E2E-PROJECT-delete-removes-project-and-owned-sessions, and
   `apps/desktop/test/two-step-delete.test.mjs`.
+
+## 2026-09-16 — The sidebar list rhythm is 1px / 2px / 8px
+
+- The sidebar's session lists had no rhythm to read. Rows and group headers sat
+  flush inside a group (a 0 gap), two project groups sat 2px apart, and the only
+  air was the 4px above a section label. Adjacent 28px rows painted rounded
+  hover fills that touched, so two rows read as one block, a collapsed group sat
+  as far from its neighbour as an expanded group with ten rows under it, and a
+  section label was closer to the rows above it than to the rows it introduces.
+- The lists now state one ladder: rows sit 1px apart, a project group header and
+  a section label sit 2px above their first row, a sidebar section sits 8px
+  below the one above it, and an expanded project group carries an 8px tail.
+- That tail belongs to the expanded group itself, so the spacing is decided by
+  the preceding group alone: an expanded group is followed by 8px whether the
+  next group is expanded or collapsed, and a collapsed group by 1px either way.
+  The scroller's own gap stays a uniform 1px and the difference lives in the
+  group body's inset, which leaves with the rows. Collapsing a group therefore
+  cannot fork the spacing on a neighbour's state, and cannot snap its own tail.
+- The dated labels inside a project group are ordinary rows of that rhythm
+  rather than a second level of groups: they keep no state, no disclosure, and
+  no `aria-expanded`, and their own inset becomes a symmetric 4px instead of 6px
+  above and 2px below, so a label no longer outweighs the 1px row gap it sits in.
+- `space-0.25` (1px) joins the spacing scale as the hairline step for dense list
+  rhythms; the settings rail already used 1px between its navigation items. The
+  section-gap rule no longer claims the sidebar, which has its own rhythm.
+- Two row budgets follow the pitch: the pinned body still shows eight rows
+  (233px, was 224px) and the standalone Sessions body still shows five (146px,
+  was 140px), because the 28px row grid no longer fits its own gaps inside the
+  old numbers.
+- Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/07-ui-design-system.md` §6.1 and §13, and
+  `04-ux/08-component-spec.md` §6.2 and §6.6.
+
+## 2026-09-16 — The sidebar project group folds as one grid row
+
+- The rhythm above shipped with the group fold animating `max-height: 2000px →
+  0` over the 300ms slow duration, plus a separate 200ms opacity fade and a
+  padding transition. A `max-height` curve spends most of its length above the
+  content, so the visible move was a short snap at the end, and the shorter
+  opacity curve emptied the group roughly two thirds of the way through: the
+  rows disappeared first and the empty box closed afterwards. Collapsing a
+  project read as two separate animations.
+- The group body is now a one-row grid whose row animates `1fr` → `0fr` over the
+  200ms normal duration. Every frame is a real fraction of the group's measured
+  height, so the fold is a single continuous motion, and `opacity` stays 1 for
+  the whole fold — the rows leave by being clipped, not by fading.
+- The body is three layers: the grid, a clip with `min-height: 0` and
+  `overflow: hidden`, and the list that owns the 1px row gap and the fixed
+  2px / 7px inset. The inset has to sit inside the clip, because vertical
+  padding on the animating box holds a `0fr` row open and leaves the group's
+  tail behind after its rows are gone.
+- A folded group keeps its rows mounted inside the `0fr` row, so it is `inert`
+  as well as `aria-hidden` and leaves the tab order. Under
+  `prefers-reduced-motion: reduce` the fold keeps both endpoints and runs in a
+  near-zero duration.
+- The scroll budgets, the indent, the pinned and standalone lists, and the
+  shared `.sidebar-session-group-body` flex column are unchanged; only the
+  project body folds as a grid.
+- Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/08-component-spec.md` §6.2 and
+  `06-delivery/04-e2e-test-plan.md` E2E-LAYOUT-sidebar-project-group-fold.
+
+## 2026-09-17 — Sidebar selection is distinct from workspace context
+
+- Project headers and project, pinned and standalone conversation rows share
+  one row-level hover surface, radius and transition. Project title buttons
+  stay transparent; selected conversation paint takes precedence over hover.
+- A project is a workspace/disclosure control, not a separate selected page.
+  The current workspace keeps its dot and all existing workspace behavior but
+  no persistent row fill, including when no conversation is selected. The
+  renderer marks that context with `data-current-workspace`, not an `active`
+  project class. Session selection remains chat-page-aware and follows the
+  destination immediately while a switch is pending.
+- Folding a selected conversation does not transfer selection to its project.
+  Keyboard focus retains its outline, action buttons retain local feedback,
+  window blur releases hover without clearing selection, and drop-target paint
+  takes precedence over hover.
+- Renderer presentation only: no persistence, workspace activation, permissions
+  or protocol changes. See `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md` §9.1c and
+  E2E-LAYOUT-sidebar-row-states in `06-delivery/04-e2e-test-plan.md`.
+
+## 2026-09-17 — Settings shares sidebar material and restores layout without entrance
+
+- Main and settings navigation now share `sidebar-surface`: the same opaque
+  color/image fallback on Windows/Linux and the existing native vibrancy plus
+  tint/sheen on macOS. Settings wrapper ancestry allows that native material
+  through, while its content pane and content-column titlebar remain opaque.
+  Only the inner settings content animates, not the navigation backing.
+- Built-in settings rail colors no longer diverge from the sidebar. Legacy
+  `--ds-settings-rail-bg` remains an optional shared fallback; a canonical
+  `--ds-bg-sidebar` override wins. No theme or native-window API changes.
+- Sidebar mounting no longer implies expansion. A dedicated transition hook
+  distinguishes visible collapsed-state changes from route restoration. Only
+  real collapse/expand changes animate; settings navigation cancels unfinished
+  phases, and returning restores the retained width/state without replaying
+  `sidebar-in`. Animation-end guards, scoped timeout cleanup, auto-restore and
+  reduced motion remain supported. Boot presentation uses the existing splash
+  reveal instead of a second sidebar width animation.
+- No changes to item indentation, widths, workspace state, data or permissions.
+  See `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md` and E2E-LAYOUT-sidebar-settings in
+  `06-delivery/04-e2e-test-plan.md`.
