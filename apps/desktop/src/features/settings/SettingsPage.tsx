@@ -226,7 +226,7 @@ export function SettingsPage() {
   return (
     <div className="settings-shell settings-shell-full">
       <div className="settings-titlebar" aria-hidden="true" />
-      <aside className="settings-nav" aria-label={t("settings.title")}>
+      <aside className="settings-nav sidebar-surface" aria-label={t("settings.title")}>
         <div className="settings-nav-top drag">
           <div className="settings-search-wrap no-drag">
             <IconSearch size={14} />

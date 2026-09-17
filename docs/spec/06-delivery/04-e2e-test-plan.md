@@ -7452,6 +7452,8 @@ identify the platform validation still needed.
 | Acceptance | Scenarios |
 |---|---|
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
+| C / D / Quality — Sidebar row states | E2E-LAYOUT-sidebar-row-states |
+| A / C / Quality — Sidebar material and settings return | E2E-LAYOUT-sidebar-settings |
 | B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
@@ -12175,6 +12177,124 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   states). DOM clicks and CDP input are not native hit-test proof; native pointer,
   window-drag and visual checks remain required on each platform. Branch runs
   are exploratory and do not satisfy the integrated-main gate.
+
+#### E2E-LAYOUT-sidebar-project-group-fold
+
+- **Preconditions**: Four retained sidebar project groups, seeded through the
+  host: one holding five sessions across four date buckets, one holding a single
+  session, one holding none, and one holding ten pinned sessions.
+  `prefers-reduced-motion` is unset.
+- **Steps**:
+  1. Inspect the groups: body layering, row and date-label counts, the empty
+     state, the tail each expanded group contributes to the next one, and the
+     non-project lists' budgets.
+  2. Collapse the multi-row group with a real pointer click on its directory row —
+     scrolled into view and confirmed to hit that button — and read the group
+     body's height, opacity, resolved `grid-template-rows`, and the distance to
+     the next group on every frame for about half a second, while recording the
+     fold's own `transitionrun` / `transitionend`.
+  3. Expand it again and confirm the open geometry returns.
+  4. Collapse and re-expand it within the same motion.
+  5. Repeat the collapse with `prefers-reduced-motion: reduce` emulated.
+  6. Scroll the pinned list to its last row.
+- **Expected**: A project group is one grid row (`grid-template-rows: 1fr`) that
+  animates to `0fr` over the 200ms normal duration — no `max-height` clamp, no
+  opacity transition — so the fold is a single continuous height ramp with no
+  plateau followed by a snap, and `opacity` stays 1 on every frame: the rows are
+  clipped, never faded. The fold fires one transition and its own event reports
+  the 200ms normal duration. The rows are clipped by an inner `min-height: 0`
+  box, and the 1px row gap plus the group's 2px / 7px inset sit on the list inside
+  that clip, so the inset travels with the rows. An expanded group's 7px inset
+  plus the 1px scroller gap read as an 8px tail to the group below it; the last
+  group in the list has no neighbour, so it is checked against its own inset and
+  clip instead. A folded group's tail leaves with its rows, its section is its
+  header plus the 1px scroller gap, and its rows stay mounted past the clipped
+  edge while the group is `aria-hidden` and `inert`. A reversal mid-flight turns
+  on the frame it reached and settles back on the open height without
+  overshooting, and the empty group folds its empty state the same way. Under
+  reduced motion both endpoints are kept and the travel is dropped. The pinned
+  list holds eight rows inside `min(233px, 30vh)` and scrolls to its remaining
+  rows, and the standalone list keeps its flex column and 146px budget. The group
+  indent, ordering, and workspace state are unchanged.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §6.1 and
+  §13, `04-ux/08-component-spec.md` §6.2, `08-meta/decisions-log.md`
+  (2026-09-16, sidebar list rhythm and project-group fold)
+- **Acceptance**: Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated (`scripts/e2e-three-column-layout.mjs` via
+  `pnpm test:e2e:layout` — host-seeded groups and pins, a hit-tested CDP pointer
+  click, per-frame height and opacity sampling across the real fold, the
+  transition's own reported duration, mid-flight reversal, and reduced-motion
+  emulation). Unit coverage in
+  `apps/desktop/test/sidebar-collapse-animation.test.mjs` and
+  `apps/desktop/test/sidebar-pinned-rendering.test.mjs`. The sampled values are
+  renderer geometry, not an eyes-on visual pass.
+
+#### E2E-LAYOUT-sidebar-row-states
+
+- **Preconditions**: Host-seeded project, pinned and standalone conversations;
+  a current workspace; built desktop with isolated data and profile directories.
+- **Steps**: In dark and light themes, select a project conversation, hover its
+  project title and an unselected conversation, then hover the selected row.
+  Exercise the window-blur handler, drop-target styling, project action hover
+  and keyboard Tab/Shift+Tab focus. Fold and reopen the selected conversation's
+  group. Select pinned and standalone conversations. Open Settings and return.
+  Enable reduced motion and inspect both row transition durations.
+- **Expected**: Project and conversation hover backgrounds, radii and transitions
+  match. The title button stays transparent. Only a conversation uses selected
+  fill, which wins over hover; workspace identity remains a separate dot with
+  no persistent header fill. Folding never promotes the project to selected.
+  Pinned and standalone rows use the same selected surface. Keyboard focus
+  retains an outline, action buttons retain local feedback, drop-target paint
+  wins over hover, and blur releases hover without clearing selection. Settings
+  replaces sidebar navigation, and returning restores conversation and workspace
+  context without a second selected row. Rendered component tests additionally
+  cover no selected session, a pending destination and non-chat page state.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md` §9.1c
+- **Acceptance**: C, D, Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated via `pnpm test:e2e:layout` and
+  `scripts/e2e/sidebar-row-states.mjs`: real CDP pointer/keyboard input and
+  computed-style assertions. Window blur/focus events and the drop-target class
+  are injected for those styling checks; this is not a native focus/drag test.
+  Unit coverage: `sidebar-navigation.test.mjs`, `sidebar-pinned-rendering.test.mjs`.
+
+#### E2E-LAYOUT-sidebar-settings
+
+- **Preconditions**: Built desktop, isolated host/profile, visible chat sidebar.
+- **Steps**:
+  1. In dark/light palettes and darwin/win32/linux CSS branches, compare the
+     home sidebar and Settings rail color, image layers, size and position.
+     Inspect transparent ancestors and opaque settings content/titlebar.
+  2. Return through Back to app while tracing sidebar insertion, width and
+     animationstart events. Repeat quick round trips, a previously collapsed
+     sidebar, and settings navigation interrupting an entrance.
+  3. Explicitly reopen a collapsed sidebar, then repeat settings return with
+     reduced motion. Repeat material comparisons with legacy and canonical
+     theme color overrides and a sidebar background image.
+- **Expected**: Both navigation surfaces share one material. Settings navigation
+  and shell have no entrance animation; only content inside its opaque pane
+  animates. On macOS all ancestors behind the rail are transparent, while right
+  content and titlebar stay opaque. Returning to an expanded sidebar starts and
+  stays at 275px without sidebar-in events; a collapsed sidebar stays absent.
+  A real reopen still produces sidebar-in and a width ramp. Legacy theme color
+  input remains supported for both rails, and a canonical override wins.
+- **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md` §1.4 and §1.7
+- **Acceptance**: A, C, Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated via `pnpm test:e2e:layout` and
+  `scripts/e2e/sidebar-settings.mjs`, with trusted CDP pointer/keyboard input,
+  mutation-time and subsequent geometry samples, animation events and computed
+  styles. CDP focus emulation keeps the isolated page painting while its native
+  window is occluded; otherwise Chromium can freeze CSS motion and hover input.
+  Platform branches and palettes are renderer emulation, not native
+  Windows/Linux or OS material/theme validation. Optional
+  `PI_DESKTOP_LAYOUT_ARTIFACT_DIR` captures renderer screenshots. State tests in
+  `sidebar-settings-return.test.mjs` cover initial presentation, both interrupted
+  phases, hidden-state changes and reversals. `pnpm test:e2e:theme-surfaces`
+  verifies the opaque fallback and legacy theme override in real Chromium.
 
 #### E2E-AGENT-alt-enter-steers-active-turn: Enter follows up and Alt+Enter steers the active turn
 
