@@ -129,6 +129,8 @@ export const fr = {
     "expandSidebar": "Développer la barre latérale",
     "resizeSidebar": "Redimensionner la barre latérale",
     "sidebarWidth": "Largeur de la barre latérale : {{width}} pixels",
+    "resizeChatWidth": "Redimensionner la conversation",
+    "chatWidth": "Largeur de la conversation : {{width}} pixels",
     "sessionActions": "Actions de session",
     "renameTask": "Renommer la tâche",
     "sessionRunning": "En cours d'exécution",
@@ -154,6 +156,7 @@ export const fr = {
     "createBranch": "Brancher à partir d'ici",
     "branchTitle": "{{title}} (branche)",
     "deleteTask": "Supprimer",
+    "deleteTaskConfirm": "Supprimer ?",
     "copyConversationId": "Copier l'ID de conversation",
     "openSessionPath": "Ouvrir le chemin de la session",
     "timeGroupYesterday": "Hier",
@@ -546,6 +549,14 @@ sklm: {
       dnsHint:
         "Ce contrôle résout l'hôte localement, alors que le téléchargement passerait par votre proxy. Si vous utilisez un proxy, un VPN ou une configuration DNS personnalisée, vérifiez Paramètres → Général → Réseau.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "Votre proxy a répondu avec des adresses fake-IP pour les sources du catalogue – sélection intégrée affichée",
+      previewFakeIpError:
+        "Votre proxy a résolu cet hôte en une adresse fake-IP ; le contrôle d'adresse de l'application l'a donc refusé – rien n'a été installé.",
+      fakeIpHint:
+        "Votre proxy a répondu {{host}} avec {{address}}, une plage de référence réservée que les proxys utilisent comme adresse factice, et non l'adresse réelle de la source. Passez le proxy en mode proxy système, ou vérifiez Paramètres → Général → Réseau.",
+      fakeIpHintPlain:
+        "Un proxy local a résolu cet hôte en une adresse factice d'une plage réservée, et non en l'adresse réelle de la source. Passez le proxy en mode proxy système, ou vérifiez Paramètres → Général → Réseau.",
       remoteErrorQuery: "Impossible d'interroger le marché de skills – sélection intégrée affichée",
       remotePartial: "Certaines sources du catalogue sont indisponibles ({{names}})",
     },
@@ -1149,6 +1160,7 @@ sklm: {
     "archive": "Archiver le projet",
     "restore": "Restaurer le projet",
     "delete": "Supprimer le projet",
+    "deleteMenuConfirm": "Supprimer ?",
     "deleteTitle": "Supprimer le projet",
     "deleteDescription": "{{name}} sera supprimé définitivement, sans possibilité d'annulation.",
     "deleteSessions_one": "{{count}} session enregistrée sera supprimée définitivement avec ses transcriptions.",
@@ -1236,6 +1248,15 @@ sklm: {
       "unanswered": "Question {{number}} sans réponse",
       "skipped": "Question {{number}} ignorée"
     }
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  "pluginPanelWidget": {
+    "alwaysOnTop": "Toujours au-dessus",
+    "minimize": "Réduire",
+    "close": "Fermer le widget"
   },
   "panel": {
     "title": "Panneau de travail",
@@ -1468,6 +1489,11 @@ sklm: {
     "permsMore": "+{{count}} plus",
     "permissionsTitle": "Autorisations",
     "permissionReview": "Examen des autorisations",
+    "devReviewTitle": "Charger {{name}} ?",
+    "devReviewNewTitle": "{{name}} demande plus d'accès",
+    "devReviewBody": "Ce plugin de développement vient d'un dossier de cette machine. Vérifiez ce qu'il peut faire — rien n'est chargé tant que vous n'acceptez pas.",
+    "devReviewAccept": "Charger le plugin",
+    "devReviewLoading": "Chargement…",
     "permissionReviewTitle": "Installer {{name}} ?",
     "permissionReviewBody": "Vérifiez ce que ce plugin peut faire. Les autorisations à plus haut risque restent bloquées jusqu'à ce que vous les acceptiez.",
     "acceptInstall": "Accepter et installer",

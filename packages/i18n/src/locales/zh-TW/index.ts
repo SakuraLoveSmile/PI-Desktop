@@ -131,6 +131,8 @@ export const zhTW = {
     expandSidebar: "展開側邊欄",
     resizeSidebar: "調整側邊欄寬度",
     sidebarWidth: "側邊欄寬度：{{width}} 畫素",
+    resizeChatWidth: "調整對話寬度",
+    chatWidth: "對話寬度：{{width}} 畫素",
     sessionActions: "會話操作",
     renameTask: "重新命名任務",
     sessionRunning: "進行中",
@@ -156,6 +158,7 @@ export const zhTW = {
     createBranch: "從此處分支",
     branchTitle: "{{title}}（分支）",
     deleteTask: "刪除",
+    deleteTaskConfirm: "確認刪除？",
     copyConversationId: "複製對話 ID",
     openSessionPath: "開啟會話路徑",
     timeGroupYesterday: "昨天",
@@ -548,6 +551,12 @@ sklm: {
       dnsHint:
         "該校驗在本機解析主機,而下載本身會走代理。如果你使用代理、VPN 或自訂 DNS,請檢查 設定 → 一般 → 網路。",
       failureSourceHost: "{{name}}（{{host}}）",
+      remoteErrorFakeIp: "代理以 fake-IP 位址回應了目錄源,已顯示內建精選",
+      previewFakeIpError: "代理將該主機解析成 fake-IP 位址,應用程式的地址校驗因此拒絕,未安裝任何內容。",
+      fakeIpHint:
+        "代理將 {{host}} 回應為 {{address}} —— 這是代理用作 fake-IP 佔位位址的保留基準測試段,不是該來源的真實位址。請將代理切換為系統代理模式,或檢查 設定 → 一般 → 網路。",
+      fakeIpHintPlain:
+        "本機代理將該主機解析成保留段中的 fake-IP 佔位位址,而不是該來源的真實位址。請將代理切換為系統代理模式,或檢查 設定 → 一般 → 網路。",
       remoteErrorQuery: "無法查詢技能市場,已顯示內建精選",
       remotePartial: "部分目錄源不可用（{{names}}）",
     },
@@ -1152,6 +1161,7 @@ sklm: {
     archive: "歸檔專案",
     restore: "恢復專案",
     delete: "刪除專案",
+    deleteMenuConfirm: "確認刪除？",
     deleteTitle: "刪除專案",
     deleteDescription: "將永久刪除 {{name}}，此操作無法復原。",
     deleteSessions_one: "{{count}} 個會話及其對話記錄將被永久刪除。",
@@ -1239,6 +1249,15 @@ sklm: {
       unanswered: "第 {{number}} 題未回答",
       skipped: "第 {{number}} 題已跳過",
     },
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "永遠置頂",
+    minimize: "最小化",
+    close: "關閉小工具",
   },
   panel: {
     title: "工作面板",
@@ -1471,6 +1490,11 @@ sklm: {
     permsMore: "另有 {{count}} 項",
     permissionsTitle: "許可權",
     permissionReview: "許可權確認",
+    devReviewTitle: "載入 {{name}}？",
+    devReviewNewTitle: "{{name}} 要求更多許可權",
+    devReviewBody: "這是來自本機資料夾的開發外掛。請確認它可以執行的操作——在你同意前不會載入任何內容。",
+    devReviewAccept: "載入外掛",
+    devReviewLoading: "載入中…",
     permissionReviewTitle: "安裝 {{name}}？",
     permissionReviewBody: "請確認此外掛可以執行的操作。高風險許可權在你同意前會保持停用。",
     acceptInstall: "同意並安裝",

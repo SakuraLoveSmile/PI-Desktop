@@ -1,4 +1,4 @@
-# ADR 0274: Official plugin channel and backup channels
+# ADR 0276: Official plugin channel and backup channels
 
 - Status: Accepted for implementation
 - Date: 2026-09-17

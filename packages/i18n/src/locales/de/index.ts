@@ -129,6 +129,8 @@ export const de = {
     "expandSidebar": "Seitenleiste erweitern",
     "resizeSidebar": "Größe der Seitenleiste ändern",
     "sidebarWidth": "Breite der Seitenleiste: {{width}} Pixel",
+    "resizeChatWidth": "Gesprächsbreite ändern",
+    "chatWidth": "Gesprächsbreite: {{width}} Pixel",
     "sessionActions": "Sitzungsaktionen",
     "renameTask": "Aufgabe umbenennen",
     "sessionRunning": "In Arbeit",
@@ -154,6 +156,7 @@ export const de = {
     "createBranch": "Verzweigung von hier aus",
     "branchTitle": "{{title}} (Verzweigung)",
     "deleteTask": "Löschen",
+    "deleteTaskConfirm": "Löschen?",
     "copyConversationId": "Gesprächs-ID kopieren",
     "openSessionPath": "Sitzungspfad öffnen",
     "timeGroupYesterday": "Gestern",
@@ -546,6 +549,14 @@ sklm: {
       dnsHint:
         "Diese Prüfung löst den Host lokal auf, der Download selbst würde jedoch über deinen Proxy laufen. Wenn du einen Proxy, ein VPN oder ein eigenes DNS-Setup verwendest, prüfe Einstellungen → Allgemein → Netzwerk.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "Dein Proxy hat die Katalogquellen mit fake-IP-Adressen beantwortet – integrierte Auswahl wird angezeigt",
+      previewFakeIpError:
+        "Dein Proxy hat diesen Host auf eine fake-IP-Adresse aufgelöst, daher hat die Adressprüfung der App abgelehnt – es wurde nichts installiert.",
+      fakeIpHint:
+        "Dein Proxy hat {{host}} mit {{address}} beantwortet – einem reservierten Benchmark-Bereich, den Proxys als fake-IP-Platzhalter verwenden, nicht der echten Adresse der Quelle. Stelle den Proxy auf Systemproxy-Modus um oder prüfe Einstellungen → Allgemein → Netzwerk.",
+      fakeIpHintPlain:
+        "Ein lokaler Proxy hat diesen Host auf einen fake-IP-Platzhalter in einem reservierten Bereich aufgelöst, nicht auf die echte Adresse der Quelle. Stelle den Proxy auf Systemproxy-Modus um oder prüfe Einstellungen → Allgemein → Netzwerk.",
       remoteErrorQuery: "Der Skill-Markt konnte nicht abgefragt werden – integrierte Auswahl wird angezeigt",
       remotePartial: "Einige Katalogquellen sind nicht verfügbar ({{names}})",
     },
@@ -1149,6 +1160,7 @@ sklm: {
     "archive": "Projekt archivieren",
     "restore": "Projekt wiederherstellen",
     "delete": "Projekt löschen",
+    "deleteMenuConfirm": "Löschen?",
     "deleteTitle": "Projekt löschen",
     "deleteDescription": "{{name}} wird dauerhaft entfernt und kann nicht wiederhergestellt werden.",
     "deleteSessions_one": "{{count}} gespeicherte Sitzung wird mit ihren Verläufen dauerhaft gelöscht.",
@@ -1236,6 +1248,15 @@ sklm: {
       "unanswered": "Frage {{number}} nicht beantwortet",
       "skipped": "Frage {{number}} übersprungen"
     }
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  "pluginPanelWidget": {
+    "alwaysOnTop": "Immer im Vordergrund",
+    "minimize": "Minimieren",
+    "close": "Widget schließen"
   },
   "panel": {
     "title": "Arbeitsfenster",
@@ -1468,6 +1489,11 @@ sklm: {
     "permsMore": "+{{count}} weitere",
     "permissionsTitle": "Berechtigungen",
     "permissionReview": "Berechtigungsüberprüfung",
+    "devReviewTitle": "{{name}} laden?",
+    "devReviewNewTitle": "{{name}} fordert mehr Zugriff",
+    "devReviewBody": "Dieses Entwicklungs-Plugin stammt aus einem Ordner auf diesem Rechner. Prüfen Sie, was es tun kann — bis Sie zustimmen, wird nichts geladen.",
+    "devReviewAccept": "Plugin laden",
+    "devReviewLoading": "Wird geladen…",
     "permissionReviewTitle": "{{name}} installieren?",
     "permissionReviewBody": "Sehen Sie sich an, was dieses Plugin leisten kann. Berechtigungen mit höherem Risiko bleiben blockiert, bis Sie sie akzeptieren.",
     "acceptInstall": "Akzeptieren und installieren",

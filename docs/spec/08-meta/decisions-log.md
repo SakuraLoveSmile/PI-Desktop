@@ -112,7 +112,7 @@ This log freezes previously open questions into concrete decisions.
 | D341 | Per-provider custom HTTP headers | **Amend D339 / ADR 0176: each AI-service and OAuth row stores optional `config_json.headers`. Empty / `{}` keeps adapter defaults. A non-empty map is last-writer on that row's outbound HTTP (turns, subagents, one-shots, discovery, connection test, OAuth refresh) via a fetch wrapper plus stream-option headers. Leftover `userAgent` migrates to `headers["User-Agent"]`. Max 32 headers; key ≤ 256 bytes; value ≤ 4096 bytes; no CR/LF; reserved auth/hop-by-hop/routing keys rejected. Compact KeyValueRows Advanced UI; first OAuth login does not collect headers. `matches()` includes the map. No schema/protocol bump.** | Users needed arbitrary non-secret headers, not only User-Agent. See ADR 0178 and E2E-005G. |
 | D242 | Builtin subagents inherit the parent permission mode | **Builtin subagents use the default `permission: inherit` behavior. The builtin `fixer` no longer overrides the parent session, so `auto` covers its in-root and explicit external-path calls without a second authorization card; explicit non-`inherit` scopes on eligible builtin or user definitions remain intentional overrides.** | The observed popup came from the builtin `fixer` replacing an `auto` parent with `accept-edits`; inheriting the parent fixes the UX without weakening host-core containment or external-path permission rules (ADR 0100). |
 | D241 | Titled Settings navigation clusters | **Keep the eight-destination Settings directory flat and searchable, but render four non-interactive localized group headings — Personal / 个人 (Basics, AI, Shortcuts), Agent / 智能体 (Instructions, Model configuration), Workspace / 工作区 (Import, Project archive), and About / 关于 (Info). Headings use whitespace for separation and no divider lines. Empty groups disappear with filtered search. This supersedes only D238's prohibition on group headings; destination order, IDs, search ownership, and marketplace placement remain unchanged.** | The flat rows became visually dense without scan landmarks. Muted headings restore grouping while preserving one-level navigation and the existing destination ownership. |
-| D438 | Marketplace download requests carry a device identifier | **Amend D238: the official plugin channel resolves every install and update through `POST /api/v1/download/resolve` and sends a stable `deviceId` — the SHA-256 digest of a platform machine identifier, or a locally persisted random id when none is readable. The client tries the returned mirrors in order, verifies `sha256` and `sizeBytes` before extracting, never caches the answer, and falls back to the catalog's own package URL only when the platform could not be reached. The GitHub and CNB backup channels and `custom` keep the existing static relative-URL resolution. See ADR 0274 and E2E-PLUGIN-official-channel-resolves-through-the-platform.** | The platform needs one stable installation identity to count a download once and to rate-limit per device instead of per source address; the value is a digest, so no machine code leaves the machine, and no new UI surface is introduced. |
+| D442 | Marketplace download requests carry a device identifier | **Amend D238: the official plugin channel resolves every install and update through `POST /api/v1/download/resolve` and sends a stable `deviceId` — the SHA-256 digest of a platform machine identifier, or a locally persisted random id when none is readable. The client tries the returned mirrors in order, verifies `sha256` and `sizeBytes` before extracting, never caches the answer, and falls back to the catalog's own package URL only when the platform could not be reached. The GitHub and CNB backup channels and `custom` keep the existing static relative-URL resolution. See ADR 0276 and E2E-PLUGIN-official-channel-resolves-through-the-platform.** | The platform needs one stable installation identity to count a download once and to rate-limit per device instead of per source address; the value is a digest, so no machine code leaves the machine, and no new UI surface is introduced. |
 
 ## D. Codex visual parity decisions (0.3.5+)
 
@@ -4570,8 +4570,9 @@ D193, and D194.
 
 ## 2026-09-10 — Plan-safe plugin actions and summon-window shortcut (D384)
 
-*(superseded by D438 for the summon-window shortcut; the plan-safe plugin
-action opt-in below stays)*
+*(the summon-window half is superseded by D438, which replaced the pair, and by
+D439, which moved the toggle off the macOS close-window chord; the plan-safe
+plugin-action opt-in below stays)*
 
 - Plan and Goal modes could not invoke plugin tools at all, even for
   read-only actions like fetching a URL through the bundled Browser
@@ -4586,6 +4587,9 @@ action opt-in below stays)*
   declares `["navigate", "snapshot", "screenshot", "console"]`; the
   mutating actions stay Agent-only. The shortcut catalog gains
   `summonWindow` (`Mod+Shift+W`) in the `window` group, paired with
+  `closeWindow` (`Mod+W`), and the desktop main process registers it
+  through `globalShortcut` and the native menu. See ADR 0211 and
+  E2E-PLAN-005.
 
 ## 2026-09-17 — One window toggle replaces the summon/close pair (#360, D438)
 
@@ -4596,13 +4600,13 @@ action opt-in below stays)*
   so D438 supersedes exactly that half of D384; the plan-safe plugin-action
   opt-in from the same decision is untouched. The numbering skips D435 and D437,
   which other in-flight work already claims.
-- The catalog ships one `toggleWindow` id in the `window` group, default
-  `Mod+W` on every platform. `closeWindow` and `summonWindow` leave
-  `KEYBOARD_SHORTCUT_IDS`, so the retired `Mod+Shift+W` chord is spent on
-  nothing: it is not a shipped default, not registered with `globalShortcut`,
-  not a settings row, and not a menu accelerator. The plugin shortcut registry
-  therefore now refuses `Alt+Space` and `Mod+W`, and the freed `Mod+Shift+W`
-  becomes available to plugins.
+- The catalog ships one `toggleWindow` id in the `window` group, and
+  `closeWindow` and `summonWindow` leave `KEYBOARD_SHORTCUT_IDS`, so neither
+  retired chord is spent on anything: neither is a shipped default, registered
+  with `globalShortcut`, a settings row, or a menu accelerator, and the freed
+  `Mod+Shift+W` becomes available to plugins again. D439 later moved the
+  toggle's own default off `Mod+W`, which D438 had chosen; the merged id, the
+  toggle semantics, and the migration below are unchanged by that.
 - Pressing the key is a decision, not a close. `windowToggleAction` hides a
   visible, focused window through `Window.hide()` and otherwise shows and
   focuses it (hidden, minimized, or behind another application all count as
@@ -4619,7 +4623,7 @@ action opt-in below stays)*
   no surface can act on the retired ids. The rules are ordered and idempotent:
   an existing `toggleWindow` override wins unchanged; otherwise the first
   retired entry that carries a *binding* wins, `closeWindow` first because
-  `Mod+W` is the key the toggle keeps; a retired entry that is only `null` is
+  hiding is the toggle's primary job; a retired entry that is only `null` is
   honoured when no binding competes, so an explicit unbind is never replaced by
   a shipped default; and a stored value equal to its own retired default carries
   no intent (the settings UI deletes overrides that match a shipped default), so
@@ -4635,9 +4639,37 @@ action opt-in below stays)*
   `07-plugins/04-plugin-security.md`, `03-runtime/01-ipc-protocol.md`
   (`NATIVE_MENU_ACTIONS`), E2E-072, and
   `apps/desktop/test/window-toggle-shortcut.test.mjs`.
-  `closeWindow` (`Mod+W`), and the desktop main process registers it
-  through `globalShortcut` and the native menu. See ADR 0211 and
-  E2E-PLAN-005.
+
+## 2026-09-17 — The window toggle avoids the macOS close-window chord (#360, D439)
+
+- D438 merged the pair onto `Mod+W`, but that binding cannot be the default of a
+  *process-wide* accelerator: macOS spends `Cmd+W` on its own close-window
+  command, so claiming it globally takes the chord away from every other
+  application instead of only closing this window. `Mod+W` is therefore the one
+  key the toggle must not hold.
+- The catalog now ships `toggleWindow` on `Alt+Shift+W` — no platform modifier,
+  so it is one chord on macOS, Windows, and Linux — which collides with no
+  shipped default, no reserved editing chord, and no platform command. The
+  merge, the hide/show semantics, and the fold of the retired
+  `closeWindow`/`summonWindow` overrides stay exactly as D438 defined them.
+- On macOS `Mod+W` is now also refused to plugins (`isReservedKeybinding`), so
+  the platform keeps the chord it owns even though the app no longer uses it.
+- A stored `toggleWindow` value that only repeats a default this release ships
+  or already superseded carries no user intent, so the fold drops it: a profile
+  that persisted the short-lived `Mod+W` default moves to `Alt+Shift+W` instead
+  of freezing the macOS chord, while a real rebind (`Ctrl+Alt+T`) and an
+  explicit unbind (`null`) survive untouched, and a retired customization still
+  wins over a dropped superseded default.
+- The number is D439 because D435 and D437 were already claimed by other
+  in-flight work. **Note**: this log currently carries two `D438` entries — the
+  window-toggle merge above (#360, the pre-rebind decision) and the Git-checkout
+  decision (ADR 0273) near the end of the file. The latter was appended after the
+  toggle's D438 had merged, so its number needs to move to D440 or the next free
+  id; this entry does not rewrite another decision's text.
+- See ADR 0211 (amended again), `04-ux/09-interaction-patterns.md` §1.1 and
+  §1.4, `04-ux/06-settings-ia.md` (shortcuts tab), `07-plugins/03-plugin-api.md`,
+  `07-plugins/04-plugin-security.md`, E2E-072, and
+  `apps/desktop/test/window-toggle-shortcut.test.mjs`.
 
 ## 2026-09-10 — Remove diagnostic timing log streams (D385)
 
@@ -5759,3 +5791,156 @@ that was sitting at the bottom — including after the turn had finished.
 - Renderer plus one narrow main-process capability: no protocol, schema, host
   RPC, permission, storage, or preference change. See ADR 0273,
   `03-runtime/01-ipc-protocol.md` §9, `04-ux/08-component-spec.md`, and E2E-258.
+
+## 2026-09-16 — Draggable chat content width (D439)
+
+- The centered conversation band, empty-home stack, and composer share one
+  preferred max width, default 760px, persisted as
+  `AppSettings.chatContentMaxWidth`. Dual edge handles (invisible at rest;
+  a short primary-ink capsule on hover, slightly stronger while dragging)
+  change that width together so the column stays centered. Drag floor is 560px.
+
+- The live used width is `min(available pane minus 24px gutters, preferred)`,
+  so a squeezed sidebar or work panel compresses the band without rewriting
+  the preference. The collapsed-sidebar 640px ceiling is removed.
+- Assistant, tool, and decision rows follow the band. User plates stay
+  `min(82%, 600px)`. Renderer only. See ADR 0274, E2E-208, and
+  E2E-CHAT-content-width-handles.
+
+## 2026-09-17 — Session and project rows delete on the second click (D441)
+
+- The sidebar's session item and both project menus (sidebar and Projects index)
+  removed the row on the first click of Delete. Every other destructive row
+  action — the settings provider rows, vendor accounts, and the capability
+  tables — arms first and relabels the control, so the two most destructive
+  actions were the only ones that fired on a single click.
+- `hooks/use-armed-delete.ts` now owns that pattern for the whole renderer: one
+  `ARMED_DELETE_MS` (3200ms) expiry and one `useArmedDelete()`. The capability
+  pages keep importing it from `AgentCapabilityLayout`, which re-exports the
+  shared hook instead of holding a second copy with a timeout of its own, so the
+  pattern cannot drift between the settings rows and the two menus.
+- A session item arms on `session.id`; both project menus arm on a
+  `project:`-prefixed key, so a session and a project can never share an arm. An
+  armed item carries `data-armed="true"`, a danger wash, and the label
+  `nav.deleteTaskConfirm` / `project.deleteMenuConfirm` ("Delete?" / "确认删除？")
+  in all eight catalogs. The menu stays open between the two clicks, and an
+  outside press, Escape, or the expiry clears the arm without removing anything.
+- Amends D431 for the idle case: a project whose turn is still live still opens
+  `ProjectDeleteDialog`, which names those sessions and stops them before it
+  deletes, and the host's 1008 / `CONFLICT` refusal is still mapped to
+  `project.deleteRunningBlocked` on both paths. A project with no live turn is
+  removed by the same store action the dialog used, with the same success toast,
+  so its second click is the confirmation the user already gave.
+- The number is D441 because D438 was already claimed twice — by the
+  window-toggle merge (#360, D438 with the D439 rebind) and by the
+  Git-checkout decision (ADR 0273), which this log flags to move to D440.
+  This entry does not rewrite another decision's text.
+- Renderer only: no protocol, storage, host, permission, or migration change,
+  and no new default. The folder on disk is still never touched. See
+  `04-ux/09-interaction-patterns.md`, D421, D431,
+  `06-delivery/04-e2e-test-plan.md`
+  E2E-PROJECT-delete-removes-project-and-owned-sessions, and
+  `apps/desktop/test/two-step-delete.test.mjs`.
+
+## 2026-09-16 — The sidebar list rhythm is 1px / 2px / 8px
+
+- The sidebar's session lists had no rhythm to read. Rows and group headers sat
+  flush inside a group (a 0 gap), two project groups sat 2px apart, and the only
+  air was the 4px above a section label. Adjacent 28px rows painted rounded
+  hover fills that touched, so two rows read as one block, a collapsed group sat
+  as far from its neighbour as an expanded group with ten rows under it, and a
+  section label was closer to the rows above it than to the rows it introduces.
+- The lists now state one ladder: rows sit 1px apart, a project group header and
+  a section label sit 2px above their first row, a sidebar section sits 8px
+  below the one above it, and an expanded project group carries an 8px tail.
+- That tail belongs to the expanded group itself, so the spacing is decided by
+  the preceding group alone: an expanded group is followed by 8px whether the
+  next group is expanded or collapsed, and a collapsed group by 1px either way.
+  The scroller's own gap stays a uniform 1px and the difference lives in the
+  group body's inset, which leaves with the rows. Collapsing a group therefore
+  cannot fork the spacing on a neighbour's state, and cannot snap its own tail.
+- The dated labels inside a project group are ordinary rows of that rhythm
+  rather than a second level of groups: they keep no state, no disclosure, and
+  no `aria-expanded`, and their own inset becomes a symmetric 4px instead of 6px
+  above and 2px below, so a label no longer outweighs the 1px row gap it sits in.
+- `space-0.25` (1px) joins the spacing scale as the hairline step for dense list
+  rhythms; the settings rail already used 1px between its navigation items. The
+  section-gap rule no longer claims the sidebar, which has its own rhythm.
+- Two row budgets follow the pitch: the pinned body still shows eight rows
+  (233px, was 224px) and the standalone Sessions body still shows five (146px,
+  was 140px), because the 28px row grid no longer fits its own gaps inside the
+  old numbers.
+- Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/07-ui-design-system.md` §6.1 and §13, and
+  `04-ux/08-component-spec.md` §6.2 and §6.6.
+
+## 2026-09-16 — The sidebar project group folds as one grid row
+
+- The rhythm above shipped with the group fold animating `max-height: 2000px →
+  0` over the 300ms slow duration, plus a separate 200ms opacity fade and a
+  padding transition. A `max-height` curve spends most of its length above the
+  content, so the visible move was a short snap at the end, and the shorter
+  opacity curve emptied the group roughly two thirds of the way through: the
+  rows disappeared first and the empty box closed afterwards. Collapsing a
+  project read as two separate animations.
+- The group body is now a one-row grid whose row animates `1fr` → `0fr` over the
+  200ms normal duration. Every frame is a real fraction of the group's measured
+  height, so the fold is a single continuous motion, and `opacity` stays 1 for
+  the whole fold — the rows leave by being clipped, not by fading.
+- The body is three layers: the grid, a clip with `min-height: 0` and
+  `overflow: hidden`, and the list that owns the 1px row gap and the fixed
+  2px / 7px inset. The inset has to sit inside the clip, because vertical
+  padding on the animating box holds a `0fr` row open and leaves the group's
+  tail behind after its rows are gone.
+- A folded group keeps its rows mounted inside the `0fr` row, so it is `inert`
+  as well as `aria-hidden` and leaves the tab order. Under
+  `prefers-reduced-motion: reduce` the fold keeps both endpoints and runs in a
+  near-zero duration.
+- The scroll budgets, the indent, the pinned and standalone lists, and the
+  shared `.sidebar-session-group-body` flex column are unchanged; only the
+  project body folds as a grid.
+- Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/08-component-spec.md` §6.2 and
+  `06-delivery/04-e2e-test-plan.md` E2E-LAYOUT-sidebar-project-group-fold.
+
+## 2026-09-17 — Sidebar selection is distinct from workspace context
+
+- Project headers and project, pinned and standalone conversation rows share
+  one row-level hover surface, radius and transition. Project title buttons
+  stay transparent; selected conversation paint takes precedence over hover.
+- A project is a workspace/disclosure control, not a separate selected page.
+  The current workspace keeps its dot and all existing workspace behavior but
+  no persistent row fill, including when no conversation is selected. The
+  renderer marks that context with `data-current-workspace`, not an `active`
+  project class. Session selection remains chat-page-aware and follows the
+  destination immediately while a switch is pending.
+- Folding a selected conversation does not transfer selection to its project.
+  Keyboard focus retains its outline, action buttons retain local feedback,
+  window blur releases hover without clearing selection, and drop-target paint
+  takes precedence over hover.
+- Renderer presentation only: no persistence, workspace activation, permissions
+  or protocol changes. See `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md` §9.1c and
+  E2E-LAYOUT-sidebar-row-states in `06-delivery/04-e2e-test-plan.md`.
+
+## 2026-09-17 — Settings shares sidebar material and restores layout without entrance
+
+- Main and settings navigation now share `sidebar-surface`: the same opaque
+  color/image fallback on Windows/Linux and the existing native vibrancy plus
+  tint/sheen on macOS. Settings wrapper ancestry allows that native material
+  through, while its content pane and content-column titlebar remain opaque.
+  Only the inner settings content animates, not the navigation backing.
+- Built-in settings rail colors no longer diverge from the sidebar. Legacy
+  `--ds-settings-rail-bg` remains an optional shared fallback; a canonical
+  `--ds-bg-sidebar` override wins. No theme or native-window API changes.
+- Sidebar mounting no longer implies expansion. A dedicated transition hook
+  distinguishes visible collapsed-state changes from route restoration. Only
+  real collapse/expand changes animate; settings navigation cancels unfinished
+  phases, and returning restores the retained width/state without replaying
+  `sidebar-in`. Animation-end guards, scoped timeout cleanup, auto-restore and
+  reduced motion remain supported. Boot presentation uses the existing splash
+  reveal instead of a second sidebar width animation.
+- No changes to item indentation, widths, workspace state, data or permissions.
+  See `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md` and E2E-LAYOUT-sidebar-settings in
+  `06-delivery/04-e2e-test-plan.md`.

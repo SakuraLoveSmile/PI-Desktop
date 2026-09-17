@@ -10,7 +10,19 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   shows a compact loading/failure state with a retry action instead of an empty
   section.
 
-- Left settings rail only (sidebar surface `#f4f4f4` light / `#000` dark), **~275px** (Codex gold at 1200-wide)
+- Left settings rail only, **275px**, using the same `sidebar-surface` material
+  as the main sidebar: native vibrancy with shared tint/sheen on macOS, opaque
+  `--ds-bg-sidebar` on Windows/Linux, and shared optional background imagery.
+  macOS settings-wrapper ancestry is transparent; the content pane and its
+  titlebar remain opaque. Only a nested settings content enter wrapper plays a
+  route animation; the scrolling inner pane, rail, and backing never fade or
+  translate. That entrance is opacity-only. Settings dialogs and sheets portal
+  to a viewport-fixed `#pi-desktop-overlays` host on the document element and
+  cover the full window, including the rail.
+- Returning to the app restores the prior sidebar collapsed/expanded state
+  without a sidebar entrance animation or a width ramp. Real toggle and
+  automatic collapse/restore transitions on the visible shell still animate;
+  initial presentation and route restoration do not.
 - Top of rail: traffic-light clearance and the pill **Search settings…**
 - The **Back to app** (`返回应用`) action is pinned to the foot of the rail, not
   the top: it keeps its chevron + label form as a 32px control, and it shares
@@ -183,11 +195,12 @@ a usage tab.
     on Windows/Linux; its native global registration follows the same override.
     An unbound launcher disables Electron registration, the Windows host hook,
     and the focused-window fallback
-  - the window-visibility row is one toggle on `Cmd/Ctrl + W`: it hides a
+  - the window-visibility row is one toggle on `Alt + Shift + W`: it hides a
     visible, focused window to the tray and brings a hidden or minimized window
     back. It is the only window key — the retired `Cmd/Ctrl + Shift + W` summon
-    row is gone — and a stored `closeWindow`/`summonWindow` override is folded
-    into it when the map is read (D438)
+    row is gone — and it avoids `Cmd/Ctrl + W` because macOS spends that chord
+    on its own close-window command; a stored `closeWindow`/`summonWindow`
+    override is folded into it when the map is read (D438, D439)
 
 ### Model configuration (`agent` tab)
 - **Defaults** card: a compact settings row shows the provider name and exact
@@ -692,7 +705,7 @@ the current window width:
 | Token | Value |
 |---|---|
 | Rail width | ~275px (`--ds-settings-nav-width`, shared by the rail and the top band inset) |
-| Rail light bg | `#f4f4f4` |
+| Rail surface | Shared sidebar material; light opaque fallback `#f3f3f3`, native glass on macOS |
 | Top band | content pane only, inset by the rail width; rail keeps its own surface |
 | Active nav pill | denser 6px/10px pad, ~8px radius, gray mix on rail |
 | Section title | 28px / 560, first baseline ~y70 |

@@ -138,6 +138,8 @@ export const ko = {
     expandSidebar: "사이드바 펼치기",
     resizeSidebar: "사이드바 크기 조절",
     sidebarWidth: "사이드바 너비: {{width}}픽셀",
+    resizeChatWidth: "대화 너비 조절",
+    chatWidth: "대화 너비: {{width}}픽셀",
     sessionActions: "세션 작업",
     renameTask: "작업 이름 바꾸기",
     sessionRunning: "작업 중",
@@ -163,6 +165,7 @@ export const ko = {
     createBranch: "여기서 브랜치 만들기",
     branchTitle: "{{title}} (브랜치)",
     deleteTask: "삭제",
+    deleteTaskConfirm: "삭제할까요?",
     copyConversationId: "대화 ID 복사",
     openSessionPath: "세션 경로 열기",
     timeGroupYesterday: "어제",
@@ -555,6 +558,14 @@ sklm: {
       dnsHint:
         "이 검사는 호스트를 로컬에서 확인하지만, 다운로드 자체는 프록시를 사용합니다. 프록시, VPN 또는 별도 DNS 설정을 사용한다면 설정 → 일반 → 네트워크를 확인하세요.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "프록시가 카탈로그 소스에 fake-IP 주소로 응답했습니다. 내장 목록을 표시합니다",
+      previewFakeIpError:
+        "프록시가 이 호스트를 fake-IP 주소로 확인했고, 앱의 주소 검사가 이를 거부했습니다. 아무것도 설치되지 않았습니다.",
+      fakeIpHint:
+        "프록시가 {{host}}를 {{address}}로 응답했습니다. 이는 프록시가 fake-IP 자리표시자로 사용하는 예약된 벤치마크 대역이며, 소스의 실제 주소가 아닙니다. 프록시를 시스템 프록시 모드로 전환하거나 설정 → 일반 → 네트워크를 확인하세요.",
+      fakeIpHintPlain:
+        "로컬 프록시가 이 호스트를 예약 대역의 fake-IP 자리표시자로 확인했습니다. 소스의 실제 주소가 아닙니다. 프록시를 시스템 프록시 모드로 전환하거나 설정 → 일반 → 네트워크를 확인하세요.",
       remoteErrorQuery: "스킬 마켓을 조회하지 못했습니다. 내장 목록을 표시합니다",
       remotePartial: "일부 카탈로그 소스를 사용할 수 없습니다 ({{names}})",
     },
@@ -1166,6 +1177,7 @@ sklm: {
     archive: "프로젝트 보관",
     restore: "프로젝트 복원",
     delete: "프로젝트 삭제",
+    deleteMenuConfirm: "삭제할까요?",
     deleteTitle: "프로젝트 삭제",
     deleteDescription: "{{name}}을(를) 영구적으로 삭제하며 되돌릴 수 없습니다.",
     deleteSessions_one: "{{count}}개의 저장된 세션이 대화 기록과 함께 영구적으로 삭제됩니다.",
@@ -1253,6 +1265,15 @@ sklm: {
       unanswered: "질문 {{number}}에 답변하지 않음",
       skipped: "질문 {{number}} 건너뜀",
     },
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "항상 위에 표시",
+    minimize: "최소화",
+    close: "위젯 닫기",
   },
   panel: {
     title: "작업 패널",
@@ -1486,6 +1507,11 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
     permsMore: "+{{count}}개 더",
     permissionsTitle: "권한",
     permissionReview: "권한 검토",
+    devReviewTitle: "{{name}}을(를) 불러올까요?",
+    devReviewNewTitle: "{{name}}이(가) 더 많은 권한을 요청합니다",
+    devReviewBody: "이 개발 플러그인은 이 컴퓨터의 폴더에서 옵니다. 무엇을 할 수 있는지 검토하세요. 승인하기 전에는 아무것도 로드되지 않습니다.",
+    devReviewAccept: "플러그인 불러오기",
+    devReviewLoading: "불러오는 중…",
     permissionReviewTitle: "{{name}}을(를) 설치할까요?",
     permissionReviewBody: "이 플러그인이 할 수 있는 작업을 검토하세요. 더 높은 위험의 권한은 승인할 때까지 차단됩니다.",
     acceptInstall: "동의하고 설치",

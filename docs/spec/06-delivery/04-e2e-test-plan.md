@@ -4157,7 +4157,9 @@ identify the platform validation still needed.
   Copy; after the response settles, the assistant toolbar offers Copy, Fork,
   Regenerate. The user toolbar offers the pager (when variants exist), Copy,
   Edit, Delete. Edit replaces the prompt bubble with a wider composer-matched
-  inline editor plate with Retry and Cancel controls; Escape or Cancel restores the bubble
+  inline editor plate filled with `--ds-tile-deep` (no outer shadow, inset
+  focus ring) so the light plate stays distinct from the white pane without
+  a clipped glow, with Retry and Cancel controls; Escape or Cancel restores the bubble
   unchanged. Retry truncates the transcript from that prompt and streams a new
   answer whether or not the text changed, leaving a `current / total` pager on
   the user turn that restores the original prompt with its full answer tail in
@@ -4224,27 +4226,47 @@ identify the platform validation still needed.
 - **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
   interaction scenario Draft
 
-#### E2E-208: Collapsed sidebar tightens the centered chat content band
+#### E2E-208: Collapsed sidebar does not force a 640px chat band
 
 - **Preconditions**: PI-Desktop is open with an active chat session at a
-  viewport wide enough for the expanded 760–768px chat content band; reduced
-  motion is off.
+  viewport wide enough for the default 760px chat content band; reduced
+  motion is off; the user has not resized the band.
 - **Steps**: 1) Record the width of the centered transcript or empty-home
   composer band with the sidebar expanded. 2) Collapse the sidebar. 3) Inspect
   the same content band while the dock transition runs and after it settles.
   4) Expand the sidebar and inspect the return transition.
-- **Expected**: The outer main pane fills the space released by the sidebar,
-  while the centered chat content band transitions from its expanded
-  760–768px ceiling to a 640px ceiling in the collapsed state. The transcript,
-  empty-home stack, and Composer use the same collapsed width envelope; no
-  content jumps, horizontal overflow, or clipped controls appear. Expanding
-  restores the expanded ceiling.
+- **Expected**: The outer main pane fills the space released by the sidebar.
+  The centered chat content band stays at its preferred 760px ceiling (or
+  `min(available, preferred)` if the pane is narrower). It does not jump to
+  640px. The transcript, empty-home stack, and Composer share that envelope.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
-  `04-ux/08-component-spec.md`
+  `04-ux/08-component-spec.md`, ADR 0274, D439
 - **Acceptance**: Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
-  interaction scenario Draft
+- **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`,
+  `chat-content-width.test.mjs`); rendered interaction scenario Draft
+
+#### E2E-CHAT-content-width-handles: Dual edge handles resize the centered chat band
+
+- **Preconditions**: PI-Desktop is open on chat (empty home or a transcript)
+  at a viewport wider than 760px. Reduced motion off.
+- **Steps**: 1) Confirm no divider is visible at rest. 2) Hover the left
+  content edge and confirm a short faint capsule, then the right edge. 3) Drag
+  the right handle outward and confirm both edges move, the composer matches,
+  and both capsules lengthen slightly while dragging. 4) Open the work panel or
+  expand the sidebar until the pane is narrower than the new preference; the band
+  compresses without a horizontal scroll. 5) Close the panel / collapse the
+  sidebar and confirm the preference returns. 6) Double-click a handle to
+  restore 760px. 7) Repeat with Arrow keys on a focused handle.
+- **Expected**: Default 760px. Drag floor 560px (or the pane if smaller).
+  User bubbles stay compact. Handles stay keyboard-accessible
+  (`role="separator"`). Preference persists as `chatContentMaxWidth`.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
+  ADR 0274, D439
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`chat-content-width.test.mjs`,
+  `packages/shared/src/chat-content-width.test.ts`); rendered scenario Draft
 
 #### E2E-UI-tooltip-never-outlives-its-trigger: A themed tooltip always retreats
 
@@ -4383,7 +4405,7 @@ identify the platform validation still needed.
   inactive. 11) Press and release Ctrl/Command alone, confirm an IME candidate,
   and hold the back/forward chord long enough to generate repeats.
   12) With the main window focused, press the window-visibility chord
-  `Cmd/Ctrl + W` and confirm the window hides to the tray with no
+  `Alt + Shift + W` and confirm the window hides to the tray with no
   close-behaviour prompt and with the app still running; from another
   application, press it again and confirm the window returns and focuses.
   13) Seed one profile with a stored customized `closeWindow` binding and one
@@ -4401,11 +4423,13 @@ identify the platform validation still needed.
   individual and global reset restore the shared defaults; Keyboard shortcuts is
   its own Settings destination. Modifier-only and IME keydowns dispatch nothing,
   and a held history chord traverses only once per physical press. The
-  window-visibility key is one toggle on `Cmd/Ctrl + W` — a visible, focused
+  window-visibility key is one toggle on `Alt + Shift + W` — a visible, focused
   window hides to the tray, anything else shows and focuses — and it never
   enters the close path, so it raises no close-behaviour prompt and never quits;
-  the retired `Cmd/Ctrl + Shift + W` chord registers nothing, and a stored
-  `closeWindow`/`summonWindow` override folds into the toggle (D438).
+  it is globally registered and deliberately avoids `Cmd/Ctrl + W`, which macOS
+  spends on its own close-window command; the retired `Cmd/Ctrl + Shift + W`
+  chord registers nothing, and a stored `closeWindow`/`summonWindow` override
+  folds into the toggle (D438, D439).
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
   `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: F (settings persistence), Quality (keyboard accessibility)
@@ -7335,14 +7359,14 @@ identify the platform validation still needed.
   `Alt+Shift+V` and inspect the answer. 5) Disable and uninstall A and confirm
   the accelerator becomes free and B can take it; repeat after terminating A's
   runtime (crash) and while A's panel is closed. 6) Attempt the app's own
-  launcher accelerator `Alt+Space`, the `Mod+W` window toggle, a
+  launcher accelerator `Alt+Space`, the `Alt+Shift+W` window toggle, a
   reserved binding such as `Mod+C`, an invalid accelerator, and a ninth
   shortcut for one plugin.
 - **Expected**: Only A's own command runs for the accelerator; a shortcut whose
   `command` is not registered by the plugin is refused with `INVALID_ARGUMENT`.
   B receives a refusal (`registered: false`, code `SHORTCUT_CONFLICT`) and keeps
   no accelerator while A holds it. The host's own `Alt+Space` launcher and
-  `Mod+W` window-toggle shortcuts and OS-reserved bindings are refused with
+  `Alt+Shift+W` window-toggle shortcuts and OS-reserved bindings are refused with
   `SHORTCUT_CONFLICT` or `SHORTCUT_UNAVAILABLE`; an invalid accelerator is
   refused with `INVALID_ACCELERATOR` and the ninth per-plugin shortcut with
   `LIMIT_EXCEEDED`. Disabling, unloading, or crashing a plugin releases every
@@ -7430,10 +7454,12 @@ identify the platform validation still needed.
 | Acceptance | Scenarios |
 |---|---|
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
+| C / D / Quality — Sidebar row states | E2E-LAYOUT-sidebar-row-states |
+| A / C / Quality — Sidebar material and settings return | E2E-LAYOUT-sidebar-settings |
 | B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154, E2E-163, E2E-166, E2E-172, E2E-174, E2E-197, E2E-005G, E2E-005J, E2E-199, E2E-201, E2E-202, E2E-203, E2E-205, E2E-206, E2E-209 |
-| C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll |
+| C — Conversation & stream | E2E-008, E2E-008d, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102g, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-218, E2E-219, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-161, E2E-162, E2E-166, E2E-172, E2E-173, E2E-174, E2E-177, E2E-178, E2E-179, E2E-180, E2E-182, E2E-183, E2E-187, E2E-198, E2E-199, E2E-202, E2E-203, E2E-207, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-102i, E2E-PLUGIN-session-orchestrator-real-workers, E2E-SUBAGENT-settlement-updates-before-parent-poll |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153, E2E-158, E2E-182, E2E-187, E2E-252 |
 | D — Workspace (project ordering) | E2E-253 |
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-102g, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147, E2E-155, E2E-158, E2E-166, E2E-181, E2E-PLUGIN-imported-pi-package-skills |
@@ -7472,6 +7498,7 @@ identify the platform validation still needed.
 | D — Workspace (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | F — Persistence (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | Quality (project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| Quality (two-click delete) | E2E-SESSION-two-click-delete-arms-first |
 | Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command, E2E-PLUGIN-permission-gate-for-real-time-capabilities, E2E-PLUGIN-background-audio-and-realtime-connection |
 | C — Conversation & stream (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
 | E — Tools & permissions (disclosure reading position) | E2E-CHAT-disclosure-toggle-keeps-reading-position |
@@ -7485,7 +7512,7 @@ identify the platform validation still needed.
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-008d, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-020, E2E-021, E2E-021a, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-144, E2E-005J, E2E-201, E2E-202, E2E-207, E2E-206 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-177, E2E-178, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-204, E2E-208, E2E-250, E2E-252, E2E-102i |
+| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-146a, E2E-147, E2E-177, E2E-178, E2E-180, E2E-181, E2E-182, E2E-183, E2E-186, E2E-187, E2E-194, E2E-195, E2E-204, E2E-208, E2E-CHAT-content-width-handles, E2E-250, E2E-252, E2E-102i |
 | M5 (project ordering) | E2E-253 |
 | M2 (IME slash alias) | E2E-255 |
 | M5 (Skill residency) | E2E-254 |
@@ -7502,6 +7529,7 @@ identify the platform validation still needed.
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
 | Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| M6+ (Two-click delete) | E2E-SESSION-two-click-delete-arms-first |
 | C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | Quality (model fallback isolation) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | C — Conversation & stream (legacy subagent turn limit) | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
@@ -8113,12 +8141,14 @@ This test plan spec is accepted when:
   active workspace; C a root of a stored two-folder project group.
 - **Steps**: open Settings → Project archive, open A's row menu, choose Delete
   project, and confirm in the dialog. Then repeat the same action from the
-  sidebar project menu for B while B is the active workspace. Then attempt the
-  same action for C, then for a path the host no longer knows, and finally for a
+  sidebar project menu for B while B is the active workspace: the item arms on
+  the first click and only the second click removes B. Then attempt the same
+  action for C, then for a path the host no longer knows, and finally for a
   fourth project D while one of D's tasks is still running.
 - **Expected**: the dialog names the project, states that the project and its
   sessions with their transcripts are removed permanently, and states that the
-  folder on disk is not deleted; nothing is removed before the confirmation.
+  folder on disk is not deleted; nothing is removed before the confirmation, and
+  an armed item that is left alone disarms itself and removes nothing.
   After confirming, the durable project row, that project's sessions, their
   transcripts, scratch and review files, and its durable project memory are
   gone, while the folder on disk is untouched. The deleted project disappears
@@ -8178,6 +8208,31 @@ This test plan spec is accepted when:
   ids, the dialog's running-session line and stop-and-delete label, the abort
   loop running before `deleteProject`, the `CONFLICT` fallback, and the new
   copy in every shipped catalog; the end-to-end journey remains Draft
+
+### E2E-SESSION-two-click-delete-arms-first
+
+- **Preconditions**: a project with one idle session and one running session,
+  both reachable from the sidebar session menu, the sidebar project menu, and
+  the Projects index.
+- **Steps**: open the session menu of the idle session, press Delete once, and
+  leave the item armed until the arm expires before pressing it again to confirm
+  the removal. Repeat for a project row from the sidebar menu and from the
+  Projects index.
+- **Expected**: the first press removes nothing and relabels the item to
+  `nav.deleteTaskConfirm` / `project.deleteMenuConfirm` ("Delete?" / "确认删除？")
+  with `data-armed="true"`; the menu stays open, and an outside press, Escape, or
+  the expiry clears the arm without removing anything. Only the second press
+  removes the session with its transcript and its row, and only the second press
+  on a project row removes an idle project. A session and a project never share
+  an arm. Deleting a project whose turn is live still opens the dialog that names
+  those sessions and stops them (see
+  E2E-PROJECT-delete-running-sessions-are-named-and-stopped).
+- **Specs linked**: `04-ux/09-interaction-patterns.md` §1.6, D421, D431, D441
+- **Acceptance criterion**: Quality
+- **Milestone**: M6+
+- **Status**: Partially automated — `apps/desktop/test/two-step-delete.test.mjs`
+  pins the shared arm and its expiry, both labels in every shipped catalog, and
+  that the first press only arms; the end-to-end journey remains Draft
 ### US-UI-59 Session-rooted background tools
 - Start a visible turn in project A, switch to project B while it runs, and
   inspect both sidebar status indicators.
@@ -8414,6 +8469,17 @@ This test plan spec is accepted when:
 - **Specs linked**: `04-ux/08-component-spec.md` §1.7, §3.4; decisions-log D304 / D348
 - **Milestone**: M6
 - **Status**: Partially automated (`macos-sidebar-vibrancy.test.mjs` source contract); native visual verification Draft
+
+### US-UI-75 Light message-edit plate
+- Open a populated transcript in light and dark themes and choose Edit on a
+  user prompt.
+- Expect the inline editor to be a `--ds-tile-deep` plate at
+  `--ds-composer-radius` with no outer shadow and no hairline stroke. On
+  light theme the 8% ink wash must remain distinct from the `#ffffff` chat
+  surface; the composer glow must not appear or get clipped at the plate
+  edges. Retry and Cancel stay legible in the footer.
+- Focusing the textarea paints an inset 2px accent ring inside the plate;
+  Escape or Cancel restores the bubble.
 
 #### E2E-123: asktool collects multiple answers and returns skipped placeholders
 
@@ -12125,6 +12191,127 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   window-drag and visual checks remain required on each platform. Branch runs
   are exploratory and do not satisfy the integrated-main gate.
 
+#### E2E-LAYOUT-sidebar-project-group-fold
+
+- **Preconditions**: Four retained sidebar project groups, seeded through the
+  host: one holding five sessions across four date buckets, one holding a single
+  session, one holding none, and one holding ten pinned sessions.
+  `prefers-reduced-motion` is unset.
+- **Steps**:
+  1. Inspect the groups: body layering, row and date-label counts, the empty
+     state, the tail each expanded group contributes to the next one, and the
+     non-project lists' budgets.
+  2. Collapse the multi-row group with a real pointer click on its directory row —
+     scrolled into view and confirmed to hit that button — and read the group
+     body's height, opacity, resolved `grid-template-rows`, and the distance to
+     the next group on every frame for about half a second, while recording the
+     fold's own `transitionrun` / `transitionend`.
+  3. Expand it again and confirm the open geometry returns.
+  4. Collapse and re-expand it within the same motion.
+  5. Repeat the collapse with `prefers-reduced-motion: reduce` emulated.
+  6. Scroll the pinned list to its last row.
+- **Expected**: A project group is one grid row (`grid-template-rows: 1fr`) that
+  animates to `0fr` over the 200ms normal duration — no `max-height` clamp, no
+  opacity transition — so the fold is a single continuous height ramp with no
+  plateau followed by a snap, and `opacity` stays 1 on every frame: the rows are
+  clipped, never faded. The fold fires one transition and its own event reports
+  the 200ms normal duration. The rows are clipped by an inner `min-height: 0`
+  box, and the 1px row gap plus the group's 2px / 7px inset sit on the list inside
+  that clip, so the inset travels with the rows. An expanded group's 7px inset
+  plus the 1px scroller gap read as an 8px tail to the group below it; the last
+  group in the list has no neighbour, so it is checked against its own inset and
+  clip instead. A folded group's tail leaves with its rows, its section is its
+  header plus the 1px scroller gap, and its rows stay mounted past the clipped
+  edge while the group is `aria-hidden` and `inert`. A reversal mid-flight turns
+  on the frame it reached and settles back on the open height without
+  overshooting, and the empty group folds its empty state the same way. Under
+  reduced motion both endpoints are kept and the travel is dropped. The pinned
+  list holds eight rows inside `min(233px, 30vh)` and scrolls to its remaining
+  rows, and the standalone list keeps its flex column and 146px budget. The group
+  indent, ordering, and workspace state are unchanged.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md` §6.1 and
+  §13, `04-ux/08-component-spec.md` §6.2, `08-meta/decisions-log.md`
+  (2026-09-16, sidebar list rhythm and project-group fold)
+- **Acceptance**: Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated (`scripts/e2e-three-column-layout.mjs` via
+  `pnpm test:e2e:layout` — host-seeded groups and pins, a hit-tested CDP pointer
+  click, per-frame height and opacity sampling across the real fold, the
+  transition's own reported duration, mid-flight reversal, and reduced-motion
+  emulation). Unit coverage in
+  `apps/desktop/test/sidebar-collapse-animation.test.mjs` and
+  `apps/desktop/test/sidebar-pinned-rendering.test.mjs`. The sampled values are
+  renderer geometry, not an eyes-on visual pass.
+
+#### E2E-LAYOUT-sidebar-row-states
+
+- **Preconditions**: Host-seeded project, pinned and standalone conversations;
+  a current workspace; built desktop with isolated data and profile directories.
+- **Steps**: In dark and light themes, select a project conversation, hover its
+  project title and an unselected conversation, then hover the selected row.
+  Exercise the window-blur handler, drop-target styling, project action hover
+  and keyboard Tab/Shift+Tab focus. Fold and reopen the selected conversation's
+  group. Select pinned and standalone conversations. Open Settings and return.
+  Enable reduced motion and inspect both row transition durations.
+- **Expected**: Project and conversation hover backgrounds, radii and transitions
+  match. The title button stays transparent. Only a conversation uses selected
+  fill, which wins over hover; workspace identity remains a separate dot with
+  no persistent header fill. Folding never promotes the project to selected.
+  Pinned and standalone rows use the same selected surface. Keyboard focus
+  retains an outline, action buttons retain local feedback, drop-target paint
+  wins over hover, and blur releases hover without clearing selection. Settings
+  replaces sidebar navigation, and returning restores conversation and workspace
+  context without a second selected row. Rendered component tests additionally
+  cover no selected session, a pending destination and non-chat page state.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md` §9.1c
+- **Acceptance**: C, D, Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated via `pnpm test:e2e:layout` and
+  `scripts/e2e/sidebar-row-states.mjs`: real CDP pointer/keyboard input and
+  computed-style assertions. Window blur/focus events and the drop-target class
+  are injected for those styling checks; this is not a native focus/drag test.
+  Unit coverage: `sidebar-navigation.test.mjs`, `sidebar-pinned-rendering.test.mjs`.
+
+#### E2E-LAYOUT-sidebar-settings
+
+- **Preconditions**: Built desktop, isolated host/profile, visible chat sidebar.
+- **Steps**:
+  1. In dark/light palettes and darwin/win32/linux CSS branches, compare the
+     home sidebar and Settings rail color, image layers, size and position.
+     Inspect transparent ancestors and opaque settings content/titlebar.
+  2. Return through Back to app while tracing sidebar insertion, width and
+     animationstart events. Repeat quick round trips, a previously collapsed
+     sidebar, and settings navigation interrupting an entrance.
+  3. Explicitly reopen a collapsed sidebar, then repeat settings return with
+     reduced motion. Repeat material comparisons with legacy and canonical
+     theme color overrides and a sidebar background image.
+- **Expected**: Both navigation surfaces share one material. Settings navigation
+  and shell have no entrance animation; only a nested content-enter wrapper
+  inside its opaque pane animates, and that motion is opacity-only so it cannot
+  trap `position: fixed` overlays. Settings dialogs cover the full window, including the rail. On macOS
+  all ancestors behind the rail are transparent, while right
+  content and titlebar stay opaque. Returning to an expanded sidebar starts and
+  stays at 275px without sidebar-in events; a collapsed sidebar stays absent.
+  A real reopen still produces sidebar-in and a width ramp. Legacy theme color
+  input remains supported for both rails, and a canonical override wins.
+- **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md` §1.4 and §1.7
+- **Acceptance**: A, C, Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated via `pnpm test:e2e:layout` and
+  `scripts/e2e/sidebar-settings.mjs`, with trusted CDP pointer/keyboard input,
+  mutation-time and subsequent geometry samples, animation events and computed
+  styles. CDP focus emulation keeps the isolated page painting while its native
+  window is occluded; otherwise Chromium can freeze CSS motion and hover input.
+  Platform branches and palettes are renderer emulation, not native
+  Windows/Linux or OS material/theme validation. Optional
+  `PI_DESKTOP_LAYOUT_ARTIFACT_DIR` captures renderer screenshots. State tests in
+  `sidebar-settings-return.test.mjs` cover initial presentation, both interrupted
+  phases, hidden-state changes and reversals. `settings-dialog-overlay.test.mjs`
+  covers the full-window overlay contract. `pnpm test:e2e:theme-surfaces`
+  verifies the opaque fallback and legacy theme override in real Chromium.
+
 #### E2E-AGENT-alt-enter-steers-active-turn: Enter follows up and Alt+Enter steers the active turn
 
 - **Preconditions**: A session with a configured model and a controllable
@@ -12265,16 +12452,20 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   policy error without fetching the private target. A judged refusal is not
   retried; a local resolver that answered nothing is, and is reported as
   `NETWORK_RESOLVE_FAILED` (`kind` `unresolved`) rather than as an address-check
-  refusal — the guard reached no verdict, so nothing may claim it did. Every
-  other refusal carries `NETWORK_POLICY_BLOCKED` (spec 08 §3.1) with its
-  `reason`, the class of the refused address, and the route that address was
-  judged on, so the install sheet can name the reason and offer a retry instead
-  of leaving the install button disabled with no explanation, and the market
-  list can tell a refused source apart from a merely unreachable one. A proxied
-  hop whose answer is the RFC 2544 fake-IP class is refused on a direct or
-  unreadable route and accepted on the proxied one, every other non-public class
-  still refuses on all routes, and each redirect hop is judged on its own route
-  (ADR 0272).
+  refusal — the guard reached no verdict, so nothing may claim it did. An address
+  in a proxy's fake-IP range (`198.18.0.0/15`, Clash's default) is refused and not
+  retried where the guard judged it — a direct or unreadable route — and is
+  accepted on the proxied one, and is reported as `kind` `fake-ip` with
+  `addressKind` `benchmark` and `reason` `non-public-address` — distinct from a
+  real private target (`kind` `policy`, `addressKind` `private`), because the guard
+  judged the target in the second case and only the proxy's placeholder in the
+  first. Every other refusal carries `NETWORK_POLICY_BLOCKED` (spec 08 §3.1) with
+  its `reason`, the address it resolved to, the class of that address, and the
+  route it was judged on, so the install sheet can name the reason and offer a
+  retry instead of leaving the install button disabled with no explanation, and the
+  market list can tell a refused source apart from a merely unreachable one. Every
+  other non-public class still refuses on all routes, and each redirect hop is
+  judged on its own route (ADR 0272).
 - **Specs linked**: `05-security/01-security.md`, ADR 0243, ADR 0272,
   `03-runtime/01-ipc-protocol.md` §12b
 - **Acceptance**: Security, Quality
@@ -12646,7 +12837,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: A host whose machine identifier is readable (Windows `MachineGuid`, the macOS platform UUID, or `/etc/machine-id`), a second environment where it is not readable, and a request-logging stub for `POST /api/v1/download/resolve`.
 - **Steps**: 1) Trigger two installs in one session and compare the recorded `deviceId` values. 2) Restart the app and trigger a third install. 3) Compare the value with the raw machine identifier of the host. 4) Search the settings, the Marketplace surface, and the installed-plugin detail view for the value. 5) Repeat steps 1 and 2 where no machine identifier is readable, then inspect the application data directory.
 - **Expected**: Every resolve request from one installation carries the same 64-character lowercase hex value, including after a restart and after an app reinstall while the machine identifier is unchanged; the value is neither the machine code nor a prefix of it, and it equals `sha256("pi-desktop.device.v1:" + <machine identifier>)`; the identifier never appears in the UI and no setting can reveal or reset it; in the unreadable case the value is a different 64-hex string that is generated once and persisted under `plugins/market/device.json`, then repeated across restarts.
-- **Specs linked**: `07-plugins/07-plugin-marketplace.md` §2, ADR 0274
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md` §2, ADR 0276
 - **Acceptance**: G (remote marketplace source) + Security
 - **Milestone**: M6+
 - **Status**: Draft
@@ -12656,7 +12847,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: A clean profile on the official channel, a plugin whose resolve answer lists at least two entries, a first mirror that fails or is slow so a second attempt is observable, and a renderer subscribed to `plugin.installProgress`.
 - **Steps**: 1) Start a manual install from the marketplace detail sheet. 2) Record the reports that arrive while it runs. 3) Hover the dialog after the install succeeds. 4) Look at the installed plugin once the install ends. 5) Install again with a large package and count the reports over a window of at least one second.
 - **Expected**: The dialog shows the phases in order — `resolve`, `download`, `verify`, `install`, `enable` — with `mirror n/N · name` and a determinate bar from `receivedBytes` / `totalBytes`; every report carries `pluginId` and `version`, only the report that names a mirror carries `source`, and `attempt` counts 1-based within `attempts` while a mirror switch increments `attempt` without changing `attempts`; byte reports arrive at most once per 200 ms, with one extra report per phase change and one terminal report; the install ends with no `error` and the plugin is installed and enabled after the ordinary permission review; the dialog closes about two seconds after success, that countdown pauses while it is hovered, and a background auto-update installs the same way without opening the dialog at all.
-- **Specs linked**: `07-plugins/07-plugin-marketplace.md` §2, `07-plugins/15-plugin-center.md` §10, ADR 0274 §7
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md` §2, `07-plugins/15-plugin-center.md` §10, ADR 0276 §7
 - **Acceptance**: G (remote marketplace source)
 - **Milestone**: M6+
 - **Status**: Draft
@@ -12666,7 +12857,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: An official-channel install of a package large enough or a mirror slow enough that the download phase lasts, a way to answer `market.cancelInstall`, and a view of the plugin directory, the install cache, and the Installed list.
 - **Steps**: 1) Start the install and wait for the download phase. 2) Press the cancel action in the dialog. 3) Watch the dialog and capture the RPC answer. 4) Inspect the plugin directory, the install cache, and the Installed list after the install ends. 5) Send `market.cancelInstall` again for the same id, for an install that is not running, and once after the download has finished.
 - **Expected**: The cancel call answers `{ cancelled: true, id }` for the running install, and the install fails with `PLUGIN_CANCELLED` (JSON-RPC code 1019); the dialog closes without reporting an error; nothing is installed — no plugin directory, no installed row, no enabled plugin — and no partial package survives in the cache; the second call for the same id, the call for an install that is not running, and a call after the download finished answer `{ cancelled: false, id }` and change nothing, so a cancel can never interrupt the write of the plugin directory.
-- **Specs linked**: `07-plugins/07-plugin-marketplace.md` §2, ADR 0274 §7
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md` §2, ADR 0276 §7
 - **Acceptance**: G (remote marketplace source) + Security
 - **Milestone**: M6+
 - **Status**: Draft
@@ -12676,7 +12867,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: An official-channel install whose every mirror fails — for example a digest mismatch on the first and a network error on the second — with a renderer subscribed to `plugin.installProgress` and a clipboard readback.
 - **Steps**: 1) Start the install. 2) Let every mirror fail. 3) Read the terminal report and the dialog. 4) Use the copy action, then the retry action once the mirrors serve valid bytes again.
 - **Expected**: The terminal report carries `error` and a `tried[]` entry per mirror in the order they were tried, each naming its `source`, `url`, and the error that mirror answered; the dialog stays open and shows the readable error plus that list; the copy action puts the tried mirrors on the clipboard; the retry action starts a new install of the same version and completes it when the mirrors answer, without reusing the failed attempt's partial state; nothing was installed by the failed attempt.
-- **Specs linked**: `07-plugins/07-plugin-marketplace.md` §2, ADR 0274 §7
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md` §2, ADR 0276 §7
 - **Acceptance**: G (remote marketplace source)
 - **Milestone**: M6+
 - **Status**: Draft

@@ -138,6 +138,8 @@ export const tr = {
     expandSidebar: "Kenar çubuğunu genişlet",
     resizeSidebar: "Kenar çubuğu genişliğini ayarla",
     sidebarWidth: "Kenar çubuğu genişliği: {{width}} piksel",
+    resizeChatWidth: "Sohbet genişliğini ayarla",
+    chatWidth: "Sohbet genişliği: {{width}} piksel",
     sessionActions: "Oturum eylemleri",
     renameTask: "Görevi yeniden adlandır",
     sessionRunning: "Çalışıyor",
@@ -163,6 +165,7 @@ export const tr = {
     createBranch: "Buradan dal oluştur",
     branchTitle: "{{title}} (dal)",
     deleteTask: "Sil",
+    deleteTaskConfirm: "Silinsin mi?",
     copyConversationId: "Konuşma kimliğini kopyala",
     openSessionPath: "Oturum yolunu aç",
     timeGroupYesterday: "Dün",
@@ -555,6 +558,14 @@ sklm: {
       dnsHint:
         "Bu denetim ana bilgisayarı yerel olarak çözer, indirmenin kendisi ise proxy'nizden geçer. Proxy, VPN veya özel bir DNS kurulumu kullanıyorsanız Ayarlar → Genel → Ağ bölümünü kontrol edin.",
       failureSourceHost: "{{name}} ({{host}})",
+      remoteErrorFakeIp:
+        "Proxy'niz katalog kaynaklarına fake-IP adresleriyle yanıt verdi – yerleşik seçkiler gösteriliyor",
+      previewFakeIpError:
+        "Proxy'niz bu ana bilgisayarı bir fake-IP adresine çözdü, bu yüzden uygulamanın adres denetimi reddetti – hiçbir şey yüklenmedi.",
+      fakeIpHint:
+        "Proxy'niz {{host}} için {{address}} yanıtını verdi; bu, proxy'lerin fake-IP yer tutucusu olarak kullandığı ayrılmış bir referans aralığıdır, kaynağın gerçek adresi değildir. Proxy'yi sistem proxy moduna alın veya Ayarlar → Genel → Ağ bölümünü kontrol edin.",
+      fakeIpHintPlain:
+        "Yerel bir proxy bu ana bilgisayarı ayrılmış bir aralıktaki fake-IP yer tutucusuna çözdü; kaynağın gerçek adresi değildir. Proxy'yi sistem proxy moduna alın veya Ayarlar → Genel → Ağ bölümünü kontrol edin.",
       remoteErrorQuery: "Skill market sorgulanamadı – yerleşik seçkiler gösteriliyor",
       remotePartial: "Bazı katalog kaynakları kullanılamıyor ({{names}})",
     },
@@ -1166,6 +1177,7 @@ sklm: {
     archive: "Projeyi arşivle",
     restore: "Projeyi geri yükle",
     delete: "Projeyi sil",
+    deleteMenuConfirm: "Silinsin mi?",
     deleteTitle: "Projeyi sil",
     deleteDescription: "{{name}} kalıcı olarak silinir ve bu işlem geri alınamaz.",
     deleteSessions_one: "{{count}} kayıtlı oturum, konuşma dökümleriyle birlikte kalıcı olarak silinir.",
@@ -1253,6 +1265,15 @@ sklm: {
       unanswered: "Soru {{number}} yanıtlanmadı",
       skipped: "Soru {{number}} atlandı",
     },
+  },
+  /**
+   * Host-owned window menu of a floating plugin widget (`ui.shape: "widget"`).
+   * A widget has no control capsule, so its context menu carries these.
+   */
+  pluginPanelWidget: {
+    alwaysOnTop: "Her zaman üstte",
+    minimize: "Küçült",
+    close: "Widget'ı kapat",
   },
   panel: {
     title: "Çalışma paneli",
@@ -1486,6 +1507,11 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
     permsMore: "+{{count}} daha",
     permissionsTitle: "İzinler",
     permissionReview: "İzin incelemesi",
+    devReviewTitle: "{{name}} yüklensin mi?",
+    devReviewNewTitle: "{{name}} artık daha fazla erişim istiyor",
+    devReviewBody: "Bu geliştirme eklentisi bu makinedeki bir klasörden geliyor. Neler yapabileceğini inceleyin — siz kabul edene kadar hiçbir şey yüklenmez.",
+    devReviewAccept: "Eklentiyi yükle",
+    devReviewLoading: "Yükleniyor…",
     permissionReviewTitle: "{{name}} kurulsun mu?",
     permissionReviewBody: "Bu eklentinin neler yapabileceğini inceleyin. Daha yüksek riskli izinler kabul edene kadar bloklu kalır.",
     acceptInstall: "Kabul et ve kur",

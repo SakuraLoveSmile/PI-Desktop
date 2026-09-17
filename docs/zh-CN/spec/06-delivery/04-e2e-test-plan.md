@@ -2924,10 +2924,11 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   状态，不参与冲突、不响应旧或默认组合、可跨重启保存，并会移除 macOS 加速器和
   Windows 启动器后备层；单项和全局恢复都返回共享默认值。仅修饰符和 IME 按键不
   会发送命令，长按历史组合每次物理按压只遍历一次。窗口可见性只有一个开关键
-  `Cmd/Ctrl + W` —— 可见且在前台的窗口隐藏到托盘，其余情况显示并获得焦点 ——
-  且绝不走关闭路径，因此不会弹出关闭行为询问、也不会退出应用；已弃用的
+  `Alt + Shift + W` —— 可见且在前台的窗口隐藏到托盘，其余情况显示并获得焦点 ——
+  且绝不走关闭路径，因此不会弹出关闭行为询问、也不会退出应用；该键刻意避开
+  `Cmd/Ctrl + W`，因为 macOS 把它用于自己的关闭窗口命令；已弃用的
   `Cmd/Ctrl + Shift + W` 组合键不再注册，已存储的 `closeWindow` / `summonWindow`
-  覆盖项会并入该开关键（D438）。
+  覆盖项会并入该开关键（D438、D439）。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/07-ui-design-system.md`、
   `03-runtime/01-ipc-protocol.md`
 - **接受**：F（设置持久性）、质量（键盘可访问性）
@@ -4926,6 +4927,8 @@ IPC 请求无法关闭。
 | 验收 | 应用场景 |
 |---|---|
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
+| C / D / Quality — 侧边栏行状态 | E2E-LAYOUT-sidebar-row-states |
+| A / C / Quality — 侧栏材质与设置返回 | E2E-LAYOUT-sidebar-settings |
 | B / F / Security — 提供商复制 | E2E-PROVIDER-copy-config-without-credentials |
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |
 | B——模型配置 | E2E-005、E2E-005G、E2E-006、E2E-007、E2E-038、E2E-050、E2E-052、E2E-055、E2E-066、E2E-080、E2E-082、E2E-151、E2E-005J、E2E-199、E2E-201、E2E-202、E2E-203、E2E-209、E2E-166 |
@@ -4968,6 +4971,7 @@ IPC 请求无法关闭。
 | D — 工作区（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | F — 持久化（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | 品质（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| 品质（两步删除） | E2E-SESSION-two-click-delete-arms-first |
 | Security (plugin real-time capabilities) | E2E-PLUGIN-global-shortcut-owns-only-its-own-command、E2E-PLUGIN-permission-gate-for-real-time-capabilities、E2E-PLUGIN-background-audio-and-realtime-connection |
 | C — 对话与流式（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
 | E — 工具与权限（展开详情保持阅读位置） | E2E-CHAT-disclosure-toggle-keeps-reading-position |
@@ -4998,6 +5002,7 @@ IPC 请求无法关闭。
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
 | 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
+| M6+（两步删除） | E2E-SESSION-two-click-delete-arms-first |
 | C — 对话和直播（模型回退） | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | 品质（模型回退隔离） | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
 | C — 对话和直播（旧版子代理回合上限） | E2E-SUBAGENT-legacy-turn-limit-frontmatter-is-ignored |
@@ -5524,14 +5529,16 @@ IPC 请求无法关闭。
 - **前提条件**：三个持久项目 A、B 和 C，每个都至少有一个带转录本的会话；A 已归档并作为
   侧边栏选项卡保留；B 是活动工作区；C 是一个已存储双文件夹项目组的根目录。
 - **步骤**：打开设置 → 项目存档，打开 A 的行菜单，选择删除项目，并在对话框中确认。然后
-  从侧边栏项目菜单对正处于活动工作区的 B 重复同一操作。接着对 C 尝试同一操作，然后对一个
-  宿主已不再知晓的路径尝试，最后在 D 的某个任务仍在运行时尝试删除 D。
+  从侧边栏项目菜单对正处于活动工作区的 B 重复同一操作：第一次点击只是武装该项，只有第二次
+  点击才会移除 B。接着对 C 尝试同一操作，然后对一个宿主已不再知晓的路径尝试，最后在 D 的
+  某个任务仍在运行时尝试删除 D。
 - **预期**：对话框会指明项目名称，说明该项目及其会话与转录本会被永久移除，并说明磁盘上的
-  文件夹不会被删除；确认之前不会移除任何内容。确认后，持久项目行、该项目的会话、其转录本、
-  scratch 和 review 文件以及该项目的持久记忆均已消失，而磁盘上的文件夹保持原样。被删除的
-  项目会立即从设置 → 项目存档和侧边栏中消失，重新加载后依然如此：没有保留的选项卡、没有
-  最近项目条目、没有由会话推导的行，也没有残留的 pin、archive 或 order 偏好。其他所有项目
-  的会话与转录本不受影响。当被删除的项目曾是活动工作区时，工作区回退到另一个已打开的项目
+  文件夹不会被删除；确认之前不会移除任何内容，被武装后放置不管的项会自行解除武装、不会移除
+  任何东西。确认后，持久项目行、该项目的会话、其转录本、scratch 和 review 文件以及该项目的
+  持久记忆均已消失，而磁盘上的文件夹保持原样。被删除的项目会立即从设置 → 项目存档和侧边栏
+  中消失，重新加载后依然如此：没有保留的选项卡、没有最近项目条目、没有由会话推导的行，也没有
+  残留的 pin、archive 或 order 偏好。其他所有项目的会话与转录本不受影响。当被删除的项目曾是
+  活动工作区时，工作区回退到另一个已打开的项目
   或 Temporary，且下次启动不会重新打开已删除的路径。磁盘上文件夹已被移动或删除的项目仍可
   移除。删除 C 会被拒绝并给出提示消息，该组保持不变；宿主已无持久行的路径仍会从项目存档与
   侧边栏中移除，不会报出缺少项目的错误。当 D 的任务仍在运行时删除 D 会打开确认对话框，而不是给出
@@ -5568,6 +5575,24 @@ IPC 请求无法关闭。
   当前运行会话 id 的情况下都能到达对话框、对话框的运行中会话行与“停止任务并删除”标签、abort 循环
   先于 `deleteProject` 执行、`CONFLICT` 兜底路径，以及所有已发布语言包中的新文案；端到端旅程仍为
   草稿
+
+### E2E-SESSION-two-click-delete-arms-first
+
+- **前提条件**：一个包含一个空闲会话和一个运行中会话的项目，二者都可从侧边栏会话菜单、侧边栏
+  项目菜单以及项目索引到达。
+- **步骤**：打开空闲会话的会话菜单，按一次删除，并让该项保持武装直到武装超时，然后再按一次以
+  确认移除。对来自侧边栏菜单与项目索引的项目行重复该操作。
+- **预期**：第一次按下不会移除任何东西，并把该项标签改为 `nav.deleteTaskConfirm` /
+  `project.deleteMenuConfirm`（"Delete?" / "确认删除？"）且带 `data-armed="true"`；菜单保持
+  打开，点击外部、按 Escape 或武装超时都会解除武装且不移除任何内容。只有第二次按下才会移除
+  该会话及其转录本和该行，也只有对项目行的第二次按下才会移除空闲项目。会话与项目永远不会共用
+  一次武装。删除仍有运行中轮次的项目时，仍会打开指明这些会话并停止它们的对话框（见
+  E2E-PROJECT-delete-running-sessions-are-named-and-stopped）。
+- **链接规格**：`04-ux/09-interaction-patterns.md` §1.6、D421、D431、D441
+- **验收**：品质
+- **里程碑**：M6+
+- **状态**：部分自动化 —— `apps/desktop/test/two-step-delete.test.mjs` 固定了共享的武装与它的
+  超时、所有已发布语言包中的两个标签，以及第一次按下只做武装；端到端旅程仍为草稿
 
 ### US-UI-59 基于会话的后台工具
 - 在项目 A 中启动可见轮次，在项目 B 运行时切换到项目 B，并且
@@ -7332,6 +7357,84 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   states). DOM/CDP clicks are not native hit-test proof. Native pointer, drag
   and visual checks remain required; branch runs are exploratory only.
 
+#### E2E-LAYOUT-sidebar-project-group-fold
+
+- **前提条件**：通过宿主预置四个保留的侧边栏项目分组：一个横跨四个日期桶共五个会话，一个只有单个会话，一个没有任何会话，一个带十个已固定会话。未设置 `prefers-reduced-motion`。
+- **步骤**：
+  1. 检查这些分组：主体分层、行数与日期标签数、空状态、每个展开分组贡献给下一个分组的尾部间距，
+     以及非项目列表的预算。
+  2. 用真实指针点击项目目录行（先滚动进视野并确认命中该按钮）折叠多行分组，在约半秒内逐帧读取
+     分组主体的高度、opacity、解析后的 `grid-template-rows`，以及到下一个分组的距离，
+     同时记录该折叠自身的 `transitionrun` / `transitionend`。
+  3. 再次展开，确认打开的几何形态恢复。
+  4. 在同一次运动中先折叠再展开。
+  5. 在模拟 `prefers-reduced-motion: reduce` 的情况下重复折叠。
+  6. 把固定列表滚动到它的最后一行。
+- **预期**：项目分组是一个网格行（`grid-template-rows: 1fr`），在 200ms 的正常时长内动画到
+  `0fr` —— 没有 `max-height` 夹取，也没有 opacity 过渡 —— 因此折叠是一条连续的高度斜坡，
+  不会先出现平台期再瞬间跳变，并且每一帧的 `opacity` 都保持为 1：行是被裁剪的，从不淡出。
+  一次折叠只触发一次过渡，其自身事件报告 200ms 的正常时长。行由内层带 `min-height: 0` 的盒
+  裁剪，1px 行间隙与分组的 2px / 7px 内缩量位于该裁剪层内部的列表上，因此内缩量随行一起移动。
+  展开分组的 7px 内缩量加上滚动容器的 1px 间隙，与下一个分组之间形成 8px 尾部间距；列表中的
+  最后一个分组没有邻居，因此改为校验它自身的内缩量与裁剪层。折叠分组的尾部随行一起消失，
+  其区块等于标题加上 1px 滚动容器间隙，行仍挂载在被裁剪的边缘之外，同时分组处于
+  `aria-hidden` 与 `inert`。中途反转会从它已经到达的那一帧转向，并回到打开高度而不越界；
+  空分组以同样方式折叠其空状态。在减弱动态效果下保留两端状态并去掉位移。固定列表在
+  `min(233px, 30vh)` 内显示八行并可滚动到其余行，独立列表保持其弹性列与 146px 预算。
+  分组的缩进、顺序与工作区状态均不变。
+- **链接规格**：`04-ux/01-ui-ia.md`、`04-ux/07-ui-design-system.md` §6.1 与 §13、
+  `04-ux/08-component-spec.md` §6.2、`08-meta/decisions-log.md`（2026-09-16 侧边栏列表节奏与项目分组折叠）
+- **验收**：品质
+- **里程碑**：Post-M6 desktop shell maintenance
+- **状态**：已自动化（`scripts/e2e-three-column-layout.mjs`，经 `pnpm test:e2e:layout`）：
+  宿主预置分组与固定项、经过命中校验的 CDP 指针点击、在真实折叠上逐帧采样高度与 opacity、
+  读取过渡自身报告的时长、中途反转，以及减弱动态效果模拟。
+  单元覆盖见 `apps/desktop/test/sidebar-collapse-animation.test.mjs` 与
+  `apps/desktop/test/sidebar-pinned-rendering.test.mjs`。采样值是渲染器几何数据，
+  不是人眼视觉验收。
+
+#### E2E-LAYOUT-sidebar-row-states
+
+- **前提条件**：宿主预置项目、置顶和独立会话，存在当前工作区；应用使用隔离的数据与 profile。
+- **步骤**：分别在深浅主题下选中项目会话，悬停项目标题、未选中和已选中会话；
+  检查失焦处理、拖拽目标样式、操作按钮悬停及 Tab/Shift+Tab 焦点；折叠后展开
+  选中会话的分组，切换置顶与独立会话，打开设置再返回；开启减少动态效果，
+  确认项目与会话行的悬停过渡均接近零时长。
+- **预期**：项目与会话共享整行悬停背景、圆角和过渡，标题按钮透明；选中背景
+  只属于会话且优先于悬停。工作区仅通过圆点表达，折叠不会转移选中态。
+  置顶和独立会话样式一致；焦点轮廓、独立操作按钮反馈和拖拽目标优先级保留。
+  失焦释放悬停而不清除选中；设置替换侧栏，返回后恢复会话与工作区上下文。
+  渲染测试另覆盖没有选中会话、切换中的目标和非聊天页状态。
+- **链接规格**：`04-ux/01-ui-ia.md`、`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md` §9.1c
+- **验收**：C、D、品质
+- **里程碑**：Post-M6 desktop shell maintenance
+- **状态**：经 `pnpm test:e2e:layout` 调用 `scripts/e2e/sidebar-row-states.mjs` 自动验证，
+  使用真实 CDP 指针/键盘输入及计算样式断言。失焦/聚焦事件与拖拽类由测试注入，
+  这两项不等同于原生窗口焦点或真实拖拽测试。单元覆盖：
+  `sidebar-navigation.test.mjs`、`sidebar-pinned-rendering.test.mjs`。
+
+#### E2E-LAYOUT-sidebar-settings
+
+- **前提条件**：构建后的桌面应用、隔离宿主与 profile，聊天侧栏可见。
+- **步骤**：在深浅主题及 darwin/win32/linux CSS 分支比较主侧栏与设置导航的颜色、
+  背景图、尺寸和位置，检查祖先透明度及右侧不透明背景；返回时记录挂载、宽度及
+  animationstart。重复快速往返、原本折叠、入场被设置打断和减少动态效果场景，
+  确认真实展开仍有动画。另验证旧主题色、标准侧栏色及背景图覆盖。
+- **预期**：两处导航共用材质，设置导航和外壳不播入场，只有不透明内容区内部动画。
+  macOS 下侧栏祖先透明，右侧内容和顶部条不透明。返回时展开侧栏始终为 275px，
+  无 sidebar-in；原本折叠则保持不显示。真实展开仍有动画与宽度变化；旧主题颜色
+  作为共享回退保留，显式标准 token 优先。
+- **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/07-ui-design-system.md`、
+  `04-ux/08-component-spec.md` §1.4、§1.7
+- **验收**：A、C、品质
+- **里程碑**：Post-M6 desktop shell maintenance
+- **状态**：`pnpm test:e2e:layout` 调用 `scripts/e2e/sidebar-settings.mjs`，使用可信
+  CDP 指针/键盘、挂载时与后续几何采样、动画事件及计算样式。测试启用 CDP 焦点模拟，
+  防止原生窗口被遮挡后 Chromium 冻结动画与悬停输入。平台和主题为渲染层模拟，
+  不等同于原生 Windows/Linux 或系统材质/主题验证。可通过 `PI_DESKTOP_LAYOUT_ARTIFACT_DIR`
+  保存渲染截图。`sidebar-settings-return.test.mjs` 覆盖首次显示、两种中断阶段、
+  隐藏时状态变化和反转；`pnpm test:e2e:theme-surfaces` 在真实 Chromium 验证不透明回退及旧主题覆盖。
+
 #### E2E-AGENT-alt-enter-steers-active-turn：Enter 排队跟进，Alt+Enter 向当前回合补充指令
 
 - **前提条件**：会话已配置模型，能够控制流式回复或工具完成时机；附件场景使用支持图像的模型。
@@ -7421,7 +7524,7 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 - **前提条件**：共享 public-network helper，以及可注入 fetch/DNS/线路 的主进程公网 HTTPS 客户端。
 - **步骤**：1）分类 trailing-dot localhost、IPv4 回环、IPv4-mapped IPv6、ULA、link-local、RFC1918 与 `http://`。2）将公网主机名解析到私网 A 记录。3）跟随 Location 为 `https://127.0.0.1/` 的 302。4）报告 `proxied` 线路与 TUN fake-IP 答案（`198.18.0.1`），同一答案在 `DIRECT` 线路、读不出线路、以及列表中含 `DIRECT` 的线路上的表现。5）让第一跳为 `proxied`，其重定向目标为 `direct`。
-- **预期**：上述绕过形态全部拒绝；公共 CDN 放行。解析到私网地址或 redirect 到回环会抛出策略错误，且不会请求私网目标。判定型拒绝不重试；本地解析没有返回答案时会重试,并且报为 `NETWORK_RESOLVE_FAILED`（`kind` 为 `unresolved`）,而不是报成地址校验拒绝——守卫并未得出判定,任何文案都不得声称它得出了。其余每次拒绝都带上 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1）及其 `reason`、被拒地址的类别与判定该地址的线路,使安装面板能给出原因并提供重试,而不是让安装按钮无解释地保持禁用；市场列表也能把被拒绝的源与单纯不可达的源区分开。若 `proxied` 线路上的答案是 RFC 2544 的 fake-IP 类别，则在 `direct` 或读不出线路时拒绝、在 `proxied` 线路上放行；其他所有非公网类别在任何线路上都拒绝；每一个重定向跳都按自己的线路判定（ADR 0272）。
+- **预期**：上述绕过形态全部拒绝；公共 CDN 放行。解析到私网地址或 redirect 到回环会抛出策略错误，且不会请求私网目标。判定型拒绝不重试；本地解析没有返回答案时会重试,并且报为 `NETWORK_RESOLVE_FAILED`（`kind` 为 `unresolved`）,而不是报成地址校验拒绝——守卫并未得出判定,任何文案都不得声称它得出了。本地代理伪造的 fake-IP 答案（如 Clash 默认的 `198.18.0.0/15`）在守卫判定它的线路上——`direct` 或读不出线路——仍被拒绝且不重试,并以 `kind` 为 `fake-ip`、`reason` 为 `non-public-address`、`addressKind` 为 `benchmark` 记录,与真实私网目标（`kind` 为 `policy`、`addressKind` 为 `private`）清楚区分——对后者守卫判定了目标,对前者没有；同一答案在 `proxied` 线路上放行。其余每次拒绝都带上 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1）及其 `reason`、被解析到的地址、地址类别与判定该地址的线路,使安装面板能给出原因并提供重试,而不是让安装按钮无解释地保持禁用；市场列表也能把被拒绝的源与单纯不可达的源区分开。其他所有非公网类别在任何线路上都拒绝；每一个重定向跳都按自己的线路判定（ADR 0272）。
 - **链接规格**：`05-security/01-security.md`、ADR 0243、ADR 0272、`03-runtime/01-ipc-protocol.md` §12b
 - **验收**：Security、Quality
 - **里程碑**：M6+
@@ -7578,7 +7681,7 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **先决条件**：一个能读到机器标识的主机（Windows `MachineGuid`、macOS 平台 UUID，或 `/etc/machine-id`），一个读不到机器标识的环境，以及为 `POST /api/v1/download/resolve` 记录请求的存根。
 - **步骤**：1) 在同一会话内触发两次安装，比较记录的 `deviceId`。 2) 重启应用后再触发一次安装。 3) 把该值与主机的机器标识原文比较。 4) 在设置、市场页面与已安装插件详情中查找该值。 5) 在读不到机器标识的环境里重复步骤 1 与 2，然后检查应用数据目录。
 - **预期**：同一安装发出的每次 resolve 请求都携带同一个 64 位小写十六进制值，包括重启之后，以及机器标识未变时的应用重装之后；该值既不是机器码原文也不是它的前缀，并等于 `sha256("pi-desktop.device.v1:" + 机器标识)`；该标识从不出现在界面上，也没有任何设置可以显示或重置它；读不到机器标识时，该值是另一个 64 位十六进制字符串，只生成一次并持久化在 `plugins/market/device.json`，之后跨重启一直复用。
-- **链接规格**：`07-plugins/07-plugin-marketplace.md` §2、ADR 0274
+- **链接规格**：`07-plugins/07-plugin-marketplace.md` §2、ADR 0276
 - **验收**：G（远程市场来源）+ 安全性
 - **里程碑**：M6+
 - **状态**：草稿
@@ -7588,7 +7691,7 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **先决条件**：全新配置停留在官方渠道；一个插件的 resolve 应答至少列出两个条目；第一个镜像失败或很慢，以便观察到第二次尝试；渲染进程已订阅 `plugin.installProgress`。
 - **步骤**：1) 从市场详情面板发起一次手动安装。 2) 记录安装期间收到的报告。 3) 安装成功后把指针悬停在对话框上。 4) 安装结束后查看已安装插件。 5) 用一个较大的安装包再次安装，并统计至少一秒窗口内的报告数量。
 - **预期**：对话框按顺序显示各阶段——`resolve`、`download`、`verify`、`install`、`enable`——以及 `mirror n/N · name` 和由 `receivedBytes` / `totalBytes` 得出的确定进度条；每条报告都带 `pluginId` 与 `version`，只有指明镜像的报告才带 `source`，`attempt` 按 1 在 `attempts` 内计数，切换镜像会递增 `attempt` 而不改变 `attempts`；字节报告最多每 200 ms 一条，另有每次阶段变化一条与最终一条；安装以不带 `error` 的状态结束，插件通过常规权限审查后完成安装并启用；成功后对话框约 2 秒自动关闭，悬停时该倒计时暂停；后台自动更新以同样方式安装，但完全不打开对话框。
-- **链接规格**：`07-plugins/07-plugin-marketplace.md` §2、`07-plugins/15-plugin-center.md` §10、ADR 0274 §7
+- **链接规格**：`07-plugins/07-plugin-marketplace.md` §2、`07-plugins/15-plugin-center.md` §10、ADR 0276 §7
 - **验收**：G（远程市场来源）
 - **里程碑**：M6+
 - **状态**：草稿
@@ -7598,7 +7701,7 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **先决条件**：一次官方渠道安装，其安装包足够大或镜像足够慢，使下载阶段持续一段时间；能够应答 `market.cancelInstall`；同时可以查看插件目录、安装缓存与已安装列表。
 - **步骤**：1) 启动安装并等待进入下载阶段。 2) 按下对话框中的取消操作。 3) 观察对话框并抓取 RPC 应答。 4) 安装结束后检查插件目录、安装缓存与已安装列表。 5) 对同一 id、对一个并未在运行的安装，以及在下载已结束之后，分别再次发出 `market.cancelInstall`。
 - **预期**：对正在运行的安装，取消调用返回 `{ cancelled: true, id }`，安装以 `PLUGIN_CANCELLED`（JSON-RPC 码 1019）失败；对话框不报告错误就关闭；没有任何东西被安装——没有插件目录、没有已安装行、没有已启用的插件——缓存中也不残留任何不完整的安装包；对同一 id 的第二次调用、对并未在运行的安装的调用，以及下载已结束之后的调用都返回 `{ cancelled: false, id }` 且不改变任何状态，因此取消永远不会中断插件目录的写入。
-- **链接规格**：`07-plugins/07-plugin-marketplace.md` §2、ADR 0274 §7
+- **链接规格**：`07-plugins/07-plugin-marketplace.md` §2、ADR 0276 §7
 - **验收**：G（远程市场来源）+ 安全性
 - **里程碑**：M6+
 - **状态**：草稿
@@ -7608,7 +7711,7 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **先决条件**：一次官方渠道安装，其所有镜像都失败——例如第一个摘要不符、第二个网络错误；渲染进程已订阅 `plugin.installProgress`，且可以读回剪贴板。
 - **步骤**：1) 启动安装。 2) 让所有镜像失败。 3) 读取最终报告与对话框。 4) 使用复制操作，然后在镜像恢复正常后使用重试操作。
 - **预期**：最终报告带有 `error`，并按尝试顺序为每个镜像提供一条 `tried[]` 记录，各自标明 `source`、`url` 与该镜像给出的错误；对话框保持打开，显示可读的错误与这份列表；复制操作把尝试过的镜像放入剪贴板；重试操作会对同一版本发起一次新的安装，并在镜像正常应答后完成，且不会复用失败尝试的不完整状态；失败的尝试没有安装任何东西。
-- **链接规格**：`07-plugins/07-plugin-marketplace.md` §2、ADR 0274 §7
+- **链接规格**：`07-plugins/07-plugin-marketplace.md` §2、ADR 0276 §7
 - **验收**：G（远程市场来源）
 - **里程碑**：M6+
 - **状态**：草稿
