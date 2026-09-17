@@ -596,7 +596,7 @@ PI-Desktop 在此基础上增加了：
 
 PI-Desktop 目前仍处于 Early Preview，并在高频迭代。
 
-当前 **0.14.x** 已包含：
+当前 **0.15.x** 已包含：
 
 - Desktop Shell
 - Streaming Agent Runtime
@@ -765,6 +765,18 @@ PI-Desktop 前后经过大量模型共同参与开发、重构、Review、设计
 ## 社区
 
 - [Linux.Do](https://linux.do/) — 欢迎讨论、反馈、分享使用体验。
+
+---
+
+## Star History
+
+<a href="https://star-history.com/#vastsa/PI-Desktop&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=vastsa/PI-Desktop&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=vastsa/PI-Desktop&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=vastsa/PI-Desktop&type=Date" />
+ </picture>
+</a>
 
 ---
 

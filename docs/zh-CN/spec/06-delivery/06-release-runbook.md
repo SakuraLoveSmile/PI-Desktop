@@ -27,7 +27,7 @@
 关于面板。运行时还将 `build/icon_1024.png` 应用于 Dock。库存
 `node_modules` 下的文件永远不会被修改。 Windows/Linux 不断发展
 正常的 electro-vite 可执行文件。尽管如此，Windows Main 还是注册了
-之前 NSIS 包使用的相同 `com.pi-desktop.app` AppUserModelID
+之前 NSIS 包使用的相同 `net.aiuo.pi-desktop` AppUserModelID
 Electron 准备就绪，防止库存主机身份拥有本机
 通知或任务栏组。 Windows 封装另外引脚
 `PI-Desktop` 可执行文件和“开始”菜单快捷方式名称。启动器设置
@@ -214,7 +214,7 @@ DMG 不包含可执行的 command 助手。
 还包含该说明和可执行的 `PI-Desktop-macOS-open.command`。将 `PI-Desktop.app` 移动到
 `/Applications` 或 `~/Applications` 后，ZIP 用户可以双击该助手。它只搜索这两个
 固定位置，在存在时递归删除唯一的 `com.apple.quarantine` 属性，然后打开 PI-Desktop。
-在执行前它会校验 `CFBundleIdentifier=com.pi-desktop.app`。它不会使用 `sudo`，也不
+在执行前它会校验 `CFBundleIdentifier=net.aiuo.pi-desktop`。它不会使用 `sudo`，也不
 接受任意应用路径。标准系统位置的终端备用命令为：
 
 ```sh
