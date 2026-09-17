@@ -39,6 +39,7 @@ import {
 import { TooltipButton } from "./ui";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api";
+import { openHttpUrl } from "../lib/open-http-url";
 import {
   rehypeSourcePositions,
   sourcePositionProps,
@@ -454,7 +455,6 @@ function InlineCode({
 }: ComponentProps<"code"> & { node?: unknown }) {
   const root = useAppStore((s) => s.workspace?.path);
   const baseDir = useContext(MarkdownBaseDirContext);
-  const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
   const openFileRef = useOpenChatFileRef();
   const text = typeof children === "string" ? children : null;
   const target =
@@ -478,7 +478,7 @@ function InlineCode({
       onClick={() =>
         target.kind === "file"
           ? openFileRef(text ?? target.path, baseDir)
-          : openUrl(target.url)
+          : openHttpUrl(target.url)
       }
     >
       <code className={className} {...rest}>
@@ -500,7 +500,6 @@ function Anchor({
   const openFileRef = useOpenChatFileRef();
   const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
   const showToast = useAppStore((s) => s.showToast);
-  const linkOpenTarget = useAppStore((s) => s.settings?.linkOpenTarget ?? "workpanel");
 
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -580,18 +579,14 @@ function Anchor({
     }
   };
 
-  // Plain click previews in the work panel (or external browser based on setting).
-  // Modified clicks fall through to _blank, which main routes to shell.openExternal.
+  // Plain click follows Link open destination. Modifier clicks fall through
+  // to _blank, which main routes to shell.openExternal.
   const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     if (!href) return;
     if (/^https?:\/\//i.test(href)) {
       e.preventDefault();
-      if (linkOpenTarget === "external") {
-        void api.browserOpenExternal(href);
-      } else {
-        openUrl(href);
-      }
+      openHttpUrl(href);
       return;
     }
     const rel = toWorkspaceRel(safeDecodeUri(href), root, baseDir);
@@ -678,7 +673,6 @@ function MarkdownImage({
   const root = useAppStore((s) => s.workspace?.path);
   const baseDir = useContext(MarkdownBaseDirContext);
   const openFileRef = useOpenChatFileRef();
-  const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
   const fileTitle = usePreviewTitle("file");
   const urlTitle = usePreviewTitle("url");
   const source = typeof src === "string" ? src : "";
@@ -701,7 +695,7 @@ function MarkdownImage({
         alt={alt ?? ""}
         className="chat-image-remote"
         title={urlTitle}
-        onClick={() => openUrl(source)}
+        onClick={() => openHttpUrl(source)}
       />
     );
   }
