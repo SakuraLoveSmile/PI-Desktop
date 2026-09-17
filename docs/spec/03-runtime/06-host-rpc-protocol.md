@@ -560,14 +560,17 @@ resource exhaustion (`EAGAIN` / `WouldBlock`) with bounded backoff, never
 retries a command after it has started, and reaps timed-out children before
 releasing the execution slot.
 
-`session.appendMessage` is idempotent by message id. Electron main may keep
+`session.appendMessage` is idempotent by message id. An id already indexed in
+another session is remapped to `{sessionId}:{id}` before the JSONL write, and
+a later replay of the original id is a no-op (D444). Electron main may keep
 message appends in its application-owned outbox while host-core is restarting;
-the outbox flushes in order after a successful handshake. A missing sessions
-row is restored from the live JSONL (or created as a stub under the same id
-when the file is gone) so a queued outbox can drain (D318). `session.delete`
-drops that session's outbox entries. In-flight checkpoints never go through
-the outbox: a checkpoint is only meaningful against a live host, and replaying
-one after the final row would be wrong.
+the outbox flushes in order after a successful handshake and treats
+`UNIQUE constraint failed: messages.id` as an ack rather than pausing the
+queue. A missing sessions row is restored from the live JSONL (or created as a
+stub under the same id when the file is gone) so a queued outbox can drain
+(D318). `session.delete` drops that session's outbox entries. In-flight
+checkpoints never go through the outbox: a checkpoint is only meaningful
+against a live host, and replaying one after the final row would be wrong.
 
 ### Permissions
 - `permissions.evaluate`
