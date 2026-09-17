@@ -1471,10 +1471,12 @@ Single message render — either user (plaintext) or assistant (markdown streami
 - The live band is `min(available pane, preferred)`. Collapsing the sidebar
   no longer tightens a 640px ceiling; the outer pane stays fluid and the
   width transition follows the sidebar dock.
-- Dual 12px handles sit on the band edges: invisible at rest, glow on hover
-  or focus, 1px hairline plus glow while dragging. Double-click resets to
-  760px. Arrow keys step the width; Home restores the default; End fills the
-  pane.
+- Dual 12px handles sit on the band edges: invisible at rest; hover/focus
+  reveals a short 2×40px capsule mixed from `--ds-text-primary` (18% dark /
+  12% light). Dragging lengthens it to 56px at a slightly stronger mix.
+  Double-click resets to 760px. Arrow keys step the width; Home restores the
+  default; End fills the pane.
+
 - User: right-aligned, theme-neutral soft plate (`color-mix` on primary ink,
   never a fixed accent tint), borderless, `radius-lg-plus` with a tighter
   bottom-right corner, capped at `min(82%, 600px)` so short prompts read as

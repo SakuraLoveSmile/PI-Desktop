@@ -4335,7 +4335,8 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 ## 2026-09-16 —— 可拖拽的对话内容宽度（D439）
 
 - 居中的对话带、空首页和输入框共用一个首选最大宽度，默认 760px，持久化为
-  `AppSettings.chatContentMaxWidth`。左右边缘各一条手柄（静止不可见、悬停光晕、拖拽时显示细线）同步改这个宽度，列保持居中。拖拽下限 560px。
+  `AppSettings.chatContentMaxWidth`。左右边缘各一条手柄（静止不可见；悬停显示短胶囊，拖拽时略加长加深）同步改这个宽度，列保持居中。拖拽下限 560px。
+
 - 实际宽度是 `min(可用窗格减去两侧 24px, 首选值)`，侧栏或工作区挤压时自适应压缩，不改写偏好。收起侧栏不再把内容带到 640px。
 - 助手/工具/决策行跟随内容带；用户气泡仍是 `min(82%, 600px)`。仅渲染器。见 ADR 0274、E2E-208、E2E-CHAT-content-width-handles。
 

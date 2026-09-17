@@ -5795,9 +5795,10 @@ that was sitting at the bottom — including after the turn had finished.
 
 - The centered conversation band, empty-home stack, and composer share one
   preferred max width, default 760px, persisted as
-  `AppSettings.chatContentMaxWidth`. Dual edge handles (invisible at rest,
-  glow on hover, hairline while dragging) change that width together so the
-  column stays centered. Drag floor is 560px.
+  `AppSettings.chatContentMaxWidth`. Dual edge handles (invisible at rest;
+  a short primary-ink capsule on hover, slightly stronger while dragging)
+  change that width together so the column stays centered. Drag floor is 560px.
+
 - The live used width is `min(available pane minus 24px gutters, preferred)`,
   so a squeezed sidebar or work panel compresses the band without rewriting
   the preference. The collapsed-sidebar 640px ceiling is removed.

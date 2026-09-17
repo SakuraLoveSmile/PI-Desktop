@@ -4249,10 +4249,10 @@ identify the platform validation still needed.
 - **Preconditions**: PI-Desktop is open on chat (empty home or a transcript)
   at a viewport wider than 760px. Reduced motion off.
 - **Steps**: 1) Confirm no divider is visible at rest. 2) Hover the left
-  content edge and confirm a glow, then the right edge. 3) Drag the right
-  handle outward and confirm both edges move, the composer matches, and a
-  hairline is visible while dragging. 4) Open the work panel or expand the
-  sidebar until the pane is narrower than the new preference; the band
+  content edge and confirm a short faint capsule, then the right edge. 3) Drag
+  the right handle outward and confirm both edges move, the composer matches,
+  and both capsules lengthen slightly while dragging. 4) Open the work panel or
+  expand the sidebar until the pane is narrower than the new preference; the band
   compresses without a horizontal scroll. 5) Close the panel / collapse the
   sidebar and confirm the preference returns. 6) Double-click a handle to
   restore 760px. 7) Repeat with Arrow keys on a focused handle.
