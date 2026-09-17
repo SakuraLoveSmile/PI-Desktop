@@ -105,7 +105,7 @@ test("scenic plugin themes expose a full-window settings compositing hook", () =
   assert.match(settingsCss, /data-plugin-theme\^="plugin:io\.github\.akshayxkill\.nexus-scenic-themes:/);
   assert.match(settingsCss, /\.app-shell\.settings-mode[^}]*background:\s*transparent\s*!important/s);
   assert.match(settingsCss, /\.settings-content[^}]*background:\s*transparent\s*!important/s);
-  assert.match(settingsCss, /\.settings-shell-full\s+\.settings-nav[^}]*background:\s*color-mix/s);
+  assert.match(settingsCss, /\.settings-shell-full\s+\.settings-nav\.sidebar-surface[^}]*background:\s*color-mix/s);
   assert.match(settingsCss, /\.settings-panel[^}]*background:\s*color-mix/s);
 });
 
@@ -120,13 +120,12 @@ test("core Settings navigation dismisses an active plugin destination", () => {
   assert.match(source, /setActiveExtension\(null\);\s*setSettingsTab\(item\.id\);/s);
 });
 
-test("scenic plugin controls theme the native window-control band without changing geometry", () => {
-  const themesRoot = "C:/jcode projects/worktrees/nexus-scenic-settings-20260915/plugins/io.github.akshayxkill.nexus-scenic-themes/themes";
-  for (const name of ["twilight-mountains", "alpine-light", "obsidian-horizon", "emerald-afterglow"]) {
-    const css = readFileSync(join(themesRoot, `${name}.css`), "utf8");
-    assert.match(css, /\.window-controls\s*\{[^}]*background:/s);
-    assert.doesNotMatch(css, /\.window-controls\s*\{[^}]*position\s*:/s);
-  }
+test("host window-control band inherits the active theme palette without plugin geometry", () => {
+  const chromeCss = readFileSync(join(desktopRoot, "src/styles/chrome.css"), "utf8");
+  const scenicSettingsCss = readFileSync(join(desktopRoot, "src/styles/settings.css"), "utf8");
+  assert.match(chromeCss, /\.window-controls\s*\{[^}]*position:\s*fixed;[^}]*background:\s*var\(--ds-bg-primary\)/s);
+  assert.match(chromeCss, /\.app-shell\s*>\s*\.window-controls\s*\{[^}]*z-index:\s*1100/s);
+  assert.doesNotMatch(scenicSettingsCss, /\.window-controls\s*\{/);
 });
 
 test("host-rendered scenic Settings destinations leave native controls outside extension content", () => {

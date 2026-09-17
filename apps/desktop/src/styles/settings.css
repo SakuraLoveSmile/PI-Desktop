@@ -17,16 +17,6 @@
   background: transparent !important;
 }
 
-:root[data-plugin-theme^="plugin:io.github.akshayxkill.nexus-scenic-themes:"] .settings-shell-full .settings-nav {
-  background: color-mix(in oklab, var(--ds-bg-sidebar) 72%, transparent);
-  backdrop-filter: blur(18px) saturate(1.08);
-}
-
-:root[data-plugin-theme^="plugin:io.github.akshayxkill.nexus-scenic-themes:"] .settings-panel {
-  background: color-mix(in oklab, var(--ds-bg-elevated) 72%, transparent);
-  backdrop-filter: blur(14px) saturate(1.06);
-}
-
 /* Scenic plugin themes own the image canvas. Keep the host Settings page as
  * transparent compositing surfaces so the single root scenic layer remains
  * visible beneath it; ordinary themes never match this attribute. */
@@ -39,14 +29,12 @@
   background: transparent !important;
 }
 
-:root[data-plugin-theme^="plugin:io.github.akshayxkill.nexus-scenic-themes:"] .settings-shell-full .settings-nav {
+:root[data-plugin-theme^="plugin:io.github.akshayxkill.nexus-scenic-themes:"] .settings-shell-full .settings-nav.sidebar-surface {
   background: color-mix(in oklab, var(--ds-bg-sidebar) 72%, transparent);
-  backdrop-filter: blur(18px) saturate(1.08);
 }
 
 :root[data-plugin-theme^="plugin:io.github.akshayxkill.nexus-scenic-themes:"] .settings-panel {
   background: color-mix(in oklab, var(--ds-bg-elevated) 72%, transparent);
-  backdrop-filter: blur(14px) saturate(1.06);
 }
 
 .settings-shell,
