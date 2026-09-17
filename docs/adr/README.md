@@ -306,3 +306,4 @@ Each ADR includes:
      (development-plugin-permission-review). The branch owner renumbers it when it
      lands; this row is kept verbatim rather than rewritten here. -->
 | 0274 | [Draggable chat content width](0274-draggable-chat-content-width.md) | Accepted (D439) |
+| 0276 | [Official plugin channel and backup channels](0276-official-plugin-channel-and-backup-channels.md) | Accepted for implementation (amends ADR 0102; D442) |
