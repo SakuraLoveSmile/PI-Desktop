@@ -13072,8 +13072,8 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Expected:** Text survives unchanged across persistence and all stdio
   directions. Requests settle without RPC timeouts; error replies and subsequent
   requests remain usable. No migration of existing sessions is needed.
-- **Automation:** `pnpm test:e2e:rpc-unicode`; `ndjson.test.mjs` additionally
-  checks every UTF-8 split boundary, consecutive frames, CRLF, EOF and disposal.
+- **Automation:** `pnpm test:e2e:rpc-unicode`; `packages/shared/src/ndjson.test.ts`
+  additionally checks every UTF-8 split boundary, consecutive frames, CRLF, EOF and disposal.
 - **Specs:** 03-runtime/06-host-rpc-protocol §2.
 - **Acceptance:** A (runtime), C (sessions).
 - **Milestone:** M6+.

@@ -12,7 +12,12 @@ interface NdjsonInput {
  * Unlike readline, Unicode line/paragraph separators are ordinary payload.
  * The input owns UTF-8 decoding, including characters split across byte chunks.
  */
-export function readNdjsonLines(input: NdjsonInput, onLine: (line: string) => void) {
+export type NdjsonLineReader = { close: () => void };
+
+export function readNdjsonLines(
+  input: NdjsonInput,
+  onLine: (line: string) => void,
+): NdjsonLineReader {
   let closed = false;
   let fragments: string[] = [];
   const close = () => {

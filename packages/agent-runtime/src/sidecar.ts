@@ -32,9 +32,9 @@ import {
   isCommandShellOption,
   MAX_INLINE_IMAGE_BYTES,
   normalizeMode,
-  readNdjsonLines,
   normalizeNetworkProxy,
   OAUTH_AUTH_KIND,
+  readNdjsonLines,
 } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,

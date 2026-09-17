@@ -6,8 +6,8 @@ import {
   ErrorCodes,
   MAX_HOST_STDIN_LINE_BYTES,
   PROTOCOL_VERSION,
-  rpcTimeoutMs,
   readNdjsonLines,
+  rpcTimeoutMs,
   stripProxyEnv,
 } from "@pi-desktop/shared";
 import {

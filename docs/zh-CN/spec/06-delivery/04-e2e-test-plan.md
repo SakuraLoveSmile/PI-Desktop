@@ -5008,7 +5008,7 @@ IPC 请求无法关闭。
 
 | 验收 | 应用场景 |
 |---|---|
-| A / C — Unicode stdio framing | E2E-RPC-unicode-separators |
+| A / C — Unicode stdio 成帧 | E2E-RPC-unicode-separators |
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | C / D / Quality — 侧边栏行状态 | E2E-LAYOUT-sidebar-row-states |
 | A / C / Quality — 侧栏材质与设置返回 | E2E-LAYOUT-sidebar-settings |
@@ -7802,19 +7802,11 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 ### E2E-RPC-unicode-separators
 
-- **Preconditions:** Built host-core, shared package and agent runtime; isolated
-  temporary data directory; loopback-only fixture provider. No live credentials.
-- **Steps:** Append a user message containing U+2028/U+2029, CJK text, emoji and
-  escaped CR/LF; read it, restart the host, and read it again. Send a Unicode
-  prompt through AgentSidecar; restore history through the parent host proxy;
-  stream and persist a Unicode answer. Send an unknown method containing the
-  same characters, then a health request.
-- **Expected:** Text survives unchanged across persistence and all stdio
-  directions. Requests settle without RPC timeouts; error replies and subsequent
-  requests remain usable. No migration of existing sessions is needed.
-- **Automation:** `pnpm test:e2e:rpc-unicode`; `ndjson.test.mjs` additionally
-  checks every UTF-8 split boundary, consecutive frames, CRLF, EOF and disposal.
-- **Specs:** 03-runtime/06-host-rpc-protocol §2.
-- **Acceptance:** A (runtime), C (sessions).
-- **Milestone:** M6+.
-- **Status:** Automated; run against the task/PR integration candidate.
+- **前置条件**：已构建 host-core、shared 与 agent-runtime；隔离的临时数据目录；仅回环的 fixture provider。不使用真实凭证。
+- **步骤**：追加一条含 U+2028/U+2029、中文、emoji 以及转义 CR/LF 的用户消息；读取、重启 host 后再读。通过 AgentSidecar 发送 Unicode 提示；经 parent host proxy 恢复历史；流式返回并持久化 Unicode 回复。发送一条含相同字符的未知方法，再发健康检查。
+- **预期**：文本在持久化与所有 stdio 方向上保持不变。请求在 RPC 超时前完成；错误回复之后的请求仍可用。无需迁移现有会话。
+- **自动化**：`pnpm test:e2e:rpc-unicode`；`packages/shared/src/ndjson.test.ts` 额外覆盖每个 UTF-8 切分位置、连续帧、CRLF、EOF 与销毁。
+- **规格**：03-runtime/06-host-rpc-protocol §2。
+- **验收**：A（运行时），C（会话）。
+- **里程碑**：M6+。
+- **状态**：已自动化；针对 task/PR 集成候选运行。

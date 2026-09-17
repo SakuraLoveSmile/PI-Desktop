@@ -27,10 +27,29 @@ const rpcTimeoutSource = await readFile(
   new URL("../../../packages/shared/src/rpc-timeouts.ts", import.meta.url),
   "utf8",
 );
+const agentSidecarEntrySource = await readFile(
+  new URL("../../../packages/agent-runtime/src/sidecar.ts", import.meta.url),
+  "utf8",
+);
 const apiSource = await readFile(
   new URL("../src/lib/api.ts", import.meta.url),
   "utf8",
 );
+
+test("stdio RPC readers split frames on LF only", () => {
+  for (const [name, source] of [
+    ["host-process", hostSource],
+    ["agent-sidecar", sidecarSource],
+    ["runtime sidecar", agentSidecarEntrySource],
+  ]) {
+    assert.match(source, /readNdjsonLines/, `${name} must use LF NDJSON framing`);
+    assert.doesNotMatch(
+      source,
+      /from ["']node:readline["']/,
+      `${name} must not use readline on the RPC pipe`,
+    );
+  }
+});
 
 test("sidecar detaches host listeners and gates every child write", () => {
   assert.match(sidecarSource, /private closeTransport\(error: Error\)/);
