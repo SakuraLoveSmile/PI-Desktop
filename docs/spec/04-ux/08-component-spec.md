@@ -2485,11 +2485,17 @@ reasoning-level control.
   `.tool-spinner` and localized `Enhancing…` label while running, and remains
   a one-shot draft rewrite action. Inline file-reference chips, including
   pasted image chips, do not disable this action and remain in the draft.
-- MainPane and the chat surface keep a 450px hard minimum so the composer toolbar
-  retains a usable single-row layout. The left and right control groups do not
-  shrink; mode and permission labels stay on one line and ellipsize within their
-  chips, so a sidebar or work-panel resize cannot vertically split, squeeze, or
-  overlap toolbar content.
+- MainPane and the chat surface keep a 450px hard minimum. The composer toolbar
+  remains a single, non-wrapping row as its container narrows: the mode and
+  permission labels stay on one line and ellipsize within their chips, while
+  the combined model × reasoning trigger progressively gives up detail. At
+  560px it hides the reasoning level label, at 480px it tightens the model label
+  cap, and at the 450px floor it becomes a 32px icon-only trigger. The trigger's
+  menu and accessible name retain the complete model/reasoning selection. The
+  context inspector hides its percentage at the floor and the enhancement
+  loading state becomes icon-only, preserving the action hit targets without
+  clipping or overlapping toolbar content. Home and thread-docked composers
+  use the same responsive rules.
 - The combined chip opens one anchored menu above itself. The menu starts with
   only Model and Reasoning level entries, each showing its current value and a
   chevron. Selecting an entry replaces the menu contents in place with a back
