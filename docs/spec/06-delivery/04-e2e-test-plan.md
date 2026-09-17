@@ -300,7 +300,7 @@ identify the platform validation still needed.
   not need it. The ZIP helper searches only `/Applications/PI-Desktop.app` and
   `~/Applications/PI-Desktop.app`, removes only `com.apple.quarantine` when
   present, and opens the app without `sudo` or an arbitrary path argument. It
-  validates `CFBundleIdentifier=com.pi-desktop.app` before changing attributes.
+  validates `CFBundleIdentifier=net.aiuo.pi-desktop` before changing attributes.
   The guidance does not claim that an unsigned artifact has passed Gatekeeper
   qualification.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
@@ -334,6 +334,25 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Workflow script/unit-covered; clean-machine journey required for
   each release (run only in a capable environment when this surface changes)
+
+#### E2E-196d: Unsigned macOS packs bind the product codesign identifier
+
+- **Preconditions**: A default unsigned macOS pack (`CSC_IDENTITY_AUTO_DISCOVERY=false`)
+  has produced `PI-Desktop.app` for at least one native architecture.
+- **Steps**: 1) Read `CFBundleIdentifier` from `Contents/Info.plist`. 2) Run
+  `codesign -dv --verbose=4` on the outer app. 3) Confirm the identifier is not
+  `Electron`. 4) With the app unfocused, complete a turn that requests a native
+  task notification.
+- **Expected**: `CFBundleIdentifier` and the codesign `Identifier` are both
+  `net.aiuo.pi-desktop`. `Info.plist` is bound. macOS records the app in
+  System Settings → Notifications and does not require
+  `com.apple.private.usernotifications.bundle-identifiers`. Developer ID
+  packs keep their authority and the same identifier.
+- **Specs linked**: `06-delivery/06-release-runbook.md`, ADR 0278, issue #524
+- **Acceptance**: Quality
+- **Milestone**: M6+
+- **Status**: Automated by `macos-codesign-identity.test.mjs`; native
+  notification delivery remains release-runner validation
 
 #### E2E-212: GitHub Release starts the CNB mirror pipeline
 

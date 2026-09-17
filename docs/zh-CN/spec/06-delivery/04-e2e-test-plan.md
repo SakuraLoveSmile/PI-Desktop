@@ -3475,7 +3475,7 @@ IPC 请求无法关闭。
   于 macOS 对可信未签名工件提示应用已损坏或应用打不开的场景；已签名/公证版本无需
   执行。ZIP 助手只查找 `/Applications/PI-Desktop.app` 和 `~/Applications/PI-Desktop.app`，
   在存在时只删除 `com.apple.quarantine` 属性，然后打开应用，不使用 `sudo`，也不接受
-  任意路径；助手会在修改属性前校验 `CFBundleIdentifier=com.pi-desktop.app`。说明不会
+  任意路径；助手会在修改属性前校验 `CFBundleIdentifier=net.aiuo.pi-desktop`。说明不会
   声称未签名工件已通过 Gatekeeper 资质验证。
 - **关联规格**：`06-delivery/06-release-runbook.md`、`05-security/01-security.md`
 - **验收**：质量、安全
@@ -3501,6 +3501,16 @@ IPC 请求无法关闭。
 - **验收**：质量、安全
 - **里程碑**：M6+
 - **状态**：工作流脚本/单元已覆盖；每次发布仍需在干净机器上验证（适用变更合入前需在具备条件的环境中运行 E2E）
+
+#### E2E-196d：未签名 macOS 包的代码签名标识与 Bundle ID 一致
+
+- **先决条件**：默认未签名 macOS 打包（`CSC_IDENTITY_AUTO_DISCOVERY=false`）已生成至少一个原生架构的 `PI-Desktop.app`。
+- **步骤**：1) 读取 `Contents/Info.plist` 中的 `CFBundleIdentifier`。2) 对应用包运行 `codesign -dv --verbose=4`。3) 确认 Identifier 不是 `Electron`。4) 在窗口失焦时完成一轮会请求原生任务通知的对话。
+- **预期**：`CFBundleIdentifier` 与 codesign `Identifier` 均为 `net.aiuo.pi-desktop`；Info.plist 已绑定；系统设置 → 通知中出现该应用，且不要求 `com.apple.private.usernotifications.bundle-identifiers`。Developer ID 包保留其证书并使用同一 Identifier。
+- **关联规格**：`06-delivery/06-release-runbook.md`、ADR 0278、issue #524
+- **验收**：质量
+- **里程碑**：M6+
+- **状态**：由 `macos-codesign-identity.test.mjs` 自动化；原生通知送达仍需发布环境验证
 
 #### E2E-212：GitHub Release 启动 CNB 镜像流水线
 
