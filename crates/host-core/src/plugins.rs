@@ -23,7 +23,7 @@ mod manifest;
 pub mod marketplace;
 mod model;
 mod permissions;
-mod progress;
+pub(crate) mod progress;
 mod providers;
 mod registry;
 mod resolve;

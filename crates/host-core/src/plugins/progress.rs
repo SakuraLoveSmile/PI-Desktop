@@ -12,7 +12,7 @@
 
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 
 /// What an install is doing right now.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,6 +119,43 @@ impl CancelToken {
 
     pub(crate) fn is_cancelled(&self) -> bool {
         self.0.load(Ordering::SeqCst)
+    }
+}
+
+/// Slot the cancel RPC flips without taking the AppState lock.
+///
+/// `market.install` holds that lock for the whole download, so a cancel that
+/// waited on it would only run after the install finished. The token is an
+/// `Arc`, so this is a second handle to the same flag.
+static ACTIVE_CANCEL: OnceLock<Mutex<Option<CancelToken>>> = OnceLock::new();
+
+fn active_cancel_slot() -> &'static Mutex<Option<CancelToken>> {
+    ACTIVE_CANCEL.get_or_init(|| Mutex::new(None))
+}
+
+pub(crate) fn arm_active_cancel(token: &CancelToken) {
+    *active_cancel_slot()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some(token.clone());
+}
+
+pub(crate) fn disarm_active_cancel() {
+    *active_cancel_slot()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = None;
+}
+
+/// Flip the running install's cancel flag. Does not take AppState.
+pub(crate) fn cancel_active_install() -> bool {
+    let guard = active_cancel_slot()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    match guard.as_ref() {
+        Some(token) => {
+            token.cancel();
+            true
+        }
+        None => false,
     }
 }
 
@@ -279,5 +316,17 @@ mod tests {
         assert!(!is_cancelled(&anyhow!(
             "PLUGIN_INTEGRITY: checksum mismatch"
         )));
+    }
+
+    #[test]
+    fn cancel_active_install_flips_the_armed_token() {
+        disarm_active_cancel();
+        assert!(!cancel_active_install(), "nothing is running");
+        let token = CancelToken::default();
+        arm_active_cancel(&token);
+        assert!(cancel_active_install());
+        assert!(token.is_cancelled());
+        disarm_active_cancel();
+        assert!(!cancel_active_install());
     }
 }

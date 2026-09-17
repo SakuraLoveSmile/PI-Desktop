@@ -4437,6 +4437,9 @@ async fn handle_request(
             // those steps is worth showing, which is what the observer does,
             // and the token is what the cancel channel flips.
             let cancel = crate::plugins::CancelToken::default();
+            // Armed outside AppState: cancelInstall must flip this flag while
+            // install still holds the state lock for the download.
+            crate::plugins::progress::arm_active_cancel(&cancel);
             let mut observer = RpcInstallObserver {
                 tx: tx.clone(),
                 cancel: cancel.clone(),
@@ -4465,10 +4468,9 @@ async fn handle_request(
                 .get("id")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
-            // Answer whether an install was actually cancelled rather than
-            // letting the surface assume the click did something.
-            let cancelled = st.plugins.cancel_install();
+            // Do not take AppState: the install holds that lock while bytes
+            // arrive, and waiting on it would make cancel a no-op.
+            let cancelled = crate::plugins::progress::cancel_active_install();
             Ok(json!({ "cancelled": cancelled, "id": id }))
         }
         "market.checkUpdates" => {

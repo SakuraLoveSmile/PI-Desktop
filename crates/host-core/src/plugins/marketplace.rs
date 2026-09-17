@@ -155,18 +155,11 @@ impl PluginManager {
     /// The token is held here rather than passed around, because the cancel
     /// action arrives as its own RPC while the install is still running.
     pub(crate) fn set_install_cancel(&mut self, token: Option<CancelToken>) {
-        self.install_cancel = token;
-    }
-
-    /// Ask the running install to stop. Answers whether one was running.
-    pub(crate) fn cancel_install(&self) -> bool {
-        match self.install_cancel.as_ref() {
-            Some(token) => {
-                token.cancel();
-                true
-            }
-            None => false,
+        match &token {
+            Some(value) => super::progress::arm_active_cancel(value),
+            None => super::progress::disarm_active_cancel(),
         }
+        self.install_cancel = token;
     }
 
     pub(crate) fn market_cache_meta_path(&self) -> PathBuf {

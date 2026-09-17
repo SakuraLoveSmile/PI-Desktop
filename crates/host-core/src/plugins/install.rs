@@ -353,6 +353,24 @@ impl PluginManager {
             if url.is_empty() {
                 continue;
             }
+            // Resolve mirrors are hosts the platform named, not local catalog
+            // fixtures: file:// and bare paths skip the allowlist on the
+            // backup path and must not do so here.
+            if let Err(error) = super::package_host_allowed(url, &catalog_url) {
+                tracing::warn!(
+                    source = %mirror.source,
+                    %url,
+                    %error,
+                    "this mirror is not an allowed package host"
+                );
+                tried.push(TriedMirror {
+                    source: mirror.source.clone(),
+                    url: url.to_string(),
+                    error: Some(error.to_string()),
+                });
+                last_error = Some(error);
+                continue;
+            }
             report.mirror(Some(&mirror.source), index as u32 + 1, attempts);
             match self.download_market_package(info, url, &expected, resolved.size_bytes, report) {
                 Ok(path) => return Ok((path, expected)),
