@@ -16,9 +16,20 @@ export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
-/** Mount a modal overlay on document.body so a transformed ancestor cannot trap `position: fixed`. */
+const OVERLAY_ROOT_ID = "pi-desktop-overlays";
+
+function overlayRoot(): HTMLElement {
+  const existing = document.getElementById(OVERLAY_ROOT_ID);
+  if (existing instanceof HTMLElement) return existing;
+  const root = document.createElement("div");
+  root.id = OVERLAY_ROOT_ID;
+  document.documentElement.appendChild(root);
+  return root;
+}
+
+/** Mount a modal overlay on a viewport-fixed host so a transformed ancestor cannot trap `position: fixed`. */
 export function portalOverlay(node: ReactNode) {
-  return typeof document === "undefined" ? node : createPortal(node, document.body);
+  return typeof document === "undefined" ? node : createPortal(node, overlayRoot());
 }
 
 function setRef<T>(ref: Ref<T> | undefined, value: T | null) {

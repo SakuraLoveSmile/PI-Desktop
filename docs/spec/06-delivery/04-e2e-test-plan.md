@@ -12274,9 +12274,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
      reduced motion. Repeat material comparisons with legacy and canonical
      theme color overrides and a sidebar background image.
 - **Expected**: Both navigation surfaces share one material. Settings navigation
-  and shell have no entrance animation; only content inside its opaque pane
-  animates, and that motion is opacity-only so it cannot trap `position: fixed`
-  overlays. Settings dialogs cover the full window, including the rail. On macOS
+  and shell have no entrance animation; only a nested content-enter wrapper
+  inside its opaque pane animates, and that motion is opacity-only so it cannot
+  trap `position: fixed` overlays. Settings dialogs cover the full window, including the rail. On macOS
   all ancestors behind the rail are transparent, while right
   content and titlebar stay opaque. Returning to an expanded sidebar starts and
   stays at 275px without sidebar-in events; a collapsed sidebar stays absent.

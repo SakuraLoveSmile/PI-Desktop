@@ -23,18 +23,26 @@ test("route entrance does not leave a transform containing block", async () => {
   const block = styles.slice(start, next === -1 ? undefined : next);
   assert.doesNotMatch(block, /transform:/);
   assert.match(block, /opacity:\s*0/);
+  assert.doesNotMatch(
+    styles,
+    /\.route-surface,\s*\.settings-content-inner\s*\{[^}]*animation:\s*route-surface-in/,
+  );
 });
 
-test("settings overlays are fixed to the viewport and portaled to document.body", async () => {
+test("settings overlays mount on a viewport-fixed host outside the app shell", async () => {
   const styles = await loadStyles();
-  const overlay = styles.match(/\.overlay \{[\s\S]*?\n\}/);
-  assert.ok(overlay, "missing .overlay rule");
-  assert.match(overlay[0], /position:\s*fixed/);
-  assert.match(overlay[0], /inset:\s*0/);
+  assert.match(styles, /\n\.overlay \{\n  position: fixed;\n  inset: 0;/);
+
+  const host = styles.match(/#pi-desktop-overlays \{[\s\S]*?\n\}/);
+  assert.ok(host, "missing overlay host rule");
+  assert.match(host[0], /position:\s*fixed/);
+  assert.match(host[0], /inset:\s*0/);
 
   const ui = await read("../src/components/ui.tsx");
   assert.match(ui, /export function portalOverlay/);
-  assert.match(ui, /createPortal\(node, document\.body\)/);
+  assert.match(ui, /pi-desktop-overlays/);
+  assert.match(ui, /document\.documentElement\.appendChild/);
+  assert.doesNotMatch(ui, /createPortal\(node, document\.body\)/);
 
   for (const rel of overlaySources) {
     const source = await read(rel);

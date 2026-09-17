@@ -14,11 +14,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   as the main sidebar: native vibrancy with shared tint/sheen on macOS, opaque
   `--ds-bg-sidebar` on Windows/Linux, and shared optional background imagery.
   macOS settings-wrapper ancestry is transparent; the content pane and its
-  titlebar remain opaque. Only the inner settings content enters with a route
-  animation; the rail and its backing never fade or translate. That entrance
-  is opacity-only so it cannot leave a transform containing block. Settings
-  dialogs and sheets portal to `document.body` and cover the full window,
-  including the rail.
+  titlebar remain opaque. Only a nested settings content enter wrapper plays a
+  route animation; the scrolling inner pane, rail, and backing never fade or
+  translate. That entrance is opacity-only. Settings dialogs and sheets portal
+  to a viewport-fixed `#pi-desktop-overlays` host on the document element and
+  cover the full window, including the rail.
 - Returning to the app restores the prior sidebar collapsed/expanded state
   without a sidebar entrance animation or a width ramp. Real toggle and
   automatic collapse/restore transitions on the visible shell still animate;

@@ -299,6 +299,7 @@ export function SettingsPage() {
 
       <div className="settings-content">
         <div className="settings-content-inner">
+          <div className="settings-content-enter">
           <h1 className="settings-section-title">{activeExtension?.label ?? t(activeTitleKey)}</h1>
 
           {activeExtension ? (
@@ -487,6 +488,7 @@ export function SettingsPage() {
           )}
           </>}
 
+          </div>
         </div>
       </div>
     </div>

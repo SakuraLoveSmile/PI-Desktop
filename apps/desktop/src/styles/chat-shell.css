@@ -163,16 +163,17 @@
 }
 
 .route-surface,
-.settings-content-inner {
+.settings-content-enter {
   animation: route-surface-in var(--motion-duration-normal) var(--motion-ease-out)
     both;
 }
 
 /*
-  Opacity only. `animation-fill-mode: both` would otherwise leave a transform
-  on this ancestor, which becomes a containing block for `position: fixed`
-  descendants. Settings dialogs would then cover the content pane instead of
-  the window, leaking the rail and section title behind the scrim.
+  Do not animate `.settings-content-inner`. Chromium promotes an animated
+  ancestor onto a compositor layer that becomes a containing block for
+  `position: fixed`, so settings dialogs would cover only the content pane.
+  Opacity-only keyframes still leave that layer while `animation-fill-mode:
+  both` is in effect.
 */
 @keyframes route-surface-in {
   from {
