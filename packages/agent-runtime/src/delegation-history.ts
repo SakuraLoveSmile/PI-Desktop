@@ -1,6 +1,6 @@
 /**
  * Rebuild a delegate's model context from its persisted transcript rows
- * (ADR 0276).
+ * (ADR 0278).
  *
  * Every row a delegate emits lands in the session transcript with
  * `parentToolCallId` (the `Task` call that spawned it) and `agentName`. Those
@@ -32,6 +32,7 @@ import type {
 import {
   MAX_RESUMABLE_LISTED_FILES,
   MAX_RESUMABLE_READ_LINES,
+  normalizeSubagentName,
   type UiMessage,
 } from "@pi-desktop/shared";
 import { isRecord, timestampMs, usageToPi } from "./agent-messages.js";
@@ -61,9 +62,11 @@ export type DelegationChain = {
   latestObjective?: string;
   /** Provider/model used by the latest run; resume must keep it. */
   latestModelId?: string;
+  /** `providerId/modelId` key the latest run resolved (ADR 0278 §4). */
+  latestModelKey?: string;
   /** Settled status of the latest run; `running` while it works. Owns the
    * resumability gate so pruning finished delegation records cannot make a
-   * stopped chain look reusable (ADR 0276). */
+   * stopped chain look reusable (ADR 0278). */
   latestStatus?: string;
   /** Latest activity timestamp, used for LRU eviction. */
   lastActivityAt: number;
@@ -399,16 +402,42 @@ export type RebuiltTaskCall = {
   task?: string;
   modelId?: string;
   createdAt: number;
+  /** Settled status this call's `Task` row recorded, when it recorded one. */
+  status?: string;
 };
+/**
+ * Status a rebuilt chain carries after a restart (ADR 0278 §12). The settled
+ * status is the one the settlement projection wrote onto the `Task` row. A run
+ * the app closed while it still worked never settled, and reads as
+ * `interrupted` rather than staying open forever. A row that records no status
+ * at all — nothing this app writes does — is trusted as settled, because the
+ * only alternative is to refuse every chain a partial transcript proves
+ * nothing about.
+ */
+function chainStatusFromDetail(
+  details: Record<string, unknown> | undefined,
+  row: UiMessage,
+): string | undefined {
+  const status =
+    typeof details?.status === "string" ? details.status.trim() : "";
+  if (status) return status === "running" ? "interrupted" : status;
+  if (row.toolStatus === "error") return "failed";
+  if (row.toolStatus === "running") return "interrupted";
+  return undefined;
+}
+
 /**
  * Scan persisted `Task` tool rows and group them into chains by their
  * `resume` links. Used at session launch so a restart does not lose
- * resumability (ADR 0276 §12).
+ * resumability (ADR 0278 §12). Every call carries the status its own `Task`
+ * row recorded, so a chain rebuilt here is resumable exactly when the live
+ * registry would consider it resumable.
  */
 export function rebuildChainsFromTranscript(
   transcript: readonly UiMessage[],
 ): DelegationChain[] {
   const calls: RebuiltTaskCall[] = [];
+  const callIndexByToolCallId = new Map<string, number>();
   for (const row of transcript) {
     if (row.role !== "tool" || row.toolName !== "Task" || !row.toolCallId) {
       continue;
@@ -420,18 +449,26 @@ export function rebuildChainsFromTranscript(
         : undefined;
     const delegationId =
       typeof details?.delegationId === "string" ? details.delegationId : "";
-    const agentName =
+    // A `Task` row with no delegation id never produced a delegate — the call
+    // was rejected (unknown agent, empty brief) and its "result" is the tool
+    // error. Such a row is not a chain and must not become one.
+    if (!delegationId) continue;
+    // `agentName` is compared against the definition name and against the
+    // transcript rows' `agentName`, so it is normalized the same way the tool
+    // normalizes `Task.agent` (ADR 0278 §12).
+    const agentName = normalizeSubagentName(
       typeof args?.agent === "string"
         ? args.agent
         : typeof details?.agent === "string"
           ? details.agent
-          : "";
-    const resume =
-      typeof args?.resume === "string" ? args.resume.trim() : "";
+          : "",
+    );
+    if (!agentName) continue;
+    const resume = typeof args?.resume === "string" ? args.resume.trim() : "";
     const task = typeof args?.task === "string" ? args.task.trim() : "";
     const modelId =
       typeof details?.modelId === "string" ? details.modelId : undefined;
-    calls.push({
+    const call: RebuiltTaskCall = {
       toolCallId: row.toolCallId,
       delegationId,
       agentName,
@@ -439,8 +476,19 @@ export function rebuildChainsFromTranscript(
       objective: taskObjectiveFromArgs(args),
       ...(task ? { task } : {}),
       ...(modelId ? { modelId } : {}),
+      status: chainStatusFromDetail(details, row),
       createdAt: timestampMs(row.createdAt) || Date.now(),
-    });
+    };
+    // Settling a delegation rewrites its `Task` row in place, so a transcript
+    // that briefly holds both the immediate and the settled copy keeps the
+    // newer one and the call is never rebuilt twice.
+    const seenAt = callIndexByToolCallId.get(row.toolCallId);
+    if (seenAt === undefined) {
+      callIndexByToolCallId.set(row.toolCallId, calls.length);
+      calls.push(call);
+    } else {
+      calls[seenAt] = call;
+    }
   }
 
   const byDelegationId = new Map(calls.map((call) => [call.delegationId, call]));
@@ -490,6 +538,7 @@ export function rebuildChainsFromTranscript(
       latestDelegationId: latest?.delegationId,
       latestObjective: latest?.objective ?? root.objective,
       latestModelId: latest?.modelId,
+      latestStatus: latest?.status,
       lastActivityAt: latest?.createdAt ?? root.createdAt,
     });
   }

@@ -1,5 +1,5 @@
 /**
- * In-memory chain registry for resumable delegations (ADR 0276).
+ * In-memory chain registry for resumable delegations (ADR 0278).
  *
  * The registry is rebuilt from the session transcript at launch, then updated
  * as `Task` calls settle. It never appears in a tool parameter: the parent
@@ -89,6 +89,8 @@ export class DelegationChainRegistry {
     originalTask: string;
     objective: string;
     latestModelId?: string;
+    /** `providerId/modelId` key that resolved, so a resume can re-resolve it. */
+    latestModelKey?: string;
     resumedFrom?: DelegationChain;
   }): DelegationChain {
     const existing = options.resumedFrom
@@ -102,6 +104,7 @@ export class DelegationChainRegistry {
           latestDelegationId: options.delegationId,
           latestObjective: options.objective || existing.latestObjective,
           latestModelId: options.latestModelId ?? existing.latestModelId,
+          latestModelKey: options.latestModelKey ?? existing.latestModelKey,
           latestStatus: "running",
           lastActivityAt: Date.now(),
         }
@@ -116,6 +119,7 @@ export class DelegationChainRegistry {
           latestDelegationId: options.delegationId,
           latestObjective: options.objective,
           latestModelId: options.latestModelId,
+          latestModelKey: options.latestModelKey,
           latestStatus: "running",
           lastActivityAt: Date.now(),
         };
@@ -138,6 +142,21 @@ export class DelegationChainRegistry {
       ...chain,
       readFiles: merged,
       readLineCount: chain.readLineCount + lineCount,
+      lastActivityAt: Date.now(),
+    });
+  }
+
+  /** Record the binding the running delegate switched to (fallback models). */
+  retarget(
+    delegateSessionId: string,
+    binding: { modelKey?: string; modelId: string },
+  ): void {
+    const chain = this.chains.get(delegateSessionId);
+    if (!chain) return;
+    this.chains.set(delegateSessionId, {
+      ...chain,
+      ...(binding.modelKey ? { latestModelKey: binding.modelKey } : {}),
+      latestModelId: binding.modelId,
       lastActivityAt: Date.now(),
     });
   }
@@ -188,12 +207,23 @@ export class DelegationChainRegistry {
   }
 
   unknownResumeError(resume: string, list: readonly ResumableChain[]): string {
-    const available = list
-      .map((chain) => `${chain.agentName} / ${chain.latestDelegationId}`)
-      .join(", ");
+    const available = resumableSummary(list);
     return available
       ? `Unknown delegation "${resume}". Reusable: ${available}.`
       : `Unknown delegation "${resume}". No reusable subagent sessions in this conversation.`;
+  }
+
+  /**
+   * A chain resolved but has nothing left to replay: its rows are gone from the
+   * transcript (a truncated branch, or a delegation that died before writing
+   * any). The caller drops the chain first, so the id in the error can never
+   * also appear in its own "reusable" list (ADR 0278 §4).
+   */
+  noHistoryResumeError(resume: string, list: readonly ResumableChain[]): string {
+    const available = resumableSummary(list);
+    return available
+      ? `Delegation "${resume}" has no recorded history in this conversation and cannot be continued. Reusable: ${available}.`
+      : `Delegation "${resume}" has no recorded history in this conversation and cannot be continued. Start a new delegation.`;
   }
 
   private install(chain: DelegationChain): void {
@@ -211,12 +241,23 @@ export class DelegationChainRegistry {
       byAgent.set(chain.agentName, group);
     }
     for (const group of byAgent.values()) {
-      const sorted = [...group].sort(
-        (left, right) => right.lastActivityAt - left.lastActivityAt,
-      );
-      for (const stale of sorted.slice(MAX_RESUMABLE_CHAINS_PER_AGENT)) {
+      // A working chain is never evicted: dropping it would strand the delegate
+      // still writing into it, and the bound counts reusable chains anyway. Any
+      // overflow those chains caused is resolved the moment they settle,
+      // because `settle` runs this again (ADR 0278 §7).
+      const settled = group
+        .filter((chain) => chain.latestStatus !== "running")
+        .sort((left, right) => right.lastActivityAt - left.lastActivityAt);
+      for (const stale of settled.slice(MAX_RESUMABLE_CHAINS_PER_AGENT)) {
         this.drop(stale.delegateSessionId);
       }
     }
   }
+}
+
+/** `<agent> / <delegationId>` pairs for an error message's hint. */
+function resumableSummary(list: readonly ResumableChain[]): string {
+  return list
+    .map((chain) => `${chain.agentName} / ${chain.latestDelegationId}`)
+    .join(", ");
 }

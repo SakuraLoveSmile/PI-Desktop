@@ -327,6 +327,14 @@ type ToolEndEvent = {
   isError?: boolean;
 };
 
+/** Narrow view of the `tool_start` agent event; the envelope carries the rest. */
+type ToolStartEvent = {
+  type: "tool_start";
+  toolCallId: string;
+  toolName: string;
+  args?: unknown;
+};
+
 export const ASK_TOOL_NAME = "asktool";
 /**
  * Delegation lifecycle (ADR 0089): `Task` starts a subagent in the background
@@ -390,12 +398,16 @@ export type DelegationRecord = {
    * `TaskWait` result or the resume-after-idle prompt. Auto-delivery is a
    * single shot per record. */
   reportDelivered: boolean;
-  /** Stable chain identity; never appears in a tool parameter (ADR 0276). */
+  /** Stable chain identity; never appears in a tool parameter (ADR 0278). */
   delegateSessionId: string;
-  /** Every `Task` toolCallId on this chain, oldest first. */
-  toolCallIdChain: string[];
   /** Prior `delegationId` this run continues, when `Task.resume` was set. */
   resumedFrom?: string;
+  /** Model the run kept before the resume could not re-resolve it (ADR 0278
+   * §4): recorded so the parent can see that the delegate's binding moved. */
+  modelChangedFrom?: string;
+  /** `toolCallId`s of this run's calls that have not ended yet: dropped when the
+   * run settles, so an aborted call cannot pin its captured arguments. */
+  pendingToolCallIds?: Set<string>;
 };
 
 
@@ -414,6 +426,9 @@ function delegationSummary(record: DelegationRecord): Record<string, unknown> {
     ...(record.result?.modelFailures ? { modelFailures: record.result.modelFailures } : {}),
     ...(record.result?.error ? { error: record.result.error } : {}),
     ...(record.resumedFrom ? { resumedFrom: record.resumedFrom } : {}),
+    ...(record.modelChangedFrom
+      ? { modelChangedFrom: record.modelChangedFrom }
+      : {}),
   };
 }
 
@@ -1456,14 +1471,24 @@ export class DesktopAgentRuntime {
   private delegations = new Map<string, DelegationRecord>();
   /** Resumable chains rebuilt from the transcript and updated as Task settles. */
   private readonly delegationChains = new DelegationChainRegistry();
-  /** Transcript rows used to rebuild a resumed delegate's context (ADR 0276):
+  /** Transcript rows used to rebuild a resumed delegate's context (ADR 0278):
    * the seed history at launch plus every row this session's delegates emit. */
   private readonly transcriptHistory: UiMessage[];
   /** Row ids already in `transcriptHistory` from live delegate events, so a
    * retried stream appends once. */
   private readonly appendedDelegationRowIds = new Set<string>();
-  /** `toolName` of a delegate's in-flight call; `tool_end` carries no name. */
-  private readonly delegateToolNames = new Map<string, string>();
+  /** Name and arguments of a delegate's in-flight call: `tool_end` carries the
+   * result only, and the row a resume replays needs both. */
+  private readonly delegateToolCalls = new Map<
+    string,
+    { name: string; args: unknown }
+  >();
+  /** The prompt this runtime composed last, so a mid-turn refresh can tell its
+   * own prompt from a transient variant it must not clobber. */
+  private composedSystemPrompt?: string;
+  /** Set when a refresh was skipped because a transient prompt variant owned the
+   * live prompt; that variant's cleanup applies it once the prompt is restored. */
+  private resumablePromptStale = false;
   /** Set by `abort` / `dispose` so a finishing delegate cannot restart the parent. */
   private runCancelled = false;
   /**
@@ -1889,7 +1914,7 @@ Delegation rules:
             runningDelegationIds: this.runningDelegationIds(),
           })
         : "";
-    return composeModeSystemPrompt(
+    const composed = composeModeSystemPrompt(
       this.mode,
       [
         this.baseSystemPrompt,
@@ -1899,17 +1924,36 @@ Delegation rules:
         ...(resumablePrompt ? [resumablePrompt] : []),
       ].join("\n\n"),
     );
+    this.composedSystemPrompt = composed;
+    return composed;
   }
 
   /**
    * The resumable list changes when a delegation settles, so the prompt the
    * parent reads on its next turn reflects it. Recomposing is only worth it
-   * when subagents exist at all.
+   * when subagents exist at all, and only while the live prompt is still the
+   * one this runtime composed: a transient variant (the delegation nudge) owns
+   * it otherwise, and the next turn recomposes anyway.
    */
   private refreshResumablePrompt(): void {
     if (this.subagents.length === 0) return;
     if (!this.agent) return;
+    if (this.composedSystemPrompt === undefined) return;
+    if (this.agent.state.systemPrompt !== this.composedSystemPrompt) {
+      // A transient variant (the delegation nudge) owns the live prompt. Its
+      // own cleanup restores the composed text, and applies this refresh then,
+      // so a chain that settled mid-nudge is still listed on the next turn.
+      this.resumablePromptStale = true;
+      return;
+    }
     this.agent.state.systemPrompt = this.composeSystemPrompt();
+  }
+
+  /** Apply a resumable-list refresh that a transient prompt variant deferred. */
+  private applyPendingResumablePrompt(): void {
+    if (!this.resumablePromptStale) return;
+    this.resumablePromptStale = false;
+    this.refreshResumablePrompt();
   }
 
   /**
@@ -3655,7 +3699,10 @@ Delegation rules:
       case "not-resumable":
         return {
           ok: false,
-          message: `Delegation ${resume} ended as "${error.status}" and cannot be resumed. Only completed or failed delegations continue; start a new delegation instead.`,
+          message:
+            error.status === "interrupted"
+              ? `Delegation ${resume} was interrupted — the app closed while it worked — so there is nothing to continue. Start a new delegation instead.`
+              : `Delegation ${resume} ended as "${error.status}" and cannot be resumed. Only completed or failed delegations continue; start a new delegation instead.`,
         };
       case "agent-mismatch":
         return {
@@ -3677,6 +3724,62 @@ Delegation rules:
         runningDelegationIds: this.runningDelegationIds(),
       }),
     );
+  }
+
+  /**
+   * A chain resolved but has nothing to replay. The caller drops it first, so
+   * the id can never be advertised as reusable in its own error (ADR 0278 §4).
+   */
+  private noHistoryResumeMessage(resume: string): string {
+    return this.delegationChains.noHistoryResumeError(
+      resume,
+      this.delegationChains.resumableList({
+        runningDelegationIds: this.runningDelegationIds(),
+      }),
+    );
+  }
+
+  /**
+   * The binding a resumed run keeps (ADR 0278 §4). A live chain records the
+   * `providerId/modelId` key it resolved, which is preferred here; a chain
+   * rebuilt from the transcript only knows the model id, matched against what
+   * is configured in this session. `undefined` means the binding is gone.
+   */
+  private resumedChainProvider(
+    chain: DelegationChain,
+  ): RuntimeProviderConfig | undefined {
+    const modelId = chain.latestModelId?.trim().toLowerCase();
+    if (!modelId) return undefined;
+    const candidates: RuntimeProviderConfig[] = [];
+    if (chain.latestModelKey) {
+      const keyed =
+        this.subagentProviders[chain.latestModelKey] ??
+        this.subagentOverrideProviders[chain.latestModelKey];
+      if (keyed) candidates.push(keyed);
+    }
+    candidates.push(
+      ...Object.values(this.subagentProviders),
+      ...Object.values(this.subagentOverrideProviders),
+      this.provider,
+    );
+    return candidates.find(
+      (candidate) => candidate.modelId.trim().toLowerCase() === modelId,
+    );
+  }
+
+  /** The delegation-model key a resolved binding is registered under, if any. */
+  private delegationModelKeyFor(
+    provider: RuntimeProviderConfig,
+  ): string | undefined {
+    for (const [key, candidate] of Object.entries(this.subagentProviders)) {
+      if (candidate === provider) return key;
+    }
+    for (const [key, candidate] of Object.entries(
+      this.subagentOverrideProviders,
+    )) {
+      if (candidate === provider) return key;
+    }
+    return undefined;
   }
 
   /**
@@ -3736,8 +3839,8 @@ Delegation rules:
         "`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.",
         "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time. You may keep working or talk to the user while they run; the runtime delivers their reports when they finish. Call TaskStop only to cancel.",
         "To continue a previous subagent, pass its `resume` id (the `delegationId` returned by Task). Saying \"reuse\" in prose is not enough. Do not pass `model` when resuming; start a new delegation to change models.",
-        `Available subagents:\\n${catalog}`,
-      ].join("\\n\\n"),
+        `Available subagents:\n${catalog}`,
+      ].join("\n\n"),
       parameters: Type.Object({
         agent: Type.String({
           description: `Name of the subagent to run: ${names.join(", ")}.`,
@@ -3878,22 +3981,33 @@ Delegation rules:
           return this.subagentToolError(toolCallId, resumeLookup.message);
         }
         const resumedChain = resumeLookup?.ok ? resumeLookup.chain : undefined;
-        if (
-          resumedChain?.latestModelId &&
-          resumedChain.latestModelId !== provider.modelId
-        ) {
-          return this.subagentToolError(
-            toolCallId,
-            `Resuming ${resume} continues the ${resumedChain.latestModelId} model. Omit \`model\` to keep it, or start a new delegation to change models.`,
-          );
-        }
+        // A resume keeps the chain's own binding (ADR 0278 §4): changing the
+        // parent's session model must not strand a chain, and a delegate must
+        // never swap models by accident. When the recorded binding is gone the
+        // run continues on the definition's current one and says so in its
+        // lifecycle details, because refusing would strand the chain forever.
+        const resumedProvider = resumedChain
+          ? this.resumedChainProvider(resumedChain)
+          : undefined;
+        if (resumedProvider) provider = resumedProvider;
+        const modelChangedFrom =
+          resumedChain?.latestModelId && !resumedProvider
+            ? resumedChain.latestModelId
+            : undefined;
         const initialMessages = resumedChain
           ? this.seedResumedDelegate(resumedChain, provider)
           : undefined;
         if (resume && !initialMessages) {
+          // The chain resolved but has nothing left to replay. Drop it so the
+          // prompt stops advertising an id that can never be continued, and
+          // report the drop without listing that same id as reusable.
+          if (resumedChain) {
+            this.delegationChains.drop(resumedChain.delegateSessionId);
+            this.refreshResumablePrompt();
+          }
           return this.subagentToolError(
             toolCallId,
-            this.unknownResumeMessage(resume),
+            this.noHistoryResumeMessage(resume),
           );
         }
         const delegationId = randomUUID();
@@ -3918,6 +4032,7 @@ Delegation rules:
           isRecord(params) && typeof params.description === "string"
             ? params.description.trim()
             : task;
+        const providerKey = this.delegationModelKeyFor(provider);
         const chain = this.delegationChains.start({
           delegateSessionId: resumedChain?.delegateSessionId ?? delegationId,
           delegationId,
@@ -3926,6 +4041,7 @@ Delegation rules:
           originalTask: resumedChain?.originalTask ?? task,
           objective,
           latestModelId: provider.modelId,
+          ...(providerKey ? { latestModelKey: providerKey } : {}),
           resumedFrom: resumedChain,
         });
         const record: DelegationRecord = {
@@ -3947,8 +4063,8 @@ Delegation rules:
           startedEpoch: this.turnEpoch,
           reportDelivered: false,
           delegateSessionId: chain.delegateSessionId,
-          toolCallIdChain: [...chain.toolCallIds],
           ...(resumedChain ? { resumedFrom: resume } : {}),
+          ...(modelChangedFrom ? { modelChangedFrom } : {}),
         };
         this.delegations.set(delegationId, record);
         const scopedTools = this.scopeDelegateTools(tools, definition);
@@ -3968,6 +4084,10 @@ Delegation rules:
           onModelChange: (next, level) => {
             record.modelId = next.modelId;
             record.thinkingLevel = level;
+            this.delegationChains.retarget(record.delegateSessionId, {
+              modelKey: this.delegationModelKeyFor(next),
+              modelId: next.modelId,
+            });
             this.publishDelegationSettlement(record);
           },
           systemPrompt: composeSubagentSystemPrompt({
@@ -4074,6 +4194,12 @@ Delegation rules:
       this.turnSubagentUsage = addUsage(this.turnSubagentUsage, result.usage);
     }
     this.delegationChains.settle(record.delegateSessionId, record.status);
+    // An aborted call never sends `tool_end`, so a settled run drops whatever
+    // its calls left behind rather than pinning those arguments for the session.
+    for (const toolCallId of record.pendingToolCallIds ?? []) {
+      this.delegateToolCalls.delete(toolCallId);
+    }
+    record.pendingToolCallIds = undefined;
     this.publishDelegationSettlement(record);
     record.resolveCompletion();
     this.refreshDelegationWait();
@@ -4187,12 +4313,21 @@ Delegation rules:
     if (event.type === "tool_start") {
       record.toolCalls += 1;
       this.touchDelegationPhase(record, "tool", event.toolName);
-      this.delegateToolNames.set(event.toolCallId, event.toolName);
+      // The row a later `resume` replays needs the call's arguments, and
+      // `tool_end` carries only the result (ADR 0278 §3).
+      this.delegateToolCalls.set(event.toolCallId, {
+        name: event.toolName,
+        args: (envelope.event as ToolStartEvent).args,
+      });
+      (record.pendingToolCallIds ??= new Set()).add(event.toolCallId);
       return;
     }
     if (event.type === "tool_end") {
       this.touchDelegationPhase(record, "waiting-model");
       this.appendDelegationRow(record, envelope, this.toolRowFromEnvelope(envelope));
+      // The call is finished; its arguments are no longer needed.
+      this.delegateToolCalls.delete(event.toolCallId);
+      record.pendingToolCallIds?.delete(event.toolCallId);
       return;
     }
     if (event.type === "message_end" && event.message.role === "assistant") {
@@ -4245,7 +4380,7 @@ Delegation rules:
 
   private toolRowFromEnvelope(envelope: AgentEventEnvelope): UiMessage {
     const event = envelope.event as ToolEndEvent;
-    const toolName = this.delegateToolNames.get(event.toolCallId) ?? "";
+    const call = this.delegateToolCalls.get(event.toolCallId);
     const ts = new Date(envelope.ts ?? Date.now()).toISOString();
     return {
       id: `delegate-tool-${event.toolCallId}`,
@@ -4254,8 +4389,8 @@ Delegation rules:
       createdAt: ts,
       toolCompletedAt: ts,
       toolCallId: event.toolCallId,
-      toolName,
-      toolArgs: undefined,
+      toolName: call?.name ?? "",
+      toolArgs: call?.args,
       toolResult: event.result,
       toolStatus: event.isError ? "error" : "success",
       isError: Boolean(event.isError),
@@ -5311,6 +5446,7 @@ Delegation rules:
       if (this.agent.state.systemPrompt === promptWithNudge) {
         this.agent.state.systemPrompt = promptBefore;
       }
+      this.applyPendingResumablePrompt();
       this.silentTurnRerunInProgress = false;
       this.suppressSilentTurnRunEnd = false;
     }
@@ -5419,6 +5555,7 @@ Delegation rules:
       if (this.agent.state.systemPrompt === promptWithNudge) {
         this.agent.state.systemPrompt = promptBefore;
       }
+      this.applyPendingResumablePrompt();
       this.progressTurnRerunInProgress = false;
       this.suppressProgressTurnRunEnd = false;
     }
@@ -7383,6 +7520,8 @@ Delegation rules:
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
     this.terminatingToolCalls.clear();
+    this.delegateToolCalls.clear();
+    this.appendedDelegationRowIds.clear();
     this.gracefulStopRequested = false;
     this.hostCloseUnsubscribe?.();
     this.hostCloseUnsubscribe = undefined;
