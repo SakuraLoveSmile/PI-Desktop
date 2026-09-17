@@ -2125,6 +2125,7 @@ fn an_install_reports_progress_and_honours_a_cancel() {
             .to_string();
         assert!(error.contains("PLUGIN_CANCELLED"), "{error}");
     });
+}
 
 #[test]
 fn plugin_ui_meta_parses_the_floating_widget_placement() {
