@@ -2,7 +2,7 @@
 
 - Status: Accepted for implementation
 - Date: 2026-09-17
-- Decision: D444
+- Decision: D445
 - Amends: ADR 0255
 
 ## Context

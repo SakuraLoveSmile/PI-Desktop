@@ -81,7 +81,7 @@
   min-height: 178px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ds-border) 84%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md-plus);
   background: color-mix(in srgb, var(--ds-bg-elevated) 76%, transparent);
   box-shadow: 0 12px 28px color-mix(in srgb, #000 24%, transparent);
   color: var(--ds-text-primary);
@@ -100,7 +100,7 @@
 .plugin-scenic-theme-card-description { color: color-mix(in srgb, #fff 78%, transparent); font-size: 12px; text-shadow: 0 1px 5px #000; }
 .plugin-scenic-theme-card-check { position: absolute; top: 12px; right: 12px; display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: var(--ds-accent); color: var(--ds-accent-foreground); font-weight: 700; }
 
-.plugin-scenic-blur-control { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px; border: 1px solid color-mix(in srgb, var(--ds-border) 84%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--ds-bg-elevated) 82%, transparent); box-shadow: 0 10px 24px color-mix(in srgb, #000 16%, transparent); }
+.plugin-scenic-blur-control { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px; border: 1px solid color-mix(in srgb, var(--ds-border) 84%, transparent); border-radius: var(--radius-md-plus); background: color-mix(in srgb, var(--ds-bg-elevated) 82%, transparent); box-shadow: 0 10px 24px color-mix(in srgb, #000 16%, transparent); }
 .plugin-scenic-blur-copy { display: grid; gap: 3px; }
 .plugin-scenic-blur-label { font-weight: 600; }
 .plugin-scenic-blur-help { color: var(--ds-text-muted); font-size: 12px; }

@@ -750,7 +750,7 @@ Theme assets declared for scenic cards may be package-relative, in which case
 the host resolves them inside the installed plugin package before rewriting the
 matching CSS `url()` or card preview to `plugin-asset:`. Absolute declared
 assets retain the external-path route. Neither route grants a plugin arbitrary
-filesystem access (ADR 0278).
+filesystem access (ADR 0281).
 
 ### audio (requires `audio.capture.background` / `audio.playback.background`)
 
