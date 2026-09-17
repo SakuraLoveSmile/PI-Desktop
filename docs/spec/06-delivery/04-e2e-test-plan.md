@@ -154,6 +154,7 @@ The minimum selection is:
 - Imported-extension dependency installation or registry-boundary changes: `pnpm test:e2e:plugin-import-deps`.
 - Trusted extension or plugin-extension changes: `pnpm test:e2e:trusted-extensions`.
 - Session collaboration / Session Orchestrator: `pnpm test:e2e:collaboration`.
+- Completion-notice silence or the silent-turn contract (D193 / D446): `pnpm test:e2e:session-completion`.
 - Changes spanning multiple surfaces use the union of the applicable suites.
 
 `pnpm test:e2e` is the default cross-system smoke suite for host RPC, IPC,
@@ -11304,10 +11305,14 @@ are withdrawn with ADR 0165.
 - **Expected**: The original result remains unchanged. The completion has one
   provider request, no error, one terminal lifecycle, completed ledger status,
   and no acknowledgement callback. Each ordinary input still retries once and
-  ends with `EMPTY_MODEL_RESPONSE`. Unit coverage additionally rejects missing
-  reply-to IDs/wrong targets and revokes the exception on accepted user steering.
+  ends with `EMPTY_MODEL_RESPONSE`, and no request the recipient sends after
+  the silent notice carries an empty assistant message. Unit coverage
+  additionally rejects missing reply-to IDs/wrong targets, spends the exception
+  on a tool batch, keeps it across a provider retry, revokes it once accepted
+  user steering enters the context, and keeps the accepted silence out of the
+  runtime entries and pi transcript state.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5e,
-  `03-runtime/08-error-codes.md`, ADR 0239
+  `03-runtime/08-error-codes.md`, ADR 0239 (D446 amendment)
 - **Acceptance**: C (conversation & stream), D (provenance), Quality
 - **Milestone**: M6+
 - **Status**: Automated by `pnpm test:e2e:session-completion` on the committed,

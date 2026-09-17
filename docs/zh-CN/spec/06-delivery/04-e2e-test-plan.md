@@ -118,6 +118,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - 导入扩展依赖安装或 registry 边界改动：`pnpm test:e2e:plugin-import-deps`。
 - 受信任扩展或插件扩展改动：`pnpm test:e2e:trusted-extensions`。
 - 会话通信 / Session Orchestrator：`pnpm test:e2e:collaboration`。
+- 完成通知静默或静默回合契约（D193 / D446）：`pnpm test:e2e:session-completion`。
 - 同时涉及多个面的改动使用适用套件的并集。
 
 `pnpm test:e2e` 是 host RPC、IPC、Agent 执行、插件、持久化集成和共享运行时合约的默认跨系统烟雾测试。由于显示、平台、凭据、硬件或其他环境能力缺失而无法运行的必需套件，必须记录为 `NOT RUN`，并说明原因、替代验证和剩余风险。在具备条件且可信的环境中通过前，该 pull request 不具备合入条件。
@@ -7203,10 +7204,12 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   来源文本、账本 task 和 message，并都返回空响应。
 - **预期**：原结果保持不变。完成通知只有一次提供商请求、无错误、一次终止
   生命周期，账本状态为 completed，且不产生确认回调。每个普通输入仍只重试
-  一次并以 `EMPTY_MODEL_RESPONSE` 结束。单测另覆盖缺少回复目标 ID、目标
-  不符，以及接受用户 steering 后撤销静默例外。
+  一次并以 `EMPTY_MODEL_RESPONSE` 结束，且静默通知之后接收方发出的任何请求
+  都不携带空的 assistant 消息。单测另覆盖缺少回复目标 ID、目标不符、工具
+  批次消耗例外、provider 重试保留例外、被接受的用户 steering 进入上下文后
+  撤销例外，以及被接受的静默不进入运行时条目和 pi 转录状态。
 - **关联规格**：`03-runtime/02-agent-runtime.md` §5e、
-  `03-runtime/08-error-codes.md`、ADR 0239
+  `03-runtime/08-error-codes.md`、ADR 0239（D446 修订段）
 - **验收**：C（会话与流）、D（来源）、质量
 - **里程碑**：M6+
 - **状态**：由 `pnpm test:e2e:session-completion` 在独立 worktree 中对已提交并
