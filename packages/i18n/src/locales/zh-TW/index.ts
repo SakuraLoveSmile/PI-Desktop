@@ -318,6 +318,7 @@ export const zhTW = {
     compactionRow: "上下文已壓縮 · 第 {{times}} 次",
     compactionRowSummary: "摘要 ≈{{tokens}} tokens",
     compactionRowNoSummary: "未生成摘要",
+    compactionRowSummaryFailed: "摘要生成失敗 · 已保留近期上下文",
     scrollToBottom: "回到最新",
     minimap: "對話大綱",
     resultNeedsAttention: "這次任務需要處理一下",

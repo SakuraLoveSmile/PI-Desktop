@@ -435,18 +435,27 @@ tokens, capped at half the hard budget so retention alone cannot fill a small
 window and leave the summary no room. None of these values are configurable.
 
 The incoming user prompt participates in budgeting before the first provider
-request. If normal compaction fails during an automatic threshold or overflow
-recovery, the runtime persists a short recovery checkpoint with the previous
-summary (when available) and an aggressively bounded applicable tail. The
-complete transcript remains durable and visible, while the next model request
-receives only that recovery checkpoint and applicable tail. The lifecycle event marks
-this as `fallback: "retained_tail"` so the renderer can show a warning rather
-than a false success. If the fallback cannot be prepared, persisted, or kept
-below the safe budget, the user row and an assistant error remain durable and
-no provider request starts. Provider-reported context overflow is the last
-recovery layer: omit the failed assistant from model context, compact once,
-and retry once. A second overflow remains terminal. Bedrock's
-`prompt is too long: N tokens > M maximum` form maps to this path.
+request. The automatic summary request retries transient provider failures
+under a bounded pi-ai retry policy (3 retries, 2s/4s/8s backoff, cancelled by
+Stop); deterministic failures such as quota or auth return at once. The
+preflight guard sizes the prompt pi actually serializes — tool results already
+capped — rather than the raw messages, and when that prompt still exceeds the
+window it tries exactly one reduced input (tool results cut to a short prefix,
+thinking dropped, no message removed) before giving up on the summary (ADR
+0282). If normal compaction still fails during an automatic threshold or
+overflow recovery, the runtime persists a short recovery checkpoint with the
+previous summary (when available) and an aggressively bounded applicable tail.
+The complete transcript remains durable and visible, while the next model
+request receives only that recovery checkpoint and applicable tail. The
+lifecycle event marks this as `fallback: "retained_tail"`, and the checkpoint's
+mark carries the same `fallback`, so the renderer shows a warning and labels
+the transcript row as a failed summary rather than a false success. If the
+fallback cannot be prepared, persisted, or kept below the safe budget, the user
+row and an assistant error remain durable and no provider request starts.
+Provider-reported context overflow is the last recovery layer: omit the failed
+assistant from model context, compact once, and retry once. A second overflow
+remains terminal. Bedrock's `prompt is too long: N tokens > M maximum` form
+maps to this path.
 
 Automatic protection is always enabled and is not user-configurable. The
 runtime still accepts a construction-time override that disables it, used by

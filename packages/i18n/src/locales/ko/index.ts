@@ -325,6 +325,7 @@ export const ko = {
     compactionRow: "컨텍스트 압축됨 · #{{times}}",
     compactionRowSummary: "요약 약 {{tokens}}토큰",
     compactionRowNoSummary: "생성된 요약 없음",
+    compactionRowSummaryFailed: "요약 생성 실패 · 최근 컨텍스트 유지됨",
     scrollToBottom: "최신 항목으로 이동",
     minimap: "대화 개요",
     resultNeedsAttention: "이 작업을 확인해야 합니다",

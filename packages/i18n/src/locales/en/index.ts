@@ -323,6 +323,7 @@ export const en = {
     compactionRow: "Context compacted · #{{times}}",
     compactionRowSummary: "summary ≈{{tokens}} tokens",
     compactionRowNoSummary: "no summary generated",
+    compactionRowSummaryFailed: "summary generation failed · recent context retained",
     scrollToBottom: "Jump to latest",
     minimap: "Conversation outline",
     resultNeedsAttention: "This task needs attention",
