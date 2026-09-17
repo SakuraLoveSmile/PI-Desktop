@@ -128,7 +128,23 @@ pi.commands.register(def: {
 pi.commands.unregister(id: string): Promise<void>
 ```
 
+### speech (`speech.adapter.register`)
+```ts
+pi.speech.registerAdapter(adapter: {
+  protocol: string
+  label: string
+  roles: Array<"transcribe" | "synthesize">
+  handle: (input) => Promise<{ kind: "text"; text: string } | { kind: "audio"; mimeType: string; data: string } | { kind: "http"; call: SpeechHttpCall }>
+}): Promise<void>
+pi.speech.unregisterAdapter(protocol: string): Promise<void>
+```
+
+The handle stays in the plugin process. Built-in protocol ids `openai_audio`
+and `openai_chat_audio` are reserved. HTTP plans are executed by the host with
+the bound provider key and must stay on that origin.
+
 ### ui
+
 ```ts
 pi.ui.openPanel(options?: { title?: string }): Promise<void>
 pi.ui.closePanel(): Promise<void>
@@ -1057,6 +1073,7 @@ The desktop plugin runtime now implements the MVP host API surface used by local
   `fs.writeText` / `fs.glob` / `fs.list` / `fs.remove` / `fs.requestDirectory`,
   bounded by `manifest.fs` (ADR 0088)
 - `agent.registerTool` / `unregisterTool` / `agent.complete`
+- `speech.registerAdapter` / `unregisterAdapter` (`speech.adapter.register`)
 - `models.list`, `session.getLlmContext`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `browser.*` (guest CDP; `browser.cdp`)

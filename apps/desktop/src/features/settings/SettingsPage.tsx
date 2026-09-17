@@ -54,6 +54,7 @@ import {
   ImportSection,
   UpdatesRow,
 } from "./agent-sections";
+import { VoiceSettingsCard } from "./voice-settings";
 import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
 import { PluginSettingsDestination } from "../../components/settings/PluginSettingsDestination";
 
@@ -367,6 +368,8 @@ export function SettingsPage() {
                   />
                 </SettingsRow>
               </SettingsCard>
+
+              <VoiceSettingsCard settings={settings} saveSettings={saveSettings} />
 
               <SettingsCard title={t("settings.defaultsTitle")}>
                 <SettingsRow title={t("settings.mode")} description={t("settings.modeDesc")}>

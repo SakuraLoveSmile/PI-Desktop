@@ -6,6 +6,7 @@ import type { ContextCompactionSettings } from "./sessions.js";
 import type { Mode } from "./common.js";
 import type { GlobalPermissionMode } from "./permissions.js";
 import type { PluginMarketSource } from "./plugins.js";
+import type { SpeechSettings } from "./speech.js";
 
 export type ThemePreference = "system" | "light" | "dark" | `plugin:${string}`;
 
@@ -22,6 +23,8 @@ export type CloseBehavior = "ask" | "tray" | "quit";
 export type AppSettings = {
   defaultProviderId?: string;
   defaultModelId?: string;
+  /** Host speech bindings. Absent means voice actions stay disabled. */
+  speech?: SpeechSettings;
   defaultMode: Mode;
   /** Configured command shell for the agent Bash protocol tool. */
   defaultCommandShell?: CommandShellId;

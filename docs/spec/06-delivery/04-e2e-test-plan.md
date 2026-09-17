@@ -869,6 +869,20 @@ identify the platform validation still needed.
 - **Status**: Source-level regression (`composer-ime.test.mjs`); full UI
   keyboard journey remains Draft. Protocol smoke does not dispatch key events.
 
+#### E2E-008e: Host speech transcribe and speak
+
+- **Preconditions**: A session is open. Settings → AI Voice is unconfigured.
+- **Steps**: 1) Confirm Composer transcribe/speak stay disabled. 2) Bind ASR
+  (`openai_audio` / whisper) and TTS. 3) Attach a small wav and transcribe it
+  into the draft. 4) Read the draft aloud.
+- **Expected**: Unconfigured actions never call the provider. Transcribe inserts
+  text. Speak writes session scratch audio and plays a bounded data URL.
+  Whisper/TTS never appear in the chat model picker.
+- **Specs linked**: `03-runtime/20-speech.md`, `04-ux/06-settings-ia.md`
+- **Acceptance**: C (speech)
+- **Milestone**: M2
+- **Status**: Source-level regression (`speech-capability.test.mjs`,
+  `plugin-speech-adapter.test.mjs`); live provider journey remains Draft.
 
 #### E2E-008a: First-turn tools load on demand
 
