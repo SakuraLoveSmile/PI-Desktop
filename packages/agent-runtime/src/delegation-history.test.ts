@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MAX_RESUMABLE_READ_LINES, type UiMessage } from "@pi-desktop/shared";
 import {
+  chainRowsToMessages,
   extractReadFiles,
   formatResumableList,
   isChainWithinReadBudget,
@@ -13,6 +14,7 @@ import {
   type DelegationChain,
   type ResumableChain,
 } from "./delegation-history.js";
+import { DelegationChainRegistry } from "./delegation-chain.js";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
 import { buildProviderModel } from "./provider-binding.js";
 
@@ -428,5 +430,264 @@ describe("chain shape", () => {
       lastActivityAt: 0,
     };
     expect(chain.latestStatus).toBeUndefined();
+  });
+});
+
+/** A persisted `Task` row, as the settlement projection rewrites it. */
+function restartedTaskRow(
+  toolCallId: string,
+  details: Record<string, unknown>,
+  options: {
+    toolStatus?: UiMessage["toolStatus"];
+    args?: Record<string, unknown>;
+  } = {},
+): UiMessage {
+  return {
+    id: `row-${toolCallId}`,
+    role: "tool",
+    content: "",
+    toolCallId,
+    toolName: "Task",
+    toolArgs: { agent: "explorer", task: "explore the parser", ...options.args },
+    toolResult: { details },
+    toolStatus: options.toolStatus ?? "success",
+    createdAt: new Date(1_700_000_000_000).toISOString(),
+  };
+}
+
+/** The same gate the live runtime uses, over chains rebuilt from the transcript. */
+function resolveRebuilt(
+  chains: DelegationChain[],
+  resume: string,
+  agentName = "explorer",
+) {
+  const registry = new DelegationChainRegistry();
+  registry.hydrate(chains);
+  return registry.resolveResume({
+    resume,
+    agentName,
+    runningDelegationIds: new Set(),
+  });
+}
+
+describe("rebuildChainsFromTranscript restart status (ADR 0278)", () => {
+  it("keeps a completed or failed status a settled Task row recorded", () => {
+    for (const status of ["completed", "failed"]) {
+      const chains = rebuildChainsFromTranscript([
+        restartedTaskRow("call-1", {
+          delegationId: "d1",
+          agent: "explorer",
+          status,
+        }),
+      ]);
+      expect(chains).toHaveLength(1);
+      expect(chains[0].latestStatus).toBe(status);
+      expect(resolveRebuilt(chains, "d1").ok).toBe(true);
+    }
+  });
+
+  it("keeps a stopped or aborted chain out of the resumable set", () => {
+    for (const status of ["stopped", "aborted"]) {
+      const chains = rebuildChainsFromTranscript([
+        restartedTaskRow("call-1", {
+          delegationId: "d1",
+          agent: "explorer",
+          status,
+        }),
+      ]);
+      expect(chains[0].latestStatus).toBe(status);
+      expect(resolveRebuilt(chains, "d1")).toEqual({
+        ok: false,
+        error: { kind: "not-resumable", status },
+      });
+    }
+  });
+
+  it("normalizes a Task row the app closed mid-run to interrupted", () => {
+    const chains = rebuildChainsFromTranscript([
+      restartedTaskRow("call-1", {
+        delegationId: "d1",
+        agent: "explorer",
+        status: "running",
+      }),
+    ]);
+    expect(chains[0].latestStatus).toBe("interrupted");
+    expect(resolveRebuilt(chains, "d1")).toEqual({
+      ok: false,
+      error: { kind: "not-resumable", status: "interrupted" },
+    });
+  });
+
+  it("normalizes an errored Task row without a status to failed", () => {
+    const chains = rebuildChainsFromTranscript([
+      restartedTaskRow(
+        "call-1",
+        { delegationId: "d1", agent: "explorer" },
+        { toolStatus: "error" },
+      ),
+    ]);
+    expect(chains[0].latestStatus).toBe("failed");
+    expect(resolveRebuilt(chains, "d1").ok).toBe(true);
+  });
+
+  it("ignores a Task row that never produced a delegationId", () => {
+    const rejected = restartedTaskRow(
+      "call-1",
+      { error: 'Unknown subagent "Researcher".' },
+      { toolStatus: "error", args: { agent: "Researcher", task: "Find it." } },
+    );
+    expect(rebuildChainsFromTranscript([rejected])).toEqual([]);
+    expect(
+      rebuildChainsFromTranscript([
+        rejected,
+        delegateAssistant("a1", "found a", "call-1"),
+      ]),
+    ).toEqual([]);
+  });
+});
+
+describe("rebuildChainsFromTranscript agent normalization (ADR 0278)", () => {
+  it("normalizes the recorded agent so a restarted session still selects its rows", () => {
+    for (const recorded of ["Explorer", "explorer.md", "EXPLORER "]) {
+      const task = restartedTaskRow(
+        "call-1",
+        { delegationId: "d1", agent: "explorer", status: "completed" },
+        { args: { agent: recorded } },
+      );
+      const read = delegateTool(
+        "t1",
+        "Read",
+        { path: "src/app.ts" },
+        { content: [{ type: "text", text: "body" }] },
+        "call-1",
+      );
+      const transcript = [task, read];
+      const chains = rebuildChainsFromTranscript(transcript);
+
+      expect(chains).toHaveLength(1);
+      expect(chains[0].agentName).toBe("explorer");
+      // The delegate's own rows only match under the normalized name.
+      expect(chains[0].readFiles).toEqual(["src/app.ts"]);
+      expect(
+        selectChainRows(transcript, {
+          toolCallIds: ["call-1"],
+          agentName: "explorer",
+        }),
+      ).toHaveLength(1);
+      expect(resolveRebuilt(chains, "d1").ok).toBe(true);
+    }
+  });
+});
+
+describe("rebuildChainsFromTranscript settled copies and replay (ADR 0278)", () => {
+  it("rebuilds a Task call once and lets the settled copy win", () => {
+    const immediate = restartedTaskRow("call-1", {
+      delegationId: "d1",
+      agent: "explorer",
+      status: "running",
+    });
+    const settled = restartedTaskRow("call-1", {
+      delegationId: "d1",
+      agent: "explorer",
+      status: "completed",
+    });
+    const chains = rebuildChainsFromTranscript([
+      immediate,
+      delegateAssistant("a1", "found a", "call-1"),
+      settled,
+    ]);
+
+    expect(chains).toHaveLength(1);
+    expect(chains[0].toolCallIds).toEqual(["call-1"]);
+    expect(chains[0].delegationIds).toEqual(["d1"]);
+    expect(chains[0].latestStatus).toBe("completed");
+    expect(resolveRebuilt(chains, "d1").ok).toBe(true);
+  });
+
+  it("resolves every delegationId on a rebuilt chain, resume links included", () => {
+    const transcript: UiMessage[] = [
+      restartedTaskRow("call-1", {
+        delegationId: "d1",
+        agent: "explorer",
+        status: "completed",
+      }),
+      delegateAssistant("a1", "found a", "call-1"),
+      restartedTaskRow(
+        "call-2",
+        { delegationId: "d2", agent: "explorer", status: "completed" },
+        { args: { resume: "d1" } },
+      ),
+      delegateAssistant("a2", "covered b", "call-2"),
+    ];
+    const chains = rebuildChainsFromTranscript(transcript);
+
+    expect(chains).toHaveLength(1);
+    expect(chains[0].delegationIds).toEqual(["d1", "d2"]);
+    const registry = new DelegationChainRegistry();
+    registry.hydrate(chains);
+    for (const delegationId of ["d1", "d2"]) {
+      expect(registry.lookup(delegationId)?.delegateSessionId).toBe("d1");
+    }
+    expect(
+      registry
+        .resumableList({ runningDelegationIds: new Set() })
+        .map((entry) => entry.latestDelegationId),
+    ).toEqual(["d2"]);
+  });
+
+  it("gates a rebuilt chain on the lines its own rows read", () => {
+    const text = Array.from({ length: MAX_RESUMABLE_READ_LINES + 1 }, () => "x").join(
+      "\n",
+    );
+    const transcript: UiMessage[] = [
+      restartedTaskRow("call-1", {
+        delegationId: "d1",
+        agent: "explorer",
+        status: "completed",
+      }),
+      delegateTool(
+        "t1",
+        "Read",
+        { path: "huge.ts" },
+        { content: [{ type: "text", text }] },
+        "call-1",
+      ),
+    ];
+    const [chain] = rebuildChainsFromTranscript(transcript);
+
+    expect(chain.readLineCount).toBe(MAX_RESUMABLE_READ_LINES + 1);
+    expect(isChainWithinReadBudget(chain)).toBe(false);
+    expect(resolveRebuilt([chain], "d1")).toEqual({
+      ok: false,
+      error: { kind: "over-budget" },
+    });
+  });
+
+  it("replays a delegate tool row with the arguments its call recorded", () => {
+    const rows: UiMessage[] = [
+      delegateAssistant("a1", "reading src/app.ts", "call-1"),
+      delegateTool(
+        "t1",
+        "Read",
+        { path: "src/app.ts", offset: 3 },
+        { content: [{ type: "text", text: "body" }] },
+        "call-1",
+      ),
+    ];
+    const messages = chainRowsToMessages(rows, provider(), buildProviderModel(provider()));
+    const assistant = messages.find((message) => message.role === "assistant");
+
+    expect(
+      assistant?.role === "assistant" ? assistant.content : [],
+    ).toContainEqual({
+      type: "toolCall",
+      id: "t1",
+      name: "Read",
+      arguments: { path: "src/app.ts", offset: 3 },
+    });
+    expect(messages.map((message) => message.role)).toEqual([
+      "assistant",
+      "toolResult",
+    ]);
   });
 });

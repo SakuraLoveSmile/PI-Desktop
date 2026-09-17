@@ -259,7 +259,7 @@ test("a delegate turn with both reasoning and text keeps both rows", () => {
   );
 });
 
-test("a resumed delegation continues in the latest Task card (ADR 0276)", () => {
+test("a resumed delegation continues in the latest Task card (ADR 0278)", () => {
   const { entries, visible } = buildTranscriptEntries([
     message("user", "user", "Audit the store"),
     message("task-1", "tool", "report", {
