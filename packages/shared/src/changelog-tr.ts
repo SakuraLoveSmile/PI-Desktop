@@ -14,7 +14,7 @@ export const trEntries: ChangelogEntry[] = [
       "Eklentiler tema değişkenleri, tema varlıkları ve saydam yüzen bir widget kaydedebilir.",
       "Bir projeyi sahip olduğu oturumlarla birlikte, ikinci bir onaydan sonra siler.",
       "Alt ajanlara sıralı bir model geri dönüş listesi verir; gelen yerleşik ajanlar Ayarlar'dan açılıp kapatılır.",
-      "macOS bildirimleri net.aiuo.pi-desktop altında kaydedilir, böylece kod imzalama kimliği paket kimliğiyle eşleşir.",
+      "Araç satırlarındaki dosya başvuruları doğru görünümü açar; ayrıntıları açmak okuma konumunu korur; Plan vurgusu opaktır.",
     ],
   },
 

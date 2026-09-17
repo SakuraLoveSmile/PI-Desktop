@@ -14,7 +14,7 @@ export const deEntries: ChangelogEntry[] = [
       "Plugins können Theme-Variablen, Theme-Assets und ein transparentes schwebendes Widget registrieren.",
       "Ein Projekt wird zusammen mit seinen eigenen Sitzungen gelöscht, nach einer zweiten Bestätigung.",
       "Subagenten erhalten eine geordnete Modell-Fallback-Liste; mitgelieferte Builtins lassen sich in den Einstellungen schalten.",
-      "macOS-Benachrichtigungen laufen unter net.aiuo.pi-desktop, damit die Code-Signing-ID mit der Bundle-ID übereinstimmt.",
+      "Dateiverweise in Tool-Zeilen öffnen die passende Ansicht; das Aufklappen hält die Leseposition; Plan-Freigabe-Hover ist undurchsichtig.",
     ],
   },
 

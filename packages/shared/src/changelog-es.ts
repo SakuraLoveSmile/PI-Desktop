@@ -14,7 +14,7 @@ export const esEntries: ChangelogEntry[] = [
       "Los plugins pueden registrar variables de tema, recursos de tema y un widget flotante transparente.",
       "Elimina un proyecto junto con las sesiones que le pertenecen, tras una segunda confirmación.",
       "Los subagentes tienen una lista ordenada de modelos de respaldo, y los builtins incluidos se pueden activar en Ajustes.",
-      "Las notificaciones de macOS se registran como net.aiuo.pi-desktop para que la identidad de firma coincida con el bundle ID.",
+      "Las referencias de archivo en filas de herramientas abren la vista correcta, expandir detalles mantiene la lectura, y el hover de Plan es una placa opaca.",
     ],
   },
 
