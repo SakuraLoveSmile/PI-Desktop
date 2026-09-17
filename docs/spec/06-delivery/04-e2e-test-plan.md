@@ -11,17 +11,18 @@
 ### E2E-PLUGIN-appearance-extension-lifecycle
 
 - **Preconditions:** A fixture plugin declares `ui.theme`, `ui.settings`, one
-  asset-backed theme with a typed `--fixture-backdrop-blur` `0..20px` variable,
-  and one Settings HTML entry.
+  asset-backed scenic card with a typed `--nexus-backdrop-blur` `0..20px` variable.
 - **Steps:** Open Settings, find the final Extensions group by search and
   keyboard navigation, open the entry, change the variable, select/reselect the
   theme, restart, then disable, reload and uninstall the plugin while its entry
   is active.
-- **Expected:** Only the declared variable rule changes; static
-  `plugin-asset://` URLs remain valid; the value restores after restart; no
-  plugin page covers native controls or core Settings. Invalid/cross-plugin
-  values are refused. Every lifecycle transition removes the entry and returns
-  the app to General.
+- **Expected:** Only the declared variable rule changes after Apply; static
+  `plugin-asset://` URLs remain valid; the value restores after restart; host-
+  rendered cards retain the scenic backdrop behind their translucent content,
+  have no opaque native rectangle, and leave Windows/Linux minimize/maximize
+  controls clickable while Settings is open. Invalid/cross-plugin values are
+  refused. Every lifecycle transition removes the entry and returns the app to
+  General.
 - **Status:** Documented; run after integration into main.
 
 - Document every user-visible and protocol-visible behavior that MVP must verify.

@@ -635,7 +635,11 @@ system while preserving their different data ownership:
 6. General shows the host-backed Appearance card; the AI destination shows
    Permissions and Defaults, including the Command shell row; the
    Shortcuts destination shows the Keyboard shortcuts card; Info shows the
-   Developer card. No additional settings destinations are rendered. Token
+   Developer card. Plugin-contributed destinations, when present, appear after
+   every core group under Extensions. Each destination is a renderer-composited
+   sandboxed surface: it preserves the existing Settings rail, titlebar,
+   Windows/Linux minimize/maximize controls, native drag/resize regions, and
+   content geometry. Token
    usage lives in plugin `pi.token-insights`, not Settings.
 7. Provider secrets never display raw key values
 8. Model configuration shows compact Defaults, separate vendor accounts, the

@@ -305,6 +305,7 @@ export function AppShell() {
       )}
       style={{ "--ds-sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
+      <div className="app-scenic-backdrop" aria-hidden />
       {shell}
       <ProjectCreateDialog />
       {splash}

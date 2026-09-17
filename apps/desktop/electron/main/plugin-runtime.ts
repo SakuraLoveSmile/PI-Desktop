@@ -1016,7 +1016,7 @@ export function resolveInsidePlugin(pluginPath: string, relative: string): strin
  * referencing one is refused instead of served from a half-honoured list.
  */
 function resolveThemeAssets(
-  _pluginPath: string,
+  pluginPath: string,
   declared: readonly string[],
 ): { files: Map<string, string>; dropped: number } {
   const files = new Map<string, string>();
@@ -1024,16 +1024,15 @@ function resolveThemeAssets(
   let total = 0;
   let dropped = 0;
   for (const asset of declared) {
-    // A theme asset is an absolute path; `normalizeThemeAssetPath` rejects
-    // package-relative references, so nothing is resolved against the package
-    // root any more. The plugin is the one naming the file.
     const normalized = normalizeThemeAssetPath(asset);
-    if (!normalized) {
+    if (!normalized || normalized.split("/").includes("node_modules")) {
       dropped += 1;
       continue;
     }
-    const absolute = normalized;
-    if (!existsSync(absolute)) {
+    const absolute = isExternalThemeAssetPath(normalized)
+      ? normalized
+      : resolveInsidePlugin(pluginPath, normalized);
+    if (!absolute || !existsSync(absolute)) {
       dropped += 1;
       continue;
     }
@@ -1319,6 +1318,25 @@ export class PluginRuntime {
 
   getLoaded(pluginId: string): LoadedPlugin | undefined {
     return this.loaded.get(pluginId);
+  }
+
+  /**
+   * Read a persisted declared variable without exposing the plugin's private
+   * settings record. Host-rendered scenic destinations use this only after
+   * validating the matching declaration themselves.
+   */
+  getThemeVariableValue(pluginId: string, themeId: string, name: string): unknown {
+    const loaded = this.loaded.get(pluginId);
+    if (!loaded) return undefined;
+    return this.readThemeVariableValues(loaded, themeId)[name];
+  }
+
+  async setScenicThemeBlur(pluginId: string, themeId: string, blur: number): Promise<void> {
+    const loaded = this.loaded.get(pluginId);
+    if (!loaded || !loaded.permissions.has("ui.theme")) {
+      throw apiError("PERMISSION_DENIED", "ui.theme");
+    }
+    await this.hostApi(loaded).themes.setVariables(themeId, { "--nexus-backdrop-blur": blur });
   }
 
   /** Return the manifest-backed settings view for the installed-plugin UI. */

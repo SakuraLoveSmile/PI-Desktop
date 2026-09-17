@@ -89,6 +89,54 @@ test("sidebar paints color and optional image layers separately", () => {
   assert.match(darwin, /--ds-bg-sidebar-image/);
 });
 
+test("scenic plugins use the normal full-window shell for compositing", () => {
+  const baseSrc = readFileSync(join(desktopRoot, "src/styles/base.css"), "utf8");
+  const settingsSrc = readFileSync(join(desktopRoot, "src/styles/settings.css"), "utf8");
+  assert.match(baseSrc, /\.app-shell\s*\{[^}]*position:\s*relative;[^}]*isolation:\s*isolate/s);
+  assert.match(baseSrc, /\.app-scenic-backdrop\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0/s);
+  assert.match(baseSrc, /\.app-shell\s*>\s*:not\(\.app-scenic-backdrop\)[^}]*z-index:\s*1/s);
+  assert.match(settingsSrc, /data-plugin-theme\^="plugin:io\.github\.akshayxkill\.nexus-scenic-themes:/);
+  assert.match(settingsSrc, /\.app-shell\.settings-mode[^}]*background:\s*transparent\s*!important/s);
+  assert.match(settingsSrc, /\.settings-content[^}]*background:\s*transparent\s*!important/s);
+});
+
+test("scenic plugin themes expose a full-window settings compositing hook", () => {
+  const settingsCss = readFileSync(join(desktopRoot, "src/styles/settings.css"), "utf8");
+  assert.match(settingsCss, /data-plugin-theme\^="plugin:io\.github\.akshayxkill\.nexus-scenic-themes:/);
+  assert.match(settingsCss, /\.app-shell\.settings-mode[^}]*background:\s*transparent\s*!important/s);
+  assert.match(settingsCss, /\.settings-content[^}]*background:\s*transparent\s*!important/s);
+  assert.match(settingsCss, /\.settings-shell-full\s+\.settings-nav[^}]*background:\s*color-mix/s);
+  assert.match(settingsCss, /\.settings-panel[^}]*background:\s*color-mix/s);
+});
+
+test("scenic background is a host root layer, not an app-shell pseudo-element", () => {
+  assert.match(appSrc, /className=\"app-scenic-backdrop\"/);
+  assert.match(readFileSync(join(desktopRoot, "src/styles/base.css"), "utf8"), /\.app-scenic-backdrop\s*\{[^}]*position:\s*fixed/s);
+  assert.match(readFileSync(join(desktopRoot, "src/styles/base.css"), "utf8"), /\.app-shell\s*>\s*:\s*not\(\.app-scenic-backdrop\)/);
+});
+
+test("core Settings navigation dismisses an active plugin destination", () => {
+  const source = readFileSync(join(desktopRoot, "src/features/settings/SettingsPage.tsx"), "utf8");
+  assert.match(source, /setActiveExtension\(null\);\s*setSettingsTab\(item\.id\);/s);
+});
+
+test("scenic plugin controls theme the native window-control band without changing geometry", () => {
+  const themesRoot = "C:/jcode projects/worktrees/nexus-scenic-settings-20260915/plugins/io.github.akshayxkill.nexus-scenic-themes/themes";
+  for (const name of ["twilight-mountains", "alpine-light", "obsidian-horizon", "emerald-afterglow"]) {
+    const css = readFileSync(join(themesRoot, `${name}.css`), "utf8");
+    assert.match(css, /\.window-controls\s*\{[^}]*background:/s);
+    assert.doesNotMatch(css, /\.window-controls\s*\{[^}]*position\s*:/s);
+  }
+});
+
+test("host-rendered scenic Settings destinations leave native controls outside extension content", () => {
+  const component = readFileSync(join(repoRoot, "apps/desktop/src/components/settings/PluginScenicThemesDestination.tsx"), "utf8");
+  const css = readFileSync(join(repoRoot, "apps/desktop/src/styles/settings.css"), "utf8");
+  assert.doesNotMatch(component, /<iframe/);
+  assert.match(css, /\.plugin-scenic-themes-destination\s*\{[\s\S]*?background:\s*transparent/s);
+});
+
+
 test("themes only load with ui.theme and are withdrawn on unload", () => {
   const register = runtimeSrc.slice(runtimeSrc.indexOf("private registerThemes"));
   assert.match(register, /permissions\.has\("ui\.theme"\)/);
