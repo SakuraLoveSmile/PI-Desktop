@@ -66,11 +66,12 @@
     max-width: 32px;
     flex: 0 0 32px;
     justify-content: center;
-    gap: 3px !important;
+    gap: 0 !important;
     padding: 0 !important;
   }
 
-  .composer-model-thinking-model {
+  .composer-model-thinking-model,
+  .composer-model-thinking-chevron {
     display: none;
   }
 
