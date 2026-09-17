@@ -1551,8 +1551,11 @@ identify the platform validation still needed.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11)
 - **Acceptance**: C (send/UI), Quality
 - **Milestone**: M2
-- **Status**: Source-covered (`composer-responsive.test.mjs`); rendered
-  validation on the integrated `main` remains pending
+- **Status**: Automated on task candidate `737435248ebd32e0b2a406f93b7b245784bc4289`
+  (base `cea6e02c`): `pnpm test:e2e:layout` 167/167 including the 450px
+  model-chip assertion; `pnpm test:e2e:composer-autocomplete` and
+  `pnpm test:e2e:composer-paste` passed. Source-covered by
+  `composer-responsive.test.mjs`.
 
 #### E2E-090: Transcript bottom reserve tracks the docked composer height
 
