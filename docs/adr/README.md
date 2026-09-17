@@ -261,7 +261,7 @@ Each ADR includes:
 | 0236 | Restore archived projects when session import adds a bound session | Accepted |
 | 0237 | Keep Session Orchestration in an Official Plugin | Accepted |
 | 0238 | Prioritize MainChat in the three-column shell | Accepted (amends ADR 0226) |
-| 0239 | Host-owned session collaboration messages | Accepted (amends ADR 0237 / 0165 / 0213) |
+| 0239 | Host-owned session collaboration messages | Accepted (amends ADR 0237 / 0165 / 0213; amended by D446) |
 | 0240 | Independent session discovery and navigable collaboration projections | Accepted (amends ADR 0239) |
 | 0241 | Ship the file view as a vendored, updatable plugin | Accepted (supersedes ADR 0105; issue #304) |
 | 0242 | Delta-only coalesced streaming updates | Accepted (amends 0127 / 0130 / 0149 / 0153; issue #299) |

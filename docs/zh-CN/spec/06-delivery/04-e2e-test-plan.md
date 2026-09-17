@@ -118,6 +118,7 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - 导入扩展依赖安装或 registry 边界改动：`pnpm test:e2e:plugin-import-deps`。
 - 受信任扩展或插件扩展改动：`pnpm test:e2e:trusted-extensions`。
 - 会话通信 / Session Orchestrator：`pnpm test:e2e:collaboration`。
+- 完成通知静默或静默回合契约（D193 / D446）：`pnpm test:e2e:session-completion`。
 - 同时涉及多个面的改动使用适用套件的并集。
 
 `pnpm test:e2e` 是 host RPC、IPC、Agent 执行、插件、持久化集成和共享运行时合约的默认跨系统烟雾测试。由于显示、平台、凭据、硬件或其他环境能力缺失而无法运行的必需套件，必须记录为 `NOT RUN`，并说明原因、替代验证和剩余风险。在具备条件且可信的环境中通过前，该 pull request 不具备合入条件。
@@ -7192,6 +7193,30 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **验收**：C（对话与流式）、D（插件安全）、G（插件）、品质
 - **里程碑**：M6+
 - **状态**：host 发现和双向投递由 `pnpm test:e2e:collaboration` 自动化；插件和 host-core 回归覆盖已自动化。真实 provider/Electron 多会话旅程仍需在具备条件的 runner 中验证，遵循无本地 E2E 策略
+
+#### E2E-SESSION-completion-notice-allows-silence：可信完成通知允许无需确认即结束
+
+- **前提**：候选提交拥有独立构建的 host-core 和 runtime sidecar；本地 SSE
+  提供商确定性返回可见文本或成功的空响应，无需真实凭证。
+- **步骤**：1）通过真实 Host 协作账本及 sidecar 投递任务，读取成功结果并完成
+  协调者总结。2）使用生产 Main 输入解析器解析排队的完成回调，再让接收会话
+  收到空 SSE 响应。3）在同一接收运行时依次发送普通用户请求、复制的完成
+  来源文本、账本 task 和 message，并都返回空响应。
+- **预期**：原结果保持不变。完成通知只有一次提供商请求、无错误、一次终止
+  生命周期，账本状态为 completed，且不产生确认回调。每个普通输入仍只重试
+  一次并以 `EMPTY_MODEL_RESPONSE` 结束，且静默通知之后接收方发出的任何请求
+  都不携带空的 assistant 消息。单测另覆盖缺少回复目标 ID、目标不符、工具
+  批次消耗例外、provider 重试保留例外、被接受的用户 steering 进入上下文后
+  撤销例外，以及被接受的静默不进入运行时条目和 pi 转录状态。
+- **关联规格**：`03-runtime/02-agent-runtime.md` §5e、
+  `03-runtime/08-error-codes.md`、ADR 0239（D446 修订段）
+- **验收**：C（会话与流）、D（来源）、质量
+- **里程碑**：M6+
+- **状态**：由 `pnpm test:e2e:session-completion` 在独立 worktree 中对已提交并
+  rebase 的候选版本自动验证。测试驱动真实 Host RPC、生产来源解析器、sidecar
+  和本地 SSE，并在 Host 结算前持久化运行时消息；不覆盖 Electron 队列/outbox
+  界面或真实提供商。候选与基线 SHA 及结果记录于验证报告；既有账本测试另用
+  `pnpm test:e2e:collaboration` 运行。
 
 #### E2E-SESSION-hover-card-model-and-links：会话 hover 卡片展示可读模型并支持创建关系导航
 
