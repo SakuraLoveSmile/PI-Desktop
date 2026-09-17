@@ -172,6 +172,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   Manual `/compact` remains available from the command palette for an idle
   session; the transcript shows where each compaction happened and the context
   usage inspector shows whether a checkpoint is installed.
+- **Voice** card: default ASR and TTS bindings (`AppSettings.speech`). Each
+  role picks an existing provider, a protocol (`openai_audio` /
+  `openai_chat_audio` plus plugin adapters), and a model id. TTS may set a
+  voice. Unconfigured roles disable the matching Composer action. Whisper / TTS
+  models do not appear in the chat model picker. See spec `20-speech.md`.
 
 Token usage is **not a Settings destination** (D335 / ADR 0173). Completed-turn
 history stays host-owned (`session.endTurn.usage`, `stats.getTokenUsageHistory`).

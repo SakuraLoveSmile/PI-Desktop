@@ -56,6 +56,7 @@ import {
 import { useComposerAttachments } from "../features/chat/composer/hooks/useComposerAttachments";
 import { useComposerDraft } from "../features/chat/composer/hooks/useComposerDraft";
 import { useComposerSubmit } from "../features/chat/composer/hooks/useComposerSubmit";
+import { useComposerSpeech } from "../features/chat/composer/hooks/useComposerSpeech";
 import { ComposerInput } from "../features/chat/composer/ComposerInput";
 import { useComposerModelMenu } from "../features/chat/composer/hooks/useComposerModelMenu";
 import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
@@ -436,7 +437,16 @@ export function Composer({
     submit,
   } = submitController;
 
-
+  const speech = useComposerSpeech({
+    activeSessionId,
+    value,
+    enhancementDraft,
+    activeFileReferences,
+    applyEditorDraft,
+    t,
+    showToast,
+    controlsBlocked,
+  });
   const composerAc = useComposerAutocomplete({
     value,
     cursor,
@@ -607,6 +617,12 @@ export function Composer({
             clearEnhancementError={clearEnhancementError}
             runActive={runActive}
             hasDraftContent={hasDraftContent}
+            transcribeEnabled={speech.transcribeEnabled}
+            speakEnabled={speech.speakEnabled}
+            transcribing={speech.transcribing}
+            speaking={speech.speaking}
+            transcribe={speech.transcribe}
+            speak={speech.speak}
             abort={abort}
             submit={submit}
           />

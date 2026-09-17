@@ -284,6 +284,7 @@ type PluginPermission =
  | "session.delete.own"
  | "audio.capture.background"
  | "audio.playback.background"
+ | "speech.adapter.register"
  | "keyboard.globalShortcut"
  | "net.websocket";
 ```
