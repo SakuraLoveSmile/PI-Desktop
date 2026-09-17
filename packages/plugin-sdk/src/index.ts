@@ -162,7 +162,11 @@ export type PluginManifest = {
   activationEvents?: string[];
 };
 
-/** A plugin-provided label. Shell UI may add locales; plugins still ship en + zh-CN. */
+/**
+ * Host-owned chrome labels (`ui.title`, views, destinations, session sources).
+ * Do not use this for plugin-owned copy; read `pi.app.getLocale` instead
+ * (ADR 0280). Shell UI may add locales; plugins still ship en + zh-CN.
+ */
 export type PluginLocalizedString = {
   en: string;
   "zh-CN": string;
@@ -333,7 +337,9 @@ export type PluginSettingOption = {
 
 export type PluginSettingContrib = {
   key: string;
+  /** Author-language label for the generated sheet. Not a locale map (ADR 0280). */
   title: string;
+  /** Author-language help text for the generated sheet. */
   description?: string;
   type: PluginSettingType;
   default?: unknown;
@@ -896,6 +902,7 @@ export type PluginThemeSummary = {
 export type PluginHostApi = {
   app: {
     getVersion: () => Promise<string>;
+    /** Active app language. Plugin-owned UI localizes from this (ADR 0280). */
     getLocale: () => Promise<string>;
     getAppearance: () => Promise<PluginAppearance>;
     /**
