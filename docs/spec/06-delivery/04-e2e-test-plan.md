@@ -12275,7 +12275,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
      theme color overrides and a sidebar background image.
 - **Expected**: Both navigation surfaces share one material. Settings navigation
   and shell have no entrance animation; only content inside its opaque pane
-  animates. On macOS all ancestors behind the rail are transparent, while right
+  animates, and that motion is opacity-only so it cannot trap `position: fixed`
+  overlays. Settings dialogs cover the full window, including the rail. On macOS
+  all ancestors behind the rail are transparent, while right
   content and titlebar stay opaque. Returning to an expanded sidebar starts and
   stays at 275px without sidebar-in events; a collapsed sidebar stays absent.
   A real reopen still produces sidebar-in and a width ramp. Legacy theme color
@@ -12293,7 +12295,8 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Windows/Linux or OS material/theme validation. Optional
   `PI_DESKTOP_LAYOUT_ARTIFACT_DIR` captures renderer screenshots. State tests in
   `sidebar-settings-return.test.mjs` cover initial presentation, both interrupted
-  phases, hidden-state changes and reversals. `pnpm test:e2e:theme-surfaces`
+  phases, hidden-state changes and reversals. `settings-dialog-overlay.test.mjs`
+  covers the full-window overlay contract. `pnpm test:e2e:theme-surfaces`
   verifies the opaque fallback and legacy theme override in real Chromium.
 
 #### E2E-AGENT-alt-enter-steers-active-turn: Enter follows up and Alt+Enter steers the active turn

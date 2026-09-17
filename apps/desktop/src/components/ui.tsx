@@ -15,6 +15,12 @@ import {
 export function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
+
+/** Mount a modal overlay on document.body so a transformed ancestor cannot trap `position: fixed`. */
+export function portalOverlay(node: ReactNode) {
+  return typeof document === "undefined" ? node : createPortal(node, document.body);
+}
+
 function setRef<T>(ref: Ref<T> | undefined, value: T | null) {
   if (typeof ref === "function") ref(value);
   else if (ref) (ref as { current: T | null }).current = value;

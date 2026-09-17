@@ -168,14 +168,18 @@
     both;
 }
 
+/*
+  Opacity only. `animation-fill-mode: both` would otherwise leave a transform
+  on this ancestor, which becomes a containing block for `position: fixed`
+  descendants. Settings dialogs would then cover the content pane instead of
+  the window, leaking the rail and section title behind the scrim.
+*/
 @keyframes route-surface-in {
   from {
     opacity: 0;
-    transform: translateY(5px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
