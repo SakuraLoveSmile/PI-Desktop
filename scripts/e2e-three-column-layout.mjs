@@ -844,6 +844,94 @@ async function main() {
         ),
       "plugin route remains visible after preview mode",
     );
+    // E2E: a plugin modal covers the window chrome. The 46px band is an opaque
+    // absolute row, and the route surface must not hold a stacking context that
+    // leaves the modal's veil underneath it — that is what put the band over
+    // the install consent. The viewport-fixed work-panel toggle sits inside the
+    // band and used to paint over the veil too; it must not any more.
+    // Measure after the entrance: opacity animation still creates a stacking
+    // context while it is in effect, even without a fill.
+    await waitFor(
+      () =>
+        cdp.evaluate(`(() => {
+          const surface = document.querySelector(".route-surface");
+          if (!surface) return false;
+          const animations = surface.getAnimations();
+          return animations.length === 0
+            || animations.every((animation) => animation.playState === "finished");
+        })()`),
+      "plugin route entrance finished",
+    );
+    await cdp.evaluate(`document.querySelector(".plugins-header-menu")?.click?.()`);
+    await waitFor(
+      () =>
+        cdp.evaluate(
+          `!!document.querySelector('[role="menuitem"][data-action="newFromTemplate"]')`,
+        ),
+      "plugins overflow newFromTemplate item",
+    );
+    await cdp.evaluate(
+      `document.querySelector('[role="menuitem"][data-action="newFromTemplate"]')?.click?.()`,
+    );
+    await waitFor(
+      () => cdp.evaluate(`!!document.querySelector(".plugins-modal-backdrop")`),
+      "plugin template modal",
+    );
+    const modalCoverage = await cdp.evaluate(`(() => {
+      const veil = document.querySelector(".plugins-modal-backdrop");
+      if (!veil) return { opened: false };
+      const toggle = document.querySelector(".app-work-panel-toggle");
+      const toggleBox = toggle?.getBoundingClientRect();
+      const toggleStack = toggleBox
+        ? document.elementsFromPoint(
+            toggleBox.left + toggleBox.width / 2,
+            toggleBox.top + toggleBox.height / 2,
+          )
+        : [];
+      // The band opts out of pointer events, so it is made an explicit target
+      // for this one measurement and put back afterwards.
+      const band = document.querySelector(".main-titlebar");
+      const previous = band?.style.pointerEvents ?? "";
+      if (band) band.style.pointerEvents = "auto";
+      const bandBox = band?.getBoundingClientRect();
+      const bandStack = bandBox
+        ? document.elementsFromPoint(
+            bandBox.left + bandBox.width / 2,
+            bandBox.top + bandBox.height / 2,
+          )
+        : [];
+      if (band) band.style.pointerEvents = previous;
+      return {
+        opened: true,
+        veilIsTopmostAtToggle: toggleStack[0] === veil,
+        toggleTopmost: (toggleStack[0]?.className ?? toggleStack[0]?.tagName ?? "").toString().slice(0, 40),
+        bandIsTopmost: bandStack[0] === band,
+        bandTopmost: (bandStack[0]?.className ?? bandStack[0]?.tagName ?? "").toString().slice(0, 40),
+      };
+    })()`);
+    check(
+      modalCoverage.opened === true,
+      "a plugin modal opens over the plugins route",
+      JSON.stringify(modalCoverage),
+    );
+    check(
+      modalCoverage.veilIsTopmostAtToggle === true,
+      "the modal veil covers the work-panel toggle in the titlebar band",
+      JSON.stringify(modalCoverage),
+    );
+    check(
+      modalCoverage.bandIsTopmost === false,
+      "the titlebar band does not paint over the modal veil",
+      JSON.stringify(modalCoverage),
+    );
+    await cdp.evaluate(
+      `document.querySelector('.plugins-modal-backdrop .plugins-modal-actions [data-action="cancel"]')?.click?.()`,
+    );
+    await waitFor(
+      () => cdp.evaluate(`!document.querySelector(".plugins-modal-backdrop")`),
+      "plugin modal closed",
+    );
+    check(true, "the plugin modal closes and leaves the route clean");
     // Once Extensions is active the footer Plugins button reuses the existing
     // Back action, so a second activation returns to the previous destination
     // (E2E-NAV-plugins-button-goes-back).
