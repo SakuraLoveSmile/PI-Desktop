@@ -13021,3 +13021,26 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Acceptance**: G (remote marketplace source)
 - **Milestone**: M6+
 - **Status**: Draft
+
+### E2E-CHAT-turn-process-and-thinking-display
+
+- **Preconditions:** A turn with thinking, multiple tools, intermediate progress
+  and a final answer; detailed and compact display modes.
+- **Steps:** Stream the turn; finish it; expand/collapse its process; search an
+  intermediate message; switch display modes through Settings → AI → Defaults.
+  Repeat with a stopped partial answer, an assistant error and a failed tool.
+- **Expected:** Completed work has one collapsed process plus its final answer.
+  Manual choices survive updates; search reveals its target; live answer text
+  stays readable. Errors and stopped trailing text stay visible. Compact mode
+  exposes no reasoning text or excerpt, shows a live indicator, and leaves no
+  completed thinking-only header. Tools and progress remain accessible. Switching
+  to detailed restores reasoning from unchanged messages. Saved mode survives
+  application restart; an older settings blob without the field uses detailed.
+- **Automation:** `test:e2e:transcript` covers the mounted renderer interactions,
+  settings control and unchanged-group performance. `test:e2e:transcript-disclosure`
+  covers scroll anchoring; `test:e2e:theme-surfaces` covers the shared theme
+  controls. Isolated Host `settings.set/get` checks verify both modes across
+  process restart and preservation during unrelated partial settings writes.
+  Renderer fixtures alone do not prove settings persistence.
+- **Specs:** 04-ux/06-settings-ia, 04-ux/08-component-spec,
+  04-ux/09-interaction-patterns; ADR turn-process-and-thinking-display.

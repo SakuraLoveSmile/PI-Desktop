@@ -223,6 +223,10 @@ CREATE TABLE kv (
 | `plugin:<id>` | per-plugin settings; uninstall = `DELETE WHERE ns = ?` |
 | `projectMemory` | durable user-authored context keyed by canonical project path; structured values contain `format: "entries-v1"`, visual `entries`, derived `content`, and `updatedAt` |
 
+The app settings JSON optionally stores `thinkingDisplayMode` (`detailed` or
+`compact`). Missing values retain detailed presentation. This additive display
+preference neither rewrites stored reasoning nor changes the database schema.
+
 New config domains (e.g. MCP servers) start as a namespace; they graduate to
 tables only when they need relations or indexes.
 

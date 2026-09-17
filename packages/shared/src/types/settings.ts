@@ -41,6 +41,8 @@ export type AppSettings = {
    * Absent means 1. Range 0.8–1.5 in 0.025 steps. Window zoom is independent.
    */
   fontScale?: number;
+  /** Transcript presentation only; absent means detailed. Reasoning is retained. */
+  thinkingDisplayMode?: "detailed" | "compact";
   /**
    * @deprecated Unreleased D343 px field. Reads migrate into `fontScale`
    * as `px / 14`; new writes persist `fontScale` instead.

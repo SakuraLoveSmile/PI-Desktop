@@ -786,6 +786,31 @@ reading surface of the workstation.
   the draft grows. `.jump-latest-btn` and `.minimap-rail` anchor to the same
   variable so they stay just above the composer.
 
+### Turn process and thinking display
+
+Each assistant-turn entry has one process disclosure containing reasoning,
+tools and intermediate assistant text in transcript order. Its trailing answer
+streams outside the disclosure. Later activity moves a provisional answer into
+the process without altering the stored message. Assistant errors and trailing
+aborted partial replies stay visible. Compaction and user/system boundaries are
+unchanged.
+
+Completed process areas start collapsed; detailed mode opens the active process.
+Manual choices and search reveals own the disclosure until unmount. Failed tools
+open an unclaimed active process and keep their invocation-level error presentation.
+The header shows elapsed time and the visible process step count. Its thinking
+label applies only while the latest activity is streaming reasoning without answer
+text; streamed answers use the processing label. Delegation
+cards and individual tool details remain available inside the process.
+
+`thinkingDisplayMode` defaults to `detailed`. In `compact`, reasoning text and
+excerpts are absent, active reasoning has a status indicator, and completed
+thinking rows disappear. Tools and intermediate text remain accessible; a
+thinking-only completed process has no empty header. The setting also applies
+to nested thinking rows and updates mounted history. It never removes stored
+reasoning or changes model thinking configuration. See
+[ADR turn-process-and-thinking-display](../../adr/turn-process-and-thinking-display.md).
+
 ### 4.4 States
 
 | State | Behavior |
