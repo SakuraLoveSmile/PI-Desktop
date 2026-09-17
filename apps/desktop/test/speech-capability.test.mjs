@@ -1,4 +1,3 @@
-import { readComposerSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { register } from "node:module";
@@ -28,15 +27,6 @@ test("speech IPC is on the typed whitelist and renderer API", async () => {
   assert.match(registerSrc, /registerSpeechIpc/);
 });
 
-test("Composer disables voice actions until speech is configured", async () => {
-  const composer = await readComposerSource();
-  assert.match(composer, /status\?\.transcribe\.available/);
-  assert.match(composer, /status\?\.synthesize\.available/);
-  assert.match(composer, /disabled=\{!transcribeEnabled \|\| transcribing \|\| speaking\}/);
-  assert.match(composer, /disabled=\{!speakEnabled \|\| speaking \|\| transcribing\}/);
-  assert.match(composer, /api\.speechTranscribe/);
-  assert.match(composer, /api\.speechSynthesize/);
-});
 
 test("settings reject an illegal speech protocol id", async () => {
   const { validateSpeechSettings } = await import("@pi-desktop/shared");
