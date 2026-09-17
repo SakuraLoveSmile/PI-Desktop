@@ -1,3 +1,4 @@
+import { isThinkingActive, resolveThinkingDisplayMode } from "../../../lib/turn-process";
 import {
   memo,
   useCallback,
@@ -551,6 +552,15 @@ export const ThinkingRow = memo(function ThinkingRow({
     onUserInteraction?.();
     collapseDisclosure();
   }, [collapseDisclosure, onUserInteraction]);
+  const compact = useAppStore((state) => resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode) === "compact");
+  if (compact) {
+    return isThinkingActive(message, streaming) ? (
+      <div className="tool-row thinking thinking-compact" role="status">
+        <span className="tool-row-icon" aria-hidden><IconSparkles size={15} /></span>
+        <span className="tool-row-name running">{t("chat.thinking", { defaultValue: "Thinking" })}</span>
+      </div>
+    ) : null;
+  }
   const text = thinkingText(message);
   const summary = text.replace(/\s+/g, " ").trim();
   return (

@@ -139,7 +139,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   control column.
 - **Defaults** card: the host-backed default operating mode (Agent / Plan / Goal),
   command shell selection, Link open destination, context usage display
-  (remaining or used), Enter-to-send control, and the large text paste
+  (remaining or used), thinking display mode, Enter-to-send control, and the large text paste
   threshold. Link open destination uses the Work panel browser by default
   and can route plain HTTP(S) link clicks to the system browser. Context
   usage display controls whether the composer toolbar context ring and its
@@ -147,6 +147,12 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   is remaining. The threshold controls when a text-only paste becomes a
   temporary session-scratch file; it defaults to 600 characters and accepts
   integer values from 1 through 1,000,000.
+- **Thinking display mode** uses a menu select with Detailed (default) and
+  Compact. Detailed retains reasoning text; Compact shows only an active
+  thinking indicator and hides finished thought rows. The global preference
+  persists as `thinkingDisplayMode` in host-owned settings; missing values use
+  Detailed. It affects presentation only, not model reasoning configuration.
+  Settings search indexes the row and both mode names.
 - The **Command shell** row in Defaults uses the host-discovered catalog of native
   PowerShell 5.1, PowerShell 7, cmd, Git Bash, and Bash with IDs
   `windows-powershell`, `windows-pwsh`, `cmd`, `git-bash`, and

@@ -1,0 +1,140 @@
+import { useContext, useEffect, useId, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import type { AssistantTurnPart } from "../../../lib/assistant-turns";
+import { formatToolDuration } from "../../../lib/tool-display";
+import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
+import {
+  resolveThinkingDisplayMode,
+  turnProcessTiming,
+  visibleProcessSteps,
+} from "../../../lib/turn-process";
+import { useAppStore } from "../../../stores/app-store";
+import {
+  IconChevronRight,
+  IconCircleAlert,
+  IconSparkles,
+} from "../../../components/icons";
+import { DisclosureCollapseRail, useAutomaticDisclosure } from "./shared";
+
+export function TurnProcess({
+  parts,
+  timingParts,
+  isActive,
+  children,
+}: {
+  parts: readonly AssistantTurnPart[];
+  timingParts: readonly AssistantTurnPart[];
+  isActive: boolean;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const mode = useAppStore((state) =>
+    resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode),
+  );
+  const search = useContext(TranscriptSearchContext);
+  const reveal =
+    search &&
+    parts.some((part) =>
+      part.kind === "message"
+        ? part.message.id === search.messageId
+        : part.items.some(
+            (item) =>
+              item.message.id === search.messageId ||
+              (item.kind === "tool" &&
+                item.delegate?.items.some(
+                  (row) => row.message.id === search.messageId,
+                )),
+          ),
+    )
+      ? search.requestId
+      : undefined;
+  const failed = parts.some(
+    (part) =>
+      part.kind === "activity" &&
+      part.items.some(
+        (item) =>
+          item.kind === "tool" &&
+          (item.message.toolStatus === "error" ||
+            item.message.toolStatus === "denied" ||
+            item.message.isError),
+      ),
+  );
+  const thinkingOnly = parts.every(
+    (part) =>
+      part.kind === "activity" && part.items.every((item) => item.kind === "thinking"),
+  );
+  const disclosure = useAutomaticDisclosure(
+    isActive && (failed || mode === "detailed"),
+    reveal,
+  );
+  const detailsId = useId();
+  const [now, setNow] = useState(Date.now);
+  const { startedAt, endedAt } = turnProcessTiming(timingParts);
+  useEffect(() => {
+    if (!isActive) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isActive]);
+  const count = visibleProcessSteps(parts, mode, isActive);
+  if (count === 0) return null;
+  const seconds =
+    startedAt === undefined
+      ? 0
+      : Math.max(
+          0,
+          Math.floor(((isActive ? now : (endedAt ?? startedAt)) - startedAt) / 1000),
+        );
+  return (
+    <section
+      className={`turn-process${disclosure.open ? " open" : ""}${isActive ? " active" : ""}`}
+    >
+      <button
+        type="button"
+        ref={disclosure.titleRef}
+        className="tool-activity-header"
+        aria-expanded={disclosure.open}
+        aria-controls={detailsId}
+        onClick={disclosure.toggle}
+      >
+        <span className="tool-activity-icon" aria-hidden>
+          <IconSparkles size={14} />
+        </span>
+        <span className={`tool-activity-label${isActive ? " running" : ""}`}>
+          {t(
+            isActive
+              ? thinkingOnly
+                ? "chat.thinkingFor"
+                : "chat.processingFor"
+              : "chat.processedFor",
+            { time: formatToolDuration(seconds) },
+          )}
+        </span>
+        {failed ? (
+          <span className="turn-process-error" title={t("chat.toolFailed")}>
+            <IconCircleAlert size={14} aria-label={t("chat.toolFailed")} />
+          </span>
+        ) : null}
+        <span className="tool-activity-count">
+          {t("chat.processingSteps", { count })}
+        </span>
+        <span className="tool-activity-caret" aria-hidden>
+          <IconChevronRight size={12} />
+        </span>
+      </button>
+      <div
+        id={detailsId}
+        className="turn-process-body"
+        hidden={!disclosure.open}
+        inert={!disclosure.open}
+        onClickCapture={disclosure.claim}
+      >
+        <DisclosureCollapseRail
+          label={t("chat.collapseDetails")}
+          onCollapse={disclosure.collapse}
+        />
+        {children}
+      </div>
+    </section>
+  );
+}
