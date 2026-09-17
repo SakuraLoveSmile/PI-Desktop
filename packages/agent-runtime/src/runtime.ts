@@ -1573,7 +1573,11 @@ export class DesktopAgentRuntime {
    * One automatic re-run per prompt, then the failure becomes visible. */
   private pendingSilentTurnRerun = false;
   private silentTurnRerunAttempted = false;
-  /** Only a current Host-ledger completion notice may need no acknowledgement. */
+  /**
+   * The first settled reply to a current Host-ledger completion notice may
+   * need no acknowledgement (D446). Spent by that reply, and revoked as soon
+   * as accepted user steering enters the model context.
+   */
   private allowSilentCompletion = false;
   private silentTurnRerunInProgress = false;
   private suppressSilentTurnRunEnd = false;
@@ -6682,8 +6686,15 @@ Delegation rules:
         if (event.message.role === "user") {
           const steeringId = this.pendingSteering.get(event.message);
           const id = steeringId ?? this.pendingUserMessageId ?? randomUUID();
-          if (steeringId) this.pendingSteering.delete(event.message);
-          else this.pendingUserMessageId = undefined;
+          if (steeringId) {
+            this.pendingSteering.delete(event.message);
+            // User input is now part of the model context: whatever the model
+            // says next answers the user, not a completion notice, so the
+            // ordinary response contract applies again.
+            this.allowSilentCompletion = false;
+          } else {
+            this.pendingUserMessageId = undefined;
+          }
           this.appendLiveEntry(id, event.message);
           break;
         }
@@ -6768,12 +6779,20 @@ Delegation rules:
           // leaving the user with nothing: the reasoning that may hold the
           // answer is never rendered. Re-run once with a nudge before letting
           // that surface as a finished turn.
-          const silentTurn =
-            !this.allowSilentCompletion &&
+          const silence =
             !failed &&
             !aborted &&
             responseText.trim().length === 0 &&
             !messageRequestsTools(event.message);
+          // A completion notice needs no acknowledgement, so its own reply may
+          // stay silent (D446). The exception covers exactly that reply: the
+          // first settled response spends it, whether silent, textual, or a
+          // tool batch, so later replies in the same run answer tool results
+          // or user input under the ordinary contract. A provider failure
+          // keeps it for the retried attempt.
+          const exemptSilence = silence && this.allowSilentCompletion;
+          if (!failed && !aborted) this.allowSilentCompletion = false;
+          const silentTurn = silence && !exemptSilence;
           if (silentTurn && !this.silentTurnRerunAttempted) {
             this.silentTurnRerunAttempted = true;
             this.pendingSilentTurnRerun = true;
@@ -6918,7 +6937,18 @@ Delegation rules:
             this.compactionEnabled &&
             overflow &&
             !this.overflowRecoveryAttempted;
-          if (!failed && !aborted && !emptyResponse) {
+          if (exemptSilence) {
+            // Accepted silence is still nothing worth resending: keep it out
+            // of the runtime entries, exactly as a restored transcript would,
+            // and out of pi's transcript state so the next request carries no
+            // empty assistant message. pi appends the message before it
+            // notifies listeners; the identity check keeps this from touching
+            // anything else should that order ever change.
+            const messages = this.agent.state.messages;
+            if (messages.at(-1) === event.message) {
+              this.agent.state.messages = messages.slice(0, -1);
+            }
+          } else if (!failed && !aborted && !emptyResponse) {
             this.appendLiveEntry(assistantId, event.message);
           } else {
             this.turnHadError = true;
@@ -7455,8 +7485,6 @@ Delegation rules:
 
   steer(input: RuntimePrompt, expectedTurnId: string, message: UiMessage): { accepted: boolean; turnId: string } {
     this.steeringContext(expectedTurnId);
-    // User input accepted during a notice requires the ordinary response contract.
-    this.allowSilentCompletion = false;
     const queued: AgentMessage = { role: "user", content: promptContent(input), timestamp: Date.now() };
     this.pendingSteering.set(queued, message.id);
     this.agent.steer(queued);

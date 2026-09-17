@@ -88,6 +88,11 @@ async function runTurn(sessionId, content, delivery, expectedError = false) {
   assert.equal(errors.length, expectedError ? 1 : 0, JSON.stringify(errors));
   if (expectedError) assert.equal(errors[0].error.code, "EMPTY_MODEL_RESPONSE");
   assert.equal(requests.length - before, expectedError ? 2 : 1, "empty recovery is bounded and completion does not retry");
+  for (const payload of requests.slice(before)) {
+    const emptyAssistant = payload.messages.filter((message) =>
+      message.role === "assistant" && !message.tool_calls && !(typeof message.content === "string" ? message.content : "").trim());
+    assert.deepEqual(emptyAssistant, [], "no request carries an empty assistant message");
+  }
   assert.equal(turnEvents.filter((event) => event.type === "agent_end").length, 1);
   for (const event of turnEvents) {
     if (event.type === "message_end" && event.message.role === "assistant") {

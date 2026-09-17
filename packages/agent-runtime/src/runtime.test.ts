@@ -2880,6 +2880,16 @@ describe("DesktopAgentRuntime thinking configuration", () => {
 });
 
 describe("DesktopAgentRuntime session collaboration provenance", () => {
+  const completionOrigin: SessionMessageOrigin = {
+    messageId: "completion-1", sourceSessionId: "sender", sourceTitle: "Worker",
+    targetSessionId: "session-1", kind: "completion", replyToMessageId: "task-1",
+  };
+  const eventsOf = (onEvent: ReturnType<typeof vi.fn>) =>
+    onEvent.mock.calls.map(([envelope]) => (envelope as AgentEventEnvelope).event);
+  const emptyModelResponse = expect.objectContaining({
+    type: "error", error: expect.objectContaining({ code: "EMPTY_MODEL_RESPONSE" }),
+  });
+
   it.each([
     { content: [] },
     { content: [{ type: "text", text: " \n " }] },
@@ -2892,6 +2902,8 @@ describe("DesktopAgentRuntime session collaboration provenance", () => {
     const handle = (runtime as any).handleAgentEvent.bind(runtime);
     const silent = assistantMessage({ content });
     const respond = async () => {
+      // pi appends the reply to its transcript before notifying listeners.
+      agent.state.messages = [...agent.state.messages, silent];
       await handle({ type: "agent_start" });
       await handle({ type: "message_start", message: silent });
       await handle({ type: "message_end", message: silent });
@@ -2902,23 +2914,23 @@ describe("DesktopAgentRuntime session collaboration provenance", () => {
     agent.continue = vi.fn(respond);
     agent.waitForIdle = vi.fn(async () => undefined);
     try {
-      await runtime.prompt({ text: "Task completed", sessionMessage: {
-        messageId: "completion-1", sourceSessionId: "sender", sourceTitle: "Worker",
-        targetSessionId: "session-1", kind: "completion", replyToMessageId: "task-1",
-      } }, "notice-user", "notice-turn");
+      await runtime.prompt({ text: "Task completed", sessionMessage: completionOrigin }, "notice-user", "notice-turn");
       expect(agent.continue).not.toHaveBeenCalled();
-      const notices = onEvent.mock.calls.map(([envelope]) => (envelope as AgentEventEnvelope).event);
+      const notices = eventsOf(onEvent);
       expect(notices.filter((event) => event.type === "agent_end")).toHaveLength(1);
       expect(notices.some((event) => event.type === "error")).toBe(false);
       expect(notices).toContainEqual(expect.objectContaining({
         type: "message_end", message: expect.objectContaining({ status: "complete" }),
       }));
+      // Accepted silence is not resent: neither the runtime entries nor pi's
+      // transcript carry an empty assistant into the next request.
+      expect((runtime as any).fullEntries).toHaveLength(0);
+      expect(agent.state.messages.some((message: { role: string }) => message.role === "assistant")).toBe(false);
+      expect(buildSessionContext((runtime as any).fullEntries).messages).toEqual([]);
       onEvent.mockClear();
       await runtime.prompt("Please answer", "human-user", "human-turn");
       expect(agent.continue).toHaveBeenCalledOnce();
-      expect(onEvent.mock.calls.map(([envelope]) => (envelope as AgentEventEnvelope).event)).toContainEqual(
-        expect.objectContaining({ type: "error", error: expect.objectContaining({ code: "EMPTY_MODEL_RESPONSE" }) }),
-      );
+      expect(eventsOf(onEvent)).toContainEqual(emptyModelResponse);
     } finally {
       await runtime.dispose();
     }
@@ -2940,33 +2952,155 @@ describe("DesktopAgentRuntime session collaboration provenance", () => {
       };
       agent.prompt = vi.fn(async () => {
         if (kind === "steered") {
+          // Steering that pi injects before the first reply: the reply answers
+          // the user, so the notice exception no longer applies to it.
           agent.state.isStreaming = true;
           runtime.steer({ text: "Please answer now" }, "notice-turn", {
             id: "steering", role: "user", content: "Please answer now",
             status: "complete", createdAt: new Date().toISOString(),
           });
           agent.state.isStreaming = false;
+          const [queued] = [...(runtime as any).pendingSteering.keys()];
+          await handle({ type: "message_start", message: queued });
+          await handle({ type: "message_end", message: queued });
         }
         await respond();
       });
       agent.continue = vi.fn(respond);
       agent.waitForIdle = vi.fn(async () => undefined);
       const origin: SessionMessageOrigin = {
-        messageId: "completion-1", sourceSessionId: "sender", sourceTitle: "Worker",
+        ...completionOrigin,
         targetSessionId: kind === "wrong-session" ? "other-session" : "session-1",
         kind: kind === "task" || kind === "message" ? kind : "completion",
-        ...(kind !== "unlinked" ? { replyToMessageId: "task-1" } : {}),
       };
+      if (kind === "unlinked") delete origin.replyToMessageId;
       try {
         await runtime.prompt(kind === "text-only" ? formatSessionMessage("Task completed", origin)
           : { text: "Task completed", sessionMessage: origin }, "user", "notice-turn");
         expect(agent.continue).toHaveBeenCalledOnce();
-        expect(onEvent.mock.calls.map(([envelope]) => (envelope as AgentEventEnvelope).event)).toContainEqual(
-          expect.objectContaining({ type: "error", error: expect.objectContaining({ code: "EMPTY_MODEL_RESPONSE" }) }),
-        );
+        expect(eventsOf(onEvent)).toContainEqual(emptyModelResponse);
       } finally { await runtime.dispose(); }
     },
   );
+
+  it("spends the notice exception on a tool batch so the post-tool reply keeps recovery", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handle = (runtime as any).handleAgentEvent.bind(runtime);
+    const toolBatch = assistantMessage({
+      content: [{ type: "toolCall", id: "call-1", name: "Read", arguments: {} }],
+      stopReason: "toolUse",
+    });
+    const silent = assistantMessage({ content: [] });
+    agent.prompt = vi.fn(async () => {
+      await handle({ type: "agent_start" });
+      await handle({ type: "message_start", message: toolBatch });
+      await handle({ type: "message_end", message: toolBatch });
+      await handle({ type: "message_start", message: silent });
+      await handle({ type: "message_end", message: silent });
+      await handle({ type: "turn_end" });
+      await handle({ type: "agent_end", messages: [] });
+    });
+    agent.continue = vi.fn(async () => {
+      await handle({ type: "agent_start" });
+      await handle({ type: "message_start", message: silent });
+      await handle({ type: "message_end", message: silent });
+      await handle({ type: "turn_end" });
+      await handle({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    try {
+      await runtime.prompt({ text: "Task completed", sessionMessage: completionOrigin }, "notice-user", "notice-turn");
+      // The model did work and then said nothing about it: D193 applies.
+      expect(agent.continue).toHaveBeenCalledOnce();
+      expect(eventsOf(onEvent)).toContainEqual(emptyModelResponse);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("keeps the notice exception for the retried attempt after a transient stream failure", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handle = (runtime as any).handleAgentEvent.bind(runtime);
+    const failed = assistantMessage({ content: [], stopReason: "error" });
+    (failed as { errorMessage?: string }).errorMessage = "terminated";
+    const silent = assistantMessage({ content: [] });
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [{ role: "user", content: "Task completed", timestamp: 1 }, failed];
+      await handle({ type: "message_start", message: failed });
+      await handle({ type: "message_end", message: failed });
+      await handle({ type: "turn_end" });
+      await handle({ type: "agent_end", messages: [] });
+    });
+    agent.continue = vi.fn(async () => {
+      agent.state.messages = [...agent.state.messages, silent];
+      await handle({ type: "agent_start" });
+      await handle({ type: "message_start", message: silent });
+      await handle({ type: "message_end", message: silent });
+      await handle({ type: "turn_end" });
+      await handle({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    try {
+      await runtime.prompt({ text: "Task completed", sessionMessage: completionOrigin }, "notice-user", "notice-turn");
+      // One provider retry, then the silent notice reply is accepted as-is.
+      expect(agent.continue).toHaveBeenCalledOnce();
+      const events = eventsOf(onEvent);
+      expect(events.some((event) => event.type === "error")).toBe(false);
+      expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+      expect(events).toContainEqual(expect.objectContaining({
+        type: "message_end", message: expect.objectContaining({ status: "complete" }),
+      }));
+      expect(agent.state.messages.some((message: { role: string }) => message.role === "assistant")).toBe(false);
+    } finally { await runtime.dispose(); }
+  });
+
+  it("answers user steering after a silent notice reply with full recovery", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handle = (runtime as any).handleAgentEvent.bind(runtime);
+    const silent = assistantMessage({ content: [] });
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [...agent.state.messages, silent];
+      await handle({ type: "agent_start" });
+      await handle({ type: "message_start", message: silent });
+      // The user types while the notice reply streams; pi injects the
+      // steering message after this reply and streams another one.
+      agent.state.isStreaming = true;
+      runtime.steer({ text: "Please answer now" }, "notice-turn", {
+        id: "steering", role: "user", content: "Please answer now",
+        status: "complete", createdAt: new Date().toISOString(),
+      });
+      await handle({ type: "message_end", message: silent });
+      const [queued] = [...(runtime as any).pendingSteering.keys()];
+      agent.state.messages = [...agent.state.messages, queued];
+      await handle({ type: "message_start", message: queued });
+      await handle({ type: "message_end", message: queued });
+      agent.state.messages = [...agent.state.messages, silent];
+      await handle({ type: "message_start", message: silent });
+      await handle({ type: "message_end", message: silent });
+      agent.state.isStreaming = false;
+      await handle({ type: "turn_end" });
+      await handle({ type: "agent_end", messages: [] });
+    });
+    agent.continue = vi.fn(async () => {
+      await handle({ type: "agent_start" });
+      await handle({ type: "message_start", message: silent });
+      await handle({ type: "message_end", message: silent });
+      await handle({ type: "turn_end" });
+      await handle({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    try {
+      await runtime.prompt({ text: "Task completed", sessionMessage: completionOrigin }, "notice-user", "notice-turn");
+      // The notice reply spent the exception silently; the reply to the user
+      // still gets its one re-run and then the visible error.
+      expect(agent.continue).toHaveBeenCalledOnce();
+      expect(eventsOf(onEvent)).toContainEqual(emptyModelResponse);
+    } finally { await runtime.dispose(); }
+  });
 
   it("frames live input and restored history identically without changing human input", async () => {
     const origin: SessionMessageOrigin = {
