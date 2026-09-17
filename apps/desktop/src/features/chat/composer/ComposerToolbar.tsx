@@ -19,8 +19,6 @@ import {
   IconSparkles,
   IconStop,
   IconUndo2,
-  IconMic,
-  IconAudio,
 } from "../../../components/icons";
 import { ModeIcon } from "./ComposerModeIcon";
 import { ComposerModelPicker } from "./ComposerModelPicker";
@@ -64,12 +62,6 @@ export type ComposerToolbarProps = {
   clearEnhancementError: () => void;
   runActive: boolean;
   hasDraftContent: boolean;
-  transcribeEnabled: boolean;
-  speakEnabled: boolean;
-  transcribing: boolean;
-  speaking: boolean;
-  transcribe: () => Promise<void>;
-  speak: () => Promise<void>;
   abort: AppState["abort"];
   submit: () => Promise<void>;
 };
@@ -105,12 +97,6 @@ export function ComposerToolbar({
   clearEnhancementError,
   runActive,
   hasDraftContent,
-  transcribeEnabled,
-  speakEnabled,
-  transcribing,
-  speaking,
-  transcribe,
-  speak,
   abort,
   submit,
 }: ComposerToolbarProps) {
@@ -257,28 +243,6 @@ export function ComposerToolbar({
           controlsBlocked={controlsBlocked}
           onCloseOtherMenus={() => setPermissionOpen(false)}
         />
-        <TooltipButton
-          type="button"
-          className={`icon-btn icon-btn-square${transcribing ? " is-loading" : ""}`}
-          tooltip={t("chat.transcribe")}
-          ariaLabel={transcribing ? t("chat.transcribing") : t("chat.transcribe")}
-          aria-busy={transcribing}
-          disabled={!transcribeEnabled || transcribing || speaking}
-          onClick={() => void transcribe()}
-        >
-          {transcribing ? <span className="tool-spinner" aria-hidden="true" /> : <IconMic size={15} aria-hidden="true" />}
-        </TooltipButton>
-        <TooltipButton
-          type="button"
-          className={`icon-btn icon-btn-square${speaking ? " is-loading" : ""}`}
-          tooltip={t("chat.speak")}
-          ariaLabel={speaking ? t("chat.speaking") : t("chat.speak")}
-          aria-busy={speaking}
-          disabled={!speakEnabled || speaking || transcribing}
-          onClick={() => void speak()}
-        >
-          {speaking ? <span className="tool-spinner" aria-hidden="true" /> : <IconAudio size={15} aria-hidden="true" />}
-        </TooltipButton>
         <TooltipButton
           type="button"
           className={`icon-btn icon-btn-square composer-enhance-btn${enhancingPrompt ? " is-loading" : ""}`}
