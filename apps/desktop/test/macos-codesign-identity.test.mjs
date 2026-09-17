@@ -15,10 +15,9 @@ const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
 
-test("packaging binds the macOS codesign identifier after sign", () => {
+test("packaging binds the macOS codesign identifier after pack", () => {
   assert.equal(packageJson.build.appId, MAC_BUNDLE_ID);
-  assert.equal(packageJson.build.afterSign, "./scripts/after-sign.mjs");
-  assert.ok(!("afterPack" in packageJson.build));
+  assert.equal(packageJson.build.afterPack, "./scripts/after-pack.mjs");
 });
 
 test(

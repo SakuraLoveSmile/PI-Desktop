@@ -74,7 +74,7 @@
   },
   "build": {
     "appId": "net.aiuo.pi-desktop",
-    "afterSign": "./scripts/after-sign.mjs",
+    "afterPack": "./scripts/after-pack.mjs",
     "productName": "PI-Desktop",
     "directories": {
       "output": "release"
