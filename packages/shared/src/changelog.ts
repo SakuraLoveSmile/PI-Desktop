@@ -41,7 +41,7 @@ const enEntries: ChangelogEntry[] = [
       "Let plugins register theme variables, theme assets, and a transparent floating widget.",
       "Delete a project together with its owned sessions, after a second-click confirm.",
       "Give subagents an ordered model fallback list, and switch shipped builtins from Settings.",
-      "Register macOS notifications under net.aiuo.pi-desktop so the code-signing identity matches the bundle ID.",
+      "Open file references from tool rows, keep the reading position when expanding details, and paint Plan approval hover as an opaque plate.",
     ],
   },
 
@@ -788,7 +788,7 @@ const zhCNEntries: ChangelogEntry[] = [
       "插件可注册主题变量、主题资源，以及透明浮动小组件。",
       "删除项目时一并删除其拥有的会话，并需二次点击确认。",
       "子智能体支持按顺序回退的模型列表，并可在设置中开关随应用提供的内置子智能体。",
-      "在 macOS 上以 net.aiuo.pi-desktop 注册通知，使代码签名标识与 Bundle ID 一致。",
+      "工具行中的文件引用会打开对应视图，展开详情时保持阅读位置；Plan 审批悬停使用不透明底板。",
     ],
   },
 
@@ -1535,7 +1535,7 @@ const zhTWEntries: ChangelogEntry[] = [
       "外掛可註冊主題變數、主題資源，以及透明浮動小工具。",
       "刪除專案時一併刪除其擁有的工作階段，並需二次點選確認。",
       "子智慧體支援依序回退的模型清單，並可在設定中開關隨應用程式提供的內建子智慧體。",
-      "在 macOS 上以 net.aiuo.pi-desktop 註冊通知，使程式碼簽名識別與 Bundle ID 一致。",
+      "工具列中的檔案引用會開啟對應檢視，展開詳情時保持閱讀位置；Plan 審批懸停使用不透明底板。",
     ],
   },
 

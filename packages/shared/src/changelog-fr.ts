@@ -14,7 +14,7 @@ export const frEntries: ChangelogEntry[] = [
       "Les plugins peuvent enregistrer des variables de thème, des ressources de thème et un widget flottant transparent.",
       "Supprime un projet avec les sessions qui lui appartiennent, après une seconde confirmation.",
       "Les sous-agents disposent d'une liste ordonnée de modèles de repli ; les builtins livrés se basculent dans les Réglages.",
-      "Les notifications macOS s'enregistrent sous net.aiuo.pi-desktop pour que l'identité de signature corresponde au bundle ID.",
+      "Les références de fichiers des lignes d'outils ouvrent la vue ; déplier conserve la lecture ; le survol Plan est une plaque opaque.",
     ],
   },
 
