@@ -831,16 +831,35 @@ async function main() {
     // leaves the modal's veil underneath it — that is what put the band over
     // the install consent. The viewport-fixed work-panel toggle sits inside the
     // band and used to paint over the veil too; it must not any more.
-    const modalCoverage = await cdp.evaluate(`(async () => {
-      document.querySelector(".plugins-header-menu")?.click?.();
-      for (let i = 0; i < 20; i += 1) {
-        if (document.querySelector('[role="menuitem"][data-action="newFromTemplate"]')) break;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      document
-        .querySelector('[role="menuitem"][data-action="newFromTemplate"]')
-        ?.click?.();
-      await new Promise((r) => setTimeout(r, 400));
+    // Measure after the entrance: opacity animation still creates a stacking
+    // context while it is in effect, even without a fill.
+    await waitFor(
+      () =>
+        cdp.evaluate(`(() => {
+          const surface = document.querySelector(".route-surface");
+          if (!surface) return false;
+          const animations = surface.getAnimations();
+          return animations.length === 0
+            || animations.every((animation) => animation.playState === "finished");
+        })()`),
+      "plugin route entrance finished",
+    );
+    await cdp.evaluate(`document.querySelector(".plugins-header-menu")?.click?.()`);
+    await waitFor(
+      () =>
+        cdp.evaluate(
+          `!!document.querySelector('[role="menuitem"][data-action="newFromTemplate"]')`,
+        ),
+      "plugins overflow newFromTemplate item",
+    );
+    await cdp.evaluate(
+      `document.querySelector('[role="menuitem"][data-action="newFromTemplate"]')?.click?.()`,
+    );
+    await waitFor(
+      () => cdp.evaluate(`!!document.querySelector(".plugins-modal-backdrop")`),
+      "plugin template modal",
+    );
+    const modalCoverage = await cdp.evaluate(`(() => {
       const veil = document.querySelector(".plugins-modal-backdrop");
       if (!veil) return { opened: false };
       const toggle = document.querySelector(".app-work-panel-toggle");
@@ -867,6 +886,7 @@ async function main() {
       return {
         opened: true,
         veilIsTopmostAtToggle: toggleStack[0] === veil,
+        toggleTopmost: (toggleStack[0]?.className ?? toggleStack[0]?.tagName ?? "").toString().slice(0, 40),
         bandIsTopmost: bandStack[0] === band,
         bandTopmost: (bandStack[0]?.className ?? bandStack[0]?.tagName ?? "").toString().slice(0, 40),
       };
@@ -886,14 +906,14 @@ async function main() {
       "the titlebar band does not paint over the modal veil",
       JSON.stringify(modalCoverage),
     );
-    const modalClosed = await cdp.evaluate(`(async () => {
-      document
-        .querySelector(".plugins-modal-backdrop .plugins-modal-actions button")
-        ?.click?.();
-      await new Promise((r) => setTimeout(r, 300));
-      return !document.querySelector(".plugins-modal-backdrop");
-    })()`);
-    check(modalClosed === true, "the plugin modal closes and leaves the route clean");
+    await cdp.evaluate(
+      `document.querySelector('.plugins-modal-backdrop .plugins-modal-actions [data-action="cancel"]')?.click?.()`,
+    );
+    await waitFor(
+      () => cdp.evaluate(`!document.querySelector(".plugins-modal-backdrop")`),
+      "plugin modal closed",
+    );
+    check(true, "the plugin modal closes and leaves the route clean");
     // Once Extensions is active the footer Plugins button reuses the existing
     // Back action, so a second activation returns to the previous destination
     // (E2E-NAV-plugins-button-goes-back).

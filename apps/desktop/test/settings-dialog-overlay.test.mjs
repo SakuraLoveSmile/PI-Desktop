@@ -90,6 +90,6 @@ test("leaf popups and toasts keep painting above the route overlays", async () =
   ]) {
     assert.ok(value <= 40, `${name} must sit on z-dialog (40), not ${value}`);
   }
-  assert.ok(selectMenu > veil && selectMenu > sheet);
-  assert.ok(toast > veil && toast > sheet);
+  assert.ok(selectMenu > veil && selectMenu > sheet && selectMenu > notes);
+  assert.ok(toast > veil && toast > sheet && toast > notes);
 });
