@@ -675,6 +675,7 @@ const pluginServices = createPluginServices({
 const {
   plugins,
   userMcp,
+  mcpOAuth,
   pluginScopes,
   sessionProjects,
   emitBrowserState,
@@ -1323,6 +1324,7 @@ function registerIpc() {
     dispatchExecutionForProposal,
     emitAgentEvent,
     userMcp,
+    mcpOAuth,
     refreshUserMcp,
     describeError,
     activeUserSubagentDocuments,
@@ -1482,6 +1484,7 @@ registerShutdownHandlers({
   pluginPanels,
   plugins,
   userMcp,
+  mcpOAuth,
   browserPane,
   pluginViews,
   pluginSettingsViews,

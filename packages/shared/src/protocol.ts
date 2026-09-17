@@ -211,6 +211,8 @@ export const IPC = {
     mcpSetScope: "pi-desktop/mcp/setScope",
     mcpTransfer: "pi-desktop/mcp/transfer",
     mcpTest: "pi-desktop/mcp/test",
+    mcpOauthStart: "pi-desktop/mcp/oauth/start",
+    mcpOauthCancel: "pi-desktop/mcp/oauth/cancel",
     mcpImport: "pi-desktop/mcp/import",
     mcpMarketSearch: "pi-desktop/mcp/market/search",
     skillList: "pi-desktop/skill/list",
@@ -302,6 +304,7 @@ export const IPC = {
     notificationActivated: "pi-desktop/notification/event/activated",
     plansChanged: "pi-desktop/plans/event/changed",
     providersOauth: "pi-desktop/providers/oauth/event",
+    mcpOauth: "pi-desktop/mcp/oauth/event",
     updatesState: "pi-desktop/updates/event/state",
   },
 } as const;
