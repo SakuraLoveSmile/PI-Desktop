@@ -483,6 +483,17 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - **里程碑**：M2
 - **状态**：草案
 
+#### E2E-SESSION-outbox-duplicate-id-does-not-drop-history
+
+- **先决条件**：两个会话的工具行把同一个 `toolCallId` 当作 `messages.id`（例如 `call_421522`）。第一个会话已经持久化该 id。第二个会话随后又跑了若干回合，助手/工具行排在这条碰撞追加之后。
+- **步骤**：1) 在会话 A 完成一条 id 为 `call_421522` 的工具调用。2) 在会话 B 使用同一供应商工具 id，再继续聊几轮。3) 退出并重新打开。4) 打开两个会话。
+- **预期**：会话 A 仍有原来的工具行。会话 B 重新打开后仍有后续回合；碰撞的工具行存成 `{sessionB}:{call_421522}`（或等价改写 id）。持久化 outbox 为空，没有停在 `UNIQUE constraint failed: messages.id`。任一会话都没有丢掉更晚的助手/工具行。
+- **链接规格**：`03-runtime/04-data-storage.md`、`03-runtime/06-host-rpc-protocol.md`、ADR 0041、D444
+- **接受**：F（持久化）
+- **里程碑**：M2
+- **状态**：单位已覆盖（`append_message_remaps_ids_owned_by_another_session`、`persistence-outbox.test.mjs`）；桌面旅程待补
+
+
 #### E2E-173：展开中的实时委托运行过程跟随最新输出
 
 - **先决条件**：一个绑定项目的 Agent 会话，提供商流被模拟为一个仍在运行的
