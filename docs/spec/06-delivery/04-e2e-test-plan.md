@@ -12019,7 +12019,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   5. Reopen the dialog, switch to Git repository, and paste a private or
      malformed remote.
 - **Expected**: The dialog swaps the folder list for a repository URL field plus
-  a clone destination row and keeps one project name field; Create stays
+  a clone destination row and keeps one project name field. Source options and
+  fields are filled tiles without strokes; keyboard focus uses the shared
+  accent-tinted ring. Create stays
   disabled until the URL parses and a folder is chosen. Confirming runs
   `git clone` into the chosen folder with the renderer still owning project
   creation: the checkout becomes the primary root and the entered name names the
