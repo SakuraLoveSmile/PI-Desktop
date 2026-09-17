@@ -284,8 +284,9 @@ export type PluginHostServices = {
   /**
    * The appearance the host is currently showing (palette, language, active
    * plugin theme). Panels and plugin processes read it through `app.getAppearance`;
-   * the host broadcasts `appearance:changed` to open panels and docked views
-   * when it changes. Workspace switches push `workspace:changed` the same way.
+   * the host broadcasts `appearance:changed` to open panels, docked views, and
+   * loaded plugin processes when it changes (ADR 0280). Workspace switches push
+   * `workspace:changed` the same way.
    */
   getAppearance?: () => PluginAppearance;
   /**
@@ -1321,7 +1322,7 @@ export class PluginRuntime {
     return this.loaded.get(pluginId);
   }
 
-  /** Return the manifest-backed settings view for the installed-plugin UI. */
+  /** Manifest settings as the installed-plugin sheet reads them. Titles stay the author's language; plugin-owned UI localizes via `app.getLocale` / `appearance:changed` (ADR 0280). */
   async getPluginSettings(pluginId: string): Promise<PluginSettingDefinition[]> {
     const loaded = this.loaded.get(pluginId);
     if (!loaded) throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
