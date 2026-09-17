@@ -4,6 +4,7 @@ import type { AssistantTurnPart } from "../../../lib/assistant-turns";
 import { formatToolDuration } from "../../../lib/tool-display";
 import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
 import {
+  isThinkingActive,
   resolveThinkingDisplayMode,
   turnProcessTiming,
   visibleProcessSteps,
@@ -59,10 +60,12 @@ export function TurnProcess({
             item.message.isError),
       ),
   );
-  const thinkingOnly = parts.every(
-    (part) =>
-      part.kind === "activity" && part.items.every((item) => item.kind === "thinking"),
-  );
+  const latestPart = timingParts.at(-1);
+  const latestActivity =
+    latestPart?.kind === "activity" ? latestPart.items.at(-1) : undefined;
+  const thinkingNow =
+    latestActivity?.kind === "thinking" &&
+    isThinkingActive(latestActivity.message, isActive);
   const disclosure = useAutomaticDisclosure(
     isActive && (failed || mode === "detailed"),
     reveal,
@@ -103,7 +106,7 @@ export function TurnProcess({
         <span className={`tool-activity-label${isActive ? " running" : ""}`}>
           {t(
             isActive
-              ? thinkingOnly
+              ? thinkingNow
                 ? "chat.thinkingFor"
                 : "chat.processingFor"
               : "chat.processedFor",

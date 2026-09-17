@@ -163,6 +163,44 @@ export async function turnProcessProbe() {
       "search reveals folded progress",
     );
 
+    const liveThought = message("live-thought", "assistant", "", {
+      thinking: "Reasoning before the answer",
+      status: "streaming",
+    });
+    const processLabel = () =>
+      container.querySelector(".tool-activity-label")?.textContent;
+    render([liveThought], true, null, "thinking-transition");
+    check(
+      processLabel()?.startsWith(i18n.t("chat.thinkingFor", { time: "" })),
+      "active reasoning uses the thinking label",
+    );
+    render(
+      [{ ...liveThought, content: "Answer has started" }],
+      true,
+      null,
+      "thinking-transition",
+    );
+    check(
+      processLabel()?.startsWith(i18n.t("chat.processingFor", { time: "" })) &&
+        visible(container.querySelector('[data-message-id="live-thought"]')),
+      "answer streaming ends the thinking label even when reasoning is retained",
+    );
+    render(
+      [
+        liveThought,
+        message("separate-answer", "assistant", "Answer text", {
+          status: "streaming",
+        }),
+      ],
+      true,
+      null,
+      "thinking-transition",
+    );
+    check(
+      processLabel()?.startsWith(i18n.t("chat.processingFor", { time: "" })),
+      "a later answer takes precedence over an earlier streaming thought",
+    );
+
     const streaming = message("stream", "assistant", "Live text", {
       status: "streaming",
     });
