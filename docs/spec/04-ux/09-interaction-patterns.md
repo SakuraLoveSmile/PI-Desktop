@@ -510,10 +510,10 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Settings → Info and application-menu checks share one typed update state.
   Manual checks expose up-to-date or error feedback; automatic failures do not
   open a toast or ambient banner.
-- Manual delivery (`darwin`, non-AppImage Linux, and Windows portable runs
+- Manual delivery (non-AppImage Linux and Windows portable runs
   with `PORTABLE_EXECUTABLE_FILE`) stops at `available` and
-  offers the fixed GitHub Releases page. In-app delivery (Windows NSIS and
-  Linux AppImage readiness builds) automatically advances through
+  offers the fixed GitHub Releases page. In-app delivery (packaged macOS,
+  Windows NSIS, and Linux AppImage) automatically advances through
   `downloading` to the stable `downloaded` state.
 - `downloaded` remains actionable until Restart to update or normal app quit;
   later scheduled/manual checks do not replace it with `checking`.
@@ -536,9 +536,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   The current release and a discovered available release are identified with
   compact badges. The list scrolls independently, closes by its close control,
   Escape, or the backdrop, and restores focus to the invoking control.
-- D126 tag releases publish all platform manifests and installers. Windows
-  NSIS and Linux AppImage therefore use the in-app lane; macOS and Linux deb/rpm
-  remain notify-and-link delivery modes.
+- D126 tag releases publish all platform manifests and installers. Packaged
+  macOS, Windows NSIS, and Linux AppImage use the in-app lane; Linux deb/rpm
+  and Windows portable remain notify-and-link delivery modes.
 
 ## 2. Streaming message behavior
 
