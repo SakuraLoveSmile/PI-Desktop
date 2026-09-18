@@ -1,4 +1,4 @@
-# ADR 0281: Package-local theme assets remain available
+# ADR 0288: Package-local theme assets remain available
 
 - Status: Accepted for implementation
 - Date: 2026-09-17
