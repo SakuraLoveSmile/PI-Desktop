@@ -20,6 +20,7 @@ import { registerScheduledIpc } from "./scheduled-ipc";
 import { registerSessionIpc } from "./session-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
+import { registerAgentImportIpc } from "./agent-import-ipc";
 import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-catalog";
 import { registerWindowIpc } from "./window-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
@@ -367,6 +368,15 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     stripWinLongPrefix,
     sendToRenderer,
     logger,
+  });
+
+
+  registerAgentImportIpc({
+    registrar,
+    getHost,
+    sendToRenderer,
+    refreshUserMcp,
+    currentWorkspacePath,
   });
 
 
