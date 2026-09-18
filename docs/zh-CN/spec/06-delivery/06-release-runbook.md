@@ -251,6 +251,29 @@ https://cnb.cool/aixk/Pi-Desktop 拉取的用户使用。
 若 CNB 流水线幂等，对同一标签重跑是安全的。它不会重新构建桌面产物，
 也不会改写 electron-updater 更新源。
 
+### 4.5 GitHub Actions 中的 macOS 签名密钥
+
+在 GitHub → 仓库 `vastsa/PI-Desktop` → Settings → Secrets and variables →
+Actions 中创建下列密钥。不要把 p12、密码、Apple ID 或应用专用密码提交进仓库。
+不要在 CI 中 `echo` 这些值。
+
+| Secret | Value |
+|---|---|
+| `CSC_LINK` | 导出的 Developer ID Application `.p12`（证书+私钥）的 Base64。electron-builder 也接受文件路径，但 CI 使用 Secret 正文。 |
+| `CSC_KEY_PASSWORD` | 导出该 `.p12` 时设置的密码 |
+| `APPLE_ID` | 属于团队 `DUV63RKYTW` 的 Apple ID 邮箱 |
+| `APPLE_APP_SPECIFIC_PASSWORD` | 来自 https://appleid.apple.com → Sign-In and Security → App-Specific Passwords 的应用专用密码 |
+| `APPLE_TEAM_ID` | `DUV63RKYTW` |
+
+在本地把 p12 编成 base64（不要把输出贴到聊天或仓库）：
+
+```bash
+base64 -i developer-id-application.p12 | pbcopy
+```
+
+Linux 使用 `base64 -w0 developer-id-application.p12`。绝不能进入 git 的文件：
+`*.p12`、`*.cer`、`*.p8`、`*.mobileprovision`。
+
 ## 5. 验证门
 
 未签名调试产物（`workflow_dispatch` 且 `sign_macos: false`）不视为通过 Gatekeeper。标签发布必须通过以下签名和装订检查，否则工作流失败。
