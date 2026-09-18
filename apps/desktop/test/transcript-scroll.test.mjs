@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  HISTORY_REVEAL_THRESHOLD_PX,
   TRANSCRIPT_REPIN_THRESHOLD_PX,
   TRANSCRIPT_SCROLL_GESTURE_WINDOW_MS,
+  isHistoryRevealPosition,
   isRecentScrollGesture,
   reduceTranscriptScroll,
+  transcriptHasLayout,
 } from "../src/lib/transcript-scroll.ts";
 
 function update(overrides = {}) {
@@ -107,4 +110,54 @@ test("a scroll event without recent user input is not a gesture", () => {
     false,
   );
   assert.equal(isRecentScrollGesture(100, -Infinity), false);
+});
+
+test("a collapsed scroller has no layout", () => {
+  assert.equal(transcriptHasLayout({ scrollHeight: 0, clientHeight: 0 }), false);
+  assert.equal(transcriptHasLayout({ scrollHeight: 800, clientHeight: 0 }), false);
+  assert.equal(transcriptHasLayout({ scrollHeight: 800, clientHeight: 400 }), true);
+});
+
+test("a collapsed scroller is not a history-reveal position", () => {
+  assert.equal(
+    isHistoryRevealPosition({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 }),
+    false,
+  );
+});
+
+test("a pinned overflowing transcript does not page from a stale zero offset", () => {
+  assert.equal(
+    isHistoryRevealPosition(
+      { scrollTop: 0, scrollHeight: 4_000, clientHeight: 800 },
+      true,
+    ),
+    false,
+  );
+});
+
+test("an underfilled pinned tail still reveals earlier history", () => {
+  assert.equal(
+    isHistoryRevealPosition(
+      { scrollTop: 0, scrollHeight: 400, clientHeight: 800 },
+      true,
+    ),
+    true,
+  );
+});
+
+test("an unpinned transcript at the top reveals earlier history", () => {
+  assert.equal(
+    isHistoryRevealPosition(
+      { scrollTop: HISTORY_REVEAL_THRESHOLD_PX, scrollHeight: 4_000, clientHeight: 800 },
+      false,
+    ),
+    true,
+  );
+  assert.equal(
+    isHistoryRevealPosition(
+      { scrollTop: HISTORY_REVEAL_THRESHOLD_PX + 1, scrollHeight: 4_000, clientHeight: 800 },
+      false,
+    ),
+    false,
+  );
 });
