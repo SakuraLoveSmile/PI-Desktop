@@ -6988,10 +6988,12 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   CommonJS `main.js` 及指向它的 manifest。
 - **步骤**：运行 `node --test apps/desktop/test/imported-package-skills-runtime.test.mjs`。
   使用生产导入器生成各个插件，通过 `PluginRuntime` 与真实子进程插件宿主加载，
-  读取技能目录与正文，并检查声明的扩展。对旧版夹具重新导入。
+  读取技能目录与正文，并检查声明的扩展。对旧版夹具重新导入且不加载旧副本，再加载旧副本。
 - **预期**：每份新 manifest 都指向实际存在的 `main.cjs`，三类包均初始化成功。
   源包及两份复制的 `package.json` 字节保持一致。重新导入得到不同的路径和 id 并成功
-  加载；旧 manifest、包装器和包文件保持原样。不会自动迁移既有导入插件。
+  加载；生成新副本时旧 manifest、包装器和包文件保持原样。加载旧副本会把生成的
+  `main.js` 就地改写为 `main.cjs`，复制的 `package.json` 字节不变，并初始化成功。
+  自定义过的 `main.js` 不会被改写。
 - **关联规范**：`07-plugins/16-trusted-extensions.md` §3.2；ADR 0215。
 - **验收**：质量
 - **状态**：已实现导入到插件宿主的自动化夹具。合入最新 `origin/main` 后，在已提交的

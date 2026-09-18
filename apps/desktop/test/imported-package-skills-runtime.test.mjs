@@ -195,3 +195,36 @@ test("re-importing an older ESM package creates a loadable copy without rewritin
   assertSkillCatalog(runtime, imported, bodies, paths);
   assert.equal(runtime.getAgentExtensions().length, 1);
 });
+
+test("loading an older generated ESM wrapper rewrites it in place and initializes", async (t) => {
+  const { source, importRoot, runtime, bodies, paths } = createHarness(t, { packageType: "module" });
+  const imported = generateImportedExtensionPlugin(source, importRoot);
+  const oldManifest = JSON.parse(readFileSync(join(imported.path, "manifest.json"), "utf8"));
+  oldManifest.main = "main.js";
+  writeFileSync(join(imported.path, "manifest.json"), JSON.stringify(oldManifest, null, 2) + "\n");
+  renameSync(join(imported.path, "main.cjs"), join(imported.path, "main.js"));
+  const originalPkg = readFileSync(join(imported.path, "package.json"), "utf8");
+
+  await runtime.loadFromPath(imported.path);
+  const manifest = runtime.getLoaded(imported.id).manifest;
+  assert.equal(manifest.main, "main.cjs");
+  assert.ok(existsSync(join(imported.path, "main.cjs")));
+  assert.equal(existsSync(join(imported.path, "main.js")), false);
+  assert.equal(readFileSync(join(imported.path, "package.json"), "utf8"), originalPkg);
+  assertSkillCatalog(runtime, imported, bodies, paths);
+  assert.equal(runtime.getAgentExtensions().length, 1);
+});
+
+test("loading a customized imported main.js does not rewrite the wrapper", async (t) => {
+  const { source, importRoot, runtime } = createHarness(t, { packageType: "module" });
+  const imported = generateImportedExtensionPlugin(source, importRoot);
+  const oldManifest = JSON.parse(readFileSync(join(imported.path, "manifest.json"), "utf8"));
+  oldManifest.main = "main.js";
+  writeFileSync(join(imported.path, "manifest.json"), JSON.stringify(oldManifest, null, 2) + "\n");
+  writeFileSync(join(imported.path, "main.js"), "module.exports = { custom: true };\n");
+  const originalJs = readFileSync(join(imported.path, "main.js"), "utf8");
+
+  await assert.rejects(runtime.loadFromPath(imported.path), /module is not defined in ES module scope/);
+  assert.equal(JSON.parse(readFileSync(join(imported.path, "manifest.json"), "utf8")).main, "main.js");
+  assert.equal(readFileSync(join(imported.path, "main.js"), "utf8"), originalJs);
+});
