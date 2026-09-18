@@ -255,10 +255,32 @@ test("macOS release signing is required on tag pushes", () => {
   assert.doesNotMatch(signedBlock, /-c\.mac\.identity=/);
   assert.doesNotMatch(signedBlock, /CSC_NAME: "Developer ID Application:/);
   assert.match(signedBlock, /-c\.mac\.notarize=true/);
+  // electron-builder notarizes only the .app; the DMG needs its own
+  // submission before the ticket can be stapled (error 65 otherwise).
+  const dmgBlock = releaseWorkflowSource.match(
+    /- name: Notarize and staple the macOS DMG[\s\S]*?(?=\n      - name:)/,
+  )?.[0];
+  assert.ok(dmgBlock, "DMG notarization step is missing");
+  assert.match(dmgBlock, /env\.MACOS_SIGN_RELEASE == 'true'/);
+  for (const secret of [
+    "APPLE_ID",
+    "APPLE_APP_SPECIFIC_PASSWORD",
+    "APPLE_TEAM_ID",
+  ]) {
+    assert.match(
+      dmgBlock,
+      new RegExp(`${secret}:\\s*\\$\\{\\{\\s*secrets\\.${secret}\\s*\\}\\}`),
+    );
+  }
+  assert.match(
+    dmgBlock,
+    /run: scripts\/notarize-and-staple-macos-release-dmg\.sh apps\/desktop\/release/,
+  );
   assert.match(
     releaseWorkflowSource,
-    /Staple macOS installer ticket[\s\S]*?if: matrix\.platform == 'macos' && env\.MACOS_SIGN_RELEASE == 'true'[\s\S]*?Verify signed and notarized macOS installer/,
+    /Notarize and staple the macOS DMG[\s\S]*?if: matrix\.platform == 'macos' && env\.MACOS_SIGN_RELEASE == 'true'[\s\S]*?Verify signed and notarized macOS installer/,
   );
+  assert.doesNotMatch(releaseWorkflowSource, /scripts\/staple-macos-release-dmg\.sh/);
 });
 
 test("the signed local macOS lane selects the native runner architecture", () => {

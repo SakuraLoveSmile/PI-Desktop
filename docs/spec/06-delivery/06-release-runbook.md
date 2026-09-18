@@ -229,10 +229,14 @@ runner. Tag builds and `sign_macos: true` (the dispatch default) receive
 `APPLE_TEAM_ID` only from GitHub Actions secrets, pin the certificate through
 `CSC_NAME=XingYu Liu (DUV63RKYTW)` (bare common name — electron-builder rejects
 the `Developer ID Application:` prefix), force code signing and
-`notarytool` notarization, verify that identity, code-signing integrity
-(including `pi-desktop-host-core`), Gatekeeper `Notarized Developer ID`, and
-the stapled app ticket, and staple and validate the DMG before any artifact
-upload. The per-architecture `latest-mac.yml` files are renamed before upload;
+`notarytool` notarization of `PI-Desktop.app`. The DMG is then submitted to the
+same service on its own (`scripts/notarize-and-staple-macos-release-dmg.sh`),
+and only an `Accepted` status allows the ticket to be stapled. Verification
+then checks the identity, code-signing integrity (including
+`pi-desktop-host-core`), Gatekeeper `Notarized Developer ID`, and both stapled
+tickets before any artifact upload. The per-architecture `latest-mac.yml` files
+are renamed before upload; the publish job merges them into one feed after
+downloading both artifacts.
 the publish job merges them into one feed after downloading both artifacts.
 
 The shared electron-builder configuration applies the architecture-labelled
@@ -329,8 +333,20 @@ enter git: `*.p12`, `*.cer`, `*.p8`, `*.mobileprovision`.
 ## 5. Verification gates
 
 Unsigned debug artifacts (`workflow_dispatch` with `sign_macos: false`) are
-not Gatekeeper-qualified. Tag releases must pass the signature and staple
-checks below or the workflow fails.
+not Gatekeeper-qualified. Tag releases must pass the signature, notarization,
+and staple checks below or the workflow fails.
+
+Two separate notarization submissions exist, because Apple notarizes one
+artifact per submission and electron-builder only covers the app:
+
+| Artifact | Submitted by | Ticket |
+|---|---|---|
+| `PI-Desktop.app` (inside the ZIP) | electron-builder `-c.mac.notarize=true` | stapled by electron-builder |
+| `PI-Desktop-<version>-<arch>.dmg` | `scripts/notarize-and-staple-macos-release-dmg.sh` (`notarytool submit --wait`) | stapled by the same script after `status: Accepted` |
+
+A DMG that was never submitted has no ticket, so stapling it fails with
+`Could not find base64 encoded ticket ... Error 65`. Stapler retries are only
+allowed after Apple returns `Accepted`.
 
 Run after every signed release build:
 
@@ -342,6 +358,16 @@ for APP in apps/desktop/release/mac-*/PI-Desktop.app; do
   xcrun stapler validate "$APP"
 done
 xcrun stapler validate apps/desktop/release/*.dmg
+```
+
+To read the Apple notarization log for a submission (the Release workflow does
+this automatically when a submission is not accepted):
+
+```bash
+xcrun notarytool log <submission-id> \
+  --apple-id "$APPLE_ID" \
+  --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+  --team-id "$APPLE_TEAM_ID"
 ```
 
 ### 5.1 Package footprint gate

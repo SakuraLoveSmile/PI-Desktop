@@ -71,8 +71,8 @@ echo "==> Building + packaging desktop (signed, $MAC_ARCH)"
 pnpm --filter @pi-desktop/desktop exec electron-vite build
 pnpm --filter @pi-desktop/desktop exec electron-builder --mac "--${MAC_ARCH}" \
   -c.mac.identity="${MAC_SIGNING_IDENTITY}" \
-  -c.mac.forceCodeSigning=true \
-  -c.mac.notarize=true
+scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
+scripts/verify-macos-release.sh apps/desktop/release
 
 scripts/staple-macos-release-dmg.sh apps/desktop/release
 scripts/verify-macos-release.sh apps/desktop/release

@@ -254,9 +254,13 @@ jobs:
             -c.mac.forceCodeSigning=true \
             -c.mac.notarize=true
 
-      - name: Staple macOS installer ticket
+      - name: Notarize and staple the macOS DMG
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
-        run: scripts/staple-macos-release-dmg.sh apps/desktop/release
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
 
       - name: Verify signed and notarized macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
