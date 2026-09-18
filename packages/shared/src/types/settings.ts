@@ -116,11 +116,6 @@ export type AppSettings = {
    */
   linkOpenTarget?: LinkOpenTarget;
   /**
-   * Attach vendor hosted-search tools when the current wire API supports them.
-   * Absent means off.
-   */
-  nativeWebSearchEnabled?: boolean;
-  /**
    * Which context figure the composer ring and its summary lead with (D398).
    * `remaining` (default, absent) counts down from 100%; `used` counts up.
    * Color thresholds always follow remaining capacity, so the warning state

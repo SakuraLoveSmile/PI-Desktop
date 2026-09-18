@@ -9,7 +9,6 @@ import { useOpenChatFileRef } from "../../../hooks/use-preview-target";
 import { splitChatText } from "../../../lib/chat-links";
 import { useAppStore } from "../../../stores/app-store";
 import { Markdown } from "../../../components/Markdown";
-import { rewriteInlineCitationMarkup } from "../../../lib/hosted-search-ui";
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -193,7 +192,7 @@ export const MessageRow = memo(function MessageRow({
               </>
             ) : (
               <div className="prose-chat">
-                <Markdown source={rewriteInlineCitationMarkup(displayed, message.hostedSearch?.sources ?? [])} />
+                <Markdown source={displayed} />
               </div>
             )}
           </div>

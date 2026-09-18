@@ -95,7 +95,6 @@ type RuntimeParams = {
   /** Durable host turn ID for the prompt currently being executed. */
   turnId?: string;
   thinkingLevel?: ThinkingLevel;
-  nativeWebSearch?: boolean;
   provider: RuntimeProviderConfig;
   commandShell: CommandShellOption;
   pluginTools?: PluginToolDef[];
@@ -328,7 +327,6 @@ async function runtimeFor(
     mode,
     provider,
     thinkingLevel,
-    nativeWebSearch: params.nativeWebSearch === true,
     pluginTools,
     pluginSkills,
     trustedExtensions,
@@ -384,7 +382,6 @@ async function runtimeFor(
     provider,
     commandShell: params.commandShell,
     thinkingLevel,
-    nativeWebSearch: params.nativeWebSearch === true,
     history,
     compaction,
     compactionSettings: params.compactionSettings,

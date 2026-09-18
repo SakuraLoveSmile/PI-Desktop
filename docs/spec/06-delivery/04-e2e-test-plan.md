@@ -13223,24 +13223,6 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Specs:** 04-ux/06-settings-ia, 04-ux/08-component-spec,
   04-ux/09-interaction-patterns; ADR turn-process-and-thinking-display.
 
-### E2E-CHAT-hosted-search-citations-stay-local
-
-- **Preconditions:** An assistant turn with `hostedSearch.sources` that include
-  `https://example.com/a`, plus markdown that contains `#cite=1`,
-  `[Read here](https://example.com)`, and `[Same path](https://example.com/a)`.
-- **Steps:** Render the turn. Inspect citation badges, remaining hyperlinks,
-  and favicon image URLs (including failed loads).
-- **Expected:** `#cite=1` and the same-path source URL render as citation
-  badges. The same-host different-path `https://example.com` link stays an
-  ordinary hyperlink with its original text. Favicon requests go only to each
-  source origin's `/favicon.ico`; no third-party favicon host is contacted.
-- **Automation:** `apps/desktop/test/hosted-search-ui.test.mjs`.
-- **Specs:** `03-runtime/11-provider-model-system.md` §16.
-- **Acceptance:** Security + C (sessions/transcript).
-- **Milestone:** M6+.
-- **Status:** Automated unit coverage; renderer E2E still draft.
-
-
 ### E2E-RPC-unicode-separators
 
 - **Preconditions:** Built host-core, shared package and agent runtime; isolated
