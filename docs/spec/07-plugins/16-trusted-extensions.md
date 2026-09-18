@@ -84,11 +84,13 @@ local-plugin flow. The confirmation before the picker remains the trust
 decision; the generated manifest declares the permissions needed by its actual
 contributions. The manifest's `main` points to `main.cjs` regardless of the
 source package's `type`; both copied package declarations retain their module
-semantics. Existing imported directories are not rewritten on upgrade. To
-repair an older import whose generated `main.js` fails under `type: module`,
-remove that failed imported plugin and import its source again. Re-importing
-without removal creates a separate plugin with a unique suffix and leaves the
-old copy unchanged; it does not migrate its grants or activation scope.
+semantics. Loading an imported plugin whose `main` is the generated CommonJS
+`main.js` wrapper rewrites that file in place to `main.cjs` and updates the
+manifest; copied package files, grants, and activation scope stay as they are.
+The rewrite matches only the generated no-op (including the original comment
+text). A customized `main.js` is left untouched. Re-importing without removal
+creates a separate plugin with a unique suffix; it does not copy grants or
+activation scope from the older copy.
 
 For extension files and packages without `pi.skills`, entry discovery keeps
 the existing `pi-coding-agent` rules: `package.json` `pi.extensions`, otherwise

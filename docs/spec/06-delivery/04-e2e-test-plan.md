@@ -11822,12 +11822,15 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Steps**: Run `node --test apps/desktop/test/imported-package-skills-runtime.test.mjs`.
   Generate each plugin through the production importer, load it through
   `PluginRuntime` and the real child-process plugin host, read its skill catalog
-  and bodies, and inspect its declared extension. Re-import the older fixture.
+  and bodies, and inspect its declared extension. Re-import the older fixture
+  without loading it, then load the older fixture itself.
 - **Expected**: Each new manifest points to an existing `main.cjs`; initialization
   succeeds for all three package types. Source and both copied `package.json`
   files retain the same bytes. The repeated import has a distinct path/id and
-  loads successfully; the older manifest, wrapper, and package files remain
-  unchanged. There is no automatic migration of older imported plugins.
+  loads successfully; generating it leaves the older manifest, wrapper, and
+  package files unchanged. Loading the older fixture rewrites its generated
+  `main.js` in place to `main.cjs`, keeps the copied `package.json` bytes, and
+  initializes. A customized `main.js` is not rewritten.
 - **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2; ADR 0215.
 - **Acceptance**: Quality
 - **Status**: Automated import-to-plugin-host fixture. Run against the committed
