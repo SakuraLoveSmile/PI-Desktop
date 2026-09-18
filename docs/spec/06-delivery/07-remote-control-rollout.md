@@ -434,8 +434,26 @@ Recorded on the `feat/remote-agent-host` branch, 2026-09-10:
   server and client cores, the `ws` binding on loopback, and device-token
   pairing; handshake, authorization, idempotency, queue order, approvals,
   cursor replay, eviction, epoch change, slow clients, and reconnect without
-  duplicate execution are package tests. The `pi-host` bundle, the SSH
-  bootstrap, and the desktop adapter are not started.
+  duplicate execution are package tests. The `pi-host` bundle, the desktop
+  adapter, and the SSH bootstrap have since started: the R2a desktop kernel
+  (D449 / ADR 0286) brought the adapter and the bundle, and the SSH bootstrap
+  followed in D452 / ADR 0291.
+- R2b partial (2026-09-19, D452 / ADR 0291): the desktop installs and pairs
+  a `pi-host` over the user's own `ssh` client with `BatchMode=yes`, so the
+  user's configuration, agent, and jump hosts apply and no SSH secret reaches
+  the app. `remote/pi-host-release.ts` holds the pure release coordinates
+  (remote platform, desktop version, published SHA-256, refusal of unpublished
+  targets) and `remote/pi-host-bootstrap-script.ts` generates the single
+  `umask 077` script that downloads, verifies, installs under the remote
+  `$HOME`, restarts the host on loopback with `--pair`, and echoes
+  `PI_HOST_READY` / `PI_HOST_PAIRING_TOKEN`; `remote/ssh-transport.ts` is the
+  injectable transport port and `remote/ssh-tunnel.ts` owns one durable
+  `ssh -N -L` forward per host, re-established on every launch and adopted
+  from the bootstrap so pairing opens exactly one tunnel. Records carry
+  `metadata.transport = "ssh"` plus an SSH descriptor instead of a URL, and
+  `pi-desktop/remoteHost/bootstrap` joins `list` / `pair` / `remove`. The
+  terminal work-panel client, the reverse tool relay, and provider-configuration
+  propagation over the SSH channel are not in this slice.
 
 ## 8. Amendment history
 

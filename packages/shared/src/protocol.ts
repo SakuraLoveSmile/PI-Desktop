@@ -158,6 +158,14 @@ export const IPC = {
     remoteHostPair: "pi-desktop/remoteHost/pair",
     /** Close the live connection for `hostKey` and drop its persisted record. */
     remoteHostRemove: "pi-desktop/remoteHost/remove",
+    /**
+     * Install and pair a `pi-host` on a machine the user reaches over SSH:
+     * upload the bootstrap script, download and verify the published bundle
+     * there, start the host, forward its loopback port, and exchange the
+     * pairing token (spec §5.2). Uses the user's own SSH keys; no credential
+     * crosses this channel.
+     */
+    remoteHostBootstrap: "pi-desktop/remoteHost/bootstrap",
     providersList: "pi-desktop/providers/list",
     providersCreate: "pi-desktop/providers/create",
     providersUpdate: "pi-desktop/providers/update",

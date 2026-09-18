@@ -100,6 +100,8 @@ import type {
   PlanResolutionResult,
   PlanningStateEvent,
   PlansPendingResult,
+  RemoteHostBootstrapRequest,
+  RemoteHostBootstrapResult,
   RemoteHostPairRequest,
   RemoteHostPairResult,
   RemoteHostSummary,
@@ -1375,6 +1377,13 @@ export const api = {
   /** Exchange `ppt1.` pairing token for a durable device token and connect. */
   pairRemoteHost: (request: RemoteHostPairRequest) =>
     invoke<RemoteHostPairResult>(IPC.invoke.remoteHostPair, request),
+  /**
+   * Install and pair a `pi-host` over SSH on a machine the user already
+   * reaches, then bring it online (spec §5.2). Credentials come from the
+   * user's own SSH configuration and agent.
+   */
+  bootstrapRemoteHost: (request: RemoteHostBootstrapRequest) =>
+    invoke<RemoteHostBootstrapResult>(IPC.invoke.remoteHostBootstrap, request),
   /** Close and drop a paired host by its stable routing key. */
   removeRemoteHost: (hostKey: string) =>
     invoke<{ ok: true }>(IPC.invoke.remoteHostRemove, { hostKey }),

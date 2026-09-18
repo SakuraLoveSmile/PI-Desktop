@@ -6078,3 +6078,37 @@ that was sitting at the bottom — including after the turn had finished.
   the expanded sidebar at that threshold.
 - Renderer only: existing `pi.desktop.sidebarWidth` preference, no IPC or native
   window change. See ADR 0290 and E2E-168.
+
+## 2026-09-19 — SSH bootstrap for remote hosts (D452)
+
+- The desktop installs and pairs a `pi-host` on a machine the user already
+  reaches over SSH using the system `ssh` client, so `~/.ssh/config`, the agent,
+  and jump hosts apply unchanged and the app holds no SSH secret; `BatchMode=yes`
+  makes a host that needs an interactive password or passphrase fail with a
+  typed error instead of hanging behind an invisible prompt.
+- The desktop resolves the bundle for the remote platform at its own version,
+  holds the SHA-256 the release publishes, and refuses an unpublished target
+  (`linux-x64` only today) before any download. The uploaded script downloads,
+  verifies, and installs the bundle under the remote `$HOME`; no executable
+  bytes cross the SSH channel.
+- The script runs under `umask 077` and echoes `PI_HOST_READY` /
+  `PI_HOST_PAIRING_TOKEN`, so the single-use pairing token exists only in a work
+  file and on the SSH channel, never in a world-readable path or a URL
+  (security §3.4). `PI_HOST_READY.version` must equal the desktop's; a mismatch
+  is `HOST_VERSION_MISMATCH` (D375) and is checked before a forward exists.
+- A paired host now stores an SSH descriptor (`metadata.transport = "ssh"`)
+  instead of a URL, because the local forward port is not stable across
+  launches; the tunnel manager re-establishes `ssh -N -L` on every launch and
+  adopts the bootstrap's own live forward so pairing opens exactly one tunnel.
+  The descriptor is re-validated on every registry read, and a malformed one
+  degrades to "not an SSH host" rather than spawning `ssh` with garbage
+  arguments.
+- `pi-desktop/remoteHost/bootstrap` joins `list` / `pair` / `remove`, and the
+  `connection/pair` exchange was factored into one `exchangePairingToken` used
+  by the pasted-URL path and the bootstrap path alike.
+- Not in this slice: the terminal work-panel client (Stage 5), the reverse tool
+  relay (Stage 6), the resync watchdog, non-Linux and Windows remote targets,
+  and provider configuration over the SSH channel — a freshly bootstrapped host
+  still fails `turn/start` closed with `MODEL_NOT_CONFIGURED` until a provider is
+  configured on it. See ADR 0291, `06-delivery/07-remote-control-rollout.md` §7,
+  and `05-security/02-remote-control-security.md` §3.4.

@@ -4426,3 +4426,12 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 插件浮层从刻度外的 `80` 与 `60` 归回到 `z-dialog`（40）（`plugins.css`，发行说明浮层一并处理）：路由表面不再困住它们之后，它们就在根堆叠上下文中参与比较，而在 80 上会盖住对话框自身弹出的叶子级弹出层（60）与 toast（50）—— 其中包括安装对话框的「已复制」提示。现在有源测试钉住这一关系。
 - 仅渲染层：无 IPC、存储、schema、协议或插件 SDK 改动，也没有新增默认值。见 `04-ux/07-ui-design-system.md` §9、`apps/desktop/test/settings-dialog-overlay.test.mjs`，以及 `06-delivery/04-e2e-test-plan.md` 的 E2E-LAYOUT-three-column-width-priority（其四条浮层断言位于 `scripts/e2e-three-column-layout.mjs`）。
 - 未做、留作后续的事项：真正的模态 —— 不可交互化、焦点收束、快捷键让位 —— 需要这些浮层进入浏览器顶层（`<dialog>.showModal()`）。在它们打开的弹出菜单、工具提示与 toast（portal 到 `document.body`）同样迁入顶层之前，这一步无法进行，因为顶层内容会绘制在它们之上并使其不可用；此前的一次尝试正因此被撤回。
+
+## 2026-09-19 —— 远端主机的 SSH 引导（D452）
+
+- 桌面用系统 `ssh` 客户端在用户已能通过 SSH 到达的机器上安装并配对 `pi-host`，因此 `~/.ssh/config`、agent 与跳板机照常生效，应用不持有任何 SSH 密钥；`BatchMode=yes` 让需要交互式密码或口令短语的主机立即以带类型的错误失败，而不是把模态框吊在一个不可见的提示后面。
+- 桌面按远端平台、以自己的版本解析 `pi-host` 包，持有发布随附的 SHA-256，并在任何下载之前拒绝未发布的目标（目前只有 `linux-x64`）。上传的脚本在远端 `$HOME` 下下载、校验并安装该包；SSH 通道上不传输任何可执行字节。
+- 脚本以 `umask 077` 运行并回显 `PI_HOST_READY` / `PI_HOST_PAIRING_TOKEN`，因此一次性配对令牌只存在于工作文件和 SSH 通道上，既不落在全局可读路径，也不出现在 URL 中（安全规格 §3.4）。`PI_HOST_READY.version` 必须与桌面版本一致；不一致为 `HOST_VERSION_MISMATCH`（D375），并在建立转发之前就已检查。
+- 已配对主机的记录改存 SSH 描述符（`metadata.transport = "ssh"`）而非 URL，因为本地转发端口在每次启动间并不稳定；隧道管理器在每次启动时重新建立 `ssh -N -L`，并收编（adopt）引导自己打开的存活转发，使配对只建立一条隧道。描述符在每次读取注册表时都会重新校验，格式不合规时降级为「非 SSH 主机」，而不会用垃圾参数去 spawn `ssh`。
+- `pi-desktop/remoteHost/bootstrap` 加入 `list` / `pair` / `remove`，`connection/pair` 交换被抽成单一的 `exchangePairingToken`，粘贴 URL 与 SSH 引导两条路径共用。
+- 本次不做：终端工作面板客户端（Stage 5）、反向工具中继（Stage 6）、resync 看门狗、非 Linux 与 Windows 远端目标，以及经 SSH 通道下发 provider 配置 —— 刚引导好的主机在配置 provider 之前，`turn/start` 仍以 `MODEL_NOT_CONFIGURED` 关闭。见 ADR 0291、`06-delivery/07-remote-control-rollout.md` §7 与 `05-security/02-remote-control-security.md` §3.4。
