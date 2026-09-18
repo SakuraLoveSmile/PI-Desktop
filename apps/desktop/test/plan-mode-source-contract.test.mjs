@@ -179,6 +179,17 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.doesNotMatch(resolveBlock, /finally[\s\S]*pendingPlans/);
 });
 
+test("the startup artifact restore resolves launchable views first", () => {
+  // The artifact's surface comes from the launchable plugin views, and the
+  // renderer only reads that list after `ready`. Opening the artifact before
+  // that read used the host file tab and then took a second tab when
+  // `selectSession` restored the same approval.
+  assert.match(
+    storeSource,
+    /await get\(\)\.refreshPluginViews\(\);[\s\S]{0,400}?openPlanArtifact\(/,
+  );
+});
+
 test("plan approval bar paints the composer plate over the transparent dock", () => {
   const barRule = composerCss.match(/\.plan-approval-bar \{[\s\S]*?\n\}/)?.[0] ?? "";
   assert.match(barRule, /background:\s*var\(--ds-bg-composer\)/);

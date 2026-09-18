@@ -3754,7 +3754,8 @@ IPC 请求无法关闭。
   独特的神器，记录其相关的 path/hash/size 与结构化
   title/question，并且绝不让渲染器或 sidecar 写入或替换它。
   标题衍生的工件文件名可以从标题中识别出来，包括
-  非 ASCII 标题字符。卡牌显示标题，打开神器；
+  非 ASCII 标题字符。卡牌显示标题，并在内置文件视图中打开神器，
+  该视图不可启动时回退到宿主机文件标签（D452）；
   它不需要内联 question/Markdown/hash/size 或 validity/deadline
   指标。选择的审批方式会被本地记住，以便下次使用
   批准。

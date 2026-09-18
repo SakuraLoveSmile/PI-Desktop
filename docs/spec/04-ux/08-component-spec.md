@@ -2396,6 +2396,11 @@ bytes. The submitted question/description, status, validity/deadline, inline
 Markdown, SHA-256, byte size, and revision/feedback controls are not rendered
 card content.
 
+Because the bundled file view can edit and save the file it opened (ADR 0241),
+an artifact changed before Approve no longer matches the recorded hash: the host
+fails that approval closed with `PLAN_ARTIFACT_HASH_MISMATCH` until the proposal
+is rejected and resubmitted.
+
 ### 10A.3 Actions and states
 
 | State | Actions | Contract |

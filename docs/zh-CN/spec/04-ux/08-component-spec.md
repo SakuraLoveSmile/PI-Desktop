@@ -1761,6 +1761,10 @@ Agent 并保存在新的不可变 `.pi/<kind>/*.md` 工件中。它是独特的
 描述、状态、validity/deadline、内联 Markdown、SHA-256、字节大小、
 和 revision/feedback 控件不渲染卡片内容。
 
+由于内置文件视图可以编辑并保存它打开的文件（ADR 0241），在 Approve 之前被改动的
+工件不再匹配记录的哈希：宿主会以 `PLAN_ARTIFACT_HASH_MISMATCH` 让该次审批失败关闭，
+直到提议被拒绝并重新提交。
+
 ### 10A.3 动作和状态
 
 | 状态 | 行动 | 合同 |

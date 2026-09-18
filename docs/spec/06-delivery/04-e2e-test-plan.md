@@ -5445,8 +5445,8 @@ identify the platform validation still needed.
   title/question, and never lets the renderer or sidecar write or replace it.
   The title-derived artifact filename is recognizable from the title, including
   non-ASCII title characters. The card shows the title and opens the artifact in
-  the bundled file view, falling back to the host file tab when that view is
-  absent (D452);
+  the bundled file view, falling back to the host file tab when that view is not
+  launchable (D452);
   it does not require inline question/Markdown/hash/size or a validity/deadline
   indicator. The selected approval mode is remembered locally for the next
   approval.
