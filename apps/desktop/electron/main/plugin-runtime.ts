@@ -374,7 +374,7 @@ export type PluginHostServices = {
   /** Transport overrides for plugin-declared MCP servers; tests inject stubs. */
   mcp?: Pick<
     McpServerClientOptions,
-    "spawnImpl" | "fetchImpl" | "connectTimeoutMs" | "callTimeoutMs"
+    "spawnImpl" | "fetchImpl" | "connectTimeoutMs" | "callTimeoutMs" | "discoveryTimeoutMs"
   >;
   /**
    * System-wide accelerators for plugins. The registry owns the platform's

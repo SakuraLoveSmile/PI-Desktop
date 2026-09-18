@@ -6079,7 +6079,25 @@ that was sitting at the bottom — including after the turn had finished.
 - Renderer only: existing `pi.desktop.sidebarWidth` preference, no IPC or native
   window change. See ADR 0290 and E2E-168.
 
-## 2026-09-19 — SSH bootstrap for remote hosts (D452)
+## 2026-09-19 — MCP catalogs are bounded by protocol guards, not truncated (D452)
+
+- Amend D176 / ADR 0038: the per-server `tools/list` bound stops being a silent
+  truncation at 64 tools and 8 pages. The client now follows pagination to the
+  last page under Codex-parity protocol guards — 2048 tools, 100 pages, a cursor
+  that repeats or is malformed, and 30s for the whole traversal — and a server
+  that breaks one loses its handshake instead of contributing a prefix of its
+  catalog.
+- The cap was never the prompt's protection: MCP tools reach the model as
+  deferred on-demand entries behind `ToolSearch`, and the prompt block that
+  advertises them is capped independently, so a 300-tool server costs nothing
+  until one of its tools is activated.
+- `plugin.mcp.tools.truncated` is gone. A refusal is audited as
+  `plugin.mcp.connect` / `mcp.connect` with the guard's error code and message,
+  and reaches the user as the status message of a user-configured server.
+- See ADR 0038 and E2E-024K; `apps/desktop/test/plugin-mcp.test.mjs` covers the
+  whole catalog, each guard, and the old truncation as a failing baseline.
+
+## 2026-09-19 — SSH bootstrap for remote hosts (D453)
 
 - The desktop installs and pairs a `pi-host` on a machine the user already
   reaches over SSH using the system `ssh` client, so `~/.ssh/config`, the agent,

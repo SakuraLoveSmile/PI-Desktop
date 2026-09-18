@@ -437,8 +437,8 @@ Recorded on the `feat/remote-agent-host` branch, 2026-09-10:
   duplicate execution are package tests. The `pi-host` bundle, the desktop
   adapter, and the SSH bootstrap have since started: the R2a desktop kernel
   (D449 / ADR 0286) brought the adapter and the bundle, and the SSH bootstrap
-  followed in D452 / ADR 0291.
-- R2b partial (2026-09-19, D452 / ADR 0291): the desktop installs and pairs
+  followed in D453 / ADR 0291.
+- R2b partial (2026-09-19, D453 / ADR 0291): the desktop installs and pairs
   a `pi-host` over the user's own `ssh` client with `BatchMode=yes`, so the
   user's configuration, agent, and jump hosts apply and no SSH secret reaches
   the app. `remote/pi-host-release.ts` holds the pure release coordinates

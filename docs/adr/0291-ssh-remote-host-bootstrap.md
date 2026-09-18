@@ -2,7 +2,7 @@
 
 - Status: Accepted for implementation
 - Date: 2026-09-19
-- Decision: D452
+- Decision: D453
 - Related: ADR 0205 (D373 / D374 / D375), ADR 0285 (D448), ADR 0286 (D449),
   `02-architecture/05-remote-agent-control.md` §5.2,
   `05-security/02-remote-control-security.md` §3.4,

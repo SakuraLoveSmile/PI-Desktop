@@ -270,7 +270,9 @@ registered under the same `plugin_*` namespace as hand-written plugin tools and
 therefore inherit the tool timeout, the audit trail, and the per-plugin disable
 switch. They are always registered at `risk: "medium"`: their schema and
 description come from a third-party server, so the host cannot trust a
-self-declared risk level. At most 64 tools per server and 8 servers per plugin.
+self-declared risk level. A server's catalog is registered whole — the count is
+bounded only by the protocol guards in §8.1 — while at most 8 servers per plugin
+are admitted.
 
 Plan is an additional host policy boundary for agent tools:
 
@@ -356,9 +358,14 @@ manifest did not name:
   `{ "setting": "<key>" }`. The host environment is never passed through, and a
   literal secret in the manifest is a review smell, not a supported pattern
   (D018).
-- Connection budget: 10s to complete `initialize`, 100s per `tools/call`, 8
-  `tools/list` pages, 4MB per stdio line. Servers are connected lazily and torn
-  down when the plugin unloads or is disabled.
+- Connection budget: 10s to complete `initialize`, 100s per `tools/call`, 4MB
+  per stdio line. `tools/list` is followed to its last page under the per-server
+  guards of §8.1 — 2048 tools, 100 pages, a cursor that repeats or is malformed,
+  and 30s for the whole traversal — and a server that breaks one is refused
+  rather than contributing a prefix of its catalog, because MCP tools reach the
+  deferred on-demand entries behind `ToolSearch`, not as an always-present list.
+  Servers are connected lazily and torn down when the plugin unloads or is
+  disabled.
 
 ## 8.2 Desktop control and device access
 
