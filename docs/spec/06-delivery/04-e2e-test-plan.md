@@ -260,25 +260,23 @@ identify the platform validation still needed.
   `development-branding.test.mjs`, `ci-workflow.test.mjs`); Fedora KDE/Wayland
   installation remains runner validation
 
-#### E2E-196a: Default unsigned macOS release lane
+#### E2E-196a: Unsigned macOS debug lane
 
-- **Preconditions**: A `vX.Y.Z` tag matches `apps/desktop/package.json`, or the
-  Release workflow is manually dispatched with `sign_macos` omitted or false;
-  Windows and Linux release credentials are not affected.
-- **Steps**: 1) Run the tag workflow or dispatch it with the default signing
-  input. 2) Confirm both macOS architectures complete ordinary DMG/ZIP
-  packaging without certificate secrets. 3) Inspect the artifacts and workflow
-  steps.
+- **Preconditions**: The Release workflow is manually dispatched with
+  `sign_macos: false`; Windows and Linux release credentials are not affected.
+  This path must not be used to publish a GitHub Release tag.
+- **Steps**: 1) Dispatch the Release workflow with `sign_macos: false`. 2)
+  Confirm both macOS architectures complete ordinary DMG/ZIP packaging without
+  certificate secrets. 3) Inspect the artifacts and workflow steps.
 - **Expected**: macOS DMG/ZIP artifacts are produced and uploaded without
   Developer ID signatures or notarization, using explicit `-arm64` and `-x64`
   filename markers for their native architecture; macOS staple and Gatekeeper
   checks are explicitly skipped. Windows/Linux artifacts and the merged updater
-  feed still publish normally. This exception must be removed before the next
-  stable release; it does not satisfy E2E-196c.
+  feed still publish normally. This exception does not satisfy E2E-196c.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
-- **Acceptance**: Quality (default release packaging)
+- **Acceptance**: Quality (debug packaging)
 - **Milestone**: M6+
-- **Status**: Active default; this scenario does not satisfy E2E-196c.
+- **Status**: Opt-in debug lane; tag releases must satisfy E2E-196c.
 
 #### E2E-196b: Unsigned macOS packages expose first-launch guidance
 
@@ -314,24 +312,30 @@ identify the platform validation still needed.
 
 #### E2E-196c: macOS tag artifacts pass Gatekeeper without a quarantine bypass
 
-- **Preconditions**: The Release workflow is manually dispatched for a
-  `vX.Y.Z` tag with `sign_macos: true`; the tag matches
-  `apps/desktop/package.json`; GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
+- **Preconditions**: A `vX.Y.Z` tag matching `apps/desktop/package.json` is
+  pushed, or the Release workflow is dispatched with `sign_macos: true`
+  (default); GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
   `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` secrets; both native macOS
   runners are available.
-- **Steps**: 1) Run the explicitly signed workflow. 2) For each macOS architecture,
-  inspect the unpacked app with `codesign -dv --verbose=4` and confirm a
-  `Developer ID Application` authority. 3) Run `codesign --verify --deep
-  --strict`, `spctl -a -vv`, and `xcrun stapler validate` against the app. 4)
-  Run `xcrun stapler validate` against the matching DMG. 5) Download the DMG on
-  a clean macOS profile, move the app to `/Applications`, and open it without
-  clearing `com.apple.quarantine`.
+- **Steps**: 1) Run the tag workflow. 2) For each macOS architecture, inspect
+  the unpacked app with `codesign -dv --verbose=4` and confirm authority
+  `Developer ID Application: XingYu Liu (DUV63RKYTW)`. 3) Run
+  `codesign --verify --deep --strict --verbose=2`,
+  `spctl --assess --type execute --verbose=4`, and `xcrun stapler validate`
+  against the app, including `Contents/Resources/bin/pi-desktop-host-core`.
+  4) Confirm the workflow's DMG step reported an Apple notary status of
+  `Accepted` and then run `xcrun stapler validate` against the matching DMG.
+  5) Download the DMG on a clean macOS profile, move the app to
+  `/Applications`, and open it without clearing `com.apple.quarantine`.
 - **Expected**: Each macOS app passes signature integrity, Gatekeeper reports
-  `Notarized Developer ID`, and both app and DMG contain valid stapled tickets.
-  The app opens normally; no `xattr` quarantine-removal command or Security &
-  Privacy override is required.
+  `source=Notarized Developer ID`, and both app and DMG contain valid stapled
+  tickets. The DMG has its own submission: a DMG that was never submitted has
+  no ticket and fails `stapler staple` with error 65, so a tag build must never
+  reach that state. The app opens normally; no `xattr` quarantine-removal
+  command or Security & Privacy override is required. Missing secrets, a
+  rejected submission, or an exhausted staple retry fail the job.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
-  `05-security/01-security.md`
+  `05-security/01-security.md`, ADR 0289
 - **Acceptance**: Quality, Security
 - **Milestone**: M6+
 - **Status**: Workflow script/unit-covered; clean-machine journey required for
@@ -3249,7 +3253,9 @@ identify the platform validation still needed.
   Repeat with failed, denied, and scratch writes.
 - **Expected**: Each successful workspace Write/Edit creates one message-owned
   review record and one adjacent keyboard-accessible card; the card is never a
-  bottom/global entry. Every review card, inline and in the Review tab, is
+  bottom/global entry. The completion opens nothing: the panel keeps whatever
+  the user left it showing, and Review appears only after the user opens it.
+  Every review card, inline and in the Review tab, is
   collapsed by default and expands on demand. The Review tab lists A's
   chronological recorded changes, independent of Git status, repository
   presence, commit state, focus refresh,
@@ -3894,12 +3900,12 @@ identify the platform validation still needed.
   automatic check or invoke Check for Updates from the application menu /
   Settings → Info.
 - **Expected**: Update state reports `available` (manual platforms) or
-  advances through in-app download for Windows NSIS / Linux AppImage with
-  `availableVersion` equal to the newer stable tag. A Windows portable run
-  (`PORTABLE_EXECUTABLE_FILE`) stays on the manual notify-and-link path and
-  must not download or run the NSIS installer. The client must not report
-  up-to-date merely because no newer release shares the same `rc` prerelease
-  channel.
+  advances through in-app download for packaged macOS, Windows NSIS, and
+  Linux AppImage with `availableVersion` equal to the newer stable tag. A
+  Windows portable run (`PORTABLE_EXECUTABLE_FILE`) stays on the manual
+  notify-and-link path and must not download or run the NSIS installer. The
+  client must not report up-to-date merely because no newer release shares the
+  same `rc` prerelease channel.
 - **Specs linked**: `04-ux/09-interaction-patterns.md`,
   `05-security/01-security.md`, `08-meta/decisions-log.md` (D120),
   ADR 0022
@@ -4549,7 +4555,8 @@ identify the platform validation still needed.
   request in A as well. 5) Open B explicitly, resolve only B's request, then
   return to A and resolve A's request. 6) Rapidly select A then B while session
   details load in opposite completion order. 7) While B is loading, resolve A's
-  Write/Edit request so its tool completion creates Review, then let B emit a
+  Write/Edit request so its tool completion records an inline review card, then
+  let B emit a
   BrowserPreview artifact while A is visible. Switch back to each session.
 - **Expected**: B's background events update only B's row and retained state;
   they do not change A's active session/project/page, transcript, draft, scroll,
@@ -4557,7 +4564,7 @@ identify the platform validation still needed.
   inline card with its original countdown. Both requests remain independently
   actionable, and resolving B does not clear A. The final rapid selection stays
   on B even when A's older load finishes later. Only explicit notification or
-  session activation may navigate. A's post-approval Review is retained only in
+  session activation may navigate. A's post-approval review card is retained only in
   A without a transient open/close flash in B; B's BrowserPreview carries B's
   session identity, updates only B's retained Browser resource, and never opens,
   navigates, focuses, or resizes A's panel. Explicitly returning to either
@@ -7159,8 +7166,8 @@ identify the platform validation still needed.
      no Uninstall action.
   2. Reveal the work panel and click `+` to create a New launcher tab. Confirm
      its rows include Review and the plugin-contributed File Manager and Browser
-     views. Trigger an agent edit and confirm Review opens itself under Open
-     resources — it is an artifact surface, not a launcher entry.
+     views. Trigger an agent edit and confirm the panel does not open itself:
+     Review appears under Open resources only after the user selects its row.
   3. Open the File Manager view. Confirm the tree lists the project, expands
      directories lazily, and omits `node_modules`, `.git`, and `.env`. Switch
      the view's top-left folder control to the project's second folder and
@@ -8479,8 +8486,8 @@ This test plan spec is accepted when:
   action removes or changes the other card.
 - Resolve A's Write/Edit permission and switch to B before completion. Expect no
   transient Review panel in B and no panel/window flash; returning to A restores
-  A's resulting Review tab and prior panel selection, while B's tabs and Browser
-  resource remain unchanged.
+  A's prior panel selection with the inline review card in its transcript — the
+  edit opened no tab — while B's tabs and Browser resource remain unchanged.
 
 ### US-UI-69 Sidebar type balance (D144/D161)
 - Open the expanded sidebar in light and dark themes at default and minimum
@@ -9883,33 +9890,38 @@ This test plan spec is accepted when:
   3. With the work panel open or on a small supported window, continue the
      resize toward the maximum; inspect the composer toolbar while the main
      pane reflows.
-  4. Repeat with a target below the minimum and above the maximum; release and
-     confirm the sidebar width stops at 240px and 520px respectively while the
-     MainChat reservation remains intact.
+  4. Repeat with a target below 240px and above the live maximum; release and
+     confirm the sidebar width stops at 240px and the live cap (at most 520px)
+     while MainChat stays at or above 450px. Continue the drag below 160px and
+     confirm the sidebar collapses immediately without saving the in-progress
+     width.
   5. Focus the edge handle and press ArrowLeft/ArrowRight, Home, and End;
-     inspect the separator's current ARIA value.
+     inspect the separator's current ARIA value. ArrowLeft at 240px must not
+     collapse the sidebar.
   6. Start a resize, press Escape or cancel the pointer, then restart the app.
-     Collapse and re-expand the sidebar as a separate check.
+     Collapse and re-expand the sidebar as a separate check; the preferred
+     expanded width must return.
 - **Expected**: The handle is discoverable on direct hover/focus without a
   full-height white/accent rail when the sidebar body is hovered, has no native
   window drag or text-selection side effect, and remains anchored to the press
-  point. MainChat follows the live width until its 515px floor. Pointer release saves one clamped
-  preferred width; Escape/cancellation restores the starting width without
-  saving it. Keyboard changes commit immediately and expose localized width
-  semantics. The saved width survives relaunch and is restored after sidebar
-  collapse; collapse does not convert the preferred width into the icon-rail
-  width. MainChat never falls below its reserved 515px width, and the composer
-  toolbar keeps its left and right groups on one row without squeezed buttons.
-  Mode/permission labels remain single-line and ellipsized; no toolbar text is
-  vertically split or overlapped.
+  point. MainChat follows the live width until its 450px floor. Pointer release
+  saves one clamped preferred width; Escape/cancellation restores the starting
+  width without saving it. A pointer width below 160px collapses the sidebar as
+  a user action and restores the preferred expanded width on reopen. Keyboard
+  changes commit immediately and expose localized width semantics. The saved
+  width survives relaunch and is restored after sidebar collapse; collapse does
+  not convert the preferred width into the icon-rail width. MainChat never
+  falls below 450px, and the composer toolbar keeps its left and right groups
+  on one row without squeezed buttons. Mode/permission labels remain
+  single-line and ellipsized; no toolbar text is vertically split or overlapped.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
-  ADR 0141, ADR 0226, D280, D401
+  ADR 0141, ADR 0238, ADR 0290, D280, D408, D451
 - **Acceptance**: A (app shell), F (persistence), Quality
 - **Milestone**: M6+
 - **Status**: Unit/source-contract covered (`sidebar-preferences.test.mjs`,
-  `sidebar-resize.test.mjs`); rendered desktop drag and relaunch journey
-  remains pending
+  `sidebar-resize.test.mjs`, `sidebar-resize-math.test.mjs`); rendered desktop
+  drag and relaunch journey remains pending
 
 #### E2E-162: A vendor account and an AI service offer the same model picker
 
@@ -13222,24 +13234,6 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Renderer fixtures alone do not prove settings persistence.
 - **Specs:** 04-ux/06-settings-ia, 04-ux/08-component-spec,
   04-ux/09-interaction-patterns; ADR turn-process-and-thinking-display.
-
-### E2E-CHAT-hosted-search-citations-stay-local
-
-- **Preconditions:** An assistant turn with `hostedSearch.sources` that include
-  `https://example.com/a`, plus markdown that contains `#cite=1`,
-  `[Read here](https://example.com)`, and `[Same path](https://example.com/a)`.
-- **Steps:** Render the turn. Inspect citation badges, remaining hyperlinks,
-  and favicon image URLs (including failed loads).
-- **Expected:** `#cite=1` and the same-path source URL render as citation
-  badges. The same-host different-path `https://example.com` link stays an
-  ordinary hyperlink with its original text. Favicon requests go only to each
-  source origin's `/favicon.ico`; no third-party favicon host is contacted.
-- **Automation:** `apps/desktop/test/hosted-search-ui.test.mjs`.
-- **Specs:** `03-runtime/11-provider-model-system.md` §16.
-- **Acceptance:** Security + C (sessions/transcript).
-- **Milestone:** M6+.
-- **Status:** Automated unit coverage; renderer E2E still draft.
-
 
 ### E2E-RPC-unicode-separators
 

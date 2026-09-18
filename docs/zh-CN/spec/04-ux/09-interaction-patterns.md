@@ -387,10 +387,12 @@
   它的承诺宽度。折叠并最终关闭回收预订，并且
   提交的分隔符调整大小会更新它。本机窗口边缘拖动更改
   仅 MainChat，从不面板宽度（D163，ADR 0032）。
-- 成功的工作区 Write/Edit 在其内部创建或激活 Review
-  发起会话。失败和临时写入不会。背景会议
-  工件仅更新其保留的上下文，并且从不打开、激活、调整大小，
-  焦点，或更改可见面板。
+- 任何工具结果都不会创建或激活工作面板标签页。Review 只由用户的
+  主动操作打开——`+` 启动器的 Review 行，或视口固定开关与
+  `Cmd/Ctrl + J` 显示的会话保留上下文——因此成功的工作区 Write/Edit
+  永远不会抢走用户正在阅读的面板。失败和临时写入同样如此。后台会话
+  事件仅更新其保留的上下文，并且从不打开、激活、调整大小、聚焦，
+  或更改可见面板。
 - 每个成功的工作区 Write/Edit 工具结果都会进行一次持久审查
   快照。其紧凑的 InlineReviewCard 在同一个 Activity 中呈现
   披露，紧随其工具行之后；它永远不会移动到
@@ -405,8 +407,8 @@
   被拒绝，非结构化结果不会呈现卡片。背景
   会话的卡片保留其自己的成绩单并且仅变得可见
   选择该会话后；它的事件永远不会呈现在当前
-  可见会话。成功的工作空间工件仍可能创建或
-  激活单例“审阅”选项卡。
+  可见会话。成功的工作空间工件不会创建或激活单例“审阅”选项卡；
+  它只在用户打开后出现。
 - 每个会话在渲染器中保留 `{open, tabs, activeTabId, browserResource}`
   记忆。选择另一个会话会自动交换可见上下文，
 切换回来可以恢复它；选择没有活动的工作区
@@ -429,11 +431,7 @@
 - 设置 → 信息和应用程序菜单检查共享一种类型的更新状态。
   手动检查公开最新或错误反馈；自动故障不会
   打开 Toast 或环境横幅。
-- 手动交付（`darwin`、非 AppImage Linux，以及带有
-  `PORTABLE_EXECUTABLE_FILE` 的 Windows 便携版运行）在 `available` 停止，并且
-  提供固定的 GitHub 发布页面。应用内交付（Windows NSIS 和
-  Linux AppImage 准备就绪构建）自动推进
-  `downloading` 到稳定的 `downloaded` 状态。
+- 手动交付（非 AppImage Linux，以及带有 `PORTABLE_EXECUTABLE_FILE` 的 Windows 便携版运行）在 `available` 停止，并提供固定的 GitHub 发布页面。应用内交付（打包的 macOS、Windows NSIS 和 Linux AppImage）自动推进 `downloading` 到稳定的 `downloaded` 状态。
 - `downloaded` 保持可操作状态，直至重新启动更新或正常应用退出；
   稍后的 scheduled/manual 检查不会将其替换为 `checking`。
 - 紧凑的更新通知仅出现在主窗格的右上角安全区域中
@@ -455,9 +453,7 @@
   当前版本和发现的可用版本标识为
   紧凑的徽章。列表独立滚动，通过其关闭控制关闭，
   转义或背景，并将焦点恢复到调用控件。
-- D126 标签版本发布所有平台清单和安装程序。 Windows
-  因此，NSIS 和 Linux AppImage 使用应用内通道； macOS 和 Linux deb/rpm
-  保持通知和链接传递模式。
+- D126 标签版本发布所有平台清单和安装程序。打包的 macOS、Windows NSIS 和 Linux AppImage 使用应用内通道；Linux deb/rpm 和 Windows 便携版保持通知和链接传递模式。
 
 ## 2. 流消息行为
 

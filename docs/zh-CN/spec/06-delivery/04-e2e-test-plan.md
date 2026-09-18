@@ -2086,7 +2086,8 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   重复失败、拒绝和临时写入。
 - **预期**：每个成功的工作区 Write/Edit 都会创建一个消息拥有的
   查看记录和一张相邻的键盘可访问卡；该卡从来都不是
-  bottom/global 条目。每张评论卡，内联和评论选项卡中，都是
+  bottom/global 条目。完成时不打开任何东西：面板保持用户离开时的样子，
+  审阅只在用户打开后出现。每张评论卡，内联和评论选项卡中，都是
   默认折叠并按需扩展。 Review 选项卡列出了 A
   按时间顺序记录的更改，独立于 Git 状态、存储库
   存在、提交状态、焦点刷新、
@@ -2996,7 +2997,7 @@ IPC 请求无法关闭。
   也在A中请求。 5）显式打开B，只解析B的请求，然后
   返回A并解决A的请求。 6) 会话时快速选择 A 然后 B
   详细信息以相反的完成顺序加载。 7) 当B加载时，解析A的
-  Write/Edit 请求，因此其工具完成创建 Review，然后让 B 发出
+  Write/Edit 请求，因此其工具完成时记录一张内联审阅卡，然后让 B 发出
   当 A 可见时，BrowserPreview 伪影。切换回每个会话。
 - **预期**：B的后台事件仅更新B的行和保留状态；
   他们不会更改 A 的活动 session/project/page、记录、草稿、卷轴、
@@ -3004,7 +3005,7 @@ IPC 请求无法关闭。
   内联卡及其原始倒计时。两个请求保持独立
   可操作，并且解决B并没有清除A。最终的快速选择保持不变
 即使 A 的较旧负载稍后完成，也会在 B 上执行。仅明确通知或
-  会话激活可以导航。 A 的批准后审查仅保留在
+  会话激活可以导航。 A 的批准后审阅卡仅保留在
   A 中 B 中没有瞬态 open/close 闪存； B 的 BrowserPreview 携带 B 的
   会话身份，仅更新 B 保留的浏览器资源，并且从不打开，
   导航、聚焦或调整 A 的面板大小。明确返回到任一
@@ -3469,21 +3470,15 @@ IPC 请求无法关闭。
 - **状态**：单位覆盖（`mermaid-rendering.test.mjs`）；提供安全性和
   视觉场景草稿
 
-#### E2E-196a：默认未签名的 macOS 发布通道
+#### E2E-196a：未签名的 macOS 调试通道
 
-- **先决条件**：`vX.Y.Z` 标签与 `apps/desktop/package.json` 匹配，或手动运行
-  Release 工作流时省略 `sign_macos` 或将其设为 false；Windows 和 Linux 的发布
-  凭据不受影响。
-- **步骤**：1) 运行标签工作流，或使用默认签名输入手动运行。2) 确认两个 macOS
-  架构都完成普通的 DMG/ZIP 打包，且没有使用证书密钥。3) 检查工件和工作流步骤。
-- **预期**：macOS DMG/ZIP 工件生成并上传，文件名分别带有 `-arm64` 和 `-x64`
-  架构标记，不包含 Developer ID 签名或公证；macOS 装订和 Gatekeeper 检查明确跳过。
-  Windows/Linux 工件和合并后的更新源仍正常发布。该例外必须在下一个稳定版本前移除，
-  且不满足 E2E-196c。
+- **先决条件**：手动运行 Release 工作流并设置 `sign_macos: false`；Windows 和 Linux 的发布凭据不受影响。该路径不得用于发布 GitHub Release 标签。
+- **步骤**：1) 以 `sign_macos: false` 手动运行 Release 工作流。2) 确认两个 macOS 架构都完成普通的 DMG/ZIP 打包，且没有使用证书密钥。3) 检查工件和工作流步骤。
+- **预期**：macOS DMG/ZIP 工件生成并上传，文件名分别带有 `-arm64` 和 `-x64` 架构标记，不包含 Developer ID 签名或公证；macOS 装订和 Gatekeeper 检查明确跳过。Windows/Linux 工件和合并后的更新源仍正常发布。该例外不满足 E2E-196c。
 - **关联规格**：`06-delivery/06-release-runbook.md`
-- **验收**：质量（默认发布打包）
+- **验收**：质量（调试打包）
 - **里程碑**：M6+
-- **状态**：当前默认行为；本场景不满足 E2E-196c。
+- **状态**：可选调试通道；标签发布必须满足 E2E-196c。
 
 #### E2E-196b：未签名的 macOS 软件包展示首次启动指引
 
@@ -3510,20 +3505,10 @@ IPC 请求无法关闭。
 
 #### E2E-196c：macOS 标签工件通过 Gatekeeper 且无需移除隔离属性
 
-- **先决条件**：针对 `vX.Y.Z` 标签手动运行 Release 工作流并设置
-  `sign_macos: true`；标签与 `apps/desktop/package.json` 匹配；GitHub Actions
-  已配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID`、
-  `APPLE_APP_SPECIFIC_PASSWORD` 和 `APPLE_TEAM_ID` 密钥；两个本机 macOS
-  运行器均可用。
-- **步骤**：1) 运行明确启用签名的工作流。2) 对每个 macOS 架构检查解压后的应用，
-  使用 `codesign -dv --verbose=4` 确认 `Developer ID Application` 权限。3) 对应用运行
-  `codesign --verify --deep --strict`、`spctl -a -vv` 和 `xcrun stapler validate`。
-  4) 对对应的 DMG 运行 `xcrun stapler validate`。5) 在干净的 macOS 配置文件中下载
-  DMG，将应用移到 `/Applications` 后不清除 `com.apple.quarantine` 直接打开。
-- **预期**：每个 macOS 应用通过签名完整性检查，Gatekeeper 报告
-  `Notarized Developer ID`，应用和 DMG 都包含有效的装订票据；应用正常打开，无需
-  `xattr` 命令或“安全性与隐私”覆盖操作。
-- **关联规格**：`06-delivery/06-release-runbook.md`、`05-security/01-security.md`
+- **先决条件**：推送与 `apps/desktop/package.json` 匹配的 `vX.Y.Z` 标签，或手动运行 Release 工作流并保持 `sign_macos: true`（默认）；GitHub Actions 已配置 `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD` 和 `APPLE_TEAM_ID` 密钥；两个本机 macOS 运行器均可用。
+- **步骤**：1) 运行标签工作流。2) 对每个 macOS 架构检查解压后的应用，使用 `codesign -dv --verbose=4` 确认权限为 `Developer ID Application: XingYu Liu (DUV63RKYTW)`。3) 对应用运行 `codesign --verify --deep --strict --verbose=2`、`spctl --assess --type execute --verbose=4` 和 `xcrun stapler validate`，并检查 `Contents/Resources/bin/pi-desktop-host-core`。4) 确认工作流的 DMG 步骤报告 Apple 公证状态为 `Accepted`，然后对对应的 DMG 运行 `xcrun stapler validate`。5) 在干净的 macOS 配置文件中下载 DMG，将应用移到 `/Applications` 后不清除 `com.apple.quarantine` 直接打开。
+- **预期**：每个 macOS 应用通过签名完整性检查，Gatekeeper 报告 `source=Notarized Developer ID`，应用和 DMG 都包含有效的装订票据。DMG 有自己的提交：从未提交过的 DMG 没有票据，装订会以 error 65 失败，因此标签构建绝不能走到该状态。应用可正常打开，无需 `xattr` 命令或“安全性与隐私”覆盖。缺少密钥、提交被拒或装订重试耗尽都会让作业失败。
+- **关联规格**：`06-delivery/06-release-runbook.md`、`05-security/01-security.md`、ADR 0289
 - **验收**：质量、安全
 - **里程碑**：M6+
 - **状态**：工作流脚本/单元已覆盖；每次发布仍需在干净机器上验证（适用变更合入前需在具备条件的环境中运行 E2E）
@@ -4892,7 +4877,7 @@ IPC 请求无法关闭。
   项目组，其第二个文件夹已注册为另一个根（ADR 0249）。
 - **步骤**：
   1. 打开插件页，确认 **文件管理器** 作为内置插件列出、已启用、显示工作面板视图能力，且没有卸载操作。
-  2. 展开工作面板并打开标题菜单，确认它出现在“插件视图”分组，而不是宿主工具中；触发一次代理编辑，确认 Review 仍在“已打开项目”中作为产物面板打开。
+  2. 展开工作面板并打开标题菜单，确认它出现在“插件视图”分组，而不是宿主工具中；触发一次代理编辑，确认面板不会自行打开，Review 仅在用户选择其行后才出现在“已打开项目”中。
   3. 打开文件管理器，确认文件树按需加载目录，并忽略 `node_modules`、`.git` 和 `.env`。把视图左上角的文件夹控件切到项目的第二个文件夹，确认文件树跟着切换，而应用显示的可见工作区不变，然后切回项目的主文件夹。
   4. 右键一个文件，确认提供“用默认应用打开”和“在文件夹中显示”且可用；右键一个目录，确认不提供这两项，因为宿主会拒绝目录。
   5. 打开文本文件、编辑并保存，确认磁盘上的文件已改变且编辑器保留保存后的内容。在应用之外改动同一文件，再次编辑并保存，确认报告冲突而不是覆盖外部改动。点击二进制文件，确认显示不支持预览而不是打印替换字符；依次打开图片、CSV 和 Markdown，确认各自使用专属查看器。切换到简体中文，确认文件树、查看器和上下文菜单均已本地化。切换项目后确认文件树立即更新，不必等待轮询。
@@ -5843,8 +5828,8 @@ IPC 请求无法关闭。
 操作删除或更改另一张卡。
 - 解析A的Write/Edit权限，完成前切换到B。预计不会
   B 中的瞬态检查面板且无 panel/window 闪烁；返回A恢复
-  A 生成的“审阅”选项卡和之前的面板选择，而 B 的选项卡和浏览器
-  资源保持不变。
+  之前的面板选择，其转录中有内联审阅卡——这次编辑没有打开任何标签页——
+  而 B 的选项卡和浏览器资源保持不变。
 
 ### US-UI-69 侧边栏类型平衡 (D144/D161)
 - 在默认和最小值下打开浅色和深色主题的扩展侧边栏

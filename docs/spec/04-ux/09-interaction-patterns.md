@@ -474,10 +474,13 @@ may be retained while exactly one workspace supplies the visible shell context.
   divider updates the renderer-owned panel target from 244px upward, capped by
   the live three-column budget, while native window edges resize only the fixed
   application window (ADR 0151).
-- A successful workspace Write/Edit creates or activates Review in its
-  originating session. Failed and scratch writes do not. Background-session
-  artifacts update only their retained context and never open, activate, resize,
-  focus, or change the visible panel.
+- No tool result creates or activates a work-panel tab. Review opens only from
+  an explicit user action — its `+` launcher row, or the retained context the
+  viewport-fixed toggle and `Cmd/Ctrl + J` reveal — so a successful workspace
+  Write/Edit never takes the panel away from what the user was reading. Failed
+  and scratch writes behave the same. Background-session events update only
+  their retained context and never open, activate, resize, focus, or change the
+  visible panel.
 - Each successful workspace Write/Edit tool result carries one durable review
   snapshot. Its compact InlineReviewCard is rendered in the same activity
   disclosure, immediately after its tool row; it is never moved to the
@@ -492,8 +495,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   denied, and unstructured results do not render a card. A background
   session's card remains with its own transcript and becomes visible only
   after that session is selected; its event never renders in the currently
-  visible session. Successful workspace artifacts may still create or
-  activate the singleton Review tab.
+  visible session. A successful workspace artifact cannot create or activate
+  the singleton Review tab; it appears only after the user opens it.
 - Each session retains `{open, tabs, activeTabId, browserResource}` in renderer
   memory. Selecting another session swaps the visible context atomically and
   switching back restores it; selecting a workspace without an active
@@ -516,10 +519,10 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Settings → Info and application-menu checks share one typed update state.
   Manual checks expose up-to-date or error feedback; automatic failures do not
   open a toast or ambient banner.
-- Manual delivery (`darwin`, non-AppImage Linux, and Windows portable runs
+- Manual delivery (non-AppImage Linux and Windows portable runs
   with `PORTABLE_EXECUTABLE_FILE`) stops at `available` and
-  offers the fixed GitHub Releases page. In-app delivery (Windows NSIS and
-  Linux AppImage readiness builds) automatically advances through
+  offers the fixed GitHub Releases page. In-app delivery (packaged macOS,
+  Windows NSIS, and Linux AppImage) automatically advances through
   `downloading` to the stable `downloaded` state.
 - `downloaded` remains actionable until Restart to update or normal app quit;
   later scheduled/manual checks do not replace it with `checking`.
@@ -542,9 +545,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   The current release and a discovered available release are identified with
   compact badges. The list scrolls independently, closes by its close control,
   Escape, or the backdrop, and restores focus to the invoking control.
-- D126 tag releases publish all platform manifests and installers. Windows
-  NSIS and Linux AppImage therefore use the in-app lane; macOS and Linux deb/rpm
-  remain notify-and-link delivery modes.
+- D126 tag releases publish all platform manifests and installers. Packaged
+  macOS, Windows NSIS, and Linux AppImage use the in-app lane; Linux deb/rpm
+  and Windows portable remain notify-and-link delivery modes.
 
 ## 2. Streaming message behavior
 
@@ -1048,9 +1051,9 @@ Work-panel and application-window resizing are implemented in MVP:
   Native pointer clicks must operate the controls and dragging empty header
   space must move the window; DOM/CDP clicks alone do not establish native hit testing.
 
-The expanded sidebar is fixed at 275px. Collapse/open changes only whether the
-column is present; the historical resize handle is hidden and legacy width
-preferences are ignored.
+The expanded sidebar is user-resizable from 240px to 520px (default 275px) via
+the right-edge handle. Pointer motion below 160px collapses the sidebar and
+keeps the preferred expanded width. Keyboard Arrow/Home/End resize without collapsing.
 
 Project ordering is implemented for retained project groups. There is no
 reorder grip. Pressing the project title and moving 8px starts a project drag,
