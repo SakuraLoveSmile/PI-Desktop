@@ -297,9 +297,11 @@ test("revealing a skill carries the level so project skills resolve", () => {
 test("skill import is one native file and is copied through the host", () => {
   assert.notEqual(skillImport, "", "skill import handler should be present");
   assert.match(skillImport, /properties:\s*\["openFile"\]/);
-  assert.doesNotMatch(skillImport, /properties:\s*\[[^\]]*(?:multiSelections|openDirectory)/);
+  // Scan-and-import (a separate `skillImportScan` handler) opens a directory,
+  // but the single-file skill-import branch must never do that or select many.
+  assert.doesNotMatch(skillImport, /properties:\s*\[[^\]]*multiSelections/);
   assert.match(skillImport, /host\.call\("skills\.import"/);
-  assert.match(read("../../../crates/host-core/src/user_skills.rs"), /fs::copy\(&source_path, &target\)/);
+  assert.match(read("../../../crates/host-core/src/user_skills.rs"), /fs::copy\(source, target\)/);
 });
 
 test("MCP management reuses the validated modal and blocks same-level duplicates", () => {

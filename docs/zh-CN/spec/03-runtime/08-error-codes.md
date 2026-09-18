@@ -270,6 +270,29 @@ reveal 不并入任何行，必须重新读取。
 同级结果字段中的有界窗口
 （请参阅 [16-工具-结果-限制](/zh-CN/spec/03-runtime/16-tool-result-limits)）。
 
+### 3.8 远程控制（RACP-WS / SSH 引导）
+
+当会话位于经 `RACP-WS` 驱动的已配对远程主机上时，由桌面端的远程主机客户端与
+`pi-host` 服务端发出（参见
+[19-远程代理控制协议](/zh-CN/spec/03-runtime/19-remote-agent-control-protocol)、
+[../05-security/02-remote-control-security](/zh-CN/spec/05-security/02-remote-control-security)、
+ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之分；这些码通过与其他调用
+相同的错误对象浮现。
+
+| 码 | 可重试 | 含义 |
+|---|---|---|
+| `HOST_DISCONNECTED` | 是 | 远程主机连接断开；进行中的调用被拒绝，客户端按游标重连并重新订阅 |
+| `HOST_BOOTSTRAP_FAILED` | 否 | 经 SSH 配置远程 `pi-host` 失败（下载、校验和不匹配或 `install.sh`）；`details.reason` 指明阶段 |
+| `HOST_VERSION_MISMATCH` | 否 | 远程 `pi-host` 版本与桌面不匹配；桌面拒绝驱动不兼容的主机 |
+| `REMOTE_AUTH_FAILED` | 否 | 设备或配对令牌在 RACP-WS 升级时被拒 |
+| `REMOTE_CONNECTION_FAILED` | 是 | RACP-WS 传输无法连接（非回环 URL、套接字被拒） |
+| `REMOTE_FORWARD_FAILED` | 是 | 无法建立 SSH 回环端口转发 |
+| `REMOTE_PATH_NOT_FOUND` | 否 | 远程项目/工作区路径在主机上不存在 |
+| `REMOTE_PATH_FORBIDDEN` | 否 | 远程路径在主机允许的根之外 |
+| `PAIRING_FAILED` | 否 | `connection/pair` 无法铸造设备凭据 |
+| `PAIRING_TOKEN_EXPIRED` | 否 | 一次性配对令牌在配对完成前已过期 |
+| `CAPABILITY_UNAVAILABLE` | 否 | 请求的操作对应主机声明为不可用的能力（如附件、工具中继） |
+
 ## 4. 映射规则
 
 ### 主机 RPC 数字 → AppError.code

@@ -13,6 +13,13 @@
 # exported as a system-Electron repackaging asset, and all outputs — with their
 # electron-updater latest*.yml feeds — are published to the GitHub Release
 # (D126/D285/D364).
+#
+# It also builds the headless `pi-host` bundle for every Linux platform the
+# desktop publishes (currently x64) and publishes it as
+# pi-host-<version>-linux-<arch>.tar.gz plus a .sha256 sidecar. The desktop's
+# SSH bootstrap downloads that asset at the desktop's version and verifies the
+# published checksum before installing on the remote machine (rollout
+# 06-delivery/07-remote-control-rollout.md §6 acceptance 4; D375 / ADR 0284).
 
 name: Release
 
@@ -275,10 +282,99 @@ jobs:
             apps/desktop/release/*.blockmap
             apps/desktop/release/latest*.yml
 
+  pi-host-bundle:
+    name: Bundle pi-host (Linux ${{ matrix.arch }})
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Every Linux platform the desktop release publishes. The desktop
+          # matrix ships Linux x64 only today; add arm64 here in lockstep if
+          # the desktop starts publishing it.
+          - arch: x64
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare tag with apps/desktop/package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          APP_VERSION="$(node -p "require('./apps/desktop/package.json').version")"
+          if [ "$TAG_VERSION" != "$APP_VERSION" ]; then
+            echo "::error::Tag v$TAG_VERSION does not match apps/desktop/package.json version $APP_VERSION."
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build inputs (host-core, workspace, sidecar bundle)
+        run: |
+          set -euo pipefail
+          # Ubuntu 22.04 keeps the host-core glibc floor at 2.35, matching the
+          # desktop Linux build so the bundled binary loads on the same distros.
+          cargo build --release --locked -p host-core &
+          host_build_pid=$!
+          trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
+
+          pnpm install --frozen-lockfile
+          pnpm build:js
+          pnpm --filter @pi-desktop/agent-runtime bundle
+          pnpm --filter @pi-desktop/pi-host build
+
+          wait "$host_build_pid"
+          trap - EXIT
+
+      - name: Verify host-core glibc floor
+        run: node scripts/check-linux-host-glibc.mjs target/release/pi-desktop-host-core
+
+      - name: Assemble pi-host bundle
+        run: node apps/pi-host/scripts/bundle.mjs --platform linux --arch ${{ matrix.arch }}
+
+      - name: Archive bundle with checksum
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./apps/pi-host/package.json').version")"
+          name="pi-host-${VERSION}-linux-${{ matrix.arch }}"
+          out="apps/pi-host/dist-bundle"
+          if [ ! -d "$out/$name" ]; then
+            echo "::error::expected bundle directory $out/$name"
+            ls -la "$out" || true
+            exit 1
+          fi
+          tar -czf "$out/${name}.tar.gz" -C "$out" "$name"
+          ( cd "$out" && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256" )
+          cat "$out/${name}.tar.gz.sha256"
+
+      - name: Upload pi-host bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-host-linux-${{ matrix.arch }}
+          if-no-files-found: error
+          compression-level: 0
+          path: |
+            apps/pi-host/dist-bundle/pi-host-*-linux-${{ matrix.arch }}.tar.gz
+            apps/pi-host/dist-bundle/pi-host-*-linux-${{ matrix.arch }}.tar.gz.sha256
+
   publish:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, pi-host-bundle]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

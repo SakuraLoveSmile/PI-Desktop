@@ -22,9 +22,16 @@ const windowSource = await readMainModule("bootstrap/window.ts");
 
 /** The `boundsWatchdog` interval body, from its `setInterval` to its closing. */
 function watchdogBody() {
-  const start = windowSource.indexOf("const boundsWatchdog = setInterval(");
-  assert.notEqual(start, -1, "the bounds watchdog interval must exist");
-  const end = windowSource.indexOf("}, 1500);", start);
+  // The source used to be a bare `const boundsWatchdog = setInterval(...)`;
+  // it became `const boundsWatchdog: NodeJS.Timeout | null =
+  // process.platform === "darwin" ? setInterval(...) : null` when the watchdog
+  // stopped being registered on non-macOS platforms. Anchor on `setInterval(`
+  // after the declaration so either form is accepted.
+  const declaration = windowSource.indexOf("const boundsWatchdog");
+  assert.notEqual(declaration, -1, "the bounds watchdog interval must exist");
+  const start = windowSource.indexOf("setInterval(", declaration);
+  assert.notEqual(start, -1, "the bounds watchdog must use setInterval");
+  const end = windowSource.indexOf("}, 1500)", start);
   assert.notEqual(end, -1, "the watchdog must keep its 1500ms cadence");
   return windowSource.slice(start, end);
 }
@@ -60,7 +67,7 @@ test("no other platform path re-layers the window on a timer", () => {
     if (!chunk.includes("setAlwaysOnTop")) continue;
     assert.match(
       windowSource,
-      /if \(process\.platform !== "darwin"\) \{\s*clearInterval\(boundsWatchdog\);\s*return;\s*\}/,
+      /if \(process\.platform !== "darwin"\) \{\s*(?:if \(boundsWatchdog\) )?clearInterval\(boundsWatchdog\);\s*return;\s*\}/,
       "a window-layer timer must be macOS-only",
     );
   }
