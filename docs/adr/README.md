@@ -313,4 +313,6 @@ Each ADR includes:
 | 0284 | [Headless runtime boundary in `packages/host-runtime`](0284-headless-runtime-boundary.md) | Accepted for implementation (D447; ADR 0205 R2 prerequisite) |
 | 0285 | [`RACP-WS` transport in `packages/racp`](0285-racp-ws-transport.md) | Accepted for implementation (D448; ADR 0205 R2) |
 | 0286 | [Remote-host desktop kernel](0286-remote-host-desktop-kernel.md) | Accepted for implementation (D449; ADR 0205 R2) |
+| 0287 | [Host-rendered plugin scenic Settings surfaces](0287-host-rendered-plugin-scenic-settings-surfaces.md) | Accepted for implementation |
+| 0288 | [Package-local theme assets remain available](0288-package-local-theme-assets.md) | Accepted for implementation (amends ADR 0255) |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |

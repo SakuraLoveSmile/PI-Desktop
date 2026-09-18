@@ -762,6 +762,24 @@ recognition and speech synthesis remain page-owned. A panel should provide a
 text fallback and announce permission or recognition failures through its
 accessible status.
 
+## Scenic Settings contribution
+
+`contributes.scenicThemes` is a declarative presentation contribution, not a
+plugin page API. It provides localized card metadata for same-plugin themes and
+declared preview assets. The host owns the Settings DOM, styles, selection,
+focus behavior, slider draft, and Apply action. The plugin receives no Settings
+bridge, renderer DOM access, arbitrary CSS, JavaScript, navigation, or actions.
+
+The host persists Apply through the existing typed theme-variable boundary and
+only for the declared `--nexus-backdrop-blur` variable. `ui.panel` windows and
+`contributes.views` retain their independent native-view implementation.
+
+Theme assets declared for scenic cards may be package-relative, in which case
+the host resolves them inside the installed plugin package before rewriting the
+matching CSS `url()` or card preview to `plugin-asset:`. Absolute declared
+assets retain the external-path route. Neither route grants a plugin arbitrary
+filesystem access (ADR 0288).
+
 ### audio (requires `audio.capture.background` / `audio.playback.background`)
 
 **Callable, but the device backend is not implemented in this branch.**

@@ -43,6 +43,15 @@ Main risks:
    delivery ledger, permission ceiling, turn binding, callback, cancellation,
    and transcript provenance.
 
+### Host-rendered scenic Settings destinations
+
+`contributes.scenicThemes` is data only. The host validates both grants,
+same-plugin theme ownership, declared preview assets, and the exact bounded
+`--nexus-backdrop-blur` variable before it renders cards in Extensions. A plugin
+cannot supply Settings HTML, CSS, JavaScript, selectors, DOM, arbitrary actions,
+or direct renderer IPC. The host owns the transparent canvas, layout, focus,
+native controls, titlebar, Apply action, and lifecycle fallback to General.
+
 Clipboard history is host-owned and remains in the Electron main process only.
 It is never written to the plugin data directory or the host database. The host
 records explicit clipboard writes and user-initiated Composer paste events; it
