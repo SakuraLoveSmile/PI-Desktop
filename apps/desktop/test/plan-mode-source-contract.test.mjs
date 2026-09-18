@@ -188,8 +188,11 @@ test("the startup artifact restore resolves launchable views first", () => {
   assert.ok(bootstrapStart > -1, "bootstrap is declared in the store source");
   const bootstrap = storeSource.slice(bootstrapStart);
   const resolvedViews = bootstrap.indexOf("await get().refreshPluginViews();");
+  // The same loop shape also runs once before the restore, so search from the
+  // refresh rather than from the top of `bootstrap`.
   const restoreLoop = bootstrap.indexOf(
     "for (const proposal of activePendingPlans)",
+    resolvedViews,
   );
 
   assert.ok(resolvedViews > -1, "bootstrap resolves the launchable views");
@@ -198,7 +201,7 @@ test("the startup artifact restore resolves launchable views first", () => {
     "the view list resolves before the pending-plan restore loop",
   );
   assert.ok(
-    bootstrap.indexOf("openPlanArtifact(") > restoreLoop,
+    bootstrap.indexOf("openPlanArtifact(", resolvedViews) > restoreLoop,
     "no artifact opens before that loop",
   );
   // Every slice call site forwards the live list, so a stub list cannot hide
