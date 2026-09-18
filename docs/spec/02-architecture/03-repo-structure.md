@@ -38,6 +38,7 @@ PI-Desktop/
 │ ├── agent-runtime/          # pi sidecar and runtime wrapper (bundled into the app)
 │ ├── agent-host/             # headless Agent Host module: admission, queue, approvals, event log
 │ ├── host-runtime/           # Electron-independent runtime: stdio transports, supervisor, turn lifecycle
+│ ├── racp/                   # RACP-WS server and client, device-token pairing
 │ ├── plugin-sdk/             # plugin author types and validators
 │ └── plugin-devkit/          # pi-plugin CLI: scaffold, check, pack, publish
 ├── examples/

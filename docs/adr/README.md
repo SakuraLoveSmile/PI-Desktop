@@ -309,4 +309,5 @@ Each ADR includes:
 | 0280 | [Plugin-owned UI localizes from the host locale](0280-plugin-owned-ui-localizes-from-host-locale.md) | Accepted (amends ADR 0267; ADR 0159) |
 | 0281 | [Host speech capability](0281-host-speech-capability.md) | Accepted for implementation (amends ADR 0257) |
 | 0282 | [Headless runtime boundary in `packages/host-runtime`](0282-headless-runtime-boundary.md) | Accepted for implementation (D445; ADR 0205 R2 prerequisite) |
+| 0283 | [`RACP-WS` transport in `packages/racp`](0283-racp-ws-transport.md) | Accepted for implementation (D446; ADR 0205 R2) |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |

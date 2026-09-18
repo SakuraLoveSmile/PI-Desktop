@@ -407,8 +407,13 @@ Recorded on the `feat/remote-agent-host` branch, 2026-09-10:
   transports, the restart supervisor, `RuntimeService` (the module's
   `RuntimePort` with the durable turn lifecycle), transcript persistence, a
   headless launch resolver, and approved Plan/Goal dispatch — and Electron
-  main runs on it through thin adapters. The `pi-host` bundle, the RACP-WS
-  transport, the SSH bootstrap, and the desktop adapter are not started.
+  main runs on it through thin adapters.
+- R2 (2026-09-18, D446 / ADR 0283): `packages/racp` holds the `RACP-WS`
+  server and client cores, the `ws` binding on loopback, and device-token
+  pairing; handshake, authorization, idempotency, queue order, approvals,
+  cursor replay, eviction, epoch change, slow clients, and reconnect without
+  duplicate execution are package tests. The `pi-host` bundle, the SSH
+  bootstrap, and the desktop adapter are not started.
 
 ## 8. Amendment history
 

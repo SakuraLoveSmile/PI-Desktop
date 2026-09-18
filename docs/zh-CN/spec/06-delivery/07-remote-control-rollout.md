@@ -138,7 +138,8 @@ runbook 写明 feature flag、配对撤销路径、远端机器上的数据保�
 - R1 已交付：renderer 的内存 prompt 队列已退役；composer 经 `agent/queue/push` 推入，
   镜像 `agent/event/queueChanged`，“立即发送”即 `turn/prioritize` 加优雅停止。
 - R1 未完成：运行时级别的逐回合权限上限（当前被限制的回合在桥接层直接拒绝）。
-- R2 已开始（2026-09-18，D445 / ADR 0282）：`packages/host-runtime` 承载与 Electron 无关的运行时层 —— host-core 与 sidecar 的 stdio 传输、重启监督器、`RuntimeService`（模块的 `RuntimePort`，含持久回合生命周期）、转录持久化、无头启动解析器与已批准 Plan/Goal 的派发 —— Electron main 通过薄适配层运行其上。`pi-host` 包、RACP-WS 传输、SSH 引导与桌面适配器尚未开始。
+- R2 已开始（2026-09-18，D445 / ADR 0282）：`packages/host-runtime` 承载与 Electron 无关的运行时层 —— host-core 与 sidecar 的 stdio 传输、重启监督器、`RuntimeService`（模块的 `RuntimePort`，含持久回合生命周期）、转录持久化、无头启动解析器与已批准 Plan/Goal 的派发 —— Electron main 通过薄适配层运行其上。
+- R2（2026-09-18，D446 / ADR 0283）：`packages/racp` 承载 `RACP-WS` 服务端与客户端核心、回环上的 `ws` 绑定与设备令牌配对；握手、鉴权、幂等、队列顺序、审批、游标重放、驱逐、epoch 变更、慢客户端与不重复执行的重连都是包内测试。`pi-host` 包、SSH 引导与桌面适配器尚未开始。
 
 ## 8. 修订记录
 

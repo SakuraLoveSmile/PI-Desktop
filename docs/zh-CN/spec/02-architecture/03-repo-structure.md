@@ -39,6 +39,7 @@ PI-Desktop/
 │ ├── agent-runtime/          # pi sidecar 与运行时包装（打包进应用）
 │ ├── agent-host/             # 无头 Agent Host 模块：准入、队列、审批、事件日志
 │ ├── host-runtime/           # 与 Electron 无关的运行时：stdio 传输、监督器、回合生命周期
+│ ├── racp/                   # RACP-WS 服务端与客户端、设备令牌配对
 │ ├── plugin-sdk/             # 插件作者类型与校验器
 │ └── plugin-devkit/          # pi-plugin CLI：scaffold、check、pack、publish
 ├── examples/
