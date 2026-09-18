@@ -4441,3 +4441,11 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 早已撤回、本次一并修正文档：ADR 0281 第 5 条中的 Composer 转写与朗读入口（其麦克风与朗读控件已于 2026-09-18 在 `344ef4ec2`／PR #555 中移除），以及 `04-ux/08-component-spec.md` §2.5 描述的 Composer 语音控件；为它们写下的文案随之退役。
 - 仅渲染层：无 IPC 通道、存储 schema、宿主 RPC、权限或 Rust 改动，也不会丢弃已存绑定。见 ADR 0291、`04-ux/06-settings-ia.md`、`03-runtime/20-speech.md`、E2E-008e。
 
+## 2026-09-19 —— 远端主机的 SSH 引导（D453）
+
+- 桌面用系统 `ssh` 客户端在用户已能通过 SSH 到达的机器上安装并配对 `pi-host`，因此 `~/.ssh/config`、agent 与跳板机照常生效，应用不持有任何 SSH 密钥；`BatchMode=yes` 让需要交互式密码或口令短语的主机立即以带类型的错误失败，而不是把模态框吊在一个不可见的提示后面。
+- 桌面按远端平台、以自己的版本解析 `pi-host` 包，持有发布随附的 SHA-256，并在任何下载之前拒绝未发布的目标（目前只有 `linux-x64`）。上传的脚本在远端 `$HOME` 下下载、校验并安装该包；SSH 通道上不传输任何可执行字节。
+- 脚本以 `umask 077` 运行并回显 `PI_HOST_READY` / `PI_HOST_PAIRING_TOKEN`，因此一次性配对令牌只存在于工作文件和 SSH 通道上，既不落在全局可读路径，也不出现在 URL 中（安全规格 §3.4）。`PI_HOST_READY.version` 必须与桌面版本一致；不一致为 `HOST_VERSION_MISMATCH`（D375），并在建立转发之前就已检查。
+- 已配对主机的记录改存 SSH 描述符（`metadata.transport = "ssh"`）而非 URL，因为本地转发端口在每次启动间并不稳定；隧道管理器在每次启动时重新建立 `ssh -N -L`，并收编（adopt）引导自己打开的存活转发，使配对只建立一条隧道。描述符在每次读取注册表时都会重新校验，格式不合规时降级为「非 SSH 主机」，而不会用垃圾参数去 spawn `ssh`。
+- `pi-desktop/remoteHost/bootstrap` 加入 `list` / `pair` / `remove`，`connection/pair` 交换被抽成单一的 `exchangePairingToken`，粘贴 URL 与 SSH 引导两条路径共用。
+- 本次不做：终端工作面板客户端（Stage 5）、反向工具中继（Stage 6）、resync 看门狗、非 Linux 与 Windows 远端目标，以及经 SSH 通道下发 provider 配置 —— 刚引导好的主机在配置 provider 之前，`turn/start` 仍以 `MODEL_NOT_CONFIGURED` 关闭。见 ADR 0292、`06-delivery/07-remote-control-rollout.md` §7 与 `05-security/02-remote-control-security.md` §3.4。

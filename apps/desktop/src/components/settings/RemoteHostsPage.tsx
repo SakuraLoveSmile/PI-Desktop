@@ -24,6 +24,22 @@ type PairForm = {
 
 const EMPTY_FORM: PairForm = { url: "", pairingToken: "", label: "" };
 
+type SshForm = {
+  label: string;
+  host: string;
+  user: string;
+  port: string;
+  identityFile: string;
+};
+
+const EMPTY_SSH_FORM: SshForm = {
+  label: "",
+  host: "",
+  user: "",
+  port: "",
+  identityFile: "",
+};
+
 export function RemoteHostsPage() {
   const { t } = useTranslation();
   const showToast = useAppStore((state) => state.showToast);
@@ -32,6 +48,8 @@ export function RemoteHostsPage() {
   const [form, setForm] = useState<PairForm>(EMPTY_FORM);
   const [pairing, setPairing] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [sshForm, setSshForm] = useState<SshForm>(EMPTY_SSH_FORM);
+  const [installing, setInstalling] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -92,6 +110,41 @@ export function RemoteHostsPage() {
     [refresh, showToast, t],
   );
 
+  const submitSsh = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const label = sshForm.label.trim();
+      const host = sshForm.host.trim();
+      if (!host || !label) return;
+      const user = sshForm.user.trim();
+      const identityFile = sshForm.identityFile.trim();
+      const port = sshForm.port.trim();
+      setInstalling(true);
+      try {
+        // Empty optional fields are dropped rather than sent blank, so main
+        // falls back to the SSH config and the local user name.
+        const result = await api.bootstrapRemoteHost({
+          label,
+          host,
+          ...(user ? { user } : {}),
+          ...(identityFile ? { identityFile } : {}),
+          ...(port ? { port: Number(port) } : {}),
+        });
+        showToast(t("settings.remoteHosts.sshSucceeded", { label: result.host.label }), {
+          variant: "info",
+        });
+        setSshForm(EMPTY_SSH_FORM);
+        await refresh();
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        showToast(t("settings.remoteHosts.sshFailed", { message }), { variant: "error" });
+      } finally {
+        setInstalling(false);
+      }
+    },
+    [sshForm, refresh, showToast, t],
+  );
+
   return (
     <div className="settings-stack">
       <SettingsCard title={t("settings.remoteHosts.listTitle")}>
@@ -119,7 +172,10 @@ export function RemoteHostsPage() {
               key={host.hostKey}
               title={host.label}
               description={
-                <span className="font-mono text-xs-plus text-text-muted">{host.url}</span>
+                <span className="font-mono text-xs-plus text-text-muted">
+                  {host.transport === "ssh" ? "ssh · " : ""}
+                  {host.url}
+                </span>
               }
             >
               <span
@@ -220,6 +276,106 @@ export function RemoteHostsPage() {
             </button>
           </SettingsRow>
         </form>
+
+      <SettingsCard title={t("settings.remoteHosts.sshTitle")}>
+        <div className="settings-row-copy" role="note">
+          <div className="settings-row-desc">{t("settings.remoteHosts.sshBody")}</div>
+        </div>
+        <form onSubmit={submitSsh} className="settings-remote-host-form">
+          <SettingsRow
+            title={t("settings.remoteHosts.fieldLabel")}
+            description={t("settings.remoteHosts.fieldLabelDesc")}
+          >
+            <Input
+              value={sshForm.label}
+              onChange={(event) =>
+                setSshForm((prev) => ({ ...prev, label: event.target.value }))
+              }
+              placeholder={t("settings.remoteHosts.fieldLabelPlaceholder")}
+              aria-label={t("settings.remoteHosts.fieldLabel")}
+              autoComplete="off"
+              spellCheck={false}
+              disabled={installing}
+            />
+          </SettingsRow>
+          <SettingsRow
+            title={t("settings.remoteHosts.sshHost")}
+            description={t("settings.remoteHosts.sshHostDesc")}
+          >
+            <Input
+              value={sshForm.host}
+              onChange={(event) =>
+                setSshForm((prev) => ({ ...prev, host: event.target.value }))
+              }
+              placeholder={t("settings.remoteHosts.sshHostPlaceholder")}
+              aria-label={t("settings.remoteHosts.sshHost")}
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              disabled={installing}
+            />
+          </SettingsRow>
+          <SettingsRow
+            title={t("settings.remoteHosts.sshUser")}
+            description={t("settings.remoteHosts.sshUserDesc")}
+          >
+            <Input
+              value={sshForm.user}
+              onChange={(event) =>
+                setSshForm((prev) => ({ ...prev, user: event.target.value }))
+              }
+              aria-label={t("settings.remoteHosts.sshUser")}
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              disabled={installing}
+            />
+          </SettingsRow>
+          <SettingsRow
+            title={t("settings.remoteHosts.sshPort")}
+            description={t("settings.remoteHosts.sshPortDesc")}
+          >
+            <Input
+              value={sshForm.port}
+              onChange={(event) =>
+                setSshForm((prev) => ({ ...prev, port: event.target.value }))
+              }
+              aria-label={t("settings.remoteHosts.sshPort")}
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck={false}
+              disabled={installing}
+            />
+          </SettingsRow>
+          <SettingsRow
+            title={t("settings.remoteHosts.sshIdentityFile")}
+            description={t("settings.remoteHosts.sshIdentityFileDesc")}
+          >
+            <Input
+              value={sshForm.identityFile}
+              onChange={(event) =>
+                setSshForm((prev) => ({ ...prev, identityFile: event.target.value }))
+              }
+              aria-label={t("settings.remoteHosts.sshIdentityFile")}
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              disabled={installing}
+            />
+          </SettingsRow>
+          <SettingsRow title={t("settings.remoteHosts.sshAction")}>
+            <button
+              type="submit"
+              className="settings-button primary"
+              disabled={installing || !sshForm.host.trim() || !sshForm.label.trim()}
+            >
+              {installing
+                ? t("settings.remoteHosts.sshRunning")
+                : t("settings.remoteHosts.sshAction")}
+            </button>
+          </SettingsRow>
+        </form>
+      </SettingsCard>
       </SettingsCard>
     </div>
   );
