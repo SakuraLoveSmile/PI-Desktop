@@ -3249,7 +3249,9 @@ identify the platform validation still needed.
   Repeat with failed, denied, and scratch writes.
 - **Expected**: Each successful workspace Write/Edit creates one message-owned
   review record and one adjacent keyboard-accessible card; the card is never a
-  bottom/global entry. Every review card, inline and in the Review tab, is
+  bottom/global entry. The completion opens nothing: the panel keeps whatever
+  the user left it showing, and Review appears only after the user opens it.
+  Every review card, inline and in the Review tab, is
   collapsed by default and expands on demand. The Review tab lists A's
   chronological recorded changes, independent of Git status, repository
   presence, commit state, focus refresh,
@@ -4549,7 +4551,8 @@ identify the platform validation still needed.
   request in A as well. 5) Open B explicitly, resolve only B's request, then
   return to A and resolve A's request. 6) Rapidly select A then B while session
   details load in opposite completion order. 7) While B is loading, resolve A's
-  Write/Edit request so its tool completion creates Review, then let B emit a
+  Write/Edit request so its tool completion records an inline review card, then
+  let B emit a
   BrowserPreview artifact while A is visible. Switch back to each session.
 - **Expected**: B's background events update only B's row and retained state;
   they do not change A's active session/project/page, transcript, draft, scroll,
@@ -4557,7 +4560,7 @@ identify the platform validation still needed.
   inline card with its original countdown. Both requests remain independently
   actionable, and resolving B does not clear A. The final rapid selection stays
   on B even when A's older load finishes later. Only explicit notification or
-  session activation may navigate. A's post-approval Review is retained only in
+  session activation may navigate. A's post-approval review card is retained only in
   A without a transient open/close flash in B; B's BrowserPreview carries B's
   session identity, updates only B's retained Browser resource, and never opens,
   navigates, focuses, or resizes A's panel. Explicitly returning to either
@@ -7159,8 +7162,8 @@ identify the platform validation still needed.
      no Uninstall action.
   2. Reveal the work panel and click `+` to create a New launcher tab. Confirm
      its rows include Review and the plugin-contributed File Manager and Browser
-     views. Trigger an agent edit and confirm Review opens itself under Open
-     resources — it is an artifact surface, not a launcher entry.
+     views. Trigger an agent edit and confirm the panel does not open itself:
+     Review appears under Open resources only after the user selects its row.
   3. Open the File Manager view. Confirm the tree lists the project, expands
      directories lazily, and omits `node_modules`, `.git`, and `.env`. Switch
      the view's top-left folder control to the project's second folder and
@@ -8479,8 +8482,8 @@ This test plan spec is accepted when:
   action removes or changes the other card.
 - Resolve A's Write/Edit permission and switch to B before completion. Expect no
   transient Review panel in B and no panel/window flash; returning to A restores
-  A's resulting Review tab and prior panel selection, while B's tabs and Browser
-  resource remain unchanged.
+  A's prior panel selection with the inline review card in its transcript — the
+  edit opened no tab — while B's tabs and Browser resource remain unchanged.
 
 ### US-UI-69 Sidebar type balance (D144/D161)
 - Open the expanded sidebar in light and dark themes at default and minimum

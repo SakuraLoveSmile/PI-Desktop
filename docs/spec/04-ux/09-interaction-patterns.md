@@ -468,10 +468,13 @@ may be retained while exactly one workspace supplies the visible shell context.
   divider updates the renderer-owned panel target from 244px upward, capped by
   the live three-column budget, while native window edges resize only the fixed
   application window (ADR 0151).
-- A successful workspace Write/Edit creates or activates Review in its
-  originating session. Failed and scratch writes do not. Background-session
-  artifacts update only their retained context and never open, activate, resize,
-  focus, or change the visible panel.
+- No tool result creates or activates a work-panel tab. Review opens only from
+  an explicit user action — its `+` launcher row, or the retained context the
+  viewport-fixed toggle and `Cmd/Ctrl + J` reveal — so a successful workspace
+  Write/Edit never takes the panel away from what the user was reading. Failed
+  and scratch writes behave the same. Background-session events update only
+  their retained context and never open, activate, resize, focus, or change the
+  visible panel.
 - Each successful workspace Write/Edit tool result carries one durable review
   snapshot. Its compact InlineReviewCard is rendered in the same activity
   disclosure, immediately after its tool row; it is never moved to the
@@ -486,8 +489,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   denied, and unstructured results do not render a card. A background
   session's card remains with its own transcript and becomes visible only
   after that session is selected; its event never renders in the currently
-  visible session. Successful workspace artifacts may still create or
-  activate the singleton Review tab.
+  visible session. A successful workspace artifact cannot create or activate
+  the singleton Review tab; it appears only after the user opens it.
 - Each session retains `{open, tabs, activeTabId, browserResource}` in renderer
   memory. Selecting another session swaps the visible context atomically and
   switching back restores it; selecting a workspace without an active

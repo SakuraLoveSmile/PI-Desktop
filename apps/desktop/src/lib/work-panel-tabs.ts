@@ -24,12 +24,6 @@ export type WorkPanelContext = WorkPanelTabsState & {
   fileRequest: { path: string; seq: number; mimeType?: string } | null;
 };
 
-export type ReviewArtifactEvent = {
-  toolName?: string;
-  isError?: boolean;
-  result: unknown;
-};
-
 let newWorkPanelTabSequence = 0;
 
 export function emptyWorkPanelContext(): WorkPanelContext {
@@ -224,22 +218,6 @@ export function fileWorkPanelTab(path: string, mimeType?: string): WorkPanelTab 
     resource,
     ...(mimeType ? { mimeType } : {}),
   };
-}
-
-export function toolResultRoot(result: unknown): string | null {
-  if (!result || typeof result !== "object") return null;
-  const details = (result as { details?: unknown }).details;
-  if (!details || typeof details !== "object") return null;
-  const root = (details as { root?: unknown }).root;
-  return typeof root === "string" ? root : null;
-}
-
-export function shouldOpenReviewArtifact(event: ReviewArtifactEvent): boolean {
-  return (
-    (event.toolName === "Write" || event.toolName === "Edit") &&
-    event.isError !== true &&
-    toolResultRoot(event.result) === "workspace"
-  );
 }
 
 export function openWorkPanelTabState(
