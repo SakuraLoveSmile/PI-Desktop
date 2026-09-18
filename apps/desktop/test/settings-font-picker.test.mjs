@@ -25,6 +25,22 @@ test("selecting System default persists an empty stack so the override clears", 
   assert.doesNotMatch(rowSource, /fontFamily: undefined/);
 });
 
+test("the closed trigger and search use the localized system-default label", () => {
+  assert.match(rowSource, /const defaultLabel = t\("settings\.fontSystemDefault"\)/);
+  assert.match(
+    rowSource,
+    /selectedOption\?\.group === "default" \|\| selectedValue === ""/,
+  );
+  assert.match(rowSource, /option\.group === "default" \? defaultLabel\.toLowerCase\(\)/);
+});
+
+test("the font trigger hugs the current label like language and theme", () => {
+  assert.match(styles, /\.settings-font\s*\{[^}]*width:\s*max-content;/s);
+  assert.match(styles, /\.settings-font-trigger\s*\{[^}]*width:\s*max-content;/s);
+  assert.match(styles, /\.settings-font-trigger-label\s*\{[^}]*flex:\s*0 1 auto;/s);
+  assert.doesNotMatch(styles, /\.settings-font-trigger\s*\{[^}]*min-width:\s*200px;/s);
+});
+
 test("font list windows the rows so only the visible slice is in the DOM", () => {
   assert.match(rowSource, /visibleRowRange\(layout, scrollTop/);
   assert.match(rowSource, /layout\.rows\.slice\(start, end\)/);
