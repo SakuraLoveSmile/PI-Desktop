@@ -4454,6 +4454,23 @@ IPC 请求无法关闭。
   `packages/shared/src/mcp-import.test.ts`、host-core `mcp_servers` 测试）；满
   UI 之旅草案
 
+#### E2E-100B：远程 HTTP MCP 服务器 OAuth 2.1 授权与令牌生命周期
+
+- **先决条件**：配置了需要 OAuth 2.1 身份验证（RFC 9728 发现与 PKCE S256）的 HTTP MCP 服务器端点。
+- **步骤**：
+  1. 打开设置 > Agent > MCP。添加 HTTP MCP 服务地址。
+  2. 服务器状态显示“需要授权”。
+  3. 点击“授权”。主进程在 `127.0.0.1` 启动回环监听，打开外部浏览器跳转至附带 RFC 8707 `resource` 的授权端点。
+  4. 在浏览器完成登录，回调跳转至 `http://127.0.0.1:<port>/callback`。
+  5. 回环服务校验 state 与 code，通过 PKCE verifier 完成令牌交换，将令牌写入加密密钥库 `secret:mcp:<id>:oauth`，渲染转义后的成功页面并触发 `done` 事件。
+  6. 设置界面状态更新为已连接及工具数量，弹出成功提示，并显示 OAuth 徽标。
+  7. 访问令牌过期时，`UserMcpRuntime` 透明使用 refresh token 换取新令牌，无需用户重新交互。
+  8. 通过 `mcp.transfer` 迁移服务器时，自动将 OAuth 令牌迁移至新 ID 下。
+- **链接规格**：`03-runtime/01-ipc-protocol.md`、ADR 0281、ADR 0142
+- **验收**：E（工具和权限）、安全性
+- **里程碑**：M5
+- **状态**：单元覆盖（`apps/desktop/test/mcp-oauth.test.mjs`、`apps/desktop/test/user-mcp.test.mjs`）；完整 UI 之旅草案
+
 #### E2E-101：用户技能编写一次并限定每个项目的范围
 
 - **先决条件**：磁盘上有两个项目。每个中都有一个 Agent 会话。
@@ -5286,9 +5303,10 @@ IPC 请求无法关闭。
 
 
 
-### US-UI-19 永久舞台管理器边界恢复
+### US-UI-19 永久舞台管理器边界恢复（仅 macOS）
 - 在使用 Stage Manager 的 macOS 上，缩小或取消聚焦 PI 窗口，直到宽度 < 1040 或高度 < 700。
 - 预计外壳会重新声明类似 Codex 的足迹（~1200×800，最小 1040×700）并在仍然折叠的情况下继续恢复（不仅在发射后的前 20 秒内）。
+- 该恢复看门狗仅限 macOS（D447）。在 Windows/Linux 上它必须完全不运行：应用绝不能在无人操作时重新调整或抬升自己的窗口。聚焦其他窗口，确认 PI-Desktop 留在其后方而不是跳回窗口栈顶端，并且栈序检查（`xprop -root _NET_CLIENT_LIST_STACKING`）不会显示它周期性回到顶端。
 
 ### US-UI-20 深色浮动编辑框
 - 在聊天主页切换到深色主题。

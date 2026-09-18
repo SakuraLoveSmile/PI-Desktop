@@ -16,6 +16,7 @@ import {
   IconCheck,
   IconChevronDown,
   IconPlus,
+  IconGlobe,
   IconSparkles,
   IconStop,
   IconUndo2,
@@ -64,6 +65,9 @@ export type ComposerToolbarProps = {
   hasDraftContent: boolean;
   abort: AppState["abort"];
   submit: () => Promise<void>;
+  nativeWebSearchEnabled: boolean;
+  nativeWebSearchSupported: boolean;
+  onToggleNativeWebSearch: () => void;
 };
 
 /** Composer controls: mode, permission, model, enhancement, and send/stop. */
@@ -99,6 +103,9 @@ export function ComposerToolbar({
   hasDraftContent,
   abort,
   submit,
+  nativeWebSearchEnabled,
+  nativeWebSearchSupported,
+  onToggleNativeWebSearch,
 }: ComposerToolbarProps) {
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
   const steeringShortcut = keybindingDisplayParts("Alt+Enter", platform).join("+");
@@ -232,6 +239,31 @@ export function ComposerToolbar({
 
       <div className="composer-right">
         {contextUsage ? <ContextUsageInspector {...contextUsage} /> : null}
+        <TooltipButton
+          type="button"
+          className={`icon-btn icon-btn-square ${nativeWebSearchEnabled && nativeWebSearchSupported ? "composer-web-search-on" : ""}`}
+          tooltip={
+            nativeWebSearchSupported
+              ? nativeWebSearchEnabled
+                ? t("chat.webSearchOn")
+                : t("chat.webSearchOff")
+              : t("chat.webSearchUnsupported")
+          }
+          ariaLabel={
+            nativeWebSearchSupported
+              ? nativeWebSearchEnabled
+                ? t("chat.webSearchOn")
+                : t("chat.webSearchOff")
+              : t("chat.webSearchUnsupported")
+          }
+          disabled={controlsBlocked || !nativeWebSearchSupported}
+          onClick={() => {
+            setPermissionOpen(false);
+            onToggleNativeWebSearch();
+          }}
+        >
+          <IconGlobe size={15} aria-hidden="true" />
+        </TooltipButton>
         <ComposerModelPicker
           t={t}
           controller={modelMenu}

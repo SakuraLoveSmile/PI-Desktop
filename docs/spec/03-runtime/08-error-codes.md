@@ -280,7 +280,7 @@ Emitted by the desktop's remote-host client and the `pi-host` server when a
 session lives on a paired remote machine driven over `RACP-WS`
 (see [19-remote-agent-control-protocol](19-remote-agent-control-protocol.md),
 [../05-security/02-remote-control-security](../05-security/02-remote-control-security.md),
-ADR 0284). The renderer never sees the local/remote split beyond a badge; these
+ADR 0285). The renderer never sees the local/remote split beyond a badge; these
 codes surface through the same error object as any other call.
 
 | code | retriable | meaning |

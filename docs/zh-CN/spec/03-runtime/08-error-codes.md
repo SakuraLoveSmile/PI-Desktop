@@ -276,7 +276,7 @@ reveal 不并入任何行，必须重新读取。
 `pi-host` 服务端发出（参见
 [19-远程代理控制协议](/zh-CN/spec/03-runtime/19-remote-agent-control-protocol)、
 [../05-security/02-remote-control-security](/zh-CN/spec/05-security/02-remote-control-security)、
-ADR 0284）。渲染进程除了一个标识徽章外看不到本地/远程之分；这些码通过与其他调用
+ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之分；这些码通过与其他调用
 相同的错误对象浮现。
 
 | 码 | 可重试 | 含义 |

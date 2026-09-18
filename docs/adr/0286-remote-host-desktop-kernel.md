@@ -1,16 +1,16 @@
-# ADR 0285: Remote-host desktop kernel
+# ADR 0286: Remote-host desktop kernel
 
 - Status: Accepted for implementation
 - Date: 2026-09-18
 - Decision: D449
-- Related: ADR 0205 (D373 / D374 / D375), ADR 0284 (D448),
+- Related: ADR 0205 (D373 / D374 / D375), ADR 0285 (D448),
   `03-runtime/19-remote-agent-control-protocol.md` §3.4, §4, §5, §7, §8,
   `05-security/02-remote-control-security.md` §3.4,
   `06-delivery/07-remote-control-rollout.md` §2 R2
 
 ## Context
 
-ADR 0284 delivered the `RACP-WS` transport and pairing on both ends. The
+ADR 0285 delivered the `RACP-WS` transport and pairing on both ends. The
 `pi-host` bundle now binds a real WebSocket server on loopback and speaks the
 frozen contract; a `RacpClient` in `packages/racp` reaches it with header
 authentication. What was still missing on the desktop side of R2 was the
@@ -153,7 +153,7 @@ events. What is scheduled for later stages of R2:
   pairing token, exchange it, and store the device token. The registry API
   is ready for this; the surface is not.
 - **SSH bootstrap (Stage 4).** A supervisor that detects system `ssh`,
-  downloads the `pi-host-bundle` (verified by SHA-256 from ADR 0284's
+  downloads the `pi-host-bundle` (verified by SHA-256 from ADR 0285's
   release pipeline), starts the remote binary, and opens the `-L` tunnel.
   Every paired host today assumes the loopback URL already exists.
 - **Terminal work-panel client (Stage 5).** RACP terminal events are dropped

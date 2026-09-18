@@ -52,6 +52,7 @@ import {
 } from "./shared";
 import { SubagentTopology } from "./SubagentDetail";
 import { ToolRow } from "./ToolRow";
+import { HostedSearchRow } from "./HostedSearchRow";
 import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
 import { useAppStore } from "../../../stores/app-store";
 import { resolveThinkingDisplayMode } from "../../../lib/turn-process";
@@ -68,6 +69,10 @@ export function activityItemDetail(item: ActivityItem): string {
       .map((line) => line.replace(/^#+\s*|\*\*/g, "").trim())
       .filter(Boolean);
     return lines[lines.length - 1] || "";
+  }
+  if (item.kind === "hostedSearch") {
+    const search = item.message.hostedSearch;
+    return search?.queries[0] || search?.sources[0]?.title || search?.sources[0]?.url || "";
   }
   if (lifecycleKindOf(item.message)) {
     return delegationRosterSummary(delegationRoster(item.message));
@@ -340,16 +345,30 @@ export const ActivityGroup = memo(function ActivityGroup({
           />
         );
       }
-      return item.kind === "tool" ? (
-        <Fragment key={item.message.id}>
-          <ToolRow
+      if (item.kind === "tool") {
+        return (
+          <Fragment key={item.message.id}>
+            <ToolRow
+              message={item.message}
+              onUserInteraction={claimDisclosure}
+              {...(item.delegate ? { delegate: item.delegate } : {})}
+            />
+            <ReviewChangeCard message={item.message} />
+          </Fragment>
+        );
+      }
+      if (item.kind === "hostedSearch") {
+        return (
+          <HostedSearchRow
+            key={`hosted-search-${item.message.id}`}
             message={item.message}
+            streaming={isActive && item.message.status === "streaming"}
+            autoOpen={live && itemIndex === items.length - 1}
             onUserInteraction={claimDisclosure}
-            {...(item.delegate ? { delegate: item.delegate } : {})}
           />
-          <ReviewChangeCard message={item.message} />
-        </Fragment>
-      ) : (
+        );
+      }
+      return (
         <ThinkingRow
           key={`thinking-${item.message.id}`}
           message={item.message}

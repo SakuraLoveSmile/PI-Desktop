@@ -93,10 +93,7 @@ import {
   executionListFromResponse,
   planExecutionFromUnknown,
 } from "@pi-desktop/host-runtime";
-import {
-  readWindowState,
-  writeWindowState,
-} from "./window-preferences";
+import { readWindowState, writeWindowState } from "./window-preferences";
 import { createPlanUiProbe } from "./plan-ui-probe";
 import type { McpControlController, McpControlServer } from "./mcp-control";
 import type { AgentHostBridge } from "./agent-host-bridge";
@@ -675,6 +672,7 @@ const pluginServices = createPluginServices({
 const {
   plugins,
   userMcp,
+  mcpOAuth,
   pluginScopes,
   sessionProjects,
   emitBrowserState,
@@ -1324,6 +1322,7 @@ function registerIpc() {
     dispatchExecutionForProposal,
     emitAgentEvent,
     userMcp,
+    mcpOAuth,
     refreshUserMcp,
     describeError,
     activeUserSubagentDocuments,
@@ -1484,6 +1483,7 @@ registerShutdownHandlers({
   pluginPanels,
   plugins,
   userMcp,
+  mcpOAuth,
   browserPane,
   pluginViews,
   pluginSettingsViews,

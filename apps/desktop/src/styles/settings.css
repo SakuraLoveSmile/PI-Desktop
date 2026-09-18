@@ -760,46 +760,10 @@
   font-size: var(--text-sm-plus);
 }
 
-/* Global UI font picker (Appearance card). Pill trigger mirrors the
-   shared settings select; the menu portals to document.body as a fixed
-   floating layer so the settings card's overflow cannot clip it. */
-.settings-font {
-  position: relative;
-}
-
-.settings-font-trigger {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 200px;
-  max-width: 280px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--radius-full);
-  background: var(--ds-raised);
-  box-shadow: var(--ds-raised-shadow);
-  color: var(--ds-text-primary);
-  font-size: var(--text-sm-plus);
-}
-
-.settings-font-trigger:hover {
-  background: var(--ds-bg-hover);
-}
-
-.settings-font-trigger-label {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-
-.settings-font-trigger > svg {
-  flex: 0 0 auto;
-  color: var(--ds-text-muted);
-}
-
+/* Global UI font picker (Appearance card). The closed pill shares the
+   language / theme trigger definition below; the menu portals to
+   document.body as a fixed floating layer so the settings card's overflow
+   cannot clip it. */
 .settings-font-menu {
   position: fixed;
   z-index: 60;
@@ -926,15 +890,15 @@
   text-align: center;
 }
 
-/* Language and theme pickers (Appearance) plus the short-list menu selects on
-   the remaining tabs. Pill trigger matches the font picker; the closed control
-   hugs the current label (capped by the row) so a short value does not stretch
-   the column. The menu is an AnchoredMenu so the settings card cannot clip it,
-   and one definition here means a design change reaches every Settings picker
-   together. */
+/* Appearance pickers (language, theme, font) plus the short-list menu selects
+   on the remaining tabs. The closed control hugs the current label (capped by
+   the row) so a short value does not stretch the column. Language and theme
+   menus are AnchoredMenu; the font menu portals itself. One definition here
+   means a design change reaches every Settings picker together. */
 .settings-language-anchor,
 .settings-theme-anchor,
-.settings-menu-select-anchor {
+.settings-menu-select-anchor,
+.settings-font {
   position: relative;
   width: max-content;
   max-width: 100%;
@@ -947,7 +911,8 @@
 
 .settings-language-trigger,
 .settings-theme-trigger,
-.settings-menu-select-trigger {
+.settings-menu-select-trigger,
+.settings-font-trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -970,7 +935,8 @@
 
 .settings-language-trigger:hover,
 .settings-theme-trigger:hover,
-.settings-menu-select-trigger:hover {
+.settings-menu-select-trigger:hover,
+.settings-font-trigger:hover {
   background: var(--ds-bg-hover);
 }
 
@@ -982,7 +948,8 @@
 
 .settings-language-trigger-label,
 .settings-theme-trigger-label,
-.settings-menu-select-trigger-label {
+.settings-menu-select-trigger-label,
+.settings-font-trigger-label {
   min-width: 0;
   flex: 0 1 auto;
   overflow: hidden;
@@ -997,7 +964,8 @@
 
 .settings-language-trigger > svg,
 .settings-theme-trigger > svg,
-.settings-menu-select-trigger > svg {
+.settings-menu-select-trigger > svg,
+.settings-font-trigger > svg {
   flex: 0 0 auto;
   color: var(--ds-text-muted);
 }
@@ -1706,6 +1674,16 @@
   .agent-capability-row-actions .agent-capability-menu-wrap {
     opacity: 1;
   }
+}
+
+.agent-capability-row-actions > .settings-icon-button.is-action-highlight {
+  opacity: 1;
+  color: var(--ds-accent);
+}
+
+.agent-capability-row-actions > .settings-icon-button.is-action-highlight:hover:not(:disabled) {
+  color: var(--ds-accent);
+  background: color-mix(in oklab, var(--ds-accent) 14%, transparent);
 }
 
 .agent-capability-row.menu-open {

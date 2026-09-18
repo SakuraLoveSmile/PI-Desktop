@@ -6,6 +6,7 @@ import {
   type ActivationScope,
   type AppSettings,
   type BrowserState,
+  type McpServerStatus,
   type ModelBinding,
   type ShortcutPlatform,
   type ThinkingLevel,
@@ -42,6 +43,7 @@ import {
   MCP_CONNECT_TIMEOUT_MS,
   McpServerClient,
 } from "../plugin-mcp";
+import { McpOAuthManager } from "../mcp-oauth";
 import { PluginPanelHost } from "../plugin-panel-host";
 import { PluginViewHost } from "../plugin-view-host";
 import { BrowserPane } from "../browser-view";
@@ -448,8 +450,26 @@ export function createPluginServices({
       sendToRenderer(IPC.event.pluginChanged,{ reason: "reload", pluginId });
     },
   });
-  const userMcp = new UserMcpRuntime({
+  let userMcp: UserMcpRuntime;
+  const mcpOAuth: McpOAuthManager = new McpOAuthManager({
+    call: async (method, params) => {
+      const h = getHost();
+      if (!h) throw new Error("host unavailable");
+      return h.call(method, params);
+    },
+    emit: (event) => sendToRenderer(IPC.event.mcpOauth, event),
+    openExternal: (url) => safeOpenExternal(url),
+    log: (level, message, data) => logger.app("plugin", level, message, { data }),
+    onAuthorized: async (serverId): Promise<McpServerStatus> => {
+      userMcp.invalidate(serverId);
+      const status: McpServerStatus = await userMcp.test(serverId);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: serverId });
+      return status;
+    },
+  });
+  userMcp = new UserMcpRuntime({
     createClient: (config) => new McpServerClient(config),
+    oauth: mcpOAuth,
     connectTimeoutMs: MCP_CONNECT_TIMEOUT_MS,
     callTimeoutMs: MCP_CALL_TIMEOUT_MS,
     audit: (entry) => logger.app("plugin", "info", "mcp.api", entry),
@@ -602,6 +622,7 @@ export function createPluginServices({
   return {
     plugins,
     userMcp,
+    mcpOAuth,
     pluginScopes,
     sessionProjects,
     emitBrowserState,

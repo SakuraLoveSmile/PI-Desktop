@@ -6217,6 +6217,23 @@ identify the platform validation still needed.
   `packages/shared/src/mcp-import.test.ts`, host-core `mcp_servers` tests); full
   UI journey Draft
 
+#### E2E-100B: Remote HTTP MCP server OAuth 2.1 authorization and token lifecycle
+
+- **Preconditions**: An HTTP MCP server endpoint configured requiring OAuth 2.1 authentication (RFC 9728 discovery and PKCE S256).
+- **Steps**:
+  1. Open Settings > Agent > MCP. Add an HTTP MCP server URL.
+  2. The server status displays `Authorization required`.
+  3. Click `Authorize`. Main spins up loopback on `127.0.0.1`, launches external browser to the authorization endpoint with RFC 8707 `resource`.
+  4. Complete login in browser, redirecting to `http://127.0.0.1:<port>/callback`.
+  5. The loopback callback validates state/code, completes token exchange with PKCE verifier, saves token to encrypted secret `secret:mcp:<id>:oauth`, renders escaped success page, and emits `done` event.
+  6. Settings UI updates status to `Ready` with discovered tools, shows localized success toast, and displays `OAuth` badge.
+  7. When access token expires, `UserMcpRuntime` transparently uses refresh token to obtain a fresh access token without user prompt.
+  8. Moving the server via `mcp.transfer` preserves and re-keys the OAuth token secret under the destination ID.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, ADR 0281, ADR 0142
+- **Acceptance**: E (tools & permissions), Security
+- **Milestone**: M5
+- **Status**: Unit-covered (`apps/desktop/test/mcp-oauth.test.mjs`, `apps/desktop/test/user-mcp.test.mjs`); full UI journey Draft
+
 #### E2E-101: A user skill is written once and scoped per project
 
 - **Preconditions**: Two projects on disk. An Agent session in each.
@@ -7804,9 +7821,10 @@ This test plan spec is accepted when:
 - Every visible composer control changes the active session, opens its menu, or
   submits/aborts the current turn.
 
-### US-UI-19 Permanent Stage Manager bounds restore
+### US-UI-19 Permanent Stage Manager bounds restore (macOS only)
 - On macOS with Stage Manager, shrink or unfocus the PI window until width < 1040 or height < 700.
 - Expect the shell to re-assert a Codex-like footprint (~1200×800, min 1040×700) and keep restoring while still collapsed (not only during the first 20s after launch).
+- The recovery watchdog is macOS-only (D447). On Windows/Linux it must not run at all: the app must never re-layer or re-raise its own window unprompted. Focus another window, then confirm PI-Desktop stays behind it instead of jumping back to the top of the stack, and that a stacking check (`xprop -root _NET_CLIENT_LIST_STACKING`) never shows it returning to the top periodically.
 
 ### US-UI-20 Dark floating composer box
 - Switch to dark theme on chat home.
@@ -10811,20 +10829,28 @@ are withdrawn with ADR 0165.
   4. Repeat a link click with Ctrl/Cmd, Shift, and Alt held.
 - **Expected**:
   - The Work panel browser is the default plain-click destination.
-  - The Default OS browser setting routes plain HTTP(S) clicks through the
-    main-owned external opener; changing the setting persists after reload.
+  - The Default OS browser setting routes chat, transcript, and plugin HTTP(S)
+    clicks through the main-owned external opener, including markdown links,
+    autolinked URLs, and inline-code URLs in assistant replies; changing the
+    setting persists after reload.
   - The body-level context menu remains interactive when clicked. Its external
     and work-panel actions open the requested destination, and Copy link address
     updates the clipboard before showing the success toast. A rejected clipboard
     write shows an error toast instead of a success toast.
   - Modifier clicks continue to open links externally regardless of the setting.
+  - Plugin/settings clicks that want the work panel return to chat so the
+    dock is visible, without recording a navigation hop. A missing session
+    falls back to the OS browser.
+  - Workspace HTML preview, BrowserPreview, OAuth, and Feedback keep their
+    existing destinations.
 - **Specs linked**: `04-ux/06-settings-ia.md`,
   `04-ux/08-component-spec.md` §8.3, `03-runtime/01-ipc-protocol.md`,
   `08-meta/decisions-log.md` (D330)
 - **Acceptance**: B (settings), C (conversation & stream), Security, Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`apps/desktop/test/markdown-link-menu.test.mjs` and
-  locale catalog tests); full UI journey Draft (run only in a capable environment when this surface changes)
+- **Status**: Unit-covered (`apps/desktop/test/markdown-link-menu.test.mjs`,
+  locale catalog tests, `apps/desktop/test/open-http-url.test.mjs`); full UI
+  journey Draft (run only in a capable environment when this surface changes)
 
 #### E2E-201: Alias a configured model and copy a model id
 
@@ -13121,6 +13147,24 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Renderer fixtures alone do not prove settings persistence.
 - **Specs:** 04-ux/06-settings-ia, 04-ux/08-component-spec,
   04-ux/09-interaction-patterns; ADR turn-process-and-thinking-display.
+
+### E2E-CHAT-hosted-search-citations-stay-local
+
+- **Preconditions:** An assistant turn with `hostedSearch.sources` that include
+  `https://example.com/a`, plus markdown that contains `#cite=1`,
+  `[Read here](https://example.com)`, and `[Same path](https://example.com/a)`.
+- **Steps:** Render the turn. Inspect citation badges, remaining hyperlinks,
+  and favicon image URLs (including failed loads).
+- **Expected:** `#cite=1` and the same-path source URL render as citation
+  badges. The same-host different-path `https://example.com` link stays an
+  ordinary hyperlink with its original text. Favicon requests go only to each
+  source origin's `/favicon.ico`; no third-party favicon host is contacted.
+- **Automation:** `apps/desktop/test/hosted-search-ui.test.mjs`.
+- **Specs:** `03-runtime/11-provider-model-system.md` §16.
+- **Acceptance:** Security + C (sessions/transcript).
+- **Milestone:** M6+.
+- **Status:** Automated unit coverage; renderer E2E still draft.
+
 
 ### E2E-RPC-unicode-separators
 

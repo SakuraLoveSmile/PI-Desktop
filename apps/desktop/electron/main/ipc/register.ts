@@ -11,6 +11,7 @@ import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerMarketIpc } from "./market-ipc";
 import { registerMcpIpc } from "./mcp-ipc";
+import type { McpOAuthManager } from "../mcp-oauth";
 import { searchMcpMarket } from "../mcp-registry-catalog";
 import { registerNotificationIpc } from "./notification-ipc";
 import { registerPluginIpc } from "./plugin-ipc";
@@ -21,6 +22,7 @@ import { registerScheduledIpc } from "./scheduled-ipc";
 import { registerSessionIpc } from "./session-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
+import { registerAgentImportIpc } from "./agent-import-ipc";
 import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-catalog";
 import { registerWindowIpc } from "./window-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
@@ -45,6 +47,7 @@ export type RegisterIpcDependencies = {
   setNotificationViewingSessionId: (sessionId: string | null) => void;
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
   disabledBuiltinSubagents: () => Promise<string[]>;
+  mcpOAuth?: McpOAuthManager;
   [name: string]: any;
 };
 
@@ -132,6 +135,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     dispatchExecutionForProposal,
     emitAgentEvent,
     userMcp,
+    mcpOAuth,
     refreshUserMcp,
     describeError,
     pluginViews,
@@ -370,6 +374,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     registrar,
     getHost,
     userMcp,
+    oauth: mcpOAuth,
     currentWorkspacePath,
     refreshUserMcp,
     describeError,
@@ -389,6 +394,15 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     stripWinLongPrefix,
     sendToRenderer,
     logger,
+  });
+
+
+  registerAgentImportIpc({
+    registrar,
+    getHost,
+    sendToRenderer,
+    refreshUserMcp,
+    currentWorkspacePath,
   });
 
 

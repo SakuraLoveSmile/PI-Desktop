@@ -30,6 +30,11 @@
   color: color-mix(in oklab, var(--gray-0) 78%, transparent);
 }
 
+:root[data-theme="dark"] .composer-toolbar .icon-btn.composer-web-search-on,
+:root[data-theme="dark"] .composer-toolbar .icon-btn.composer-web-search-on:hover {
+  color: #34d399;
+}
+
 :root[data-theme="dark"] .empty-hero-icon {
   color: var(--gray-0);
   opacity: 1;

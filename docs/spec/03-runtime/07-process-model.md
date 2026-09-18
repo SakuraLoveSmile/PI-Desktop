@@ -124,7 +124,7 @@ the operating system's x64 emulation; native Windows ARM64 artifacts are not
 currently published.
 
 Supervision parameters (the transports, restart policy, and turn lifecycle are
-`packages/host-runtime`, ADR 0283; Electron main adapts them and owns the
+`packages/host-runtime`, ADR 0284; Electron main adapts them and owns the
 renderer-facing status):
 
 - Child exit rejects all in-flight RPCs for that child immediately (no 130s timeout wait).

@@ -12,6 +12,7 @@ import type { PluginViewHost } from "../plugin-view-host";
 import type { AppUpdaterController } from "../updater";
 import type { UserMcpRuntime } from "../user-mcp";
 import type { McpControlServer } from "../mcp-control";
+import type { McpOAuthManager } from "../mcp-oauth";
 import { getActiveRemoteHostsBoot, setActiveRemoteHostsBoot } from "./remote-hosts";
 
 const QUIT_TURN_SETTLE_BUDGET_MS = 2_000;
@@ -39,6 +40,7 @@ export type ShutdownDependencies = {
   pluginPanels: Pick<PluginPanelHost, "closeAll">;
   plugins: Pick<PluginRuntime, "disposeAll">;
   userMcp: Pick<UserMcpRuntime, "disposeAll">;
+  mcpOAuth?: Pick<McpOAuthManager, "disposeAll">;
   browserPane: Pick<BrowserPane, "dispose">;
   pluginViews: Pick<PluginViewHost, "dispose">;
   pluginSettingsViews: Pick<PluginViewHost, "dispose">;
@@ -60,6 +62,7 @@ export function registerShutdownHandlers({
   pluginPanels,
   plugins,
   userMcp,
+  mcpOAuth,
   browserPane,
   pluginViews,
   pluginSettingsViews,
@@ -153,6 +156,7 @@ export function registerShutdownHandlers({
       // end every quit in error logs, toasts, and restarts into a closing app.
       const pluginShutdown = plugins.disposeAll();
       userMcp.disposeAll();
+      mcpOAuth?.disposeAll();
       browserPane.dispose();
       pluginViews.dispose();
       pluginSettingsViews.dispose();

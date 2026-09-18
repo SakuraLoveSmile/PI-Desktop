@@ -1427,6 +1427,27 @@ filters disabled records, so a disabled project record still shadows a global
 one. The desktop-only `mcp/test` IPC action forces one connection test and
 returns its status to the MCP editor.
 
+Desktop-only channels scan configuration written by other agent tools on the
+same machine — Claude Desktop (`claude_desktop_config.json` on macOS, Windows
+and Linux), Claude Code (`~/.claude.json` and `~/.claude/settings.json` merged),
+Cursor global and per-project `mcp.json`, Codex (`~/.codex/config.toml`
+`[mcp_servers.*]`), opencode (`~/.config/opencode/opencode.json` `mcp` map) —
+so the user can review and batch-import into this app's MCP list. ChatGPT
+desktop is listed as a placeholder because it has no public configuration path
+yet.
+
+- `pi-desktop/mcp/importScan` — `{ projectPath? }` →
+  `{ candidates: ExternalMcpCandidate[], sources: ExternalMcpSourceReport[] }`.
+  Missing files, ENOENT and parse errors surface on `sources[].error`; one bad
+  source never fails the scan. Per-source de-duplication keeps the cross-source
+  copies so the user can pick which install to import.
+- `pi-desktop/mcp/importRun` — `{ items: ExternalMcpImportItem[] }` →
+  `{ imported, skipped, failed }`. Main calls `mcp.upsert` once per item,
+  omitting `disabled` from the server payload and following up with
+  `mcp.setEnabled({ enabled: false })` when the source marked the server
+  disabled. One failure never blocks the rest; conflicts land in `skipped`
+  and every other error lands in `failed`.
+
 ```ts
 type McpServerStatus = {
  serverId: string
@@ -1456,8 +1477,12 @@ one-liner.
 - `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
 - `skills.active({ projectPath? })` → the effective runtime list
 - `skills.create(skill)`
-- `skills.import({ path, level, projectPath? })` — one source file is physically
-  copied into the selected `.agents/skills` directory
+- `skills.import({ path, level, projectPath?, shape?, mode?, id?, name?, description? })`
+  — imports one Markdown skill. `shape` is `"file"` (default when `path` is a
+  regular file) or `"dir"` (Anthropic-style `<name>/SKILL.md` plus resources).
+  `mode` is `"copy"` (default, byte-for-byte replica so a moved or deleted
+  source cannot break the skill) or `"link"` (symlink so external edits appear
+  on the next scan; `SKILL_INVALID` if the OS or file system refuses a symlink).
 - `skills.update({ id, ...skill })`
 - `skills.read({ id, level?, projectPath? })` → `{ skill, body }`
 - `skills.remove({ id, level?, projectPath? })`
@@ -1467,6 +1492,25 @@ The list contains frontmatter-derived `name` and `description`, not the body.
 Only the description enters the prompt, and the body is fetched when the model
 invokes `Skill` (D174). A missing file is removed from the list and its local
 state is pruned during the next scan.
+
+Desktop-only channels scan skill folders written by other agent tools on this
+machine — `~/.claude/skills/`, `<project>/.claude/skills/`, and the app's own
+`~/.agents/skills/` (or `PI_DESKTOP_AGENTS_DIR/skills/`) plus its project
+equivalent — so the user can review candidates and batch-import them. Both the
+single-file (`<id>.md`) and Anthropic-style directory (`<name>/SKILL.md`)
+shapes are detected.
+
+- `pi-desktop/skill/importScan` — `{ projectPath? }` →
+  `{ candidates: ExternalSkillCandidate[], sources: ExternalSkillSourceReport[] }`.
+  Missing directories and read errors surface on `sources[].error`; one failing
+  source never aborts the scan. Candidates from `~/.agents/skills/` carry an
+  "already in current registry" warning so the UI can filter or highlight them.
+- `pi-desktop/skill/importRun` — `{ level, projectPath?, mode?, items }` →
+  `{ imported, skipped, failed }`. Main calls `skills.import` once per item,
+  passing `path = shape==="dir" ? rootDir : sourcePath` and forwarding `mode`
+  and per-item `id`/`name`/`description`. A conflict lands in `skipped` and
+  every other error lands in `failed`; one failure never blocks the rest. Batch
+  import is still bounded by `MAX_SKILLS` (128 per level).
 
 Desktop-only skill market channels (not host RPC) live on Electron IPC:
 
@@ -1508,6 +1552,35 @@ Desktop-only MCP market channels (not host RPC) live on Electron IPC:
   each resolved public address, follows only bounded HTTPS redirects, and keeps
   cursor state for browse and server-side search. One failed source does not
   discard successful sources; the response and caches are bounded.
+
+### MCP OAuth (ADR 0281)
+
+Browser-based OAuth 2.1 authentication for HTTP MCP servers is handled in the Electron main process via non-blocking IPC invocations and an event stream:
+
+- `pi-desktop/mcp/oauth/start({ id, level?, projectPath? }) -> { ok: true, loginId }`
+  Initiates OAuth metadata discovery and PKCE authorization code flow. Returns immediately; user browser navigation and callback exchange proceed asynchronously in the background.
+- `pi-desktop/mcp/oauth/cancel({ loginId?, id? }) -> { ok: boolean }`
+  Aborts an in-flight authorization attempt, tears down the local loopback HTTP server, and cancels pending timers.
+- `pi-desktop/mcp/oauth/event` streams `McpOAuthLoginEvent` to the renderer:
+
+```ts
+type McpOAuthLoginEvent = {
+  loginId: string;
+  serverId: string;
+} & (
+  | { kind: "authUrl"; url: string; instructions?: string; opened: boolean }
+  | { kind: "progress"; message: string }
+  | { kind: "done"; status: McpServerStatus }
+  | { kind: "error"; message: string }
+  | { kind: "cancelled" }
+);
+```
+
+#### Status and Token Storage
+- `McpServerStatus` includes:
+  - `hasOauth: boolean` — whether the server has an encrypted OAuth secret stored in host-core (`secret:mcp:<serverId>:oauth`).
+  - `authRequired: boolean` — flags that a connection attempt or `tools/call` returned HTTP 401 Unauthorized and user re-authentication is required.
+- OAuth tokens (`accessToken`, `refreshToken`, `expiresAt`, `resource`, `clientId`) are persisted exclusively in host-core encrypted secrets under `secret:mcp:<serverId>:oauth` and never exposed to the renderer.
 
 ## 12c. Subagent API (D202)
 

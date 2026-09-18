@@ -1,9 +1,9 @@
-# ADR 0284: `RACP-WS` transport in `packages/racp`
+# ADR 0285: `RACP-WS` transport in `packages/racp`
 
 - Status: Accepted for implementation
 - Date: 2026-09-18
 - Decision: D448
-- Related: ADR 0205 (D373 / D374 / D375), ADR 0283 (D447),
+- Related: ADR 0205 (D373 / D374 / D375), ADR 0284 (D447),
   `03-runtime/19-remote-agent-control-protocol.md` §3, §4, §8, §11.1, §14a,
   `05-security/02-remote-control-security.md` §3.4, §5.1
 
@@ -63,7 +63,7 @@ no code implemented.
 ## Consequences
 
 - `pi-host` composes `RacpServer` + `bindRacpWebSocket` over the module and
-  `RuntimeService` (ADR 0283); the desktop adapter composes `RacpClient` +
+  `RuntimeService` (ADR 0284); the desktop adapter composes `RacpClient` +
   `wsClientTransport`.
 - The conformance behaviors of spec §14 that do not need a machine boundary
   (handshake, authorization, idempotency, queue ordering, approval decisions,

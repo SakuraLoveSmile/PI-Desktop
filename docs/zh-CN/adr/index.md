@@ -291,8 +291,9 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0279 | [可恢复的子代理委托](/adr/0279-resumable-subagent-delegations) | 已接受待实现（修订 ADR 0062；ADR 0089；issue #513） |
 | 0280 | [插件自有界面按宿主语言自行本地化](/adr/0280-plugin-owned-ui-localizes-from-host-locale) | 已接受（修订 ADR 0267；ADR 0159） |
 | 0282 | [压缩摘要先重试并按实际提示大小预检，再回退保留尾部](/adr/0282-compaction-summary-retry-and-sizing) | 已接受（修订 ADR 0049；issue #543） |
-| 0283 | [`packages/host-runtime` 的无头运行时边界](/adr/0283-headless-runtime-boundary) | 已接受（实施中）（D447；ADR 0205 R2 前置） |
-| 0284 | [`packages/racp` 的 `RACP-WS` 传输](/adr/0284-racp-ws-transport) | 已接受（实施中）（D448；ADR 0205 R2） |
+| 0283 | [远程 MCP 服务端 OAuth 2.1 认证](/adr/0283-remote-mcp-oauth) | 已接受 |
+| 0284 | [`packages/host-runtime` 的无头运行时边界](/adr/0284-headless-runtime-boundary) | 已接受（实施中）（D447；ADR 0205 R2 前置） |
+| 0285 | [`packages/racp` 的 `RACP-WS` 传输](/adr/0285-racp-ws-transport) | 已接受（实施中）（D448；ADR 0205 R2） |
 | turn-process-and-thinking-display | [回合过程与思考展示](/adr/turn-process-and-thinking-display) | 已接受 |
 
 ## 什么时候看 ADR

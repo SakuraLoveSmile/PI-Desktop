@@ -43,6 +43,7 @@ coverage/
 # Local runtime data
 .pi-desktop/
 .pi-desktop-test/
+.pi/
 .cc-connect/
 
 .playwright-mcp/

@@ -1554,16 +1554,26 @@ async fn handle_request(
             let path = crate::db::canonical_project_path(path)
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
-            if st
+            // A path that belongs to a multi-folder project group must stay put:
+            // deleting one root would orphan the rest of the group, so callers
+            // remove the folder from the group first. A single-folder stored
+            // group is just a wrapper around one project, so removing that
+            // project also removes the now-empty group record.
+            if let Some(group) = st
                 .db
-                .path_is_in_stored_project_group(&path)
+                .stored_project_group_for_path(&path)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
             {
-                return Err(rpc_err(
-                    1002,
-                    "project belongs to a multi-folder project group; remove the folder from the group first",
-                    "INVALID_PARAMS",
-                ));
+                if group.roots.len() > 1 {
+                    return Err(rpc_err(
+                        1002,
+                        "project belongs to a multi-folder project group; remove the folder from the group first",
+                        "INVALID_PARAMS",
+                    ));
+                }
+                st.db
+                    .delete_project_group_record(&group.id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             }
             let session_ids = st
                 .db
@@ -5128,6 +5138,51 @@ mod tests {
             .unwrap()
             .iter()
             .any(|project| project["path"].as_str() == Some(canonical.as_str())));
+    }
+
+    /// A single-folder stored project group is just a wrapper around one
+    /// project. Removing that project must succeed and delete the now-empty
+    /// group record instead of locking the project in place (issue #572).
+    #[tokio::test]
+    async fn projects_remove_deletes_single_folder_stored_group() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let solo_dir = data_dir.path().join("solo");
+        fs::create_dir_all(&solo_dir).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let solo_path = solo_dir.to_string_lossy().to_string();
+        let group = app_state
+            .db
+            .create_project_group("Solo", std::slice::from_ref(&solo_path))
+            .unwrap();
+        assert!(!group.legacy);
+        assert_eq!(group.roots.len(), 1);
+        let state = Arc::new(Mutex::new(app_state));
+
+        let result = handle_request(
+            state.clone(),
+            "projects.remove",
+            json!({ "path": solo_path }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .expect("a single-folder stored group must be removable");
+        assert_eq!(result["removed"], json!(true));
+
+        let canonical =
+            crate::db::canonical_project_path(&solo_path).expect("canonical project path");
+        let st = state.lock().await;
+        assert!(st
+            .db
+            .stored_project_group_for_path(&canonical)
+            .unwrap()
+            .is_none());
+        assert!(st
+            .db
+            .list_projects()
+            .unwrap()
+            .iter()
+            .all(|project| project.path != canonical));
     }
 
     /// A running turn owns its session's tools, working directory, and

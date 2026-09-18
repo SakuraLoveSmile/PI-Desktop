@@ -1,4 +1,4 @@
-# ADR 0283: Headless runtime boundary in `packages/host-runtime`
+# ADR 0284: Headless runtime boundary in `packages/host-runtime`
 
 - Status: Accepted for implementation
 - Date: 2026-09-18
