@@ -936,6 +936,18 @@ export async function createWindow({
       if (boundsWatchdog) clearInterval(boundsWatchdog);
       return;
     }
+    // Stage Manager recovery is macOS-only: the CG bounds helper it reads
+    // exists there alone (D039, D053, D083), and the minimum window size makes
+    // the tiny-bounds test unreachable elsewhere. On Windows/Linux this
+    // interval had nothing to recover and only cleared the window layer every
+    // 1.5s — and Mutter answers that repeated `_NET_WM_STATE` removal by
+    // raising the window (`meta_window_unmake_above` → `meta_window_raise`),
+    // so the app kept yanking itself above whatever the user had just focused
+    // (D447).
+    if (process.platform !== "darwin") {
+      clearInterval(boundsWatchdog);
+      return;
+    }
     const cg = readCgBounds();
     const electronBounds = window.getBounds();
     if (!cg && cgHelperAvailable) missingCgStreak += 1;
