@@ -21,6 +21,16 @@ export const ROUTE_LOCAL = Symbol("pi-desktop.route-local");
 /** Namespaced-id prefix for sessions owned by a remote host. */
 const REMOTE_PREFIX = "remote:";
 
+/**
+ * Delimiter that embeds the renderer-visible remote session id inside a tool
+ * permission `requestId`. `toolResolvePermission` carries only `{requestId,
+ * decision}` — no session id — so the id itself must name its owning session
+ * for {@link sessionIdForCall} to route the resolution statelessly, with no
+ * correlation map. Chosen so it cannot collide with a `remote:` session id or a
+ * host-assigned approval id.
+ */
+const APPROVAL_ID_DELIMITER = "#racp-approval:";
+
 /** A registered remote host's session, addressed by its renderer-visible id. */
 export interface RemoteBackend {
   /**
@@ -80,9 +90,39 @@ export function parseRemoteSessionId(
 }
 
 /**
+ * Encode a tool permission `requestId` that names its owning remote session.
+ * The renderer echoes this id back verbatim in `toolResolvePermission`, and the
+ * router recovers the session from it without any server-side correlation.
+ */
+export function makeRemoteApprovalRequestId(
+  remoteSessionId: string,
+  hostApprovalId: string,
+): string {
+  return `${remoteSessionId}${APPROVAL_ID_DELIMITER}${hostApprovalId}`;
+}
+
+/**
+ * Split an encoded approval `requestId` back into the remote session id and the
+ * host's own approval id. Returns null for a plain (local) request id.
+ */
+export function parseRemoteApprovalRequestId(
+  requestId: string,
+): { remoteSessionId: string; hostApprovalId: string } | null {
+  const at = requestId.indexOf(APPROVAL_ID_DELIMITER);
+  if (at <= 0) return null;
+  const remoteSessionId = requestId.slice(0, at);
+  if (!isRemoteSessionId(remoteSessionId)) return null;
+  const hostApprovalId = requestId.slice(at + APPROVAL_ID_DELIMITER.length);
+  if (!hostApprovalId) return null;
+  return { remoteSessionId, hostApprovalId };
+}
+
+/**
  * Best-effort session id for a renderer IPC call. Desktop channels pass the
  * session id either as the first positional argument or as `sessionId` on the
- * first argument object; anything else has no session and is always local.
+ * first argument object; `toolResolvePermission` carries neither, so its
+ * remote-session-encoded `requestId` is decoded instead. Anything else has no
+ * session and is always local.
  */
 export function sessionIdForCall(args: readonly unknown[]): string | null {
   const first = args[0];
@@ -90,6 +130,16 @@ export function sessionIdForCall(args: readonly unknown[]): string | null {
   if (first && typeof first === "object") {
     const id = (first as { sessionId?: unknown }).sessionId;
     if (typeof id === "string" && isRemoteSessionId(id)) return id;
+    // `sessionGet` addresses the session as `{ id }` rather than `{ sessionId }`.
+    // Matching a bare `id` is safe because only a `remote:`-prefixed value ever
+    // resolves, and no other entity id carries that prefix.
+    const bareId = (first as { id?: unknown }).id;
+    if (typeof bareId === "string" && isRemoteSessionId(bareId)) return bareId;
+    const requestId = (first as { requestId?: unknown }).requestId;
+    if (typeof requestId === "string") {
+      const parsed = parseRemoteApprovalRequestId(requestId);
+      if (parsed) return parsed.remoteSessionId;
+    }
   }
   return null;
 }
