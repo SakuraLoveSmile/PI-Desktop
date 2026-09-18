@@ -89,6 +89,16 @@ import type {
 } from "@pi-desktop/shared";
 import {
   addUsage,
+  attachNativeWebSearchToPayload,
+  extractHostedSearchFromAssistantContent,
+  hostedSearchHasContent,
+  isHiddenNativeWebToolName,
+  mergeHostedSearch,
+  parseHostedSearchStreamEvent,
+  supportsNativeWebSearch,
+
+
+  type HostedSearch,
   checkpointGeneration,
   contextCompactionMark,
   cumulativeDelta,
@@ -197,8 +207,8 @@ import {
   providerRateLimitDelayMs,
   providerSetupRetryDelayMs,
 } from "./provider-retry.js";
-
 import { rebuildNodeNetworkTransport } from "./node-proxy.js";
+
 import {
   createProviderTransportHealth,
   explainsProviderFetchFailure,
@@ -837,6 +847,8 @@ export type AgentRuntimeOptions = {
   turnId?: string;
   provider: RuntimeProviderConfig;
   thinkingLevel: ThinkingLevel;
+  /** Attach vendor hosted-search tools for this session when the wire API allows. */
+  nativeWebSearch?: boolean;
   systemPrompt?: string;
   /** Session-bound workspace root used for path-scoped instruction requests. */
   projectPath?: string;
@@ -889,6 +901,7 @@ export type RuntimeMatchConfig = {
   mode: Mode;
   provider: RuntimeProviderConfig;
   thinkingLevel: ThinkingLevel;
+  nativeWebSearch?: boolean;
   pluginTools?: PluginToolDef[];
   pluginSkills?: PluginSkillDef[];
   trustedExtensions?: TrustedExtensionSpec[];
@@ -1448,6 +1461,8 @@ export class DesktopAgentRuntime {
   private mode: Mode;
   private provider: RuntimeProviderConfig;
   private thinkingLevel: ThinkingLevel;
+  private nativeWebSearch: boolean;
+
   private host: RuntimeHost;
   private onEvent: (envelope: AgentEventEnvelope) => void;
   private streamSink: StreamCoalescer;
@@ -1650,6 +1665,7 @@ export class DesktopAgentRuntime {
     this.planningState = proposalKindForMode(this.mode) ? "planning" : "inactive";
     this.provider = opts.provider;
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
+    this.nativeWebSearch = opts.nativeWebSearch === true;
     this.host = opts.host;
     this.hostCloseUnsubscribe = this.host.onClose?.(() => {
       this.cleanupActiveToolProgress();
@@ -1771,26 +1787,42 @@ Delegation rules:
               ...options,
               maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
               sessionId: this.sessionId,
+              onPayload: async (payload, payloadModel) => {
+                const rewritten = await options?.onPayload?.(payload, payloadModel);
+                const current = rewritten ?? payload;
+                if (!this.nativeWebSearch) return current;
+                return attachNativeWebSearchToPayload(current, {
+                  api: payloadModel.api,
+                  apiStyle: this.provider.apiStyle,
+                  vendorKey: this.provider.vendorKey,
+                  baseUrl: this.provider.baseUrl ?? payloadModel.baseUrl,
+                });
+
+
+              },
               // pi-ai only exposes onResponse after a request succeeds. Capture the
               // failed response separately so a 429 can honor Retry-After headers,
               // and capture the transport cause of a rejection while the original
               // Error still exists (issue #234).
-              fetch: captureProviderResponse(
-                options?.fetch,
-                (response, requestBytes, failure) => {
-                  this.providerResponseStatus = response?.status;
-                  this.providerRequestBytes = requestBytes;
-                  this.providerFetchFailure = failure;
-                  if (failure) this.recoverProviderTransport(failure);
-                  // A gateway 502/503 can also state Retry-After, so keep headers
-                  // for every status whose delay is usable, not only for 429.
-                  this.providerRetryHeaders = carriesRetryDelayHeaders(
-                    response?.status,
-                  )
-                    ? response?.headers
-                    : undefined;
-                },
-              ),
+              fetch: async (input, init) => {
+                const captured = captureProviderResponse(
+                  options?.fetch,
+                  (response, requestBytes, failure) => {
+                    this.providerResponseStatus = response?.status;
+                    this.providerRequestBytes = requestBytes;
+                    this.providerFetchFailure = failure;
+                    if (failure) this.recoverProviderTransport(failure);
+                    this.providerRetryHeaders = carriesRetryDelayHeaders(
+                      response?.status,
+                    )
+                      ? response?.headers
+                      : undefined;
+                  },
+                );
+                const response = await captured(input, init);
+                this.ingestHostedSearchStream(response);
+                return response;
+              },
               onResponse: async (response, responseModel) => {
                 this.providerResponseStatus = response.status;
                 await options?.onResponse?.(response, responseModel);
@@ -2177,6 +2209,7 @@ Delegation rules:
       this.mode === config.mode &&
       this.thinkingLevel ===
         clampThinkingLevel(config.provider, config.thinkingLevel) &&
+      this.nativeWebSearch === (config.nativeWebSearch === true) &&
       current === next &&
       safeJson(this.commandShell) === safeJson(config.commandShell) &&
       safeJson(this.baseProjectInstructions ?? null) ===
@@ -6568,6 +6601,80 @@ Delegation rules:
     }
   }
 
+
+  private nativeWebSearchActive(): boolean {
+    return (
+      this.nativeWebSearch &&
+      supportsNativeWebSearch({
+        api: this.model.api,
+        apiStyle: this.provider.apiStyle,
+        vendorKey: this.provider.vendorKey,
+        baseUrl: this.provider.baseUrl ?? this.model.baseUrl,
+      })
+    );
+  }
+
+
+  private applyHostedSearch(
+    next: Parameters<typeof mergeHostedSearch>[1],
+    emit = true,
+  ): void {
+    if (!this.currentAssistant) return;
+    if (!hostedSearchHasContent(next as HostedSearch | undefined) && !this.currentAssistant.hostedSearch) {
+      return;
+    }
+    const hostedSearch = mergeHostedSearch(this.currentAssistant.hostedSearch, next);
+    if (!hostedSearch) return;
+    this.currentAssistant = { ...this.currentAssistant, hostedSearch };
+    if (emit) this.emit({ type: "message_update", message: this.currentAssistant });
+  }
+
+
+
+
+  private ingestHostedSearchStream(response: Response): void {
+    if (!this.nativeWebSearchActive() || !response.body) return;
+    let clone: Response;
+    try {
+      clone = response.clone();
+    } catch {
+      return;
+    }
+    void this.readHostedSearchStream(clone);
+  }
+
+  private async readHostedSearchStream(response: Response): Promise<void> {
+    try {
+      const reader = response.body?.getReader();
+      if (!reader) return;
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/\r?\n/g);
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          const payload = trimmed.startsWith("data:") ? trimmed.slice(5).trim() : trimmed;
+          if (!payload || payload === "[DONE]" || (!payload.startsWith("{") && !payload.startsWith("["))) {
+            continue;
+          }
+          try {
+            const parsed = JSON.parse(payload) as unknown;
+            const update = parseHostedSearchStreamEvent(parsed);
+            if (update) this.applyHostedSearch(update);
+          } catch {
+            // Ignore partial JSON from the clone parser.
+          }
+        }
+      }
+    } catch {
+      // Hosted-search metadata is best-effort and must not break the provider stream.
+    }
+  }
+
   private async handleAgentEvent(event: AgentEvent) {
     this.forwardAgentEventToExtensions(event);
     switch (event.type) {
@@ -6609,6 +6716,9 @@ Delegation rules:
               : this.progressTurnRerunInProgress
                 ? retryingAssistant?.content ?? ""
                 : content.text;
+          const initialSearch = extractHostedSearchFromAssistantContent(
+            (event.message as { content?: unknown }).content,
+          );
           this.currentAssistant = {
             id: retryingAssistant?.id ?? randomUUID(),
             role: "assistant",
@@ -6616,6 +6726,11 @@ Delegation rules:
             ...(content.hasThinking && content.thinking
               ? { thinking: content.thinking }
               : {}),
+            ...(initialSearch
+              ? { hostedSearch: mergeHostedSearch(retryingAssistant?.hostedSearch, initialSearch) }
+              : retryingAssistant?.hostedSearch
+                ? { hostedSearch: retryingAssistant.hostedSearch }
+                : {}),
             createdAt: nowIso(),
             status: "streaming",
             modelId: this.provider.modelId,
@@ -6654,6 +6769,9 @@ Delegation rules:
           const thinkingDelta = content.hasThinking
             ? cumulativeDelta(previousThinking, content.thinking)
             : { delta: "", reset: false };
+          const extractedSearch = extractHostedSearchFromAssistantContent(
+            (event.message as { content?: unknown }).content,
+          );
           this.currentAssistant = {
             ...this.currentAssistant,
             content: nextText,
@@ -6662,6 +6780,14 @@ Delegation rules:
               : content.hasThinking
                 ? { thinking: undefined }
                 : {}),
+            ...(extractedSearch
+              ? {
+                  hostedSearch: mergeHostedSearch(
+                    this.currentAssistant.hostedSearch,
+                    extractedSearch,
+                  ),
+                }
+              : {}),
             status: "streaming",
           };
           if (
@@ -6905,6 +7031,23 @@ Delegation rules:
                   thinking: nextThinking,
                 })
               : undefined;
+          const endedSearch = mergeHostedSearch(
+            this.currentAssistant.hostedSearch,
+            extractHostedSearchFromAssistantContent(
+              (event.message as { content?: unknown }).content,
+            ),
+          );
+          const hostedSearch = hostedSearchHasContent(endedSearch) && endedSearch
+            ? {
+                queries: endedSearch.queries,
+                sources: endedSearch.sources,
+                status: (failed || aborted
+                  ? endedSearch.sources.length > 0
+                    ? "completed" as const
+                    : "failed" as const
+                  : "completed" as const),
+              }
+            : undefined;
           this.currentAssistant = {
             ...this.currentAssistant,
             content: nextText,
@@ -6913,6 +7056,7 @@ Delegation rules:
               : content.hasThinking
                 ? { thinking: undefined }
                 : {}),
+            ...(hostedSearch ? { hostedSearch } : {}),
             status: failed || emptyResponse
               ? "error"
               : aborted
@@ -6933,6 +7077,7 @@ Delegation rules:
           this.activeProviderRetryAttempt = 0;
           this.streamStartedAt = undefined;
           this.currentAssistant = undefined;
+
           const canRecoverOverflow =
             this.compactionEnabled &&
             overflow &&
@@ -6964,6 +7109,22 @@ Delegation rules:
         break;
       }
       case "tool_execution_start": {
+        if (this.nativeWebSearchActive() && isHiddenNativeWebToolName(event.toolName)) {
+          const startedAt = Date.now();
+          this.activeToolCalls.set(event.toolCallId, {
+            toolName: event.toolName,
+            args: event.args,
+            startedAt,
+          });
+          this.applyHostedSearch(
+            mergeHostedSearch(undefined, extractHostedSearchFromAssistantContent({
+              type: "toolCall",
+              name: event.toolName,
+              arguments: event.args,
+            })) ?? { status: "searching", queries: [], sources: [] },
+          );
+          break;
+        }
         const startedAt = Date.now();
         this.clearAgentActivity();
         this.activeToolCalls.set(event.toolCallId, {
@@ -6990,6 +7151,19 @@ Delegation rules:
         // The agent issues the follow-up provider request as soon as the tool
         // results are in, so this is the anchor for the next providerWaitMs.
         {
+          if (this.nativeWebSearchActive() && isHiddenNativeWebToolName(
+            this.activeToolCalls.get(event.toolCallId)?.toolName ?? event.toolName,
+          )) {
+            this.activeToolCalls.delete(event.toolCallId);
+            this.applyHostedSearch(
+              mergeHostedSearch(undefined, extractHostedSearchFromAssistantContent(event.result)) ?? {
+                status: event.isError ? "failed" : "completed",
+                queries: [],
+                sources: [],
+              },
+            );
+            break;
+          }
           const endedAt = Date.now();
           const activeTool = this.activeToolCalls.get(event.toolCallId);
           this.activeToolCalls.delete(event.toolCallId);
@@ -7166,6 +7340,7 @@ Delegation rules:
     this.streamStartedAt = undefined;
     this.currentAssistant = undefined;
   }
+
 
   /** Keep a pre-flight user message in context so a reused runtime and the
    * next turn both see it, even though no provider request was made. */
