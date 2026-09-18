@@ -57,3 +57,4 @@ export * from "./message-stream.js";
 export * from "./session-collaboration.js";
 export * from "./window-chrome.js";
 export * from "./native-web-search.js";
+export * from "./prompt-enhancement.js";
