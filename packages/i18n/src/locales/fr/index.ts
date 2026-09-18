@@ -247,6 +247,8 @@ export const fr = {
     "speakSaved": "Audio enregistré dans {{path}}",
     "undoEnhancement": "Annuler l'amélioration",
     "enhancementFailed": "L'amélioration de l'invite a échoué",
+    "enhancementTimeout":
+      "La réécriture a pris trop de temps. Réessayez, ou choisissez un modèle plus rapide dans les réglages.",
     "dismissEnhancementError": "Ignorer l'erreur d'amélioration",
     sendWhileRunning: "Envoyer à la suite · {{shortcut}} pour réorienter",
     steeringUnavailable: "Ce tour ne peut plus recevoir de consignes. Votre brouillon a été conservé.",
@@ -1181,6 +1183,33 @@ sklm: {
     "fontSizeXl": "Trenta",
     "fontSizeScale": "Échelle de taille du texte",
     "fontSizePercent": "{{value}}%",
+    "promptEnhancementTitle": "Amélioration du prompt",
+    "promptEnhancementDesc":
+      "S'applique à l'action « Améliorer le prompt » du compositeur. Le prompt système est intégré ; le modèle et le modèle de texte sont personnalisables.",
+    "promptEnhancementCustomTemplate": "Utiliser un modèle personnalisé",
+    "promptEnhancementCustomTemplateDesc":
+      "Remplace le modèle utilisateur intégré par le vôtre. Le prompt système reste intégré.",
+    "promptEnhancementCustomTemplateNeedsTemplate":
+      "Enregistrez d'abord un modèle personnalisé ; l'interrupteur choisit ensuite entre celui-ci et le modèle intégré.",
+    "promptEnhancementEdit": "Modifier",
+    "promptEnhancementModelTitle": "Amélioration du prompt",
+    "promptEnhancementModel": "Modèle par défaut",
+    "promptEnhancementThinking": "Effort de raisonnement",
+    "promptEnhancementThinkingDesc":
+      "Effort de raisonnement pour la réécriture. Désactivé est la valeur par défaut et la plus rapide.",
+    "promptEnhancementThinkingOff": "Désactivé",
+    "promptEnhancementModelFollow": "Suivre le modèle actuel",
+    "promptEnhancementModelUnavailable":
+      "Indisponible — l'amélioration utilisera le modèle actuel",
+    "promptEnhancementUserTemplate": "Modèle utilisateur",
+    "promptEnhancementUserTemplateDesc":
+      "Encadre le brouillon. Doit contenir la variable de brouillon ; utilisez le bouton d'insertion.",
+    "promptEnhancementInsertDraft": "Insérer la variable de brouillon",
+    "promptEnhancementRestore": "Rétablir la valeur par défaut",
+    "promptEnhancementMissingDraftVariable":
+      "Le modèle utilisateur doit contenir la variable de brouillon, sinon le brouillon ne peut pas être envoyé.",
+    "promptEnhancementTooLong": "Le modèle utilisateur ne doit pas dépasser 8000 caractères.",
+    "promptEnhancementSaveError": "Impossible d'enregistrer les paramètres d'amélioration du prompt.",
   },
   "project": {
     "open": "Ouvrir le projet",

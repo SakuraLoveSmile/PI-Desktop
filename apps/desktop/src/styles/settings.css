@@ -485,6 +485,14 @@
   align-items: stretch;
 }
 
+/*
+  A toggle paired with an icon action (prompt enhancement). The control column
+  has no gap of its own, so the two would otherwise touch.
+*/
+.settings-row-control:has(> .settings-toggle + .settings-icon-button) {
+  gap: 8px;
+}
+
 .settings-speech-fields {
   display: flex;
   flex-direction: column;
@@ -792,6 +800,23 @@
 .settings-toggle:focus-visible,
 .settings-toggle.on:focus-visible {
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 24%, transparent);
+}
+
+/*
+  A disabled switch still reads as a switch: dimmed, not restyled, and the
+  cursor says why clicking does nothing.
+*/
+.settings-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-toggle:disabled:hover {
+  background: var(--ds-switch-track-off);
+}
+
+.settings-toggle.on:disabled:hover {
+  background: var(--ds-accent);
 }
 
 .settings-toggle.is-busy .settings-toggle-thumb {
