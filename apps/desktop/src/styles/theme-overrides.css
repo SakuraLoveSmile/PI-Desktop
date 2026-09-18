@@ -65,7 +65,7 @@
 
 :root[data-theme="light"] .composer-toolbar .icon-btn.composer-web-search-on,
 :root[data-theme="light"] .composer-toolbar .icon-btn.composer-web-search-on:hover {
-  color: #059669 !important;
+  color: var(--color-success) !important;
 }
 
 :root[data-theme="light"] .composer-input::placeholder,
