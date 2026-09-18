@@ -7,6 +7,9 @@
  * gateway holds the renderer's promise open indefinitely, and the provider
  * retry budget alone can already spend about a minute before giving up.
  *
+ * The helper still aborts: a timeout that only races leaves the provider call
+ * running, which burns tokens and can overlap the user's next click.
+ *
  * Kept in its own module (no Electron or pi-ai imports) so the behavior is
  * directly testable.
  */
@@ -24,33 +27,43 @@ export function promptEnhancementTimeoutError(
 ): PromptEnhancementTimeoutError {
   return Object.assign(
     new Error(
-      `Prompt enhancement timed out after ${Math.round(timeoutMs / 1000)}s. Try again, or set the enhancement model to follow the session in Settings.`,
+      `Prompt enhancement timed out after ${Math.round(timeoutMs / 1000)}s. Try again, or pick a faster enhancement model in Settings.`,
     ),
     { errorCode: "TIMEOUT" as const },
   );
 }
 
 /**
- * Resolve with `work`, or reject with a `TIMEOUT` error after `timeoutMs`.
+ * Run `start` with an abort signal, or reject with `TIMEOUT` after `timeoutMs`.
  *
- * A failure from `work` itself passes through unchanged; only an unanswered
- * request becomes a timeout. The rejection is never retried on another model:
+ * A failure from `start` itself passes through unchanged; only an unanswered
+ * request becomes a timeout. Abort after timeout is best-effort; the race is
+ * what frees the caller. The rejection is never retried on another model:
  * the user chose this one, and a hidden second attempt would double the wait.
  */
 export function withPromptEnhancementTimeout<T>(
-  work: Promise<T>,
+  start: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number = PROMPT_ENHANCEMENT_TIMEOUT_MS,
 ): Promise<T> {
+  const controller = new AbortController();
+  const work = start(controller.signal);
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(promptEnhancementTimeoutError(timeoutMs)), timeoutMs);
+    let settled = false;
+    const finish = (action: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      action();
+    };
+    const timer = setTimeout(() => {
+      controller.abort();
+      finish(() => reject(promptEnhancementTimeoutError(timeoutMs)));
+    }, timeoutMs);
     work.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
+      (value) => finish(() => resolve(value)),
       (error) => {
-        clearTimeout(timer);
-        reject(error);
+        if (controller.signal.aborted) return;
+        finish(() => reject(error));
       },
     );
   });

@@ -247,6 +247,8 @@ export const de = {
     "speakSaved": "Gesprochene Audio gespeichert unter {{path}}",
     "undoEnhancement": "Verbesserung rückgängig machen",
     "enhancementFailed": "Eingabeaufforderung zur Verbesserung fehlgeschlagen",
+    "enhancementTimeout":
+      "Die Umschreibung hat zu lange gedauert. Erneut versuchen oder in den Einstellungen ein schnelleres Modell wählen.",
     "dismissEnhancementError": "Verbesserungsfehler verwerfen",
     sendWhileRunning: "Folgenachricht senden · {{shortcut}} zum Lenken",
     steeringUnavailable: "Diese Runde nimmt keine weiteren Eingaben an. Dein Entwurf wurde behalten.",
@@ -1197,6 +1199,8 @@ sklm: {
       "Denkaufwand für die Umschreibung. Standard ist Aus und am schnellsten.",
     "promptEnhancementThinkingOff": "Aus (kein Denken)",
     "promptEnhancementModelFollow": "Aktuellem Modell folgen",
+    "promptEnhancementModelUnavailable":
+      "Nicht verfügbar — die Verbesserung fällt auf das aktuelle Modell zurück",
     "promptEnhancementUserTemplate": "Benutzer-Vorlage",
     "promptEnhancementUserTemplateDesc":
       "Umschließt den Entwurf. Muss die Entwurfsvariable enthalten; fügen Sie sie über die Schaltfläche ein.",
@@ -1204,6 +1208,7 @@ sklm: {
     "promptEnhancementRestore": "Standard wiederherstellen",
     "promptEnhancementMissingDraftVariable":
       "Die Benutzer-Vorlage muss die Entwurfsvariable enthalten, sonst kann der Entwurf nicht gesendet werden.",
+    "promptEnhancementTooLong": "Die Nutzervorlage darf höchstens 8000 Zeichen haben.",
     "promptEnhancementSaveError": "Die Prompt-Verbesserungseinstellungen konnten nicht gespeichert werden.",
   },
   "project": {

@@ -10,6 +10,7 @@ import {
 import {
   enhancePromptDraft,
   promptEnhancementContext,
+  stripEnhancementDecorations,
   stripWrappingQuotes,
 } from "./prompt-enhancement.js";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
@@ -196,3 +197,24 @@ describe("stripWrappingQuotes", () => {
     expect(stripWrappingQuotes("  plain text  ")).toBe("plain text");
   });
 });
+
+describe("stripEnhancementDecorations", () => {
+  it("strips a leading rewrite label after unquoting", () => {
+    expect(stripEnhancementDecorations('Enhanced: fix the login bug')).toBe(
+      "fix the login bug",
+    );
+    expect(stripEnhancementDecorations('"Output: 请审查这段代码"')).toBe(
+      "请审查这段代码",
+    );
+    expect(stripEnhancementDecorations("增强：请说明要处理的对象")).toBe(
+      "请说明要处理的对象",
+    );
+  });
+
+  it("leaves a prompt that is not a label prefix unchanged", () => {
+    expect(stripEnhancementDecorations("Fix the login bug: identify the path.")).toBe(
+      "Fix the login bug: identify the path.",
+    );
+  });
+});
+

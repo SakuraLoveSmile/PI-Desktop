@@ -256,6 +256,8 @@ export const tr = {
     speakSaved: "Ses {{path}} konumuna kaydedildi",
     undoEnhancement: "İyileştirmeyi geri al",
     enhancementFailed: "İstem iyileştirilemedi",
+    enhancementTimeout:
+      "Yeniden yazma zaman aşımına uğradı. Yeniden deneyin veya Ayarlar'dan daha hızlı bir iyileştirme modeli seçin.",
     dismissEnhancementError: "İyileştirme hatasını kapat",
     sendWhileRunning: "Takip mesajı gönder · {{shortcut}} ile yönlendir",
     steeringUnavailable: "Bu tur artık yönlendirme kabul edemiyor. Taslağınız korundu.",
@@ -1217,6 +1219,7 @@ sklm: {
       "Yeniden yazma için akıl yürütme düzeyi. Varsayılan kapalıdır ve en hızlısıdır.",
     promptEnhancementThinkingOff: "Kapalı (akıl yürütme yok)",
     promptEnhancementModelFollow: "Geçerli modeli izle",
+    promptEnhancementModelUnavailable: "Kullanılamıyor — iyileştirme geçerli modele düşer",
     promptEnhancementUserTemplate: "Kullanıcı şablonu",
     promptEnhancementUserTemplateDesc:
       "Taslağı sarar. Taslak değişkenini içermelidir; ekleme düğmesini kullanın.",
@@ -1224,6 +1227,7 @@ sklm: {
     promptEnhancementRestore: "Varsayılanı geri yükle",
     promptEnhancementMissingDraftVariable:
       "Kullanıcı şablonu taslak değişkenini içermelidir, aksi halde taslak gönderilemez.",
+    promptEnhancementTooLong: "Kullanıcı şablonu en fazla 8000 karakter olabilir.",
     promptEnhancementSaveError: "Prompt iyileştirme ayarları kaydedilemedi.",
   },
   project: {

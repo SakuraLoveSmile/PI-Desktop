@@ -254,6 +254,8 @@ export const en = {
     speakSaved: "Saved spoken audio to {{path}}",
     undoEnhancement: "Undo enhancement",
     enhancementFailed: "Prompt enhancement failed",
+    enhancementTimeout:
+      "The rewrite took too long. Try again, or pick a faster enhancement model in Settings.",
     dismissEnhancementError: "Dismiss enhancement error",
     sendWhileRunning: "Send follow-up · {{shortcut}} to steer",
     steeringUnavailable: "This turn can no longer accept steering. Your draft was kept.",
@@ -1216,6 +1218,8 @@ sklm: {
       "Reasoning effort for the rewrite. Off is the default and the fastest.",
     promptEnhancementThinkingOff: "Off (no reasoning)",
     promptEnhancementModelFollow: "Follow the current model",
+    promptEnhancementModelUnavailable:
+      "Unavailable — enhance will fall back to the current model",
     promptEnhancementUserTemplate: "User template",
     promptEnhancementUserTemplateDesc:
       "Wraps the draft. It must include the draft variable; use the insert button to place it.",
@@ -1223,6 +1227,7 @@ sklm: {
     promptEnhancementRestore: "Restore default",
     promptEnhancementMissingDraftVariable:
       "The user template must contain the draft variable, or the draft cannot be sent.",
+    promptEnhancementTooLong: "The user template must be at most 8000 characters.",
     promptEnhancementSaveError: "Couldn't save the prompt-enhancement settings.",
   },
   project: {

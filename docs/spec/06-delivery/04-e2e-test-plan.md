@@ -11083,12 +11083,6 @@ are withdrawn with ADR 0165.
   successfully, and rewrites that text. The image chip remains at the front of
   the draft, remains removable, and is dispatched exactly once with the
   enhanced prompt. Enhancement does not create a transcript row or alter the
-  attachment bytes.
-- **Expected**: The Sparkles action is enabled with the image chip present.
-  The one-shot request contains only the visible prompt text, completes
-  successfully, and rewrites that text. The image chip remains at the front of
-  the draft, remains removable, and is dispatched exactly once with the
-  enhanced prompt. Enhancement does not create a transcript row or alter the
   attachment bytes. The request is built from the built-in system prompt and the
   effective user template: with no saved override the built-in template applies;
   with an override saved in Settings, that text applies instead (E2E-259).

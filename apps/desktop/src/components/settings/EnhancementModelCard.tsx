@@ -102,7 +102,17 @@ export function EnhancementModelCard() {
   );
   // A pinned model defines the ladder; with no pin the request follows the
   // session's model, whose ladder is not knowable here, so offer the full list.
-  const levelOptions = reasoningProvider ? reasoningLevels : [...THINKING_LEVELS];
+  // A model without reasoning still lists `off` so the closed trigger does not
+  // show the raw id, and the row is disabled.
+  const noReasoning =
+    Boolean(reasoningProvider) && reasoningProvider?.supportsReasoning !== true;
+  const levelOptions = noReasoning
+    ? (["off"] as ThinkingLevel[])
+    : reasoningProvider
+      ? reasoningLevels.length > 0
+        ? reasoningLevels
+        : (["off"] as ThinkingLevel[])
+      : [...THINKING_LEVELS];
   const storedReasoning = settings?.promptEnhancementThinkingLevel ?? "off";
   const reasoning = useMemo(() => {
     if (!reasoningProvider) return storedReasoning;
@@ -155,15 +165,23 @@ export function EnhancementModelCard() {
         <SettingsRow
           title={t("settings.promptEnhancementModel")}
           description={
-            pinnedProvider && settings.promptEnhancementModelId ? (
+            settings.promptEnhancementProviderId && settings.promptEnhancementModelId ? (
               <span className="model-default-value">
-                <span className="model-default-provider">{pinnedProvider.name}</span>
+                <span className="model-default-provider">
+                  {pinnedProvider?.name ?? settings.promptEnhancementProviderId}
+                </span>
                 <span className="model-default-sep" aria-hidden>
                   ·
                 </span>
                 <span className="model-default-model font-mono">
                   {settings.promptEnhancementModelId}
                 </span>
+                {!pinnedProvider || orphanPin ? (
+                  <span className="model-default-empty">
+                    {" "}
+                    {t("settings.promptEnhancementModelUnavailable")}
+                  </span>
+                ) : null}
               </span>
             ) : (
               <span className="model-default-empty">
@@ -282,7 +300,7 @@ export function EnhancementModelCard() {
           <SettingsMenuSelect
             label={t("settings.promptEnhancementThinking")}
             value={reasoning}
-            disabled={levelOptions.length === 0}
+            disabled={noReasoning}
             options={levelOptions.map((level) => ({
               id: level,
               label: level === "off" ? t("settings.promptEnhancementThinkingOff") : level,

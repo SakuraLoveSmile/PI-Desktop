@@ -26,10 +26,11 @@ test("prompt enhancement uses the typed main-process bridge", () => {
   assert.match(api, /IPC\.invoke\.promptEnhance/);
   assert.match(main, /handle\(IPC\.invoke\.promptEnhance/);
   assert.match(main, /enhancePromptDraft\(/);
-  // The handler bounds the request through the dedicated timeout module.
   assert.match(main, /withPromptEnhancementTimeout/);
   assert.match(main, /enhancementThinkingLevel \|\| "off"/);
   assert.match(main, /from "\.\.\/prompt-enhancement-timeout"/);
+  assert.match(main, /withPromptEnhancementTimeout\(\(signal\) =>/);
+  assert.match(main, /signal,/);
   assert.match(main, /sessionId: launchSessionId/);
   assert.match(main, /resolveAuth: \(\) => vendorOAuth\.resolveAuth/);
   assert.match(runtime, /completeOneShot\(/);
@@ -67,6 +68,7 @@ test("prompt enhancement has complete English-first locale coverage", () => {
     assert.match(source, /enhancingPrompt:/);
     assert.match(source, /undoEnhancement:/);
     assert.match(source, /enhancementFailed:/);
+    assert.match(source, /enhancementTimeout:/);
     assert.match(source, /dismissEnhancementError:/);
   }
 });
@@ -106,8 +108,10 @@ test("prompt-enhancement settings expose templates, restore, and the draft varia
   assert.doesNotMatch(card, /promptEnhancementThinkingLevel/);
   assert.doesNotMatch(card, /promptEnhancementModelId/);
   assert.doesNotMatch(card, /SubagentModelPicker/);
-  // A save that would drop the draft variable is refused before it is sent.
+  // A save that would drop the draft variable or exceed the host-core bound
+  // is refused before it is sent.
   assert.match(card, /templateMissingVariable/);
+  assert.match(card, /templateTooLong/);
   assert.match(card, /isValidPromptEnhancementUserTemplate/);
 
   // The defaults live in shared so the settings page can display the same text
@@ -139,6 +143,7 @@ test("prompt-enhancement locale coverage includes the settings copy", () => {
       "promptEnhancementCustomTemplateDesc",
       "promptEnhancementCustomTemplateNeedsTemplate",
       "promptEnhancementMissingDraftVariable",
+      "promptEnhancementTooLong",
       "promptEnhancementSaveError",
     ]) {
       assert.match(source, new RegExp(`${key}:`));
@@ -151,21 +156,29 @@ test("an enhancement request is released when the provider never answers", async
   // A promise that never settles is exactly the hang the transport cannot bound
   // on its own: the abort signal is only consulted between provider retries.
   const never = new Promise(() => {});
+  let seenSignal;
   await assert.rejects(
-    withPromptEnhancementTimeout(never, 40),
+    withPromptEnhancementTimeout((signal) => {
+      seenSignal = signal;
+      return never;
+    }, 40),
     (error) => {
       assert.equal(error.errorCode, "TIMEOUT");
       assert.match(error.message, /timed out after/);
       return true;
     },
   );
+  assert.equal(seenSignal?.aborted, true, "timeout must abort the in-flight request");
   assert.ok(Date.now() - started < 2000, "the caller must be released promptly");
 });
 
 test("a completed enhancement is not turned into a timeout", async () => {
-  assert.equal(await withPromptEnhancementTimeout(Promise.resolve("ok"), 5000), "ok");
+  assert.equal(
+    await withPromptEnhancementTimeout(() => Promise.resolve("ok"), 5000),
+    "ok",
+  );
   await assert.rejects(
-    withPromptEnhancementTimeout(Promise.reject(new Error("provider 500")), 5000),
+    withPromptEnhancementTimeout(() => Promise.reject(new Error("provider 500")), 5000),
     /provider 500/,
   );
 });
@@ -192,6 +205,7 @@ test("the enhancement model and reasoning live on their own Model-page card", as
   assert.match(card, /promptEnhancementProviderId/);
   assert.match(card, /promptEnhancementModelId/);
   assert.match(card, /promptEnhancementModelFollow/);
+  assert.match(card, /promptEnhancementModelUnavailable/);
   assert.match(card, /pickModel/);
 
   // The rows use the shared settings row, not an ad-hoc layout.
@@ -206,10 +220,9 @@ test("the reasoning row follows the selected model's real ladder", async () => {
   assert.match(card, /thinkingLevelForProvider/);
   assert.match(card, /reasoningProvider/);
   assert.match(card, /levelOptions/);
-  // A pinned model narrows the list; only an unpinned model falls back to all.
-  assert.match(card, /reasoningProvider \? reasoningLevels : \[\.\.\.THINKING_LEVELS\]/);
-  // A model without reasoning disables the row rather than offering levels.
-  assert.match(card, /disabled=\{levelOptions\.length === 0\}/);
+  // A pinned model without reasoning still lists `off` and disables the row.
+  assert.match(card, /noReasoning/);
+  assert.match(card, /disabled=\{noReasoning\}/);
   // Switching model re-clamps the stored level onto the new model.
   const pickModel = card.slice(card.indexOf("const pickModel"), card.indexOf("return ("));
   assert.match(pickModel, /thinkingLevelForProvider\(nextProvider, stored\)/);
@@ -223,6 +236,7 @@ test("the model-page copy exists in both reference locales", () => {
       "promptEnhancementModelTitle",
       "promptEnhancementModel",
       "promptEnhancementModelFollow",
+      "promptEnhancementModelUnavailable",
       "promptEnhancementThinking",
       "promptEnhancementThinkingDesc",
       "promptEnhancementThinkingOff",

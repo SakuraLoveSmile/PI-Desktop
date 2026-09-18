@@ -249,6 +249,7 @@ export const zhCN = {
     speakSaved: "朗读音频已保存到 {{path}}",
     undoEnhancement: "撤回增强",
     enhancementFailed: "提示词增强失败",
+    enhancementTimeout: "改写超时。请重试，或在设置里换一个更快的增强模型。",
     dismissEnhancementError: "关闭增强错误",
     sendWhileRunning: "发送后续消息 · {{shortcut}} 立即转向",
     steeringUnavailable: "当前轮已无法接收转向输入，草稿已保留。",
@@ -1201,6 +1202,7 @@ sklm: {
       "改写时使用的思考强度。默认关闭，最快。",
     promptEnhancementThinkingOff: "关闭思考",
     promptEnhancementModelFollow: "跟随当前模型",
+    promptEnhancementModelUnavailable: "不可用 — 增强时会回退到当前模型",
     promptEnhancementUserTemplate: "用户模板",
     promptEnhancementUserTemplateDesc:
       "用于包裹草稿。必须包含草稿变量，请用插入按钮写入。",
@@ -1208,6 +1210,7 @@ sklm: {
     promptEnhancementRestore: "恢复默认",
     promptEnhancementMissingDraftVariable:
       "用户模板必须包含草稿变量，否则草稿无法发送给模型。",
+    promptEnhancementTooLong: "用户模板最多 8000 个字符。",
     promptEnhancementSaveError: "无法保存提示词增强设置。",
   },
   project: {

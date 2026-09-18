@@ -256,6 +256,8 @@ export const ko = {
     speakSaved: "음성 파일을 {{path}}에 저장했습니다",
     undoEnhancement: "개선 취소",
     enhancementFailed: "프롬프트 개선 실패",
+    enhancementTimeout:
+      "재작성 시간이 초과되었습니다. 다시 시도하거나 설정에서 더 빠른 향상 모델로 바꾸세요.",
     dismissEnhancementError: "프롬프트 개선 오류 닫기",
     sendWhileRunning: "후속 메시지 보내기 · {{shortcut}}로 방향 수정",
     steeringUnavailable: "현재 턴에 지시를 추가할 수 없습니다. 초안은 유지됩니다.",
@@ -1217,6 +1219,7 @@ sklm: {
       "재작성에 사용할 추론 강도입니다. 기본값은 끄기이며 가장 빠릅니다.",
     promptEnhancementThinkingOff: "끄기(추론 없음)",
     promptEnhancementModelFollow: "현재 모델 따르기",
+    promptEnhancementModelUnavailable: "사용할 수 없음 — 향상 시 현재 모델로 대체됩니다",
     promptEnhancementUserTemplate: "사용자 템플릿",
     promptEnhancementUserTemplateDesc:
       "초안을 감쌉니다. 초안 변수를 반드시 포함해야 하며, 삽입 버튼으로 넣으세요.",
@@ -1224,6 +1227,7 @@ sklm: {
     promptEnhancementRestore: "기본값 복원",
     promptEnhancementMissingDraftVariable:
       "사용자 템플릿에 초안 변수가 있어야 하며, 없으면 초안을 보낼 수 없습니다.",
+    promptEnhancementTooLong: "사용자 템플릿은 최대 8000자입니다.",
     promptEnhancementSaveError: "프롬프트 향상 설정을 저장하지 못했습니다.",
   },
   project: {

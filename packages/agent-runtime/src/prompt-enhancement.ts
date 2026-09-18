@@ -80,6 +80,17 @@ export function stripWrappingQuotes(text: string): string {
 }
 
 /**
+ * Few-shot examples used to teach `Enhanced:` / `Output:` labels. Strip a
+ * leading copy of that label so it cannot land in the Composer.
+ */
+const LEADING_REWRITE_LABEL =
+  /^(?:enhanced|output|after|rewrite|rewritten|增强(?:提示词)?|輸出|输出|改写|改寫)\s*[:：]\s*/i;
+
+export function stripEnhancementDecorations(text: string): string {
+  return stripWrappingQuotes(text).replace(LEADING_REWRITE_LABEL, "").trim();
+}
+
+/**
  * Run one independent completion with no session history or tools.
  * Provider setup retries follow the same controller as the agent runtime.
  */
@@ -101,7 +112,7 @@ export async function enhancePromptDraft(
       emptyErrorMessage: "The model returned an empty enhanced draft.",
     },
   );
-  const stripped = stripWrappingQuotes(result.text);
+  const stripped = stripEnhancementDecorations(result.text);
   if (!stripped) {
     // A quote-only answer is not a usable rewrite: keep the same terminal
     // classification the empty-completion path uses.

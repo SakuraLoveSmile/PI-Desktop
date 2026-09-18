@@ -47,7 +47,7 @@ REWRITE PRINCIPLES:
 - Make a substantive improvement: state the task, scope, constraints, and expected output explicitly.
 - Replace vague wording with verifiable requirements.
 - Prefer WHAT over HOW: do not prescribe an implementation the draft does not ask for.
-- Keep the enhanced prompt concise: do not expand beyond roughly twice the draft's length, and never beyond about 800 characters.
+- Keep the enhanced prompt concise: do not expand beyond roughly twice the draft's length. A long draft may stay long; do not compress it just to be short.
 - If the draft is already clear, sharpen it instead of returning it unchanged.
 
 DO NOT:
@@ -70,7 +70,9 @@ OUTPUT:
  * Default user template. The draft stays inside `<draft>` tags so draft text
  * reads as content to improve, never as instructions. The examples cover
  * Chinese, English, mixed-language input, and the language-meta-note failure
- * that the old single-line prompt did not guard against.
+ * that the old single-line prompt did not guard against. Example answers are
+ * bare rewritten prompts — no `Enhanced:` / `Output:` label — so the model
+ * does not copy a prefix into the Composer.
  */
 export const PROMPT_ENHANCEMENT_DEFAULT_USER_TEMPLATE = `<draft>
 ${PROMPT_ENHANCEMENT_DRAFT_VARIABLE}
@@ -82,20 +84,20 @@ Language: match the draft's language exactly, including a natural mix when the d
 
 Output: only the enhanced prompt. No explanation, preamble, heading, label, code fence, or wrapping quotation marks. Never end with an unfinished list, a dangling conjunction, or a trailing colon.
 
-Examples:
+Examples — each line after an <example-draft> is the entire answer. Copy no label.
 
-Draft: 帮我看看这段代码
-Enhanced: 请审查这段代码的正确性、边界情况和可读性，指出具体位置，并说明每个问题的修复方向。
+<example-draft>帮我看看这段代码</example-draft>
+请审查这段代码的正确性、边界情况和可读性，指出具体位置，并说明每个问题的修复方向。
 
-Draft: fix the login bug
-Enhanced: Fix the login bug: identify the failing code path, explain the root cause, and apply a minimal fix while keeping the current behavior. State how the fix can be verified.
+<example-draft>fix the login bug</example-draft>
+Fix the login bug: identify the failing code path, explain the root cause, and apply a minimal fix while keeping the current behavior. State how the fix can be verified.
 
-Draft: 这个函数有点慢，can you make it faster
-Enhanced: 这个函数执行较慢。请分析性能瓶颈（复杂度与热点调用），说明原因，给出优化后的实现，并保持现有行为不变。
+<example-draft>这个函数有点慢，can you make it faster</example-draft>
+这个函数执行较慢。请分析性能瓶颈（复杂度与热点调用），说明原因，给出优化后的实现，并保持现有行为不变。
 
-Draft: 帮我搞一下那个东西
-Bad output (never emit this): "The draft is in Chinese, so the response must be in Chinese." followed by the draft unchanged.
-Good output: 请说明要处理的具体对象、期望的输出格式、可接受的约束条件与验收标准；如果缺少必要信息，先列出需要我补充的内容再开始。`;
+<example-draft>帮我搞一下那个东西</example-draft>
+Never emit: "The draft is in Chinese, so the response must be in Chinese." followed by the draft unchanged.
+请说明要处理的具体对象、期望的输出格式、可接受的约束条件与验收标准；如果缺少必要信息，先列出需要我补充的内容再开始。`;
 
 /** The persisted user-template override, as stored on `AppSettings`. */
 export type PromptEnhancementTemplateOverrides = {

@@ -247,6 +247,8 @@ export const es = {
     "speakSaved": "Audio guardado en {{path}}",
     "undoEnhancement": "Deshacer mejora",
     "enhancementFailed": "Error en la mejora de solicitud",
+    "enhancementTimeout":
+      "La reescritura tardó demasiado. Vuelve a intentarlo o elige un modelo más rápido en Ajustes.",
     "dismissEnhancementError": "Descartar error de mejora",
     sendWhileRunning: "Enviar seguimiento · {{shortcut}} para orientar",
     steeringUnavailable: "Este turno ya no acepta indicaciones. Se conservó el borrador.",
@@ -1197,6 +1199,8 @@ sklm: {
       "Esfuerzo de razonamiento para la reescritura. Desactivado es el valor predeterminado y el más rápido.",
     "promptEnhancementThinkingOff": "Desactivado",
     "promptEnhancementModelFollow": "Seguir el modelo actual",
+    "promptEnhancementModelUnavailable":
+      "No disponible: la mejora usará el modelo actual",
     "promptEnhancementUserTemplate": "Plantilla de usuario",
     "promptEnhancementUserTemplateDesc":
       "Envuelve el borrador. Debe incluir la variable del borrador; use el botón de inserción.",
@@ -1204,6 +1208,7 @@ sklm: {
     "promptEnhancementRestore": "Restaurar predeterminado",
     "promptEnhancementMissingDraftVariable":
       "La plantilla de usuario debe contener la variable del borrador; de lo contrario el borrador no puede enviarse.",
+    "promptEnhancementTooLong": "La plantilla de usuario no puede superar los 8000 caracteres.",
     "promptEnhancementSaveError": "No se pudo guardar la configuración de mejora de prompts.",
   },
   "project": {

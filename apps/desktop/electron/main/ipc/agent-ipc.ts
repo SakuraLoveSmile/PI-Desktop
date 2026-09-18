@@ -177,11 +177,12 @@ export function registerAgentIpc({
         : {}),
     } as RuntimeProviderConfig;
     // A pin, a slow gateway, or a stalled connection would otherwise hold this
-    // promise open indefinitely. The transport only consults the signal between
-    // provider retries, so aborting is best-effort cancellation; racing the
-    // promise is what actually guarantees the caller is released on time.
-    const enhancedDraft = await withPromptEnhancementTimeout(
+    // promise open indefinitely. Aborting is best-effort (the transport only
+    // consults the signal between provider retries); racing the promise is what
+    // actually guarantees the caller is released on time.
+    const enhancedDraft = await withPromptEnhancementTimeout((signal) =>
       enhancePromptDraft(runtimeProvider, draft, launch.sidecarParams.thinkingLevel, {
+        signal,
         sessionId: launchSessionId,
         customTemplate: settings?.promptEnhancementCustomTemplate === true,
         userTemplate:

@@ -23,9 +23,9 @@ import type { AppSettings } from "@pi-desktop/shared";
 import {
   PROMPT_ENHANCEMENT_DEFAULT_USER_TEMPLATE,
   PROMPT_ENHANCEMENT_DRAFT_VARIABLE,
+  PROMPT_ENHANCEMENT_TEMPLATE_MAX_LENGTH,
   isValidPromptEnhancementUserTemplate,
 } from "@pi-desktop/shared";
-import { useAppStore } from "../../stores/app-store";
 import { Button, Field, TooltipButton, cx, portalOverlay } from "../../components/ui";
 import { IconPencil, IconX } from "../../components/icons";
 import { SettingsCard, SettingsRow } from "./primitives";
@@ -127,6 +127,8 @@ function PromptEnhancementEditorSheet({
   const templateMissingVariable =
     templateDraft.trim().length > 0 &&
     !isValidPromptEnhancementUserTemplate(templateDraft);
+  const templateTooLong =
+    [...templateDraft].length > PROMPT_ENHANCEMENT_TEMPLATE_MAX_LENGTH;
   const dirty =
     templateDraft !== (savedTemplate || PROMPT_ENHANCEMENT_DEFAULT_USER_TEMPLATE);
 
@@ -163,7 +165,7 @@ function PromptEnhancementEditorSheet({
   };
 
   const save = async () => {
-    if (templateMissingVariable || saving) return;
+    if (templateMissingVariable || templateTooLong || saving) return;
     setSaving(true);
     setSaveError(false);
     try {
@@ -215,7 +217,10 @@ function PromptEnhancementEditorSheet({
             className="ext-sheet-close"
             ariaLabel={t("common.close")}
             tooltip={t("common.close")}
-            onClick={onClose}
+            onClick={() => {
+              if (!saving) onClose();
+            }}
+            disabled={saving}
           >
             <IconX size={14} />
           </TooltipButton>
@@ -235,7 +240,7 @@ function PromptEnhancementEditorSheet({
               rows={8}
               onChange={(event) => setTemplateDraft(event.target.value)}
               aria-label={t("settings.promptEnhancementUserTemplate")}
-              aria-invalid={templateMissingVariable}
+              aria-invalid={templateMissingVariable || templateTooLong}
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="off"
@@ -245,6 +250,11 @@ function PromptEnhancementEditorSheet({
           {templateMissingVariable ? (
             <span className="settings-command-shell-state error" role="status">
               {t("settings.promptEnhancementMissingDraftVariable")}
+            </span>
+          ) : null}
+          {templateTooLong ? (
+            <span className="settings-command-shell-state error" role="status">
+              {t("settings.promptEnhancementTooLong")}
             </span>
           ) : null}
 
@@ -272,7 +282,7 @@ function PromptEnhancementEditorSheet({
             <Button
               variant="primary"
               type="button"
-              disabled={!dirty || saving || templateMissingVariable}
+              disabled={!dirty || saving || templateMissingVariable || templateTooLong}
               onClick={() => void save()}
             >
               {saving ? t("common.saving") : t("common.save")}

@@ -51,7 +51,9 @@ tags so draft text reads as content to improve rather than as instructions. The
 system prompt is not user-editable and states the role, the rewrite principles,
 an explicit do-not list (including leaving code, commands, file paths,
 identifiers, and other proper nouns exactly as written), language-following
-rules that forbid language meta notes, a length brake, and the output contract.
+rules that forbid language meta notes, a length brake (do not expand beyond
+roughly twice the draft's length; a long draft may stay long), and the output
+contract.
 
 No prior conversation, tools, attachments, or session state are included. The
 renderer removes its inline file-reference chip tokens before the request and
@@ -62,13 +64,14 @@ the existing bounded retry controller. When the resolved provider is OpenCode Go
 (or another `opencode.ai` host), the one-shot forwards the Composer session id
 as `x-opencode-session`; a request with no session gets a per-call id. Model
 output is consumed as plain text, has one matching pair of wrapping quotation
-marks removed, and is trimmed. Empty or whitespace-only output is a
-`PROMPT_ENHANCEMENT_EMPTY` failure.
+marks removed, has a leading rewrite label such as `Enhanced:` stripped, and is
+trimmed. Empty or whitespace-only output is a `PROMPT_ENHANCEMENT_EMPTY`
+failure.
 
-The handler bounds one request with a 60-second ceiling. The provider retry
-budget alone can spend about a minute, and the renderer offers no cancel, so on
-expiry the action fails with `TIMEOUT` and a message naming the budget and the
-setting to change. It does not silently retry on the session model: the user
+The handler bounds one request with a 60-second ceiling. On expiry it aborts
+the in-flight request (best-effort: the transport consults the signal between
+provider retries) and races the promise so the caller is released. The action
+fails with `TIMEOUT`. It does not silently retry on the session model: the user
 chose the pinned model, and a hidden second attempt would double the wait.
 
 ## 4. Failure and race handling
@@ -145,10 +148,11 @@ The card's model row is titled `Default model` and uses the same anchored,
 searchable menu as the Defaults card's row, so the page shows one kind of model
 picker. Both rows therefore read `Default model`; the card heading is what
 separates the conversation's default from the enhancement's. When
-`promptEnhancementProviderId` is set, main prefers that pin and logs a warning
-plus falls back to the Composer's current model if the pin cannot be resolved: a
-stale pin is a preference that cannot be honoured, never a failure that disables
-the action.
+`promptEnhancementProviderId` is set, the row still shows that pin even if the
+provider is gone or disabled, with an unavailable hint. Main prefers the pin
+and logs a warning plus falls back to the Composer's current model if it cannot
+be resolved: a stale pin is a preference that cannot be honoured, never a
+failure that disables the action.
 
 The reasoning row lists the levels the selected model actually supports, using
 the same resolution the Composer applies to a turn: the model binding's

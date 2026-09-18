@@ -52,11 +52,12 @@ The enhancement carries its own reasoning level through
 `AppSettings.promptEnhancementThinkingLevel`, defaulting to `off`, and never
 inherits the conversation's effort: a rewrite rarely benefits from reasoning and
 reasoning is the slow path. The row lists only the levels the selected model
-supports and disables itself when that set is empty, resolving them exactly as a
-turn does (binding, then catalog, then provider default). The chosen level is
-clamped by that ladder, and switching model re-clamps the stored value. One request is bounded by a 60-second ceiling, because the
-provider retry budget alone can spend about a minute and the renderer has no
-cancel; expiry fails with `TIMEOUT` rather than retrying on the session model.
+supports and still shows `Off (no reasoning)` when that set is empty, resolving
+them exactly as a turn does (binding, then catalog, then provider default). The
+chosen level is clamped by that ladder, and switching model re-clamps the stored
+value. One request is bounded by a 60-second ceiling: expiry aborts the
+in-flight call (best-effort) and races the promise so the renderer is released,
+then fails with `TIMEOUT` rather than retrying on the session model.
 
 The enhancement model and its reasoning level are configured on the Model
 configuration page, in their own card titled "Enhancement prompt", because both

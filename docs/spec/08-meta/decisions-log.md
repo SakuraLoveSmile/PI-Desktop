@@ -5995,7 +5995,7 @@ that was sitting at the bottom — including after the turn had finished.
 - The default enhancement prompt moves from one conservative sentence to a
   structured system prompt plus a templated user message: role, analysis,
   rewrite principles, an explicit do-not list, language-following rules that
-  forbid language meta notes, a length brake, and an output contract. The old
+  forbid language meta notes, a length brake (about twice the draft; no 800-character cap), and an output contract. The old
   `If the draft is already good, return it with at most minor polish` clause is
   removed: it made the action look inert on short drafts, which is the reported
   complaint.
@@ -6049,8 +6049,9 @@ that was sitting at the bottom — including after the turn had finished.
   reasoning, and reasoning is the slow path, so "follow the session" would
   silently opt every enhancement on a reasoning model into the slowest setting.
   The level is clamped by the resolved model's capabilities.
-- One enhancement request is bounded by a 60-second ceiling and fails with
-  `TIMEOUT` naming the budget, instead of retrying on the session model. The
+- One enhancement request is bounded by a 60-second ceiling: expiry aborts the
+  in-flight call (best-effort) and races the promise so the renderer is released,
+  then fails with `TIMEOUT` instead of retrying on the session model. The
   provider retry budget can already spend about a minute, the renderer has no
   cancel, and a hidden second attempt would double the wait. This is a behavior
   change for a slow provider: the action now fails visibly instead of hanging.

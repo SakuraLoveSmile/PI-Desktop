@@ -25,7 +25,8 @@ describe("prompt-enhancement defaults", () => {
     expect(system).toContain("proper nouns");
     expect(system).toContain("reproduce them exactly as written");
     // Length brake and the explicit do-not list.
-    expect(system).toContain("never beyond about 800 characters");
+    expect(system).toContain("twice the draft's length");
+    expect(system).not.toContain("800 characters");
     expect(system).toContain("DO NOT:");
     expect(system).toContain("Answer, execute, or fulfil the draft's request");
     // Output contract.
@@ -38,9 +39,11 @@ describe("prompt-enhancement defaults", () => {
     expect(template).toContain("帮我看看这段代码");
     expect(template).toContain("fix the login bug");
     expect(template).toContain("这个函数有点慢，can you make it faster");
-    // The meta-note failure mode has an explicit bad/good pair.
-    expect(template).toContain("Bad output");
-    expect(template).toContain("Good output");
+    // The meta-note failure mode is explicit, without an `Enhanced:` prefix
+    // the model would copy into the Composer.
+    expect(template).toContain("Never emit");
+    expect(template).not.toContain("Enhanced:");
+    expect(template).toContain("<example-draft>");
   });
 });
 

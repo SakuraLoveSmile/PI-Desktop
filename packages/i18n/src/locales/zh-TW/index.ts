@@ -249,6 +249,7 @@ export const zhTW = {
     speakSaved: "朗讀音訊已儲存到 {{path}}",
     undoEnhancement: "撤回增強",
     enhancementFailed: "提示詞增強失敗",
+    enhancementTimeout: "改寫逾時。請重試，或在設定中改用更快的增強模型。",
     dismissEnhancementError: "關閉增強錯誤",
     sendWhileRunning: "傳送後續訊息 · {{shortcut}} 立即轉向",
     steeringUnavailable: "目前回合已無法接收轉向輸入，草稿已保留。",
@@ -1201,6 +1202,7 @@ sklm: {
       "改寫時使用的思考強度。預設關閉，最快。",
     promptEnhancementThinkingOff: "關閉思考",
     promptEnhancementModelFollow: "跟隨目前模型",
+    promptEnhancementModelUnavailable: "無法使用 — 增強時會回退到目前模型",
     promptEnhancementUserTemplate: "使用者範本",
     promptEnhancementUserTemplateDesc:
       "用於包裹草稿。必須包含草稿變數，請用插入按鈕寫入。",
@@ -1208,6 +1210,7 @@ sklm: {
     promptEnhancementRestore: "恢復預設",
     promptEnhancementMissingDraftVariable:
       "使用者範本必須包含草稿變數，否則草稿無法傳送給模型。",
+    promptEnhancementTooLong: "使用者範本最多 8000 個字元。",
     promptEnhancementSaveError: "無法儲存提示詞增強設定。",
   },
   project: {
