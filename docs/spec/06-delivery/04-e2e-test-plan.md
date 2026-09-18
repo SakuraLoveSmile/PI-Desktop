@@ -10839,7 +10839,8 @@ are withdrawn with ADR 0165.
     write shows an error toast instead of a success toast.
   - Modifier clicks continue to open links externally regardless of the setting.
   - Plugin/settings clicks that want the work panel return to chat so the
-    dock is visible. A missing session falls back to the OS browser.
+    dock is visible, without recording a navigation hop. A missing session
+    falls back to the OS browser.
   - Workspace HTML preview, BrowserPreview, OAuth, and Feedback keep their
     existing destinations.
 - **Specs linked**: `04-ux/06-settings-ia.md`,

@@ -17,6 +17,34 @@ export function canPresentWorkPanelBrowser(state: {
   return Boolean(state.activeSessionId);
 }
 
+export type HttpUrlOpenPlan =
+  | { action: "ignore" }
+  | { action: "external"; url: string }
+  | { action: "workpanel"; url: string; returnToChat: boolean };
+
+/** Decide where an HTTP(S) click goes. Non-HTTP strings are ignored. */
+export function planHttpUrlOpen(
+  url: string,
+  state: {
+    settings?: { linkOpenTarget?: string | null } | null;
+    activeSessionId?: string | null;
+    page?: string | null;
+  },
+): HttpUrlOpenPlan {
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return { action: "ignore" };
+  const wantsWorkPanel =
+    resolveLinkOpenTarget(state.settings?.linkOpenTarget) === "workpanel";
+  if (wantsWorkPanel && canPresentWorkPanelBrowser(state)) {
+    return {
+      action: "workpanel",
+      url: trimmed,
+      returnToChat: state.page !== "chat",
+    };
+  }
+  return { action: "external", url: trimmed };
+}
+
 /**
  * Open an HTTP(S) URL using Settings → AI → Link open destination.
  *
@@ -24,20 +52,19 @@ export function canPresentWorkPanelBrowser(state: {
  * "Open in work panel" item) keeps calling `openUrlInWorkPanel` directly.
  *
  * Plugin/settings pages cover or unmount the dock, so a work-panel destination
- * returns to chat first. A missing session falls back to the OS browser.
+ * returns to chat first without recording a navigation hop. A missing session
+ * falls back to the OS browser.
  */
 export function openHttpUrl(url: string): void {
-  const trimmed = url.trim();
-  if (!/^https?:\/\//i.test(trimmed)) return;
   const state = useAppStore.getState();
-  const wantsWorkPanel =
-    resolveLinkOpenTarget(state.settings?.linkOpenTarget) === "workpanel";
-  if (wantsWorkPanel && canPresentWorkPanelBrowser(state)) {
-    if (state.page !== "chat") {
-      state.setPage("chat");
+  const plan = planHttpUrlOpen(url, state);
+  if (plan.action === "ignore") return;
+  if (plan.action === "workpanel") {
+    if (plan.returnToChat) {
+      state.setPage("chat", { record: false });
     }
-    state.openUrlInWorkPanel(trimmed);
+    state.openUrlInWorkPanel(plan.url);
     return;
   }
-  void api.browserOpenExternal(trimmed);
+  void api.browserOpenExternal(plan.url);
 }
