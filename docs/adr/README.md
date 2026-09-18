@@ -311,4 +311,5 @@ Each ADR includes:
 | 0282 | [Retry and right-size the compaction summary before retained-tail recovery](0282-compaction-summary-retry-and-sizing.md) | Accepted (amends ADR 0049; issue #543) |
 | 0283 | [Headless runtime boundary in `packages/host-runtime`](0283-headless-runtime-boundary.md) | Accepted for implementation (D447; ADR 0205 R2 prerequisite) |
 | 0284 | [`RACP-WS` transport in `packages/racp`](0284-racp-ws-transport.md) | Accepted for implementation (D448; ADR 0205 R2) |
+| 0285 | [Remote-host desktop kernel](0285-remote-host-desktop-kernel.md) | Accepted for implementation (D449; ADR 0205 R2) |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |
