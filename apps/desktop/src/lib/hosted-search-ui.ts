@@ -15,11 +15,8 @@ export function hostedSearchHost(url: string): string {
 export function hostedSearchFaviconCandidates(url: string): string[] {
   try {
     const parsed = new URL(url);
-    const host = parsed.hostname;
-    const remote = `https://a.favicon.im/${encodeURIComponent(host)}?larger=true`;
-    return parsed.protocol === "https:"
-      ? [`${parsed.origin}/favicon.ico`, remote]
-      : [remote];
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return [];
+    return [`${parsed.origin}/favicon.ico`];
   } catch {
     return [];
   }
@@ -90,11 +87,7 @@ export function sourcesForHref(
     }
     return matched;
   }
-  const direct = sources.filter((source) => urlsReferToSameSource(source.url, href));
-  if (direct.length > 0) return direct;
-  const host = hostedSearchHost(href);
-  if (!host) return [];
-  return sources.filter((source) => hostedSearchHost(source.url) === host);
+  return sources.filter((source) => urlsReferToSameSource(source.url, href));
 }
 
 export function openChatHttpUrl(url: string): void {

@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const {
+  hostedSearchFaviconCandidates,
   hostedSearchTitle,
   rewriteInlineCitationMarkup,
   sourcesForHref,
@@ -61,3 +62,30 @@ test("resolves #cite indices as 1-based source rows", () => {
   const matched = sourcesForHref("#cite=4", sources);
   assert.equal(matched[0]?.url, "https://www.bing.com/search?q=tibo");
 });
+
+test("resolves markdown links only when host and path match a source", () => {
+  const matched = sourcesForHref("https://example.com/a", sources);
+  assert.equal(matched.length, 1);
+  assert.equal(matched[0]?.url, "https://example.com/a");
+});
+
+test("does not turn same-host different-path links into citations", () => {
+  assert.deepEqual(sourcesForHref("https://example.com", sources), []);
+  assert.deepEqual(sourcesForHref("https://example.com/other", sources), []);
+});
+
+test("loads favicons only from the source origin", () => {
+  assert.deepEqual(hostedSearchFaviconCandidates("https://news.example.com/c"), [
+    "https://news.example.com/favicon.ico",
+  ]);
+  assert.deepEqual(hostedSearchFaviconCandidates("http://example.com/a"), [
+    "http://example.com/favicon.ico",
+  ]);
+  assert.ok(
+    hostedSearchFaviconCandidates("https://news.example.com/c").every(
+      (src) => !src.includes("favicon.im"),
+    ),
+  );
+  assert.deepEqual(hostedSearchFaviconCandidates("file:///tmp/x"), []);
+});
+
