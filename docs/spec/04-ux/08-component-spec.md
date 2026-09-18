@@ -1019,6 +1019,9 @@ entirely inside the plugin's isolated page:
   context the viewport-fixed toggle and `Cmd/Ctrl + J` reveal, so a successful
   workspace Write/Edit cannot open, activate, or resize the panel in any
   session.
+  The plan/goal approval artifact still creates or activates a tab in its
+  originating session, but the host picks its surface: the bundled file view when
+  that view is launchable, otherwise the host file tab (D452).
   The viewport-fixed toggle and `Cmd/Ctrl + J` both toggle the active session's
   retained panel context: they reveal the panel without creating a resource and
   collapse the visible panel without deleting one. With no active session the
@@ -2386,10 +2389,12 @@ execution permission mode, not an individual tool call.
 ### 10A.2 Content
 
 The card renders the structured title and an opener for the exact
-`.pi/<kind>/*.md` path. Opening the artifact reads the host-written file;
-renderer edits do not change the approved bytes. The submitted question/
-description, status, validity/deadline, inline Markdown, SHA-256, byte size,
-and revision/feedback controls are not rendered card content.
+`.pi/<kind>/*.md` path; the opener prefers the bundled file view and falls back
+to the host file tab when that view is not launchable (D452). Opening the
+artifact reads the host-written file; renderer edits do not change the approved
+bytes. The submitted question/description, status, validity/deadline, inline
+Markdown, SHA-256, byte size, and revision/feedback controls are not rendered
+card content.
 
 ### 10A.3 Actions and states
 

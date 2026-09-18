@@ -854,6 +854,9 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
    `.pi/plan/*.md` or `.pi/goal/*.md` artifact, records its path/hash/size and structured
    title/question, and the renderer displays the shared contract approval card with
    only the title and artifact opener; the question remains host-side contract data.
+   The opener hands that path to the bundled file view when it is launchable and to
+   the host file tab otherwise, so the artifact opens beside the conversation in the
+   same view the user's other project files use (D452).
 4. Approve requires Ask / Accept edits / Auto selection. The renderer remembers
    the last selected mode on this device and uses it as the next approval's
    default. Host-core commits the approval, `mode = agent`, permission mode,

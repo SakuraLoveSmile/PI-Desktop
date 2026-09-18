@@ -166,7 +166,10 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.doesNotMatch(transcriptSource, /PlanApprovalCard|plan-approval-card/);
   assert.doesNotMatch(transcriptSource, /\bpendingPlan\b/);
   assert.match(storeSource, /openPlanArtifact/);
-  assert.match(storeSource, /fileWorkPanelTab\(relativePath\)/);
+  assert.match(
+    storeSource,
+    /preferredFileWorkPanelTab\(relativePath, pluginViews\)/,
+  );
   assert.match(barSource, /const isPending = proposal\.status === "pending"/);
   const resolveBlock = interactionSource.slice(interactionSource.indexOf("resolvePlan: async"));
   assert.match(resolveBlock, /await api\.resolvePlan\(resolution\)/);
