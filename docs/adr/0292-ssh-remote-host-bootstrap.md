@@ -1,4 +1,4 @@
-# ADR 0291: SSH bootstrap for remote hosts
+# ADR 0292: SSH bootstrap for remote hosts
 
 - Status: Accepted for implementation
 - Date: 2026-09-19

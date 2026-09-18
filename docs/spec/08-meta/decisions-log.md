@@ -6097,6 +6097,29 @@ that was sitting at the bottom — including after the turn had finished.
 - See ADR 0038 and E2E-024K; `apps/desktop/test/plugin-mcp.test.mjs` covers the
   whole catalog, each guard, and the old truncation as a failing baseline.
 
+## 2026-09-19 — The Voice settings card is removed (ADR 0291)
+
+- Settings → AI no longer carries a speech section: `VoiceSettingsCard` and
+  `features/settings/voice-settings.tsx`, the AI destination's
+  `settings.speechTitle` / `settings.speechTranscribe` / `settings.speechSynthesize`
+  search keywords, the `.settings-speech-*` styles, the thirteen
+  `settings.speech*` keys in all eight shipped locale catalogs, and the seven
+  unreferenced `chat.transcribe*` / `chat.speak*` keys written for those
+  withdrawn Composer controls are gone.
+- The host capability stays: `speech/getStatus`, `speech/transcribe`,
+  `speech/synthesize`, `AppSettings.speech` validation, the two built-in
+  protocols, the `speech.adapter.register` plugin permission, and the renderer
+  API bridge are unchanged. A binding is written by a caller through the host
+  settings API, and plugins and IPC calls are its only consumers.
+- Already withdrawn, and repaired here in the docs: ADR 0281 item 5's Composer
+  transcription and draft-speech entry point — its mic and read-aloud controls
+  were removed on 2026-09-18 (`344ef4ec2`, PR #555) — and the Composer speech
+  controls `04-ux/08-component-spec.md` §2.5 described. The copy written for them
+  is retired with them.
+- Renderer only: no IPC channel, storage schema, host RPC, permission, or Rust
+  change, and no stored binding is dropped. See ADR 0291,
+  `04-ux/06-settings-ia.md`, `03-runtime/20-speech.md`, E2E-008e.
+
 ## 2026-09-19 — SSH bootstrap for remote hosts (D453)
 
 - The desktop installs and pairs a `pi-host` on a machine the user already
@@ -6128,5 +6151,5 @@ that was sitting at the bottom — including after the turn had finished.
   relay (Stage 6), the resync watchdog, non-Linux and Windows remote targets,
   and provider configuration over the SSH channel — a freshly bootstrapped host
   still fails `turn/start` closed with `MODEL_NOT_CONFIGURED` until a provider is
-  configured on it. See ADR 0291, `06-delivery/07-remote-control-rollout.md` §7,
+  configured on it. See ADR 0292, `06-delivery/07-remote-control-rollout.md` §7,
   and `05-security/02-remote-control-security.md` §3.4.

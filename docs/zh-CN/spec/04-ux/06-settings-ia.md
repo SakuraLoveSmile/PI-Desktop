@@ -101,7 +101,9 @@
   「跟随输入框当前模型」。因此会有两行都题为「默认模型」，靠各自卡片标题区分。思考
   强度行是一个菜单选择器，列出所选模型实际支持的等级（不支持时该行仍显示「关闭思考」并禁用），默认「关闭
   思考」，且不提供「跟随会话」项。设置搜索会索引该卡与这两行。
-- **语音**卡：默认转写/朗读绑定（`AppSettings.speech`）。未配置时 Composer 对应入口禁用。Whisper / TTS 不进聊天模型列表。见 `20-speech.md`。
+- 语音绑定（`AppSettings.speech`）**不属于设置页面**（ADR 0291）。宿主仍保留语音能力与
+  `speech/*` IPC，供插件和已存绑定使用；这里不再提供转写/朗读的服务、协议、模型或音色
+  选择，设置搜索也不再索引语音相关键。
 - **默认项**卡中的**命令 Shell**行：主机发现的本机 PowerShell 5.1、PowerShell 7、
   cmd、Git Bash 和 ID 为 `windows-powershell`、`windows-pwsh`、`cmd`、`git-bash`
   的 Bash 和

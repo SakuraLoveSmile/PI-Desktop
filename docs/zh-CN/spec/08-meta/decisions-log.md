@@ -4434,6 +4434,13 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - `plugin.mcp.tools.truncated` 已移除。拒绝会以 `plugin.mcp.connect` / `mcp.connect` 记入审计并带上护栏的错误码与消息，对用户自建的服务器则显示为其状态消息。
 - 见 ADR 0038 与 E2E-024K；`apps/desktop/test/plugin-mcp.test.mjs` 覆盖完整目录、各项护栏，以及把旧的截断行为作为失败基线。
 
+## 2026-09-19 —— 移除设置页面的语音卡片（ADR 0291）
+
+- 设置 → AI 不再有语音区块：`VoiceSettingsCard` 与 `features/settings/voice-settings.tsx`、AI 目的地的 `settings.speechTitle` / `settings.speechTranscribe` / `settings.speechSynthesize` 搜索关键词、`.settings-speech-*` 样式、八种出厂语言各十三条 `settings.speech*` 文案，以及为已撤回 Composer 控件所写、无任何引用的七个 `chat.transcribe*` / `chat.speak*` 文案全部删除。
+- 宿主能力保留：`speech/getStatus`、`speech/transcribe`、`speech/synthesize`、`AppSettings.speech` 校验、两个内置协议、`speech.adapter.register` 插件权限与渲染器 API 桥接均未改动。绑定由调用方通过宿主设置接口写入，插件与 IPC 调用是其唯一消费方。
+- 早已撤回、本次一并修正文档：ADR 0281 第 5 条中的 Composer 转写与朗读入口（其麦克风与朗读控件已于 2026-09-18 在 `344ef4ec2`／PR #555 中移除），以及 `04-ux/08-component-spec.md` §2.5 描述的 Composer 语音控件；为它们写下的文案随之退役。
+- 仅渲染层：无 IPC 通道、存储 schema、宿主 RPC、权限或 Rust 改动，也不会丢弃已存绑定。见 ADR 0291、`04-ux/06-settings-ia.md`、`03-runtime/20-speech.md`、E2E-008e。
+
 ## 2026-09-19 —— 远端主机的 SSH 引导（D453）
 
 - 桌面用系统 `ssh` 客户端在用户已能通过 SSH 到达的机器上安装并配对 `pi-host`，因此 `~/.ssh/config`、agent 与跳板机照常生效，应用不持有任何 SSH 密钥；`BatchMode=yes` 让需要交互式密码或口令短语的主机立即以带类型的错误失败，而不是把模态框吊在一个不可见的提示后面。
@@ -4441,4 +4448,4 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 脚本以 `umask 077` 运行并回显 `PI_HOST_READY` / `PI_HOST_PAIRING_TOKEN`，因此一次性配对令牌只存在于工作文件和 SSH 通道上，既不落在全局可读路径，也不出现在 URL 中（安全规格 §3.4）。`PI_HOST_READY.version` 必须与桌面版本一致；不一致为 `HOST_VERSION_MISMATCH`（D375），并在建立转发之前就已检查。
 - 已配对主机的记录改存 SSH 描述符（`metadata.transport = "ssh"`）而非 URL，因为本地转发端口在每次启动间并不稳定；隧道管理器在每次启动时重新建立 `ssh -N -L`，并收编（adopt）引导自己打开的存活转发，使配对只建立一条隧道。描述符在每次读取注册表时都会重新校验，格式不合规时降级为「非 SSH 主机」，而不会用垃圾参数去 spawn `ssh`。
 - `pi-desktop/remoteHost/bootstrap` 加入 `list` / `pair` / `remove`，`connection/pair` 交换被抽成单一的 `exchangePairingToken`，粘贴 URL 与 SSH 引导两条路径共用。
-- 本次不做：终端工作面板客户端（Stage 5）、反向工具中继（Stage 6）、resync 看门狗、非 Linux 与 Windows 远端目标，以及经 SSH 通道下发 provider 配置 —— 刚引导好的主机在配置 provider 之前，`turn/start` 仍以 `MODEL_NOT_CONFIGURED` 关闭。见 ADR 0291、`06-delivery/07-remote-control-rollout.md` §7 与 `05-security/02-remote-control-security.md` §3.4。
+- 本次不做：终端工作面板客户端（Stage 5）、反向工具中继（Stage 6）、resync 看门狗、非 Linux 与 Windows 远端目标，以及经 SSH 通道下发 provider 配置 —— 刚引导好的主机在配置 provider 之前，`turn/start` 仍以 `MODEL_NOT_CONFIGURED` 关闭。见 ADR 0292、`06-delivery/07-remote-control-rollout.md` §7 与 `05-security/02-remote-control-security.md` §3.4。
