@@ -237,7 +237,6 @@ then checks the identity, code-signing integrity (including
 tickets before any artifact upload. The per-architecture `latest-mac.yml` files
 are renamed before upload; the publish job merges them into one feed after
 downloading both artifacts.
-the publish job merges them into one feed after downloading both artifacts.
 
 The shared electron-builder configuration applies the architecture-labelled
 pattern at the macOS platform level for ZIPs and overrides it at the DMG target
@@ -329,6 +328,77 @@ base64 -i developer-id-application.p12 | pbcopy
 
 On Linux use `base64 -w0 developer-id-application.p12`. Files that must never
 enter git: `*.p12`, `*.cer`, `*.p8`, `*.mobileprovision`.
+
+### 4.6 macOS signing observability and timeouts
+
+`electron-builder` prints one line before signing — `signing
+file=release/mac-arm64/PI-Desktop.app platform=darwin type=distribution
+identityName=...` — and then nothing until the phase is over. Three mechanisms
+hide in that gap, and the macOS lanes now expose all three:
+
+| Point in the phase | What happens | How it is visible |
+|---|---|---|
+| Walk | `@electron/osx-sign` walks `PI-Desktop.app/Contents` and collects every Mach-O file plus nested `.app` and `.framework` bundles | `DEBUG=electron-osx-sign*` prints `Walking... <dir>`; `scripts/macos-bundle-inventory.mjs` prints the same bundle's counts right after packaging |
+| Per-file signing | `codesign --force --sign <identity> --timestamp --entitlements ... <file>` runs serially, deepest file first, the app bundle last | `DEBUG=electron-osx-sign*` prints `Signing... <file>` and `Executing... <file> codesign ...`; the codesign shim times every invocation. If a keychain ever refuses to hand the key to a wrapped `codesign`, `PI_SIGNING_NO_CODESIGN_SHIM=1` runs the phase without the shim |
+| Silent retry | A failing pass is retried up to three more times with a 5s/10s/15s backoff and no log line | The watchdog's `codesign-calls` and `failures` lines expose repeated passes |
+| App notarization | `@electron/notarize` zips the app, uploads it, and waits for Apple's queue (`mac.notarize=true`) | `DEBUG=electron-notarize*` prints `zipping application to`, `attempting to upload file to Apple`, `notarization success`, then electron-builder prints `notarization successful` |
+| DMG notarization | The DMG carries its own signature, so the next step submits it again with `xcrun notarytool submit --wait` | The same watchdog keeps that wait observable and bounded |
+
+`scripts/macos-signing-watchdog.mjs` wraps both long phases. It forwards every
+child line with a `[sign] ` prefix and keeps the child's exit code, so the
+failure semantics of the lane do not change. stdout and stderr are forwarded as
+two independent streams, so their relative order can differ from a direct run,
+and the child receives no stdin. It prints a heartbeat while the
+child is silent (elapsed time, phase, last file, active codesign target), dumps
+diagnostics when the phase produces no output and no codesign activity for
+`PI_SIGNING_STALL_SECONDS` (the last file, the `ps` state of the signing
+processes, the codesign log tail), and reports per-file codesign timings — call
+count, total, p50, p95, maximum, and the slowest files — in a `[sign] summary`
+block. The knobs:
+
+| Setting | Default | Effect |
+|---|---|---|
+| `PI_SIGNING_TIMEOUT_SECONDS` | 2400 (CI: 1800 packaging, 1200 DMG) | Hard limit for the wrapped phase: diagnostics are dumped, the process group is killed, and the step exits 124 instead of hanging |
+| `PI_SIGNING_STALL_SECONDS` | 300 | Silence with no codesign activity for this long triggers one diagnostics dump; the phase keeps running, because Apple's notarization queue is a legitimate wait |
+| `PI_SIGNING_HEARTBEAT_SECONDS` | 60 | Heartbeat interval while the child produces no output |
+| `DEBUG` | `electron-osx-sign*,electron-notarize*` | Namespaces that expose walking, per-file signing, and notarization progress |
+
+`DEBUG` lists only the two namespaces that sanitize their own command lines,
+because `electron-builder`'s namespace is not safe here: builder-util prints
+every spawned command through a stem list that does not cover
+`security set-key-partition-list -k <p12 password>`. On top of that the watchdog
+redacts the values of `CSC_KEY_PASSWORD` and `APPLE_APP_SPECIFIC_PASSWORD` at any
+length, the values of `CSC_LINK` and `APPLE_ID`, and any `--password` or `-k`
+argument, from everything it emits — including the diagnostics, whose process
+view prints `comm` only and never `argv`, and the summary, which carries counts
+and redacted target paths. GitHub additionally masks every value that comes from
+a secret.
+
+Measured on the maintainer machine, one macOS arm64 bundle needs 93 `codesign`
+invocations (91 signing, 1 verification, 1 entitlement display) and about 49s of
+`codesign` wall time; only 16 of those files are Mach-O code and 5 are nested
+bundles. `@electron/osx-sign` also signs binary resources — 33 `.pak` files plus
+`.nib`, `.dat`, `.bin`, `.png`, `.icns`, and `app.asar` — because its walk
+selects every file that looks binary, not only Mach-O. Excluding exactly those
+data files with `mac.signIgnore` would remove roughly three quarters of the
+calls, but it changes what the release artifacts carry and needs a notarized
+release to validate, so it is deliberately not enabled.
+
+`scripts/macos-signing-diagnostics.sh` records the runner baseline before the
+certificate is imported: system version, `codesign --version`, keychain
+identities/list/default, `xcrun --find notarytool`, and the reachability and
+latency of `http://timestamp.apple.com/ts01`. The Developer ID identity is
+expected to be absent at that point, because electron-builder imports it from
+`CSC_LINK` while packaging; only `--require-identity` makes a missing identity
+fatal.
+
+Signer status: `@electron/osx-sign@1.3.3` is pinned exactly by
+`app-builder-lib@26.15.3` and no override applies to it. Its
+`signApplication()` awaits one `codesign` per file; it has no batch or parallel
+path and no option or environment variable that enables one. A faster signer
+therefore needs the `mac.sign` replacement hook, which is a rewrite rather than
+a configuration switch, so the lane keeps the pinned signer and the diagnostics
+above.
 
 ## 5. Verification gates
 

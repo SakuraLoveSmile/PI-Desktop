@@ -480,6 +480,8 @@ visually distinct from list content.
   reflows continuously, the press position remains anchored, and the final
   width is saved on release. Focus the edge handle and use ArrowLeft/Right,
   Home, or End for keyboard resizing; Escape cancels an active pointer resize.
+  Double-click the handle to restore the default 275px width, clamped by the
+  live three-column budget so the reset never breaches the MainChat floor.
 - Click the viewport-fixed work-panel toggle to reveal or hide the panel
   without deleting tabs; the work-panel header keeps its tab strip and fixed `+`
   menu, while each tab owns resource closing
@@ -1081,7 +1083,10 @@ entirely inside the plugin's isolated page:
   and starting panel width, so grabbing the handle cannot jump the divider;
   moves are frame-coalesced. Escape, pointer cancellation, and lost capture
   restore the press-time panel width. The 10px hit area keeps a column-resize
-  cursor and suppresses text selection during the gesture.
+  cursor and suppresses text selection during the gesture. A double-click on
+  the divider restores the default 360px width, clamped by the same live
+  minimum and three-column budget, so a reset never breaches the MainChat
+  floor.
 - Persistence: all session contexts are renderer runtime state only. On app
   startup, open state, tabs, active-tab selection, file requests, and Browser
   resources reset; only the committed preferred `{width}` remains in

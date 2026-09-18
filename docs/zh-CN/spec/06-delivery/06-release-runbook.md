@@ -273,6 +273,62 @@ base64 -i developer-id-application.p12 | pbcopy
 Linux 使用 `base64 -w0 developer-id-application.p12`。绝不能进入 git 的文件：
 `*.p12`、`*.cer`、`*.p8`、`*.mobileprovision`。
 
+### 4.6 macOS 签名可观测性与超时
+
+`electron-builder` 在开始签名前只打印一行 —— `signing
+file=release/mac-arm64/PI-Desktop.app platform=darwin type=distribution
+identityName=...` —— 之后直到该阶段结束都没有任何输出。这段时间里隐藏了三种机制，
+现在 macOS 通道把它们全部暴露出来：
+
+| 阶段位置 | 发生什么 | 现在如何可见 |
+|---|---|---|
+| 遍历 | `@electron/osx-sign` 遍历 `PI-Desktop.app/Contents`，收集所有 Mach-O 文件以及嵌套的 `.app` 与 `.framework` 包 | `DEBUG=electron-osx-sign*` 打印 `Walking... <dir>`；`scripts/macos-bundle-inventory.mjs` 在打包结束后打印同一个包的数量 |
+| 逐文件签名 | `codesign --force --sign <identity> --timestamp --entitlements ... <file>` 串行执行，最深的文件优先，应用包最后签 | `DEBUG=electron-osx-sign*` 打印 `Signing... <file>` 与 `Executing... <file> codesign ...`；codesign shim 记录每次调用的耗时。若钥匙串拒绝把私钥交给被包裹的 `codesign`，可设置 `PI_SIGNING_NO_CODESIGN_SHIM=1` 在不使用 shim 的情况下运行该阶段 |
+| 静默重试 | 一轮签名失败后最多再重试三次，退避 5s/10s/15s，且没有任何日志行 | 看门狗汇总中的 `codesign-calls` 与 `failures` 行会暴露重复的整轮签名 |
+| 应用公证 | `@electron/notarize` 打包 zip、上传并等待 Apple 队列（`mac.notarize=true`） | `DEBUG=electron-notarize*` 打印 `zipping application to`、`attempting to upload file to Apple`、`notarization success`，随后 electron-builder 打印 `notarization successful` |
+| DMG 公证 | DMG 有自己的签名，因此下一步会用 `xcrun notarytool submit --wait` 再提交一次 | 同一个看门狗让该等待过程可见并且有上限 |
+
+`scripts/macos-signing-watchdog.mjs` 包裹这两个长时间阶段。它给子进程的每一行加上
+`[sign] ` 前缀后转发，并保留子进程退出码，因此通道的失败语义不变；stdout 与 stderr 作为
+两条独立流转发，二者相对顺序可能与直接运行不同，子进程也不会获得 stdin。子进程静默时它打印心跳
+（已用时间、阶段、最后处理的文件、当前活动的 codesign 目标）；当阶段在
+`PI_SIGNING_STALL_SECONDS` 内既无输出也无 codesign 活动时，它输出一次诊断（最后处理的
+文件、签名相关进程的 `ps` 状态、codesign 日志尾部）；并在 `[sign] summary` 块中给出逐文件
+codesign 耗时 —— 调用次数、总耗时、p50、p95、最大值以及最慢的几个文件。可调项：
+
+| 设置 | 默认值 | 作用 |
+|---|---|---|
+| `PI_SIGNING_TIMEOUT_SECONDS` | 2400（CI：打包 1800，DMG 1200） | 被包裹阶段的硬上限：输出诊断、杀掉进程组，并以 124 退出而不是继续挂起 |
+| `PI_SIGNING_STALL_SECONDS` | 300 | 无 codesign 活动的静默持续这么长时间就触发一次诊断输出；阶段继续运行，因为等待 Apple 公证队列是合法等待 |
+| `PI_SIGNING_HEARTBEAT_SECONDS` | 60 | 子进程无输出时的心跳间隔 |
+| `DEBUG` | `electron-osx-sign*,electron-notarize*` | 暴露遍历、逐文件签名与公证进度的命名空间 |
+
+`DEBUG` 只列出两个会自行清洗命令行的命名空间，因为 `electron-builder` 的命名空间在这里
+并不安全：builder-util 打印每条外部命令时所用的敏感词表并不覆盖
+`security set-key-partition-list -k <p12 密码>`。在此之上，看门狗会把
+`CSC_KEY_PASSWORD`、`APPLE_APP_SPECIFIC_PASSWORD` 的取值（不限长度）、`CSC_LINK` 与
+`APPLE_ID` 的取值，以及任何 `--password` 或 `-k` 参数替换为 `[redacted]` —— 包括诊断
+输出（进程视图只打印 `comm`，绝不打印 `argv`）与汇总（只有计数与已脱敏的目标路径）。
+GitHub 本身也会屏蔽所有来自 secret 的值。
+
+在维护者机器上实测：一个 macOS arm64 包需要 93 次 `codesign` 调用（91 次签名、
+1 次校验、1 次 entitlement 显示），`codesign` 墙钟时间约 49s；其中只有 16 个文件是 Mach-O
+代码、5 个是嵌套包。`@electron/osx-sign` 还会给二进制资源签名 —— 33 个 `.pak`，以及
+`.nib`、`.dat`、`.bin`、`.png`、`.icns`、`app.asar` —— 因为它的遍历会选中所有"看起来是
+二进制"的文件，而不只是 Mach-O。用 `mac.signIgnore` 精确排除这些数据文件可以去掉约四分之三
+的调用，但这会改变发布工件所携带的内容，且需要一次真实公证发布来验证，因此这里有意不启用。
+
+`scripts/macos-signing-diagnostics.sh` 在证书导入之前记录 runner 基线：系统版本、
+`codesign --version`、钥匙串身份/列表/默认钥匙串、`xcrun --find notarytool`，以及
+`http://timestamp.apple.com/ts01` 的可达性与延迟。此时 Developer ID 身份理应不存在，
+因为 electron-builder 在打包过程中才从 `CSC_LINK` 导入；只有 `--require-identity`
+才会在缺少身份时判定失败。
+
+签名器现状：`@electron/osx-sign@1.3.3` 由 `app-builder-lib@26.15.3` 精确锁定，且没有任何
+override 作用于它。它的 `signApplication()` 对每个文件 `await` 一次 `codesign`；没有批量或
+并行路径，也没有任何选项或环境变量可以开启并发。因此更快的签名器只能通过 `mac.sign`
+替换钩子实现，那是重写而不是配置开关；所以该通道继续使用锁定的签名器并保留上述诊断。
+
 ## 5. 验证门
 
 未签名调试产物（`workflow_dispatch` 且 `sign_macos: false`）不视为通过 Gatekeeper。标签发布必须通过以下签名、公证和装订检查，否则工作流失败。

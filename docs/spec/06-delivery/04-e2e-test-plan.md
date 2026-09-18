@@ -3169,7 +3169,9 @@ identify the platform validation still needed.
   7) Drag the inner left-edge handle left and right across its bounds; verify
   pointer-down does not jump the divider or resize the native window, cancel one
   gesture with Escape, then focus the handle and exercise Arrow/Shift+Arrow/Home/End.
-  Commit a different panel width with Browser active. 8) Record MainChat width
+  Commit a different panel width with Browser active, double-click the divider and
+  confirm the default 360px width returns (or the live budget when it is smaller),
+  then commit a different width again. 8) Record MainChat width
   and native bounds while opening, repeating the same open action, resizing the
   panel, collapsing, reopening, and closing the final resource. Repeat collapse
   on Windows while watching the entire frameless window. 9) With the panel open,
@@ -3208,7 +3210,8 @@ identify the platform validation still needed.
   inner divider exposes the panel width to assistive technology and supports
   the documented keyboard steps. Pointer-down preserves the starting width,
   movement follows the pointer continuously, and release commits once only when
-  the target changed. Escape or cancellation restores the press-time width.
+  the target changed. Escape or cancellation restores the press-time width, and a
+  double-click restores the 360px default inside the live bounds.
   Browser preview does not intercept an active divider drag.
   A and B independently restore their runtime open state, ordered tabs, active
   tab, and Browser resource; selecting a project without an active conversation
@@ -9901,12 +9904,17 @@ This test plan spec is accepted when:
   6. Start a resize, press Escape or cancel the pointer, then restart the app.
      Collapse and re-expand the sidebar as a separate check; the preferred
      expanded width must return.
+  7. Drag the handle wide, double-click it, and confirm the width returns to the
+     default 275px. Repeat after a minimum-width drag and on a squeezed window
+     where the live cap is the binding bound.
 - **Expected**: The handle is discoverable on direct hover/focus without a
   full-height white/accent rail when the sidebar body is hovered, has no native
   window drag or text-selection side effect, and remains anchored to the press
   point. MainChat follows the live width until its 450px floor. Pointer release
   saves one clamped preferred width; Escape/cancellation restores the starting
-  width without saving it. A pointer width below 160px collapses the sidebar as
+  width without saving it. Double-clicking the handle restores the default
+  275px width, clamped to the live budget so the reset never breaches the 450px
+  MainChat floor. A pointer width below 160px collapses the sidebar as
   a user action and restores the preferred expanded width on reopen. Keyboard
   changes commit immediately and expose localized width semantics. The saved
   width survives relaunch and is restored after sidebar collapse; collapse does

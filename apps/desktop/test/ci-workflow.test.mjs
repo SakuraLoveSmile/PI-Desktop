@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
@@ -255,6 +255,24 @@ test("macOS release signing is required on tag pushes", () => {
   assert.doesNotMatch(signedBlock, /-c\.mac\.identity=/);
   assert.doesNotMatch(signedBlock, /CSC_NAME: "Developer ID Application:/);
   assert.match(signedBlock, /-c\.mac\.notarize=true/);
+  // The single "signing PI-Desktop.app" line electron-builder prints does not
+  // tell walking, per-file codesign, silent retries, and the Apple
+  // notarization wait apart; the signing trace and the watchdog carry the rest.
+  assert.match(
+    signedBlock,
+    /DEBUG: "electron-osx-sign\*,electron-notarize\*"/,
+  );
+  // builder-util's `executing` debug line prints every spawned command with a
+  // stem list that does not cover `security set-key-partition-list -k <p12
+  // password>`, so electron-builder's namespace is deliberately excluded.
+  assert.doesNotMatch(signedBlock, /DEBUG: ".*electron-builder.*"/);
+  assert.match(signedBlock, /PI_SIGNING_TIMEOUT_SECONDS: "1800"/);
+  assert.match(signedBlock, /PI_SIGNING_STALL_SECONDS: "300"/);
+  assert.match(
+    signedBlock,
+    /node scripts\/macos-signing-watchdog\.mjs \\\n\s+--label "dist:mac-\$\{\{ matrix\.arch \}\}" \\\n\s+-- pnpm --filter @pi-desktop\/desktop run dist:mac/,
+    "the signed macOS packaging phase runs under the signing watchdog",
+  );
   // electron-builder notarizes only the .app; the DMG needs its own
   // submission before the ticket can be stapled (error 65 otherwise).
   const dmgBlock = releaseWorkflowSource.match(
@@ -274,7 +292,14 @@ test("macOS release signing is required on tag pushes", () => {
   }
   assert.match(
     dmgBlock,
-    /run: scripts\/notarize-and-staple-macos-release-dmg\.sh apps\/desktop\/release/,
+    /node scripts\/macos-signing-watchdog\.mjs[\s\S]*?-- scripts\/notarize-and-staple-macos-release-dmg\.sh apps\/desktop\/release/,
+    "the DMG notarization wait runs under the signing watchdog",
+  );
+  assert.match(dmgBlock, /PI_SIGNING_TIMEOUT_SECONDS: "1200"/);
+  assert.match(
+    releaseWorkflowSource,
+    /- name: Analyze the packaged macOS app bundle[\s\S]*?if: matrix\.platform == 'macos'[\s\S]*?continue-on-error: true[\s\S]*?run: node scripts\/macos-bundle-inventory\.mjs apps\/desktop\/release/,
+    "the packaged macOS bundle is measured, without failing a release",
   );
   assert.match(
     releaseWorkflowSource,
@@ -299,6 +324,78 @@ test("the signed local macOS lane selects the native runner architecture", () =>
     /-c\.(?:dmg|zip)\.artifactName/,
     "the signed local macOS lane uses the shared artifact naming config",
   );
+  // The local lane documents itself as Developer ID + mandatory
+  // notarization, so it must pass both flags and must not publish.
+  assert.match(releaseMacScriptSource, /-c\.mac\.notarize=true/);
+  assert.match(releaseMacScriptSource, /-c\.mac\.forceCodeSigning=true/);
+  assert.match(releaseMacScriptSource, /--publish never/);
+  assert.doesNotMatch(
+    releaseMacScriptSource,
+    /DEBUG="\$\{DEBUG:-[^}]*electron-builder/,
+    "the local lane must not enable builder-util's executing debug line",
+  );
+  assert.match(
+    releaseMacScriptSource,
+    /node scripts\/macos-signing-watchdog\.mjs --label "release-macos-\$\{MAC_ARCH\}" --/,
+    "the local signed macOS lane runs under the signing watchdog",
+  );
+  assert.match(
+    releaseMacScriptSource,
+    /node scripts\/macos-bundle-inventory\.mjs apps\/desktop\/release/,
+  );
+  // The DMG is submitted, stapled, and validated once, and the release is
+  // verified exactly once.
+  assert.match(
+    releaseMacScriptSource,
+    /scripts\/notarize-and-staple-macos-release-dmg\.sh apps\/desktop\/release/,
+  );
+  assert.equal(
+    (releaseMacScriptSource.match(/scripts\/verify-macos-release\.sh/g) ?? []).length,
+    1,
+    "the local signed macOS lane verifies the release exactly once",
+  );
+  assert.doesNotMatch(releaseMacScriptSource, /scripts\/staple-macos-release-dmg\.sh/);
+});
+
+/**
+ * The regression that broke the local signed lane: a rewrite replaced the
+ * electron-builder flags with two commands but kept the line continuation, so
+ * one command became a positional argument while the other still pointed at a
+ * deleted script. Every script path either lane references must exist.
+ */
+test("both macOS lanes only reference scripts that exist", async () => {
+  const referenced = new Set();
+  for (const source of [releaseMacScriptSource, releaseWorkflowSource]) {
+    for (const match of source.matchAll(/(?<![\w./-])scripts\/[A-Za-z0-9._-]+\.(?:sh|mjs)/g)) {
+      referenced.add(match[0]);
+    }
+  }
+  assert.ok(referenced.size >= 6, "the macOS lanes reference their scripts");
+  const missing = [];
+  for (const relPath of referenced) {
+    try {
+      await access(new URL(`../../../${relPath}`, import.meta.url));
+    } catch {
+      missing.push(relPath);
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
+test("macOS signing instrumentation stays out of the Windows and Linux lanes", () => {
+  const instrumentation =
+    /macos-signing-watchdog|macos-signing-diagnostics|macos-bundle-inventory/;
+  const stepBlock = (name) =>
+    releaseWorkflowSource.match(new RegExp(`- name: ${name}[^]*?(?=\\n      - name:)`))?.[0] ??
+    "";
+  assert.doesNotMatch(stepBlock("Package installers"), instrumentation);
+  assert.doesNotMatch(stepBlock("Verify Linux host-core glibc floor"), instrumentation);
+  assert.doesNotMatch(stepBlock("Export Linux ASAR release asset"), instrumentation);
+  // The unsigned macOS debug lane reports its bundle size but must not gain a
+  // signing identity, notarization, or publishing behaviour.
+  const unsignedBlock = stepBlock("Package unsigned macOS installer");
+  assert.ok(unsignedBlock, "unsigned macOS debug package step is missing");
+  assert.doesNotMatch(unsignedBlock, instrumentation);
 });
 
 test("GitHub releases trigger the CNB mirror pipeline with a JSON payload", () => {
