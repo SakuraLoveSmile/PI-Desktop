@@ -575,7 +575,8 @@ type AgentEvent =
      willRetry: boolean; fallback?: "retained_tail";
      mark?: { id: string; throughMessageId: string;
               generation: number; summaryTokens: number;
-              summarized: boolean };
+              summarized: boolean;
+              fallback?: "retained_tail" };
      error?: { code: string; message: string } }
  | { type: "error"; error: AppError }
  | { type: "status"; status: AgentStatus };
@@ -606,7 +607,8 @@ type AgentEvent =
 转录本行位于 `generation` 之后（此会话有多少个检查点
 已安装）、`summaryTokens`（摘要的估计上下文成本）以及
 `summarized`（当窗口滚动且未向模型询问时，`false`
-总结）。记录本身不被携带——它的摘要和保留尾部被携带
+总结）以及 `fallback`（摘要生成失败、检查点只带恢复说明和保留尾部时为
+`"retained_tail"`；转录行将其标为摘要生成失败，而不是 N tokens 的摘要）。记录本身不被携带——它的摘要和保留尾部被携带
 远远大于事件应有的大小——而是从
 `SessionDetail.compactions` 会话打开或分叉。
 

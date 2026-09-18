@@ -171,7 +171,7 @@ async function canonicalDirectory(path: string): Promise<string> {
   return real;
 }
 
-/** Projects over host-core: registration canonicalizes on the Host (D446). */
+/** Projects over host-core: registration canonicalizes on the Host (D448). */
 export function createProjectCatalog(deps: HostOperationsDeps): RacpProjectCatalog {
   const { getHost } = deps;
   const browseRoot = resolve(deps.browseRoot ?? homedir());

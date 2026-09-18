@@ -402,13 +402,13 @@ Recorded on the `feat/remote-agent-host` branch, 2026-09-10:
   graceful stop.
 - R1 open: a runtime-level per-turn permission ceiling (a capped turn
   currently fails closed in the bridge).
-- R2 started (2026-09-18, D445 / ADR 0282): `packages/host-runtime` holds the
+- R2 started (2026-09-18, D447 / ADR 0283): `packages/host-runtime` holds the
   Electron-independent runtime layer — the host-core and sidecar stdio
   transports, the restart supervisor, `RuntimeService` (the module's
   `RuntimePort` with the durable turn lifecycle), transcript persistence, a
   headless launch resolver, and approved Plan/Goal dispatch — and Electron
   main runs on it through thin adapters.
-- R2 (2026-09-18, D446 / ADR 0283): `packages/racp` holds the `RACP-WS`
+- R2 (2026-09-18, D448 / ADR 0284): `packages/racp` holds the `RACP-WS`
   server and client cores, the `ws` binding on loopback, and device-token
   pairing; handshake, authorization, idempotency, queue order, approvals,
   cursor replay, eviction, epoch change, slow clients, and reconnect without

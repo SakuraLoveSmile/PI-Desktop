@@ -172,7 +172,7 @@ export const ErrorCodes = {
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
   RATE_LIMITED: "RATE_LIMITED",
   /**
-   * Remote Host connection codes (D446 / ADR 0283). The desktop adapter and
+   * Remote Host connection codes (D448 / ADR 0284). The desktop adapter and
    * the `pi-host` bootstrap classify a remote failure by these, never by
    * matching message text.
    */

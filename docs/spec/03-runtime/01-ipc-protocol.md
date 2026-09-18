@@ -670,7 +670,8 @@ type AgentEvent =
      willRetry: boolean; fallback?: "retained_tail";
      mark?: { id: string; throughMessageId: string;
               generation: number; summaryTokens: number;
-              summarized: boolean };
+              summarized: boolean;
+              fallback?: "retained_tail" };
      error?: { code: string; message: string } }
  | { type: "error"; error: AppError }
  | { type: "status"; status: AgentStatus };
@@ -724,7 +725,9 @@ renderer's whole view of that compaction: `id`, the `throughMessageId` anchor th
 transcript row sits after, `generation` (how many checkpoints this session has
 installed), `summaryTokens` (the summary's estimated context cost), and
 `summarized` (`false` when the window rolled over without asking the model for a
-summary). The record itself is not carried — its summary and retained tail are
+summary), and `fallback` (`"retained_tail"` when summary generation failed and
+the checkpoint carries only a recovery notice plus a retained tail; the row
+labels it as a failed summary, never as a summary of N tokens). The record itself is not carried — its summary and retained tail are
 far larger than an event should be — and is instead read from
 `SessionDetail.compactions` on session open or fork.
 

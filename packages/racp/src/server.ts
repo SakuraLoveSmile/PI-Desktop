@@ -48,7 +48,7 @@ export type RacpServerOptions = {
   agentHost: AgentHost;
   operations: RacpHostOperations;
   authenticator: DeviceTokenAuthenticator;
-  /** Stable Host identity (D446). */
+  /** Stable Host identity (D448). */
   hostId: string;
   serverName?: string;
   serverVersion: string;

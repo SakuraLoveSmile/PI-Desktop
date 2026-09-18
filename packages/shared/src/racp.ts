@@ -483,7 +483,7 @@ export const RacpInitializeResultSchema = Type.Object({
   server: Type.Object({
     name: Type.String(),
     version: Type.String(),
-    /** Stable identity of this Host, minted once at first start (D446). */
+    /** Stable identity of this Host, minted once at first start (D448). */
     hostId: Type.Optional(Type.String({ minLength: 1 })),
   }),
   connectionId: Type.String({ minLength: 1 }),

@@ -1,8 +1,8 @@
-# ADR 0282: Headless runtime boundary in `packages/host-runtime`
+# ADR 0283: Headless runtime boundary in `packages/host-runtime`
 
 - Status: Accepted for implementation
 - Date: 2026-09-18
-- Decision: D445
+- Decision: D447
 - Related: ADR 0205 (D373 / D374 / D375), ADR 0213 (D386),
   `02-architecture/05-remote-agent-control.md` §4 and §11,
   `03-runtime/07-process-model.md` §4,

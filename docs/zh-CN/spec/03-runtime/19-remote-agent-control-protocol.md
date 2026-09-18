@@ -213,9 +213,9 @@ owner，工作区读取都按会话持久根、Host 忽略规则和 `PATH_OUTSID
 | `terminal/input` | controller | 向已打开终端写入字节 |
 | `terminal/resize` | controller | 调整已打开终端尺寸 |
 | `terminal/close` | controller | 关闭终端，幂等 |
-| `connection/pair` | authenticated | 用升级请求携带的一次性配对令牌换取设备凭证（安全规格 §3.4）；仅在配对连接上有效（D446） |
-| `project/register` | owner | 将 Host 上的目录注册为项目：Host 规范化并校验路径，返回项目 id（D446） |
-| `project/browse` | owner | 列出 Host 某路径下的目录，有界，供远程目录选择器使用（D446） |
+| `connection/pair` | authenticated | 用升级请求携带的一次性配对令牌换取设备凭证（安全规格 §3.4）；仅在配对连接上有效（D448） |
+| `project/register` | owner | 将 Host 上的目录注册为项目：Host 规范化并校验路径，返回项目 id（D448） |
+| `project/browse` | owner | 列出 Host 某路径下的目录，有界，供远程目录选择器使用（D448） |
 
 仍推迟的本地操作：
 

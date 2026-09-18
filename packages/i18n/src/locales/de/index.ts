@@ -316,6 +316,7 @@ export const de = {
     "compactionRow": "Kontext komprimiert · #{{times}}",
     "compactionRowSummary": "Zusammenfassung ≈{{tokens}} Token",
     "compactionRowNoSummary": "keine Zusammenfassung generiert",
+    "compactionRowSummaryFailed": "Zusammenfassung fehlgeschlagen · aktueller Kontext beibehalten",
     "scrollToBottom": "Zum Neuesten springen",
     "minimap": "Gesprächsübersicht",
     "resultNeedsAttention": "Diese Aufgabe erfordert Aufmerksamkeit",

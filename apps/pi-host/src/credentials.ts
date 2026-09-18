@@ -26,7 +26,7 @@ async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
 }
 
 /**
- * The Host's stable identity (D446): minted once at first start and kept
+ * The Host's stable identity (D448): minted once at first start and kept
  * beside the data directory. Never derived from hostname, address, or path,
  * so two machines with the same project path are still two Hosts.
  */

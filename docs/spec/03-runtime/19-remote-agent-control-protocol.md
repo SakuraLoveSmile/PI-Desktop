@@ -591,9 +591,9 @@ session root as working directory and stream through `terminal.output`.
 | `terminal/input` | controller | Write bytes to an open terminal |
 | `terminal/resize` | controller | Resize an open terminal |
 | `terminal/close` | controller | Close a terminal; idempotent |
-| `connection/pair` | authenticated | Exchange the single-use pairing token presented on the upgrade for a device credential (security §3.4); only valid on a pairing connection (D446) |
-| `project/register` | owner | Register a Host directory as a project: the Host canonicalizes and validates the path and returns the project id (D446) |
-| `project/browse` | owner | List directories under a Host path, bounded, for the remote folder picker (D446) |
+| `connection/pair` | authenticated | Exchange the single-use pairing token presented on the upgrade for a device credential (security §3.4); only valid on a pairing connection (D448) |
+| `project/register` | owner | Register a Host directory as a project: the Host canonicalizes and validates the path and returns the project id (D448) |
+| `project/browse` | owner | List directories under a Host path, bounded, for the remote folder picker (D448) |
 
 ### 6.3 Deferred operations
 
@@ -1216,7 +1216,7 @@ thing across all bindings.
 8. The client treats a new major protocol version as incompatible unless an
    explicit compatibility adapter is selected.
 
-## 14a. RACP-WS binding implementation notes (D446)
+## 14a. RACP-WS binding implementation notes (D448)
 
 `packages/racp` is the reference implementation of the `RACP-WS` binding.
 Beyond the rules above it fixes these wire details:
