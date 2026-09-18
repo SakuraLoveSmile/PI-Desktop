@@ -167,6 +167,10 @@ export function sshMetadataOf(record: RemoteHostRecord): RemoteHostSshMetadata |
     ...(port !== null ? { port } : {}),
     ...(user !== null ? { user } : {}),
     ...(identityFile !== null ? { identityFile } : {}),
+    // Anything that is not the literal `"password"` reads back as a key
+    // descriptor, so records written before this field existed are unchanged —
+    // on disk and in memory alike.
+    ...(candidate.auth === "password" ? { auth: "password" as const } : {}),
     remotePort: candidate.remotePort,
     version: typeof candidate.version === "string" ? candidate.version : "",
   };
@@ -179,12 +183,15 @@ export function sshHostRecord(input: {
   url: string;
   deviceToken: string;
   ssh: RemoteHostSshMetadata;
+  /** Login password for a host that uses one; the registry encrypts it. */
+  sshSecret?: string;
 }): RemoteHostRecord {
   return {
     hostKey: input.hostKey,
     label: input.label,
     url: input.url,
     deviceToken: input.deviceToken,
+    ...(input.sshSecret ? { sshSecret: input.sshSecret } : {}),
     metadata: { [TRANSPORT_KEY]: "ssh", [SSH_KEY]: input.ssh },
   };
 }
@@ -247,7 +254,9 @@ export function createRemoteHostsBoot(
     const ssh = sshMetadataOf(record);
     // An SSH host is only reachable while its forward is up; opening one here
     // — rather than trusting the stored URL — is what makes a restart work.
-    const url = ssh ? (await tunnels.open(record.hostKey, ssh)).url : record.url;
+    const url = ssh
+      ? (await tunnels.open(record.hostKey, ssh, record.sshSecret)).url
+      : record.url;
     try {
       const adapter = buildAdapter({ ...record, url });
       await adapter.connect();
@@ -398,6 +407,7 @@ export function createRemoteHostsBoot(
           url: outcome.url,
           deviceToken: outcome.deviceToken,
           ssh: outcome.ssh,
+          ...(outcome.sshSecret ? { sshSecret: outcome.sshSecret } : {}),
         }),
       );
       return { host, ssh: outcome.ssh, steps: outcome.steps };

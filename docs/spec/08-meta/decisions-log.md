@@ -6153,3 +6153,45 @@ that was sitting at the bottom — including after the turn had finished.
   still fails `turn/start` closed with `MODEL_NOT_CONFIGURED` until a provider is
   configured on it. See ADR 0292, `06-delivery/07-remote-control-rollout.md` §7,
   and `05-security/02-remote-control-security.md` §3.4.
+
+## 2026-09-19 — SSH password authentication for the bootstrap (D454)
+
+- ADR 0292 kept the app free of SSH secrets and made `BatchMode=yes` the
+  enforcer, which is the right default but leaves a machine whose only
+  credential is a password unreachable from the app — the user has to install a
+  key from a terminal first, which is the detour the bootstrap exists to
+  remove. A password may now be supplied *instead of* a key, per host, and it
+  is opt-in: with no password the argv and every other behaviour are unchanged.
+- The secret reaches the `ssh` client through OpenSSH's askpass helper
+  (`remote/ssh-askpass.ts`): `SSH_ASKPASS` points at a generated `/bin/sh`
+  script and `SSH_ASKPASS_REQUIRE=force` makes it apply without a terminal, so
+  the password is never an `ssh` argument or an environment value. Its
+  confidentiality rests on modes — a `0700` directory, a `0600` secret, a `0700`
+  helper — and the material is deleted once no child can still be prompting
+  (after an exec child closes, after a forward's port is up, or on `dispose`),
+  so nothing lingers between operations.
+- `BatchMode=yes` becomes `BatchMode=no` only for a password target, together
+  with `NumberOfPasswordPrompts=1`: the helper answers every prompt with the
+  same secret, so a retry could only repeat a wrong password, and repeated
+  failures are what trip a server's own lockout.
+- The password is persisted encrypted through the same OS-keychain
+  `EncryptionPort` the device token uses, as a new optional
+  `encryptedSshSecret` in `remote-hosts.json`; the descriptor gains
+  `auth: "password"` and nothing else, so a key descriptor keeps exactly its
+  previous shape and the file's `version` stays `1`. A password that will not
+  decrypt costs the secret, not the paired host, because the device token is
+  independent of it.
+- The renderer never sees it: `RemoteHostSummary` is unchanged and the secret
+  travels beside `RemoteHostSshMetadata` (plaintext, persisted metadata) rather
+  than inside it. `assertSshPassword` rejects a line break with
+  `INVALID_ARGUMENT` before any remote command runs, because OpenSSH reads the
+  helper's answer only up to the first break; Windows is refused with
+  `HOST_BOOTSTRAP_FAILED` and a remedy, because its OpenSSH cannot execute a
+  shell-script helper. A host recorded as password-authenticated with no usable
+  secret is not opened at all, which surfaces as the host being offline.
+- Settings gains an authentication mode on the SSH form with a masked password
+  field and a reveal toggle, and the copy that promised no password was ever
+  stored is replaced in all eight shipped locales. See ADR 0293,
+  `05-security/02-remote-control-security.md` §3.4 and gate 21,
+  `02-architecture/05-remote-agent-control.md` §5.2,
+  E2E-REMOTE-HOST-ssh-password-authentication.

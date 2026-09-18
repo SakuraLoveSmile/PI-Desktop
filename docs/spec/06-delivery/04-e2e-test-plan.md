@@ -11830,6 +11830,47 @@ browser milestones are scheduled.
 - **Milestone**: Post-MVP (rollout R2)
 - **Status**: Draft; remote harness with a Linux SSH target required
 
+#### E2E-REMOTE-HOST-ssh-password-authentication
+
+- **Preconditions**: A Linux test machine runs `sshd` with
+  `PasswordAuthentication yes` and `PubkeyAuthentication no`, so the login is
+  only reachable with a password; the user's local SSH agent holds no usable key
+  for it. A GitHub Releases fixture serves the `pi-host` bundle for that platform
+  at the desktop's version. A second machine accepts the user's key only.
+- **Steps**: 1) In Settings → Remote Hosts, install over SSH with key
+  authentication and confirm the form shows the identity-file field.
+  2) Switch the authentication mode to password, confirm the identity-file field
+  is replaced by a masked password field, and reveal it once.
+  3) Try to submit an empty password. 4) Point the form at the
+  password-only machine, enter the password, and bootstrap it.
+  5) Quit the desktop, relaunch it, and let the host reconnect.
+  6) Change the saved password to a wrong value through a re-pair, then force a
+  reconnect. 7) Bootstrap the key-only machine with a password supplied.
+  8) Inspect the desktop's process arguments and `remote-hosts.json` while a
+  password-authenticated host is connected. 9) Attempt to submit a password
+  containing a newline through the IPC channel directly.
+- **Expected**: Key mode is byte-for-byte today's behaviour — `BatchMode=yes` and
+  no credential file anywhere. In password mode the password field replaces the
+  identity-file field, the reveal toggle shows and re-hides the value, and an
+  empty password keeps the submit disabled. The password-only machine installs
+  and pairs. After the relaunch the host reconnects with no prompt, proving the
+  saved credential is used. The wrong password yields exactly one failed attempt
+  per connect (no helper-driven retry storm) and the host shows as offline rather
+  than crashing the app or showing a rejected-login dialog. The key-only machine
+  still authenticates with the key. No `ssh` argument contains the password, no
+  askpass file or directory remains after the connect completes, and the on-disk
+  record stores the password only as keychain ciphertext — never in cleartext.
+  A password containing a newline is refused with `INVALID_ARGUMENT` before any
+  remote command runs.
+- **Specs linked**: `05-security/02-remote-control-security.md` §§3.4 and 13
+  (gate 21), `02-architecture/05-remote-agent-control.md` §5.2,
+  `06-delivery/07-remote-control-rollout.md` §2
+- **Acceptance**: Security, D (surfaces), Quality
+- **Milestone**: Post-MVP (rollout R2b)
+- **Status**: Draft; remote harness with a password-only Linux SSH target
+  required. The credential seam itself is covered offline by
+  `apps/desktop/test/remote-host-ssh-password.test.mjs`.
+
 #### E2E-232: The outbound messaging integration relays events and commands
 
 - **Preconditions**: A Host runs with the integration adapter configured

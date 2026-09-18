@@ -20,9 +20,25 @@
 export type RemoteHostTransport = "direct" | "ssh";
 
 /**
+ * How the desktop authenticates the SSH session itself.
+ *
+ * - `key`: the user's agent, `~/.ssh/config`, and identity files — the only
+ *   mode that existed before password auth, and still the default.
+ * - `password`: the desktop supplies a login password through OpenSSH's
+ *   askpass helper. The secret is never an `ssh` argument and never appears in
+ *   a renderer payload; it is stored encrypted (see `RemoteHostSshMetadata`).
+ */
+export type RemoteHostSshAuth = "key" | "password";
+
+/**
  * The SSH descriptor a bootstrapped host reconnects through. Persisted in the
  * host record so the forward can be re-established on the next launch without
  * another bootstrap.
+ *
+ * The password for an `auth: "password"` descriptor is deliberately *not* part
+ * of this shape: this type is persisted in plaintext metadata and is echoed
+ * back to the renderer inside `RemoteHostBootstrapResult`. The secret lives in
+ * a separate encrypted record field instead.
  */
 export type RemoteHostSshMetadata = {
   /** Host name or address as `ssh` receives it (no `user@` prefix). */
@@ -33,6 +49,8 @@ export type RemoteHostSshMetadata = {
   user?: string;
   /** `ssh -i` value; absent means the agent and `~/.ssh/config` decide. */
   identityFile?: string;
+  /** Absent means `key`, so descriptors written before password auth read back unchanged. */
+  auth?: RemoteHostSshAuth;
   /** `pi-host`'s loopback port on the remote machine. */
   remotePort: number;
   /** Release version the bootstrap installed, checked against `APP_VERSION`. */
@@ -100,6 +118,15 @@ export type RemoteHostBootstrapRequest = {
   remotePort?: number;
   /** Optional stable routing key; absent means the desktop mints one. */
   hostKey?: string;
+  /**
+   * SSH login password, when the user chose password auth instead of a key.
+   * Absent keeps the key/agent path byte-for-byte unchanged. It is passed to
+   * the `ssh` client through an askpass helper, never as an argument, and is
+   * persisted encrypted with the OS keychain so the next launch can reconnect.
+   * A newline cannot be expressed — OpenSSH reads the helper's answer up to the
+   * first line break — so such a value is rejected with `INVALID_ARGUMENT`.
+   */
+  password?: string;
 };
 
 export type RemoteHostBootstrapResult = {

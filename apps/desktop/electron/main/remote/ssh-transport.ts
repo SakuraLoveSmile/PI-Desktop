@@ -9,12 +9,15 @@
  * - The user's `~/.ssh/config`, agent, `known_hosts`, and jump hosts apply
  *   exactly as they do in their terminal, so a machine that is reachable from
  *   the shell is reachable from the app with no second credential store.
- * - The desktop never holds, prompts for, or persists an SSH secret; there is
- *   nothing for the app to leak.
+ * - With no password in hand the desktop holds no SSH secret at all, and
+ *   `BatchMode=yes` keeps that honest: a host that needs an interactive
+ *   password or passphrase fails immediately with a typed error instead of
+ *   hanging behind an invisible prompt.
  *
- * `BatchMode=yes` is what keeps that honest: a host that needs an interactive
- * password or passphrase fails immediately with a typed error instead of
- * hanging a modal behind an invisible prompt.
+ * A password can be supplied instead of relying on a key. That is the one case
+ * where the app carries an SSH secret: it reaches the child through OpenSSH's
+ * askpass helper rather than the command line (`ssh-askpass.ts`), and the
+ * caller decides whether it is persisted encrypted for the next launch.
  *
  * The module is a port so the bootstrap orchestrator can be tested against a
  * fake; `createSystemSshTransport` is the only implementation that spawns.
@@ -23,6 +26,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createServer, connect } from "node:net";
 import { ErrorCodes } from "@pi-desktop/shared";
 import { redactBootstrapOutput } from "./pi-host-bootstrap-script.js";
+import { createSshAskpass, type SshAskpassMaterial } from "./ssh-askpass.js";
 
 /** Where to reach a machine over SSH. */
 export type SshTarget = {
@@ -30,6 +34,12 @@ export type SshTarget = {
   port?: number;
   user?: string;
   identityFile?: string;
+  /**
+   * Login password, when the user chose password auth over a key. Never placed
+   * in the argv (`ssh-askpass.ts`). Leaving it undefined keeps the key/agent
+   * path byte-for-byte as it was, `BatchMode=yes` included.
+   */
+  password?: string;
 };
 
 export type SshExecResult = {
@@ -101,10 +111,13 @@ export function assertSshArgument(value: string, field: string): string {
 
 /** The argv `ssh` receives, minus the final command. */
 export function sshCommonArgs(target: SshTarget): string[] {
+  const password = target.password !== undefined;
   const args = [
-    // Fail instead of prompting: there is no terminal behind this spawn.
+    // Fail instead of prompting when there is no secret to answer with: there
+    // is no terminal behind this spawn. With one, the prompt is routed to the
+    // askpass helper instead, which is the only reason BatchMode is relaxed.
     "-o",
-    "BatchMode=yes",
+    password ? "BatchMode=no" : "BatchMode=yes",
     // Trust-on-first-use, as `ssh` itself offers interactively.
     "-o",
     "StrictHostKeyChecking=accept-new",
@@ -114,6 +127,12 @@ export function sshCommonArgs(target: SshTarget): string[] {
     "-o",
     "ExitOnForwardFailure=yes",
   ];
+  if (password) {
+    // The helper answers every prompt with the same secret, so a retry could
+    // only repeat a wrong password — and repeated failures are what trip a
+    // server's own lockout. One prompt, one answer.
+    args.push("-o", "NumberOfPasswordPrompts=1");
+  }
   if (target.port !== undefined) args.push("-p", String(target.port));
   if (target.identityFile) args.push("-i", target.identityFile);
   const user = target.user?.trim();
@@ -206,6 +225,8 @@ function runCommand(
   options: {
     input?: string;
     timeoutMs: number;
+    /** Full environment for the child; defaults to the app's own. */
+    env?: NodeJS.ProcessEnv;
     /** Called with the spawned child so a transport can track and reap it. */
     onSpawn?: (child: ChildProcessWithoutNullStreams) => void;
   },
@@ -213,7 +234,7 @@ function runCommand(
   return new Promise((resolveRun, rejectRun) => {
     let child: ChildProcessWithoutNullStreams;
     try {
-      child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"] });
+      child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"], env: options.env });
     } catch (error) {
       rejectRun(
         fail(
@@ -276,13 +297,43 @@ export function createSystemSshTransport(
   target: SshTarget,
   options: SystemSshTransportOptions = {},
 ): SshTransport {
-  const binary = options.binary ?? "ssh";
   const log = options.log ?? (() => undefined);
+  const binary = options.binary ?? "ssh";
   const base = [...sshCommonArgs(target), ...(options.extraOptions ?? [])];
   const children = new Set<ChildProcessWithoutNullStreams>();
 
-  const spawnTracked = (args: string[]): ChildProcessWithoutNullStreams => {
-    const child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"] });
+  // Askpass material is written on the first spawn and dropped once no child
+  // can still be authenticating. The reference count is what makes a transport
+  // that runs several commands (`exec`, `execWithInput`, then `forward`) work
+  // without either deleting the secret under a live prompt or keeping it on
+  // disk for the whole session.
+  let material: Promise<SshAskpassMaterial> | null = null;
+  let holders = 0;
+  const acquireEnv = async (): Promise<NodeJS.ProcessEnv | undefined> => {
+    if (target.password === undefined) return undefined;
+    holders += 1;
+    try {
+      material ??= createSshAskpass(target.password);
+      return { ...process.env, ...(await material).env };
+    } catch (error) {
+      holders -= 1;
+      throw error;
+    }
+  };
+  const releaseEnv = async (): Promise<void> => {
+    if (target.password === undefined) return;
+    holders -= 1;
+    if (holders > 0 || !material) return;
+    const current = material;
+    material = null;
+    await current.then((loaded) => loaded.dispose()).catch(() => undefined);
+  };
+
+  const spawnTracked = (
+    args: string[],
+    env?: NodeJS.ProcessEnv,
+  ): ChildProcessWithoutNullStreams => {
+    const child = spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"], env });
     children.add(child);
     child.once("close", () => children.delete(child));
     child.once("error", () => children.delete(child));
@@ -297,15 +348,23 @@ export function createSystemSshTransport(
     // `sh -s` reads the script from stdin, so the script never has to survive
     // an argv round trip and never lands in a remote file we must clean up.
     const args = input === undefined ? [...base, command] : [...base, "sh -s"];
-    const result = await runCommand(binary, args, {
-      input,
-      timeoutMs,
-      onSpawn: (child) => {
-        children.add(child);
-        child.once("close", () => children.delete(child));
-        child.once("error", () => children.delete(child));
-      },
-    });
+    const env = await acquireEnv();
+    let result: SshExecResult;
+    try {
+      result = await runCommand(binary, args, {
+        input,
+        timeoutMs,
+        env,
+        onSpawn: (child) => {
+          children.add(child);
+          child.once("close", () => children.delete(child));
+          child.once("error", () => children.delete(child));
+        },
+      });
+    } finally {
+      // The child has authenticated by now, or it never will.
+      await releaseEnv();
+    }
     if (result.code !== 0) {
       throw fail(
         `ssh command failed with exit code ${result.code}`,
@@ -329,13 +388,14 @@ export function createSystemSshTransport(
     execWithInput: (command, input, execOptions) =>
       execOnce(command, input, execOptions?.timeoutMs ?? DEFAULT_EXEC_TIMEOUT_MS),
     async forward({ localPort, remoteHost, remotePort, timeoutMs }) {
+      const env = await acquireEnv();
       const args = [
         ...base,
         "-N",
         "-L",
         `127.0.0.1:${localPort}:${remoteHost}:${remotePort}`,
       ];
-      const child = spawnTracked(args);
+      const child = spawnTracked(args, env);
       let stderr = "";
       child.stderr.on("data", (chunk: Buffer) => {
         stderr += chunk.toString("utf8");
@@ -393,6 +453,7 @@ export function createSystemSshTransport(
         // to its own deadline with a referenced timer.
         probeAbort.abort();
         child.kill("SIGKILL");
+        await releaseEnv();
         throw error instanceof Error && "errorCode" in error
           ? error
           : fail(
@@ -400,7 +461,10 @@ export function createSystemSshTransport(
               ErrorCodes.REMOTE_FORWARD_FAILED,
             );
       }
-
+      // The forward is up, so authentication is over: the askpass helper has
+      // answered its last prompt and the secret file has no further use. The
+      // `ssh` process stays for the life of the tunnel, but without it.
+      await releaseEnv();
       let disposed = false;
       return {
         localPort,
@@ -426,6 +490,12 @@ export function createSystemSshTransport(
     dispose() {
       for (const child of children) child.kill("SIGKILL");
       children.clear();
+      // Killing the children means nothing can still be authenticating, so the
+      // credential files go too rather than waiting out the session.
+      holders = 0;
+      const current = material;
+      material = null;
+      void current?.then((loaded) => loaded.dispose()).catch(() => undefined);
       log("info", "ssh transport disposed", { host: target.host });
     },
   };

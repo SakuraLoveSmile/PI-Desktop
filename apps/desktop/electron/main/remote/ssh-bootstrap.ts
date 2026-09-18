@@ -48,6 +48,7 @@ import {
   type SshExecResult,
   type SshTransport,
 } from "./ssh-transport.js";
+import { assertSshPassword } from "./ssh-askpass.js";
 import { racpUrlForLocalPort } from "./ssh-tunnel.js";
 
 /** Progress the Settings surface can render while a bootstrap runs. */
@@ -96,6 +97,12 @@ export type SshBootstrapOutcome = {
   url: string;
   deviceToken: string;
   ssh: RemoteHostSshMetadata;
+  /**
+   * The login password the forward was opened with, when the user chose
+   * password auth. The caller persists it encrypted; it is never placed in
+   * `ssh` (which is echoed back to the renderer) and never logged.
+   */
+  sshSecret?: string;
   /** Steps that completed, in order. */
   steps: SshBootstrapStep[];
 };
@@ -141,6 +148,12 @@ export function sshMetadataFromTarget(target: SshTarget): Omit<RemoteHostSshMeta
     ...(target.port !== undefined ? { port: target.port } : {}),
     ...(target.user ? { user: target.user } : {}),
     ...(target.identityFile ? { identityFile: target.identityFile } : {}),
+    // Only recorded when it is not the default: a key-authenticated descriptor
+    // keeps exactly the shape it had before password auth existed, so no
+    // existing `remote-hosts.json` entry changes on its next write. A later
+    // launch reads the field to know a secret is needed, so it can say so
+    // plainly instead of failing as a bare authentication error.
+    ...(target.password !== undefined ? { auth: "password" as const } : {}),
   };
 }
 
@@ -173,6 +186,12 @@ function validateTarget(request: RemoteHostBootstrapRequest): SshTarget {
   if (request?.user) target.user = assertSshArgument(String(request.user), "user");
   if (request?.identityFile) {
     target.identityFile = assertSshArgument(String(request.identityFile), "identityFile");
+  }
+  // The one secret in the request. It is validated here rather than trusted
+  // because it cannot survive a line break through the askpass helper, and a
+  // value that cannot work should be refused before a remote script runs.
+  if (request?.password !== undefined && request.password !== null) {
+    target.password = assertSshPassword(request.password);
   }
   return target;
 }
@@ -352,8 +371,24 @@ export function createSshBootstrap(deps: SshBootstrapDeps): SshBootstrap {
           version: parsed.ready.version,
         };
         completed = true;
-        log("info", "ssh bootstrap completed", { hostKey, url, version: ssh.version });
-        return { hostKey, label, forward, url, deviceToken, ssh, steps };
+        log("info", "ssh bootstrap completed", {
+          hostKey,
+          url,
+          version: ssh.version,
+          auth: ssh.auth,
+        });
+        return {
+          hostKey,
+          label,
+          forward,
+          url,
+          deviceToken,
+          ssh,
+          // Handed to the caller to encrypt, never logged and never returned
+          // to the renderer.
+          ...(target.password !== undefined ? { sshSecret: target.password } : {}),
+          steps,
+        };
       } finally {
         // On success the caller adopts the forward, which is a child of this
         // transport — disposing here would tear down the tunnel it just got.

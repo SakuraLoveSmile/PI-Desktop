@@ -441,6 +441,67 @@
   padding: 12px 14px 14px;
 }
 
+/*
+  Remote hosts: the SSH install is a real form (label + field cells), not a row
+  list, so it keeps the rhythm of `.settings-form-grid` and lays its fields out
+  in a two-column grid instead of five stacked full-width rows.
+*/
+.settings-remote-host-form {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px 14px;
+}
+
+/* Label + host. The port only needs room for five digits, so the user row
+   trades its second column for a narrow one. */
+.settings-remote-host-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-remote-host-form-row.is-narrow-port {
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.4fr);
+}
+
+/* Authentication mode: label, the shared segmented control, and its note.
+   The segment keeps its paint from `.settings-segment` and only takes its
+   position from here. */
+.settings-remote-host-form-auth {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+/* The install action sits right; its hint stays with it on the left. */
+.settings-remote-host-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Paired-host row: the status pill and the remove action need a gap, which the
+   row's control column does not have by default. */
+.settings-row-control:has(> .settings-remote-host-status) {
+  gap: 10px;
+}
+
+.settings-remote-host-status {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Same breakpoint as the other two-column grid in this sheet
+   (`.plugin-scenic-theme-grid`): one field per row before the columns pinch. */
+@media (max-width: 720px) {
+  .settings-remote-host-form-row,
+  .settings-remote-host-form-row.is-narrow-port {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .settings-row {
   display: flex;
   align-items: center;

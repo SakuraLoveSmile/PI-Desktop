@@ -25,13 +25,21 @@ export function racpUrlForLocalPort(port: number): string {
   return `ws://127.0.0.1:${port}${RACP_WS_PATH}`;
 }
 
-/** Translate a persisted descriptor into `ssh` arguments. */
-export function sshTargetOf(ssh: RemoteHostSshMetadata): SshTarget {
+/**
+ * Translate a persisted descriptor into `ssh` arguments.
+ *
+ * `sshSecret` is the login password read back from the encrypted record and is
+ * deliberately not part of {@link RemoteHostSshMetadata}: the descriptor is
+ * plaintext metadata that the renderer also receives, so the secret travels
+ * beside it rather than inside it.
+ */
+export function sshTargetOf(ssh: RemoteHostSshMetadata, sshSecret?: string): SshTarget {
   return {
     host: ssh.host,
     ...(ssh.port !== undefined ? { port: ssh.port } : {}),
     ...(ssh.user ? { user: ssh.user } : {}),
     ...(ssh.identityFile ? { identityFile: ssh.identityFile } : {}),
+    ...(sshSecret ? { password: sshSecret } : {}),
   };
 }
 
@@ -45,17 +53,21 @@ export type SshTunnelManagerOptions = {
   /**
    * Build the transport for one host. Defaults to the system `ssh` client,
    * which is what makes the user's own `~/.ssh/config` and agent apply; tests
-   * substitute a fake so no process is spawned.
+   * substitute a fake so no process is spawned. The second argument is the
+   * decrypted login password, absent for a key-authenticated host.
    */
-  buildTransport?: (ssh: RemoteHostSshMetadata) => SshTransport;
+  buildTransport?: (ssh: RemoteHostSshMetadata, sshSecret?: string) => SshTransport;
   /** Reserve the loopback port `-L` binds. Injectable for deterministic tests. */
   reservePort?: () => Promise<number>;
   log?: (level: "info" | "warn" | "error", message: string, data?: unknown) => void;
 };
 
 export interface SshTunnelManager {
-  /** Open the forward for `hostKey`, or return the live one. */
-  open(hostKey: string, ssh: RemoteHostSshMetadata): Promise<SshTunnel>;
+  /**
+   * Open the forward for `hostKey`, or return the live one. `sshSecret` is the
+   * decrypted login password when the host authenticates with one.
+   */
+  open(hostKey: string, ssh: RemoteHostSshMetadata, sshSecret?: string): Promise<SshTunnel>;
   /** Take ownership of a forward the bootstrap already opened. */
   adopt(hostKey: string, ssh: RemoteHostSshMetadata, forward: SshForward): Promise<SshTunnel>;
   /** Close the forward for one host; a missing key is a no-op. */
@@ -75,8 +87,8 @@ export function createSshTunnelManager(options: SshTunnelManagerOptions = {}): S
   const log = options.log ?? (() => undefined);
   const buildTransport =
     options.buildTransport ??
-    ((ssh: RemoteHostSshMetadata) =>
-      createSystemSshTransport(sshTargetOf(ssh), {
+    ((ssh: RemoteHostSshMetadata, sshSecret?: string) =>
+      createSystemSshTransport(sshTargetOf(ssh, sshSecret), {
         log: (level, message, data) => log(level, message, data),
       }));
   const reservePort = options.reservePort ?? reserveLocalPort;
@@ -91,12 +103,16 @@ export function createSshTunnelManager(options: SshTunnelManagerOptions = {}): S
     entry.transport.dispose();
   };
 
-  const remember = (hostKey: string, ssh: RemoteHostSshMetadata, transport: SshTransport, forward: SshForward): SshTunnel => {
+  const remember = (
+    hostKey: string,
+    ssh: RemoteHostSshMetadata,
+    transport: SshTransport,
+    forward: SshForward,
+  ): SshTunnel => {
     const tunnel: SshTunnel = { url: racpUrlForLocalPort(forward.localPort), localPort: forward.localPort };
     entries.set(hostKey, { ssh, transport, forward, tunnel });
     return tunnel;
   };
-
 
   /** Drop one entry and reap its process; shared by `close` and `adopt`. */
   const closeForKey = async (hostKey: string): Promise<void> => {
@@ -105,12 +121,13 @@ export function createSshTunnelManager(options: SshTunnelManagerOptions = {}): S
     entries.delete(hostKey);
     await closeEntry(entry);
   };
+
   return {
-    async open(hostKey, ssh) {
+    async open(hostKey, ssh, sshSecret) {
       const existing = entries.get(hostKey);
       if (existing) return existing.tunnel;
 
-      const transport = buildTransport(ssh);
+      const transport = buildTransport(ssh, sshSecret);
       // A dead ssh client must not take the app with it; `forward` reports the
       // failure through its own rejection.
       let forward: SshForward;
