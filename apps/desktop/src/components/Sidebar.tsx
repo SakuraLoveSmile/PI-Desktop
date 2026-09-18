@@ -53,7 +53,11 @@ import {
   SIDEBAR_WIDTH_MAX,
   SIDEBAR_WIDTH_MIN,
 } from "../lib/sidebar-preferences";
-import { SIDEBAR_RESIZE_STEP, sidebarPointerResize } from "../lib/sidebar-resize";
+import {
+  SIDEBAR_RESIZE_STEP,
+  sidebarPointerResize,
+  sidebarResetWidth,
+} from "../lib/sidebar-resize";
 import { BrandLogo } from "./BrandLogo";
 import { NotificationCenter } from "./NotificationCenter";
 import { ProjectEditDialog } from "./ProjectEditDialog";
@@ -400,6 +404,16 @@ export function Sidebar({
     if (nextWidth === currentWidth) return;
     onWidthCommit(nextWidth);
   }, [onWidthCommit, sidebarWidth, widthMax]);
+
+  /**
+   * Double-click reset: the shell's default width, clamped by the live
+   * three-column budget. A pointer gesture that is somehow still open is
+   * dropped first so its release cannot overwrite the reset.
+   */
+  const resetSidebarWidth = useCallback(() => {
+    if (sidebarResizeRef.current) finishSidebarResize(true);
+    onWidthCommit(sidebarResetWidth(widthMax));
+  }, [finishSidebarResize, onWidthCommit, widthMax]);
 
   useEffect(() => {
     if (!sidebarResizing) return;
@@ -2393,6 +2407,7 @@ export function Sidebar({
         onPointerCancel={cancelSidebarResize}
         onLostPointerCapture={cancelSidebarResize}
         onKeyDown={handleSidebarResizeKeyDown}
+        onDoubleClick={resetSidebarWidth}
       />
     </aside>
   );

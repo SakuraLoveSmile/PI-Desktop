@@ -402,6 +402,13 @@ test("work panel separator exposes internal panel width resizing", () => {
   assert.match(panelSource, /onPointerCancel=\{onPanelResizeCancel\}/);
   assert.match(panelSource, /onLostPointerCapture=\{onPanelResizeCancel\}/);
   assert.match(panelSource, /onKeyDown=\{onPanelResizeKeyDown\}/);
+  assert.match(panelSource, /onDoubleClick=\{onPanelResizeReset\}/);
+  assert.match(
+    panelSource,
+    /if \(drag\) finishPanelResize\(event\.currentTarget, drag\.pointerId, true\)/,
+  );
+  assert.match(panelSource, /workPanelResetWidth\(panelMinimum, layout\.maxPanelWidth\)/);
+  assert.match(panelSource, /workPanelWidthBounds\(/);
   assert.match(panelSource, /data-work-panel-resizing/);
   assert.match(globalStyles, /\.work-panel-resize \{[^}]*width:\s*10px;/s);
   assert.match(globalStyles, /touch-action:\s*none/);
