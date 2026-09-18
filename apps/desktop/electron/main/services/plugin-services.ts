@@ -41,6 +41,7 @@ import { UserMcpRuntime } from "../user-mcp";
 import {
   MCP_CALL_TIMEOUT_MS,
   MCP_CONNECT_TIMEOUT_MS,
+  MCP_TOOL_DISCOVERY_TIMEOUT_MS,
   McpServerClient,
 } from "../plugin-mcp";
 import { McpOAuthManager } from "../mcp-oauth";
@@ -484,6 +485,7 @@ export function createPluginServices({
     oauth: mcpOAuth,
     connectTimeoutMs: MCP_CONNECT_TIMEOUT_MS,
     callTimeoutMs: MCP_CALL_TIMEOUT_MS,
+    discoveryTimeoutMs: MCP_TOOL_DISCOVERY_TIMEOUT_MS,
     audit: (entry) => logger.app("plugin", "info", "mcp.api", entry),
     log: (level, message, data) => logger.app("plugin", level, message, { data }),
   });

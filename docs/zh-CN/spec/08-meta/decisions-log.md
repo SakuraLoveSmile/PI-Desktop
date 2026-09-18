@@ -4426,3 +4426,10 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 插件浮层从刻度外的 `80` 与 `60` 归回到 `z-dialog`（40）（`plugins.css`，发行说明浮层一并处理）：路由表面不再困住它们之后，它们就在根堆叠上下文中参与比较，而在 80 上会盖住对话框自身弹出的叶子级弹出层（60）与 toast（50）—— 其中包括安装对话框的「已复制」提示。现在有源测试钉住这一关系。
 - 仅渲染层：无 IPC、存储、schema、协议或插件 SDK 改动，也没有新增默认值。见 `04-ux/07-ui-design-system.md` §9、`apps/desktop/test/settings-dialog-overlay.test.mjs`，以及 `06-delivery/04-e2e-test-plan.md` 的 E2E-LAYOUT-three-column-width-priority（其四条浮层断言位于 `scripts/e2e-three-column-layout.mjs`）。
 - 未做、留作后续的事项：真正的模态 —— 不可交互化、焦点收束、快捷键让位 —— 需要这些浮层进入浏览器顶层（`<dialog>.showModal()`）。在它们打开的弹出菜单、工具提示与 toast（portal 到 `document.body`）同样迁入顶层之前，这一步无法进行，因为顶层内容会绘制在它们之上并使其不可用；此前的一次尝试正因此被撤回。
+
+## 2026-09-19 —— MCP 目录由协议护栏约束，而不是被截断 (D452)
+
+- 修订 D176 / ADR 0038：每服务器的 `tools/list` 上限不再是「64 个工具、8 页」的静默截断。客户端现在在 Codex 同级的协议护栏下跟进分页直到最后一页 —— 2048 个工具、100 页、重复或畸形游标、整轮遍历 30 秒 —— 突破任一护栏的服务器会失去它的握手，而不是贡献其目录的一个前缀。
+- 该上限从来不是对提示词的保护：MCP 工具以 `ToolSearch` 之后的延迟按需条目到达模型，宣传它们的提示词区块另有独立上限，因此一个 300 个工具的服务器在被激活之前不产生任何成本。
+- `plugin.mcp.tools.truncated` 已移除。拒绝会以 `plugin.mcp.connect` / `mcp.connect` 记入审计并带上护栏的错误码与消息，对用户自建的服务器则显示为其状态消息。
+- 见 ADR 0038 与 E2E-024K；`apps/desktop/test/plugin-mcp.test.mjs` 覆盖完整目录、各项护栏，以及把旧的截断行为作为失败基线。
