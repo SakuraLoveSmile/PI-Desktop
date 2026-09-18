@@ -146,6 +146,130 @@ export interface ImportRunResult {
   failed: number;
 }
 
+// --- External skill / MCP scan-and-import ---------------------------------
+// Renderer-side mirrors of the electron-main scanner output so the panel does
+// not have to import from `electron/`. Keep the field names in sync with
+// `apps/desktop/electron/main/importers/agent-*-scan.ts`.
+
+export type ExternalSkillSourceKind =
+  | "claude-user"
+  | "claude-project"
+  | "pi-user"
+  | "pi-project";
+
+export interface ExternalSkillCandidate {
+  source: ExternalSkillSourceKind;
+  sourcePath: string;
+  rootDir?: string;
+  shape: "file" | "dir";
+  id: string;
+  name: string;
+  description: string;
+  bytes: number;
+  warnings: string[];
+}
+
+export interface ExternalSkillSourceReport {
+  kind: ExternalSkillSourceKind | "error";
+  path: string;
+  exists: boolean;
+  error?: string;
+  count: number;
+}
+
+export interface ExternalSkillScanResult {
+  candidates: ExternalSkillCandidate[];
+  sources: ExternalSkillSourceReport[];
+}
+
+export interface ExternalSkillImportItem {
+  source: ExternalSkillSourceKind;
+  sourcePath: string;
+  shape: "file" | "dir";
+  rootDir?: string;
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface ExternalSkillImportPayload {
+  level: "global" | "project";
+  projectPath?: string;
+  mode?: "copy" | "link";
+  items: ExternalSkillImportItem[];
+}
+
+export interface ExternalSkillImportRunResult {
+  imported: Array<{ item: ExternalSkillImportItem; skill: UserSkillRecord }>;
+  skipped: Array<{ item: ExternalSkillImportItem; reason: string }>;
+  failed: Array<{ item: ExternalSkillImportItem; error: string }>;
+}
+
+export type ExternalMcpSourceKind =
+  | "claude-desktop"
+  | "claude-code"
+  | "cursor-global"
+  | "cursor-project"
+  | "codex"
+  | "opencode"
+  | "chatgpt-desktop";
+
+export interface ExternalMcpCandidate {
+  source: ExternalMcpSourceKind;
+  sourcePath: string;
+  id: string;
+  rawKey: string;
+  label?: string;
+  description?: string;
+  transport: "stdio" | "http";
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  disabled?: boolean;
+  warnings: string[];
+}
+
+export interface ExternalMcpSourceReport {
+  kind: ExternalMcpSourceKind | "error";
+  path: string;
+  exists: boolean;
+  error?: string;
+  count: number;
+}
+
+export interface ExternalMcpScanResult {
+  candidates: ExternalMcpCandidate[];
+  sources: ExternalMcpSourceReport[];
+}
+
+export interface ExternalMcpImportItem {
+  source: ExternalMcpSourceKind;
+  sourcePath: string;
+  id: string;
+  rawKey: string;
+  label?: string;
+  description?: string;
+  transport: "stdio" | "http";
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  disabled?: boolean;
+}
+
+export interface ExternalMcpImportPayload {
+  items: ExternalMcpImportItem[];
+}
+
+export interface ExternalMcpImportRunResult {
+  imported: Array<{ item: ExternalMcpImportItem; server: McpServerRecord }>;
+  skipped: Array<{ item: ExternalMcpImportItem; reason: string }>;
+  failed: Array<{ item: ExternalMcpImportItem; error: string }>;
+}
+
 declare global {
   interface Window {
     piDesktop?: {
@@ -777,6 +901,20 @@ export const api = {
       imported: McpServerRecord[];
       failed: Array<{ id: string; reason: string }>;
     }>(IPC.invoke.mcpImport, { text }),
+  /**
+   * Scan third-party AI-tool config files for MCP server definitions. The
+   * scanner never throws; a source that failed to read is reported with an
+   * `error` on its row and a zero count.
+   */
+  scanExternalMcp: (query?: { projectPath?: string }) =>
+    invoke<ExternalMcpScanResult>(IPC.invoke.mcpImportScan, query ?? {}),
+  /**
+   * Import each candidate through `mcp.upsert` one at a time; a `disabled`
+   * item is turned off with `mcp.setEnabled` after it is written. One failure
+   * never aborts the batch.
+   */
+  runExternalMcpImport: (payload: ExternalMcpImportPayload) =>
+    invoke<ExternalMcpImportRunResult>(IPC.invoke.mcpImportRun, payload),
   /** Query the configured market sources; `failedSources` names dead ones. */
   searchMcpMarketRegistry: (query: string, sources: MarketSource[], options?: { more?: boolean }) =>
     invoke<{ entries: McpCatalogEntry[]; failedSources?: string[]; exhausted?: boolean }>(
@@ -819,9 +957,30 @@ export const api = {
     invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList, query),
   createUserSkill: (skill: UserSkillInput) =>
     invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillCreate, skill),
-  /** Opens a native picker for one file; `canceled` when the user backed out. */
-  importUserSkill: (query?: AgentCapabilityQuery) =>
-    invoke<{ canceled?: boolean; skill?: UserSkillRecord }>(IPC.invoke.skillImport, query),
+  /**
+   * Opens a native picker for one file or (when `sourceKind === "dir"`) a
+   * folder; `canceled` when the user backed out. `mode: "link"` swaps copy
+   * for a symlink import.
+   */
+  importUserSkill: (
+    query?: AgentCapabilityQuery & {
+      sourceKind?: "file" | "dir";
+      mode?: "copy" | "link";
+    },
+  ) => invoke<{ canceled?: boolean; skill?: UserSkillRecord }>(IPC.invoke.skillImport, query),
+  /**
+   * Scan third-party AI-tool skill directories. The scanner never throws;
+   * a source that failed to read is reported with an `error` on its row.
+   */
+  scanExternalSkills: (query?: { projectPath?: string }) =>
+    invoke<ExternalSkillScanResult>(IPC.invoke.skillImportScan, query ?? {}),
+  /**
+   * Import each candidate through `skills.import` one at a time. `mode`
+   * defaults to `"copy"`; a `dir` shape sends its `rootDir` as the source
+   * path so host-core knows it is a `<name>/SKILL.md` skill.
+   */
+  runExternalSkillsImport: (payload: ExternalSkillImportPayload) =>
+    invoke<ExternalSkillImportRunResult>(IPC.invoke.skillImportRun, payload),
   updateUserSkill: (id: string, skill: Omit<UserSkillInput, "id">) =>
     invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillUpdate, { id, ...skill }),
   /** The record plus the document body, for the editor. */
