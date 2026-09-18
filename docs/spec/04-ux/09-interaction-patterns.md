@@ -304,8 +304,10 @@ may be retained while exactly one workspace supplies the visible shell context.
   activation no longer resets manual-scroll state for a revisit (ADR 0137).
   History continuation (D269) does not page earlier rows from a collapsed
   scroller or from a pinned overflowing transcript whose `scrollTop` has been
-  reset to 0; an empty first paint does not spend the first-commit hydration
-  gate, so a later long page still re-bottoms behind the settle veil.
+  reset to 0; a real gesture in the near-top band still continues history. An
+  empty first paint does not spend the first-commit hydration gate, so a later
+  long page is still bounded and re-bottomed in the layout phase, before the
+  browser paints it.
 - Selecting a project-scoped conversation activates its project as part of the
   store-owned selection transaction. Selecting a Temporary conversation clears
   the visible workspace. Project-scoped new-session actions pass their target

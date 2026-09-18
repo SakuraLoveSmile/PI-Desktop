@@ -161,3 +161,50 @@ test("an unpinned transcript at the top reveals earlier history", () => {
     false,
   );
 });
+
+test("a one-pixel overflow is not a pinned overflowing transcript", () => {
+  // The overflow test is deliberately slack by one pixel: a fractional layout
+  // can leave a single pixel that no scroll event can retire, and a pinned
+  // transcript there is genuinely at its own top.
+  assert.equal(
+    isHistoryRevealPosition(
+      { scrollTop: 0, scrollHeight: 801, clientHeight: 800 },
+      true,
+    ),
+    true,
+  );
+  assert.equal(
+    isHistoryRevealPosition(
+      { scrollTop: 0, scrollHeight: 802, clientHeight: 800 },
+      true,
+    ),
+    false,
+  );
+});
+
+test("a pinned overflowing transcript is suppressed anywhere in the band", () => {
+  // The suppression is about the offset being stale, not about it being zero:
+  // the caller passes `pinned` only for an offset its own event did not produce.
+  assert.equal(
+    isHistoryRevealPosition(
+      {
+        scrollTop: HISTORY_REVEAL_THRESHOLD_PX,
+        scrollHeight: 900,
+        clientHeight: 800,
+      },
+      true,
+    ),
+    false,
+  );
+  assert.equal(
+    isHistoryRevealPosition(
+      {
+        scrollTop: HISTORY_REVEAL_THRESHOLD_PX + 1,
+        scrollHeight: 900,
+        clientHeight: 800,
+      },
+      true,
+    ),
+    false,
+  );
+});

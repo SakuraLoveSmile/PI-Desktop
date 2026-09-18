@@ -48,7 +48,10 @@ test("session reads use a bounded tail and load older pages on demand", () => {
   // The near-top band is one named constant shared by the scroll check and the
   // D269 boundary observer, so the two triggers cannot drift apart.
   assert.match(transcript, /HISTORY_REVEAL_THRESHOLD_PX/);
-  assert.match(transcript, /isHistoryRevealPosition\(el, pinnedRef\.current\)/);
+  assert.match(
+    transcript,
+    /isHistoryRevealPosition\(el, pinnedRef\.current && !gesturing\)/,
+  );
   // Paging is wired per retained pane (ADR 0137), so each pane requests its own
   // older pages rather than the surface requesting them for whichever session
   // happens to be active.

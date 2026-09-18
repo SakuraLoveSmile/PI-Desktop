@@ -39,7 +39,9 @@ export function transcriptHasLayout(
  * user is reading the top". A pinned overflowing transcript is at (or about
  * to be restored to) the bottom; a stale zero offset there must not page the
  * conversation back to its start. An underfilled pinned tail still advances:
- * it does not overflow, so the top boundary is genuinely in view.
+ * it does not overflow, so the top boundary is genuinely in view. Callers pass
+ * `pinned` only for an offset their own event did not produce: a real gesture
+ * is the reader's position, not stale noise, and must still continue history.
  */
 export function isHistoryRevealPosition(
   geometry: TranscriptScrollerGeometry,

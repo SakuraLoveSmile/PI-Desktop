@@ -333,12 +333,20 @@ export function useTranscriptScroll({
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (paneVisibleRef.current && transcriptHasLayout(el)) {
-      lastLaidOutScrollTopRef.current = el.scrollTop;
-    }
+    // A real gesture is never stale noise: the reader's own input took the
+    // scroller to the near-top band, and this event is the last one that
+    // position produces. Suppressing history continuation here would strand an
+    // overflowing transcript at the top until some other scroll event or the
+    // minimap control arrived (D269). Only an offset this event did not produce
+    // — a collapsed box, or a pinned scroller still about to be restored to the
+    // bottom — is read as "not at the top".
+    const gesturing = isRecentScrollGesture(
+      performance.now(),
+      lastScrollGestureAtRef.current,
+    );
     if (
       paneVisibleRef.current &&
-      isHistoryRevealPosition(el, pinnedRef.current)
+      isHistoryRevealPosition(el, pinnedRef.current && !gesturing)
     ) {
       reachTop();
     }
@@ -358,10 +366,8 @@ export function useTranscriptScroll({
     // device pixel ratio leaves behind on programmatic corrections; anything a
     // gesture produced is compared exactly, so a one-pixel scroll still
     // unpins.
-    const gesturing = isRecentScrollGesture(
-      performance.now(),
-      lastScrollGestureAtRef.current,
-    );
+    // `gesturing` was read above, before the history-reveal question: a real
+    // gesture is what makes a near-top offset the reader's own position.
     const transition = reduceTranscriptScroll({
       previousScrollTop: lastScrollTopRef.current,
       scrollTop: el.scrollTop,

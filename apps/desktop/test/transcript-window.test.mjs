@@ -210,7 +210,7 @@ test("the transcript bounds mounted history and escalates at the top", () => {
   // older page once the window already covers it.
   assert.match(
     transcript,
-    /isHistoryRevealPosition\(el, pinnedRef\.current\)/,
+    /isHistoryRevealPosition\(el, pinnedRef\.current && !gesturing\)/,
   );
   const reachTop = transcript.match(
     /const reachTop = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[loadOlder, windowSize\]\);/,
