@@ -55,6 +55,9 @@ importers:
       '@pi-desktop/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
+      '@pi-desktop/racp':
+        specifier: workspace:*
+        version: link:../../packages/racp
       '@pi-desktop/shared':
         specifier: workspace:*
         version: link:../../packages/shared
