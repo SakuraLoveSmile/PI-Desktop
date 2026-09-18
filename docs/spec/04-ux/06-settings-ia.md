@@ -538,12 +538,13 @@ system while preserving their different data ownership:
   menu and are resolved after the global layer.
 
 ### Import
-- Scan supported local agent stores for **sessions** and **model configuration**
-  through two independent cards on the same destination. Neither scan runs
-  automatically (D007 / D342).
+- Scan supported local agent stores for **sessions**, **model configuration**,
+  **skills**, and **MCP servers** through one workbench per kind behind the
+  page's kind switcher. Every kind keeps its own explicit scan: none of them
+  runs automatically, and switching kinds never starts one (D007 / D342).
 - Sessions: review candidates through `SessionImportPanel`. Source and
   project-path grouping behavior follows
-  [08-component-spec §18](08-component-spec.md#18-sessionimportpanel).
+  [08-component-spec §18](08-component-spec.md#18-import-destination).
   The Group-by control is the same in-app menu select as the Appearance and
   Permissions pickers, not a platform-drawn `<select>`.
 - Model configuration: review provider drafts through
@@ -556,6 +557,9 @@ system while preserving their different data ownership:
   (same normalized base URL, API style, and credential) is skipped; profiles
   with different credentials at one endpoint remain separate. If the app has
   no default model yet, the first newly created provider becomes the default.
+- Skills and MCP servers reuse the agent capability scanners and their source
+  labels. The skills kind carries the import mode (copy or symlink); the MCP
+  kind writes into the same MCP list the MCP destination manages.
 
 ### Project archive
 - Reuses the durable Projects index as a settings-scale management surface

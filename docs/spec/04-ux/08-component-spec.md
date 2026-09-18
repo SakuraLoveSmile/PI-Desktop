@@ -3206,34 +3206,54 @@ dismissToast(id: number); // ToastHost internal / tests
 
 ---
 
-## 18. SessionImportPanel
+## 18. Import destination
 
 ### 18.1 Purpose
 
-Scan supported local agent stores, review discovered sessions in manageable
-groups, select candidates, and start an explicit import.
+Scan supported local agent stores for the four things this machine can hand
+over — sessions, provider/model configuration, skills, and MCP servers — then
+review the candidates, select them, and start an explicit import.
 
 ### 18.2 Anatomy
 
+One workbench per kind behind a segmented kind switcher; every kind owns its
+own scan, selection, and import action.
+
 ```text
-[Found N sessions]  [Group by: Source ▾]  [Import selected (N)]
-──────────────────────────────────────────────────────────────────
-[ ] [›] Claude Code                                      N sessions
-[ ] [›] Codex                                            N sessions
+[ Sessions | Models | Skills | MCP ]                   ← kind switcher
+[ ] Found 12 · 6 selected   Group by: Source ▾   [Scan] [Import selected (6)]
+───────────────────────────────────────────────────────────────────────────
+CLAUDE CODE              ~/code/pi                                  4
+[ ] Refactor the importer   12 messages · Jan 5, 2026   [Claude Code]
 ```
 
-- The grouping control supports **Project path** and **Source**.
-- Source is the default grouping.
-- In project-path mode, exact paths remain visible in group headers.
-- Sessions without a project path appear in a final **No project** group.
-- Each group header includes group selection, disclosure, label, and count.
-- Import source names, grouping controls, counts, results, and accessible names
-  come from the shared i18n catalog. Candidate dates use the active app locale.
+- The switcher reuses the labels the sidebar and the settings rail already ship
+  (`nav.sessions`, `settings.nav.models`, `settings.nav.skills`,
+  `settings.nav.mcp`), so the page adds no catalog entries of its own.
+- Each kind carries its own toolbar: the select-all checkbox with both the
+  "found" sentence and the selected count, the kind's own option (session
+  grouping, skills import mode), re-scan, and Import selected.
+- Before a kind's first scan its panel shows a quiet next-action state: what the
+  scan reads plus the Scan action. Switching tabs never starts a scan
+  (D007 / D342).
+- Group headers are quiet label lines — source or project name, the resolved
+  path in mono, and a count pill — not tinted bands; the candidates below them
+  are individual tiles.
+- The grouping control supports **Project path** and **Source**. Source is the
+  default. In project-path mode, exact paths remain visible in group headers,
+  and sessions without a project path appear in a final **No project** group.
+- Import source names, grouping and mode controls, counts, results, and
+  accessible names come from the shared i18n catalog. Candidate dates use the
+  active app locale.
 
 ### 18.3 States and interactions
 
 - A successful scan replaces the prior candidate set, clears selection, and
-  leaves every group collapsed.
+  shows every group expanded: the found candidates are the answer to the scan,
+  so they are not hidden behind a second click.
+- Every kind scans on its own: a session scan never starts a model-config,
+  skills, or MCP scan, and switching tabs preserves the result and the
+  selection of the kind left behind (inactive panels stay mounted and hidden).
 - A successful import creates or reuses one durable Projects-index entry for
   each distinct non-empty project path and refreshes sessions/projects.
 - When a successful core or plugin import adds a project-bound session under an
@@ -3245,20 +3265,29 @@ groups, select candidates, and start an explicit import.
   sessions. Import never creates a physical filesystem directory.
 - Re-importing an existing source session skips it without duplicating its
   project entry.
-- Changing the grouping mode preserves candidate selection but collapses every
-  newly formed group.
+- Changing the grouping mode preserves candidate selection and shows every
+  newly formed group expanded.
 - Expanding or collapsing one group does not affect the others.
 - Group and global checkboxes support checked, unchecked, and indeterminate
-  selection states as applicable.
+  selection states; the global checkbox reports a partial selection as
+  indeterminate.
 - Candidates inside each group and groups themselves are ordered newest first;
   the path-less group remains last in project-path mode.
 
 ### 18.4 Accessibility
 
+- The kind switcher is a `tablist` of `tab` controls, each carrying
+  `aria-selected` and `aria-controls` that names its panel. Every panel is a
+  `tabpanel` labelled by its tab, and an inactive panel is `hidden` rather than
+  visually covered.
 - Each disclosure button exposes `aria-expanded` and references its body with
   `aria-controls`.
-- Global and group checkboxes have localized accessible names.
-- The grouping selector has a visible label and is keyboard-operable.
+- Global and group checkboxes have localized accessible names and carry the
+  indeterminate state.
+- The grouping and import-mode selectors are the shared in-app menu selects
+  with visible labels and keyboard operation, never a platform-drawn
+  `<select>`.
+- Group count pills carry the localized count sentence as their title.
 - Projects-row disclosure and action-menu buttons expose localized,
   project-specific accessible names.
 
@@ -3268,17 +3297,17 @@ Scan the same local agent stores for provider and model settings, review
 candidates grouped by source, select them, and start an explicit import.
 
 ```text
-[Found N providers]                         [Import selected (N)]
-──────────────────────────────────────────────────────────────────
-[ ] [›] Claude Code                                      N providers
-[ ] [›] OpenCode                                         N providers
-[ ] [›] CC Switch                                        N providers
+[ ] Found 3 · 1 selected                        [Scan] [Import selected (1)]
+───────────────────────────────────────────────────────────────────────────
+CLAUDE CODE                                                                1
+[ ] acme-gateway   4 models · api.acme.dev    [API key]
 ```
 
-- The card is independent of session import: its own Scan, selection, and
-  Import selected action. A session scan never starts a model-config scan.
+- The kind is independent of session import: its own scan, selection, and
+  Import selected action. A session scan never starts a model-config scan, and
+  the two are shown one at a time behind the switcher.
 - Source grouping is the only grouping. A successful scan replaces the prior
-  candidate set, clears selection, and leaves every group collapsed.
+  candidate set, clears selection, and shows every group expanded.
 - Each row shows the provider name, model count, host, an API key / No API
   key badge, and the source. The raw secret never reaches the renderer.
 - Import creates one `providers.create` row per selected candidate. An
@@ -3290,7 +3319,6 @@ candidates grouped by source, select them, and start an explicit import.
   a different credential remains visible.
 - If `settings.defaultProviderId` is empty after a successful create, the
   first new provider becomes the global default.
-
 ---
 
 ## 19. ProviderStudio (Settings → Agent)

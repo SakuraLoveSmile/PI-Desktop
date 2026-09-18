@@ -1318,4 +1318,11 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
   per D092, the content cards fill the pane width available from the current
   window instead of retaining D070's fixed 720px cap — the earlier in-shell
   200px rail and broad grouped directory are superseded
+- **Import**: four kinds (sessions / models / skills / MCP) behind one
+  page-scale segmented switcher, composed like the agent capability pages: a
+  quiet pre-scan next-action state per kind, one toolbar per kind (select-all
+  with both counts, the kind's own option, re-scan, import selected), and one
+  list whose group headers are quiet label lines and whose candidates are
+  individual tiles. No per-kind scan card, no tinted group band, no second
+  copy of the settings row scaffold
 - Light destination cards use white elevated plates (not flat gray fills)

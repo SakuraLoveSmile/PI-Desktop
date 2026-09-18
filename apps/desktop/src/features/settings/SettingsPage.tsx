@@ -51,11 +51,8 @@ import {
   SettingsCard,
   SettingsRow,
 } from "./primitives";
-import {
-  AgentInstructionsSection,
-  ImportSection,
-  UpdatesRow,
-} from "./agent-sections";
+import { AgentInstructionsSection, UpdatesRow } from "./agent-sections";
+import { ImportSection } from "./import-page";
 import { PromptEnhancementCard } from "./prompt-enhancement-card";
 import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
 import { PluginScenicThemesDestination } from "../../components/settings/PluginScenicThemesDestination";
