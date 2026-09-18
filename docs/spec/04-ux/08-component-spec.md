@@ -1589,11 +1589,13 @@ Single message render — either user (plaintext) or assistant (markdown streami
    image thumbnail resolves and opens the same way. A chip whose reference
    matches nothing opens nothing and reports itself; the OS default application
    is no longer what this click does.
-  HTTP(S) URLs remain inline text links. Plain clicks follow the persisted
-  Link open destination setting (Work panel browser by default, or the system
-  default browser). Right-clicking a link opens a body-level context menu with
-  Open in default browser, Open in work panel, and Copy link address. Modifier
-  clicks (Ctrl/Cmd/Shift/Alt) continue to open externally. Long URL links wrap
+  HTTP(S) URLs remain inline text links. Plain clicks — including markdown
+  links, autolinked URLs, inline-code URLs, and remote images — follow the
+  persisted Link open destination setting (Work panel browser by default, or
+  the system default browser). Right-clicking a link opens a body-level
+  context menu with Open in default browser, Open in work panel, and Copy
+  link address. Modifier clicks (Ctrl/Cmd/Shift/Alt) continue to open
+  externally. Long URL links wrap
   within the plate and keep logical-start alignment instead of inheriting the
   browser's centered button text.
 - Assistant: transparent surface, left-aligned, markdown rendered at full
