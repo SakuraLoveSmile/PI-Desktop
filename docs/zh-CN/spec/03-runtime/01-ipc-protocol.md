@@ -1228,6 +1228,36 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 
 - `pi-desktop/mcp/market/search` — `{ query?, sources[], more? }` →
   `{ entries, failedSources, exhausted }`。Main 校验源 URL，固定每个解析出的公网地址，只跟随有界的 HTTPS 重定向，并为 browse 与服务端搜索保留 cursor 状态。单个源失败不会丢弃成功源；响应和缓存均有界。
+
+### MCP OAuth（ADR 0281）
+
+HTTP MCP 服务的基于浏览器的 OAuth 2.1 认证在 Electron 主进程中通过非阻塞 IPC 与事件流处理：
+
+- `pi-desktop/mcp/oauth/start({ id, level?, projectPath? }) -> { ok: true, loginId }`
+  启动 OAuth 元数据发现与 PKCE 授权码流程。立即返回，用户的浏览器交互与回调交换在后台异步执行。
+- `pi-desktop/mcp/oauth/cancel({ loginId?, id? }) -> { ok: boolean }`
+  中止正在进行的授权尝试，关闭本地回环 HTTP 服务并清理定时器。
+- `pi-desktop/mcp/oauth/event` 向渲染层推送 `McpOAuthLoginEvent`：
+
+```ts
+type McpOAuthLoginEvent = {
+  loginId: string;
+  serverId: string;
+} & (
+  | { kind: "authUrl"; url: string; instructions?: string; opened: boolean }
+  | { kind: "progress"; message: string }
+  | { kind: "done"; status: McpServerStatus }
+  | { kind: "error"; message: string }
+  | { kind: "cancelled" }
+);
+```
+
+#### 状态与凭证存储
+- `McpServerStatus` 包含：
+  - `hasOauth: boolean` — 服务是否在 host-core 加密凭据库存储有 OAuth 凭据（`secret:mcp:<serverId>:oauth`）。
+  - `authRequired: boolean` — 连接握手或 `tools/call` 是否收到 HTTP 401 Unauthorized，提示用户需要认证/重新授权。
+- OAuth 令牌（`accessToken`, `refreshToken`, `expiresAt`, `resource`, `clientId`）仅持久化在 host-core 的加密 secret 中（`secret:mcp:<serverId>:oauth`），绝不向渲染层暴露。
+
 ## 12c. 子代理 API (D202)
 
 用户拥有的子代理仅是全局 Markdown 文档：`~/.agents/subagents/<id>.md`。

@@ -1713,6 +1713,16 @@
   }
 }
 
+.agent-capability-row-actions > .settings-icon-button.is-action-highlight {
+  opacity: 1;
+  color: var(--ds-accent);
+}
+
+.agent-capability-row-actions > .settings-icon-button.is-action-highlight:hover:not(:disabled) {
+  color: var(--ds-accent);
+  background: color-mix(in oklab, var(--ds-accent) 14%, transparent);
+}
+
 .agent-capability-row.menu-open {
   background: var(--ds-tile-hover);
 }

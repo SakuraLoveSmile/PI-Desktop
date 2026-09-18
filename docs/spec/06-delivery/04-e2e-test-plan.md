@@ -6217,6 +6217,23 @@ identify the platform validation still needed.
   `packages/shared/src/mcp-import.test.ts`, host-core `mcp_servers` tests); full
   UI journey Draft
 
+#### E2E-100B: Remote HTTP MCP server OAuth 2.1 authorization and token lifecycle
+
+- **Preconditions**: An HTTP MCP server endpoint configured requiring OAuth 2.1 authentication (RFC 9728 discovery and PKCE S256).
+- **Steps**:
+  1. Open Settings > Agent > MCP. Add an HTTP MCP server URL.
+  2. The server status displays `Authorization required`.
+  3. Click `Authorize`. Main spins up loopback on `127.0.0.1`, launches external browser to the authorization endpoint with RFC 8707 `resource`.
+  4. Complete login in browser, redirecting to `http://127.0.0.1:<port>/callback`.
+  5. The loopback callback validates state/code, completes token exchange with PKCE verifier, saves token to encrypted secret `secret:mcp:<id>:oauth`, renders escaped success page, and emits `done` event.
+  6. Settings UI updates status to `Ready` with discovered tools, shows localized success toast, and displays `OAuth` badge.
+  7. When access token expires, `UserMcpRuntime` transparently uses refresh token to obtain a fresh access token without user prompt.
+  8. Moving the server via `mcp.transfer` preserves and re-keys the OAuth token secret under the destination ID.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, ADR 0281, ADR 0142
+- **Acceptance**: E (tools & permissions), Security
+- **Milestone**: M5
+- **Status**: Unit-covered (`apps/desktop/test/mcp-oauth.test.mjs`, `apps/desktop/test/user-mcp.test.mjs`); full UI journey Draft
+
 #### E2E-101: A user skill is written once and scoped per project
 
 - **Preconditions**: Two projects on disk. An Agent session in each.

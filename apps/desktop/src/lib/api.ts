@@ -49,6 +49,7 @@ import type {
   McpServerInput,
   McpServerRecord,
   McpServerStatus,
+  McpOAuthLoginEvent,
   OnboardingState,
   OAuthLoginEvent,
   OAuthRespondInput,
@@ -895,6 +896,11 @@ export const api = {
   /** Force one handshake and report what happened, for the editor's test button. */
   testMcpServer: (id: string, query?: Partial<AgentCapabilityQuery>) =>
     invoke<{ status: McpServerStatus }>(IPC.invoke.mcpTest, { id, ...query }),
+  /** Launch browser-based OAuth 2.1 authorization flow for an HTTP MCP server. */
+  startMcpOAuth: (id: string, query?: Partial<AgentCapabilityQuery>) =>
+    invoke<{ ok: boolean; loginId: string }>(IPC.invoke.mcpOauthStart, { id, ...query }),
+  cancelMcpOAuth: (payload: { loginId?: string; id?: string }) =>
+    invoke<{ ok: boolean }>(IPC.invoke.mcpOauthCancel, payload),
   /** Accept a pasted `mcpServers` block; bad entries are reported, not fatal. */
   importMcpServers: (text: string) =>
     invoke<{
@@ -1323,6 +1329,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.providersOauth, (payload) =>
       listener(payload as OAuthLoginEvent),
+    );
+  },
+  onMcpOAuth: (listener: (event: McpOAuthLoginEvent) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.mcpOauth, (payload) =>
+      listener(payload as McpOAuthLoginEvent),
     );
   },
   onExtensionPrompt: (listener: (prompt: TrustedExtensionUiPrompt) => void) => {
