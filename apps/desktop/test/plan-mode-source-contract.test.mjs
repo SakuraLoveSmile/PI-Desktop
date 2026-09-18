@@ -184,10 +184,28 @@ test("the startup artifact restore resolves launchable views first", () => {
   // renderer only reads that list after `ready`. Opening the artifact before
   // that read used the host file tab and then took a second tab when
   // `selectSession` restored the same approval.
-  assert.match(
-    storeSource,
-    /await get\(\)\.refreshPluginViews\(\);[\s\S]{0,400}?openPlanArtifact\(/,
+  const bootstrapStart = storeSource.indexOf("bootstrap: async");
+  assert.ok(bootstrapStart > -1, "bootstrap is declared in the store source");
+  const bootstrap = storeSource.slice(bootstrapStart);
+  const resolvedViews = bootstrap.indexOf("await get().refreshPluginViews();");
+  const restoreLoop = bootstrap.indexOf(
+    "for (const proposal of activePendingPlans)",
   );
+
+  assert.ok(resolvedViews > -1, "bootstrap resolves the launchable views");
+  assert.ok(
+    restoreLoop > resolvedViews,
+    "the view list resolves before the pending-plan restore loop",
+  );
+  assert.ok(
+    bootstrap.indexOf("openPlanArtifact(") > restoreLoop,
+    "no artifact opens before that loop",
+  );
+  // Every slice call site forwards the live list, so a stub list cannot hide
+  // the wrong surface behind a green run.
+  for (const slice of [eventsSource, sessionSource]) {
+    assert.match(slice, /openPlanArtifact\([\s\S]{0,120}?get\(\)\.pluginViews/);
+  }
 });
 
 test("plan approval bar paints the composer plate over the transparent dock", () => {
