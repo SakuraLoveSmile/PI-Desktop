@@ -15,6 +15,7 @@ const stapleScript = new URL(
 );
 
 const SIGNING_IDENTITY = "Developer ID Application: XingYu Liu (DUV63RKYTW)";
+const SIGNING_IDENTITY_NAME = "XingYu Liu (DUV63RKYTW)";
 
 async function writeSignedAppFixture(release) {
   const app = join(release, "mac-arm64", "PI-Desktop.app");
@@ -80,10 +81,13 @@ test("macOS release verification requires a notarized Developer ID app and DMG",
     ["codesign", "spctl", "xcrun"].map((name) => chmod(join(bin, name), 0o755)),
   );
 
+  // The local lane passes the bare common name; the script must still match the
+  // prefixed Authority line codesign prints.
   const result = spawnSync("bash", [verifyScript.pathname, release], {
     encoding: "utf8",
     env: {
       ...process.env,
+      MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME,
       PATH: `${bin}:${process.env.PATH}`,
       STAPLER_LOG: staplerLog,
     },
@@ -127,4 +131,71 @@ test("macOS release verification rejects a Developer ID app without notarization
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /did not recognize .* as notarized/);
+});
+
+test("macOS release verification accepts the prefixed identity form", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-prefixed-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const release = join(root, "release");
+  const bin = join(root, "bin");
+  await writeSignedAppFixture(release);
+  await mkdir(bin, { recursive: true });
+  await writeFile(
+    join(bin, "codesign"),
+    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'flags=0x10000(runtime)' >&2; fi\n`,
+  );
+  await writeFile(
+    join(bin, "spctl"),
+    "#!/usr/bin/env bash\necho 'source=Notarized Developer ID' >&2\n",
+  );
+  await writeFile(join(bin, "xcrun"), "#!/usr/bin/env bash\nexit 0\n");
+  await Promise.all(
+    ["codesign", "spctl", "xcrun"].map((name) => chmod(join(bin, name), 0o755)),
+  );
+
+  const result = spawnSync("bash", [verifyScript.pathname, release], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      MAC_SIGNING_IDENTITY: SIGNING_IDENTITY,
+      PATH: `${bin}:${process.env.PATH}`,
+    },
+  });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
+test("macOS release verification rejects a different signing identity", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-wrong-id-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const release = join(root, "release");
+  const bin = join(root, "bin");
+  await writeSignedAppFixture(release);
+  await mkdir(bin, { recursive: true });
+  await writeFile(
+    join(bin, "codesign"),
+    "#!/usr/bin/env bash\nif [[ \"$*\" == *\"-dv\"* ]]; then echo 'Authority=Developer ID Application: Someone Else (ZZZZZZZZZZ)' >&2; fi\n",
+  );
+  await writeFile(
+    join(bin, "spctl"),
+    "#!/usr/bin/env bash\necho 'source=Notarized Developer ID' >&2\n",
+  );
+  await writeFile(join(bin, "xcrun"), "#!/usr/bin/env bash\nexit 0\n");
+  await Promise.all(
+    ["codesign", "spctl", "xcrun"].map((name) => chmod(join(bin, name), 0o755)),
+  );
+
+  const result = spawnSync("bash", [verifyScript.pathname, release], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME,
+      PATH: `${bin}:${process.env.PATH}`,
+    },
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /is not signed with/);
 });

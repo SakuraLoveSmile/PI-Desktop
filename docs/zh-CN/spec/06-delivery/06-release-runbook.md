@@ -43,11 +43,10 @@ Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染�
 
 ## 2. 先决条件（发布通道）
 
-1. Apple 开发者帐户，具有 **开发者 ID 应用程序** 证书
-   登录钥匙串。
-2、环境变量：
-   - `MAC_SIGNING_IDENTITY` — 例如`Developer ID Application: <Name> (<TEAMID>)`
-   - `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID` — 公证所必需。
+1. Apple 开发者帐户，登录钥匙串中具有 **Developer ID Application** 证书。正式证书为 `Developer ID Application: XingYu Liu (DUV63RKYTW)`（Team ID `DUV63RKYTW`）。
+2. 本地签名通道的环境变量：
+   - `MAC_SIGNING_IDENTITY` — 裸通用名 `XingYu Liu (DUV63RKYTW)`；electron-builder 拒绝保留 `Developer ID Application:` 前缀的名称，脚本会自动去掉该前缀
+   - `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID` — 公证所必需（`APPLE_TEAM_ID` 必须为 `DUV63RKYTW`）
 3. 安装 Rust 工具链和 pnpm 工作区。Rust 必须在 macOS 本机运行器上运行：
    Apple Silicon 使用 arm64，Intel 使用 x86_64。
 
@@ -159,7 +158,7 @@ Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染�
 ### 4.2 构建/打包
 
 ```bash
-export MAC_SIGNING_IDENTITY="Developer ID Application: ... (TEAMID)"
+export MAC_SIGNING_IDENTITY="XingYu Liu (DUV63RKYTW)"
 export APPLE_ID=...
 export APPLE_APP_SPECIFIC_PASSWORD=...
 export APPLE_TEAM_ID=...
@@ -225,7 +224,7 @@ xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app
 该助手仅适用于可信来源的未签名工件在 macOS 上提示应用已损坏的场景；已签名并公证
 的版本无需执行它。
 
-标签构建和 `sign_macos: true`（手动运行的默认值）仅从 GitHub Actions 密钥接收 `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD` 和 `APPLE_TEAM_ID`，固定身份 `Developer ID Application: XingYu Liu (DUV63RKYTW)`，强制代码签名与 `notarytool` 公证，然后验证该身份、代码签名完整性（含 `pi-desktop-host-core`）、Gatekeeper `Notarized Developer ID` 以及已装订的应用票据。生成的 DMG 也会在任何工件上传前显式装订并验证。
+标签构建和 `sign_macos: true`（手动运行的默认值）仅从 GitHub Actions 密钥接收 `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD` 和 `APPLE_TEAM_ID`，通过 `CSC_NAME=XingYu Liu (DUV63RKYTW)`（裸通用名——electron-builder 拒绝 `Developer ID Application:` 前缀）固定证书，强制代码签名与 `notarytool` 公证，然后验证该身份、代码签名完整性（含 `pi-desktop-host-core`）、Gatekeeper `Notarized Developer ID` 以及已装订的应用票据。生成的 DMG 也会在任何工件上传前显式装订并验证。
 
 DMG、ZIP、NSIS、AppImage、deb、rpm、块图和更新程序提要输出已
 压缩或压缩不敏感。因此，工作流程会上传它们的

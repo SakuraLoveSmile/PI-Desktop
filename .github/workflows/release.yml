@@ -239,7 +239,10 @@ jobs:
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          CSC_NAME: "Developer ID Application: XingYu Liu (DUV63RKYTW)"
+          # electron-builder rejects the "Developer ID Application:" prefix on
+          # identity names and resolves the certificate itself, so CSC_NAME
+          # carries the bare common name only.
+          CSC_NAME: "XingYu Liu (DUV63RKYTW)"
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -248,7 +251,6 @@ jobs:
           # Artifact names are defined in apps/desktop/package.json: the mac
           # pattern labels ZIPs, and the dmg target pattern labels DMGs.
           pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} \
-            -c.mac.identity="Developer ID Application: XingYu Liu (DUV63RKYTW)" \
             -c.mac.forceCodeSigning=true \
             -c.mac.notarize=true
 

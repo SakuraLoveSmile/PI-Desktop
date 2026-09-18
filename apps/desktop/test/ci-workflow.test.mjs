@@ -248,15 +248,12 @@ test("macOS release signing is required on tag pushes", () => {
   ]) {
     assert.match(signedBlock, new RegExp(`${secret}:\\s*\\$\\{\\{\\s*secrets\\.${secret}\\s*\\}\\}`));
   }
-  assert.match(
-    signedBlock,
-    /CSC_NAME: "Developer ID Application: XingYu Liu \(DUV63RKYTW\)"/,
-  );
-  assert.match(
-    signedBlock,
-    /-c\.mac\.identity="Developer ID Application: XingYu Liu \(DUV63RKYTW\)"/,
-  );
-  assert.match(signedBlock, /-c\.mac\.forceCodeSigning=true/);
+  // electron-builder throws InvalidConfigurationError when an identity name
+  // keeps the "Developer ID Application:" prefix, so CSC_NAME carries the bare
+  // common name and the CLI must not pass -c.mac.identity.
+  assert.match(signedBlock, /CSC_NAME: "XingYu Liu \(DUV63RKYTW\)"/);
+  assert.doesNotMatch(signedBlock, /-c\.mac\.identity=/);
+  assert.doesNotMatch(signedBlock, /CSC_NAME: "Developer ID Application:/);
   assert.match(signedBlock, /-c\.mac\.notarize=true/);
   assert.match(
     releaseWorkflowSource,
@@ -270,6 +267,11 @@ test("the signed local macOS lane selects the native runner architecture", () =>
   assert.match(releaseMacScriptSource, /must match the host/);
   assert.match(releaseMacScriptSource, /electron-builder --mac "--\$\{MAC_ARCH\}"/);
   assert.match(releaseMacScriptSource, /XingYu Liu \(DUV63RKYTW\)/);
+  assert.match(
+    releaseMacScriptSource,
+    /MAC_SIGNING_IDENTITY="\$\{MAC_SIGNING_IDENTITY#Developer ID Application: \}"/,
+    "the local lane strips the prefix electron-builder rejects",
+  );
   assert.doesNotMatch(
     releaseMacScriptSource,
     /-c\.(?:dmg|zip)\.artifactName/,

@@ -46,10 +46,12 @@ when macOS `iconutil` is available, without overwriting the canonical source.
 ## 2. Prerequisites (release lane)
 
 1. Apple Developer account with a **Developer ID Application** certificate in
-   the login keychain. Official identity:
+   the login keychain. Official certificate:
    `Developer ID Application: XingYu Liu (DUV63RKYTW)` (Team ID `DUV63RKYTW`).
 2. Environment variables for the local signed lane:
-   - `MAC_SIGNING_IDENTITY` — defaults to the official identity above
+   - `MAC_SIGNING_IDENTITY` — bare common name `XingYu Liu (DUV63RKYTW)`;
+     electron-builder rejects a name that keeps the
+     `Developer ID Application:` prefix, so the script strips it
    - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` — required for
      notarization (`APPLE_TEAM_ID` must be `DUV63RKYTW`)
 3. Rust toolchain and pnpm workspace installed. The Rust toolchain must run on
@@ -182,7 +184,7 @@ Pre-tag checklist:
 ### 4.2 Build / package
 
 ```bash
-export MAC_SIGNING_IDENTITY="Developer ID Application: ... (TEAMID)"
+export MAC_SIGNING_IDENTITY="XingYu Liu (DUV63RKYTW)"
 export APPLE_ID=...
 export APPLE_APP_SPECIFIC_PASSWORD=...
 export APPLE_TEAM_ID=...
@@ -224,8 +226,9 @@ Each job verifies `uname -m`, passes the matching `--arm64` or `--x64` flag to
 electron-builder, and builds `pi-desktop-host-core` on that same native
 runner. Tag builds and `sign_macos: true` (the dispatch default) receive
 `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
-`APPLE_TEAM_ID` only from GitHub Actions secrets, pin identity
-`Developer ID Application: XingYu Liu (DUV63RKYTW)`, force code signing and
+`APPLE_TEAM_ID` only from GitHub Actions secrets, pin the certificate through
+`CSC_NAME=XingYu Liu (DUV63RKYTW)` (bare common name — electron-builder rejects
+the `Developer ID Application:` prefix), force code signing and
 `notarytool` notarization, verify that identity, code-signing integrity
 (including `pi-desktop-host-core`), Gatekeeper `Notarized Developer ID`, and
 the stapled app ticket, and staple and validate the DMG before any artifact
