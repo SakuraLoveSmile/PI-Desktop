@@ -107,9 +107,10 @@ destination, chat as the home surface, tools and permissions inline.
   revealing it without creating a resource tab and collapsing it without
   discarding one; the create trigger remains unavailable while the panel is
   closed. Closing the final tab keeps the panel open and shows the New launcher.
-  A
-  successful active-session workspace Write/Edit artifact opens Review;
-  scratch, failed, and background-session writes never steal focus. The inner
+  No agent or tool result opens, activates, or resizes the panel: Review is
+  reached only through an explicit user action, so a successful workspace
+  Write/Edit leaves the panel exactly as the user left it and shows its
+  evidence as a transcript card instead. The inner
   divider resizes the panel through the shared three-column budget; moving it
   left takes space until MainChat reaches 450px, at which point the expanded
   sidebar yields immediately, and moving it right gives space back. A manual

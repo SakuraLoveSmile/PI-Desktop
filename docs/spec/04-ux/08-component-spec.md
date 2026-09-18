@@ -1014,8 +1014,11 @@ entirely inside the plugin's isolated page:
 - Trigger: file/URL references and BrowserPreview create/activate their
   resource tab in the originating session's runtime context. BrowserPreview
   events carry `sessionId`, and the renderer retains that session's preview
-  path/URL as its Browser resource. Successful workspace Write/Edit artifacts
-  create/activate Review in the originating session.
+  path/URL as its Browser resource. Review is never triggered by a tool
+  result: it opens only from the `+` launcher row or from the retained panel
+  context the viewport-fixed toggle and `Cmd/Ctrl + J` reveal, so a successful
+  workspace Write/Edit cannot open, activate, or resize the panel in any
+  session.
   The viewport-fixed toggle and `Cmd/Ctrl + J` both toggle the active session's
   retained panel context: they reveal the panel without creating a resource and
   collapse the visible panel without deleting one. With no active session the
