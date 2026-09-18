@@ -1021,7 +1021,8 @@ Work-panel and application-window resizing are implemented in MVP:
 - The inner divider's target clamps to the shared three-column budget
   (`client width - 450px - expanded sidebar`, with no fixed pixel cap); pointer movement is
   frame-coalesced and release commits the preferred width. Escape, pointer
-  cancellation, and lost capture restore the press-time panel width.
+  cancellation, and lost capture restore the press-time panel width. A
+  double-click restores the default 360px width inside those same live bounds.
 - Opening and closing animate the dock's `width` and `flex-basis` together with
   the bounded opacity/transform feedback, so MainChat reflows continuously
   inside the existing client area without crossing its 450px minimum instead of
@@ -1054,6 +1055,7 @@ Work-panel and application-window resizing are implemented in MVP:
 The expanded sidebar is user-resizable from 240px to 520px (default 275px) via
 the right-edge handle. Pointer motion below 160px collapses the sidebar and
 keeps the preferred expanded width. Keyboard Arrow/Home/End resize without collapsing.
+Double-clicking the handle restores the 275px default inside the live budget.
 
 Project ordering is implemented for retained project groups. There is no
 reorder grip. Pressing the project title and moving 8px starts a project drag,

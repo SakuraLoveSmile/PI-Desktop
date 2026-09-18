@@ -26,6 +26,8 @@ test("the sidebar exposes an accessible pointer and keyboard resize handle", () 
   assert.match(sidebarSource, /finishSidebarResize\(true, true\)/);
   assert.match(sidebarSource, /onResizeCollapse/);
   assert.match(sidebarSource, /sidebarPointerResize\(/);
+  assert.match(sidebarSource, /onDoubleClick=\{resetSidebarWidth\}/);
+  assert.match(sidebarSource, /sidebarResetWidth\(widthMax\)/);
 });
 
 test("sidebar width is shell-owned and the resize affordance is edge-anchored", () => {

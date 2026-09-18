@@ -40,6 +40,15 @@ export function sidebarPointerResize({
 }
 
 /**
+ * Double-click reset for the expanded-sidebar separator. The default stays
+ * inside the live budget so resetting a squeezed three-column window cannot
+ * push MainChat under its 450px floor.
+ */
+export function sidebarResetWidth(maxWidth = SIDEBAR_WIDTH_MAX): number {
+  return clampSidebarWidth(SIDEBAR_WIDTH_DEFAULT, maxWidth);
+}
+
+/**
  * Live upper bound for a user-chosen sidebar width. The three-column budget
  * still belongs to MainChat: this cap keeps a resize from crossing the 450px
  * floor and tripping D408's sidebar yield.
