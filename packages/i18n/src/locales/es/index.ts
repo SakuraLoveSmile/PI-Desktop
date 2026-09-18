@@ -1152,6 +1152,30 @@ sklm: {
     "fontSizeXl": "Trenta",
     "fontSizeScale": "Escala de tamaño de texto",
     "fontSizePercent": "{{value}}%",
+    "promptEnhancementTitle": "Mejora de prompts",
+    "promptEnhancementDesc":
+      "Se aplica a la acción «Mejorar prompt» del compositor. El prompt del sistema es integrado; la plantilla y el modelo se pueden personalizar.",
+    "promptEnhancementCustomTemplate": "Usar una plantilla propia",
+    "promptEnhancementCustomTemplateDesc":
+      "Reemplaza la plantilla de usuario integrada por la suya. El prompt del sistema sigue integrado.",
+    "promptEnhancementCustomTemplateNeedsTemplate":
+      "Guarde primero una plantilla propia; el interruptor elegirá entonces entre ella y la plantilla integrada.",
+    "promptEnhancementEdit": "Editar",
+    "promptEnhancementModelTitle": "Mejora de prompts",
+    "promptEnhancementModel": "Modelo predeterminado",
+    "promptEnhancementThinking": "Esfuerzo de razonamiento",
+    "promptEnhancementThinkingDesc":
+      "Esfuerzo de razonamiento para la reescritura. Desactivado es el valor predeterminado y el más rápido.",
+    "promptEnhancementThinkingOff": "Desactivado",
+    "promptEnhancementModelFollow": "Seguir el modelo actual",
+    "promptEnhancementUserTemplate": "Plantilla de usuario",
+    "promptEnhancementUserTemplateDesc":
+      "Envuelve el borrador. Debe incluir la variable del borrador; use el botón de inserción.",
+    "promptEnhancementInsertDraft": "Insertar variable del borrador",
+    "promptEnhancementRestore": "Restaurar predeterminado",
+    "promptEnhancementMissingDraftVariable":
+      "La plantilla de usuario debe contener la variable del borrador; de lo contrario el borrador no puede enviarse.",
+    "promptEnhancementSaveError": "No se pudo guardar la configuración de mejora de prompts.",
   },
   "project": {
     "open": "Abrir proyecto",

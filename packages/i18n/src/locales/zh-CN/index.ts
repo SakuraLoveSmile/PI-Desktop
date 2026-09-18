@@ -1153,6 +1153,30 @@ sklm: {
     fontSizeXl: "超超大杯",
     fontSizeScale: "文字缩放比例",
     fontSizePercent: "{{value}}%",
+    promptEnhancementTitle: "提示词增强",
+    promptEnhancementDesc:
+      "作用于输入框的「增强提示词」操作。系统提示词为内置，可自定义用户模板与增强模型。",
+    promptEnhancementCustomTemplate: "使用自定义提示词",
+    promptEnhancementCustomTemplateDesc:
+      "用你自己的用户模板替换内置模板。系统提示词保持内置。",
+    promptEnhancementCustomTemplateNeedsTemplate:
+      "请先保存自定义模板；保存后即可用开关在内置模板与自定义模板之间切换。",
+    promptEnhancementEdit: "编辑",
+    promptEnhancementModelTitle: "增强提示词",
+    promptEnhancementModel: "默认模型",
+    promptEnhancementThinking: "思考强度",
+    promptEnhancementThinkingDesc:
+      "改写时使用的思考强度。默认关闭，最快。",
+    promptEnhancementThinkingOff: "关闭思考",
+    promptEnhancementModelFollow: "跟随当前模型",
+    promptEnhancementUserTemplate: "用户模板",
+    promptEnhancementUserTemplateDesc:
+      "用于包裹草稿。必须包含草稿变量，请用插入按钮写入。",
+    promptEnhancementInsertDraft: "插入草稿变量",
+    promptEnhancementRestore: "恢复默认",
+    promptEnhancementMissingDraftVariable:
+      "用户模板必须包含草稿变量，否则草稿无法发送给模型。",
+    promptEnhancementSaveError: "无法保存提示词增强设置。",
   },
   project: {
     open: "打开项目",
