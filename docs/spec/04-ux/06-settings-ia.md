@@ -141,7 +141,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   command shell selection, Link open destination, context usage display
   (remaining or used), thinking display mode, Enter-to-send control, and the large text paste
   threshold. Link open destination uses the Work panel browser by default
-  and can route plain HTTP(S) link clicks to the system browser. Context
+  and routes chat, transcript, and plugin HTTP(S) clicks to the system
+  browser when set to Default OS browser. Plugin/settings clicks that want
+  the work panel return to chat first so the dock is visible; a missing
+  session falls back to the OS browser. Workspace HTML preview,
+  BrowserPreview, OAuth, and Feedback keep their existing destinations. Context
   usage display controls whether the composer toolbar context ring and its
   popover lead with the remaining or the used capacity figure; the default
   is remaining. The threshold controls when a text-only paste becomes a
