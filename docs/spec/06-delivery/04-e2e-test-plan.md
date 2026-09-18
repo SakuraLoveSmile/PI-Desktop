@@ -260,25 +260,23 @@ identify the platform validation still needed.
   `development-branding.test.mjs`, `ci-workflow.test.mjs`); Fedora KDE/Wayland
   installation remains runner validation
 
-#### E2E-196a: Default unsigned macOS release lane
+#### E2E-196a: Unsigned macOS debug lane
 
-- **Preconditions**: A `vX.Y.Z` tag matches `apps/desktop/package.json`, or the
-  Release workflow is manually dispatched with `sign_macos` omitted or false;
-  Windows and Linux release credentials are not affected.
-- **Steps**: 1) Run the tag workflow or dispatch it with the default signing
-  input. 2) Confirm both macOS architectures complete ordinary DMG/ZIP
-  packaging without certificate secrets. 3) Inspect the artifacts and workflow
-  steps.
+- **Preconditions**: The Release workflow is manually dispatched with
+  `sign_macos: false`; Windows and Linux release credentials are not affected.
+  This path must not be used to publish a GitHub Release tag.
+- **Steps**: 1) Dispatch the Release workflow with `sign_macos: false`. 2)
+  Confirm both macOS architectures complete ordinary DMG/ZIP packaging without
+  certificate secrets. 3) Inspect the artifacts and workflow steps.
 - **Expected**: macOS DMG/ZIP artifacts are produced and uploaded without
   Developer ID signatures or notarization, using explicit `-arm64` and `-x64`
   filename markers for their native architecture; macOS staple and Gatekeeper
   checks are explicitly skipped. Windows/Linux artifacts and the merged updater
-  feed still publish normally. This exception must be removed before the next
-  stable release; it does not satisfy E2E-196c.
+  feed still publish normally. This exception does not satisfy E2E-196c.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
-- **Acceptance**: Quality (default release packaging)
+- **Acceptance**: Quality (debug packaging)
 - **Milestone**: M6+
-- **Status**: Active default; this scenario does not satisfy E2E-196c.
+- **Status**: Opt-in debug lane; tag releases must satisfy E2E-196c.
 
 #### E2E-196b: Unsigned macOS packages expose first-launch guidance
 
@@ -314,24 +312,26 @@ identify the platform validation still needed.
 
 #### E2E-196c: macOS tag artifacts pass Gatekeeper without a quarantine bypass
 
-- **Preconditions**: The Release workflow is manually dispatched for a
-  `vX.Y.Z` tag with `sign_macos: true`; the tag matches
-  `apps/desktop/package.json`; GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
+- **Preconditions**: A `vX.Y.Z` tag matching `apps/desktop/package.json` is
+  pushed, or the Release workflow is dispatched with `sign_macos: true`
+  (default); GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
   `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` secrets; both native macOS
   runners are available.
-- **Steps**: 1) Run the explicitly signed workflow. 2) For each macOS architecture,
-  inspect the unpacked app with `codesign -dv --verbose=4` and confirm a
-  `Developer ID Application` authority. 3) Run `codesign --verify --deep
-  --strict`, `spctl -a -vv`, and `xcrun stapler validate` against the app. 4)
-  Run `xcrun stapler validate` against the matching DMG. 5) Download the DMG on
-  a clean macOS profile, move the app to `/Applications`, and open it without
-  clearing `com.apple.quarantine`.
+- **Steps**: 1) Run the tag workflow. 2) For each macOS architecture, inspect
+  the unpacked app with `codesign -dv --verbose=4` and confirm authority
+  `Developer ID Application: XingYu Liu (DUV63RKYTW)`. 3) Run
+  `codesign --verify --deep --strict --verbose=2`,
+  `spctl --assess --type execute --verbose=4`, and `xcrun stapler validate`
+  against the app, including `Contents/Resources/bin/pi-desktop-host-core`.
+  4) Run `xcrun stapler validate` against the matching DMG. 5) Download the
+  DMG on a clean macOS profile, move the app to `/Applications`, and open it
+  without clearing `com.apple.quarantine`.
 - **Expected**: Each macOS app passes signature integrity, Gatekeeper reports
-  `Notarized Developer ID`, and both app and DMG contain valid stapled tickets.
-  The app opens normally; no `xattr` quarantine-removal command or Security &
-  Privacy override is required.
+  `source=Notarized Developer ID`, and both app and DMG contain valid stapled
+  tickets. The app opens normally; no `xattr` quarantine-removal command or
+  Security & Privacy override is required. Missing secrets fail the job.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
-  `05-security/01-security.md`
+  `05-security/01-security.md`, ADR 0289
 - **Acceptance**: Quality, Security
 - **Milestone**: M6+
 - **Status**: Workflow script/unit-covered; clean-machine journey required for
@@ -3894,12 +3894,12 @@ identify the platform validation still needed.
   automatic check or invoke Check for Updates from the application menu /
   Settings → Info.
 - **Expected**: Update state reports `available` (manual platforms) or
-  advances through in-app download for Windows NSIS / Linux AppImage with
-  `availableVersion` equal to the newer stable tag. A Windows portable run
-  (`PORTABLE_EXECUTABLE_FILE`) stays on the manual notify-and-link path and
-  must not download or run the NSIS installer. The client must not report
-  up-to-date merely because no newer release shares the same `rc` prerelease
-  channel.
+  advances through in-app download for packaged macOS, Windows NSIS, and
+  Linux AppImage with `availableVersion` equal to the newer stable tag. A
+  Windows portable run (`PORTABLE_EXECUTABLE_FILE`) stays on the manual
+  notify-and-link path and must not download or run the NSIS installer. The
+  client must not report up-to-date merely because no newer release shares the
+  same `rc` prerelease channel.
 - **Specs linked**: `04-ux/09-interaction-patterns.md`,
   `05-security/01-security.md`, `08-meta/decisions-log.md` (D120),
   ADR 0022

@@ -295,6 +295,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0284 | [`packages/host-runtime` 的无头运行时边界](/adr/0284-headless-runtime-boundary) | 已接受（实施中）（D447；ADR 0205 R2 前置） |
 | 0285 | [`packages/racp` 的 `RACP-WS` 传输](/adr/0285-racp-ws-transport) | 已接受（实施中）（D448；ADR 0205 R2） |
 | turn-process-and-thinking-display | [回合过程与思考展示](/adr/turn-process-and-thinking-display) | 已接受 |
+| 0289 | [签名的 macOS GitHub Release 与应用内更新](/adr/0289-signed-macos-github-releases) | 已接受（D450；修订 ADR 0022 / 0145 / 0191 / 0204 / D078） |
 
 ## 什么时候看 ADR
 
