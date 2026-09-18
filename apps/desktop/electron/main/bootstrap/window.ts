@@ -33,6 +33,7 @@ import {
   type WorkPanelReservationState,
 } from "../work-panel-window";
 import { readWindowState, writeWindowState } from "../window-preferences";
+import { suppressLinuxFramelessSystemMenu } from "../frameless-system-menu";
 
 function windowsIconPath(): string | undefined {
   if (process.platform !== "win32") return undefined;
@@ -198,6 +199,7 @@ export async function createWindow({
     },
   });
   const window = windowState.mainWindow;
+  suppressLinuxFramelessSystemMenu(window);
   const initialBounds = window.getBounds();
   windowState.workPanelBaseBounds = savedState ? { ...savedState } : { ...initialBounds };
   windowState.workPanelLastAppliedBounds = { ...initialBounds };
