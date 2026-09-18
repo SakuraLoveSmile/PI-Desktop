@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from "electron";
+import { app, BrowserWindow, Menu, safeStorage } from "electron";
 import {
   APP_NAME,
   APP_VERSION,
@@ -18,6 +18,7 @@ import { applyNetworkProxyFromAppSettings } from "../network-proxy";
 import { readCloseBehavior } from "../window-preferences";
 import { createAgentHostBridge, type AgentHostBridge } from "../agent-host-bridge";
 import { createBackendRouter, type BackendRouter } from "../remote/backend-router";
+import { createRemoteHostsBoot, setActiveRemoteHostsBoot } from "./remote-hosts";
 import {
   createMcpControlController,
   McpControlServer,
@@ -168,6 +169,34 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     state.backendRouter = createBackendRouter({
       log: (level, message, data) =>
         logger.app("runtime", level, message, { data: data === undefined ? undefined : String(data) }),
+    });
+    // Every paired remote `pi-host` opens against the router this boot just
+    // created. An empty registry (default install with no user pairing) makes
+    // this a full no-op — nothing connects, no backend registers, every
+    // renderer call keeps hitting the local handler byte-for-byte.
+    const remoteHostsBoot = createRemoteHostsBoot({
+      dataDir,
+      encryption: {
+        // Electron's safeStorage exposes `isEncryptionAvailable`; the port
+        // keeps the shorter `isAvailable` name so a Node-side test can drop
+        // in a fake without pulling in the Electron type.
+        isAvailable: () => safeStorage.isEncryptionAvailable(),
+        encryptString: (plain) => safeStorage.encryptString(plain),
+        decryptString: (buffer) => safeStorage.decryptString(buffer),
+      },
+      router: state.backendRouter,
+      emit: sendToRenderer,
+      clientInfo: { name: APP_NAME, version: APP_VERSION },
+      log: (level, message, data) =>
+        logger.app("runtime", level, message, { data: data === undefined ? undefined : String(data) }),
+    });
+    setActiveRemoteHostsBoot(remoteHostsBoot);
+    // Boot in the background: a slow or unreachable host must not delay the
+    // first window. Failures for individual hosts are logged inside `open()`.
+    void remoteHostsBoot.open().then((opened) => {
+      if (opened > 0) {
+        logger.app("runtime", "info", "remote hosts connected", { data: String(opened) });
+      }
     });
     state.agentHostBridge = createAgentHostBridge({
       invoke: invokeIpc,
