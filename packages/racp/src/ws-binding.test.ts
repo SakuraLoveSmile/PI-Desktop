@@ -64,6 +64,12 @@ describe("RACP-WS over a loopback socket", () => {
         socket.once("close", (code) => resolve(code));
       });
       expect(closeCode).toBe(1003);
+      // The client observed its own close frame; the server drops the
+      // connection on its side of the socket's close event, which can lag
+      // under parallel test load. Poll instead of asserting on the same tick.
+      for (let i = 0; i < 100 && h.server.connectionCount() > 0; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
       expect(h.server.connectionCount()).toBe(0);
     } finally {
       await binding.close();
