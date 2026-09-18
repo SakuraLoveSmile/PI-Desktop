@@ -945,7 +945,7 @@ export async function createWindow({
     // so the app kept yanking itself above whatever the user had just focused
     // (D447).
     if (process.platform !== "darwin") {
-      clearInterval(boundsWatchdog);
+      if (boundsWatchdog) clearInterval(boundsWatchdog);
       return;
     }
     const cg = readCgBounds();
