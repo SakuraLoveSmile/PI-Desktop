@@ -480,11 +480,6 @@
   justify-content: flex-end;
 }
 
-.settings-row:has(.settings-speech-fields) .settings-row-control {
-  max-width: 280px;
-  align-items: stretch;
-}
-
 /*
   A toggle paired with an icon action (prompt enhancement). The control column
   has no gap of its own, so the two would otherwise touch.
@@ -492,19 +487,6 @@
 .settings-row-control:has(> .settings-toggle + .settings-icon-button) {
   gap: 8px;
 }
-
-.settings-speech-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 180px;
-  width: 100%;
-}
-
-.settings-speech-lead {
-  padding: 12px 16px 0;
-}
-
 .settings-row-control .field-input {
   width: 100%;
   min-width: 140px;

@@ -297,6 +297,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | turn-process-and-thinking-display | [回合过程与思考展示](/adr/turn-process-and-thinking-display) | 已接受 |
 | 0289 | [签名的 macOS GitHub Release 与应用内更新](/adr/0289-signed-macos-github-releases) | 已接受（D450；修订 ADR 0022 / 0145 / 0191 / 0204 / D078） |
 | 0290 | [恢复可拖拽侧边栏宽度，过窄时收起](/adr/0290-resizable-sidebar-collapse-threshold) | 已接受（D451；修订 ADR 0141 / ADR 0238） |
+| 0291 | [移除设置页面的语音界面](/adr/0291-remove-speech-settings-ui) | 已接受（修订 ADR 0281） |
 
 ## 什么时候看 ADR
 

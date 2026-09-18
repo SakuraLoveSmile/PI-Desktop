@@ -139,6 +139,14 @@ test("Basics and AI tabs expose their respective app and AI controls", () => {
   // The AI tab keeps the Settings picker control: a native <select> popup is
   // platform-drawn and cannot carry the shared menu surface or its check mark.
   assert.doesNotMatch(aiSource, /<select/);
+  // Speech is not a Settings surface: the AI tab renders no voice card, search
+  // indexes no speech keys, its styles are gone, and the host capability keeps
+  // its IPC contract (ADR 0291).
+  assert.doesNotMatch(settingsPageSource, /VoiceSettingsCard|voice-settings/);
+  assert.doesNotMatch(settingsSearchSource, /settings\.speech/);
+  assert.doesNotMatch(stylesSource, /\.settings-speech/);
+  assert.doesNotMatch(enLocaleSource, /speechTitle:|speechVoicePlaceholder:/);
+  assert.match(protocolSource, /speechTranscribe: "pi-desktop\/speech\/transcribe"/);
 });
 
 test("language persists as part of shared app settings", () => {

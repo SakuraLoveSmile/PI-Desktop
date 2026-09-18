@@ -254,6 +254,7 @@ Composer 拥有 Agent/Plan/Goal 控件以及组合的模型 × 推理选择（§
 ### 2.5 辅助功能
 
 - 每个控件都可以通过 Tab 键盘访问
+- 输入框不渲染任何转写或朗读控件；宿主语音能力只能由 IPC 与插件调用（ADR 0291）。
 - 停止按钮有 `aria-label="Stop generating"`
 
 ### 2.6 MVP 约束

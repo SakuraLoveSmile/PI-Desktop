@@ -6096,3 +6096,27 @@ that was sitting at the bottom — including after the turn had finished.
   and reaches the user as the status message of a user-configured server.
 - See ADR 0038 and E2E-024K; `apps/desktop/test/plugin-mcp.test.mjs` covers the
   whole catalog, each guard, and the old truncation as a failing baseline.
+
+## 2026-09-19 — The Voice settings card is removed (ADR 0291)
+
+- Settings → AI no longer carries a speech section: `VoiceSettingsCard` and
+  `features/settings/voice-settings.tsx`, the AI destination's
+  `settings.speechTitle` / `settings.speechTranscribe` / `settings.speechSynthesize`
+  search keywords, the `.settings-speech-*` styles, the thirteen
+  `settings.speech*` keys in all eight shipped locale catalogs, and the seven
+  unreferenced `chat.transcribe*` / `chat.speak*` keys written for those
+  withdrawn Composer controls are gone.
+- The host capability stays: `speech/getStatus`, `speech/transcribe`,
+  `speech/synthesize`, `AppSettings.speech` validation, the two built-in
+  protocols, the `speech.adapter.register` plugin permission, and the renderer
+  API bridge are unchanged. A binding is written by a caller through the host
+  settings API, and plugins and IPC calls are its only consumers.
+- Already withdrawn, and repaired here in the docs: ADR 0281 item 5's Composer
+  transcription and draft-speech entry point — its mic and read-aloud controls
+  were removed on 2026-09-18 (`344ef4ec2`, PR #555) — and the Composer speech
+  controls `04-ux/08-component-spec.md` §2.5 described. The copy written for them
+  is retired with them.
+- Renderer only: no IPC channel, storage schema, host RPC, permission, or Rust
+  change, and no stored binding is dropped. See ADR 0291,
+  `04-ux/06-settings-ia.md`, `03-runtime/20-speech.md`, E2E-008e.
+

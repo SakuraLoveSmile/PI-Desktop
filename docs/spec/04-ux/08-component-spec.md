@@ -316,7 +316,8 @@ combined model × reasoning selection (§11).
 
 - Every control is keyboard-reachable with Tab
 - Composer stop control has `aria-label="Stop generating"`
-- Composer transcribe / speak controls are icon buttons with `aria-label` from `chat.transcribe` / `chat.speak`. They stay disabled until the matching speech role is configured.
+- The Composer renders no transcription or speech control; the host speech
+  capability is reachable only from IPC and plugins (ADR 0291).
 - The topbar does not render a separate running-state indicator; the Composer
   submit control and transcript working feedback remain the running-state cues.
 

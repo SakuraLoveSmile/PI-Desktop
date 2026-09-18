@@ -4433,3 +4433,11 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 该上限从来不是对提示词的保护：MCP 工具以 `ToolSearch` 之后的延迟按需条目到达模型，宣传它们的提示词区块另有独立上限，因此一个 300 个工具的服务器在被激活之前不产生任何成本。
 - `plugin.mcp.tools.truncated` 已移除。拒绝会以 `plugin.mcp.connect` / `mcp.connect` 记入审计并带上护栏的错误码与消息，对用户自建的服务器则显示为其状态消息。
 - 见 ADR 0038 与 E2E-024K；`apps/desktop/test/plugin-mcp.test.mjs` 覆盖完整目录、各项护栏，以及把旧的截断行为作为失败基线。
+
+## 2026-09-19 —— 移除设置页面的语音卡片（ADR 0291）
+
+- 设置 → AI 不再有语音区块：`VoiceSettingsCard` 与 `features/settings/voice-settings.tsx`、AI 目的地的 `settings.speechTitle` / `settings.speechTranscribe` / `settings.speechSynthesize` 搜索关键词、`.settings-speech-*` 样式、八种出厂语言各十三条 `settings.speech*` 文案，以及为已撤回 Composer 控件所写、无任何引用的七个 `chat.transcribe*` / `chat.speak*` 文案全部删除。
+- 宿主能力保留：`speech/getStatus`、`speech/transcribe`、`speech/synthesize`、`AppSettings.speech` 校验、两个内置协议、`speech.adapter.register` 插件权限与渲染器 API 桥接均未改动。绑定由调用方通过宿主设置接口写入，插件与 IPC 调用是其唯一消费方。
+- 早已撤回、本次一并修正文档：ADR 0281 第 5 条中的 Composer 转写与朗读入口（其麦克风与朗读控件已于 2026-09-18 在 `344ef4ec2`／PR #555 中移除），以及 `04-ux/08-component-spec.md` §2.5 描述的 Composer 语音控件；为它们写下的文案随之退役。
+- 仅渲染层：无 IPC 通道、存储 schema、宿主 RPC、权限或 Rust 改动，也不会丢弃已存绑定。见 ADR 0291、`04-ux/06-settings-ia.md`、`03-runtime/20-speech.md`、E2E-008e。
+
