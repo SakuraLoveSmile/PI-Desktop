@@ -184,7 +184,6 @@ export function createPluginServices({
       globalShortcut.unregister(accelerator);
     },
     // Late-bound: the runtime is constructed just below, and a trigger can
-    // Late-bound: the runtime is constructed just below, and a trigger can
     // only arrive once the app is running and a plugin holds a shortcut.
     onTrigger: (entry) => {
       void plugins.triggerPluginShortcut(entry);
@@ -460,9 +459,17 @@ export function createPluginServices({
     emit: (event) => sendToRenderer(IPC.event.mcpOauth, event),
     openExternal: (url) => safeOpenExternal(url),
     log: (level, message, data) => logger.app("plugin", level, message, { data }),
-    onAuthorized: async (serverId): Promise<McpServerStatus> => {
+    onAuthorized: async (serverId, record): Promise<McpServerStatus> => {
+      const existed = userMcp.listRecords().some((item) => item.id === serverId);
+      if (record && !existed) {
+        userMcp.setRecords([...userMcp.listRecords(), record]);
+      }
       userMcp.invalidate(serverId);
       const status: McpServerStatus = await userMcp.test(serverId);
+      if (!existed) {
+        userMcp.invalidate(serverId);
+        userMcp.setRecords(userMcp.listRecords().filter((item) => item.id !== serverId));
+      }
       sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: serverId });
       return status;
     },
