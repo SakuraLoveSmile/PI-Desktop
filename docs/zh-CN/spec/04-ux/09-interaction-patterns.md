@@ -706,6 +706,8 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
    `.pi/plan/*.md` 或 `.pi/goal/*.md` 工件，记录其 path/hash/size 并结构化
    title/question，渲染器显示共享合同审批卡
    只有标题和神器开启器；问题仍然是主机端合同数据。
+   打开器在该视图可启动时把这一路径交给内置文件视图，否则交给宿主机文件标签，
+   因此工件会在对话旁、与用户其它项目文件相同的视图中打开（D452）。
 4. 批准需要询问/接受编辑/自动选择。渲染器会记住
    该设备上最后选择的模式并将其用作下一个批准的模式
    默认。 Host-core提交批准，`mode = agent`，权限模式，
