@@ -3125,8 +3125,8 @@ D193, and D194.
 - Sidebar collapse remains independent from the preferred expanded width. No
   IPC, native-window bounds, work-panel reservation, or project/session order
   contract changes. See ADR 0141 and E2E-168.
-- D408 supersedes this width contract for the live shell: the expanded sidebar
-  is fixed at 275px and the historical resize handle is hidden.
+- D408 later pinned the live shell at 275px and hid the handle. D451 / ADR 0290
+  restores the resizable handle and adds collapse below 160px.
 
 
 ## 2026-09-01 — Non-loopback HTTP MCP endpoints are supported (D281)
@@ -6061,3 +6061,20 @@ that was sitting at the bottom — including after the turn had finished.
   changes; the existing `prompt/enhance` payload is unchanged. See
   `04-ux/12-prompt-enhancement.md` §3 and §5, ADR 0121, and
   `06-delivery/04-e2e-test-plan.md` E2E-259.
+
+## 2026-09-19 — Restore resizable sidebar width with collapse-below-threshold (D451)
+
+- Amend D408 / ADR 0238 and restore ADR 0141: the expanded sidebar is again a
+  renderer-owned `240px..520px` column (default `275px`). The right-edge handle
+  previews width from the pointer-down position, persists on release, and
+  supports ArrowLeft/ArrowRight (16px), Home, and End. Escape, cancellation,
+  lost capture, and unmount restore the press-time width.
+- A pointer width below `160px` collapses the sidebar immediately as a user
+  action. The preferred expanded width is not overwritten. Keyboard resize never
+  collapses; `Cmd/Ctrl+B` remains the keyboard fold.
+- The live maximum is the three-column remainder after MainChat's 450px floor
+  and an occupying work panel's requested width, so a user-chosen sidebar width
+  does not trip D408's yield. Work-panel growth and window shrink still collapse
+  the expanded sidebar at that threshold.
+- Renderer only: existing `pi.desktop.sidebarWidth` preference, no IPC or native
+  window change. See ADR 0290 and E2E-168.
