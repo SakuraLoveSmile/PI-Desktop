@@ -659,7 +659,12 @@ Responses attaches `{ type: "web_search" }`. Chat Completions stays off
 except xAI (`vendorKey` xai / `api.x.ai`), which attaches
 `search_parameters`. The Composer globe writes `nativeWebSearchEnabled`
 (default off). Search results render as a hostedSearch activity row on
-the assistant turn and can be expanded to show sources.
+the assistant turn and can be expanded to show sources. Inline citation
+badges replace a markdown link only when its href is `#cite=N` or matches
+a source URL by host and path; a same-host different-path link stays an
+ordinary hyperlink. Source favicons load only from that origin's
+`/favicon.ico`; the renderer must not send source hostnames to a
+third-party favicon service.
 
 
 This is the **universal escape hatch** guaranteeing market coverage beyond native integrations.
