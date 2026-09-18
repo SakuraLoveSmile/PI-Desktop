@@ -923,9 +923,15 @@ export async function createWindow({
     })();
   });
 
-  const boundsWatchdog = setInterval(() => {
+  // Stage Manager recovery is macOS-only. On other platforms readCgBounds is
+  // always null and cgHelperAvailable is false, so the periodic tick would only
+  // call setAlwaysOnTop(false). Under Mutter (GNOME/Linux) meta_window_unmake_above
+  // unconditionally raises the window, which causes the window to periodically
+  // steal focus (see issue #568). Skip the watchdog entirely off macOS.
+  const boundsWatchdog: NodeJS.Timeout | null = process.platform === "darwin"
+    ? setInterval(() => {
     if (!isLiveWindow()) {
-      clearInterval(boundsWatchdog);
+      if (boundsWatchdog) clearInterval(boundsWatchdog);
       return;
     }
     const cg = readCgBounds();
@@ -948,7 +954,8 @@ export async function createWindow({
         // ignore
       }
     }
-  }, 1500);
+  }, 1500)
+    : null;
   window.on("closed", () => {
     if (boundsTimer) {
       clearTimeout(boundsTimer);
@@ -966,7 +973,7 @@ export async function createWindow({
       clearTimeout(workPanelSettleExpiryTimer);
       workPanelSettleExpiryTimer = null;
     }
-    clearInterval(boundsWatchdog);
+    if (boundsWatchdog) clearInterval(boundsWatchdog);
   });
 
   window.once("ready-to-show", () => {
