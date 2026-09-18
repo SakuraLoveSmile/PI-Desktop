@@ -166,11 +166,11 @@ export function FontFamilyRow({
     const needle = query.trim().toLowerCase();
     if (!needle) return options;
     return options.filter((option) => {
-      const localized =
-        option.group === "default" ? defaultLabel.toLowerCase() : option.label.toLowerCase();
-      return (
-        localized.includes(needle) || option.label.toLowerCase().includes(needle)
-      );
+      const haystack =
+        option.group === "default"
+          ? `${defaultLabel} ${option.label}`.toLowerCase()
+          : option.label.toLowerCase();
+      return haystack.includes(needle);
     });
   }, [defaultLabel, options, query]);
 

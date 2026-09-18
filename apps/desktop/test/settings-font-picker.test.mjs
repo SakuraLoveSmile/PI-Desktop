@@ -31,13 +31,25 @@ test("the closed trigger and search use the localized system-default label", () 
     rowSource,
     /selectedOption\?\.group === "default" \|\| selectedValue === ""/,
   );
-  assert.match(rowSource, /option\.group === "default" \? defaultLabel\.toLowerCase\(\)/);
+  assert.match(
+    rowSource,
+    /option\.group === "default"[\s\S]*?`\$\{defaultLabel\} \$\{option\.label\}`\.toLowerCase\(\)/,
+  );
 });
 
 test("the font trigger hugs the current label like language and theme", () => {
-  assert.match(styles, /\.settings-font\s*\{[^}]*width:\s*max-content;/s);
-  assert.match(styles, /\.settings-font-trigger\s*\{[^}]*width:\s*max-content;/s);
-  assert.match(styles, /\.settings-font-trigger-label\s*\{[^}]*flex:\s*0 1 auto;/s);
+  assert.match(
+    styles,
+    /\.settings-language-anchor,\s*\.settings-theme-anchor,\s*\.settings-menu-select-anchor,\s*\.settings-font\s*\{[^}]*width:\s*max-content/s,
+  );
+  assert.match(
+    styles,
+    /\.settings-language-trigger,\s*\.settings-theme-trigger,\s*\.settings-menu-select-trigger,\s*\.settings-font-trigger\s*\{[^}]*width:\s*max-content/s,
+  );
+  assert.match(
+    styles,
+    /\.settings-language-trigger-label,\s*\.settings-theme-trigger-label,\s*\.settings-menu-select-trigger-label,\s*\.settings-font-trigger-label\s*\{[^}]*flex:\s*0 1 auto/s,
+  );
   assert.doesNotMatch(styles, /\.settings-font-trigger\s*\{[^}]*min-width:\s*200px;/s);
 });
 
