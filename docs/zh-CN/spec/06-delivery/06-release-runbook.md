@@ -55,7 +55,12 @@ Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染�
 
 - Electron 应用程序具有强化的运行时 + 权利
   (`build/entitlements.mac.plist`: JIT + 无符号可执行内存 +
-  库验证禁用 — 标准 Electron 设置）。
+  库验证禁用 — 标准 Electron 设置），并在 Info.plist 中通过
+  `apps/desktop/package.json` → `mac.extendInfo` 追加
+  `NSLocalNetworkUsageDescription`，使 macOS 15+ 弹出本地网络授权，同时授予
+  Chromium 主进程与 `ELECTRON_RUN_AS_NODE` 的 agent sidecar；否则主进程的
+  Test Provider 能过，但 sidecar 走局域网请求会以 `EHOSTUNREACH` 失败
+  （issue #573）。
 - `Resources/bin/pi-desktop-host-core` — Rust 主机二进制文件（发布版本）。
 - Windows NSIS 构建包含静态链接 MSVC CRT 的 x64
   `pi-desktop-host-core.exe`，因此全新的 Windows x64 或 Windows 11 ARM64
