@@ -22,11 +22,15 @@ for the official `vastsa/PI-Desktop` release lane.
 
 ## Decision
 
-1. Every GitHub tag release (`vX.Y.Z`) Developer ID-signs, notarizes with
-   `xcrun notarytool` through electron-builder 26 (`-c.mac.notarize=true`),
-   staples the DMG, and verifies the app as `Notarized Developer ID` before
-   upload. Missing signing or notarization secrets fail the job; unsigned
-   macOS artifacts must not be published from a tag.
+1. Every GitHub tag release (`vX.Y.Z`) Developer ID-signs the app through
+   electron-builder 26 and notarizes it with `xcrun notarytool`
+   (`-c.mac.notarize=true`). Because electron-builder notarizes only the app,
+   the final DMG is submitted separately (`xcrun notarytool submit --wait`) and
+   must return `status: Accepted` before `xcrun stapler staple` may run; the
+   run then verifies the app as `Notarized Developer ID` and both stapled
+   tickets before upload. Stapler retries are bounded and only allowed after
+   Apple accepts. Missing signing or notarization secrets fail the job;
+   unsigned macOS artifacts must not be published from a tag.
 2. The signing certificate is
    `Developer ID Application: XingYu Liu (DUV63RKYTW)`; Apple team id
    `DUV63RKYTW`. CI pins it with `CSC_NAME=XingYu Liu (DUV63RKYTW)`. The name
