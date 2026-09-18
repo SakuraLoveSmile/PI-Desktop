@@ -1879,7 +1879,9 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   observed inside the scroller with the same near-top threshold the scroll handler
   uses. An underfilled tail page, a page whose fetched rows all land outside the
   mounted window, and a window transition can leave `scrollTop` untouched, so a
-  scroll-only trigger could never fire again.
+  scroll-only trigger could never fire again. A collapsed scroller and a pinned
+  overflowing transcript whose `scrollTop` has been reset to 0 are not treated as
+  "at the top", so opening or revealing a session cannot page back to the start.
 - **Minimap hover cost**: dash magnification is applied by writing a custom
   property per dash, and dash centers are measured in a separate read-only pass.
   Reading a dash's geometry inside the same loop that writes to it forces one
