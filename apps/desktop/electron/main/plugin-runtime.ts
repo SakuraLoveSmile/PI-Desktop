@@ -77,7 +77,7 @@ import {
   resolveRealPathForCreateWithinRoot,
   resolveRealPathWithinRoot,
   resolveWithinRoot,
-} from "./fs-panel";
+} from "@pi-desktop/host-runtime";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
 import { PluginToolInvocations, type PluginToolInvocation } from "./plugin-tool-invocations";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
@@ -986,7 +986,7 @@ export function readDevPluginDeclaration(pluginPath: string): {
 
 /**
  * `realpath` with the input as its own fallback, for a path that may not exist
- * yet. Containment is decided by `fs-panel`'s checks; this only exists so the
+ * yet. Containment is decided by the host-runtime workspace-files checks; this only exists so the
  * relative path we compare scopes against is expressed in the same terms.
  */
 function realpathOrSelf(path: string): string {
