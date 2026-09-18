@@ -1255,6 +1255,7 @@ function registerIpc() {
     getHost: () => host,
     getSidecar: () => sidecar,
     getAgentHostBridge: () => agentHostBridge,
+    getBackendRouter: () => startupState.backendRouter,
     getNotificationViewingSessionId: () => notificationViewingSessionId,
     setNotificationViewingSessionId: (sessionId: string | null) => {
       notificationViewingSessionId = sessionId;
@@ -1369,6 +1370,7 @@ const startupState: StartupState = {
   set agentHostBridge(value) {
     agentHostBridge = value;
   },
+  backendRouter: null,
   get desktopControl() {
     return desktopControl;
   },

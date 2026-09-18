@@ -17,6 +17,7 @@ import {
 import { applyNetworkProxyFromAppSettings } from "../network-proxy";
 import { readCloseBehavior } from "../window-preferences";
 import { createAgentHostBridge, type AgentHostBridge } from "../agent-host-bridge";
+import { createBackendRouter, type BackendRouter } from "../remote/backend-router";
 import {
   createMcpControlController,
   McpControlServer,
@@ -40,6 +41,7 @@ export type StartupState = {
   applicationBooted: boolean;
   closeBehavior: CloseBehavior;
   agentHostBridge: AgentHostBridge | null;
+  backendRouter: BackendRouter | null;
   desktopControl: McpControlController | null;
   mcpControl: McpControlServer | null;
 };
@@ -158,6 +160,15 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // not race the renderer allocation just because backend startup was slow.
     prewarmPluginLauncher();
     const invokeIpc = registerIpc();
+    // The backend router is the single seam that forwards a renderer IPC call
+    // to a paired remote host; with no remote session registered it returns
+    // ROUTE_LOCAL and the local handler runs unchanged. Assigned before the
+    // first window can issue IPC. Remote host connections register their
+    // sessions here once paired (later stages).
+    state.backendRouter = createBackendRouter({
+      log: (level, message, data) =>
+        logger.app("runtime", level, message, { data: data === undefined ? undefined : String(data) }),
+    });
     state.agentHostBridge = createAgentHostBridge({
       invoke: invokeIpc,
       channels: IPC.invoke,

@@ -274,6 +274,29 @@ carries a marker naming which end survived and where the rest is, or reports
 the bounded window in sibling result fields
 (see [16-tool-result-limits](16-tool-result-limits.md)).
 
+### 3.8 Remote control (RACP-WS / SSH bootstrap)
+
+Emitted by the desktop's remote-host client and the `pi-host` server when a
+session lives on a paired remote machine driven over `RACP-WS`
+(see [19-remote-agent-control-protocol](19-remote-agent-control-protocol.md),
+[../05-security/02-remote-control-security](../05-security/02-remote-control-security.md),
+ADR 0284). The renderer never sees the local/remote split beyond a badge; these
+codes surface through the same error object as any other call.
+
+| code | retriable | meaning |
+|---|---|---|
+| `HOST_DISCONNECTED` | yes | the remote host connection dropped; in-flight calls are rejected and the client reconnects and resubscribes by cursor |
+| `HOST_BOOTSTRAP_FAILED` | no | provisioning the remote `pi-host` over SSH failed (download, checksum mismatch, or `install.sh`); `details.reason` names the stage |
+| `HOST_VERSION_MISMATCH` | no | the remote `pi-host` version does not match the desktop; the desktop refuses to drive an incompatible host |
+| `REMOTE_AUTH_FAILED` | no | the device or pairing token was rejected on the RACP-WS upgrade |
+| `REMOTE_CONNECTION_FAILED` | yes | the RACP-WS transport could not connect (non-loopback URL, refused socket) |
+| `REMOTE_FORWARD_FAILED` | yes | the SSH loopback port forward could not be established |
+| `REMOTE_PATH_NOT_FOUND` | no | a remote project/workspace path does not exist on the host |
+| `REMOTE_PATH_FORBIDDEN` | no | a remote path is outside the host's permitted roots |
+| `PAIRING_FAILED` | no | `connection/pair` could not mint a device credential |
+| `PAIRING_TOKEN_EXPIRED` | no | the single-use pairing token expired before pairing completed |
+| `CAPABILITY_UNAVAILABLE` | no | an operation was requested for a capability the host advertised as unavailable (e.g. attachments, tool relay) |
+
 ## 4. Mapping rules
 
 ### Host RPC numeric → AppError.code
