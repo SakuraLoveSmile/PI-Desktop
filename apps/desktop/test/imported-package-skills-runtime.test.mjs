@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -20,7 +21,7 @@ const { generateImportedExtensionPlugin } = await import("../electron/main/agent
 const { PluginRuntime } = await import("../electron/main/plugin-runtime.ts");
 const hostEntry = fileURLToPath(new URL("../electron/main/plugin-host-process.mjs", import.meta.url));
 
-function createHarness(t, { skillsOnly = false } = {}) {
+function createHarness(t, { skillsOnly = false, packageType } = {}) {
   const root = mkdtempSync(join(tmpdir(), "pi-imported-package-skills-"));
   // The selected package itself lives under node_modules, as an npm global
   // installation would. Its own nested dependency tree must still be excluded.
@@ -46,6 +47,7 @@ function createHarness(t, { skillsOnly = false } = {}) {
   write("package.json", JSON.stringify({
     name: "@fixture/package-skills",
     version: "1.0.0",
+    ...(packageType ? { type: packageType } : {}),
     pi: {
       ...(!skillsOnly ? { extensions: ["index.ts"] } : {}),
       skills: ["skills/direct.md", "skills/release", "skills/catalog"],
@@ -65,7 +67,7 @@ function createHarness(t, { skillsOnly = false } = {}) {
     hostEntry,
     spawnProcess: ({ entry }) => {
       // Execute only the repository's real plugin host and the importer's
-      // generated no-op main.js. Fixture extension modules are only catalogued.
+      // generated no-op main.cjs. Fixture extension modules are only catalogued.
       const child = fork(entry, [], { stdio: ["ignore", "pipe", "pipe", "ipc"] });
       return {
         postMessage: (message) => { if (child.connected) child.send(message); },
@@ -151,4 +153,45 @@ test("a skill-only pi package loads in the plugin runtime without requiring exec
   const manifest = runtime.getLoaded(imported.id).manifest;
   assert.ok(manifest.permissions.includes("agent.prompt.inject"));
   assert.equal(manifest.permissions.includes("agent.extension"), false);
+});
+
+for (const packageType of ["module", "commonjs", undefined]) {
+  test(`imported ${packageType ?? "untyped"} packages initialize in the real plugin host`, async (t) => {
+    const { source, importRoot, runtime, bodies, paths } = createHarness(t, { packageType });
+    const imported = generateImportedExtensionPlugin(source, importRoot);
+    await runtime.loadFromPath(imported.path);
+    assertSkillCatalog(runtime, imported, bodies, paths);
+    assert.equal(runtime.getAgentExtensions().length, 1);
+    const manifest = runtime.getLoaded(imported.id).manifest;
+    assert.equal(manifest.main, "main.cjs");
+    assert.ok(existsSync(join(imported.path, manifest.main)));
+    assert.equal(existsSync(join(imported.path, "main.js")), false);
+    const original = readFileSync(join(source, "package.json"), "utf8");
+    for (const path of ["package.json", "src/package.json"]) {
+      assert.equal(readFileSync(join(imported.path, path), "utf8"), original);
+    }
+  });
+}
+
+test("re-importing an older ESM package creates a loadable copy without rewriting the existing plugin", async (t) => {
+  const { source, importRoot, runtime, bodies, paths } = createHarness(t, { packageType: "module" });
+  const previous = generateImportedExtensionPlugin(source, importRoot);
+  // Model the on-disk layout generated before explicit CommonJS wrappers.
+  const oldManifest = JSON.parse(readFileSync(join(previous.path, "manifest.json"), "utf8"));
+  oldManifest.main = "main.js";
+  writeFileSync(join(previous.path, "manifest.json"), JSON.stringify(oldManifest));
+  renameSync(join(previous.path, "main.cjs"), join(previous.path, "main.js"));
+  const oldFiles = new Map(["manifest.json", "main.js", "package.json", "src/package.json"]
+    .map((path) => [path, readFileSync(join(previous.path, path), "utf8")]));
+
+  const imported = generateImportedExtensionPlugin(source, importRoot);
+  assert.notEqual(imported.id, previous.id);
+  assert.notEqual(imported.path, previous.path);
+  for (const [path, contents] of oldFiles) {
+    assert.equal(readFileSync(join(previous.path, path), "utf8"), contents);
+  }
+  assert.equal(existsSync(join(previous.path, "main.cjs")), false);
+  await runtime.loadFromPath(imported.path);
+  assertSkillCatalog(runtime, imported, bodies, paths);
+  assert.equal(runtime.getAgentExtensions().length, 1);
 });

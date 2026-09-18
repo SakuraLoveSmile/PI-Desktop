@@ -5054,7 +5054,7 @@ IPC 请求无法关闭。
 | E——工具和权限 | E2E-008a、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-024I、E2E-024K、E2E-040、E2E-049、E2E-074、E2E-093、E2E-097、 E2E-099、E2E-100、E2E-101、E2E-102、E2E-103、E2E-105、E2E-106、E2E-107、E2E-111、E2E-112、E2E-113、E2E-114、E2E-115、E2E-116、 E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-145、E2E-147、E2E-PLUGIN-imported-pi-package-skills、E2E-166 |
 | F——坚持 | E2E-020、E2E-021、E2E-036、E2E-037、E2E-038、E2E-040、E2E-042、E2E-047、E2E-048、E2E-051、E2E-054、E2E-056、E2E-061、E2E-062、 E2E-064、E2E-066、E2E-068、E2E-071、E2E-072、E2E-073、E2E-082、E2E-084、E2E-096、E2E-098、E2E-102、E2E-102b、E2E-103、E2E-代理-001、 E2E-061a、E2E-073a、E2E-104、E2E-106、E2E-107、E2E-108、E2E-109、E2E-110、E2E-112、E2E-118、E2E-119、E2E-120、E2E-121、E2E-123、E2E-142、E2E-146、E2E-148、E2E-151、E2E-171、E2E-005J |
 | F——持久化（项目排序） | E2E-253 |
-| G——插件 | E2E-022、E2E-022A、E2E-022B、E2E-022C、E2E-023、E2E-024、E2E-024B、E2E-024C、E2E-024D、E2E-024AA、E2E-024E、E2E-024W、E2E-024F、E2E-024G、E2E-024H、 E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M、E2E-024N、E2E-024O、E2E-024P、E2E-025、E2E-026、E2E-105、E2E-117、E2E-120、E2E-122、E2E-123、E2E-148、E2E-153、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-global-shortcut-owns-only-its-own-command、E2E-PLUGIN-permission-gate-for-real-time-capabilities、E2E-PLUGIN-background-audio-and-realtime-connection |
+| G——插件 | E2E-022、E2E-022A、E2E-022B、E2E-022C、E2E-023、E2E-024、E2E-024B、E2E-024C、E2E-024D、E2E-024AA、E2E-024E、E2E-024W、E2E-024F、E2E-024G、E2E-024H、 E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M、E2E-024N、E2E-024O、E2E-024P、E2E-025、E2E-026、E2E-105、E2E-117、E2E-120、E2E-122、E2E-123、E2E-148、E2E-153、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-imported-pi-package-wrapper、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-global-shortcut-owns-only-its-own-command、E2E-PLUGIN-permission-gate-for-real-time-capabilities、E2E-PLUGIN-background-audio-and-realtime-connection |
 | H——诊断 | E2E-027、E2E-031、E2E-034、E2E-042、E2E-096、E2E-098、E2E-104、E2E-107、E2E-108、E2E-109、E2E-110、E2E-113、E2E-115、E2E-116、 E2E-118、E2E-121、E2E-146、E2E-194、E2E-195 |
 | 安全性 | E2E-028、E2E-029、E2E-030、E2E-024J、E2E-024K、E2E-024M、E2E-049、E2E-068、E2E-086、E2E-105、E2E-106、E2E-107、E2E-108、E2E-109、 E2E-110、E2E-112、E2E-113、E2E-115、E2E-116、E2E-117、E2E-119、E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-151、E2E-153 |
 | 品质 | E2E-032、E2E-033、E2E-039、E2E-043、E2E-044、E2E-045、E2E-046、E2E-047、E2E-048、E2E-048A、E2E-049、E2E-050、E2E-053、E2E-055、 E2E-056、E2E-057、E2E-058、E2E-059、E2E-060、E2E-061、E2E-062、E2E-063、E2E-064、E2E-065、E2E-066、E2E-067、E2E-068、E2E-069、 E2E-070、E2E-071、E2E-072、E2E-073、E2E-074、E2E-075、E2E-076、E2E-077、E2E-078、E2E-079、E2E-080、E2E-081、E2E-082、E2E-083、 E2E-084、E2E-085、E2E-086、E2E-092、E2E-093、E2E-094、E2E-095、E2E-096、E2E-097、E2E-098、E2E-099、E2E-100、E2E-101、E2E-102、 E2E-102a、E2E-102b、E2E-103、E2E-AGENTS-001、E2E-024N、E2E-024O、E2E-059a、E2E-060b、E2E-060c、E2E-060d、E2E-061a、E2E-073a、E2E-111、 E2E-114、E2E-117、E2E-118、E2E-119、E2E-120、E2E-122、E2E-123、E2E-142、E2E-143、E2E-144、E2E-145、E2E-146、E2E-147、E2E-148、E2E-150、E2E-151、E2E-153、E2E-194、E2E-195、E2E-199、E2E-200、E2E-201、E2E-202、E2E-203、E2E-204、E2E-209、E2E-210、E2E-250、E2E-PLUGIN-imported-pi-package-skills、E2E-SUBAGENT-resume-a-settled-delegation |
@@ -6980,6 +6980,23 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **验收**：安全、质量
 - **里程碑**：MVP 后（R7 v1）
 - **状态**：部分自动化（`pnpm test:e2e:trusted-extensions`）；无头旅程覆盖插件发现/投影、项目范围、加载状态和诊断；原生选择器导入与显式启用仍需渲染器/平台验证
+
+#### E2E-PLUGIN-imported-pi-package-wrapper：导入包的模块类型不妨碍插件初始化
+
+- **前置条件**：隔离的本地 Pi 包分别声明 `type: module`、`type: commonjs` 或不声明
+  `type`，各自包含扩展和技能贡献。另一个夹具模拟旧版导入的 ESM 包，包含生成的
+  CommonJS `main.js` 及指向它的 manifest。
+- **步骤**：运行 `node --test apps/desktop/test/imported-package-skills-runtime.test.mjs`。
+  使用生产导入器生成各个插件，通过 `PluginRuntime` 与真实子进程插件宿主加载，
+  读取技能目录与正文，并检查声明的扩展。对旧版夹具重新导入。
+- **预期**：每份新 manifest 都指向实际存在的 `main.cjs`，三类包均初始化成功。
+  源包及两份复制的 `package.json` 字节保持一致。重新导入得到不同的路径和 id 并成功
+  加载；旧 manifest、包装器和包文件保持原样。不会自动迁移既有导入插件。
+- **关联规范**：`07-plugins/16-trusted-extensions.md` §3.2；ADR 0215。
+- **验收**：质量
+- **状态**：已实现导入到插件宿主的自动化夹具。合入最新 `origin/main` 后，在已提交的
+  任务候选上执行，并在交付证据中记录候选、基线、结果和环境。本夹具不覆盖原生选择器、
+  npm 依赖安装、Windows 运行或模型回合中的第三方扩展执行。
 
 #### E2E-PLUGIN-imported-pi-package-skills：显式导入包后按插件权限提供技能
 
