@@ -17,6 +17,7 @@ import type { PluginViewHost } from "../plugin-view-host";
 import {
   baseWindowBounds,
   clampBoundsOriginToWorkArea,
+  clampBoundsToWorkArea,
   displayWorkAreaKey,
   emptyWorkPanelReservationState,
   isWorkPanelOuterResizeEdge,
@@ -151,10 +152,24 @@ export async function createWindow({
     windowMinWidth,
     windowMinHeight,
   );
+  // A persisted rect can exceed the current work area when the display scale or
+  // the Windows accessibility "text size" changed since it was saved: fit it
+  // back inside the target display so the window never restores off-screen
+  // (issue #544). The minimum size is capped to the work area for the same
+  // reason — a minimum wider than the screen would defeat the clamp.
+  const restoreDisplay = screen.getDisplayMatching(
+    savedState ?? { x: 0, y: 0, width: 1200, height: 800 },
+  );
+  const restoreWorkArea = restoreDisplay.workArea;
+  const restoredBounds = savedState
+    ? clampBoundsToWorkArea(savedState, restoreWorkArea)
+    : null;
+  const initialMinWidth = Math.min(windowMinWidth, restoreWorkArea.width);
+  const initialMinHeight = Math.min(windowMinHeight, restoreWorkArea.height);
   windowState.mainWindow = new BrowserWindow({
-    ...(savedState ?? { width: 1200, height: 800 }),
-    minWidth: windowMinWidth,
-    minHeight: windowMinHeight,
+    ...(restoredBounds ?? { width: 1200, height: 800 }),
+    minWidth: initialMinWidth,
+    minHeight: initialMinHeight,
     title: APP_NAME,
     show: false,
     // Keep native edge/corner resizing explicit. Frameless chrome owns the
@@ -199,7 +214,9 @@ export async function createWindow({
   });
   const window = windowState.mainWindow;
   const initialBounds = window.getBounds();
-  windowState.workPanelBaseBounds = savedState ? { ...savedState } : { ...initialBounds };
+  windowState.workPanelBaseBounds = restoredBounds
+    ? { ...restoredBounds }
+    : { ...initialBounds };
   windowState.workPanelLastAppliedBounds = { ...initialBounds };
   resetMenuRendererReady(window);
   const isLiveWindow = () =>
@@ -334,7 +351,13 @@ export async function createWindow({
     windowState.workPanelNativeResizeActive = true;
     // Let the right edge reach the panel minimum while the base chat width
     // remains fixed. The normal minimum is restored after the gesture settles.
-    window.setMinimumSize(baseBounds.width + WORK_PANEL_MIN_WIDTH, windowMinHeight);
+    // Never demand more width than the current work area offers, or a narrow
+    // display could no longer shrink the window back on-screen (issue #544).
+    const resizeWorkArea = screen.getDisplayMatching(currentBounds).workArea;
+    window.setMinimumSize(
+      Math.min(baseBounds.width + WORK_PANEL_MIN_WIDTH, resizeWorkArea.width),
+      Math.min(windowMinHeight, resizeWorkArea.height),
+    );
     return nativeWorkPanelResize;
   };
 
@@ -499,6 +522,7 @@ export async function createWindow({
   window.on("enter-full-screen", sendFullScreen);
   window.on("leave-full-screen", () => {
     sendFullScreen();
+    refitWindowToWorkArea();
     scheduleWorkPanelReservation();
   });
   window.webContents.on("did-finish-load", sendFullScreen);
@@ -508,6 +532,29 @@ export async function createWindow({
     window.webContents.send(IPC.event.windowMaximized, {
       maximized: window.isMaximized(),
     });
+  };
+
+  // After a restore/unmaximize (or leaving fullscreen) the OS puts the window
+  // back to its normal bounds. Those bounds can sit outside the current work
+  // area — e.g. a display-scale or accessibility "text size" change inflated a
+  // persisted rect past the screen (issue #544). Fit them back inside so the
+  // window never lands partly off-screen. macOS keeps its own restore behavior.
+  const refitWindowToWorkArea = () => {
+    if (!isLiveWindow() || process.platform === "darwin") return;
+    if (window.isMaximized() || window.isFullScreen() || window.isMinimized()) return;
+    const currentBounds = window.getBounds();
+    const workArea = screen.getDisplayMatching(currentBounds).workArea;
+    window.setMinimumSize(
+      Math.min(windowMinWidth, workArea.width),
+      Math.min(windowMinHeight, workArea.height),
+    );
+    const fitted = clampBoundsToWorkArea(currentBounds, workArea);
+    if (windowBoundsEqual(fitted, currentBounds)) return;
+    windowState.expectedWorkPanelBounds = fitted;
+    window.setBounds(fitted, false);
+    const appliedBounds = window.getBounds();
+    windowState.workPanelBaseBounds = { ...appliedBounds };
+    windowState.workPanelLastAppliedBounds = { ...appliedBounds };
   };
   // Custom window controls (Windows/Linux) need maximize state to swap the
   // maximize/restore glyph.
@@ -519,6 +566,7 @@ export async function createWindow({
   }
   window.on("unmaximize", () => {
     if (process.platform !== "darwin") sendMaximized();
+    refitWindowToWorkArea();
     scheduleWorkPanelReservation();
   });
 
