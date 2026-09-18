@@ -1740,6 +1740,7 @@ sklm: {
       "bus.publish": "向其他插件发送消息",
       "bus.subscribe": "接收其他插件的消息",
       "browser.cdp": "控制工作面板浏览器",
+      "usage.read": "读取用量统计",
     },
     permissionHelp: {
       "ui.panel": "允许插件在应用内显示独立面板。",
@@ -1779,6 +1780,8 @@ sklm: {
       "bus.subscribe": "可在其声明的主题上接收消息。",
       "browser.cdp":
         "可导航工作面板浏览器、读取页面、运行 JavaScript，并发送白名单内的 Chrome DevTools 命令。Cookie 与存储相关方法会被拒绝。",
+      "usage.read":
+        "分页列出已完成回合的用量事实（每回合 token 计数与会话标题）。不包含任何消息内容。",
     },
   },
   extensions: {
