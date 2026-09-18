@@ -57,7 +57,6 @@ import {
   UpdatesRow,
 } from "./agent-sections";
 import { PromptEnhancementCard } from "./prompt-enhancement-card";
-import { VoiceSettingsCard } from "./voice-settings";
 import { CloseBehaviorSection, DeveloperSection } from "./developer-sections";
 import { PluginScenicThemesDestination } from "../../components/settings/PluginScenicThemesDestination";
 
@@ -379,8 +378,6 @@ export function SettingsPage() {
                   />
                 </SettingsRow>
               </SettingsCard>
-
-              <VoiceSettingsCard settings={settings} saveSettings={saveSettings} />
 
               <SettingsCard title={t("settings.defaultsTitle")}>
                 <SettingsRow title={t("settings.mode")} description={t("settings.modeDesc")}>
