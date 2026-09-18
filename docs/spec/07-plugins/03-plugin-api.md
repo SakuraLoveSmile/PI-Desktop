@@ -451,6 +451,50 @@ storage. P2/P3 operations (session create, message mutation, arbitrary re-bindin
 provider/model binding, batch delete, and tags) are intentionally not part of
 this contract.
 
+### usage (requires `usage.read`)
+
+Read-only completed-turn facts for the non-deleted sessions the user can
+still see. The host serves one flat fact row per turn — counters and
+identifiers only; no message body, no transcript projection, and no write
+path. Deliberately **no dashboard shape**: streaks, heatmaps, per-model
+shares, and top-session rankings are the plugin's own computation on top of
+these rows, so changing a metric definition later is never a breaking SDK
+change.
+
+```ts
+pi.usage.listTurns(input?: {
+  fromMs?: number      // inclusive window start, epoch ms; default toMs - 30 days
+  toMs?: number        // inclusive window end, epoch ms; default now
+  projectId?: number | null
+  sessionId?: string
+  cursor?: string      // opaque page cursor from the previous nextCursor
+  limit?: number       // 1..=500 rows; default 200
+}): Promise<{
+  turns: Array<{
+    turnId: string; sessionId: string; sessionTitle: string | null
+    projectId: number | null; providerId: string | null; modelId: string | null
+    startedAt: number; endedAt: number
+    inputTokens: number; outputTokens: number
+    cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number
+  }>
+  nextCursor: string | null
+}>
+```
+
+Semantics:
+
+- Only completed turns of non-deleted sessions are listed. A session the
+  user deleted leaves the listing.
+- Rows are ordered by `endedAt` ascending with a keyset cursor, so paging is
+  stable while the window fills; the ranking a dashboard shows is its own
+  sort, not the host's.
+- The window spans at most 365 days; `limit` is 1..=500 (default 200). The
+  Electron side validates first, and the host RPC re-checks the same bounds.
+  Absent and `null` bounds are equivalent; an empty session title is returned
+  as `null`.
+- A missing or malformed `usage_json` yields zero cache/reasoning counters —
+  never a partial row.
+
 ### session collaboration (requires `desktop.control`)
 
 The official Session Orchestrator composes the reviewed desktop-control

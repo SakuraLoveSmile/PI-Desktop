@@ -16,6 +16,7 @@ use crate::notifications;
 use crate::permissions::{PermissionDecision, PermissionEvaluationParams, PermissionManager};
 use crate::plans;
 use crate::plugin_sessions;
+use crate::plugin_usage;
 use crate::providers::{self, DiscoveredModelInput, ProviderCreateInput, ProviderUpdateInput};
 use crate::review;
 use crate::scheduled;
@@ -2498,6 +2499,28 @@ async fn handle_request(
                 return Err(rpc_err(1006, "plugin delete rate exceeded", "RATE_LIMITED"));
             }
             plugin_sessions::delete(&st.db, plugin_id, &params).map_err(plugin_session_rpc_err)
+        }
+
+        // Plugin usage is a read-only facts domain: a keyset page of completed
+        // turns from non-deleted sessions, served to plugins that hold
+        // `usage.read` (checked in Electron main before dispatch). The payload
+        // carries counters and titles — never a message body — and Electron
+        // main remains the only caller that can supply pluginId.
+        "plugin.usage.listTurns" => {
+            let plugin_id = params
+                .get("pluginId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "pluginId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let page =
+                plugin_usage::list_turns_page(&st.db, &params).map_err(plugin_session_rpc_err)?;
+            tracing::debug!(
+                method = "plugin.usage.listTurns",
+                plugin_id,
+                count = page["turns"].as_array().map(Vec::len).unwrap_or(0),
+                "plugin usage rpc served"
+            );
+            Ok(page)
         }
 
         "session.beginTurn" => {
@@ -5529,6 +5552,235 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn plugin_usage_rpc_serves_read_only_fact_rows() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        // Three completed turns across two sessions: t2 carries all three
+        // usage_json token kinds, t1 carries none (zeros), and t4 belongs to a
+        // soft-deleted session so it must never appear. Different ended_at
+        // values make the ASC ordering and the cursor page observable.
+        let now = chrono::Utc::now().timestamp_millis();
+        {
+            let st = state.lock().await;
+            let conn = st.db.conn();
+            for (project_id, path, name) in [(1, "/tmp/p1", "P1"), (2, "/tmp/p2", "P2")] {
+                conn.execute(
+                    "INSERT INTO projects (id, path, name, created_at, last_opened_at) VALUES (?1, ?2, ?3, ?4, ?4)",
+                    rusqlite::params![project_id, path, name, now],
+                )
+                .unwrap();
+            }
+            for (id, title, project) in [("s1", "", 1), ("s2", "Big", 2), ("s3", "Trashed", 1)] {
+                conn.execute(
+                    "INSERT INTO sessions (id, title, project_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
+                    rusqlite::params![id, title, project, now],
+                )
+                .unwrap();
+            }
+            conn.execute(
+                "UPDATE sessions SET deleted_at = ?1 WHERE id = 's3'",
+                rusqlite::params![now],
+            )
+            .unwrap();
+            // (id, session, ended, input, output, usage_json)
+            let turn = |id: &str, session: &str, ended: i64, usage: Option<&str>| {
+                conn.execute(
+                    "INSERT INTO turns (id, session_id, status, provider_id, model_id, input_tokens, output_tokens, usage_json, started_at, ended_at)
+                     VALUES (?1, ?2, 'completed', 'prov', 'model-a', ?3, ?4, ?5, ?6, ?7)",
+                    rusqlite::params![id, session, 100, 200, usage, ended - 1_000, ended],
+                )
+                .unwrap();
+            };
+            turn("t1", "s1", now - 3_000, None);
+            turn(
+                "t2",
+                "s2",
+                now - 2_000,
+                Some(
+                    serde_json::json!({
+                        "cacheReadTokens": 300,
+                        "cacheWriteTokens": 400,
+                        "reasoningTokens": 500
+                    })
+                    .to_string(),
+                )
+                .as_deref(),
+            );
+            turn(
+                "t3",
+                "s2",
+                now - 1_000,
+                Some(r#"{"cacheReadTokens":"bad"}"#),
+            );
+            turn("t4", "s3", now - 500, None);
+        }
+
+        const METHOD: &str = "plugin.usage.listTurns";
+
+        // Missing pluginId is a client error, same as the session domain.
+        let missing = handle_request(state.clone(), METHOD, json!({}), tx.clone())
+            .await
+            .unwrap_err();
+        assert_eq!(missing.code, 1002);
+        assert_eq!(missing.data.unwrap()["errorCode"], "INVALID_PARAMS");
+
+        // Default window covers every turn; ordering is ended_at ASC and the
+        // soft-deleted session's turn is absent.
+        let page = handle_request(
+            state.clone(),
+            METHOD,
+            json!({ "pluginId": "plugin.one" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let turns = page["turns"].as_array().unwrap();
+        assert_eq!(turns.len(), 3, "t4 belongs to a trashed session");
+        assert_eq!(turns[0]["turnId"], "t1");
+        assert_eq!(turns[1]["turnId"], "t2");
+        assert_eq!(turns[2]["turnId"], "t3");
+        assert!(page["nextCursor"].is_null(), "no more rows, no cursor");
+        // Row shape: counters and titles only, camelCase, no message fields.
+        assert!(
+            turns[0]["sessionTitle"].is_null(),
+            "empty title maps to null"
+        );
+        assert_eq!(turns[1]["sessionTitle"], "Big");
+        assert_eq!(turns[1]["sessionId"], "s2");
+        assert_eq!(turns[1]["projectId"], 2);
+        assert_eq!(turns[1]["providerId"], "prov");
+        assert_eq!(turns[1]["modelId"], "model-a");
+        assert_eq!(turns[1]["inputTokens"], 100);
+        assert_eq!(turns[1]["outputTokens"], 200);
+        assert_eq!(turns[1]["cacheReadTokens"], 300);
+        assert_eq!(turns[1]["cacheWriteTokens"], 400);
+        assert_eq!(turns[1]["reasoningTokens"], 500);
+        // Missing usage_json yields zeros; a malformed one also yields zeros.
+        assert_eq!(turns[0]["cacheReadTokens"], 0);
+        assert_eq!(turns[0]["reasoningTokens"], 0);
+        assert_eq!(turns[2]["cacheReadTokens"], 0);
+        assert!(turns[0].get("content").is_none());
+        assert!(turns[0].get("messages").is_none());
+
+        // limit truncates and the returned cursor fetches exactly the rest.
+        let page1 = handle_request(
+            state.clone(),
+            METHOD,
+            json!({ "pluginId": "plugin.one", "limit": 2 }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(page1["turns"].as_array().unwrap().len(), 2);
+        let cursor1 = page1["nextCursor"].as_str().unwrap();
+        let page2 = handle_request(
+            state.clone(),
+            METHOD,
+            json!({ "pluginId": "plugin.one", "limit": 2, "cursor": cursor1 }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let rest = page2["turns"].as_array().unwrap();
+        assert_eq!(rest.len(), 1, "exactly the remaining row");
+        assert_eq!(rest[0]["turnId"], "t3");
+        assert!(page2["nextCursor"].is_null());
+
+        // Filtering: sessionId and projectId narrow the facts.
+        let only_s2 = handle_request(
+            state.clone(),
+            METHOD,
+            json!({ "pluginId": "plugin.one", "sessionId": "s2" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let s2_turns = only_s2["turns"].as_array().unwrap();
+        assert_eq!(s2_turns.len(), 2);
+        assert!(s2_turns.iter().all(|t| t["sessionId"] == "s2"));
+
+        let only_p1 = handle_request(
+            state.clone(),
+            METHOD,
+            json!({ "pluginId": "plugin.one", "projectId": 1 }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let p1_turns = only_p1["turns"].as_array().unwrap();
+        assert_eq!(p1_turns.len(), 1);
+        assert_eq!(p1_turns[0]["sessionId"], "s1");
+
+        // Explicit bounds exclude out-of-window turns.
+        let windowed = handle_request(
+            state.clone(),
+            METHOD,
+            json!({ "pluginId": "plugin.one", "fromMs": now - 1_500, "toMs": now }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let w = windowed["turns"].as_array().unwrap();
+        assert_eq!(w.len(), 1, "only t3 ended inside the window");
+        assert_eq!(w[0]["turnId"], "t3");
+
+        // Client errors the host must reject: bad cursor, bad limit, bad
+        // window, wrong types.
+        for bad in [
+            json!({ "pluginId": "p", "cursor": "not-a-cursor" }),
+            json!({ "pluginId": "p", "limit": 0 }),
+            json!({ "pluginId": "p", "limit": 501 }),
+            json!({ "pluginId": "p", "limit": "ten" }),
+            json!({ "pluginId": "p", "fromMs": -1 }),
+            json!({ "pluginId": "p", "toMs": "now" }),
+            json!({ "pluginId": "p", "fromMs": now, "toMs": now - 1_000 }),
+            json!({
+                "pluginId": "p",
+                "fromMs": now - 366 * 24 * 3600 * 1000,
+                "toMs": now
+            }),
+            json!({ "pluginId": "p", "fromMs": 0 }),
+            json!({ "pluginId": "p", "sessionId": 7 }),
+            json!({ "pluginId": "p", "sessionId": "" }),
+            json!({ "pluginId": "p", "projectId": "seven" }),
+        ] {
+            let error = handle_request(state.clone(), METHOD, bad.clone(), tx.clone())
+                .await
+                .unwrap_err();
+            assert_eq!(error.code, 1002, "{bad}");
+            assert_eq!(error.data.unwrap()["errorCode"], "INVALID_PARAMS", "{bad}");
+        }
+
+        // Null bounds match omitted bounds; the 365-day window edge is accepted.
+        let null_bounds = handle_request(
+            state.clone(),
+            METHOD,
+            json!({ "pluginId": "plugin.one", "fromMs": null, "toMs": null }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(null_bounds["turns"].as_array().unwrap().len(), 3);
+        let edge = handle_request(
+            state.clone(),
+            METHOD,
+            json!({
+                "pluginId": "plugin.one",
+                "fromMs": now - 365 * 24 * 3600 * 1000,
+                "toMs": now
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(edge["turns"].as_array().unwrap().len(), 3);
     }
 
     fn available_test_shell_id() -> Option<String> {

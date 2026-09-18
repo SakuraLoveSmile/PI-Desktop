@@ -11023,6 +11023,26 @@ are withdrawn with ADR 0165.
 - **Milestone**: M6+
 - **Status**: Host/RPC/unit-covered; full UI journey Draft (run only in a capable environment when this surface changes)
 
+#### E2E-PLUGIN-usage-listTurns: Plugin usage fact listing
+
+- **Preconditions**: A test plugin is granted `usage.read`. The host database
+  has completed turns across live and soft-deleted sessions.
+- **Steps**: 1) Call `pi.usage.listTurns` without the permission. 2) Call it
+  with the permission, page by cursor, and filter by session/project/window.
+  3) Pass inverted bounds, a window longer than 365 days, and a malformed
+  cursor. 4) Confirm rows include token counters and titles but no message
+  bodies, and that trashed sessions are absent.
+- **Expected**: Missing permission returns `PERMISSION_DENIED` and does not
+  hit the host. Valid calls return keyset pages of completed-turn facts.
+  Invalid params return `INVALID_PARAMS`. Empty titles are `null`.
+- **Specs linked**: `07-plugins/03-plugin-api.md`,
+  `07-plugins/13-plugin-permissions-matrix.md`,
+  `03-runtime/06-host-rpc-protocol.md`, ADR 0173, D335
+- **Acceptance**: Security, Quality
+- **Milestone**: M6+
+- **Status**: Unit/RPC/wiring-covered (`plugin-session-api.test.mjs`,
+  host-core `plugin_usage`); full UI journey Draft
+
 #### E2E-216: Explicit plugin project binding and host-owned sidebar refresh
 
 - **Preconditions**: A test plugin has `project.create` and `session.import`

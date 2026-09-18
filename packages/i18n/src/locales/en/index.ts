@@ -1759,6 +1759,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "bus.publish": "Send messages to other plugins",
       "bus.subscribe": "Receive messages from other plugins",
       "browser.cdp": "Control the work-panel browser",
+      "usage.read": "Read usage statistics",
     },
     permissionHelp: {
       "ui.panel": "Lets the plugin show its own panel inside the app.",
@@ -1808,6 +1809,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "bus.subscribe": "Can receive messages on the topics it declared.",
       "browser.cdp":
         "Can navigate the work-panel browser, read the page, run JavaScript, and send allowlisted Chrome DevTools commands. Cookie and storage methods are blocked.",
+      "usage.read":
+        "Lists completed-turn usage facts (paginated token counters and session titles). No message content is included.",
     },
   },
   /**

@@ -1,4 +1,4 @@
-# ADR 0280 — Host-rendered plugin scenic Settings surfaces
+# ADR 0287 — Host-rendered plugin scenic Settings surfaces
 
 - **Status:** Accepted for implementation
 - **Date:** 2026-09-17

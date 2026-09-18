@@ -6822,6 +6822,16 @@ IPC 请求无法关闭。
 - **里程碑**：M6+
 - **状态**：主机/RPC/单元已覆盖；完整 UI 路径草稿（适用变更合入前需在具备条件的环境中运行 E2E）
 
+#### E2E-PLUGIN-usage-listTurns：插件用量事实列举
+
+- **前置条件**：测试插件获得 `usage.read`；主机库中有未删除与软删会话的已完成 turn。
+- **步骤**：1）无权限调用 `pi.usage.listTurns`。2）有权限调用、按游标翻页、按会话/项目/时间窗过滤。3）传入倒置边界、超过 365 天的窗口、畸形游标。4）确认行含 token 计数与标题、无消息正文，软删会话不出现。
+- **预期**：缺权限返回 `PERMISSION_DENIED` 且不打到主机。合法调用返回已完成 turn 的 keyset 页。非法参数返回 `INVALID_PARAMS`。空标题为 `null`。
+- **关联规格**：`07-plugins/03-plugin-api.md`、`07-plugins/13-plugin-permissions-matrix.md`、`03-runtime/06-host-rpc-protocol.md`、ADR 0173、D335
+- **验收**：安全、质量
+- **里程碑**：M6+
+- **状态**：单元/RPC/连线已覆盖（`plugin-session-api.test.mjs`、host-core `plugin_usage`）；完整 UI 路径草稿
+
 #### E2E-216：插件显式绑定项目与宿主拥有的侧栏刷新
 
 - **前置条件**：测试插件获得 `project.create`、`session.import` 权限并声明会话来源；
