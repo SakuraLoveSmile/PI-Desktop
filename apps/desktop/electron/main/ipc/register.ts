@@ -23,6 +23,7 @@ import { registerSessionIpc } from "./session-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
 import { registerAgentImportIpc } from "./agent-import-ipc";
+import { registerRemoteHostIpc } from "./remote-host-ipc";
 import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-catalog";
 import { registerWindowIpc } from "./window-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
@@ -420,6 +421,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   });
 
   registerSpeechIpc({ registrar, speech });
+
+  registerRemoteHostIpc({ registrar });
 
   registerMarketIpc({
     registrar,

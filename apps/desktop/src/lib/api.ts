@@ -100,6 +100,9 @@ import type {
   PlanResolutionResult,
   PlanningStateEvent,
   PlansPendingResult,
+  RemoteHostPairRequest,
+  RemoteHostPairResult,
+  RemoteHostSummary,
   UpdateState,
   WindowControlAction,
   CloseBehavior,
@@ -1369,6 +1372,17 @@ export const api = {
       listener((payload as { notification: AppNotification }).notification),
     );
   },
+
+  // --- Remote hosts (R2b pairing UX) -----------------------------------------
+  /** Paired remote `pi-host` list, redacted so no device token reaches here. */
+  listRemoteHosts: () =>
+    invoke<{ hosts: RemoteHostSummary[] }>(IPC.invoke.remoteHostList),
+  /** Exchange `ppt1.` pairing token for a durable device token and connect. */
+  pairRemoteHost: (request: RemoteHostPairRequest) =>
+    invoke<RemoteHostPairResult>(IPC.invoke.remoteHostPair, request),
+  /** Close and drop a paired host by its stable routing key. */
+  removeRemoteHost: (hostKey: string) =>
+    invoke<{ ok: true }>(IPC.invoke.remoteHostRemove, { hostKey }),
   onSessionsChanged: (
     listener: (event: {
       reason?: string;

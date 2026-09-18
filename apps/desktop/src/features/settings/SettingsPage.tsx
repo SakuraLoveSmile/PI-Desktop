@@ -20,6 +20,7 @@ import {
   IconChevronLeft,
   IconDownload,
   IconFileText,
+  IconGlobe,
   IconInfo,
   IconKeyboard,
   IconSearch,
@@ -41,6 +42,7 @@ import { ProjectsPage } from "../../pages/ProjectsPage";
 import { AgentSkillsPage } from "../../components/settings/AgentSkillsPage";
 import { AgentMcpPage } from "../../components/settings/AgentMcpPage";
 import { AgentSubagentsPage } from "../../components/settings/AgentSubagentsPage";
+import { RemoteHostsPage } from "../../components/settings/RemoteHostsPage";
 import {
   CommandShellRow,
   ContextUsageDisplayRow,
@@ -184,6 +186,7 @@ export function SettingsPage() {
       subagents: <IconBot size={14} />,
       import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
+      remoteHosts: <IconGlobe size={14} />,
       about: <IconInfo size={14} />,
     };
     return SETTINGS_NAV.map((entry) => ({
@@ -453,6 +456,8 @@ export function SettingsPage() {
           {tab === "import" && <ImportSection />}
 
           {tab === "projects" && <ProjectsPage />}
+
+          {tab === "remoteHosts" && <RemoteHostsPage />}
 
           {tab === "about" && (
             <div className="settings-stack">

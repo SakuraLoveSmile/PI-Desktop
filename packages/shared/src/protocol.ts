@@ -146,6 +146,18 @@ export const IPC = {
     askToolResolve: "pi-desktop/agent/askTool/resolve",
     plansPending: "pi-desktop/plans/pending",
     plansResolve: "pi-desktop/plans/resolve",
+    /**
+     * List every paired remote `pi-host` this desktop knows, redacted so no
+     * device token reaches the renderer. See ADR 0286 (R2b pairing UX).
+     */
+    remoteHostList: "pi-desktop/remoteHost/list",
+    /**
+     * Pair with a `pi-host` at `url` using a single-use `pairingToken`, mint
+     * a device token, persist it encrypted, and open the live connection.
+     */
+    remoteHostPair: "pi-desktop/remoteHost/pair",
+    /** Close the live connection for `hostKey` and drop its persisted record. */
+    remoteHostRemove: "pi-desktop/remoteHost/remove",
     providersList: "pi-desktop/providers/list",
     providersCreate: "pi-desktop/providers/create",
     providersUpdate: "pi-desktop/providers/update",
