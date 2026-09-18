@@ -5989,3 +5989,72 @@ that was sitting at the bottom — including after the turn had finished.
   toasts they open, which are portaled to `document.body`, also move to the top
   layer, because top-layer content paints above them and makes them unusable; an
   attempt was withdrawn for exactly that reason.
+
+## 2026-09-18 — Prompt enhancement ships a substantive rewrite with user-overridable templates (D447)
+
+- The default enhancement prompt moves from one conservative sentence to a
+  structured system prompt plus a templated user message: role, analysis,
+  rewrite principles, an explicit do-not list, language-following rules that
+  forbid language meta notes, a length brake, and an output contract. The old
+  `If the draft is already good, return it with at most minor polish` clause is
+  removed: it made the action look inert on short drafts, which is the reported
+  complaint.
+- Two constraints the old prompt lacked are now explicit: code, commands, file
+  paths, identifiers, API names, and other proper nouns must be reproduced
+  exactly, and the answer must not open with a language meta note such as
+  "The draft is in Chinese". Both are default-value decisions, not
+  implementation details, because they change what every user receives.
+- The user template becomes an `AppSettings` override
+  (`promptEnhancementUserTemplate`) with its default in
+  `packages/shared/src/prompt-enhancement.ts`; a blank override means "use the
+  default", and editing the field back to the exact default text clears the
+  override instead of freezing a copy. Storing the default text as a user value
+  was rejected: a later improvement to the default would then never reach those
+  users.
+- The system prompt stays built in and is not user-editable. It carries rules
+  the spec and E2E scenario assert, so a stored override could silently remove
+  one; host-core drops such a value if an older build wrote it. Editing the
+  system prompt remains a source change with a spec update.
+- The user template carries `{{draft}}`. host-core rejects a non-blank user
+  template without it, and each template must stay within
+  `PROMPT_ENHANCEMENT_TEMPLATE_MAX_LENGTH`; main falls back to the default if an
+  unusable value ever reaches the runtime. One matching pair of wrapping
+  quotation marks is stripped from the model's answer.
+- The settings surface is one row with a `Use a custom template` switch and the
+  subagent rows' edit icon button, opening an editor sheet, rather than inline
+  textareas or a row of labelled actions: the AI settings tab stays compact and
+  the row reads as one control cluster. The switch, not the text, decides whether
+  a stored template applies, so turning it off preserves the user's text. It is
+  enabled only once a usable template exists and saving one turns it on, because
+  an always-enabled switch would choose between two identical states before any
+  template was written.
+- `promptEnhancementProviderId` / `promptEnhancementModelId` let the rewrite run
+  on a model other than the conversation's. An unresolvable pin falls back to
+  the Composer's current model with a warning rather than failing the action.
+- The enhancement model and reasoning level move to Settings -> Models, in a
+  dedicated `Enhancement prompt` card below Defaults, whose model row is titled
+  `Default model` like the Defaults card's row (the card heading separates them). Both are decisions about which model
+  runs the rewrite, and the model page already owns the one model picker a user
+  learns; the prompt card keeps only the prompt. The enhancement-model row reuses
+  the default-model row's anchored menu rather than introducing a second picker.
+- The enhancement reasoning row lists only the levels the selected model actually
+  supports, resolved the same way a turn resolves them (binding `thinkingLevels`,
+  then the live catalog, then the provider default), and is disabled when the
+  model supports none. An earlier revision offered the full canonical ladder
+  regardless of model, which is wrong for a model without reasoning. Switching
+  model re-clamps and rewrites the stored level, so a persisted level is always
+  runnable.
+- The enhancement reasoning level becomes configurable and defaults to `off`; it
+  never inherits the conversation's effort. A rewrite rarely benefits from
+  reasoning, and reasoning is the slow path, so "follow the session" would
+  silently opt every enhancement on a reasoning model into the slowest setting.
+  The level is clamped by the resolved model's capabilities.
+- One enhancement request is bounded by a 60-second ceiling and fails with
+  `TIMEOUT` naming the budget, instead of retrying on the session model. The
+  provider retry budget can already spend about a minute, the renderer has no
+  cancel, and a hidden second attempt would double the wait. This is a behavior
+  change for a slow provider: the action now fails visibly instead of hanging.
+- No IPC method, process boundary, storage ownership, or security boundary
+  changes; the existing `prompt/enhance` payload is unchanged. See
+  `04-ux/12-prompt-enhancement.md` §3 and §5, ADR 0121, and
+  `06-delivery/04-e2e-test-plan.md` E2E-259.

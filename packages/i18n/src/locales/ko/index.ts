@@ -1201,6 +1201,30 @@ sklm: {
     fontSizeXl: "Trenta",
     fontSizeScale: "텍스트 크기 배율",
     fontSizePercent: "{{value}}%",
+    promptEnhancementTitle: "프롬프트 향상",
+    promptEnhancementDesc:
+      "입력창의 '프롬프트 향상' 동작에 적용됩니다. 시스템 프롬프트는 내장이며 사용자 템플릿과 모델을 사용자 지정할 수 있습니다.",
+    promptEnhancementCustomTemplate: "사용자 템플릿 사용",
+    promptEnhancementCustomTemplateDesc:
+      "내장 사용자 템플릿을 직접 만든 템플릿으로 교체합니다. 시스템 프롬프트는 내장으로 유지됩니다.",
+    promptEnhancementCustomTemplateNeedsTemplate:
+      "먼저 사용자 템플릿을 저장하세요. 저장한 뒤에는 스위치로 내장 템플릿과 사용자 템플릿을 전환할 수 있습니다.",
+    promptEnhancementEdit: "편집",
+    promptEnhancementModelTitle: "프롬프트 향상",
+    promptEnhancementModel: "기본 모델",
+    promptEnhancementThinking: "추론 강도",
+    promptEnhancementThinkingDesc:
+      "재작성에 사용할 추론 강도입니다. 기본값은 끄기이며 가장 빠릅니다.",
+    promptEnhancementThinkingOff: "끄기(추론 없음)",
+    promptEnhancementModelFollow: "현재 모델 따르기",
+    promptEnhancementUserTemplate: "사용자 템플릿",
+    promptEnhancementUserTemplateDesc:
+      "초안을 감쌉니다. 초안 변수를 반드시 포함해야 하며, 삽입 버튼으로 넣으세요.",
+    promptEnhancementInsertDraft: "초안 변수 삽입",
+    promptEnhancementRestore: "기본값 복원",
+    promptEnhancementMissingDraftVariable:
+      "사용자 템플릿에 초안 변수가 있어야 하며, 없으면 초안을 보낼 수 없습니다.",
+    promptEnhancementSaveError: "프롬프트 향상 설정을 저장하지 못했습니다.",
   },
   project: {
     open: "프로젝트 열기",

@@ -1181,6 +1181,30 @@ sklm: {
     "fontSizeXl": "Trenta",
     "fontSizeScale": "Textgrößenskala",
     "fontSizePercent": "{{value}}%",
+    "promptEnhancementTitle": "Prompt-Verbesserung",
+    "promptEnhancementDesc":
+      "Gilt für die Aktion „Prompt verbessern“ im Composer. Der System-Prompt ist eingebaut; Nutzervorlage und Modell sind anpassbar.",
+    "promptEnhancementCustomTemplate": "Eigene Vorlage verwenden",
+    "promptEnhancementCustomTemplateDesc":
+      "Ersetzt die eingebaute Nutzervorlage durch Ihre eigene. Der System-Prompt bleibt eingebaut.",
+    "promptEnhancementCustomTemplateNeedsTemplate":
+      "Speichern Sie zuerst eine eigene Vorlage; der Schalter wählt dann zwischen ihr und der eingebauten Vorlage.",
+    "promptEnhancementEdit": "Bearbeiten",
+    "promptEnhancementModelTitle": "Prompt-Verbesserung",
+    "promptEnhancementModel": "Standardmodell",
+    "promptEnhancementThinking": "Denkaufwand",
+    "promptEnhancementThinkingDesc":
+      "Denkaufwand für die Umschreibung. Standard ist Aus und am schnellsten.",
+    "promptEnhancementThinkingOff": "Aus (kein Denken)",
+    "promptEnhancementModelFollow": "Aktuellem Modell folgen",
+    "promptEnhancementUserTemplate": "Benutzer-Vorlage",
+    "promptEnhancementUserTemplateDesc":
+      "Umschließt den Entwurf. Muss die Entwurfsvariable enthalten; fügen Sie sie über die Schaltfläche ein.",
+    "promptEnhancementInsertDraft": "Entwurfsvariable einfügen",
+    "promptEnhancementRestore": "Standard wiederherstellen",
+    "promptEnhancementMissingDraftVariable":
+      "Die Benutzer-Vorlage muss die Entwurfsvariable enthalten, sonst kann der Entwurf nicht gesendet werden.",
+    "promptEnhancementSaveError": "Die Prompt-Verbesserungseinstellungen konnten nicht gespeichert werden.",
   },
   "project": {
     "open": "Projekt öffnen",
