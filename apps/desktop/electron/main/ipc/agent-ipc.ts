@@ -546,6 +546,11 @@ export function registerAgentIpc({
               data: attachment.inlineData,
             })),
           userMessageId: userMessage.id,
+          // Per-turn permission ceiling override (R1 leftover; spec §7.3). The
+          // sidecar records it on the turn context; enforcement of a NARROWER
+          // ceiling still routes through the session's stored mode until
+          // host-core `session.beginTurn` accepts the scoped param.
+          ...(req.permissionMode ? { permissionMode: req.permissionMode } : {}),
         },
       );
     } catch (e) {
