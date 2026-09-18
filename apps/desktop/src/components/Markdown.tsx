@@ -37,6 +37,7 @@ import {
   IconWorkflow,
 } from "./icons";
 import { TooltipButton } from "./ui";
+import { CitationBadge, useHostedSearchCitationSources } from "./CitationBadge";
 import { createPortal } from "react-dom";
 import { api } from "../lib/api";
 import {
@@ -501,6 +502,7 @@ function Anchor({
   const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
   const showToast = useAppStore((s) => s.showToast);
   const linkOpenTarget = useAppStore((s) => s.settings?.linkOpenTarget ?? "workpanel");
+  const citationSources = useHostedSearchCitationSources(href);
 
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -582,6 +584,10 @@ function Anchor({
 
   // Plain click previews in the work panel (or external browser based on setting).
   // Modified clicks fall through to _blank, which main routes to shell.openExternal.
+  if (citationSources.length > 0) {
+    return <CitationBadge sources={citationSources} />;
+  }
+
   const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     if (!href) return;
