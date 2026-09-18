@@ -4,7 +4,9 @@
 # Local builds without a certificate remain unsigned. This script injects a
 # real signing identity and requires notarization credentials:
 #
-#   MAC_SIGNING_IDENTITY   default: "Developer ID Application: XingYu Liu (DUV63RKYTW)"
+#   MAC_SIGNING_IDENTITY   default: "XingYu Liu (DUV63RKYTW)" — bare common
+#                          name; electron-builder rejects the
+#                          "Developer ID Application:" prefix
 #   APPLE_ID               Apple ID email for notarization
 #   APPLE_APP_SPECIFIC_PASSWORD  app-specific password for the Apple ID
 #   APPLE_TEAM_ID          Apple Developer Team ID (must be DUV63RKYTW)
@@ -44,7 +46,8 @@ if [[ "$MAC_ARCH" != "$DEFAULT_MAC_ARCH" ]]; then
   exit 1
 fi
 
-MAC_SIGNING_IDENTITY="${MAC_SIGNING_IDENTITY:-Developer ID Application: XingYu Liu (DUV63RKYTW)}"
+MAC_SIGNING_IDENTITY="${MAC_SIGNING_IDENTITY:-XingYu Liu (DUV63RKYTW)}"
+MAC_SIGNING_IDENTITY="${MAC_SIGNING_IDENTITY#Developer ID Application: }"
 APPLE_TEAM_ID="${APPLE_TEAM_ID:-DUV63RKYTW}"
 
 if [[ -z "${APPLE_ID:-}" || -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]]; then

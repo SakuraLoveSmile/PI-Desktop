@@ -27,9 +27,12 @@ for the official `vastsa/PI-Desktop` release lane.
    staples the DMG, and verifies the app as `Notarized Developer ID` before
    upload. Missing signing or notarization secrets fail the job; unsigned
    macOS artifacts must not be published from a tag.
-2. The signing identity is
-   `Developer ID Application: XingYu Liu (DUV63RKYTW)`. CI pins it with
-   `CSC_NAME` and `-c.mac.identity`. The Apple team id is `DUV63RKYTW`.
+2. The signing certificate is
+   `Developer ID Application: XingYu Liu (DUV63RKYTW)`; Apple team id
+   `DUV63RKYTW`. CI pins it with `CSC_NAME=XingYu Liu (DUV63RKYTW)`. The name
+   must be the bare common name: electron-builder 26 rejects an identity that
+   keeps the `Developer ID Application:` prefix, and the verification step
+   re-adds that prefix when it compares the `codesign` authority.
 3. Certificate material stays in GitHub Actions secrets:
    `CSC_LINK` (p12, file path or base64), `CSC_KEY_PASSWORD`, `APPLE_ID`,
    `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`. Nothing of that set is
