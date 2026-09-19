@@ -1014,7 +1014,7 @@ Minimal interface:
   directory, creates it if missing, and opens it in the system file manager.
   The renderer supplies only the session id; Main rejects a path outside the
   scratch root.
-- `session/importScan`
+- `session/importScan -> { sessions, truncated? }`
 - `session/importRun(candidates) -> { imported, skipped, failed }`
 - `modelConfig/importScan -> { providers }`
 - `modelConfig/importRun(candidates) -> { imported, skipped, failed }`
@@ -1024,13 +1024,17 @@ Import candidates carry `projectPath: string | null` and
 importer's sampled-scan threshold; larger files are sampled (head + tail) so
 scanning a multi-gigabyte archive stays interactive, and their `messageCount`
 is null — the import list renders an em dash for it, while imported sessions
-always compute their real message count at convert time. Scan titles come
+always compute their real message count at convert time. Codex discovery also
+caps traversal at 250 session files, walking `YYYY/MM/DD` paths newest-first
+(path date, not `updatedAt`). Hitting that cap sets `truncated.codex` to 250
+so the renderer can say the list is incomplete. Scan titles come
 from the first real user message: known synthetic injections (repo
 instructions, the IDE-context family such as `# Context from my IDE setup:`
 or `# Browser comments:`) are skipped, while pasted markdown starting with
 `#` is kept. A corrupt or out-of-range stored timestamp falls back to the
 source file's mtime, never to the import moment. A successful import
 refreshes both sessions and the durable Projects index.
+
 
 `modelConfig/importScan` reads Claude Code, Codex, OpenCode, Pi, and CC
 Switch config files from the user home directory and returns public provider drafts

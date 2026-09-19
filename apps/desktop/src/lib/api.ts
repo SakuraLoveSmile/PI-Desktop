@@ -555,7 +555,11 @@ export const api = {
       config,
     ).then((result) => ({ ...result, session: normalizeSession(result.session) })),
   scanImportSessions: () =>
-    invoke<{ sessions: ImportCandidate[] }>(IPC.invoke.sessionImportScan),
+    invoke<{
+      sessions: ImportCandidate[];
+      truncated?: Partial<Record<ImportSource, number>>;
+    }>(IPC.invoke.sessionImportScan),
+
   runImportSessions: (items: ImportCandidate[]) =>
     invoke<ImportRunResult>(IPC.invoke.sessionImportRun, items),
   scanImportModelConfigs: () =>

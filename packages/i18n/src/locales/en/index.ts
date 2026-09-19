@@ -901,7 +901,9 @@ sklm: {
     importFound: "Sessions found: {{count}}",
     importFound_one: "1 session found",
     importFound_other: "{{count}} sessions found",
+    importCodexCapped: "Codex is limited to the {{limit}} newest session files (by folder date).",
     importNone: "No importable sessions found on this machine.",
+
     importSelectAll: "Select all",
     importSelected: "Import selected ({{count}})",
     importing: "Importing…",

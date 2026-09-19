@@ -901,7 +901,9 @@ sklm: {
     importFound: "Bulunan oturumlar: {{count}}",
     importFound_one: "1 oturum bulundu",
     importFound_other: "{{count}} oturum bulundu",
+    importCodexCapped: "Codex, klasör tarihine göre en yeni {{limit}} oturum dosyasıyla sınırlıdır.",
     importNone: "Bu makinede içe aktarılabilir oturum bulunamadı.",
+
     importSelectAll: "Tümünü seç",
     importSelected: "Seçilenleri içe aktar ({{count}})",
     importing: "İçe aktarılıyor…",
