@@ -1604,7 +1604,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   and structured attachments retain their existing chips without speculative
   lookup. At most 32 unique candidates per message are checked, with four
   concurrent lookups across visible rows; additional candidates remain text.
-  Confirmation is scoped to the message text, workspace, and session; changing
+  Confirmation is scoped to the message text, workspace path, and session; changing
   any of these discards old results and cancels queued work. Newly created
   files are reconsidered when the message remounts or its scope changes, not
   by polling. Non-ASCII filenames remain supported. Absolute and `~/` tokens are matched whole,

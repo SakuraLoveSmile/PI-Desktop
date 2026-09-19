@@ -6382,6 +6382,8 @@ identify the platform validation still needed.
     attachment format and leaves work-panel tabs unchanged. Closing/unmounting
     releases modal/native-view blocking.
   - Deleting the session removes the pasted files with the rest of scratch.
+  - Deleting text immediately before an inline file chip must not insert a
+    blank line or move the chip to the next line; native undo/redo stay intact.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.7–11.8,
   `03-runtime/01-ipc-protocol.md` §13c,
   `03-runtime/03-tools-and-permissions.md` §4b,
@@ -6391,7 +6393,7 @@ identify the platform validation still needed.
   F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`composer-paste-files.test.mjs`,
-  `composer-clipboard.test.mjs`); `pnpm test:e2e:composer-paste` mounts the real
+  `composer-clipboard.test.mjs`, `composer-native-deletion.test.mjs`); `pnpm test:e2e:composer-paste` mounts the real
   ComposerInput, draft/paste hooks, file viewer, production CSS and sandboxed
   preload. It dispatches Chromium ClipboardEvents with synthetic mixed data
   and native File objects, exercises the real scratch writer and contained
@@ -10623,6 +10625,9 @@ are withdrawn with ADR 0165.
   file in the work-panel files viewer and click a `../spec/00-baseline.md` link.
   5) Include an absolute path under the workspace, an outside absolute path,
   and a `~/` path in chat; confirm only the under-root path becomes a target.
+  6) Send a user message `使用llama.cpp，给我迁移步骤，只读。`, then a user
+  message that names the real `apps/desktop/src/App.tsx` as a bare path and as
+  `@apps/desktop/src/App.tsx`.
 - **Expected**:
   - Opening the session paints the transcript without throwing.
   - Each chat path opens `apps/desktop/src/App.tsx` in the File Manager
@@ -10635,11 +10640,16 @@ are withdrawn with ADR 0165.
   - The markdown-file `../` link opens `docs/spec/00-baseline.md`, not a
     workspace-root `spec/00-baseline.md`.
   - A `../../../outside.ts` link from `docs/adr` stays inert.
+  - The user sentence containing `使用llama.cpp` stays exact original text, not
+    a file chip, when that path does not exist.
+  - A user-message bare path becomes a chip only after `fs/resolveRef` confirms
+    a real file; an explicit `@path` chips immediately.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3,
   `08-meta/decisions-log.md` (D322)
 - **Acceptance**: C (conversation & stream), D (workspace), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`chat-links.test.mjs`,
+  `verified-chat-files.test.mjs`, `transcript-file-chips.test.mjs`,
   `markdown-prose-style.test.mjs`); full UI journey Draft (run only in a capable environment when this surface changes)
 
 #### E2E-185: External URL opens stay on http(s) and mailto

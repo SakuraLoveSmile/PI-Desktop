@@ -8,15 +8,15 @@ import { useAppStore } from "../stores/app-store";
 const scheduleVerification = createChatFileVerificationQueue();
 const EMPTY: ReadonlySet<string> = new Set();
 
-/** Confirmation belongs to this text and workspace/session, never the next one. */
+/** Confirmation belongs to this text and workspace path/session, never the next one. */
 export function useVerifiedChatText(text: string, attachments?: readonly MessageAttachment[]) {
-  const workspace = useAppStore((s) => s.workspace);
+  const workspacePath = useAppStore((s) => s.workspace?.path);
   const sessionId = useAppStore((s) => s.activeSessionId);
   const request = useMemo(() => {
-    const segments = splitChatText(text, workspace?.path);
+    const segments = splitChatText(text, workspacePath);
     const trusted = new Set(attachments?.map((attachment) => attachment.ref));
     return { segments, trusted, sessionId, paths: chatFileCandidates(segments, trusted) };
-  }, [text, workspace, sessionId, attachments]);
+  }, [text, workspacePath, sessionId, attachments]);
   const [result, setResult] = useState<{
     request: typeof request;
     verified: ReadonlySet<string>;
