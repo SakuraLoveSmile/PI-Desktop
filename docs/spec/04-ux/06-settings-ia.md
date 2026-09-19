@@ -49,17 +49,25 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   8. **Subagents / 子智能体** — Lucide `Bot` (built-in and personal parallel agents)
   9. **Import / 导入** — Lucide `Download` (bring sessions and model configuration in from other tools)
   10. **Projects / 项目** — Lucide `Archive` (durable project index)
-  11. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
+  11. **Remote Hosts / 远程主机** — Lucide `Globe` (SSH bootstrap and pairing inventory; developer mode only)
+  12. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
 - The directory remains a flat searchable list in the same exact order. For
   scanability, the destinations are shown in four titled visual clusters:
   `Preferences` / `偏好` (General, AI, Shortcuts), `Agent` / `智能体`
   (Instructions, Models, Skills, MCP, Subagents), `Workspace` / `工作区`
-  (Import, Projects), and `System` / `系统` (Info). Headings are muted,
-  non-interactive labels and use whitespace for separation; no divider lines are
-  rendered. These are visual landmarks only, not a second navigation level.
+  (Import, Projects), and `System` / `系统` (Remote Hosts, Info). Headings are
+  muted, non-interactive labels and use whitespace for separation; no divider
+  lines are rendered. These are visual landmarks only, not a second navigation
+  level.
   When search filters the directory, empty clusters and their headings disappear.
+- **Remote Hosts / 远程主机** is a developer-only, Experimental destination: its
+  rail row, its page, and its settings-search hits exist only while
+  `AppSettings.developerMode` is `true`. With developer mode off the row is
+  absent rather than disabled, settings search returns no hit for it, and a
+  rail position left on it falls back to General. The row and the page title
+  carry the Experimental badge (`settings.remoteHosts.experimental`)
 - Loaded plugin Settings entries may appear only in a final **Extensions** group
   after all core groups. The host owns their ordering, search result, titlebar
   and fallback to General. The rail icon is the destination's host token
@@ -652,8 +660,8 @@ system while preserving their different data ownership:
     `AppSettings.developerMode` value is `true`
   - the developer mode switch unlocks the Open console button, F12 on every
     platform, Ctrl+Shift+I on Windows/Linux, the macOS View-menu developer
-    tools item, and Copy conversation ID / Open session path on the
-    conversation overflow menu
+    tools item, Copy conversation ID / Open session path on the conversation
+    overflow menu, and the Remote Hosts destination on the rail
   - disabling developer mode closes an open console and disables or removes
     every entry point; Settings search indexes the card, switch, and console
     action
@@ -680,6 +688,10 @@ system while preserving their different data ownership:
 - Project archive is indexed by Settings search and is not duplicated as a home
   sidebar destination or standalone global-search page
 - Back to app returns to chat shell from the rail's pinned footer action
+- Developer-only destinations join and leave the rail, the page, and settings
+  search as one unit: while developer mode is off the rail omits the row,
+  settings search returns no hit for it, and an open Remote Hosts page returns
+  to General
 
 ## 4. Acceptance
 
@@ -688,8 +700,10 @@ system while preserving their different data ownership:
    foot on the main sidebar's footer icon line, and exactly General / 常规, AI,
    Shortcuts / 快捷键, Instructions / 指令, Models / 模型, Skills / 技能, MCP,
    Subagents / 子智能体, Import / 导入, Projects / 项目, and Info / 信息 in
-   that order. The rows are grouped under Preferences / 偏好, Agent / 智能体,
-   Workspace / 工作区, and System / 系统. There is no Usage / 用量 destination.
+   that order, with Remote Hosts / 远程主机 between Projects and Info only
+   while developer mode is on. The rows are grouped under Preferences / 偏好,
+   Agent / 智能体, Workspace / 工作区, and System / 系统. There is no
+   Usage / 用量 destination.
 3. Appearance is part of General and has no standalone rail destination
 4. Providers is part of Agent and has no standalone rail destination
 5. Plugins has no Settings destination; the app-shell Plugins page supports

@@ -12028,7 +12028,8 @@ browser milestones are scheduled.
 
 #### E2E-REMOTE-HOST-ssh-password-authentication
 
-- **Preconditions**: A Linux test machine runs `sshd` with
+- **Preconditions**: Developer mode is enabled (Settings → Info → Developer),
+  so the Remote Hosts destination exists. A Linux test machine runs `sshd` with
   `PasswordAuthentication yes` and `PubkeyAuthentication no`, so the login is
   only reachable with a password; the user's local SSH agent holds no usable key
   for it. A GitHub Releases fixture serves the `pi-host` bundle for that platform
@@ -12073,22 +12074,30 @@ browser milestones are scheduled.
 #### E2E-REMOTE-HOST-settings-compact-inventory
 
 - **Preconditions**: The desktop Settings window can open. No paired remote
-  host is required.
-- **Steps**: 1) Open Settings. 2) Confirm Remote Hosts shows an Experimental
-  badge on the rail. 3) Open it and confirm the page title carries the same
-  badge, with a host inventory and one Add form (SSH / Pair) and no
-  instructional copy. 4) Switch Add to Pair and back to SSH; confirm both
-  forms stay filled.
-- **Expected**: The whole destination is marked Experimental. Field labels
-  and placeholders remain; overview, body, and hint copy are absent. There
-  is no Experimental switch list. SSH stays the default Add tab. Pairing and
-  SSH bootstrap keep their existing success and failure toasts.
-- **Specs linked**: `06-delivery/07-remote-control-rollout.md` §2 R2,
+  host is required. Developer mode is off in persisted settings.
+- **Steps**: 1) Open Settings and confirm the rail has no Remote Hosts row and
+  that searching settings for it returns nothing. 2) Enable developer mode in
+  Info → Developer and confirm Remote Hosts appears on the rail between
+  Projects and Info with an Experimental badge. 3) Open it and confirm the page
+  title carries the same badge, with a host inventory and one Add form
+  (SSH / Pair) and no instructional copy. 4) Switch Add to Pair and back to
+  SSH; confirm both forms stay filled. 5) Disable developer mode while the
+  destination is open and confirm the page returns to General and the rail row
+  is gone.
+- **Expected**: The whole destination is marked Experimental and is reachable
+  only while developer mode is on; the rail row, the page, and settings search
+  add and drop it together. Field labels and placeholders remain; overview,
+  body, and hint copy are absent. There is no Experimental switch list. SSH
+  stays the default Add tab. Pairing and SSH bootstrap keep their existing
+  success and failure toasts.
+- **Specs linked**: `04-ux/06-settings-ia.md` §1, §3,
+  `06-delivery/07-remote-control-rollout.md` §2 R2,
   `02-architecture/05-remote-agent-control.md` §5.2
 - **Acceptance**: D (surfaces), Quality
 - **Milestone**: Post-MVP (rollout R2b)
 - **Status**: Draft; covered offline by
-  `apps/desktop/test/settings-remote-hosts.test.mjs`.
+  `apps/desktop/test/settings-remote-hosts.test.mjs` and
+  `apps/desktop/test/settings-developer-only-destinations.test.mjs`.
 
 #### E2E-232: The outbound messaging integration relays events and commands
 
