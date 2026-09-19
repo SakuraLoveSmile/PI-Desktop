@@ -24,6 +24,18 @@ pub fn prepare_append(
     let mut message = input.clone();
     if message.role == "user" && message.parent_tool_call_id.is_none() {
         if let Some(delivery) = delivery {
+            // A steering input is additional human input to an already-claimed
+            // delivery turn, not the delivery itself: it must land in the same
+            // session but is exempt from the delivery's content/attachment
+            // contract and must not inherit the delivery's agent origin.
+            if message.steering == Some(true) {
+                if delivery.target_session_id != session_id {
+                    return Err(anyhow!(
+                        "PERMISSION_DENIED: steering input does not target its delivery session"
+                    ));
+                }
+                return Ok(message);
+            }
             if delivery.target_session_id != session_id
                 || delivery.content != message.content
                 || message
