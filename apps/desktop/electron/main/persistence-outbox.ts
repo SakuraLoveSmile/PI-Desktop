@@ -101,10 +101,9 @@ export class PersistenceOutbox {
             data: String(error),
           });
         } else if (isPoisonMessageError(error)) {
-          // The host will reject this row forever (for example provenance
-          // check: a steering message written into the wrong session). Drop
-          // only this entry and keep draining so one poisoned head cannot
-          // starve every later message out of the transcript.
+          // The host will reject this row forever (provenance / permission
+          // on this message). Drop only this entry and keep draining so one
+          // poisoned head cannot starve later transcript rows (D597).
           this.logger("warn", "session persistence flush dropped poisoned message", {
             key: current.key,
             data: String(error),
@@ -171,11 +170,12 @@ function isDuplicateMessageIdError(error: unknown): boolean {
 }
 
 /**
- * The host will reject this message on every attempt, no matter how many times
- * it is retried. These are permanent, message-level errors (provenance /
- * validation / permission), not transient host failures. Dropping the row is
- * the only way to keep the FIFO outbox from starving every message behind it.
+ * The host will reject this message on every retry. Match the host-core
+ * provenance prefix in the JSON-RPC message body (append maps those failures
+ * as INTERNAL). Do not treat PLUGIN_PERMISSION_DENIED or schema
+ * INVALID_PARAMS as poison — those are a different surface, and serde
+ * failures do not even put INVALID_PARAMS in the message text.
  */
 function isPoisonMessageError(error: unknown): boolean {
-  return /PERMISSION_DENIED|INVALID_(ARGUMENT|PARAMS)|NOT_FOUND: session/i.test(String(error));
+  return /(?<![A-Z_])PERMISSION_DENIED:/i.test(String(error));
 }

@@ -274,6 +274,7 @@
 | D324 | 空闲切换保留尚未刷入的已完成尾巴 | **在渲染器中修订 D317 / ADR 0137：`selectSession` 在会话仍在运行或仍有实时来源（`liveSessionTranscripts`）时，把有界持久化页缝到实时快照上。持久化页尚未包含的已完成助手/工具行予以保留。只有当该页已包含每一个实时 id 时才清掉实时来源，而不是回合一结束就清。仅渲染器：不改动 IPC、存储、主机协议或分页。** | 用户提示在模型运行前就落盘；助手/工具行走异步 outbox，在 `message_end` 之后才写入。`agent_end` 之后的空闲再验证只用持久化页，会丢掉已经显示在屏幕上的回复（issue #41）。 |
 | D327 | 已完成回复在进程重启后仍然存在 | **修订 D299 / ADR 0153 / ADR 0041：`message_end` 的完成快照在 outbox 追加之前先做检查点；`completed`/`error` 的 `session.endTurn` 仅在该 id 已索引时才删除 `.inflight.json`；启动恢复跳过已完成残留以便 outbox 先追加；握手等待排空后再用 `session.recoverInflightMessages` 把剩下的提升为 `complete`。附加 RPC，不改协议或 schema 版本。** | 与 issue #41 相同的「只剩用户消息」画面，但发生在完全退出之后（issue #42）：用户行在模型运行前就落盘，助手/工具行停在 outbox，D324 的实时缝合无法跨进程。 |
 | D444 | 跨会话消息 id 碰撞时改写；outbox 的 UNIQUE 不再停整队 | **修订 ADR 0041 / D327：`session.appendMessage` 仍把本会话已索引的 id 当作无操作（或用终态助手替换流式行）。若该全局唯一 `messages.id` 已属于另一会话，主机在写 JSONL 或索引之前改写为 `{sessionId}:{id}`，之后重放原始 id 也对改写后的行无操作。Electron 持久化 outbox 把 `UNIQUE constraint failed: messages.id` 当作幂等确认并继续排空，因此一个撞车的 toolCallId 不会卡住之后所有助手/工具行，也不会把 1024 上限填满。不改协议或 schema 版本。** | 工具行曾把 `toolCallId`（如 `call_421522`）当作 `messages.id`，这些 id 并不全局唯一。碰撞会在 JSONL 写完后 SQLite 失败，FIFO outbox 停在队头，所有会话的后续行都无法落盘，退出后再开就像前期历史丢了（issue #523）。 |
+| D597 | 丢弃 outbox 毒消息；接受投递回合内的 steering | **修订 ADR 0041 / ADR 0239 / ADR active-turn-steering / D444：Electron 持久化 outbox 把消息正文带 `PERMISSION_DENIED:` 前缀的追加当作永久拒绝，丢掉该行并继续排空。`PLUGIN_PERMISSION_DENIED` 和其他失败仍暂停。宿主 provenance 在目标会话一致时接受已认领协作投递回合上的 `UiMessage.steering`，不盖投递来源，并清掉客户端带来的 `session_message`。跨会话 steering 仍是 `PERMISSION_DENIED`。不改协议或 schema 版本。** | 向 session-collaboration 投递回合按 Alt+Enter 会被当成投递不匹配拒绝，outbox 永远重试队头，打满 1024 后丢掉后面的助手/工具行，转录只剩用户消息。 |
 | D328 | 由父级判定的子智能体寿命 | **修订 ADR 0089 / ADR 0119 / ADR 0129：不武装空闲和时长看门狗；父级 `agent_end` 不中止仍在跑的委托；运行时保持持久回合打开，完成时把报告交给父级。`TaskWait` 超时和 `TaskList` 返回心跳。只有 `TaskStop` 和用户 Stop 会中止委托。显式 `maxTurns` 和并发上限 10 保留。运行时专用，不改 IPC、存储或主机协议。** | 父级看不到实时委托工作，把 `TaskWait` 到期当成可以收工；等待是事件循环，模型不是。 |
 | D352 | 父级终态错误中止残留委托 | **修订 D328 / ADR 0166：父级空闲仍不中止委托。终端父级 provider/stream 错误（含耗尽的 HTTP 429）、溢出恢复失败、变更预算终止或拒绝的提示会中止残留委托、跳过 D328 续跑提示并发出 `agent_end`。`isRunning` 在该错误后不计残留委托，因此继续不会变成 `AGENT_BUSY`。见 ADR 0189 与 E2E-155。** | 父级 429 后 UI 显示继续，子智能体仍占 sidecar，下一条提示变成 session already has an active turn。 |
 | D354 | 同时标注两个 macOS 发布架构 | **修订 D353 / ADR 0145：两条原生 macOS 发布通道都使用带架构后缀的 electron-builder 模式。公开资产为 `PI-Desktop-<version>-arm64.dmg` / `-arm64-mac.zip` 以及 `-x64.dmg` / `-x64-mac.zip`。更新源 URL 与校验和保持一致。只改发布资产命名。** | arm64 资产原先不标明架构，x64 又用另一套 Intel 约定。 |
@@ -4478,3 +4479,16 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   共用低层 omit 路径，适配器不发送思考字段。显式 `off` 仍关闭思考。
 - Composer 推理菜单在所选模型有已启用规范档位时把 `omit` 放在最前，芯片渲染
   规范字符串。Schema v19 重建 `sessions` 以使 CHECK 包含 `omit`。见 ADR 0295 与 E2E-203a。
+
+## 2026-09-19 —— 丢弃 outbox 毒消息；接受投递回合内的 steering（D597）
+
+- 决策 D597 修订 ADR 0041、ADR 0239、ADR active-turn-steering 与 D444。
+  宿主追加错误消息带 `PERMISSION_DENIED:` 前缀时是永久的、消息级拒绝。
+  Electron outbox 丢掉该行并继续排空，避免一条毒消息把 1024 上限填满。
+  `PLUGIN_PERMISSION_DENIED` 这类子串以及其他宿主失败仍暂停。
+- 向已认领的协作投递回合做 steering 是该会话里额外的人类输入：不受投递
+  内容/附件契约约束，不继承投递来源，并清掉客户端带来的 `session_message`。
+  指向另一会话的 steering 仍是 `PERMISSION_DENIED`。
+- 见 `03-runtime/04-data-storage.md`、`03-runtime/06-host-rpc-protocol.md`、
+  E2E-SESSION-outbox-poison-does-not-drop-history。
+

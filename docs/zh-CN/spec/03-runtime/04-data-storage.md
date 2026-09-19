@@ -1293,4 +1293,8 @@ UI投影损失
 最新检查点。如果主机调用尚未完成时出现更新的追加快照，outbox 同样保留该快照。
 若 `messages.id` 已属于另一会话，主机在写 JSONL 之前改写为 `{sessionId}:{id}`；
 重放原始 id 对该改写行无操作。outbox 把 `UNIQUE constraint failed: messages.id`
-当作确认并继续排空（D444）。无需存储架构迁移。
+当作确认并继续排空（D444）。带 `PERMISSION_DENIED:` 前缀的永久拒绝同样丢弃该行
+以便 FIFO 继续；`PLUGIN_PERMISSION_DENIED` 和其他宿主失败仍暂停（D597）。
+向已认领的协作投递回合做 steering 是额外的人类输入：必须指向该投递的会话，
+不受投递内容/附件契约约束，不继承投递来源，并清掉客户端带来的
+`session_message`。无需存储架构迁移。

@@ -161,3 +161,23 @@ test("poisoned provenance message does not stall later outbox entries (D597)", a
     logs.some((row) => row.message === "session persistence flush dropped poisoned message"),
   );
 });
+
+test("PLUGIN_PERMISSION_DENIED is not poison and still pauses the outbox (D597)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "pi-outbox-"));
+  const outbox = new PersistenceOutbox(dir, silent);
+  const host = mockHost(async () => {
+    throw new Error("PLUGIN_PERMISSION_DENIED: missing grant for fs.write");
+  });
+  const getHost = () => host;
+  await outbox.enqueue(
+    { key: "message:s1:a", sessionId: "s1", message: { id: "a" } },
+    getHost,
+  );
+  await outbox.enqueue(
+    { key: "message:s2:b", sessionId: "s2", message: { id: "b" } },
+    getHost,
+  );
+  await outbox.flush(getHost);
+  assert.equal(outbox.size(), 2);
+});
+

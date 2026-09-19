@@ -1111,6 +1111,7 @@ sklm: {
     "modelAlreadyAdded": "Modelo ya agregado",
     "modelConfigurations": "Configuración del modelo",
     "removeModel": "Eliminar modelo",
+    "reorderModel": "Reordenar {{name}}. Arrastra o usa las flechas arriba y abajo.",
     "modelAlias": "Alias",
     "modelAliasHint": "Se muestra dondequiera que se nombre el modelo; el id sigue siendo la identidad de la solicitud.",
     "modelAliasPlaceholder": "p. ej. rápido",

@@ -1132,6 +1132,7 @@ sklm: {
     modelAlreadyAdded: "Model zaten eklendi",
     modelConfigurations: "Model ayarları",
     removeModel: "Modeli kaldır",
+    reorderModel: "{{name}} sırasını değiştir. Sürükleyin veya Yukarı ve Aşağı ok tuşlarını kullanın.",
     modelAlias: "Takma ad",
     modelAliasHint: "Modelin adlandırıldığı her yerde gösterilir; istek kimliği model ID olarak kalır.",
     modelAliasPlaceholder: "örn. hızlı",
