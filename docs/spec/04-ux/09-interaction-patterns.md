@@ -200,6 +200,10 @@ recency only breaks ties between equally relevant matches.
 - Start/finish, read, pin, rename, archive, delete, and backend restart update
   the menu. The menu remains available when the main window is hidden or
   closed, without creating another window until an explicit activation.
+- macOS does not listen for tray mouse-enter: that event replaces the native
+  status item and hides the extra. Windows/Linux still retry a failed Host
+  read on hover/right-click; macOS retries from the next session or inbox event.
+
 
 ### 1.6 Sidebar project and conversation organization
 

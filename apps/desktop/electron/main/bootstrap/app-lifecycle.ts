@@ -265,11 +265,14 @@ export function createApplicationLifecycle({
     state.tray = new Tray(icon);
     state.tray.setToolTip(APP_NAME);
     // macOS single-click opens its attached menu without focusing/reading a conversation.
-    if (process.platform !== "darwin") state.tray.on("click", restoreMainWindow);
+    // mouse-enter/move/leave replace the native NSStatusItem with a custom view,
+    // which hides the menu-bar extra. Keep hover retry on Windows/Linux only.
+    if (process.platform !== "darwin") {
+      state.tray.on("click", restoreMainWindow);
+      state.tray.on("mouse-enter", () => { void traySessions.refresh(); });
+      state.tray.on("right-click", () => { void traySessions.refresh(); });
+    }
     state.tray.on("double-click", restoreMainWindow);
-    // User access retries a transient Host read failure without a polling timer.
-    state.tray.on("mouse-enter", () => { void traySessions.refresh(); });
-    state.tray.on("right-click", () => { void traySessions.refresh(); });
     updateTrayMenu();
     void traySessions.refresh();
   }
