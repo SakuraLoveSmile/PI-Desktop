@@ -576,8 +576,8 @@ system while preserving their different data ownership:
   is the primary root of one logical project, and the remaining folders are
   retained as roots of that same project rather than separate project tabs.
   Chats, project instructions, and project memory are shared by the group.
-- The destination is one workbench (D267), revised by D455 into a list +
-  inspector. A quiet intro line sits above one toolbar above the workbench. It
+- The destination is one workbench (D267), revised by D455 into a one-column
+  list with an in-row inspector. A quiet intro line sits above one toolbar above the workbench. It
   reuses the same composition, control height, and row rhythm as the agent
   capability pages (D257) and adds no page-specific chrome.
   1. **Intro line** — one quiet description line, the same shape as the
@@ -588,14 +588,14 @@ system while preserving their different data ownership:
   2. **Toolbar** — one row carrying the Recent/Name sort as the shared
      segmented control, the search field with a clear affordance and a match
      count while searching, and the primary Add project action right-aligned
-  3. **Workbench** — a compact index beside an inspector. The always-visible
-     index sections run Pinned, All projects, Archived as non-interactive
-     header strips, each carrying its label and row count. Every section is a
-     labelled region wrapping its own list, so the strip is never a non-list
-     child of a list and each row keeps its group name in the accessibility
-     tree. Empty sections are omitted, and an index with no rows renders one
-     quiet empty state instead of the workbench. Below 720px the inspector
-     stacks under the index
+  3. **Workbench** — one column. The always-visible index sections run Pinned,
+     All projects, Archived as non-interactive header strips, each carrying its
+     label and row count. Every section is a labelled region wrapping its own
+     list, so the strip is never a non-list child of a list and each row keeps
+     its group name in the accessibility tree. Selecting a row opens its
+     inspector under that row at full content width. Empty sections are omitted,
+     and an index with no rows renders one quiet empty state instead of the
+     workbench
 - Compact row anatomy: color glyph, project name with one status tag (Active,
   Open, or Archived), session count, and a relative last-active time. The
   colored glyph uses Folder for ordinary projects and a filled Star for pinned
@@ -699,7 +699,7 @@ system while preserving their different data ownership:
     duplicating the index in the app shell
 13. Project archive renders one quiet description line — no hero, banner, or
     page-level counter run — above one search + sort toolbar and a list +
-    inspector workbench whose index holds the Pinned / All projects / Archived
+    one-column workbench whose index holds the Pinned / All projects / Archived
     group strips; each strip's count agrees with its rendered rows, a click
     selects a row without leaving Settings, sorting reorders rows inside every
     section without hiding any, and clearing the search restores the complete

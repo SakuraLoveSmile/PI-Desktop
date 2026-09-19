@@ -16,12 +16,11 @@ import {
   IconPin,
   IconPlus,
   IconSearch,
-  IconStar,
   IconSparkles,
   IconTrash,
   IconX,
 } from "../components/icons";
-import { loadRecentProjects, projectColor, type RecentProject } from "../lib/recent-projects";
+import { loadRecentProjects, type RecentProject } from "../lib/recent-projects";
 import { collectSessionProjects } from "../lib/session-projects";
 import { normalizeProjectPath } from "../lib/sidebar-session-groups";
 import { ProjectInstructionsDialog } from "../components/ProjectInstructionsDialog";
@@ -47,7 +46,7 @@ import {
   type ProjectIndexItem,
   type SortMode,
 } from "../lib/project-archive";
-import { ProjectArchiveIndex, projectRowId } from "../features/projects/ProjectArchiveIndex";
+import { ProjectArchiveIndex } from "../features/projects/ProjectArchiveIndex";
 
 export function ProjectsPage() {
   const { t, i18n } = useTranslation();
@@ -332,10 +331,6 @@ export function ProjectsPage() {
       (path) => normalizeProjectPath(path) === normalizeProjectPath(project.path),
     );
   const selectedArchived = project?.archived === true;
-  const selectedColor = project
-    ? project.color || projectColor(project.path)
-    : undefined;
-
   const onIndexKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
@@ -455,8 +450,7 @@ export function ProjectsPage() {
           tabIndex={0}
           onKeyDown={onIndexKeyDown}
         >
-          <div className="projects-index-pane">
-            <ProjectArchiveIndex
+          <ProjectArchiveIndex
               groups={groups}
               selectedPath={selectedPath}
               workspacePath={workspace?.path}
@@ -468,44 +462,10 @@ export function ProjectsPage() {
                 setMenuFor(null);
               }}
               onActivate={(path) => void activate(path)}
-            />
-          </div>
-          <div
-            className="settings-panel projects-inspector"
-            role="region"
-            aria-labelledby={project ? projectRowId(project.path) : undefined}
-          >
-            {project ? (
-              <>
+              detail={
+                project ? (
+                  <>
                 <div className="projects-inspector-head">
-                  <span className="projects-glyph is-large" style={{ background: selectedColor }}>
-                    {project.pinned ? (
-                      <IconStar size={16} fill="currentColor" aria-hidden />
-                    ) : (
-                      <IconFolder size={16} aria-hidden />
-                    )}
-                  </span>
-                  <div className="projects-inspector-ident">
-                    <div className="projects-inspector-title">
-                      <h3 className="projects-inspector-name">{project.name}</h3>
-                      {selectedActive ? (
-                        <span className="projects-tag is-active">{t("project.active")}</span>
-                      ) : selectedRetained ? (
-                        <span className="projects-tag">{t("project.openTag")}</span>
-                      ) : null}
-                      {project.pinned ? (
-                        <span
-                          className="projects-tag is-pin"
-                          title={t("project.pinnedTag")}
-                          aria-label={t("project.pinnedTag")}
-                        >
-                          <IconPin size={10} />
-                        </span>
-                      ) : null}
-                      {selectedArchived ? (
-                        <span className="projects-tag is-archived">{t("project.archivedTag")}</span>
-                      ) : null}
-                    </div>
                     <div className="projects-inspector-meta">
                       <span className="projects-name-path" title={project.path}>
                         {shortenPath(project.path)}
@@ -519,7 +479,6 @@ export function ProjectsPage() {
                         </>
                       ) : null}
                     </div>
-                  </div>
                   <div className="projects-inspector-actions">
                     {selectedActive ? null : (
                       <Button size="sm" variant="primary" onClick={() => void activate(project.path)}>
@@ -782,13 +741,9 @@ export function ProjectsPage() {
                   </Button>
                 ) : null}
               </>
-            ) : (
-              <div className="projects-inspector-empty">
-                <div className="projects-empty-title">{t("project.inspectorEmptyTitle")}</div>
-                <div className="projects-empty-body">{t("project.inspectorEmptyBody")}</div>
-              </div>
-            )}
-          </div>
+                ) : null
+              }
+            />
         </div>
       )}
       {instructionsFor ? (

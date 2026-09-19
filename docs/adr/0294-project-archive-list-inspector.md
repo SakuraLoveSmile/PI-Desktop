@@ -35,11 +35,11 @@ must not leave the page.
    selects the row and keeps Settings open. Double-click, Enter, or the
    inspector Open action activates the project and returns to chat. Archive and
    close still keep Project archive open.
-4. **The inspector owns management.** Folders, chats (latest first, batches of
-   eight), New task, and the existing menu (instructions, memory, edit, pin,
-   archive/restore, two-step delete, close) live beside the index. Below 720px
-   the inspector stacks under the index. Archived records stay grouped and
-   visible; there is still no visibility toggle (D133).
+4. **The inspector owns management, in one column.** Folders, chats (latest
+   first, batches of eight), New task, and the existing menu (instructions,
+   memory, edit, pin, archive/restore, two-step delete, close) open under the
+   selected row at full content width. There is no side-by-side pane. Archived
+   records stay grouped and visible; there is still no visibility toggle (D133).
 5. **Search still matches session titles.** A session-title hit keeps the
    owning project in the index, selects it, and lists the matching chats in
    the inspector.
@@ -48,7 +48,7 @@ must not leave the page.
 
 ## Consequences
 
-- Managing many projects no longer requires expanding rows in the index.
+- Compact rows stay scannable; only the selected project opens its full-width detail.
 - A single click no longer leaves Settings, which is the management path; the
   chat path is Open / double-click / Enter / opening a session.
 - Source-contract tests for the archive destination now cover the workbench

@@ -98,6 +98,8 @@ test("project archive renders the intro, toolbar, and list-inspector workbench",
 
   assert.equal(projectsPageSource.match(/projects-workbench/g)?.length, 1);
   assert.match(projectsPageSource, /projects-inspector/);
+  assert.match(projectsIndexSource, /projects-inspector/);
+  assert.doesNotMatch(projectsPartialSource, /grid-template-columns/);
   assert.match(projectsIndexSource, /aria-labelledby=\{`projects-group-\$\{group\.id\}`\}/);
   assert.match(projectsIndexSource, /<h3 className="projects-group-label"/);
   assert.match(projectsIndexSource, /className="projects-group-rows" role="list"/);
