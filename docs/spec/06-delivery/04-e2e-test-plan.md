@@ -4772,7 +4772,7 @@ identify the platform validation still needed.
   - Work panel body reads as quiet `#fafafa` inset paper with a white header band.
   - Settings fields, browser URL, segment tracks, and shortcut keycaps use light inset fills; focused fields lift with a neutral ring.
   - Toggle on-state keeps a white knob on the near-black track.
-  - Hover fills on file-tree/diff/resize ease with shared motion tokens, and the divider's 2px line is a 50% accent tint while hovered or dragged, so it never paints a solid white hairline across the dark plate; keyboard focus keeps the full accent.
+  - Hover fills on file-tree/diff/resize ease with shared motion tokens, and the divider matches the sidebar: a 32px centered grip on direct hover/focus, not a full-height hairline; keyboard focus and an in-progress drag use the solid accent.
   - Light dialog scrim is softer than the dark 45% veil (~28% ink).
   - The dock question card paints the composer plate in both palettes — light
     `#ffffff` with the composer shadow, dark 96% `#212121` — and its option rows
