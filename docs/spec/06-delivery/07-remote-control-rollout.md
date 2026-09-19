@@ -142,11 +142,9 @@ Deliverables:
 - the terminal: `terminal/open`, `terminal/input`, `terminal/resize`,
   `terminal/close`, `terminal.output`, and a bounded replay ring, running on
   the remote machine; and
-- the Settings → Remote Hosts destination: a compact host inventory, one Add
-  form with SSH and Pair tabs and no instructional copy, and Experimental
-  rows for unscheduled capabilities (LAN discovery, browser access,
-  messaging, WSL, share this machine) that toast unavailability and do not
-  call IPC.
+- the Settings → Remote Hosts destination: a compact host inventory and one
+  Add form with SSH and Pair tabs, no instructional copy, marked Experimental
+  on the settings rail and page title because the topology may still fail.
 
 Design decisions (D375, recorded 2026-09-10):
 

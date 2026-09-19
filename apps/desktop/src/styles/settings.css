@@ -320,12 +320,22 @@
 }
 
 .settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 0 0 28px;
   color: var(--ds-text-primary);
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-strong);
   letter-spacing: var(--tracking-tighter);
   line-height: var(--leading-heading);
+}
+
+.settings-nav-experimental {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  font-size: var(--text-2xs);
+  line-height: var(--leading-compact);
 }
 
 .settings-recovery {
@@ -930,17 +940,14 @@
 
 /*
   A disabled switch still reads as a switch: dimmed, not restyled, and the
-  cursor says why clicking does nothing. `aria-disabled` covers Experimental
-  rows that must stay focusable so a click can announce unavailability.
+  cursor says why clicking does nothing.
 */
-.settings-toggle:disabled,
-.settings-toggle[aria-disabled="true"] {
+.settings-toggle:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.settings-toggle:disabled:hover,
-.settings-toggle[aria-disabled="true"]:hover {
+.settings-toggle:disabled:hover {
   background: var(--ds-switch-track-off);
 }
 

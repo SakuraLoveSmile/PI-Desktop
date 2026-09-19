@@ -246,12 +246,7 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.remoteHosts.sshPassword",
       "settings.remoteHosts.statusOnline",
       "settings.remoteHosts.statusOffline",
-      "settings.remoteHosts.experimentalTitle",
-      "settings.remoteHosts.experimentalLan",
-      "settings.remoteHosts.experimentalGateway",
-      "settings.remoteHosts.experimentalMessaging",
-      "settings.remoteHosts.experimentalWsl",
-      "settings.remoteHosts.experimentalExpose",
+      "settings.remoteHosts.experimental",
     ],
   },
   {

@@ -1,19 +1,21 @@
 /**
  * Settings ▸ Remote Hosts page contract.
  *
- * Guards the compact inventory + Add (SSH/Pair) + Experimental layout: no
- * instructional copy, both add modes stay mounted behind `hidden`, and the
- * unscheduled rows toast unavailability without calling IPC.
+ * Guards the compact inventory + Add (SSH/Pair) layout: no instructional
+ * copy, both add modes stay mounted behind `hidden`, and the destination is
+ * marked Experimental on the rail and page title.
  */
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadStylesSync } from "./helpers/styles.mjs";
+import { readSettingsSourceSync } from "./helpers/source-contracts.mjs";
 
 const page = readFileSync(
   new URL("../src/components/settings/RemoteHostsPage.tsx", import.meta.url),
   "utf8",
 );
+const settings = readSettingsSourceSync();
 const styles = loadStylesSync();
 
 function cssRule(selector) {
@@ -46,18 +48,13 @@ test("remote hosts omits instructional copy", () => {
   assert.doesNotMatch(page, /<SettingsCard title=\{t\("settings\.remoteHosts\.listTitle"\)\}/);
 });
 
-test("experimental remote-host rows stay local and unavailable", () => {
-  assert.match(page, /EXPERIMENTAL_FEATURES/);
-  assert.match(page, /settings\.remoteHosts\.experimentalLan/);
-  assert.match(page, /settings\.remoteHosts\.experimentalGateway/);
-  assert.match(page, /settings\.remoteHosts\.experimentalMessaging/);
-  assert.match(page, /settings\.remoteHosts\.experimentalWsl/);
-  assert.match(page, /settings\.remoteHosts\.experimentalExpose/);
-  assert.match(page, /aria-disabled="true"/);
-  assert.match(page, /experimentalUnavailable/);
-  assert.doesNotMatch(page, /api\.\w*[Ee]xperimental/);
-  assert.match(
-    cssRule('.settings-toggle[aria-disabled="true"]'),
-    /cursor:\s*not-allowed/,
-  );
+test("the remote-hosts destination is marked experimental", () => {
+  assert.match(settings, /item\.id === "remoteHosts"/);
+  assert.match(settings, /settings\.remoteHosts\.experimental/);
+  assert.match(settings, /className="settings-nav-experimental"/);
+  assert.match(cssRule(".settings-nav-experimental"), /font-size:\s*var\(--text-2xs\)/);
+  assert.doesNotMatch(page, /EXPERIMENTAL_FEATURES/);
+  assert.doesNotMatch(page, /experimentalLan/);
+  assert.doesNotMatch(page, /experimentalGateway/);
+  assert.doesNotMatch(page, /SettingsCard/);
 });

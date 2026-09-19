@@ -30,7 +30,7 @@ import {
   IconSliders,
   IconSparkles,
 } from "../../components/icons";
-import { Button, cx } from "../../components/ui";
+import { Badge, Button, cx } from "../../components/ui";
 import { ModelConfigPage } from "../../components/settings/ModelConfigPage";
 import { KeyboardShortcutsSection } from "../../components/settings/KeyboardShortcutsSection";
 import { FontFamilyRow } from "../../components/settings/FontFamilyRow";
@@ -271,6 +271,11 @@ export function SettingsPage() {
                   >
                     <span className="settings-nav-icon">{item.icon}</span>
                     <span className="settings-nav-label">{t(item.labelKey)}</span>
+                    {item.id === "remoteHosts" ? (
+                      <Badge tone="warning" className="settings-nav-experimental">
+                        {t("settings.remoteHosts.experimental")}
+                      </Badge>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -318,7 +323,12 @@ export function SettingsPage() {
       <div className="settings-content">
         <div className="settings-content-inner">
           <div className="settings-content-enter">
-          <h1 className="settings-section-title">{activeExtension?.label ?? t(activeTitleKey)}</h1>
+          <h1 className="settings-section-title">
+            <span>{activeExtension?.label ?? t(activeTitleKey)}</span>
+            {!activeExtension && tab === "remoteHosts" ? (
+              <Badge tone="warning">{t("settings.remoteHosts.experimental")}</Badge>
+            ) : null}
+          </h1>
 
           {activeExtension ? (
             <PluginScenicThemesDestination destination={activeExtension} selectTheme={selectPluginTheme} />

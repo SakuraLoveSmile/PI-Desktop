@@ -849,13 +849,7 @@ sklm: {
       "sshSucceeded": "{{label}} installé.",
       "sshFailed": "Échec de l'installation : {{message}}",
       "transportSsh": "SSH",
-      "experimentalTitle": "Expérimental",
-      "experimentalUnavailable": "Pas encore disponible",
-      "experimentalLan": "Découverte LAN",
-      "experimentalGateway": "Accès navigateur",
-      "experimentalMessaging": "Messagerie",
-      "experimentalWsl": "WSL",
-      "experimentalExpose": "Partager cette machine"
+      "experimental": "Expérimental"
     },
     "importTitle": "Importer à partir d'autres outils",
     "importScan": "Scanner",

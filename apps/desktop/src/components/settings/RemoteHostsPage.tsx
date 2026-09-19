@@ -4,9 +4,10 @@
  *
  * Inventory of `<dataDir>/remote-hosts.json` plus one Add form: SSH install
  * first, URL + pairing token second. Instructional copy stays out of the
- * renderer. Unscheduled capabilities render as Experimental rows that toast
- * unavailability and never call IPC. A password typed into the SSH form lives
- * in this component's state only; it is never persisted or logged here.
+ * renderer. The destination is marked Experimental on the settings rail and
+ * page title; pairing and SSH bootstrap still call the same IPC. A password
+ * typed into the SSH form lives in this component's state only; it is never
+ * persisted or logged here.
  */
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,7 +15,6 @@ import type { RemoteHostSshAuth, RemoteHostSummary } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import { Badge, Button, Field, Input, PasswordInput, cx } from "../ui";
-import { SettingsCard, SettingsRow } from "../../features/settings/primitives";
 
 type AddMode = "ssh" | "pair";
 
@@ -45,14 +45,6 @@ const EMPTY_SSH_FORM: SshForm = {
   auth: "key",
   password: "",
 };
-
-const EXPERIMENTAL_FEATURES = [
-  { id: "lan", titleKey: "settings.remoteHosts.experimentalLan" },
-  { id: "gateway", titleKey: "settings.remoteHosts.experimentalGateway" },
-  { id: "messaging", titleKey: "settings.remoteHosts.experimentalMessaging" },
-  { id: "wsl", titleKey: "settings.remoteHosts.experimentalWsl" },
-  { id: "expose", titleKey: "settings.remoteHosts.experimentalExpose" },
-] as const;
 
 export function RemoteHostsPage() {
   const { t } = useTranslation();
@@ -177,11 +169,6 @@ export function RemoteHostsPage() {
     },
     [sshForm, refresh, showToast, t],
   );
-
-  const onExperimental = useCallback(() => {
-    showToast(t("settings.remoteHosts.experimentalUnavailable"), { variant: "info" });
-  }, [showToast, t]);
-
   const busy = installing || pairing;
   const sshSubmitDisabled =
     installing ||
@@ -484,24 +471,6 @@ export function RemoteHostsPage() {
           </form>
         </div>
       </section>
-
-      <SettingsCard title={t("settings.remoteHosts.experimentalTitle")}>
-        {EXPERIMENTAL_FEATURES.map((feature) => (
-          <SettingsRow key={feature.id} title={t(feature.titleKey)}>
-            <button
-              type="button"
-              className="settings-toggle"
-              role="switch"
-              aria-checked={false}
-              aria-disabled="true"
-              aria-label={t(feature.titleKey)}
-              onClick={onExperimental}
-            >
-              <span className="settings-toggle-thumb" />
-            </button>
-          </SettingsRow>
-        ))}
-      </SettingsCard>
     </div>
   );
 }

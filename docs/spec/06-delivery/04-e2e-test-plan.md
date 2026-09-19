@@ -11983,17 +11983,15 @@ browser milestones are scheduled.
 
 - **Preconditions**: The desktop Settings window can open. No paired remote
   host is required.
-- **Steps**: 1) Open Settings → Remote Hosts. 2) Confirm the destination is a
-  host inventory, one Add form with SSH and Pair tabs, and an Experimental
-  section — not three stacked cards of instructional copy. 3) Switch Add to
-  Pair and back to SSH; confirm both forms stay filled. 4) Click an
-  Experimental switch (LAN discovery, browser access, messaging, WSL, or
-  share this machine).
-- **Expected**: Field labels and placeholders remain; overview, body, and
-  hint copy are absent. SSH stays the default Add tab. Experimental switches
-  stay off, remain focusable, toast that the capability is not available yet,
-  and issue no IPC. Pairing and SSH bootstrap keep their existing success and
-  failure toasts.
+- **Steps**: 1) Open Settings. 2) Confirm Remote Hosts shows an Experimental
+  badge on the rail. 3) Open it and confirm the page title carries the same
+  badge, with a host inventory and one Add form (SSH / Pair) and no
+  instructional copy. 4) Switch Add to Pair and back to SSH; confirm both
+  forms stay filled.
+- **Expected**: The whole destination is marked Experimental. Field labels
+  and placeholders remain; overview, body, and hint copy are absent. There
+  is no Experimental switch list. SSH stays the default Add tab. Pairing and
+  SSH bootstrap keep their existing success and failure toasts.
 - **Specs linked**: `06-delivery/07-remote-control-rollout.md` §2 R2,
   `02-architecture/05-remote-agent-control.md` §5.2
 - **Acceptance**: D (surfaces), Quality
