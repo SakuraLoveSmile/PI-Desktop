@@ -1668,16 +1668,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   and owns the pager whenever `revisionCount > 1`; replacing the assistant/tool
   tail must not move or detach that pager from the user bubble. The pager is
   part of the message action toolbar: hidden by default and revealed together
-  with Copy on row hover or keyboard focus. Right-clicking a user message or
-  an assistant turn opens the same action vocabulary as a body-level
-  pointer-anchored menu (Copy, Select text, and the row's own Edit / Delete /
-  Regenerate / Branch / revision items). Right-clicking empty transcript
-  space, a system row, or a permission/outcome card opens a conversation
-  menu: Copy conversation, Select conversation text, Scroll to top, Jump to
-  latest. Quote, Annotate, and Open side chat stay retired (ADR 0268). A
-  streaming or empty assistant turn that would produce no items opens
-  nothing. Copying from the menu reports through the toast host because the
-  surface closes as soon as the item runs.
+  with Copy on row hover or keyboard focus.
   Fork creates and activates an independent session whose snapshot ends at the
   selected assistant response, requires an idle source, and leaves that
   source's transcript, live runtime, and provider cache state untouched (D134).
@@ -1801,11 +1792,6 @@ message its checkpoint covers.
   whatever its z-index. When the pane is narrower than the panel, the popover
   narrows with the pane instead of crossing that edge.
 - Timestamps: `aria-label` with full time string, visual shows relative time
-- Right-click menus are `role="menu"` with `role="menuitem"` rows, arrow /
-  Home / End navigation, Escape / Tab / outside-press / scroll-behind
-  dismissal, and an accessible name (`chat.messageMenu` or
-  `chat.conversationMenu`). Focus returns to whatever the right-click
-  interrupted.
 
 ### 8.6 MVP constraints
 

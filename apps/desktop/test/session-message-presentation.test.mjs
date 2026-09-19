@@ -43,11 +43,6 @@ function loadComponent(name, extras = {}) {
     "../../../components/icons": new Proxy({}, { get: () => Icon }),
     "../../../components/ui": { TooltipButton },
     "./shared": shared,
-    "./menu-items": { userMessageMenuItems: () => [] },
-    "./TranscriptMenu": {
-      useTranscriptMenu: () => () => {},
-      useChatTextActions: () => ({ copyText: () => {}, selectText: () => {} }),
-    },
     ...extras,
   };
   const module = { exports: {} };

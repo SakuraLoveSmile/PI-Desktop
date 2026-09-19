@@ -3422,33 +3422,6 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
-#### E2E-CHAT-transcript-context-menu: Right-click a message or the transcript
-
-- **Preconditions**: A session contains a completed user prompt and a
-  completed assistant answer; the conversation pane is focused.
-- **Steps**: 1) Right-click the user plate. 2) Choose Copy, then Select
-  message text. 3) Right-click the assistant turn and choose Copy.
-  4) Right-click empty space below the last turn and choose Copy
-  conversation. 5) Press Escape on an open menu, then Tab. 6) Right-click
-  a markdown link in the answer.
-- **Expected**: The user menu lists Copy, Select message text, Edit, and
-  a separated Delete; the assistant menu lists Copy, Select message text,
-  Regenerate, and Branch. Copy writes the message or the labelled
-  conversation to the clipboard and shows a toast. Select text highlights
-  the bubble. Escape and Tab dismiss the menu without running an item.
-  A link still offers Open in default browser, Open in work panel, and
-  Copy link address. Quote, Annotate, and Open side chat are absent
-  (ADR 0268). The surface is a viewport-fixed body-level layer and does
-  not resize the transcript.
-- **Specs linked**: `04-ux/08-component-spec.md` §8.3 / §8.5,
-  `04-ux/09-interaction-patterns.md` (floating dropdown surfaces),
-  ADR 0268
-- **Acceptance**: C (chat stream), Quality
-- **Milestone**: M5
-- **Status**: Unit-covered (`chat-context-menu.test.mjs`,
-  `chat-context-menu-items.test.mjs`, `chat-context-menu-surface.test.mjs`);
-  full UI scenario Draft
-
 #### E2E-060b: Neutral gray accent across chrome
 
 - **Preconditions**: App running in dark and light themes; plugins page and a
