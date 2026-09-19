@@ -811,9 +811,11 @@ the process without altering the stored message. Assistant errors and trailing
 aborted partial replies stay visible. Compaction and user/system boundaries are
 unchanged.
 
-Completed process areas start collapsed; detailed mode opens the active process.
-Manual choices and search reveals own the disclosure until unmount. Failed tools
-open an unclaimed active process and keep their invocation-level error presentation.
+Detailed mode keeps process areas open, including completed history. Compact
+mode starts completed process areas collapsed. Manual choices and search
+reveals own the disclosure until unmount. Failed tools open an unclaimed
+active process even in compact mode and keep their invocation-level error
+presentation.
 The header shows elapsed time and the visible process step count. Its thinking
 label applies only while the latest activity is streaming reasoning without answer
 text; streamed answers use the processing label. Delegation

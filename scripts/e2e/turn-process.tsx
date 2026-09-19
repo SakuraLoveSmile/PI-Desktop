@@ -115,8 +115,8 @@ export async function turnProcessProbe() {
       "one process per turn",
     );
     check(
-      header()?.getAttribute("aria-expanded") === "false" && !visible(process()),
-      "completed process starts collapsed",
+      header()?.getAttribute("aria-expanded") === "true" && visible(process()),
+      "detailed completed process starts open",
     );
     check(
       visible(container.querySelector('[data-message-id="answer"]')),
@@ -126,19 +126,23 @@ export async function turnProcessProbe() {
       header()?.textContent?.includes("5 steps"),
       "process counts thought, tools and progress once",
     );
-    click(header());
     check(
       visible(container.querySelector('[data-message-id="progress"]')),
-      "expanding reveals intermediate progress",
+      "detailed completed process shows intermediate progress",
     );
     check(
       process()?.querySelectorAll(".tool-row").length === 3,
-      "expanding retains thinking and both tools",
+      "detailed process shows thinking and both tools",
+    );
+    click(header());
+    check(
+      header()?.getAttribute("aria-expanded") === "false" && !visible(process()),
+      "detailed process can still collapse",
     );
     render(messages, true);
     render(messages);
     check(
-      header()?.getAttribute("aria-expanded") === "true",
+      header()?.getAttribute("aria-expanded") === "false",
       "manual disclosure survives active-to-complete transition",
     );
 
@@ -149,8 +153,9 @@ export async function turnProcessProbe() {
     );
     render(messages, false, null, "live");
     check(
-      header()?.getAttribute("aria-expanded") === "false",
-      "unclaimed process collapses on completion",
+      header()?.getAttribute("aria-expanded") === "true" &&
+        visible(container.querySelector('[data-message-id="progress"]')),
+      "detailed unclaimed process stays open on completion",
     );
     render(
       messages,
@@ -309,6 +314,10 @@ export async function turnProcessProbe() {
       "compact thinking ends as soon as answer text starts",
     );
     render(messages, false, null, "compact-tools");
+    check(
+      header()?.getAttribute("aria-expanded") === "false" && !visible(process()),
+      "compact completed process starts collapsed",
+    );
     click(header());
     check(
       !container.querySelector(".thinking") &&

@@ -54,6 +54,15 @@ export function hasFailedProcessTool(parts: readonly AssistantTurnPart[]): boole
   );
 }
 
+/** Detailed keeps process visible; compact only auto-opens an active tool failure. */
+export function shouldAutoOpenTurnProcess(
+  mode: ThinkingDisplayMode,
+  isActive: boolean,
+  hasToolFailure: boolean,
+): boolean {
+  return mode === "detailed" || (isActive && hasToolFailure);
+}
+
 /**
  * Only a trailing assistant text can be the answer: text followed by tools is
  * progress. The stream carries no final-answer marker, so a live trailing text

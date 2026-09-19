@@ -22,11 +22,12 @@ belongs to the process. There is no semantic final-answer marker in UiMessage,
 so the renderer does not guess intent from the wording. User/system messages
 and compaction dividers retain their existing turn boundaries.
 
-Completed process areas start collapsed. Detailed mode opens the active
-process automatically and retains the existing thinking-row disclosures.
-Manual disclosure choices survive streaming and completion. Search navigation
-opens the containing process. Tool failures open an unclaimed active process so the
-invocation error stays visible; that does not mark the whole turn as failed.
+Detailed mode keeps process areas open for both active and completed turns
+and retains the existing thinking-row disclosures. Compact mode starts
+completed process areas collapsed. Manual disclosure choices survive
+streaming and completion. Search navigation opens the containing process.
+Tool failures open an unclaimed active process so the invocation error stays
+visible even in compact mode; that does not mark the whole turn as failed.
 Assistant errors and stopped trailing partial answers stay outside the process.
 Tool/delegation detail controls, permission cards, and transcript actions retain
 their existing behavior.
@@ -50,7 +51,7 @@ tool and intermediate-text items and omit hidden compact-mode thinking.
 ## Consequences
 
 - One completed turn has one process disclosure plus its visible answer.
-- Reasoning remains available by switching back to detailed mode.
+- Detailed mode keeps thinking, tools and intermediate text visible without an extra click; compact remains the collapsed presentation.
 - Unchanged activity groups keep their memoized boundary during text deltas;
   the process wrapper does not move execution or persistence into the renderer.
 - This groups loaded transcript entries; it does not reconstruct history that
