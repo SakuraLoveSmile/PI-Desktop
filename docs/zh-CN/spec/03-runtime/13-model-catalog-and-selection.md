@@ -112,10 +112,10 @@ type RecentModelRef = {
 且不发送思考覆盖。
 
 对于新创建的会话，渲染器会解析所选（或应用默认）模型的 `ModelBinding`。
-具有推理能力的模型始于该绑定的 `defaultThinkingLevel`，并钳位到已启用档位；
-当默认值未设置时，才回落到已发布 `supportedThinkingLevels` 中的最高已启用档。
-非推理模型或缺失的能力元数据从 `off` 开始。这是一个仅创建时的默认值，绝不会
-重写现有会话的存储选择。
+具有推理能力的模型始于该绑定的 `defaultThinkingLevel`（`omit` 保留；其它值
+钳位到已启用档位）；当默认值未设置时，才回落到已发布
+`supportedThinkingLevels` 中的最高已启用档。非推理模型或缺失的能力元数据从
+`off` 开始。这是一个仅创建时的默认值，绝不会重写现有会话的存储选择。
 
 未固定的会话仍在 list/get/create/fork/configure 上展示该继承默认模型的
 推理能力；丰富步骤不会写入 `providerId`/`modelId`。桌面创建会话时会把当时的

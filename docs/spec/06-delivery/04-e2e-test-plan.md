@@ -6423,6 +6423,8 @@ identify the platform validation still needed.
     attachment format and leaves work-panel tabs unchanged. Closing/unmounting
     releases modal/native-view blocking.
   - Deleting the session removes the pasted files with the rest of scratch.
+  - Deleting text immediately before an inline file chip must not insert a
+    blank line or move the chip to the next line; native undo/redo stay intact.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.7–11.8,
   `03-runtime/01-ipc-protocol.md` §13c,
   `03-runtime/03-tools-and-permissions.md` §4b,
@@ -6432,7 +6434,7 @@ identify the platform validation still needed.
   F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`composer-paste-files.test.mjs`,
-  `composer-clipboard.test.mjs`); `pnpm test:e2e:composer-paste` mounts the real
+  `composer-clipboard.test.mjs`, `composer-native-deletion.test.mjs`); `pnpm test:e2e:composer-paste` mounts the real
   ComposerInput, draft/paste hooks, file viewer, production CSS and sandboxed
   preload. It dispatches Chromium ClipboardEvents with synthetic mixed data
   and native File objects, exercises the real scratch writer and contained
@@ -10664,6 +10666,9 @@ are withdrawn with ADR 0165.
   file in the work-panel files viewer and click a `../spec/00-baseline.md` link.
   5) Include an absolute path under the workspace, an outside absolute path,
   and a `~/` path in chat; confirm only the under-root path becomes a target.
+  6) Send a user message `使用llama.cpp，给我迁移步骤，只读。`, then a user
+  message that names the real `apps/desktop/src/App.tsx` as a bare path and as
+  `@apps/desktop/src/App.tsx`.
 - **Expected**:
   - Opening the session paints the transcript without throwing.
   - Each chat path opens `apps/desktop/src/App.tsx` in the File Manager
@@ -10676,11 +10681,16 @@ are withdrawn with ADR 0165.
   - The markdown-file `../` link opens `docs/spec/00-baseline.md`, not a
     workspace-root `spec/00-baseline.md`.
   - A `../../../outside.ts` link from `docs/adr` stays inert.
+  - The user sentence containing `使用llama.cpp` stays exact original text, not
+    a file chip, when that path does not exist.
+  - A user-message bare path becomes a chip only after `fs/resolveRef` confirms
+    a real file; an explicit `@path` chips immediately.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3,
   `08-meta/decisions-log.md` (D322)
 - **Acceptance**: C (conversation & stream), D (workspace), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`chat-links.test.mjs`,
+  `verified-chat-files.test.mjs`, `transcript-file-chips.test.mjs`,
   `markdown-prose-style.test.mjs`); full UI journey Draft (run only in a capable environment when this surface changes)
 
 #### E2E-185: External URL opens stay on http(s) and mailto
@@ -11120,10 +11130,13 @@ are withdrawn with ADR 0165.
   reasoning option, followed by the binding's enabled canonical levels.
   2) Choose `omit` and confirm the chip shows `omit` and the session stores
   `thinkingLevel: omit`. 3) Send a turn and inspect the outbound request.
-  4) Choose explicit `off` and send again.
+  4) Choose explicit `off` and send again. 5) In Settings → Model configuration,
+  expand the same model's Advanced row and confirm the default picker lists
+  `omit` first; save `omit` as the default and start a new session.
 - **Expected**: `omit` persists and the request has no thinking/reasoning field.
   Explicit `off` still serializes a disable. A non-reasoning model keeps an
-  `off`-only menu.
+  `off`-only menu. A new session whose binding default is `omit` starts at
+  `omit`.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/13-model-catalog-and-selection.md`,
   ADR 0295 / D456
@@ -13140,7 +13153,8 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Running overflow cannot
   appear as Unread/Pinned. Empty groups and stale shortcuts disappear. Unread
   uses the latest terminal result per session, newest first. Titles remain
-  one line within the cap, including literal ampersands. Opening the macOS
+  one line within the 32-column cap, half as many characters for CJK/emoji,
+  including literal ampersands. Opening the macOS
   menu leaves the window hidden and records unread. A row opens exactly that
   session/project, acknowledges it normally, and wins over startup navigation.
   View more returns from Settings, closes search, and expands session navigation. Hidden/closed windows receive fresh groups;
@@ -13578,3 +13592,27 @@ frames must produce no further renders or pending callbacks. Card geometry is
 read at press time, and move/release/cancel/unmount paths must clear transient
 transforms and queued frames. Release before the scheduled frame must still save
 the latest destination. These assertions measure work counts, not device FPS.
+
+### E2E-CHROME-window-controls-survive-work-panel
+
+- **Preconditions:** A built desktop and matching host-core binary; isolated
+  profile and data directory with one local session; no real provider calls.
+- **Steps:** Open the work panel from the titlebar, toggle the sidebar, maximize
+  and restore the panel, maximize and restore the native window, close the panel,
+  visit Settings and return, reopen the panel, minimize/restore the window, then
+  click Close with close-to-tray configured in the disposable profile. Also
+  enter and leave native fullscreen with the panel open. Check the three controls
+  with Chromium hit testing throughout, including light/dark Windows/Linux CSS.
+- **Expected:** Windows/Linux minimize, maximize/restore, and close stay visible
+  and hit-testable at the window edge. Native actions work with the panel open.
+  Preview sidebar navigation remains clickable. On macOS no duplicate renderer
+  window controls appear; the native traffic-light and fullscreen contracts stay
+  unchanged. CSS emulation does not qualify another operating system's native UI.
+- **Specs:** `04-ux/01-ui-ia.md` titlebar; ADR 0021 and ADR 0025.
+- **Acceptance:** Window actions remain accessible independently of pane state.
+- **Milestone:** Post-MVP regression coverage.
+- **Automation:** `pnpm test:e2e:window-controls`; macOS traffic-light geometry
+  also has `apps/desktop/test/traffic-light-reserve.test.mjs` contract coverage.
+- **Status:** Automated for the executing native platform; run on macOS/Linux
+  runners for native qualification. Optional screenshots are written only to
+  `PI_DESKTOP_CHROME_ARTIFACT_DIR`.

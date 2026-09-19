@@ -6974,8 +6974,8 @@ IPC 请求无法关闭。
 #### E2E-203a：会话思考 omit 不发送提供商覆盖
 
 - **前提条件**：Composer 已选中支持推理的已配置模型。
-- **步骤**：1) 打开模型 × 推理菜单，确认 `omit` 是第一项，其后是绑定已启用的规范档位。2) 选择 `omit`，确认芯片显示 `omit` 且会话存 `thinkingLevel: omit`。3) 发送一回合并检查出站请求。4) 再选显式 `off` 并发送。
-- **预期**：`omit` 会持久化，且请求不含思考/推理字段。显式 `off` 仍序列化为关闭思考。非推理模型菜单仍只有 `off`。
+- **步骤**：1) 打开模型 × 推理菜单，确认 `omit` 是第一项，其后是绑定已启用的规范档位。2) 选择 `omit`，确认芯片显示 `omit` 且会话存 `thinkingLevel: omit`。3) 发送一回合并检查出站请求。4) 再选显式 `off` 并发送。5) 在设置 → 模型配置展开同一模型高级区，确认默认选择器把 `omit` 放在最前；把默认存成 `omit` 并开新会话。
+- **预期**：`omit` 会持久化，且请求不含思考/推理字段。显式 `off` 仍序列化为关闭思考。非推理模型菜单仍只有 `off`。绑定默认是 `omit` 的新会话从 `omit` 开始。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`、`03-runtime/02-agent-runtime.md`、`03-runtime/13-model-catalog-and-selection.md`、ADR 0295 / D456
 - **验收**：C + 质量
 - **里程碑**：M6+
@@ -7886,7 +7886,8 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   Running overflow cannot
   appear as Unread/Pinned. Empty groups and stale shortcuts disappear. Unread
   uses the latest terminal result per session, newest first. Titles remain
-  one line within the cap, including literal ampersands. Opening the macOS
+  one line within the 32-column cap, half as many characters for CJK/emoji,
+  including literal ampersands. Opening the macOS
   menu leaves the window hidden and records unread. A row opens exactly that
   session/project, acknowledges it normally, and wins over startup navigation.
   View more returns from Settings, closes search, and expands session navigation. Hidden/closed windows receive fresh groups;
@@ -8032,3 +8033,27 @@ frames must produce no further renders or pending callbacks. Card geometry is
 read at press time, and move/release/cancel/unmount paths must clear transient
 transforms and queued frames. Release before the scheduled frame must still save
 the latest destination. These assertions measure work counts, not device FPS.
+
+### E2E-CHROME-window-controls-survive-work-panel
+
+- **Preconditions:** A built desktop and matching host-core binary; isolated
+  profile and data directory with one local session; no real provider calls.
+- **Steps:** Open the work panel from the titlebar, toggle the sidebar, maximize
+  and restore the panel, maximize and restore the native window, close the panel,
+  visit Settings and return, reopen the panel, minimize/restore the window, then
+  click Close with close-to-tray configured in the disposable profile. Also
+  enter and leave native fullscreen with the panel open. Check the three controls
+  with Chromium hit testing throughout, including light/dark Windows/Linux CSS.
+- **Expected:** Windows/Linux minimize, maximize/restore, and close stay visible
+  and hit-testable at the window edge. Native actions work with the panel open.
+  Preview sidebar navigation remains clickable. On macOS no duplicate renderer
+  window controls appear; the native traffic-light and fullscreen contracts stay
+  unchanged. CSS emulation does not qualify another operating system's native UI.
+- **Specs:** `04-ux/01-ui-ia.md` titlebar; ADR 0021 and ADR 0025.
+- **Acceptance:** Window actions remain accessible independently of pane state.
+- **Milestone:** Post-MVP regression coverage.
+- **Automation:** `pnpm test:e2e:window-controls`; macOS traffic-light geometry
+  also has `apps/desktop/test/traffic-light-reserve.test.mjs` contract coverage.
+- **Status:** Automated for the executing native platform; run on macOS/Linux
+  runners for native qualification. Optional screenshots are written only to
+  `PI_DESKTOP_CHROME_ARTIFACT_DIR`.

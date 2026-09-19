@@ -12,15 +12,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   THINKING_LEVELS,
+  bindingDefaultThinkingMenuLevels,
   bindingForCustomModel,
   bindingFromModelInfo,
   formatTokenCount,
   modelMatchesFilter,
   nativeWebSearchSupportedOn,
   publishedThinkingLevels,
+  resolveBindingDefaultThinkingLevel,
   sortThinkingLevels,
   type ModelBinding,
   type ModelInfo,
+  type SessionThinkingLevel,
   type ThinkingLevel,
 } from "@pi-desktop/shared";
 import {
@@ -129,10 +132,10 @@ export function useModelSelection(
         // would save a different default than the one the user was shown.
         const thinkingLevels = sortThinkingLevels(binding.thinkingLevels);
         const enabled = thinkingLevels;
-        const defaultThinkingLevel =
-          binding.defaultThinkingLevel && enabled.includes(binding.defaultThinkingLevel)
-            ? binding.defaultThinkingLevel
-            : (enabled[0] ?? null);
+        const defaultThinkingLevel = resolveBindingDefaultThinkingLevel(
+          binding.defaultThinkingLevel,
+          enabled,
+        );
         if (
           thinkingLevels.length === binding.thinkingLevels.length &&
           defaultThinkingLevel === binding.defaultThinkingLevel
@@ -732,7 +735,7 @@ export function ModelSelectionPanes({
                             {t("settings.thinkingManualOverrideHint")}
                           </span>
                         ) : null}
-                        {enabledLevels.length > 1 ? (
+                        {bindingDefaultThinkingMenuLevels(enabledLevels).length > 1 ? (
                           <div className="provider-chosen-thinking-default">
                             <span className="provider-chosen-thinking-label">
                               {t("settings.defaultThinkingLevel")}
@@ -741,20 +744,22 @@ export function ModelSelectionPanes({
                               className="provider-chosen-thinking-select"
                               label={t("settings.defaultThinkingLevel")}
                               value={
-                                binding.defaultThinkingLevel &&
-                                enabledLevels.includes(binding.defaultThinkingLevel)
-                                  ? binding.defaultThinkingLevel
-                                  : (enabledLevels[0] ?? "")
+                                resolveBindingDefaultThinkingLevel(
+                                  binding.defaultThinkingLevel,
+                                  enabledLevels,
+                                ) ?? ""
                               }
                               onChange={(id) =>
                                 updateBinding(binding.id, {
-                                  defaultThinkingLevel: id as ThinkingLevel,
+                                  defaultThinkingLevel: id as SessionThinkingLevel,
                                 })
                               }
-                              options={enabledLevels.map((level) => ({
-                                id: level,
-                                label: level,
-                              }))}
+                              options={bindingDefaultThinkingMenuLevels(enabledLevels).map(
+                                (level) => ({
+                                  id: level,
+                                  label: level,
+                                }),
+                              )}
                             />
                           </div>
                         ) : null}
@@ -782,11 +787,10 @@ export function ModelSelectionPanes({
                                   : [...binding.thinkingLevels, level];
                                 updateBinding(binding.id, {
                                   thinkingLevels: next,
-                                  defaultThinkingLevel: next.includes(
-                                    binding.defaultThinkingLevel as ThinkingLevel,
-                                  )
-                                    ? binding.defaultThinkingLevel
-                                    : (sortThinkingLevels(next)[0] ?? null),
+                                  defaultThinkingLevel: resolveBindingDefaultThinkingLevel(
+                                    binding.defaultThinkingLevel,
+                                    sortThinkingLevels(next),
+                                  ),
                                 });
                               }}
                             >

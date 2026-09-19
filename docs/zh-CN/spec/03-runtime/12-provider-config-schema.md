@@ -96,7 +96,7 @@
           },
           "defaultThinkingLevel": {
             "type": ["string", "null"],
-            "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max", null]
+            "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max", "omit", null]
           },
           "supportsImages": { "type": ["boolean", "null"] },
           "supportsDocuments": { "type": ["boolean", "null"] },
