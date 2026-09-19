@@ -578,9 +578,12 @@ system while preserving their different data ownership:
   retained as roots of that same project rather than separate project tabs.
   Chats, project instructions, and project memory are shared by the group.
 - The destination is one workbench (D267), revised by D455 into a one-column
-  list with an in-row inspector. A quiet intro line sits above one toolbar above the workbench. It
-  reuses the same composition, control height, and row rhythm as the agent
-  capability pages (D257) and adds no page-specific chrome.
+  list with an in-row inspector, and revised again into an inset grouped index
+  in the iOS sense: the selected row is the header of its own card, so the
+  detail opens under the row and repeats nothing the row already states. A
+  quiet intro line sits above one toolbar above the workbench. It reuses the
+  same composition, control height, and row rhythm as the agent capability
+  pages (D257) and adds no page-specific chrome.
   1. **Intro line** — one quiet description line, the same shape as the
      capability pages' intro. The destination shows no page-level totals: there
      is no hero block, decorative gradient, counter banner, or inline counter
@@ -593,20 +596,28 @@ system while preserving their different data ownership:
      All projects, Archived as non-interactive header strips, each carrying its
      label and row count. Every section is a labelled region wrapping its own
      list, so the strip is never a non-list child of a list and each row keeps
-     its group name in the accessibility tree. Selecting a row opens its
-     inspector under that row at full content width. Empty sections are omitted,
-     and an index with no rows renders one quiet empty state instead of the
-     workbench
-- Compact row anatomy: color glyph, project name with one status tag (Active,
-  Open, or Archived), session count, and a relative last-active time. The
-  colored glyph uses Folder for ordinary projects and a filled Star for pinned
-  projects. A click selects the row and keeps Settings open; double-click or
-  Enter activates the project and returns to chat
-- The inspector shows the selected project's name and tags (Active, Open,
-  pinned, Archived), shortened monospace path and branch, Open and New task
-  actions, folders, and chats. The inspector menu groups create/edit actions
-  above pin, archive/restore, and the destructive Close action, and closes on
-  Escape or any outside press
+     its group name in the accessibility tree. Selecting a row expands its card
+     under that row at full content width, and that row's disclosure indicator
+     turns down while the card is open. Empty sections are omitted, and an index
+     with no rows renders one quiet empty state instead of the workbench
+- Row anatomy reads left to right as identity and right to left as detail: the
+  color glyph, the project name with one status tag (Active, Open, or
+  Archived), and the shortened monospace path that tells two same-named
+  projects apart, then the right-aligned session count and relative last-active
+  time, closed by the row's disclosure indicator. The colored glyph uses Folder
+  for ordinary projects and a filled Star for pinned projects. Rows are tiles
+  separated by the row gap, never by rules. A click selects the row and keeps
+  Settings open, and a click on the row whose card is already open closes that
+  card again; the disclosure indicator turns down only while the card is open,
+  so it never claims a closed card is open. Double-click or Enter activates the
+  project and returns to chat
+- The card under the selected row is the detail panel, and it repeats nothing
+  the row already states — no second copy of the name, the path, or the status
+  tag. It opens with an action bar (New task, Open while the project is not the
+  live workspace, and the overflow menu), continues with the read-only folder
+  and branch facts and the sessions count, and ends with the chats themselves.
+  The overflow menu groups create/edit actions above pin, archive/restore, and
+  the destructive Close action, and closes on Escape or any outside press
 - The inspector menu includes Project memory. Its editor is a compact
   viewport-level dialog with a list of editable memory cards. Each card
   supports an optional title, multiline content, and removal; the dialog also

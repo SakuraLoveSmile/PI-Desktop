@@ -13,6 +13,10 @@ const projectsIndexSource = await readFile(
   new URL("../src/features/projects/ProjectArchiveIndex.tsx", import.meta.url),
   "utf8",
 );
+const projectsDetailSource = await readFile(
+  new URL("../src/features/projects/ProjectDetailPanel.tsx", import.meta.url),
+  "utf8",
+);
 const projectArchiveSource = await readFile(
   new URL("../src/lib/project-archive.ts", import.meta.url),
   "utf8",
@@ -31,7 +35,7 @@ const projectsPartialSource = await readFile(
   new URL("../src/styles/projects.css", import.meta.url),
   "utf8",
 );
-const archiveUiSource = `${projectsPageSource}\n${projectsIndexSource}\n${projectArchiveSource}`;
+const archiveUiSource = `${projectsPageSource}\n${projectsIndexSource}\n${projectsDetailSource}\n${projectArchiveSource}`;
 
 test("settings owns the project archive destination", () => {
   assert.match(settingsSearchSource, /id: "projects"/);
@@ -60,10 +64,10 @@ test("project archive makes project sessions searchable and progressively visibl
   );
   assert.doesNotMatch(archiveUiSource, /\.slice\(0, 4\)/);
   assert.match(projectArchiveSource, /INITIAL_VISIBLE_SESSION_COUNT = 8/);
-  assert.match(projectsPageSource, /project\.sessionsCount/);
-  assert.match(projectsPageSource, /project\.showMoreSessions/);
-  assert.match(projectsPageSource, /project\.showFewerSessions/);
-  assert.match(projectsPageSource, /projects-detail-task-updated/);
+  assert.match(projectsDetailSource, /project\.sessionsCount/);
+  assert.match(projectsDetailSource, /project\.showMoreSessions/);
+  assert.match(projectsDetailSource, /project\.showFewerSessions/);
+  assert.match(projectsDetailSource, /projects-detail-task-updated/);
 });
 
 test("project archive is no longer a standalone app page", () => {
@@ -97,7 +101,7 @@ test("project archive renders the intro, toolbar, and list-inspector workbench",
   assert.match(projectsPageSource, /projects-empty/);
 
   assert.equal(projectsPageSource.match(/projects-workbench/g)?.length, 1);
-  assert.match(projectsPageSource, /projects-inspector/);
+  assert.match(projectsPageSource, /<ProjectDetailPanel/);
   assert.match(projectsIndexSource, /projects-inspector/);
   assert.doesNotMatch(projectsPartialSource, /grid-template-columns/);
   assert.match(projectsIndexSource, /aria-labelledby=\{`projects-group-\$\{group\.id\}`\}/);
@@ -107,6 +111,68 @@ test("project archive renders the intro, toolbar, and list-inspector workbench",
   assert.doesNotMatch(archiveUiSource, /projects-expand/);
   assert.match(projectsIndexSource, /onDoubleClick=\{\(\) => onActivate\(project\.path\)\}/);
   assert.match(projectsPageSource, /onActivate=\{\(path\) => void activate\(path\)\}/);
+});
+
+test("the index row carries identity and the selected row is its own card header", () => {
+  // Identity reads left to right: glyph, name, then the path that tells two
+  // same-named projects apart without selecting either of them.
+  assert.match(projectsIndexSource, /projects-glyph/);
+  assert.match(projectsIndexSource, /projects-name-text/);
+  assert.match(projectsIndexSource, /projects-name-path/);
+  assert.match(projectsIndexSource, /shortenPath\(project\.path\)/);
+  // Detail reads right to left, capped by a disclosure indicator that turns
+  // down once the row owns an open card.
+  assert.match(projectsIndexSource, /projects-row-meta/);
+  assert.match(projectsIndexSource, /projects-row-disclosure/);
+  assert.match(
+    projectsPartialSource,
+    /\.projects-row-block\.open \.projects-row-disclosure\s*\{[^}]*rotate\(90deg\)/,
+  );
+  // The open card is headed by that same row, so the detail never repeats the
+  // name, the path, or the status tag: no second source of truth on screen.
+  assert.match(projectsDetailSource, /projects-detail-bar/);
+  assert.match(projectsDetailSource, /projects-detail-roots/);
+  assert.match(projectsDetailSource, /project\.foldersLabel/);
+  assert.doesNotMatch(projectsDetailSource, /projects-name-text/);
+  assert.doesNotMatch(projectsDetailSource, /projects-name-path/);
+  assert.doesNotMatch(projectsDetailSource, /projects-tag/);
+});
+
+test("the selected row's card can be closed again", () => {
+  // One click resolves through the shared toggle, so clicking the open row
+  // closes it instead of re-selecting it and leaving the card up.
+  assert.match(projectsPageSource, /toggleArchiveRow\(\{/);
+  assert.match(projectArchiveSource, /export function toggleArchiveRow\(/);
+  // Selection and the open card are separate: the ring stays on the current
+  // row while the card is closed, and only the open row renders the panel.
+  assert.match(projectsIndexSource, /const open = openPath === project\.path/);
+  assert.match(projectsIndexSource, /aria-expanded=\{open\}/);
+  assert.match(projectsIndexSource, /\{open && detail \? \(/);
+  assert.match(projectsPageSource, /openPath=\{cardOpen \? selectedPath : null\}/);
+  // Moving the selection with the keyboard always opens the row it landed on.
+  assert.match(projectsPageSource, /setSelectedPath\(next\);\n\s+setCardOpen\(true\);/);
+});
+
+test("the selected row is selected by one shared status helper", () => {
+  assert.match(projectArchiveSource, /export function projectStatus\(/);
+  assert.match(projectArchiveSource, /active: "project\.active"/);
+  assert.match(projectArchiveSource, /open: "project\.openTag"/);
+  assert.match(projectArchiveSource, /archived: "project\.archivedTag"/);
+  assert.match(projectsIndexSource, /projectStatus\(\{/);
+  // The component no longer owns a second copy of the row-state ladder.
+  assert.doesNotMatch(projectsIndexSource, /function rowStatus\(/);
+});
+
+test("keyboard selection follows the rendered order and yields to the open card", () => {
+  // The arrow keys must walk what the user sees: section order with the active
+  // sort applied, not the order the index was built in.
+  assert.match(projectsPageSource, /groups\.flatMap\(\(group\) => group\.rows\)/);
+  assert.match(projectsPageSource, /neighborPath\(\s*\n?\s*renderedRows,/);
+  // Enter inside the detail is that control's own action, never "activate".
+  assert.match(projectsPageSource, /closest\("\.projects-inspector"\)/);
+  // Row ids are encoded, so two paths that differ only in separators cannot
+  // collide and send focus to the wrong row.
+  assert.match(projectsIndexSource, /projects-row-\$\{encodeURIComponent\(path\)\}/);
 });
 
 test("pinned projects use a distinct star glyph", () => {
@@ -136,4 +202,15 @@ test("project archive styles group archived rows instead of hiding them", () => 
   assert.doesNotMatch(projectsPartialSource, /projects-hero/);
   assert.doesNotMatch(projectsPartialSource, /projects-stat/);
   assert.doesNotMatch(projectsPartialSource, /linear-gradient/);
+});
+
+test("the project archive honors reduced motion for every animated transition", () => {
+  const reduced = projectsPartialSource.slice(
+    projectsPartialSource.indexOf("@media (prefers-reduced-motion: reduce)"),
+  );
+  assert.match(reduced, /\.projects-row-block,/);
+  assert.match(reduced, /\.projects-row-disclosure,/);
+  assert.match(reduced, /\.projects-inspector,/);
+  // The expanded card must not slide in for a user who asked for stillness.
+  assert.match(reduced, /\.projects-inspector,\s*\.projects-menu\.is-open\s*\{\s*animation:\s*none;/);
 });

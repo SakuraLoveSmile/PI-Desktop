@@ -135,6 +135,64 @@ export function projectBucket(project: ProjectIndexItem): GroupId {
   return "projects";
 }
 
+/**
+ * Row state of one project. Archived outranks both live states so a record can
+ * never read as "active" while it sits in the Archived group, and the live
+ * workspace outranks a merely retained project. `null` is a plain project.
+ */
+export type ProjectStatus = "active" | "open" | "archived";
+
+export const PROJECT_STATUS_LABEL_KEYS: Record<ProjectStatus, string> = {
+  active: "project.active",
+  open: "project.openTag",
+  archived: "project.archivedTag",
+};
+
+export function projectStatus(args: {
+  project: Pick<ProjectIndexItem, "path" | "archived">;
+  workspacePath?: string | null;
+  openProjectPaths: readonly string[];
+}): ProjectStatus | null {
+  const { project, workspacePath, openProjectPaths } = args;
+  if (project.archived === true) return "archived";
+  if (normalizeProjectPath(workspacePath) === normalizeProjectPath(project.path)) {
+    return "active";
+  }
+  if (
+    openProjectPaths.some(
+      (path) => normalizeProjectPath(path) === normalizeProjectPath(project.path),
+    )
+  ) {
+    return "open";
+  }
+  return null;
+}
+
+/**
+ * Whether one project's card is open. Kept apart from the selection so the
+ * disclosure indicator can mean what it looks like: the selected row stays the
+ * current row while its card is closed again.
+ */
+export type ArchiveCardState = { selectedPath: string; open: boolean };
+
+/**
+ * One row click, resolved. The row whose card is already open closes it, any
+ * other row becomes the selection and opens. Without this the index had no
+ * collapse path at all: clicking the open row re-selected it and the card
+ * stayed up, while the rotating indicator promised otherwise.
+ */
+export function toggleArchiveRow(args: {
+  selectedPath: string | null;
+  open: boolean;
+  clickedPath: string;
+}): ArchiveCardState {
+  const { selectedPath, open, clickedPath } = args;
+  if (clickedPath === selectedPath && open) {
+    return { selectedPath: clickedPath, open: false };
+  }
+  return { selectedPath: clickedPath, open: true };
+}
+
 export function compareProjects(
   a: ProjectIndexItem,
   b: ProjectIndexItem,
