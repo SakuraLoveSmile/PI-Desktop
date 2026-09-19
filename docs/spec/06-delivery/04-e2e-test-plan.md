@@ -3063,15 +3063,16 @@ identify the platform validation still needed.
   level text. The single anchored menu replaces its root
   with an in-place back row and submenu, never opens tabs or a second popover,
   and always reopens at the root. Model search filters sticky provider groups;
-  reasoning levels come from the selected model binding's explicit binding
+  reasoning levels come from `omit` then the selected model binding's enabled
   levels in canonical order. The root carries a drag slider with one labeled
   stop per level directly beneath the Reasoning level entry when more than
-  one level is enabled (a single-level binding hides the slider); slider and
-  tick commits update the chip immediately while the menu stays at the root.
-  The Reasoning level entry opens the radio list, which uses radio semantics,
-  a trailing check, and the current model support note. Selecting either
-  value immediately updates the chip and root value, clears model filtering,
-  and keeps the menu open. A
+  one level is listed (a single-level binding hides the slider). Dragging
+  across several stops persists only the last pending level; tick labels are
+  not tab stops. Slider and tick commits update the chip immediately while
+  the menu stays at the root. The Reasoning level entry opens the radio list,
+  which uses radio semantics, a trailing check, and the current model support
+  note. Selecting either value immediately updates the chip and root value,
+  clears model filtering, and keeps the menu open. A
   non-reasoning or unknown model starts at `off`, but an explicit Settings
   binding can make its configured levels available; discovery never promotes it
   automatically. Refreshing discovered model data cannot overwrite the binding.
@@ -3084,7 +3085,7 @@ identify the platform validation still needed.
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0018, ADR 0027
 - **Acceptance**: B (model config), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`thinking-ui.test.mjs`, `composer-model-thinking-menu.test.mjs`, agent-runtime capability tests); full UI scenario Draft
+- **Status**: Unit-covered (`thinking-ui.test.mjs`, `composer-model-thinking-menu.test.mjs`, `thinking-commit-queue.test.mjs`, agent-runtime capability tests); full UI scenario Draft
 
 #### E2E-051: Thinking level persists with the session
 

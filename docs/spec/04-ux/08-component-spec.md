@@ -2726,8 +2726,9 @@ reasoning-level control.
   alias with the wire ID or a second visible name.
 - The combined model × reasoning menu opens at `bottom: calc(100% + 8px)` with
   `role="menu"`. Its root has exactly two `role="menuitem"` entries and, when
-  the binding enables more than one level, a drag slider with one labeled
-  stop per enabled level directly beneath the Reasoning level entry (D458).
+  the menu lists more than one level, a drag slider with one labeled stop per
+  level directly beneath the Reasoning level entry (D458). Tick labels are
+  clickable but not tab stops; the range input is the accessible control.
   The Model submenu has a search input and sticky provider headings, while
   the Reasoning level submenu starts with `Current model <model> supports
   these reasoning levels` and lists `omit` then the selected model binding's
@@ -2740,8 +2741,8 @@ reasoning-level control.
   trailing check. Selecting a concrete model, or a level from the radio list,
   persists the complete session config, clears model filtering, and returns
   to the root without dismissing the menu; slider and tick commits persist
-  the level while the menu stays where it is. Closing and reopening always
-  starts at the root.
+  the last pending level while the menu stays where it is. Closing and
+  reopening always starts at the root.
 - Unknown Custom/OpenAI-compatible models remain at `off` until the user
   explicitly enables a level in Settings. The menu never auto-infers reasoning
   support; after an explicit binding selection it renders the configured level.

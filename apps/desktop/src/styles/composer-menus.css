@@ -295,10 +295,9 @@
   border-radius: var(--radius-full);
   background: var(--ds-accent);
 }
-
 .composer-thinking-range::-moz-range-thumb {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border: 2px solid var(--ds-bg-elevated-opaque);
   border-radius: var(--radius-full);
   background: var(--ds-accent);

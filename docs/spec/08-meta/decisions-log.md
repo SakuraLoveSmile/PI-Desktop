@@ -6336,10 +6336,12 @@ that was sitting at the bottom — including after the turn had finished.
   Up/Down/Enter/Left contract, and root-return behavior.
 - The slider owns its arrow/Home/End/Enter keys while focused, so those keys
   adjust the level instead of driving menu navigation, while Escape still
-  closes the menu. A drag can emit one commit per crossed stop, so commits
-  serialize behind a promise chain and a local drag lead keeps the controlled
-  input from snapping back while the store confirmation lands; a binding with
-  a single enabled level hides the slider entirely.
+  closes the menu. Dragging across several stops keeps only the last pending
+  level; commits serialize latest-wins so an in-flight idle persist cannot
+  land an intermediate stop, and a session or model change invalidates
+  pending work. A local drag lead keeps the controlled input from snapping
+  back while the store confirmation lands. Tick labels are clickable but not
+  tab stops. A binding with a single enabled level hides the slider entirely.
 - Level values remain untranslated canonical strings, including session
   `omit` (D456) when the binding exposes enabled canonical levels. The
   seven-level ladder, provider filtering, and clamping rules are unchanged.

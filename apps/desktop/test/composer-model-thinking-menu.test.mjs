@@ -39,22 +39,21 @@ test("the menu root carries the reasoning slider under the reasoning entry", () 
   assert.match(composerSource, /className="composer-thinking-range"/);
   assert.match(composerSource, /aria-label=\{t\("chat.reasoningLevel"\)\}/);
   assert.match(composerSource, /aria-valuetext=\{thinkingMenuLevels\[thinkingSliderValue\] \?\? thinkingLevel\}/);
-  assert.match(composerSource, /const commitThinkingLevel = async/);
+  assert.match(composerSource, /const commitThinkingLevel = /);
   assert.match(composerSource, /if \(!\(await commitThinkingLevel\(level\)\)\) return;/);
   assert.match(composerSource, /if \(level && level !== thinkingLevel\) void commitThinkingLevel\(level\);/);
-  // The slider owns its arrow/Home/End keys so they adjust the level
-  // instead of driving the menu's list navigation.
   assert.match(composerSource, /if \(THINKING_SLIDER_KEYS\.has\(event\.key\)\) event\.stopPropagation\(\);/);
   assert.match(composerSource, /composer-thinking-tick/);
-  // A drag can emit one commit per crossed stop; sends serialize so
-  // out-of-order configure responses cannot land a stale level.
-  assert.match(composerSource, /thinkingCommitChainRef/);
+  assert.match(composerSource, /createLatestCommitQueue/);
+  assert.match(composerSource, /thinkingQueueRef\.current\?\.invalidate\(\)/);
+  assert.match(pickerSource, /tabIndex=\{-1\}/);
+  assert.match(pickerSource, /className="composer-thinking-ticks" aria-hidden="true"/);
+  assert.doesNotMatch(pickerSource, /composer-thinking-tick[\s\S]{0,200}role="menuitemradio"/);
   assert.match(stylesSource, /\.composer-thinking-range::-webkit-slider-runnable-track/);
   assert.match(stylesSource, /\.composer-thinking-range::-webkit-slider-thumb/);
   assert.match(stylesSource, /\.composer-thinking-range::-moz-range-thumb/);
   assert.match(stylesSource, /\.composer-thinking-tick\.active\s*\{/);
-  // The slider/list toggle machinery is gone: one surface, one behavior.
-  assert.doesNotMatch(composerSource, /thinkingMode|showThinkingMode|ThinkingSelectionMode/);
+  assert.doesNotMatch(composerSource, /thinkingMode|showThinkingMode|ThinkingSelectionMode|thinkingCommitChainRef/);
 });
 
 test("opening the combined menu preloads model metadata before its submenu", () => {

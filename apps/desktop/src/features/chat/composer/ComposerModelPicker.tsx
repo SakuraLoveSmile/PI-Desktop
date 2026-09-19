@@ -72,7 +72,6 @@ export function ComposerModelPicker({
     modelSearchRef,
     modelListRef,
     thinkingListRef,
-    thinkingSliderRef,
     modelGroups,
     flatModels,
     thinkingMenuLevels,
@@ -92,13 +91,17 @@ export function ComposerModelPicker({
   // Local drag lead: the native input follows the pointer or arrow key
   // immediately while the store confirmation lands, so a controlled value
   // never snaps back mid-drag. The lead clears once the store confirms.
+  const thinkingLevelsKey = thinkingMenuLevels.join("|");
   const [dragThinkingIndex, setDragThinkingIndex] = useState<number | null>(null);
+  useEffect(() => {
+    setDragThinkingIndex(null);
+  }, [thinkingLevelsKey]);
   useEffect(() => {
     if (dragThinkingIndex === null) return;
     if (thinkingMenuLevels[dragThinkingIndex] === thinkingLevel) {
       setDragThinkingIndex(null);
     }
-  }, [dragThinkingIndex, thinkingLevel, thinkingMenuLevels]);
+  }, [dragThinkingIndex, thinkingLevel, thinkingLevelsKey, thinkingMenuLevels]);
   const thinkingSliderValue = dragThinkingIndex ?? thinkingSliderIndex;
   const thinkingSliderPercent =
     thinkingMenuLevels.length > 1
@@ -184,7 +187,6 @@ export function ComposerModelPicker({
           {thinkingMenuLevels.length > 1 ? (
             <div className="composer-thinking-slider">
               <input
-                ref={thinkingSliderRef}
                 type="range"
                 className="composer-thinking-range"
                 min={0}
@@ -204,27 +206,22 @@ export function ComposerModelPicker({
                   const level = thinkingMenuLevels[index];
                   if (level && level !== thinkingLevel) void commitThinkingLevel(level);
                 }}
-                onBlur={() => setDragThinkingIndex(null)}
                 onKeyDown={(event) => {
                   if (THINKING_SLIDER_KEYS.has(event.key)) event.stopPropagation();
                 }}
               />
-              <div className="composer-thinking-ticks">
-                {thinkingMenuLevels.map((level) => (
+              <div className="composer-thinking-ticks" aria-hidden="true">
+                {thinkingMenuLevels.map((level, index) => (
                   <button
                     key={level}
                     type="button"
-                    className={`composer-thinking-tick ${thinkingLevel === level ? "active" : ""}`}
-                    role="menuitemradio"
-                    aria-checked={thinkingLevel === level}
+                    tabIndex={-1}
+                    className={`composer-thinking-tick ${thinkingSliderValue === index ? "active" : ""}`}
                     title={level}
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => {
+                      setDragThinkingIndex(index);
                       if (level !== thinkingLevel) void commitThinkingLevel(level);
-                    }}
-                    onKeyDown={(event) => {
-                      // Enter must commit this tick in place, not run the
-                      // menu's list selection.
-                      if (event.key === "Enter") event.stopPropagation();
                     }}
                   >
                     {level}
