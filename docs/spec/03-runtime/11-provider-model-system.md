@@ -208,8 +208,9 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
 8. Settings renders the seven canonical thinking levels for every binding.
    Published levels begin selected for a known reasoning model. A non-reasoning
    or unknown model shows the same choices unselected, with a short manual
-   override note. `defaultThinkingLevel` is chosen from the levels the binding
-   enables, so a stored default is always part of the explicit set.
+   override note. `defaultThinkingLevel` is chosen from `omit` plus the levels
+   the binding enables, so a stored default is either `omit` or part of that
+   explicit set.
 9. `supportsImages` and `supportsDocuments` are three-state overrides. Absent
    or `null` follows the published models.dev modality, so a catalog correction
    still reaches a saved binding; `true` or `false` is the user's explicit
@@ -324,7 +325,7 @@ type ModelBinding = {
   contextWindowSource?: "catalog" | "user"
   maxTokens: number
   thinkingLevels: ThinkingLevel[]
-  defaultThinkingLevel: ThinkingLevel | null
+  defaultThinkingLevel: SessionThinkingLevel | null
   availableForSubagents?: boolean // opt-in for AI-driven delegation
 }
 
