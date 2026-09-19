@@ -1250,7 +1250,6 @@ sklm: {
     clearSearch: "清除搜索",
     resultCount_one: "{{total}} 个项目中的 {{count}} 个",
     resultCount_other: "{{total}} 个项目中的 {{count}} 个",
-    archiveSubtitle: "已打开的文件夹及其对话。",
     groupPinned: "已置顶",
     groupProjects: "全部项目",
     groupArchived: "已归档",

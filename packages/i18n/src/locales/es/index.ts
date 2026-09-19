@@ -1247,7 +1247,6 @@ sklm: {
     "clearSearch": "Borrar búsqueda",
     "resultCount_one": "{{count}} de {{total}} proyecto",
     "resultCount_other": "{{count}} de {{total}} proyectos",
-    "archiveSubtitle": "Carpetas abiertas y sus chats.",
     "groupPinned": "Fijado",
     "groupProjects": "Todos los proyectos",
     "groupArchived": "Archivado",

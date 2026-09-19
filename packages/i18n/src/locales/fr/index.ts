@@ -1247,7 +1247,6 @@ sklm: {
     "clearSearch": "Effacer la recherche",
     "resultCount_one": "{{count}} de {{total}} projet",
     "resultCount_other": "{{count}} sur {{total}} projets",
-    "archiveSubtitle": "Dossiers ouverts et leurs discussions.",
     "groupPinned": "Épinglé",
     "groupProjects": "Tous les projets",
     "groupArchived": "Archivé",

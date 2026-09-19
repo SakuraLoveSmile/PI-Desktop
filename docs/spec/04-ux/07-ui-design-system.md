@@ -1308,8 +1308,8 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
   is embedded in Settings with no duplicate page title or outer page padding;
   the earlier standalone Projects destination and card grid (D042) are
   superseded by D133. Per D267 the destination is composed exactly like the
-  agent capability pages (D257): a quiet description-only intro line, one
-  toolbar (sort segment, search, primary action), and one index whose
+  agent capability pages (D257): one toolbar (sort segment, search, primary
+  action) and one index whose
   Pinned / All projects / Archived groups are plain section header lines
   carrying the only counts on the page. Per D455 it stays one column with no
   side-by-side

@@ -169,28 +169,16 @@ export function projectStatus(args: {
 }
 
 /**
- * Whether one project's card is open. Kept apart from the selection so the
- * disclosure indicator can mean what it looks like: the selected row stays the
- * current row while its card is closed again.
+ * One row click, resolved: the row whose card is already open closes it, and
+ * any other row opens its card. There is no separate selection to keep — the
+ * open card *is* the current row — so nothing is expanded until the user asks
+ * for it, and the disclosure indicator can mean exactly what it shows.
  */
-export type ArchiveCardState = { selectedPath: string; open: boolean };
-
-/**
- * One row click, resolved. The row whose card is already open closes it, any
- * other row becomes the selection and opens. Without this the index had no
- * collapse path at all: clicking the open row re-selected it and the card
- * stayed up, while the rotating indicator promised otherwise.
- */
-export function toggleArchiveRow(args: {
-  selectedPath: string | null;
-  open: boolean;
-  clickedPath: string;
-}): ArchiveCardState {
-  const { selectedPath, open, clickedPath } = args;
-  if (clickedPath === selectedPath && open) {
-    return { selectedPath: clickedPath, open: false };
-  }
-  return { selectedPath: clickedPath, open: true };
+export function nextArchiveOpenPath(
+  openPath: string | null,
+  clickedPath: string,
+): string | null {
+  return openPath === clickedPath ? null : clickedPath;
 }
 
 export function compareProjects(
@@ -289,36 +277,17 @@ export function displayedProjectSessions(
 }
 
 /**
- * Keep the current row when it still matches. Otherwise prefer the live
- * workspace, then the first visible row. An empty index has no selection.
+ * The row `delta` steps from `currentPath` in the rendered order, clamped to
+ * the ends. With no row current yet the first press lands on the first row
+ * whichever way it points, so an arrow key always has somewhere to go.
  */
-export function resolveSelectedPath(args: {
-  selectedPath: string | null;
-  filtered: readonly ProjectIndexItem[];
-  preferredPath?: string | null;
-}) {
-  const { selectedPath, filtered, preferredPath } = args;
-  if (filtered.length === 0) return null;
-  if (selectedPath && filtered.some((project) => project.path === selectedPath)) {
-    return selectedPath;
-  }
-  const preferred = normalizeProjectPath(preferredPath);
-  if (preferred) {
-    const match = filtered.find(
-      (project) => normalizeProjectPath(project.path) === preferred,
-    );
-    if (match) return match.path;
-  }
-  return filtered[0]?.path ?? null;
-}
-
 export function neighborPath(
   filtered: readonly ProjectIndexItem[],
-  selectedPath: string | null,
+  currentPath: string | null,
   delta: number,
 ) {
   if (filtered.length === 0) return null;
-  const index = filtered.findIndex((project) => project.path === selectedPath);
+  const index = filtered.findIndex((project) => project.path === currentPath);
   const from = index >= 0 ? index : delta > 0 ? -1 : 0;
   const next = Math.min(filtered.length - 1, Math.max(0, from + delta));
   return filtered[next]?.path ?? null;

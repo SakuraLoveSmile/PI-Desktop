@@ -1250,7 +1250,6 @@ sklm: {
     clearSearch: "清除搜尋",
     resultCount_one: "{{total}} 個專案中的 {{count}} 個",
     resultCount_other: "{{total}} 個專案中的 {{count}} 個",
-    archiveSubtitle: "已開啟的資料夾及其對話。",
     groupPinned: "已置頂",
     groupProjects: "全部專案",
     groupArchived: "已歸檔",

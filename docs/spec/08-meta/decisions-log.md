@@ -6299,6 +6299,22 @@ that was sitting at the bottom — including after the turn had finished.
   down only while the card is really open. Moving the selection with the arrow
   keys always opens the row it landed on.
   Presentation only: no IPC, storage, host-protocol, or
-  Presentation only: no IPC, storage, host-protocol, or
   activation-semantics change. See `04-ux/06-settings-ia.md`,
   `04-ux/07-ui-design-system.md`, and ADR 0294.
+
+## 2026-09-20 — Project archive opens closed and keeps no page-level prose
+
+- The destination renders no description line: the toolbar is the first thing
+  under the page title, the same shape as the agent capability and Import
+  destinations. The `project.archiveSubtitle` key is retired from every catalog
+  rather than left behind unused.
+- Nothing is expanded until the user clicks a row. Selection and the open card
+  were two states; they collapse into one, so a closed index highlights nothing,
+  `aria-expanded` and the rotating disclosure indicator describe the open card
+  only, and a row whose project leaves the list (a search that no longer matches
+  it) closes with it. `resolveSelectedPath`, which always resolved a selection
+  (the live workspace first, then the first row), is removed together with the
+  auto-expansion it existed to serve.
+- Presentation only: no IPC, storage, host-protocol, or activation-semantics
+  change. Search still matches session titles and keeps the owning project in
+  the index. See `04-ux/06-settings-ia.md`.

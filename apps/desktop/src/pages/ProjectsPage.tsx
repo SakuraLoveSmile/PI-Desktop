@@ -37,9 +37,8 @@ import {
   filterArchiveItems,
   groupArchiveRows,
   neighborPath,
-  resolveSelectedPath,
+  nextArchiveOpenPath,
   sessionMatchesIndexProject,
-  toggleArchiveRow,
   type ProjectIndexItem,
   type SessionIndexRecord,
   type SortMode,
@@ -76,11 +75,10 @@ export function ProjectsPage() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("recent");
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  // The row whose card is open. Closed until the user asks for one.
+  const [openPath, setOpenPath] = useState<string | null>(null);
   const [visibleSessionCounts, setVisibleSessionCounts] = useState<Record<string, number>>({});
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  // The card under the selected row: closed again by clicking that same row.
-  const [cardOpen, setCardOpen] = useState(true);
   // Which row menu item is armed for its second, confirming click.
   const { armed: armedDelete, setArmed: setArmedDelete } = useArmedDelete();
   const [renameFor, setRenameFor] = useState<SessionIndexRecord | null>(null);
@@ -167,16 +165,15 @@ export function ProjectsPage() {
     [groups],
   );
 
+  // An open card cannot outlive its row: a search that no longer matches the
+  // project drops it from the list, and the card closes with it.
   useEffect(() => {
-    const next = resolveSelectedPath({
-      selectedPath,
-      filtered,
-      preferredPath: workspace?.path,
-    });
-    if (next !== selectedPath) setSelectedPath(next);
-  }, [filtered, selectedPath, workspace?.path]);
+    if (openPath && !filtered.some((item) => item.path === openPath)) {
+      setOpenPath(null);
+    }
+  }, [filtered, openPath]);
 
-  const project = filtered.find((item) => item.path === selectedPath) ?? null;
+  const project = filtered.find((item) => item.path === openPath) ?? null;
   const selectedSessions = project
     ? displayedProjectSessions(sessions, project, query)
     : { related: [] as SessionIndexRecord[], displayed: [] as SessionIndexRecord[], sessionSearchMatch: false };
@@ -363,12 +360,11 @@ export function ProjectsPage() {
       event.preventDefault();
       const next = neighborPath(
         renderedRows,
-        selectedPath,
+        openPath,
         event.key === "ArrowDown" ? 1 : -1,
       );
-      if (!next || next === selectedPath) return;
-      setSelectedPath(next);
-      setCardOpen(true);
+      if (!next || next === openPath) return;
+      setOpenPath(next);
       setMenuFor(null);
       document
         .getElementById(projectRowId(next))
@@ -376,18 +372,14 @@ export function ProjectsPage() {
         ?.focus();
       return;
     }
-    if (event.key === "Enter" && selectedPath) {
+    if (event.key === "Enter" && openPath) {
       event.preventDefault();
-      void activate(selectedPath);
+      void activate(openPath);
     }
   };
 
   return (
-    <div className="settings-stack settings-project-archive">
-      <div className="projects-intro">
-        <p className="projects-intro-desc">{t("project.archiveSubtitle")}</p>
-      </div>
-
+    <div className="settings-stack">
       <div className="projects-toolbar">
         <div
           className="settings-segment projects-sort"
@@ -497,20 +489,13 @@ export function ProjectsPage() {
         <div className="projects-workbench" tabIndex={0} onKeyDown={onIndexKeyDown}>
           <ProjectArchiveIndex
             groups={groups}
-            openPath={cardOpen ? selectedPath : null}
-            selectedPath={selectedPath}
+            openPath={openPath}
             workspacePath={workspace?.path}
             openProjectPaths={openProjectPaths}
             locale={locale}
             sessionCounts={sessionCounts}
             onSelect={(path) => {
-              const next = toggleArchiveRow({
-                selectedPath,
-                open: cardOpen,
-                clickedPath: path,
-              });
-              setSelectedPath(next.selectedPath);
-              setCardOpen(next.open);
+              setOpenPath((current) => nextArchiveOpenPath(current, path));
               setMenuFor(null);
             }}
             onActivate={(path) => void activate(path)}

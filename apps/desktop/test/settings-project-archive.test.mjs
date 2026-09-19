@@ -75,11 +75,15 @@ test("project archive is no longer a standalone app page", () => {
   assert.doesNotMatch(appSource, /page === "projects"/);
 });
 
-test("project archive renders the intro, toolbar, and list-inspector workbench", () => {
-  assert.match(projectsPageSource, /projects-intro-desc/);
-  assert.match(projectsPageSource, /project\.archiveSubtitle/);
+test("project archive is a toolbar over a list, with no page-level prose", () => {
+  // Sibling destinations carry no description line, so this one does not
+  // either: the toolbar is the first thing under the title, and the intro
+  // element and its catalog key are gone rather than merely hidden.
+  assert.doesNotMatch(projectsPageSource, /projects-intro/);
+  assert.doesNotMatch(projectsPageSource, /project\.archiveSubtitle/);
+  assert.doesNotMatch(projectArchiveSource, /archiveSubtitle/);
   assert.doesNotMatch(projectsPageSource, /projects-intro-stat/);
-  assert.doesNotMatch(projectsPageSource, /project\.stat[A-Z]/);
+  assert.doesNotMatch(archiveUiSource, /archiveSubtitle/);
 
   assert.match(projectsPageSource, /projects-search-clear/);
   assert.match(projectsPageSource, /project\.clearSearch/);
@@ -140,17 +144,20 @@ test("the index row carries identity and the selected row is its own card header
 
 test("the selected row's card can be closed again", () => {
   // One click resolves through the shared toggle, so clicking the open row
-  // closes it instead of re-selecting it and leaving the card up.
-  assert.match(projectsPageSource, /toggleArchiveRow\(\{/);
-  assert.match(projectArchiveSource, /export function toggleArchiveRow\(/);
-  // Selection and the open card are separate: the ring stays on the current
-  // row while the card is closed, and only the open row renders the panel.
+  // closes it instead of re-selecting it and leaving the card up. The open card
+  // is the only state the index knows, so nothing is highlighted by default.
+  assert.match(projectsPageSource, /nextArchiveOpenPath\(current, path\)/);
+  assert.match(projectArchiveSource, /export function nextArchiveOpenPath\(/);
+  assert.match(
+    projectsPageSource,
+    /const \[openPath, setOpenPath\] = useState<string \| null>\(null\)/,
+  );
   assert.match(projectsIndexSource, /const open = openPath === project\.path/);
   assert.match(projectsIndexSource, /aria-expanded=\{open\}/);
   assert.match(projectsIndexSource, /\{open && detail \? \(/);
-  assert.match(projectsPageSource, /openPath=\{cardOpen \? selectedPath : null\}/);
-  // Moving the selection with the keyboard always opens the row it landed on.
-  assert.match(projectsPageSource, /setSelectedPath\(next\);\n\s+setCardOpen\(true\);/);
+  assert.match(projectsPageSource, /openPath=\{openPath\}/);
+  // Moving with the keyboard opens the row it landed on.
+  assert.match(projectsPageSource, /setOpenPath\(next\);/);
 });
 
 test("the selected row is selected by one shared status helper", () => {
@@ -191,7 +198,9 @@ test("project archive row menu closes on escape and outside press", () => {
 });
 
 test("project archive styles group archived rows instead of hiding them", () => {
-  assert.match(projectsStyleSource, /\.projects-intro-desc\s*\{/);
+  // The old description line and its page wrapper are gone, not hidden.
+  assert.doesNotMatch(projectsPartialSource, /projects-intro/);
+  assert.doesNotMatch(projectsPartialSource, /settings-project-archive/);
   assert.match(projectsStyleSource, /\.projects-sort-btn\.active\s*\{/);
   assert.match(projectsStyleSource, /\.projects-group-head\s*\{/);
   assert.match(projectsPartialSource, /\.projects-workbench\s*\{/);

@@ -1267,7 +1267,6 @@ sklm: {
     clearSearch: "검색 지우기",
     resultCount_one: "프로젝트 {{total}}개 중 {{count}}개",
     resultCount_other: "프로젝트 {{total}}개 중 {{count}}개",
-    archiveSubtitle: "열어 본 폴더와 채팅입니다.",
     groupPinned: "고정됨",
     groupProjects: "모든 프로젝트",
     groupArchived: "보관됨",

@@ -1268,7 +1268,6 @@ sklm: {
     clearSearch: "Clear search",
     resultCount_one: "{{count}} of {{total}} project",
     resultCount_other: "{{count}} of {{total}} projects",
-    archiveSubtitle: "Opened folders and their chats.",
     groupPinned: "Pinned",
     groupProjects: "All projects",
     groupArchived: "Archived",

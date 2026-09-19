@@ -7,14 +7,13 @@ import {
   filterArchiveItems,
   groupArchiveRows,
   neighborPath,
+  nextArchiveOpenPath,
   projectBucket,
   projectMatchesQuery,
-  resolveSelectedPath,
   sessionMatchesIndexProject,
   sessionMatchesQuery,
   sessionTimestamp,
   shortenPath,
-  toggleArchiveRow,
 } from "../src/lib/project-archive.ts";
 
 test("the archive never hides archived rows behind a filter", () => {
@@ -101,21 +100,19 @@ test("search keeps a project when a session title matches", () => {
   assert.equal(shown.displayed[0]?.id, "s1");
 });
 
-test("selection stays on the current row, then the live workspace, then the first match", () => {
+test("the arrow keys walk the rows the user can see", () => {
   const rows = [
     { path: "/a", name: "A", openedAt: 1, groupId: "a", roots: [], legacy: false },
     { path: "/b", name: "B", openedAt: 2, groupId: "b", roots: [], legacy: false },
   ];
-  assert.equal(resolveSelectedPath({ selectedPath: "/b", filtered: rows }), "/b");
-  assert.equal(
-    resolveSelectedPath({ selectedPath: "/gone", filtered: rows, preferredPath: "/a" }),
-    "/a",
-  );
-  assert.equal(resolveSelectedPath({ selectedPath: null, filtered: rows }), "/a");
-  assert.equal(resolveSelectedPath({ selectedPath: "/a", filtered: [] }), null);
   assert.equal(neighborPath(rows, "/a", 1), "/b");
   assert.equal(neighborPath(rows, "/b", 1), "/b");
   assert.equal(neighborPath(rows, "/b", -1), "/a");
+  // With nothing open yet the first key press lands on the first row, either
+  // direction, and an empty index has nowhere to go.
+  assert.equal(neighborPath(rows, null, 1), "/a");
+  assert.equal(neighborPath(rows, null, -1), "/a");
+  assert.equal(neighborPath([], null, 1), null);
 });
 
 test("the index merges durable groups ahead of recents and session seeds", () => {
@@ -151,30 +148,13 @@ test("the index merges durable groups ahead of recents and session seeds", () =>
   assert.ok(sessionTimestamp("2026-01-02T00:00:00.000Z") > 0);
 });
 
-test("one row click toggles that row's card and opens any other", () => {
-  // The open card closes again: this is the path the index was missing, where
-  // clicking the selected row re-selected it and the card stayed up.
-  assert.deepEqual(
-    toggleArchiveRow({ selectedPath: "/a", open: true, clickedPath: "/a" }),
-    { selectedPath: "/a", open: false },
-  );
-  // Clicking the closed row reopens it rather than collapsing "nothing".
-  assert.deepEqual(
-    toggleArchiveRow({ selectedPath: "/a", open: false, clickedPath: "/a" }),
-    { selectedPath: "/a", open: true },
-  );
-  // Any other row becomes the selection and opens, whichever row was open.
-  assert.deepEqual(
-    toggleArchiveRow({ selectedPath: "/a", open: true, clickedPath: "/b" }),
-    { selectedPath: "/b", open: true },
-  );
-  assert.deepEqual(
-    toggleArchiveRow({ selectedPath: "/a", open: false, clickedPath: "/b" }),
-    { selectedPath: "/b", open: true },
-  );
-  // First click with nothing selected yet opens that row.
-  assert.deepEqual(
-    toggleArchiveRow({ selectedPath: null, open: false, clickedPath: "/a" }),
-    { selectedPath: "/a", open: true },
-  );
+test("one row click opens that row's card and closes the open one", () => {
+  // Nothing is expanded to begin with, so the first click opens a card.
+  assert.equal(nextArchiveOpenPath(null, "/a"), "/a");
+  // Any other row takes the open card with it.
+  assert.equal(nextArchiveOpenPath("/a", "/b"), "/b");
+  // Clicking the open row closes it again. This is the path the index was
+  // missing: the click re-selected the row and the card stayed up.
+  assert.equal(nextArchiveOpenPath("/a", "/a"), null);
+  assert.equal(nextArchiveOpenPath(null, "/a"), "/a");
 });

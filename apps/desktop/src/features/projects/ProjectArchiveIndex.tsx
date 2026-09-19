@@ -31,7 +31,6 @@ export function projectRowId(path: string) {
 */
 export function ProjectArchiveIndex({
   groups,
-  selectedPath,
   openPath,
   workspacePath,
   openProjectPaths,
@@ -42,8 +41,7 @@ export function ProjectArchiveIndex({
   onActivate,
 }: {
   groups: { id: GroupId; rows: ProjectIndexItem[] }[];
-  selectedPath: string | null;
-  /** Path whose card is open. `null` when the selected row's card is closed. */
+  /** Path whose card is open, or `null` while the index is only a list. */
   openPath: string | null;
   workspacePath?: string | null;
   openProjectPaths: readonly string[];
@@ -70,7 +68,6 @@ export function ProjectArchiveIndex({
           </div>
           <div className="projects-group-rows" role="list">
             {group.rows.map((project) => {
-              const selected = selectedPath === project.path;
               const open = openPath === project.path;
               const status = projectStatus({
                 project,
@@ -86,7 +83,6 @@ export function ProjectArchiveIndex({
                   role="listitem"
                   className={cx(
                     "projects-row-block",
-                    selected && "selected",
                     open && "open",
                     status === "active" && "active",
                     status === "archived" && "archived",
@@ -98,7 +94,7 @@ export function ProjectArchiveIndex({
                     title={project.path}
                     aria-label={t("project.selectProject", { name: project.name })}
                     aria-expanded={open}
-                    aria-current={selected ? "true" : undefined}
+                    aria-current={open ? "true" : undefined}
                     onClick={() => onSelect(project.path)}
                     onDoubleClick={() => onActivate(project.path)}
                   >

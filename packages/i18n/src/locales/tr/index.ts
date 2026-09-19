@@ -1267,7 +1267,6 @@ sklm: {
     clearSearch: "Aramayı temizle",
     resultCount_one: "{{total}} projeden {{count}}",
     resultCount_other: "{{total}} projeden {{count}}",
-    archiveSubtitle: "Açılan klasörler ve sohbetleri.",
     groupPinned: "Sabitlenen",
     groupProjects: "Tüm projeler",
     groupArchived: "Arşivlenen",

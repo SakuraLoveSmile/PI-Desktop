@@ -1247,7 +1247,6 @@ sklm: {
     "clearSearch": "Suche löschen",
     "resultCount_one": "{{count}} von {{total}} Projekt",
     "resultCount_other": "{{count}} von {{total}} Projekten",
-    "archiveSubtitle": "Geöffnete Ordner und ihre Chats.",
     "groupPinned": "Angepinnt",
     "groupProjects": "Alle Projekte",
     "groupArchived": "Archiviert",

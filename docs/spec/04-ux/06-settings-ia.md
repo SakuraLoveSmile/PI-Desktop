@@ -580,23 +580,24 @@ system while preserving their different data ownership:
 - The destination is one workbench (D267), revised by D455 into a one-column
   list with an in-row inspector, and revised again into an inset grouped index
   in the iOS sense: the selected row is the header of its own card, so the
-  detail opens under the row and repeats nothing the row already states. A
-  quiet intro line sits above one toolbar above the workbench. It reuses the
-  same composition, control height, and row rhythm as the agent capability
-  pages (D257) and adds no page-specific chrome.
-  1. **Intro line** — one quiet description line, the same shape as the
-     capability pages' intro. The destination shows no page-level totals: there
-     is no hero block, decorative gradient, counter banner, or inline counter
-     run. The per-group counts on the index header strips are the only totals,
-     so a number is never repeated in two places
-  2. **Toolbar** — one row carrying the Recent/Name sort as the shared
+  detail opens under the row and repeats nothing the row already states. One
+  toolbar leads the page and nothing is expanded in it: like the capability and
+  Import destinations, the destination carries no description line, so no
+  sentence sits between the page title and the controls. It reuses the same
+  composition, control height, and row rhythm as the agent capability pages
+  (D257) and adds no page-specific chrome.
+  1. **Toolbar** — one row carrying the Recent/Name sort as the shared
      segmented control, the search field with a clear affordance and a match
-     count while searching, and the primary Add project action right-aligned
-  3. **Workbench** — one column. The always-visible index sections run Pinned,
-     All projects, Archived as non-interactive header strips, each carrying its
+     count while searching, and the primary Add project action right-aligned.
+     The destination shows no page-level totals: there is no hero block,
+     decorative gradient, counter banner, or inline counter run. The per-group
+     counts on the index sections are the only totals, so a number is never
+     repeated in two places
+  2. **Workbench** — one column. The always-visible index sections run Pinned,
+     All projects, Archived as non-interactive header lines, each carrying its
      label and row count. Every section is a labelled region wrapping its own
-     list, so the strip is never a non-list child of a list and each row keeps
-     its group name in the accessibility tree. Selecting a row expands its card
+     list, so the header is never a non-list child of a list and each row keeps
+     its group name in the accessibility tree. Clicking a row opens its card
      under that row at full content width, and that row's disclosure indicator
      turns down while the card is open. Empty sections are omitted, and an index
      with no rows renders one quiet empty state instead of the workbench
@@ -606,11 +607,11 @@ system while preserving their different data ownership:
   projects apart, then the right-aligned session count and relative last-active
   time, closed by the row's disclosure indicator. The colored glyph uses Folder
   for ordinary projects and a filled Star for pinned projects. Rows are tiles
-  separated by the row gap, never by rules. A click selects the row and keeps
-  Settings open, and a click on the row whose card is already open closes that
-  card again; the disclosure indicator turns down only while the card is open,
-  so it never claims a closed card is open. Double-click or Enter activates the
-  project and returns to chat
+  separated by the row gap, never by rules. The index starts closed: clicking a
+  row opens its card and keeps Settings open, clicking that row again closes the
+  card, and clicking any other row moves the open card to it. The disclosure
+  indicator turns down only while the card is open, so it never claims a closed
+  card is open. Double-click or Enter activates the project and returns to chat
 - The card under the selected row is the detail panel, and it repeats nothing
   the row already states — no second copy of the name, the path, or the status
   tag. It opens with an action bar (New task, Open while the project is not the
@@ -624,9 +625,9 @@ system while preserving their different data ownership:
   supports adding entries, shows an empty state, and keeps Cancel/Save
   actions. Saved entries are scoped to that project's path and are available
   in later chats for the project.
-- Project search also matches session titles. Matching a session retains and
-  selects its owning project; the inspector lists matching sessions ordered by
-  latest activity, shows a count and relative update time, and reveals
+- Project search also matches session titles. Matching a session keeps its
+  owning project in the index; opening that project lists the matching sessions
+  ordered by latest activity, shows a count and relative update time, and reveals
   additional rows in batches of eight rather than silently truncating the
   history
 - Activating a project or project session returns to chat; archive and close
@@ -709,13 +710,13 @@ system while preserving their different data ownership:
     the page does not gain horizontal overflow
 12. Project archive always exposes archived records and can restore them without
     duplicating the index in the app shell
-13. Project archive renders one quiet description line — no hero, banner, or
-    page-level counter run — above one search + sort toolbar and a list +
-    one-column workbench whose index holds the Pinned / All projects / Archived
-    group strips; each strip's count agrees with its rendered rows, a click
-    selects a row without leaving Settings, sorting reorders rows inside every
-    section without hiding any, and clearing the search restores the complete
-    index
+13. Project archive renders no description line — no hero, banner, or page-level
+    counter run — above one search + sort toolbar and a list + one-column
+    workbench whose index holds the Pinned / All projects / Archived section
+    headers; each header's count agrees with its rendered rows, the index starts
+    with nothing expanded and a click opens one row's card without leaving
+    Settings, sorting reorders rows inside every section without hiding any, and
+    clearing the search restores the complete index
 14. Info renders disabled, checking, up-to-date, available, downloading,
     downloaded, and error update states without adding another destination
 15. Native select option lists remain readable in both light and dark themes,

@@ -1,37 +1,16 @@
 /*
-  Settings → Project archive — one quiet description line, one toolbar (sort,
-  search, add project), and a one-column workbench (D455).
+  Settings → Project archive — one toolbar (sort, search, add project) and a
+  one-column workbench (D455). Nothing is expanded until a row is clicked, and
+  clicking that row again closes it.
 
   The workbench is an iOS-style inset grouped index: a quiet section label, then
   rows that read left-to-right as identity (glyph, name, path) and right-to-left
-  as detail (sessions, last active, disclosure). The selected row is the header
-  of its own card, so its detail opens under the row and never repeats the name.
+  as detail (sessions, last active, disclosure). The open row is the header of
+  its own card, so its detail opens under the row and never repeats the name.
   Separators are spacing, never rules — tiles carry the structure (D297).
 */
 
 /* ---------- Settings → Project archive ---------- */
-.settings-project-archive {
-  gap: 14px;
-}
-
-/* One quiet description line, same as `.agent-capability-intro` on the sibling
-   capability pages. The workbench below carries the per-group counts. */
-.projects-intro {
-  display: flex;
-  max-width: 92ch;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px 10px;
-  margin: -12px 0 0;
-  padding: 0 1px;
-}
-
-.projects-intro-desc {
-  margin: 0;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-md);
-  line-height: var(--leading-body);
-}
 
 /*
   One toolbar owns sort, search, the live match count, and the primary action.
@@ -119,12 +98,12 @@
   display: inline-flex;
   height: var(--projects-control-height);
   min-width: 0;
-  flex: 1 1 200px;
-  max-width: 380px;
+  flex: 1 1 180px;
+  max-width: 320px;
   align-items: center;
   gap: 6px;
   border-radius: var(--radius-full);
-  background: var(--ds-tile-hover);
+  background: var(--ds-field-inset-bg);
   padding: 0 11px;
   color: var(--ds-text-muted);
   transition:
@@ -133,8 +112,8 @@
 }
 
 .projects-search-wrap:focus-within {
-  background: var(--ds-raised);
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ds-accent) 40%, transparent);
+  background: var(--ds-field-inset-focus-bg);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ds-accent) 45%, transparent);
 }
 
 .projects-search-wrap > svg {
@@ -270,12 +249,13 @@
   background: var(--ds-tile-hover);
 }
 
-/* The open project is the deepest tile; selection uses a quiet accent ring. */
+/* The live project is the deepest tile; the row whose card is open carries a
+   quiet accent ring. Nothing else is highlighted, so a closed index is quiet. */
 .projects-row-block.active {
   background: var(--ds-tile-deep);
 }
 
-.projects-row-block.selected {
+.projects-row-block.open {
   background: var(--ds-tile-deep);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--ds-accent) 34%, transparent);
 }
@@ -294,9 +274,9 @@
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  padding: 7px 10px 7px 12px;
+  padding: 8px 14px;
   text-align: left;
   border-radius: var(--radius-md-plus);
   cursor: pointer;
@@ -378,13 +358,13 @@
 }
 
 /* Trailing detail column, mirrored against the identity column. */
+/* Trailing detail is one line, mirrored against the identity column. */
 .projects-row-meta {
   display: flex;
   min-width: 0;
   flex: 0 0 auto;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
+  align-items: baseline;
+  gap: 8px;
   margin-left: 4px;
 }
 
@@ -400,8 +380,13 @@
   color: var(--ds-text-muted);
 }
 
+/*
+  Muted, not faint: `--ds-text-faint` is #afafaf in light mode, which lands at
+  2.2:1 on the card and makes a timestamp the user actually reads unreadable.
+  Quietness comes from size and the trailing column instead.
+*/
 .projects-updated {
-  color: var(--ds-text-faint);
+  color: var(--ds-text-muted);
 }
 
 /* Disclosure indicator: points at the row, turns down once its detail is open. */
@@ -412,7 +397,7 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  color: var(--ds-text-faint);
+  color: var(--ds-text-muted);
   transition: transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
@@ -420,7 +405,6 @@
    closed again must point right, or the indicator lies about the state. */
 .projects-row-block.open .projects-row-disclosure {
   transform: rotate(90deg);
-  color: var(--ds-text-muted);
 }
 
 .projects-tag {
@@ -458,7 +442,7 @@
   min-width: 0;
   flex-direction: column;
   gap: 8px;
-  padding: 0 14px 12px 50px;
+  padding: 0 14px 12px 54px;
   animation: projects-detail-in var(--motion-duration-fast) var(--motion-ease-out);
 }
 
