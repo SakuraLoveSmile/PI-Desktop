@@ -138,10 +138,15 @@ Deliverables:
 - the remote session ownership split of architecture §6.3;
 - the reverse tool relay: `tools/advertise` and the `tool/execute` server
   request, so desktop MCP servers and workspace-free plugin tools run on the
-  desktop for a remote session; and
+  desktop for a remote session;
 - the terminal: `terminal/open`, `terminal/input`, `terminal/resize`,
   `terminal/close`, `terminal.output`, and a bounded replay ring, running on
-  the remote machine.
+  the remote machine; and
+- the Settings → Remote Hosts destination: a compact host inventory, one Add
+  form with SSH and Pair tabs and no instructional copy, and Experimental
+  rows for unscheduled capabilities (LAN discovery, browser access,
+  messaging, WSL, share this machine) that toast unavailability and do not
+  call IPC.
 
 Design decisions (D375, recorded 2026-09-10):
 

@@ -11938,7 +11938,7 @@ browser milestones are scheduled.
   only reachable with a password; the user's local SSH agent holds no usable key
   for it. A GitHub Releases fixture serves the `pi-host` bundle for that platform
   at the desktop's version. A second machine accepts the user's key only.
-- **Steps**: 1) In Settings → Remote Hosts, install over SSH with key
+- **Steps**: 1) In Settings → Remote Hosts, open the Add form's SSH tab and install over SSH with key
   authentication and confirm the form shows the identity-file field.
   2) Switch the authentication mode to password, confirm the identity-file field
   is replaced by a masked password field, and reveal it once.
@@ -11973,6 +11973,29 @@ browser milestones are scheduled.
 - **Status**: Draft; remote harness with a password-only Linux SSH target
   required. The credential seam itself is covered offline by
   `apps/desktop/test/remote-host-ssh-password.test.mjs`.
+
+
+#### E2E-REMOTE-HOST-settings-compact-inventory
+
+- **Preconditions**: The desktop Settings window can open. No paired remote
+  host is required.
+- **Steps**: 1) Open Settings → Remote Hosts. 2) Confirm the destination is a
+  host inventory, one Add form with SSH and Pair tabs, and an Experimental
+  section — not three stacked cards of instructional copy. 3) Switch Add to
+  Pair and back to SSH; confirm both forms stay filled. 4) Click an
+  Experimental switch (LAN discovery, browser access, messaging, WSL, or
+  share this machine).
+- **Expected**: Field labels and placeholders remain; overview, body, and
+  hint copy are absent. SSH stays the default Add tab. Experimental switches
+  stay off, remain focusable, toast that the capability is not available yet,
+  and issue no IPC. Pairing and SSH bootstrap keep their existing success and
+  failure toasts.
+- **Specs linked**: `06-delivery/07-remote-control-rollout.md` §2 R2,
+  `02-architecture/05-remote-agent-control.md` §5.2
+- **Acceptance**: D (surfaces), Quality
+- **Milestone**: Post-MVP (rollout R2b)
+- **Status**: Draft; covered offline by
+  `apps/desktop/test/settings-remote-hosts.test.mjs`.
 
 #### E2E-232: The outbound messaging integration relays events and commands
 
