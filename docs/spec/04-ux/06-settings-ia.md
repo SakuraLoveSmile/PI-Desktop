@@ -565,8 +565,8 @@ system while preserving their different data ownership:
 - Reuses the durable Projects index as a settings-scale management surface
 - Always includes archived records; archived rows are grouped, never hidden, so
   the destination still has no visibility toggle
-- Supports project search, add, activate, project-session expansion, pin,
-  archive/restore, and close
+- Supports project search, add, select, activate, pin, archive/restore, and
+  close
 - A successful session import bound to an archived project restores that
   project's renderer presentation state after the session refresh, making the
   imported session visible in the default sidebar. Ordinary refreshes and
@@ -576,44 +576,47 @@ system while preserving their different data ownership:
   is the primary root of one logical project, and the remaining folders are
   retained as roots of that same project rather than separate project tabs.
   Chats, project instructions, and project memory are shared by the group.
-- The destination is one workbench, not a stack of bands (D267, revising D168):
-  a quiet intro line above a single toolbar above a single elevated panel. It
+- The destination is one workbench (D267), revised by D455 into a list +
+  inspector. A quiet intro line sits above one toolbar above the workbench. It
   reuses the same composition, control height, and row rhythm as the agent
   capability pages (D257) and adds no page-specific chrome.
   1. **Intro line** — one quiet description line, the same shape as the
      capability pages' intro. The destination shows no page-level totals: there
      is no hero block, decorative gradient, counter banner, or inline counter
-     run. The per-group counts on the panel's header strips are the only totals,
+     run. The per-group counts on the index header strips are the only totals,
      so a number is never repeated in two places
   2. **Toolbar** — one row carrying the Recent/Name sort as the shared
      segmented control, the search field with a clear affordance and a match
      count while searching, and the primary Add project action right-aligned
-  3. **Panel** — one settings panel holds every group. The always-visible
-     sections run Pinned, All projects, Archived as non-interactive in-panel
+  3. **Workbench** — a compact index beside an inspector. The always-visible
+     index sections run Pinned, All projects, Archived as non-interactive
      header strips, each carrying its label and row count. Every section is a
      labelled region wrapping its own list, so the strip is never a non-list
      child of a list and each row keeps its group name in the accessibility
-     tree; rows follow with hairline separators. Empty sections are omitted,
-     and an index with no rows renders one quiet in-panel empty state instead
-     of the panel groups
-- Row anatomy: disclosure control, color glyph, project name with state tags
-  (Active, Open, pinned tag, Archived), one meta line carrying the shortened
-  monospace path, branch, and session count, a relative last-active time, and a
-  hover/focus-revealed action pair (New task, row menu). The colored glyph uses
-  Folder for ordinary projects and a filled Star for pinned projects, while the
-  pinned tag remains as the localized text cue.
-- The row menu groups create/edit actions above pin, archive/restore, and the
-  destructive Close action, and closes on Escape or any outside press
-- The row menu includes Project memory. Its editor is a compact viewport-level
-  dialog with a list of editable memory cards. Each card supports an optional
-  title, multiline content, and removal; the dialog also supports adding
-  entries, shows an empty state, and keeps Cancel/Save actions. Saved entries
-  are scoped to that project's path and are available in later chats for the
-  project.
+     tree. Empty sections are omitted, and an index with no rows renders one
+     quiet empty state instead of the workbench. Below 720px the inspector
+     stacks under the index
+- Compact row anatomy: color glyph, project name with one status tag (Active,
+  Open, or Archived), session count, and a relative last-active time. The
+  colored glyph uses Folder for ordinary projects and a filled Star for pinned
+  projects. A click selects the row and keeps Settings open; double-click or
+  Enter activates the project and returns to chat
+- The inspector shows the selected project's name and tags (Active, Open,
+  pinned, Archived), shortened monospace path and branch, Open and New task
+  actions, folders, and chats. The inspector menu groups create/edit actions
+  above pin, archive/restore, and the destructive Close action, and closes on
+  Escape or any outside press
+- The inspector menu includes Project memory. Its editor is a compact
+  viewport-level dialog with a list of editable memory cards. Each card
+  supports an optional title, multiline content, and removal; the dialog also
+  supports adding entries, shows an empty state, and keeps Cancel/Save
+  actions. Saved entries are scoped to that project's path and are available
+  in later chats for the project.
 - Project search also matches session titles. Matching a session retains and
-  expands its owning project; expanded sessions are ordered by latest activity,
-  show a count and relative update time, and reveal additional rows in batches
-  of eight rather than silently truncating the history
+  selects its owning project; the inspector lists matching sessions ordered by
+  latest activity, shows a count and relative update time, and reveals
+  additional rows in batches of eight rather than silently truncating the
+  history
 - Activating a project or project session returns to chat; archive and close
   actions keep Project archive open even when the active workspace changes
 
@@ -695,9 +698,10 @@ system while preserving their different data ownership:
 12. Project archive always exposes archived records and can restore them without
     duplicating the index in the app shell
 13. Project archive renders one quiet description line — no hero, banner, or
-    page-level counter run — above one search + sort toolbar and one panel
-    containing the Pinned / All projects / Archived group strips; each strip's
-    count agrees with its rendered rows, sorting reorders rows inside every
+    page-level counter run — above one search + sort toolbar and a list +
+    inspector workbench whose index holds the Pinned / All projects / Archived
+    group strips; each strip's count agrees with its rendered rows, a click
+    selects a row without leaving Settings, sorting reorders rows inside every
     section without hiding any, and clearing the search restores the complete
     index
 14. Info renders disabled, checking, up-to-date, available, downloading,
