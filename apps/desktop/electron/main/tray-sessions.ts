@@ -122,38 +122,47 @@ export function createTraySessions({
 
   function observeEvent(channel: string, payload: unknown) {
     if (isQuitting()) return;
-    if (channel === IPC.event.agentMessage) {
-      const envelope = payload as AgentEventEnvelope;
-      if (envelope.parentToolCallId) return;
-      const event = envelope.event;
-      let running: boolean;
-      if (
-        event.type === "agent_start" ||
-        event.type === "turn_start" ||
-        event.type === "compaction_start"
-      ) {
-        running = true;
-      } else if (
-        event.type === "agent_end" ||
-        event.type === "error" ||
-        (event.type === "compaction_end" && event.reason === "manual")
-      ) {
-        running = false;
-      } else if (event.type === "status") {
-        running = event.status.isRunning;
-      } else {
+    try {
+      if (channel === IPC.event.agentMessage) {
+        const envelope = payload as AgentEventEnvelope;
+        if (!envelope || typeof envelope !== "object") return;
+        if (envelope.parentToolCallId) return;
+        const event = envelope.event;
+        if (!event || typeof event !== "object" || typeof event.type !== "string") return;
+        let running: boolean;
+        if (
+          event.type === "agent_start" ||
+          event.type === "turn_start" ||
+          event.type === "compaction_start"
+        ) {
+          running = true;
+        } else if (
+          event.type === "agent_end" ||
+          event.type === "error" ||
+          (event.type === "compaction_end" && event.reason === "manual")
+        ) {
+          running = false;
+        } else if (event.type === "status") {
+          running = event.status.isRunning;
+        } else {
+          return;
+        }
+        if (runningOverrides.get(envelope.sessionId) === running) return;
+        runningOverrides.set(envelope.sessionId, running);
+      } else if (channel === IPC.event.hostStatus) {
+        const status = payload as HostStatusEvent;
+        if (!status || typeof status !== "object") return;
+        if (!status.ok) runningOverrides.clear();
+        if (!status.component || status.component === "sidecar") agentAvailable = status.ok;
+      } else if (channel !== IPC.event.sessionsChanged && channel !== IPC.event.notificationChanged) {
         return;
       }
-      if (runningOverrides.get(envelope.sessionId) === running) return;
-      runningOverrides.set(envelope.sessionId, running);
-    } else if (channel === IPC.event.hostStatus) {
-      const status = payload as HostStatusEvent;
-      if (!status.ok) runningOverrides.clear();
-      if (!status.component || status.component === "sidecar") agentAvailable = status.ok;
-    } else if (channel !== IPC.event.sessionsChanged && channel !== IPC.event.notificationChanged) {
-      return;
+      void refresh();
+    } catch (error) {
+      logger.app("diagnostics", "warn", "tray session event observation failed", {
+        data: String(error),
+      });
     }
-    void refresh();
   }
 
   return {

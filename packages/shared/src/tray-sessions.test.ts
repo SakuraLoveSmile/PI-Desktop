@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   allocateTraySessionRows,
   buildTraySessionGroups,
+  parseTraySessionPreferences,
+  traySessionTitle,
   type TraySessionPreferences,
 } from "./tray-sessions.js";
 import type { SessionSummary } from "./types/sessions.js";
+import type { AppNotification } from "./types/workspace.js";
 
 function session(id: string): SessionSummary {
   return {
@@ -103,5 +106,92 @@ describe("buildTraySessionGroups", () => {
       ["running", 4, false],
       ["pinned", 4, false],
     ]);
+  });
+
+  it("assigns unread after running and sorts newest unread first", () => {
+    const running = session("run-0");
+    const unreadNewer = session("unread-new");
+    const unreadOlder = session("unread-old");
+    const pinned = session("pin-0");
+    const notifications: AppNotification[] = [
+      {
+        id: "n-new",
+        kind: "task.completed",
+        sessionId: unreadNewer.id,
+        sessionTitle: unreadNewer.title,
+        turnId: "t-new",
+        createdAt: "2026-09-13T02:00:00.000Z",
+      },
+      {
+        id: "n-old",
+        kind: "task.failed",
+        sessionId: unreadOlder.id,
+        sessionTitle: unreadOlder.title,
+        turnId: "t-old",
+        createdAt: "2026-09-13T01:00:00.000Z",
+      },
+    ];
+    const groups = buildTraySessionGroups(
+      [pinned, unreadOlder, unreadNewer, running],
+      new Set([running.id]),
+      notifications,
+      preferences([pinned.id, running.id]),
+    );
+    expect(groups.map((group) => [group.kind, group.sessions.map((row) => row.id)])).toEqual([
+      ["running", ["run-0"]],
+      ["unread", ["unread-new", "unread-old"]],
+      ["pinned", ["pin-0"]],
+    ]);
+  });
+
+  it("excludes archived sessions and sessions in archived projects", () => {
+    const active = session("active");
+    const archivedSession = session("archived");
+    const inArchivedProject = { ...session("project-archived"), projectPath: "/work/old" };
+    const groups = buildTraySessionGroups(
+      [active, archivedSession, inArchivedProject],
+      new Set([archivedSession.id, inArchivedProject.id]),
+      [],
+      {
+        sessionMeta: { archived: { archived: true }, active: { pinned: true } },
+        archivedProjectPaths: ["/work/old"],
+        sort: "recent",
+      },
+    );
+    expect(groups).toEqual([{ kind: "pinned", sessions: [{ id: "active", title: "active" }], hasMore: false }]);
+  });
+});
+
+describe("parseTraySessionPreferences", () => {
+  it("accepts extra session meta fields and rejects invalid payloads", () => {
+    expect(
+      parseTraySessionPreferences({
+        sessionMeta: { "session-1": { pinned: true, manualTitle: true } },
+        archivedProjectPaths: ["/work/app"],
+        sort: "recent",
+      }),
+    ).toEqual({
+      sessionMeta: { "session-1": { pinned: true, archived: undefined, order: undefined } },
+      archivedProjectPaths: ["/work/app"],
+      sort: "recent",
+    });
+    expect(parseTraySessionPreferences({ sessionMeta: {}, archivedProjectPaths: [], sort: "nope" })).toBeNull();
+    expect(
+      parseTraySessionPreferences({
+        sessionMeta: { "session-1": { order: -1 } },
+        archivedProjectPaths: [],
+        sort: "recent",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("traySessionTitle", () => {
+  it("keeps one line and truncates to 48 code points including the ellipsis", () => {
+    expect(traySessionTitle(["line", "one"].join("\n"), "fallback")).toBe("line one");
+    const title = "😀".repeat(49);
+    const truncated = traySessionTitle(title, "fallback");
+    expect(Array.from(truncated)).toHaveLength(48);
+    expect(truncated.endsWith("…")).toBe(true);
   });
 });
