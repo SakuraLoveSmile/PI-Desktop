@@ -750,7 +750,16 @@ type Block =
       toolUsage?: ToolTokenUsage }
   | { type: "attachment"; kind: "image" | "file"; name: string;
       ref: string /* attachments/<sha256> or absolute path */;
-      mimeType?: string; size?: number };
+      mimeType?: string; size?: number }
+  | { type: "hostedSearch"; status: "searching" | "completed" | "failed";
+      rounds: Array<{ id: string;
+        status: "searching" | "completed" | "failed";
+        kind?: "search" | "openPage" | "findInPage";
+        query?: string; url?: string;
+        sources: Array<{ url: string; title?: string }> }>;
+      replay?: Array<{ type: "hostedSearch"; phase: string;
+        blockId?: string; name?: string; input?: unknown;
+        status?: string; isError?: boolean; wire?: unknown }> };
 ```
 
 - Tool results are stored **post-truncation** (16-tool-result-limits); full

@@ -16,6 +16,7 @@ import {
   bindingFromModelInfo,
   formatTokenCount,
   modelMatchesFilter,
+  nativeWebSearchSupportedOn,
   publishedThinkingLevels,
   sortThinkingLevels,
   type ModelBinding,
@@ -183,6 +184,12 @@ export type ModelSelectionPanesProps = {
   busy?: boolean;
   /** Probe the service's model list now, skipping the edit debounce. */
   onReload?: () => void;
+  /**
+   * Effective API style of the provider being configured. Gates the native
+   * web search opt-in: only wires that can carry a provider-hosted search
+   * tool offer the checkbox at all.
+   */
+  apiStyle?: string;
 };
 
 /**
@@ -196,6 +203,7 @@ export function ModelSelectionPanes({
   listTitle,
   busy = false,
   onReload,
+  apiStyle,
 }: ModelSelectionPanesProps) {
   const { t } = useTranslation();
   const { rows, models, publishedLevelsById, setModels } = selection;
@@ -245,6 +253,11 @@ export function ModelSelectionPanes({
   useEffect(() => {
     if (models.length === 0) setChosenQuery("");
   }, [models.length]);
+
+  // The hosted web search tool only exists on two wires; on any other
+  // style the opt-in cannot work, so the checkbox stays present but disabled
+  // with an explanatory hint instead of silently doing nothing.
+  const nativeWebSearchWireCapable = nativeWebSearchSupportedOn(apiStyle);
 
   /**
    * The chosen list narrows with the discovered list's rule plus the binding's
@@ -822,6 +835,36 @@ export function ModelSelectionPanes({
                             className="provider-chosen-delegation-help"
                             label={t("settings.availableForSubagentsHint")}
                             ariaLabel={t("settings.availableForSubagentsHint")}
+                          >
+                            <IconHelp size={13} />
+                          </Tooltip>
+                        </span>
+                        <span className="provider-chosen-delegation">
+                          <label className="provider-chosen-capability">
+                            <input
+                              type="checkbox"
+                              checked={binding.nativeWebSearch === true}
+                              disabled={!nativeWebSearchWireCapable}
+                              onChange={(event) =>
+                                updateBinding(binding.id, {
+                                  nativeWebSearch: event.target.checked || undefined,
+                                })
+                              }
+                            />
+                            <span>{t("settings.nativeWebSearch")}</span>
+                          </label>
+                          <Tooltip
+                            className="provider-chosen-delegation-help"
+                            label={t(
+                              nativeWebSearchWireCapable
+                                ? "settings.nativeWebSearchHint"
+                                : "settings.nativeWebSearchUnsupported",
+                            )}
+                            ariaLabel={t(
+                              nativeWebSearchWireCapable
+                                ? "settings.nativeWebSearchHint"
+                                : "settings.nativeWebSearchUnsupported",
+                            )}
                           >
                             <IconHelp size={13} />
                           </Tooltip>

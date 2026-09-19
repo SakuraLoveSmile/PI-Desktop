@@ -674,7 +674,16 @@ type Block =
       completedAt?: string; durationMs?: number;
       toolUsage?: ToolTokenUsage }
   | { type: "attachment"; kind: "image" | "file"; name: string;
-      ref: string /* attachments/<sha256> or absolute path */ };
+      ref: string /* attachments/<sha256> or absolute path */ }
+  | { type: "hostedSearch"; status: "searching" | "completed" | "failed";
+      rounds: Array<{ id: string;
+        status: "searching" | "completed" | "failed";
+        kind?: "search" | "openPage" | "findInPage";
+        query?: string; url?: string;
+        sources: Array<{ url: string; title?: string }> }>;
+      replay?: Array<{ type: "hostedSearch"; phase: string;
+        blockId?: string; name?: string; input?: unknown;
+        status?: string; isError?: boolean; wire?: unknown }> };
 ```
 
 - 工具结果存储**截断后**（16 个工具结果限制）；满
