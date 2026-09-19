@@ -1123,6 +1123,7 @@ sklm: {
     modelAlreadyAdded: "Model already added",
     modelConfigurations: "Model settings",
     removeModel: "Remove model",
+    reorderModel: "Reorder {{name}}. Drag or use the Up and Down arrow keys.",
     modelAlias: "Alias",
     modelAliasHint: "Shown wherever the model is named. The id stays the request identity.",
     modelAliasPlaceholder: "e.g. fast",
