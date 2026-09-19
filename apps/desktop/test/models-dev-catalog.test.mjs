@@ -635,6 +635,23 @@ test("models.dev reasoning options map to canonical levels", () => {
   assert.deepEqual(thinkingLevelsFromModelsDev(false, [{ type: "effort", values: ["high"] }]), []);
 });
 
+test("toggle ladders still map off to none", () => {
+  const [provider] = parseModelsDevCatalog({
+    vendor: {
+      name: "Vendor",
+      models: {
+        "toggle-model": {
+          id: "toggle-model",
+          reasoning: true,
+          reasoning_options: [{ type: "toggle" }],
+        },
+      },
+    },
+  });
+  const info = modelInfoFromModelsDev(provider.models[0], "row");
+  assert.equal(info.thinkingLevelMap?.off, "none");
+});
+
 test("the application loads the bundled release snapshot without network access", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pi-models-dev-release-"));
   const catalogPath = join(dir, "api.json");

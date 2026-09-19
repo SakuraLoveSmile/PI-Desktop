@@ -11079,10 +11079,13 @@ are withdrawn with ADR 0165.
   reasoning option, followed by the binding's enabled canonical levels.
   2) Choose `omit` and confirm the chip shows `omit` and the session stores
   `thinkingLevel: omit`. 3) Send a turn and inspect the outbound request.
-  4) Choose explicit `off` and send again.
+  4) Choose explicit `off` and send again. 5) In Settings → Model configuration,
+  expand the same model's Advanced row and confirm the default picker lists
+  `omit` first; save `omit` as the default and start a new session.
 - **Expected**: `omit` persists and the request has no thinking/reasoning field.
   Explicit `off` still serializes a disable. A non-reasoning model keeps an
-  `off`-only menu.
+  `off`-only menu. A new session whose binding default is `omit` starts at
+  `omit`.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/13-model-catalog-and-selection.md`,
   ADR 0295 / D456

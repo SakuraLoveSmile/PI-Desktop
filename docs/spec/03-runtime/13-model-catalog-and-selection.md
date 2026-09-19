@@ -195,11 +195,11 @@ resolves to `off`.
 
 For a newly created session, the renderer resolves the selected (or app-default)
 model's `ModelBinding`. A reasoning model starts at that binding's
-`defaultThinkingLevel`, clamped onto the enabled levels. When the default is
-unset it falls back to the highest enabled level seeded from published
-`supportedThinkingLevels`. A non-reasoning or unknown model starts at `off`
-until the user enables a non-`off` level. This is a creation default only and
-never rewrites an existing session's stored choice.
+`defaultThinkingLevel` (`omit` is preserved; other values are clamped onto the
+enabled levels). When the default is unset it falls back to the highest enabled
+level seeded from published `supportedThinkingLevels`. A non-reasoning or
+unknown model starts at `off` until the user enables a non-`off` level. This is
+a creation default only and never rewrites an existing session's stored choice.
 
 Unpinned sessions still advertise that inherited default model's reasoning
 capability on session list/get/create/fork/configure. Enrichment does not pin

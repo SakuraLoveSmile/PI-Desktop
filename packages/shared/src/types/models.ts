@@ -94,9 +94,9 @@ export type ModelBinding = {
    * `effectiveContextWindow`. */
   contextWindowSource?: ContextWindowSource;
   maxTokens: number;
-  /** Explicit endpoint levels; an empty or off-only set disables thinking. */
   thinkingLevels: ThinkingLevel[];
-  defaultThinkingLevel: ThinkingLevel | null;
+  /** Canonical enabled level, or `omit` when new sessions should send no override. */
+  defaultThinkingLevel: SessionThinkingLevel | null;
   /**
    * User override for image input. `null` or absent follows the published
    * models.dev capability; `true` forces image transport on for an endpoint the
