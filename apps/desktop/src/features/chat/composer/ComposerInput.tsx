@@ -1,3 +1,5 @@
+import { useLayoutEffect } from "react";
+import { installComposerDeletionGuard } from "./native-deletion";
 import type {
   ClipboardEvent,
   Dispatch,
@@ -57,6 +59,10 @@ export function ComposerInput({
   onFocus,
   onBlur,
 }: ComposerInputProps) {
+  useLayoutEffect(() => {
+    const editor = inputRef.current;
+    return editor ? installComposerDeletionGuard(editor) : undefined;
+  }, [inputRef]);
   return (
     <div className="composer-input-wrap">
       {imagePreview ? <ComposerImagePreview controller={imagePreview} /> : null}
