@@ -839,4 +839,3 @@ pub(crate) fn migrate_v18_to_v19(conn: &Connection, path: &Path) -> Result<()> {
     let _ = conn.pragma_update(None, "foreign_keys", true);
     result
 }
-
