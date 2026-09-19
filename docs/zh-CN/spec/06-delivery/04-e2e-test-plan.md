@@ -1848,30 +1848,17 @@ hover/focus 不带移位标签，项目标题 hover/focus 路径显示
 - **状态**：单位覆盖（`rpc::tests` 表示项目绑定、临时和
   缺少会话工作区解决方案）；完整的多回合UI场景草稿
 
-#### E2E-050：思考选择器遵循精确的模型功能
+#### E2E-050：Composer 模型 × 推理菜单遵循精确能力
 
-- **先决条件**：一种编目推理模型，一种非推理模型，
-  以及一个未知的自由格式模型 ID。
-- **步骤**： 1) 依次选择每个 provider/model。 2）检查输入框
-  Agent / Plan / Goal 旁边的控件。 3）打开Thinking触发器并选择多个
-  支持的级别。 4) 检查未知模型的​​菜单和提供商设置。
-- **预期**：推理模型立即显示当前的思维水平
-  Agent / Plan / Goal 的右侧，仅将其稀疏支持级别公开为
-  按规范顺序的单列列表，用尾随标记所选行
-  检查，不公开 inherit/default 行，调整菜单大小以适应其内容，而无需
-  超过 160px 或可用视口，截断过长标签并关闭
-  选择后的菜单。非推理模型不显示思维触发器。
-  每个级别都来自 pi 选择的模型记录。未知模型曝光
-  既不是思维触发器，也不是启用思维行动，并且提供商
-  设置不公开 reasoning/level 覆盖。刷新发现的模型
-  数据无法取代 pi 的已知模型语义或为 pi 发明功能
-  未知模型。
+- **先决条件**：一种编目推理模型、一种非推理模型，以及一个未知的自由格式模型 ID。
+- **步骤**：1) 打开 Composer 模型 × 推理芯片。2) 确认根层包含带当前值的模型和推理等级条目，以及推理等级条目正下方每个支持等级一个刻度的滑杆。3) 拖动并点击滑杆跨过多档，再点击一个刻度标签，确认芯片更新且菜单留在根层。4) 打开模型，搜索并从一个提供商分组选择模型；确认菜单仍在根层打开。5) 打开推理等级并从单选列表选择一档。6) 对非推理提供商和未知自由格式模型 ID 重复；练习 Escape、外部点击、上/下、Enter、左方向键和滑杆方向键。
+- **预期**：芯片在右侧工具栏，带 Bot 图标，位于独立提示词增强 Sparkles 动作和发送/中止之前；Off 省略等级文本。单个锚定菜单把根层原地替换成返回行和子菜单，从不打开标签页或第二个弹出层，再打开总是从根层开始。模型搜索过滤粘性提供商分组；推理等级来自 `omit` 然后绑定已启用档位的规范顺序。当列出一个以上等级时，根层在推理等级条目正下方承载拖动滑杆（单档绑定隐藏滑杆）。拖过多个刻度只持久化最后一次待提交的档位；刻度标签不是 Tab 停靠点。滑杆和刻度提交立即更新芯片且菜单留在根层。推理等级条目打开单选列表，使用单选语义、末尾勾选和当前模型支持说明。选择任一值立即更新芯片和根层值、清除模型过滤并保持菜单打开。非推理或未知模型从 `off` 开始，但显式 Settings 绑定可以提供其配置档位；发现不会自动提升。刷新发现的模型数据不能覆盖绑定。第一条消息创建会话之前，Composer 使用模型菜单里选中的精确模型而不是提供商默认模型；物化后仍保持同一精确模型能力。
 - **链接规格**：`03-runtime/11-provider-model-system.md`，
   `03-runtime/12-provider-config-schema.md`，
   `03-runtime/13-model-catalog-and-selection.md`、ADR 0018、ADR 0027
 - **验收**：B（模型配置），质量
 - **里程碑**：M5
-- **状态**：单元覆盖（`thinking-ui.test.mjs`，代理运行时能力测试）；完整的 UI 场景草稿
+- **状态**：单元覆盖（`thinking-ui.test.mjs`、`composer-model-thinking-menu.test.mjs`、`thinking-commit-queue.test.mjs`，代理运行时能力测试）；完整 UI 场景草稿
 
 #### E2E-051：思考水平在会话中持续存在
 
@@ -2123,8 +2110,9 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   已完成的 Bash 行仍显示命令、输出、状态和复制操作，并保留终端图标。
   4) 确认交互式 shell 由用户的外部终端承担，而不是由工作面板打开。
   5) 构建/打包桌面应用并检查依赖项和解压资源列表。
-- **预期**：工作面板只提供浏览器、当前范围内的插件视图以及对话打开的审阅/文件资源；
-  不创建 PTY，也无法打开终端选项卡。Agent Bash 仍是非交互式的，完整显示在对话中。
+- **预期**：工作面板提供审阅启动器行、浏览器和当前范围内的插件视图；审阅只在用户
+  主动打开时出现，文件资源由对话打开；不创建 PTY，也无法打开终端选项卡。
+  Agent Bash 仍是非交互式的，完整显示在对话中。
   打包结果不含 PTY/xterm 依赖、终端 IPC 或终端原生负载。
 - **链接规格**：`02-architecture/02-tech-stack.md`、`03-runtime/01-ipc-protocol.md`、
   `04-ux/08-component-spec.md` §5、ADR 0108
@@ -3751,9 +3739,10 @@ IPC 请求无法关闭。
   创造。
 - **步骤**： 1) 让 Agent 使用固定标题、Markdown 和
   问题。 2) 逐字节检查新的 `.pi/plan/*.md` 文件和
-  `plan_approvals` 行。 3）检查卡牌的标题和神器开启者；确认
-  question/description、validity/deadline 和状态不存在且仅
-  提供批准和拒绝。 4) 打开审批模式菜单，选择自动，
+  `plan_approvals` 行。 3）检查卡牌的标题和神器开启者；确认开启者在内置文件
+  视图中打开（该视图不可启动时回退到宿主机文件标签，D452），且
+  question/description、validity/deadline 和状态不存在且仅提供批准和拒绝。
+  4) 打开审批模式菜单，选择自动，
   并验证下一个批准默认为自动。 5) 拒绝
   提案。 6) 确认持久模式为Plan，实时状态为可编辑`planning`，
   批准门已清除，并接受稍后的提示。 7）让
@@ -3763,7 +3752,8 @@ IPC 请求无法关闭。
   独特的神器，记录其相关的 path/hash/size 与结构化
   title/question，并且绝不让渲染器或 sidecar 写入或替换它。
   标题衍生的工件文件名可以从标题中识别出来，包括
-  非 ASCII 标题字符。卡牌显示标题，打开神器；
+  非 ASCII 标题字符。卡牌显示标题，并在内置文件视图中打开神器，
+  该视图不可启动时回退到宿主机文件标签（D452）；
   它不需要内联 question/Markdown/hash/size 或 validity/deadline
   指标。选择的审批方式会被本地记住，以便下次使用
   批准。
@@ -4516,6 +4506,19 @@ IPC 请求无法关闭。
      可移动的叶名芯片和无划痕的绝对路径占用
      文本区域。 Hover/focus 芯片检查其完整路径，删除一个，然后
      发送提示并检查会话消息。
+     发送前确认缩略图位于输入框外上方并靠左排列。全选替换与撤销正文应保留图片；
+     仅图片草稿切换会话后仍保留图片与发送元数据。挂载完整 Composer，验证
+     仅图片时点击发送会交付附件并清空草稿，文字加图片的发送立即失败时全部恢复。
+     窄面板添加 20 张图片后应能滚动到最后一张并删除，其他图片保留。
+     用点击、Enter 和空格打开居中图片浮层，工作面板与草稿保持
+     不变。小图不放大，宽图等比适应窗口；验证缩放、重置、下载原图、多图按钮与方向键
+     切换。切图重置缩放与位置。在适应窗口和放大后拖动图片，验证移出图片后
+     松手、取消拖动与滚动平移；适应窗口恢复居中，拖动不关闭浮层，关闭或切换会话
+     后不残留指针捕获。Esc、关闭按钮和空白处均可关闭，焦点与光标回到原处，
+     浮层打开时焦点不离开浮层，原生插件视图隐藏。在无项目会话重复。
+     删除不触发预览或发送。延迟读取期间切换会话/项目或移除当前附件，应关闭预览；
+     晚到结果不覆盖较新的图片。丢失或解码失败的图片显示重试并保留草稿。
+     文本芯片仍能展开为可编辑正文。
   5. 检查 `<data_dir>/scratch/<sessionId>/pasted/` 并比较保存的
      源 files/image 的字节。检查项目 `git status`。
   6.删除会话，然后确认其临时目录和粘贴的文件
@@ -4530,6 +4533,9 @@ IPC 请求无法关闭。
     代理可以使用其普通文件工具来读取物化文件。
   - 家庭粘贴在写入之前创建或重用持久会话。的
     工作区保持干净，并且不会创建任何工作区工件行。
+  - 图片预览保留草稿及附件元数据，通过 `fs/readImageDataUrl` 限制读取大小与路径；
+    无项目时也可读取允许访问的暂存图片。预览保持草稿附件格式及工作面板选项卡不变。关闭或卸载时
+    释放浮层与原生视图阻挡状态。
   - 删除会话会删除粘贴的文件以及其余的内容。
 - **链接规格**：`04-ux/08-component-spec.md` §11.7–11.8，
   `03-runtime/01-ipc-protocol.md` §13c，
@@ -4540,12 +4546,13 @@ IPC 请求无法关闭。
   F（坚持），品质
 - **里程碑**：M5
 - **状态**：单元覆盖（`composer-paste-files.test.mjs`、`composer-clipboard.test.mjs`）；
-  `pnpm test:e2e:composer-paste` 挂载真实 ComposerInput、草稿/粘贴 hook、生产 CSS
-  和沙盒 preload，以 Chromium ClipboardEvent 注入混合数据与原生 File，并调用
-  真实临时文件写入器核对字节。需先构建桌面、安装 Electron，并有图形会话
+  `pnpm test:e2e:composer-paste` 挂载真实 ComposerInput、草稿/粘贴 hook、文件查看器、
+  生产 CSS 和沙盒 preload，以 Chromium ClipboardEvent 注入混合数据与原生 File，
+  调用真实暂存文件写入器和受限文件读取器，核对字节并解码预览图片。
+  需先构建桌面、安装 Electron，并有图形会话
   （Linux 可用 Xvfb）。测试不修改系统剪贴板，也不操作 Word；Word/各平台旅程
-  及完整提供商发送仍需人工验证。分支运行仅为合入前证据；合入后须按规定从
-  集成后的 main 重新运行。
+  及完整提供商发送仍需人工验证。应在更新后的任务候选版本运行并记录修订；随后
+  按权威 `AGENTS.md` 工作流验证 PR 集成候选，无需先合入本地 main。
 
 #### E2E-102a：Composer 文件引用结果使用紧凑的叶名称
 
@@ -7986,3 +7993,28 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **验收**：A（运行时），C（会话）。
 - **里程碑**：M6+。
 - **状态**：已自动化；针对 task/PR 集成候选运行。
+
+### E2E-PROVIDER-ORDER: Reorder configured AI services
+
+- Open Model configuration with three providers and drag the last before the
+  first, then after the last; verify pointer-following cards, live slot preview,
+  and saved order. Check movement threshold, action-button exclusion, edge
+  scrolling, Escape cancellation, and automatic-scroll cleanup.
+- Cancel a drag and use Up/Down on a focused provider card. Verify no configuration or
+  default-model changes. Failed saves report an error and retain accepted order;
+  overlapping moves are blocked and late catalog reads cannot undo a move.
+- Reopen the Composer model menu: groups follow the provider order. Restart the
+  host and renderer and verify persistence. Check English and Chinese labels.
+- Automated: `pnpm test:e2e:provider-order` runs the real settings component,
+  sandboxed preload, provider IPC registrar, and an isolated Rust host. It uses
+  synthetic Chromium pointer/key events and test providers without credentials;
+  model-catalog/OAuth discovery is stubbed and no provider requests are sent.
+- Host unit tests cover no metadata, disabled/plugin rows, new/deleted IDs,
+  stale moves, no-op moves, preserved configuration, and reopening the database.
+
+The provider-order suite also runs a 200-card fixture under a controlled animation
+clock. A burst of 200 pointer events may arm React state once, but stationary
+frames must produce no further renders or pending callbacks. Card geometry is
+read at press time, and move/release/cancel/unmount paths must clear transient
+transforms and queued frames. Release before the scheduled frame must still save
+the latest destination. These assertions measure work counts, not device FPS.

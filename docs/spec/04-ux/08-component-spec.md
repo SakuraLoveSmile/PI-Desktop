@@ -1034,6 +1034,9 @@ entirely inside the plugin's isolated page:
   context the viewport-fixed toggle and `Cmd/Ctrl + J` reveal, so a successful
   workspace Write/Edit cannot open, activate, or resize the panel in any
   session.
+  The plan/goal approval artifact still creates or activates a tab in its
+  originating session, but the host picks its surface: the bundled file view when
+  that view is launchable, otherwise the host file tab (D452).
   The viewport-fixed toggle and `Cmd/Ctrl + J` both toggle the active session's
   retained panel context: they reveal the panel without creating a resource and
   collapse the visible panel without deleting one. With no active session the
@@ -2404,10 +2407,17 @@ execution permission mode, not an individual tool call.
 ### 10A.2 Content
 
 The card renders the structured title and an opener for the exact
-`.pi/<kind>/*.md` path. Opening the artifact reads the host-written file;
-renderer edits do not change the approved bytes. The submitted question/
-description, status, validity/deadline, inline Markdown, SHA-256, byte size,
-and revision/feedback controls are not rendered card content.
+`.pi/<kind>/*.md` path; the opener prefers the bundled file view and falls back
+to the host file tab when that view is not launchable (D452). Opening the
+artifact reads the host-written file; renderer edits do not change the approved
+bytes. The submitted question/description, status, validity/deadline, inline
+Markdown, SHA-256, byte size, and revision/feedback controls are not rendered
+card content.
+
+Because the bundled file view can edit and save the file it opened (ADR 0241),
+an artifact changed before Approve no longer matches the recorded hash: the host
+fails that approval closed with `PLAN_ARTIFACT_HASH_MISMATCH` until the proposal
+is rejected and resubmitted.
 
 ### 10A.3 Actions and states
 
@@ -2725,19 +2735,24 @@ reasoning-level control.
   live discovery updates them in the background without replacing a configured
   alias with the wire ID or a second visible name.
 - The combined model × reasoning menu opens at `bottom: calc(100% + 8px)` with
-  `role="menu"`. Its root has exactly two `role="menuitem"` entries. The Model
-  submenu has a search input and sticky provider headings, while the Reasoning
-  level submenu starts with `Current model <model> supports these reasoning
-  levels` and lists `omit` then the selected model binding's enabled levels in
-  canonical order. `omit` persists as the session thinking level and sends no
-  provider thinking override (ADR 0295).
+  `role="menu"`. Its root has exactly two `role="menuitem"` entries and, when
+  the menu lists more than one level, a drag slider with one labeled stop per
+  level directly beneath the Reasoning level entry (D458). Tick labels are
+  clickable but not tab stops; the range input is the accessible control.
+  The Model submenu has a search input and sticky provider headings, while
+  the Reasoning level submenu starts with `Current model <model> supports
+  these reasoning levels` and lists `omit` then the selected model binding's
+  enabled levels as the classic radio rows. `omit` persists as the session
+  thinking level and sends no provider thinking override (ADR 0295).
   Model-row reasoning badges use published reasoning metadata; vision badges
   use the effective image-input capability for the row's provider binding
   (`supportsImages` when explicitly set, published image input otherwise).
   Rows use `role="menuitemradio"`, `aria-checked`, active-row styling, and a
-  trailing check. Selecting a concrete model or level persists the complete
-  session config, clears model filtering, and returns to the root without
-  dismissing the menu. Closing and reopening always starts at the root.
+  trailing check. Selecting a concrete model, or a level from the radio list,
+  persists the complete session config, clears model filtering, and returns
+  to the root without dismissing the menu; slider and tick commits persist
+  the last pending level while the menu stays where it is. Closing and
+  reopening always starts at the root.
 - Unknown Custom/OpenAI-compatible models remain at `off` until the user
   explicitly enables a level in Settings. The menu never auto-infers reasoning
   support; after an explicit binding selection it renders the configured level.
@@ -2917,9 +2932,35 @@ Anatomy:
   separate because identity and dispatch use the canonical path, not the name.
   Text/plain and `.txt` chips are also keyboard-focusable buttons: clicking or
   pressing Enter/Space expands their bounded contents into editable draft text;
-  binary, image, oversized, or failed reads keep the chip. Image and other file
-  references use the same compact chip treatment; no separate explanatory
-  vision-status row is rendered.
+  binary, image, oversized, or failed reads keep the chip. Ordinary files stay
+  compact chips. Unsent images render in a left-aligned attachment row above and
+  outside the input shell, never within editable text. Their existing detached
+  reference metadata survives text selection, editing, undo, and session
+  switching; restored inline-image tokens are removed from text while keeping
+  the attachment. Image-only drafts enable Send; a rejected send restores both
+  text and attachments even when rejection precedes the next render. The
+  attachment row is height-limited and scrolls vertically so every image remains
+  reachable in a narrow chat pane. Thumbnails have an independent
+  remove button shown on hover/focus (always visible for touch input). No
+  separate explanatory vision-status row is rendered.
+  Clicking an image or pressing Enter/Space opens a modal image preview, without
+  sending the draft or changing the work-panel tabs. Inside the dark viewport,
+  the image is horizontally and vertically centered, keeps its aspect ratio,
+  and initially fits available space without upscaling small images. The
+  preview supports zoom, fit reset, original-image download, and previous/next
+  navigation across the draft's images. Dragging with the primary pointer or
+  scrolling pans the image at any zoom; pointer capture keeps a drag continuous
+  outside the image, and release/cancel ends it without dismissing the modal.
+  A visible portion remains in bounds. Fit reset and switching images recenter
+  the image; switching images also resets zoom. Escape,
+  the close button, or a blank-area click dismisses it and restores the prior
+  input focus/caret. Focus remains inside the modal, and native plugin surfaces
+  are hidden while it is open. The remove button never opens or submits.
+  Thumbnails and previews use the bounded, contained `fs/readImageDataUrl`
+  bridge, including allowed scratch files when no project is open. Missing,
+  unsupported, oversized, or undecodable images show a retry state and retain
+  the draft. Session/project changes or removal of the selected attachment
+  dismiss the preview; late reads cannot replace a newer image.
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - Sent `@path` file references (quoted or unquoted) render as the same compact
@@ -3264,6 +3305,12 @@ CLAUDE CODE              ~/code/pi                                  4
 - A successful scan replaces the prior candidate set, clears selection, and
   shows every group expanded: the found candidates are the answer to the scan,
   so they are not hidden behind a second click.
+- Codex session discovery walks `~/.codex/sessions/YYYY/MM/DD` newest-path-first
+  and stops after 250 `.jsonl` files. That order is folder-date lexicographic,
+  not `updatedAt`. When the cap hits, `session/importScan` returns
+  `truncated.codex = 250` and the sessions toolbar shows the localized cap note;
+  older Codex files are absent from the candidate list.
+
 - Every kind scans on its own: a session scan never starts a model-config,
   skills, or MCP scan, and switching tabs preserves the result and the
   selection of the kind left behind (inactive panels stay mounted and hidden).
@@ -3344,6 +3391,18 @@ surface, while model metadata remains owned by models.dev and transport
 compatibility remains owned by pi-ai.
 
 ### 19.2 Anatomy
+
+Each AI service card can be dragged from its non-interactive surface. After a
+small movement threshold, the card follows the pointer and surrounding cards
+animate into the proposed slot. Dragging near the list edge scrolls it. Releasing
+saves the previewed order; Escape, pointer cancellation, focus loss, unmount or
+catalog changes cancel the drag. Buttons and form controls retain their actions.
+There is no separate drag handle. A focused card accepts Up/Down to move one visible row. Saving blocks further
+moves; a failed save shows an error and restores the accepted order. Late catalog
+responses cannot restore an earlier order. The default-model picker and Composer
+model groups follow the persisted order. Sorting changes neither the selected
+default nor provider configuration. OAuth accounts remain in their separate section.
+
 1. **Defaults card** — a compact settings row reusing the shared
    14px/16px row geometry; the Default model label sits above the provider name
    and exact model ID, while a quiet Change action opens the picker without

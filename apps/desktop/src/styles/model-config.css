@@ -962,6 +962,7 @@
 
 .provider-chosen-advanced-toggle:focus-visible,
 .provider-chosen-reorder:focus-visible,
+.model-provider-row:focus-visible,
 .provider-chosen-remove:focus-visible {
   outline: 2px solid var(--ds-accent-soft);
   outline-offset: 1px;
@@ -1565,6 +1566,7 @@
 }
 
 .model-provider-row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1747,4 +1749,22 @@
   .model-default-option {
     transition: none;
   }
+}
+
+/* Provider cards move with the pointer; surrounding cards preview the open slot. */
+.model-provider-row {
+  cursor: grab;
+  touch-action: none;
+  transition: transform 160ms ease;
+}
+.model-provider-row.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+  opacity: 1;
+  box-shadow: var(--ds-shadow-dialog);
+  transition: none;
+}
+.model-provider-list[aria-busy="true"] .model-provider-row { cursor: default; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .model-provider-row { transition: none; }
 }

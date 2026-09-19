@@ -750,7 +750,16 @@ type Block =
       toolUsage?: ToolTokenUsage }
   | { type: "attachment"; kind: "image" | "file"; name: string;
       ref: string /* attachments/<sha256> or absolute path */;
-      mimeType?: string; size?: number };
+      mimeType?: string; size?: number }
+  | { type: "hostedSearch"; status: "searching" | "completed" | "failed";
+      rounds: Array<{ id: string;
+        status: "searching" | "completed" | "failed";
+        kind?: "search" | "openPage" | "findInPage";
+        query?: string; url?: string;
+        sources: Array<{ url: string; title?: string }> }>;
+      replay?: Array<{ type: "hostedSearch"; phase: string;
+        blockId?: string; name?: string; input?: unknown;
+        status?: string; isError?: boolean; wire?: unknown }> };
 ```
 
 - Tool results are stored **post-truncation** (16-tool-result-limits); full
@@ -1486,3 +1495,10 @@ the sidecar.
 The first slice has no projection cache or async scan bound; every list still
 reads/parses complete files. Caching by canonical path/file identity/size/mtime
 and bounded asynchronous scanning remain deferred performance work.
+
+### Provider display order
+
+`kv(ns="app", key="providers.order")` stores an ordered array of provider IDs.
+Host-core owns updates through `providers.reorder`; missing metadata preserves
+creation order, new IDs follow saved IDs, and deleted IDs are ignored. This
+preference does not rewrite provider configuration or require a schema migration.

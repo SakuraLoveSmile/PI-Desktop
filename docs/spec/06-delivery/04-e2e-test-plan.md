@@ -1993,7 +1993,8 @@ identify the platform validation still needed.
 
 - **Preconditions**: Supported local agent stores contain importable sessions across at least two project paths and two sources, including one session without a project path; the app can be launched once with an English system locale and once with a Simplified Chinese system locale.
 - **Steps**: 1) Launch in English and open Settings → Import. 2) Scan for sessions. 3) Inspect the initial source groups. 4) Expand one group and select a session. 5) Change Group by to Project path. 6) Switch back to Source. 7) Repeat the flow after launching with a Simplified Chinese system locale.
-- **Expected**: Source/来源 is the initial grouping; all groups are collapsed after the scan and after either grouping change; project-path mode shows exact project paths and a final No project/未关联项目 group; expanding one group leaves the others collapsed; the selected session remains selected across grouping changes; counts, dates, selection labels, accessible names, and the import result use the active locale without raw keys or unresolved double-brace placeholders. A Codex archive above the scan threshold may show an em dash for its unknown message count during review, but it remains selectable and the later import converts the complete transcript.
+- **Expected**: Source/来源 is the initial grouping; all groups are collapsed after the scan and after either grouping change; project-path mode shows exact project paths and a final No project/未关联项目 group; expanding one group leaves the others collapsed; the selected session remains selected across grouping changes; counts, dates, selection labels, accessible names, and the import result use the active locale without raw keys or unresolved double-brace placeholders. A Codex archive above the scan threshold may show an em dash for its unknown message count during review, but it remains selectable and the later import converts the complete transcript. A Codex archive with more than 250 session files shows only the newest 250 by folder date plus a localized cap note; older Codex sessions are absent from that scan.
+
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/02-i18n-english-first.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: F (session import review)
 - **Milestone**: M2
@@ -3053,20 +3054,30 @@ identify the platform validation still needed.
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
   and one unknown free-form model id.
 - **Steps**: 1) Open the Composer model × reasoning chip. 2) Confirm the root
-  contains only Model and Reasoning level entries with current values. 3) Open
-  Model, search for a model, and select a model from a provider group. 4) Confirm
-  the menu remains open at the root, then open Reasoning level and choose multiple
-  supported levels. 5) Repeat with a non-reasoning provider and an unknown
-  free-form model id; exercise Escape, outside click, Up/Down, Enter, and Left.
+  contains the Model and Reasoning level entries with current values, plus a
+  slider with one labeled stop per supported level directly beneath the
+  Reasoning level entry. 3) Drag and click the slider across multiple
+  supported levels and click a tick label, confirming the chip updates while
+  the menu stays at the root. 4) Open Model, search for a model, and select a
+  model from a provider group; confirm the menu remains open at the root.
+  5) Open Reasoning level and choose a level from the radio list. 6) Repeat
+  with a non-reasoning provider and an unknown free-form model id; exercise
+  Escape, outside click, Up/Down, Enter, Left, and the slider's arrow keys.
 - **Expected**: The chip is in the right toolbar with a Bot icon, before the
   standalone prompt-enhancement Sparkles action and Send/Abort; Off omits the
   level text. The single anchored menu replaces its root
   with an in-place back row and submenu, never opens tabs or a second popover,
   and always reopens at the root. Model search filters sticky provider groups;
-  reasoning rows come from the selected model's explicit binding levels in
-  canonical order, use radio semantics and a trailing check, and show the
-  current model support note. Selecting either value immediately updates the
-  chip and root value, clears model filtering, and keeps the menu open. A
+  reasoning levels come from `omit` then the selected model binding's enabled
+  levels in canonical order. The root carries a drag slider with one labeled
+  stop per level directly beneath the Reasoning level entry when more than
+  one level is listed (a single-level binding hides the slider). Dragging
+  across several stops persists only the last pending level; tick labels are
+  not tab stops. Slider and tick commits update the chip immediately while
+  the menu stays at the root. The Reasoning level entry opens the radio list,
+  which uses radio semantics, a trailing check, and the current model support
+  note. Selecting either value immediately updates the chip and root value,
+  clears model filtering, and keeps the menu open. A
   non-reasoning or unknown model starts at `off`, but an explicit Settings
   binding can make its configured levels available; discovery never promotes it
   automatically. Refreshing discovered model data cannot overwrite the binding.
@@ -3079,7 +3090,7 @@ identify the platform validation still needed.
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0018, ADR 0027
 - **Acceptance**: B (model config), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`thinking-ui.test.mjs`, `composer-model-thinking-menu.test.mjs`, agent-runtime capability tests); full UI scenario Draft
+- **Status**: Unit-covered (`thinking-ui.test.mjs`, `composer-model-thinking-menu.test.mjs`, `thinking-commit-queue.test.mjs`, agent-runtime capability tests); full UI scenario Draft
 
 #### E2E-051: Thinking level persists with the session
 
@@ -3320,11 +3331,12 @@ identify the platform validation still needed.
   interactive shell is opened in the user's external terminal instead of the
   work panel. 5) Build/package the desktop app and inspect the dependency and
   unpacked-resource lists.
-- **Expected**: The work panel offers Browser and in-scope plugin views plus
-  transcript-opened Review/file resources; no PTY is created and no terminal
-  tab can be opened. Agent Bash remains non-interactive and fully visible in
-  the transcript. Interactive shell work is performed by the external
-  terminal. Desktop packaging has no PTY/xterm dependency, terminal-specific
+- **Expected**: The work panel offers the Review launcher row plus Browser and
+  in-scope plugin views; Review opens on explicit user action and file resources
+  are transcript-opened; no PTY is created and no terminal tab can be opened.
+  Agent Bash remains non-interactive and fully visible in the transcript.
+  Interactive shell work is performed by the external terminal. Desktop
+  packaging has no PTY/xterm dependency, terminal-specific
   IPC, or native terminal payload, while generic lifecycle `terminal` values
   continue to work.
 - **Specs linked**: `02-architecture/02-tech-stack.md`,
@@ -5468,8 +5480,10 @@ identify the platform validation still needed.
 - **Steps**: 1) Let the Agent call `SubmitPlan` with fixed title, Markdown, and
   question. 2) Inspect the new `.pi/plan/*.md` file byte-for-byte and the
   `plan_approvals` row. 3) Inspect the card's title and artifact opener; confirm
-  the question/description, validity/deadline, and status are absent and only
-  Approve and Reject are offered. 4) Open the approval mode menu, choose Auto,
+  the opener uses the bundled file view when it is launchable and the host
+  file tab otherwise (D452), and that the question/description,
+  validity/deadline, and status are absent with only Approve and Reject
+  offered. 4) Open the approval mode menu, choose Auto,
   and verify the next approval defaults to Auto. 5) Reject the
   proposal. 6) Confirm durable mode is Plan, live state is editable `planning`,
   the approval gate is cleared, and a later prompt is accepted. 7) Let the
@@ -5479,7 +5493,9 @@ identify the platform validation still needed.
   unique artifact, records its relative path/hash/size with structured
   title/question, and never lets the renderer or sidecar write or replace it.
   The title-derived artifact filename is recognizable from the title, including
-  non-ASCII title characters. The card shows the title and opens the artifact;
+  non-ASCII title characters. The card shows the title and opens the artifact in
+  the bundled file view, falling back to the host file tab when that view is not
+  launchable (D452);
   it does not require inline question/Markdown/hash/size or a validity/deadline
   indicator. The selected approval mode is remembered locally for the next
   approval.
@@ -6334,6 +6350,29 @@ identify the platform validation still needed.
      removable leaf-name chip and no scratch absolute path occupies the
      textarea. Hover/focus chips to inspect their full paths, remove one, then
      send the prompt and inspect the session message's attachment metadata.
+     Before sending, verify image thumbnails sit left-aligned above and outside
+     the input shell. Replacing/undoing all text must retain the images; image-only
+     drafts must survive session switching and retain submission metadata.
+     Mount the complete Composer: click Send for image-only input, verify
+     attachment delivery and successful clearing, and immediately reject a
+     text-plus-image send to verify full draft restoration. In a narrow pane,
+     add 20 images, scroll to the last one and remove it without losing others.
+     Inspect the thumbnail and open it with click, Enter, and
+     Space. Confirm a centered modal preview opens, the work panel stays
+     unchanged, and the draft is neither edited nor sent. Check small images
+     stay at natural size, wide images fit without distortion, zoom/reset and
+     download target the selected original, and multiple images support button
+     and arrow-key navigation with zoom reset. Drag at fit size and after zoom,
+     including releasing outside the image; check cancellation and ordinary wheel
+     panning. Fit and image navigation must reset position; dragging must not
+     dismiss the preview or leave capture active after close/session changes. Close with Escape, the close
+     button, and blank space; verify focus/caret restoration and modal focus
+     containment. Native plugin surfaces must hide while the preview is open.
+     Repeat without a project. Remove an attachment; it must neither preview
+     nor send. Switch session/project or remove the selected attachment during
+     a delayed read; the old preview must close and late results must not
+     overwrite a newer image. Missing/undecodable images show retry and keep
+     the draft. Text chips must still expand as editable text.
   5. Inspect `<data_dir>/scratch/<sessionId>/pasted/` and compare the saved
      bytes with the source files/image. Check the project `git status`.
   6. Delete the session, then confirm its scratch directory and pasted files
@@ -6351,6 +6390,11 @@ identify the platform validation still needed.
     The agent can use its normal file tools to read the materialized files.
   - A home paste creates or reuses a durable session before writing. The
     workspace remains clean and no workspace artifact row is created.
+  - Image preview preserves the draft and attachment metadata, uses
+    `fs/readImageDataUrl` with bounded reads and path containment, and works
+    without a workspace for allowed scratch files. Preview preserves the draft
+    attachment format and leaves work-panel tabs unchanged. Closing/unmounting
+    releases modal/native-view blocking.
   - Deleting the session removes the pasted files with the rest of scratch.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.7–11.8,
   `03-runtime/01-ipc-protocol.md` §13c,
@@ -6362,13 +6406,15 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`composer-paste-files.test.mjs`,
   `composer-clipboard.test.mjs`); `pnpm test:e2e:composer-paste` mounts the real
-  ComposerInput, draft/paste hooks, production CSS and sandboxed preload. It
-  dispatches Chromium ClipboardEvents with synthetic mixed data and native File
-  objects, exercises the real scratch writer and compares saved bytes. Requires
+  ComposerInput, draft/paste hooks, file viewer, production CSS and sandboxed
+  preload. It dispatches Chromium ClipboardEvents with synthetic mixed data
+  and native File objects, exercises the real scratch writer and contained
+  file reader, compares saved bytes and decodes the preview image. Requires
   a desktop build, installed Electron and a graphical session (Xvfb on Linux).
   It does not modify the OS clipboard or automate Word; Word/platform journeys
-  and full provider dispatch remain manual. Branch runs are pre-merge evidence;
-  rerun from integrated main under the post-integration E2E policy.
+  and full provider dispatch remain manual. Run against the refreshed request
+  candidate and record its revision; PR integration validation follows the
+  authoritative `AGENTS.md` workflow without merging into local main first.
 
 #### E2E-102h: Composer picker imports files into session scratch
 
@@ -13478,3 +13524,29 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Acceptance:** A (runtime), C (sessions).
 - **Milestone:** M6+.
 - **Status:** Automated; run against the task/PR integration candidate.
+
+
+### E2E-PROVIDER-ORDER: Reorder configured AI services
+
+- Open Model configuration with three providers and drag the last before the
+  first, then after the last; verify pointer-following cards, live slot preview,
+  and saved order. Check movement threshold, action-button exclusion, edge
+  scrolling, Escape cancellation, and automatic-scroll cleanup.
+- Cancel a drag and use Up/Down on a focused provider card. Verify no configuration or
+  default-model changes. Failed saves report an error and retain accepted order;
+  overlapping moves are blocked and late catalog reads cannot undo a move.
+- Reopen the Composer model menu: groups follow the provider order. Restart the
+  host and renderer and verify persistence. Check English and Chinese labels.
+- Automated: `pnpm test:e2e:provider-order` runs the real settings component,
+  sandboxed preload, provider IPC registrar, and an isolated Rust host. It uses
+  synthetic Chromium pointer/key events and test providers without credentials;
+  model-catalog/OAuth discovery is stubbed and no provider requests are sent.
+- Host unit tests cover no metadata, disabled/plugin rows, new/deleted IDs,
+  stale moves, no-op moves, preserved configuration, and reopening the database.
+
+The provider-order suite also runs a 200-card fixture under a controlled animation
+clock. A burst of 200 pointer events may arm React state once, but stationary
+frames must produce no further renders or pending callbacks. Card geometry is
+read at press time, and move/release/cancel/unmount paths must clear transient
+transforms and queued frames. Release before the scheduled frame must still save
+the latest destination. These assertions measure work counts, not device FPS.

@@ -664,11 +664,11 @@ expanded/collapsed 侧边栏仍为 20px/18px 且启动画面为 64 像素。
 
 ### 5.1 目的
 
-停靠右侧工作栏，用于检查和引导座席的工作空间。可主动启动的表面是插件视图
-（ADR 0104），包括 vendor 进来的文件管理器 `pi.file-manager`（项目浏览与编辑）
+停靠右侧工作栏，用于检查和引导座席的工作空间。可主动启动的表面是宿主 Review 行与
+插件视图（ADR 0104），包括 vendor 进来的文件管理器 `pi.file-manager`（项目浏览与编辑）
 和随应用打包的 `pi.browser`
-（工作面板浏览器 chrome；访客页仍由宿主拥有，ADR 0170）。审阅与 `file:<path>` 属于
-**产物**表面：由宿主渲染，但由对话打开，因此不出现在工具列表中。
+（工作面板浏览器 chrome；访客页仍由宿主拥有，ADR 0170）。`file:<path>` 属于
+**产物**表面：由宿主渲染，但由对话打开，因此不出现在启动器中。
 应用不再提供交互式终端；Agent Bash 输出保留在对话中。
 
 ### 5.2 解剖学
@@ -788,6 +788,8 @@ vendor 进来的 `pi.file-manager` 视图在插件自己的隔离页面内完成
   它只会从 `+` 启动器行，或视口固定开关与 `Cmd/Ctrl + J` 显示的会话
   保留上下文打开，因此成功的工作区 Write/Edit 不会在任何会话中打开、
   激活或改变面板。
+  计划/目标审批工件仍会在其来源会话中创建或激活标签，但承载界面由宿主选择：
+  内置文件视图可启动时用它，否则用宿主机文件标签（D452）。
   `Cmd/Ctrl + J` 显示活动会话的保留面板上下文，无需
   创建资源；如果没有活动会话，它什么也不做。捷径是
   当“设置”处于活动页面时被忽略。
@@ -1766,10 +1768,15 @@ Agent 并保存在新的不可变 `.pi/<kind>/*.md` 工件中。它是独特的
 ### 10A.2 内容
 
 该卡片呈现结构化标题和确切的开场白
-`.pi/<kind>/*.md` 路径。打开工件会读取主机写入的文件；
+`.pi/<kind>/*.md` 路径；打开器优先使用内置文件视图，在该视图不可启动时
+回退到宿主机文件标签（D452）。打开工件会读取主机写入的文件；
 渲染器编辑不会更改批准的字节。提交的问题/
 描述、状态、validity/deadline、内联 Markdown、SHA-256、字节大小、
 和 revision/feedback 控件不渲染卡片内容。
+
+由于内置文件视图可以编辑并保存它打开的文件（ADR 0241），在 Approve 之前被改动的
+工件不再匹配记录的哈希：宿主会以 `PLAN_ARTIFACT_HASH_MISMATCH` 让该次审批失败关闭，
+直到提议被拒绝并重新提交。
 
 ### 10A.3 动作和状态
 
@@ -1970,15 +1977,7 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
   发现不可用时仍显示已配置的模型 ID。
 - 打开组合菜单时，会在进入“模型”子菜单前开始加载模型。首个可见行使用缓存元数据或
   已配置绑定；实时发现会在后台更新列表，不会把已配置别名替换成 wire ID 或第二个可见名称。
-- 对于具有推理能力的主动模型，会出现单独的思维触发器
-  紧邻模式芯片的右侧、许可之前
-  控制。它显示当前级别并仅打开支持的确切模型
-  紧凑的单列列表和规范顺序中的级别；选定的行
-  带有尾随支票。菜单宽度适合其内容最多 160 像素，并且
-  进一步受到视口的限制；较长的规范值会被截断。的
-  列表不包含 inherited/default 选择。等级使用规范值原样显示，不使用本地化标签；选择具体级别仍然存在
-完整的会话配置并关闭菜单。非推理模型渲染
-  没有思维触发。
+- 组合的模型 × 推理菜单在 `bottom: calc(100% + 8px)` 以 `role="menu"` 打开。根层正好两条 `role="menuitem"` 条目；当菜单列出一个以上等级时，推理等级条目正下方有一条每个等级一个刻度的拖动滑杆（D458）。刻度标签可点但不是 Tab 停靠点，range 输入才是可访问控件。模型子菜单有搜索输入和粘性提供商标题；推理等级子菜单以 `Current model <model> supports these reasoning levels` 开头，先列出 `omit` 再列出绑定已启用档位的经典单选行。`omit` 作为会话思考等级持久化，且不发送提供商思考覆盖（ADR 0295）。行使用 `role="menuitemradio"`、`aria-checked`、当前行样式和末尾勾选。从列表选择具体模型或等级会持久化完整会话配置、清除模型过滤并返回根层且不关闭菜单；滑杆和刻度提交最后一次待提交的档位并留在原地。关闭再打开总是从根层开始。
 - 未知的 Custom/OpenAI-compatible 模型可以启用显式推理
   从模型菜单覆盖。提供商刷新，会话选择
   支持的级别最接近 `medium`，并出现工具栏触发器；已知的
@@ -2108,6 +2107,21 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
   分开是因为身份和调度使用规范路径，而不是名称。`text/plain` 和 `.txt`
   芯片还可通过键盘聚焦；点击或按 Enter/Space 会将有界内容展开为可编辑草稿
   文本。二进制、图像、过大或读取失败时保留芯片。
+  未发送图片在输入框外上方单独一行靠左显示缩略图，不占据可编辑正文。
+  全选、编辑或撤销正文不会删除图片；切换会话保留图片，旧草稿里的图片标记恢复为
+  独立附件。只有图片的草稿也能点击发送；发送立即失败时仍恢复文字与附件。
+  附件区限制高度并可纵向滚动，窄聊天面板内也能查看和删除每张图片。
+  悬停或聚焦时显示独立删除按钮，触屏始终显示。
+  点击或按 Enter/Space 打开图片浮层，不发送草稿，不改变工作面板选项卡。
+  图片在深色遮罩内水平、垂直居中，保持比例并适应可用区域，小图默认不放大。
+  支持缩放、适应窗口、下载原图及同一草稿内的多图切换；切图重置缩放与位置。按住图片拖动或滚动可在任意缩放下平移，
+  指针移出图片后仍能连续拖动；松开或取消即结束拖动，不关闭浮层。图片保留一部分
+  在可见区域内，适应窗口会恢复居中。
+  按 Esc、点击关闭或空白处退出并恢复输入焦点与光标。焦点限制在浮层内，
+  打开期间隐藏原生插件视图。删除按钮不触发预览或发送。
+  缩略图与预览沿用有界、受限的 `fs/readImageDataUrl` 接口，无项目时也可读取允许
+  访问的暂存图片。图片丢失、格式不支持、过大或解码失败时显示重试并保留草稿。
+  切换会话或项目、删除正在查看的附件时关闭预览；晚到的读取结果不得覆盖新图片。
 - 发送的模板调用在记录中呈现为等宽命令
   来自消息的 `command` 字段的芯片而不是扩展的正文。
 - 已发送的 `@path` 文件引用（带引号或不带引号）画成与草稿相同的叶子名芯片。点击芯片先经 `pi-desktop/fs/resolveRef` 补全引用——搜索整个打开的项目，按项目组文件夹顺序、主文件夹优先（ADR 0263）——再按解析结果打开：项目文件在随应用打包的 `pi.file-manager` 视图中打开（该视图不可用时退回宿主 `file:` 选项卡），会话临时目录或附件文件在宿主 `file:` 选项卡中打开，主文件夹中的 `.html`/`.htm` 在侧边浏览器打开。交给该视图的地址跟随应答的文件夹：主文件夹中的文件用项目内相对路径传递，同一项目的同级文件夹中的文件用绝对路径传递，与会话临时目录和附件文件一致。什么都没匹配到时既不打开任何东西，也会自己报告出来；系统默认应用不再由这次点击触发。HTTP(S) URL 仍是侧边浏览器的文本链接。
@@ -2660,3 +2674,16 @@ Sidebar footer                                        Popover (360px max)
     取消的分隔符手势恢复之前的宽度 (ADR 0033)
 19. 扩展侧边栏会话标题、project/group 标题和空状态文案
     使用 13px 紧凑令牌，同时主要侧边栏操作保持在 14px
+
+### Provider ordering
+
+Each AI service card can be dragged from its non-interactive surface. After a
+small movement threshold, the card follows the pointer and surrounding cards
+animate into the proposed slot. Dragging near the list edge scrolls it. Releasing
+saves the previewed order; Escape, pointer cancellation, focus loss, unmount or
+catalog changes cancel the drag. Buttons and form controls retain their actions.
+There is no separate drag handle. A focused card accepts Up/Down to move one visible row. Saving blocks further
+moves; a failed save shows an error and restores the accepted order. Late catalog
+responses cannot restore an earlier order. The default-model picker and Composer
+model groups follow the persisted order. Sorting changes neither the selected
+default nor provider configuration. OAuth accounts remain in their separate section.
