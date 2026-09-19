@@ -880,7 +880,9 @@ sklm: {
     "importFound": "Sesiones encontradas: {{count}}",
     "importFound_one": "1 sesión encontrada",
     "importFound_other": "{{count}} sesiones encontradas",
+    "importCodexCapped": "Codex se limita a los {{limit}} archivos de sesión más recientes (por fecha de carpeta).",
     "importNone": "No se encontraron sesiones importables en esta máquina.",
+
     "importSelectAll": "Seleccionar todo",
     "importSelected": "Importar seleccionado ({{count}})",
     "importing": "Importando…",

@@ -881,7 +881,9 @@ sklm: {
     importFound: "發現 {{count}} 個會話",
     importFound_one: "發現 1 個會話",
     importFound_other: "發現 {{count}} 個會話",
+    importCodexCapped: "Codex 僅列出依目錄日期最新的 {{limit}} 個工作階段檔案。",
     importNone: "未在本機發現可匯入的會話。",
+
     importSelectAll: "全選",
     importSelected: "匯入所選（{{count}}）",
     importing: "正在匯入…",

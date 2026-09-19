@@ -3290,6 +3290,12 @@ CLAUDE CODE              ~/code/pi                                  4
 - A successful scan replaces the prior candidate set, clears selection, and
   shows every group expanded: the found candidates are the answer to the scan,
   so they are not hidden behind a second click.
+- Codex session discovery walks `~/.codex/sessions/YYYY/MM/DD` newest-path-first
+  and stops after 250 `.jsonl` files. That order is folder-date lexicographic,
+  not `updatedAt`. When the cap hits, `session/importScan` returns
+  `truncated.codex = 250` and the sessions toolbar shows the localized cap note;
+  older Codex files are absent from the candidate list.
+
 - Every kind scans on its own: a session scan never starts a model-config,
   skills, or MCP scan, and switching tabs preserves the result and the
   selection of the kind left behind (inactive panels stay mounted and hidden).
