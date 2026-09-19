@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(joinPath(here, "helpers/ts-import-hooks.mjs")));
-const { CODEX_SCAN_FULL_PARSE_MAX_BYTES, scanCodexSessions } = await import(
+const { CODEX_SCAN_FULL_PARSE_MAX_BYTES, CODEX_SCAN_MAX_FILES, scanCodexSessions } = await import(
   "../electron/main/importers/codex.ts"
 );
 
@@ -393,6 +393,34 @@ test("the sampled path also falls back to the file mtime", async () => {
       const [s] = await scanCodexSessions(dir);
       assert.equal(s.createdAt, iso(mtime));
       assert.equal(s.updatedAt, iso(mtime));
+    },
+  );
+});
+
+test("scans newest sessions first and bounds total files to limit", async () => {
+  assert.equal(CODEX_SCAN_MAX_FILES, 250);
+  await withArchive(
+    [
+      [
+        "2026/01/01/old.jsonl",
+        [
+          metaLine("old-1", "/repo", "2026-01-01T00:00:00Z"),
+          responseItem("user", "很早以前的消息", "2026-01-01T00:00:01Z"),
+        ].join("\n"),
+      ],
+      [
+        "2026/09/18/new.jsonl",
+        [
+          metaLine("new-1", "/repo", "2026-09-18T00:00:00Z"),
+          responseItem("user", "今天的最新消息", "2026-09-18T00:00:01Z"),
+        ].join("\n"),
+      ],
+    ],
+    async (dir) => {
+      const summaries = await scanCodexSessions(dir, 1);
+      assert.equal(summaries.length, 1);
+      assert.equal(summaries[0].externalId, "new-1");
+      assert.equal(summaries[0].title, "今天的最新消息");
     },
   );
 });
