@@ -421,6 +421,7 @@ export function createSessionSlice({
                 mode: selected.mode,
                 providerId: pin.providerId,
                 modelId: pin.modelId,
+                thinkingLevel: selected.thinkingLevel,
               });
             } else {
               void api.configureSession(id, {
