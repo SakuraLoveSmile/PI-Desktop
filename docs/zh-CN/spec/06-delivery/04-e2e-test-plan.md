@@ -7885,7 +7885,8 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   Running overflow cannot
   appear as Unread/Pinned. Empty groups and stale shortcuts disappear. Unread
   uses the latest terminal result per session, newest first. Titles remain
-  one line within the cap, including literal ampersands. Opening the macOS
+  one line within the 32-column cap, half as many characters for CJK/emoji,
+  including literal ampersands. Opening the macOS
   menu leaves the window hidden and records unread. A row opens exactly that
   session/project, acknowledges it normally, and wins over startup navigation.
   View more returns from Settings, closes search, and expands session navigation. Hidden/closed windows receive fresh groups;

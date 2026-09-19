@@ -187,11 +187,39 @@ describe("parseTraySessionPreferences", () => {
 });
 
 describe("traySessionTitle", () => {
-  it("keeps one line and truncates to 48 code points including the ellipsis", () => {
+  it("keeps one line and leaves a title inside the column budget alone", () => {
     expect(traySessionTitle(["line", "one"].join("\n"), "fallback")).toBe("line one");
-    const title = "😀".repeat(49);
-    const truncated = traySessionTitle(title, "fallback");
-    expect(Array.from(truncated)).toHaveLength(48);
-    expect(truncated.endsWith("…")).toBe(true);
+    expect(traySessionTitle("   ", "fallback")).toBe("fallback");
+    expect(traySessionTitle("a".repeat(32), "fallback")).toBe("a".repeat(32));
+    expect(traySessionTitle("中".repeat(16), "fallback")).toBe("中".repeat(16));
+  });
+
+  it("cuts a Latin title to 31 columns plus an ellipsis", () => {
+    expect(traySessionTitle("a".repeat(40), "fallback")).toBe(`${"a".repeat(31)}…`);
+    // A cut that lands on a space never leaves it in front of the ellipsis.
+    expect(traySessionTitle(`${"a".repeat(30)} ${"b".repeat(5)}`, "fallback")).toBe(
+      `${"a".repeat(30)}…`,
+    );
+  });
+
+  it("counts a CJK character as two columns, so half as many fit", () => {
+    expect(traySessionTitle("中".repeat(20), "fallback")).toBe(`${"中".repeat(15)}…`);
+    expect(traySessionTitle(`a${"中".repeat(20)}`, "fallback")).toBe(`a${"中".repeat(15)}…`);
+  });
+
+  it("counts an emoji as two columns, with or without the variation selector", () => {
+    expect(traySessionTitle("😀".repeat(20), "fallback")).toBe(`${"😀".repeat(15)}…`);
+    expect(traySessionTitle("✅".repeat(20), "fallback")).toBe(`${"✅".repeat(15)}…`);
+    const sun = "\u2600\ufe0f";
+    expect(traySessionTitle(sun.repeat(21), "fallback")).toBe(`${sun.repeat(15)}…`);
+  });
+
+  it("counts a combining mark as nothing and drops a joiner left by the cut", () => {
+    expect(traySessionTitle("e\u0301".repeat(40), "fallback")).toBe(
+      `${"e\u0301".repeat(31)}…`,
+    );
+    expect(traySessionTitle(`${"a".repeat(29)}\u{1f468}\u200d${"b".repeat(3)}`, "fallback")).toBe(
+      `${"a".repeat(29)}\u{1f468}…`,
+    );
   });
 });
