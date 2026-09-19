@@ -1,8 +1,13 @@
 import { useEffect, useState, type ButtonHTMLAttributes, type HTMLAttributes } from "react";
 import type { ModelBinding } from "@pi-desktop/shared";
-import { reorderModel } from "./model-reorder";
-
-type DropTarget = { id: string; placement: "before" | "after" };
+import {
+  MODEL_REORDER_MIME,
+  dropPlacement,
+  reorderModel,
+  sameDropTarget,
+  visibleNeighborMove,
+  type DropTarget,
+} from "./model-reorder";
 
 /** Dragging previews a destination; only dropping or an arrow key edits the draft. */
 export function useModelReorder(
@@ -28,18 +33,26 @@ export function useModelReorder(
 
   const destination = (id: string, clientY: number, element: HTMLElement): DropTarget => {
     const rect = element.getBoundingClientRect();
-    return { id, placement: clientY > rect.top + rect.height / 2 ? "after" : "before" };
+    return { id, placement: dropPlacement(clientY, rect.top, rect.height) };
+  };
+
+  const previewDrop = (id: string, clientY: number, element: HTMLElement) => {
+    const next = id === draggingId ? null : destination(id, clientY, element);
+    setDropTarget((current) => (sameDropTarget(current, next) ? current : next));
   };
 
   const rowEvents = (id: string): HTMLAttributes<HTMLLIElement> => ({
+    onDragEnter(event) {
+      if (disabled || !draggingId) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
     onDragOver(event) {
       if (disabled || !draggingId) return;
       event.preventDefault();
       event.stopPropagation();
       event.dataTransfer.dropEffect = "move";
-      setDropTarget(
-        id === draggingId ? null : destination(id, event.clientY, event.currentTarget),
-      );
+      previewDrop(id, event.clientY, event.currentTarget);
     },
     onDragLeave(event) {
       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -47,11 +60,12 @@ export function useModelReorder(
       }
     },
     onDrop(event) {
-      if (disabled || !draggingId) return;
+      const sourceId = draggingId || event.dataTransfer.getData(MODEL_REORDER_MIME);
+      if (disabled || !sourceId) return;
       event.preventDefault();
       event.stopPropagation();
       const target = destination(id, event.clientY, event.currentTarget);
-      setModels((current) => reorderModel(current, draggingId, id, target.placement));
+      setModels((current) => reorderModel(current, sourceId, id, target.placement));
       clearDrag();
     },
   });
@@ -66,7 +80,7 @@ export function useModelReorder(
       }
       event.stopPropagation();
       event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("application/x-pi-desktop-model", id);
+      event.dataTransfer.setData(MODEL_REORDER_MIME, id);
       setDraggingId(id);
       setDropTarget(null);
     },
@@ -75,11 +89,13 @@ export function useModelReorder(
       if (disabled || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
       event.preventDefault();
       event.stopPropagation();
-      const index = visibleModels.findIndex((model) => model.id === id);
-      const down = event.key === "ArrowDown";
-      const target = visibleModels[index + (down ? 1 : -1)];
-      if (!target) return;
-      setModels((current) => reorderModel(current, id, target.id, down ? "after" : "before"));
+      const move = visibleNeighborMove(
+        visibleModels,
+        id,
+        event.key === "ArrowDown" ? "down" : "up",
+      );
+      if (!move) return;
+      setModels((current) => reorderModel(current, id, move.targetId, move.placement));
     },
   });
 

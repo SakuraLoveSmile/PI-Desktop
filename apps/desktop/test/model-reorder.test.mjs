@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { reorderModel } from "../src/components/settings/model-reorder.ts";
+import {
+  dropPlacement,
+  reorderModel,
+  sameDropTarget,
+  visibleNeighborMove,
+} from "../src/components/settings/model-reorder.ts";
 
 const ids = (models) => models.map((model) => model.id);
 const models = [
@@ -48,4 +53,54 @@ test("same-place drops and stale or missing targets leave the draft unchanged", 
     assert.equal(reorderModel(models, source, target, side), models);
   }
   assert.deepEqual(reorderModel([], "first", "last", "after"), []);
+});
+
+test("drop placement splits a row at its vertical midpoint", () => {
+  assert.equal(dropPlacement(10, 0, 40), "before");
+  assert.equal(dropPlacement(20, 0, 40), "before");
+  assert.equal(dropPlacement(21, 0, 40), "after");
+});
+
+test("arrow keys move past the neighboring visible row and no-op at the ends", () => {
+  const visible = [{ id: "shown-a" }, { id: "shown-b" }, { id: "shown-c" }];
+  assert.deepEqual(visibleNeighborMove(visible, "shown-a", "down"), {
+    targetId: "shown-b",
+    placement: "after",
+  });
+  assert.deepEqual(visibleNeighborMove(visible, "shown-c", "up"), {
+    targetId: "shown-b",
+    placement: "before",
+  });
+  assert.equal(visibleNeighborMove(visible, "shown-a", "up"), null);
+  assert.equal(visibleNeighborMove(visible, "shown-c", "down"), null);
+  assert.equal(visibleNeighborMove(visible, "missing", "down"), null);
+});
+
+test("a filtered drag before the first visible row keeps hidden bindings in place", () => {
+  const all = [
+    { id: "shown-a" },
+    { id: "hidden-a" },
+    { id: "shown-b" },
+    { id: "hidden-b" },
+    { id: "shown-c" },
+  ];
+  const visible = all.filter((model) => model.id.startsWith("shown-"));
+  const move = visibleNeighborMove(visible, "shown-c", "up");
+  assert.deepEqual(move, { targetId: "shown-b", placement: "before" });
+  assert.deepEqual(
+    ids(reorderModel(all, "shown-c", "shown-a", "before")),
+    ["shown-c", "shown-a", "hidden-a", "shown-b", "hidden-b"],
+  );
+  assert.deepEqual(
+    ids(reorderModel(all, "shown-a", move.targetId, move.placement)),
+    ["hidden-a", "shown-a", "shown-b", "hidden-b", "shown-c"],
+  );
+});
+
+test("drop-target identity ignores equivalent previews", () => {
+  const target = { id: "shown-a", placement: "before" };
+  assert.equal(sameDropTarget(target, { id: "shown-a", placement: "before" }), true);
+  assert.equal(sameDropTarget(target, { id: "shown-a", placement: "after" }), false);
+  assert.equal(sameDropTarget(null, null), true);
+  assert.equal(sameDropTarget(target, null), false);
 });
