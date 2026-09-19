@@ -13,6 +13,7 @@ export const trEntries: ChangelogEntry[] = [
       "Diğer ajan araçlarındaki skill ve MCP sunucularını tarayıp toplu içe aktarın.",
       "macOS menü çubuğu eklentisi yerel bir durum öğesinde kalır; tepside sınırlı oturum kısayolları vardır.",
       "Resmi macOS derlemeleri imzalanır, noter onaylanır ve uygulama içi güncellemeyi destekler.",
+      "İmzalı macOS DMG iki simgeyle kurulur; imzasız açılış notu yalnızca ZIP'te kalır.",
       "Review yalnızca siz isteyince açılır; oturum açınca en son tura iner.",
       "Takılı bir gönderim kuyruğunu kurtarır ve sahte steering kökenlerini yok sayar.",
     ],

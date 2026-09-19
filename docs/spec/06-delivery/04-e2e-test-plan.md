@@ -286,16 +286,16 @@ identify the platform validation still needed.
   ZIP artifacts for at least one native architecture; a test macOS account can
   copy an app into `/Applications` or `~/Applications`.
 - **Steps**: 1) Open the DMG and inspect its root and layout. 2) Confirm the
-  app and Applications link form the main row, and `If app won't open, read this.txt` is the
-  only secondary item. 3) Confirm the DMG has no command helper. 4) Inspect
+  app and Applications link are the only items in the window. 3) Confirm the
+  DMG has no command helper and no `If app won't open, read this.txt`. 4) Inspect
   the ZIP root without extracting the application contents and confirm it has
   both `PI-Desktop-macOS-opening-help.txt` and the executable
   `PI-Desktop-macOS-open.command`. 5) Read the note, move the app to
   `/Applications`, and double-click the ZIP helper.
-- **Expected**: The DMG contains the branded 720×500 background, the app,
-  Applications link, and the text-only opening note displayed as
-  `If app won't open, read this.txt`; it does not contain or expose the command helper. The
-  ZIP contains the helper and the same note at its root. The note includes
+- **Expected**: The DMG contains the branded 720×440 background, the app, and
+  the Applications link only; it does not contain or expose the command helper
+  or the opening-help note. The ZIP contains the helper and the opening note at
+  its root. The note includes
   `xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app`, explains
   that the fallback is only for a trusted unsigned artifact when macOS reports
   that the app is damaged or does not open, and says signed/notarized builds do

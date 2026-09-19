@@ -254,7 +254,7 @@ Each ADR includes:
 | 0229 | Press-and-move project title reorder | Accepted (amends 0228) |
 | 0230 | Skill ships with the Agent core tool set | Accepted (amends D174 / ADR 0048 / ADR 0219; issue #204) |
 | 0231 | Ideographic comma opens the composer slash menu | Accepted (amends D123 / D139 / ADR 0024; issue #65) |
-| 0232 | Keep macOS DMG opening guidance text-only | Accepted (amends D371 / ADR 0204) |
+| 0232 | Keep macOS DMG opening guidance text-only | Accepted (amended by 0296; amends D371 / ADR 0204) |
 | 0233 | Renderer-owned multi-folder project creation | Accepted (amends ADR 0011 / ADR 0016) |
 | 0234 | Keep project memory host-owned and path-scoped | Accepted |
 | 0235 | Preserve domain facades and enforce architecture budgets | Accepted |
@@ -323,4 +323,5 @@ Each ADR includes:
 | 0293 | [SSH password authentication for the remote-host bootstrap](0293-ssh-password-authentication.md) | Accepted (D454; amends ADR 0292) |
 | 0294 | [Project archive is a list + inspector workbench](0294-project-archive-list-inspector.md) | Accepted (D455; amends D267 / D168) |
 | 0295 | [Session thinking-parameter omission](0295-session-thinking-parameter-omission.md) | Accepted (D456; amends ADR 0194 / ADR 0144 / ADR 0221) |
+| 0296 | [Signed macOS DMG is a two-icon install](0296-macos-signed-dmg-two-icon-install.md) | Accepted (D457; amends ADR 0232 / ADR 0204) |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |

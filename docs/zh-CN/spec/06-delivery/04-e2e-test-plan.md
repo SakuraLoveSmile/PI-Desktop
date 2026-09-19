@@ -3494,14 +3494,13 @@ IPC 请求无法关闭。
 
 - **先决条件**：默认未签名的 macOS 发布已为至少一个本机架构生成 DMG 和 ZIP 工件；
   测试 macOS 账户可以将应用复制到 `/Applications` 或 `~/Applications`。
-- **步骤**：1) 打开 DMG 并检查根目录和布局。2) 确认应用与 Applications 链接位于主
-  区域，且下方唯一的辅助项是 `If app won't open, read this.txt`。3) 确认 DMG 不含 command 助手。
+- **步骤**：1) 打开 DMG 并检查根目录和布局。2) 确认窗口里只有应用与 Applications
+  链接。3) 确认 DMG 不含 command 助手，也不含 `If app won't open, read this.txt`。
   4) 不解压应用内容，检查 ZIP 根目录，并确认其中同时存在
   `PI-Desktop-macOS-opening-help.txt` 和可执行的 `PI-Desktop-macOS-open.command`。
   5) 阅读说明，将应用移动到 `/Applications`，然后双击 ZIP 中的助手。
-- **预期**：DMG 使用带品牌的 720×500 背景，包含应用、Applications 链接和显示为
-  `If app won't open, read this.txt` 的纯文本说明，不包含或暴露 command 助手。ZIP 根目录包含助手
-  和同一份说明。说明包含
+- **预期**：DMG 使用带品牌的 720×440 背景，只包含应用和 Applications 链接，不包含或
+  暴露 command 助手或打开说明。ZIP 根目录包含助手和同一份说明。说明包含
   `xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app`，并说明兜底方式仅适用
   于 macOS 对可信未签名工件提示应用已损坏或应用打不开的场景；已签名/公证版本无需
   执行。ZIP 助手只查找 `/Applications/PI-Desktop.app` 和 `~/Applications/PI-Desktop.app`，

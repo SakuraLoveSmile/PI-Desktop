@@ -13,6 +13,7 @@ export const deEntries: ChangelogEntry[] = [
       "Skills und MCP-Server anderer Agent-Tools lassen sich scannen und gesammelt importieren.",
       "Das macOS-Menüleisten-Extra bleibt auf einem nativen Statusitem, mit begrenzten Tray-Sitzungs-Shortcuts.",
       "Offizielle macOS-Builds sind signiert und notariell beglaubigt und unterstützen In-App-Updates.",
+      "Die signierte macOS-DMG ist eine Zwei-Symbol-Installation; der Hinweis für unsignierte Starts bleibt nur im ZIP.",
       "Review öffnet sich nur auf ausdrückliche Aktion; das Öffnen einer Sitzung landet bei der neuesten Runde.",
       "Eine blockierte Sendewarteschlange wird wiederhergestellt, gefälschte Steering-Origins werden ignoriert.",
     ],

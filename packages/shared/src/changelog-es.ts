@@ -13,6 +13,7 @@ export const esEntries: ChangelogEntry[] = [
       "Escanea e importa en lote skills y servidores MCP de otras herramientas de agente.",
       "El extra de la barra de menús de macOS usa un status item nativo, con atajos de sesión acotados en la bandeja.",
       "Las compilaciones oficiales de macOS van firmadas y notarizadas, con actualizaciones in-app.",
+      "La DMG firmada de macOS instala con dos iconos; la nota de apertura sin firmar queda solo en el ZIP.",
       "Review se abre solo cuando lo pides, y al abrir una sesión aterrizas en el último turno.",
       "Recupera una cola de envío atascada e ignora orígenes de steering falsificados.",
     ],
