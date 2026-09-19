@@ -438,8 +438,12 @@ identify the platform validation still needed.
   provider name and exact model ID beneath the Default model label; its quiet
   Change action does not repeat the current value. The picker groups
   model-level entries by provider, marks the exact current model, and a newly
-  created session inherits that exact model and its owning provider.
-  Searching by provider or model filters locally, the result list scrolls without moving the settings card, and an unmatched query shows an empty state.
+  created session inherits that exact model and its owning provider. Changing
+  the default later does not rewrite an already created session's stored
+  provider/model; only a new session or the unpersisted home draft follows the
+  live default. Searching by provider or model filters locally, the result list
+  scrolls without moving the settings card, and an unmatched query shows an empty
+  state.
 - **Specs linked**: `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance**: B (model selection)
 - **Milestone**: M6
