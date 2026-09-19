@@ -1308,11 +1308,17 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
   is embedded in Settings with no duplicate page title or outer page padding;
   the earlier standalone Projects destination and card grid (D042) are
   superseded by D133. Per D267 the destination is composed exactly like the
-  agent capability pages (D257): a quiet description-only intro line, one
-  toolbar (sort segment, search, primary action), and one elevated panel whose
-  Pinned / All projects / Archived groups are in-panel header strips carrying
-  the only counts on the page. It has no hero block, no decorative gradient,
-  and no page-level counter run
+  agent capability pages (D257): one toolbar (sort segment, search, primary
+  action) and one index whose
+  Pinned / All projects / Archived groups are plain section header lines
+  carrying the only counts on the page. Per D455 it stays one column with no
+  side-by-side
+  pane, and the index is an inset grouped list in the iOS sense: each row reads
+  left to right as identity (glyph, name, status tag, path) and right to left as
+  detail (session count, last active, disclosure indicator), and the selected
+  row is the header of the card that opens under it — so the detail repeats no
+  name, path, or tag. It has no hero block, no decorative gradient, and no
+  page-level counter run
 - **Settings**: full-page Codex shell per D063/D090/D133/D166 (275px compact
   navigation rail sharing the main sidebar material, elevated content cards, Back to app);
   per D092, the content cards fill the pane width available from the current

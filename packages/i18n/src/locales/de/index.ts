@@ -22,6 +22,10 @@ export const de = {
     "close": "Schließen"
   },
   "tray": {
+    "running": "Laufend",
+    "unread": "Ungelesen",
+    "pinned": "Angeheftet",
+    "viewMore": "Mehr anzeigen…",
     "open": "Öffnen Sie PI-Desktop",
     "quit": "Beenden Sie PI-Desktop",
     "askTitle": "Lassen Sie PI-Desktop im Hintergrund laufen?",
@@ -1112,6 +1116,8 @@ sklm: {
     "modelConfigurations": "Modelleinstellungen",
     "removeModel": "Modell entfernen",
     "reorderModel": "Reihenfolge von {{name}} ändern. Ziehen oder die Pfeiltasten nach oben und unten verwenden.",
+    "reorderProvider": "Reihenfolge von {{name}} ändern. Ziehen oder die Pfeiltasten nach oben und unten verwenden.",
+    providerOrderFailed: "Anbieterreihenfolge konnte nicht gespeichert werden: {{error}}",
     "modelAlias": "Alias",
     "modelAliasHint": "Wird überall angezeigt, wo das Modell benannt wird; die ID bleibt die Identität der Anfrage.",
     "modelAliasPlaceholder": "z. B. schnell",
@@ -1255,7 +1261,6 @@ sklm: {
     "clearSearch": "Suche löschen",
     "resultCount_one": "{{count}} von {{total}} Projekt",
     "resultCount_other": "{{count}} von {{total}} Projekten",
-    "archiveSubtitle": "Geöffnete Ordner und ihre Chats.",
     "groupPinned": "Angepinnt",
     "groupProjects": "Alle Projekte",
     "groupArchived": "Archiviert",

@@ -1,6 +1,6 @@
-# ADR 0296: Provider-hosted web search as an adapter capability
+# ADR 0297: Provider-hosted web search as an adapter capability
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-19
 
 ## Context

@@ -8201,7 +8201,7 @@ describe("DesktopAgentRuntime compaction summary retry and sizing (#543, ADR 028
   });
 });
 
-describe("DesktopAgentRuntime hosted web search rounds (ADR 0296)", () => {
+describe("DesktopAgentRuntime hosted web search rounds (ADR 0297)", () => {
   it("emits each search round as it happens and closes open rounds on message_end", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });

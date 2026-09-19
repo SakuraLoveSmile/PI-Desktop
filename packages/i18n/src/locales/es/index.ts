@@ -22,6 +22,10 @@ export const es = {
     "close": "Cerrar"
   },
   "tray": {
+    "running": "En curso",
+    "unread": "Sin leer",
+    "pinned": "Fijadas",
+    "viewMore": "Ver más…",
     "open": "Abrir PI-Desktop",
     "quit": "Salir de PI-Desktop",
     "askTitle": "¿Mantener PI-Desktop ejecutándose en segundo plano?",
@@ -1112,6 +1116,8 @@ sklm: {
     "modelConfigurations": "Configuración del modelo",
     "removeModel": "Eliminar modelo",
     "reorderModel": "Reordenar {{name}}. Arrastra o usa las flechas arriba y abajo.",
+    "reorderProvider": "Reordenar {{name}}. Arrastra o usa las flechas arriba y abajo.",
+    providerOrderFailed: "No se pudo guardar el orden de los proveedores: {{error}}",
     "modelAlias": "Alias",
     "modelAliasHint": "Se muestra dondequiera que se nombre el modelo; el id sigue siendo la identidad de la solicitud.",
     "modelAliasPlaceholder": "p. ej. rápido",
@@ -1255,7 +1261,6 @@ sklm: {
     "clearSearch": "Borrar búsqueda",
     "resultCount_one": "{{count}} de {{total}} proyecto",
     "resultCount_other": "{{count}} de {{total}} proyectos",
-    "archiveSubtitle": "Carpetas abiertas y sus chats.",
     "groupPinned": "Fijado",
     "groupProjects": "Todos los proyectos",
     "groupArchived": "Archivado",

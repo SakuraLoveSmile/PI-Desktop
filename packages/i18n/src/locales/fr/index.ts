@@ -22,6 +22,10 @@ export const fr = {
     "close": "Fermer"
   },
   "tray": {
+    "running": "En cours",
+    "unread": "Non lues",
+    "pinned": "Épinglées",
+    "viewMore": "Voir plus…",
     "open": "Ouvrir PI-Desktop",
     "quit": "Quitter PI-Desktop",
     "askTitle": "Garder PI-Desktop en arrière-plan ?",
@@ -1112,6 +1116,8 @@ sklm: {
     "modelConfigurations": "Paramètres du modèle",
     "removeModel": "Supprimer le modèle",
     "reorderModel": "Réordonner {{name}}. Faites glisser ou utilisez les flèches haut et bas.",
+    "reorderProvider": "Réordonner {{name}}. Faites glisser ou utilisez les flèches haut et bas.",
+    providerOrderFailed: "Impossible d’enregistrer l’ordre des fournisseurs : {{error}}",
     "modelAlias": "Alias",
     "modelAliasHint": "Affiché partout où le modèle est nommé ; l'id reste l'identité de la requête.",
     "modelAliasPlaceholder": "ex. rapide",
@@ -1255,7 +1261,6 @@ sklm: {
     "clearSearch": "Effacer la recherche",
     "resultCount_one": "{{count}} de {{total}} projet",
     "resultCount_other": "{{count}} sur {{total}} projets",
-    "archiveSubtitle": "Dossiers ouverts et leurs discussions.",
     "groupPinned": "Épinglé",
     "groupProjects": "Tous les projets",
     "groupArchived": "Archivé",

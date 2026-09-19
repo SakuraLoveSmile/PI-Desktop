@@ -232,7 +232,7 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
     hosted web search tool (`web_search_20250305` / `web_search`), extracts
     the search activity into `UiMessage.hostedSearch` (`rounds` for display,
     `replay` for convertMessages), and restores those raw blocks on later
-    turns including after a restart (ADR 0296). The checkbox is disabled
+    turns including after a restart (ADR 0297). The checkbox is disabled
     when the provider's API style is neither of those two. Gateways that do
     not support the tool surface the provider error; the remedy is unchecking.
     Search runs on the provider: there is no local fetch and no permission

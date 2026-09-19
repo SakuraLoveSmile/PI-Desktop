@@ -382,7 +382,7 @@ xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app
 
 4. Open PI-Desktop again.
 
-The DMG includes `If app won't open, read this.txt`. The ZIP also includes `PI-Desktop-macOS-open.command`, which performs the same trusted-source fallback after the app is moved to Applications.
+The ZIP includes `PI-Desktop-macOS-opening-help.txt` and `PI-Desktop-macOS-open.command`, which performs the same trusted-source fallback after the app is moved to Applications. The DMG is a two-icon install and does not include that note.
 
 The command only removes Apple's quarantine attribute. Do not use it for an untrusted app.
 
