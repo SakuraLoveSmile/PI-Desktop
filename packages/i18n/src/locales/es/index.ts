@@ -1107,6 +1107,8 @@ sklm: {
     "modelConfigurations": "Configuración del modelo",
     "removeModel": "Eliminar modelo",
     "reorderModel": "Reordenar {{name}}. Arrastra o usa las flechas arriba y abajo.",
+    "reorderProvider": "Reordenar {{name}}. Arrastra o usa las flechas arriba y abajo.",
+    providerOrderFailed: "No se pudo guardar el orden de los proveedores: {{error}}",
     "modelAlias": "Alias",
     "modelAliasHint": "Se muestra dondequiera que se nombre el modelo; el id sigue siendo la identidad de la solicitud.",
     "modelAliasPlaceholder": "p. ej. rápido",

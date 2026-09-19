@@ -1107,6 +1107,8 @@ sklm: {
     "modelConfigurations": "Modelleinstellungen",
     "removeModel": "Modell entfernen",
     "reorderModel": "Reihenfolge von {{name}} ändern. Ziehen oder die Pfeiltasten nach oben und unten verwenden.",
+    "reorderProvider": "Reihenfolge von {{name}} ändern. Ziehen oder die Pfeiltasten nach oben und unten verwenden.",
+    providerOrderFailed: "Anbieterreihenfolge konnte nicht gespeichert werden: {{error}}",
     "modelAlias": "Alias",
     "modelAliasHint": "Wird überall angezeigt, wo das Modell benannt wird; die ID bleibt die Identität der Anfrage.",
     "modelAliasPlaceholder": "z. B. schnell",

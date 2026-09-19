@@ -2235,3 +2235,11 @@ submissions remain distinct; SDK entry IDs are never rewritten. Desktop event
 semantics are unchanged. Native terminal completion follows SDK settlement,
 not intermediate retry/compaction loop ends. Native abort never invokes
 `replaceSessionMessages` and reloads durable detail after abort returns.
+
+### Provider ordering
+
+`pi-desktop/providers/reorder({ id, targetId, placement: "before" | "after" })`
+returns `{ ok: true }` and forwards to host `providers.reorder`. The sandboxed
+preload permits this channel through the shared IPC registry. Invalid placement
+or missing providers returns `INVALID_PARAMS`; configuration and defaults are
+unchanged. See [provider configuration](12-provider-config-schema.md).

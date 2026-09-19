@@ -1486,3 +1486,10 @@ the sidecar.
 The first slice has no projection cache or async scan bound; every list still
 reads/parses complete files. Caching by canonical path/file identity/size/mtime
 and bounded asynchronous scanning remain deferred performance work.
+
+### Provider display order
+
+`kv(ns="app", key="providers.order")` stores an ordered array of provider IDs.
+Host-core owns updates through `providers.reorder`; missing metadata preserves
+creation order, new IDs follow saved IDs, and deleted IDs are ignored. This
+preference does not rewrite provider configuration or require a schema migration.

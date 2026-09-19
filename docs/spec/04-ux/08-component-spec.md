@@ -3344,6 +3344,18 @@ surface, while model metadata remains owned by models.dev and transport
 compatibility remains owned by pi-ai.
 
 ### 19.2 Anatomy
+
+Each AI service card can be dragged from its non-interactive surface. After a
+small movement threshold, the card follows the pointer and surrounding cards
+animate into the proposed slot. Dragging near the list edge scrolls it. Releasing
+saves the previewed order; Escape, pointer cancellation, focus loss, unmount or
+catalog changes cancel the drag. Buttons and form controls retain their actions.
+There is no separate drag handle. A focused card accepts Up/Down to move one visible row. Saving blocks further
+moves; a failed save shows an error and restores the accepted order. Late catalog
+responses cannot restore an earlier order. The default-model picker and Composer
+model groups follow the persisted order. Sorting changes neither the selected
+default nor provider configuration. OAuth accounts remain in their separate section.
+
 1. **Defaults card** — a compact settings row reusing the shared
    14px/16px row geometry; the Default model label sits above the provider name
    and exact model ID, while a quiet Change action opens the picker without
