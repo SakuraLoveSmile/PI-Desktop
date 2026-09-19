@@ -156,7 +156,10 @@ async function parseFile(filePath: string): Promise<ParsedCodexFile | null> {
   return parsed.items.length > 0 ? parsed : null;
 }
 
-async function listSessionFiles(dir: string = SESSIONS_DIR): Promise<string[]> {
+async function listSessionFiles(
+  dir: string = SESSIONS_DIR,
+  maxFiles: number = CODEX_SCAN_MAX_FILES,
+): Promise<string[]> {
   const out: string[] = [];
   const walk = async (dir: string, depth: number) => {
     let entries: string[] = [];
@@ -165,7 +168,9 @@ async function listSessionFiles(dir: string = SESSIONS_DIR): Promise<string[]> {
     } catch {
       return;
     }
+    entries.sort().reverse();
     for (const entry of entries) {
+      if (out.length >= maxFiles) return;
       const full = path.join(dir, entry);
       if (entry.endsWith(".jsonl")) {
         out.push(full);
@@ -195,6 +200,7 @@ async function listSessionFiles(dir: string = SESSIONS_DIR): Promise<string[]> {
 //   require reading the whole file, which sampling exists to avoid).
 
 export const CODEX_SCAN_FULL_PARSE_MAX_BYTES = 5 * 1024 * 1024;
+export const CODEX_SCAN_MAX_FILES = 250;
 const CODEX_SCAN_HEAD_BYTES = 1024 * 1024;
 const CODEX_SCAN_TAIL_BYTES = 256 * 1024;
 
@@ -397,8 +403,9 @@ async function scanFile(filePath: string): Promise<CodexScanMeta | null> {
 
 export async function scanCodexSessions(
   dir: string = SESSIONS_DIR,
+  maxFiles: number = CODEX_SCAN_MAX_FILES,
 ): Promise<ExternalSessionSummary[]> {
-  const files = await listSessionFiles(dir);
+  const files = await listSessionFiles(dir, maxFiles);
   const summaries: ExternalSessionSummary[] = [];
   for (const filePath of files) {
     const meta = await scanFile(filePath);
