@@ -96,6 +96,7 @@ import {
   DEFAULT_SUBAGENT_PERMISSION,
   formatAskToolOutput,
   formatSessionMessage,
+  hostedSearchFromBlocks,
   isCommandShellOption,
   isToolsOutputParams,
   MAX_SUBAGENT_CONCURRENCY,
@@ -6596,6 +6597,33 @@ Delegation rules:
     }
   }
 
+  /**
+   * Fold pi-ai hostedSearch content blocks and message citations into the
+   * current assistant bubble as `UiMessage.hostedSearch`, emitting a
+   * full-frame message_update when the normalized state actually changed.
+   * Search state transitions are low frequency, so a full frame costs less
+   * than teaching every delta path about the field.
+   */
+  private applyHostedSearch(message: unknown): void {
+    if (!this.currentAssistant) return;
+    const record = message as {
+      content?: unknown;
+      hostedSearchCitations?: unknown;
+    };
+    const next = hostedSearchFromBlocks({
+      content: record?.content,
+      citations: record?.hostedSearchCitations,
+    });
+    if (!next) return;
+    const previous = this.currentAssistant.hostedSearch;
+    if (previous && JSON.stringify(previous) === JSON.stringify(next)) return;
+    this.currentAssistant = {
+      ...this.currentAssistant,
+      hostedSearch: next,
+    };
+    this.emit({ type: "message_update", message: this.currentAssistant });
+  }
+
   private async handleAgentEvent(event: AgentEvent) {
     this.forwardAgentEventToExtensions(event);
     switch (event.type) {
@@ -6661,6 +6689,7 @@ Delegation rules:
           } else {
             this.emit({ type: "message_start", message: this.currentAssistant });
           }
+          this.applyHostedSearch(event.message);
         }
         // User messages are echoed and persisted by the desktop main process
         // (agentPrompt handler); re-emitting them here would duplicate the
@@ -6669,6 +6698,7 @@ Delegation rules:
       }
       case "message_update": {
         if (this.currentAssistant && event.message.role === "assistant") {
+          this.applyHostedSearch(event.message);
           const content = assistantContent((event.message as any).content);
           const previousText = this.currentAssistant.content;
           const previousThinking = this.currentAssistant.thinking ?? "";
@@ -6785,6 +6815,21 @@ Delegation rules:
             );
           }
           const usage = usageFromPi((event.message as any).usage as Usage | undefined);
+          const hostedSearch = hostedSearchFromBlocks({
+            content: (event.message as any).content,
+            citations: (event.message as any).hostedSearchCitations,
+          });
+          if (hostedSearch) {
+            const terminal = failed || aborted ? "failed" : "completed";
+            for (const round of hostedSearch.rounds) {
+              if (round.status === "searching") round.status = terminal;
+            }
+            hostedSearch.status = hostedSearch.rounds.some(
+              (round) => round.status === "failed",
+            )
+              ? "failed"
+              : "completed";
+          }
           const endedAt = Date.now();
           const providerWaitMs =
             this.requestStartedAt !== undefined &&
@@ -6956,6 +7001,7 @@ Delegation rules:
             ...(classifiedError
               ? { error: classifiedError, isError: true }
               : {}),
+            ...(hostedSearch ? { hostedSearch } : {}),
           };
           this.emit({ type: "message_end", message: this.currentAssistant });
           this.activeProviderRetryAttempt = 0;
