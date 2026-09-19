@@ -322,9 +322,10 @@ UI 字体栈可从设置 → 基础 → 外观中由用户覆盖（ADR 0083）�
 （默认 1，范围 0.8–1.5）。渲染器在根元素设置 `--font-scale`，全部
 `--text-*` 令牌（以及 `--leading-row`）按比例缩放。共享 Lucide 图标使用同一倍率。
 窗口缩放仍独立。界面不出现 px 输入。
-内置开源字体（Geist、Inter、Noto Sans SC、LXGW WenKai — SIL OFL 1.1）
-在 `apps/desktop/src/assets/fonts/` 下本地发布并附许可证文本，系统已安装
-字体由 Electron 主进程枚举。每个自定义字体栈都会追加 CJK 回退层，
+应用不再随包发布任何字体文件（ADR 0298）：选择器提供「跟随系统」与
+由 Electron 主进程枚举的系统已安装字体，此前保存的指向已移除字体的字体栈
+仍显示在「已保存」分组。每个生成的字体栈以纯系统 CJK 回退层收尾
+（`PingFang SC`、`Hiragino Sans GB`、`Microsoft YaHei`、`sans-serif`），
 确保中文文本保持可读。等宽字体栈（`--font-mono`）不可由用户配置。
 
 ### 5. 2 类型规模

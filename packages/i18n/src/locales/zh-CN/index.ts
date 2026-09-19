@@ -1190,7 +1190,6 @@ sklm: {
     languageSearchPlaceholder: "搜索语言…",
     font: "字体",
     fontSystemDefault: "跟随系统",
-    fontBundled: "内置",
     fontSystem: "系统",
     fontCustom: "已保存",
     fontSearchPlaceholder: "搜索字体…",

@@ -1190,7 +1190,6 @@ sklm: {
     "languageSearchPlaceholder": "Buscar idiomas…",
     "font": "Fuente",
     "fontSystemDefault": "Valor predeterminado del sistema",
-    "fontBundled": "Paquete",
     "fontSystem": "Sistema",
     "fontCustom": "Guardado",
     "fontSearchPlaceholder": "Buscar fuentes…",

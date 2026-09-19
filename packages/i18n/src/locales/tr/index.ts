@@ -1207,7 +1207,6 @@ sklm: {
     languageSearchPlaceholder: "Dil ara…",
     font: "Yazı tipi",
     fontSystemDefault: "Sistem varsayılanı",
-    fontBundled: "Paketlenen",
     fontSystem: "Sistem",
     fontCustom: "Kaydedilmiş",
     fontSearchPlaceholder: "Yazı tipi ara…",

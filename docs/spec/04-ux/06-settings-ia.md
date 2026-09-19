@@ -97,11 +97,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     Adding a locale is a catalog plus a registry row; the picker does not
     hard-code the option list.
   - **Font**: a searchable picker row (trigger shows the current family rendered
-    in that face) offering the System default, bundled open-licensed families
-    (Geist, Inter, Noto Sans SC, LXGW WenKai — SIL OFL 1.1, shipped locally),
-    and installed system families enumerated by Electron main; selection
+    in that face) offering the System default and installed system families
+    enumerated by Electron main; the app ships no fonts of its own (ADR 0298),
+    so there is no bundled group and no license badge, and a stack saved while
+    a removed family existed still appears under Saved; selection
     persists as `AppSettings.fontFamily` and applies to the global UI stack
     (`--font-sans`) without a reload; System default clears the override;
+    every stack ends in the system-only CJK fallback tier (`PingFang SC`,
+    `Hiragino Sans GB`, `Microsoft YaHei`, `sans-serif`);
     long system lists are windowed so only the visible slice is in the DOM
     (bounded font loading) and opening the picker never blocks input
   - **Font size**: Starbucks-style cup presets (Tall / Grande / Venti /

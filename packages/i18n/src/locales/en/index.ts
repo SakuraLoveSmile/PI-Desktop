@@ -1206,7 +1206,6 @@ sklm: {
     languageSearchPlaceholder: "Search languages…",
     font: "Font",
     fontSystemDefault: "System default",
-    fontBundled: "Bundled",
     fontSystem: "System",
     fontCustom: "Saved",
     fontSearchPlaceholder: "Search fonts…",

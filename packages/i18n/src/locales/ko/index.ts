@@ -1207,7 +1207,6 @@ sklm: {
     languageSearchPlaceholder: "언어 검색…",
     font: "글꼴",
     fontSystemDefault: "시스템 기본값",
-    fontBundled: "번들",
     fontSystem: "시스템",
     fontCustom: "저장됨",
     fontSearchPlaceholder: "글꼴 검색…",
