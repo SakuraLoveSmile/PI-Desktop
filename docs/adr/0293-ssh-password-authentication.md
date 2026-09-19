@@ -55,11 +55,13 @@ answer:
    a `0700` directory created by `mkdtemp`, a `0600` secret, a `0700` helper.
 
 3. **`BatchMode=yes` becomes `BatchMode=no` only when a password is supplied,
-   together with `NumberOfPasswordPrompts=1`.** The helper answers every prompt
-   with the same secret, so a retry could only repeat a wrong password, and
-   repeated failures are what trip a server's own lockout. One prompt, one
-   answer. An encrypted key whose passphrase is not that password falls through
-   to password authentication, which is the behaviour a user with both expects.
+   together with `NumberOfPasswordPrompts=1` and `PubkeyAuthentication=no`.**
+   The helper answers every prompt with the same secret, so a retry could only
+   repeat a wrong password, and repeated failures are what trip a server's own
+   lockout. One prompt, one answer. Default identities are skipped: an encrypted
+   `~/.ssh/id_rsa` would consume that single prompt as a key passphrase and the
+   login password would never be tried. Password mode in Settings replaces a
+   key; a user with both picks key mode.
 
 4. **The credential is short-lived.** Material is written when a child is about
    to authenticate and deleted once it cannot still be prompting: after an
@@ -147,9 +149,10 @@ answer:
   make an SSH host the only paired host that needs a human at startup, so a
   restart would silently leave it offline. Encrypting it in the same store as
   the device token keeps one credential model instead of two.
-- **`ssh -o PreferredAuthentications=password`.** Rejected: forcing the method
-  breaks the fall-through a user with both a key and a password relies on, and
-  it turns a working agent login into a failure.
+- **`ssh -o PreferredAuthentications=password`.** Rejected as a *key-path*
+  default: forcing the method would turn a working agent login into a failure.
+  Password mode (a secret supplied) instead sets `PubkeyAuthentication=no`,
+  which is the exclusive Settings choice rather than a fall-through.
 
 ## Testing
 
