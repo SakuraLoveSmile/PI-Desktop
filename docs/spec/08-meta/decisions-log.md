@@ -6282,6 +6282,12 @@ that was sitting at the bottom — including after the turn had finished.
   that differ only in separators can no longer collide. An empty index shows the
   pending indicator until the host listing settles instead of "no projects yet",
   and the expanded card and the disclosure indicator honor reduced motion.
+- Clicking the row whose card is open closes it again, through one shared
+  toggle. Selection and the open card are separate states, so the current row
+  keeps its ring while its card is closed and the disclosure indicator turns
+  down only while the card is really open. Moving the selection with the arrow
+  keys always opens the row it landed on.
+  Presentation only: no IPC, storage, host-protocol, or
   Presentation only: no IPC, storage, host-protocol, or
   activation-semantics change. See `04-ux/06-settings-ia.md`,
   `04-ux/07-ui-design-system.md`, and ADR 0294.

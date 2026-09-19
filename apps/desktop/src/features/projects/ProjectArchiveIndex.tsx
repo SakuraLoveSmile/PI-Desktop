@@ -32,6 +32,7 @@ export function projectRowId(path: string) {
 export function ProjectArchiveIndex({
   groups,
   selectedPath,
+  openPath,
   workspacePath,
   openProjectPaths,
   locale,
@@ -42,6 +43,8 @@ export function ProjectArchiveIndex({
 }: {
   groups: { id: GroupId; rows: ProjectIndexItem[] }[];
   selectedPath: string | null;
+  /** Path whose card is open. `null` when the selected row's card is closed. */
+  openPath: string | null;
   workspacePath?: string | null;
   openProjectPaths: readonly string[];
   locale?: string;
@@ -68,6 +71,7 @@ export function ProjectArchiveIndex({
           <div className="projects-group-rows" role="list">
             {group.rows.map((project) => {
               const selected = selectedPath === project.path;
+              const open = openPath === project.path;
               const status = projectStatus({
                 project,
                 workspacePath,
@@ -83,6 +87,7 @@ export function ProjectArchiveIndex({
                   className={cx(
                     "projects-row-block",
                     selected && "selected",
+                    open && "open",
                     status === "active" && "active",
                     status === "archived" && "archived",
                   )}
@@ -92,7 +97,7 @@ export function ProjectArchiveIndex({
                     className="projects-row"
                     title={project.path}
                     aria-label={t("project.selectProject", { name: project.name })}
-                    aria-expanded={selected}
+                    aria-expanded={open}
                     aria-current={selected ? "true" : undefined}
                     onClick={() => onSelect(project.path)}
                     onDoubleClick={() => onActivate(project.path)}
@@ -129,7 +134,7 @@ export function ProjectArchiveIndex({
                       <IconChevronRight size={14} />
                     </span>
                   </button>
-                  {selected && detail ? (
+                  {open && detail ? (
                     <div
                       className="projects-inspector"
                       role="region"

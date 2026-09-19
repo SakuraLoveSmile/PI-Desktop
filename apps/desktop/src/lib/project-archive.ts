@@ -168,6 +168,31 @@ export function projectStatus(args: {
   return null;
 }
 
+/**
+ * Whether one project's card is open. Kept apart from the selection so the
+ * disclosure indicator can mean what it looks like: the selected row stays the
+ * current row while its card is closed again.
+ */
+export type ArchiveCardState = { selectedPath: string; open: boolean };
+
+/**
+ * One row click, resolved. The row whose card is already open closes it, any
+ * other row becomes the selection and opens. Without this the index had no
+ * collapse path at all: clicking the open row re-selected it and the card
+ * stayed up, while the rotating indicator promised otherwise.
+ */
+export function toggleArchiveRow(args: {
+  selectedPath: string | null;
+  open: boolean;
+  clickedPath: string;
+}): ArchiveCardState {
+  const { selectedPath, open, clickedPath } = args;
+  if (clickedPath === selectedPath && open) {
+    return { selectedPath: clickedPath, open: false };
+  }
+  return { selectedPath: clickedPath, open: true };
+}
+
 export function compareProjects(
   a: ProjectIndexItem,
   b: ProjectIndexItem,

@@ -416,7 +416,9 @@
   transition: transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.projects-row-block.selected .projects-row-disclosure {
+/* Keyed on the open card, not on selection: a selected row whose card was
+   closed again must point right, or the indicator lies about the state. */
+.projects-row-block.open .projects-row-disclosure {
   transform: rotate(90deg);
   color: var(--ds-text-muted);
 }

@@ -39,6 +39,7 @@ import {
   neighborPath,
   resolveSelectedPath,
   sessionMatchesIndexProject,
+  toggleArchiveRow,
   type ProjectIndexItem,
   type SessionIndexRecord,
   type SortMode,
@@ -78,6 +79,8 @@ export function ProjectsPage() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [visibleSessionCounts, setVisibleSessionCounts] = useState<Record<string, number>>({});
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  // The card under the selected row: closed again by clicking that same row.
+  const [cardOpen, setCardOpen] = useState(true);
   // Which row menu item is armed for its second, confirming click.
   const { armed: armedDelete, setArmed: setArmedDelete } = useArmedDelete();
   const [renameFor, setRenameFor] = useState<SessionIndexRecord | null>(null);
@@ -365,6 +368,7 @@ export function ProjectsPage() {
       );
       if (!next || next === selectedPath) return;
       setSelectedPath(next);
+      setCardOpen(true);
       setMenuFor(null);
       document
         .getElementById(projectRowId(next))
@@ -493,13 +497,20 @@ export function ProjectsPage() {
         <div className="projects-workbench" tabIndex={0} onKeyDown={onIndexKeyDown}>
           <ProjectArchiveIndex
             groups={groups}
+            openPath={cardOpen ? selectedPath : null}
             selectedPath={selectedPath}
             workspacePath={workspace?.path}
             openProjectPaths={openProjectPaths}
             locale={locale}
             sessionCounts={sessionCounts}
             onSelect={(path) => {
-              setSelectedPath(path);
+              const next = toggleArchiveRow({
+                selectedPath,
+                open: cardOpen,
+                clickedPath: path,
+              });
+              setSelectedPath(next.selectedPath);
+              setCardOpen(next.open);
               setMenuFor(null);
             }}
             onActivate={(path) => void activate(path)}

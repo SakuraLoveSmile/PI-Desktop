@@ -126,7 +126,7 @@ test("the index row carries identity and the selected row is its own card header
   assert.match(projectsIndexSource, /projects-row-disclosure/);
   assert.match(
     projectsPartialSource,
-    /\.projects-row-block\.selected \.projects-row-disclosure\s*\{[^}]*rotate\(90deg\)/,
+    /\.projects-row-block\.open \.projects-row-disclosure\s*\{[^}]*rotate\(90deg\)/,
   );
   // The open card is headed by that same row, so the detail never repeats the
   // name, the path, or the status tag: no second source of truth on screen.
@@ -136,6 +136,21 @@ test("the index row carries identity and the selected row is its own card header
   assert.doesNotMatch(projectsDetailSource, /projects-name-text/);
   assert.doesNotMatch(projectsDetailSource, /projects-name-path/);
   assert.doesNotMatch(projectsDetailSource, /projects-tag/);
+});
+
+test("the selected row's card can be closed again", () => {
+  // One click resolves through the shared toggle, so clicking the open row
+  // closes it instead of re-selecting it and leaving the card up.
+  assert.match(projectsPageSource, /toggleArchiveRow\(\{/);
+  assert.match(projectArchiveSource, /export function toggleArchiveRow\(/);
+  // Selection and the open card are separate: the ring stays on the current
+  // row while the card is closed, and only the open row renders the panel.
+  assert.match(projectsIndexSource, /const open = openPath === project\.path/);
+  assert.match(projectsIndexSource, /aria-expanded=\{open\}/);
+  assert.match(projectsIndexSource, /\{open && detail \? \(/);
+  assert.match(projectsPageSource, /openPath=\{cardOpen \? selectedPath : null\}/);
+  // Moving the selection with the keyboard always opens the row it landed on.
+  assert.match(projectsPageSource, /setSelectedPath\(next\);\n\s+setCardOpen\(true\);/);
 });
 
 test("the selected row is selected by one shared status helper", () => {

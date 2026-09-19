@@ -607,7 +607,10 @@ system while preserving their different data ownership:
   time, closed by the row's disclosure indicator. The colored glyph uses Folder
   for ordinary projects and a filled Star for pinned projects. Rows are tiles
   separated by the row gap, never by rules. A click selects the row and keeps
-  Settings open; double-click or Enter activates the project and returns to chat
+  Settings open, and a click on the row whose card is already open closes that
+  card again; the disclosure indicator turns down only while the card is open,
+  so it never claims a closed card is open. Double-click or Enter activates the
+  project and returns to chat
 - The card under the selected row is the detail panel, and it repeats nothing
   the row already states — no second copy of the name, the path, or the status
   tag. It opens with an action bar (New task, Open while the project is not the

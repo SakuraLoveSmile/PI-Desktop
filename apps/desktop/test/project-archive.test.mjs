@@ -14,6 +14,7 @@ import {
   sessionMatchesQuery,
   sessionTimestamp,
   shortenPath,
+  toggleArchiveRow,
 } from "../src/lib/project-archive.ts";
 
 test("the archive never hides archived rows behind a filter", () => {
@@ -148,4 +149,32 @@ test("the index merges durable groups ahead of recents and session seeds", () =>
   assert.equal(shortenPath("/Users/lan/PI-Desktop"), "~/PI-Desktop");
   assert.equal(INITIAL_VISIBLE_SESSION_COUNT, 8);
   assert.ok(sessionTimestamp("2026-01-02T00:00:00.000Z") > 0);
+});
+
+test("one row click toggles that row's card and opens any other", () => {
+  // The open card closes again: this is the path the index was missing, where
+  // clicking the selected row re-selected it and the card stayed up.
+  assert.deepEqual(
+    toggleArchiveRow({ selectedPath: "/a", open: true, clickedPath: "/a" }),
+    { selectedPath: "/a", open: false },
+  );
+  // Clicking the closed row reopens it rather than collapsing "nothing".
+  assert.deepEqual(
+    toggleArchiveRow({ selectedPath: "/a", open: false, clickedPath: "/a" }),
+    { selectedPath: "/a", open: true },
+  );
+  // Any other row becomes the selection and opens, whichever row was open.
+  assert.deepEqual(
+    toggleArchiveRow({ selectedPath: "/a", open: true, clickedPath: "/b" }),
+    { selectedPath: "/b", open: true },
+  );
+  assert.deepEqual(
+    toggleArchiveRow({ selectedPath: "/a", open: false, clickedPath: "/b" }),
+    { selectedPath: "/b", open: true },
+  );
+  // First click with nothing selected yet opens that row.
+  assert.deepEqual(
+    toggleArchiveRow({ selectedPath: null, open: false, clickedPath: "/a" }),
+    { selectedPath: "/a", open: true },
+  );
 });
