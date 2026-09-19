@@ -943,7 +943,7 @@ sklm: {
     linkOpenTargetWorkpanel: "작업 패널 브라우저",
     linkOpenTargetExternal: "시스템 기본 브라우저",
     thinkingDisplayMode: "사고 과정 표시 모드",
-    thinkingDisplayModeDesc: "상세 모드는 사고 내용을 표시합니다. 간결 모드는 사고 중에 상태만 표시하고 완료된 사고 과정은 숨깁니다.",
+    thinkingDisplayModeDesc: "상세 모드는 사고·도구·중간 텍스트를 제자리에 표시하고 처리 블록으로 묶지 않습니다. 간결 모드는 그 과정을 하나로 묶고, 사고 중에는 상태만 표시하며 완료된 사고는 숨깁니다.",
     thinkingDisplayDetailed: "상세 (기본값)",
     thinkingDisplayCompact: "간결",
     contextUsageDisplay: "컨텍스트 사용량 표시",

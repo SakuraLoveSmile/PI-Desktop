@@ -54,13 +54,18 @@ export function hasFailedProcessTool(parts: readonly AssistantTurnPart[]): boole
   );
 }
 
-/** Detailed keeps process visible; compact only auto-opens an active tool failure. */
+/** Compact groups a turn into one process disclosure; detailed does not. */
+export function shouldGroupTurnProcess(mode: ThinkingDisplayMode): boolean {
+  return mode === "compact";
+}
+
+/** Compact process stays collapsed unless an active tool failed. */
 export function shouldAutoOpenTurnProcess(
   mode: ThinkingDisplayMode,
   isActive: boolean,
   hasToolFailure: boolean,
 ): boolean {
-  return mode === "detailed" || (isActive && hasToolFailure);
+  return mode === "compact" && isActive && hasToolFailure;
 }
 
 /**

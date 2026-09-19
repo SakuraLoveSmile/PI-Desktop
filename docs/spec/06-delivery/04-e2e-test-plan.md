@@ -13490,9 +13490,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Steps:** Stream the turn; finish it; expand/collapse its process; search an
   intermediate message; switch display modes through Settings → AI → Defaults.
   Repeat with a stopped partial answer, an assistant error and a failed tool.
-- **Expected:** In detailed mode, completed work has one open process plus
-  its final answer. Compact mode keeps that process collapsed until expanded.
-  Manual choices survive updates; search reveals its target; live answer text
+- **Expected:** In detailed mode, thinking, tools and intermediate text stay
+  in place with no process wrapper. Compact mode keeps that process collapsed
+  until expanded. Manual choices survive updates; search reveals its target; live answer text
   stays readable. Errors and stopped trailing text stay visible. Compact mode
   exposes no reasoning text or excerpt, shows a live indicator, and leaves no
   completed thinking-only header. Tools and progress remain accessible. Switching

@@ -932,7 +932,7 @@ sklm: {
     linkOpenTargetWorkpanel: "工作區瀏覽器",
     linkOpenTargetExternal: "系統預設瀏覽器",
     thinkingDisplayMode: "思考過程顯示模式",
-    thinkingDisplayModeDesc: "詳細模式顯示思考文字；精簡模式僅在思考時顯示狀態提示，結束後隱藏思考區塊。",
+    thinkingDisplayModeDesc: "詳細模式依原文展開思考、工具與中間文字，不合成處理區塊。精簡模式將過程收進處理區塊，思考中僅顯示狀態提示，結束後隱藏思考區塊。",
     thinkingDisplayDetailed: "詳細（預設）",
     thinkingDisplayCompact: "精簡",
     contextUsageDisplay: "上下文用量讀數",

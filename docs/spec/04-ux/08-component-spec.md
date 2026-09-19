@@ -804,22 +804,22 @@ reading surface of the workstation.
 
 ### Turn process and thinking display
 
-Each assistant-turn entry has one process disclosure containing reasoning,
-tools and intermediate assistant text in transcript order. Its trailing answer
-streams outside the disclosure. Later activity moves a provisional answer into
-the process without altering the stored message. Assistant errors and trailing
-aborted partial replies stay visible. Compaction and user/system boundaries are
-unchanged.
+Compact mode projects each assistant-turn entry into one process disclosure
+containing reasoning, tools and intermediate assistant text in transcript
+order. Its trailing answer streams outside the disclosure. Later activity
+moves a provisional answer into the process without altering the stored
+message. Detailed mode does not wrap that process: the same parts stay in
+place. Assistant errors and trailing aborted partial replies stay visible.
+Compaction and user/system boundaries are unchanged.
 
-Detailed mode keeps process areas open, including completed history. Compact
-mode starts completed process areas collapsed. Manual choices and search
-reveals own the disclosure until unmount. Failed tools open an unclaimed
-active process even in compact mode and keep their invocation-level error
-presentation.
-The header shows elapsed time and the visible process step count. Its thinking
-label applies only while the latest activity is streaming reasoning without answer
-text; streamed answers use the processing label. Delegation
-cards and individual tool details remain available inside the process.
+Compact mode starts completed process areas collapsed. Manual choices and
+search reveals own the disclosure until unmount. Failed tools open an
+unclaimed active process even in compact mode and keep their invocation-level
+error presentation. The compact header shows elapsed time and the visible
+process step count. Its thinking label applies only while the latest activity
+is streaming reasoning without answer text; streamed answers use the
+processing label. Delegation cards and individual tool details remain
+available inside the compact process.
 
 `thinkingDisplayMode` defaults to `detailed`. In `compact`, reasoning text and
 excerpts are absent, active reasoning has a status indicator, and completed

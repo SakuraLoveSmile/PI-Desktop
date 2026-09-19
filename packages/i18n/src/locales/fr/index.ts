@@ -933,7 +933,7 @@ sklm: {
     "linkOpenTargetWorkpanel": "Navigateur du panneau de travail",
     "linkOpenTargetExternal": "Navigateur par défaut du système",
     "thinkingDisplayMode": "Affichage du raisonnement",
-    "thinkingDisplayModeDesc": "Le mode détaillé affiche le raisonnement. Le mode compact affiche un indicateur pendant la réflexion, puis masque le raisonnement terminé.",
+    "thinkingDisplayModeDesc": "Le mode détaillé affiche raisonnement, outils et texte intermédiaire sur place. Le mode compact les regroupe dans un processus, affiche un indicateur pendant la réflexion, puis masque le raisonnement terminé.",
     "thinkingDisplayDetailed": "Détaillé (par défaut)",
     "thinkingDisplayCompact": "Compact",
     "contextUsageDisplay": "Affichage de l'usage du contexte",

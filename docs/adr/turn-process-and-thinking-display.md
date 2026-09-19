@@ -14,16 +14,16 @@ thinking indicator without rapidly changing reasoning text.
 
 ## Decision
 
-The renderer projects each existing assistant-turn entry into one process
-area and its trailing answer. Thinking, tools and intermediate assistant text
-keep their original order inside the process. A trailing assistant text stays
+Compact mode projects each assistant-turn entry into one process area and
+its trailing answer. Thinking, tools and intermediate assistant text keep
+their original order inside the process. A trailing assistant text stays
 visible while streaming; if a later tool or thinking block follows, that text
 belongs to the process. There is no semantic final-answer marker in UiMessage,
 so the renderer does not guess intent from the wording. User/system messages
 and compaction dividers retain their existing turn boundaries.
 
-Detailed mode keeps process areas open for both active and completed turns
-and retains the existing thinking-row disclosures. Compact mode starts
+Detailed mode does not wrap a process: thinking, tools and intermediate
+assistant text stay in transcript order beside the answer. Compact mode starts
 completed process areas collapsed. Manual disclosure choices survive
 streaming and completion. Search navigation opens the containing process.
 Tool failures open an unclaimed active process so the invocation error stays
@@ -50,8 +50,8 @@ tool and intermediate-text items and omit hidden compact-mode thinking.
 
 ## Consequences
 
-- One completed turn has one process disclosure plus its visible answer.
-- Detailed mode keeps thinking, tools and intermediate text visible without an extra click; compact remains the collapsed presentation.
+- Compact completed turns have one process disclosure plus the visible answer.
+- Detailed mode does not group that work; compact remains the collapsed process.
 - Unchanged activity groups keep their memoized boundary during text deltas;
   the process wrapper does not move execution or persistence into the renderer.
 - This groups loaded transcript entries; it does not reconstruct history that

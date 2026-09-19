@@ -933,7 +933,7 @@ sklm: {
     "linkOpenTargetWorkpanel": "Arbeitsbereich-Browser",
     "linkOpenTargetExternal": "Standard-Betriebssystem-Browser",
     "thinkingDisplayMode": "Denkprozess anzeigen",
-    "thinkingDisplayModeDesc": "Detailliert zeigt den Denktext. Kompakt zeigt während des Denkens einen Hinweis und blendet abgeschlossene Denkprozesse aus.",
+    "thinkingDisplayModeDesc": "Detailliert zeigt Denken, Werkzeuge und Zwischentext an Ort und Stelle. Kompakt fasst das in einem Prozess zusammen, zeigt während des Denkens einen Hinweis und blendet abgeschlossene Denkprozesse aus.",
     "thinkingDisplayDetailed": "Detailliert (Standard)",
     "thinkingDisplayCompact": "Kompakt",
     "contextUsageDisplay": "Kontextnutzung-Anzeige",

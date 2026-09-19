@@ -942,7 +942,7 @@ sklm: {
     linkOpenTargetWorkpanel: "Work panel browser",
     linkOpenTargetExternal: "Default OS browser",
     thinkingDisplayMode: "Thinking display mode",
-    thinkingDisplayModeDesc: "Detailed shows reasoning text. Compact shows a thinking indicator while active and hides completed thinking.",
+    thinkingDisplayModeDesc: "Detailed shows reasoning, tools and intermediate text in place. Compact groups that work into a process, shows a thinking indicator while active, and hides completed thinking.",
     thinkingDisplayDetailed: "Detailed (default)",
     thinkingDisplayCompact: "Compact",
     contextUsageDisplay: "Context usage readout",

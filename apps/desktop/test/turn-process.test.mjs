@@ -8,6 +8,7 @@ const {
   visibleProcessSteps,
   resolveThinkingDisplayMode,
   shouldAutoOpenTurnProcess,
+  shouldGroupTurnProcess,
   turnProcessTiming,
 } = await import("../src/lib/turn-process.ts");
 
@@ -97,10 +98,12 @@ test("missing and unknown display settings retain detailed mode", () => {
   assert.equal(resolveThinkingDisplayMode("compact"), "compact");
 });
 
-test("detailed auto-opens completed process; compact only opens active failures", () => {
-  assert.equal(shouldAutoOpenTurnProcess("detailed", false, false), true);
-  assert.equal(shouldAutoOpenTurnProcess("detailed", true, false), true);
-  assert.equal(shouldAutoOpenTurnProcess("detailed", false, true), true);
+test("only compact groups a turn into a process; compact auto-opens active failures", () => {
+  assert.equal(shouldGroupTurnProcess("detailed"), false);
+  assert.equal(shouldGroupTurnProcess("compact"), true);
+  assert.equal(shouldAutoOpenTurnProcess("detailed", false, false), false);
+  assert.equal(shouldAutoOpenTurnProcess("detailed", true, false), false);
+  assert.equal(shouldAutoOpenTurnProcess("detailed", true, true), false);
   assert.equal(shouldAutoOpenTurnProcess("compact", false, false), false);
   assert.equal(shouldAutoOpenTurnProcess("compact", true, false), false);
   assert.equal(shouldAutoOpenTurnProcess("compact", true, true), true);

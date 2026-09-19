@@ -943,7 +943,7 @@ sklm: {
     linkOpenTargetWorkpanel: "Çalışma paneli tarayıcısı",
     linkOpenTargetExternal: "Varsayılan sistem tarayıcısı",
     thinkingDisplayMode: "Düşünme görünümü",
-    thinkingDisplayModeDesc: "Ayrıntılı mod düşünme metnini gösterir. Sade mod düşünürken bir gösterge gösterir ve tamamlanan düşünmeyi gizler.",
+    thinkingDisplayModeDesc: "Ayrıntılı mod düşünme, araçlar ve ara metni yerinde gösterir, bir işlem bloğunda birleştirmez. Sade mod bunları bir işlemde gruplar, düşünürken bir gösterge gösterir ve tamamlanan düşünmeyi gizler.",
     thinkingDisplayDetailed: "Ayrıntılı (varsayılan)",
     thinkingDisplayCompact: "Sade",
     contextUsageDisplay: "Bağlam kullanımı göstergesi",
