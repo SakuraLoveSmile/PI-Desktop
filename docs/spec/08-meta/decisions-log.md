@@ -301,6 +301,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D275 | Preserve the active task boundary across context compaction | **Amends D203 / ADR 0064 in the agent runtime: checkpoints record opaque `details.retainedTailMode`. An active-turn checkpoint retains only the latest user message (up to the existing 20,000-token cap) when the provider must continue after a tool result, `toolUse`, or overflow recovery. A completed-turn checkpoint has an empty retained tail at terminal boundaries, before a new prompt, and for manual compaction; its summary is authoritative for completed work. Legacy records without the mode normalize to their latest user message. No visible transcript, storage schema, host ownership, or protocol shape changes.** | Keeping several recent user prompts while compacting away completion messages made the next prompt look like a continuation of an old task (issue #22). The boundary must be explicit at restore time while active tool loops still retain the prompt needed to continue. |
 | D278 | Subagent model selection | **Task.model overrides definition pin; only models with `availableForSubagents` appear in the delegation catalog; on-demand RPC resolves models not pre-resolved at launch** | The parent agent needs per-task model choice without exposing the full provider configuration. An opt-in flag keeps the delegation catalog bounded and intentional, and on-demand resolution avoids stale bindings for models added after sidecar launch. See §3/02 §5f, §3/11 §7, and E2E-166. |
 | D365 | Named quiet intervals on the live activity row | **Amend D338 / ADR 0175: `AgentActivity` adds `preparing`, `compacting`, and `recovering`; `starting` shows its own label; `waiting-subagents` carries a live running snapshot (`name`, `lastPhase`, `lastToolName`) that updates on child tool/thinking changes, not on every token. The row stays one compact inline status and does not restore an activity-group capsule.** | Compaction, silent-turn recovery, the post-tool gap, and startup all looked like a stuck generic wait, and a parent wait hid what its delegates were doing (ADR 0198, E2E-008c / E2E-094) |
+| D599 | A development build is its own installation | **Narrow D236 / amend ADR 0094: a development build (unpackaged, or `PI_DESKTOP_DEV=1`) takes `PI-Desktop Dev` as its Electron `userData` — and with it the single-instance lock, renderer `localStorage`, the plugin panel partitions, and browser pane cookies — and reads `~/.pi-desktop-dev`. An explicit `--user-data-dir` still wins, which is how the E2E harnesses point a build at a throwaway profile. A packaged installation keeps `PI-Desktop` and `~/.pi-desktop`, so no existing profile is relocated. `PI_DESKTOP_DATA_DIR` still overrides either profile and is made absolute before it reaches host-core as a child-process environment variable; Electron main publishes the resolved directory back to that variable so the plugin runtime reads one root. No IPC, protocol, schema, or packaged-installation path change. See `03-runtime/07-process-model.md` and E2E-150.** | A packaged app that was already running held the lock, so `pnpm dev` quit on arrival; a development host that won the race instead put a second host-core over the same single-writer `pi.sqlite`, the outbox, and the log tree. |
 
 ## M0. Model catalog decisions
 
@@ -6351,3 +6352,28 @@ that was sitting at the bottom — including after the turn had finished.
   seven-level ladder, provider filtering, and clamping rules are unchanged.
   Renderer only: no protocol, storage, host, permission, or migration change.
   See `04-ux/08-component-spec.md`, `04-ux/07-ui-design-system.md`, and E2E-050.
+
+## 2026-09-20 — A development build is its own installation (D599)
+
+- A packaged PI-Desktop and a `pnpm dev` host no longer share the two
+  directories that define an installation. A development build runs under
+  `PI-Desktop Dev` in the OS application-data root — its own Electron
+  `userData`, and with it the single-instance lock, renderer `localStorage`,
+  the plugin panel partitions, and browser pane cookies — and reads
+  `~/.pi-desktop-dev`. A packaged installation keeps `PI-Desktop` and
+  `~/.pi-desktop` unchanged, so no existing profile is relocated.
+- A shipped app that is already running therefore no longer refuses the lock a
+  development launch needs, and the two never put a second host-core over one
+  `pi.sqlite`, one persistence outbox, or one log tree. `PI_DESKTOP_DATA_DIR`
+  still wins over either profile and is now made absolute before it reaches
+  host-core as a child-process environment variable. Electron main publishes the
+  resolved directory back to that variable so the plugin runtime reads one root
+  instead of falling back to the shipped default.
+  An explicit `--user-data-dir` still wins, because the E2E harnesses point a
+  build at a throwaway profile with it.
+- Decision D599 narrows D236 and amends ADR 0094: the lock keeps its
+  installation scope, and a development build is now a second installation
+  rather than an ambiguous second process. No IPC channel, host protocol,
+  storage schema, or packaged-installation path changed. See
+  `03-runtime/07-process-model.md`, `03-runtime/04-data-storage.md`, and
+  `02-architecture/03-repo-structure.md`.

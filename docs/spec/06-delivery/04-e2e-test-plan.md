@@ -8784,16 +8784,21 @@ This test plan spec is accepted when:
   both the window and the process list. 2) Minimize the window into the tray,
   then launch again. 3) On Windows/Linux with close behavior `tray`, close the
   window, then launch again. 4) While the app is running, launch a build with
-  `PI_DESKTOP_DATA_DIR` set to an empty directory. 5) Quit the app, confirm no
-  process remains, and launch once more.
+  `PI_DESKTOP_DATA_DIR` set to an empty directory. 5) Still while the packaged
+  app is running, start a development build (the `dev` script, with no
+  `PI_DESKTOP_DATA_DIR`). 6) Quit the app, confirm no process remains, and
+  launch once more.
 - **Expected**: Steps 1–3 never create a second window, tray icon, host-core,
   agent sidecar, or log file: the existing window is restored and focused, the
   duplicate process exits, and the running instance's session list, in-flight
   turn, and `pi.sqlite` are untouched. Step 4 starts normally as an independent
-  instance against its own data directory. Step 5 starts a clean single
-  instance, proving the lock is released on exit and never leaves a stale block.
+  instance against its own data directory. Step 5 also starts normally: the
+  development build takes its own `userData` and `~/.pi-desktop-dev`, so it
+  neither waits for nor disturbs the running packaged app. Step 6 starts a clean
+  single instance, proving the lock is released on exit and never leaves a stale
+  block.
 - **Specs linked**: `03-runtime/07-process-model.md`,
-  `08-meta/decisions-log.md` (D236, D002), ADR 0094
+  `08-meta/decisions-log.md` (D236, D599, D002), ADR 0094
 - **Acceptance**: A (app lifecycle), Quality
 - **Milestone**: M6+
 - **Status**: Unit/source-contract covered; native cross-platform relaunch

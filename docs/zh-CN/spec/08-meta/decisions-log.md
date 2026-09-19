@@ -305,6 +305,7 @@
 | D275 | 在上下文压缩期间保留活动任务边界 | **修订 D203 / ADR 0064（代理运行时）：检查点记录不透明的 `details.retainedTailMode`。当提供商必须在工具结果、`toolUse` 或溢出恢复后继续时，活动回合检查点只保留最新的用户消息（沿用现有 20,000 令牌上限）。在终止边界、发送新提示之前和手动压缩时，已完成回合检查点的保留尾部为空，摘要是已完成工作的权威内容。没有该模式的旧记录归一化为最新的用户消息。不改变可见转录本、存储 schema、主机所有权或协议形状。** | 压缩掉完成消息却保留多个最近用户提示，会让下一条提示看起来像旧任务的延续（issue #22）。恢复时必须显式保留任务边界，同时活动工具循环仍需保留继续当前任务所需的提示。 |
 | D278 | 子代理模型选择 | **Task.model 覆盖定义中固定的模型；只有带 `availableForSubagents` 的模型出现在委托目录中；启动时未预解析的模型由按需 RPC 解析** | 父代理需要按任务选择模型，又不能暴露完整的服务商配置。选择加入的标志让委托目录保持有界且有意为之，按需解析则避免 sidecar 启动后新增模型的绑定过期。参见 §3/02 §5f、§3/11 §7 与 E2E-166。 |
 | D365 | 为实时活动行的每个安静间隔命名 | **修订 D338 / ADR 0175：`AgentActivity` 增加 `preparing`、`compacting`、`recovering`；`starting` 显示独立标签；`waiting-subagents` 携带实时运行快照（`name`、`lastPhase`、`lastToolName`），随子级工具/思考变化更新而非逐 token 更新。该行保持为一条紧凑的内联状态，不恢复活动分组胶囊。** | 压缩、静默回合恢复、工具后间隙与启动都像卡住的通用等待，父级等待也隐藏了委托在做什么（ADR 0198，E2E-008c / E2E-094） |
+| D599 | 开发构建是一个独立安装 | **收窄 D236 / 修订 ADR 0094：开发构建（未打包，或 `PI_DESKTOP_DEV=1`）以 `PI-Desktop Dev` 作为 Electron `userData`（随之独立的单实例锁、渲染层 `localStorage`、插件面板 partition 与浏览器面板 Cookie），数据目录为 `~/.pi-desktop-dev`。显式 `--user-data-dir` 仍然优先，E2E 装置正是用它把构建指向临时 profile。正式安装仍保持 `PI-Desktop` 与 `~/.pi-desktop`，既有 profile 不会被搬迁。`PI_DESKTOP_DATA_DIR` 仍优先于两种 profile，并在作为子进程环境变量传给 host-core 之前被绝对化；Electron 主进程把解析结果回写到该变量，使插件运行时读到同一个根目录。不改 IPC、协议、schema 或正式安装路径。见 `03-runtime/07-process-model.md` 与 E2E-150。** | 已在运行的正式版持有锁，`pnpm dev` 一启动就退出；而抢到锁的开发 host 会把第二个 host-core 压到同一个单写者 `pi.sqlite`、outbox 与日志树上。 |
 
 ## M0. 模型目录决策
 
@@ -4544,3 +4545,10 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 合并后的「模型 × 推理」菜单根层现在直接展示一个原生 range 输入，每个已启用等级一个刻度，并配有可点击的刻度标签，位置就在「推理等级」条目正下方。拖动滑块或点击刻度都会通过同一条 `configureActiveSession` 路径立即提交等级，并停留在菜单原处，因此临时调整不必再往子菜单里跑一趟。「推理等级」条目本身仍然打开经典单选列表，保留其单选语义、末尾勾选、上/下/Enter/左键契约与返回根层的行为。
 - 滑块在获得焦点时自行掌管方向键/Home/End/Enter，因此这些按键用于调整等级而不再驱动菜单导航，Escape 仍然关闭菜单。拖过多个刻度只保留最后一次待提交的档位，提交按 latest-wins 串行，空闲会话的持久化不会把中间档写进去；会话或模型变化会作废未完成的提交。本地拖动前导值避免受控输入在 store 确认回写之前被弹回。刻度标签可点但不进入 Tab 顺序。当菜单只列出一个等级时，滑块整体隐藏。
 - 等级值仍是未翻译的规范字符串，在绑定暴露已启用规范档位时也包括会话级 `omit`（D456）。七级阶梯、提供方过滤与钳制规则均未改动；仅渲染层：无协议、存储、宿主、权限或迁移改动。见 `04-ux/08-component-spec.md`、`04-ux/07-ui-design-system.md` 与 E2E-050。
+
+## 2026-09-20 —— 开发构建是一个独立安装（D599）
+
+- 正式打包版与 `pnpm dev` 不再共享定义「一个安装」的那两个目录。开发构建运行在操作系统应用数据根目录下的 `PI-Desktop Dev`（即独立的 Electron `userData`，随之独立的单实例锁、渲染层 `localStorage`、插件面板 partition 与浏览器面板 Cookie），数据目录为 `~/.pi-desktop-dev`。正式安装仍保持 `PI-Desktop` 与 `~/.pi-desktop` 不变，既有 profile 不会被搬迁。
+- 因此已在运行的正式版不再拒绝开发启动所需的锁，两者也不会把两个 host-core 压到同一个 `pi.sqlite`、同一个持久化 outbox 或同一棵日志树上。`PI_DESKTOP_DATA_DIR` 仍然优先于两种 profile，并且在作为子进程环境变量传给 host-core 之前被绝对化；Electron 主进程把解析结果回写到该变量，使插件运行时读到同一个根目录，而不是回退到正式版默认值。
+- 显式 `--user-data-dir` 仍然优先，E2E 装置正是用它把构建指向临时 profile。
+- 决策 D599 收窄 D236 并修订 ADR 0094：锁仍以「安装」为作用域，而开发构建现在是第二个安装，不再是一个含义模糊的第二个进程。未改动任何 IPC 通道、宿主协议、存储 schema 或正式安装的路径。见 `03-runtime/07-process-model.md`、`03-runtime/04-data-storage.md` 与 `02-architecture/03-repo-structure.md`。
