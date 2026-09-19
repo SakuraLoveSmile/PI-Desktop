@@ -8031,3 +8031,27 @@ frames must produce no further renders or pending callbacks. Card geometry is
 read at press time, and move/release/cancel/unmount paths must clear transient
 transforms and queued frames. Release before the scheduled frame must still save
 the latest destination. These assertions measure work counts, not device FPS.
+
+### E2E-CHROME-window-controls-survive-work-panel
+
+- **Preconditions:** A built desktop and matching host-core binary; isolated
+  profile and data directory with one local session; no real provider calls.
+- **Steps:** Open the work panel from the titlebar, toggle the sidebar, maximize
+  and restore the panel, maximize and restore the native window, close the panel,
+  visit Settings and return, reopen the panel, minimize/restore the window, then
+  click Close with close-to-tray configured in the disposable profile. Also
+  enter and leave native fullscreen with the panel open. Check the three controls
+  with Chromium hit testing throughout, including light/dark Windows/Linux CSS.
+- **Expected:** Windows/Linux minimize, maximize/restore, and close stay visible
+  and hit-testable at the window edge. Native actions work with the panel open.
+  Preview sidebar navigation remains clickable. On macOS no duplicate renderer
+  window controls appear; the native traffic-light and fullscreen contracts stay
+  unchanged. CSS emulation does not qualify another operating system's native UI.
+- **Specs:** `04-ux/01-ui-ia.md` titlebar; ADR 0021 and ADR 0025.
+- **Acceptance:** Window actions remain accessible independently of pane state.
+- **Milestone:** Post-MVP regression coverage.
+- **Automation:** `pnpm test:e2e:window-controls`; macOS traffic-light geometry
+  also has `apps/desktop/test/traffic-light-reserve.test.mjs` contract coverage.
+- **Status:** Automated for the executing native platform; run on macOS/Linux
+  runners for native qualification. Optional screenshots are written only to
+  `PI_DESKTOP_CHROME_ARTIFACT_DIR`.
