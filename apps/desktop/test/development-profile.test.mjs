@@ -10,6 +10,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const {
+  applyDevelopmentUserData,
   DEVELOPMENT_DATA_DIR_NAME,
   DEVELOPMENT_INSTALLATION_NAME,
   INSTALLATION_DATA_DIR_NAME,
@@ -71,27 +72,51 @@ test("an explicit data directory reaches the child processes as an absolute path
   );
 });
 
-test("a development build takes its own userData before the single-instance lock", () => {
+test("applyDevelopmentUserData sets userData unless --user-data-dir is set", () => {
+  const calls = [];
+  const app = {
+    commandLine: { hasSwitch: () => false },
+    getPath: () => "/tmp/appData",
+    setPath: (name, path) => calls.push([name, path]),
+  };
+  applyDevelopmentUserData(app, true);
+  assert.deepEqual(calls, [
+    ["userData", join("/tmp/appData", DEVELOPMENT_INSTALLATION_NAME)],
+  ]);
+  calls.length = 0;
+  applyDevelopmentUserData(app, false);
+  assert.equal(calls.length, 0);
+  applyDevelopmentUserData(
+    { ...app, commandLine: { hasSwitch: (name) => name === "user-data-dir" } },
+    true,
+  );
+  assert.equal(calls.length, 0);
+});
+
+test("a development build takes its own userData before the single-instance lock", async () => {
   // The lock lives under `userData`, so the profile has to be applied before
   // Electron asks for it; otherwise a running packaged app refuses the lock and
   // `pnpm dev` quits on arrival.
-  const setUserData = indexSource.search(
-    /app\.setPath\(\s*"userData",\s*join\(app\.getPath\("appData"\), DEVELOPMENT_INSTALLATION_NAME\)/,
-  );
+  const pathsSource = await readMainModule("data-paths.ts");
+  const apply = indexSource.indexOf("applyDevelopmentUserData(app, isDevelopmentBuild)");
   const setName = indexSource.indexOf("app.setName(APP_NAME)");
   const lock = indexSource.indexOf("app.requestSingleInstanceLock()");
 
-  assert.ok(setUserData > 0, "main must give the development build its own userData");
+  assert.ok(apply > 0, "main must give the development build its own userData");
   assert.ok(lock > 0, "main must request the single-instance lock");
-  assert.ok(setName > 0 && setName < setUserData);
-  assert.ok(setUserData < lock);
+  assert.ok(setName > 0 && setName < apply);
+  assert.ok(apply < lock);
 
   // An explicit `--user-data-dir` wins. The E2E harnesses point a build at a
   // throwaway profile with that switch, so overriding it would run their
   // assertions against the developer's own state instead.
   assert.match(
-    indexSource,
-    /if \(isDevelopmentBuild && !app\.commandLine\.hasSwitch\("user-data-dir"\)\) \{/,
+    pathsSource,
+    /if \(development && !app\.commandLine\.hasSwitch\("user-data-dir"\)\) \{/,
+  );
+  assert.match(
+    pathsSource,
+    /app\.setPath\(\s*"userData",\s*join\(app\.getPath\("appData"\), DEVELOPMENT_INSTALLATION_NAME\)/,
   );
 
   // The two profiles are told apart by the same verdict everywhere, and it is
@@ -99,7 +124,7 @@ test("a development build takes its own userData before the single-instance lock
   const development = indexSource.search(
     /const isDevelopmentBuild =\s*\n?\s*process\.env\.PI_DESKTOP_DEV === "1" \|\| !app\.isPackaged;/,
   );
-  assert.ok(development > 0 && development < setUserData);
+  assert.ok(development > 0 && development < apply);
 });
 
 test("main resolves one data directory and publishes it to everything below", () => {

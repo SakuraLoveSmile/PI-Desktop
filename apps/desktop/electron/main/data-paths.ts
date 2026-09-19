@@ -87,3 +87,28 @@ export function desktopDataDir(
     home: homedir(),
   });
 }
+
+/** The Electron `app` surface this helper needs; kept structural so tests need no Electron. */
+export type UserDataApp = {
+  commandLine: { hasSwitch(name: string): boolean };
+  getPath(name: "appData"): string;
+  setPath(name: "userData", path: string): void;
+};
+
+/**
+ * Give a development build its own `userData` so the single-instance lock
+ * does not collide with a shipped app that is already running (D236, ADR 0094).
+ * An explicit `--user-data-dir` wins, because that is how the E2E harnesses
+ * point a build at a throwaway profile.
+ */
+export function applyDevelopmentUserData(
+  app: UserDataApp,
+  development: boolean,
+): void {
+  if (development && !app.commandLine.hasSwitch("user-data-dir")) {
+    app.setPath(
+      "userData",
+      join(app.getPath("appData"), DEVELOPMENT_INSTALLATION_NAME),
+    );
+  }
+}

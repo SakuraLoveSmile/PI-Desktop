@@ -93,10 +93,7 @@ import {
   planExecutionFromUnknown,
 } from "@pi-desktop/host-runtime";
 import { readWindowState, writeWindowState } from "./window-preferences";
-import {
-  desktopDataDir,
-  DEVELOPMENT_INSTALLATION_NAME,
-} from "./data-paths";
+import { applyDevelopmentUserData, desktopDataDir } from "./data-paths";
 import { createPlanUiProbe } from "./plan-ui-probe";
 import type { McpControlController, McpControlServer } from "./mcp-control";
 import type { AgentHostBridge } from "./agent-host-bridge";
@@ -178,39 +175,19 @@ const ErrorCodes = {
 ignoreBrokenStdio();
 installMainProcessErrorHandlers();
 
-// A development build is a second installation beside the shipped app, so it
-// takes its own `userData`: the single-instance lock below lives there, and a
-// shipped app that is already running must not refuse the developer the lock
-// (D236, ADR 0094). An explicit `--user-data-dir` wins, because that is how the
-// E2E harnesses point a build at a throwaway profile — overriding it would run
-// their assertions against the developer's own state instead.
 const isDevelopmentBuild =
   process.env.PI_DESKTOP_DEV === "1" || !app.isPackaged;
 
 app.setName(APP_NAME);
-if (isDevelopmentBuild && !app.commandLine.hasSwitch("user-data-dir")) {
-  app.setPath(
-    "userData",
-    join(app.getPath("appData"), DEVELOPMENT_INSTALLATION_NAME),
-  );
-}
+applyDevelopmentUserData(app, isDevelopmentBuild);
 if (process.platform === "win32") {
   app.setAppUserModelId(APP_ID);
 }
 
-// One installation admits exactly one desktop process. host-core owns
-// `pi.sqlite` exclusively (D002), Electron main owns the persistence outbox and
-// the log tree beside it, and the tray, the global launcher shortcut, and the
-// updater are singletons of the running app — a second process fights the first
-// for every one of them and leaves the user with two shells over one database.
-//
-// Electron keeps the lock in `userData`, which the name and profile set just
-// above decide, so it is taken after `setName` and before anything else in this
-// module touches the data directory. That scope is the installation, not
-// `PI_DESKTOP_DATA_DIR`: a development build is its own installation, and a run
-// pointed at its own data directory (E2E harnesses, the capture rig, a
-// side-by-side profile) shares no state with the shipped one either. Both stay
-// launchable while the other is running.
+// One installation, one process. The lock lives in `userData` (set just
+// above), so it is taken after `setName` and before anything else here
+// touches the data directory. A development build is its own installation;
+// `PI_DESKTOP_DATA_DIR` still opts a run out of the lock (E2E, capture rig).
 const singleInstanceRequired = !process.env.PI_DESKTOP_DATA_DIR;
 const hasSingleInstanceLock = singleInstanceRequired
   ? app.requestSingleInstanceLock()
