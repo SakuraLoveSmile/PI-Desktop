@@ -163,6 +163,8 @@
 - Start/finish, read, pin, rename, archive, delete, and backend restart update
   the menu. The menu remains available when the main window is hidden or
   closed, without creating another window until an explicit activation.
+- macOS 不监听托盘 mouse-enter：该事件会替换原生 status item 并让菜单栏图标消失。
+  Windows/Linux 仍可在悬停/右键时重试失败的 Host 读取；macOS 改由下一次会话或收件箱事件刷新。
 
 ### 1. 6 侧边栏项目和对话组织
 

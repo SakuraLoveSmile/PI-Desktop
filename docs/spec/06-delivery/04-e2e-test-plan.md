@@ -13031,7 +13031,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Close the macOS window while a task runs and let it finish, then activate
   its tray row while the new renderer bootstraps a pending plan. Delay a Host
   read while a newer preference update, delete, or Host restart arrives.
-  Retry a transient read failure by hovering/right-clicking the tray.
+  Retry a transient read failure by hovering/right-clicking the tray on Windows/Linux; macOS retries from the next session or inbox event instead of mouse-enter.
   Repeat after clearing all group memberships and changing shipped locales.
   Choose Quit then Cancel, then Quit and confirm.
 - **Expected**: Running → Unread → Pinned; at most nine rows in total. Each
