@@ -10955,6 +10955,24 @@ are withdrawn with ADR 0165.
 - **Milestone**: M6+
 - **Status**: Unit/source-contract-covered; full UI journey Draft (run only in a capable environment when this surface changes)
 
+#### E2E-203a: Session thinking omit sends no provider override
+
+- **Preconditions**: A configured reasoning model is selected in Composer.
+- **Steps**: 1) Open the model × reasoning menu and confirm `omit` is the first
+  reasoning option, followed by the binding's enabled canonical levels.
+  2) Choose `omit` and confirm the chip shows `omit` and the session stores
+  `thinkingLevel: omit`. 3) Send a turn and inspect the outbound request.
+  4) Choose explicit `off` and send again.
+- **Expected**: `omit` persists and the request has no thinking/reasoning field.
+  Explicit `off` still serializes a disable. A non-reasoning model keeps an
+  `off`-only menu.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/02-agent-runtime.md`, `03-runtime/13-model-catalog-and-selection.md`,
+  ADR 0295 / D456
+- **Acceptance**: C (chat/stream) + Quality
+- **Milestone**: M6+
+- **Status**: Unit/source-contract-covered; full UI journey Draft
+
 #### E2E-211: Windows portable exe launches without an installer (D364)
 
 - **Preconditions**: A Windows x64 tag or `dist:win` package has produced both
