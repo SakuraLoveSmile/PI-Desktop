@@ -207,6 +207,16 @@ export const en = {
     sessionMissing: "That session no longer exists",
   },
   chat: {
+    imagePreview: {
+      title: "Image preview",
+      download: "Download image",
+      previous: "Previous image",
+      next: "Next image",
+      fit: "Fit",
+      error: "Could not load this image",
+      retry: "Try again",
+      position: "{{current}} of {{total}}",
+    },
     emptyTitle: "What can I help you build?",
     emptyTitleInProject: "What can we build in {{project}}?",
     emptyTitleTemporary: "What would you like to explore temporarily?",
