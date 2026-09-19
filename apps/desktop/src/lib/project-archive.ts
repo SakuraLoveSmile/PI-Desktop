@@ -135,6 +135,39 @@ export function projectBucket(project: ProjectIndexItem): GroupId {
   return "projects";
 }
 
+/**
+ * Row state of one project. Archived outranks both live states so a record can
+ * never read as "active" while it sits in the Archived group, and the live
+ * workspace outranks a merely retained project. `null` is a plain project.
+ */
+export type ProjectStatus = "active" | "open" | "archived";
+
+export const PROJECT_STATUS_LABEL_KEYS: Record<ProjectStatus, string> = {
+  active: "project.active",
+  open: "project.openTag",
+  archived: "project.archivedTag",
+};
+
+export function projectStatus(args: {
+  project: Pick<ProjectIndexItem, "path" | "archived">;
+  workspacePath?: string | null;
+  openProjectPaths: readonly string[];
+}): ProjectStatus | null {
+  const { project, workspacePath, openProjectPaths } = args;
+  if (project.archived === true) return "archived";
+  if (normalizeProjectPath(workspacePath) === normalizeProjectPath(project.path)) {
+    return "active";
+  }
+  if (
+    openProjectPaths.some(
+      (path) => normalizeProjectPath(path) === normalizeProjectPath(project.path),
+    )
+  ) {
+    return "open";
+  }
+  return null;
+}
+
 export function compareProjects(
   a: ProjectIndexItem,
   b: ProjectIndexItem,
