@@ -36,7 +36,7 @@ try {
   await build({
     entryPoints: {
       writer: join(root, "apps/desktop/electron/main/composer-paste.ts"),
-      reader: join(root, "apps/desktop/electron/main/fs-panel.ts"),
+      reader: join(root, "packages/host-runtime/src/workspace-files.ts"),
     },
     outdir: temp,
     outExtension: { ".js": ".cjs" },
