@@ -2760,6 +2760,7 @@
  */
 .tool-file-item {
   display: block;
+  flex: none;
   width: 100%;
   min-width: 0;
   overflow: hidden;
