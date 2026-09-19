@@ -1,6 +1,3 @@
-/** Drag payload so a drop can recover the source if React state lags. */
-export const MODEL_REORDER_MIME = "application/x-pi-desktop-model";
-
 export type ReorderPlacement = "before" | "after";
 
 export type DropTarget = { id: string; placement: ReorderPlacement };
@@ -16,11 +13,11 @@ export function dropPlacement(
 
 /** Adjacent *visible* row for ArrowUp / ArrowDown; hidden filter matches stay put. */
 export function visibleNeighborMove<T extends { id: string }>(
-  visible: T[],
+  visible: readonly T[],
   id: string,
   direction: "up" | "down",
 ): { targetId: string; placement: ReorderPlacement } | null {
-  const index = visible.findIndex((model) => model.id === id);
+  const index = visible.findIndex((item) => item.id === id);
   if (index < 0) return null;
   const target = visible[index + (direction === "down" ? 1 : -1)];
   if (!target) return null;
@@ -37,22 +34,22 @@ export function sameDropTarget(
   return current?.id === next?.id && current?.placement === next?.placement;
 }
 
-/** Move one binding without rebuilding it or dropping models hidden by a filter. */
-export function reorderModel<T extends { id: string }>(
-  models: T[],
+/** Move one item without rebuilding it or dropping items hidden by a filter. */
+export function reorderItem<T extends { id: string }>(
+  items: T[],
   sourceId: string,
   targetId: string,
   placement: ReorderPlacement,
 ): T[] {
-  const sourceIndex = models.findIndex((model) => model.id === sourceId);
-  const targetIndex = models.findIndex((model) => model.id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return models;
+  const sourceIndex = items.findIndex((item) => item.id === sourceId);
+  const targetIndex = items.findIndex((item) => item.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return items;
 
   const insertionIndex =
     targetIndex + (placement === "after" ? 1 : 0) - (sourceIndex < targetIndex ? 1 : 0);
-  if (insertionIndex === sourceIndex) return models;
-  const next = [...models];
-  const [binding] = next.splice(sourceIndex, 1);
-  next.splice(insertionIndex, 0, binding);
+  if (insertionIndex === sourceIndex) return items;
+  const next = [...items];
+  const [item] = next.splice(sourceIndex, 1);
+  next.splice(insertionIndex, 0, item);
   return next;
 }

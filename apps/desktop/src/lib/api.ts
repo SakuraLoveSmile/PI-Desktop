@@ -75,6 +75,7 @@ import type {
   ScheduledTask,
   ProviderCreateInput,
   ProviderPublic,
+  ProviderReorderInput,
   ProviderUpdateInput,
   Result,
   SessionDetail,
@@ -572,6 +573,8 @@ export const api = {
   listSystemFonts: () => invoke<string[]>(IPC.invoke.systemFontsList),
   listCommandShells: () =>
     invoke<CommandShellCatalog>(IPC.invoke.commandShellList),
+  reorderProviders: (input: ProviderReorderInput) =>
+    invoke<{ ok: boolean }>(IPC.invoke.providersReorder, input),
   listProviders: () =>
     invoke<{ providers: ProviderPublic[] }>(IPC.invoke.providersList),
   createProvider: (input: ProviderCreateInput) =>

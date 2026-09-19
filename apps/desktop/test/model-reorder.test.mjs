@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   dropPlacement,
-  reorderModel,
+  reorderItem,
   sameDropTarget,
   visibleNeighborMove,
-} from "../src/components/settings/model-reorder.ts";
+} from "../src/lib/list-reorder.ts";
 
 const ids = (models) => models.map((model) => model.id);
 const models = [
@@ -16,25 +16,25 @@ const models = [
 ];
 
 test("moves the first model to the end and the last to the beginning", () => {
-  assert.deepEqual(ids(reorderModel(models, "first", "last", "after")), [
+  assert.deepEqual(ids(reorderItem(models, "first", "last", "after")), [
     "hidden", "middle", "last", "first",
   ]);
-  assert.deepEqual(ids(reorderModel(models, "last", "first", "before")), [
+  assert.deepEqual(ids(reorderItem(models, "last", "first", "before")), [
     "last", "first", "hidden", "middle",
   ]);
 });
 
 test("inserts on either side of a target in both drag directions", () => {
-  assert.deepEqual(ids(reorderModel(models, "first", "middle", "before")), [
+  assert.deepEqual(ids(reorderItem(models, "first", "middle", "before")), [
     "hidden", "first", "middle", "last",
   ]);
-  assert.deepEqual(ids(reorderModel(models, "last", "hidden", "after")), [
+  assert.deepEqual(ids(reorderItem(models, "last", "hidden", "after")), [
     "first", "hidden", "last", "middle",
   ]);
 });
 
 test("a filtered drag retains hidden models and every binding's overrides", () => {
-  const next = reorderModel(models, "last", "first", "before");
+  const next = reorderItem(models, "last", "first", "before");
   assert.deepEqual(ids(next), ["last", "first", "hidden", "middle"]);
   for (const binding of models) {
     assert.equal(next.find((model) => model.id === binding.id), binding);
@@ -50,9 +50,9 @@ test("same-place drops and stale or missing targets leave the draft unchanged", 
     ["removed", "first", "before"],
     ["first", "removed", "after"],
   ]) {
-    assert.equal(reorderModel(models, source, target, side), models);
+    assert.equal(reorderItem(models, source, target, side), models);
   }
-  assert.deepEqual(reorderModel([], "first", "last", "after"), []);
+  assert.deepEqual(reorderItem([], "first", "last", "after"), []);
 });
 
 test("drop placement splits a row at its vertical midpoint", () => {
@@ -88,11 +88,11 @@ test("a filtered drag before the first visible row keeps hidden bindings in plac
   const move = visibleNeighborMove(visible, "shown-c", "up");
   assert.deepEqual(move, { targetId: "shown-b", placement: "before" });
   assert.deepEqual(
-    ids(reorderModel(all, "shown-c", "shown-a", "before")),
+    ids(reorderItem(all, "shown-c", "shown-a", "before")),
     ["shown-c", "shown-a", "hidden-a", "shown-b", "hidden-b"],
   );
   assert.deepEqual(
-    ids(reorderModel(all, "shown-a", move.targetId, move.placement)),
+    ids(reorderItem(all, "shown-a", move.targetId, move.placement)),
     ["hidden-a", "shown-a", "shown-b", "hidden-b", "shown-c"],
   );
 });

@@ -2660,3 +2660,16 @@ Sidebar footer                                        Popover (360px max)
     取消的分隔符手势恢复之前的宽度 (ADR 0033)
 19. 扩展侧边栏会话标题、project/group 标题和空状态文案
     使用 13px 紧凑令牌，同时主要侧边栏操作保持在 14px
+
+### Provider ordering
+
+Each AI service card can be dragged from its non-interactive surface. After a
+small movement threshold, the card follows the pointer and surrounding cards
+animate into the proposed slot. Dragging near the list edge scrolls it. Releasing
+saves the previewed order; Escape, pointer cancellation, focus loss, unmount or
+catalog changes cancel the drag. Buttons and form controls retain their actions.
+There is no separate drag handle. A focused card accepts Up/Down to move one visible row. Saving blocks further
+moves; a failed save shows an error and restores the accepted order. Late catalog
+responses cannot restore an earlier order. The default-model picker and Composer
+model groups follow the persisted order. Sorting changes neither the selected
+default nor provider configuration. OAuth accounts remain in their separate section.
