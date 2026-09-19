@@ -16,62 +16,65 @@ export function createLatestCommitQueue<T>(options: {
 } {
   let pending: T | null = null;
   let generation = 0;
-  let busy = false;
-  let tail: Promise<boolean> = Promise.resolve(true);
+  let running = false;
+  let idleWaiters: Array<() => void> = [];
 
-  const invalidate = () => {
-    generation += 1;
-    pending = null;
+  const notifyIdle = () => {
+    if (running || pending !== null) return;
+    const waiters = idleWaiters;
+    idleWaiters = [];
+    for (const waiter of waiters) waiter();
   };
 
-  const drain = async (): Promise<boolean> => {
-    busy = true;
+  const pump = async () => {
+    if (running) return;
+    running = true;
     try {
       while (pending !== null) {
         const gen = generation;
         const value = pending;
         pending = null;
-        if (gen !== generation) return false;
+        if (gen !== generation) break;
         try {
           await options.send(value);
         } catch (error) {
           generation += 1;
           pending = null;
           options.onError?.(error);
-          return false;
+          break;
         }
-        if (gen !== generation) return false;
+        if (gen !== generation) break;
       }
-      return true;
     } finally {
-      busy = false;
+      running = false;
+      if (pending !== null) {
+        void pump();
+        return;
+      }
+      notifyIdle();
     }
   };
+
+  const invalidate = () => {
+    generation += 1;
+    pending = null;
+  };
+
+  const whenIdle = () =>
+    new Promise<void>((resolve) => {
+      if (!running && pending === null) {
+        resolve();
+        return;
+      }
+      idleWaiters.push(resolve);
+    });
 
   const commit = (value: T): Promise<boolean> => {
     pending = value;
     const enqueuedAt = generation;
-    const finish = async (run: Promise<boolean>) => {
-      const ok = await run;
-      return ok && generation === enqueuedAt;
-    };
-    if (!busy) {
-      const run = drain();
-      tail = run.then(
-        () => true,
-        () => true,
-      );
-      return finish(run);
-    }
-    const run = tail.then(drain, drain);
-    tail = run.then(
-      () => true,
-      () => true,
-    );
-    return finish(run);
+    void pump();
+    return whenIdle().then(() => generation === enqueuedAt);
   };
 
-  const idle = () => tail.then(() => undefined);
-
-  return { commit, invalidate, idle };
+  return { commit, invalidate, idle: whenIdle };
 }

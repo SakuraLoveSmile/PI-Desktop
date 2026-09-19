@@ -22,7 +22,7 @@ import {
   thinkingProviderForModel,
   type ComposerMenuView,
 } from "../model";
-import { createLatestCommitQueue } from "./thinking-commit-queue";
+import { createLatestCommitQueue } from "../thinking-commit-queue";
 
 type UseComposerModelMenuOptions = {
   mode: Mode;
