@@ -6172,9 +6172,11 @@ that was sitting at the bottom — including after the turn had finished.
   (after an exec child closes, after a forward's port is up, or on `dispose`),
   so nothing lingers between operations.
 - `BatchMode=yes` becomes `BatchMode=no` only for a password target, together
-  with `NumberOfPasswordPrompts=1`: the helper answers every prompt with the
-  same secret, so a retry could only repeat a wrong password, and repeated
-  failures are what trip a server's own lockout.
+  with `NumberOfPasswordPrompts=1` and `PubkeyAuthentication=no`: the helper
+  answers every prompt with the same secret, so a retry could only repeat a
+  wrong password, and repeated failures are what trip a server's own lockout.
+  Default identities are skipped so an encrypted local key cannot consume that
+  single prompt as a passphrase; password mode in Settings replaces a key.
 - The password is persisted encrypted through the same OS-keychain
   `EncryptionPort` the device token uses, as a new optional
   `encryptedSshSecret` in `remote-hosts.json`; the descriptor gains

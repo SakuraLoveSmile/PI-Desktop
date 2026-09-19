@@ -11820,7 +11820,9 @@ browser milestones are scheduled.
   resumes from the replay ring; the remote catalog lists the relayed MCP tool
   but not the workspace-requiring plugin tool; the non-loopback peer and the
   reused pairing token are rejected; the tampered bundle is refused before
-  start; the version mismatch returns `PROTOCOL_MISMATCH` and offers the
+  start with a Settings toast that names the checksum failure rather than a
+  bare SSH exit code; a refused SSH login surfaces ssh's last stderr line in
+  that toast; the version mismatch returns `PROTOCOL_MISMATCH` and offers the
   re-download; and the local session is untouched throughout.
 - **Specs linked**: `02-architecture/05-remote-agent-control.md` §§5.2 and
   6.3, `03-runtime/19-remote-agent-control-protocol.md` §§6.2, 9.4, and
@@ -11856,12 +11858,14 @@ browser milestones are scheduled.
   and pairs. After the relaunch the host reconnects with no prompt, proving the
   saved credential is used. The wrong password yields exactly one failed attempt
   per connect (no helper-driven retry storm) and the host shows as offline rather
-  than crashing the app or showing a rejected-login dialog. The key-only machine
-  still authenticates with the key. No `ssh` argument contains the password, no
-  askpass file or directory remains after the connect completes, and the on-disk
-  record stores the password only as keychain ciphertext — never in cleartext.
-  A password containing a newline is refused with `INVALID_ARGUMENT` before any
-  remote command runs.
+  than crashing the app or showing a rejected-login dialog. The Settings toast
+  carries ssh's last stderr line (for example `Permission denied`), not a bare
+  exit code 255. The key-only machine fails under password mode because that
+  mode sets `PubkeyAuthentication=no`; a user with a key picks key mode. No
+  `ssh` argument contains the password, no askpass file or directory remains
+  after the connect completes, and the on-disk record stores the password only
+  as keychain ciphertext — never in cleartext. A password containing a newline
+  is refused with `INVALID_ARGUMENT` before any remote command runs.
 - **Specs linked**: `05-security/02-remote-control-security.md` §§3.4 and 13
   (gate 21), `02-architecture/05-remote-agent-control.md` §5.2,
   `06-delivery/07-remote-control-rollout.md` §2

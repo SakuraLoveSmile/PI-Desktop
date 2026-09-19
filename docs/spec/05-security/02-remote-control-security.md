@@ -176,6 +176,10 @@ password for a host the user paired that way, under these rules:
 - A password containing a line break cannot survive the askpass round trip and
   is rejected before any remote command runs. Windows OpenSSH cannot execute
   the helper and is refused with a remedy instead.
+- Password mode is exclusive: `PubkeyAuthentication=no` and
+  `NumberOfPasswordPrompts=1`. Default identities are not tried, because an
+  encrypted local key would consume the single askpass answer as a passphrase.
+  A user with both a key and a password picks key mode.
 
 ## 4. Authorization model
 
@@ -526,5 +530,5 @@ credentials.
 
 D454 (2026-09-19) added SSH password authentication for the bootstrap (§3.4,
 ADR 0293): the credential-handling rules above and gate 21. It relaxes
-`BatchMode=yes` for a password target only, with `NumberOfPasswordPrompts=1`,
-and keeps a key or agent as the default path.
+`BatchMode=yes` for a password target only, with `NumberOfPasswordPrompts=1`
+and `PubkeyAuthentication=no`, and keeps a key or agent as the default path.
