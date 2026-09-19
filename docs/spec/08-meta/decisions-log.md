@@ -5536,6 +5536,7 @@ that was sitting at the bottom — including after the turn had finished.
   and no new default. `project.deleteRunningBlocked` keeps its meaning, copy,
   and every translation. See ADR 0251, D421, and
   E2E-PROJECT-delete-running-sessions-are-named-and-stopped.
+
 ## 2026-09-16 — Plugin `workspace` fs roots follow the calling session (D432)
 
 - Every plugin `pi.fs.*` call whose mode root is `workspace` resolved the one
@@ -6319,3 +6320,28 @@ that was sitting at the bottom — including after the turn had finished.
 - Presentation only: no IPC, storage, host-protocol, or activation-semantics
   change. Search still matches session titles and keeps the owning project in
   the index. See `04-ux/06-settings-ia.md`.
+
+## 2026-09-20 — The menu root carries the reasoning slider (#417, D458)
+
+- The Composer's Reasoning level selection lived only inside a vertical radio
+  list one submenu deep. Issue #417 asked for a Codex-desktop-style slider
+  while keeping the existing click-to-list interaction.
+- The combined model × reasoning menu root now shows a native range input with
+  one stop per enabled level plus a clickable tick label per stop, directly
+  beneath the Reasoning level entry. Dragging the slider or clicking a tick
+  commits the level immediately through the same `configureActiveSession`
+  path and leaves the menu where it is, so quick adjustments never cost a
+  submenu trip. The Reasoning level entry itself still opens the classic
+  radio list, which keeps its radio semantics, trailing check,
+  Up/Down/Enter/Left contract, and root-return behavior.
+- The slider owns its arrow/Home/End/Enter keys while focused, so those keys
+  adjust the level instead of driving menu navigation, while Escape still
+  closes the menu. A drag can emit one commit per crossed stop, so commits
+  serialize behind a promise chain and a local drag lead keeps the controlled
+  input from snapping back while the store confirmation lands; a binding with
+  a single enabled level hides the slider entirely.
+- Level values remain untranslated canonical strings, including session
+  `omit` (D456) when the binding exposes enabled canonical levels. The
+  seven-level ladder, provider filtering, and clamping rules are unchanged.
+  Renderer only: no protocol, storage, host, permission, or migration change.
+  See `04-ux/08-component-spec.md`, `04-ux/07-ui-design-system.md`, and E2E-050.

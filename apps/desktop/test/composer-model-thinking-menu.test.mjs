@@ -30,6 +30,32 @@ test("model and reasoning selection return to the root without closing", () => {
   assert.match(composerSource, /setView\("root"\);[\s\S]*?setThinkingHighlight\(-1\)/);
   assert.match(composerSource, /const thinkingMenuLevels = sessionThinkingMenuLevels\(availableThinkingLevels\)/);
 });
+test("the menu root carries the reasoning slider under the reasoning entry", () => {
+  // The root view renders the slider directly beneath the Reasoning level
+  // entry; the entry itself still opens the classic radio-list submenu.
+  assert.match(composerSource, /onClick=\{\(\) => showView\("thinking"\)\}[\s\S]*?className="composer-thinking-slider"/);
+  assert.match(composerSource, /\{thinkingMenuLevels\.length > 1 \? \(\s*<div className="composer-thinking-slider">/);
+  assert.match(composerSource, /type="range"/);
+  assert.match(composerSource, /className="composer-thinking-range"/);
+  assert.match(composerSource, /aria-label=\{t\("chat.reasoningLevel"\)\}/);
+  assert.match(composerSource, /aria-valuetext=\{thinkingMenuLevels\[thinkingSliderValue\] \?\? thinkingLevel\}/);
+  assert.match(composerSource, /const commitThinkingLevel = async/);
+  assert.match(composerSource, /if \(!\(await commitThinkingLevel\(level\)\)\) return;/);
+  assert.match(composerSource, /if \(level && level !== thinkingLevel\) void commitThinkingLevel\(level\);/);
+  // The slider owns its arrow/Home/End keys so they adjust the level
+  // instead of driving the menu's list navigation.
+  assert.match(composerSource, /if \(THINKING_SLIDER_KEYS\.has\(event\.key\)\) event\.stopPropagation\(\);/);
+  assert.match(composerSource, /composer-thinking-tick/);
+  // A drag can emit one commit per crossed stop; sends serialize so
+  // out-of-order configure responses cannot land a stale level.
+  assert.match(composerSource, /thinkingCommitChainRef/);
+  assert.match(stylesSource, /\.composer-thinking-range::-webkit-slider-runnable-track/);
+  assert.match(stylesSource, /\.composer-thinking-range::-webkit-slider-thumb/);
+  assert.match(stylesSource, /\.composer-thinking-range::-moz-range-thumb/);
+  assert.match(stylesSource, /\.composer-thinking-tick\.active\s*\{/);
+  // The slider/list toggle machinery is gone: one surface, one behavior.
+  assert.doesNotMatch(composerSource, /thinkingMode|showThinkingMode|ThinkingSelectionMode/);
+});
 
 test("opening the combined menu preloads model metadata before its submenu", () => {
   assert.match(

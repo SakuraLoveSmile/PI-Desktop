@@ -56,6 +56,7 @@ export function useComposerModelMenu({
   const modelSearchRef = useRef<HTMLInputElement>(null);
   const modelListRef = useRef<HTMLDivElement>(null);
   const thinkingListRef = useRef<HTMLDivElement>(null);
+  const thinkingSliderRef = useRef<HTMLInputElement>(null);
 
   const thinkingProvider =
     resolvedThinkingProvider ??
@@ -235,22 +236,48 @@ export function useComposerModelMenu({
     }
   };
 
+  /**
+   * Commit a reasoning level without leaving the menu surface, so a dragged
+   * root slider or a tick click keeps the menu where it is. Returns false
+   * when the configuration is rejected, mirroring the list selection path's
+   * error contract.
+   *
+   * A drag can emit one commit per crossed stop. Idle sessions persist each
+   * configure directly, so concurrent promises could resolve out of order and
+   * land the store on a stale level. The chain serializes the sends: each
+   * configure starts only after the previous one has settled its store write.
+   */
+  const thinkingCommitChainRef = useRef<Promise<boolean | void>>(Promise.resolve());
+  const commitThinkingLevel = async (level: SessionThinkingLevel) => {
+    const send = async (): Promise<boolean> => {
+      try {
+        await configureActiveSession({
+          mode,
+          providerId: provider?.id,
+          modelId,
+          thinkingLevel: level,
+        });
+        return true;
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error), {
+          variant: "error",
+        });
+        return false;
+      }
+    };
+    const run = thinkingCommitChainRef.current.then(send);
+    thinkingCommitChainRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  };
+
   const selectThinkingLevel = async (level: SessionThinkingLevel) => {
-    try {
-      await configureActiveSession({
-        mode,
-        providerId: provider?.id,
-        modelId,
-        thinkingLevel: level,
-      });
-      setView("root");
-      setModelHighlight(-1);
-      setThinkingHighlight(-1);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), {
-        variant: "error",
-      });
-    }
+    if (!(await commitThinkingLevel(level))) return;
+    setView("root");
+    setModelHighlight(-1);
+    setThinkingHighlight(-1);
   };
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -315,11 +342,13 @@ export function useComposerModelMenu({
     modelSearchRef,
     modelListRef,
     thinkingListRef,
+    thinkingSliderRef,
     modelGroups: filteredModelGroups,
     flatModels,
     thinkingMenuLevels,
     showView,
     selectModel,
+    commitThinkingLevel,
     selectThinkingLevel,
     onMenuKeyDown,
     controlsBlocked,
