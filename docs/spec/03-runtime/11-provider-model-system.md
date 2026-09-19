@@ -224,6 +224,15 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
     catalog" rather than an equal-valued override. Agreeing with models.dev is
     therefore the reset, and no separate reset control or per-capability
     explanatory copy is required.
+10a. `nativeWebSearch` is a two-state opt-in (absent means off; there is no
+    catalog baseline because models.dev publishes no hosted-tool capability).
+    When enabled and the provider's resolved wire API is
+    `anthropic_messages` or `responses`, the adapter attaches the provider's
+    hosted web search tool (`web_search_20250305` / `web_search`), extracts
+    the search activity into `UiMessage.hostedSearch`, and replays the raw
+    search blocks on later turns (ADR 0294). The checkbox is disabled when
+    the provider's API style is neither of those two. Gateways that do not
+    support the tool surface the provider error; the remedy is unchecking.
 11. `ModelInfo` is the published record the settings surface compares against,
     so a stored binding must not shape its capabilities or reasoning fields.
     Effective limits, reasoning and thinking levels are resolved through the
