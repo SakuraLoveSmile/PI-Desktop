@@ -21,6 +21,10 @@ export const en = {
     close: "Close",
   },
   tray: {
+    running: "Running",
+    unread: "Unread",
+    pinned: "Pinned",
+    viewMore: "View more…",
     open: "Open PI-Desktop",
     quit: "Quit PI-Desktop",
     askTitle: "Keep PI-Desktop running in the background?",
