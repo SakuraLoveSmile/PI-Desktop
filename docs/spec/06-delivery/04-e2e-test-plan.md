@@ -16,7 +16,9 @@
   keyboard navigation, open the entry, change the variable, select/reselect the
   theme, restart, then disable, reload and uninstall the plugin while its entry
   is active.
-- **Expected:** Only the declared variable rule changes after Apply; static
+- **Expected:** The Extensions rail draws the destination's host icon token
+  (`palette` / Lucide Palette), not a Skills book glyph and not plugin SVG.
+  Only the declared variable rule changes after Apply; static
   `plugin-asset://` URLs remain valid; the value restores after restart; host-
   rendered cards retain the scenic backdrop behind their translucent content,
   have no opaque native rectangle, and leave Windows/Linux minimize/maximize
@@ -6736,7 +6738,8 @@ identify the platform validation still needed.
     only, later refreshes dim the rows already on screen and announce the
     refresh, busy state is confined to the row with the in-flight request, and
     counts are exposed to assistive technology. Empty states stay centered
-    inside the panel without a decorative frame and offer the page's primary
+    inside the panel without a decorative frame, show a host Lucide icon in a
+    chip wrapper (not a padded raw SVG), and offer the page's primary
     action, and no capability-specific color system is introduced.
   - Create, edit, and delete are available for all three capabilities without
     leaving Settings. New capabilities land at the level the filter points at,
