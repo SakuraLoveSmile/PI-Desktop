@@ -226,13 +226,17 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
     explanatory copy is required.
 10a. `nativeWebSearch` is a two-state opt-in (absent means off; there is no
     catalog baseline because models.dev publishes no hosted-tool capability).
-    When enabled and the provider's resolved wire API is
-    `anthropic_messages` or `responses`, the adapter attaches the provider's
+    When enabled and the model's resolved wire API is `anthropic-messages`,
+    `openai-responses`, or `azure-openai-responses` (stored apiStyle
+    `anthropic_messages` / `responses`), the adapter attaches the provider's
     hosted web search tool (`web_search_20250305` / `web_search`), extracts
-    the search activity into `UiMessage.hostedSearch`, and replays the raw
-    search blocks on later turns (ADR 0296). The checkbox is disabled when
-    the provider's API style is neither of those two. Gateways that do not
-    support the tool surface the provider error; the remedy is unchecking.
+    the search activity into `UiMessage.hostedSearch` (`rounds` for display,
+    `replay` for convertMessages), and restores those raw blocks on later
+    turns including after a restart (ADR 0296). The checkbox is disabled
+    when the provider's API style is neither of those two. Gateways that do
+    not support the tool surface the provider error; the remedy is unchecking.
+    Search runs on the provider: there is no local fetch and no permission
+    prompt. Compaction still drops search blocks.
 11. `ModelInfo` is the published record the settings surface compares against,
     so a stored binding must not shape its capabilities or reasoning fields.
     Effective limits, reasoning and thinking levels are resolved through the

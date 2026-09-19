@@ -1,20 +1,14 @@
 /**
- * Single evaluation point for the provider-hosted web search tool.
+ * Evaluation helpers for the provider-hosted web search tool.
  *
- * Every consumer — the request assembly in the pi-ai adapters, the runtime,
- * and any UI gating — must resolve "does this request carry the hosted web
- * search tool" through `resolveNativeWebSearch` and nothing else. Detection
- * inputs are deliberately minimal:
- *
- * - `wireApi` is the RESOLVED wire API for the model (the result of
- *   `apiBindingForProviderModel`), never the provider's stored apiStyle: a
- *   model-level catalog pin can select a different wire than the provider
- *   row, and judging by the stored style produced UI/runtime disagreement
- *   before.
- * - `modelWebSearch` is the `ModelConfig.webSearch` flag derived from the
- *   user's per-model binding opt-in. models.dev publishes no hosted-tool
- *   capability, so there is no catalog default: only an explicit user
- *   opt-in can enable the tool.
+ * - `nativeWebSearchSupportedOn` gates the settings checkbox. It accepts
+ *   stored apiStyle (`responses`, `anthropic_messages`) and resolved wire
+ *   APIs (`openai-responses`, `anthropic-messages`, `azure-openai-responses`).
+ * - `resolveNativeWebSearch` is the runtime decision: capable wire AND the
+ *   binding opt-in. Adapters then key on `model.webSearch`, which
+ *   `modelConfigWithBinding` copies from that opt-in.
+ * - `hostedSearchFromMessage` is what the runtime persists: display rounds
+ *   plus raw `replay` blocks for convertMessages after a restart.
  *
  * Vendor display names, base URL hostnames, and model id substrings are
  * intentionally not consulted. An endpoint either carries the tool on the
@@ -63,6 +57,68 @@ export function nativeWebSearchToolFor(
     return { ...OPENAI_RESPONSES_WEB_SEARCH_TOOL };
   }
   return undefined;
+}
+
+const NATIVE_WEB_SEARCH_API_STYLES = new Set(["responses", "anthropic_messages"]);
+
+/**
+ * Whether a stored apiStyle or a resolved wire API can carry the hosted
+ * search tool. Settings UI gates the checkbox with this; it accepts both
+ * spellings because the pane sees `responses` / `anthropic_messages` while
+ * the runtime sees `openai-responses` / `anthropic-messages`.
+ */
+export function nativeWebSearchSupportedOn(api: string | undefined): boolean {
+  const value = (api ?? "").trim().toLowerCase();
+  if (!value) return false;
+  if (NATIVE_WEB_SEARCH_WIRE_APIS.has(value)) return true;
+  if (NATIVE_WEB_SEARCH_API_STYLES.has(value)) return true;
+  return NATIVE_WEB_SEARCH_WIRE_APIS.has(value.replace(/_/g, "-"));
+}
+
+/**
+ * Capture the adapter's hostedSearch content parts for convertMessages
+ * replay. Streaming scratch (`index`, `inputJson`) is dropped; unknown
+ * shapes are ignored. Display normalization is `hostedSearchFromBlocks`.
+ */
+export function hostedSearchReplayBlocks(
+  content: unknown,
+): import("./types/messages.js").HostedSearchReplayBlock[] {
+  if (!Array.isArray(content)) return [];
+  const replay: import("./types/messages.js").HostedSearchReplayBlock[] = [];
+  for (const part of content) {
+    if (!part || typeof part !== "object") continue;
+    const block = part as Record<string, unknown>;
+    if (block.type !== "hostedSearch") continue;
+    const phase = typeof block.phase === "string" ? block.phase.trim() : "";
+    if (!phase) continue;
+    const next: import("./types/messages.js").HostedSearchReplayBlock = {
+      type: "hostedSearch",
+      phase,
+    };
+    if (typeof block.blockId === "string" && block.blockId) next.blockId = block.blockId;
+    if (typeof block.name === "string" && block.name) next.name = block.name;
+    if (block.input !== undefined) next.input = block.input;
+    if (typeof block.status === "string") next.status = block.status;
+    if (block.isError === true) next.isError = true;
+    if (block.wire && typeof block.wire === "object") next.wire = block.wire;
+    replay.push(next);
+  }
+  return replay;
+}
+
+/**
+ * Display rounds plus replay payload. Runtime persistence and stream
+ * updates go through this so a restart can rebuild the same content
+ * parts convertMessages expects.
+ */
+export function hostedSearchFromMessage(input: {
+  content: unknown;
+  citations?: unknown;
+}): import("./types/messages.js").HostedSearch | undefined {
+  const search = hostedSearchFromBlocks(input);
+  if (!search) return undefined;
+  const replay = hostedSearchReplayBlocks(input.content);
+  return replay.length > 0 ? { ...search, replay } : search;
 }
 
 /**

@@ -141,6 +141,25 @@ export type HostedSearch = {
    * any round is still in flight. */
   status: "searching" | "completed" | "failed";
   rounds: HostedSearchRound[];
+  /**
+   * Raw pi-ai hostedSearch content parts, in original block order. Display
+   * uses `rounds`; convertMessages replay after a restart uses this. Absent
+   * on transcripts written before the field existed — those rows still
+   * render, but later turns cannot ground on the old search.
+   */
+  replay?: HostedSearchReplayBlock[];
+};
+
+/** One adapter-captured search block, stripped of streaming scratch. */
+export type HostedSearchReplayBlock = {
+  type: "hostedSearch";
+  phase: string;
+  blockId?: string;
+  name?: string;
+  input?: unknown;
+  status?: string;
+  isError?: boolean;
+  wire?: unknown;
 };
 
 /** One provider search round, in the order the provider issued it. */

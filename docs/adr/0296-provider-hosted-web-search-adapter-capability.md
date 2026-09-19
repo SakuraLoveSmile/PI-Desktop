@@ -69,15 +69,16 @@ Two upstream facts forced the design:
    the pi-ai `Model`, so no new IPC, sidecar parameter, or runtime rebuild
    hook is needed.
 
-4. **Display data and replay data are separated.** The runtime normalizes
-   `hostedSearch` blocks into `UiMessage.hostedSearch`
-   (`status/rounds[]`, one round per provider search/open-page/find-in-page
-   call, shape-checked, junk ignored) for the activity rows; the raw wire blocks stay inside
-   pi-ai's message content for replay. Persistence is an additive
+4. **Display data and replay data are separated, and both persist.** The
+   runtime normalizes `hostedSearch` blocks into `UiMessage.hostedSearch`
+   (`status/rounds[]` for activity rows; `replay[]` for the adapter's raw
+   content parts, stripped of streaming scratch). Persistence is an additive
    `hostedSearch` transcript block (`ui_to_record` / `record_to_ui`) — no SQL
-   migration, per the storage playbook. The wire-slimming functions
-   (`streamingMessageIdentity`, `applyMessageUpdate`) carry the field so
-   delta frames cannot drop it.
+   migration. `historyToEntries` restores `replay` after thinking and before
+   text so convertMessages can ground later turns after a restart. Transcripts
+   written without `replay` still render; they just cannot ground. The
+   wire-slimming functions (`streamingMessageIdentity`, `applyMessageUpdate`)
+   carry the field so delta frames cannot drop it.
 
 5. **UI is a transcript activity row per round, not a composer control.**
    Each round of a `hostedSearch` activity renders as a `HostedSearchRow` on
@@ -103,3 +104,6 @@ Two upstream facts forced the design:
   limitation to revisit with the upstream patch.
 - Compaction rewrites history and drops search blocks; later turns lose old
   grounding and the model searches again as needed. Documented behavior.
+- Search executes on the provider. There is no local fetch, no ask/allow
+  prompt, and billing is the provider's. The model-level opt-in (default
+  off) is the user consent surface.

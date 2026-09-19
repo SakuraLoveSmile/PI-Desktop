@@ -16,6 +16,7 @@ import {
   bindingFromModelInfo,
   formatTokenCount,
   modelMatchesFilter,
+  nativeWebSearchSupportedOn,
   publishedThinkingLevels,
   sortThinkingLevels,
   type ModelBinding,
@@ -252,11 +253,10 @@ export function ModelSelectionPanes({
     if (models.length === 0) setChosenQuery("");
   }, [models.length]);
 
-  // The hosted web search tool only exists on two wire APIs; on any other
+  // The hosted web search tool only exists on two wires; on any other
   // style the opt-in cannot work, so the checkbox stays present but disabled
   // with an explanatory hint instead of silently doing nothing.
-  const nativeWebSearchWireCapable =
-    apiStyle === "responses" || apiStyle === "anthropic_messages";
+  const nativeWebSearchWireCapable = nativeWebSearchSupportedOn(apiStyle);
 
   /**
    * The chosen list narrows with the discovered list's rule plus the binding's

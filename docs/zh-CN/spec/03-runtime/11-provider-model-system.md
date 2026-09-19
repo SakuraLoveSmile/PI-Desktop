@@ -202,12 +202,15 @@ PI-Desktop 不得把用户永久限制在一份简短的固定模型列表上。
     值，存下来的是"跟随目录"，而不是一个取值相同的覆盖。因此与 models.dev
     保持一致本身就是重置，不需要另外的重置控件，也不需要逐项能力的解释文案。
 10a. `nativeWebSearch` 是两态的主动开启（缺省即关闭；没有目录基线，因为
-    models.dev 不发布托管工具能力）。启用且提供商解析后的线路 API 是
-    `anthropic_messages` 或 `responses` 时，适配器会附加提供商托管的联网
-    搜索工具（`web_search_20250305` / `web_search`），把搜索活动提取为
-    `UiMessage.hostedSearch`，并在后续回合回放原始搜索块（ADR 0296）。
-    提供商接口风格不属于这两种时复选框禁用。不支持该工具的网关会把
-    提供商错误暴露出来；处理方式是取消勾选。
+    models.dev 不发布托管工具能力）。启用且模型解析后的线路 API 是
+    `anthropic-messages`、`openai-responses` 或 `azure-openai-responses`
+    （存储的 apiStyle 为 `anthropic_messages` / `responses`）时，适配器会
+    附加提供商托管的联网搜索工具（`web_search_20250305` / `web_search`），
+    把搜索活动提取为 `UiMessage.hostedSearch`（`rounds` 用于展示，`replay`
+    用于 convertMessages），并在后续回合——包括重启之后——回放这些原始
+    搜索块（ADR 0296）。提供商接口风格不属于这两种时复选框禁用。不支持
+    该工具的网关会把提供商错误暴露出来；处理方式是取消勾选。搜索在提供商
+    侧执行：没有本地抓取，也没有权限询问。压缩仍会丢掉搜索块。
 11. `ModelInfo` 是设置界面用来对照的已发布记录，因此已存储的 binding 不得
     塑造它的能力或推理字段。有效上限、推理与思考级别都通过那个确切的 binding
     解析；有效的传输模态数组还会额外套用显式的附件覆盖。

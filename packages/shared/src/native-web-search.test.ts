@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   hostedSearchFromBlocks,
+  hostedSearchFromMessage,
+  hostedSearchReplayBlocks,
   hostedSearchRounds,
+  nativeWebSearchSupportedOn,
   nativeWebSearchToolFor,
   resolveNativeWebSearch,
 } from "./native-web-search.js";
@@ -463,3 +466,110 @@ describe("hostedSearchRounds", () => {
     ).toEqual([]);
   });
 });
+
+describe("nativeWebSearchSupportedOn", () => {
+  it("accepts stored apiStyle and resolved wire spellings", () => {
+    expect(nativeWebSearchSupportedOn("responses")).toBe(true);
+    expect(nativeWebSearchSupportedOn("anthropic_messages")).toBe(true);
+    expect(nativeWebSearchSupportedOn("openai-responses")).toBe(true);
+    expect(nativeWebSearchSupportedOn("azure-openai-responses")).toBe(true);
+    expect(nativeWebSearchSupportedOn("anthropic-messages")).toBe(true);
+  });
+
+  it("rejects wires without a hosted search tool", () => {
+    expect(nativeWebSearchSupportedOn("chat_completions")).toBe(false);
+    expect(nativeWebSearchSupportedOn("openai-completions")).toBe(false);
+    expect(nativeWebSearchSupportedOn("openai_codex_responses")).toBe(false);
+    expect(nativeWebSearchSupportedOn(undefined)).toBe(false);
+    expect(nativeWebSearchSupportedOn("")).toBe(false);
+  });
+});
+
+describe("hostedSearchReplayBlocks", () => {
+  it("keeps wire payloads and drops streaming scratch", () => {
+    expect(
+      hostedSearchReplayBlocks([
+        {
+          type: "hostedSearch",
+          phase: "server_tool_use",
+          blockId: "srvtoolu_01",
+          name: "web_search",
+          input: { query: "pi-desktop" },
+          index: 2,
+          inputJson: "{\"query\":\"pi-desktop\"}",
+        },
+        {
+          type: "hostedSearch",
+          phase: "web_search_tool_result",
+          blockId: "srvtoolu_01",
+          wire: {
+            type: "web_search_tool_result",
+            encrypted_content: "enc-1",
+          },
+        },
+        { type: "text", text: "answer" },
+      ]),
+    ).toEqual([
+      {
+        type: "hostedSearch",
+        phase: "server_tool_use",
+        blockId: "srvtoolu_01",
+        name: "web_search",
+        input: { query: "pi-desktop" },
+      },
+      {
+        type: "hostedSearch",
+        phase: "web_search_tool_result",
+        blockId: "srvtoolu_01",
+        wire: {
+          type: "web_search_tool_result",
+          encrypted_content: "enc-1",
+        },
+      },
+    ]);
+  });
+
+  it("ignores junk and empty input", () => {
+    expect(hostedSearchReplayBlocks(undefined)).toEqual([]);
+    expect(hostedSearchReplayBlocks([{ type: "hostedSearch" }])).toEqual([]);
+    expect(hostedSearchReplayBlocks("nope")).toEqual([]);
+  });
+});
+
+describe("hostedSearchFromMessage", () => {
+  it("attaches replay next to the display rounds", () => {
+    const content = [
+      {
+        type: "hostedSearch",
+        phase: "web_search_call",
+        blockId: "ws_1",
+        status: "completed",
+        wire: {
+          type: "web_search_call",
+          id: "ws_1",
+          status: "completed",
+          action: { type: "search", query: "q" },
+        },
+      },
+    ];
+    const search = hostedSearchFromMessage({ content });
+    expect(search?.rounds).toEqual([
+      { id: "ws_1", status: "completed", query: "q", sources: [] },
+    ]);
+    expect(search?.replay).toEqual([
+      {
+        type: "hostedSearch",
+        phase: "web_search_call",
+        blockId: "ws_1",
+        status: "completed",
+        wire: {
+          type: "web_search_call",
+          id: "ws_1",
+          status: "completed",
+          action: { type: "search", query: "q" },
+        },
+      },
+    ]);
+  });
+});
+

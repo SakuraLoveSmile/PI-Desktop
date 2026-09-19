@@ -756,7 +756,10 @@ type Block =
         status: "searching" | "completed" | "failed";
         kind?: "search" | "openPage" | "findInPage";
         query?: string; url?: string;
-        sources: Array<{ url: string; title?: string }> }> };
+        sources: Array<{ url: string; title?: string }> }>;
+      replay?: Array<{ type: "hostedSearch"; phase: string;
+        blockId?: string; name?: string; input?: unknown;
+        status?: string; isError?: boolean; wire?: unknown }> };
 ```
 
 - Tool results are stored **post-truncation** (16-tool-result-limits); full

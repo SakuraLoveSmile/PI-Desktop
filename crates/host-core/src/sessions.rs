@@ -4498,6 +4498,15 @@ mod tests {
                             { "url": "https://example.com/a", "title": "A" }
                         ]
                     }
+                ],
+                "replay": [
+                    {
+                        "type": "hostedSearch",
+                        "phase": "server_tool_use",
+                        "blockId": "srvtoolu_01",
+                        "name": "web_search",
+                        "input": { "query": "pi-desktop release notes" }
+                    }
                 ]
             })),
             session_message: None,
@@ -4521,6 +4530,15 @@ mod tests {
                             { "url": "https://example.com/a", "title": "A" }
                         ]
                     }
+                ],
+                "replay": [
+                    {
+                        "type": "hostedSearch",
+                        "phase": "server_tool_use",
+                        "blockId": "srvtoolu_01",
+                        "name": "web_search",
+                        "input": { "query": "pi-desktop release notes" }
+                    }
                 ]
             })
         );
@@ -4538,6 +4556,15 @@ mod tests {
                         "sources": [
                             { "url": "https://example.com/a", "title": "A" }
                         ]
+                    }
+                ],
+                "replay": [
+                    {
+                        "type": "hostedSearch",
+                        "phase": "server_tool_use",
+                        "blockId": "srvtoolu_01",
+                        "name": "web_search",
+                        "input": { "query": "pi-desktop release notes" }
                     }
                 ]
             }))

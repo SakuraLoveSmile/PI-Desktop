@@ -8288,7 +8288,78 @@ describe("DesktopAgentRuntime hosted web search rounds (ADR 0296)", () => {
         },
         { id: "ws_2", status: "completed", query: "second query", sources: [] },
       ],
+      replay: [
+        round("ws_1", "completed", "first query", [
+          { url: "https://example.com/a", title: "A" },
+        ]),
+        round("ws_2", "in_progress", "second query"),
+      ],
     });
     await runtime.dispose();
+  });
+
+  it("replays persisted hostedSearch blocks into model context on restore", async () => {
+    const restored = createRuntime({
+      history: [
+        {
+          id: "u1",
+          role: "user",
+          content: "news?",
+          status: "complete",
+          createdAt: "2026-09-19T00:00:00.000Z",
+        },
+        {
+          id: "a1",
+          role: "assistant",
+          content: "here is the news",
+          status: "complete",
+          createdAt: "2026-09-19T00:00:01.000Z",
+          hostedSearch: {
+            status: "completed",
+            rounds: [
+              { id: "srvtoolu_01", status: "completed", query: "news", sources: [] },
+            ],
+            replay: [
+              {
+                type: "hostedSearch",
+                phase: "server_tool_use",
+                blockId: "srvtoolu_01",
+                name: "web_search",
+                input: { query: "news" },
+              },
+              {
+                type: "hostedSearch",
+                phase: "web_search_tool_result",
+                blockId: "srvtoolu_01",
+                wire: {
+                  type: "web_search_tool_result",
+                  encrypted_content: "enc-1",
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const assistant = (restored as unknown as { agent: Agent }).agent.state.messages.find(
+      (message) => message.role === "assistant",
+    ) as { content: unknown[] } | undefined;
+    expect(assistant?.content).toEqual([
+      {
+        type: "hostedSearch",
+        phase: "server_tool_use",
+        blockId: "srvtoolu_01",
+        name: "web_search",
+        input: { query: "news" },
+      },
+      {
+        type: "hostedSearch",
+        phase: "web_search_tool_result",
+        blockId: "srvtoolu_01",
+        wire: { type: "web_search_tool_result", encrypted_content: "enc-1" },
+      },
+      { type: "text", text: "here is the news" },
+    ]);
+    await restored.dispose();
   });
 });
