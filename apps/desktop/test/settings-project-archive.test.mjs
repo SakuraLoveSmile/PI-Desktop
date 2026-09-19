@@ -9,6 +9,14 @@ const projectsPageSource = await readFile(
   new URL("../src/pages/ProjectsPage.tsx", import.meta.url),
   "utf8",
 );
+const projectsIndexSource = await readFile(
+  new URL("../src/features/projects/ProjectArchiveIndex.tsx", import.meta.url),
+  "utf8",
+);
+const projectArchiveSource = await readFile(
+  new URL("../src/lib/project-archive.ts", import.meta.url),
+  "utf8",
+);
 const settingsSearchSource = await readFile(
   new URL("../src/lib/settings-search.ts", import.meta.url),
   "utf8",
@@ -19,12 +27,11 @@ const searchDialogSource = await readFile(
 );
 const appSource = await readAppSource();
 const projectsStyleSource = await loadStyles();
-// The archive partial on its own: `loadStyles` inlines the whole cascade, so
-// assertions that a rule is *gone* have to look at the file that owned it.
 const projectsPartialSource = await readFile(
   new URL("../src/styles/projects.css", import.meta.url),
   "utf8",
 );
+const archiveUiSource = `${projectsPageSource}\n${projectsIndexSource}\n${projectArchiveSource}`;
 
 test("settings owns the project archive destination", () => {
   assert.match(settingsSearchSource, /id: "projects"/);
@@ -39,19 +46,20 @@ test("settings owns the project archive destination", () => {
 });
 
 test("project archive includes archived projects without a visibility toggle", () => {
-  assert.doesNotMatch(
-    projectsPageSource,
-    /filter\(\(project\).*project\.archived/s,
-  );
-  assert.doesNotMatch(projectsPageSource, /setSessionArchiveVisibility/);
+  assert.doesNotMatch(projectArchiveSource, /setSessionArchiveVisibility/);
+  assert.match(projectArchiveSource, /Archived records are grouped last/);
   assert.match(projectsPageSource, /setSettingsTab\("projects"\)/);
+  assert.match(projectArchiveSource, /if \(project\.archived === true\) return "archived"/);
 });
 
 test("project archive makes project sessions searchable and progressively visible", () => {
-  assert.match(projectsPageSource, /sessionMatchesQuery/);
-  assert.match(projectsPageSource, /sessionTimestamp\(b\.updatedAt\) - sessionTimestamp\(a\.updatedAt\)/);
-  assert.doesNotMatch(projectsPageSource, /\.slice\(0, 4\)/);
-  assert.match(projectsPageSource, /INITIAL_VISIBLE_SESSION_COUNT = 8/);
+  assert.match(archiveUiSource, /sessionMatchesQuery/);
+  assert.match(
+    projectArchiveSource,
+    /sessionTimestamp\(b\.updatedAt\) - sessionTimestamp\(a\.updatedAt\)/,
+  );
+  assert.doesNotMatch(archiveUiSource, /\.slice\(0, 4\)/);
+  assert.match(projectArchiveSource, /INITIAL_VISIBLE_SESSION_COUNT = 8/);
   assert.match(projectsPageSource, /project\.sessionsCount/);
   assert.match(projectsPageSource, /project\.showMoreSessions/);
   assert.match(projectsPageSource, /project\.showFewerSessions/);
@@ -63,16 +71,12 @@ test("project archive is no longer a standalone app page", () => {
   assert.doesNotMatch(appSource, /page === "projects"/);
 });
 
-test("project archive renders the intro, toolbar, and grouped index", () => {
-  // One quiet description line and no counter run: the per-group counts in the
-  // panel are the only totals the destination shows.
+test("project archive renders the intro, toolbar, and list-inspector workbench", () => {
   assert.match(projectsPageSource, /projects-intro-desc/);
   assert.match(projectsPageSource, /project\.archiveSubtitle/);
-  // The counter run is gone, so its markup and its four label keys are retired.
   assert.doesNotMatch(projectsPageSource, /projects-intro-stat/);
   assert.doesNotMatch(projectsPageSource, /project\.stat[A-Z]/);
 
-  // Toolbar: clearable search with a live match count plus a sort control.
   assert.match(projectsPageSource, /projects-search-clear/);
   assert.match(projectsPageSource, /project\.clearSearch/);
   assert.match(projectsPageSource, /projects-result-count[^]*aria-live="polite"/);
@@ -82,34 +86,31 @@ test("project archive renders the intro, toolbar, and grouped index", () => {
   assert.match(projectsPageSource, /project\.sortRecent/);
   assert.match(projectsPageSource, /project\.sortName/);
 
-  // Grouped index: archived records are a trailing section, not a filter.
   assert.match(
-    projectsPageSource,
+    projectArchiveSource,
     /GROUP_ORDER: GroupId\[\] = \["pinned", "projects", "archived"\]/,
   );
-  assert.match(projectsPageSource, /pinned: "project\.groupPinned"/);
-  assert.match(projectsPageSource, /projects: "project\.groupProjects"/);
-  assert.match(projectsPageSource, /archived: "project\.groupArchived"/);
-  assert.match(projectsPageSource, /projects-group-count/);
+  assert.match(projectArchiveSource, /pinned: "project\.groupPinned"/);
+  assert.match(projectArchiveSource, /projects: "project\.groupProjects"/);
+  assert.match(projectArchiveSource, /archived: "project\.groupArchived"/);
+  assert.match(projectsIndexSource, /projects-group-count/);
   assert.match(projectsPageSource, /projects-empty/);
 
-  // One workbench: the groups are strips inside a single elevated panel.
-  assert.equal(
-    projectsPageSource.match(/settings-panel projects-list/g)?.length,
-    1,
-  );
-  // Each group keeps its name in the accessibility tree and owns the list role,
-  // so the strip never becomes a non-listitem child of a list.
-  assert.match(projectsPageSource, /aria-labelledby=\{`projects-group-\$\{group\.id\}`\}/);
-  assert.match(projectsPageSource, /<h3 className="projects-group-label"/);
-  assert.match(projectsPageSource, /className="projects-group-rows" role="list"/);
-  assert.doesNotMatch(projectsPageSource, /projects-group-head" role="presentation"/);
+  assert.equal(projectsPageSource.match(/projects-workbench/g)?.length, 1);
+  assert.match(projectsPageSource, /projects-inspector/);
+  assert.match(projectsIndexSource, /aria-labelledby=\{`projects-group-\$\{group\.id\}`\}/);
+  assert.match(projectsIndexSource, /<h3 className="projects-group-label"/);
+  assert.match(projectsIndexSource, /className="projects-group-rows" role="list"/);
+  assert.doesNotMatch(archiveUiSource, /projects-group-head" role="presentation"/);
+  assert.doesNotMatch(archiveUiSource, /projects-expand/);
+  assert.match(projectsIndexSource, /onDoubleClick=\{\(\) => onActivate\(project\.path\)\}/);
+  assert.match(projectsPageSource, /onActivate=\{\(path\) => void activate\(path\)\}/);
 });
 
 test("pinned projects use a distinct star glyph", () => {
-  assert.match(projectsPageSource, /IconStar/);
+  assert.match(projectsIndexSource, /IconStar/);
   assert.match(
-    projectsPageSource,
+    projectsIndexSource,
     /projects-glyph[^]*project\.pinned \? \([\s\S]*<IconStar size=\{15\} fill="currentColor" aria-hidden \/>[\s\S]*<IconFolder size=\{15\} aria-hidden \/>/,
   );
 });
@@ -125,10 +126,11 @@ test("project archive styles group archived rows instead of hiding them", () => 
   assert.match(projectsStyleSource, /\.projects-intro-desc\s*\{/);
   assert.match(projectsStyleSource, /\.projects-sort-btn\.active\s*\{/);
   assert.match(projectsStyleSource, /\.projects-group-head\s*\{/);
+  assert.match(projectsPartialSource, /\.projects-workbench\s*\{/);
+  assert.match(projectsPartialSource, /\.projects-inspector\s*\{/);
   assert.doesNotMatch(projectsStyleSource, /\.projects-row-block\.archived\s*\{\s*display:\s*none/);
   assert.doesNotMatch(projectsStyleSource, /\.projects-row-block\.archived\s*\{\s*opacity/);
 
-  // The decorative hero card is gone: no hero rules and no gradient fill.
   assert.doesNotMatch(projectsPartialSource, /projects-hero/);
   assert.doesNotMatch(projectsPartialSource, /projects-stat/);
   assert.doesNotMatch(projectsPartialSource, /linear-gradient/);
