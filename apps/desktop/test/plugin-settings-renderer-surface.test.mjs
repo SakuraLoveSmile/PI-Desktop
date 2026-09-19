@@ -36,6 +36,5 @@ test("scenic blur persists only after the host-owned Apply action", () => {
 test("window controls have a compositor layer above Settings destinations", () => {
   const chrome = read("src/styles/chrome.css");
   assert.match(chrome, /\.window-controls\s*\{[\s\S]*?z-index:\s*1000/s);
-  assert.match(chrome, /\.window-controls\.window-controls-in-pane\s*\{[\s\S]*?isolation:\s*isolate/s);
   assert.match(chrome, /\.app-shell\s*>\s*\.window-controls\s*\{[\s\S]*?z-index:\s*1100/s);
 });
