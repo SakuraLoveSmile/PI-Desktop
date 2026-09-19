@@ -241,4 +241,24 @@ describe("Plan protocol contracts", () => {
       130_000,
     );
   });
+
+  it("covers the permission wait and host-core dispatch for plugin and MCP tools", () => {
+    // Permission (120s) + host-core dispatch (120s) + slack (10s). A flat 130s
+    // would cut off a prompted plugin tool that is still inside its budget.
+    expect(rpcTimeoutMs("tools.execute", { toolName: "plugin_advisor_ask" })).toBe(
+      250_000,
+    );
+    expect(rpcTimeoutMs("tools.execute", { toolName: "mcp_github_search" })).toBe(
+      250_000,
+    );
+    expect(
+      rpcTimeoutMs("tools.execute", {
+        toolName: "plugin_advisor_ask",
+        timeoutMs: 5_000,
+      }),
+    ).toBe(135_000);
+    expect(
+      rpcTimeoutMs("tools.execute", { toolName: "plugin_advisor_ask", timeoutMs: 0 }),
+    ).toBe(250_000);
+  });
 });

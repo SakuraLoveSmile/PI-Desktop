@@ -8066,3 +8066,28 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Status:** Automated for the executing native platform; run on macOS/Linux
   runners for native qualification. Optional screenshots are written only to
   `PI_DESKTOP_CHROME_ARTIFACT_DIR`.
+
+### E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch
+
+- **Preconditions:** A loaded plugin that registers an agent tool; the tool
+  awaits work longer than 60s but shorter than the 110s plugin tool budget (for
+  example an `agent.complete` call that takes ~70s).
+- **Steps:** Ask the agent to use the tool, approve it if prompted, and wait for
+  the call to finish. Repeat with the permission card left open for a while
+  before approving.
+- **Expected:** The call returns the plugin's result. host-core does not answer
+  `TOOL_TIMEOUT` before Electron's plugin tool budget expires, and no transport
+  layer reports `host RPC timeout` or `sidecar RPC timeout` for the call. Budgets
+  nest from the inside out: plugin `agent.complete` 90s < MCP call 100s < plugin
+  tool 110s < host-core dispatch 120s, and the transport deadline covers the
+  permission wait plus that dispatch.
+- **Specs:** `07-plugins/12-plugin-ipc-and-host-services.md` agent-tool
+  dispatch; ADR 0038; ADR 0174.
+- **Acceptance:** G (plugin agent tool).
+- **Milestone:** Post-MVP regression coverage.
+- **Automation:** `apps/desktop/test/plugin-timeout-budgets.test.mjs` checks the
+  budget order across the TypeScript and Rust sources;
+  `packages/shared/src/protocol.test.ts` covers the transport deadline;
+  host-core `desktop_dispatch_outlasts_the_electron_plugin_tool_budget` covers
+  the dispatch default.
+- **Status:** Contract-covered; no end-to-end driver waits out a real 70s call.

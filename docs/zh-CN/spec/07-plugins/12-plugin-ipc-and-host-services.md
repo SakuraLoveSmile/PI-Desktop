@@ -212,8 +212,11 @@ toast 加上 `pluginChanged` 到渲染器。
    Electron主要执行注册的插件工具JS并通过RPC应答
    `plugins.resolveExecution` `{ executionId, ok, content, errorCode? }`。
 4. host-core 解析待执行并返回一个标准
-   `ToolsExecuteResult` 到 sidecar。调度超时映射到
-   `TOOL_TIMEOUT`； unknown/unloaded 工具映射到 `TOOL_NOT_FOUND`。
+   `ToolsExecuteResult` 到 sidecar。调度最多等待 120 秒
+   （`DESKTOP_TOOL_DISPATCH_TIMEOUT_MS`，高于 110 秒的插件工具预算），超时映射到
+   `TOOL_TIMEOUT`； unknown/unloaded 工具映射到 `TOOL_NOT_FOUND`。这类调用的传输
+   截止时间覆盖权限等待、上述调度和 10 秒余量（`rpcTimeoutMs`），因此外层不会在
+   host-core 报告结果之前先放弃。
 
 面向模型的注册表根据提示获得插件工具：已注册主要通道
 defs（`fullName`、描述、JSON 架构参数）到 `agent.prompt`，以及
