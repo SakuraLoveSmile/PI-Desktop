@@ -308,8 +308,8 @@ export function AppShell() {
     >
       <div className="app-scenic-backdrop" aria-hidden />
       {shell}
-      {/* Keep native-window actions outside pane stacking contexts. */}
-      {ready && <WindowControls />}
+      {/* Outside pane stacking; skip splash so the band cannot cover boot chrome. */}
+      {ready && !showSplash && <WindowControls />}
       <ProjectCreateDialog />
       {splash}
     </div>

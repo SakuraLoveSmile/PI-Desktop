@@ -77,12 +77,10 @@
   The main process uses the same geometry from `@pi-desktop/shared`.
   Right native-control exclusion is unchanged; header-height background paint
   fills the left lane without an opaque overlay covering panel controls.
-  One window-level control band stays outside pane stacking contexts across
-  panel open, preview, restore, and Settings transitions. Its background follows
-  the adjacent titlebar surface (dock header when open, conversation surface when
-  closed) in both themes. Preview navigation
-  must also remain above the panel; macOS keeps native traffic lights and its
-  existing fullscreen insets.
+  窗口级控件条始终挂在各面板堆叠上下文之外，覆盖面板打开、预览、还原和设置页切换。
+  背景跟随相邻标题栏（打开时为停靠栏标题，关闭时为会话表面），深浅色主题均如此。
+  启动闪屏、搜索和 Toast 保持在控件条之上。预览导航也必须保持在面板之上；
+  macOS 继续使用原生交通灯和既有全屏留白。
   Windows/Linux 使用无菜单的无框架 46px 行，并在
   左侧和可访问的最小化/最大化或恢复/关闭控件
   右（D129）。目的地历史以快捷键为主（`Cmd/Ctrl+[` 和

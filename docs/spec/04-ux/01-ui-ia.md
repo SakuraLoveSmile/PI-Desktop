@@ -77,6 +77,7 @@ destination, chat as the home surface, tools and permissions inline.
   stays outside pane stacking contexts across panel open, preview, restore,
   and Settings transitions. Its background follows the adjacent titlebar surface
   (dock header when open, conversation surface when closed) in both themes.
+  Boot splash, search, and toasts stay above that band.
   Preview navigation must also remain above the panel;
   macOS keeps native traffic lights and its existing fullscreen insets.
   Destination history is

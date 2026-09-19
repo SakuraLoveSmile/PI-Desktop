@@ -37,4 +37,9 @@ test("window controls have a compositor layer above Settings destinations", () =
   const chrome = read("src/styles/chrome.css");
   assert.match(chrome, /\.window-controls\s*\{[\s\S]*?z-index:\s*1000/s);
   assert.match(chrome, /\.app-shell\s*>\s*\.window-controls\s*\{[\s\S]*?z-index:\s*1100/s);
+  assert.match(
+    chrome,
+    /\.app-shell\s*>\s*\.search-overlay,\s*\n\.app-shell\s*>\s*\.toast-viewport\s*\{[\s\S]*?z-index:\s*1200/s,
+  );
+  assert.match(chrome, /\.app-shell\s*>\s*\.startup-splash\s*\{[\s\S]*?z-index:\s*1300/s);
 });
