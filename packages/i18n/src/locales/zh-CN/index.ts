@@ -890,7 +890,9 @@ sklm: {
     importFound: "发现 {{count}} 个会话",
     importFound_one: "发现 1 个会话",
     importFound_other: "发现 {{count}} 个会话",
+    importCodexCapped: "Codex 仅列出按目录日期最新的 {{limit}} 个会话文件。",
     importNone: "未在本机发现可导入的会话。",
+
     importSelectAll: "全选",
     importSelected: "导入所选（{{count}}）",
     importing: "正在导入…",

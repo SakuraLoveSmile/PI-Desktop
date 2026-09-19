@@ -901,7 +901,9 @@ sklm: {
     importFound: "찾은 세션: {{count}}",
     importFound_one: "세션 1개 찾음",
     importFound_other: "세션 {{count}}개 찾음",
+    importCodexCapped: "Codex는 폴더 날짜 기준 최신 세션 파일 {{limit}}개만 표시합니다.",
     importNone: "이 컴퓨터에서 가져올 수 있는 세션을 찾지 못했습니다.",
+
     importSelectAll: "모두 선택",
     importSelected: "선택 항목 가져오기 ({{count}})",
     importing: "가져오는 중…",

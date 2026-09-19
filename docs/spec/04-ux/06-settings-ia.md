@@ -547,7 +547,11 @@ system while preserving their different data ownership:
   project-path grouping behavior follows
   [08-component-spec §18](08-component-spec.md#18-import-destination).
   The Group-by control is the same in-app menu select as the Appearance and
-  Permissions pickers, not a platform-drawn `<select>`.
+  Permissions pickers, not a platform-drawn `<select>`. A Codex archive larger
+  than `CODEX_SCAN_MAX_FILES` (250) is truncated to the newest session files by
+  `YYYY/MM/DD` path date; the workbench shows a localized cap note, and omitted
+  Codex files are not in that candidate list.
+
 - Model configuration: review provider drafts through
   `ModelConfigImportPanel`
   ([08-component-spec §18.5](08-component-spec.md#185-modelconfigimportpanel)).
