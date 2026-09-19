@@ -280,6 +280,8 @@ test("models.dev records retain all published model parameters and modalities", 
     high: "high",
     xhigh: "xhigh",
     max: "max",
+    // Effort ladder without a published none/off value (#603).
+    off: null,
   });
   assert.deepEqual(info.provider, { npm: "@ai-sdk/anthropic" });
   assert.deepEqual(info.experimental, { modes: { fast: { enabled: true } } });
@@ -315,6 +317,8 @@ test("models.dev records retain all published model parameters and modalities", 
     high: "high",
     xhigh: "xhigh",
     max: "max",
+    // Effort ladder without a published none/off value (#603).
+    off: null,
   });
   assert.equal(config.cost.reasoning, 25);
   assert.deepEqual(config.provider, { npm: "@ai-sdk/anthropic" });
