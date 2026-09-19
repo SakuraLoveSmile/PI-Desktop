@@ -152,10 +152,12 @@
 - Empty groups are hidden. Archived sessions/projects and deleted sessions
   are excluded. Running/Pinned follow sidebar sorting; Unread follows the
   latest unread result per session, newest first, including failed results.
-- Long titles use one line and an ellipsis after at most 48 Unicode code
-  points. An overflowing group offers View more to restore the window and
-  expand session navigation. A session row restores/focuses its exact conversation,
-  activating its project through the existing selection flow.
+- Long titles use one line capped at 32 display columns including the
+  ellipsis; an East Asian wide or emoji code point counts as two, so a CJK
+  row stays as wide as a Latin one. An overflowing group offers View more to
+  restore the window and expand session navigation. A session row
+  restores/focuses its exact conversation, activating its project through the
+  existing selection flow.
 - macOS single-click opens the menu without restoring/focusing a conversation
   or marking it read. Entering a conversation uses normal acknowledgement.
   Open and double-click restore the window; Quit keeps its confirmation and

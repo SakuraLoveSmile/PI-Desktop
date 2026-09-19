@@ -44,8 +44,9 @@ or closed, so a renderer-only menu snapshot would become stale.
    read. Single-click opens the attached menu; double-click and Open retain
    window restore behavior. Each overflowing group has View more, which
    restores the main window and expands the existing session sidebar. Titles are one
-   line and capped at 48 Unicode code points including an ellipsis; labels
-   use the active shipped locale. Quit retains confirmation and shutdown.
+   line and capped at 32 display columns including an ellipsis, counting an East
+   Asian wide or emoji code point as two; labels use the active shipped locale.
+   Quit retains confirmation and shutdown.
 
 ## Consequences
 

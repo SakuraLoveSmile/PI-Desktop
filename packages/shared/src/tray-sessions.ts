@@ -12,7 +12,8 @@ import type { AppNotification } from "./types/workspace.js";
 export const TRAY_SESSION_GROUP_SHARE = 3;
 /** Rows the menu may show across all groups once unused shares are reclaimed. */
 export const TRAY_SESSION_TOTAL_LIMIT = 9;
-export const TRAY_SESSION_TITLE_LIMIT = 48;
+/** Display columns one tray row may use, ellipsis included. */
+export const TRAY_SESSION_TITLE_COLUMNS = 32;
 export const TRAY_SESSION_GROUPS = ["running", "unread", "pinned"] as const;
 export type TraySessionGroupKind = (typeof TRAY_SESSION_GROUPS)[number];
 
@@ -54,15 +55,60 @@ export function parseTraySessionPreferences(input: unknown): TraySessionPreferen
   };
 }
 
+/**
+ * East Asian wide and fullwidth code points, plus everything Unicode gives
+ * emoji presentation by default, draw at two display columns. Counting them as
+ * two keeps a CJK menu row as wide as a Latin one instead of letting one
+ * Chinese title fill the whole tray menu.
+ */
+const WIDE_CODE_POINT =
+  /[\u1100-\u115f\u2329-\u232a\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\ua960-\ua97f\uac00-\ud7a3\uf900-\ufaff\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6\u{1b000}\u{1b001}\u{1f000}-\u{1faff}\u{20000}-\u{3fffd}]|\p{Emoji_Presentation}/u;
+/** Joiners, zero-width space, variation selectors, and combining marks draw nothing of their own. */
+const ZERO_WIDTH_CODE_POINT = /[\u200b-\u200d\u2060\ufe00-\ufe0f]|\p{Mn}/u;
+/** A text-presentation base becomes a two-column emoji once this selector follows it. */
+const EMOJI_VARIATION_SELECTOR = "\ufe0f";
+/** Joiners and zero-width code points that the cut left with nothing to join. */
+const DANGLING_TAIL = /[\u200b-\u200d\u2060]+$/u;
+
+/** Display columns one code point of `characters` occupies in a native menu row. */
+function characterColumns(characters: readonly string[], index: number): number {
+  const character = characters[index];
+  if (ZERO_WIDTH_CODE_POINT.test(character)) return 0;
+  if (characters[index + 1] === EMOJI_VARIATION_SELECTOR) return 2;
+  return WIDE_CODE_POINT.test(character) ? 2 : 1;
+}
+
+function titleColumns(characters: readonly string[]): number {
+  let columns = 0;
+  for (let index = 0; index < characters.length; index += 1) {
+    columns += characterColumns(characters, index);
+  }
+  return columns;
+}
+
+/**
+ * One line that never outgrows `TRAY_SESSION_TITLE_COLUMNS`: a longer title is
+ * cut to `TRAY_SESSION_TITLE_COLUMNS - 1` columns plus an ellipsis, so Latin,
+ * CJK, and emoji rows land at the same menu width.
+ */
 export function traySessionTitle(title: string, fallback: string): string {
   const singleLine = title
     .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const characters = Array.from(singleLine || fallback);
-  return characters.length > TRAY_SESSION_TITLE_LIMIT
-    ? `${characters.slice(0, TRAY_SESSION_TITLE_LIMIT - 1).join("")}…`
-    : characters.join("");
+  const line = singleLine || fallback;
+  const characters = Array.from(line);
+  if (titleColumns(characters) <= TRAY_SESSION_TITLE_COLUMNS) return line;
+  const budget = TRAY_SESSION_TITLE_COLUMNS - 1;
+  let clipped = "";
+  let columns = 0;
+  for (let index = 0; index < characters.length; index += 1) {
+    const next = columns + characterColumns(characters, index);
+    if (next > budget) break;
+    clipped += characters[index];
+    columns = next;
+  }
+  return `${clipped.replace(DANGLING_TAIL, "").trimEnd()}\u2026`;
 }
 
 /**
