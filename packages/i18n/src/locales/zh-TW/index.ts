@@ -206,6 +206,16 @@ export const zhTW = {
     sessionMissing: "該對話已不存在",
   },
   chat: {
+    imagePreview: {
+      title: "圖片預覽",
+      download: "下載圖片",
+      previous: "上一張圖片",
+      next: "下一張圖片",
+      fit: "符合視窗",
+      error: "無法載入這張圖片",
+      retry: "重試",
+      position: "{{current}} / {{total}}",
+    },
     emptyTitle: "今天想做點什麼？",
     emptyTitleInProject: "今天想在 {{project}} 裡做點什麼？",
     emptyTitleTemporary: "臨時聊點什麼？",

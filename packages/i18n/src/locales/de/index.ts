@@ -204,6 +204,16 @@ export const de = {
     sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
+    imagePreview: {
+      title: "Bildvorschau",
+      download: "Bild herunterladen",
+      previous: "Vorheriges Bild",
+      next: "Nächstes Bild",
+      fit: "Einpassen",
+      error: "Dieses Bild konnte nicht geladen werden",
+      retry: "Erneut versuchen",
+      position: "{{current}} von {{total}}",
+    },
     "emptyTitle": "Was kann ich Ihnen beim Aufbau helfen?",
     "emptyTitleInProject": "Was können wir in {{project}} bauen?",
     "emptyTitleTemporary": "Was würden Sie gerne vorübergehend erkunden?",

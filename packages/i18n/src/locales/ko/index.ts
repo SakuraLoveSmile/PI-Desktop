@@ -213,6 +213,16 @@ export const ko = {
     sessionMissing: "해당 세션이 더 이상 존재하지 않습니다",
   },
   chat: {
+    imagePreview: {
+      title: "이미지 미리보기",
+      download: "이미지 다운로드",
+      previous: "이전 이미지",
+      next: "다음 이미지",
+      fit: "창에 맞추기",
+      error: "이미지를 불러올 수 없습니다",
+      retry: "다시 시도",
+      position: "{{current}} / {{total}}",
+    },
     emptyTitle: "무엇을 만들어 볼까요?",
     emptyTitleInProject: "{{project}}에서 무엇을 만들어 볼까요?",
     emptyTitleTemporary: "무엇을 임시로 탐색해 볼까요?",

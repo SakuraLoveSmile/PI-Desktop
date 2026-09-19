@@ -6330,6 +6330,29 @@ identify the platform validation still needed.
      removable leaf-name chip and no scratch absolute path occupies the
      textarea. Hover/focus chips to inspect their full paths, remove one, then
      send the prompt and inspect the session message's attachment metadata.
+     Before sending, verify image thumbnails sit left-aligned above and outside
+     the input shell. Replacing/undoing all text must retain the images; image-only
+     drafts must survive session switching and retain submission metadata.
+     Mount the complete Composer: click Send for image-only input, verify
+     attachment delivery and successful clearing, and immediately reject a
+     text-plus-image send to verify full draft restoration. In a narrow pane,
+     add 20 images, scroll to the last one and remove it without losing others.
+     Inspect the thumbnail and open it with click, Enter, and
+     Space. Confirm a centered modal preview opens, the work panel stays
+     unchanged, and the draft is neither edited nor sent. Check small images
+     stay at natural size, wide images fit without distortion, zoom/reset and
+     download target the selected original, and multiple images support button
+     and arrow-key navigation with zoom reset. Drag at fit size and after zoom,
+     including releasing outside the image; check cancellation and ordinary wheel
+     panning. Fit and image navigation must reset position; dragging must not
+     dismiss the preview or leave capture active after close/session changes. Close with Escape, the close
+     button, and blank space; verify focus/caret restoration and modal focus
+     containment. Native plugin surfaces must hide while the preview is open.
+     Repeat without a project. Remove an attachment; it must neither preview
+     nor send. Switch session/project or remove the selected attachment during
+     a delayed read; the old preview must close and late results must not
+     overwrite a newer image. Missing/undecodable images show retry and keep
+     the draft. Text chips must still expand as editable text.
   5. Inspect `<data_dir>/scratch/<sessionId>/pasted/` and compare the saved
      bytes with the source files/image. Check the project `git status`.
   6. Delete the session, then confirm its scratch directory and pasted files
@@ -6347,6 +6370,11 @@ identify the platform validation still needed.
     The agent can use its normal file tools to read the materialized files.
   - A home paste creates or reuses a durable session before writing. The
     workspace remains clean and no workspace artifact row is created.
+  - Image preview preserves the draft and attachment metadata, uses
+    `fs/readImageDataUrl` with bounded reads and path containment, and works
+    without a workspace for allowed scratch files. Preview preserves the draft
+    attachment format and leaves work-panel tabs unchanged. Closing/unmounting
+    releases modal/native-view blocking.
   - Deleting the session removes the pasted files with the rest of scratch.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.7–11.8,
   `03-runtime/01-ipc-protocol.md` §13c,
@@ -6358,13 +6386,15 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`composer-paste-files.test.mjs`,
   `composer-clipboard.test.mjs`); `pnpm test:e2e:composer-paste` mounts the real
-  ComposerInput, draft/paste hooks, production CSS and sandboxed preload. It
-  dispatches Chromium ClipboardEvents with synthetic mixed data and native File
-  objects, exercises the real scratch writer and compares saved bytes. Requires
+  ComposerInput, draft/paste hooks, file viewer, production CSS and sandboxed
+  preload. It dispatches Chromium ClipboardEvents with synthetic mixed data
+  and native File objects, exercises the real scratch writer and contained
+  file reader, compares saved bytes and decodes the preview image. Requires
   a desktop build, installed Electron and a graphical session (Xvfb on Linux).
   It does not modify the OS clipboard or automate Word; Word/platform journeys
-  and full provider dispatch remain manual. Branch runs are pre-merge evidence;
-  rerun from integrated main under the post-integration E2E policy.
+  and full provider dispatch remain manual. Run against the refreshed request
+  candidate and record its revision; PR integration validation follows the
+  authoritative `AGENTS.md` workflow without merging into local main first.
 
 #### E2E-102h: Composer picker imports files into session scratch
 

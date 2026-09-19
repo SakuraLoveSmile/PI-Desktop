@@ -2917,9 +2917,35 @@ Anatomy:
   separate because identity and dispatch use the canonical path, not the name.
   Text/plain and `.txt` chips are also keyboard-focusable buttons: clicking or
   pressing Enter/Space expands their bounded contents into editable draft text;
-  binary, image, oversized, or failed reads keep the chip. Image and other file
-  references use the same compact chip treatment; no separate explanatory
-  vision-status row is rendered.
+  binary, image, oversized, or failed reads keep the chip. Ordinary files stay
+  compact chips. Unsent images render in a left-aligned attachment row above and
+  outside the input shell, never within editable text. Their existing detached
+  reference metadata survives text selection, editing, undo, and session
+  switching; restored inline-image tokens are removed from text while keeping
+  the attachment. Image-only drafts enable Send; a rejected send restores both
+  text and attachments even when rejection precedes the next render. The
+  attachment row is height-limited and scrolls vertically so every image remains
+  reachable in a narrow chat pane. Thumbnails have an independent
+  remove button shown on hover/focus (always visible for touch input). No
+  separate explanatory vision-status row is rendered.
+  Clicking an image or pressing Enter/Space opens a modal image preview, without
+  sending the draft or changing the work-panel tabs. Inside the dark viewport,
+  the image is horizontally and vertically centered, keeps its aspect ratio,
+  and initially fits available space without upscaling small images. The
+  preview supports zoom, fit reset, original-image download, and previous/next
+  navigation across the draft's images. Dragging with the primary pointer or
+  scrolling pans the image at any zoom; pointer capture keeps a drag continuous
+  outside the image, and release/cancel ends it without dismissing the modal.
+  A visible portion remains in bounds. Fit reset and switching images recenter
+  the image; switching images also resets zoom. Escape,
+  the close button, or a blank-area click dismisses it and restores the prior
+  input focus/caret. Focus remains inside the modal, and native plugin surfaces
+  are hidden while it is open. The remove button never opens or submits.
+  Thumbnails and previews use the bounded, contained `fs/readImageDataUrl`
+  bridge, including allowed scratch files when no project is open. Missing,
+  unsupported, oversized, or undecodable images show a retry state and retain
+  the draft. Session/project changes or removal of the selected attachment
+  dismiss the preview; late reads cannot replace a newer image.
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - Sent `@path` file references (quoted or unquoted) render as the same compact

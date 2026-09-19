@@ -206,6 +206,16 @@ export const zhCN = {
     sessionMissing: "该会话已不存在",
   },
   chat: {
+    imagePreview: {
+      title: "图片预览",
+      download: "下载图片",
+      previous: "上一张图片",
+      next: "下一张图片",
+      fit: "适应窗口",
+      error: "无法加载这张图片",
+      retry: "重试",
+      position: "{{current}} / {{total}}",
+    },
     emptyTitle: "今天想做点什么？",
     emptyTitleInProject: "今天想在 {{project}} 里做点什么？",
     emptyTitleTemporary: "临时聊点什么？",

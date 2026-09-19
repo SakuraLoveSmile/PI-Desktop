@@ -213,6 +213,16 @@ export const tr = {
     sessionMissing: "Bu oturum artık mevcut değil",
   },
   chat: {
+    imagePreview: {
+      title: "Görsel önizlemesi",
+      download: "Görseli indir",
+      previous: "Önceki görsel",
+      next: "Sonraki görsel",
+      fit: "Sığdır",
+      error: "Bu görsel yüklenemedi",
+      retry: "Tekrar dene",
+      position: "{{current}} / {{total}}",
+    },
     emptyTitle: "Neyi birlikte oluşturalım?",
     emptyTitleInProject: "{{project}} içinde ne oluşturalım?",
     emptyTitleTemporary: "Geçici olarak neyi keşfetmek istersiniz?",
