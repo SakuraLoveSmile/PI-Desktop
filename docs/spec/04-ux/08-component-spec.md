@@ -1597,8 +1597,17 @@ Single message render — either user (plaintext) or assistant (markdown streami
   the tooltip and accessible name). Image attachments that are not already
   inlined as `@path` chips render as bounded thumbnails (data URL from
   `fs/readImageDataUrl`); unresolved loads keep the chip. Bare path tokens in
-  message text recognize Unicode letters and digits, so non-ASCII filenames
-  chip exactly like ASCII ones; absolute and `~/` tokens are matched whole,
+  message text recognize Unicode letters and digits. In user-message prose,
+  these are candidates only: show a chip after the existing `fs/resolveRef`
+  lookup confirms a real file. Pending, missing, or failed lookups preserve
+  the exact original text, including `使用llama.cpp`. Explicit `@path` refs
+  and structured attachments retain their existing chips without speculative
+  lookup. At most 32 unique candidates per message are checked, with four
+  concurrent lookups across visible rows; additional candidates remain text.
+  Confirmation is scoped to the message text, workspace, and session; changing
+  any of these discards old results and cancels queued work. Newly created
+  files are reconsidered when the message remounts or its scope changes, not
+  by polling. Non-ASCII filenames remain supported. Absolute and `~/` tokens are matched whole,
   and one outside the workspace (or any home path) stays plain text rather
   than rendering a chip that could never open — containment is unchanged
   (D322). Clicking a chip
@@ -3667,3 +3676,15 @@ Sidebar footer                                        Popover (360px max)
     panel width (ADR 0151)
 19. Expanded sidebar session titles, project/group titles, and empty-state copy
     use the 13px compact token while primary sidebar actions remain at 14px
+
+
+### Native deletion beside composer file chips
+
+Deleting text before an inline file reference must not add a blank line or move
+the chip to the next line. Keep native editing and undo/redo. Before a native
+deletion, record the browser's target range and existing BR nodes; after input,
+remove a newly created BR only when removing that exact node makes the draft
+match the requested deletion. Never trim leading newlines or normalize all BRs.
+Remember proven placeholder nodes weakly so native redo cannot restore them.
+Explicit line breaks, IME composition, file references, and chip deletion retain
+their normal behavior. The input owns and disposes the native event listeners.

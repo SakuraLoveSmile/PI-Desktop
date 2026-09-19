@@ -2695,3 +2695,26 @@ moves; a failed save shows an error and restores the accepted order. Late catalo
 responses cannot restore an earlier order. The default-model picker and Composer
 model groups follow the persisted order. Sorting changes neither the selected
 default nor provider configuration. OAuth accounts remain in their separate section.
+
+
+### User-message file candidate verification (#649)
+
+Bare file-like tokens in user prose become chips only after `fs/resolveRef`
+confirms a real file. Pending, missing, and failed lookups preserve the original
+text. Explicit `@` references and structured attachments retain their existing
+chips. Verification checks up to 32 unique candidates per message with four
+concurrent lookups across rows. Results belong to the current text, workspace,
+and session; stale results are discarded. Files created later are reconsidered
+on remount or scope change rather than polled. Assistant Markdown is unchanged.
+
+
+### Native deletion beside composer file chips
+
+Deleting text before an inline file reference must not add a blank line or move
+the chip to the next line. Keep native editing and undo/redo. Before a native
+deletion, record the browser's target range and existing BR nodes; after input,
+remove a newly created BR only when removing that exact node makes the draft
+match the requested deletion. Never trim leading newlines or normalize all BRs.
+Remember proven placeholder nodes weakly so native redo cannot restore them.
+Explicit line breaks, IME composition, file references, and chip deletion retain
+their normal behavior. The input owns and disposes the native event listeners.
