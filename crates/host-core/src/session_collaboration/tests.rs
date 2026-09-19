@@ -247,14 +247,24 @@ fn steering_input_persists_without_inheriting_delivery_origin() {
     let message = send(&db, &parent, &child, "one");
     let turn = begin_turn(&db, &child, &message.id, None, None).unwrap();
 
+    // The delivery user row still receives host-derived origin.
+    sessions::append_message(&db, &child, &ui("user", &message.content), Some(&turn)).unwrap();
+
     // Additional human input into the delivery turn keeps its human origin: it
-    // must not be rejected as a delivery mismatch, and it must not be stamped
-    // with the delivery's agent origin.
+    // must not be rejected as a delivery mismatch, must not inherit the
+    // delivery's agent origin, and must drop a client-supplied origin.
     let mut steering = ui("user", "also update the docs");
     steering.steering = Some(true);
+    steering.session_message = Some(json!({"messageId":"forged","kind":"task"}));
     sessions::append_message(&db, &child, &steering, Some(&turn)).unwrap();
 
     let detail = sessions::get_session(&db, &child).unwrap().unwrap();
+    let delivery_row = detail
+        .messages
+        .iter()
+        .find(|m| m.content == message.content)
+        .expect("delivery user persisted");
+    assert!(delivery_row.session_message.is_some());
     let appended = detail
         .messages
         .iter()

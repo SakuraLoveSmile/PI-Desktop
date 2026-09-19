@@ -1063,6 +1063,29 @@ identify the platform validation still needed.
 - **Status**: Unit-covered (`append_message_remaps_ids_owned_by_another_session`,
   `persistence-outbox.test.mjs`); desktop journey outstanding
 
+#### E2E-SESSION-outbox-poison-does-not-drop-history
+
+- **Preconditions**: A session-collaboration delivery turn is running. The user
+  steers with Alt+Enter (content that does not match the delivery). Later
+  assistant and tool rows from this or another session queue behind that
+  append. Optionally the outbox already holds a `PERMISSION_DENIED:` head from
+  an older host.
+- **Steps**: 1) Start a collaboration delivery turn. 2) Alt+Enter a steering
+  prompt. 3) Let the turn produce assistant/tool rows, including in another
+  session if convenient. 4) Quit and reopen. 5) Open the affected sessions.
+- **Expected**: Steering persists as a human user row with no
+  `session_message` origin. The delivery user row still has host-derived
+  origin. Later assistant/tool rows survive reopen. The outbox is empty and
+  did not stay paused on `PERMISSION_DENIED:`. A `PLUGIN_PERMISSION_DENIED`
+  head would still pause rather than drain.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, ADR 0041, ADR 0239,
+  ADR active-turn-steering, D597
+- **Acceptance**: F (persistence)
+- **Milestone**: M2
+- **Status**: Unit-covered (`steering_input_persists_without_inheriting_delivery_origin`,
+  `persistence-outbox.test.mjs`); desktop journey outstanding
+
 
 #### E2E-011: Switch between project and temporary sessions
 
