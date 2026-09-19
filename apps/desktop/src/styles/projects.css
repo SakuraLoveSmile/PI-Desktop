@@ -1,8 +1,8 @@
 /*
   Settings → Project archive — one quiet description line, one toolbar (sort,
-  search, add project), and a list + inspector workbench. Pinned / projects /
-  archived stay grouped in the index; folders, chats, and actions live in the
-  inspector so a long index stays scannable (D455).
+  search, add project), and a one-column workbench. Pinned / projects /
+  archived stay grouped in the index; folders, chats, and actions open under
+  the selected row so a long index stays scannable (D455).
 */
 
 /* ---------- Settings → Project archive ---------- */
@@ -220,11 +220,9 @@
 }
 
 .projects-workbench {
-  display: grid;
-  grid-template-columns: minmax(240px, 0.92fr) minmax(280px, 1.15fr);
-  gap: 14px;
-  align-items: start;
+  display: flex;
   min-width: 0;
+  flex-direction: column;
 }
 
 .projects-workbench:focus-visible {
@@ -232,7 +230,6 @@
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 80%, transparent);
 }
 
-.projects-index-pane,
 .projects-index {
   display: flex;
   min-width: 0;
@@ -337,10 +334,6 @@
   flex: 0 0 auto;
 }
 
-.projects-glyph.is-large {
-  width: 36px;
-  height: 36px;
-}
 
 .projects-name-copy {
   min-width: 0;
@@ -438,55 +431,27 @@
 }
 
 .projects-inspector {
-  position: sticky;
-  top: 8px;
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 10px;
-  padding: 16px;
+  padding: 0 14px 14px 50px;
 }
 
 .projects-inspector-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
   min-width: 0;
 }
 
-.projects-inspector-ident {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.projects-inspector-title {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-}
-
-.projects-inspector-name {
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ds-text-primary);
-  font-size: var(--text-md-plus);
-  font-weight: var(--font-weight-medium-plus);
-  line-height: var(--leading-tight);
-}
-
 .projects-inspector-meta {
   display: flex;
+  min-width: 0;
+  flex: 1;
   align-items: center;
   gap: 5px;
-  min-width: 0;
   color: var(--ds-text-muted);
   font-size: var(--text-xs-plus);
 }
@@ -496,17 +461,6 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-}
-
-.projects-inspector-empty {
-  display: flex;
-  min-height: 180px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 24px 12px;
-  text-align: center;
 }
 
 .projects-menu-wrap {
@@ -810,12 +764,8 @@
     margin-left: 0;
   }
 
-  .projects-workbench {
-    grid-template-columns: 1fr;
-  }
-
   .projects-inspector {
-    position: static;
+    padding-left: 14px;
   }
 }
 

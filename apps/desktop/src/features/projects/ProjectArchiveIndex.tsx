@@ -1,3 +1,4 @@
+import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cx } from "../../components/ui";
 import { IconFolder, IconStar } from "../../components/icons";
@@ -41,6 +42,7 @@ export function ProjectArchiveIndex({
   openProjectPaths,
   locale,
   sessionCounts,
+  detail,
   onSelect,
   onActivate,
 }: {
@@ -50,6 +52,7 @@ export function ProjectArchiveIndex({
   openProjectPaths: readonly string[];
   locale?: string;
   sessionCounts: Map<string, number>;
+  detail?: ReactNode;
   onSelect: (path: string) => void;
   onActivate: (path: string) => void;
 }) {
@@ -96,6 +99,7 @@ export function ProjectArchiveIndex({
                     className="projects-row"
                     title={project.path}
                     aria-label={t("project.selectProject", { name: project.name })}
+                    aria-expanded={selected}
                     aria-current={selected ? "true" : undefined}
                     onClick={() => onSelect(project.path)}
                     onDoubleClick={() => onActivate(project.path)}
@@ -128,6 +132,15 @@ export function ProjectArchiveIndex({
                       {formatUpdated(project.openedAt, locale, t("project.updatedNever"))}
                     </span>
                   </button>
+                  {selected && detail ? (
+                    <div
+                      className="projects-inspector"
+                      role="region"
+                      aria-label={project.name}
+                    >
+                      {detail}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
