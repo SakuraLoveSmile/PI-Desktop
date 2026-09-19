@@ -1435,7 +1435,14 @@ host call is still pending. If `messages.id` already belongs to another
 session, the host remaps to `{sessionId}:{id}` before any JSONL write; a
 replay of the original id is a no-op against that remapped row. The outbox
 treats `UNIQUE constraint failed: messages.id` as an ack and keeps draining
-(D444). No schema migration is required.
+(D444). A permanently rejected append whose host error carries a
+`PERMISSION_DENIED:` prefix is likewise dropped so the FIFO can continue;
+`PLUGIN_PERMISSION_DENIED` and other host failures still pause (D597).
+Steering into a claimed collaboration delivery turn is extra human input: it
+must target that delivery's session, is exempt from the delivery
+content/attachment contract, does not inherit the delivery origin, and has
+any client-supplied `session_message` stripped. No schema migration is
+required.
 
 ## 12. Native Pi session authority (ADR 0254)
 

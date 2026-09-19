@@ -34,6 +34,8 @@ pub fn prepare_append(
                         "PERMISSION_DENIED: steering input does not target its delivery session"
                     ));
                 }
+                // Extra human input must not inherit or smuggle agent origin.
+                message.session_message = None;
                 return Ok(message);
             }
             if delivery.target_session_id != session_id

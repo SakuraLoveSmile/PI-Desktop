@@ -494,6 +494,16 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - **里程碑**：M2
 - **状态**：单位已覆盖（`append_message_remaps_ids_owned_by_another_session`、`persistence-outbox.test.mjs`）；桌面旅程待补
 
+#### E2E-SESSION-outbox-poison-does-not-drop-history
+
+- **先决条件**：一个 session-collaboration 投递回合正在运行。用户用 Alt+Enter 做 steering（内容与投递不一致）。之后本会话或其他会话的助手/工具行排在这条追加后面。可选：outbox 里已有旧宿主留下的 `PERMISSION_DENIED:` 队头。
+- **步骤**：1) 开始一次协作投递回合。2) Alt+Enter 一条转向输入。3) 让该回合产出助手/工具行（也可在另一会话）。4) 退出并重新打开。5) 打开受影响会话。
+- **预期**：steering 作为没有 `session_message` 来源的人类用户行落盘。投递用户行仍有宿主来源。更晚的助手/工具行在重新打开后仍在。outbox 为空，没有停在 `PERMISSION_DENIED:`。`PLUGIN_PERMISSION_DENIED` 队头仍会暂停而不是排空。
+- **链接规格**：`03-runtime/04-data-storage.md`、`03-runtime/06-host-rpc-protocol.md`、ADR 0041、ADR 0239、ADR active-turn-steering、D597
+- **接受**：F（持久化）
+- **里程碑**：M2
+- **状态**：单位已覆盖（`steering_input_persists_without_inheriting_delivery_origin`、`persistence-outbox.test.mjs`）；桌面旅程待补
+
 
 #### E2E-173：展开中的实时委托运行过程跟随最新输出
 
