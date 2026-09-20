@@ -58,26 +58,27 @@ test("the menu root carries the reasoning slider under the reasoning entry", () 
   assert.doesNotMatch(composerSource, /thinkingMode|showThinkingMode|ThinkingSelectionMode|thinkingCommitChainRef/);
 });
 
-test("the reasoning slider aligns each label to its stop and collapses long ladders", () => {
-  // Each tick carries a positional marker so CSS can keep the selected stop
-  // and its neighbours labeled while collapsing the rest on long ladders.
-  assert.match(pickerSource, /data-pos=\{position\}/);
-  assert.match(pickerSource, /index === thinkingSliderValue - 1/);
-  assert.match(pickerSource, /index === thinkingSliderValue \+ 1/);
+test("the reasoning slider aligns each track dot and label to the thumb", () => {
+  // The dots row and the labels row are separate full-width n-column grids
+  // keyed to --stop-count; the range input overlays the dots row at full
+  // width and is inset by half a column minus the thumb radius, which moves
+  // the native thumb's stops onto the same column centers for every n.
+  assert.match(pickerSource, /className="composer-thinking-rail"/);
+  assert.match(pickerSource, /className="composer-thinking-dots" aria-hidden="true"/);
+  assert.match(pickerSource, /className="composer-thinking-ticks" aria-hidden="true"/);
 
-  // The ticks row is an n-column grid keyed to --stop-count, and the range
-  // input is inset by half a column minus the thumb radius so the native
-  // thumb center lands on the matching column center for every stop count.
-  assert.match(stylesSource, /\.composer-thinking-ticks \{\s*display: grid;/);
-  assert.match(stylesSource, /grid-template-columns: repeat\(var\(--stop-count, 1\), minmax\(0, 1fr\)\)/);
+  // Rail, dots and labels all key off --stop-count; the dots and labels are
+  // full-width grids and the input carries the inset.
   assert.match(stylesSource, /--thinking-thumb-radius: 7px/);
-  assert.match(stylesSource, /padding: 0 calc\(100% \/ \(2 \* var\(--stop-count, 1\)\) - var\(--thinking-thumb-radius\)\)/);
+  assert.match(stylesSource, /--thinking-inset: calc\(100% \/ \(2 \* var\(--stop-count, 1\)\) - var\(--thinking-thumb-radius\)\)/);
+  assert.match(stylesSource, /\.composer-thinking-dots \{[\s\S]*?grid-template-columns: repeat\(var\(--stop-count, 1\), minmax\(0, 1fr\)\)/);
+  assert.match(stylesSource, /\.composer-thinking-ticks \{[\s\S]*?grid-template-columns: repeat\(var\(--stop-count, 1\), minmax\(0, 1fr\)\)/);
+  assert.match(stylesSource, /\.composer-thinking-range \{[\s\S]*?padding: 0 var\(--thinking-inset\)/);
 
-  // Labels center in their column and carry a tick dot; hidden labels keep
-  // their tooltip while collapsing to the dot on ladders longer than four.
-  assert.match(stylesSource, /\.composer-thinking-tick::before/);
-  assert.match(stylesSource, /\.composer-thinking-tick\.active::before/);
-  assert.match(stylesSource, /\.composer-thinking-slider\[style\*="--stop-count: 8"\] \.composer-thinking-tick\[data-pos="hidden"\]/);
+  // Track dots sit on the rail (accent for the selected, muted for the rest)
+  // and labels stay visible; the input's own track is transparent.
+  assert.match(stylesSource, /\.composer-thinking-dot\.active/);
+  assert.match(stylesSource, /\.composer-thinking-range::-webkit-slider-runnable-track \{\s*height: var\(--thinking-track-height\);\s*background: transparent;/);
 });
 
 test("opening the combined menu preloads model metadata before its submenu", () => {

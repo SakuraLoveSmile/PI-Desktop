@@ -103,6 +103,9 @@ export function ComposerModelPicker({
     }
   }, [dragThinkingIndex, thinkingLevel, thinkingLevelsKey, thinkingMenuLevels]);
   const thinkingSliderValue = dragThinkingIndex ?? thinkingSliderIndex;
+  // The rail line spans the stop-to-stop distance (it starts and ends half a
+  // column in), so the fill percentage is relative to that span: i/(n-1)
+  // reaches exactly the active stop's column center and the thumb's x.
   const thinkingSliderPercent =
     thinkingMenuLevels.length > 1
       ? (thinkingSliderValue / (thinkingMenuLevels.length - 1)) * 100
@@ -189,65 +192,64 @@ export function ComposerModelPicker({
               className="composer-thinking-slider"
               style={{ "--stop-count": thinkingMenuLevels.length } as CSSProperties}
             >
-              <input
-                type="range"
-                className="composer-thinking-range"
-                min={0}
-                max={thinkingMenuLevels.length - 1}
-                step={1}
-                value={thinkingSliderValue}
-                aria-label={t("chat.reasoningLevel")}
-                aria-valuetext={thinkingMenuLevels[thinkingSliderValue] ?? thinkingLevel}
-                style={
-                  {
-                    "--composer-thinking-progress": `${thinkingSliderPercent}%`,
-                  } as CSSProperties
-                }
-                onChange={(event) => {
-                  const index = Number(event.target.value);
-                  setDragThinkingIndex(index);
-                  const level = thinkingMenuLevels[index];
-                  if (level && level !== thinkingLevel) void commitThinkingLevel(level);
-                }}
-                onKeyDown={(event) => {
-                  if (THINKING_SLIDER_KEYS.has(event.key)) event.stopPropagation();
-                }}
-              />
               {/*
-                Label visibility contract: with more than four stops the
-                ladder cannot fit every canonical word, so only the selected
-                stop and its immediate neighbours keep visible text; the rest
-                collapse to a tick dot but stay clickable and keep their
-                tooltip. Four or fewer stops show every label.
+                One grid owns the geometry: the dots row and the labels row
+                share the same n columns, so the dot, the thumb and the label
+                all sit on the same column center for every stop count. The
+                range input is the accessible control and overlays the dots
+                row only, leaving the labels free to be clicked and hovered.
               */}
-              <div className="composer-thinking-ticks" aria-hidden="true">
-                {thinkingMenuLevels.map((level, index) => {
-                  const position =
-                    index === thinkingSliderValue
-                      ? "selected"
-                      : index === thinkingSliderValue - 1
-                        ? "before"
-                        : index === thinkingSliderValue + 1
-                          ? "after"
-                          : "hidden";
-                  return (
-                    <button
+              <div className="composer-thinking-rail">
+                <div className="composer-thinking-dots" aria-hidden="true">
+                  {thinkingMenuLevels.map((level, index) => (
+                    <span
                       key={level}
-                      type="button"
-                      tabIndex={-1}
-                      data-pos={position}
-                      className={`composer-thinking-tick ${thinkingSliderValue === index ? "active" : ""}`}
-                      title={level}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => {
-                        setDragThinkingIndex(index);
-                        if (level !== thinkingLevel) void commitThinkingLevel(level);
-                      }}
-                    >
-                      {level}
-                    </button>
-                  );
-                })}
+                      className={`composer-thinking-dot ${thinkingSliderValue === index ? "active" : ""}`}
+                    />
+                  ))}
+                </div>
+                <input
+                  type="range"
+                  className="composer-thinking-range"
+                  min={0}
+                  max={thinkingMenuLevels.length - 1}
+                  step={1}
+                  value={thinkingSliderValue}
+                  aria-label={t("chat.reasoningLevel")}
+                  aria-valuetext={thinkingMenuLevels[thinkingSliderValue] ?? thinkingLevel}
+                  style={
+                    {
+                      "--composer-thinking-progress": `${thinkingSliderPercent}%`,
+                    } as CSSProperties
+                  }
+                  onChange={(event) => {
+                    const index = Number(event.target.value);
+                    setDragThinkingIndex(index);
+                    const level = thinkingMenuLevels[index];
+                    if (level && level !== thinkingLevel) void commitThinkingLevel(level);
+                  }}
+                  onKeyDown={(event) => {
+                    if (THINKING_SLIDER_KEYS.has(event.key)) event.stopPropagation();
+                  }}
+                />
+              </div>
+              <div className="composer-thinking-ticks" aria-hidden="true">
+                {thinkingMenuLevels.map((level, index) => (
+                  <button
+                    key={level}
+                    type="button"
+                    tabIndex={-1}
+                    className={`composer-thinking-tick ${thinkingSliderValue === index ? "active" : ""}`}
+                    title={level}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setDragThinkingIndex(index);
+                      if (level !== thinkingLevel) void commitThinkingLevel(level);
+                    }}
+                  >
+                    {level}
+                  </button>
+                ))}
               </div>
             </div>
           ) : null}
