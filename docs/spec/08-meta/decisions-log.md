@@ -6400,3 +6400,18 @@ that was sitting at the bottom — including after the turn had finished.
 - `out/renderer` emits no application font face any more; only KaTeX's `woff2`
   glyphs remain. See ADR 0298, `04-ux/06-settings-ia.md`,
   `04-ux/07-ui-design-system.md`, and E2E-126.
+
+## 2026-09-20 — Stdio MCP spawn uses the login-shell PATH (D600, issue #571)
+
+- Finder/Dock launches Electron with `/usr/bin:/bin:/usr/sbin:/sbin`. User MCP
+  stdio spawn copies that PATH and uses `shell: false`, so a market-installed
+  Fetch server (`uvx mcp-server-fetch`) failed with `spawn uvx ENOENT` even
+  when `uvx` worked in a terminal. Same hole for `npx`.
+- Electron main now probes the login shell the way host-core already does for
+  Bash (ADR 0045): `$SHELL -lic 'printf %s "$PATH"'`, 5s-bounded, cached, last
+  stdout line only. Well-known user bin dirs that exist (`/opt/homebrew/bin`,
+  `~/.local/bin`, `~/.cargo/bin`, …) are merged in. Windows stays on the
+  inherited PATH. Command names stay bare; arguments stay literal.
+- A missing executable is reported as `command not found: <name>` instead of
+  a raw `spawn uvx ENOENT`.
+- See ADR 0045, `03-runtime/03-tools-and-permissions.md`, issue #571.
