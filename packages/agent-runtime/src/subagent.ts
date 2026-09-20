@@ -361,7 +361,13 @@ export class SubagentRun {
       );
       throw new Error(this.pendingContextOverflow.message);
     }
-    this.agent.state.messages = outcome.messages;
+    const systemMessage = this.agent.state.messages.find(
+      (message) => message.role === "system",
+    );
+    this.agent.state.messages = [
+      ...(systemMessage ? [systemMessage] : []),
+      ...outcome.messages.filter((message) => message.role !== "system"),
+    ];
     if (outcome.kind === "compacted") {
       this.contextCompactions += 1;
       const summaryUsage = usageFromPi(outcome.summaryUsage);
@@ -371,7 +377,6 @@ export class SubagentRun {
     }
     return {
       context: {
-        systemPrompt: this.agent.state.systemPrompt,
         messages: this.agent.state.messages,
         tools: this.agent.state.tools,
       },

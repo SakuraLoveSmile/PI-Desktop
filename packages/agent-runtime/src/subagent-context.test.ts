@@ -149,7 +149,7 @@ function turnContext(
   return {
     message: assistantText("done"),
     toolResults: [],
-    context: { systemPrompt: "system", messages: [], tools: [] },
+    context: { messages: [], tools: [] },
     newMessages: [],
     ...overrides,
   };

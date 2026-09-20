@@ -6580,7 +6580,7 @@ IPC 请求无法关闭。
   编辑器不再缺少高级设置。在账户模型上启用的等级会持久化，并在重新打开编辑器后
   依然存在。OpenAI Codex 的 `openai-codex` 适配器键会解析匹配的 `openai`
   models.dev 记录，因此 `gpt-6-astra` 不会显示为通用的 128,000 / 8,192 /
-  无推理默认值。已认证的 ChatGPT 列表本身来自已固定的 pi-ai 目录（0.85.1
+  无推理默认值。已认证的 ChatGPT 列表本身来自已固定的 pi-ai 目录（0.86.1
   包含 `gpt-6-astra`）；models.dev 不能补上缺失的 OAuth ID。没有已发布记录
   的模型则保留其已存等级不变。账户的默认模型仍是首个绑定。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/08-component-spec.md` §19、
@@ -8244,28 +8244,23 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 ### E2E-PROVIDER-certificate-trust-and-terminal-errors
 
-- **Preconditions:** Built request candidate incorporating current `origin/main`,
-  Electron installed, isolated test process/profile and loopback HTTPS fixture.
-  No real provider, credentials, user profile, or OS certificate-store writes.
-- **Steps:** Run `node scripts/e2e-provider-certificates.mjs`. Launch the actual
-  desktop sidecar and submit a chat prompt against an untrusted localhost
-  certificate. Relaunch with its CA in `NODE_EXTRA_CA_CERTS`, then request the
-  same certificate through a hostname absent from its SAN.
-- **Expected:** The child's default CA set includes system roots and extra CAs.
-  The first request fails once with a non-retriable certificate error and no
-  retry status; the trusted request returns text; the hostname mismatch still
-  fails once. TLS and hostname verification remain enabled.
-- **UI:** Run `node scripts/e2e-provider-certificate-ui.mjs` for the real error
-  component in isolated Chromium. Certificate errors get localized guidance;
-  DNS and protocol errors retain the generic summary. Errno/raw details remain
-  visible, and details can be closed and reopened. Optional
-  `PI_CERTIFICATE_EVIDENCE_DIR` records a screenshot; `--baseline` uses the
-  upstream error component with the same fixture and stylesheet.
-- **Lower-level coverage:** `provider-certificate-flow.test.ts` enters main
-  session `prompt()` and delegate `run()` through real Agent/pi-ai wiring,
-  with only the external fetch mocked. Both stop after one request and retain
-  the certificate cause. Error classification and recovery suites cover direct,
-  nested, flattened, non-certificate and wrapped certificate failures.
-- **Limits:** OS-root inclusion is checked without installing a root. The TLS
-  success fixture uses a child-only extra CA; it does not reproduce a specific
-  antivirus installation or claim native macOS/Linux verification.
+- **前提：** 已构建、包含当前 `origin/main` 的任务候选版本，已安装 Electron，使用
+  隔离的测试进程／配置和回环 HTTPS 夹具。不使用真实 provider、凭据或用户配置，
+  也不写入操作系统证书库。
+- **步骤：** 运行 `node scripts/e2e-provider-certificates.mjs`。启动真实桌面
+  sidecar，使用不受信任的 localhost 证书提交聊天提示。再将其 CA 放入
+  `NODE_EXTRA_CA_CERTS` 后重启，并通过 SAN 中不存在的主机名请求同一证书。
+- **预期：** 子进程默认 CA 集合包含系统根证书和额外 CA。首次请求只失败一次，
+  返回不可重试的证书错误且没有重试状态；信任 CA 后请求返回文本；主机名不匹配
+  仍只失败一次。TLS 和主机名校验始终保持启用。
+- **UI：** 运行 `node scripts/e2e-provider-certificate-ui.mjs`，在隔离 Chromium
+  中验证真实错误组件。证书错误显示本地化指引；DNS 和协议错误保留通用摘要。
+  errno／原始 details 仍可见，详情可以关闭并重新打开。可选的
+  `PI_CERTIFICATE_EVIDENCE_DIR` 会记录截图；`--baseline` 使用相同夹具和样式的
+  upstream 错误组件。
+- **低层覆盖：** `provider-certificate-flow.test.ts` 通过真实 Agent/pi-ai wiring
+  进入主 session 的 `prompt()` 和 delegate 的 `run()`，仅 mock 外部 fetch。两条
+  路径都只请求一次并保留证书原因；错误分类和恢复测试覆盖直接、嵌套、扁平化、
+  非证书以及包装后的证书错误。
+- **限制：** OS 根证书的纳入在不安装根证书的条件下检查。TLS 成功夹具只使用
+  子进程额外 CA，不复现某个具体杀毒软件安装，也不宣称已完成 macOS/Linux 实机验证。

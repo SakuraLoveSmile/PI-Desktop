@@ -3847,7 +3847,7 @@ identify the platform validation still needed.
   runnable with the generic text-only, non-reasoning shape; pi-ai supplies only
   the selected wire adapter, OAuth flow, and account model availability. A
   ChatGPT Plus/Pro or GitHub Copilot account lists `gpt-6-astra` from the
-  pinned pi-ai 0.85.1 catalog; models.dev then supplies its published metadata.
+  pinned pi-ai 0.86.1 catalog; models.dev then supplies its published metadata.
 - **Specs linked**: `02-architecture/02-tech-stack.md`,
   `03-runtime/11-provider-model-system.md`,
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0134
@@ -7242,7 +7242,7 @@ identify the platform validation still needed.
 
 - **Preconditions**: A build with `registerBunOAuthFlows()` running at startup
   and a real subscription for at least one PKCE vendor (Anthropic) and one
-  device-code vendor (xAI or GitHub Copilot). No provider row exists yet for
+  device-code vendor (xAI, GitHub Copilot, or Meta/Muse). No provider row exists yet for
   either vendor.
 - **Steps**: 1) Open Settings -> Model configuration, confirm the Vendor
   accounts card starts empty, and open Add account — the picker lists every
@@ -7269,13 +7269,13 @@ identify the platform validation still needed.
   used as the OAuth provider group heading, while the configured model alias is
   shown on its model row. 5) Resolve
   and use each account separately, including model discovery and one streamed
-  turn per account. 6) Start the device-code login on a second vendor, then
-  press Cancel while the dialog is polling; confirm no row or credential is
-  left. 7) Remove the first Anthropic account, then confirm its provider row
-  and OAuth secret are gone while the second Anthropic account remains usable.
-  8) If the removed account was default, confirm Defaults points to another
-  ready provider or shows no default. 9) Grep sidecar and renderer logs for
-  token material.
+  turn per account. 6) Start the device-code login on a second vendor, including
+  Meta/Muse when available, then press Cancel while the dialog is polling;
+  confirm no row or credential is left. 7) Remove the first Anthropic account,
+  then confirm its provider row and OAuth secret are gone while the second
+  Anthropic account remains usable. 8) If the removed account was default,
+  confirm Defaults points to another ready provider or shows no default. 9) Grep
+  sidecar and renderer logs for token material.
 - **Expected**: Each successful login creates a distinct row with
   `authKind: "oauth"`, `hasSecret` and `hasOauth` both true, a non-secret
   account label, and `baseUrl`/`apiStyle`/`defaultModelId` filled from that
@@ -7283,10 +7283,10 @@ identify the platform validation still needed.
   `secret:provider:<providerId>:oauth` ref and row-scoped pi-ai collection;
   resolving one account never returns the other account's token. The model list
   is the authenticated catalog (a Copilot account lists only what its
-  subscription includes), not a `/models` probe. Matching models.dev metadata
-  supplies each newly logged-in binding's limits, modalities, and thinking
-  levels; an ID missing from models.dev uses the conservative generic
-  text-only/non-reasoning shape. The account editor updates only non-secret
+  subscription includes; a Meta account lists Muse Spark models), not a
+  `/models` probe. Matching models.dev metadata supplies each newly logged-in
+  binding's limits, modalities, and thinking levels; an ID missing from
+  models.dev uses the conservative generic text-only/non-reasoning shape.
   label/model fields and the full per-model bindings, and Test connection
   resolves that exact account. Both turns run without a
   pasted key and reuse the same warm runtime — the launch payload carries
@@ -10303,7 +10303,7 @@ This test plan spec is accepted when:
   catalog does not publish. OpenAI Codex's `openai-codex` adapter key resolves
   the matching `openai` models.dev record, so `gpt-6-astra` is not shown with
   generic 128,000 / 8,192 / no-reasoning defaults. The authenticated ChatGPT
-  list itself comes from the pinned pi-ai catalog (0.85.1 includes
+  list itself comes from the pinned pi-ai catalog (0.86.1 includes
   `gpt-6-astra`); models.dev cannot add a missing OAuth ID. A model with no published
   record keeps its explicit levels and starts with all choices available for
   manual opt-in. The account's default model stays the head binding.

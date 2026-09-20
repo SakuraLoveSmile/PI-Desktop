@@ -116,6 +116,7 @@ import {
   isRecord,
   nowIso,
   timestampMs,
+  toJsonObject,
   toJsonValue,
   usageFromPi,
   usageToPi,
@@ -1372,10 +1373,14 @@ function toolResultFromUi(
     toolCallId: m.toolCallId ?? "",
     toolName: m.toolName ?? "",
     content: blocks,
-    ...(isRecord(raw) && raw.details !== undefined
-      ? { details: raw.details }
+    ...(toJsonValue(rawRecord?.details) !== undefined || addedToolNames.length > 0
+      ? {
+          details: {
+            ...toJsonObject(rawRecord?.details),
+            ...(addedToolNames.length > 0 ? { addedToolNames } : {}),
+          },
+        }
       : {}),
-    ...(addedToolNames.length > 0 ? { addedToolNames } : {}),
     isError:
       interrupted ||
       m.toolStatus === "error" ||
@@ -1401,7 +1406,7 @@ function estimateToolTokenUsage(
         type: "toolCall" as const,
         id: toolCallId,
         name: toolName,
-        arguments: isRecord(args) ? args : { value: args },
+        arguments: toJsonObject(isRecord(args) ? args : { value: args }),
       },
     ],
     api: model.api,
@@ -1942,13 +1947,47 @@ Delegation rules:
     this.activeDeferredToolNames.clear();
     this.rebuildToolCatalog();
     this.restoreDeferredToolsFromContext();
-    this.agent.state.systemPrompt = this.composeSystemPrompt();
+    this.setAgentSystemPrompt(this.composeSystemPrompt());
     this.agent.state.tools = this.activeTools();
     this.setPlanningState(planningState, details);
   }
 
   getMode(): Mode {
     return this.mode;
+  }
+
+  private agentUsesTranscriptSystemMessages(): boolean {
+    let current: object | null = this.agent.state as unknown as object;
+    while (current) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, "systemPrompt");
+      if (descriptor) return typeof descriptor.get === "function" && !descriptor.set;
+      current = Object.getPrototypeOf(current) as object | null;
+    }
+    return false;
+  }
+
+  private setAgentSystemPrompt(prompt: string): void {
+    if (!this.agentUsesTranscriptSystemMessages()) {
+      (this.agent.state as unknown as { systemPrompt: string }).systemPrompt = prompt;
+      return;
+    }
+    const messages = this.agent.state.messages.filter((message) => message.role !== "system");
+    this.agent.state.messages = [
+      { role: "system", content: prompt, timestamp: Date.now() },
+      ...messages,
+    ];
+  }
+
+  private setAgentMessages(messages: AgentMessage[]): void {
+    if (!this.agentUsesTranscriptSystemMessages()) {
+      this.agent.state.messages = messages;
+      return;
+    }
+    const systemPrompt = this.agent.state.systemPrompt;
+    this.agent.state.messages = [
+      { role: "system", content: systemPrompt, timestamp: Date.now() },
+      ...messages.filter((message) => message.role !== "system"),
+    ];
   }
 
   private composeSystemPrompt(): string {
@@ -1993,7 +2032,7 @@ Delegation rules:
       this.resumablePromptStale = true;
       return;
     }
-    this.agent.state.systemPrompt = this.composeSystemPrompt();
+    this.setAgentSystemPrompt(this.composeSystemPrompt());
   }
 
   /** Apply a resumable-list refresh that a transient prompt variant deferred. */
@@ -2605,9 +2644,7 @@ Delegation rules:
           type: "toolCall",
           id: m.toolCallId,
           name: m.toolName,
-          arguments: isRecord(m.toolArgs)
-            ? (m.toolArgs as Record<string, unknown>)
-            : {},
+          arguments: toJsonObject(m.toolArgs),
         });
         toolCarrier.stopReason = "toolUse";
         append(m.id, toolResultFromUi(m, timestamp));
@@ -3462,7 +3499,6 @@ Delegation rules:
         return {
           content: [{ type: "text", text }],
           details: { query, matches, activated },
-          ...(activated.length > 0 ? { addedToolNames: activated } : {}),
         };
       },
     };
@@ -4898,7 +4934,9 @@ Delegation rules:
       if (isMissingToolResultPlaceholder(message.content)) continue;
       const names =
         message.toolName === TOOL_SEARCH_NAME
-          ? (message.addedToolNames ?? [])
+          ? (isRecord(message.details) && Array.isArray(message.details.addedToolNames)
+              ? message.details.addedToolNames.filter((name): name is string => typeof name === "string")
+              : [])
           : [message.toolName];
       for (const name of names) {
         if (this.deferredToolNames.has(name)) {
@@ -5182,7 +5220,7 @@ Delegation rules:
 
   private applyProjectInstructions(resolved: ProjectInstructions | undefined): void {
     this.projectInstructions = resolved;
-    this.agent.state.systemPrompt = this.composeSystemPrompt();
+    this.setAgentSystemPrompt(this.composeSystemPrompt());
   }
 
   /**
@@ -5432,7 +5470,7 @@ Delegation rules:
       throw new Error("Cannot retry a provider stream without its failed assistant message");
     }
     messages.pop();
-    this.agent.state.messages = messages;
+    this.setAgentMessages(messages);
 
     this.providerRetryInProgress = true;
     this.requestStartedAt = Date.now();
@@ -5491,11 +5529,11 @@ Delegation rules:
     // and this one carries nothing worth resending anyway.
     const messages = [...this.agent.state.messages];
     if (messages.at(-1)?.role === "assistant") messages.pop();
-    this.agent.state.messages = messages;
+    this.setAgentMessages(messages);
 
     const promptBefore = this.agent.state.systemPrompt;
     const promptWithNudge = `${promptBefore}\n\n${SILENT_TURN_NUDGE}`;
-    this.agent.state.systemPrompt = promptWithNudge;
+    this.setAgentSystemPrompt(promptWithNudge);
     this.silentTurnRerunInProgress = true;
     this.requestStartedAt = Date.now();
     this.setAgentActivity({ phase: "recovering", since: Date.now() });
@@ -5505,7 +5543,7 @@ Delegation rules:
       await this.waitForIdleAndSteering();
     } finally {
       if (this.agent.state.systemPrompt === promptWithNudge) {
-        this.agent.state.systemPrompt = promptBefore;
+        this.setAgentSystemPrompt(promptBefore);
       }
       this.applyPendingResumablePrompt();
       this.silentTurnRerunInProgress = false;
@@ -5542,7 +5580,7 @@ Delegation rules:
         this.overflowRecoveryAttempted = true;
         const messages = [...this.agent.state.messages];
         if (messages.at(-1)?.role === "assistant") messages.pop();
-        this.agent.state.messages = messages;
+        this.setAgentMessages(messages);
         const compacted = await this.runCompaction(
           "overflow",
           true,
@@ -5599,11 +5637,11 @@ Delegation rules:
     // bubble, so it must not be sent back as model context.
     const messages = [...this.agent.state.messages];
     if (messages.at(-1)?.role === "assistant") messages.pop();
-    this.agent.state.messages = messages;
+    this.setAgentMessages(messages);
 
     const promptBefore = this.agent.state.systemPrompt;
     const promptWithNudge = `${promptBefore}\n\n${PROGRESS_TURN_NUDGE}`;
-    this.agent.state.systemPrompt = promptWithNudge;
+    this.setAgentSystemPrompt(promptWithNudge);
     this.progressTurnRerunInProgress = true;
     this.requestStartedAt = Date.now();
     this.setAgentActivity({ phase: "recovering", since: Date.now() });
@@ -5614,7 +5652,7 @@ Delegation rules:
       await this.waitForIdleAndSteering();
     } finally {
       if (this.agent.state.systemPrompt === promptWithNudge) {
-        this.agent.state.systemPrompt = promptBefore;
+        this.setAgentSystemPrompt(promptBefore);
       }
       this.applyPendingResumablePrompt();
       this.progressTurnRerunInProgress = false;
@@ -5750,13 +5788,13 @@ Delegation rules:
   private rebuiltAgentContext(): AgentContext {
     const messages = this.liveSessionContext().messages;
     const tools = this.activeTools();
-    this.agent.state.messages = messages;
+    this.setAgentMessages(messages);
     this.agent.state.tools = tools;
     return {
-      systemPrompt: this.agent.state.systemPrompt,
-      messages,
+      messages: this.agent.state.messages,
       tools,
-    };
+      systemPrompt: this.agent.state.systemPrompt,
+    } as AgentContext;
   }
 
   /**
@@ -5842,10 +5880,19 @@ Delegation rules:
     const remaining = Math.max(0, budget.hardLimit - budget.tokens);
     const reminder = this.claimContextBudgetReminder(remaining, budget);
     if (!reminder) return context;
+    const legacyContext = context as AgentContext & { systemPrompt?: string };
+    const systemPrompt =
+      typeof legacyContext.systemPrompt === "string"
+        ? `${legacyContext.systemPrompt}\n\n${reminder}`
+        : undefined;
     return {
       ...context,
-      systemPrompt: `${context.systemPrompt}\n\n${reminder}`,
-    };
+      ...(systemPrompt ? { systemPrompt } : {}),
+      messages: [
+        ...context.messages,
+        { role: "system", content: reminder, timestamp: Date.now() },
+      ],
+    } as AgentContext;
   }
 
   private claimContextBudgetReminder(
@@ -6194,7 +6241,7 @@ Delegation rules:
     // resetting its `claim_*` flags when the context window turns over.
     this.contextReminderClaimed = false;
     this.contextFallbackReminderClaimed = false;
-    this.agent.state.messages = this.liveSessionContext().messages;
+    this.setAgentMessages(this.liveSessionContext().messages);
     this.emit({
       type: "compaction_end",
       reason,
@@ -6993,7 +7040,7 @@ Delegation rules:
             // anything else should that order ever change.
             const messages = this.agent.state.messages;
             if (messages.at(-1) === event.message) {
-              this.agent.state.messages = messages.slice(0, -1);
+              this.setAgentMessages(messages.slice(0, -1));
             }
           } else if (!failed && !aborted && !emptyResponse) {
             this.appendLiveEntry(assistantId, event.message);
@@ -7220,9 +7267,8 @@ Delegation rules:
     const userMessageId = this.pendingUserMessageId || randomUUID();
     this.pendingUserMessageId = undefined;
     this.appendLiveEntry(userMessageId, incomingUserMessage);
-    this.agent.state.messages = this.liveSessionContext().messages;
+    this.setAgentMessages(this.liveSessionContext().messages);
   }
-
   private failBeforeProviderRequest(
     incomingUserMessage: AgentMessage,
     error: ReturnType<typeof classifyAgentError>,
@@ -7312,8 +7358,8 @@ Delegation rules:
       timestamp: Date.now(),
     };
     this.appendLiveEntry(internalId, internalMessage);
-    this.agent.state.messages = this.liveSessionContext().messages;
     this.setAgentActivity({ phase: "starting", since: Date.now() });
+    this.setAgentMessages(this.liveSessionContext().messages);
     await this.agent.continue();
     await this.waitForIdleAndSteering();
     // Same recovery contract as a user prompt: a plan execution that overflows,
@@ -7457,10 +7503,10 @@ Delegation rules:
       },
       (acc, next) => ({ ...(acc ?? {}), ...next }),
     );
-    this.agent.state.systemPrompt =
-      typeof result?.systemPrompt === "string" ? result.systemPrompt : base;
+    this.setAgentSystemPrompt(
+      typeof result?.systemPrompt === "string" ? result.systemPrompt : base,
+    );
   }
-
   /**
    * `before_provider_request` rides pi-ai's `onPayload`, `after_provider_response`
    * its `onResponse`, and the per-turn `before_provider_headers` result merges
@@ -7549,12 +7595,12 @@ Delegation rules:
   private retainPendingSteering(): void {
     this.agent.clearSteeringQueue();
     for (const [message, id] of this.pendingSteering) {
-      if (!this.agent.state.messages.includes(message)) this.agent.state.messages = [...this.agent.state.messages, message];
+      if (!this.agent.state.messages.includes(message)) this.setAgentMessages([...this.agent.state.messages, message]);
       this.appendLiveEntry(id, message);
     }
     this.pendingSteering.clear();
-  }
 
+  }
   private async waitForIdleAndSteering(): Promise<void> {
     await this.agent.waitForIdle();
     if (!this.acceptingSteering || this.runCancelled || this.turnHadError) {

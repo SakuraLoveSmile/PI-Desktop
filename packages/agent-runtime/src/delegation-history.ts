@@ -37,7 +37,7 @@ import {
   normalizeSubagentName,
   type UiMessage,
 } from "@pi-desktop/shared";
-import { isRecord, timestampMs, usageToPi } from "./agent-messages.js";
+import { isRecord, timestampMs, toJsonObject, toJsonValue, usageToPi } from "./agent-messages.js";
 import type { ContextBudgetLimits } from "./context-budget.js";
 import {
   apiBindingForProviderModel,
@@ -295,7 +295,7 @@ export function chainRowsToMessages(
         type: "toolCall",
         id: row.toolCallId,
         name: row.toolName,
-        arguments: isRecord(row.toolArgs) ? row.toolArgs : {},
+        arguments: toJsonObject(row.toolArgs),
       });
       toolCarrier.stopReason = "toolUse";
       messages.push(toolResultFromUi(row, timestamp));
@@ -456,7 +456,7 @@ function toolResultFromUi(m: UiMessage, timestamp: number): ToolResultMessage {
           : MISSING_TOOL_RESULT_PLACEHOLDER,
     });
   }
-  const details = isRecord(raw) ? raw.details : undefined;
+  const details = toJsonValue(isRecord(raw) ? raw.details : undefined);
   return {
     role: "toolResult",
     toolCallId: m.toolCallId ?? "",
