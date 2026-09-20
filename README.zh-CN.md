@@ -465,38 +465,9 @@ electron PI-Desktop-<version>-linux-x64.asar
 
 </details>
 
-<details>
-<summary><strong>macOS 首次启动说明</strong></summary>
-
-<br />
-
-GitHub Release 上的正式 macOS 构建已使用 Developer ID 签名、公证并装订。将 `PI-Desktop.app` 移到 `/Applications` 后应可直接打开。
-
-本地或未签名的调试构建仍可能带有 Apple 隔离属性。如果 macOS 提示 App 已损坏或无法打开：
-
-1. 确认安装包来自可信的 PI-Desktop 来源
-2. 将 `PI-Desktop.app` 移动到 `/Applications`
-3. 运行：
-
-```bash
-xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app
-```
-
-4. 再次打开 PI-Desktop
-
-ZIP 包包含 `PI-Desktop-macOS-opening-help.txt` 和 `PI-Desktop-macOS-open.command`，在应用移动到 Applications 后可以执行相同的 trusted-source fallback。DMG 是双图标安装，不再放入该说明。
-
-这个命令只会移除 Apple 的 quarantine 属性。
-
-**不要对来源不可信的 App 使用。**
-
-已签名并公证的版本不需要这套 fallback。
-
-</details>
-
 ### 代码签名
 
-macOS GitHub Release 产物使用 Developer ID Application `XingYu Liu (DUV63RKYTW)` 签名，并由 Apple 公证。
+macOS GitHub Release 产物使用 Developer ID Application `XingYu Liu (DUV63RKYTW)` 签名，并由 Apple 公证。将 `PI-Desktop.app` 移到 `/Applications` 后应可直接打开。
 
 ---
 
