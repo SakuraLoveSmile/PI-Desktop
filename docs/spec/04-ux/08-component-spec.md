@@ -353,9 +353,9 @@ path-less history under `Sessions` and retained project tabs under `Projects`; t
 collapsed state is an icon rail. Retained tabs are renderer presentation state,
 not additional host workspaces.
 The sidebar body is reserved for Pinned, Sessions, and Projects; the footer exposes the
-Plugins destination beside Settings. Projects is managed through Settings →
-Project archive, while Pull requests and Scheduled are not rendered in the
-sidebar.
+Plugins and Scheduled destinations beside Settings. Scheduled uses a clock
+action with a localized accessible name and active state. Projects is managed
+through Settings → Project archive; Pull requests is not rendered in the sidebar.
 
 Section-level create and sort controls stay visually quiet at rest and reveal
 when the owning Sessions or Projects toolbar is hovered or keyboard-focused.

@@ -8,6 +8,34 @@
 
 ## 1. Goals
 
+### E2E-SCHEDULED-desktop-automation-lifecycle
+
+- **Preconditions:** Isolated desktop profile, built task candidate, local SSE
+  fixture model; no real provider credentials or paid API.
+- **Steps:** Open the footer clock; create a daily Morning task at 09:00; edit its name;
+  select a daily time period from four fixed defaults; open the weekday menu,
+  select custom days, save and reopen; reject empty days; verify the four defaults,
+  arrows, Home/End, Enter, Escape/Tab and outside dismissal; select hourly without time
+  fields and verify its first occurrence is one hour away; pause/resume; Run now;
+  open the result conversation; configure a daily task for the next real minute;
+  observe automatic completion; delete the settled task. In a normal Agent
+  conversation, use model tool calls to discover, create, list, update to 15:30
+  and delete a task. Verify the custom time appears in the form and survives
+  renaming. The model is a local deterministic fixture, not a live provider.
+- **Expected:** Configuration persists, next time is visible, paused tasks do
+  not dispatch, both execution paths reach the real Agent sidecar, history links
+  to the persisted transcript, and automatic execution does not require a
+  renderer prompt. Host tests additionally prove duplicate admission rejection,
+  stale/missed occurrence handling, invalid input rejection and recovery.
+- **Specs:** 04-ux/01-ui-ia §3.4; 03-runtime/04-data-storage §4.11;
+  ADR scheduled-desktop-automations.
+- **Acceptance:** Scheduled task execution and recoverable run history.
+- **Milestone:** Post-MVP desktop automations.
+- **Status:** Automated in `node scripts/e2e-scheduled.mjs`; run against the
+  request candidate per AGENTS.md, with tested head and base recorded.
+
+
+
 ### E2E-PLUGIN-appearance-extension-lifecycle
 
 - **Preconditions:** A fixture plugin declares `ui.theme`, `ui.settings`, one
@@ -7758,6 +7786,7 @@ identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
+| C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |
 | A / C — Unicode stdio framing | E2E-RPC-unicode-separators |
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | C / D / Quality — Sidebar row states | E2E-LAYOUT-sidebar-row-states |
