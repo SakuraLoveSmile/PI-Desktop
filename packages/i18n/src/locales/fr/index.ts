@@ -2110,6 +2110,7 @@ sklm: {
     "PROVIDER_RATE_LIMITED": "Le fournisseur d'IA limite le débit des requêtes. Attendez un moment et réessayez.",
     "PROVIDER_ERROR": "Le fournisseur d'IA a renvoyé une erreur.",
     "NETWORK_ERROR": "Impossible de joindre le fournisseur d'IA. Vérifiez votre réseau ou votre URL de base.",
+    providerCertificate: "Le certificat du service IA n’a pas pu être vérifié. Vérifiez le certificat, l’horloge système et les certificats racines approuvés utilisés par votre logiciel de sécurité ou proxy. Redémarrez l’application après avoir modifié les paramètres de confiance.",
     NETWORK_POLICY_BLOCKED: "Le contrôle d'adresse de l'application a bloqué cette requête. Si vous utilisez un proxy ou un VPN, vérifiez Paramètres → Général → Réseau.",
     "TIMEOUT": "La demande adressée au fournisseur d'IA a expiré.",
     "STREAM_FAILED": "La réponse a été interrompue.",

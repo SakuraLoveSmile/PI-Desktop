@@ -13854,3 +13854,31 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Automation:** `pnpm test:e2e:dialog-overflow`; source/contract dialog suites
   supplement, but do not replace, real Chromium geometry and pointer checks.
 - **Status:** Implemented. Native Windows evidence; macOS/Linux not qualified.
+
+### E2E-PROVIDER-certificate-trust-and-terminal-errors
+
+- **Preconditions:** Built request candidate incorporating current `origin/main`,
+  Electron installed, isolated test process/profile and loopback HTTPS fixture.
+  No real provider, credentials, user profile, or OS certificate-store writes.
+- **Steps:** Run `node scripts/e2e-provider-certificates.mjs`. Launch the actual
+  desktop sidecar and submit a chat prompt against an untrusted localhost
+  certificate. Relaunch with its CA in `NODE_EXTRA_CA_CERTS`, then request the
+  same certificate through a hostname absent from its SAN.
+- **Expected:** The child's default CA set includes system roots and extra CAs.
+  The first request fails once with a non-retriable certificate error and no
+  retry status; the trusted request returns text; the hostname mismatch still
+  fails once. TLS and hostname verification remain enabled.
+- **UI:** Run `node scripts/e2e-provider-certificate-ui.mjs` for the real error
+  component in isolated Chromium. Certificate errors get localized guidance;
+  DNS and protocol errors retain the generic summary. Errno/raw details remain
+  visible, and details can be closed and reopened. Optional
+  `PI_CERTIFICATE_EVIDENCE_DIR` records a screenshot; `--baseline` uses the
+  upstream error component with the same fixture and stylesheet.
+- **Lower-level coverage:** `provider-certificate-flow.test.ts` enters main
+  session `prompt()` and delegate `run()` through real Agent/pi-ai wiring,
+  with only the external fetch mocked. Both stop after one request and retain
+  the certificate cause. Error classification and recovery suites cover direct,
+  nested, flattened, non-certificate and wrapped certificate failures.
+- **Limits:** OS-root inclusion is checked without installing a root. The TLS
+  success fixture uses a child-only extra CA; it does not reproduce a specific
+  antivirus installation or claim native macOS/Linux verification.

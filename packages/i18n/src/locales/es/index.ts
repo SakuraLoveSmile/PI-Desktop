@@ -2110,6 +2110,7 @@ sklm: {
     "PROVIDER_RATE_LIMITED": "El proveedor de IA limita la velocidad de las solicitudes. Espere un momento y vuelva a intentarlo.",
     "PROVIDER_ERROR": "El proveedor de IA devolvió un error.",
     "NETWORK_ERROR": "No se puede comunicar con el proveedor de IA. Verifique su red o URL base.",
+    providerCertificate: "No se pudo verificar el certificado del servicio de IA. Compruebe el certificado, la hora del sistema y los certificados raíz de confianza del software de seguridad o proxy. Reinicie la aplicación tras actualizar la configuración de confianza.",
     NETWORK_POLICY_BLOCKED: "La comprobación de direcciones de la aplicación bloqueó esta solicitud. Si usas proxy o VPN, revisa Configuración → General → Red.",
     "TIMEOUT": "Se agotó el tiempo de espera de la solicitud al proveedor de IA.",
     "STREAM_FAILED": "La respuesta fue interrumpida.",
