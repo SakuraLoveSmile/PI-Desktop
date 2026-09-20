@@ -2,6 +2,18 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    "version": "0.15.2",
+    "date": "2026-09-21",
+    "highlights": [
+      "Araç etkinlikleri konuşma genişliğini izler ve uzun etkinlik etiketleri düzgünce sığdırılır.",
+      "Oturum değiştirdikten sonra yapıştırma tamamlansa bile yapıştırılan dosya ekleri korunur.",
+      "Sağlayıcıları düzenlerken seçili varsayılan model korunur; model kaldırılırsa güvenli bir yedek kullanılır.",
+      "İç içe düşünme ve araç etkinliği bölümlerini okumak, gezinmek ve kurtarmak kolaylaşır.",
+      "Composer düzenleri, akıl yürütme kontrolleri ve çalışma alanı tema tutarlılığı iyileştirilir.",
+    ],
+  },
+
+  {
     "version": "0.15.1",
     "date": "2026-09-19",
     "highlights": [
