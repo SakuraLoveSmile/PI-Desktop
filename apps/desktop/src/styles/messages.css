@@ -1860,7 +1860,7 @@
   transition: transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.tool-activity-group.open .tool-activity-caret {
+.tool-activity-group.open > .tool-activity-header > .tool-activity-caret {
   transform: rotate(90deg);
 }
 
@@ -1872,7 +1872,7 @@
     opacity var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.tool-activity-group.open .tool-activity-collapse {
+.tool-activity-group.open > .tool-activity-collapse {
   grid-template-rows: 1fr;
   opacity: 1;
 }
@@ -2445,7 +2445,7 @@
   flex: none;
   margin-left: 2px;
   color: var(--ds-text-muted);
-  opacity: 0;
+  opacity: 0.65;
   transition: transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
@@ -2457,7 +2457,9 @@
   opacity: 1;
 }
 
-.tool-row.open .tool-row-caret {
+.tool-row.open > .tool-row-header > .tool-row-caret,
+.tool-row.open > .tool-row-head > .tool-row-header > .tool-row-caret,
+.tool-row.open > .tool-row-head > .tool-row-caret {
   transform: rotate(90deg);
 }
 
@@ -2989,14 +2991,15 @@
   font-size: var(--text-xs);
 }
 
-/* One disclosure owns the process; tools retain their own detail controls. */
+/* Process, activity groups and item details own independent disclosure levels. */
 .turn-process {
   width: 100%;
   margin: 0 0 8px;
   min-width: 0;
 }
 
-.turn-process.open > .tool-activity-header > .tool-activity-caret {
+.turn-process.open > .tool-activity-header > .tool-activity-caret,
+.process-activity-group.open > .tool-activity-header > .tool-activity-caret {
   transform: rotate(90deg);
 }
 
@@ -3005,13 +3008,50 @@
   padding-left: 18px;
 }
 
-.turn-process-body[hidden] {
+.turn-process-body[hidden],
+.process-activity-body[hidden] {
   display: none;
 }
 
 .turn-process-body > .assistant-turn-fragment {
   color: var(--ds-text-secondary);
   margin-block: 8px;
+}
+
+.process-activity-group {
+  width: 100%;
+  min-width: 0;
+  margin-block: 6px;
+}
+
+.process-activity-body {
+  position: relative;
+  min-width: 0;
+}
+
+.process-activity-group.grouped > .process-activity-body {
+  margin-block: 3px 6px;
+  padding-inline-start: 12px;
+}
+
+.process-activity-group > .tool-activity-header,
+.turn-process > .tool-activity-header {
+  display: flex;
+  width: 100%;
+}
+
+.process-activity-group > .tool-activity-header > .tool-activity-label,
+.turn-process > .tool-activity-header > .tool-activity-label {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-activity-group > .tool-activity-header > .tool-activity-caret,
+.turn-process > .tool-activity-header > .tool-activity-caret {
+  margin-inline-start: auto;
 }
 
 .thinking-compact {
@@ -3023,6 +3063,10 @@
 
 .turn-process-error {
   display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  font-size: var(--text-xs-plus);
   color: var(--ds-error);
 }
 
