@@ -3427,15 +3427,20 @@ identify the platform validation still needed.
 - **Preconditions**: A session contains a completed user prompt and a
   completed assistant answer; the conversation pane is focused.
 - **Steps**: 1) Right-click the user plate. 2) Choose Copy, then Select
-  message text. 3) Right-click the assistant turn and choose Copy.
-  4) Right-click empty space below the last turn and choose Copy
-  conversation. 5) Press Escape on an open menu, then Tab. 6) Right-click
+  message text. 3) Select a phrase in the user plate, right-click that
+  plate, and choose Copy; collapse the caret, right-click again, and
+  choose Copy. 4) Right-click the assistant turn and choose Copy.
+  5) Right-click empty space below the last turn and choose Copy
+  conversation. 6) Press Escape on an open menu, then Tab. 7) Right-click
   a markdown link in the answer.
 - **Expected**: The user menu lists Copy, Select message text, Edit, and
   a separated Delete; the assistant menu lists Copy, Select message text,
-  Regenerate, and Branch. Copy writes the message or the labelled
-  conversation to the clipboard and shows a toast. Select text highlights
-  the bubble. Escape and Tab dismiss the menu without running an item.
+  Regenerate, and Branch. Copy writes the live selection in the
+  right-clicked turn when the menu opened over one; a collapsed caret
+  or a selection outside that row falls back to the whole turn. Copy
+  conversation writes the labelled thread. Both show a toast. Select
+  text highlights the bubble. Escape and Tab dismiss the menu without
+  running an item.
   A link still offers Open in default browser, Open in work panel, and
   Copy link address. Quote, Annotate, and Open side chat are absent
   (ADR 0268). The surface is a viewport-fixed body-level layer and does

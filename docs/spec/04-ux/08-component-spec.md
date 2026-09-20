@@ -1676,8 +1676,12 @@ Single message render — either user (plaintext) or assistant (markdown streami
   menu: Copy conversation, Select conversation text, Scroll to top, Jump to
   latest. Quote, Annotate, and Open side chat stay retired (ADR 0268). A
   streaming or empty assistant turn that would produce no items opens
-  nothing. Copying from the menu reports through the toast host because the
-  surface closes as soon as the item runs.
+  nothing. Copy on a speaking-turn menu writes the live selection in that
+  turn captured when the menu opened; a collapsed caret, or a selection
+  outside the row, falls back to the whole turn.
+  Copy conversation still writes the labelled thread. Copying from the
+  menu reports through the toast host because the surface closes as soon
+  as the item runs.
   Fork creates and activates an independent session whose snapshot ends at the
   selected assistant response, requires an idle source, and leaves that
   source's transcript, live runtime, and provider cache state untouched (D134).
