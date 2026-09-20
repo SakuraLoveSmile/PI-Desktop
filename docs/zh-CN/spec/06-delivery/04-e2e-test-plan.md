@@ -3796,17 +3796,21 @@ IPC 请求无法关闭。
   输入 CDP 或输出。默认无钥匙运行仍为 5/5 与现场案例
   明确跳过。
 
-#### E2E-CHAT-opaque-floating-decision-and-retry-surfaces：Plan 审批条与重试 hover 保持不透明
+#### E2E-CHAT-opaque-floating-decision-and-retry-surfaces：停靠区、Plan 审批条与重试表面遮住正文
 
-- **状态**：已自动化（`apps/desktop/test/plan-mode-source-contract.test.mjs`、`apps/desktop/test/active-turn-surface.test.mjs`）
+- **状态**：已自动化（`pnpm test:e2e:composer-occlusion`、`pnpm test:e2e:theme-surfaces`、`apps/desktop/test/plan-mode-source-contract.test.mjs`、`apps/desktop/test/active-turn-surface.test.mjs`）
 - **优先级**：P2
 - **覆盖**：C、品质 / 浮动 Composer 与重试表面
 - **先决条件**：渲染器 CSS 为 `apps/desktop/src/styles` 下的生产源。
 - **步骤**：
-  1. 检查 Composer 停靠栏样式中的 `.plan-approval-bar`。
-  2. 检查记录样式中的 `.run-activity-error-popover.message-error`。
-  3. 在实时会话中悬停或聚焦正在重试的活动行。
+  1. 在两套内置主题和一套自定义主题中检查 `.composer-dock-docked` 的计算背景。
+  2. 滚动长会话，让一行正文经过悬浮 Composer 下方。
+  3. 检查 Composer 停靠栏样式中的 `.plan-approval-bar`。
+  4. 检查记录样式中的 `.run-activity-error-popover.message-error`。
+  5. 在实时会话中悬停或聚焦正在重试的活动行。
 - **预期**：
+  - 停靠区横跨整个宽度绘制不透明的 `--ds-bg-primary` 工作区表面；正文在
+    Composer 边界处消失，不会留在输入框下方或圆角外侧。
   - Plan/Goal 审批条使用 `--ds-bg-composer` 加 `--ds-shadow-composer`，而不是正文流里的 `--ds-tile` 薄洗，因此在透明停靠栏上仍可读。
   - 重试 hover tooltip 把错误色混在 `--ds-bg-elevated-opaque` 上，记录正文不会透出。
   - 重试 tooltip 的高度被限制在尾部状态行上方的可用空间内，其余部分可滚动，

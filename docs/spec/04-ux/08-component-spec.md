@@ -2598,7 +2598,10 @@ reasoning-level control.
   `.composer-shell`, `.composer-input-wrap`, `.composer-input`, and
   `.composer-toolbar` spacing, minimum heights, theme surfaces, and controls.
   Only the parent placement and the localized placeholder copy differ between
-  the empty home and a recorded conversation.
+  the empty home and a recorded conversation. In a recorded conversation,
+  `.composer-dock-docked` paints the primary workspace background across its
+  full width. This occlusion band prevents transcript rows from remaining
+  visible beneath the floating shell or through its rounded outer corners.
 - Empty draft height: `.composer-input` uses `min-height: 3lh`, so an idle
   composer shows three lines of input before it grows with the draft.
 - Scroll stability: The thread scrollport reserves one stable trailing gutter,

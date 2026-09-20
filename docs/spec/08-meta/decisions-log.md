@@ -6457,3 +6457,16 @@ that was sitting at the bottom — including after the turn had finished.
   `03-runtime/07-process-model.md` §4, `03-runtime/09-logging-and-observability.md`,
   and `03-runtime/04-data-storage.md`.
 
+## 2026-09-20 — The dock occludes transcript paint below Composer (D603, issue #728)
+
+- The transcript scrollport fills the conversation pane while its content
+  reserves the measured Composer height. Because the absolutely positioned dock
+  was transparent, a row could keep painting below the floating shell and stay
+  visible in its bottom gap or outside its rounded corners.
+- `.composer-dock-docked` now paints the opaque `--ds-bg-primary` workspace
+  surface across its full width. The Composer retains its existing translucent
+  elevated token, radius, shadow, and measured scroll reserve; the backing band
+  removes only transcript paint that has crossed the Composer boundary.
+- Renderer CSS and the theme surface regression change only. There is no scroll
+  state, protocol, persistence, theme schema, or permission change. See
+  `04-ux/08-component-spec.md` and E2E-CHAT-opaque-floating-decision-and-retry-surfaces.
