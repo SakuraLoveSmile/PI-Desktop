@@ -3809,6 +3809,8 @@ IPC 请求无法关闭。
 - **预期**：
   - Plan/Goal 审批条使用 `--ds-bg-composer` 加 `--ds-shadow-composer`，而不是正文流里的 `--ds-tile` 薄洗，因此在透明停靠栏上仍可读。
   - 重试 hover tooltip 把错误色混在 `--ds-bg-elevated-opaque` 上，记录正文不会透出。
+  - 重试 tooltip 的高度被限制在尾部状态行上方的可用空间内，其余部分可滚动，
+    因此较长的 provider 消息会保留开头几行，不会被记录滚动容器或会话顶栏遮住。
 - **链接规格**：`04-ux/03-permission-ux.md`、`04-ux/08-component-spec.md`
 - **接受**：C、品质
 - **里程碑**：M6

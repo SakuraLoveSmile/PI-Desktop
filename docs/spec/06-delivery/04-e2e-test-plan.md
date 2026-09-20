@@ -5624,6 +5624,10 @@ identify the platform validation still needed.
 - **Expected**:
   - The Plan/Goal approval bar paints `--ds-bg-composer` with `--ds-shadow-composer` rather than the in-flow `--ds-tile` wash, so it remains a readable plate over the transparent composer dock.
   - The retry hover tooltip mixes the error tint over `--ds-bg-elevated-opaque`, so transcript text does not show through.
+  - The retry tooltip is capped to the room above the tail status row and
+    scrolls the remainder, so a long provider message keeps its first lines
+    inside the transcript scrollport and below the conversation bar instead of
+    being hidden by either.
 - **Specs linked**: `04-ux/03-permission-ux.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: C, Quality
 - **Milestone**: M6
