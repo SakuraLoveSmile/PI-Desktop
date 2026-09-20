@@ -752,6 +752,9 @@ reading surface of the workstation.
 
 - Background: bg-primary
 - Max content width: 760px default, user-resizable (D439); assistant rows follow the band. User plates stay `min(82%, 600px)`
+  subagent card, or a single tool row — spans that band: its header is a
+  full-width row with an ellipsizing label and a trailing caret, never a
+  content-sized chip, so it follows the dragged width instead of its own text.
 - The transcript keeps one stable scrollbar gutter on the trailing edge. It
   never reserves a matching left gutter, so the minimap and first message do
   not leave a decorative blank strip beside the session.
