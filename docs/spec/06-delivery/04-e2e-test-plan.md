@@ -7887,6 +7887,9 @@ identify the platform validation still needed.
 | F — Persistence (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 | Quality (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 | M6+ (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| C — Conversation & stream (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
+| Quality (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
+| M6+ (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -9873,6 +9876,108 @@ This test plan spec is accepted when:
   `apps/desktop/test/assistant-turns.test.mjs`); the desktop journey needs a
   capable environment. Required suites: `test:e2e`, `test:e2e:subagents`,
   `test:e2e:transcript`.
+
+#### E2E-SUBAGENT-context-overflow-compacts-before-failing
+
+- **Preconditions**: An Agent session on a deterministic local transport whose
+  model metadata declares a small context window (for example 16,000 tokens)
+  and whose replies are scripted. The small window is injected through that
+  fake provider, never a real one: real providers and paid APIs are not
+  default test environments in this repository. A user definition
+  `~/.agents/subagents/reader.md` declares `Read`, `Glob`, and `Grep`, and the
+  workspace holds files large enough that two or three reads cross the
+  delegate's hard limit.
+- **Steps**:
+  1. Delegate a brief that requires reading those files in sequence and record
+     every request the transport receives, with its estimated size.
+  2. Read the request that follows the boundary at which the delegate crosses
+     its hard limit.
+  3. Repeat with the crossing landing while a tool result is still pending,
+     then with it landing on a completed turn.
+  4. Repeat with the summary request scripted to fail.
+  5. Run the same brief as the session Agent on the same fixture and compare
+     its requests and transcript rows with a run recorded before this change.
+  6. Inspect the delegation card, the transcript, the context inspector, and
+     the parent's own model context after the delegate settles.
+- **Expected**: The delegate keeps working instead of failing. The request
+  after the crossing is below the hard limit and carries a summary plus the
+  applicable retained tail; no request is sent above the window. A pending
+  tool result retains as an active turn (latest user message only), a
+  completed turn retains none. A failed summary degrades to the original task
+  brief plus the most recent message(s), the run still completes, and the
+  report and lifecycle details say it was degraded rather than presenting a
+  partial answer as complete. Delegate compaction adds no transcript row, no
+  host-core checkpoint, no warning toast, and no context-inspector line; the
+  delegate's own rows stay complete and the parent's model context still holds
+  only the report. The session Agent behaves exactly as it did before.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5.1, §5f,
+  `03-runtime/08-error-codes.md` §3.2, ADR 0299, ADR 0064, ADR 0136
+- **Acceptance criterion**: C — Conversation & stream; Quality
+- **Milestone**: M6+
+- **Status**: Draft. Required suites: `test:e2e`, `test:e2e:subagents`.
+
+#### E2E-SUBAGENT-context-overflow-reports-actionable-failure
+
+- **Preconditions**: The same injected small-window fake provider, sized so
+  even the degraded context cannot fit. One definition declares two ordered
+  `fallbackModels`: one whose window is no larger than the primary's and one
+  that is larger. A second definition declares none.
+- **Steps**:
+  1. Delegate a brief that overflows past both compaction and degradation, and
+     read the tool result the parent receives plus the lifecycle details.
+  2. Repeat for the definition that declares the two alternatives, recording
+     which alternatives the transport is actually asked for.
+  3. Repeat with every alternative at the same small window.
+  4. Read the delegation card and the report in English and in Chinese.
+  5. Continue the parent turn, then send a new prompt.
+- **Expected**: The run fails with `SUBAGENT_CONTEXT_OVERFLOW`, not retriable,
+  and what the parent reads names what it can change — narrow the task,
+  delegate to a model with a larger context window, read less at once. The
+  provider's raw overflow sentence is not what the parent receives. An
+  alternative whose own budget cannot hold the carried context is never
+  requested and appears in `modelFailures` with that reason; the larger
+  alternative is attempted and can succeed. With no alternative that fits, the
+  outcome stays `SUBAGENT_CONTEXT_OVERFLOW` rather than the final provider
+  error. The delegate's rows stay durable and visible, the session returns to
+  idle, and the next prompt is not `AGENT_BUSY`.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
+  `03-runtime/08-error-codes.md` §3.2, ADR 0299,
+  ADR subagent-model-fallback
+- **Acceptance criterion**: C — Conversation & stream; Quality
+- **Milestone**: M6+
+- **Status**: Draft. Required suites: `test:e2e`, `test:e2e:subagents`,
+  `test:e2e:subagent-models`.
+
+#### E2E-SUBAGENT-resume-seeds-within-context-budget
+
+- **Preconditions**: The same injected small-window fake provider. One settled
+  `reader` chain read enough to exceed the delegate hard limit while staying
+  under `MAX_RESUMABLE_READ_LINES`; a second settled chain fits well inside
+  the budget.
+- **Steps**:
+  1. `Task.resume` the over-budget chain and capture its first provider
+     request in full.
+  2. `Task.resume` the chain that fits and capture the same request.
+  3. Ask the resumed run for a conclusion the chain reached in its most recent
+     round, and for one it reached in its first round.
+  4. Relaunch the app, rebuild the chain index from the transcript, and resume
+     the over-budget chain again.
+  5. Accumulate more than `MAX_RESUMABLE_READ_LINES` of read-only output in a
+     chain and read the reusable list the next prompt offers.
+- **Expected**: The first request of a resumed run is below the hard limit. It
+  opens with the original task brief and holds the most recent turns; the
+  oldest tool results are dropped first, and dropping an assistant message
+  drops its tool calls with it, so no orphaned tool call reaches the provider.
+  A chain that fits is seeded whole, exactly as before. The most recent
+  conclusion is answered from the seeded context; the first round's may be
+  gone, and the run says so rather than inventing it. A resume never fails
+  with `CONTEXT_TOO_LARGE` or `SUBAGENT_CONTEXT_OVERFLOW` on its first
+  request. `MAX_RESUMABLE_READ_LINES` still removes an over-read chain from
+  the reusable list; truncation does not make it resumable again.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f, ADR 0299, ADR 0279
+- **Acceptance criterion**: C — Conversation & stream; Quality
+- **Milestone**: M6+
+- **Status**: Draft. Required suites: `test:e2e`, `test:e2e:subagents`.
 
 #### E2E-161: A delegation lifecycle row reads as a subagent row
 
