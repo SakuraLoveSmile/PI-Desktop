@@ -13227,8 +13227,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 | ID | Scenario | Verification |
 |---|---|---|
 | E2E-MCP-MARKET-NET-BOUNDARY | URL guard rejects credentials, loopback, private, special-use IPv4, v4-mapped, ULA, site-local and link-local bypass forms (trailing dot included); Main pins the checked public address and rechecks HTTPS redirects | deterministic guard assertions; source-contract coverage for DNS pin and bounded responses |
-| E2E-MCP-MARKET-SEMANTICS | Registry records map to install templates preserving package versions, named/positional runtime/package arguments and required/optional env variables | deterministic mapping assertions |
+| E2E-MCP-MARKET-SEMANTICS | Registry records map to install templates preserving package versions, named/positional runtime/package arguments and required/optional env variables; a remote header variable is recognized in both the registry's `{name}` and the catalog's `${NAME}` spelling, prompts for declared editable values, preserves unbound brace literals, and resolves header-local defaults, fixed values, and optional flags without merging same-named inputs across headers (ADR registry-header-variable-spelling) | deterministic mapping assertions |
 | E2E-MCP-MARKET-INSTALL | Builtin catalog entry resolves through `resolveCatalogEntry` and installs via the host `mcp.upsert` RPC; record lands in `~/.agents/servers/` | real host binary, isolated temp HOME |
+| E2E-MCP-MARKET-HEADER-SCOPE | Registry header-local `{token}` resolves only in its header; same-named URL path/query tokens remain literal through mapping, resolution, host upsert/list and persistence. URL templates retain only legacy `${NAME}` substitution | shared regressions plus real host binary with isolated temporary storage; remote entry disabled, no network call |
 
 
 #### E2E-SKILL-MARKET-NET-BOUNDARY: Public-HTTPS skill sources reject private and loopback URLs

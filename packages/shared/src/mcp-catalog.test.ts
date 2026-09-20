@@ -142,6 +142,21 @@ describe("resolveCatalogEntry", () => {
     expect(input.headers).toEqual({ Authorization: "Bearer tok" });
   });
 
+  it("resolves only legacy URL tokens alongside header-local variables", () => {
+    const entry: McpCatalogEntry = {
+      ...httpTemplate,
+      url: "https://api.example.com/${REGION}/{token}?literal=${token}",
+      headers: { Authorization: "Bearer {token}" },
+      headerBindings: { Authorization: { "{token}": { input: "token" } } },
+      requiredEnv: [{ name: "REGION" }, { name: "token" }],
+    };
+    expect(collectCatalogPlaceholders({ ...entry, headers: {}, headerBindings: undefined })).toEqual(["REGION"]);
+    const input = resolveCatalogEntry(entry, { REGION: "eu", token: "synthetic-secret" });
+    expect(input.url).toBe("https://api.example.com/eu/{token}?literal=${token}");
+    expect(input.headers).toEqual({ Authorization: "Bearer synthetic-secret" });
+    expect(() => resolveCatalogEntry(entry, { token: "synthetic-secret" })).toThrow("missing value for REGION");
+  });
+
   it("substitutes values into stdio args and env", () => {
     const input = resolveCatalogEntry(stdioTemplate, {
       GITHUB_PAT: "pat-value",
@@ -244,5 +259,33 @@ describe("validateMcpCatalogFile", () => {
     expect(warnings).toHaveLength(malformed.length);
     expect(warnings.join("\n")).toContain("categories");
     expect(warnings.join("\n")).toContain("public https");
+  });
+});
+
+
+describe("header-local token bindings", () => {
+  const entry: McpCatalogEntry = {
+    id: "scoped", name: "Scoped", transport: "http", url: "https://example.com/mcp",
+    headers: { "X-Test": "{literal} {input} {fixed}" },
+    headerBindings: { "X-Test": { "{input}": { input: "key" }, "{fixed}": { value: "{input}" } } },
+    requiredEnv: [{ name: "key" }],
+  };
+
+  it("collects editable references only and preserves literal replacements", () => {
+    expect(collectCatalogPlaceholders(entry)).toEqual(["key"]);
+    expect(resolveCatalogEntry(entry, { key: "synthetic" }).headers).toEqual({
+      "X-Test": "{literal} synthetic {input}",
+    });
+  });
+
+  it("validates input references and binding shapes", () => {
+    expect(catalogEntryError({ ...entry, requiredEnv: [] })).toContain("placeholder key is not declared");
+    for (const headerBindings of [
+      { "X-Unknown": {} },
+      { "X-Test": { "{input}": { input: "key", value: "both" } } },
+      { "X-Test": { "{input}": { input: 3 } } },
+      { "X-Test": { invalid: { value: "literal" } } },
+    ]) expect(catalogEntryError({ ...entry, headerBindings })).not.toBeNull();
+    expect(catalogEntryError({ ...entry, transport: "stdio", command: "node" })).toContain("requires http");
   });
 });
