@@ -144,7 +144,10 @@ import {
   seedDelegateMessages,
   type DelegationChain,
 } from "./delegation-history.js";
-import { clampOutputToContext } from "./output-cap.js";
+import {
+  clampOutputToContext,
+  effectiveModelContextWindow,
+} from "./output-cap.js";
 import {
   composeSubagentSystemPrompt,
   SubagentRun,
@@ -5659,7 +5662,7 @@ Delegation rules:
   private contextBudget(messages: AgentMessage[]): ContextBudget {
     const contextWindow = Math.max(
       1,
-      Math.round(this.model.contextWindow || DEFAULT_CONTEXT_WINDOW),
+      effectiveModelContextWindow(this.model) || DEFAULT_CONTEXT_WINDOW,
     );
     const modelOutputBudget = Math.min(
       Math.max(1, Math.round(this.model.maxTokens || DEFAULT_MAX_TOKENS)),
@@ -6813,7 +6816,7 @@ Delegation rules:
             | undefined;
           const overflow = isContextOverflow(
             event.message as AssistantMessage,
-            this.model.contextWindow || DEFAULT_CONTEXT_WINDOW,
+            effectiveModelContextWindow(this.model) || DEFAULT_CONTEXT_WINDOW,
           );
           const failed = stopReason === "error" || overflow;
           const aborted = stopReason === "aborted";

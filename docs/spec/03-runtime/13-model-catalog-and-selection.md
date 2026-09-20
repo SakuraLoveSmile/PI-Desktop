@@ -334,6 +334,12 @@ models still use the conservative 128k generic window and are never promoted fro
 an ID pattern alone. The marker is optional in the persisted record, so a config
 written by an older version stays readable and a downgrade ignores it.
 
+The configured user value remains persisted and visible in Advanced settings, but
+provider safety does not trust an enlarged override beyond a known published
+window. Outbound output caps, automatic compaction, and overflow classification
+use the smaller of the configured and published windows; a smaller user value
+continues to narrow the runtime budget.
+
 ### 9.2 Conversation Composer scope
 
 The conversation Composer is a configured-model picker, not a raw discovery

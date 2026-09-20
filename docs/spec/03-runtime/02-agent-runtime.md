@@ -462,6 +462,14 @@ boundary falls, not what survives it. The active-user retention limit is 20,000
 tokens, capped at half the hard budget so retention alone cannot fill a small
 window and leave the summary no room. None of these values are configurable.
 
+The provider request layer also caps the concrete output budget before every
+parent, subagent, and one-shot request. It estimates the serialized input with
+the pi-ai chars/4 baseline plus a CJK correction, then reserves the larger of
+4,096 tokens or 1% of the effective window. The effective window is the smaller
+of the configured value and the published catalog window when both are known;
+this prevents an oversized user override from bypassing compaction and output
+protection. Unknown windows preserve the configured output budget.
+
 The incoming user prompt participates in budgeting before the first provider
 request. The automatic summary request retries transient provider failures
 under a bounded pi-ai retry policy (3 retries, 2s/4s/8s backoff, cancelled by
