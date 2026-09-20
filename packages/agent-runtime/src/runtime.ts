@@ -134,6 +134,7 @@ import {
 } from "./provider-binding.js";
 import {
   contextBudgetFor,
+  contextBudgetLimitsFor,
   retainedUserMessageBudget,
   type ContextBudget,
 } from "./context-budget.js";
@@ -441,6 +442,14 @@ function delegationSummary(record: DelegationRecord): Record<string, unknown> {
     ...(record.completedAt ? { completedAt: record.completedAt } : {}),
     ...(record.result?.modelFailures ? { modelFailures: record.result.modelFailures } : {}),
     ...(record.result?.error ? { error: record.result.error } : {}),
+    // A delegate that compacted or lost history says so in its lifecycle
+    // details, not only in the report text (ADR 0299, decision 4).
+    ...(record.result?.contextCompactions
+      ? { contextCompactions: record.result.contextCompactions }
+      : {}),
+    ...(record.result?.contextDegraded
+      ? { contextDegraded: record.result.contextDegraded }
+      : {}),
     ...(record.resumedFrom ? { resumedFrom: record.resumedFrom } : {}),
     ...(record.modelChangedFrom
       ? { modelChangedFrom: record.modelChangedFrom }
@@ -3845,11 +3854,16 @@ Delegation rules:
     if (!originalTask) return undefined;
     const rows = selectChainRows(this.transcriptHistory, chain);
     if (rows.length === 0) return undefined;
+    // The seed is truncated against the delegate's own budget (ADR 0299 §7),
+    // derived from the same model the resumed run will use, so the first
+    // request fits the window instead of overflowing on arrival.
+    const model = buildProviderModel(provider);
     return seedDelegateMessages({
       originalTask,
       rows,
       provider,
-      model: buildProviderModel(provider),
+      model,
+      budget: contextBudgetLimitsFor(model),
     });
   }
 
