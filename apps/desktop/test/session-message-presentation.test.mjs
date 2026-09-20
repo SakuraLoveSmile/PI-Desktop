@@ -43,6 +43,9 @@ function loadComponent(name, extras = {}) {
     "../../../components/icons": new Proxy({}, { get: () => Icon }),
     "../../../components/ui": { TooltipButton },
     "./shared": shared,
+    "../../../lib/transcript-search-context": {
+      transcriptItemKey: (messageId, kind, roundId = "") => JSON.stringify([messageId, kind, roundId]),
+    },
     "./menu-items": { userMessageMenuItems: () => [] },
     "./TranscriptMenu": {
       useTranscriptMenu: () => () => {},
