@@ -237,8 +237,12 @@ permission gate and result envelope stay in host-core:
    Electron main executing the registered plugin tool JS and answering via RPC
    `plugins.resolveExecution` `{ executionId, ok, content, errorCode? }`.
 4. host-core resolves the pending execution and returns a standard
-   `ToolsExecuteResult` to the sidecar. Dispatch timeout maps to
-   `TOOL_TIMEOUT`; an unknown/unloaded tool maps to `TOOL_NOT_FOUND`.
+   `ToolsExecuteResult` to the sidecar. Dispatch waits up to 120s
+   (`DESKTOP_TOOL_DISPATCH_TIMEOUT_MS`, above the 110s plugin tool budget) and
+   then maps to `TOOL_TIMEOUT`; an unknown/unloaded tool maps to
+   `TOOL_NOT_FOUND`. The transport deadline for these calls covers the
+   permission wait plus that dispatch plus 10s of slack (`rpcTimeoutMs`), so no
+   outer layer gives up before host-core reports the outcome.
 
 The model-facing registry gains plugin tools per prompt: main passes registered
 defs (`fullName`, description, JSON-schema parameters) to `agent.prompt`, and
