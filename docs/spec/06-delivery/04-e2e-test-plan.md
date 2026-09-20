@@ -3100,9 +3100,13 @@ identify the platform validation still needed.
 - **Steps**: 1) Open the Composer model × reasoning chip. 2) Confirm the root
   contains the Model and Reasoning level entries with current values, plus a
   slider with one labeled stop per supported level directly beneath the
-  Reasoning level entry. 3) Drag and click the slider across multiple
+  Reasoning level entry; confirm each visible label is centered on its stop
+  and a tick dot marks every stop. 3) Drag and click the slider across multiple
   supported levels and click a tick label, confirming the chip updates while
-  the menu stays at the root. 4) Open Model, search for a model, and select a
+  the menu stays at the root; on a ladder longer than four stops, confirm only
+  the selected stop and its immediate neighbours keep visible labels while the
+  rest collapse to their tick dot and stay clickable. 4) Open Model, search
+  for a model, and select a
   model from a provider group; confirm the menu remains open at the root.
   5) Open Reasoning level and choose a level from the radio list. 6) Repeat
   with a non-reasoning provider and an unknown free-form model id; exercise

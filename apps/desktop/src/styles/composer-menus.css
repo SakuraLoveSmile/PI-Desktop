@@ -238,8 +238,16 @@
 }
 
 /* Reasoning slider (issue #417): the menu root carries the slider directly
-   under the Reasoning level entry; the entry opens the classic radio list. */
+   under the Reasoning level entry; the entry opens the classic radio list.
+
+   Point/label alignment contract: the ticks row is an n-column grid and the
+   range input is inset on both sides by half a column minus half the thumb
+   (W/(2n) - r). The native thumb center then lands exactly on the center of
+   the matching column for every stop count, so the active label always sits
+   under the thumb. The thumb radius lives in --thinking-thumb-radius so the
+   formula stays correct if the thumb size ever changes. */
 .composer-thinking-slider {
+  --thinking-thumb-radius: 7px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -252,6 +260,8 @@
   width: 100%;
   height: 18px;
   margin: 0;
+  /* Inset so the thumb travel matches the grid column centers. */
+  padding: 0 calc(100% / (2 * var(--stop-count, 1)) - var(--thinking-thumb-radius));
   background: transparent;
   cursor: pointer;
 }
@@ -303,25 +313,43 @@
   background: var(--ds-accent);
 }
 
-/* One label per stop; long ladders ellipsize instead of wrapping. */
+/* n equal columns so label i centers on the same x as the thumb at index i. */
 .composer-thinking-ticks {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(var(--stop-count, 1), minmax(0, 1fr));
   gap: 2px;
 }
 
+/* Each label centers in its column; a tick dot marks the stop above the
+   text. Long words ellipsize inside the column so the label center never
+   leaves the thumb center. */
 .composer-thinking-tick {
-  flex: 1 1 0;
+  position: relative;
   min-width: 0;
   overflow: hidden;
-  padding: 0;
+  padding: 6px 0 0;
   border-radius: var(--radius-sm);
   color: var(--ds-text-muted);
   font-size: var(--text-2xs);
   line-height: var(--leading-compact);
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
   transition: color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.composer-thinking-tick::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--ds-text-muted);
+  opacity: 0.55;
+  transform: translateX(-50%);
 }
 
 .composer-thinking-tick:hover,
@@ -332,6 +360,23 @@
 .composer-thinking-tick.active {
   color: var(--ds-accent);
   font-weight: var(--font-weight-strong);
+}
+
+.composer-thinking-tick.active::before {
+  background: var(--ds-accent);
+  opacity: 1;
+}
+
+/* Label visibility: ladders longer than four stops cannot fit every canonical
+   word, so only the selected stop and its immediate neighbours keep text;
+   the rest collapse to a tick dot but stay clickable and keep their tooltip.
+   Four or fewer stops show every label. */
+.composer-thinking-slider[style*="--stop-count: 5"] .composer-thinking-tick[data-pos="hidden"],
+.composer-thinking-slider[style*="--stop-count: 6"] .composer-thinking-tick[data-pos="hidden"],
+.composer-thinking-slider[style*="--stop-count: 7"] .composer-thinking-tick[data-pos="hidden"],
+.composer-thinking-slider[style*="--stop-count: 8"] .composer-thinking-tick[data-pos="hidden"] {
+  font-size: 0;
+  overflow: visible;
 }
 
 @keyframes composer-menu-in {

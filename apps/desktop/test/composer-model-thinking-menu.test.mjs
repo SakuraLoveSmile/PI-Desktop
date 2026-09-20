@@ -34,7 +34,9 @@ test("the menu root carries the reasoning slider under the reasoning entry", () 
   // The root view renders the slider directly beneath the Reasoning level
   // entry; the entry itself still opens the classic radio-list submenu.
   assert.match(composerSource, /onClick=\{\(\) => showView\("thinking"\)\}[\s\S]*?className="composer-thinking-slider"/);
-  assert.match(composerSource, /\{thinkingMenuLevels\.length > 1 \? \(\s*<div className="composer-thinking-slider">/);
+  assert.match(composerSource, /\{thinkingMenuLevels\.length > 1 \? \(/);
+  assert.match(composerSource, /className="composer-thinking-slider"/);
+  assert.match(composerSource, /"--stop-count": thinkingMenuLevels\.length/);
   assert.match(composerSource, /type="range"/);
   assert.match(composerSource, /className="composer-thinking-range"/);
   assert.match(composerSource, /aria-label=\{t\("chat.reasoningLevel"\)\}/);
@@ -54,6 +56,28 @@ test("the menu root carries the reasoning slider under the reasoning entry", () 
   assert.match(stylesSource, /\.composer-thinking-range::-moz-range-thumb/);
   assert.match(stylesSource, /\.composer-thinking-tick\.active\s*\{/);
   assert.doesNotMatch(composerSource, /thinkingMode|showThinkingMode|ThinkingSelectionMode|thinkingCommitChainRef/);
+});
+
+test("the reasoning slider aligns each label to its stop and collapses long ladders", () => {
+  // Each tick carries a positional marker so CSS can keep the selected stop
+  // and its neighbours labeled while collapsing the rest on long ladders.
+  assert.match(pickerSource, /data-pos=\{position\}/);
+  assert.match(pickerSource, /index === thinkingSliderValue - 1/);
+  assert.match(pickerSource, /index === thinkingSliderValue \+ 1/);
+
+  // The ticks row is an n-column grid keyed to --stop-count, and the range
+  // input is inset by half a column minus the thumb radius so the native
+  // thumb center lands on the matching column center for every stop count.
+  assert.match(stylesSource, /\.composer-thinking-ticks \{\s*display: grid;/);
+  assert.match(stylesSource, /grid-template-columns: repeat\(var\(--stop-count, 1\), minmax\(0, 1fr\)\)/);
+  assert.match(stylesSource, /--thinking-thumb-radius: 7px/);
+  assert.match(stylesSource, /padding: 0 calc\(100% \/ \(2 \* var\(--stop-count, 1\)\) - var\(--thinking-thumb-radius\)\)/);
+
+  // Labels center in their column and carry a tick dot; hidden labels keep
+  // their tooltip while collapsing to the dot on ladders longer than four.
+  assert.match(stylesSource, /\.composer-thinking-tick::before/);
+  assert.match(stylesSource, /\.composer-thinking-tick\.active::before/);
+  assert.match(stylesSource, /\.composer-thinking-slider\[style\*="--stop-count: 8"\] \.composer-thinking-tick\[data-pos="hidden"\]/);
 });
 
 test("opening the combined menu preloads model metadata before its submenu", () => {

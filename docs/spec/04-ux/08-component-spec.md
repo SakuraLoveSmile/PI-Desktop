@@ -2784,8 +2784,16 @@ reasoning-level control.
 - The combined model × reasoning menu opens at `bottom: calc(100% + 8px)` with
   `role="menu"`. Its root has exactly two `role="menuitem"` entries and, when
   the menu lists more than one level, a drag slider with one labeled stop per
-  level directly beneath the Reasoning level entry (D458). Tick labels are
-  clickable but not tab stops; the range input is the accessible control.
+  level directly beneath the Reasoning level entry (D458). Each label centers
+  on its stop: the ticks row is an n-column grid and the range input is inset
+  on both sides by half a column minus the thumb radius, so the thumb lands on
+  the matching column center for every stop count. A tick dot marks each stop
+  above its label; the selected stop uses the accent token, the rest a muted
+  token. Tick labels are clickable but not tab stops; the range input is the
+  accessible control. When the ladder lists more than four stops, only the
+  selected stop and its immediate neighbours keep visible text and the rest
+  collapse to their tick dot while staying clickable with their tooltip;
+  four or fewer stops show every label.
   The Model submenu has a search input and sticky provider headings, while
   the Reasoning level submenu starts with `Current model <model> supports
   these reasoning levels` and lists `omit` then the selected model binding's

@@ -185,7 +185,10 @@ export function ComposerModelPicker({
               (issue #417): one drag adjusts the level without entering the
               submenu, while the entry itself opens the classic radio list. */}
           {thinkingMenuLevels.length > 1 ? (
-            <div className="composer-thinking-slider">
+            <div
+              className="composer-thinking-slider"
+              style={{ "--stop-count": thinkingMenuLevels.length } as CSSProperties}
+            >
               <input
                 type="range"
                 className="composer-thinking-range"
@@ -210,23 +213,41 @@ export function ComposerModelPicker({
                   if (THINKING_SLIDER_KEYS.has(event.key)) event.stopPropagation();
                 }}
               />
+              {/*
+                Label visibility contract: with more than four stops the
+                ladder cannot fit every canonical word, so only the selected
+                stop and its immediate neighbours keep visible text; the rest
+                collapse to a tick dot but stay clickable and keep their
+                tooltip. Four or fewer stops show every label.
+              */}
               <div className="composer-thinking-ticks" aria-hidden="true">
-                {thinkingMenuLevels.map((level, index) => (
-                  <button
-                    key={level}
-                    type="button"
-                    tabIndex={-1}
-                    className={`composer-thinking-tick ${thinkingSliderValue === index ? "active" : ""}`}
-                    title={level}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      setDragThinkingIndex(index);
-                      if (level !== thinkingLevel) void commitThinkingLevel(level);
-                    }}
-                  >
-                    {level}
-                  </button>
-                ))}
+                {thinkingMenuLevels.map((level, index) => {
+                  const position =
+                    index === thinkingSliderValue
+                      ? "selected"
+                      : index === thinkingSliderValue - 1
+                        ? "before"
+                        : index === thinkingSliderValue + 1
+                          ? "after"
+                          : "hidden";
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      tabIndex={-1}
+                      data-pos={position}
+                      className={`composer-thinking-tick ${thinkingSliderValue === index ? "active" : ""}`}
+                      title={level}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setDragThinkingIndex(index);
+                        if (level !== thinkingLevel) void commitThinkingLevel(level);
+                      }}
+                    >
+                      {level}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : null}
