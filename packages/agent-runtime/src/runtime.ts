@@ -144,6 +144,7 @@ import {
   seedDelegateMessages,
   type DelegationChain,
 } from "./delegation-history.js";
+import { clampOutputToContext } from "./output-cap.js";
 import {
   composeSubagentSystemPrompt,
   SubagentRun,
@@ -1846,6 +1847,12 @@ Delegation rules:
         const stallAbort = new AbortController();
         const attemptOptions: SimpleStreamOptions = {
           ...hookedOptions,
+          // Cap the output budget at the pi-desktop layer so the estimate
+          // holds for both adapter branches: `streamSimple` re-derives
+          // max_tokens, but the low-level `stream` path used by
+          // `thinkingLevel: "omit"` would otherwise send it untouched, and
+          // both consume an estimate that under-counts CJK text (issue B).
+          maxTokens: clampOutputToContext(m, context, hookedOptions.maxTokens),
           signal: AbortSignal.any([
             ...(hookedOptions.signal ? [hookedOptions.signal] : []),
             stallAbort.signal,

@@ -10,7 +10,11 @@ import {
   withOpenCodeSessionHeaders,
 } from "./opencode-session-headers.js";
 import { mergeProviderHeaders, withProviderHeaders } from "./provider-headers.js";
-import { agentThinkingLevel as agentThinkingLevelFor, omitThinkingModel as withOmittedThinking } from "./thinking-level.js";
+import { clampOutputToContext } from "./output-cap.js";
+import {
+  agentThinkingLevel as agentThinkingLevelFor,
+  omitThinkingModel as withOmittedThinking,
+} from "./thinking-level.js";
 import { captureProviderResponse, carriesRetryDelayHeaders, createProviderRetryStream } from "./provider-retry.js";
 import type { AgentOptions } from "@earendil-works/pi-agent-core";
 import type { SubagentThinkingLevel } from "@pi-desktop/shared";
@@ -58,6 +62,10 @@ export function subagentModelBinding(opts: {
         withOpenCodeSessionHeaders(
           {
             ...options,
+            // Same request-side output cap as the parent runtime: the
+            // `omit` branch hits pi-ai's low-level `stream` which never
+            // re-derives max_tokens (issue B).
+            maxTokens: clampOutputToContext(m, context, options?.maxTokens),
             maxRetries: 0,
             sessionId: opts.sessionId,
             fetch: captureProviderResponse(options?.fetch, (response) => {
