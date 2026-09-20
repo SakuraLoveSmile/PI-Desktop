@@ -102,6 +102,7 @@ does not turn temporary thread pressure into a host process exit.
 | `SPEECH_INPUT_TOO_LARGE` | no | speech input exceeds 25 MB |
 | `SUBAGENT_IDLE_TIMEOUT` | no | withdrawn (D328): idle watchdogs are not armed; the code remains for stored results |
 | `SUBAGENT_DURATION_TIMEOUT` | no | withdrawn (D328): duration watchdogs are not armed; the code remains for stored results |
+| `SUBAGENT_CONTEXT_OVERFLOW` | no | a delegate's own model context exceeded its safe budget and neither automatic turn-boundary compaction nor the degraded retry that keeps only the task brief and the most recent messages brought it back below the limit; the failure names the actionable recovery instead of the provider's overflow text |
 ### 3.3 Workspace / tools / permissions
 
 | code | retriable | meaning |

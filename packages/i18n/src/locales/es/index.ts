@@ -2118,6 +2118,7 @@ sklm: {
     "MUTATION_RETRY_BUDGET_EXHAUSTED": "La misma edición falló tres veces, por lo que este turno se detuvo en lugar de volver a intentarlo a ciegas. Pregunta nuevamente para continuar.",
     "CONTEXT_TOO_LARGE": "Este chat aún dura demasiado después de la recuperación del contexto. Acorta tu mensaje o inicia un nuevo chat.",
     "CONTEXT_COMPACTION_FAILED": "No se pudo compactar el contexto del modelo de esta conversación.",
+    "SUBAGENT_CONTEXT_OVERFLOW": "La tarea de un subagente superó el límite de contexto de su modelo. Reduce el alcance de la tarea, dale al subagente un modelo con una ventana de contexto más grande o haz que lea menos a la vez.",
     "AGENT_BUSY": "Este chat ya está funcionando. Espere a que termine o deténgalo primero.",
     "TURN_ABORTED": "Detenido.",
     "workspaceActivationFailed": "No se pudo activar el espacio de trabajo del proyecto",
