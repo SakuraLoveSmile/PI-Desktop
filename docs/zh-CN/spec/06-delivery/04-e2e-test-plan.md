@@ -5097,6 +5097,7 @@ IPC 请求无法关闭。
 | 安全性（导入扩展依赖） | E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency |
 | 品质（导入扩展依赖） | E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency |
 | F / G / 安全性 / 品质 — 导入扩展的 npm 恢复 | E2E-PLUGIN-import-extension-recovers-missing-npm |
+| G — 插件（桌面工具调度预算） | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
 | C — 对话与流式（独立会话通信） | E2E-SESSION-independent-top-level-communication |
 | D — 插件安全（独立会话通信） | E2E-SESSION-independent-top-level-communication |
 | G — 插件（独立会话通信） | E2E-SESSION-independent-top-level-communication |
@@ -5137,6 +5138,7 @@ IPC 请求无法关闭。
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
 | 受信任扩展（R7 v1） | E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | 受信任扩展（R7 v1 npm 恢复） | E2E-PLUGIN-import-extension-recovers-missing-npm |
+| Post-MVP 回归覆盖（插件工具调度） | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
 | M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | M6+（两步删除） | E2E-SESSION-two-click-delete-arms-first |
 | C — 对话和直播（模型回退） | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
@@ -8078,18 +8080,21 @@ the latest destination. These assertions measure work counts, not device FPS.
   the call to finish. Repeat with the permission card left open for a while
   before approving.
 - **Expected:** The call returns the plugin's result. host-core does not answer
-  `TOOL_TIMEOUT` before Electron's plugin tool budget expires, and no transport
-  layer reports `host RPC timeout` or `sidecar RPC timeout` for the call. Budgets
-  nest from the inside out: plugin `agent.complete` 90s < MCP call 100s < plugin
-  tool 110s < host-core dispatch 120s, and the transport deadline covers the
-  permission wait plus that dispatch.
+  `TOOL_TIMEOUT` before Electron's budget expires, and no transport layer reports
+  `host RPC timeout`, `sidecar RPC timeout`, or `parent host proxy timeout` for
+  the call. Budgets nest from the inside out: plugin `agent.complete` 90s < MCP
+  call 100s < plugin tool 110s < host-core dispatch 150s, while the widest MCP leg
+  (a lazy handshake, then a `tools/list` traversal, then the call) is 140s. The
+  transport deadline covers the permission wait, the admission queue wait, and
+  that dispatch, so a call that waited for a saturated plugin class before it was
+  dispatched is still inside it.
 - **Specs:** `07-plugins/12-plugin-ipc-and-host-services.md` agent-tool
   dispatch; ADR 0038; ADR 0174.
 - **Acceptance:** G (plugin agent tool).
 - **Milestone:** Post-MVP regression coverage.
 - **Automation:** `apps/desktop/test/plugin-timeout-budgets.test.mjs` checks the
-  budget order across the TypeScript and Rust sources;
-  `packages/shared/src/protocol.test.ts` covers the transport deadline;
-  host-core `desktop_dispatch_outlasts_the_electron_plugin_tool_budget` covers
-  the dispatch default.
+  budget order and the dispatch call site across the TypeScript and Rust sources;
+  `packages/shared/src/protocol.test.ts` covers the transport deadline; host-core
+  `desktop_dispatch_outlasts_every_electron_budget_it_wraps` covers the dispatch
+  default.
 - **Status:** Contract-covered; no end-to-end driver waits out a real 70s call.
