@@ -2739,7 +2739,9 @@ reasoning-level control.
   — empty-home ↔ docked, chat ↔ Settings/Plugins/other pages, or the window
   hiding and showing — restores the same slot. Switching sessions saves the
   source draft and restores the target draft; an uncached target and every
-  newly created session start empty. The no-active-session home composer has
+  newly created session start empty. A pending paste retains the source
+  draft's existing file references even if saving finishes after a session switch.
+  The no-active-session home composer has
   its own slot. A successful send clears only the submitting session's slot,
   including when navigation occurs while the request is in flight, and
   deleting a session drops its slot. If the contenteditable DOM is wiped while
