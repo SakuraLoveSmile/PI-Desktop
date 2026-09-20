@@ -2157,6 +2157,8 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "Aynı düzenleme üç kez başarısız oldu, bu yüzden körü körüne yeniden denemek yerine tur durdu. Devam etmek için yeniden sorun.",
     CONTEXT_TOO_LARGE: "Bağlam kurtarmadan sonra bu sohbet hâlâ çok uzun. İletinizi kısaltın veya yeni sohbet açın.",
     CONTEXT_COMPACTION_FAILED: "Bu sohbetin model bağlamı sıkıştırılamadı.",
+    SUBAGENT_CONTEXT_OVERFLOW:
+      "Bir alt ajanın görevi, modelinin bağlam sınırını aştı. Görevi daraltın, alt ajana daha büyük bağlam penceresi olan bir model verin veya bir defada daha az okumasını sağlayın.",
     AGENT_BUSY: "Bu sohbet zaten çalışıyor. Bitmesini bekleyin veya önce durdurun.",
     TURN_ABORTED: "Durduruldu.",
     workspaceActivationFailed: "Proje çalışma alanı etkinleştirilemedi",
