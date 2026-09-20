@@ -12,10 +12,11 @@
 
 <br />
 
-
-
-
-\
+[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
+[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
+[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
 
 <br />
 
@@ -41,7 +42,7 @@
 
 终端 Agent 擅长执行，IDE Agent 擅长嵌入编辑器。
 
-PI-Desktop 更进一步：
+PI-Desktop 想做得更进一步：
 
 > **给 AI Agent 一个独立、长期、可扩展的桌面工作空间。**
 
@@ -72,9 +73,9 @@ Project、Session、Review、Preview 与 Agent 都有自己的空间。
 
 ### Agent 编排
 
-一个 Agent 不够，就拆。
+一个 Agent 不够，就拆开做。
 
-Subagent 与 Worker Session 可以承担独立任务与并行工作。
+Subagent 与 Worker Session 可以承担独立任务并行工作。
 
 </td>
 
@@ -99,13 +100,16 @@ Subagent 与 Worker Session 可以承担独立任务与并行工作。
 
 </div>
 
+> [!NOTE]
+> **PI-Desktop 目前仍处于 Early Preview。** 已可用于真实开发工作流，部分 API、插件接口与桌面能力仍在持续演进。
+
 ---
 
 ## 插件不是附加功能，而是工作台的一部分
 
-PI-Desktop 的 Core 负责底座。
+PI-Desktop 的 Core 负责提供稳定底座。
 
-**你真正需要的工作流，由插件组合出来。**
+**真正属于你的工作流，由插件组合出来。**
 
 <table>
 <tr>
@@ -114,7 +118,7 @@ PI-Desktop 的 Core 负责底座。
 
 ### Agent
 
-扩展 Agent 的能力
+扩展 Agent 能力
 
 **Agent Tools**
 **Skills**
@@ -127,7 +131,7 @@ PI-Desktop 的 Core 负责底座。
 
 ### Workspace
 
-扩展桌面工作区
+扩展整个桌面
 
 **Commands**
 **Panels**
@@ -152,7 +156,7 @@ PI-Desktop 的 Core 负责底座。
 </tr>
 </table>
 
-一个插件不必只是“多一个 Tool”。
+插件不必只是“给 Agent 多加一个 Tool”。
 
 它可以是一整个产品：
 
@@ -175,23 +179,23 @@ Session Analytics
 └── Workspace View
 ```
 
-### 插件能力
+### 插件能做什么？
 
-| 能力                  | 可以做什么           |
-| ------------------- | --------------- |
-| **Command**         | 向全局命令系统添加操作     |
-| **Panel**           | 创建独立插件界面        |
-| **Floating Widget** | 创建悬浮球、语音球、状态窗口  |
-| **Work Panel View** | 向右侧工作区加入新视图     |
-| **Agent Tool**      | 注册 Agent 可调用工具  |
-| **Completion**      | 调用用户已经配置的模型     |
-| **Skill**           | 为 Agent 提供可复用能力 |
-| **Theme**           | 修改工作台视觉         |
-| **MCP Server**      | 接入本地或远程 MCP     |
-| **Service**         | 运行常驻后台任务        |
-| **Message Bus**     | 在插件之间传递消息       |
+| 能力                  | 用途                  |
+| ------------------- | ------------------- |
+| **Command**         | 向全局命令系统添加操作         |
+| **Panel**           | 创建独立插件界面            |
+| **Floating Widget** | 创建语音球、状态窗、计时器等悬浮界面  |
+| **Work Panel View** | 向右侧工作区加入新视图         |
+| **Agent Tool**      | 注册 Agent 可调用工具      |
+| **Completion**      | 调用用户已经配置的模型         |
+| **Skill**           | 为 Agent 提供可复用能力与工作流 |
+| **Theme**           | 修改工作台视觉             |
+| **MCP Server**      | 接入本地或远程 MCP         |
+| **Service**         | 运行常驻后台任务            |
+| **Message Bus**     | 在插件之间传递消息           |
 
-插件通过 `.piplug` 分发，也可以直接从插件市场安装。
+插件可以通过 `.piplug` 分发，也可以从插件市场安装。
 
 <div align="center">
 
@@ -241,7 +245,7 @@ PI-Desktop 可以只是一个 Coding Agent。
 
 **你给任务，它直接做。**
 
-读代码、改文件、跑命令、测试、迭代。
+读代码、改文件、跑命令、测试、持续迭代。
 
 适合日常开发。
 
@@ -274,7 +278,7 @@ PI-Desktop 可以只是一个 Coding Agent。
 </tr>
 </table>
 
-高权限操作仍然经过 PI-Desktop 的 Permission Layer。
+高权限操作始终经过 PI-Desktop 的 Permission Layer。
 
 ---
 
@@ -286,15 +290,15 @@ PI-Desktop 提供两层任务拆分能力。
 
 ### Subagents
 
-把独立任务交给后台 Agent：
+把独立工作交给后台 Agent：
 
 **代码调查 · 独立实现 · 测试分析 · Research · Review**
 
-每个 Subagent 使用独立 Context，完成后把结果返回主 Agent。
+每个 Subagent 拥有独立 Context，完成后将结果返回主 Agent。
 
 ### Session Orchestrator
 
-需要更长生命周期时，可以继续拆成多个完整 Worker Session。
+需要更完整、更长期的并行任务时，可以继续拆成多个 Worker Session。
 
 ```text
 Main Session
@@ -314,7 +318,7 @@ Main Session
 
 Worker 是完整的 PI-Desktop Session：
 
-**独立 Context · 独立运行 · 可直接查看 · 持续接受任务 · 保留完整 Transcript**
+**独立 Context · 独立运行 · 可直接查看 · 可持续接受任务 · 保留完整 Transcript**
 
 <table>
 <tr>
@@ -331,7 +335,7 @@ Worker 是完整的 PI-Desktop Session：
 
 <img src="docs/image/readme/session-orchestrator-worker.png" alt="Worker Session" />
 
-<p align="center"><sub>Worker 仍然是完整、可查看的 Session</sub></p>
+<p align="center"><sub>每个 Worker 都是完整、可查看的 Session</sub></p>
 
 </td>
 
@@ -363,7 +367,7 @@ PI-Desktop 围绕：
 * 多 Project / 多 Session
 * Pin / Archive / Branch / Search
 * Agent 运行时继续 Queue Prompt
-* `@` 引用项目文件
+* 使用 `@` 引用项目文件
 * Slash Commands
 * Diff Review
 * Command Output
@@ -454,7 +458,7 @@ Private Task → Local Model
 
 ---
 
-## 已经在用其他 Agent？
+## 已经在用其他 Coding Agent？
 
 已有工作不需要从零开始。
 
@@ -468,15 +472,15 @@ PI-Desktop 可以导入本地 Session：
 
 PI-Desktop 不要求你把开发环境搬到我们的云端。
 
-| 数据                   | 默认行为             |
-| -------------------- | ---------------- |
-| Project              | 本地               |
-| Session              | 本地               |
-| Settings             | 本地               |
-| Logs                 | 本地               |
-| API Credentials      | OS Keychain      |
-| PI-Desktop Telemetry | 无                |
-| Model Request        | 直接发送到你的 Provider |
+| 数据                   | 默认行为               |
+| -------------------- | ------------------ |
+| Project              | 本地                 |
+| Session              | 本地                 |
+| Settings             | 本地                 |
+| Logs                 | 本地                 |
+| API Credentials      | OS Keychain        |
+| PI-Desktop Telemetry | 无                  |
+| Model Request        | 直接发送到你配置的 Provider |
 
 **无需 PI-Desktop 账号。**
 
@@ -582,7 +586,7 @@ macOS Release 使用 Developer ID 签名并经过 Apple Notarization。
 
 Linux x64 需要 **glibc 2.35+**。
 
-支持的常见发行版：
+常见支持版本：
 
 * Ubuntu 22.04+
 * Debian 12+
@@ -607,13 +611,13 @@ Agent Runtime 使用：
 * `pi-ai`
 * `pi-agent-core`
 
-> **Pi 提供 Agent Engine，PI-Desktop 在其上构建 Desktop Workspace、Session、权限、插件和 Agent 编排。**
+> **Pi 提供 Agent Engine，PI-Desktop 在其上构建 Desktop Workspace、Session、权限、插件与 Agent 编排。**
 
 ---
 
 ## 开发者
 
-PI-Desktop 同样可以作为 Agent 产品的宿主平台。
+PI-Desktop 也可以作为开发者构建 Agent 产品的宿主平台。
 
 你可以开发：
 
@@ -687,11 +691,11 @@ pnpm test
 
 **Issues · Pull Requests · Plugins · Skills · MCP Integrations · Documentation · Translations**
 
-对于相对独立的新能力，优先考虑：
+对于相对独立的新能力，优先考虑一个问题：
 
 > **它是否更适合作为一个 Plugin？**
 
-让 Core 保持克制，让生态继续生长。
+让 Core 保持克制，让生态持续生长。
 
 **[提交 Issue](https://github.com/vastsa/PI-Desktop/issues/new/choose)** ·
 [查看 Issues](https://github.com/vastsa/PI-Desktop/issues) ·
@@ -703,7 +707,7 @@ pnpm test
 
 <div align="center">
 
-<a href="[https://trendshift.io/repositories/178787?utm_source=repository-badge&utm_medium=badge&utm_campaign=badge-repository-178787](https://trendshift.io/repositories/178787?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-178787)">
+<a href="https://trendshift.io/repositories/178787?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-178787">
 <img src="https://trendshift.io/api/badge/repositories/178787" alt="PI-Desktop on Trendshift" width="230" height="51" />
 </a>
 
@@ -725,7 +729,7 @@ PI-Desktop 的开发过程中使用了来自多个 Provider 的模型。
 
 累计模型使用量已超过 **27 Billion Tokens**。
 
-感谢参与构建 PI-Desktop 的每一位贡献者，以及陪我们写下这些代码的模型。
+感谢参与构建 PI-Desktop 的每一位贡献者，以及陪我们一起写下这些代码的模型。
 
 ---
 
