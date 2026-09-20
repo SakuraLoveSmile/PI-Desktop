@@ -332,7 +332,7 @@ If you use a remote model provider, the context required for that model request 
 
 Packaged builds can check GitHub Releases for updates and surface new versions inside the application.
 
-Windows NSIS and Linux AppImage can download and install updates in-app. macOS, Linux deb/rpm, and the Windows portable executable open the releases page.
+macOS, Windows NSIS, and Linux AppImage can download and install updates in-app. Linux deb/rpm and the Windows portable executable open the releases page.
 
 <details>
 <summary><strong>Linux compatibility</strong></summary>
@@ -393,8 +393,6 @@ Signed and notarized builds do not need this fallback.
 ### Code signing
 
 macOS GitHub Release artifacts are signed with Developer ID Application `XingYu Liu (DUV63RKYTW)` and notarized by Apple.
-
-Windows releases of PI-Desktop are digitally signed with free code signing provided by [SignPath.io](https://signpath.io/), using a certificate from the [SignPath Foundation](https://signpath.org/).
 
 ---
 
