@@ -9,7 +9,6 @@ import {
   BACKGROUND_CONTEXT,
   compact,
   convertToLlm,
-  estimateContextTokens,
   estimateTokens,
   prepareCompaction,
   withAbortSignal,
@@ -133,6 +132,11 @@ import {
   providerRequestKey,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
+import {
+  contextBudgetFor,
+  retainedUserMessageBudget,
+  type ContextBudget,
+} from "./context-budget.js";
 import { PathMutex } from "./path-lock.js";
 import { DelegationChainRegistry } from "./delegation-chain.js";
 import {
@@ -527,27 +531,6 @@ function formatDelegationResults(
     includedDelegationIds,
   };
 }
-/**
- * Tokens held back from the context window for the summary prompt and the
- * model's own output. Compaction thresholds are derived from the active model's
- * window rather than configured, and this floor reproduces the reserve that
- * used to be the default setting, so the hard safety boundary is unchanged.
- */
-const COMPACTION_RESERVE_FLOOR_TOKENS = 16_384;
-/**
- * Retained-tail target as a share of the safe budget, bounded so a 32K window
- * still keeps a usable tail and a 1M window does not carry the whole session
- * forward. A single fixed token count cannot serve both.
- */
-const COMPACTION_KEEP_RECENT_RATIO = 0.2;
-const COMPACTION_MIN_KEEP_RECENT_TOKENS = 8_000;
-const COMPACTION_MAX_KEEP_RECENT_TOKENS = 64_000;
-/**
- * Cap on the user messages carried across a compaction boundary, matching
- * Codex's `COMPACT_USER_MESSAGE_MAX_TOKENS`. Clamped against the safe budget so
- * a small model window is not filled by retention alone.
- */
-const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS = 20_000;
 const COMPACTION_FALLBACK_KEEP_RECENT_RATIO = 0.25;
 const COMPACTION_FALLBACK_MAX_SUMMARY_CHARS = 12_000;
 const COMPACTION_SUMMARY_PROMPT_SAFETY_TOKENS = 2_048;
@@ -801,24 +784,6 @@ function contextFallbackReminder(): string {
   ].join("\n");
 }
 
-
-/**
- * Context thresholds derived from the active model's window.
- *
- * `hardLimit` is the safety boundary: the next provider request must not be
- * issued while the context is at or above it. Compaction happens inline at that
- * boundary, the way Codex does it — there is no off-critical-path variant.
- */
-type ContextBudget = {
-  /** Estimated tokens in the reconstructed model context. */
-  tokens: number;
-  /** Point where an uncompacted provider request is no longer allowed. */
-  hardLimit: number;
-  /** Tokens reserved for the request's own prompt and output. */
-  requestHeadroom: number;
-  /** Approximate recent-context tokens a checkpoint should retain. */
-  keepRecentTokens: number;
-};
 
 export type PluginToolDef = {
   /** Full exposed name (`plugin_<pluginIdSafe>_<toolName>`, D015). */
@@ -5656,43 +5621,7 @@ Delegation rules:
   }
 
   private contextBudget(messages: AgentMessage[]): ContextBudget {
-    const contextWindow = Math.max(
-      1,
-      Math.round(this.model.contextWindow || DEFAULT_CONTEXT_WINDOW),
-    );
-    const modelOutputBudget = Math.min(
-      Math.max(1, Math.round(this.model.maxTokens || DEFAULT_MAX_TOKENS)),
-      Math.max(1, Math.floor(contextWindow * 0.25)),
-    );
-    const reserveFloor = Math.min(
-      COMPACTION_RESERVE_FLOOR_TOKENS,
-      Math.max(1, Math.floor(contextWindow * 0.5)),
-    );
-    const requestHeadroom = Math.min(
-      contextWindow - 1,
-      Math.max(
-        reserveFloor,
-        modelOutputBudget,
-        Math.ceil(contextWindow * 0.05),
-      ),
-    );
-    const hardLimit = Math.max(1, contextWindow - requestHeadroom);
-    const keepRecentTokens = Math.min(
-      Math.max(
-        COMPACTION_MIN_KEEP_RECENT_TOKENS,
-        Math.min(
-          COMPACTION_MAX_KEEP_RECENT_TOKENS,
-          Math.floor(hardLimit * COMPACTION_KEEP_RECENT_RATIO),
-        ),
-      ),
-      Math.max(1, Math.floor(hardLimit * 0.5)),
-    );
-    return {
-      tokens: estimateContextTokens(messages).tokens,
-      hardLimit,
-      requestHeadroom,
-      keepRecentTokens,
-    };
+    return contextBudgetFor(this.model, messages);
   }
 
   private automaticCompactionNeeded(
@@ -5704,19 +5633,8 @@ Delegation rules:
     return this.compactionEnabled && budget.tokens >= budget.hardLimit;
   }
 
-  /**
- * Cap on the active user message a checkpoint carries forward. Codex uses a
- * flat 20k; the clamp keeps a small model window from being filled by
- * retention alone, which would leave the summary no room.
-   */
   private retainedUserMessageBudget(budget: ContextBudget): number {
-    return Math.max(
-      1,
-      Math.min(
-        COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS,
-        Math.floor(budget.hardLimit * 0.5),
-      ),
-    );
+    return retainedUserMessageBudget(budget);
   }
 
   /**
