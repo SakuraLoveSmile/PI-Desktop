@@ -111,6 +111,48 @@ No lifecycle script runs. Failed installs remove partial dependencies/cache and
 are reported to the renderer without blocking the import. The confirm discloses
 the npm step alongside the skills disclosure.
 
+If npm or its Node.js runtime is unavailable, the installer returns a structured
+unavailable error. Only this category opens a native Main-owned message box with
+"Choose npm" and "Cancel"; ordinary registry, network, dependency-policy, or
+installation errors never open an executable-path prompt. The message explains
+that npm must come from a trusted Node.js installation, that the choice is
+remembered for future imports, and that Node.js must be installed first if absent.
+Choosing npm opens a native executable picker with `showHiddenFiles`, allowing
+navigation into installations such as `~/.nvm`. On macOS, `noResolveAliases`
+preserves the selected `bin/npm` symlink rather than returning its internal CLI
+target, so the sibling `node` remains discoverable. Selected paths never come
+from renderer text input.
+
+Main validates the selected executable and its Node.js runtime with bounded
+version checks before saving or installing. Invalid selections (including npm
+without usable Node.js) show a localized native warning and let the user choose
+again or cancel; the guidance is to choose npm in the same directory as `node`.
+Only a validated selection is persisted, atomically, in Main-owned
+`<dataDir>/npm-path.json`, not renderer settings or Host SQLite. Future imports
+reuse it after validation; a stale saved path returns to the recovery prompt.
+If persistence fails, a native warning explains that the choice could not be
+saved but the current import can still use the validated executable.
+
+The selected executable's directory is added only to the install child's `PATH`
+so npm can find `node`; no shell startup probing or global environment mutation
+is permitted. Version checks and installation retain a minimal environment with
+no inherited credentials. The registry-only proxy, isolated npm configuration,
+bounded two-step install, disabled git resolution, and disabled lifecycle scripts
+remain unchanged. Configured Windows `.cmd`/`.bat` launchers use the adjacent
+`node.exe` and `node_modules/npm/bin/npm-cli.js` directly, without shell
+interpolation; a nonstandard launcher missing this layout is rejected with
+recovery guidance. Recovery retries dependency installation in the already-generated
+plugin directory: it never recopies the source or allocates another plugin id.
+After recovery succeeds, is cancelled (including closing the picker), or ends in
+a dependency error, the generated plugin is loaded and registered exactly once;
+dependency errors remain visible without blocking registration.
+
+All native recovery labels use the active locale's flat `plugins.npmMissingTitle`,
+`npmMissingBody`, `npmChoose`, `npmPickerTitle`, `npmInvalidTitle`, `npmInvalidBody`,
+`npmSaveFailedTitle`, and `npmSaveFailedBody` keys, plus existing `common.cancel`.
+Bodies are standalone localized text without interpolation placeholders; Main
+appends any dynamic diagnostic on a new line.
+
 | Source | Becomes |
 |---|---|
 | A pi extension directory or file | A local plugin under `plugins/imported`, id `imported.<slug>` |
