@@ -7727,6 +7727,7 @@ identify the platform validation still needed.
 | Quality (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
 | Security (imported extension dependencies) | E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
 | Quality (imported extension dependencies) | E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency |
+| F / G / Security / Quality — Imported extension npm recovery | E2E-PLUGIN-import-extension-recovers-missing-npm |
 | C — Conversation & stream (Independent session communication) | E2E-SESSION-independent-top-level-communication |
 | D — Plugin security (Independent session communication) | E2E-SESSION-independent-top-level-communication |
 | G — Plugins (Independent session communication) | E2E-SESSION-independent-top-level-communication |
@@ -7772,6 +7773,7 @@ identify the platform validation still needed.
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
 | Trusted extensions (R7 v1) | E2E-241, E2E-242, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
+| Trusted extensions (R7 v1 npm recovery) | E2E-PLUGIN-import-extension-recovers-missing-npm |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
 | M6+ (Two-click delete) | E2E-SESSION-two-click-delete-arms-first |
 | C — Conversation & stream (model fallback) | E2E-SUBAGENT-ordered-model-fallback-preserves-work |
@@ -12409,6 +12411,50 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Status**: Automated by `pnpm test:e2e:plugin-import-deps` for the deterministic
   registry-source rejection boundary; renderer warning-toast and `load_error`
   behavior remains a separate validation surface.
+
+#### E2E-PLUGIN-import-extension-recovers-missing-npm: Choose a trusted npm installation and resume the same import
+
+- **Preconditions**: A desktop build with an isolated data directory; npm/Node.js
+  unavailable on its inherited `PATH`; a local extension declaring a pinned
+  registry dependency and an install-script marker; a trusted Node.js/npm
+  installation outside `PATH` (on macOS, include a hidden `~/.nvm` directory).
+- **Steps**: 1) Import the package through Plugins and accept the trust confirm.
+  2) In the native missing-npm message choose "Choose npm". Select an invalid
+  executable, then an npm without usable Node.js; choose again after each warning.
+  3) Select working npm alongside `node`. Inspect the resulting plugin and saved
+  path. 4) Restart the app and import another package; then remove or move the
+  saved executable and repeat. 5) Repeat with Cancel in the message box, picker,
+  and invalid-selection warning. 6) Make saving the path fail while keeping the
+  plugin destination writable and retry with a valid selection. 7) With working
+  npm, force an ordinary registry/network failure. Repeat dialog checks in all
+  eight shipped locales.
+- **Expected**: Only structured npm/Node unavailability prompts for a path.
+  Native copy explains trusted Node.js, installing Node.js if absent, and remembering
+  the selection; hidden directories are visible. Invalid selections are rejected
+  by bounded version checks and never saved; choose-again/cancel stays available.
+  A valid choice resumes installation in the original generated directory with
+  the original plugin id and writes `<dataDir>/npm-path.json` atomically. Restart
+  reuses the validated path without prompting; a stale saved path prompts again.
+  Save failure warns but the current install still uses the valid choice. Every
+  completion, cancellation, and dependency error loads/registers that generated
+  plugin exactly once without recopying it; dependency failures remain visible.
+  Network/registry failures never open the npm picker. Only the install child
+  gains the selected directory in `PATH`; shell probing, global environment
+  changes, credential inheritance, and lifecycle marker execution do not occur.
+  The registry-only proxy and two-step dependency validation remain enforced.
+  Dialogs use localized standalone bodies and existing localized Cancel, with
+  dynamic diagnostics appended on a new line.
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §3.2; ADR 0244
+- **Acceptance**: F, G, Security, Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Automated at the native-dialog I/O boundary by
+  `pnpm test:e2e:plugin-import-deps`: the real import handler and npm installer
+  recover from an empty PATH, keep registry-only resolution and disabled scripts,
+  persist the selected path, and register the same plugin once. The desktop
+  `npm-install-recovery.test.mjs` suite covers cancellation, invalid/stale paths,
+  preference reload, save failure, localization, and ordinary network errors.
+  Physical native-picker interaction (including macOS symlink selection), full
+  desktop restart, and visual checks in every locale remain manual/not run.
 
 
 ---

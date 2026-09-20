@@ -1164,7 +1164,7 @@ export const api = {
           dependencies:
             | { state: "skipped"; reason: "no-package-json" | "no-dependencies" }
             | { state: "installed" }
-            | { state: "failed"; error: string };
+            | { state: "failed"; error: string; reason?: "npm-unavailable" };
         }
     >(IPC.invoke.pluginImportExtension),
   runExtensionCommand: (input: { sessionId: string; name: string; args: string }) =>

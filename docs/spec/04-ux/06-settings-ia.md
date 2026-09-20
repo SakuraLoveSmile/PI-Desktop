@@ -724,8 +724,12 @@ system while preserving their different data ownership:
 8. Model configuration shows compact Defaults, separate vendor accounts, the
    account edit/add dialogs, and AI service cards rather than a dense always-on
    form dump
-9. Row descriptions use semantic secondary text and maintain at least 4.5:1
-   contrast against their card surface in both light and dark themes
+9. A row's or card heading's explanation is not a permanent second line: it
+   travels as a string into the question mark beside the title, which reveals
+   it on hover and keyboard focus and keeps at least 4.5:1 contrast against its
+   card surface in both light and dark themes. A row's live value (the pinned
+   default model) is data rather than prose and stays visible, and a form
+   field's hint follows the same rule as a row's explanation
 10. Dragging the empty top band from either side of Settings moves the native
    window without blocking Back, search, or navigation controls
 11. Resizing the window expands or contracts the content cards with the

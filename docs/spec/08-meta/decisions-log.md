@@ -6415,3 +6415,25 @@ that was sitting at the bottom — including after the turn had finished.
 - A missing executable is reported as `command not found: <name>` instead of
   a raw `spawn uvx ENOENT`.
 - See ADR 0045, `03-runtime/03-tools-and-permissions.md`, issue #571.
+## 2026-09-20 — Settings explain themselves on demand (D601)
+
+- Decision D601 is renderer-only. A settings row no longer carries a permanent
+  second line of prose under its title: `SettingsRow.description` is a string
+  that renders behind the question mark beside the title, and `SettingsCard`
+  gains the same `description` for a card heading. `HelpIcon`
+  (`components/ui.tsx`) is the single affordance — a real button, so a keyboard
+  reaches the sentence a pointer hovers, and the sentence itself is its
+  accessible name. `Field`'s `hint` moved to it as well.
+- A row's live value is not an explanation and stays visible: the pinned
+  default model travels through the new `SettingsRow.detail`, and
+  `NetworkProxySection`'s local copy of the row skeleton is gone in favour of
+  the shared one, so the retired line cannot return through a second renderer.
+- The mark is a sibling of the element it explains wherever that element is a
+  heading, because a nested button joins the heading's accessible name. A
+  settings `Field` is the deliberate exception: its hint stays inside the
+  `<label>`, so the field's accessible name carries the sentence too. Moving it
+  out would cost click-to-focus on every field, which a longer name does not
+  justify.
+- No IPC channel, host protocol, storage schema, persisted setting, or i18n key
+  changed: every sentence keeps its key and only its placement moved. See
+  `04-ux/06-settings-ia.md` and `04-ux/07-ui-design-system.md`.
