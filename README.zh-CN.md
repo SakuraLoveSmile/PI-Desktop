@@ -430,9 +430,9 @@ PI-Desktop 不要求注册账号，也没有强制的 PI-Desktop 云端中转层
 
 打包版本会检查 GitHub Releases，并在应用内提示新版本。
 
-Windows NSIS 与 Linux AppImage 可以在应用内下载并安装更新。
+Windows NSIS、Linux AppImage 与 macOS 可以在应用内下载并安装更新。
 
-macOS、Linux deb/rpm，以及 Windows Portable 版本会跳转到 Releases 页面。
+Linux deb/rpm 以及 Windows Portable 版本会跳转到 Releases 页面。
 
 <details>
 <summary><strong>Linux 兼容性说明</strong></summary>
@@ -497,8 +497,6 @@ ZIP 包包含 `PI-Desktop-macOS-opening-help.txt` 和 `PI-Desktop-macOS-open.com
 ### 代码签名
 
 macOS GitHub Release 产物使用 Developer ID Application `XingYu Liu (DUV63RKYTW)` 签名，并由 Apple 公证。
-
-PI-Desktop 的 Windows Release 使用 [SignPath.io](https://signpath.io/) 提供的免费代码签名服务，并通过 [SignPath Foundation](https://signpath.org/) 的证书完成签名。
 
 ---
 
