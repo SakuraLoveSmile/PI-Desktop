@@ -16,6 +16,7 @@ export type SettingsTabId =
   | "subagents"
   | "import"
   | "projects"
+  | "remoteHosts"
   | "about";
 
 export type SettingsNavGroupId =
@@ -41,6 +42,11 @@ export type SettingsNavEntry = {
   group: SettingsNavGroupId;
   /** i18n keys of the rows inside the tab; search matches their translations. */
   keywordKeys: string[];
+  /**
+   * Destination only exists while `AppSettings.developerMode` is on; the
+   * rail, the page, and settings search drop it together.
+   */
+  developerOnly?: true;
 };
 
 export const SETTINGS_NAV: SettingsNavEntry[] = [
@@ -79,9 +85,6 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.permissionModeAcceptEdits",
       "settings.permissionModeAuto",
       "settings.defaultsTitle",
-      "settings.speechTitle",
-      "settings.speechTranscribe",
-      "settings.speechSynthesize",
       "settings.mode",
       "settings.commandShell",
       "settings.linkOpenTarget",
@@ -92,6 +95,15 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.contextUsageDisplay",
       "settings.contextUsageDisplayRemaining",
       "settings.contextUsageDisplayUsed",
+      "settings.promptEnhancementTitle",
+      "settings.promptEnhancementDesc",
+      "settings.promptEnhancementCustomTemplate",
+      "settings.promptEnhancementEdit",
+      "settings.promptEnhancementUserTemplate",
+      "settings.promptEnhancementModelTitle",
+      "settings.promptEnhancementModel",
+      "settings.promptEnhancementModelFollow",
+      "settings.promptEnhancementThinking",
       "settings.largePasteThreshold",
     ],
   },
@@ -222,6 +234,28 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     ],
   },
   {
+    id: "remoteHosts",
+    labelKey: "settings.nav.remoteHosts",
+    titleKey: "settings.remoteHosts.title",
+    group: "system",
+    developerOnly: true,
+    keywordKeys: [
+      "settings.remoteHosts.title",
+      "settings.remoteHosts.addTitle",
+      "settings.remoteHosts.addSsh",
+      "settings.remoteHosts.addPair",
+      "settings.remoteHosts.pair",
+      "settings.remoteHosts.fieldUrl",
+      "settings.remoteHosts.fieldPairingToken",
+      "settings.remoteHosts.sshHost",
+      "settings.remoteHosts.sshAuthMode",
+      "settings.remoteHosts.sshPassword",
+      "settings.remoteHosts.statusOnline",
+      "settings.remoteHosts.statusOffline",
+      "settings.remoteHosts.experimental",
+    ],
+  },
+  {
     id: "about",
     labelKey: "settings.nav.info",
     titleKey: "settings.about",
@@ -238,6 +272,28 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
   },
 ];
 
+/**
+ * Destinations the current mode offers, in rail order. `developerMode` comes
+ * from `AppSettings.developerMode`; when it is off the developer-only rows are
+ * absent rather than disabled.
+ */
+export function visibleSettingsNav(developerMode: boolean): SettingsNavEntry[] {
+  return SETTINGS_NAV.filter((entry) => entry.developerOnly !== true || developerMode);
+}
+
+/**
+ * True when `tab` is a destination the current mode hides, so a caller holding
+ * a stale selection can fall back instead of rendering a page the rail no
+ * longer offers.
+ */
+export function isSettingsDestinationHidden(
+  tab: SettingsTabId,
+  developerMode: boolean,
+): boolean {
+  const entry = SETTINGS_NAV.find((candidate) => candidate.id === tab);
+  return entry?.developerOnly === true && !developerMode;
+}
+
 export type SettingsSearchHit = {
   tab: SettingsTabId;
   tabLabelKey: string;
@@ -245,15 +301,21 @@ export type SettingsSearchHit = {
   rowKey: string | null;
 };
 
+export type SettingsSearchOptions = {
+  limit?: number;
+  /** Search mirrors the rail, so developer-only tabs stay out of the results. */
+  developerMode?: boolean;
+};
+
 export function searchSettings(
   query: string,
   t: (key: string) => string,
-  limit = 8,
+  { limit = 8, developerMode = false }: SettingsSearchOptions = {},
 ): SettingsSearchHit[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const hits: SettingsSearchHit[] = [];
-  for (const entry of SETTINGS_NAV) {
+  for (const entry of visibleSettingsNav(developerMode)) {
     if (t(entry.labelKey).toLowerCase().includes(q)) {
       hits.push({ tab: entry.id, tabLabelKey: entry.labelKey, rowKey: null });
     }

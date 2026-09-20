@@ -11,7 +11,7 @@ import {
   type ModelBinding,
   type Mode,
   type Risk,
-  type ThinkingLevel,
+  type SessionThinkingLevel,
   type UserSkillRecord,
   type UserSubagentRecord,
 } from "@pi-desktop/shared";
@@ -79,7 +79,7 @@ export type SessionLaunchRuntimeDependencies = {
     modelConfig: ReturnType<typeof modelConfigWithBinding>;
     capabilities: ReturnType<typeof capabilitiesFromModelConfig>;
   };
-  normalizeThinkingLevel: (value: unknown) => ThinkingLevel;
+  normalizeThinkingLevel: (value: unknown) => SessionThinkingLevel;
 };
 
 export function createSessionLaunchRuntime({
@@ -264,7 +264,7 @@ export function createSessionLaunchRuntime({
       turnId?: string;
       providerId?: string;
       modelId?: string;
-      thinkingLevel?: ThinkingLevel;
+      thinkingLevel?: SessionThinkingLevel;
     } = {},
   ) {
     if (!runtimeState.host) throw new Error("host unavailable");
@@ -611,7 +611,6 @@ export function createSessionLaunchRuntime({
         ),
         ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
         thinkingLevel,
-        nativeWebSearch: settings?.nativeWebSearchEnabled === true,
         commandShell,
         scratchDir: join(dataDir, "scratch", sessionId),
         attachmentsDir: join(dataDir, "attachments"),

@@ -2,7 +2,7 @@ export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
 export const APP_ID = "net.aiuo.pi-desktop";
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.15.0";
+export const APP_VERSION = "0.15.1";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -146,7 +146,28 @@ export const IPC = {
     askToolResolve: "pi-desktop/agent/askTool/resolve",
     plansPending: "pi-desktop/plans/pending",
     plansResolve: "pi-desktop/plans/resolve",
+    /**
+     * List every paired remote `pi-host` this desktop knows, redacted so no
+     * device token reaches the renderer. See ADR 0286 (R2b pairing UX).
+     */
+    remoteHostList: "pi-desktop/remoteHost/list",
+    /**
+     * Pair with a `pi-host` at `url` using a single-use `pairingToken`, mint
+     * a device token, persist it encrypted, and open the live connection.
+     */
+    remoteHostPair: "pi-desktop/remoteHost/pair",
+    /** Close the live connection for `hostKey` and drop its persisted record. */
+    remoteHostRemove: "pi-desktop/remoteHost/remove",
+    /**
+     * Install and pair a `pi-host` on a machine the user reaches over SSH:
+     * upload the bootstrap script, download and verify the published bundle
+     * there, start the host, forward its loopback port, and exchange the
+     * pairing token (spec §5.2). Uses the user's own SSH keys; no credential
+     * crosses this channel.
+     */
+    remoteHostBootstrap: "pi-desktop/remoteHost/bootstrap",
     providersList: "pi-desktop/providers/list",
+    providersReorder: "pi-desktop/providers/reorder",
     providersCreate: "pi-desktop/providers/create",
     providersUpdate: "pi-desktop/providers/update",
     providersDelete: "pi-desktop/providers/delete",
@@ -194,16 +215,14 @@ export const IPC = {
     pluginLauncherToggle: "pi-desktop/pluginLauncher/toggle",
     pluginLauncherDismiss: "pi-desktop/pluginLauncher/dismiss",
     pluginThemes: "pi-desktop/plugin/themes",
-    pluginSettingsDestinations: "pi-desktop/plugin/settings/destinations",
+    pluginScenicThemesDestinations: "pi-desktop/plugin/scenicThemes/destinations",
+    pluginScenicThemesSetBlur: "pi-desktop/plugin/scenicThemes/setBlur",
     pluginServices: "pi-desktop/plugin/services",
     pluginViews: "pi-desktop/plugin/views",
     pluginViewOpen: "pi-desktop/plugin/view/open",
     pluginViewClose: "pi-desktop/plugin/view/close",
     pluginViewSetBounds: "pi-desktop/plugin/view/setBounds",
     pluginViewSetVisible: "pi-desktop/plugin/view/setVisible",
-    pluginSettingsViewOpen: "pi-desktop/plugin/settings/view/open",
-    pluginSettingsViewSetBounds: "pi-desktop/plugin/settings/view/setBounds",
-    pluginSettingsViewSetVisible: "pi-desktop/plugin/settings/view/setVisible",
     mcpList: "pi-desktop/mcp/list",
     mcpUpsert: "pi-desktop/mcp/upsert",
     mcpRemove: "pi-desktop/mcp/remove",
@@ -282,6 +301,7 @@ export const IPC = {
     closeBehaviorGet: "pi-desktop/window/closeBehavior/get",
     closeBehaviorSet: "pi-desktop/window/closeBehavior/set",
     menuRendererReady: "pi-desktop/menu/rendererReady",
+    traySetSessionPreferences: "pi-desktop/tray/setSessionPreferences",
     nativeMenuAction: "pi-desktop/menu/nativeAction",
   },
   event: {
@@ -303,6 +323,7 @@ export const IPC = {
     windowFullScreen: "pi-desktop/window/event/fullscreen",
     windowWorkPanelResize: "pi-desktop/window/event/workPanelResize",
     menuCommand: "pi-desktop/menu/event/command",
+    traySessionActivated: "pi-desktop/tray/event/sessionActivated",
     notificationChanged: "pi-desktop/notification/event/changed",
     sessionsChanged: "pi-desktop/session/event/changed",
     notificationActivated: "pi-desktop/notification/event/activated",

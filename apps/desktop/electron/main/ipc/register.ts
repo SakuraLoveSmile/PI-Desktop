@@ -23,17 +23,20 @@ import { registerSessionIpc } from "./session-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
 import { registerAgentImportIpc } from "./agent-import-ipc";
+import { registerRemoteHostIpc } from "./remote-host-ipc";
 import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-catalog";
 import { registerWindowIpc } from "./window-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
 import { registerComposerIpc } from "./composer-ipc";
 import { registerSpeechIpc } from "./speech-ipc";
 import type { IpcRegistrar } from "./types";
+import type { createTraySessions } from "../tray-sessions";
 
 export type RegisterIpcDependencies = {
   ipcMain: IpcMain;
   getMainWindow: () => BrowserWindow | null;
   getHost: () => HostProcess | null;
+  traySessions: ReturnType<typeof createTraySessions>;
   getSidecar: () => AgentSidecar | null;
   getAgentHostBridge: () => AgentHostBridge | null;
   /**
@@ -115,6 +118,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     applyCloseBehavior,
     getCloseBehavior,
     markMenuRendererReady,
+    traySessions,
     executeNativeMenuAction,
     scheduledRunsBySession,
     isDevelopmentBuild,
@@ -139,7 +143,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     refreshUserMcp,
     describeError,
     pluginViews,
-    pluginSettingsViews,
     pluginScopes,
     rememberPluginScopes,
     pluginPanels,
@@ -152,7 +155,12 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
 
   const ipcHandlers = new Map<string, (...args: any[]) => Promise<any>>();
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {
-    ipcHandlers.set(channel, fn);
+    const handler = async (...args: any[]) => {
+      const result = await fn(...args);
+      traySessions.observeInvoke(channel);
+      return result;
+    };
+    ipcHandlers.set(channel, handler);
     // The interception seam for remote-host routing: a renderer call whose
     // session is owned by a paired remote host is served over RACP-WS; every
     // other call (and every internal invoke, which never reaches this wrapper)
@@ -164,7 +172,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
           const outcome = await router.route(channel, args);
           if (outcome !== ROUTE_LOCAL) return outcome.value;
         }
-        return fn(...args);
+        return handler(...args);
       }),
     );
   };
@@ -271,6 +279,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     loadComposerTemplatesCached,
   });
   registerWindowIpc({
+    setTraySessionPreferences: traySessions.setPreferences,
     registrar,
     getMainWindow,
     getWorkPanelReservationWidth,
@@ -362,7 +371,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     agentExtensions,
     browserHost,
     pluginViews,
-    pluginSettingsViews,
     pluginScopes,
     rememberPluginScopes,
     sendToRenderer,
@@ -411,7 +419,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     plugins,
     browserHost,
     pluginViews,
-    pluginSettingsViews,
     pluginPanels,
     pluginActiveInProject,
     currentWorkspacePath,
@@ -420,6 +427,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   });
 
   registerSpeechIpc({ registrar, speech });
+
+  registerRemoteHostIpc({ registrar });
 
   registerMarketIpc({
     registrar,

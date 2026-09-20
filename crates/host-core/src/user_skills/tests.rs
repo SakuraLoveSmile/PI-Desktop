@@ -685,11 +685,7 @@ fn imports_a_directory_with_skill_md_in_copy_mode() {
     let record = registry
         .import(
             source_dir.to_str().unwrap(),
-            input(
-                "Ignored",
-                "project",
-                Some(app.path().to_str().unwrap()),
-            ),
+            input("Ignored", "project", Some(app.path().to_str().unwrap())),
         )
         .unwrap();
     let normalized_project =
@@ -703,10 +699,16 @@ fn imports_a_directory_with_skill_md_in_copy_mode() {
     .join("example");
     assert!(expected_root.is_dir(), "target dir exists");
     assert!(expected_root.join("SKILL.md").is_file(), "SKILL.md placed");
-    assert!(expected_root.join("resource.txt").is_file(), "resources copied");
+    assert!(
+        expected_root.join("resource.txt").is_file(),
+        "resources copied"
+    );
     assert_eq!(record.name, "Example");
     // The record path points at the SKILL.md the scanner selects.
-    assert_eq!(record.path, expected_root.join("SKILL.md").to_string_lossy());
+    assert_eq!(
+        record.path,
+        expected_root.join("SKILL.md").to_string_lossy()
+    );
     // Source is untouched under copy mode.
     assert!(source_dir.join("SKILL.md").is_file());
 }
@@ -799,11 +801,7 @@ fn directory_import_without_skill_md_is_rejected() {
 fn unknown_import_mode_is_rejected() {
     let app = tempdir().unwrap();
     let source = app.path().join("incoming.md");
-    fs::write(
-        &source,
-        "---\nname: Any\n---\n\nBody.\n",
-    )
-    .unwrap();
+    fs::write(&source, "---\nname: Any\n---\n\nBody.\n").unwrap();
     let mut registry = UserSkillRegistry::new(app.path());
     let mut payload = input("Ignored", "project", Some(app.path().to_str().unwrap()));
     payload.mode = Some("teleport".into());

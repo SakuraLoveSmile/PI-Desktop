@@ -60,7 +60,7 @@ import type {
   PluginSettingDefinition,
   PluginServiceStatus,
   PluginViewMeta,
-  PluginSettingsDestinationMeta,
+  PluginScenicThemesDestinationMeta,
   PluginTheme,
   MarketPluginSummary,
   MarketPluginDetail,
@@ -75,6 +75,7 @@ import type {
   ScheduledTask,
   ProviderCreateInput,
   ProviderPublic,
+  ProviderReorderInput,
   ProviderUpdateInput,
   Result,
   SessionDetail,
@@ -83,6 +84,7 @@ import type {
   SessionSearchContextRequest,
   SessionSummary,
   SessionCollaborationSummary,
+  TraySessionPreferences,
   ToolPermissionResolution,
   UserSkillInput,
   UserSkillRecord,
@@ -100,6 +102,11 @@ import type {
   PlanResolutionResult,
   PlanningStateEvent,
   PlansPendingResult,
+  RemoteHostBootstrapRequest,
+  RemoteHostBootstrapResult,
+  RemoteHostPairRequest,
+  RemoteHostPairResult,
+  RemoteHostSummary,
   UpdateState,
   WindowControlAction,
   CloseBehavior,
@@ -548,7 +555,11 @@ export const api = {
       config,
     ).then((result) => ({ ...result, session: normalizeSession(result.session) })),
   scanImportSessions: () =>
-    invoke<{ sessions: ImportCandidate[] }>(IPC.invoke.sessionImportScan),
+    invoke<{
+      sessions: ImportCandidate[];
+      truncated?: Partial<Record<ImportSource, number>>;
+    }>(IPC.invoke.sessionImportScan),
+
   runImportSessions: (items: ImportCandidate[]) =>
     invoke<ImportRunResult>(IPC.invoke.sessionImportRun, items),
   scanImportModelConfigs: () =>
@@ -566,6 +577,8 @@ export const api = {
   listSystemFonts: () => invoke<string[]>(IPC.invoke.systemFontsList),
   listCommandShells: () =>
     invoke<CommandShellCatalog>(IPC.invoke.commandShellList),
+  reorderProviders: (input: ProviderReorderInput) =>
+    invoke<{ ok: boolean }>(IPC.invoke.providersReorder, input),
   listProviders: () =>
     invoke<{ providers: ProviderPublic[] }>(IPC.invoke.providersList),
   createProvider: (input: ProviderCreateInput) =>
@@ -1067,7 +1080,8 @@ export const api = {
   togglePluginLauncher: () => invoke(IPC.invoke.pluginLauncherToggle),
   dismissPluginLauncher: () => invoke(IPC.invoke.pluginLauncherDismiss),
   listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
-  listPluginSettingsDestinations: () => invoke<PluginSettingsDestinationMeta[]>(IPC.invoke.pluginSettingsDestinations),
+  listPluginScenicThemesDestinations: () => invoke<PluginScenicThemesDestinationMeta[]>(IPC.invoke.pluginScenicThemesDestinations),
+  setPluginScenicThemeBlur: (pluginId: string, themeId: string, blur: number) => invoke(IPC.invoke.pluginScenicThemesSetBlur, { pluginId, themeId, blur }),
   listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),
   /**
    * Work panel views, already filtered by permission, activation scope, and
@@ -1100,12 +1114,6 @@ export const api = {
       visible,
       sessionId,
     }),
-  pluginSettingsViewOpen: (pluginId: string, destinationId: string) =>
-    invoke(IPC.invoke.pluginSettingsViewOpen, { pluginId, destinationId }),
-  pluginSettingsViewSetBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
-    invoke(IPC.invoke.pluginSettingsViewSetBounds, bounds),
-  pluginSettingsViewSetVisible: (pluginId: string, destinationId: string, visible: boolean) =>
-    invoke(IPC.invoke.pluginSettingsViewSetVisible, { pluginId, destinationId, visible }),
   marketRefresh: (force = true) =>
     invoke<{
       providerId: string;
@@ -1254,6 +1262,15 @@ export const api = {
     ),
   menuRendererReady: () =>
     invoke<{ ready: boolean }>(IPC.invoke.menuRendererReady),
+  setTraySessionPreferences: (preferences: TraySessionPreferences) =>
+    invoke<{ ok: boolean }>(IPC.invoke.traySetSessionPreferences, preferences),
+  onTraySessionActivated: (listener: (sessionId: string | null) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.traySessionActivated, (payload) => {
+      const sessionId = (payload as { sessionId?: unknown })?.sessionId;
+      if (sessionId === null || (typeof sessionId === "string" && sessionId)) listener(sessionId);
+    });
+  },
   nativeMenuAction: (action: NativeMenuAction) =>
     invoke<{ maximized: boolean; fullScreen: boolean }>(
       IPC.invoke.nativeMenuAction,
@@ -1369,6 +1386,24 @@ export const api = {
       listener((payload as { notification: AppNotification }).notification),
     );
   },
+
+  // --- Remote hosts (R2b pairing UX) -----------------------------------------
+  /** Paired remote `pi-host` list, redacted so no device token reaches here. */
+  listRemoteHosts: () =>
+    invoke<{ hosts: RemoteHostSummary[] }>(IPC.invoke.remoteHostList),
+  /** Exchange `ppt1.` pairing token for a durable device token and connect. */
+  pairRemoteHost: (request: RemoteHostPairRequest) =>
+    invoke<RemoteHostPairResult>(IPC.invoke.remoteHostPair, request),
+  /**
+   * Install and pair a `pi-host` over SSH on a machine the user already
+   * reaches, then bring it online (spec §5.2). Credentials come from the
+   * user's own SSH configuration and agent.
+   */
+  bootstrapRemoteHost: (request: RemoteHostBootstrapRequest) =>
+    invoke<RemoteHostBootstrapResult>(IPC.invoke.remoteHostBootstrap, request),
+  /** Close and drop a paired host by its stable routing key. */
+  removeRemoteHost: (hostKey: string) =>
+    invoke<{ ok: true }>(IPC.invoke.remoteHostRemove, { hostKey }),
   onSessionsChanged: (
     listener: (event: {
       reason?: string;
