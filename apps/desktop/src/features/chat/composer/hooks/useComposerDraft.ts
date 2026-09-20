@@ -138,6 +138,7 @@ export function useComposerDraft({
   const ref = useRef<HTMLDivElement>(null);
   const placeholderContextRef = useRef(`${variant}:${activeSessionId ?? HOME_DRAFT_KEY}`);
   const draftKeyRef = useRef(draftKey);
+  const previousWorkspacePathRef = useRef(workspacePath);
 
   // Keep one guidance copy stable until the user changes page or session.
   useEffect(() => {
@@ -385,6 +386,10 @@ export function useComposerDraft({
   }, []);
 
   useEffect(() => {
+    // A remount restores this workspace's draft; only a real workspace change
+    // invalidates its relative file references.
+    if (previousWorkspacePathRef.current === workspacePath) return;
+    previousWorkspacePathRef.current = workspacePath;
     const current = fileReferencesRef.current;
     const kept = current.filter((fileReference) =>
       isPersistedScratchReference(fileReference.path),
