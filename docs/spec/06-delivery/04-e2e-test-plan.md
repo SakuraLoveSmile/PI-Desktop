@@ -1918,6 +1918,22 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Automated (host-core unit tests: login-PATH probe + child-PATH injection)
 
+#### E2E-MCP-stdio-login-path: Market stdio MCP finds uvx/npx after a GUI launch (issue #571)
+
+- **Preconditions**: macOS; the app was started from Finder/Dock so `process.env.PATH`
+  is the GUI default; `uvx` or `npx` exists on the user's login-shell PATH.
+- **Steps**: 1) Install Fetch from the MCP market (`uvx mcp-server-fetch`).
+  2) Test connection. 3) Repeat with an npx catalog entry.
+- **Expected**: The stdio child env PATH includes the login-shell PATH (Homebrew /
+  nvm / `~/.local/bin`) ahead of the GUI PATH, so spawn succeeds. A truly missing
+  binary reports `command not found: uvx` rather than `spawn uvx ENOENT`.
+  Windows keeps the inherited PATH.
+- **Specs linked**: ADR 0045, D600, `03-runtime/03-tools-and-permissions.md`
+- **Acceptance**: Quality
+- **Milestone**: M6+
+- **Status**: Automated (`apps/desktop/test/user-login-path.test.mjs`,
+  `apps/desktop/test/plugin-mcp.test.mjs`)
+
 ### Session Persistence
 
 #### E2E-020: Session survives restart
@@ -10053,7 +10069,7 @@ This test plan spec is accepted when:
   single-line and ellipsized; no toolbar text is vertically split or overlapped.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
-  ADR 0141, ADR 0238, ADR 0290, D280, D408, D451
+  ADR 0141, ADR 0238, ADR 0290, D280, D408, D459
 - **Acceptance**: A (app shell), F (persistence), Quality
 - **Milestone**: M6+
 - **Status**: Unit/source-contract covered (`sidebar-preferences.test.mjs`,
