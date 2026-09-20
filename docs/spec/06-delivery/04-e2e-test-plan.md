@@ -3095,14 +3095,40 @@ identify the platform validation still needed.
   and one unknown free-form model id.
 - **Steps**: 1) Open the Composer model × reasoning chip. 2) Confirm the root
   contains the Model and Reasoning level entries with current values, plus a
-  slider with one labeled stop per supported level directly beneath the
-  Reasoning level entry. 3) Drag and click the slider across multiple
-  supported levels and click a tick label, confirming the chip updates while
-  the menu stays at the root. 4) Open Model, search for a model, and select a
+  slider with one track dot per supported level on a rail directly beneath the
+  Reasoning level entry; confirm every level keeps a visible label under the
+  rail, each centered on its track dot. 3) Drag and click the slider across
+  multiple supported levels and click a tick label, confirming the chip
+  updates while the menu stays at the root and the selected track dot sits
+  under the thumb. 4) Open Model, search for a model, and select a
   model from a provider group; confirm the menu remains open at the root.
   5) Open Reasoning level and choose a level from the radio list. 6) Repeat
   with a non-reasoning provider and an unknown free-form model id; exercise
   Escape, outside click, Up/Down, Enter, Left, and the slider's arrow keys.
+  In both roomy and crowded toolbars, switch `omit`, `low`, `high`, `max`,
+  and `off` without closing the menu: its horizontal position stays stable,
+  and the trigger stays inside its slot, including with a long model name.
+  Moving the anchor and dispatching a viewport resize must reposition the
+  menu without an event-target type error. Automated geometry coverage:
+  `node scripts/e2e-composer-thinking-layout.mjs` (isolated Electron fixture,
+  production React picker and compiled styles; no live providers).
+  Repeat native mouse press/release to open, select the first and subsequent
+  reasoning levels, close, and reopen three times with motion enabled. The
+  menu must retain its opening position on every selection; synthetic DOM
+  `click()` alone does not exercise the trigger's `:active` transition.
+  Hover each dot and its label: the corresponding label highlights. Unfilled
+  dots brighten and enlarge slightly; filled dots and the selected thumb stay unchanged
+  without shifting the menu. Move outside: the preview clears and the selected
+  value remains unchanged. Reduced motion disables hover transitions.
+  Click a non-adjacent level and verify the thumb travels through intermediate
+  positions while the selected value already equals the target. Interrupt
+  travel with another click; the thumb retargets without jumping to the old
+  start, and only the clicked levels are submitted. Check save failure,
+  stale completion, remount, and 3/5/7/8-stop alignment. At each stop, verify
+  the fill covers the first dot's left edge and still ends at the thumb center.
+  Native range dragging
+  follows immediately; arrow keys retain focus and update the selection.
+  With reduced motion enabled, the target is shown without a transition.
 - **Expected**: The chip is in the right toolbar with a Bot icon, before the
   standalone prompt-enhancement Sparkles action and Send/Abort; Off omits the
   level text. The single anchored menu replaces its root
