@@ -2128,8 +2128,9 @@ identify the platform validation still needed.
   expanded row, then keyboard-focus and activate the processing group's
   vertical rule. 8) Reload the session and expand the restored group.
 - **Expected**: The latest active group opens automatically so the process list
-  is visible, but tool-call details, including failed tool details, remain
-  collapsed. The latest thinking step
+  is visible. Compact tool-call details, including failed tool details, remain
+  collapsed. In detailed mode the last tool-call of the last activity group
+  starts expanded and earlier rows stay collapsed. The latest thinking step
   opens automatically while it streams; older groups and rows remain collapsed.
   The header shows its localized processing label, elapsed time, and step count
   without an additional status capsule. When the turn settles, the automatic
@@ -13575,8 +13576,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   intermediate message; switch display modes through Settings → AI → Defaults.
   Repeat with a stopped partial answer, an assistant error and a failed tool.
 - **Expected:** In detailed mode, thinking, tools and intermediate text stay
-  in place with no process wrapper. Compact mode keeps that process collapsed
-  until expanded. Manual choices survive updates; search reveals its target; live answer text
+  in place with no process wrapper, and the last tool-call of the last activity
+  group starts expanded. Compact mode keeps that process collapsed
+  until expanded, with tool payloads collapsed. Manual choices survive updates; search reveals its target; live answer text
   stays readable. Errors and stopped trailing text stay visible. Compact mode
   exposes no reasoning text or excerpt, shows a live indicator, and leaves no
   completed thinking-only header. Tools and progress remain accessible. Switching

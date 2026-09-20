@@ -27,6 +27,7 @@ import {
   collectDelegationTimings,
 } from "../../../lib/subagent-topology";
 import {
+  isLastActivityPart,
   projectTurnProcess,
   resolveThinkingDisplayMode,
   shouldGroupTurnProcess,
@@ -331,6 +332,7 @@ export const AssistantTurn = memo(function AssistantTurn({
         items={part.items}
         endedAt={part.endedAt}
         isActive={part === activePart}
+        isLast={isLastActivityPart(entry.parts, part)}
         runtimeActivity={part === activePart ? runtimeActivity : undefined}
         turnDelegationStatuses={turnDelegationStatuses}
         turnDelegationTimings={turnDelegationTimings}

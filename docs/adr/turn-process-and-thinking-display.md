@@ -23,14 +23,16 @@ so the renderer does not guess intent from the wording. User/system messages
 and compaction dividers retain their existing turn boundaries.
 
 Detailed mode does not wrap a process: thinking, tools and intermediate
-assistant text stay in transcript order beside the answer. Compact mode starts
-completed process areas collapsed. Manual disclosure choices survive
+assistant text stay in transcript order beside the answer. Its last tool-call
+or hosted-search row of the last activity group starts expanded; earlier tool
+details stay collapsed. Compact mode starts completed process areas collapsed
+and keeps individual tool payloads collapsed. Manual disclosure choices survive
 streaming and completion. Search navigation opens the containing process.
 Tool failures open an unclaimed active process so the invocation error stays
 visible even in compact mode; that does not mark the whole turn as failed.
 Assistant errors and stopped trailing partial answers stay outside the process.
 Tool/delegation detail controls, permission cards, and transcript actions retain
-their existing behavior.
+their existing behavior aside from that detailed last-tool default.
 
 Settings → AI → Defaults includes `thinkingDisplayMode`, an optional
 `detailed | compact` AppSettings field. Absent or unrecognized values display
@@ -38,7 +40,8 @@ as detailed. Compact mode renders no reasoning text or excerpt: while a
 thinking-only message streams it shows a status indicator, and when reasoning
 ends the thinking row disappears. Answer text ends that indicator even while
 the assistant message is still streaming. A completed thinking-only process
-leaves no empty header. Tool rows and progress text remain expandable.
+leaves no empty header. Tool rows and progress text remain expandable; detailed
+mode opens the last tool of the last activity group by default.
 Changing the setting updates mounted history and nested thinking rows.
 
 The field uses the existing host-owned settings JSON; no database migration or

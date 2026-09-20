@@ -152,6 +152,8 @@ type ActivityGroupProps = {
   embedded?: boolean;
   isActive: boolean;
   endedAt?: string;
+  /** Last activity chunk of this assistant turn. */
+  isLast?: boolean;
   /** Current runtime wait phase, when the group owns the live turn tail. */
   runtimeActivity?: AgentActivity;
   /** Delegation statuses from the entire assistant turn (cross-activity-part). */
@@ -185,6 +187,7 @@ function activityGroupPropsEqual(
     previous.embedded !== next.embedded ||
     previous.isActive !== next.isActive ||
     previous.endedAt !== next.endedAt ||
+    previous.isLast !== next.isLast ||
     previous.runtimeActivity !== next.runtimeActivity ||
     previous.items.length !== next.items.length
   ) {
@@ -211,6 +214,7 @@ export const ActivityGroup = memo(function ActivityGroup({
   embedded = false,
   isActive,
   endedAt,
+  isLast = false,
   runtimeActivity,
   turnDelegationStatuses,
   turnDelegationTimings,
@@ -345,23 +349,33 @@ export const ActivityGroup = memo(function ActivityGroup({
           />
         );
       }
-      return item.kind === "tool" ? (
-        <Fragment key={item.message.id}>
-          <ToolRow
-            message={item.message}
+      const autoOpenLatest =
+        !compact && isLast && itemIndex === items.length - 1;
+      if (item.kind === "tool") {
+        return (
+          <Fragment key={item.message.id}>
+            <ToolRow
+              message={item.message}
+              autoOpen={autoOpenLatest}
+              onUserInteraction={claimDisclosure}
+              {...(item.delegate ? { delegate: item.delegate } : {})}
+            />
+            <ReviewChangeCard message={item.message} />
+          </Fragment>
+        );
+      }
+      if (item.kind === "hostedSearch") {
+        return (
+          <HostedSearchRow
+            key={`hosted-search-${item.message.id}-${item.round.id}`}
+            round={item.round}
+            streaming={isActive && item.message.status === "streaming"}
+            autoOpen={autoOpenLatest}
             onUserInteraction={claimDisclosure}
-            {...(item.delegate ? { delegate: item.delegate } : {})}
           />
-          <ReviewChangeCard message={item.message} />
-        </Fragment>
-      ) : item.kind === "hostedSearch" ? (
-        <HostedSearchRow
-          key={`hosted-search-${item.message.id}-${item.round.id}`}
-          round={item.round}
-          streaming={isActive && item.message.status === "streaming"}
-          onUserInteraction={claimDisclosure}
-        />
-      ) : (
+        );
+      }
+      return (
         <ThinkingRow
           key={`thinking-${item.message.id}`}
           message={item.message}

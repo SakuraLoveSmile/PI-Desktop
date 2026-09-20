@@ -807,17 +807,18 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 ### 4.2 Collapse indicator
 
-- Tool activity starts as a lightweight collapsed row; failed calls open
-  automatically so the error remains local to its invocation.
+- Tool activity starts as a lightweight collapsed row. Failed calls keep their
+  error in the row header; they do not auto-expand.
 - Compact mode gives one assistant turn one process disclosure containing
   thinking, tool calls and intermediate progress text. The trailing answer
   streams outside it; later activity moves that text into the process. The
   header updates elapsed time once per second while active and shows the
   visible step count.
-- Detailed mode does not wrap a process. Compact completed process areas
-  collapse unless a click, keyboard activation or search reveal has taken
-  ownership. Tool details keep
-  their individual controls. Failed tool calls open an unclaimed active process so
+- Detailed mode does not wrap a process. Its last tool-call or hosted-search
+  row of the last activity group starts expanded; earlier tool details stay
+  collapsed. Compact completed process areas collapse unless a click, keyboard
+  activation or search reveal has taken ownership. Tool details keep their
+  individual controls. Failed tool calls open an unclaimed active process so
   their errors stay visible even in compact mode.
 - Compact thinking mode shows only a status indicator while reasoning streams;
   when answer text starts or reasoning ends, the thought row disappears. Tools
