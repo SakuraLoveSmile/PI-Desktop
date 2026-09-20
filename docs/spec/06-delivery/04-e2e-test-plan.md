@@ -3847,7 +3847,7 @@ identify the platform validation still needed.
   runnable with the generic text-only, non-reasoning shape; pi-ai supplies only
   the selected wire adapter, OAuth flow, and account model availability. A
   ChatGPT Plus/Pro or GitHub Copilot account lists `gpt-6-astra` from the
-  pinned pi-ai 0.85.1 catalog; models.dev then supplies its published metadata.
+  pinned pi-ai 0.86.1 catalog; models.dev then supplies its published metadata.
 - **Specs linked**: `02-architecture/02-tech-stack.md`,
   `03-runtime/11-provider-model-system.md`,
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0134
@@ -7242,7 +7242,7 @@ identify the platform validation still needed.
 
 - **Preconditions**: A build with `registerBunOAuthFlows()` running at startup
   and a real subscription for at least one PKCE vendor (Anthropic) and one
-  device-code vendor (xAI or GitHub Copilot). No provider row exists yet for
+  device-code vendor (xAI, GitHub Copilot, or Meta/Muse). No provider row exists yet for
   either vendor.
 - **Steps**: 1) Open Settings -> Model configuration, confirm the Vendor
   accounts card starts empty, and open Add account — the picker lists every
@@ -7269,13 +7269,13 @@ identify the platform validation still needed.
   used as the OAuth provider group heading, while the configured model alias is
   shown on its model row. 5) Resolve
   and use each account separately, including model discovery and one streamed
-  turn per account. 6) Start the device-code login on a second vendor, then
-  press Cancel while the dialog is polling; confirm no row or credential is
-  left. 7) Remove the first Anthropic account, then confirm its provider row
-  and OAuth secret are gone while the second Anthropic account remains usable.
-  8) If the removed account was default, confirm Defaults points to another
-  ready provider or shows no default. 9) Grep sidecar and renderer logs for
-  token material.
+  turn per account. 6) Start the device-code login on a second vendor, including
+  Meta/Muse when available, then press Cancel while the dialog is polling;
+  confirm no row or credential is left. 7) Remove the first Anthropic account,
+  then confirm its provider row and OAuth secret are gone while the second
+  Anthropic account remains usable. 8) If the removed account was default,
+  confirm Defaults points to another ready provider or shows no default. 9) Grep
+  sidecar and renderer logs for token material.
 - **Expected**: Each successful login creates a distinct row with
   `authKind: "oauth"`, `hasSecret` and `hasOauth` both true, a non-secret
   account label, and `baseUrl`/`apiStyle`/`defaultModelId` filled from that
@@ -7283,10 +7283,10 @@ identify the platform validation still needed.
   `secret:provider:<providerId>:oauth` ref and row-scoped pi-ai collection;
   resolving one account never returns the other account's token. The model list
   is the authenticated catalog (a Copilot account lists only what its
-  subscription includes), not a `/models` probe. Matching models.dev metadata
-  supplies each newly logged-in binding's limits, modalities, and thinking
-  levels; an ID missing from models.dev uses the conservative generic
-  text-only/non-reasoning shape. The account editor updates only non-secret
+  subscription includes; a Meta account lists Muse Spark models), not a
+  `/models` probe. Matching models.dev metadata supplies each newly logged-in
+  binding's limits, modalities, and thinking levels; an ID missing from
+  models.dev uses the conservative generic text-only/non-reasoning shape.
   label/model fields and the full per-model bindings, and Test connection
   resolves that exact account. Both turns run without a
   pasted key and reuse the same warm runtime — the launch payload carries
@@ -7887,6 +7887,9 @@ identify the platform validation still needed.
 | F — Persistence (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 | Quality (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 | M6+ (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| C — Conversation & stream (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
+| Quality (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
+| M6+ (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -9874,6 +9877,108 @@ This test plan spec is accepted when:
   capable environment. Required suites: `test:e2e`, `test:e2e:subagents`,
   `test:e2e:transcript`.
 
+#### E2E-SUBAGENT-context-overflow-compacts-before-failing
+
+- **Preconditions**: An Agent session on a deterministic local transport whose
+  model metadata declares a small context window (for example 16,000 tokens)
+  and whose replies are scripted. The small window is injected through that
+  fake provider, never a real one: real providers and paid APIs are not
+  default test environments in this repository. A user definition
+  `~/.agents/subagents/reader.md` declares `Read`, `Glob`, and `Grep`, and the
+  workspace holds files large enough that two or three reads cross the
+  delegate's hard limit.
+- **Steps**:
+  1. Delegate a brief that requires reading those files in sequence and record
+     every request the transport receives, with its estimated size.
+  2. Read the request that follows the boundary at which the delegate crosses
+     its hard limit.
+  3. Repeat with the crossing landing while a tool result is still pending,
+     then with it landing on a completed turn.
+  4. Repeat with the summary request scripted to fail.
+  5. Run the same brief as the session Agent on the same fixture and compare
+     its requests and transcript rows with a run recorded before this change.
+  6. Inspect the delegation card, the transcript, the context inspector, and
+     the parent's own model context after the delegate settles.
+- **Expected**: The delegate keeps working instead of failing. The request
+  after the crossing is below the hard limit and carries a summary plus the
+  applicable retained tail; no request is sent above the window. A pending
+  tool result retains as an active turn (latest user message only), a
+  completed turn retains none. A failed summary degrades to the original task
+  brief plus the most recent message(s), the run still completes, and the
+  report and lifecycle details say it was degraded rather than presenting a
+  partial answer as complete. Delegate compaction adds no transcript row, no
+  host-core checkpoint, no warning toast, and no context-inspector line; the
+  delegate's own rows stay complete and the parent's model context still holds
+  only the report. The session Agent behaves exactly as it did before.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5.1, §5f,
+  `03-runtime/08-error-codes.md` §3.2, ADR 0299, ADR 0064, ADR 0136
+- **Acceptance criterion**: C — Conversation & stream; Quality
+- **Milestone**: M6+
+- **Status**: Draft. Required suites: `test:e2e`, `test:e2e:subagents`.
+
+#### E2E-SUBAGENT-context-overflow-reports-actionable-failure
+
+- **Preconditions**: The same injected small-window fake provider, sized so
+  even the degraded context cannot fit. One definition declares two ordered
+  `fallbackModels`: one whose window is no larger than the primary's and one
+  that is larger. A second definition declares none.
+- **Steps**:
+  1. Delegate a brief that overflows past both compaction and degradation, and
+     read the tool result the parent receives plus the lifecycle details.
+  2. Repeat for the definition that declares the two alternatives, recording
+     which alternatives the transport is actually asked for.
+  3. Repeat with every alternative at the same small window.
+  4. Read the delegation card and the report in English and in Chinese.
+  5. Continue the parent turn, then send a new prompt.
+- **Expected**: The run fails with `SUBAGENT_CONTEXT_OVERFLOW`, not retriable,
+  and what the parent reads names what it can change — narrow the task,
+  delegate to a model with a larger context window, read less at once. The
+  provider's raw overflow sentence is not what the parent receives. An
+  alternative whose own budget cannot hold the carried context is never
+  requested and appears in `modelFailures` with that reason; the larger
+  alternative is attempted and can succeed. With no alternative that fits, the
+  outcome stays `SUBAGENT_CONTEXT_OVERFLOW` rather than the final provider
+  error. The delegate's rows stay durable and visible, the session returns to
+  idle, and the next prompt is not `AGENT_BUSY`.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
+  `03-runtime/08-error-codes.md` §3.2, ADR 0299,
+  ADR subagent-model-fallback
+- **Acceptance criterion**: C — Conversation & stream; Quality
+- **Milestone**: M6+
+- **Status**: Draft. Required suites: `test:e2e`, `test:e2e:subagents`,
+  `test:e2e:subagent-models`.
+
+#### E2E-SUBAGENT-resume-seeds-within-context-budget
+
+- **Preconditions**: The same injected small-window fake provider. One settled
+  `reader` chain read enough to exceed the delegate hard limit while staying
+  under `MAX_RESUMABLE_READ_LINES`; a second settled chain fits well inside
+  the budget.
+- **Steps**:
+  1. `Task.resume` the over-budget chain and capture its first provider
+     request in full.
+  2. `Task.resume` the chain that fits and capture the same request.
+  3. Ask the resumed run for a conclusion the chain reached in its most recent
+     round, and for one it reached in its first round.
+  4. Relaunch the app, rebuild the chain index from the transcript, and resume
+     the over-budget chain again.
+  5. Accumulate more than `MAX_RESUMABLE_READ_LINES` of read-only output in a
+     chain and read the reusable list the next prompt offers.
+- **Expected**: The first request of a resumed run is below the hard limit. It
+  opens with the original task brief and holds the most recent turns; the
+  oldest tool results are dropped first, and dropping an assistant message
+  drops its tool calls with it, so no orphaned tool call reaches the provider.
+  A chain that fits is seeded whole, exactly as before. The most recent
+  conclusion is answered from the seeded context; the first round's may be
+  gone, and the run says so rather than inventing it. A resume never fails
+  with `CONTEXT_TOO_LARGE` or `SUBAGENT_CONTEXT_OVERFLOW` on its first
+  request. `MAX_RESUMABLE_READ_LINES` still removes an over-read chain from
+  the reusable list; truncation does not make it resumable again.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f, ADR 0299, ADR 0279
+- **Acceptance criterion**: C — Conversation & stream; Quality
+- **Milestone**: M6+
+- **Status**: Draft. Required suites: `test:e2e`, `test:e2e:subagents`.
+
 #### E2E-161: A delegation lifecycle row reads as a subagent row
 
 - **Preconditions**: A project-bound Agent session with a mocked provider stream
@@ -10198,7 +10303,7 @@ This test plan spec is accepted when:
   catalog does not publish. OpenAI Codex's `openai-codex` adapter key resolves
   the matching `openai` models.dev record, so `gpt-6-astra` is not shown with
   generic 128,000 / 8,192 / no-reasoning defaults. The authenticated ChatGPT
-  list itself comes from the pinned pi-ai catalog (0.85.1 includes
+  list itself comes from the pinned pi-ai catalog (0.86.1 includes
   `gpt-6-astra`); models.dev cannot add a missing OAuth ID. A model with no published
   record keeps its explicit levels and starts with all choices available for
   manual opt-in. The account's default model stays the head binding.
@@ -13871,3 +13976,31 @@ the latest destination. These assertions measure work counts, not device FPS.
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance:** F (runtime provider requests), C (chat and stream)
 - **Status:** Unit-covered; deterministic provider fixture pending
+
+### E2E-PROVIDER-certificate-trust-and-terminal-errors
+
+- **Preconditions:** Built request candidate incorporating current `origin/main`,
+  Electron installed, isolated test process/profile and loopback HTTPS fixture.
+  No real provider, credentials, user profile, or OS certificate-store writes.
+- **Steps:** Run `node scripts/e2e-provider-certificates.mjs`. Launch the actual
+  desktop sidecar and submit a chat prompt against an untrusted localhost
+  certificate. Relaunch with its CA in `NODE_EXTRA_CA_CERTS`, then request the
+  same certificate through a hostname absent from its SAN.
+- **Expected:** The child's default CA set includes system roots and extra CAs.
+  The first request fails once with a non-retriable certificate error and no
+  retry status; the trusted request returns text; the hostname mismatch still
+  fails once. TLS and hostname verification remain enabled.
+- **UI:** Run `node scripts/e2e-provider-certificate-ui.mjs` for the real error
+  component in isolated Chromium. Certificate errors get localized guidance;
+  DNS and protocol errors retain the generic summary. Errno/raw details remain
+  visible, and details can be closed and reopened. Optional
+  `PI_CERTIFICATE_EVIDENCE_DIR` records a screenshot; `--baseline` uses the
+  upstream error component with the same fixture and stylesheet.
+- **Lower-level coverage:** `provider-certificate-flow.test.ts` enters main
+  session `prompt()` and delegate `run()` through real Agent/pi-ai wiring,
+  with only the external fetch mocked. Both stop after one request and retain
+  the certificate cause. Error classification and recovery suites cover direct,
+  nested, flattened, non-certificate and wrapped certificate failures.
+- **Limits:** OS-root inclusion is checked without installing a root. The TLS
+  success fixture uses a child-only extra CA; it does not reproduce a specific
+  antivirus installation or claim native macOS/Linux verification.

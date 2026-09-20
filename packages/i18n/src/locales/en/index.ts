@@ -2149,6 +2149,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     PROVIDER_RATE_LIMITED: "The AI provider is rate-limiting requests. Wait a moment and try again.",
     PROVIDER_ERROR: "The AI provider returned an error.",
     NETWORK_ERROR: "Can't reach the AI provider. Check your network or base URL.",
+    providerCertificate: "The AI service certificate could not be verified. Check the certificate, system clock, and trusted roots used by your security software or proxy. Restart the app after updating trust settings.",
     NETWORK_POLICY_BLOCKED: "The app's address check blocked this request. Behind a proxy or VPN, check Settings → General → Network.",
     TIMEOUT: "The request to the AI provider timed out.",
     STREAM_FAILED: "The reply was interrupted.",
@@ -2158,6 +2159,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "The same edit failed three times, so this turn stopped instead of retrying blind. Ask again to continue.",
     CONTEXT_TOO_LARGE: "This chat is still too long after context recovery. Shorten your message or start a new chat.",
     CONTEXT_COMPACTION_FAILED: "Couldn't compact this conversation's model context.",
+    SUBAGENT_CONTEXT_OVERFLOW:
+      "A subagent's task grew past its model's context limit. Narrow the task, give the subagent a model with a larger context window, or have it read less at once.",
     AGENT_BUSY: "This chat is already working. Wait for it to finish, or stop it first.",
     TURN_ABORTED: "Stopped.",
     workspaceActivationFailed: "Unable to activate project workspace",

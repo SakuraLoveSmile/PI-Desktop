@@ -2110,6 +2110,7 @@ sklm: {
     PROVIDER_RATE_LIMITED: "AI 服務觸發了限流，請稍後再試。",
     PROVIDER_ERROR: "AI 服務返回了錯誤。",
     NETWORK_ERROR: "無法連線 AI 服務，請檢查網路或介面地址。",
+    providerCertificate: "無法驗證 AI 服務的憑證。請檢查憑證、系統時間，以及安全軟體或代理使用的受信任根憑證。更新信任設定後請重新啟動應用程式。",
     NETWORK_POLICY_BLOCKED: "應用程式的地址校驗阻止了該請求。若使用代理或 VPN,請檢查 設定 → 常規 → 網路。",
     TIMEOUT: "請求 AI 服務超時。",
     STREAM_FAILED: "回覆中斷了。",
@@ -2118,6 +2119,8 @@ sklm: {
       "同一處修改連續失敗三次，本輪已停止，不再盲目重試。再說一次即可繼續。",
     CONTEXT_TOO_LARGE: "上下文恢復後對話仍然過長。請縮短訊息內容或新開對話。",
     CONTEXT_COMPACTION_FAILED: "無法壓縮當前對話的模型上下文。",
+    SUBAGENT_CONTEXT_OVERFLOW:
+      "子智慧體的任務超出了其模型的上下文上限。請縮小任務範圍、為它選擇上下文視窗更大的模型，或讓它一次讀取更少的內容。",
     AGENT_BUSY: "此對話正在處理中。請等待完成，或先停止當前任務。",
     TURN_ABORTED: "已停止。",
     workspaceActivationFailed: "無法啟用專案工作區",
