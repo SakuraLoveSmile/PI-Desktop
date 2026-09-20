@@ -3719,13 +3719,14 @@ async fn handle_request(
                 }
 
                 let mut result = if tools::is_desktop_dispatched(&p.tool_name) {
-                    // Plugin dispatch keeps its existing bounded default timeout;
-                    // command-shell timeout semantics apply only to Bash.
+                    // Plugin and MCP dispatch has its own bounded default, sized
+                    // to outlast Electron's budgets; command-shell timeout
+                    // semantics apply only to Bash.
                     execute_plugin_tool(
                         &state,
                         &tx,
                         &p,
-                        p.timeout_ms.unwrap_or(60_000),
+                        tools::desktop_dispatch_timeout_ms(p.timeout_ms),
                         &durable_mode,
                     )
                     .await
