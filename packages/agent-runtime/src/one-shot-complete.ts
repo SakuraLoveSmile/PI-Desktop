@@ -13,6 +13,7 @@ import type {
 } from "@earendil-works/pi-ai";
 import type { MessageUsage, ThinkingLevel } from "@pi-desktop/shared";
 import { classifyAgentError } from "./agent-errors.js";
+import { clampOutputToContext } from "./output-cap.js";
 import { assistantContent, usageFromPi } from "./agent-messages.js";
 import {
   buildProviderModel,
@@ -89,6 +90,7 @@ export async function completeOneShot(
   const requestOptions: SimpleStreamOptions = withProviderHeaders(
     withOpenCodeSessionHeaders(
       {
+        maxTokens: clampOutputToContext(model, context, undefined),
         ...(options.signal ? { signal: options.signal } : {}),
         maxRetries: 0,
         ...(thinkingLevel !== "off" ? { reasoning: thinkingLevel } : {}),

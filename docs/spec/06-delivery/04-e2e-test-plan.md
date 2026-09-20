@@ -13854,3 +13854,20 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Automation:** `pnpm test:e2e:dialog-overflow`; source/contract dialog suites
   supplement, but do not replace, real Chromium geometry and pointer checks.
 - **Status:** Implemented. Native Windows evidence; macOS/Linux not qualified.
+
+### E2E-OUTPUT-CAP-716: Keep model requests inside the published context window
+
+- **Preconditions:** A deterministic provider fixture exposes a published context
+  window, supports parent and subagent requests, and records request payloads.
+- **Steps:** Configure a user context override larger than the published window;
+  send a CJK-heavy parent prompt, invoke a subagent, and run a one-shot
+  completion. Repeat the parent request with `thinkingLevel: "omit"`.
+- **Expected:** Each request carries a concrete output budget no larger than the
+  remaining published window after input estimation and safety reserve. The
+  runtime compacts against the published safety ceiling, and no request is sent
+  with `input + output` beyond that ceiling. Small ASCII requests retain the
+  configured budget when it fits.
+- **Specs linked:** `03-runtime/02-agent-runtime.md`,
+  `03-runtime/13-model-catalog-and-selection.md`
+- **Acceptance:** F (runtime provider requests), C (chat and stream)
+- **Status:** Unit-covered; deterministic provider fixture pending
