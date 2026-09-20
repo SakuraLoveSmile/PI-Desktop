@@ -1,4 +1,5 @@
 mod scheduled_rpc;
+mod scheduled_tools;
 
 use std::io::{self, BufRead, BufReader as StdBufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -3119,7 +3120,13 @@ async fn handle_request(
             scheduled_rpc::handle(&st, method, params)
         }
 
-        "tools.list" => Ok(json!({ "tools": tools::builtin_tool_defs() })),
+        "tools.list" => {
+            let mut definitions = tools::builtin_tool_defs();
+            if let Some(items) = definitions.as_array_mut() {
+                items.extend(scheduled_tools::definitions());
+            }
+            Ok(json!({ "tools": definitions }))
+        }
         "tools.execute" => {
             let call_started = std::time::Instant::now();
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
@@ -3617,6 +3624,9 @@ async fn handle_request(
                         &durable_mode,
                     )
                     .await
+                } else if scheduled_tools::recognizes(&p.tool_name) {
+                    let st = state.lock().await;
+                    scheduled_tools::execute(&st, &p)
                 } else {
                     tools::execute_tool_with_path_access(
                         ws_path.as_deref(),

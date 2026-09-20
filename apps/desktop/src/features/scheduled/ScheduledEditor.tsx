@@ -118,7 +118,7 @@ export function ScheduledEditor({
         )}
       </div>
       {(cadence === "daily" || cadence === "weekly") && (
-        <p className="dest-row-meta">{hour}:{minute}</p>
+        <p className="dest-row-meta">{hour}:{minute} · {t("scheduled.exactTimeHint")}</p>
       )}
       {cadence === "weekly" && (
         <p className="dest-row-meta" aria-live="polite">

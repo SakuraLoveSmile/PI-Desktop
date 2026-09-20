@@ -334,6 +334,37 @@ try {
   acceptDelete = true;
   await click("Delete");
   await waitFor(async () => (await invoke("scheduledList")).tasks.length === 0, 5000, "confirmed deletion");
+  await evaluate(`document.querySelector('[data-nav="home"]').click()`);
+  await waitFor(() => evaluate(`document.querySelector('.page-title')?.textContent !== 'Scheduled'`), 5000, "leave tasks before conversation CRUD");
+  const chat = (await invoke("sessionCreate", { title: "Scheduled AI CRUD", mode: "agent", projectPath: project, providerId: provider.id, modelId: "fixture", permissionMode: "auto" })).session;
+  for (const scenario of ["create", "read", "update", "delete"]) {
+    model.setScenario(scenario);
+    await invoke("agentPrompt", { sessionId: chat.id, content: `${scenario} the scheduled task; for update use 15:30.`, viewingSessionId: chat.id });
+    await waitFor(async () => {
+      const session = (await invoke("sessionGet", chat.id)).session;
+      return session.messages.some(message => message.role === "assistant" && JSON.stringify(message).includes(`SCHEDULE_AI_${scenario.toUpperCase()}_OK`));
+    }, 60_000, `AI ${scenario} turn`);
+    const tasks = (await invoke("scheduledList")).tasks;
+    if (scenario === "delete") assert.equal(tasks.length, 0);
+    else { assert.equal(tasks[0].id, model.taskId); assert.equal(tasks[0].enabled, false); }
+    if (scenario === "update") {
+      assert.equal(tasks[0].schedule.hour,15);
+      assert.equal(tasks[0].schedule.minute,30);
+      await evaluate(`document.querySelector('[data-nav="scheduled"]').click()`);
+      await waitFor(() => evaluate(`document.body.innerText.includes('AI managed task')`),15000,"AI task appears on page");
+      await click("Edit task");
+      assert.equal(await evaluate(`document.querySelector('button[aria-label="Time"]').textContent.trim()`),'Custom · 15:30');
+      await screenshot('after-ai-custom-time.png');
+      await fill('form input','AI managed task renamed');
+      await click('Save task');
+      await waitFor(() => evaluate(`!document.querySelector('form')`),5000,'save without resetting AI time');
+      assert.equal((await invoke('scheduledList')).tasks[0].schedule.minute,30);
+      assert.equal((await invoke('scheduledList')).tasks[0].enabled,false);
+    }
+  }
+  assert.ok(model.results.some(result => result.name === 'ScheduledTaskDelete' && result.value.ok));
+  if (evidence) writeFileSync(join(evidence,'ai-crud.json'),JSON.stringify(model.results,null,2));
+  console.log('PASS normal conversation AI tools: discover, create, list, update exact time, preserve UI custom time, delete');
   console.log(
     "PASS scheduled user path: create, time, weekday dropdown/multiple selection, validation, keyboard, hourly interval, edit, pause/resume, manual run, transcript, automatic run, delete",
   );

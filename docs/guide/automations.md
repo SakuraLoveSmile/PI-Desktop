@@ -44,3 +44,14 @@ Scheduled tasks now execute while the desktop is running, with hourly intervals 
 configuration, editing, pause/resume, a visible clock entry and run history.
 Existing data stays readable; old cadence-only records do not start automatically.
 
+## Manage tasks in a conversation
+
+In Agent mode, ask to create, list, update or delete scheduled tasks in the
+conversation's project. For example: “Change the project review to 15:30.”
+The AI uses ScheduledTaskList/Create/Update/Delete through the normal tool
+permission pipeline; Ask mode requests approval for mutations. Plan/Goal
+cannot use these tools. Tasks from another project are not visible or writable.
+
+An exact time set by AI appears as Custom in the form. Editing the name or
+prompt preserves it; selecting a period explicitly replaces it with that
+period's default time.

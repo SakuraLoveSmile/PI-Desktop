@@ -57,3 +57,15 @@ automation depend on extension availability. A second agent loop would bypass
 existing admission, persistence and permissions. Both are rejected. The pi
 agent implementation remains the execution engine.
 
+## Conversation management
+
+Expose project-scoped CRUD as on-demand Agent tools using the existing
+`tools.execute` permission and audit pipeline. A thin Host adapter reuses the
+scheduled RPC handlers with the calling session's project, so background
+conversations cannot retarget tasks when the foreground workspace changes.
+List is read-only; mutations keep normal approvals. Plan/Goal stay denied.
+
+The UI offers four time periods (09:00, 14:00, 19:00, 22:00) to keep setup
+simple. AI tools retain precise local time configuration, and the form preserves
+those custom times. Direct database access or renderer-mediated tool mutation
+would duplicate ownership or bypass permission gates and is rejected.
