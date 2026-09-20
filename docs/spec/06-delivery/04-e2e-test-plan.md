@@ -5661,17 +5661,22 @@ identify the platform validation still needed.
   entered CDP or output. The default no-key run remains 5/5 with the live case
   explicitly skipped.
 
-#### E2E-CHAT-opaque-floating-decision-and-retry-surfaces: Plan approval and retry hover stay opaque
+#### E2E-CHAT-opaque-floating-decision-and-retry-surfaces: Dock, Plan approval, and retry surfaces occlude transcript text
 
-- **Status**: Automated (`apps/desktop/test/plan-mode-source-contract.test.mjs`, `apps/desktop/test/active-turn-surface.test.mjs`)
+- **Status**: Automated (`pnpm test:e2e:composer-occlusion`, `pnpm test:e2e:theme-surfaces`, `apps/desktop/test/plan-mode-source-contract.test.mjs`, `apps/desktop/test/active-turn-surface.test.mjs`)
 - **Priority**: P2
 - **Covers**: C, Quality / floating composer and retry surfaces
 - **Preconditions**: Renderer CSS is the production source under `apps/desktop/src/styles`.
 - **Steps**:
-  1. Inspect `.plan-approval-bar` in the composer dock styles.
-  2. Inspect `.run-activity-error-popover.message-error` in the transcript styles.
-  3. Hover or focus a retrying active-turn row in a live session.
+  1. Inspect the computed background of `.composer-dock-docked` in both built-in themes and a custom theme.
+  2. Scroll a long transcript until a row passes beneath the floating Composer.
+  3. Inspect `.plan-approval-bar` in the composer dock styles.
+  4. Inspect `.run-activity-error-popover.message-error` in the transcript styles.
+  5. Hover or focus a retrying active-turn row in a live session.
 - **Expected**:
+  - The dock paints the opaque `--ds-bg-primary` workspace surface across its
+    full width. Transcript text disappears at the Composer boundary and cannot
+    remain visible below the shell or around its rounded corners.
   - The Plan/Goal approval bar paints `--ds-bg-composer` with `--ds-shadow-composer` rather than the in-flow `--ds-tile` wash, so it remains a readable plate over the transparent composer dock.
   - The retry hover tooltip mixes the error tint over `--ds-bg-elevated-opaque`, so transcript text does not show through.
   - The retry tooltip is capped to the room above the tail status row and

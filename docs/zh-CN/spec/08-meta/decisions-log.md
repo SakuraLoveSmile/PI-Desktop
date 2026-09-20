@@ -4589,3 +4589,13 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   什么都不上传。见 `03-runtime/07-process-model.md` §4、
   `03-runtime/09-logging-and-observability.md` 与 `03-runtime/04-data-storage.md`。
 
+## 2026-09-20 —— Composer 下方的停靠区遮住正文绘制（D603，issue #728）
+
+- 正文滚动容器占满会话面板，内容通过实测 Composer 高度预留底部空间。此前绝对定位的
+  停靠区是透明的，因此正文行可以继续绘制到悬浮输入框下方，并从底部空隙或圆角外侧露出。
+- `.composer-dock-docked` 现在横跨整个宽度绘制不透明的 `--ds-bg-primary` 工作区表面。
+  Composer 原有的半透明高架令牌、圆角、阴影和滚动预留保持不变；底层遮罩只移除越过
+  Composer 边界的正文绘制。
+- 仅改动渲染器 CSS 与主题表面回归测试；不改变滚动状态、协议、持久化、主题 schema
+  或权限。见 `04-ux/08-component-spec.md` 与
+  E2E-CHAT-opaque-floating-decision-and-retry-surfaces。
