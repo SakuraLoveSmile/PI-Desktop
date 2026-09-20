@@ -267,22 +267,27 @@
 }
 
 /* The rail line spans the stop-to-stop distance: it starts and ends half a
-   column in from the edges so its tips land on the first/last dot centers. */
-.composer-thinking-rail::before {
+   column in from the edges so its tips land on the first/last dot centers.
+   The muted base rail is ::before and the accent fill is ::after, a separate
+   layer whose width transitions smoothly between stops. */
+.composer-thinking-rail::before,
+.composer-thinking-rail::after {
   content: "";
   position: absolute;
   top: var(--thinking-track-center);
   left: calc(100% / (2 * var(--stop-count, 1)));
-  right: calc(100% / (2 * var(--stop-count, 1)));
   height: var(--thinking-track-height);
   border-radius: var(--radius-full);
-  background: linear-gradient(
-    to right,
-    var(--ds-accent) 0,
-    var(--ds-accent) var(--composer-thinking-progress, 0%),
-    var(--ds-border-subtle) var(--composer-thinking-progress, 0%),
-    var(--ds-border-subtle) 100%
-  );
+}
+
+.composer-thinking-rail::before {
+  right: calc(100% / (2 * var(--stop-count, 1)));
+  background: var(--ds-border-subtle);
+}
+
+.composer-thinking-rail::after {
+  width: var(--composer-thinking-progress, 0%);
+  background: var(--ds-accent);
 }
 
 /* One dot per stop, centered on the rail at each full-width column center. */
@@ -303,6 +308,10 @@
   border-radius: var(--radius-full);
   background: var(--ds-text-muted);
   opacity: 0.55;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 /* The thumb covers the selected dot; accent keeps a partial cover readable. */
@@ -361,6 +370,27 @@
   background: var(--ds-accent);
 }
 
+/* Settle feedback: the thumb plays a single overshoot pop only when a drag
+   commit has just landed (data-settling), never while dragging or on open.
+   The fill slides between stops whenever the control is not mid-drag. */
+.composer-thinking-slider[data-settling] .composer-thinking-range::-webkit-slider-thumb {
+  animation: composer-thinking-thumb-pop var(--motion-duration-normal)
+    cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.composer-thinking-slider[data-settling] .composer-thinking-range::-moz-range-thumb {
+  animation: composer-thinking-thumb-pop var(--motion-duration-normal)
+    cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.composer-thinking-slider:not([data-dragging]) .composer-thinking-rail::after {
+  transition: width var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+@keyframes composer-thinking-thumb-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
 /* Labels form the same full-width n-column grid as the dots, so label i
    centers under dot i and the thumb at index i. Long words ellipsize inside
    the column; every label stays visible. */
@@ -410,6 +440,16 @@
 @media (prefers-reduced-motion: reduce) {
   .composer-model-thinking-menu {
     animation: none;
+  }
+
+  .composer-thinking-range::-webkit-slider-thumb,
+  .composer-thinking-range::-moz-range-thumb {
+    animation: none;
+  }
+
+  .composer-thinking-rail::after,
+  .composer-thinking-dot {
+    transition: none;
   }
 }
 

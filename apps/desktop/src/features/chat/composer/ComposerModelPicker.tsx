@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { TFunction } from "i18next";
 import { formatTokenCount, modelIdsMatch } from "@pi-desktop/shared";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
@@ -93,6 +93,11 @@ export function ComposerModelPicker({
   // never snaps back mid-drag. The lead clears once the store confirms.
   const thinkingLevelsKey = thinkingMenuLevels.join("|");
   const [dragThinkingIndex, setDragThinkingIndex] = useState<number | null>(null);
+  // Settle pulse: only when a drag commit has just landed (the drag lead goes
+  // from set to cleared) do we mark the control settling, which lets the
+  // thumb play its overshoot pop once. Opening the menu never settles.
+  const [settling, setSettling] = useState(false);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     setDragThinkingIndex(null);
   }, [thinkingLevelsKey]);
@@ -100,15 +105,25 @@ export function ComposerModelPicker({
     if (dragThinkingIndex === null) return;
     if (thinkingMenuLevels[dragThinkingIndex] === thinkingLevel) {
       setDragThinkingIndex(null);
+      setSettling(true);
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = setTimeout(() => setSettling(false), 220);
     }
   }, [dragThinkingIndex, thinkingLevel, thinkingLevelsKey, thinkingMenuLevels]);
+  useEffect(
+    () => () => {
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    },
+    [],
+  );
   const thinkingSliderValue = dragThinkingIndex ?? thinkingSliderIndex;
-  // The rail line spans the stop-to-stop distance (it starts and ends half a
-  // column in), so the fill percentage is relative to that span: i/(n-1)
-  // reaches exactly the active stop's column center and the thumb's x.
+  // The accent fill starts half a column in and its width is a fraction of
+  // the full rail width, so i/n reaches exactly the active stop's column
+  // center and the thumb's x. (The fill layer is the rail's ::after; its
+  // percentage is relative to the full rail width.)
   const thinkingSliderPercent =
     thinkingMenuLevels.length > 1
-      ? (thinkingSliderValue / (thinkingMenuLevels.length - 1)) * 100
+      ? (thinkingSliderValue / thinkingMenuLevels.length) * 100
       : 0;
 
   return (
@@ -190,6 +205,8 @@ export function ComposerModelPicker({
           {thinkingMenuLevels.length > 1 ? (
             <div
               className="composer-thinking-slider"
+              data-dragging={dragThinkingIndex !== null ? "true" : undefined}
+              data-settling={settling ? "true" : undefined}
               style={{ "--stop-count": thinkingMenuLevels.length } as CSSProperties}
             >
               {/*
@@ -198,6 +215,12 @@ export function ComposerModelPicker({
                 all sit on the same column center for every stop count. The
                 range input is the accessible control and overlays the dots
                 row only, leaving the labels free to be clicked and hovered.
+
+                Motion: while a drag is in flight (data-dragging) the thumb,
+                dots and fill track the pointer with no transition so the
+                control feels direct; once the store confirms and the drag
+                lead clears, the settle transition plays (thumb pop, dot and
+                label color, fill slide). See composer-menus.css.
               */}
               <div className="composer-thinking-rail">
                 <div className="composer-thinking-dots" aria-hidden="true">
