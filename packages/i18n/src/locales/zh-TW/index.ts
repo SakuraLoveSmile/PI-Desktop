@@ -2119,6 +2119,8 @@ sklm: {
       "同一處修改連續失敗三次，本輪已停止，不再盲目重試。再說一次即可繼續。",
     CONTEXT_TOO_LARGE: "上下文恢復後對話仍然過長。請縮短訊息內容或新開對話。",
     CONTEXT_COMPACTION_FAILED: "無法壓縮當前對話的模型上下文。",
+    SUBAGENT_CONTEXT_OVERFLOW:
+      "子智慧體的任務超出了其模型的上下文上限。請縮小任務範圍、為它選擇上下文視窗更大的模型，或讓它一次讀取更少的內容。",
     AGENT_BUSY: "此對話正在處理中。請等待完成，或先停止當前任務。",
     TURN_ABORTED: "已停止。",
     workspaceActivationFailed: "無法啟用專案工作區",

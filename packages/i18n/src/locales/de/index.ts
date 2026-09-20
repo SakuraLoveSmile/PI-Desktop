@@ -2118,6 +2118,7 @@ sklm: {
     "MUTATION_RETRY_BUDGET_EXHAUSTED": "Die gleiche Bearbeitung schlug dreimal fehl, daher wurde dieser Zug abgebrochen, anstatt es erneut zu versuchen. Bitten Sie erneut, fortzufahren.",
     "CONTEXT_TOO_LARGE": "Dieser Chat ist nach der Kontextwiederherstellung immer noch zu lang. Kürzen Sie Ihre Nachricht oder starten Sie einen neuen Chat.",
     "CONTEXT_COMPACTION_FAILED": "Der Modellkontext dieser Konversation konnte nicht komprimiert werden.",
+    "SUBAGENT_CONTEXT_OVERFLOW": "Die Aufgabe eines Subagenten hat das Kontextlimit seines Modells überschritten. Grenzen Sie die Aufgabe ein, geben Sie dem Subagenten ein Modell mit größerem Kontextfenster oder lassen Sie ihn weniger auf einmal lesen.",
     "AGENT_BUSY": "Dieser Chat funktioniert bereits. Warten Sie, bis der Vorgang abgeschlossen ist, oder stoppen Sie ihn zuerst.",
     "TURN_ABORTED": "Gestoppt.",
     "workspaceActivationFailed": "Projekt-Arbeitsbereich konnte nicht aktiviert werden",

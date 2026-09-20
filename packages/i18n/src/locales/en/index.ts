@@ -2159,6 +2159,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "The same edit failed three times, so this turn stopped instead of retrying blind. Ask again to continue.",
     CONTEXT_TOO_LARGE: "This chat is still too long after context recovery. Shorten your message or start a new chat.",
     CONTEXT_COMPACTION_FAILED: "Couldn't compact this conversation's model context.",
+    SUBAGENT_CONTEXT_OVERFLOW:
+      "A subagent's task grew past its model's context limit. Narrow the task, give the subagent a model with a larger context window, or have it read less at once.",
     AGENT_BUSY: "This chat is already working. Wait for it to finish, or stop it first.",
     TURN_ABORTED: "Stopped.",
     workspaceActivationFailed: "Unable to activate project workspace",
