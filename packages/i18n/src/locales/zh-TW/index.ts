@@ -2110,6 +2110,7 @@ sklm: {
     PROVIDER_RATE_LIMITED: "AI 服務觸發了限流，請稍後再試。",
     PROVIDER_ERROR: "AI 服務返回了錯誤。",
     NETWORK_ERROR: "無法連線 AI 服務，請檢查網路或介面地址。",
+    providerCertificate: "無法驗證 AI 服務的憑證。請檢查憑證、系統時間，以及安全軟體或代理使用的受信任根憑證。更新信任設定後請重新啟動應用程式。",
     NETWORK_POLICY_BLOCKED: "應用程式的地址校驗阻止了該請求。若使用代理或 VPN,請檢查 設定 → 常規 → 網路。",
     TIMEOUT: "請求 AI 服務超時。",
     STREAM_FAILED: "回覆中斷了。",

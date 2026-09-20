@@ -2149,6 +2149,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     PROVIDER_RATE_LIMITED: "The AI provider is rate-limiting requests. Wait a moment and try again.",
     PROVIDER_ERROR: "The AI provider returned an error.",
     NETWORK_ERROR: "Can't reach the AI provider. Check your network or base URL.",
+    providerCertificate: "The AI service certificate could not be verified. Check the certificate, system clock, and trusted roots used by your security software or proxy. Restart the app after updating trust settings.",
     NETWORK_POLICY_BLOCKED: "The app's address check blocked this request. Behind a proxy or VPN, check Settings → General → Network.",
     TIMEOUT: "The request to the AI provider timed out.",
     STREAM_FAILED: "The reply was interrupted.",

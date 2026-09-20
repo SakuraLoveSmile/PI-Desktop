@@ -2147,6 +2147,7 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
     PROVIDER_RATE_LIMITED: "AI servisi istekleri hız sınırlıyor. Biraz bekleyip yeniden deneyin.",
     PROVIDER_ERROR: "AI servisi bir hata döndürdü.",
     NETWORK_ERROR: "AI servisine ulaşılamıyor. Ağınızı veya temel URL’yi kontrol edin.",
+    providerCertificate: "AI hizmetinin sertifikası doğrulanamadı. Sertifikayı, sistem saatini ve güvenlik yazılımınızın veya proxy’nizin kullandığı güvenilir kök sertifikaları kontrol edin. Güven ayarlarını güncelledikten sonra uygulamayı yeniden başlatın.",
     NETWORK_POLICY_BLOCKED: "Uygulamanın adres denetimi bu isteği engelledi. Proxy veya VPN kullanıyorsanız Ayarlar → Genel → Ağ bölümüne bakın.",
     TIMEOUT: "AI servisine istek zaman aşımına uğradı.",
     STREAM_FAILED: "Yanıt kesildi.",

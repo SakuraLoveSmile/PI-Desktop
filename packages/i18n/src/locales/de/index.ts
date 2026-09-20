@@ -2110,6 +2110,7 @@ sklm: {
     "PROVIDER_RATE_LIMITED": "Der KI-Anbieter begrenzt Anfragen. Warten Sie einen Moment und versuchen Sie es erneut.",
     "PROVIDER_ERROR": "Der KI-Anbieter hat einen Fehler zurückgegeben.",
     "NETWORK_ERROR": "Der KI-Anbieter kann nicht erreicht werden. Überprüfen Sie Ihr Netzwerk oder Ihre Basis-URL.",
+    providerCertificate: "Das Zertifikat des KI-Dienstes konnte nicht überprüft werden. Prüfen Sie das Zertifikat, die Systemzeit und die vertrauenswürdigen Stammzertifikate Ihrer Sicherheitssoftware oder Ihres Proxys. Starten Sie die App nach Änderungen an den Vertrauenseinstellungen neu.",
     NETWORK_POLICY_BLOCKED: "Die Adressprüfung der App hat diese Anfrage blockiert. Bei Proxy oder VPN: Einstellungen → Allgemein → Netzwerk prüfen.",
     "TIMEOUT": "Bei der Anfrage an den KI-Anbieter ist eine Zeitüberschreitung aufgetreten.",
     "STREAM_FAILED": "Die Antwort wurde unterbrochen.",

@@ -208,6 +208,7 @@ import { rebuildNodeNetworkTransport } from "./node-proxy.js";
 import {
   createProviderTransportHealth,
   explainsProviderFetchFailure,
+  withProviderFetchFailure,
   type ProviderFetchFailure,
   type ProviderTransportHealth,
 } from "./provider-transport-recovery.js";
@@ -5323,7 +5324,8 @@ Delegation rules:
     providerWaitMs?: number,
     streamMs?: number,
   ): ReturnType<typeof classifyAgentError> {
-    const existingDetails = isRecord(error.details) ? error.details : {};
+    const explained = withProviderFetchFailure(error, this.providerFetchFailure);
+    const existingDetails = explained.details ?? {};
     // A capture exists only for an attempt that rejected before any response, so
     // it is also the honest phase: whatever the message lifecycle that surfaced
     // the failure looks like, this request never reached the provider, and
@@ -5335,12 +5337,9 @@ Delegation rules:
         ? this.providerFetchFailure
         : undefined;
     return {
-      ...error,
+      ...explained,
       details: {
         ...existingDetails,
-        // First-hand cause, so it replaces the `unknown` the text classifier
-        // falls back to for a bare `fetch failed`.
-        ...(captured ? captured.fields : {}),
         phase: captured ? "request" : phase,
         // Correlation for a failure that produced no response to inspect: how
         // much context and how many bytes the attempt carried, and which
