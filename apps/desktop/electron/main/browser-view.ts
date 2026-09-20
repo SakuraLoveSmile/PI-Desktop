@@ -147,22 +147,27 @@ export class BrowserPane {
     const target = localPath
       ? pathToFileURL(localPath).toString()
       : normalizeUrl(raw);
-    if (!target) return this.getState();
+    if (!target) return null;
     if (localPath) this.watchDirForReload(dirname(localPath));
     else this.clearLiveReload();
     const view = this.ensureView();
     if (this.visible) this.attach();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await Promise.race([
-        view.webContents.loadURL(target),
-        new Promise<void>((resolve) => {
-          setTimeout(resolve, Math.max(1, timeoutMs));
+      const completed = await Promise.race([
+        view.webContents.loadURL(target).then(() => true),
+        new Promise<false>((resolve) => {
+          timer = setTimeout(() => resolve(false), Math.max(1, timeoutMs));
         }),
       ]);
+      return completed ? this.getState() : null;
     } catch {
-      // Load failures surface through did-fail-load → state push.
+      // Load failures still surface through did-fail-load → state push, but
+      // must not make a previous session's document eligible for display.
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-    return this.getState();
   }
 
   action(action: "back" | "forward" | "reload" | "stop"): void {

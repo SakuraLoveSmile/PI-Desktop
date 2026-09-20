@@ -1031,6 +1031,15 @@ entirely inside the plugin's isolated page:
   folder the view is browsing — never the whole group — refuses credential
   paths, and records writes to its own audit log (ADR 0241, ADR 0263).
 
+- During a Browser session switch, Main hides the shared guest immediately
+  until the destination's current navigation completes. Root lookup or load
+  completion from a superseded request cannot navigate, reveal, or publish the
+  old session as current. A session without a remembered preview stays empty;
+  closing the panel or disposing the guest wins over pending work. Normal
+  navigation within the same session retains that session's visible content.
+  A failed switch or one exceeding the existing 15-second load wait remains
+  hidden until retried; a late network completion does not automatically reveal it.
+
 ### 5.3 States
 
 | State | Behavior |
