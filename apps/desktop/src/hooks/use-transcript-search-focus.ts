@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
 import type { TranscriptSearchTarget } from "../lib/transcript-reading";
 import { locateTranscriptSearch } from "../lib/transcript-search-highlight";
-import { transcriptSearchSelector } from "../lib/transcript-search-context";
 
 const READING_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 const GESTURES = ["wheel", "touchstart", "touchmove", "pointerdown", "keydown"];
@@ -31,82 +30,16 @@ export function useTranscriptSearchFocus({
     const scroller = scrollRef.current;
     const content = contentRef.current;
     if (!visible || !target || !scroller || !content) return;
-
-    let removeFocus: (() => void) | undefined;
-    let observer: MutationObserver | undefined;
-    const install = () => {
-      if (removeFocus) return true;
-      const targetElement = content.querySelector<HTMLElement>(
-        transcriptSearchSelector(target),
-      );
-      if (!targetElement || !transcriptSearchTargetVisible(target, targetElement, content)) {
-        return false;
-      }
-      removeFocus = installTranscriptSearchFocus({
-        target,
-        targetElement,
-        source,
-        scroller,
-        content,
-        position,
-        onNavigate,
-        onPosition,
-      });
-      return Boolean(removeFocus);
-    };
-
-    if (!install()) {
-      observer = new MutationObserver(() => {
-        if (!install()) return;
-        observer?.disconnect();
-        observer = undefined;
-      });
-      observer.observe(content, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["aria-hidden", "class", "hidden", "inert"],
-      });
-      // Close the gap between the first lookup and observer registration.
-      if (install()) {
-        observer?.disconnect();
-        observer = undefined;
-      }
-    }
-
-    return () => {
-      observer?.disconnect();
-      removeFocus?.();
-    };
+    return installTranscriptSearchFocus({
+      target,
+      source,
+      scroller,
+      content,
+      position,
+      onNavigate,
+      onPosition,
+    });
   }, [contentRef, contentVersion, onNavigate, onPosition, scrollRef, source, target, visible]);
-}
-
-function transcriptSearchTargetVisible(
-  target: TranscriptSearchTarget,
-  element: HTMLElement,
-  content: HTMLElement,
-): boolean {
-  for (
-    let current: HTMLElement | null = element;
-    current && current !== content;
-    current = current.parentElement
-  ) {
-    if (
-      current.hidden ||
-      current.hasAttribute("inert") ||
-      current.getAttribute("aria-hidden") === "true"
-    ) {
-      return false;
-    }
-  }
-
-  const itemKind = target.item?.kind;
-  const disclosureItem =
-    itemKind === "thinking" ||
-    itemKind === "tool" ||
-    itemKind === "hostedSearch" ||
-    (!itemKind && element.classList.contains("tool-row"));
-  return !disclosureItem || element.classList.contains("open");
 }
 
 type SearchPosition = { current: { requestId: number; alignUntil: number } };
@@ -114,7 +47,6 @@ type SearchPosition = { current: { requestId: number; alignUntil: number } };
 /** Install one browser focus effect; cleanup is safe during StrictMode replay. */
 export function installTranscriptSearchFocus({
   target,
-  targetElement,
   source,
   scroller,
   content,
@@ -123,7 +55,6 @@ export function installTranscriptSearchFocus({
   onPosition,
 }: {
   target: TranscriptSearchTarget;
-  targetElement?: HTMLElement;
   source: string;
   scroller: HTMLElement;
   content: HTMLElement;
@@ -131,10 +62,10 @@ export function installTranscriptSearchFocus({
   onNavigate: (fresh: boolean) => void;
   onPosition?: (scrollTop: number) => void;
 }) {
-  const message = targetElement ?? content.querySelector<HTMLElement>(
-    transcriptSearchSelector(target),
+  const message = content.querySelector<HTMLElement>(
+    `[data-message-id="${CSS.escape(target.messageId)}"]`,
   );
-  if (!message || !transcriptSearchTargetVisible(target, message, content)) return;
+  if (!message) return;
   const row = message.closest<HTMLElement>(".message-row") ?? message;
   row.classList.add("transcript-search-target");
   const fresh = position.current.requestId !== target.requestId;

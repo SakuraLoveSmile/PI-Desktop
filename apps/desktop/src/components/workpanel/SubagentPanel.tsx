@@ -22,7 +22,6 @@ import { useTranscriptView } from "../../hooks/use-transcript-view";
 import { useTranscriptSearchFocus } from "../../hooks/use-transcript-search-focus";
 import { IconArrowDown } from "../icons";
 import { DisclosureAnchorContext } from "../../lib/disclosure-anchor-context";
-import { TranscriptSearchContext } from "../../lib/transcript-search-context";
 import { TranscriptDisclosureProvider } from "../../features/chat/transcript/disclosure";
 import { TooltipButton } from "../ui";
 import { SubagentDetail } from "../ChatTranscript";
@@ -35,32 +34,21 @@ type SelectedSubagent = {
 function findSelectedSubagent(
   messages: UiMessage[],
   delegationId: string,
-  targetMessageId?: string,
 ): SelectedSubagent | null {
   const { entries } = buildTranscriptEntries(messages);
-  let fallback: SelectedSubagent | null = null;
   for (const entry of entries) {
     if (entry.kind !== "assistant-turn") continue;
     const turnActivityItems = entry.parts.flatMap((part) =>
       part.kind === "activity" ? part.items : [],
     );
-    for (const candidate of turnActivityItems) {
-      if (!isDelegationActivityItem(candidate)) continue;
-      const selected = { item: candidate, turnActivityItems };
-      if (
-        targetMessageId &&
-        candidate.delegate?.items.some((row) => row.message.id === targetMessageId)
-      ) {
-        return selected;
-      }
-      if (delegationIdForMessage(candidate.message) === delegationId) {
-        // Resumed calls can reuse a delegation id; the latest card owns the
-        // merged run produced by buildTranscriptEntries.
-        fallback = selected;
-      }
-    }
+    const item = turnActivityItems.find(
+      (candidate): candidate is DelegationActivityItem =>
+        isDelegationActivityItem(candidate) &&
+        delegationIdForMessage(candidate.message) === delegationId,
+    );
+    if (item) return { item, turnActivityItems };
   }
-  return fallback;
+  return null;
 }
 
 export function SubagentPanel({ selection }: { selection: SubagentPanelSelection }) {
@@ -81,12 +69,8 @@ function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection
     (state) => state.runningSessions[selection.sessionId] ?? false,
   );
   const selected = useMemo(
-    () => findSelectedSubagent(
-      messages,
-      selection.delegationId,
-      searchTarget?.messageId,
-    ),
-    [messages, searchTarget?.messageId, selection.delegationId],
+    () => findSelectedSubagent(messages, selection.delegationId),
+    [messages, selection.delegationId],
   );
   const delegationStatuses = useMemo<ReadonlyMap<string, SubagentOutcome>>(
     () =>
@@ -140,7 +124,6 @@ function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection
   });
 
   return (
-    <TranscriptSearchContext.Provider value={searchTarget}>
     <DisclosureAnchorContext.Provider value={disclosureAnchorNotifier}>
     <section
       id="subagent-panel"
@@ -194,6 +177,5 @@ function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection
       </span>
     </section>
     </DisclosureAnchorContext.Provider>
-    </TranscriptSearchContext.Provider>
   );
 }

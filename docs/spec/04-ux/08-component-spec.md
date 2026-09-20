@@ -841,8 +841,9 @@ stable turn/group/item identities and remain while the retained session pane liv
 including mode changes and row remounts; pane eviction, deletion or renderer restart
 reapplies defaults rather than persisting disclosure state to messages or settings.
 
-Search/navigation reveals the precise process -> group -> item path required by the
-target and applies each reveal request once. Compact reasoning stays hidden until
+Search/navigation reveals the process and the activity group that own the named
+message, and applies each reveal request once. Item-level targeting is not part
+of this change. Compact reasoning stays hidden until
 the user selects Detailed. Permission, question, plan/goal approval and other
 pending action cards remain reachable outside a hidden process. See
 [ADR turn-process-and-thinking-display](../../adr/turn-process-and-thinking-display.md).

@@ -1,6 +1,7 @@
 import {
   memo,
   useCallback,
+  useContext,
   useId,
   useRef,
   useState,
@@ -20,7 +21,7 @@ import {
 import { useOpenChatFileRef, useOpenPreviewTarget } from "../../../hooks/use-preview-target";
 import { useDisclosureAnchorNotifier } from "../../../lib/disclosure-anchor-context";
 import { isThinkingActive, resolveThinkingDisplayMode } from "../../../lib/turn-process";
-import { useItemReveal, transcriptItemKey } from "../../../lib/transcript-search-context";
+import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
 import { disclosureKey, useAutomaticDisclosure } from "./disclosure";
 export { useAutomaticDisclosure } from "./disclosure";
 import { messageThinking as thinkingText } from "../../../lib/assistant-turns";
@@ -56,6 +57,17 @@ import {
   IconWrench,
 } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
+
+/**
+ * Legacy message navigation reveals the row it names, at message precision.
+ * Item-level targeting is not part of this change.
+ */
+export function useMessageRevealRequest(messageId: string) {
+  const target = useContext(TranscriptSearchContext);
+  return target && target.messageId === messageId
+    ? target.requestId
+    : undefined;
+}
 
 export function CopyButton({
   text,
@@ -501,7 +513,7 @@ export const ThinkingRow = memo(function ThinkingRow({
 }) {
   const { t } = useTranslation();
   const detailsId = useId();
-  const revealRequest = useItemReveal(message.id, "thinking");
+  const revealRequest = useMessageRevealRequest(message.id);
   const disclosure = useAutomaticDisclosure(autoOpen, revealRequest, disclosureKey("thinking", message.id));
   const { open, toggle: toggleDisclosure, collapse: collapseDisclosure } = disclosure;
   const titleRef = disclosure.titleRef;
@@ -531,7 +543,7 @@ export const ThinkingRow = memo(function ThinkingRow({
   const text = thinkingText(message);
   const summary = text.replace(/\s+/g, " ").trim();
   return (
-    <div className={`tool-row thinking ${open ? "open" : ""}`} data-transcript-item={transcriptItemKey(message.id, "thinking")}>
+    <div className={`tool-row thinking ${open ? "open" : ""}`}>
       <button
         ref={titleRef}
         className="tool-row-header"

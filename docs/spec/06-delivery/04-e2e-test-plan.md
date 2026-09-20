@@ -13818,10 +13818,11 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 
 - **Preconditions:** A turn with progress paragraph A, multiple searches plus
   thinking, progress paragraph B, multiple commands plus thinking, and a final
-  answer; Detailed and Compact display modes; precise transcript search targets.
+  answer; Detailed and Compact display modes; legacy message-level transcript
+  search targets.
 - **Steps:** Review the nested disclosure path in Detailed, including independent
   group/item toggles, parent close/reopen, a singleton segment, literal-final-item
-  leaf selection, failure/denial/recovery, retained-pane remounts and a precise
+  leaf selection, failure/denial/recovery, retained-pane remounts and a legacy
   search reveal. Repeat in Compact and with permission/question/plan/goal action
   cards, a stopped partial answer, an assistant error and delegated child work.
 - **Expected:** Both modes use one whole-process disclosure and leave the final
@@ -13834,14 +13835,14 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   literal final tool/search item of the last activity group; it does not scan past
   thinking, and failed/denied leaves stay closed. Parent/child/sibling states remain
   independent, pane-owned user choices survive updates, mode changes and remounts,
-  and renderer restart reapplies defaults. Search opens only the precise process ->
-  group -> item or Task-panel path once per request; Compact reasoning requires an
+  and renderer restart reapplies defaults. Search reveals the process and activity
+  group that own the named message once per request; item-level targeting is not
+  part of this change, and Compact reasoning requires an
   explicit switch to Detailed. Saved mode survives restart and a missing/unknown
   setting resolves to Detailed.
-- **Validation scope for the 2026-09-20 change:** Intended behavior for static
-  source/design review only. The scoped task adds or runs no unit, component,
-  integration, runtime, browser, Electron or E2E tests; existing automation names
-  elsewhere in this plan are prior inventory, not evidence that this change ran.
+- **Validation scope for the 2026-09-20 change:** Nested disclosure and activity
+  group presentation only; precise item-level transcript search targeting is out
+  of scope and keeps the existing message-level search behavior.
 - **Specs:** 04-ux/06-settings-ia, 04-ux/08-component-spec,
   04-ux/09-interaction-patterns; ADR turn-process-and-thinking-display.
 

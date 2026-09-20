@@ -1,4 +1,3 @@
-import { transcriptItemKey } from "../../../lib/transcript-search-context";
 import {
   memo,
   useMemo,
@@ -346,7 +345,6 @@ export const AssistantTurn = memo(function AssistantTurn({
             : ""
         }`}
         data-message-id={part.message.id}
-        data-transcript-item={transcriptItemKey(part.message.id, "message")}
         key={part.message.id}
       >
         {part.message.content ? (

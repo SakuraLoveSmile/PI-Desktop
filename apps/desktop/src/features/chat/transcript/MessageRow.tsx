@@ -8,7 +8,6 @@ import { useTranslation } from "react-i18next";
 import type { UiMessage } from "@pi-desktop/shared";
 import { useOpenChatFileRef } from "../../../hooks/use-preview-target";
 import { splitChatText } from "../../../lib/chat-links";
-import { transcriptItemKey } from "../../../lib/transcript-search-context";
 import { useAppStore } from "../../../stores/app-store";
 import { Markdown } from "../../../components/Markdown";
 import {
@@ -124,7 +123,6 @@ export const MessageRow = memo(function MessageRow({
       className={`message-row ${isSessionMessage ? "session-message" : isUser ? "user" : message.role}`}
       data-minimap-id={message.id}
       data-message-id={message.id}
-      data-transcript-item={transcriptItemKey(message.id, "message")}
       data-row-role={isSessionMessage ? undefined : "user"}
       onContextMenu={onContextMenu}
       role="article"

@@ -1,17 +1,11 @@
 import type { SessionDetail, UiMessage } from "@pi-desktop/shared";
 import { dedupeSessionMessages, mergeLiveSessionMessages } from "./session-transcript";
 
-/** Renderer-only precision for surfaces sharing one persisted message. */
-export type TranscriptItemTarget =
-  | { kind: "message" | "thinking" | "tool" }
-  | { kind: "hostedSearch"; roundId: string };
-
 export type TranscriptSearchTarget = {
   sessionId: string;
   messageId: string;
   query: string;
   requestId: number;
-  item?: TranscriptItemTarget;
 };
 
 /** One renderer reading range, shared by ordinary history and search navigation. */

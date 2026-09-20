@@ -78,7 +78,13 @@ export function useAutomaticDisclosure(
   const subscribe = useCallback((listener: () => void) => choices.subscribe(key, listener), [choices, key]);
   const snapshot = useCallback(() => choices.get(key), [choices, key]);
   const choice = useSyncExternalStore(subscribe, snapshot, snapshot);
-  const open = choice?.open ?? automaticOpen;
+  // A pending reveal is the derived default, so the first paint (and SSR)
+  // already shows the row the transcript search asked to open.
+  const open = choice?.open ?? (
+    revealRequest !== undefined && choice?.revealRequest !== revealRequest
+      ? true
+      : automaticOpen
+  );
   const titleRef = useRef<HTMLButtonElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const notifyAnchor = useDisclosureAnchorNotifier();

@@ -14,7 +14,6 @@ import { useOpenPreviewTarget } from "../../../hooks/use-preview-target";
 import { useFollowScroll } from "../../../hooks/use-follow-scroll";
 import { getToolPreviewTarget } from "../../../lib/chat-links";
 import { disclosureKey } from "./disclosure";
-import { transcriptItemKey, useItemReveal } from "../../../lib/transcript-search-context";
 import {
   formatToolDuration,
   getToolAction,
@@ -70,6 +69,7 @@ import {
   TOOL_ACTION_KEYS,
   TOOL_RUNNING_KEYS,
   useAutomaticDisclosure,
+  useMessageRevealRequest,
 } from "./shared";
 import {
   delegateAgentName,
@@ -160,7 +160,7 @@ export const ToolRow = memo(function ToolRow({
   // Detailed mode opens the last tool of the last activity group. Compact keeps
   // payloads collapsed so a live burst only updates the header. Failure and
   // denial stay in the row head without expanding the payload automatically.
-  const revealRequest = useItemReveal(message.id, "tool");
+  const revealRequest = useMessageRevealRequest(message.id);
   const disclosure = useAutomaticDisclosure(
     autoOpen && !failed && status !== "denied",
     revealRequest,
@@ -338,7 +338,6 @@ export const ToolRow = memo(function ToolRow({
       } status-${run === "failed" ? "error" : status || "success"}${outcome ? ` outcome-${outcome.replaceAll("_", "-")}` : ""}${creating ? " outcome-creating" : ""}`}
       role={variant === "topology" ? "listitem" : "region"}
       data-message-id={message.id}
-      data-transcript-item={transcriptItemKey(message.id, "tool")}
       aria-label={`${t("chat.toolCall")}: ${rawName}${agentName ? `, ${agentName}` : ""}${modelLabel ? `, ${modelLabel}` : ""}${statusLabel ? `, ${statusLabel}` : ""}`}
     >
       {variant === "topology" ? (

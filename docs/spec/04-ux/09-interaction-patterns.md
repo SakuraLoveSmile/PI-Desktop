@@ -834,9 +834,10 @@ may be retained while exactly one workspace supplies the visible shell context.
   them. Streaming and completion cannot reopen a manual close or close around
   content the user opened, focused or selected. Choices survive mode changes,
   singleton-to-group growth and remounts while the retained session pane lives.
-- Search/navigation opens only the precise process -> group -> item ancestor path
-  required for the target, once per reveal request. Compact reasoning requires an
-  explicit switch to Detailed. Closing search does not collapse the revealed path.
+- Search/navigation opens the process and activity group that own the named
+  message, once per reveal request. Item-level targeting is not part of this
+  change. Compact reasoning requires an explicit switch to Detailed. Closing
+  search does not collapse the revealed path.
 - Pending permission, question, plan/goal approval and other action cards remain
   reachable outside hidden process content.
 - Each disclosure uses its own button, `aria-expanded` and `aria-controls`; closed
@@ -1315,7 +1316,7 @@ Project drag/drop follows these patterns:
   restores the title's viewport offset for every frame of the height change. A
   nested scroller (the delegate run dock, D302) holds its own position and passes
   the hold outward because growing it also grows the outer content.
-- Closing a parent does not reset a retained child's disclosure or reading state.
+  Search reveal opens the required ancestors at message precision and uses the
   Search reveal opens the required ancestors and uses the precise target as the
   final anchor. Leaving follow for any disclosure is not a re-pin: the transcript
   stays where the reader put it, with jump-to-latest visible, until real scroll

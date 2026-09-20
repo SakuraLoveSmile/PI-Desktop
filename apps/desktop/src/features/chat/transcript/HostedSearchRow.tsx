@@ -6,9 +6,12 @@ import {
   IconCircleAlert,
   IconGlobe,
 } from "../../../components/icons";
-import { DisclosureCollapseRail, useAutomaticDisclosure } from "./shared";
+import {
+  DisclosureCollapseRail,
+  useAutomaticDisclosure,
+  useMessageRevealRequest,
+} from "./shared";
 import { disclosureKey } from "./disclosure";
-import { transcriptItemKey, useItemReveal } from "../../../lib/transcript-search-context";
 
 /**
  * One provider-hosted web search round, rendered on the same tool-row idiom
@@ -45,7 +48,7 @@ export const HostedSearchRow = memo(function HostedSearchRow({
   const detailsId = useId();
   const searching = streaming && round.status === "searching";
   const failed = round.status === "failed";
-  const revealRequest = useItemReveal(messageId, "hostedSearch", round.id);
+  const revealRequest = useMessageRevealRequest(messageId);
   const disclosure = useAutomaticDisclosure(autoOpen && !failed, revealRequest, disclosureKey("hostedSearch", messageId, round.id));
   const { open, toggle: toggleDisclosure, collapse: collapseDisclosure } = disclosure;
   const titleRef = disclosure.titleRef;
@@ -85,7 +88,7 @@ export const HostedSearchRow = memo(function HostedSearchRow({
           : t("chat.webSearch");
 
   return (
-    <div className={`tool-row hosted-search ${open ? "open" : ""}`} data-transcript-item={transcriptItemKey(messageId, "hostedSearch", round.id)}>
+    <div className={`tool-row hosted-search ${open ? "open" : ""}`}>
       <button
         ref={titleRef}
         className="tool-row-header"

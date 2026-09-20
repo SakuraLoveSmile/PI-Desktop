@@ -250,10 +250,8 @@ export const ActivityGroup = memo(function ActivityGroup({
   const topologyLive = hasSubagentTopology && subagentSummary.running > 0;
   const live = isActive || topologyLive;
   const searchTarget = useContext(TranscriptSearchContext);
-  const revealRequest = searchTarget && items.some((item) =>
-    item.message.id === searchTarget.messageId ||
-    (item.kind === "tool" && item.delegate?.items.some((row) => row.message.id === searchTarget.messageId)),
-  ) ? searchTarget.requestId : undefined;
+  const revealRequest = searchTarget && items.some((item) => item.message.id === searchTarget.messageId)
+    ? searchTarget.requestId : undefined;
   const visibleItems = visibleActivityItems(items, compact, isActive);
   const first = items[0];
   const disclosure = useAutomaticDisclosure(

@@ -60,13 +60,14 @@ reparenting from singleton to group, and row remounts while the owning retained
 session pane remains alive. Pane eviction, session deletion, or renderer restart
 releases this presentation memory; it is not stored in messages or host settings.
 
-Search/navigation reveals only the precise ancestor path needed for its target:
-process, group, then item details when required. Replaying the same request does
-not repeatedly override a later manual close. Compact-mode reasoning remains
-hidden until the user chooses Detailed. Assistant errors, stopped trailing
-partial answers, permission/question/plan/goal decisions, and any other pending
-action surface remain outside hidden process content and reachable without
-expanding it.
+Search/navigation reveals the ancestor path its target needs: the process, then
+the activity group that owns the named message. Item-level targeting is not part
+of this change, so each row's own details stay behind its own disclosure.
+Replaying the same request does not repeatedly override a later manual close.
+Compact-mode reasoning remains hidden until the user chooses Detailed. Assistant
+errors, stopped trailing partial answers, permission/question/plan/goal
+decisions, and any other pending action surface remain outside hidden process
+content and reachable without expanding it.
 
 Settings → AI → Defaults retains `thinkingDisplayMode`, the optional
 `detailed | compact` `AppSettings` field. Absent or unrecognized values resolve

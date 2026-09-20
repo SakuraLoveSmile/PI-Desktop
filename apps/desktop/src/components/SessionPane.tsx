@@ -49,7 +49,6 @@ export const SessionPane = memo(function SessionPane({
             ...transcript.focus,
             messageId: transcript.parentMessage.id,
             query: "",
-            item: { kind: "tool" } as const,
           }
         : transcript.focus,
     [transcript.focus, transcript.parentMessage],
