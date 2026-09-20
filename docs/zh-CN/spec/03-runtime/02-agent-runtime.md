@@ -1032,17 +1032,14 @@ sidecar 序列化针对相同标准化路径的 IPC/`sequential` 调用
 跟踪差距（MVP 后积压）：更丰富的系统提示组成 (§7) 和
 provider/model 目录发现超出当前有线路径。
 
-### Provider certificate trust (issue #714)
+### Provider certificate trust（issue #714）
 
-The desktop sidecar starts with Node's `--use-system-ca`, retaining bundled
-roots and inherited `NODE_EXTRA_CA_CERTS`. It uses the OS trust store without
-turning off chain or hostname validation. Restart after updating local trust
-or the extra-CA startup environment. Headless pi-host launch behavior and
-System/Direct/Custom proxy routing are unchanged.
+桌面 sidecar 使用 Node 的 `--use-system-ca` 启动，同时保留内置根证书和继承的
+`NODE_EXTRA_CA_CERTS`。它使用操作系统信任库，但不会关闭证书链或主机名校验。
+更新本地信任库或额外 CA 启动环境后，需要重启桌面应用。无头 pi-host 启动行为以及
+System/Direct/Custom 代理路由保持不变。
 
-Explicit certificate verification errors are terminal for both setup and
-stream recovery in main sessions and built-in delegates. Their structured
-cause survives adapter message flattening, remains on the final error row,
-and never triggers a provider transport rebuild. Protocol errors such as
-`EPROTO` keep their existing retry behavior. See
-[certificate trust ADR](../../../adr/provider-system-certificates.md).
+在主 session 和内置 delegate 中，明确的证书校验错误在初始化和流恢复阶段都视为
+终态。结构化原因会穿过 adapter 的错误扁平化，保留在最终错误行中，也不会触发
+provider transport 重建。`EPROTO` 等协议错误继续使用原有重试行为。详见
+[证书信任 ADR](../../../adr/provider-system-certificates.md)。

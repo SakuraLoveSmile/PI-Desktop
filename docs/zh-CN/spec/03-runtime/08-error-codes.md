@@ -413,19 +413,15 @@ errors.<code>.action
    代码；仅允许记录的预转目录后备，并且不进行任何工作
    正在重播
 
-### Certificate verification failures (issue #714)
+### 证书校验失败（issue #714）
 
-`NETWORK_ERROR` is non-retriable when `details.networkCode` is a recognized
-certificate verification failure, including an untrusted/self-signed chain,
-an expired/not-yet-valid certificate, or `ERR_TLS_CERT_ALTNAME_INVALID`.
-A concrete certificate cause takes precedence over generic socket/proxy
-wrapper codes. Captured fetch causes apply this policy after adapter error
-flattening as well as during direct classification. Unknown and non-certificate
-TLS/protocol errors retain existing recovery behavior.
+当 `details.networkCode` 是已识别的证书校验错误时，`NETWORK_ERROR` 不可重试，
+包括不受信任或自签名链、证书已过期或尚未生效，以及
+`ERR_TLS_CERT_ALTNAME_INVALID`。具体证书原因优先于通用 socket/proxy 包装错误。
+即使 adapter 已将错误扁平化，捕获的 fetch 原因仍会应用这条策略。未知 TLS 错误和
+非证书协议错误继续使用原有恢复行为。
 
-The transcript keeps the stable error code, transport errno and raw details,
-but uses localized certificate guidance instead of the generic connectivity
-summary. It asks the user to check the certificate, clock, and trusted roots
-used by security software/proxies, then restart after changing trust. It does
-not claim that interception is the only possible cause or offer a TLS bypass.
-Manual Continue remains available after the cause is corrected.
+transcript 保留稳定错误码、传输 errno 和原始 details，但使用本地化的证书指引，
+而不是通用连接错误摘要。它会提示用户检查证书、系统时间以及安全软件或代理使用的
+信任根，并在修改信任设置后重启。文案不会断言一定是流量拦截，也不会提供关闭 TLS
+校验的绕过方式。修复原因后，用户仍可手动继续。
