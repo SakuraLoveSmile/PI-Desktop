@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import type { BrowserWindow, Dialog, MessageBoxOptions, OpenDialogOptions } from "electron";
 import { catalogs, resolveLocale } from "@pi-desktop/i18n";
 import { installExtensionDependencies, type ExtensionDependencyInstallResult } from "./npm-installer";
-import { validateNpmExecutable } from "./npm-executable";
+import { NPM_VALIDATION_BUDGET_MS, validateNpmExecutable } from "./npm-executable";
 
 export type NpmRecoveryDependencies = {
   dialogs: Pick<Dialog, "showMessageBox" | "showOpenDialog">;
@@ -64,7 +64,9 @@ export async function installDependenciesWithNpmRecovery(
     const selected = picked.canceled ? undefined : picked.filePaths[0];
     if (!selected) return result;
 
-    const validation = await validateNpmExecutable(selected);
+    // A picked executable gets the full validation ceiling: rejecting a working
+    // npm because process startup was slow would loop the user through the picker.
+    const validation = await validateNpmExecutable(selected, NPM_VALIDATION_BUDGET_MS);
     if (!validation.ok) {
       result = { state: "failed", reason: "npm-unavailable", error: validation.error };
       invalidSelection = true;

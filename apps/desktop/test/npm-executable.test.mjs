@@ -278,8 +278,11 @@ test("short install budgets cap validation and include its time in both install 
   assert.ok(Date.now() - started < 2_000, "validation does not consume its default five seconds");
   const f = fixture(t, "if (args[0] === '--version') Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);");
   const budgets = [];
+  // Validation spawns two real processes, so these short budgets only prove the
+  // containment property on an idle machine. Five seconds still leaves the
+  // budget far below the installer's default.
   const installed = await installExtensionDependencies(f.plugin, {
-    npmPath: f.npm, timeoutMs: 3_000,
+    npmPath: f.npm, timeoutMs: 5_000,
     runner: async (_command, _args, _cwd, timeoutMs) => {
       budgets.push(timeoutMs);
       return { code: 0, stderr: "" };
@@ -287,9 +290,9 @@ test("short install budgets cap validation and include its time in both install 
   });
   assert.deepEqual(installed, { state: "installed" });
   assert.equal(budgets.length, 2);
-  assert.ok(budgets.every((budget) => budget <= 2_700 && budget > 0));
+  assert.ok(budgets.every((budget) => budget <= 4_700 && budget > 0));
   const stalled = fixture(t, "if (args[0] === 'install') setInterval(() => {}, 60_000);");
-  const timedOut = await installExtensionDependencies(stalled.plugin, { npmPath: stalled.npm, timeoutMs: 1_500 });
+  const timedOut = await installExtensionDependencies(stalled.plugin, { npmPath: stalled.npm, timeoutMs: 5_000 });
   assert.equal(timedOut.state, "failed");
   assert.equal(timedOut.reason, undefined, "install timeout is not an unavailable tool");
   assert.match(timedOut.error, /exceeded/);

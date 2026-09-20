@@ -124,9 +124,12 @@ target, so the sibling `node` remains discoverable. Selected paths never come
 from renderer text input.
 
 Main validates the selected executable and its Node.js runtime with bounded
-version checks before saving or installing. Invalid selections (including npm
-without usable Node.js) show a localized native warning and let the user choose
-again or cancel; the guidance is to choose npm in the same directory as `node`.
+version checks before saving or installing. The checks share the installation
+budget and stop at a bounded ceiling, because a slow machine must not report a
+working npm as unavailable and send the user back to the picker. Invalid
+selections (including npm without usable Node.js) show a localized native
+warning and let the user choose again or cancel; the guidance is to choose npm
+in the same directory as `node`.
 Only a validated selection is persisted, atomically, in Main-owned
 `<dataDir>/npm-path.json`, not renderer settings or Host SQLite. Future imports
 reuse it after validation; a stale saved path returns to the recovery prompt.

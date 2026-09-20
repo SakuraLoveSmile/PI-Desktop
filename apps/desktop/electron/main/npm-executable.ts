@@ -13,7 +13,17 @@ export type DependencyCommandRunner = (
   envOverrides?: Record<string, string>,
 ) => Promise<{ code: number; stderr: string; stdout?: string }>;
 
-const NPM_VALIDATION_TIMEOUT_MS = 5_000;
+/**
+ * Budget for a standalone npm/Node.js validation call, covering both probes.
+ * Process startup on a loaded machine costs seconds, and a probe that runs out
+ * of time is indistinguishable from a missing tool.
+ */
+const NPM_VALIDATION_TIMEOUT_MS = 10_000;
+/**
+ * Ceiling for both probes when the caller has a longer budget (dependency
+ * installs and the picker). Callers with a smaller budget stay bounded by it.
+ */
+export const NPM_VALIDATION_BUDGET_MS = 30_000;
 const DEPENDENCY_STDERR_KEEP_CHARS = 8192;
 const VERSION_STDOUT_MAX_CHARS = 1024;
 const SEMVER = "(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?";
@@ -137,7 +147,8 @@ export async function prepareNpmExecutable(
   npmPath?: string,
   timeoutMs = NPM_VALIDATION_TIMEOUT_MS,
 ): Promise<NpmExecutable> {
-  const deadline = Date.now() + Math.min(timeoutMs, NPM_VALIDATION_TIMEOUT_MS);
+  const budget = Math.max(1, Math.min(timeoutMs, NPM_VALIDATION_BUDGET_MS));
+  const deadline = Date.now() + budget;
   let cwd: string | undefined;
   try {
     const tool: NpmExecutable = { command: npmPath ?? "npm", args: [], env: {} };
@@ -168,9 +179,10 @@ export async function prepareNpmExecutable(
       [node, ["--version"], "Node.js"],
       [tool.command, [...tool.args, "--version"], "npm"],
     ] as const) {
-      if (Date.now() >= deadline) throw new Error("npm/Node.js validation exceeded its time budget");
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new Error("npm/Node.js validation exceeded its time budget");
       const result = await defaultDependencyRunner(
-        command, [...args], cwd, Math.max(1, deadline - Date.now()), tool.env,
+        command, [...args], cwd, Math.max(1, remaining), tool.env,
       );
       if (result.code !== 0) {
         throw new Error(`${label} --version failed (${result.code}): ${result.stderr.trim().slice(-200)}`);
@@ -192,9 +204,10 @@ export async function prepareNpmExecutable(
 /** Only call with a main-process-owned path selected through the native dialog. */
 export async function validateNpmExecutable(
   npmPath: string,
+  timeoutMs = NPM_VALIDATION_TIMEOUT_MS,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await prepareNpmExecutable(npmPath);
+    await prepareNpmExecutable(npmPath, timeoutMs);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
