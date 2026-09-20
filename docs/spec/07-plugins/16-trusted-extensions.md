@@ -212,12 +212,22 @@ never in Electron main, the renderer, or a plugin host process.
 ### 4.2 Loader
 
 - The sidecar pins `@earendil-works/pi-coding-agent` at exactly the version
-  pinned for `pi-ai` and `pi-agent-core`, as a types-only dependency. The
-  three versions must match; CI fails when they drift.
+  pinned for `pi-ai` and `pi-agent-core`. The three versions must match; CI
+  fails when they drift. Native Pi sessions run its extension loader
+  in process, so the pin is a bundled runtime dependency and not a
+  types-only contract.
 - The loader mirrors the `pi-coding-agent` discovery rules and uses
   `jiti/static` with `virtualModules`, so the babel transform is bundled
   and no path resolution happens at runtime. The bundling step is verified
   by a contract test that runs the bundle outside the repository (E2E-245).
+- The bundle is built with `--define:PI_BUNDLED_NODE=true`. The
+  `pi-coding-agent` extension loader embeds the kernel modules and
+  `typebox` for a compiled binary, for a bundled Node distribution, and
+  for its own TypeScript-source runtime; every other Node build resolves
+  them from the importing file, which a packaged install
+  (`resources/agent-runtime/`) cannot satisfy. An entry point that
+  bundles pi's session or extension loader in process needs the same
+  define.
 - Import aliases: `pi-ai`, `pi-agent-core`, and `typebox` resolve to the
   sidecar's copies; `@earendil-works/pi-coding-agent` resolves to a runtime
   shim that exports `defineTool` and the tool-result type guards. `@earendil-works/pi-tui`
