@@ -190,6 +190,37 @@ globalThis.composerPasteProbe = async () => {
     selection.addRange(range);
   };
   try {
+    // Keep the source attachment snapshot when a paste finishes in another session.
+    await reset("keep \uE010 ", 7, 7);
+    const originalReference = createFileReference("/scratch/paste-a/original.txt", "original.txt", "paste-a", { token: "\uE010", kind: "file" });
+    flushSync(() => controller.applyEditorDraft("keep \uE010 ", [originalReference], 7));
+    await new Promise(requestAnimationFrame);
+    const originalPasteFiles = api.pasteFiles;
+    let releasePaste!: () => void;
+    const responseGate = new Promise<void>((resolve) => { releasePaste = resolve; });
+    let started = false;
+    api.pasteFiles = async () => {
+      started = true;
+      await responseGate;
+      return { files: [{ path: "/scratch/paste-a/new.txt", name: "new.txt", kind: "file", mimeType: "text/plain" }] };
+    };
+    try {
+      const pendingPaste = dispatchPaste(controller.ref.current!, "", [new File(["new"], "new.txt", {type: "text/plain"})]);
+      while (!started) await new Promise(requestAnimationFrame);
+      render("paste-b");
+      await new Promise(requestAnimationFrame);
+      releasePaste();
+      await pendingPaste;
+      assert(controller.value === "", "pending paste changed the destination draft");
+      render("paste-a");
+      await new Promise(requestAnimationFrame);
+      const names = controller.fileReferences.map((r) => r.name);
+      assert(names.includes("original.txt") && names.includes("new.txt"),
+        "PENDING_PASTE_SESSION_SWITCH lost original attachment: " + JSON.stringify({ names, text: readEditorValue(controller.ref.current!), visible: controller.ref.current!.textContent }));
+    } finally {
+      releasePaste();
+      api.pasteFiles = originalPasteFiles;
+    }
     const nativeFiles = Array.from(
       (document.getElementById("native-files") as HTMLInputElement).files!,
     );
@@ -665,6 +696,7 @@ globalThis.composerPasteProbe = async () => {
       imageZoomFocusAndRecovery: true,
       nativeMultipleFiles: true,
       selectionAndSessionDrafts: true,
+      pendingPasteAcrossSessionSwitch: true,
     };
   } finally {
     flushSync(() => root.unmount());
