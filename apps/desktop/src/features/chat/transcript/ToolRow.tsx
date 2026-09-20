@@ -344,8 +344,9 @@ export const ToolRow = memo(function ToolRow({
       {variant === "topology" ? (
         <button
           className="subagent-topology-node-header"
+          data-subagent-trigger={panelSelectionId}
           aria-expanded={panelOpen}
-          aria-controls={hasDetails ? "subagent-panel" : undefined}
+          aria-controls={panelOpen ? "subagent-panel" : undefined}
           disabled={!hasDetails}
           title={[agentName || rawName, modelLabel, summary].filter(Boolean).join(" · ")}
           onClick={() => {
