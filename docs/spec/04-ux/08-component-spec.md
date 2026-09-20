@@ -2794,6 +2794,21 @@ reasoning-level control.
   token, the rest a muted token; the thumb covers the selected dot. Tick
   labels are clickable but not tab stops; the range input is the accessible
   control.
+  Hovering either a stop or its label highlights the corresponding label.
+  Only unfilled dots brighten and scale to 1.3x; filled stops and the selected
+  thumb have no hover effect. Leaving
+  the slider clears the preview without selecting or persisting a level.
+  A decorative, non-interactive thumb and the filled rail share the range's
+  gapless column geometry. The fill starts at the first dot's outer left edge
+  and ends at the selected thumb's center, covering the starting dot fully.
+  Clicks and keyboard changes move the thumb and
+  fill over `--motion-duration-normal` (200ms); a new click retargets from
+  the current visual position. Native pointer dragging bypasses transitions.
+  Only the requested levels are persisted, never interpolated animation
+  positions. Pending selection is optimistic; failure restores the confirmed
+  level, and stale completions cannot overwrite a newer choice. Reopening
+  starts directly at the current level. Reduced motion disables travel.
+  This replaces the earlier timer-driven settle pulse.
   The Model submenu has a search input and sticky provider headings, while
   the Reasoning level submenu starts with `Current model <model> supports
   these reasoning levels` and lists `omit` then the selected model binding's
@@ -2808,6 +2823,13 @@ reasoning-level control.
   to the root without dismissing the menu; slider and tick commits persist
   the last pending level while the menu stays where it is. Closing and
   reopening always starts at the root.
+- The model/reasoning trigger shrinks within its toolbar slot. Switching
+  reasoning labels, including `off`, must not move the menu horizontally when
+  the toolbar bounds are unchanged. Long model names truncate within the
+  trigger; the menu continues to follow its anchor on viewport changes.
+  This positioning trigger does not scale on pointer press: its measured
+  bounds stay stable while opening, including before the first selection
+  and after closing and reopening the menu.
 - Unknown Custom/OpenAI-compatible models remain at `off` until the user
   explicitly enables a level in Settings. The menu never auto-infers reasoning
   support; after an explicit binding selection it renders the configured level.

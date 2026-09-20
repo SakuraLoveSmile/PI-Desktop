@@ -4,11 +4,12 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { loadStyles } from "./helpers/styles.mjs";
 
-const [modelMenuSource, pickerSource] = await Promise.all([
+const [modelMenuSource, pickerSource, sliderSource] = await Promise.all([
   readComposerModule("hooks/useComposerModelMenu.ts"),
   readComposerModule("ComposerModelPicker.tsx"),
+  readComposerModule("ThinkingLevelSlider.tsx"),
 ]);
-const composerSource = `${modelMenuSource}\n${pickerSource}`;
+const composerSource = `${modelMenuSource}\n${pickerSource}\n${sliderSource}`;
 const stylesSource = await loadStyles();
 
 test("Composer uses one model × reasoning popover with a root and in-place submenus", () => {
@@ -36,20 +37,20 @@ test("the menu root carries the reasoning slider under the reasoning entry", () 
   assert.match(composerSource, /onClick=\{\(\) => showView\("thinking"\)\}[\s\S]*?className="composer-thinking-slider"/);
   assert.match(composerSource, /\{thinkingMenuLevels\.length > 1 \? \(/);
   assert.match(composerSource, /className="composer-thinking-slider"/);
-  assert.match(composerSource, /"--stop-count": thinkingMenuLevels\.length/);
+  assert.match(sliderSource, /"--stop-count": levels\.length/);
   assert.match(composerSource, /type="range"/);
   assert.match(composerSource, /className="composer-thinking-range"/);
-  assert.match(composerSource, /aria-label=\{t\("chat.reasoningLevel"\)\}/);
-  assert.match(composerSource, /aria-valuetext=\{thinkingMenuLevels\[thinkingSliderValue\] \?\? thinkingLevel\}/);
+  assert.match(sliderSource, /aria-label=\{label\}/);
+  assert.match(sliderSource, /aria-valuetext=\{levels\[index\] \?\? level\}/);
   assert.match(composerSource, /const commitThinkingLevel = /);
   assert.match(composerSource, /if \(!\(await commitThinkingLevel\(level\)\)\) return;/);
-  assert.match(composerSource, /if \(level && level !== thinkingLevel\) void commitThinkingLevel\(level\);/);
-  assert.match(composerSource, /if \(THINKING_SLIDER_KEYS\.has\(event\.key\)\) event\.stopPropagation\(\);/);
+  assert.match(pickerSource, /commit=\{commitThinkingLevel\}/);
+  assert.match(composerSource, /if \(SLIDER_KEYS\.has\(event\.key\)\) event\.stopPropagation\(\);/);
   assert.match(composerSource, /composer-thinking-tick/);
   assert.match(composerSource, /createLatestCommitQueue/);
   assert.match(composerSource, /thinkingQueueRef\.current\?\.invalidate\(\)/);
-  assert.match(pickerSource, /tabIndex=\{-1\}/);
-  assert.match(pickerSource, /className="composer-thinking-ticks" aria-hidden="true"/);
+  assert.match(sliderSource, /tabIndex=\{-1\}/);
+  assert.match(sliderSource, /className="composer-thinking-ticks" aria-hidden="true"/);
   assert.doesNotMatch(pickerSource, /composer-thinking-tick[\s\S]{0,200}role="menuitemradio"/);
   assert.match(stylesSource, /\.composer-thinking-range::-webkit-slider-runnable-track/);
   assert.match(stylesSource, /\.composer-thinking-range::-webkit-slider-thumb/);
@@ -63,9 +64,9 @@ test("the reasoning slider aligns each track dot and label to the thumb", () => 
   // keyed to --stop-count; the range input overlays the dots row at full
   // width and is inset by half a column minus the thumb radius, which moves
   // the native thumb's stops onto the same column centers for every n.
-  assert.match(pickerSource, /className="composer-thinking-rail"/);
-  assert.match(pickerSource, /className="composer-thinking-dots" aria-hidden="true"/);
-  assert.match(pickerSource, /className="composer-thinking-ticks" aria-hidden="true"/);
+  assert.match(sliderSource, /className="composer-thinking-rail"/);
+  assert.match(sliderSource, /className="composer-thinking-dots" aria-hidden="true"/);
+  assert.match(sliderSource, /className="composer-thinking-ticks" aria-hidden="true"/);
 
   // Rail, dots and labels all key off --stop-count; the dots and labels are
   // full-width grids and the input carries the inset.

@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { TFunction } from "i18next";
 import { formatTokenCount, modelIdsMatch } from "@pi-desktop/shared";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
@@ -14,25 +13,9 @@ import {
 import { TooltipButton } from "../../../components/ui";
 import { composerModelBadges } from "../../../lib/composer-models";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
+import { ThinkingLevelSlider } from "./ThinkingLevelSlider";
 
 type ModelMenuController = ReturnType<typeof useComposerModelMenu>;
-
-/**
- * Keys the native range input must own while focused. The menu root ignores
- * arrows, but stopping propagation keeps the keys unambiguous — they adjust
- * the level, never drive menu navigation — no matter where focus lands.
- */
-const THINKING_SLIDER_KEYS = new Set([
-  "ArrowLeft",
-  "ArrowRight",
-  "ArrowUp",
-  "ArrowDown",
-  "Home",
-  "End",
-  "PageUp",
-  "PageDown",
-  "Enter",
-]);
 
 export type ComposerModelPickerProps = {
   t: TFunction;
@@ -81,50 +64,6 @@ export function ComposerModelPicker({
     selectThinkingLevel,
     onMenuKeyDown,
   } = controller;
-
-  // Slider geometry: one stop per available level, with the fill carried as
-  // a CSS custom property so the accent track can follow the native input.
-  const thinkingSliderIndex = Math.max(
-    thinkingMenuLevels.findIndex((level) => level === thinkingLevel),
-    0,
-  );
-  // Local drag lead: the native input follows the pointer or arrow key
-  // immediately while the store confirmation lands, so a controlled value
-  // never snaps back mid-drag. The lead clears once the store confirms.
-  const thinkingLevelsKey = thinkingMenuLevels.join("|");
-  const [dragThinkingIndex, setDragThinkingIndex] = useState<number | null>(null);
-  // Settle pulse: only when a drag commit has just landed (the drag lead goes
-  // from set to cleared) do we mark the control settling, which lets the
-  // thumb play its overshoot pop once. Opening the menu never settles.
-  const [settling, setSettling] = useState(false);
-  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    setDragThinkingIndex(null);
-  }, [thinkingLevelsKey]);
-  useEffect(() => {
-    if (dragThinkingIndex === null) return;
-    if (thinkingMenuLevels[dragThinkingIndex] === thinkingLevel) {
-      setDragThinkingIndex(null);
-      setSettling(true);
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-      settleTimerRef.current = setTimeout(() => setSettling(false), 220);
-    }
-  }, [dragThinkingIndex, thinkingLevel, thinkingLevelsKey, thinkingMenuLevels]);
-  useEffect(
-    () => () => {
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    },
-    [],
-  );
-  const thinkingSliderValue = dragThinkingIndex ?? thinkingSliderIndex;
-  // The accent fill starts half a column in and its width is a fraction of
-  // the full rail width, so i/n reaches exactly the active stop's column
-  // center and the thumb's x. (The fill layer is the rail's ::after; its
-  // percentage is relative to the full rail width.)
-  const thinkingSliderPercent =
-    thinkingMenuLevels.length > 1
-      ? (thinkingSliderValue / thinkingMenuLevels.length) * 100
-      : 0;
 
   return (
     <AnchoredMenu
@@ -203,78 +142,13 @@ export function ComposerModelPicker({
               (issue #417): one drag adjusts the level without entering the
               submenu, while the entry itself opens the classic radio list. */}
           {thinkingMenuLevels.length > 1 ? (
-            <div
-              className="composer-thinking-slider"
-              data-dragging={dragThinkingIndex !== null ? "true" : undefined}
-              data-settling={settling ? "true" : undefined}
-              style={{ "--stop-count": thinkingMenuLevels.length } as CSSProperties}
-            >
-              {/*
-                One grid owns the geometry: the dots row and the labels row
-                share the same n columns, so the dot, the thumb and the label
-                all sit on the same column center for every stop count. The
-                range input is the accessible control and overlays the dots
-                row only, leaving the labels free to be clicked and hovered.
-
-                Motion: while a drag is in flight (data-dragging) the thumb,
-                dots and fill track the pointer with no transition so the
-                control feels direct; once the store confirms and the drag
-                lead clears, the settle transition plays (thumb pop, dot and
-                label color, fill slide). See composer-menus.css.
-              */}
-              <div className="composer-thinking-rail">
-                <div className="composer-thinking-dots" aria-hidden="true">
-                  {thinkingMenuLevels.map((level, index) => (
-                    <span
-                      key={level}
-                      className={`composer-thinking-dot ${thinkingSliderValue === index ? "active" : ""}`}
-                    />
-                  ))}
-                </div>
-                <input
-                  type="range"
-                  className="composer-thinking-range"
-                  min={0}
-                  max={thinkingMenuLevels.length - 1}
-                  step={1}
-                  value={thinkingSliderValue}
-                  aria-label={t("chat.reasoningLevel")}
-                  aria-valuetext={thinkingMenuLevels[thinkingSliderValue] ?? thinkingLevel}
-                  style={
-                    {
-                      "--composer-thinking-progress": `${thinkingSliderPercent}%`,
-                    } as CSSProperties
-                  }
-                  onChange={(event) => {
-                    const index = Number(event.target.value);
-                    setDragThinkingIndex(index);
-                    const level = thinkingMenuLevels[index];
-                    if (level && level !== thinkingLevel) void commitThinkingLevel(level);
-                  }}
-                  onKeyDown={(event) => {
-                    if (THINKING_SLIDER_KEYS.has(event.key)) event.stopPropagation();
-                  }}
-                />
-              </div>
-              <div className="composer-thinking-ticks" aria-hidden="true">
-                {thinkingMenuLevels.map((level, index) => (
-                  <button
-                    key={level}
-                    type="button"
-                    tabIndex={-1}
-                    className={`composer-thinking-tick ${thinkingSliderValue === index ? "active" : ""}`}
-                    title={level}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      setDragThinkingIndex(index);
-                      if (level !== thinkingLevel) void commitThinkingLevel(level);
-                    }}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ThinkingLevelSlider
+              key={`${selectedProviderId}:${selectedModelId}:${thinkingMenuLevels.join("|")}`}
+              levels={thinkingMenuLevels}
+              level={thinkingLevel}
+              label={t("chat.reasoningLevel")}
+              commit={commitThinkingLevel}
+            />
           ) : null}
         </div>
       ) : (
