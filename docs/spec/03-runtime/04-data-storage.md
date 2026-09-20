@@ -990,7 +990,16 @@ CREATE INDEX idx_task_runs ON task_runs(task_id, started_at DESC);
 ```
 
 A run that spawns a session gets its transcript for free via `session_id`.
-Finer schedules (cron) land in `config_json` without a migration.
+The existing JSON extension stores `schedule: {hour, minute, weekday}`,
+`nextRunAt` (epoch milliseconds) and `workspacePath` for desktop automations.
+Optional `weekdays` stores 1–7 unique integers in 0–6, overriding legacy
+`weekday` for weekly schedules. Missing `weekdays` preserves the single-day
+behavior. Invalid or empty selections are rejected before mutation. No table
+migration is needed. Daily/weekly schedules use the host local timezone; hourly
+schedules compute `nextRunAt = now + 3_600_000`, ignoring calendar fields. Absence
+of `schedule` leaves legacy tasks unarmed. No physical schema change is made.
+Task wire fields project `schedule`, RFC3339 `nextRunAt` and `workspacePath`.
+See [the automation ADR](../../adr/scheduled-desktop-automations.md).
 
 Scheduled task `config_json.mode` is a durable operating-mode value. There is
 intentionally no physical `scheduled_tasks.mode` column. The v7→v8
