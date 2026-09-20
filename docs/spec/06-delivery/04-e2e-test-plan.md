@@ -13693,6 +13693,12 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Milestone**: M6+
 - **Status**: Draft
 
+- **Local fallback regression**: Set the process default data directory to a
+  different temporary root, then create a plugin manager with its own root.
+  All bundled fallback package URLs must stay beneath the manager's root;
+  installing the bundled package must still report byte progress, validate its
+  size and checksum, and preserve cancellation behavior.
+
 #### E2E-PLUGIN-cancel-during-download-installs-nothing: Cancelling during the download stops the install, leaves nothing installed, and closes the dialog without an error
 
 - **Preconditions**: An official-channel install of a package large enough or a mirror slow enough that the download phase lasts, a way to answer `market.cancelInstall`, and a view of the plugin directory, the install cache, and the Installed list.

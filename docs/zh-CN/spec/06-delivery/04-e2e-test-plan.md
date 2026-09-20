@@ -8016,6 +8016,12 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **里程碑**：M6+
 - **状态**：草稿
 
+- **Local fallback regression**: Set the process default data directory to a
+  different temporary root, then create a plugin manager with its own root.
+  All bundled fallback package URLs must stay beneath the manager's root;
+  installing the bundled package must still report byte progress, validate its
+  size and checksum, and preserve cancellation behavior.
+
 #### E2E-PLUGIN-cancel-during-download-installs-nothing：在下载期间取消会停止安装、不留下任何已安装内容，并让对话框静默关闭
 
 - **先决条件**：一次官方渠道安装，其安装包足够大或镜像足够慢，使下载阶段持续一段时间；能够应答 `market.cancelInstall`；同时可以查看插件目录、安装缓存与已安装列表。
