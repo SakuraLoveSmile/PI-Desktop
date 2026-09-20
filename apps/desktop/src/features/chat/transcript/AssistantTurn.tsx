@@ -1,3 +1,4 @@
+import { transcriptItemKey } from "../../../lib/transcript-search-context";
 import {
   memo,
   useMemo,
@@ -328,7 +329,7 @@ export const AssistantTurn = memo(function AssistantTurn({
     part.kind === "activity" ? (
       <ActivityGroup
         embedded
-        key={`activity-${part.items[0].message.id}`}
+        key={`activity-${part.items[0].message.id}-${part.items[0].kind}${part.items[0].kind === "hostedSearch" ? `-${part.items[0].round.id}` : ""}`}
         items={part.items}
         endedAt={part.endedAt}
         isActive={part === activePart}
@@ -345,6 +346,7 @@ export const AssistantTurn = memo(function AssistantTurn({
             : ""
         }`}
         data-message-id={part.message.id}
+        data-transcript-item={transcriptItemKey(part.message.id, "message")}
         key={part.message.id}
       >
         {part.message.content ? (
@@ -370,7 +372,7 @@ export const AssistantTurn = memo(function AssistantTurn({
       <div className="message-col">
         {groupProcess ? (
           <>
-            <TurnProcess processParts={process} turnParts={entry.parts} isActive={isActive}>
+            <TurnProcess turnId={entry.id} processParts={process} turnParts={entry.parts} isActive={isActive} delegationStatuses={turnDelegationStatuses}>
               {process.map(renderPart)}
             </TurnProcess>
             {responses.map(renderPart)}
