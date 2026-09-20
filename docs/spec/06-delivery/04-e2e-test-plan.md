@@ -6512,12 +6512,16 @@ identify the platform validation still needed.
 - **Preconditions**: The app is running with a home or Agent composer and a
   durable session. The native picker can select a text file and an image outside
   the active workspace.
-- **Steps**: 1) Click the Composer `+` button; confirm it opens the native file
-  picker directly without an intermediate type-choice menu. 2) Select both
+- **Steps**: 1) Click the Composer `+` button twice in quick succession;
+  confirm that only one native file picker opens, directly without an
+  intermediate type-choice menu. 2) Select both
   fixtures. 3) Inspect the draft chips and send a prompt asking the agent to
   read the text fixture and identify the image marker. 4) Inspect the renderer
   request, session transcript, and the session scratch directory.
-- **Expected**: The native picker returns a short-lived one-shot token, never a
+- **Expected**: While the native picker or its renderer import is in flight,
+  repeated `+` clicks are ignored. While the native picker is open, the main
+  process rejects duplicate picker requests instead of opening another dialog.
+  The native picker returns a short-lived one-shot token, never a
   source absolute path, and the selections are copied into
   `<data_dir>/scratch/<sessionId>/pasted/` before they enter the draft. The app
   classifies each selected item from its MIME/extension metadata, so the same
@@ -12739,14 +12743,17 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Preconditions**: The Create project dialog opens from the Projects heading
   (no existing project is required); `git` is installed.
 - **Steps**:
-  1. Switch the source selector to Git repository.
-  2. Paste `https://github.com/octocat/Hello-World.git` and confirm the project
+  1. Open the Create project dialog and click Add folder twice quickly; confirm
+     that only one native folder picker opens, then cancel it.
+  2. Switch the source selector to Git repository.
+  3. Paste `https://github.com/octocat/Hello-World.git` and confirm the project
      name field is seeded with `Hello-World`, then type a custom name.
-  3. Choose a clone destination folder and confirm the destination row shows it.
-  4. Confirm Create and inspect the workspace, sidebar, and project archive.
-  5. Reopen the dialog, switch to Git repository, and paste a private or
+  4. Choose a clone destination folder and confirm the destination row shows it.
+  5. Confirm Create and inspect the workspace, sidebar, and project archive.
+  6. Reopen the dialog, switch to Git repository, and paste a private or
      malformed remote.
-- **Expected**: The dialog swaps the folder list for a repository URL field plus
+- **Expected**: Repeated folder-picker clicks are ignored while the native
+  picker is open. The dialog swaps the folder list for a repository URL field plus
   a clone destination row and keeps one project name field. Source options and
   fields are filled tiles without strokes; keyboard focus uses the shared
   accent-tinted ring. Create stays

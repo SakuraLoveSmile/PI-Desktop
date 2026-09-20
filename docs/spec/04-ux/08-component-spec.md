@@ -526,6 +526,8 @@ visually distinct from list content.
   Git repository as equal filled tiles without strokes (D297); the active source
   uses a deeper tile, not a selected border. A repository URL reuses the clone
   rules of ADR 0247 and its checkout becomes the primary root of the same group.
+  Repeated clicks on Add folder or the clone destination while a native folder
+  picker is open are ignored; only one project folder picker can be active.
   The dialog does not add explanatory copy for durable memory or multi-selection.
   The surface has no outer stroke, section rules, footer divider, source-option
   stroke, field stroke, or dashed picker border. The action row stays fixed
@@ -2854,6 +2856,8 @@ reasoning-level control.
   inserts an inline temporary-file token at the paste position (D197, D209,
   D262, ADR 0059, ADR 0070, ADR 0131)
 - The Composer `+` button opens one native file picker with no type-choice menu.
+  While that picker or its import is in flight, repeated clicks are ignored so
+  only one composer picker can be active at a time.
   The picker accepts regular files, and the importer classifies each selected
   item as an image or file from its MIME/extension metadata before copying it
   into the active session's scratch `pasted/` directory and adding its compact
