@@ -183,12 +183,15 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   to Off, and has no follow-the-session entry. Settings search indexes the card,
   its switch, the template row, the default-model row, and the reasoning row.
 - **Thinking display mode** uses a menu select with Detailed (default) and
-  Compact. Detailed shows reasoning, tools and intermediate text in place
-  without grouping them into a process; Compact groups that work into a
-  process, collapses completed processes, shows only an active thinking
-  indicator, and hides finished thought rows. The global preference
+  Compact. Both modes use one whole-process disclosure. Detailed starts the
+  process open, keeps reasoning visible, opens the active multi-item activity
+  group, and closes an untouched group when it completes; Compact starts the
+  process and groups closed, keeps tool/search payloads closed, shows only an
+  active thinking indicator, and hides finished reasoning. Singleton activity
+  uses its item disclosure directly in either mode. The global preference
   persists as `thinkingDisplayMode` in host-owned settings; missing values use
-  Detailed. It affects presentation only, not model reasoning configuration.
+  Detailed. It affects presentation only, not model reasoning configuration,
+  and explicit disclosure choices are retained for the mounted session pane.
   Settings search indexes the row and both mode names.
 - The **Command shell** row in Defaults uses the host-discovered catalog of native
   PowerShell 5.1, PowerShell 7, cmd, Git Bash, and Bash with IDs

@@ -2140,45 +2140,41 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`settings-responsive-layout.test.mjs`); scenario Documented
 
-#### E2E-040: Codex-style tool activity survives transcript reload
-- **Preconditions**: Provider configured; project open; a session can run a
-  successful tool and a failing or aborted tool.
-- **Steps**: 1) Run representative read, search, edit, and command tools. 2)
-  While the turn is active, inspect the latest processing group and its latest
-  tool/thinking row. 3) Confirm the group header retains its localized
-  processing label, elapsed time, and step count while live activity remains
-  in the rows or dedicated runtime indicator. 4) Wait for completion and inspect
-  the settled transcript. 5)
-  Manually expand a completed group and row, then copy its output. 6) While a
-  later turn is streaming, manually collapse its active group and verify that
-  new stream updates do not reopen it. 7) Click the vertical rule beside an
-  expanded row, then keyboard-focus and activate the processing group's
-  vertical rule. 8) Reload the session and expand the restored group.
-- **Expected**: The latest active group opens automatically so the process list
-  is visible. Compact tool-call details, including failed tool details, remain
-  collapsed. In detailed mode the last tool-call of the last activity group
-  starts expanded and earlier rows stay collapsed. The latest thinking step
-  opens automatically while it streams; older groups and rows remain collapsed.
-  The header shows its localized processing label, elapsed time, and step count
-  without an additional status capsule. When the turn settles, the automatic
-  thinking disclosure closes, while a group or row touched by the user keeps
-  its chosen state. A user-expanded tool call keeps its detail heading and
-  content aligned with the tool row rather than introducing another horizontal
-  indent; the collapse rail remains usable beside the body. Expanded calls use
-  transparent semantic activity rows with an action icon, natural-language verb,
-  monospace primary argument, and quiet disclosure. The processing group uses
-  the full assistant-column width, so a short label or payload does not shrink
-  expanded details into a content-sized chip. Each expanded-content vertical rule
-  is a pointer and keyboard-focusable collapse control for its owning disclosure.
-  Nested expansion shows output before raw input in clamped scroll regions. Live
-  partial output updates in place. Reloaded rows preserve the tool name,
-  arguments, result, and status.
+#### E2E-040: Nested tool activity survives transcript reload
+- **Preconditions**: Provider configured; project open; a turn can contain
+  progress text, multiple search/tool/thinking items, and a failed or denied tool.
+- **Steps**: 1) In Detailed, stream progress paragraph A, a multi-item search
+  segment, progress paragraph B, and a multi-item command segment. 2) Inspect the
+  open whole process and active group; manually close the active group while more
+  output arrives. 3) Complete the turn and inspect untouched versus user-owned
+  groups. 4) Open one completed group and one item, copy its output, close and
+  reopen the group, then open a sibling group independently. 5) Repeat with a
+  singleton item and with the last activity group's literal final item set to a
+  tool/search, thinking, failed tool, and denied tool. 6) Switch to Compact and
+  inspect the active-thinking, failure/recovery and completed states. 7) Remount
+  rows within the retained pane, then reload the renderer and reopen the session.
+- **Expected**: Both modes use one whole-process disclosure and keep the trailing
+  answer outside it. Detailed keeps active and completed processes open; the
+  active multi-item group opens, then closes on completion only if untouched.
+  Compact starts processes/groups and all payloads closed, hides reasoning text,
+  and keeps an untouched active process open after a failed/denied tool through
+  later recovery. A singleton has no group wrapper. Detailed auto-opens a payload
+  only when the literal final item of the last activity group is an eligible
+  tool/search; it never scans backward past thinking, and failure/denial guards
+  keep that leaf closed. Parent, child and sibling choices are independent;
+  closing/reopening a parent preserves descendants, and streaming/completion does
+  not override user-owned choices. Retained-pane remounts preserve choices;
+  renderer restart reapplies defaults while tool names, arguments, results and
+  statuses remain restored. Group/process headers show bounded running and issue
+  summaries without marking the whole turn failed.
 - **Specs linked**: `04-ux/01-ui-ia.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`
 - **Acceptance**: C (chat stream), E (tools), F (persistence)
 - **Milestone**: M3
-- **Status**: Draft
+- **Status**: Draft. For the 2026-09-20 nested-disclosure change, this scenario is
+  intended behavior for static source/design review only; no unit, component,
+  integration, browser, Electron or E2E test is added or run by that scoped task.
 
 #### E2E-041: Conversation minimap navigates long transcripts
 
@@ -13715,26 +13711,32 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 
 ### E2E-CHAT-turn-process-and-thinking-display
 
-- **Preconditions:** A turn with thinking, multiple tools, intermediate progress
-  and a final answer; detailed and compact display modes.
-- **Steps:** Stream the turn; finish it; expand/collapse its process; search an
-  intermediate message; switch display modes through Settings → AI → Defaults.
-  Repeat with a stopped partial answer, an assistant error and a failed tool.
-- **Expected:** In detailed mode, thinking, tools and intermediate text stay
-  in place with no process wrapper, and the last tool-call of the last activity
-  group starts expanded. Compact mode keeps that process collapsed
-  until expanded, with tool payloads collapsed. Manual choices survive updates; search reveals its target; live answer text
-  stays readable. Errors and stopped trailing text stay visible. Compact mode
-  exposes no reasoning text or excerpt, shows a live indicator, and leaves no
-  completed thinking-only header. Tools and progress remain accessible. Switching
-  to detailed restores reasoning from unchanged messages. Saved mode survives
-  application restart; an older settings blob without the field uses detailed.
-- **Automation:** `test:e2e:transcript` covers the mounted renderer interactions,
-  settings control and unchanged-group performance. `test:e2e:transcript-disclosure`
-  covers scroll anchoring; `test:e2e:theme-surfaces` covers the shared theme
-  controls. Isolated Host `settings.set/get` checks verify both modes across
-  process restart and preservation during unrelated partial settings writes.
-  Renderer fixtures alone do not prove settings persistence.
+- **Preconditions:** A turn with progress paragraph A, multiple searches plus
+  thinking, progress paragraph B, multiple commands plus thinking, and a final
+  answer; Detailed and Compact display modes; precise transcript search targets.
+- **Steps:** Review the nested disclosure path in Detailed, including independent
+  group/item toggles, parent close/reopen, a singleton segment, literal-final-item
+  leaf selection, failure/denial/recovery, retained-pane remounts and a precise
+  search reveal. Repeat in Compact and with permission/question/plan/goal action
+  cards, a stopped partial answer, an assistant error and delegated child work.
+- **Expected:** Both modes use one whole-process disclosure and leave the final
+  answer, assistant errors, stopped trailing text and pending actions outside it.
+  Detailed starts active/completed processes open; the active multi-item group is
+  open and an untouched group closes on completion. Compact starts processes and
+  groups closed, hides reasoning, and keeps payloads closed; an untouched active
+  process with a recorded failed/denied tool stays open through recovery and closes
+  on completion. Singletons have no group. Detailed auto-opens only an eligible
+  literal final tool/search item of the last activity group; it does not scan past
+  thinking, and failed/denied leaves stay closed. Parent/child/sibling states remain
+  independent, pane-owned user choices survive updates, mode changes and remounts,
+  and renderer restart reapplies defaults. Search opens only the precise process ->
+  group -> item or Task-panel path once per request; Compact reasoning requires an
+  explicit switch to Detailed. Saved mode survives restart and a missing/unknown
+  setting resolves to Detailed.
+- **Validation scope for the 2026-09-20 change:** Intended behavior for static
+  source/design review only. The scoped task adds or runs no unit, component,
+  integration, runtime, browser, Electron or E2E tests; existing automation names
+  elsewhere in this plan are prior inventory, not evidence that this change ran.
 - **Specs:** 04-ux/06-settings-ia, 04-ux/08-component-spec,
   04-ux/09-interaction-patterns; ADR turn-process-and-thinking-display.
 
