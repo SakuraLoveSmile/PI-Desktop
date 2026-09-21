@@ -1558,7 +1558,8 @@ storage but compose into one assistant turn until the next user message.
   Loading and failure states must not masquerade as an empty result.
 - Keep page, settings, and command results available. Arrow keys and Enter
   navigate session headings, snippets, Load more, and the existing result
-  types. IME composition Enter must not activate a result.
+  types. IME composition Enter must not activate a result; Escape during
+  composition must not close search, including events bubbling from its input.
 
 ### 7.6 MVP constraints
 
@@ -1742,7 +1743,8 @@ Single message render — either user (plaintext) or assistant (markdown streami
   composer lift would be cut off at the plate edges (D297: in-flow surfaces
   use tone, not stroke). Focus paints an inset 2px accent ring. The textarea
   is unboxed inside that plate; localized Retry and Cancel sit in a 28px footer
-  (Escape cancels, Cmd/Ctrl+Enter retries; slash turns seed the typed
+  (Escape cancels, Cmd/Ctrl+Enter retries; both shortcuts are ignored during
+  IME composition, preserving the draft; slash turns seed the typed
   `command` form so retrying re-expands the template). Opening it widens the
   user column to the assistant reading width and hides the action toolbar.
   Retry runs the Regenerate path with the current text in the same session,
