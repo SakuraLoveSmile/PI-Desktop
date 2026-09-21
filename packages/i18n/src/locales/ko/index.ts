@@ -559,6 +559,19 @@ export const ko = {
     dismiss: "닫기",
   },
   settings: {
+    "imageModel": "이미지 생성 모델",
+    "imageModelUnset": "설정되지 않음",
+    "imageModelUnavailable": "이 이미지 모델을 사용할 수 없습니다. 다른 모델을 선택하세요.",
+    "imageModelSaveFailed": "이미지 모델을 저장할 수 없습니다.",
+    "clearImageModel": "지우기",
+    "setImageModel": "이미지 모델로 설정",
+    "imageModelSelected": "선택된 이미지 모델",
+    "generatedImage": "생성된 이미지 {{index}}",
+    "imagePreviewUnavailable": "미리보기 불가; 파일 열기",
+    "imageGenerationFailed": "이미지 {{index}} 생성이 완료되지 않았습니다.",
+    "imageModelSetupHint": "설정 → AI에서 이미지 모델을 설정하세요.",
+    "configureImageModel": "이미지 모델 설정",
+
 
 sklm: {
       browse: "마켓",

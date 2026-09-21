@@ -37,6 +37,7 @@ import {
   displayedDefaultModelId,
 } from "./default-model";
 import { copyProviderConfiguration, type ProviderCopyDraft } from "./provider-copy";
+import { ImageGenerationModelRow } from "./ImageGenerationModelRow";
 import { ProviderSetupDialog } from "./ProviderSetupDialog";
 import { useProviderReorder } from "./useProviderReorder";
 import { VendorAccountsSection } from "./VendorAccountsSection";
@@ -161,10 +162,14 @@ export function ModelConfigPage() {
   /**
    * Preserve the selected app default unless it was removed from the provider.
    */
-  const afterSaved = async (saved: ProviderPublic, models: ModelBinding[]) => {
+  const afterSaved = async (saved: ProviderPublic, models: ModelBinding[], imageModelId?: string) => {
     const firstModelId = models[0]?.id;
     try {
-      if (copyDraft) {
+      if (imageModelId) {
+        await api.setSettings({ ...(await api.getSettings()), imageGeneration: { providerId: saved.id, modelId: imageModelId } });
+        useAppStore.setState({ settings: await api.getSettings() });
+        showToast(t("settings.providerSaved"), { variant: "success" });
+      } else if (copyDraft) {
         showToast(t("settings.providerSaved"), { variant: "success" });
       } else if (!editingProvider) {
         await api.setSettings({
@@ -420,6 +425,8 @@ export function ModelConfigPage() {
           </div>
         </div>
       </section>
+
+      <ImageGenerationModelRow settings={settings} providers={providers} />
 
       <section className="settings-card-block">
         <div className="model-config-section-head">
@@ -722,7 +729,8 @@ export function ModelConfigPage() {
           provider={editingProvider}
           initialDraft={copyDraft}
           onClose={() => { setSetupFor(null); setCopyDraft(null); }}
-          onSaved={(saved, models) => void afterSaved(saved, models)}
+          imageModelId={settings.imageGeneration?.providerId === editingProvider?.id ? settings.imageGeneration?.modelId : undefined}
+          onSaved={afterSaved}
         />
       ) : null}
     </div>

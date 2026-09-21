@@ -550,6 +550,19 @@ export const de = {
     "dismiss": "Verwerfen"
   },
   "settings": {
+    "imageModel": "Bildgenerierungsmodell",
+    "imageModelUnset": "Nicht konfiguriert",
+    "imageModelUnavailable": "Dieses Bildmodell ist nicht verfügbar. Wählen Sie ein anderes.",
+    "imageModelSaveFailed": "Bildmodell konnte nicht gespeichert werden.",
+    "clearImageModel": "Löschen",
+    "setImageModel": "Als Bildmodell festlegen",
+    "imageModelSelected": "Ausgewähltes Bildmodell",
+    "generatedImage": "Generiertes Bild {{index}}",
+    "imagePreviewUnavailable": "Vorschau nicht verfügbar; Datei öffnen",
+    "imageGenerationFailed": "Bild {{index}} wurde nicht fertiggestellt.",
+    "imageModelSetupHint": "Konfigurieren Sie ein Bildmodell unter Einstellungen → AI.",
+    "configureImageModel": "Bildmodell konfigurieren",
+
 
 sklm: {
       browse: "Markt",

@@ -550,6 +550,19 @@ export const es = {
     "dismiss": "Descartar"
   },
   "settings": {
+    "imageModel": "Modelo de imágenes",
+    "imageModelUnset": "Sin configurar",
+    "imageModelUnavailable": "Este modelo no está disponible. Elige otro.",
+    "imageModelSaveFailed": "No se pudo guardar el modelo.",
+    "clearImageModel": "Borrar",
+    "setImageModel": "Usar para generar imágenes",
+    "imageModelSelected": "Modelo de imágenes seleccionado",
+    "generatedImage": "Imagen generada {{index}}",
+    "imagePreviewUnavailable": "Vista previa no disponible; abrir archivo",
+    "imageGenerationFailed": "La imagen {{index}} no se completó.",
+    "imageModelSetupHint": "Configura un modelo de imágenes en Ajustes → AI.",
+    "configureImageModel": "Configurar modelo de imágenes",
+
 
 sklm: {
       browse: "Mercado",

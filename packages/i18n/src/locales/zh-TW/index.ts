@@ -554,6 +554,19 @@ export const zhTW = {
     dismiss: "關閉",
   },
   settings: {
+    imageModel: "生圖模型",
+    imageModelUnset: "未設定",
+    imageModelUnavailable: "目前生圖模型無法使用，請選擇其他模型。",
+    imageModelSaveFailed: "無法儲存生圖模型。",
+    clearImageModel: "清除",
+    setImageModel: "設為生圖模型",
+    imageModelSelected: "已設為生圖模型",
+    generatedImage: "生成圖片 {{index}}",
+    imagePreviewUnavailable: "無法預覽，開啟檔案",
+    imageGenerationFailed: "圖片 {{index}} 未完成。",
+    imageModelSetupHint: "請前往 設定 → AI → 生圖模型 完成設定。",
+    configureImageModel: "設定生圖模型",
+
 
 sklm: {
       browse: "市場",

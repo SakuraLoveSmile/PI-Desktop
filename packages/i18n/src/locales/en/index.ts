@@ -557,6 +557,19 @@ export const en = {
     dismiss: "Dismiss",
   },
   settings: {
+    imageModel: "Image generation model",
+    imageModelUnset: "Not configured",
+    imageModelUnavailable: "This image model is unavailable. Choose another model.",
+    imageModelSaveFailed: "Could not save the image model.",
+    clearImageModel: "Clear",
+    setImageModel: "Set as image model",
+    imageModelSelected: "Selected image model",
+    generatedImage: "Generated image {{index}}",
+    imagePreviewUnavailable: "Preview unavailable; open file",
+    imageGenerationFailed: "Image {{index}} did not complete.",
+    imageModelSetupHint: "Configure an image model in Settings → AI before generating images.",
+    configureImageModel: "Configure image model",
+
 
 sklm: {
       browse: "Market",

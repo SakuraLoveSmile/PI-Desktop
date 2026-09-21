@@ -559,6 +559,19 @@ export const tr = {
     dismiss: "Kapat",
   },
   settings: {
+    "imageModel": "Görsel oluşturma modeli",
+    "imageModelUnset": "Yapılandırılmadı",
+    "imageModelUnavailable": "Bu görsel modeli kullanılamıyor. Başka bir model seçin.",
+    "imageModelSaveFailed": "Görsel modeli kaydedilemedi.",
+    "clearImageModel": "Temizle",
+    "setImageModel": "Görsel modeli olarak ayarla",
+    "imageModelSelected": "Seçili görsel modeli",
+    "generatedImage": "Oluşturulan görsel {{index}}",
+    "imagePreviewUnavailable": "Önizleme yok; dosyayı aç",
+    "imageGenerationFailed": "Görsel {{index}} tamamlanmadı.",
+    "imageModelSetupHint": "Ayarlar → AI bölümünde bir görsel modeli yapılandırın.",
+    "configureImageModel": "Görsel modelini yapılandır",
+
 
 sklm: {
       browse: "Market",
