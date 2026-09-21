@@ -443,6 +443,11 @@ CREATE INDEX idx_session_import_origins_plugin
   消息。 Assistant Edit 使用该子项并记录 original/edited
   子级现有 `message_revisions` 存储中的响应尾部；来源
   抄本和源版本的修订永远不会被重写。
+- 分支将已有且被引用的 `scratch/<sourceId>/pasted/` 文件复制到
+  `scratch/<childId>/pasted/`，在建立索引前更新消息和检查点中的路径。
+  删除原任务不会删除子任务的副本。未引用文件、截断点之后独有的输入和其他
+  scratch 输出不复制；已过期的文件仍不可用，不新增跨任务读取授权。
+  分支失败时清理已复制的输入及子任务转录本。
 
 ### 4.6 turns — 每次 agent 运行一行
 
