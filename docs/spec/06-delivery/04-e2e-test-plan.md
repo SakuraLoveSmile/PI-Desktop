@@ -13756,7 +13756,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   re-enable it. 6) Uninstall the plugin; reinstall and enable it, then remove
   the declaration from its manifest and reload. 7) Load a manifest that
   declares providers without `provider.register`. 8) Load a manifest that
-  declares an `oauth` block and `authKind: "oauth"`.
+  declares an `oauth` block and `authKind: "oauth"`. 9) Load manifests whose
+  model uses a non-array `thinkingLevels`, a non-string entry, or a non-string
+  `defaultThinkingLevel`.
 - **Expected**: Step 1 shows one row in the native provider list with
   `ownerPluginId` set to the plugin and the row id
   `plugin:<pluginId>:<declaredId>`. Its model binding contains the normalized
@@ -13773,6 +13775,8 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   8 fail manifest validation as `PLUGIN_INVALID` — the missing-permission
   message and `plugin OAuth providers are not supported in this release` /
   `unsupported authKind oauth` — and neither failure changes plugin enablement.
+  Step 9 rejects each malformed thinking-level field with `PLUGIN_INVALID` and
+  leaves plugin enablement unchanged.
 - **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4, §5.4, §7;
   `07-plugins/13-plugin-permissions-matrix.md`; `03-runtime/04-data-storage.md`
   §4.3, §7; `03-runtime/11-provider-model-system.md` §6.2;

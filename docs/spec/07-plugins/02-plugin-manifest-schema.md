@@ -304,6 +304,9 @@ names, removes duplicates, and preserves the remaining declaration order. An
 absent or unusable list becomes an empty binding. `defaultThinkingLevel` is kept
 only when it names a normalized level in that model's list; otherwise it is
 dropped and normal binding normalization selects the first available level.
+Manifest validation rejects a non-array `thinkingLevels`, any non-string entry, or
+an explicitly non-string `defaultThinkingLevel`; unknown string names are
+accepted and dropped during normalization.
 
 ## 5. permissions enum
 
