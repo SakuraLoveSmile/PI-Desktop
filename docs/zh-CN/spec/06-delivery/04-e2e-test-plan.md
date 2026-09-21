@@ -8469,6 +8469,12 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **覆盖**：`chat-links.test.mjs`；桌面端通过正常浏览器目标实际点击验证。
 - **链接规格**：`04-ux/08-component-spec.md` §8.3。
 
+#### E2E-IME-escape: 取消组词保留草稿
+
+- **步骤**：编辑用户消息并输入草稿，派发组词中的 Escape 和 Cmd/Ctrl+Enter；打开全局搜索，从输入框派发组词中的 Escape。对 legacy keyCode 229 重复检查，再验证普通 Escape 和重试快捷键。
+- **预期**：组词事件不会丢弃编辑、关闭搜索或重试发送；普通 Escape 仍取消或关闭（包括搜索输入框之外的焦点），普通 Cmd/Ctrl+Enter 仍重试。
+- **覆盖**：`node scripts/e2e-ime-escape.mjs` 使用真实组件、冒泡 DOM 键盘事件及宿主边界测试数据；不代表已验证操作系统输入法候选窗口。
+
 ### E2E-SCHEDULED-manual-to-hourly
 
 - **Preconditions:** Built host candidate, isolated data directory, no provider.

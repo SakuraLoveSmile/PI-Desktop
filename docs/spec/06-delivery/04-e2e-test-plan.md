@@ -14326,6 +14326,12 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Coverage**: `chat-links.test.mjs`; native desktop click-through with the normal browser destination.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3.
 
+#### E2E-IME-escape: Composition cancellation preserves drafts
+
+- **Steps**: Edit a user message; type a draft; dispatch composing Escape and Cmd/Ctrl+Enter. Open global search and dispatch composing Escape from its input. Repeat with legacy keyCode 229, then ordinary Escape and retry shortcuts.
+- **Expected**: Composition events neither discard the edit nor close search nor submit a retry. Ordinary Escape still cancels/closes, including search focus outside its input; ordinary Cmd/Ctrl+Enter still retries.
+- **Coverage**: `node scripts/e2e-ime-escape.mjs` exercises production components with bubbling DOM keyboard events and host-boundary fixtures. This does not verify an operating system IME candidate window.
+
 ### E2E-SCHEDULED-manual-to-hourly
 
 - **Preconditions:** Built host candidate, isolated data directory, no provider.
