@@ -5761,12 +5761,17 @@ that was sitting at the bottom — including after the turn had finished.
   On a `proxied` route `isAcceptableResolvedAddress` tolerates only the
   resolver-artifact class (`benchmark`); every real internal class and an
   unanswered resolver still refuse. A `direct` route keeps the pre-change
-  semantics byte for byte, a `DIRECT` entry anywhere in the list is read as
+  semantics by default; an explicit `allowFakeIp` setting may permit only the
+  benchmark placeholder. A `DIRECT` entry anywhere in the list is read as
   `unknown` because Chromium may fall back to it, and `unknown` stays strict.
 - Refusals and the market's `failureDetails` now carry `route`, so a fake-IP
   refusal on a direct route reads apart from one on an unreadable route.
-- The MCP market keeps its pinned Node HTTPS guard (ADR 0245) and is unchanged;
-  a fake-IP environment still refuses its sources.
+- The MCP market now asks the Electron session for its route per hop: fully
+  proxied hops use `net.fetch` so fake-IP sources can reach the configured proxy,
+  while direct and unknown hops retain the pinned Node HTTPS guard and strict
+  public-address rule by default. The explicit `allowFakeIp` setting permits
+  only benchmark placeholders for transparent router/TUN deployments; real
+  private answers remain refused. See ADR 0245.
 - See ADR 0272, `05-security/01-security.md` §4.1,
   `03-runtime/09-logging-and-observability.md`, and
   `06-delivery/04-e2e-test-plan.md` E2E-SKILL-MARKET-NET-BOUNDARY.
