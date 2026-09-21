@@ -8537,3 +8537,16 @@ the latest destination. These assertions measure work counts, not device FPS.
   `providers::tests::a_stored_array_survives_an_entry_that_lost_a_field`）；
   宿主 RPC 路径由 `scripts/e2e-smoke.mjs` 覆盖提供商的创建与列举，但没有套件
   驱动手工编辑的 `config_json`。
+
+### E2E-SESSION-temporary-attachment-fork：临时任务预览与独立分支附件
+
+- **步骤**：在没有项目的任务中粘贴超过长文本阈值的内容并发送，点击对话中的附件。
+  返回后创建分支并打开同一附件；删除原任务，再打开分支附件，并继续创建分支。
+- **预期**：每次预览均显示原始文件内容；各分支引用自身的 scratch 输入目录，
+  不需要打开项目，也不授予跨任务读取权限。按消息截断的分支不复制后续消息独有
+  或未引用的输入文件。
+- **自动化**：`scripts/e2e-composer-paste.mjs` 覆盖长文本保存、真实 Electron
+  文件读取、临时任务预览及返回。主机测试
+  `fork_preserves_referenced_pasted_files_independently` 和 `sessions::fork_files`
+  覆盖附件归属、删除、重复与截断分支、保留的压缩检查点引用、过期输入、失败回滚
+  及符号链接拒绝。
