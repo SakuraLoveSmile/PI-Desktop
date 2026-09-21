@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   AppSettings,
@@ -95,6 +95,13 @@ export function SettingsPage() {
   const [settingsRecoveryFailed, setSettingsRecoveryFailed] = useState(false);
   const [extensions, setExtensions] = useState<PluginScenicThemesDestinationMeta[]>([]);
   const [activeExtension, setActiveExtension] = useState<PluginScenicThemesDestinationMeta | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const destination = activeExtension ? `extension:${activeExtension.ref}` : `builtin:${tab}`;
+
+  useLayoutEffect(() => {
+    // Reset before paint and before the search-anchor effect positions its row.
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [destination]);
 
   useEffect(() => {
     const refresh = () => void api.listPluginScenicThemesDestinations().then(setExtensions, () => setExtensions([]));
@@ -335,7 +342,7 @@ export function SettingsPage() {
         </div>
       </aside>
 
-      <div className="settings-content">
+      <div className="settings-content" ref={contentRef}>
         <div className="settings-content-inner">
           <div className="settings-content-enter">
           <h1 className="settings-section-title">
