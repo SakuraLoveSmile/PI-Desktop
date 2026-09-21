@@ -322,7 +322,8 @@ Node sidecar 将提供商 SDK 错误映射到：
 上限为 8 秒，在其他情况下依次等待 1 秒、2 秒、4 秒，然后是 8 秒。只有失败
 的请求会被重放；会话及其工具状态保持不变。来自格式错误的 400/422 请求的
 不可重试 `PROVIDER_ERROR` 永远不会进入任何预算。预算耗尽后的失败仍然是
-致命的。
+致命的。设置 `infiniteProviderRetry` 默认关闭；开启后只移除上述可重试网络/瞬时类别的次数上限，
+不会改变退避、`Retry-After`、取消或终止分类，并可能在用户停止回合前持续消耗 API 用量。
 
 `NETWORK_ERROR` 以有界的 `details` 携带真正失败的传输层：
 `networkCategory`（`dns`、`tls`、`timeout`、`refused`、`unreachable`、

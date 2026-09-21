@@ -37,6 +37,7 @@ const enEntries: ChangelogEntry[] = [
       "Keep the selected default model when editing providers, and fall back safely when it is removed.",
       "Make nested thinking and tool activity disclosures easier to read, navigate, and recover.",
       "Improve Composer layouts, reasoning controls, and theme consistency across the workspace.",
+      "Add an opt-in Settings switch to keep retrying network and transient provider failures until they succeed.",
     ],
   },
 
@@ -831,6 +832,7 @@ const zhCNEntries: ChangelogEntry[] = [
       "编辑提供商时保留已选的默认模型；模型被移除后安全回退。",
       "优化嵌套思考和工具活动的展开收起，更易阅读、导航和恢复。",
       "改进 Composer 布局、推理强度控制和工作区主题一致性。",
+      "设置里新增可选的无尽重试：网络或临时服务故障会一直重试到成功。",
     ],
   },
 
@@ -1625,6 +1627,7 @@ const zhTWEntries: ChangelogEntry[] = [
       "編輯提供商時保留已選的預設模型；模型被移除後安全回退。",
       "優化巢狀思考和工具活動的展開收合，更易閱讀、導覽和恢復。",
       "改進 Composer 版面、推理強度控制和工作區主題一致性。",
+      "設定裡新增可選的無盡重試：網路或暫時性服務故障會持續重試到成功。",
     ],
   },
 

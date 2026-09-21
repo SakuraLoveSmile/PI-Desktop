@@ -2111,10 +2111,21 @@ fn an_install_reports_progress_and_honours_a_cancel() {
 
     with_local_market(|| {
         let dir = tempdir().unwrap();
+        // The manager's directory owns its packages, even when another host
+        // or test changes the process-wide default directory.
+        let other = tempdir().unwrap();
         unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            std::env::set_var("PI_DESKTOP_DATA_DIR", other.path());
         }
         let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
+        let catalog: MarketCatalogFile =
+            serde_json::from_str(&fs::read_to_string(mgr.catalog_path()).unwrap()).unwrap();
+        for plugin in &catalog.plugins {
+            for version in &plugin.versions {
+                let local = version.url.strip_prefix("file://").unwrap();
+                assert!(Path::new(local).starts_with(dir.path()));
+            }
+        }
 
         let mut log = InstallLog::default();
         let installed = mgr

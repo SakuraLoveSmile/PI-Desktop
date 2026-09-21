@@ -954,6 +954,8 @@ sklm: {
     "noResults": "No hay configuraciones coincidentes",
     "enterToSend": "Ingresar para enviar",
     "enterToSendDesc": "Desactivado: presione ⌘/Ctrl+Entrar para enviar.",
+    "infiniteProviderRetry": "Reintentar hasta tener éxito",
+    "infiniteProviderRetryDesc": "Reintenta los errores de red y temporales hasta que la solicitud tenga éxito. Puedes detener el turno; el uso de la API puede continuar.",
     "linkOpenTarget": "Destino al abrir enlaces",
     "linkOpenTargetWorkpanel": "Navegador del panel de trabajo",
     "linkOpenTargetExternal": "Navegador predeterminado del sistema",

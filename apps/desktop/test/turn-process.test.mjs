@@ -177,6 +177,12 @@ test("settings writes validate the mode without changing other preferences", asy
     onboardingDismissed: false,
   };
   assert.equal(validateSettingsWrite(settings), settings);
+  const infiniteSettings = { ...settings, infiniteProviderRetry: true };
+  assert.equal(validateSettingsWrite(infiniteSettings), infiniteSettings);
+  assert.throws(
+    () => validateSettingsWrite({ ...settings, infiniteProviderRetry: "yes" }),
+    /infiniteProviderRetry is invalid/,
+  );
   for (const thinkingDisplayMode of ["detailed", "compact"]) {
     const next = { ...settings, thinkingDisplayMode };
     assert.equal(validateSettingsWrite(next), next);
