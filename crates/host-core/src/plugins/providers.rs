@@ -96,7 +96,10 @@ fn declared_thinking_levels(model: &serde_json::Map<String, Value>) -> Vec<Strin
 /// value that matches nothing would silently fall back to the first entry while
 /// the row claimed otherwise.
 fn declared_default_thinking_level(model: &serde_json::Map<String, Value>) -> Option<String> {
-    let named = model.get("defaultThinkingLevel").and_then(Value::as_str)?.trim();
+    let named = model
+        .get("defaultThinkingLevel")
+        .and_then(Value::as_str)?
+        .trim();
     if named.is_empty() {
         return None;
     }

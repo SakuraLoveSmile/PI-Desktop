@@ -607,7 +607,10 @@ fn manifest_with_thinking_levels() -> PluginManifest {
 fn declared_thinking_levels_survive_into_the_row() {
     let (_dir, db, secrets) = test_context();
     let declared = declared_providers(&manifest_with_thinking_levels());
-    assert_eq!(declared[0].models[0].thinking_levels, ["off", "low", "high"]);
+    assert_eq!(
+        declared[0].models[0].thinking_levels,
+        ["off", "low", "high"]
+    );
     assert_eq!(
         declared[0].models[0].default_thinking_level.as_deref(),
         Some("high")
@@ -645,7 +648,10 @@ fn a_default_outside_the_declared_list_is_dropped() {
     value["contributes"]["providers"][0]["models"][0]["defaultThinkingLevel"] = json!("max");
     let manifest: PluginManifest = serde_json::from_value(value).unwrap();
     let declared = declared_providers(&manifest);
-    assert_eq!(declared[0].models[0].thinking_levels, ["off", "low", "high"]);
+    assert_eq!(
+        declared[0].models[0].thinking_levels,
+        ["off", "low", "high"]
+    );
     assert!(declared[0].models[0].default_thinking_level.is_none());
 }
 
