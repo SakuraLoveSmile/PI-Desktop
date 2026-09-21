@@ -1,5 +1,15 @@
+import { modelIdsMatch } from "./types/models.js";
+
 /** A single host-owned binding, independent of the default conversation model. */
 export type ImageGenerationBinding = { providerId: string; modelId: string };
+export function isImageGenerationModel(
+  binding: ImageGenerationBinding | null | undefined,
+  providerId: string | undefined,
+  modelId: string | undefined,
+): boolean {
+  return !!binding && binding.providerId === providerId && !!modelId &&
+    modelIdsMatch(binding.modelId, modelId);
+}
 export const MAX_GENERATED_IMAGES = 10;
 export const IMAGE_GENERATION_TIMEOUT_MS = 180_000;
 export const IMAGE_BATCH_TIMEOUT_MS = 950_000;

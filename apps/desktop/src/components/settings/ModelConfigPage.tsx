@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   OAUTH_AUTH_KIND,
+  isImageGenerationModel,
   modelIdsMatch,
   type ModelBinding,
   type ProviderPublic,
@@ -32,7 +33,6 @@ import {
 } from "../icons";
 import { AnchoredMenu } from "./AnchoredMenu";
 import {
-  defaultModelIdOf,
   defaultModelOptions,
   displayedDefaultModelId,
 } from "./default-model";
@@ -111,7 +111,7 @@ export function ModelConfigPage() {
 
   const providerReady = (provider: ProviderPublic) =>
     provider.enabled &&
-    !!defaultModelIdOf(provider) &&
+    defaultModelOptions([provider], settings?.imageGeneration).length > 0 &&
     (provider.hasSecret || provider.hasOauth || provider.authKind === "none");
 
   const aiProviders = useMemo(
@@ -120,7 +120,7 @@ export function ModelConfigPage() {
   );
   const reorder = useProviderReorder(aiProviders, busyId !== null || testingId !== null || setupFor !== null);
   const readyProviders = providers.filter(providerReady);
-  const defaultModelOptionsList = defaultModelOptions(readyProviders);
+  const defaultModelOptionsList = defaultModelOptions(readyProviders, settings?.imageGeneration);
   const visibleDefaultModelOptions = useMemo(() => {
     const query = defaultModelQuery.trim().toLowerCase();
     if (!query) return defaultModelOptionsList;
@@ -136,10 +136,13 @@ export function ModelConfigPage() {
     providers.find((provider) => provider.id === settings.defaultProviderId) ?? null;
   const editingProvider =
     setupFor ? providers.find((provider) => provider.id === setupFor) ?? null : null;
-  const defaultProviderReady = defaultProvider !== null && providerReady(defaultProvider);
+  const defaultProviderReady = defaultProvider !== null && providerReady(defaultProvider) &&
+    !isImageGenerationModel(settings.imageGeneration, defaultProvider.id,
+      displayedDefaultModelId(defaultProvider, settings.defaultModelId));
 
 
   const setDefaultModel = async (provider: ProviderPublic, modelId: string) => {
+    if (isImageGenerationModel(useAppStore.getState().settings?.imageGeneration, provider.id, modelId)) return;
     setBusyId(provider.id);
     try {
       await api.setSettings({
@@ -525,7 +528,7 @@ export function ModelConfigPage() {
                           variant="ghost"
                           disabled={rowBusy || !providerReady(provider)}
                           onClick={() =>
-                            void setDefaultModel(provider, defaultModelIdOf(provider) ?? "")
+                            void setDefaultModel(provider, defaultModelOptions([provider], settings.imageGeneration)[0]?.modelId ?? "")
                           }
                         >
                           {t("settings.makeDefault")}

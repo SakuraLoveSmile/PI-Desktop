@@ -16,6 +16,11 @@ read-only summary with the same provider/model typography and a 12px row gap.
 It has no Change or Clear actions; replacement uses the provider's Advanced
 settings. Missing, disabled, credential-less or removed bindings display only
 **Currently unavailable**. OAuth accounts are not eligible; there is no fallback.
+The selected provider/model pair is excluded from the default conversation picker,
+provider quick-default action, and Composer model menu. Other providers with the
+same model ID remain independent. Existing conversation bindings and history are
+preserved; a conversation still pinned to the image binding must select a chat
+model before sending. Runtime launch also rejects that binding before inference.
 
 ## Agent contract
 

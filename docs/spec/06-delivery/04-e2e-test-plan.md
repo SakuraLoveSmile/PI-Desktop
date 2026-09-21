@@ -24,6 +24,9 @@
   provider's image model in Advanced and save; the summary changes while the
   chat default stays unchanged. Missing/disabled bindings show only Currently
   unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
+- **Conversation selection:** The selected image provider/model is absent from
+  default and Composer candidates. Other providers retain same-ID models. An
+  existing session pinned to the image binding is rejected before inference.
 - **Status:** Automated in `node scripts/e2e-image-chat.mjs`; optional screenshots
   use `PI_IMAGE_CHAT_EVIDENCE_DIR`. The images are deterministic raster fixtures,
   not evidence of real-model quality or provider compatibility.

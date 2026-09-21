@@ -173,6 +173,14 @@ try {
   await screenshot("settings.png");
   assert.ok(gap>=11 && gap<=13, `defaults gap ${gap}px`);
   await click("返回应用");
+  await evaluate(`document.querySelector('.composer-model-thinking-chip').click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('.composer-menu-entry')`),5000,"composer model root");
+  await evaluate(`document.querySelector('.composer-menu-entry').click()`);
+  await waitFor(() => evaluate(`document.querySelectorAll('.composer-model-option').length>0`),5000,"composer model options");
+  assert.equal(await evaluate(`document.querySelectorAll('.composer-model-option').length`),1,"image-only provider must not be a chat candidate");
+  assert.ok(await evaluate(`![...document.querySelectorAll('.composer-model-group-label')].some(e=>e.textContent.includes('Image-only fixture'))`));
+  await key("Escape",27);
+  await key("Escape",27);
   const prompt = async (content) => {
     await waitFor(() => evaluate(`!!document.querySelector('.composer-input[contenteditable="true"]')`),10000,"composer ready");
     await evaluate(`document.querySelector('.composer-input').focus()`);
@@ -210,7 +218,7 @@ try {
   await waitFor(() => evaluate(`!!document.querySelector('.model-default-row')`),10000,"setup action opens model settings");
   assert.equal(model.imageRequests.length,3,"unconfigured generation makes no image request");
   assert.deepEqual(model.failures,[]);
-  console.log(JSON.stringify({ok:true,gap,scenarios:["settings-spacing","composer-batch-generation","composer-edit-generated-image","collapsed-previews","unconfigured-setup-navigation"],imageRequests:model.imageRequests,evidence}));
+  console.log(JSON.stringify({ok:true,gap,scenarios:["image-excluded-from-composer","settings-spacing","composer-batch-generation","composer-edit-generated-image","collapsed-previews","unconfigured-setup-navigation"],imageRequests:model.imageRequests,evidence}));
 } catch (error) {
   console.error("MODEL_FIXTURE_ERRORS",JSON.stringify(model.failures));
   console.error(output.slice(-4000));

@@ -148,6 +148,12 @@ globalThis.imageGenerationProbe = async () => {
         "saved image model missing",
       );
       assert(settings.defaultModelId === "chat-model", "image model changed default chat model");
+      click(container.querySelector<HTMLButtonElement>(".model-default-trigger"));
+      await until(() => !!document.querySelector(".model-default-list"), "default picker missing");
+      assert(!document.querySelector('[aria-label="Images · image-one"]'), "image binding leaked into chat defaults");
+      assert(document.querySelector('[aria-label="Images · image-two"]'), "other configured chat model disappeared");
+      assert(document.querySelector('[aria-label="Images B · image-one"]'), "same model on another provider disappeared");
+      click(container.querySelector<HTMLButtonElement>(".model-default-trigger"));
       const row = [...container.querySelectorAll<HTMLElement>(".settings-row")].find((element) =>
         element.textContent?.includes(i18n.t("settings.imageModel")),
       )!;
@@ -233,6 +239,7 @@ globalThis.imageGenerationProbe = async () => {
         "read-only-summary-typography",
         "unavailable-summary",
         "chat-default-preserved",
+        "image-excluded-from-chat-defaults",
         "image-preview-partial-failure",
         "setup-navigation",
         "absolute-image-markdown",
