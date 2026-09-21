@@ -23,17 +23,7 @@ import { useProviderModels } from "./useProviderModels";
 import { ModelSelectionPanes, useModelSelection } from "./ModelSelectionPanes";
 import { CUSTOM_SERVICE, ServicePicker } from "./ServicePicker";
 import type { ProviderCopyDraft } from "./provider-copy";
-import { CUSTOM_PROVIDER_API_STYLES, isAccountOnlyApiStyle, needsCustomApiStyleChoice, providerSetupPreset } from "./provider-api-style";
-
-const API_STYLE_LABEL_KEYS: Record<CatalogApiStyle, string> = {
-  chat_completions: "settings.apiStyleChatCompletions",
-  responses: "settings.apiStyleResponses",
-  anthropic_messages: "settings.apiStyleAnthropic",
-  google_generative_ai: "settings.apiStyleGoogle",
-  openai_codex_responses: "settings.apiStyleCodexResponses",
-  pi_messages: "settings.apiStylePiMessages",
-  opencode_go: "settings.apiStyleOpenCodeGo",
-};
+import { API_STYLE_LABEL_KEYS, CUSTOM_PROVIDER_API_STYLES, isAccountOnlyApiStyle, needsCustomApiStyleChoice, providerSetupPreset } from "./provider-api-style";
 
 type BaseUrlIssue = "invalid";
 
