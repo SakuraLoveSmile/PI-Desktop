@@ -5184,6 +5184,7 @@ eleven-tool-round desktop paths are verified by
 
 | 验收 | 应用场景 |
 |---|---|
+| C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — 桌面定时任务 | E2E-SCHEDULED-desktop-automation-lifecycle |
 | A / C — Unicode stdio 成帧 | E2E-RPC-unicode-separators |
@@ -8458,6 +8459,21 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **预期**：打开包含 `(software)` 的完整网址，进入 React 软件词条；正文外层的右括号和紧跟 URL 右括号的句末标点不属于链接，相邻引用仍能独立点击。嵌套圆括号、查询和片段内的圆括号、百分号编码的圆括号均保持完整。
 - **覆盖**：`chat-links.test.mjs`；桌面端通过正常浏览器目标实际点击验证。
 - **链接规格**：`04-ux/08-component-spec.md` §8.3。
+
+### E2E-SCHEDULED-manual-to-hourly
+
+- **Preconditions:** Built host candidate, isolated data directory, no provider.
+- **Steps:** Through `tools.execute`, create a paused Manual task, update only
+  its id and cadence to Hourly, rename it, restart, and list tasks again.
+- **Expected:** Update succeeds without calendar fields; the next occurrence is
+  one hour away. Prompt, paused state and saved configuration survive. Rename
+  does not reset the interval. RPC tests also cover required Daily/Weekly times
+  and retention of an existing custom schedule.
+- **Specs:** 04-ux/01-ui-ia §3.4.
+- **Acceptance:** C / F — task configuration and persistence.
+- **Milestone:** Maintenance.
+- **Status:** `node scripts/e2e-scheduled-hourly-update.mjs` exercises the real
+  Rust host, permission path, stdio and SQLite; no model inference or desktop UI.
 
 ### E2E-SCHEDULED-manual-workspace-binding
 

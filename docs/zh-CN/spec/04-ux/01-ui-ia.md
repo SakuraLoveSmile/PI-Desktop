@@ -229,6 +229,11 @@ saved binding capture the current project on their first explicit configuration.
 用户必须在启用无人值守之前显式将其切换到 Agent
 执行。
 
+Agent tools can change a Manual task to Hourly by supplying only its id and
+`cadence: "hourly"`; no calendar time is required. Preserve existing schedule
+fields and paused state. Daily and Weekly still require a valid saved or supplied
+schedule. Renaming an Hourly task does not restart its interval.
+
 ### 3. 5 扩展
 
 扩展目标是专注于插件的页面，使用紧凑标头并且只保留两个选项卡：
