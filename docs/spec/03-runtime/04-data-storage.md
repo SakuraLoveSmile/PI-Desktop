@@ -532,6 +532,12 @@ CREATE INDEX idx_session_import_origins_plugin
   message. Assistant Edit uses that child and records the original/edited
   response tails in the child's existing `message_revisions` store; the source
   transcript and source revisions are never rewritten.
+- Forks copy existing referenced files from `scratch/<sourceId>/pasted/` to
+  `scratch/<childId>/pasted/` and rewrite message/checkpoint paths before
+  indexing. Source deletion cannot remove the child copies. Unreferenced files,
+  later-message inputs outside a bounded fork, and other scratch outputs are
+  excluded. Missing expired inputs stay missing; no cross-session read grant
+  is added. Handled fork failures remove copied inputs and child transcripts.
 
 ### 4.6 turns — one row per agent run
 
