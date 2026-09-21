@@ -1720,7 +1720,10 @@ Single message render — either user (plaintext) or assistant (markdown streami
   nothing. Copy on a speaking-turn menu writes the live selection in that
   turn captured when the menu opened; a collapsed caret, or a selection
   outside the row, falls back to the whole turn.
-  Copy conversation still writes the labelled thread. Copying from the
+  Copy conversation reads the complete session on demand, including unloaded
+  history and untruncated message text, and preserves the visible in-flight
+  tail. It does not change the reading window or scroll position. A failed
+  read reports an error without copying partial history. Copying from the
   menu reports through the toast host because the surface closes as soon
   as the item runs.
   Fork creates and activates an independent session whose snapshot ends at the
