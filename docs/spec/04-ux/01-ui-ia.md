@@ -266,7 +266,10 @@ rearms future occurrences only. Hourly schedules wait a full hour after saving,
 enabling, startup or the preceding automatic admission; Run now leaves the
 automatic occurrence unchanged. Legacy cadence-only tasks require explicit
 schedule configuration. The current project is captured when first configured;
-subsequent foreground project changes do not retarget it. Automatic runs use
+subsequent foreground project changes do not retarget it. This includes Manual
+tasks and tasks saved without a project: Run now, renaming, and cadence changes
+preserve that binding, including after restart. Only legacy tasks without a saved
+binding capture the current project on their first explicit configuration. Automatic runs use
 Ask permissions and may wait for input in their conversation.
 New tasks default to Agent. A migrated Plan or Goal task is allowed to remain
 stored, but an unattended run is explicitly rejected before provider, artifact,
@@ -274,6 +277,11 @@ or queue work with `PLAN_REQUIRES_INTERACTIVE_SESSION`; it cannot display or
 auto-approve a contract.
 The user must explicitly switch it to Agent before enabling unattended
 execution.
+
+Agent tools can change a Manual task to Hourly by supplying only its id and
+`cadence: "hourly"`; no calendar time is required. Preserve existing schedule
+fields and paused state. Daily and Weekly still require a valid saved or supplied
+schedule. Renaming an Hourly task does not restart its interval.
 
 ### 3.5 Extensions
 
