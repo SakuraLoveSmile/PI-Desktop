@@ -5511,7 +5511,10 @@ Delegation rules:
     if (messages.at(-1)?.role !== "assistant") {
       throw new Error("Cannot retry a provider stream without its failed assistant message");
     }
-    messages.pop();
+    // A failed stream can be represented by more than one trailing assistant
+    // message after a tool round. Remove the whole failed suffix before
+    // continuing; pi-agent-core rejects any assistant-terminated transcript.
+    while (messages.at(-1)?.role === "assistant") messages.pop();
     this.setAgentMessages(messages);
 
     this.providerRetryInProgress = true;

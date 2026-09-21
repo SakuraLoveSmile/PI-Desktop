@@ -14067,16 +14067,16 @@ the latest destination. These assertions measure work counts, not device FPS.
   log channel. Repeat with a hard fault (a Windows `0xC0000005`-class exit) if
   one is available, and then quit the app while a plugin host is alive.
 - **Expected:** Every one of those surfaces names the exit code (`exit code 7`,
-  and `exit code 3221225477 (0xC0000005)` for the fault), and the newest plugin
-  output line travels with the load error and the audit record. A clean quit
+  and `exit code 3221225477 (0xC0000005)` for the fault), while the fixture's
+  stderr line is absent from the load error and crash audit record. A clean quit
   reports no crash at all: quitting is a shutdown, not a crash.
 - **Specs:** `07-plugins/05-plugin-lifecycle.md` §3.1 / §8,
   `08-meta/decisions-log.md` D607.
 - **Acceptance:** G (plugin host lifecycle), Quality (diagnosability).
 - **Milestone:** Post-MVP regression coverage.
 - **Automation:** `apps/desktop/test/plugin-services.test.mjs` forks a real host
-  process, kills it with a fixture exit code and asserts the code and the stderr
-  line on the service state and the audit record; `plugin-isolation.test.mjs`
+  process, kills it with a fixture exit code and asserts the code plus the
+  absence of raw stderr in the crash audit record; `plugin-isolation.test.mjs`
   and the shutdown cases cover the "quit is not a crash" half.
 - **Status:** Automated at the runtime level; no UI driver reads the plugin
   page's error text.

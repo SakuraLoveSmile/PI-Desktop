@@ -8358,10 +8358,10 @@ the latest destination. These assertions measure work counts, not device FPS.
   隔离的桌面配置；不访问市场或网络。
 - **步骤：** 加载插件并让宿主进程死亡。读取加载错误、`failed` 服务状态、`plugin.crash` 审计记录与 `plugin` 日志通道。若有条件，
   再用一次硬故障（Windows `0xC0000005` 一类退出）重复；最后在插件宿主存活时退出应用。
-- **预期：** 上述每一处都给出退出码（`exit code 7`；硬故障为 `exit code 3221225477 (0xC0000005)`），且插件最新一行输出随加载错误与
-  审计记录一同出现。干净退出完全不上报崩溃：退出是关闭而不是崩溃。
+- **预期：** 上述每一处都给出退出码（`exit code 7`；硬故障为 `exit code 3221225477 (0xC0000005)`），而夹具的 stderr 行不会出现在
+  加载错误或崩溃审计记录中。干净退出完全不上报崩溃：退出是关闭而不是崩溃。
 - **规格：** 07-plugins/05-plugin-lifecycle §3.1 / §8、08-meta/decisions-log D607。
 - **验收：** G（插件宿主生命周期）、品质（可诊断性）。**里程碑：** Post-MVP 回归覆盖。
 - **自动化：** `apps/desktop/test/plugin-services.test.mjs` 真实 fork 宿主进程、以夹具退出码杀死它，并断言服务状态与审计记录上的
-  退出码与 stderr 行；`plugin-isolation.test.mjs` 与关闭用例覆盖"退出不是崩溃"那一半。
+  退出码及原始 stderr 缺失；`plugin-isolation.test.mjs` 与关闭用例覆盖"退出不是崩溃"那一半。
 - **状态：** 运行时层已自动化；无 UI 驱动读取插件页的错误文本。
