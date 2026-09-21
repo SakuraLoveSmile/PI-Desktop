@@ -953,6 +953,8 @@ sklm: {
     noResults: "没有匹配的设置项",
     enterToSend: "回车发送",
     enterToSendDesc: "关闭后按 ⌘/Ctrl+Enter 发送。",
+    infiniteProviderRetry: "无尽重试",
+    infiniteProviderRetryDesc: "网络或临时服务故障会一直重试直到成功。仍可随时停止，但开启后可能持续消耗 API 用量。",
     linkOpenTarget: "链接打开位置",
     linkOpenTargetWorkpanel: "工作区浏览器",
     linkOpenTargetExternal: "系统默认浏览器",

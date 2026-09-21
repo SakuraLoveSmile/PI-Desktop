@@ -5483,6 +5483,10 @@ identify the platform validation still needed.
      no repair request starts.
   9. Reload the session and verify that only the completed response or the
      single terminal failed assistant remains durable.
+  10. Open Settings → AI → Defaults, enable infinite provider retry, and repeat
+      a network fixture that fails beyond ten attempts before recovering. Stop the
+      turn during backoff and verify no later request starts; disable the setting
+      and verify a fresh persistent outage stops after ten retries.
 - **Expected**:
   - `terminated` is classified as `STREAM_FAILED`, and an upstream gateway
     `502`/`503`/`504` as retryable `PROVIDER_ERROR`.
@@ -5521,7 +5525,9 @@ identify the platform validation still needed.
   - Authentication, model-selection, context, and descriptive
     malformed-request failures do not enter either provider replay path. The
     opaque empty-body 400/422 case is the bounded repair exception described
-    above.
+    above. Infinite mode changes no classification and only removes the retry
+    ceiling for admitted network/transient failures; it remains abortable and
+    is visibly marked with an unbounded retry indicator.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/08-error-codes.md`,
   `08-meta/decisions-log.md` (D186, D259, D378), ADR 0050, ADR 0128, ADR 0206

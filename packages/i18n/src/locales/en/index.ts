@@ -963,6 +963,8 @@ sklm: {
     noResults: "No matching settings",
     enterToSend: "Enter to send",
     enterToSendDesc: "Off: press ⌘/Ctrl+Enter to send.",
+    infiniteProviderRetry: "Retry until success",
+    infiniteProviderRetryDesc: "Keep retrying network and transient provider failures until the request succeeds. You can still stop the turn; API usage may continue while enabled.",
     linkOpenTarget: "Link open destination",
     linkOpenTargetWorkpanel: "Work panel browser",
     linkOpenTargetExternal: "Default OS browser",

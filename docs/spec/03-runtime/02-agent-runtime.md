@@ -218,6 +218,15 @@ Only the failed request is replayed. The session, its transcript, and its tool
 state are untouched: the failed assistant is removed from the next model context
 and the same visible message id is reused, so a retry never restarts the turn or
 re-runs a completed tool call.
+
+The application setting `infiniteProviderRetry` is off by default. When enabled,
+the main session and its builtin subagents skip only the ten-retry ceiling for
+`NETWORK_ERROR`, `TIMEOUT`, `STREAM_FAILED`, retryable `PROVIDER_ERROR`
+(including 5xx gateway failures), and `PROVIDER_RATE_LIMITED`. The same backoff,
+`Retry-After` precedence, visible retry status, and abort/Stop path remain in
+force. Non-retryable errors, context recovery, compaction, tool execution, and
+one-shot completions are unchanged. The setting can keep billing requests alive
+indefinitely until the user stops the turn.
 Each retry is abortable and reports its current backoff through the normalized
 status event. The `retrying` activity carries the classified error code, the
 bounded/redacted provider message, and the HTTP status when known. The main

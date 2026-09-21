@@ -3862,6 +3862,33 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.dispose();
   });
 
+  it("allows the opt-in retry mode to claim beyond both bounded budgets", async () => {
+    const runtime = createRuntime({ onEvent: vi.fn() });
+    runtime.setInfiniteProviderRetry(true);
+    const claim = (runtime as any).claimProviderRetry.bind(runtime);
+    const transient = classifyAgentError("fetch failed");
+    const rateLimited = classifyAgentError("429: too many requests");
+
+    for (let attempt = 1; attempt <= PROVIDER_TRANSIENT_MAX_RETRIES + 2; attempt += 1) {
+      expect(claim(transient, attempt % 2 === 0 ? "stream" : "request")).toBe(attempt);
+    }
+    for (let attempt = 1; attempt <= PROVIDER_RATE_LIMIT_MAX_RETRIES + 2; attempt += 1) {
+      expect(claim(rateLimited, attempt % 2 === 0 ? "stream" : "request")).toBe(attempt);
+    }
+    await runtime.dispose();
+  });
+
+  it("keeps the bounded retry policy when infinite mode is disabled", async () => {
+    const runtime = createRuntime({ onEvent: vi.fn() });
+    const claim = (runtime as any).claimProviderRetry.bind(runtime);
+    const transient = classifyAgentError("fetch failed");
+    for (let attempt = 1; attempt <= PROVIDER_TRANSIENT_MAX_RETRIES; attempt += 1) {
+      expect(claim(transient, "request")).toBe(attempt);
+    }
+    expect(claim(transient, "request")).toBeUndefined();
+    await runtime.dispose();
+  });
+
   it("retries a mid-stream rate-limit (429) failure in the same turn", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });

@@ -964,6 +964,8 @@ sklm: {
     noResults: "Eşleşen ayar yok",
     enterToSend: "Enter ile gönder",
     enterToSendDesc: "Kapalı: göndermek için ⌘/Ctrl+Enter.",
+    infiniteProviderRetry: "Başarılı olana kadar yeniden dene",
+    infiniteProviderRetryDesc: "Ağ ve geçici sağlayıcı hataları istek başarılı olana kadar yeniden denenir. Çalışmayı yine durdurabilirsiniz; açıkken API kullanımı sürebilir.",
     linkOpenTarget: "Bağlantı açma hedefi",
     linkOpenTargetWorkpanel: "Çalışma paneli tarayıcısı",
     linkOpenTargetExternal: "Varsayılan sistem tarayıcısı",
