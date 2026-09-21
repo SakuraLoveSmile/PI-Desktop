@@ -13740,44 +13740,52 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   acceptance remains outstanding. Required post-integration suites: `test:e2e`,
   `test:e2e:subagents`, `test:e2e:subagent-models`.
 
-#### E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list: A plugin-declared provider is a Host-owned, read-only row
+#### E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list: A plugin-declared provider is a Host-owned row with thinking controls
 
 - **Preconditions**: An installed local plugin declares one provider in
-  `contributes.providers` with the `provider.register` permission, one model, a
-  fixture `baseUrl`, and a key the user stores once through Settings.
-- **Steps**: 1) Enable the plugin and open Settings → Providers. 2) Select the
-  row as the session model and run a turn. 3) Try to edit it, then delete it,
-  through the user path. 4) Disable the plugin, inspect the list and the stored
-  credential, and re-enable it. 5) Uninstall the plugin; reinstall and enable
-  it, then remove the declaration from its manifest and reload. 6) Load a
-  manifest that declares providers without `provider.register`. 7) Load a
-  manifest that declares an `oauth` block and `authKind: "oauth"`.
+  `contributes.providers` with the `provider.register` permission, one model,
+  a fixture `baseUrl`, `thinkingLevels: ["off", "low", "high"]`, and
+  `defaultThinkingLevel: "high"`; a key is stored once through Settings.
+- **Steps**: 1) Enable the plugin and open Settings → Providers. 2) Inspect
+  the model binding and Composer thinking selector, then select the row as the
+  session model and run a turn. 3) Change the session thinking level and run a
+  second turn. 4) Try to edit the provider, then delete it, through the user
+  path. 5) Disable the plugin, inspect the list and stored credential, and
+  re-enable it. 6) Uninstall the plugin; reinstall and enable it, then remove
+  the declaration from its manifest and reload. 7) Load a manifest that
+  declares providers without `provider.register`. 8) Load a manifest that
+  declares an `oauth` block and `authKind: "oauth"`.
 - **Expected**: Step 1 shows one row in the native provider list with
   `ownerPluginId` set to the plugin and the row id
-  `plugin:<pluginId>:<declaredId>`. Step 2 binds the session like any provider
-  row. Step 3 refuses both actions with an error whose message begins
-  `PROVIDER_OWNED_BY_PLUGIN` and leaves the row unchanged. Step 4 keeps the row
-  and sets `enabled = 0` while `secret:provider:<id>:api_key` stays stored, so
-  re-enabling restores the credential. Step 5 deletes the rows and both
-  credential refs (`:api_key` and `:oauth`) in both orders — uninstall, and a
-  manifest that no longer declares the provider. Steps 6 and 7 fail manifest
-  validation as `PLUGIN_INVALID` — the missing-permission message and
-  `plugin OAuth providers are not supported in this release` /
+  `plugin:<pluginId>:<declaredId>`. Its model binding contains the normalized
+  levels `off`, `low`, and `high` in declaration order, with `high` as the
+  default. Step 2 shows those declared levels in the thinking selector and
+  starts the session at `high`; the turn uses that choice. Step 3 persists and
+  uses the changed session level without changing the provider declaration.
+  Step 4 refuses both actions with an error whose message begins
+  `PROVIDER_OWNED_BY_PLUGIN` and leaves the row unchanged. Step 5 keeps the
+  row and sets `enabled = 0` while `secret:provider:<id>:api_key` stays stored,
+  so re-enabling restores the credential and thinking binding. Step 6 deletes
+  the row and both credential refs (`:api_key` and `:oauth`) in both orders —
+  uninstall, and a manifest that no longer declares the provider. Steps 7 and
+  8 fail manifest validation as `PLUGIN_INVALID` — the missing-permission
+  message and `plugin OAuth providers are not supported in this release` /
   `unsupported authKind oauth` — and neither failure changes plugin enablement.
 - **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4, §5.4, §7;
   `07-plugins/13-plugin-permissions-matrix.md`; `03-runtime/04-data-storage.md`
-  §4.3, §7; `03-runtime/12-provider-config-schema.md` §2, §9;
+  §4.3, §7; `03-runtime/11-provider-model-system.md` §6.2;
+  `03-runtime/12-provider-config-schema.md` §2, §9;
   `03-runtime/06-host-rpc-protocol.md`; ADR 0259; D427
 - **Acceptance**: B (model config), E (tools & permissions), F (persistence),
   G (plugins), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`): the
   declared row materializing as `plugin:<pluginId>:<declaredId>` in the native
-  provider list with its `ownerPluginId`, endpoint and models, and no row owned
-  by any other plugin, pass. Ownership refusal (`PROVIDER_OWNED_BY_PLUGIN`),
-  disable/enable, undeclare and uninstall cleanup, and the manifest refusals are
-  covered by host-core unit tests; the renderer's read-only row presentation
-  remains additional validation.
+  provider list with its `ownerPluginId`, endpoint, models, and thinking
+  binding passes. Ownership refusal (`PROVIDER_OWNED_BY_PLUGIN`),
+  disable/enable, undeclare and uninstall cleanup, and the manifest refusals
+  are covered by host-core unit tests; the renderer's read-only row and
+  thinking-selector presentation remain additional validation.
 
 #### E2E-CHAT-disclosure-toggle-keeps-reading-position
 
