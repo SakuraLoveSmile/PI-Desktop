@@ -2352,6 +2352,8 @@ identify the platform validation still needed.
 - **Acceptance**: G (marketplace detail UX)
 - **Status**: Documented
 
+- **Focus regression**: In light and dark themes, open a marketplace card and press Escape. Like pointer dismissal, Escape leaves no line or focus ring on the card. Then use Tab and Shift+Tab: the detail button shows a complete, unclipped ring, and Install remains separately focusable. Automated focus-state regression: `node scripts/e2e-plugin-detail-focus.mjs`; verify the rendered ring visually.
+
 #### E2E-024F: Refresh official remote marketplace repository
 
 - **Preconditions**: Network available to GitHub raw content.

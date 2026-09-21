@@ -1215,6 +1215,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - **接受**：G（市场详细信息用户体验）
 - **状态**：已记录
 
+- **焦点回归**：在浅色和深色主题下打开市场卡片，再按 Escape。与鼠标关闭一样，Escape 关闭后卡片不残留横线或焦点框。再用 Tab 和 Shift+Tab 导航：详情按钮显示完整、未裁剪的焦点框，安装按钮仍可单独获得焦点。 自动化焦点状态回归：`node scripts/e2e-plugin-detail-focus.mjs`；焦点框外观需进行视觉验证。
+
 #### E2E-024W：插件剪贴板历史捕获有界的文本和图片
 
 - **先决条件**：应用正在运行；测试插件声明并获授 `clipboard.read`；Composer 可以接收
