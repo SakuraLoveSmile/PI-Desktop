@@ -124,6 +124,10 @@ import {
 } from "./agent-messages.js";
 import { buildSessionContext } from "./session-context.js";
 import {
+  dedupeToolCallMessages,
+  reportDuplicateToolCallDrop,
+} from "./tool-call-dedupe.js";
+import {
   apiBindingForProviderModel,
   buildProviderModel,
   copilotRequestHeaders,
@@ -607,6 +611,7 @@ const AGENT_CORE_TOOL_NAMES = new Set([
 ]);
 const MAX_ON_DEMAND_TOOL_PROMPT_ENTRIES = 64;
 const MAX_TOOL_SEARCH_RESULT_NAMES = 24;
+
 
 /** Tools that ask the host to switch this session into a contract mode (D198). */
 const ENTER_TOOL_NAMES: Record<ProposalKind, string> = {
@@ -1916,9 +1921,12 @@ Delegation rules:
       // A vendor account has no long-lived key. Leaving it unset keeps pi-ai
       // from overriding the auth the provider just resolved for this request.
       getApiKey: async () => runtimeApiKey || undefined,
+      // The provider's rule that a tool-call id is unique is enforced here, on
+      // the last view before the wire: the request is the only place it can be
+      // guaranteed for both a rebuilt context and one that grew in this process.
       convertToLlm: (messages) =>
         alignRetainedReasoningIdentity(
-          convertToLlm(messages),
+          convertToLlm(this.dropDuplicateToolCalls(messages)),
           this.reasoningReplayIdentity(),
         ),
       prepareNextTurnWithContext: (context, signal) =>
@@ -2708,6 +2716,29 @@ Delegation rules:
       (entry) =>
         entry.message.role !== "assistant" || entry.message.content.length > 0,
     );
+  }
+
+  /**
+   * A `tool_use` id has to be unique across the request: Anthropic-family
+   * endpoints (DeepSeek's included) reject the whole turn with "tool_use ids
+   * must be unique" (issue #718), and a session that hits that 400 cannot
+   * continue. Every message the next request carries passes through here, so
+   * this is the one place that can guarantee the provider's rule for both a
+   * rebuilt context and one that grew during this process.
+   *
+   * The transcript is append-only and tolerates a retried append, so the same
+   * call can reach the request twice: under the same row id (which the host's
+   * keep-last dedupe already collapses) or a new one (which it cannot). The
+   * first occurrence wins, and a later call *or* a later result for that id is
+   * dropped, so the pair the provider validates stays well-formed — one call,
+   * one result. What was dropped is logged with its ids, because the next
+   * report of this should name the writer instead of only the provider's
+   * sentence.
+   */
+  private dropDuplicateToolCalls(messages: AgentMessage[]): AgentMessage[] {
+    const drop = dedupeToolCallMessages(messages);
+    reportDuplicateToolCallDrop(this.sessionId, drop);
+    return drop.messages;
   }
 
   private entriesWithCompaction(
@@ -5593,7 +5624,7 @@ Delegation rules:
     // agentLoopContinue refuses a transcript ending in an assistant message,
     // and this one carries nothing worth resending anyway.
     const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role === "assistant") messages.pop();
+    while (messages.at(-1)?.role === "assistant") messages.pop();
     this.setAgentMessages(messages);
 
     const promptBefore = this.agent.state.systemPrompt;
@@ -5644,7 +5675,7 @@ Delegation rules:
         this.suppressOverflowRunEnd = false;
         this.overflowRecoveryAttempted = true;
         const messages = [...this.agent.state.messages];
-        if (messages.at(-1)?.role === "assistant") messages.pop();
+        while (messages.at(-1)?.role === "assistant") messages.pop();
         this.setAgentMessages(messages);
         const compacted = await this.runCompaction(
           "overflow",
@@ -5701,7 +5732,7 @@ Delegation rules:
     // assistant message. The progress text is already visible in the reused
     // bubble, so it must not be sent back as model context.
     const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role === "assistant") messages.pop();
+    while (messages.at(-1)?.role === "assistant") messages.pop();
     this.setAgentMessages(messages);
 
     const promptBefore = this.agent.state.systemPrompt;
@@ -7738,6 +7769,15 @@ Delegation rules:
       try {
         await this.agent.continue();
         await this.agent.waitForIdle();
+        // The steering continuation may itself finish with a recoverable
+        // provider/silent/overflow/progress failure. Let runPendingRecoveries
+        // repair that assistant tail before another steering continuation.
+        if (
+          this.suppressOverflowRunEnd ||
+          this.suppressProviderRetryRunEnd ||
+          this.suppressSilentTurnRunEnd ||
+          this.suppressProgressTurnRunEnd
+        ) return;
       } finally {
         this.steeringContinuation = false;
       }

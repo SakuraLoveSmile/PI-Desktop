@@ -3363,6 +3363,92 @@ describe("DesktopAgentRuntime tool history restore (D120)", () => {
     await runtime.dispose();
   });
 
+  it("keeps one tool call when the transcript carries the same call id twice", async () => {
+    // A retried append can leave the same call on two rows (the file is
+    // append-only), and a provider rejects the whole request with `tool_use ids
+    // must be unique` (issue #718). The first occurrence wins; the later row is
+    // dropped, because that call already has its result.
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "user-1",
+          role: "user",
+          content: "optimize the form",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "Let me find the render code.",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        toolRow({ id: "tool-1", toolCallId: "call-1" }),
+        // The same call again, under the row id a re-persist would have left.
+        toolRow({ id: "tool-1-retry", toolCallId: "call-1" }),
+        {
+          id: "assistant-2",
+          role: "assistant",
+          content: "Found it.",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+      ],
+    });
+    const context = (runtime as any).liveSessionContext().messages;
+    // The rebuilt context still carries both snapshots; the request view is
+    // where the provider's rule is enforced, because that is the last place
+    // both a resumed and a live-appended history pass through.
+    const outgoing = (runtime as any).dropDuplicateToolCalls(context);
+
+    const toolCalls = outgoing
+      .filter((message: any) => message.role === "assistant")
+      .flatMap((message: any) =>
+        (message.content as any[]).filter((block) => block.type === "toolCall"),
+      );
+    expect(toolCalls.map((call: any) => call.id)).toEqual(["call-1"]);
+    expect(
+      outgoing.filter((message: any) => message.role === "toolResult"),
+    ).toHaveLength(1);
+    // The result the kept call belongs to is the one that survives.
+    expect(
+      outgoing.find((message: any) => message.role === "toolResult").toolCallId,
+    ).toBe("call-1");
+
+    const line = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+    expect(line).toContain("dropped 2 duplicate tool call entries");
+    expect(line).toContain("session=session-1");
+    expect(line).toContain("ids=call-1");
+    stderr.mockRestore();
+
+    await runtime.dispose();
+  });
+
+  it("leaves a request with unique tool calls untouched", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "Two reads.",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        toolRow({ id: "tool-a", toolCallId: "call-a" }),
+        toolRow({ id: "tool-b", toolCallId: "call-b" }),
+      ],
+    });
+    const context = (runtime as any).liveSessionContext().messages;
+    // Identity, not a copy: the common path pays nothing and logs nothing.
+    expect((runtime as any).dropDuplicateToolCalls(context)).toBe(context);
+    expect(stderr).not.toHaveBeenCalled();
+    stderr.mockRestore();
+    await runtime.dispose();
+  });
+
   it("keeps call-only assistant turns as carriers and drops truly empty ones", async () => {
     const runtime = createRuntime({
       history: [
@@ -3752,6 +3838,19 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       errorMessage: "terminated",
       timestamp: 2,
     };
+    const toolUseMessage = {
+      role: "assistant",
+      content: [{ type: "toolCall", id: "call-1", name: "Read", arguments: {} }],
+      stopReason: "toolUse",
+      timestamp: 1,
+    };
+    const toolResultMessage = {
+      role: "toolResult",
+      toolCallId: "call-1",
+      content: [{ type: "text", text: "result" }],
+      isError: false,
+      timestamp: 1,
+    };
     const successfulMessage = {
       role: "assistant",
       content: [{ type: "text", text: "recovered response" }],
@@ -3773,6 +3872,9 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     agent.prompt = vi.fn(async () => {
       agent.state.messages = [
         { role: "user", content: "hello", timestamp: 1 },
+        toolUseMessage,
+        toolResultMessage,
+        failedMessage,
         failedMessage,
       ];
       await handleAgentEvent({ type: "message_start", message: failedMessage });
@@ -3782,7 +3884,8 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     });
     agent.waitForIdle = vi.fn(async () => undefined);
     agent.continue = vi.fn(async () => {
-      expect(agent.state.messages.filter((message: any) => message.role !== "system")).toHaveLength(1);
+      expect(agent.state.messages.filter((message: any) => message.role !== "system")).toHaveLength(3);
+      expect(agent.state.messages.at(-1)?.role).toBe("toolResult");
       await handleAgentEvent({ type: "agent_start" });
       await handleAgentEvent({ type: "turn_start" });
       await handleAgentEvent({
@@ -3811,6 +3914,34 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       }),
     );
 
+    await runtime.dispose();
+  });
+
+  it("does not continue steering after a recovery becomes pending", async () => {
+    const runtime = createRuntime({ onEvent: vi.fn() });
+    const agent = (runtime as any).agent;
+    agent.state.messages = [
+      { role: "user", content: "hello", timestamp: 1 },
+      { role: "assistant", content: [], timestamp: 2 },
+    ];
+    (runtime as any).acceptingSteering = true;
+    (runtime as any).pendingSteering = new Map([
+      [{ role: "user", content: "steer", timestamp: 3 }, "steer-1"],
+    ]);
+    const continueCalls: number[] = [];
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => {
+      continueCalls.push(continueCalls.length + 1);
+      if (continueCalls.length === 1) {
+        (runtime as any).suppressProviderRetryRunEnd = true;
+        return;
+      }
+      throw new Error("Cannot continue from message role: assistant");
+    });
+
+    await expect((runtime as any).waitForIdleAndSteering()).resolves.toBeUndefined();
+
+    expect(continueCalls).toEqual([1]);
     await runtime.dispose();
   });
 
