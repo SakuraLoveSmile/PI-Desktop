@@ -6556,3 +6556,17 @@ that was sitting at the bottom — including after the turn had finished.
 - `contextWindow` and `maxTokens` are therefore optional on the wire, and each entry of the array is decoded on its own. An absent key, or an explicit `0`, reads as zero and is seeded with the generic default (128,000 / 8,192) by the normalisation that already existed for the explicit zero — the same value a record carrying only `defaultModelId` is materialized with, and the same value a plugin manifest that declares no limits already produces. The two paths now agree instead of one rejecting what the other accepts.
 - An entry that still fails to decode costs itself, not the array: the readable entries survive in their stored order, and the failure is reported on the host log with the provider id, the entry's index and the reason, so it is locatable rather than silent. An absent `models` key, an empty array, and an array whose every entry was unreadable all still read as the legacy binding, so a provider stays selectable whatever its stored shape; only the third is reported, because an empty array is a legal state and an absent one predates bindings.
 - Nothing is rewritten on disk and the write path remains explicit: `providers.update` still persists exactly the bindings the client sends. Before accepting an explicit model-array replacement, the host checks the stored value and rejects it with `MODEL_BINDINGS_DEGRADED` when the value is degraded, so a partial settings view cannot erase unreadable entries; unrelated provider fields remain updatable. See `03-runtime/12-provider-config-schema.md` §2.
+
+## 2026-09-21 — Bound Desktop trusted-extension lifecycle waits
+
+- Apply the existing 30-second handler budget to notification, startup and
+  shutdown handlers as well as result handlers; module loading and factory
+  initialization each use the same budget. This changes previously unbounded
+  waits, including event handlers waiting for a UI answer.
+- Abort retires current waits; disposal rejects new dispatches and runs shutdown
+  once. Late settlements cannot supply results to the retired dispatch. Existing
+  fail-open error handling, result folding, plugin ownership and permissions
+  remain unchanged. In-process code is not forcibly terminated.
+- Deferred events remain registrable and now appear in existing diagnostics.
+  See `07-plugins/16-trusted-extensions.md` §6 and
+  `E2E-HOOKS-cancel-and-dispose`.

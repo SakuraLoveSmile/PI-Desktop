@@ -180,9 +180,9 @@ main、渲染层或插件宿主进程中。
 | `session_info_changed` | 经 `setSessionName` 的会话改名 | 否 |
 | `project_trust` | v1 说明：不触发；按项目启用即信任决定 | 否 |
 | `resources_discover` | v1 说明：不触发；skills 与提示发现留在 Electron main | 不适用 |
-| `before_agent_start` | 回合内首个 provider 请求之前 | 是，系统提示与消息编辑 |
+| `before_agent_start` | 回合内首个 provider 请求之前 | 是，仅替换系统提示词 |
 | `context` | `prepareNextTurn` | 是，替换消息列表 |
-| `before_provider_request`、`before_provider_headers`、`after_provider_response` | provider 调用包装 | 请求与头部为是 |
+| `before_provider_request`、`before_provider_headers`、`after_provider_response` | provider 调用包装 | 请求采纳返回值；头部原地修改 payload |
 | `agent_start`、`agent_end`、`agent_settled` | Agent 循环边界 | 否 |
 | `turn_start`、`turn_end` | 回合边界 | 否 |
 | `message_start`、`message_update`、`message_end` | Agent 消息事件 | v1 说明：否，pi-agent-core 不提供事后替换 |
@@ -195,8 +195,25 @@ main、渲染层或插件宿主进程中。
 | `input` | v1 说明：不触发；Host 队列准入尚未接入 | 不适用 |
 | `user_bash`、`session_before_switch`、`session_before_tree`、`session_tree`、`ui_prompt_start`、`ui_prompt_end` | v1 不触发 | 不适用 |
 
-抛出异常的处理器记为诊断并视为返回 `undefined`。带返回结果的事件若处理器超过
-30 秒，则放弃并记诊断，回合以未修改的值继续。
+Desktop 事件能力由 `packages/agent-runtime/src/extensions/event-capabilities.ts`
+维护，分为返回值、原地修改、通知和未接通。未接通事件仍可注册，但会在现有插件诊断中
+显示 `unsupported_api`，不妨碍其他已支持的处理器加载。
+
+所有事件处理器（包括启动、关闭和通知）均有每个处理器 30 秒的等待上限。模块加载和
+工厂初始化分别有 30 秒上限，失败归入加载或工厂诊断。处理器异常或超时记诊断并视为
+返回 `undefined`，后续处理器按注册顺序继续。既有结果归并和失败继续策略保持不变，
+不能将其作为强制安全检查。多个挂起处理器可能分别耗尽各自的时间预算。
+
+中止会使等待中的事件派发失效。销毁先拒绝新派发并取消已有等待，再执行关闭处理器；
+并发销毁只关闭一次。旧派发不返回结果、不再执行剩余处理器，迟到的完成或异常不会覆盖
+结果或增加诊断。销毁后完成的工厂不能发布工具和命令。Runtime 在等待扩展关闭前先停止
+Agent 工作。在请求前 hook 等待期间停止，不会继续请求模型，并保留用户消息；之后可正常
+发送下一条消息。
+
+这些限制只约束等待，不是强制执行隔离：进程内处理器仍可能同步阻塞 JS，或在超时、取消
+后产生外部副作用。不新增公开取消参数。扩展命令和工具保留原有生命周期；Native Pi
+会话由上游 SDK 管理，不属于本次 Desktop 变更。事件处理器等待 UI 提示时也受 30 秒限制，
+UI broker 自身的提示超时不会延长该预算。
 
 ## 7. 工具
 

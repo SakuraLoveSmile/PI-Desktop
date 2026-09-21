@@ -42,67 +42,13 @@ import {
   type TrustedExtensionUiResponse,
 } from "./types.js";
 
-/** Events the desktop runtime emits in v1 (spec §6). */
-export const TRUSTED_EXTENSION_EVENTS = [
-  "session_start",
-  "session_shutdown",
-  "session_info_changed",
-  "project_trust",
-  "resources_discover",
-  "before_agent_start",
-  "context",
-  "before_provider_request",
-  "before_provider_headers",
-  "after_provider_response",
-  "agent_start",
-  "agent_end",
-  "agent_settled",
-  "turn_start",
-  "turn_end",
-  "message_start",
-  "message_update",
-  "message_end",
-  "tool_call",
-  "tool_execution_start",
-  "tool_execution_update",
-  "tool_execution_end",
-  "tool_result",
-  "model_select",
-  "thinking_level_select",
-  "session_before_compact",
-  "session_compact",
-  "session_compact_failed",
-  "session_before_fork",
-  "input",
-] as const;
-
-export type TrustedExtensionEventName = (typeof TRUSTED_EXTENSION_EVENTS)[number];
-
-/** Upstream events the runtime never emits in v1; handlers register silently. */
-const NOT_EMITTED_EVENTS = new Set([
-  "user_bash",
-  "session_before_switch",
-  "session_before_tree",
-  "session_tree",
-  "ui_prompt_start",
-  "ui_prompt_end",
-]);
-
-/** Events whose handler result is honored, and therefore time-limited. */
-const RESULT_EVENTS = new Set<string>([
-  "resources_discover",
-  "before_agent_start",
-  "context",
-  "before_provider_request",
-  "before_provider_headers",
-  "message_end",
-  "tool_call",
-  "tool_result",
-  "session_before_compact",
-  "session_before_fork",
-  "input",
-  "project_trust",
-]);
+import { HandlerLifecycle } from "./handler-lifecycle.js";
+import {
+  isKnownExtensionEvent,
+  TRUSTED_EXTENSION_EVENT_CAPABILITIES,
+  type TrustedExtensionEventName,
+} from "./event-capabilities.js";
+export { TRUSTED_EXTENSION_EVENTS, type TrustedExtensionEventName } from "./event-capabilities.js";
 
 /** ExtensionAPI members deferred to v2 or unsupported in v1. */
 const INERT_API_MEMBERS = [
@@ -345,22 +291,6 @@ function errorStack(err: unknown): string | undefined {
   return err instanceof Error ? err.stack : undefined;
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`handler exceeded ${ms}ms`)), ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (err) => {
-        clearTimeout(timer);
-        reject(err);
-      },
-    );
-  });
-}
-
 export type TrustedExtensionRunnerOptions = {
   specs: TrustedExtensionSpec[];
   bridge: TrustedExtensionBridge;
@@ -377,6 +307,9 @@ export class TrustedExtensionRunner {
   private readonly reports = new Map<string, TrustedExtensionLoadReport>();
   private publishScheduled = false;
   private disposed = false;
+  private closing = false;
+  private disposal?: Promise<void>;
+  private readonly lifecycle = new HandlerLifecycle();
 
   constructor(options: TrustedExtensionRunnerOptions) {
     this.bridge = options.bridge;
@@ -390,7 +323,9 @@ export class TrustedExtensionRunner {
 
   /** Load every entry. A failing entry is reported and skipped (spec §4.4). */
   async load(): Promise<TrustedExtensionLoadReport[]> {
+    const signal = this.lifecycle.signal;
     for (const spec of this.specs) {
+      if (this.closing || signal.aborted) break;
       const extension: LoadedExtension = {
         spec,
         tools: new Map(),
@@ -413,8 +348,11 @@ export class TrustedExtensionRunner {
       if (factory) for (const symbol of knownStubSymbols(spec.id)) reportStub(symbol);
       if (!factory) {
         try {
-          factory = await loadExtensionFactory(spec.entry, virtualModules);
+          factory = await this.lifecycle.run(
+            () => loadExtensionFactory(spec.entry, virtualModules), signal, TRUSTED_EXTENSION_HANDLER_TIMEOUT_MS,
+          );
         } catch (err) {
+          if (signal.aborted) break;
           this.report(spec.id, "load_error", errorMessage(err), undefined, errorStack(err));
           this.reports.set(spec.id, this.errorReport(spec.id));
           continue;
@@ -427,12 +365,17 @@ export class TrustedExtensionRunner {
         factoryCache.set(spec.id, factory);
       }
       try {
-        await factory(this.createApi(extension));
+        const loadedFactory = factory;
+        await this.lifecycle.run(
+          () => loadedFactory(this.createApi(extension)), signal, TRUSTED_EXTENSION_HANDLER_TIMEOUT_MS,
+        );
       } catch (err) {
+        if (signal.aborted) break;
         this.report(spec.id, "factory_error", errorMessage(err), undefined, errorStack(err));
         this.reports.set(spec.id, this.errorReport(spec.id));
         continue;
       }
+      if (this.closing || signal.aborted) break;
       this.loaded.set(spec.id, extension);
       this.reports.set(spec.id, {
         extensionId: spec.id,
@@ -443,17 +386,32 @@ export class TrustedExtensionRunner {
         eventNames: [...extension.handlers.keys()],
       });
     }
+    if (this.closing || signal.aborted) return this.getLoadReports();
     this.bridge.publishCommands(this.getCommands());
     this.flushDiagnostics();
     await this.emit("session_start", { type: "session_start", reason: "startup" });
     return this.getLoadReports();
   }
 
-  async dispose(): Promise<void> {
-    if (this.disposed) return;
-    await this.emit("session_shutdown", { type: "session_shutdown", reason: "quit" });
-    this.disposed = true;
-    this.bridge.publishCommands([]);
+  /** Retire current dispatches; subsequent turns use a fresh generation. */
+  cancelPending(): void {
+    if (!this.closing) this.lifecycle.cancel();
+  }
+
+  dispose(): Promise<void> {
+    if (this.disposal) return this.disposal;
+    this.closing = true;
+    this.lifecycle.cancel();
+    this.disposal = Promise.resolve().then(async () => {
+      try {
+        await this.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" });
+      } finally {
+        this.disposed = true;
+        this.lifecycle.cancel();
+        this.bridge.publishCommands([]);
+      }
+    });
+    return this.disposal;
   }
 
   getLoadReports(): TrustedExtensionLoadReport[] {
@@ -530,6 +488,7 @@ export class TrustedExtensionRunner {
 
   /** Run `/<name> <args>` in this session (spec §8). Returns false when unknown. */
   async runCommand(name: string, args: string): Promise<boolean> {
+    if (this.closing) return false;
     for (const extension of this.loaded.values()) {
       const command = extension.commands.get(name);
       if (!command) continue;
@@ -553,23 +512,33 @@ export class TrustedExtensionRunner {
     payload: Record<string, unknown>,
     fold?: (acc: R | undefined, next: R) => R,
   ): Promise<R | undefined> {
-    if (this.disposed) return undefined;
+    if (this.closing) return undefined;
+    return this.dispatch(event, payload, fold);
+  }
+
+  private async dispatch<R>(
+    event: TrustedExtensionEventName,
+    payload: Record<string, unknown>,
+    fold?: (acc: R | undefined, next: R) => R,
+  ): Promise<R | undefined> {
+    const signal = this.lifecycle.signal;
     let acc: R | undefined;
-    const timed = RESULT_EVENTS.has(event);
     for (const extension of this.loaded.values()) {
       const handlers = extension.handlers.get(event);
       if (!handlers?.length) continue;
       const ctx = this.createContext(extension);
       for (const handler of handlers) {
+        if (signal.aborted || this.disposed) return undefined;
         try {
-          const run = Promise.resolve(handler(payload, ctx));
-          const result = (await (timed
-            ? withTimeout(run, TRUSTED_EXTENSION_HANDLER_TIMEOUT_MS)
-            : run)) as R | undefined;
+          const result = await this.lifecycle.run(
+            () => handler(payload, ctx), signal, TRUSTED_EXTENSION_HANDLER_TIMEOUT_MS,
+          ) as R | undefined;
+          if (signal.aborted || this.disposed) return undefined;
           if (result !== undefined && result !== null) {
             acc = fold ? fold(acc, result) : result;
           }
         } catch (err) {
+          if (signal.aborted || this.disposed) return undefined;
           const kind: TrustedExtensionDiagnosticKind = /exceeded \d+ms/.test(errorMessage(err))
             ? "handler_timeout"
             : "handler_error";
@@ -810,12 +779,12 @@ export class TrustedExtensionRunner {
     const api: Record<string, unknown> = {
       on: (event: string, handler: Handler) => {
         if (typeof handler !== "function") return;
-        if (
-          !NOT_EMITTED_EVENTS.has(event) &&
-          !(TRUSTED_EXTENSION_EVENTS as readonly string[]).includes(event)
-        ) {
+        if (!isKnownExtensionEvent(event)) {
           this.report(extension.spec.id, "unsupported_api", `unknown event "${event}"`, `on:${event}`);
           return;
+        }
+        if (TRUSTED_EXTENSION_EVENT_CAPABILITIES[event] === "deferred") {
+          this.report(extension.spec.id, "unsupported_api", `event "${event}" is not emitted by Desktop`, `on:${event}`);
         }
         const list = extension.handlers.get(event) ?? [];
         list.push(handler);

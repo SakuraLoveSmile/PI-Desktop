@@ -7599,6 +7599,10 @@ Delegation rules:
         }
       }
       await this.extensionBeforeAgentStart(modelInput);
+      if (this.runCancelled || this.disposed) {
+        this.keepPreflightUserMessage(incomingUserMessage);
+        throw turnAbortedError("Turn aborted during extension hooks");
+      }
       if (typeof modelInput === "string") {
         await this.agent.prompt(modelInput);
       } else {
@@ -7636,7 +7640,6 @@ Delegation rules:
     return { turnId: this.turnId };
   }
 
-  /** `before_agent_start` hook: extensions may replace the system prompt for this turn. */
   private async extensionBeforeAgentStart(input: string | RuntimePrompt): Promise<void> {
     const runner = this.extensionRunner;
     if (!runner) return;
@@ -7645,7 +7648,8 @@ Delegation rules:
       // Handlers edit the headers object in place, as they do in the pi CLI.
       const headers: Record<string, string> = { ...(this.provider.headers ?? {}) };
       await runner.emit("before_provider_headers", { type: "before_provider_headers", headers });
-      this.extensionProviderHeaders = headers;
+      if (this.runCancelled || this.disposed) return;
+      this.extensionProviderHeaders = { ...headers };
     }
     if (!runner.hasHandlers("before_agent_start")) return;
     const base = this.composeSystemPrompt();
@@ -7791,6 +7795,7 @@ Delegation rules:
     this.acceptingSteering = false;
     this.gracefulStopRequested = false;
     this.runCancelled = true;
+    this.extensionRunner?.cancelPending();
     this.resolvePendingAskTools();
     this.abortRunningDelegations();
     this.turnSubagentUsage = undefined;
@@ -7828,9 +7833,10 @@ Delegation rules:
   }
 
   async dispose(): Promise<void> {
+    if (this.disposed) return;
     const runner = this.extensionRunner;
     this.extensionRunner = undefined;
-    if (runner) await runner.dispose().catch(() => undefined);
+    const closingExtensions = runner?.dispose();
     this.streamSink.dispose();
     this.disposed = true;
     this.acceptingSteering = false;
@@ -7854,5 +7860,6 @@ Delegation rules:
     this.cleanupActiveToolProgress();
     if (this.compactionInProgress) this.compactionAborted = true;
     this.compactionAbort?.abort();
+    await closingExtensions;
   }
 }

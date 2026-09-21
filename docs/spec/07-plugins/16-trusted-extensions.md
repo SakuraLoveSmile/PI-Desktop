@@ -303,9 +303,9 @@ are honored where the event type defines a result.
 | `session_info_changed` | Session rename through `setSessionName` | No |
 | `project_trust` | v1 note: not emitted; enablement per project is the trust decision | No |
 | `resources_discover` | v1 note: not emitted; skills and prompt discovery stay in Electron main | n/a |
-| `before_agent_start` | Before the first provider request of a turn | Yes, system prompt and message edits |
+| `before_agent_start` | Before the first provider request of a turn | Yes, system prompt replacement only |
 | `context` | `prepareNextTurn` | Yes, replacement message list |
-| `before_provider_request`, `before_provider_headers`, `after_provider_response` | Provider call wrapper | Yes for request and headers |
+| `before_provider_request`, `before_provider_headers`, `after_provider_response` | Provider call wrapper | Request return value; headers mutate the payload in place |
 | `agent_start`, `agent_end`, `agent_settled` | Agent loop boundaries | No |
 | `turn_start`, `turn_end` | Turn boundaries | No |
 | `message_start`, `message_update`, `message_end` | Agent message events | v1 note: no, pi-agent-core offers no post-hoc replacement |
@@ -318,9 +318,36 @@ are honored where the event type defines a result.
 | `input` | v1 note: not emitted; Host queue admission is not wired yet | n/a |
 | `user_bash`, `session_before_switch`, `session_before_tree`, `session_tree`, `ui_prompt_start`, `ui_prompt_end` | Not emitted in v1 | n/a |
 
-A handler that throws is logged as a diagnostic and treated as returning
-`undefined`. A handler that exceeds 30 s for a result-bearing event is
-abandoned with a diagnostic and the turn proceeds with the unmodified value.
+Desktop event capabilities are maintained in
+`packages/agent-runtime/src/extensions/event-capabilities.ts`: result,
+mutation, notification, or deferred. Registering a deferred event remains
+accepted but emits an `unsupported_api` diagnostic in the existing plugin
+diagnostics; it does not prevent supported handlers from loading.
+
+Every event handler, including startup, shutdown, and notifications, has a
+30-second **per-handler** wait budget. Module loading and factory initialization
+also have separate 30-second wait budgets, reported as load/factory errors.
+A handler that throws or times out produces a diagnostic and counts as
+`undefined`; subsequent handlers still run in registration order. Existing
+result folding and fail-open semantics are unchanged. This is not a mandatory
+security-check mechanism. Multiple stalled handlers can each consume their budget.
+
+Abort retires pending event dispatches. Disposal first rejects new dispatches
+and cancels existing waits, then runs shutdown once even under concurrent
+disposal. Old dispatches return no result and never invoke their remaining
+handlers; late settlements do not add diagnostics or overwrite results. A
+factory finishing after disposal cannot publish tools or commands. Runtime
+shutdown cancels agent work before waiting for extension shutdown. Stopping
+during preflight hooks prevents the provider request and retains the user
+message; a later prompt can run normally.
+
+These are bounds on waiting, not forced execution isolation: an in-process
+handler can still block the JS thread or perform external side effects after
+timeout/cancellation. No new public cancellation parameter is added. Slash
+commands and extension tool execution retain their existing lifecycle. Native
+Pi sessions use the upstream SDK lifecycle and are outside this Desktop change.
+The 30-second event budget also applies when a handler waits for a UI prompt;
+the UI broker's own prompt timeout does not extend that budget.
 
 ## 7. Tools
 
