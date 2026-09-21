@@ -5605,7 +5605,7 @@ Delegation rules:
     // agentLoopContinue refuses a transcript ending in an assistant message,
     // and this one carries nothing worth resending anyway.
     const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role === "assistant") messages.pop();
+    while (messages.at(-1)?.role === "assistant") messages.pop();
     this.setAgentMessages(messages);
 
     const promptBefore = this.agent.state.systemPrompt;
@@ -5656,7 +5656,7 @@ Delegation rules:
         this.suppressOverflowRunEnd = false;
         this.overflowRecoveryAttempted = true;
         const messages = [...this.agent.state.messages];
-        if (messages.at(-1)?.role === "assistant") messages.pop();
+        while (messages.at(-1)?.role === "assistant") messages.pop();
         this.setAgentMessages(messages);
         const compacted = await this.runCompaction(
           "overflow",
@@ -5713,7 +5713,7 @@ Delegation rules:
     // assistant message. The progress text is already visible in the reused
     // bubble, so it must not be sent back as model context.
     const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role === "assistant") messages.pop();
+    while (messages.at(-1)?.role === "assistant") messages.pop();
     this.setAgentMessages(messages);
 
     const promptBefore = this.agent.state.systemPrompt;
@@ -7696,6 +7696,15 @@ Delegation rules:
       try {
         await this.agent.continue();
         await this.agent.waitForIdle();
+        // The steering continuation may itself finish with a recoverable
+        // provider/silent/overflow/progress failure. Let runPendingRecoveries
+        // repair that assistant tail before another steering continuation.
+        if (
+          this.suppressOverflowRunEnd ||
+          this.suppressProviderRetryRunEnd ||
+          this.suppressSilentTurnRunEnd ||
+          this.suppressProgressTurnRunEnd
+        ) return;
       } finally {
         this.steeringContinuation = false;
       }
