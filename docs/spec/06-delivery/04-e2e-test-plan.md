@@ -14207,12 +14207,15 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Steps:** Call `providers.list` and confirm every binding returns. Edit the
   stored `config_json` to delete one binding's `maxTokens` and list again.
   Restore the field and list again. Then set one binding's `contextWindow` to a
-  string and list once more.
-- **Expected:** All three bindings return in every case except the last, where
-  the two readable bindings return in their stored order. The binding that lost
-  `maxTokens` reads with the generic default output cap, and restoring the field
-  restores the value. The host log names the provider id, the entry's index and
-  the reason for the entry that could not be decoded.
+  string and list once more. Attempt `providers.update` with the readable
+  subset and an unrelated provider change.
+- **Expected:** All three bindings return in every case except the malformed
+  entry, where the readable bindings return in their stored order. The binding
+  that lost `maxTokens` reads with the generic default output cap, and restoring
+  the field restores the value. The host log names the provider id, the entry's
+  index and the reason for the entry that could not be decoded. The explicit
+  model-array update is rejected with `MODEL_BINDINGS_DEGRADED`, while the
+  stored `config_json` remains unchanged.
 - **Specs linked:** `03-runtime/12-provider-config-schema.md` §2,
   `08-meta/decisions-log.md` D610
 - **Acceptance:** F (persistence), Quality

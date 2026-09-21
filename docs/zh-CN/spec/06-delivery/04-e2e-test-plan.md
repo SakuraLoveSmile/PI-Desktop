@@ -8500,10 +8500,12 @@ the latest destination. These assertions measure work counts, not device FPS.
   建立一个至少含三条完整绑定的提供商；不使用真实提供商或凭据。
 - **步骤**：调用 `providers.list`，确认全部绑定都返回。编辑存储的
   `config_json`，删掉其中一个绑定的 `maxTokens`，再次 list。补回该字段后再
-  list。最后把某个绑定的 `contextWindow` 改成字符串，再 list 一次。
-- **预期**：除最后一次外，三种情况下三条绑定全部返回；最后一次按存储顺序返回
-  两条可读绑定。丢失 `maxTokens` 的绑定以通用默认输出上限读出，补回字段后数值
-  恢复。宿主日志为无法解码的条目带上提供商 id、条目下标与原因。
+  list。最后把某个绑定的 `contextWindow` 改成字符串，再 list 一次；用可读子集
+  携带一个无关字段变更调用 `providers.update`。
+- **预期**：除损坏条目外，三条绑定都按存储顺序返回。丢失 `maxTokens` 的绑定以
+  通用默认输出上限读出，补回字段后数值恢复。宿主日志为无法解码的条目带上提供商
+  id、条目下标与原因。显式模型数组更新返回 `MODEL_BINDINGS_DEGRADED`，而存储的
+  `config_json` 保持不变。
 - **链接规格**：`03-runtime/12-provider-config-schema.md` §2、
   `08-meta/decisions-log.md` D610
 - **验收**：F（持久化）、品质

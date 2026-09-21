@@ -201,15 +201,15 @@ manifest therefore agree on what a model without limits means (D610).
 
 Each entry of a stored `models` array is decoded on its own. An entry that no
 longer matches the schema is skipped and reported on the host log with the
-provider id, its index and the reason, instead of discarding the whole array:
-one hand-edited or partially written binding used to leave the provider reading
-as a single legacy default model, every other configured model gone and nothing
-said about why (D610). An absent `models` key, an empty array, and an array
-whose every entry was unreadable all still read as the legacy binding, so a
-provider stays selectable whatever its stored shape; only the third is
-reported, because an empty array is a legal state and an absent one predates
-bindings. A save still writes exactly the bindings the client sends, so the
-stored array is only ever replaced by an explicit write.
+provider id, its index and the reason, instead of discarding the whole array.
+The read remains usable, but it is marked degraded: invalid JSON, a non-object
+config, a non-array `models` value, or any unreadable entry is reported. An
+absent `models` key and an empty array remain legal legacy states; an array
+whose entries are all unreadable still falls back to the legacy binding and is
+reported. To prevent a partial settings view from erasing stored data,
+`providers.update` rejects an explicit model-array replacement with
+`MODEL_BINDINGS_DEGRADED` while the stored value is degraded. Updates to
+unrelated provider fields remain allowed.
 
 For context resolution, that 128,000 value is a backward-compatible generic
 seed, not a reason to hide a published long-context limit. If models.dev now

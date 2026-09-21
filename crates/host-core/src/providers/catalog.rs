@@ -101,6 +101,11 @@ fn legacy_model_binding(model_id: Option<String>) -> Vec<ModelBinding> {
 enum StoredModels {
     /// The key is absent — a record written before bindings existed.
     Absent,
+    /// The stored config is not valid JSON or is not an object.
+    InvalidConfig {
+        /// A safe, non-secret description suitable for the RPC error/log.
+        reason: String,
+    },
     /// The key is present but is not an array, so there is nothing to decode.
     NotAnArray,
     /// The array, decoded one entry at a time.
@@ -123,7 +128,20 @@ enum StoredModels {
 /// about why (issue #784). Each entry is therefore decoded on its own and the
 /// ones that fail are collected for the caller to report.
 fn decode_stored_models(raw: &str) -> StoredModels {
-    let Some(models) = config_value(raw).and_then(|value| value.get("models").cloned()) else {
+    let value = match serde_json::from_str::<serde_json::Value>(raw) {
+        Ok(value) if value.is_object() => value,
+        Ok(_) => {
+            return StoredModels::InvalidConfig {
+                reason: "config_json root must be an object".to_string(),
+            };
+        }
+        Err(error) => {
+            return StoredModels::InvalidConfig {
+                reason: format!("config_json is not valid JSON: {error}"),
+            };
+        }
+    };
+    let Some(models) = value.get("models").cloned() else {
         return StoredModels::Absent;
     };
     let Some(entries) = models.as_array() else {
@@ -133,6 +151,10 @@ fn decode_stored_models(raw: &str) -> StoredModels {
     let mut unreadable = Vec::new();
     for (index, entry) in entries.iter().enumerate() {
         match serde_json::from_value::<ModelBinding>(entry.clone()) {
+            Ok(binding) if binding.id.trim().is_empty() => unreadable.push((
+                index,
+                "model binding id must be a non-empty string".to_string(),
+            )),
             Ok(binding) => bindings.push(binding),
             Err(error) => unreadable.push((index, error.to_string())),
         }
@@ -145,10 +167,10 @@ fn decode_stored_models(raw: &str) -> StoredModels {
 
 /// Read the provider's model bindings out of `config_json`.
 ///
-/// An absent array, an empty one, and one whose every entry was unreadable all
-/// leave the single legacy binding, so a provider stays selectable whatever its
-/// stored shape. Only the third case is reported: an empty array is a legal
-/// state, and an absent one is a record that predates bindings.
+/// An absent array and an empty one leave the single legacy binding without a
+/// warning. Invalid config shapes and unreadable entries are reported. An array
+/// whose every entry is unreadable still falls back to the legacy binding, so a
+/// provider stays selectable while the loss remains diagnosable.
 pub(crate) fn config_model_bindings(
     raw: &str,
     legacy_model_id: Option<String>,
@@ -177,6 +199,14 @@ pub(crate) fn config_model_bindings(
                 bindings
             }
         }
+        StoredModels::InvalidConfig { reason } => {
+            tracing::warn!(
+                %provider_id,
+                %reason,
+                "invalid provider config_json; reading the legacy binding"
+            );
+            legacy_model_binding(legacy_model_id)
+        }
         StoredModels::NotAnArray => {
             tracing::warn!(
                 %provider_id,
@@ -185,6 +215,33 @@ pub(crate) fn config_model_bindings(
             legacy_model_binding(legacy_model_id)
         }
         StoredModels::Absent => legacy_model_binding(legacy_model_id),
+    }
+}
+
+/// Reject a full model-array replacement while the stored array is degraded.
+///
+/// Returning the readable subset from a degraded read keeps providers usable,
+/// but accepting that subset back through `providers.update` would permanently
+/// erase unreadable entries. Callers may still update unrelated provider fields;
+/// only an explicit `models` replacement is blocked.
+pub(crate) fn ensure_model_bindings_update_safe(raw: &str) -> Result<()> {
+    match decode_stored_models(raw) {
+        StoredModels::Absent => Ok(()),
+        StoredModels::Entries { unreadable, .. } if unreadable.is_empty() => Ok(()),
+        StoredModels::Entries { unreadable, .. } => {
+            let details = unreadable
+                .into_iter()
+                .map(|(index, reason)| format!("index {index}: {reason}"))
+                .collect::<Vec<_>>()
+                .join("; ");
+            bail!("MODEL_BINDINGS_DEGRADED: {details}");
+        }
+        StoredModels::InvalidConfig { reason } => {
+            bail!("MODEL_BINDINGS_DEGRADED: {reason}");
+        }
+        StoredModels::NotAnArray => {
+            bail!("MODEL_BINDINGS_DEGRADED: config_json.models is not an array");
+        }
     }
 }
 
@@ -479,5 +536,38 @@ mod tests {
         );
         assert_eq!(bindings.len(), 1);
         assert_eq!(bindings[0].id, "config-legacy");
+    }
+    #[test]
+    fn malformed_model_storage_is_explicitly_degraded() {
+        let invalid_json = ensure_model_bindings_update_safe("not-json").unwrap_err();
+        assert!(invalid_json
+            .to_string()
+            .starts_with("MODEL_BINDINGS_DEGRADED: config_json is not valid JSON"));
+
+        let non_object = ensure_model_bindings_update_safe("[]").unwrap_err();
+        assert!(non_object
+            .to_string()
+            .contains("config_json root must be an object"));
+
+        let non_array =
+            ensure_model_bindings_update_safe(r#"{"models":{"id":"wrapped"}}"#).unwrap_err();
+        assert!(non_array
+            .to_string()
+            .contains("config_json.models is not an array"));
+
+        let empty_id = read(r#"{"models":[{"id":"  "},{"id":"readable"}]}"#);
+        assert_eq!(
+            empty_id
+                .iter()
+                .map(|binding| binding.id.as_str())
+                .collect::<Vec<_>>(),
+            ["readable"]
+        );
+        let empty_id_error =
+            ensure_model_bindings_update_safe(r#"{"models":[{"id":"  "},{"id":"readable"}]}"#)
+                .unwrap_err();
+        assert!(empty_id_error.to_string().contains("index 0"));
+
+        assert!(ensure_model_bindings_update_safe(r#"{"models":[]}"#).is_ok());
     }
 }

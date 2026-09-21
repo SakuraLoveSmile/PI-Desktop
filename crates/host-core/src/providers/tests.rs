@@ -1282,3 +1282,85 @@ fn a_stored_array_survives_an_entry_that_lost_a_field() {
     let damaged = get_provider(&db, &secrets, &provider.id).unwrap().unwrap();
     assert_eq!(model_ids(&damaged), ["alpha", "beta"]);
 }
+#[test]
+fn degraded_model_array_cannot_be_overwritten_by_update() {
+    let (_dir, db, secrets) = test_context();
+    let provider = create_provider(
+        &db,
+        &secrets,
+        ProviderCreateInput {
+            name: "Protected array".into(),
+            vendor_key: None,
+            provider_type: None,
+            protocol: None,
+            base_url: Some("https://example.test/v1".into()),
+            auth_kind: Some("api_key_and_base_url".into()),
+            models: Some(vec![binding_with_limits("alpha", 128_000, 8_192)]),
+            default_model_id: Some("alpha".into()),
+            secret_value: Some("old-secret".into()),
+            api_style: None,
+            oauth_account_label: None,
+            headers: None,
+            context_window: None,
+            max_output_tokens: None,
+            temperature: None,
+            supports_reasoning: None,
+            supported_thinking_levels: None,
+        },
+    )
+    .unwrap();
+    let mut config: serde_json::Value = db
+        .conn()
+        .query_row(
+            "SELECT config_json FROM providers WHERE id = ?1",
+            params![provider.id],
+            |row| row.get::<_, String>(0),
+        )
+        .map(|raw| serde_json::from_str(&raw).unwrap())
+        .unwrap();
+    config["models"][0]["contextWindow"] = json!("not-a-number");
+    db.conn()
+        .execute(
+            "UPDATE providers SET config_json = ?1 WHERE id = ?2",
+            params![config.to_string(), provider.id],
+        )
+        .unwrap();
+    let before: String = db
+        .conn()
+        .query_row(
+            "SELECT config_json FROM providers WHERE id = ?1",
+            params![provider.id],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    let error = update_provider(
+        &db,
+        &secrets,
+        ProviderUpdateInput {
+            models: Some(vec![binding_with_limits("alpha", 128_000, 8_192)]),
+            secret_value: Some("new-secret".into()),
+            ..blank_update(provider.id.clone())
+        },
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.starts_with("MODEL_BINDINGS_DEGRADED:"), "{error}");
+
+    let after: String = db
+        .conn()
+        .query_row(
+            "SELECT config_json FROM providers WHERE id = ?1",
+            params![provider.id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(after, before);
+    assert_eq!(
+        secrets
+            .get(&secret_ref_for_provider(&provider.id))
+            .unwrap()
+            .as_deref(),
+        Some("old-secret")
+    );
+}
