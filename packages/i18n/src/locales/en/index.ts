@@ -529,6 +529,7 @@ export const en = {
     reject: "Reject",
     untitled: "Untitled plan",
     openArtifact: "Open plan",
+    openArtifactLabel: "Open plan artifact {{path}}",
   },
   goal: {
     planning: "Defining goal",
@@ -546,6 +547,7 @@ export const en = {
     reject: "Reject",
     untitled: "Untitled goal",
     openArtifact: "Open goal",
+    openArtifactLabel: "Open goal artifact {{path}}",
   },
   onboarding: {
     title: "Get started",
