@@ -8491,3 +8491,14 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Status:** Automated by `node --experimental-strip-types
   scripts/e2e-scheduled-workspace.mjs`, using production Electron dispatch and
   real Rust/stdio/SQLite. Only external inference is replaced with an observer.
+
+### E2E-011f 补充：入队确认前的操作锁定
+
+- **前提**：会话正在回复，可控制 Host 入队请求的完成时刻。
+- **步骤**：发送一条后续消息，暂停入队；尝试编辑或删除；释放入队后再次编辑或删除，
+  然后刷新队列。用带文件引用的草稿重复。
+- **预期**：未确认时五个行操作都禁用，条目不消失，也不回填第二份草稿；
+  确认后删除能移除持久化条目，编辑完整回填草稿及文件引用，刷新不会恢复已移除条目。
+- **规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`。
+- **验收 / 里程碑**：C、Quality / M6+。
+- **状态**：组件与状态层用户路径由 `queue-pending-actions.test.mjs` 覆盖。

@@ -139,12 +139,12 @@ test("running prompts use a removable per-session queue with priority actions", 
     /\{promoted \? t\("chat\.sendNowPending"\) : t\("chat\.sendNow"\)\}/,
   );
   assert.equal(
-    (composer.match(/disabled=\{promoted\}/g) ?? []).length,
+    (composer.match(/disabled=\{actionsLocked\}/g) ?? []).length,
     8,
-    "four promoted rows set disabled and aria-disabled on move up/down, edit, and remove",
+    "four pending or promoted row actions set disabled and aria-disabled on move up/down, edit, and remove",
   );
   assert.equal(
-    (composer.match(/aria-disabled=\{promoted\}/g) ?? []).length,
+    (composer.match(/aria-disabled=\{actionsLocked\}/g) ?? []).length,
     4,
     "each locked action carries its own aria-disabled state",
   );

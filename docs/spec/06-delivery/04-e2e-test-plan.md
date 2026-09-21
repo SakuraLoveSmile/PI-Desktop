@@ -1231,7 +1231,8 @@ identify the platform validation still needed.
   `04-ux/09-interaction-patterns.md` (§1.6, §11)
 - **Acceptance**: C (session isolation, chat & stream)
 - **Milestone**: M2
-- **Status**: Unit-covered (`composer-send-state.test.mjs`); full UI scenario Draft
+- **Status**: Unit-covered (`composer-send-state.test.mjs`); pending-admission component/store user path
+  covered (`queue-pending-actions.test.mjs`); full UI scenario Draft
 
 #### E2E-011b: Create a new session from a retained project group
 
@@ -1380,7 +1381,9 @@ identify the platform validation still needed.
   follow-ups through their turn boundaries. Repeat with a provider error and an
   immediate abort. 9) With waiting rows, use move up and move down and confirm
   the persisted order follows. 10) Edit a waiting row while the composer holds
-  text, then with an empty composer.
+  text, then with an empty composer. 11) Delay Host queue admission. Attempt to
+  edit/remove the pending row, release admission, then edit/remove the durable
+  row. Repeat with a captured file-reference draft.
 - **Expected**: The single submit slot contains exactly one button in every
   state: disabled Send while idle and empty, enabled Send while running with
   content (which queues the prompt), and Stop while running with an empty
@@ -1402,7 +1405,10 @@ identify the platform validation still needed.
   is pending; each subsequent turn starts once in FIFO order, without another
   click or session switch. Repeated terminal handling does not double-dispatch.
   Other sessions' queues remain unchanged, and quitting while finalization is
-  pending preserves queued work without starting another turn.
+  pending preserves queued work without starting another turn. Pending-admission
+  rows disable all five actions and remain visible without restoring a second
+  draft. Once acknowledged, remove deletes the durable row and edit restores
+  exactly its captured draft; neither row reappears after refresh.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` (§5.6),
   `04-ux/08-component-spec.md` (§11),
   `04-ux/09-interaction-patterns.md` (§3.4), ADR 0118, ADR 0213, ADR 0265
