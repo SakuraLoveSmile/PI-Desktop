@@ -172,6 +172,12 @@ try {
   const gap = await evaluate(`(() => {const rows=[...document.querySelectorAll('.settings-row')];const image=rows.find(e=>e.innerText.includes('生图模型'));return image.getBoundingClientRect().top-document.querySelector('.model-default-row').getBoundingClientRect().bottom})()`);
   await screenshot("settings.png");
   assert.ok(gap>=11 && gap<=13, `defaults gap ${gap}px`);
+  await evaluate(`document.querySelector('.model-default-trigger').click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('.model-default-option')`),5000,"default option ready");
+  await evaluate(`document.querySelector('.model-default-option').click()`);
+  await waitFor(() => evaluate(`document.body.innerText.includes('默认 AI 服务已更新')`),5000,"settings save success feedback");
+  await waitFor(async () => (await invoke("settingsGet")).infiniteProviderRetry === false,5000,"normalized settings save round trip");
+  assert.ok(await evaluate(`!document.body.innerText.includes('infiniteProviderRetry is invalid')`));
   await click("返回应用");
   await evaluate(`document.querySelector('.composer-model-thinking-chip').click()`);
   await waitFor(() => evaluate(`!!document.querySelector('.composer-menu-entry')`),5000,"composer model root");
