@@ -30,6 +30,11 @@ behavior, actual HTTP transmission, or a user's observed response status.
    declared by the registry. Each header owns its variable definitions.
 2. Add optional `headerBindings` to the shared catalog template. Each header
    maps exact tokens to an editable `requiredEnv` input or a fixed literal.
+   Presence of `headerBindings`, including an empty map, selects explicit
+   binding mode for all headers. A header absent from that map has no bound
+   tokens: both `{name}` and `${NAME}` remain literal, regardless of global
+   `requiredEnv` names or defaults. Only catalogs with no `headerBindings`
+   metadata use the legacy global input scope.
    Same-named inputs in separate headers get distinct collision-safe names.
    Variable `default` prefills the editable input; omitted `isRequired` means
    optional. A fixed `value` is not editable and its content is never parsed

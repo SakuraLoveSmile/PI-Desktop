@@ -39,7 +39,10 @@ export type McpCatalogEntry = {
   /** Public HTTPS template; only legacy `${NAME}` URL tokens are expanded. */
   url?: string;
   headers?: Record<string, string>;
-  /** Header-local token bindings. Unbound text stays literal, including braces. */
+  /**
+   * Header-local token bindings. When present (even empty), every unbound token
+   * stays literal, including in headers without a binding map.
+   */
   headerBindings?: Record<string, Record<string, McpCatalogHeaderBinding>>;
   requiredEnv?: McpCatalogRequiredEnv[];
   prerequisites?: string[];
@@ -191,7 +194,9 @@ export function collectCatalogPlaceholders(entry: McpCatalogEntry): string[] {
 }
 
 function bindingsForHeader(entry: McpCatalogEntry, header: string): Record<string, McpCatalogHeaderBinding> | undefined {
-  return entry.headerBindings && Object.hasOwn(entry.headerBindings, header) ? entry.headerBindings[header] : undefined;
+  // Only catalogs without binding metadata use the legacy global input scope.
+  if (entry.headerBindings === undefined) return undefined;
+  return Object.hasOwn(entry.headerBindings, header) ? entry.headerBindings[header] : {};
 }
 
 function declaredNames(entry: McpCatalogEntry): Map<string, McpCatalogRequiredEnv> {

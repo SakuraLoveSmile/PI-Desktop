@@ -157,6 +157,74 @@ describe("resolveCatalogEntry", () => {
     expect(() => resolveCatalogEntry(entry, { token: "synthetic-secret" })).toThrow("missing value for REGION");
   });
 
+  it.each(["{token}", "${token}"])("keeps unbound %s literal in a partial header binding map", (token) => {
+    const entry: McpCatalogEntry = {
+      ...httpTemplate,
+      headers: { Authorization: `Bearer ${token}`, "X-Unbound": token },
+      headerBindings: { Authorization: { [token]: { input: "token" } } },
+      requiredEnv: [{ name: "token", defaultValue: "synthetic-default" }],
+    };
+    expect(catalogEntryError(entry)).toBeNull();
+    expect(collectCatalogPlaceholders(entry)).toEqual(["token"]);
+    expect(resolveCatalogEntry(entry, { token: "synthetic-secret" }).headers).toEqual({
+      Authorization: "Bearer synthetic-secret", "X-Unbound": token,
+    });
+    expect(resolveCatalogEntry(entry).headers).toEqual({
+      Authorization: "Bearer synthetic-default", "X-Unbound": token,
+    });
+  });
+
+  it("does not discover or require an unbound header token in explicit binding mode", () => {
+    const entry: McpCatalogEntry = {
+      ...httpTemplate,
+      headers: { Authorization: "Bearer {token}", "X-Unbound": "${UNBOUND}" },
+      headerBindings: { Authorization: { "{token}": { input: "key" } } },
+      requiredEnv: [{ name: "key" }],
+    };
+    expect(collectCatalogPlaceholders(entry)).toEqual(["key"]);
+    expect(catalogEntryError(entry)).toBeNull();
+    expect(resolveCatalogEntry(entry, { key: "synthetic-secret" }).headers).toEqual({
+      Authorization: "Bearer synthetic-secret", "X-Unbound": "${UNBOUND}",
+    });
+  });
+
+  it.each<NonNullable<McpCatalogEntry["headerBindings"]>>([{}, { Authorization: {} }])("treats an empty binding map as explicit mode: %j", (headerBindings) => {
+    const entry: McpCatalogEntry = {
+      ...httpTemplate,
+      headers: { Authorization: "Bearer ${TOKEN}", "X-Unbound": "{TOKEN}" },
+      headerBindings,
+      requiredEnv: [{ name: "TOKEN", defaultValue: "synthetic-default" }],
+    };
+    expect(collectCatalogPlaceholders(entry)).toEqual([]);
+    expect(catalogEntryError(entry)).toBeNull();
+    expect(resolveCatalogEntry(entry).headers).toEqual(entry.headers);
+    expect(resolveCatalogEntry(entry, { TOKEN: "synthetic-secret" }).headers).toEqual(entry.headers);
+    expect(resolveCatalogEntry({ ...entry, requiredEnv: [{ name: "TOKEN" }] }).headers).toEqual(entry.headers);
+  });
+
+  it("ignores inherited header bindings instead of falling back to global inputs", () => {
+    const entry: McpCatalogEntry = {
+      ...httpTemplate,
+      headers: { Authorization: "Bearer {token}" },
+      headerBindings: Object.create({ Authorization: { "{token}": { input: "token" } } }),
+      requiredEnv: [{ name: "token" }],
+    };
+    expect(collectCatalogPlaceholders(entry)).toEqual([]);
+    expect(resolveCatalogEntry(entry, { token: "synthetic-secret" }).headers).toEqual(entry.headers);
+  });
+
+  it("preserves legacy dollar and declared brace headers without binding metadata", () => {
+    const entry: McpCatalogEntry = {
+      ...httpTemplate,
+      headers: { Authorization: "Bearer ${TOKEN}", "X-Token": "{TOKEN}" },
+      requiredEnv: [{ name: "TOKEN" }],
+    };
+    expect(collectCatalogPlaceholders(entry)).toEqual(["TOKEN"]);
+    expect(resolveCatalogEntry(entry, { TOKEN: "synthetic-secret" }).headers).toEqual({
+      Authorization: "Bearer synthetic-secret", "X-Token": "synthetic-secret",
+    });
+  });
+
   it("substitutes values into stdio args and env", () => {
     const input = resolveCatalogEntry(stdioTemplate, {
       GITHUB_PAT: "pat-value",

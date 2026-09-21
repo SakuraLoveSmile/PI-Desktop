@@ -7,7 +7,8 @@
  *   E2E-MCP-MARKET-SEMANTICS      registry record → template keeps named
  *                                 arguments and required/optional envs
  *   E2E-MCP-MARKET-HEADER-SCOPE   header credential stays out of the URL
- *                                 through mapping, resolution and persistence
+ *                                 through mapping, resolution and persistence; unbound
+ *                                 headers stay literal with a partial binding map
  *   E2E-MCP-MARKET-NET-BOUNDARY   the URL guard rejects loopback/private/
  *                                 mapped/ULA/link-local bypass forms
  *
@@ -233,6 +234,34 @@ try {
         && scopedDisk.headers?.Authorization === "Bearer synthetic-header-secret"
         && scopedRow.enabled === false,
       "header resolves while the same-named URL token remains literal in host configuration",
+    );
+
+    // A partial binding map must not authorize tokens in a different header.
+    const partialEntry = {
+      ...scopedEntry, id: "partial-header-scope", name: "Partial header scope",
+      headers: {
+        Authorization: "Bearer {token}",
+        "X-Unbound": "{token}/${token}",
+        "X-Undeclared": "${UNBOUND}",
+      },
+      headerBindings: { Authorization: { "{token}": { input: "token" } } },
+    };
+    const partialInput = resolveCatalogEntry(partialEntry, { token: "synthetic-header-secret" });
+    await host.call("mcp.upsert", { server: {
+      ...partialInput, enabled: false, level: "global", scope: GLOBAL_SCOPE,
+    } });
+    const partialList = await host.call("mcp.list", { level: "global" });
+    const partialRow = partialList.servers.find((server) => server.id === partialEntry.id);
+    const partialDisk = JSON.parse(readFileSync(join(home, ".agents", "servers", `${partialEntry.id}.json`), "utf8"));
+    const partialScopeOk = [partialInput, partialRow, partialDisk].every((server) =>
+      server?.url === scopedUrl
+      && server.headers?.Authorization === "Bearer synthetic-header-secret"
+      && server.headers?.["X-Unbound"] === "{token}/${token}"
+      && server.headers?.["X-Undeclared"] === "${UNBOUND}");
+    record(
+      "E2E-MCP-MARKET-partial-header-bindings-stay-literal",
+      partialScopeOk && partialRow?.enabled === false,
+      "partial bindings leave other headers literal through resolution, host upsert/list and persistence",
     );
   }
 } catch (error) {
