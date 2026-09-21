@@ -207,10 +207,11 @@ globalThis.composerPasteProbe = async () => {
       "Settings round-trip lost a workspace file reference from the draft");
     assert(controller.fileReferences.length === 2 && controller.ref.current!.textContent!.includes("main.ts"),
       "Settings round-trip must restore both workspace and scratch chips");
+    flushSync(() => root.render(null));
     render("paste-a", "/project-b");
     await new Promise(requestAnimationFrame);
     assert(readEditorValue(controller.ref.current!) === "Check  and \uE002",
-      "changing workspace must still remove the previous workspace's chip");
+      "changing workspace while the composer is unmounted must remove the previous workspace's chip");
     assert(controller.fileReferences.length === 1 && controller.fileReferences[0].path === references[1].path,
       "changing workspace must preserve scratch references");
     flushSync(() => root.render(null));
