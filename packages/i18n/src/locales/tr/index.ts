@@ -561,7 +561,7 @@ export const tr = {
   settings: {
     "imageModel": "Görsel oluşturma modeli",
     "imageModelUnset": "Yapılandırılmadı",
-    "imageModelUnavailable": "Bu görsel modeli kullanılamıyor. Başka bir model seçin.",
+    "imageModelUnavailable": "Şu anda kullanılamıyor",
     "imageModelSaveFailed": "Görsel modeli kaydedilemedi.",
     "clearImageModel": "Temizle",
     "setImageModel": "Görsel modeli olarak ayarla",
@@ -569,7 +569,7 @@ export const tr = {
     "generatedImage": "Oluşturulan görsel {{index}}",
     "imagePreviewUnavailable": "Önizleme yok; dosyayı aç",
     "imageGenerationFailed": "Görsel {{index}} tamamlanmadı.",
-    "imageModelSetupHint": "Ayarlar → AI bölümünde bir görsel modeli yapılandırın.",
+    "imageModelSetupHint": "Ayarlar → Modeller bölümünde bir görsel modeli yapılandırın.",
     "configureImageModel": "Görsel modelini yapılandır",
 
 

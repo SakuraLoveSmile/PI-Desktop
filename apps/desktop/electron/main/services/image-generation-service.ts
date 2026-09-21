@@ -35,7 +35,7 @@ export function createImageGenerationTool(options: {
     if (!binding)
       return failure(
         "IMAGE_NOT_CONFIGURED",
-        "Configure an image generation model in Settings > AI > Image generation model before generating images. Do not substitute another model.",
+        "Configure an image generation model in Settings > Models > Image generation model before generating images. Do not substitute another model.",
       );
     const { provider } = await host.call<{ provider?: ProviderPublic }>("providers.get", {
       id: binding.providerId,
@@ -47,7 +47,7 @@ export function createImageGenerationTool(options: {
     ) {
       return failure(
         "IMAGE_MODEL_UNAVAILABLE",
-        "The configured image model is unavailable. Update Settings > AI > Image generation model.",
+        "The configured image model is unavailable. Update Settings > Models > Image generation model.",
       );
     }
     if (provider.authKind === "oauth")

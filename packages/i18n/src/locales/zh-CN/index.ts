@@ -556,7 +556,7 @@ export const zhCN = {
   settings: {
     imageModel: "生图模型",
     imageModelUnset: "未配置",
-    imageModelUnavailable: "当前生图模型不可用，请选择其他模型。",
+    imageModelUnavailable: "暂不可用",
     imageModelSaveFailed: "无法保存生图模型。",
     clearImageModel: "清除",
     setImageModel: "设为生图模型",
@@ -564,7 +564,7 @@ export const zhCN = {
     generatedImage: "生成图片 {{index}}",
     imagePreviewUnavailable: "预览不可用，打开文件",
     imageGenerationFailed: "图片 {{index}} 未完成。",
-    imageModelSetupHint: "请前往 设置 → AI → 生图模型 完成配置。",
+    imageModelSetupHint: "请前往 设置 → 模型 → 生图模型 完成配置。",
     configureImageModel: "配置生图模型",
 
 

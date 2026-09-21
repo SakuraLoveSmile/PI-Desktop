@@ -22,9 +22,8 @@ try {
     platform: "browser",
     format: "iife",
     jsx: "automatic",
+    loader: { ".woff": "file", ".woff2": "file", ".ttf": "file" },
     define: { "process.env.NODE_ENV": '"production"' },
-    // Exercise API-format interactions with real components/hooks, not visual layout.
-    loader: { ".css": "empty" },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
       // The fixture lives outside the desktop package; use its React instance.
@@ -35,7 +34,7 @@ try {
   });
   await writeFile(
     join(temp, "index.html"),
-    '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:"><title>Image generation interactions</title><body><script src="renderer.js"></script>',
+    '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:"><link rel="stylesheet" href="renderer.css"><title>Image generation interactions</title><body><script src="renderer.js"></script>',
   );
   await writeFile(
     join(temp, "main.cjs"),

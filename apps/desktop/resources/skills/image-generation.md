@@ -6,7 +6,7 @@ description: Generate or edit raster images, illustrations, photos, banners, and
 # Image generation
 
 Use the desktop `GenerateImages` tool. The user selects its provider and model
-under Settings → AI → Image generation model; this is independent of the chat
+under Settings → Models → Image generation model; this is independent of the chat
 model. If ToolSearch is available and GenerateImages is not loaded, discover it
 there first. Do not install an SDK, run an API script, ask for a key in chat, or
 substitute the conversation model.
@@ -42,7 +42,7 @@ Example: two cover variants and one distinct icon:
 Generation may incur cost. Do not retry failed or timed-out items automatically,
 including after cancellation: the provider may already have processed them.
 Report partial success and wait for a user request before retrying. If no image
-model is configured, direct the user to Settings → AI; do not select one silently.
+model is configured, direct the user to Settings → Models; do not select one silently.
 
 ## Deliver the result
 

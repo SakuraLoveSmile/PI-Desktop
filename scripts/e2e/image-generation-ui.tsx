@@ -6,8 +6,12 @@ import { catalogs } from "@pi-desktop/i18n";
 import type { AppSettings, ProviderPublic, UiMessage } from "@pi-desktop/shared";
 import { ModelConfigPage } from "../../apps/desktop/src/components/settings/ModelConfigPage";
 import { GeneratedImages } from "../../apps/desktop/src/features/chat/transcript/GeneratedImages";
+import { Markdown } from "../../apps/desktop/src/components/Markdown";
 import { api } from "../../apps/desktop/src/lib/api";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
+import "../../apps/desktop/src/styles/tokens.css";
+import "../../apps/desktop/src/styles/settings.css";
+import "../../apps/desktop/src/styles/model-config.css";
 
 declare global {
   var imageGenerationProbe: () => Promise<unknown>;
@@ -57,12 +61,15 @@ globalThis.imageGenerationProbe = async () => {
       defaultThinkingLevel: null,
     })),
   };
+  const alternate = { ...provider, id: "q", name: "Images B" };
+  const chatProvider = { ...provider, id: "chat", name: "Chat", models: [{ ...provider.models[0], id: "chat-model" }] };
+  const providers = [provider, alternate, chatProvider];
   api.getSettings = async () => structuredClone(settings);
   api.setSettings = async (next) => {
     settings = structuredClone(next);
     return { ok: true };
   };
-  api.listProviders = async () => ({ providers: [provider] });
+  api.listProviders = async () => ({ providers });
   api.listSessions = async () => ({ sessions: [] });
   api.getOnboarding = async () => ({ dismissed: true });
   api.listProviderModels = async () => ({ models: [], source: "remote" });
@@ -73,13 +80,13 @@ globalThis.imageGenerationProbe = async () => {
     providerCount: 1,
     modelCount: 2,
   });
-  api.updateProvider = async () => ({ provider });
+  api.updateProvider = async (input) => ({ provider: providers.find((entry) => entry.id === input.id)! });
   api.fsReadImageDataUrl = async () => ({
     kind: "image",
     dataUrl:
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9mQAAAAASUVORK5CYII=",
   });
-  useAppStore.setState({ settings, providers: [provider] });
+  useAppStore.setState({ settings, providers });
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -103,6 +110,12 @@ globalThis.imageGenerationProbe = async () => {
     for (const locale of ["en", "zh-CN"]) {
       await i18n.changeLanguage(locale);
       render();
+      const defaultRow = container.querySelector<HTMLElement>(".model-default-row")!;
+      const imageRow = [...container.querySelectorAll<HTMLElement>(".settings-row")].find(
+        (element) => element.textContent?.includes(i18n.t("settings.imageModel")),
+      )!;
+      const gap = imageRow.getBoundingClientRect().top - defaultRow.getBoundingClientRect().bottom;
+      assert(gap >= 11 && gap <= 13, `model defaults should be adjacent rows, got ${gap}px`);
       const edit =
         container.querySelector<HTMLButtonElement>(
           'button[aria-label="' + i18n.t("settings.editProvider") + '"]',
@@ -138,19 +151,35 @@ globalThis.imageGenerationProbe = async () => {
       const row = [...container.querySelectorAll<HTMLElement>(".settings-row")].find((element) =>
         element.textContent?.includes(i18n.t("settings.imageModel")),
       )!;
-      click(
-        [...row.querySelectorAll<HTMLButtonElement>("button")].find(
-          (element) => element.textContent === i18n.t("settings.changeDefaultModel"),
-        ),
-      );
-      await until(() => !!button("Images / image-two"), "replacement picker missing");
-      click(button("Images / image-two"));
-      await until(
-        () => settings.imageGeneration?.modelId === "image-two",
-        "replacement did not persist",
-      );
-      click(button(i18n.t("settings.clearImageModel")));
-      await until(() => settings.imageGeneration === null, "clear did not persist");
+      assert(row.querySelectorAll("button").length === 0, "image summary still offers change or clear");
+      const textStyle = (element: Element | null) => {
+        assert(element, "missing model text");
+        const style = getComputedStyle(element!);
+        return [style.fontSize, style.fontWeight, style.fontFamily].join("|");
+      };
+      assert(textStyle(row.querySelector(".model-default-provider")) === textStyle(defaultRow.querySelector(".model-default-provider")), "provider typography differs from default model");
+      assert(textStyle(row.querySelector(".model-default-model")) === textStyle(defaultRow.querySelector(".model-default-model")), "model typography differs from default model");
+      const alternateRow = [...container.querySelectorAll<HTMLElement>(".model-provider-row")].find((element) => element.textContent?.includes("Images B"));
+      click(alternateRow?.querySelector<HTMLButtonElement>('button[aria-label="' + i18n.t("settings.editProvider") + '"]'));
+      await until(() => !!button(i18n.t("settings.setImageModel")), "alternate provider edit missing");
+      click(button(i18n.t("settings.setImageModel")));
+      click(button(i18n.t("settings.saveProvider")));
+      await until(() => settings.imageGeneration?.providerId === "q" && !document.querySelector(".provider-setup"), "advanced provider switch did not persist");
+      assert(settings.defaultProviderId === "chat" && settings.defaultModelId === "chat-model", "image switch changed chat default");
+      assert(row.textContent?.includes("Images B"), "new provider name missing");
+      for (const invalid of [
+        { ...alternate, enabled: false },
+        { ...alternate, hasSecret: false },
+        { ...alternate, models: [] },
+      ]) {
+        flushSync(() => useAppStore.setState({ providers: [provider, invalid, chatProvider] }));
+        assert(row.querySelector('[role="status"]')?.textContent === i18n.t("settings.imageModelUnavailable"), "unavailable state missing");
+        assert(!row.querySelector(".model-default-provider"), "unavailable binding still displays provider");
+      }
+      settings = { ...settings, imageGeneration: null };
+      flushSync(() => useAppStore.setState({ settings, providers }));
+      assert(row.querySelector('[role="status"]')?.textContent === i18n.t("settings.imageModelUnavailable"), "unset state missing");
+
     }
     const message = {
       id: "image",
@@ -179,18 +208,34 @@ globalThis.imageGenerationProbe = async () => {
     });
     click(button(i18n.t("settings.configureImageModel")));
     assert(
-      useAppStore.getState().settingsTab === "ai" && useAppStore.getState().page === "settings",
+      useAppStore.getState().settingsTab === "agent" && useAppStore.getState().page === "settings",
       "setup action did not navigate",
     );
+    const imageReads: string[] = [];
+    const readImage = api.fsReadImageDataUrl;
+    api.fsReadImageDataUrl = async (ref, mimeType) => {
+      imageReads.push(ref);
+      return readImage(ref, mimeType);
+    };
+    for (const ref of [String.raw`C:\scratch\cup.png`, "/tmp/scratch/cup.png"]) {
+      flushSync(() => root.render(
+        <I18nextProvider i18n={i18n}><Markdown source={`![Generated cup](${ref})`} /></I18nextProvider>,
+      ));
+      await until(() => (container.querySelector("img")?.naturalWidth ?? 0) > 0, "absolute generated image Markdown did not decode");
+      await until(() => imageReads.includes(ref), `Markdown image did not use the contained host reader: ${JSON.stringify(imageReads)}`);
+    }
     return {
       ok: true,
       locales: ["en", "zh-CN"],
       scenarios: [
         "advanced-save-cancel",
-        "replace-clear",
+        "advanced-provider-switch",
+        "read-only-summary-typography",
+        "unavailable-summary",
         "chat-default-preserved",
         "image-preview-partial-failure",
         "setup-navigation",
+        "absolute-image-markdown",
       ],
       apiBoundary: "fixture",
     };

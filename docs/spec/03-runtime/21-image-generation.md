@@ -11,9 +11,11 @@ an existing enabled API-key or no-auth provider and one of its configured models
 Model Advanced offers **Set as image model**. A draft selection only takes effect
 when the provider form saves; Cancel leaves settings unchanged. Saving a provider
 as an image model does not replace the default conversation model. Below the
-default model row, **Image generation model** displays the binding and offers
-searchable replacement and Clear. OAuth accounts are not eligible. Missing,
-disabled or removed bindings remain visible as unavailable; there is no fallback.
+default model row in the same defaults panel, **Image generation model** is a
+read-only summary with the same provider/model typography and a 12px row gap.
+It has no Change or Clear actions; replacement uses the provider's Advanced
+settings. Missing, disabled, credential-less or removed bindings display only
+**Currently unavailable**. OAuth accounts are not eligible; there is no fallback.
 
 ## Agent contract
 
@@ -66,12 +68,20 @@ path/MIME type or a safe error code. New files get unique names in session scrat
 editing never overwrites its source. The tool result and transcript retain file
 references, not Base64. Existing bounded image reads and file viewers serve previews.
 Successful images and per-item failures render even when only part of a batch
-completed. Missing configuration returns a structured error and a Settings → AI
+completed. Missing configuration returns a structured error and a Settings → Models
 navigation action. The same references render after session reload/restart.
+Image results and setup actions remain visible outside the turn's collapsible
+process details; opening tool details does not duplicate the image gallery.
+Markdown image references to generated absolute paths, including Windows drive
+paths, use the existing bounded host image reader. URL sanitization stays enabled;
+the host still rejects files outside its permitted workspace/scratch/attachment roots.
 
 Validation: `node scripts/e2e-image-generation.mjs` covers host/stdio/HTTP/storage;
 `node scripts/e2e-image-generation-ui.mjs` covers real React/Chromium interactions
 with an API-boundary fixture. Unit/service tests cover limits, cancellation,
 partial failures, authentication, timeout, unsafe paths, and bounded downloads.
+`node scripts/e2e-image-chat.mjs` exercises the full isolated desktop with local
+model/image HTTP fixtures: adjacent default settings, composer submission, batch
+previews, editing a generated file, collapsed results, and setup navigation.
 Live verification is opt-in via `scripts/test-image-generation-live.mjs`, limited
 to one generation plus one edit and never a default test command.

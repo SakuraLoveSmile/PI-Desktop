@@ -552,7 +552,7 @@ export const es = {
   "settings": {
     "imageModel": "Modelo de imágenes",
     "imageModelUnset": "Sin configurar",
-    "imageModelUnavailable": "Este modelo no está disponible. Elige otro.",
+    "imageModelUnavailable": "No disponible por ahora",
     "imageModelSaveFailed": "No se pudo guardar el modelo.",
     "clearImageModel": "Borrar",
     "setImageModel": "Usar para generar imágenes",
@@ -560,7 +560,7 @@ export const es = {
     "generatedImage": "Imagen generada {{index}}",
     "imagePreviewUnavailable": "Vista previa no disponible; abrir archivo",
     "imageGenerationFailed": "La imagen {{index}} no se completó.",
-    "imageModelSetupHint": "Configura un modelo de imágenes en Ajustes → AI.",
+    "imageModelSetupHint": "Configura un modelo de imágenes en Ajustes → Modelos.",
     "configureImageModel": "Configurar modelo de imágenes",
 
 

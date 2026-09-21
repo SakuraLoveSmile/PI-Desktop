@@ -61,7 +61,7 @@ export function GeneratedImages({ message }: { message: UiMessage }) {
             variant="ghost"
             onClick={() => {
               const state = useAppStore.getState();
-              state.setSettingsTab("ai");
+              state.setSettingsTab("agent");
               state.setSettingsAnchor("settings.imageModel");
               state.setPage("settings");
             }}

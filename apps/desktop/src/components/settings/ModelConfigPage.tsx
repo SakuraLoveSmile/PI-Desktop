@@ -423,10 +423,9 @@ export function ModelConfigPage() {
               </div>
             </AnchoredMenu>
           </div>
+          <ImageGenerationModelRow settings={settings} providers={providers} />
         </div>
       </section>
-
-      <ImageGenerationModelRow settings={settings} providers={providers} />
 
       <section className="settings-card-block">
         <div className="model-config-section-head">

@@ -8,6 +8,26 @@
 
 ## 1. Goals
 
+### E2E-IMAGES-desktop-conversation
+
+- **Preconditions:** Isolated desktop profile and workspace, built image feature,
+  local chat and OpenAI Images HTTP fixtures; no live provider credentials.
+- **Steps:** Open Models settings; verify the conversation and image defaults
+  share a compact panel. Submit a two-image request through the composer, then
+  edit the first output through a follow-up message. Collapse tool details.
+  Clear the binding and follow the visible configuration action back to Models.
+- **Expected:** A 12px default-row gap, decoded image previews outside collapsed
+  process details, multipart source upload for editing, preserved originals,
+  and no image HTTP request while unconfigured.
+- **Settings interactions:** The image summary has no Change/Clear buttons and
+  matches the default model's provider/model text styles. Select another
+  provider's image model in Advanced and save; the summary changes while the
+  chat default stays unchanged. Missing/disabled bindings show only Currently
+  unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
+- **Status:** Automated in `node scripts/e2e-image-chat.mjs`; optional screenshots
+  use `PI_IMAGE_CHAT_EVIDENCE_DIR`. The images are deterministic raster fixtures,
+  not evidence of real-model quality or provider compatibility.
+
 ### E2E-SCHEDULED-desktop-automation-lifecycle
 
 - **Preconditions:** Isolated desktop profile, built task candidate, local SSE
