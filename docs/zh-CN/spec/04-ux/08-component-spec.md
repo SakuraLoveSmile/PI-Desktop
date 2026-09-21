@@ -1328,7 +1328,7 @@ row 而不是在转录本中添加树镶边。
   因此一旦弹框伸入面板列就会被覆盖，与其 z-index 无关。当会话面板比弹框
   窄时，弹框随面板收窄，而不是越过该边界。
 - 时间戳：`aria-label` 带有完整时间字符串，视觉显示相对时间
-- 右键菜单为 `role="menu"`、行项为 `role="menuitem"`，支持方向键 / Home / End，Escape / Tab / 外部按下 / 背后滚动关闭，并带有可访问名称（`chat.messageMenu` 或 `chat.conversationMenu`）。焦点回到被右键打断的控件。
+- 右键菜单为 `role="menu"`、行项为 `role="menuitem"`，支持方向键 / Home / End，Escape / Tab / 外部按下 / 背后滚动关闭，并带有可访问名称（`chat.messageMenu` 或 `chat.conversationMenu`）。焦点回到被右键打断的控件。编辑用户消息时，复制读取草稿选区（无选区时复制整份草稿），选中消息文本会选中草稿；结束编辑前不提供针对已保存消息的编辑、删除或版本切换操作。
 
 ### 8.6 MVP 约束
 
