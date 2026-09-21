@@ -1212,6 +1212,9 @@ a schedule. Update takes an existing ID and partial fields, preserving all
 unspecified configuration. Exact local times remain supported despite the
 UI's four period presets. No new DB schema or transport is introduced.
 
+### Scheduled tasks: project removal and automations
+
+Removing a project pauses its bound scheduled tasks without deleting their definitions, schedule, workspace binding or run history. Session references in history may become null when the project's conversations are removed. Already admitted task runs block removal even before a conversation turn starts. Tasks belonging to other projects and unbound legacy tasks are unaffected. Explicit resume or Run now may recreate a project from the preserved path; automatic polling cannot do so while paused.
 ### Scheduled tasks: legacy task maintenance
 
 Agent tools allow title, prompt and pause updates on legacy automatic tasks without a schedule, including an echoed unchanged cadence. These edits do not arm the task or capture the foreground workspace. Explicit enabling, a cadence change or a supplied schedule still follows schedule validation. Resume requires an explicit valid schedule; Manual-to-Hourly retains its existing default interval behavior.

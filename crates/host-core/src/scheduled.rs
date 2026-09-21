@@ -8,6 +8,7 @@ use crate::db::{ms_to_ts, now_ms, ts_to_ms, Database};
 use crate::sessions;
 
 pub mod automation;
+pub mod project;
 pub mod timing;
 
 /// Wire format matches the legacy Electron `scheduled-tasks.json` records so

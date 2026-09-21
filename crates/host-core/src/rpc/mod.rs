@@ -1670,6 +1670,15 @@ async fn handle_request(
             let path = crate::db::canonical_project_path(path)
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            if crate::scheduled::project::has_running_tasks(&st.db, &path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            {
+                return Err(rpc_err(
+                    1008,
+                    "project has running scheduled tasks",
+                    "CONFLICT",
+                ));
+            }
             // A path that belongs to a multi-folder project group must stay put:
             // deleting one root would orphan the rest of the group, so callers
             // remove the folder from the group first. A single-folder stored
@@ -1705,6 +1714,8 @@ async fn handle_request(
                     return Err(rpc_err(1008, "project has running sessions", "CONFLICT"));
                 }
             }
+            crate::scheduled::project::pause(&st.db, &path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             let mut sessions_removed = 0;
             for id in &session_ids {
                 if sessions::delete_session(&st.db, id)

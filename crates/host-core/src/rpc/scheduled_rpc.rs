@@ -1,6 +1,10 @@
 use super::{json, plan_rpc_err, rpc_err, AppState, JsonRpcError, Value};
 use crate::{scheduled, sessions};
 
+#[cfg(test)]
+#[path = "scheduled_project_tests.rs"]
+mod project_tests;
+
 pub(super) fn handle(st: &AppState, method: &str, params: Value) -> Result<Value, JsonRpcError> {
     handle_in_workspace(
         st,
@@ -247,6 +251,70 @@ fn validate_schedule_input(params: &Value) -> Result<(), JsonRpcError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn review_deleted_project_is_not_recreated_by_automatic_task() {
+        use std::sync::Arc;
+        use tokio::sync::{mpsc, Mutex};
+        let dir = tempfile::tempdir().unwrap();
+        let project = tempfile::tempdir().unwrap();
+        let mut st = AppState::open(dir.path()).unwrap();
+        st.handshook = true;
+        let path = st.workspace.set(project.path()).path;
+        sessions::create_session(
+            &st.db,
+            None,
+            Some("agent".into()),
+            None,
+            None,
+            Some(path.clone()),
+        )
+        .unwrap();
+        let task = handle(
+            &st,
+            "scheduled.create",
+            json!({
+                "title":"Review", "prompt":"Review project", "cadence":"hourly",
+                "schedule":{"hour":0,"minute":0,"weekday":0}
+            }),
+        )
+        .unwrap()["task"]
+            .clone();
+        let state = Arc::new(Mutex::new(st));
+        let removed = super::super::handle_request(
+            state.clone(),
+            "projects.remove",
+            json!({"path":path}),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(removed["removed"], true);
+        let st = state.lock().await;
+        let count = || {
+            st.db
+                .conn()
+                .query_row("SELECT COUNT(*) FROM projects", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .unwrap()
+        };
+        assert_eq!(count(), 0);
+        st.db.conn().execute(
+            "UPDATE scheduled_tasks SET config_json = json_set(config_json, '$.nextRunAt', ?1) WHERE id = ?2",
+            rusqlite::params![crate::db::now_ms(), task["id"].as_str().unwrap()],
+        ).unwrap();
+        let launched = handle(
+            &st,
+            "scheduled.run",
+            json!({"id":task["id"],"automatic":true}),
+        );
+        assert_eq!(
+            count(),
+            0,
+            "Automatic admission resurrected the deleted project: {launched:?}"
+        );
+    }
 
     #[test]
     fn manual_task_keeps_saved_workspace_across_run_edit_and_restart() {
