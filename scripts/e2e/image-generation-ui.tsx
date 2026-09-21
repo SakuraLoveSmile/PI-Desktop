@@ -113,6 +113,12 @@ globalThis.imageGenerationProbe = async () => {
   try {
     for (const locale of ["en", "zh-CN"]) {
       await i18n.changeLanguage(locale);
+      // The scenario precondition is "no image model configured", so each locale
+      // pass starts unmarked instead of inheriting the candidates the previous
+      // pass saved: a marked model's checkbox reads as selected, not "Set as
+      // image model", which is what this pass looks for.
+      settings = { ...settings, imageGeneration: null, imageGenerationModels: null };
+      flushSync(() => useAppStore.setState({ settings }));
       render();
       const defaultRow = container.querySelector<HTMLElement>(".model-default-row")!;
       const initialImageRow = [...container.querySelectorAll<HTMLElement>(".settings-row")].find(
