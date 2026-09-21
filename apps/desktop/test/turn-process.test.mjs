@@ -99,12 +99,12 @@ test("missing and unknown display settings retain detailed mode", () => {
   assert.equal(resolveThinkingDisplayMode("compact"), "compact");
 });
 
-test("only compact groups a turn into a process; compact auto-opens active failures", () => {
-  assert.equal(shouldGroupTurnProcess("detailed"), false);
+test("both display modes group a turn and only compact auto-opens active failures", () => {
+  assert.equal(shouldGroupTurnProcess("detailed"), true);
   assert.equal(shouldGroupTurnProcess("compact"), true);
-  assert.equal(shouldAutoOpenTurnProcess("detailed", false, false), false);
-  assert.equal(shouldAutoOpenTurnProcess("detailed", true, false), false);
-  assert.equal(shouldAutoOpenTurnProcess("detailed", true, true), false);
+  assert.equal(shouldAutoOpenTurnProcess("detailed", false, false), true);
+  assert.equal(shouldAutoOpenTurnProcess("detailed", true, false), true);
+  assert.equal(shouldAutoOpenTurnProcess("detailed", true, true), true);
   assert.equal(shouldAutoOpenTurnProcess("compact", false, false), false);
   assert.equal(shouldAutoOpenTurnProcess("compact", true, false), false);
   assert.equal(shouldAutoOpenTurnProcess("compact", true, true), true);

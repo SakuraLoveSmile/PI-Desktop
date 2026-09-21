@@ -462,6 +462,14 @@ boundary falls, not what survives it. The active-user retention limit is 20,000
 tokens, capped at half the hard budget so retention alone cannot fill a small
 window and leave the summary no room. None of these values are configurable.
 
+The provider request layer also caps the concrete output budget before every
+parent, subagent, and one-shot request. It estimates the serialized input with
+the pi-ai chars/4 baseline plus a CJK correction, then reserves the larger of
+4,096 tokens or 1% of the effective window. The effective window is the smaller
+of the configured value and the published catalog window when both are known;
+this prevents an oversized user override from bypassing compaction and output
+protection. Unknown windows preserve the configured output budget.
+
 The incoming user prompt participates in budgeting before the first provider
 request. The automatic summary request retries transient provider failures
 under a bounded pi-ai retry policy (3 retries, 2s/4s/8s backoff, cancelled by
@@ -491,6 +499,10 @@ tests; persisted `contextCompaction` settings are ignored so a session cannot
 be left with the guard off and no way to restore it. Manual `/compact` remains
 available while the session is idle. Checkpoint generation is abortable and
 counts as running state until durable persistence completes.
+
+A delegate (§5f) runs the same derivation against its own resolved model and
+compacts at its own turn boundaries, without a durable checkpoint chain of
+its own (ADR 0299).
 
 ## 5b. Operating mode and planning state
 
@@ -911,6 +923,45 @@ and additive `modelFailures` lifecycle detail. Lifecycle model/thinking fields
 track the effective alternative, including after settlement and reload. If all
 alternatives fail, the result remains `failed` with the final provider error.
 See [ADR subagent-model-fallback](../../adr/subagent-model-fallback.md).
+
+**Context budget and compaction (ADR 0299).** A delegate has the same
+window protection the session has, derived the same way. The budget comes
+from the model the run actually resolved — a `Task.model` override, a
+definition pin, or the inherited session model — through the shared
+derivation of §5.1, so `hardLimit` is that window minus the same request
+headroom and a per-definition `maxTokens` cap participates as the output
+budget. At a delegate turn boundary the run re-estimates its own context and,
+at or above `hardLimit`, compacts synchronously before the next provider
+request, with the retention mode chosen from the same lifecycle rule as the
+session: a boundary that still has pending tool results retains as an active
+turn, a completed one as a completed turn. There is no pre-computation and no
+second threshold.
+
+When a summary cannot be generated, or the compacted context still exceeds
+the budget, the run degrades: it keeps the original task brief plus the most
+recent message(s), discards the rest of its history, continues, and records
+that it was degraded, so the report and the lifecycle details say the
+delegate lost history rather than presenting a complete answer. When even
+that does not fit, the run fails with `SUBAGENT_CONTEXT_OVERFLOW`
+(not retriable) naming what the parent can change — narrow the task,
+delegate to a model with a larger window, read less at once — instead of
+forwarding the provider's overflow text.
+
+An ordered alternative (**Ordered model fallback**, above) is re-evaluated
+against its own window before it is attempted: an alternative whose budget
+cannot hold the carried context is skipped and recorded in `modelFailures`
+with that reason rather than retried into the same failure. A resumed chain
+is seeded within the budget — `seedDelegateMessages` preserves the original
+task brief and the recent turns and drops the oldest tool results first — so
+a resume starts below `hardLimit` instead of overflowing on its first
+request.
+
+Delegate compaction affects the delegate's model context only. It rewrites no
+persisted transcript row, writes no host-core checkpoint, and adds no
+compaction row, warning toast, or context-inspector line; the delegate keeps
+its complete visible rows and the parent still sees only reports. Compaction
+is entirely automatic: `new_context` remains denied to delegates, because
+executing it would set the parent runtime's pending-compaction flag.
 
 **Events and context.** Every event a delegate emits carries
 `parentToolCallId` and `agentName` on its envelope, and Electron main copies both
