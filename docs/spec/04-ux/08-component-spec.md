@@ -271,8 +271,10 @@ combined model × reasoning selection (§11).
   overlay hiding tabs or panel actions.
   Resource close actions stay in their tabs so a second header `×` does not echo
   the native Windows close control (D357).
-- Title cluster (task title) flexes and shows at most the first 10 Unicode
-  characters plus an ellipsis; the full title remains in the native tooltip.
+- Title cluster (task title) flexes to the remaining width after toolbar
+  reservations (sidebar lead-in, action icons, work-panel toggle, and
+  platform window controls). The visible title uses CSS ellipsis only when
+  that width overflows; the full title remains in the native tooltip.
   The right cluster (action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
@@ -319,7 +321,7 @@ combined model × reasoning selection (§11).
 
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
-| Task title | session title (or untitled), capped at 10 characters with an ellipsis when needed | same | same | same |
+| Task title | session title (or untitled), uses the available width, with an ellipsis only on overflow | same | same | same |
 | New task / Search | icon buttons | same | same | same |
 | Composer stop control | hidden | visible only when the running composer draft is empty | hidden | hidden |
 | Project name | title tooltip only | same | same | omitted |
