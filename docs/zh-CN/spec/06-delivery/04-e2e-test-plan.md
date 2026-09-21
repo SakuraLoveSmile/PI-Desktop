@@ -2167,6 +2167,17 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   覆盖生产 BrowserHost/BrowserPane 服务路径，控制原生浏览器与 Host 边界，采用确定性
   时钟。尚不覆盖原生 Electron 合成显示或报告者的真实会话。
 
+#### E2E-BROWSER-in-page-navigation：浏览器工具栏跟随同文档导航
+
+- **前置条件**：启用 Browser 插件；本地网页包含锚点链接及 History API 路由控件。
+- **步骤**：打开网页；点击锚点链接；通过 `history.pushState` 切换路由；
+  使用后退、前进和刷新。切换至另一会话，检查旧页面的迟到事件不能更新新预览。
+- **预期**：地址与主文档 URL 一致，历史按钮状态正确；加载结束后恢复刷新按钮。
+  子框架、已替换框架及失效会话的事件不能改变工具栏。
+- **覆盖**：`browser-pane-navigation.test.mjs` 验证状态发布与事件隔离；
+  原生 Electron 操作验证真实同文档导航事件。
+- **关联规范**：`04-ux/08-component-spec.md` §5.3。
+
 #### E2E-060：文件选项卡浏览停留在工作区中
 
 - **先决条件**：具有嵌套源文件工件的工作区，大型
