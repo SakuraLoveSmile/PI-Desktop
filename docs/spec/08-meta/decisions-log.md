@@ -6530,3 +6530,23 @@ that was sitting at the bottom — including after the turn had finished.
   new is persisted and no permission or API surface changes; the existing
   `plugin.stdio` audit stream is otherwise unchanged.
 - See `07-plugins/05-plugin-lifecycle.md` §3.1.
+
+## 2026-09-20 — The Create project name defaults to the primary folder (D609)
+
+- The Create project dialog required a typed name before Create became
+  available, so a local folder pick could not be confirmed without inventing a
+  title; the git source already seeded the field from the repository name
+  (D438, ADR 0273).
+- The name field is now optional for both sources. It seeds from the picked
+  source — the first selected folder's name for a local pick, the repository
+  name for a git checkout — and stops following the source as soon as the user
+  types their own name. Create is gated by the source alone (one folder, or a
+  parsed URL plus a destination), and a field left empty falls back to the same
+  derived name.
+- Derived names are cut to `MAX_PROJECT_NAME_CHARS` (80) so the persisted
+  sidebar preference and the name field accept them unchanged. Folder-name
+  parsing moves to `apps/desktop/src/lib/project-name.ts` and is shared with the
+  dialog's folder rows.
+- Renderer only: no protocol, storage, host, permission, or migration change,
+  and no new default. See `04-ux/08-component-spec.md`, ADR 0233, ADR 0273, and
+  E2E-012a / E2E-256.
