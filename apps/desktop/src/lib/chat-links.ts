@@ -245,7 +245,21 @@ export type ChatTextSegment =
 // uses `(?![A-Za-z0-9_])` rather than `\b`: in unicode mode `\b` treats CJK
 // letters as word characters, which would stop `App.tsx文件` from linking.
 const SCAN_RE =
-  /@"[^"\n]+"|@[^\s]+|https?:\/\/[^\s<>"'()[\]{}]+|(?:~\/)?\/?\.{1,2}\/(?:[\p{L}\p{N}_@+.-]+\/)*[\p{L}\p{N}_@+.-]+(?::\d+(?::\d+)?)?|(?:~\/)?\/?(?:[\p{L}\p{N}_@+.-]+\/)+[\p{L}\p{N}_@+.-]+(?::\d+(?::\d+)?)?|[\p{L}\p{N}_@+-][\p{L}\p{N}_@+.-]*\.[A-Za-z0-9]{1,8}(?![A-Za-z0-9_])/gu;
+  /@"[^"\n]+"|@[^\s]+|https?:\/\/[^\s<>"'[\]{}]+|(?:~\/)?\/?\.{1,2}\/(?:[\p{L}\p{N}_@+.-]+\/)*[\p{L}\p{N}_@+.-]+(?::\d+(?::\d+)?)?|(?:~\/)?\/?(?:[\p{L}\p{N}_@+.-]+\/)+[\p{L}\p{N}_@+.-]+(?::\d+(?::\d+)?)?|[\p{L}\p{N}_@+-][\p{L}\p{N}_@+.-]*\.[A-Za-z0-9]{1,8}(?![A-Za-z0-9_])/gu;
+
+/** Keep URL parentheses, but stop before a closing prose wrapper. */
+function trimUrlWrapper(token: string): string {
+  if (!/^https?:\/\//i.test(token)) return token;
+  let depth = 0;
+  for (let index = 0; index < token.length; index += 1) {
+    if (token[index] === "(") depth += 1;
+    else if (token[index] === ")") {
+      if (depth === 0) return token.slice(0, index);
+      depth -= 1;
+    }
+  }
+  return token;
+}
 
 /**
  * Split plain chat text (user messages) into literal runs and previewable
@@ -259,9 +273,11 @@ export function splitChatText(
 ): ChatTextSegment[] {
   const segments: ChatTextSegment[] = [];
   let last = 0;
-  for (const match of text.matchAll(SCAN_RE)) {
-    const raw = match[0];
-    const start = match.index ?? 0;
+  const scanner = new RegExp(SCAN_RE);
+  for (let match = scanner.exec(text); match; match = scanner.exec(text)) {
+    const raw = trimUrlWrapper(match[0]);
+    const start = match.index;
+    scanner.lastIndex = start + raw.length;
     const target = resolvePreviewTarget(raw, root, baseDir);
     if (!target) continue;
     if (start > last) segments.push({ kind: "text", text: text.slice(last, start) });

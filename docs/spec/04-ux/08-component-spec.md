@@ -1665,7 +1665,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
    image thumbnail resolves and opens the same way. A chip whose reference
    matches nothing opens nothing and reports itself; the OS default application
    is no longer what this click does.
-  HTTP(S) URLs remain inline text links. Plain clicks — including markdown
+  HTTP(S) URLs remain inline text links. Bare URLs preserve balanced parentheses
+  in paths, queries, and fragments; an unmatched closing parenthesis wrapping
+  the URL in prose stays outside the link. Plain clicks — including markdown
   links, autolinked URLs, inline-code URLs, and remote images — follow the
   persisted Link open destination setting (Work panel browser by default, or
   the system default browser). Right-clicking a link opens a body-level
