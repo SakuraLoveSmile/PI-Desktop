@@ -1003,8 +1003,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 #### E2E-038：设置拥有项目存档目标
 
 - **先决条件**：应用程序运行时至少有一个已配置的提供程序、一个受支持的本地会话存储、一个保留的项目和一个存档的项目。
-- **步骤**：1) 打开设置。 2) 检查完整的设置导轨。 3) 打开Basics 并使用可搜索主题选择器更改其外观卡中的主题。 4) 打开全局 AI 并检查权限和默认项卡，包括命令 Shell 行；确认上下文管理没有设置卡。 5) 打开快捷方式并检查键盘快捷方式卡。 6) 打开指令并保存全局指令。 7) 打开模型配置并检查提供商工作室。 8) 按顺序打开“导入”、“项目存档”和“信息”。 9) 搜索设置“项目”或“存档”。 10) 在项目存档中，将每个分组条的计数与其呈现的行进行比较。 11) 将排序控件从“最近”切换到“名称”。 12) 搜索已知的会话标题，检查其展开的项目行，然后显示八个以上的会话；通过清晰的功能来清除搜索。 13) 打开行菜单，使用 Escape 并按下外部按钮将其关闭。 14) 恢复存档的项目，然后激活它。 15) 返回应用程序外壳并打开插件。
-- **预期**：该导轨按顺序包含基础知识、全局 AI/AI、快捷方式、说明、模型配置、导入、项目存档和信息，每个都有其语义 Lucide 图标（滑块/火花/键盘/文件文本/机器人/下载/存档/信息）；行按四个柔和的非交互标题分组：Personal / 个人包含基础知识、全局 AI 和快捷键，Agent / 智能体包含说明和模型配置，Workspace / 工作区包含导入和项目存档，About / 关于包含信息；分组之间使用留白而不是分割线，搜索保持目的地结果扁平，并将空分组及其标题一起隐藏。外观保留在基础下，权限、默认项和命令 Shell 行位于全局 AI 下；可用的已选 Shell 由选择器表示，不重复显示“已配置”状态；默认、回退和无实际 Shell 状态仍明确展示；上下文管理没有设置卡；键盘快捷键和全局指令都有自己的目的地；开发者生活在 Info 下；项目存档显示活动、关闭和存档的持久行，无需可见性切换，将它们分组在一个面板内始终可见的固定/所有项目/存档分组条 (D168/D267) 下，并带有每个部分的计数。该目的地不呈现英雄区块，也没有页面级计数器串：引导区是一条安静的说明行，每个分组条的计数与其呈现的行一致；按名称排序会重新排序每个部分内的行，而不隐藏任何行；搜索匹配项目字段和会话标题并报告匹配计数，会话标题结果扩展其所属项目，按最新活动和相对更新时间列出会话，并以八个批次显示历史记录；清除搜索将恢复完整索引。行菜单在 Escape 和外部按下时关闭。恢复使存档保持打开状态，激活返回以与侧栏中保留的恢复项目聊天；主页侧边栏和全局页面结果没有独立的项目目标；设置搜索找到项目存档；插件仍然是一个独立的应用程序外壳目的地。
+- **步骤**：1) 打开设置。 2) 检查完整的设置导轨。 3) 打开Basics 并使用可搜索主题选择器更改其外观卡中的主题。 4) 打开全局 AI 并检查权限和默认项卡，包括命令 Shell 行；确认上下文管理没有设置卡。 5) 打开快捷方式并检查键盘快捷方式卡。 6) 打开指令并保存全局指令。 7) 打开模型配置并检查提供商工作室。 8) 按顺序打开“导入”、“项目存档”和“信息”。 9) 搜索设置“项目”或“存档”。 10) 在项目存档中，将每个分组条的计数与其呈现的行进行比较。 11) 将排序控件从“最近”切换到“名称”。 12) 搜索已知的会话标题，检查其展开的项目行，然后显示八个以上的会话；通过清晰的功能来清除搜索。 13) 打开行菜单，使用 Escape 并按下外部按钮将其关闭。 14) 恢复存档的项目，然后激活它。 15) 归档一个项目会话，从项目归档中打开它，然后返回项目归档。 16) 返回应用程序外壳并打开插件。
+- **预期**：该导轨按顺序包含基础知识、全局 AI/AI、快捷方式、说明、模型配置、导入、项目存档和信息，每个都有其语义 Lucide 图标（滑块/火花/键盘/文件文本/机器人/下载/存档/信息）；行按四个柔和的非交互标题分组：Personal / 个人包含基础知识、全局 AI 和快捷键，Agent / 智能体包含说明和模型配置，Workspace / 工作区包含导入和项目存档，About / 关于包含信息；分组之间使用留白而不是分割线，搜索保持目的地结果扁平，并将空分组及其标题一起隐藏。外观保留在基础下，权限、默认项和命令 Shell 行位于全局 AI 下；可用的已选 Shell 由选择器表示，不重复显示“已配置”状态；默认、回退和无实际 Shell 状态仍明确展示；上下文管理没有设置卡；键盘快捷键和全局指令都有自己的目的地；开发者生活在 Info 下；项目存档显示活动、关闭和存档的持久行，无需可见性切换，将它们分组在一个面板内始终可见的固定/所有项目/存档分组条 (D168/D267) 下，并带有每个部分的计数。该目的地不呈现英雄区块，也没有页面级计数器串：引导区是一条安静的说明行，每个分组条的计数与其呈现的行一致；按名称排序会重新排序每个部分内的行，而不隐藏任何行；搜索匹配项目字段和会话标题并报告匹配计数，会话标题结果扩展其所属项目，按最新活动和相对更新时间列出会话，并以八个批次显示历史记录；清除搜索将恢复完整索引。行菜单在 Escape 和外部按下时关闭。恢复使存档保持打开状态，激活返回以与侧栏中保留的恢复项目聊天。打开归档会话时，应用会先成功选择该会话，再清除它的归档状态；聊天页选中该会话，项目侧边栏重新显示它，返回项目归档后它也不再处于归档状态。主页侧边栏和全局页面结果没有独立的项目目标；设置搜索找到项目存档；插件仍然是一个独立的应用程序外壳目的地。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/01-ui-ia.md`、`03-runtime/11-provider-model-system.md`
 - **接受**：B（模型配置），F（会话导入）
 - **里程碑**：M4
@@ -2227,6 +2227,7 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   `chat-context-menu-items.test.mjs`、`chat-context-menu-surface.test.mjs`）；
   完整 UI 场景草稿
 
+- **完整历史回归**：打开包含 140 条消息的会话，不向上翻页，选择复制整个对话；剪贴板必须包含第 1–140 条消息。从搜索上下文窗口和长消息截断预览重复验证。保留当前可见的生成中文字；读取失败时提示错误，剪贴板保持不变。仅在选择复制后读取完整历史，不改变阅读位置。运行 `node scripts/e2e-copy-conversation.mjs`。
 - 编辑时复制应使用草稿选区，无选区时复制整份草稿；选中消息文本应选中草稿。菜单不提供编辑、删除或版本切换；取消后原消息及其菜单保持不变。自动化验证：`node scripts/e2e-message-edit-copy.mjs`。
 
 #### E2E-060b：镀铬中性灰色调
@@ -7900,8 +7901,10 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 | ID | 场景 | 验证 |
 |---|---|---|
 | E2E-MCP-MARKET-NET-BOUNDARY | URL guard 拒绝凭据、回环、私网、special-use IPv4、v4-mapped、ULA、site-local 和 link-local 及尾点绕过形态；Main 固定已检查的公网地址并逐跳复核 HTTPS 重定向 | 确定性 guard 断言；DNS pin 与响应上限 source-contract 覆盖 |
-| E2E-MCP-MARKET-SEMANTICS | Registry 记录映射为安装模板时保留包版本、named/positional runtime/package 参数与 required/optional 环境变量语义 | 确定性映射断言 |
+| E2E-MCP-MARKET-SEMANTICS | Registry 记录映射为安装模板时保留包版本、named/positional runtime/package 参数与 required/optional 环境变量语义；远端 header 变量同时识别注册表的 `{name}` 与目录的 `${NAME}` 两种写法，仅为已声明的可编辑值显示输入，保留未声明花括号字面量，并按各 header 的作用域处理默认值、固定值与可选标记，不合并不同 header 的同名输入（ADR registry-header-variable-spelling） | 确定性映射断言 |
 | E2E-MCP-MARKET-INSTALL | 内置目录条目经 `resolveCatalogEntry` 解析并通过宿主 `mcp.upsert` RPC 安装；记录落盘 `~/.agents/servers/` | 真实宿主二进制，隔离临时 HOME |
+| E2E-MCP-MARKET-HEADER-SCOPE | Registry header-local `{token}` resolves only in its header; same-named URL path/query tokens remain literal through mapping, resolution, host upsert/list and persistence. URL templates retain only legacy `${NAME}` substitution. When `headerBindings` exists (even empty or partial), unbound tokens in every header stay literal and never consume another header's input or default | shared regressions plus real host binary with isolated temporary storage; remote entry disabled, no network call |
+| E2E-MCP-MARKET-partial-header-bindings-stay-literal | Resolve a catalog with only Authorization bound and another header using the same `{token}` / `${token}`; an undeclared `${UNBOUND}` in a third header also remains literal through host upsert/list and disk persistence | real host binary, disabled remote entry, synthetic input and isolated temporary storage; no network call |
 
 
 #### E2E-SKILL-MARKET-NET-BOUNDARY：技能源公网 HTTPS 策略拒绝私网与回环
