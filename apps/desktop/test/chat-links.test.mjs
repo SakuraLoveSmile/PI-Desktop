@@ -324,17 +324,24 @@ test("a prose wrapper does not swallow the next URL or file reference", () => {
 });
 
 
-test("sentence punctuation after a parenthesized URL stays outside the link", () => {
-  const url = "https://en.wikipedia.org/wiki/React_(software)";
-  for (const suffix of [".", ",", "!", "?", ";", ":", "。", "，", "！", "？", "..."]) {
-    const source = `See ${url}${suffix}`;
-    const segments = splitChatText(source, ROOT);
-    assert.equal(segments.find(s => s.kind === "target").target.url, url);
-    assert.equal(segments.at(-1).text, suffix);
-    assert.equal(segments.map(s => s.text).join(""), source);
+test("sentence punctuation after URLs stays outside the link", () => {
+  for (const url of [
+    "https://example.com",
+    "https://en.wikipedia.org/wiki/React_(software)",
+    "https://example.com/report_(draft).html?q=(one)#part(2)",
+  ]) {
+    for (const suffix of [".", ",", "!", "?", ";", ":", "。", "，", "！", "？", "..."]) {
+      const source = `See ${url}${suffix}`;
+      const segments = splitChatText(source, ROOT);
+      assert.equal(segments.find(s => s.kind === "target").target.url, url);
+      assert.equal(segments.at(-1).text, suffix);
+      assert.equal(segments.map(s => s.text).join(""), source);
+    }
   }
-  const urlWithExtension = "https://example.com/report_(draft).html?q=(one)#part(2)";
-  assert.equal(splitChatText(urlWithExtension, ROOT)[0].target.url, urlWithExtension);
+  assert.equal(
+    splitChatText("See https://example.com/report_(draft).html, next", ROOT)[1].target.url,
+    "https://example.com/report_(draft).html",
+  );
 });
 
 test("adjacent parenthesis-wrapped URLs all remain independently linkable", () => {
