@@ -1850,7 +1850,10 @@ message its checkpoint covers.
   Home / End navigation, Escape / Tab / outside-press / scroll-behind
   dismissal, and an accessible name (`chat.messageMenu` or
   `chat.conversationMenu`). Focus returns to whatever the right-click
-  interrupted.
+  interrupted. While editing a user message, Copy uses the selected draft text
+  (or the whole draft if the caret is collapsed), and Select message text selects
+  the draft. Saved-message Edit, Delete, and revision actions are not offered
+  until editing ends.
 
 ### 8.6 MVP constraints
 

@@ -3532,7 +3532,9 @@ identify the platform validation still needed.
   choose Copy. 4) Right-click the assistant turn and choose Copy.
   5) Right-click empty space below the last turn and choose Copy
   conversation. 6) Press Escape on an open menu, then Tab. 7) Right-click
-  a markdown link in the answer.
+  a markdown link in the answer. 8) Edit the user message, replace its content,
+  select a phrase, and right-click Copy. Repeat with a collapsed caret and
+  Select message text, then cancel editing and copy the saved message.
 - **Expected**: The user menu lists Copy, Select message text, Edit, and
   a separated Delete; the assistant menu lists Copy, Select message text,
   Regenerate, and Branch. Copy writes the live selection in the
@@ -3544,7 +3546,11 @@ identify the platform validation still needed.
   A link still offers Open in default browser, Open in work panel, and
   Copy link address. Quote, Annotate, and Open side chat are absent
   (ADR 0268). The surface is a viewport-fixed body-level layer and does
-  not resize the transcript.
+  not resize the transcript. During editing, Copy uses the selected draft text
+  or the full draft with a collapsed caret; Select message text selects the
+  draft. Edit, Delete, and revision actions are absent until editing ends.
+  Cancel preserves the original message. Automated Chromium component check:
+  `node scripts/e2e-message-edit-copy.mjs`.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3 / §8.5,
   `04-ux/09-interaction-patterns.md` (floating dropdown surfaces),
   ADR 0268
