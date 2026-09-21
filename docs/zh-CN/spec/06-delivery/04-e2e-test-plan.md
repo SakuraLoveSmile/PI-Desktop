@@ -1791,6 +1791,10 @@ hover/focus 不带移位标签，项目标题 hover/focus 路径显示
 - **步骤**：1) 打开侧边栏项目溢出菜单并选择“编辑项目”。2) 修改名称，移除
   附加文件夹，再通过原生文件夹选择器将其添加回来。3) 确认 Primary 行不能移除。
   4) 保存并检查侧边栏、项目存档中的根目录和当前工作区。5) 重启应用并再次检查项目组。
+- **后台更新回归**：从设置打开编辑项目，修改名称并移除附加文件夹，然后在保存前
+  完成一个后台任务。两项草稿修改必须保留，并一起保存。隔离渲染测试为
+  `node scripts/e2e-project-edit.mjs`；使用真实页面和 store，仅控制 host IPC 边界，
+  不代表已验证磁盘持久化。
 - **预期**：两个项目菜单都提供编辑项目；编辑器保持焦点、去除首尾空格并限制为
   80 个 Unicode 字符，Primary 文件夹始终是第一行，根目录数量更新且不会误删其他行。
   保存后仍是一个逻辑项目组，调整后的根目录会持久化；名称在重启后保留，规范化
@@ -2166,6 +2170,17 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
 - **状态**：`browser-host-session.test.mjs` 与 `browser-pane-navigation.test.mjs`
   覆盖生产 BrowserHost/BrowserPane 服务路径，控制原生浏览器与 Host 边界，采用确定性
   时钟。尚不覆盖原生 Electron 合成显示或报告者的真实会话。
+
+#### E2E-BROWSER-in-page-navigation：浏览器工具栏跟随同文档导航
+
+- **前置条件**：启用 Browser 插件；本地网页包含锚点链接及 History API 路由控件。
+- **步骤**：打开网页；点击锚点链接；通过 `history.pushState` 切换路由；
+  使用后退、前进和刷新。切换至另一会话，检查旧页面的迟到事件不能更新新预览。
+- **预期**：地址与主文档 URL 一致，历史按钮状态正确；加载结束后恢复刷新按钮。
+  子框架、已替换框架及失效会话的事件不能改变工具栏。
+- **覆盖**：`browser-pane-navigation.test.mjs` 验证状态发布与事件隔离；
+  原生 Electron 操作验证真实同文档导航事件。
+- **关联规范**：`04-ux/08-component-spec.md` §5.3。
 
 #### E2E-060：文件选项卡浏览停留在工作区中
 
@@ -2977,12 +2992,15 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   确认所有行都恢复默认。9) 在 macOS 上检查每次保存/恢复后的本机菜单加速器。10)
   在 Windows 上禁用插件启动器，确认旧的全局绑定、聚焦窗口后备和 Alt+Space host
   后备都已关闭。11) 单独按下并释放 Ctrl/Command，确认 IME 候选，并长按
-  back/forward 组合以产生重复。
+  back/forward 组合以产生重复。12) 禁用 New task，把其默认组合分配给 Search，
+  再单独恢复 New task；确认出现冲突提示、两项绑定不变，且该组合仍能打开 Search。
+  将 New task 改为自定义绑定后重复测试；恢复 Search 释放组合后，再恢复 New task。
 - **预期**：操作分为导航、Agent 和窗口，并使用平台原生按键标签；录制有可见焦点
   且 `Escape` 取消；自定义 Search 组合立即生效、替换旧组合、跨重启保留并更新
   macOS 菜单；重复、无修饰符和保留组合以内联错误拒绝；“未绑定”是明确的本地化
   状态，不参与冲突、不响应旧或默认组合、可跨重启保存，并会移除 macOS 加速器和
-  Windows 启动器后备层；单项和全局恢复都返回共享默认值。仅修饰符和 IME 按键不
+  Windows 启动器后备层；单项恢复遇到默认组合已被占用时拒绝保存，保留两项绑定；
+  无冲突的单项恢复和全局恢复都返回共享默认值。仅修饰符和 IME 按键不
   会发送命令，长按历史组合每次物理按压只遍历一次。窗口可见性只有一个开关键
   `Alt + Shift + W` —— 可见且在前台的窗口隐藏到托盘，其余情况显示并获得焦点 ——
   且绝不走关闭路径，因此不会弹出关闭行为询问、也不会退出应用；该键刻意避开
@@ -8462,6 +8480,12 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **覆盖**：`chat-links.test.mjs`；桌面端通过正常浏览器目标实际点击验证。
 - **链接规格**：`04-ux/08-component-spec.md` §8.3。
 
+#### E2E-IME-escape: 取消组词保留草稿
+
+- **步骤**：编辑用户消息并输入草稿，派发组词中的 Escape 和 Cmd/Ctrl+Enter；打开全局搜索，从输入框派发组词中的 Escape。对 legacy keyCode 229 重复检查，再验证普通 Escape 和重试快捷键。
+- **预期**：组词事件不会丢弃编辑、关闭搜索或重试发送；普通 Escape 仍取消或关闭（包括搜索输入框之外的焦点），普通 Cmd/Ctrl+Enter 仍重试。
+- **覆盖**：`node scripts/e2e-ime-escape.mjs` 使用真实组件、冒泡 DOM 键盘事件及宿主边界测试数据；不代表已验证操作系统输入法候选窗口。
+
 ### E2E-SCHEDULED-manual-to-hourly
 
 - **Preconditions:** Built host candidate, isolated data directory, no provider.
@@ -8513,6 +8537,19 @@ the latest destination. These assertions measure work counts, not device FPS.
   `providers::tests::a_stored_array_survives_an_entry_that_lost_a_field`）；
   宿主 RPC 路径由 `scripts/e2e-smoke.mjs` 覆盖提供商的创建与列举，但没有套件
   驱动手工编辑的 `config_json`。
+
+### E2E-SESSION-temporary-attachment-fork：临时任务预览与独立分支附件
+
+- **步骤**：在没有项目的任务中粘贴超过长文本阈值的内容并发送，点击对话中的附件。
+  返回后创建分支并打开同一附件；删除原任务，再打开分支附件，并继续创建分支。
+- **预期**：每次预览均显示原始文件内容；各分支引用自身的 scratch 输入目录，
+  不需要打开项目，也不授予跨任务读取权限。按消息截断的分支不复制后续消息独有
+  或未引用的输入文件。
+- **自动化**：`scripts/e2e-composer-paste.mjs` 覆盖长文本保存、真实 Electron
+  文件读取、临时任务预览及返回。主机测试
+  `fork_preserves_referenced_pasted_files_independently` 和 `sessions::fork_files`
+  覆盖附件归属、删除、重复与截断分支、保留的压缩检查点引用、过期输入、失败回滚
+  及符号链接拒绝。
 
 ### E2E-SETTINGS-destination-scroll-reset
 
