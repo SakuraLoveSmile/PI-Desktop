@@ -206,6 +206,14 @@ export const zhCN = {
     sessionMissing: "该会话已不存在",
   },
   chat: {
+    tableActions: "表格操作",
+    copyTableMarkdown: "复制表格为 Markdown",
+    exportTableCsv: "下载表格为 CSV",
+    tablePreview: "放大表格",
+    closeTablePreview: "关闭表格预览",
+    tableCopied: "表格已复制",
+    tableCopyFailed: "无法复制表格",
+    tableExportFailed: "无法下载表格",
     imagePreview: {
       title: "图片预览",
       download: "下载图片",

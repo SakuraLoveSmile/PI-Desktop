@@ -1,5 +1,8 @@
 # Unreleased changes
 
+- Copy individual Markdown tables, download them as CSV, or expand them for
+  reading without leaving the conversation.
+
 - The Composer reasoning slider now moves smoothly to clicked or
   keyboard-selected levels, follows dragging immediately, and respects
   reduced-motion settings. Rapid clicks redirect the animation; failed saves

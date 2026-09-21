@@ -204,6 +204,14 @@ export const de = {
     sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
+    "tableActions": "Tabellenaktionen",
+    "copyTableMarkdown": "Tabelle als Markdown kopieren",
+    "exportTableCsv": "Tabelle als CSV herunterladen",
+    "tablePreview": "Tabelle vergrößern",
+    "closeTablePreview": "Tabellenvorschau schließen",
+    "tableCopied": "Tabelle kopiert",
+    "tableCopyFailed": "Tabelle konnte nicht kopiert werden",
+    "tableExportFailed": "Tabelle konnte nicht heruntergeladen werden",
     imagePreview: {
       title: "Bildvorschau",
       download: "Bild herunterladen",

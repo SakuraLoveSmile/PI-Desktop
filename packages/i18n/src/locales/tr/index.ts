@@ -213,6 +213,14 @@ export const tr = {
     sessionMissing: "Bu oturum artık mevcut değil",
   },
   chat: {
+    tableActions: "Tablo işlemleri",
+    copyTableMarkdown: "Tabloyu Markdown olarak kopyala",
+    exportTableCsv: "Tabloyu CSV olarak indir",
+    tablePreview: "Tabloyu büyüt",
+    closeTablePreview: "Tablo önizlemesini kapat",
+    tableCopied: "Tablo kopyalandı",
+    tableCopyFailed: "Tablo kopyalanamadı",
+    tableExportFailed: "Tablo indirilemedi",
     imagePreview: {
       title: "Görsel önizlemesi",
       download: "Görseli indir",
