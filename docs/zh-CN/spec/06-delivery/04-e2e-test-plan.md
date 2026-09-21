@@ -8563,3 +8563,12 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`。
 - **验收 / 里程碑**：C、Quality / M6+。
 - **状态**：组件与状态层用户路径由 `queue-pending-actions.test.mjs` 覆盖。
+
+### E2E-SCHEDULED-dispatch
+
+- **场景**：独立分发到期任务。
+- **预期**：Electron runner 无需等待其他任务的提示词准备即可准入彼此独立的
+  到期任务；本地所有权按任务 ID 和 Host 实例保留，Host 继续负责 enabled、
+  due 和重叠检查。停止只阻止新轮询，错误仍可观察，迟到 90 秒的规则不变。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-dispatch.mjs`
+  使用隔离的真实 Host 与 SQLite 配置，不向真实提供商发送推理请求。

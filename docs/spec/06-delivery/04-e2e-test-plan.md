@@ -14402,3 +14402,9 @@ the latest destination. These assertions measure work counts, not device FPS.
   `fork_preserves_referenced_pasted_files_independently` and `sessions::fork_files`
   cover ownership, deletion, repeated/bounded forks, retained checkpoint paths,
   expired inputs, rollback, and symlink rejection.
+
+### E2E-SCHEDULED-dispatch
+
+- **Scenario:** Independent task dispatch.
+- **Expected:** The Electron runner admits independent due tasks without awaiting another task's prompt setup. Local in-flight ownership is keyed by task ID and Host instance until setup settles; Host remains authoritative for enabled, due and overlap checks. A replaced Host's completion cannot clear its successor's local ownership. Stop prevents new polls; admitted work keeps the existing execution/failure lifecycle. Failures remain observable and the 90-second late policy is unchanged.
+- **Automation:** `node --experimental-strip-types scripts/e2e-scheduled-dispatch.mjs` uses an isolated real Host and SQLite profile. Inference is not sent to a live provider.
