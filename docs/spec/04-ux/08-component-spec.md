@@ -271,8 +271,10 @@ combined model × reasoning selection (§11).
   overlay hiding tabs or panel actions.
   Resource close actions stay in their tabs so a second header `×` does not echo
   the native Windows close control (D357).
-- Title cluster (task title) flexes and shows at most the first 10 Unicode
-  characters plus an ellipsis; the full title remains in the native tooltip.
+- Title cluster (task title) flexes to the remaining width after toolbar
+  reservations (sidebar lead-in, action icons, work-panel toggle, and
+  platform window controls). The visible title uses CSS ellipsis only when
+  that width overflows; the full title remains in the native tooltip.
   The right cluster (action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
@@ -319,7 +321,7 @@ combined model × reasoning selection (§11).
 
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
-| Task title | session title (or untitled), capped at 10 characters with an ellipsis when needed | same | same | same |
+| Task title | session title (or untitled), uses the available width, with an ellipsis only on overflow | same | same | same |
 | New task / Search | icon buttons | same | same | same |
 | Composer stop control | hidden | visible only when the running composer draft is empty | hidden | hidden |
 | Project name | title tooltip only | same | same | omitted |
@@ -1030,6 +1032,15 @@ entirely inside the plugin's isolated page:
   reads and writes go through its host process, which keeps the jail of the one
   folder the view is browsing — never the whole group — refuses credential
   paths, and records writes to its own audit log (ADR 0241, ADR 0263).
+
+- During a Browser session switch, Main hides the shared guest immediately
+  until the destination's current navigation completes. Root lookup or load
+  completion from a superseded request cannot navigate, reveal, or publish the
+  old session as current. A session without a remembered preview stays empty;
+  closing the panel or disposing the guest wins over pending work. Normal
+  navigation within the same session retains that session's visible content.
+  A failed switch or one exceeding the existing 15-second load wait remains
+  hidden until retried; a late network completion does not automatically reveal it.
 
 ### 5.3 States
 
@@ -2741,10 +2752,12 @@ reasoning-level control.
   session (D301). The cache is module-scoped, not instance state, so a remount
   — empty-home ↔ docked, chat ↔ Settings/Plugins/other pages, or the window
   hiding and showing — restores the same slot. Switching sessions saves the
-  source draft and restores the target draft; an uncached target and every
-  newly created session start empty. A pending paste retains the source
-  draft's existing file references even if saving finishes after a session switch.
-  The no-active-session home composer has
+  source draft and restores the target draft. Restoring a composer in the same
+  workspace must retain relative `@` file references as well as absolute scratch
+  attachments; workspace-reference cleanup runs only when the workspace changes.
+  An uncached target and every newly created session start empty. A pending paste
+  retains the source draft's existing file references even if saving finishes
+  after a session switch. The no-active-session home composer has
   its own slot. A successful send clears only the submitting session's slot,
   including when navigation occurs while the request is in flight, and
   deleting a session drops its slot. If the contenteditable DOM is wiped while

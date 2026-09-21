@@ -151,17 +151,19 @@ Each scenario is documented in this format:
 ## E2E Main Integration Validation
 
 Every code-bearing change must pass the E2E suites relevant to its regression
-surface on the integrated local `main` that carries the change, before the
-request branch is pushed and the pull request is opened. Code-bearing changes
-include Renderer, Electron Main, Preload, Agent Runtime, Rust host-core,
-sessions, transcripts, plans, plugins, MCP, permissions, provider/model
-runtime, persistence, process lifecycle, packaging/runtime startup, and build
-or CI behavior that affects application execution. Documentation-only changes
-are exempt when they do not alter executable behavior.
+surface on a candidate that already contains the latest `origin/main`, before
+the request branch is pushed and the pull request is opened. Code-bearing
+changes include Renderer, Electron Main, Preload, Agent Runtime, Rust
+host-core, sessions, transcripts, plans, plugins, MCP, permissions,
+provider/model runtime, persistence, process lifecycle, packaging/runtime
+startup, and build or CI behavior that affects application execution.
+Documentation-only changes are exempt when they do not alter executable
+behavior.
 
-Run the selected suites from the latest integrated local `main` checkout and
-commit. An E2E run on the request branch is exploratory and does not satisfy
-this gate.
+Run the selected suites from the request worktree after `pnpm check:pr-base`
+passes. An E2E run on a branch that is behind `origin/main` is exploratory and
+does not satisfy this gate. Do not merge the task into local `main` to create
+the candidate.
 
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
@@ -1235,7 +1237,10 @@ identify the platform validation still needed.
   and inspect the composer. 3) Type a different prompt in B, then switch back
   to A. 4) Create a new session and inspect its composer. 5) Return to B and
   then delete B; revisit the remaining sessions and the home composer if it is
-  available. 6) Type in A, open Settings (or Plugins), then return to chat.
+  available. 6) Type in A, add a workspace file through `@` and a pasted scratch
+  file, open Settings (or Plugins), then return to chat. Confirm both file chips
+  and the surrounding text remain. Change the workspace of the same draft and
+  confirm only its workspace-relative reference is removed.
   7) Hide the app window and show it again with an unsent draft in A.
 - **Expected**: B initially shows an empty composer, A restores its original
   unsent prompt, and the new session starts empty rather than inheriting A or
@@ -1250,7 +1255,9 @@ identify the platform validation still needed.
 - **Acceptance**: C (session isolation and composer input)
 - **Milestone**: M2
 - **Status**: Source-level regression covered
-  (`composer-draft-cache.test.mjs`); full UI scenario Draft
+  (`composer-draft-cache.test.mjs`); real React remount and workspace-change
+  coverage in `scripts/e2e/composer-paste.tsx` (`pnpm test:e2e:composer-paste`);
+  full UI scenario Draft
 
 #### E2E-011d: New task creates an immediate durable empty slot
 
@@ -1481,8 +1488,11 @@ identify the platform validation still needed.
   or Agent|Plan|Goal mode control. The
   left-of-input Composer chip owns the active session's Agent/Plan/Goal switch,
   and the Composer-right combined chip owns model and reasoning selection. The
-  task title is the only visible title text and is capped at 10 characters
-  with an ellipsis; project scope is available through its tooltip. The sidebar
+  task title is the only visible title text and uses the available width,
+  with an ellipsis only on overflow. Check an English title longer than 10
+  characters in wide and narrow layouts, with the sidebar expanded/collapsed
+  and the work panel open/closed; titles must not overlap the action buttons.
+  The complete title and project scope remain available through its tooltip. The sidebar
   toggle is present only in the collapsed state (no
   duplicate of the sidebar's control). On every other route the frameless drag
   band renders instead (no chat top-bar controls) while retaining the same
@@ -3440,6 +3450,30 @@ identify the platform validation still needed.
 - **Acceptance**: Quality, Security
 - **Milestone**: M5
 - **Status**: Draft (manual)
+
+#### E2E-BROWSER-session-preview-race: Session switching does not expose a stale preview
+
+- **Preconditions**: Two sessions have distinct HTML previews; their Browser
+  panel contexts are retained independently. Directory lookups and document
+  loads can be delayed independently by the fixture.
+- **Steps**: Preview A; produce B's preview in the background; collapse A's
+  panel and open B; delay B's directory lookup and load, then return to A.
+  Switch rapidly B → C and finish the older B lookup last. Repeat with an
+  already-started old load, an empty session, a failed load, and disposal.
+- **Expected**: Background B does not navigate A. On switching, no A document
+  appears in B's panel, even after bounds/visibility updates. Only the latest
+  navigation can reveal the guest; the late B lookup cannot replace C.
+  Returning to A restores A, while an empty session remains empty. Closing or
+  disposing cannot be undone by a delayed completion. Same-session navigation
+  keeps its current page visible. Invalid, failed, or timed-out loads do not
+  report the previous document as the destination being ready. A switch that
+  exceeds the existing 15-second load wait stays hidden until retried; automatic
+  late reveal is not promised.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.3; ADR 0028, ADR 0170.
+- **Status**: Automated service-path coverage in `browser-host-session.test.mjs`
+  and `browser-pane-navigation.test.mjs`: production BrowserHost/BrowserPane,
+  controlled native-browser/Host boundaries, and deterministic timers. Native
+  Electron compositing and the reporter's live sessions are not covered.
 
 #### E2E-060: Files tab browsing stays inside the workspace
 
