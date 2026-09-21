@@ -3446,6 +3446,30 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Draft (manual)
 
+#### E2E-BROWSER-session-preview-race: Session switching does not expose a stale preview
+
+- **Preconditions**: Two sessions have distinct HTML previews; their Browser
+  panel contexts are retained independently. Directory lookups and document
+  loads can be delayed independently by the fixture.
+- **Steps**: Preview A; produce B's preview in the background; collapse A's
+  panel and open B; delay B's directory lookup and load, then return to A.
+  Switch rapidly B → C and finish the older B lookup last. Repeat with an
+  already-started old load, an empty session, a failed load, and disposal.
+- **Expected**: Background B does not navigate A. On switching, no A document
+  appears in B's panel, even after bounds/visibility updates. Only the latest
+  navigation can reveal the guest; the late B lookup cannot replace C.
+  Returning to A restores A, while an empty session remains empty. Closing or
+  disposing cannot be undone by a delayed completion. Same-session navigation
+  keeps its current page visible. Invalid, failed, or timed-out loads do not
+  report the previous document as the destination being ready. A switch that
+  exceeds the existing 15-second load wait stays hidden until retried; automatic
+  late reveal is not promised.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.3; ADR 0028, ADR 0170.
+- **Status**: Automated service-path coverage in `browser-host-session.test.mjs`
+  and `browser-pane-navigation.test.mjs`: production BrowserHost/BrowserPane,
+  controlled native-browser/Host boundaries, and deterministic timers. Native
+  Electron compositing and the reporter's live sessions are not covered.
+
 #### E2E-060: Files tab browsing stays inside the workspace
 
 - **Preconditions**: Workspace with file artifacts for nested source, large
