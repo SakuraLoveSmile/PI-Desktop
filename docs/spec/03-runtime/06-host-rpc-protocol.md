@@ -1212,6 +1212,9 @@ a schedule. Update takes an existing ID and partial fields, preserving all
 unspecified configuration. Exact local times remain supported despite the
 UI's four period presets. No new DB schema or transport is introduced.
 
+### Scheduled tasks: independent task dispatch
+
+The Electron runner admits independent due tasks without awaiting another task's prompt setup. Local in-flight ownership is keyed by task ID and Host instance until setup settles; Host remains authoritative for enabled, due and overlap checks. A replaced Host's completion cannot clear its successor's local ownership. Stop prevents new polls; admitted work keeps the existing execution/failure lifecycle. Failures remain observable and the 90-second late policy is unchanged.
 ### Scheduled tasks: project removal and automations
 
 Removing a project pauses its bound scheduled tasks without deleting their definitions, schedule, workspace binding or run history. Session references in history may become null when the project's conversations are removed. Already admitted task runs block removal even before a conversation turn starts. Tasks belonging to other projects and unbound legacy tasks are unaffected. Explicit resume or Run now may recreate a project from the preserved path; automatic polling cannot do so while paused.
