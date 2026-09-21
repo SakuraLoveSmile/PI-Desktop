@@ -8581,3 +8581,16 @@ the latest destination. These assertions measure work counts, not device FPS.
   `fork_preserves_referenced_pasted_files_independently` 和 `sessions::fork_files`
   覆盖附件归属、删除、重复与截断分支、保留的压缩检查点引用、过期输入、失败回滚
   及符号链接拒绝。
+
+### E2E-011f 补充：入队确认前的操作锁定
+
+- **前提**：会话正在回复，可控制 Host 入队请求的完成时刻。
+- **步骤**：发送一条后续消息，暂停入队；尝试编辑或删除；释放入队后再次编辑或删除，
+  然后刷新队列。用带文件引用的草稿重复；让本地 Host 入队请求超过现有 RPC 超时后重试。
+- **预期**：未确认时五个行操作都禁用且提示正在保存，立即发送按钮也显示正在保存，
+  条目不消失，也不回填第二份草稿；
+  确认后删除能移除持久化条目，编辑完整回填草稿及文件引用，刷新不会恢复已移除条目。
+  本地 Host 超时后移除未确认行、显示错误并恢复被拒绝的草稿，重试可正常入队。
+- **规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`。
+- **验收 / 里程碑**：C、Quality / M6+。
+- **状态**：组件与状态层用户路径由 `queue-pending-actions.test.mjs` 覆盖。
