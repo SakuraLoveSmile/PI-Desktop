@@ -99,6 +99,7 @@ export class BrowserHost {
     if (this.chromeSessionId === next) return;
     this.chromeSessionId = next;
     this.navigationEpoch += 1;
+    this.pane.invalidateNavigation();
     this.started = false;
     this.pane.setVisible(false);
     if (next) {

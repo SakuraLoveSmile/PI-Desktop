@@ -12,7 +12,12 @@ const electron = `data:text/javascript,${encodeURIComponent(`
     constructor() {
       this.webContents = Object.assign(new EventEmitter(), {
         url: "https://fixture.invalid/previous",
-        loadURL: () => new Promise(() => {}),
+        pendingLoads: [],
+        loadURL(url) {
+          return new Promise((resolve, reject) => {
+            this.pendingLoads.push({ url, resolve, reject });
+          });
+        },
         getURL() { return this.url; },
         getTitle: () => "fixture",
         isLoading: () => false,
@@ -71,4 +76,27 @@ test("an invalid target cannot mark the previous document ready", async (t) => {
   await request;
   assert.equal(await pane.navigateAndWait("javascript:alert(1)"), null);
   await settled();
+});
+
+test("late native navigation events cannot publish after the session is invalidated", async () => {
+  const published = [];
+  const pane = new BrowserPane((state) => published.push(state));
+  const first = pane.navigateAndWait("https://fixture.invalid/first");
+  const wc = WebContentsView.instances.at(-1).webContents;
+  wc.url = "https://fixture.invalid/first";
+  wc.pendingLoads.shift().resolve();
+  await first;
+  pane.invalidateNavigation();
+  const second = pane.navigateAndWait("https://fixture.invalid/second");
+  wc.url = "https://fixture.invalid/second";
+  wc.pendingLoads.shift().resolve();
+  await second;
+
+  wc.emit("did-navigate", {}, "https://fixture.invalid/first");
+  wc.emit("did-fail-load", {}, -3, "aborted", "https://fixture.invalid/first", true);
+  assert.deepEqual(published, []);
+
+  wc.emit("did-navigate", {}, "https://fixture.invalid/second");
+  assert.equal(published.length, 1);
+  assert.equal(published[0].url, "https://fixture.invalid/second");
 });

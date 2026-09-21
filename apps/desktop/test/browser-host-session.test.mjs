@@ -22,9 +22,11 @@ function harness() {
   const loads = [];
   const shown = [];
   const published = [];
+  let invalidations = 0;
   const pane = {
     getState: () => state,
     getWebContents: () => null,
+    invalidateNavigation: () => { invalidations += 1; },
     setBounds: () => {},
     setVisible(value) {
       visible = value;
@@ -58,7 +60,11 @@ function harness() {
   const hole = () => host.setGuestHole("pi.browser", { x: 0, y: 30, width: 400, height: 570 });
   surface();
   hole();
-  return { host, roots, loads, shown, published, surface, hole, get visible() { return visible; } };
+  return {
+    host, roots, loads, shown, published, surface, hole,
+    get visible() { return visible; },
+    get invalidations() { return invalidations; },
+  };
 }
 
 async function openPreview(h, sessionId, path) {
@@ -127,6 +133,7 @@ test("a previous session's load completion cannot reveal its guest while the new
   await settled();
   h.host.rememberLocation("B", "B.html");
   h.host.setChromeSession("B");
+  assert.equal(h.invalidations, 2, "each session binding invalidates native events");
   h.loads[0].finish();
   await pending;
   assert.equal(h.visible, false);
