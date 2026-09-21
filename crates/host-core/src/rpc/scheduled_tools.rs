@@ -131,7 +131,13 @@ fn execute_inner(st: &AppState, p: &ToolsExecuteParams) -> Result<Value, JsonRpc
             input["schedule"] = Value::Null;
         }
     }
+    // An echoed cadence during legacy maintenance is not an arming request.
     if args.get("cadence").and_then(Value::as_str) == Some("hourly")
+        && (p.tool_name == "ScheduledTaskCreate"
+            || existing
+                .as_ref()
+                .is_some_and(|task| task.cadence != "hourly")
+            || args.get("enabled").and_then(Value::as_bool) == Some(true))
         && !args.contains_key("schedule")
         && existing
             .as_ref()
@@ -141,6 +147,13 @@ fn execute_inner(st: &AppState, p: &ToolsExecuteParams) -> Result<Value, JsonRpc
         input["schedule"] = json!({"hour":0,"minute":0,"weekday":0});
     }
     if p.tool_name != "ScheduledTaskDelete"
+        && (p.tool_name == "ScheduledTaskCreate"
+            || (args.contains_key("cadence")
+                && existing
+                    .as_ref()
+                    .is_some_and(|task| task.cadence != cadence))
+            || args.contains_key("schedule")
+            || args.get("enabled").and_then(Value::as_bool) == Some(true))
         && cadence != "manual"
         && input.get("schedule").is_none()
         && existing
@@ -567,5 +580,93 @@ mod tests {
             ),
             Some(PermissionDecision::AllowOnce)
         ));
+    }
+
+    #[tokio::test]
+    async fn review_legacy_task_can_be_paused_without_arming_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut st = AppState::open(dir.path()).unwrap();
+        st.handshook = true;
+        st.db
+            .set_setting("app", &json!({"defaultPermissionMode":"auto"}))
+            .unwrap();
+        scheduled::import_tasks(
+            &st.db,
+            &[json!({"id":"legacy", "prompt":"Review", "cadence":"daily"})],
+        )
+        .unwrap();
+        let session =
+            sessions::create_session(&st.db, None, Some("agent".into()), None, None, None).unwrap();
+        let state = Arc::new(Mutex::new(st));
+        let listed = call(&state, &session.id, "ScheduledTaskList", json!({})).await;
+        assert_eq!(listed["content"]["tasks"][0]["id"], "legacy");
+        let paused = call(
+            &state,
+            &session.id,
+            "ScheduledTaskUpdate",
+            json!({"id":"legacy","enabled":false}),
+        )
+        .await;
+        assert_eq!(
+            paused["ok"], true,
+            "Pausing must not require an automatic schedule: {paused}"
+        );
+        assert_eq!(paused["content"]["task"]["enabled"], false);
+        assert!(paused["content"]["task"].get("nextRunAt").is_none());
+    }
+
+    #[tokio::test]
+    async fn legacy_maintenance_preserves_data_but_does_not_silently_enable() {
+        for cadence in ["hourly", "daily", "weekly"] {
+            for enabled in [false, true] {
+                let dir = tempfile::tempdir().unwrap();
+                let mut st = AppState::open(dir.path()).unwrap();
+                st.handshook = true;
+                st.db
+                    .set_setting("app", &json!({"defaultPermissionMode":"auto"}))
+                    .unwrap();
+                scheduled::import_tasks(&st.db,&[json!({"id":"old","title":"Old","prompt":"Review","cadence":cadence,"enabled":enabled})]).unwrap();
+                let sid =
+                    sessions::create_session(&st.db, None, Some("agent".into()), None, None, None)
+                        .unwrap()
+                        .id;
+                let state = Arc::new(Mutex::new(st));
+                for args in [
+                    json!({"id":"old","title":"Renamed"}),
+                    json!({"id":"old","prompt":"Updated"}),
+                    json!({"id":"old","enabled":false}),
+                    json!({"id":"old","cadence":cadence,"enabled":false}),
+                ] {
+                    let result = call(&state, &sid, "ScheduledTaskUpdate", args).await;
+                    assert_eq!(result["ok"], true, "{result}");
+                    assert!(result["content"]["task"].get("schedule").is_none());
+                    assert!(result["content"]["task"].get("nextRunAt").is_none());
+                }
+                let refused = call(
+                    &state,
+                    &sid,
+                    "ScheduledTaskUpdate",
+                    json!({"id":"old","enabled":true}),
+                )
+                .await;
+                assert_eq!(refused["errorCode"], "INVALID_PARAMS");
+                drop(state);
+                let mut st = AppState::open(dir.path()).unwrap();
+                st.handshook = true;
+                let saved = scheduled::get_task(&st.db, "old").unwrap().unwrap();
+                assert_eq!(saved.title, "Renamed");
+                assert_eq!(saved.prompt, "Updated");
+                assert!(!saved.enabled);
+                assert!(saved.schedule.is_none());
+                assert!(!saved.workspace_bound);
+                let state = Arc::new(Mutex::new(st));
+                let configured=call(&state,&sid,"ScheduledTaskUpdate",json!({"id":"old","cadence":cadence,"schedule":{"hour":9,"minute":30,"weekday":0},"enabled":true})).await;
+                assert_eq!(configured["ok"], true, "{configured}");
+                assert_eq!(
+                    call(&state, &sid, "ScheduledTaskDelete", json!({"id":"old"})).await["ok"],
+                    true
+                );
+            }
+        }
     }
 }
