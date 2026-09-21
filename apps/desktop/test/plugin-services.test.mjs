@@ -33,7 +33,30 @@ function forkPluginProcess({ entry }) {
     },
     onMessage: (handler) => child.on("message", handler),
     onExit: (handler) => child.on("exit", (code) => handler(code ?? 0)),
+    // Mirrors the real spawner: the plugin's own stdout/stderr is what a crash
+    // report has to be able to quote.
+    onLog: (handler) => {
+      child.stdout?.on("data", (chunk) => handler("info", String(chunk).trimEnd()));
+      child.stderr?.on("data", (chunk) => handler("error", String(chunk).trimEnd()));
+    },
     kill: () => child.kill(),
+  };
+}
+
+function fakePluginProcess() {
+  let onMessage = () => {};
+  let onExit = () => {};
+  return {
+    postMessage: (message) => {
+      if (message.t === "init") {
+        queueMicrotask(() => onMessage({ t: "res", id: message.id, ok: true, value: null }));
+      }
+    },
+    onMessage: (handler) => { onMessage = handler; },
+    onExit: (handler) => { onExit = handler; },
+    onLog: () => {},
+    kill: () => {},
+    emitExit: (code) => onExit(code),
   };
 }
 
@@ -321,7 +344,15 @@ test("a crashed host process is restarted with backoff and the restart is counte
             id: "worker",
             start: async () => {
               // Die once, right after the broker was told the service is up.
-              if (countStart() === 1) setTimeout(() => process.exit(7), 30);
+              // Die once, right after the broker was told the service is up.
+              // The line on stderr is the fixture's own "last words", which the
+              // crash report has to carry (issue #747).
+              if (countStart() === 1) {
+                setTimeout(() => {
+                  process.stderr.write("fixture older line\\nfixture service worker died");
+                  process.exit(7);
+                }, 30);
+              }
             },
           });
         },
@@ -334,7 +365,14 @@ test("a crashed host process is restarted with backoff and the restart is counte
   const failed = await waitFor(() =>
     runtime.getServiceStates().find((s) => s.state === "failed"),
   );
-  assert.equal(failed.message, "plugin host process exited");
+  // The exit code is the diagnosis: without it a report says only "it died".
+  assert.equal(failed.message, "plugin host process exited (exit code 7)");
+
+  const crash = await waitFor(() =>
+    audits.find((a) => a.api === "plugin.crash"),
+  );
+  assert.equal(crash.exitCode, 7);
+  assert.equal(crash.message, "error: fixture service worker died");
 
   const scheduled = await waitFor(() =>
     audits.find((a) => a.api === "plugin.service.restart.scheduled"),
@@ -351,6 +389,46 @@ test("a crashed host process is restarted with backoff and the restart is counte
   assert.equal(running.restarts, 1);
   assert.equal(readFileSync(startsFile, "utf8"), "2");
   assert.ok(audits.some((a) => a.api === "plugin.service.restart" && a.ok));
+});
+
+test("Windows hard-fault exit codes stay unsigned across crash surfaces", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "pi-crash-format-plugin-"));
+  writeFileSync(
+    join(dir, "manifest.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      id: "com.example.crash-format",
+      name: "Crash Format Plugin",
+      version: "0.0.1",
+      main: "main.js",
+      permissions: [],
+      contributes: {},
+    }),
+    "utf8",
+  );
+  writeFileSync(join(dir, "main.js"), "module.exports = {};", "utf8");
+  let child;
+  const audits = [];
+  const crashes = [];
+  const runtime = new PluginRuntime({
+    hostEntry: hostProcessEntry,
+    spawnProcess: () => {
+      child = fakePluginProcess();
+      return child;
+    },
+    audit: (entry) => audits.push(entry),
+    onPluginCrash: (info) => crashes.push(info),
+  });
+  t.after(() => runtime.disposeAll());
+
+  await runtime.loadFromPath(dir);
+  child.emitExit(-1073741819);
+
+  const crash = audits.find((entry) => entry.api === "plugin.crash");
+  assert.equal(crash.exitCode, 3221225477);
+  assert.equal(crash.exitCodeHex, "0xC0000005");
+  assert.equal(crashes[0].exitCode, 3221225477);
+  assert.equal(crashes[0].exitCodeHex, "0xC0000005");
 });
 
 test("autoRestart:false leaves a crashed service down", async (t) => {
