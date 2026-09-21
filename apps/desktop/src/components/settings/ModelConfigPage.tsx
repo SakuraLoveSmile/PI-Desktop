@@ -38,7 +38,8 @@ import { AnchoredMenu } from "./AnchoredMenu";
 import {
   defaultModelOptions,
   displayedDefaultModelId,
-  hasResolvedDefaultModel,
+  keepsAppDefaultModel,
+  providerServesChatModels,
 } from "./default-model";
 import { planImageGenerationDefaults } from "./image-generation-default";
 import { copyProviderConfiguration, type ProviderCopyDraft } from "./provider-copy";
@@ -119,10 +120,10 @@ export function ModelConfigPage() {
     () => imageGenerationBindings(settings?.imageGenerationModels, settings?.imageGeneration),
     [settings?.imageGenerationModels, settings?.imageGeneration],
   );
+  // One readiness rule for the picker, the provider rows and the add-provider
+  // guard: both call `providerServesChatModels`.
   const providerReady = (provider: ProviderPublic) =>
-    provider.enabled &&
-    defaultModelOptions([provider], imageGenerationCandidates).length > 0 &&
-    (provider.hasSecret || provider.hasOauth || provider.authKind === "none");
+    providerServesChatModels(provider, imageGenerationCandidates);
 
   const aiProviders = useMemo(
     () => providers.filter((provider) => provider.authKind !== OAUTH_AUTH_KIND),
@@ -207,11 +208,13 @@ export function ModelConfigPage() {
         showToast(t("settings.providerSaved"), { variant: "success" });
       } else if (!editingProvider) {
         // A freshly added provider must not take over the app default: whatever
-        // the user already picked keeps running until they change it themselves.
-        const keepsCurrentDefault = hasResolvedDefaultModel(
+        // the user already picked keeps running — as long as that default's own
+        // provider is still runnable — until they change it themselves.
+        const keepsCurrentDefault = keepsAppDefaultModel(
           providers,
           settings.defaultProviderId,
           settings.defaultModelId,
+          imageGenerationCandidates,
         );
         if (!keepsCurrentDefault) {
           await api.setSettings({
