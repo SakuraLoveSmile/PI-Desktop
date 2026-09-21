@@ -1,3 +1,5 @@
+import { GeneratedImages } from "./GeneratedImages";
+import "../../../styles/generated-images.css";
 import {
   Fragment,
   memo,
@@ -5,13 +7,15 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useRef,
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { UiMessage } from "@pi-desktop/shared";
-import { useOpenChatFileRef, useOpenPreviewTarget } from "../../../hooks/use-preview-target";
+import { useOpenPreviewTarget } from "../../../hooks/use-preview-target";
 import { useFollowScroll } from "../../../hooks/use-follow-scroll";
 import { getToolPreviewTarget } from "../../../lib/chat-links";
+import { disclosureKey } from "./disclosure";
 import {
   formatToolDuration,
   getToolAction,
@@ -54,6 +58,7 @@ import {
   IconStop,
 } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
+import { DisclosureAnchorContext } from "../../../lib/disclosure-anchor-context";
 import {
   AssistantErrorMessage,
   DisclosureCollapseRail,
@@ -66,6 +71,7 @@ import {
   TOOL_ACTION_KEYS,
   TOOL_RUNNING_KEYS,
   useAutomaticDisclosure,
+  useMessageRevealRequest,
 } from "./shared";
 import {
   delegateAgentName,
@@ -79,6 +85,10 @@ type ToolRowProps = {
   delegate?: SubagentRun;
   /** Card treatment used when several Task calls form a delegation topology. */
   variant?: "default" | "topology";
+  /** Open the latest detailed-mode tool unless the user took over. */
+  autoOpen?: boolean;
+  /** The containing turn renders image results outside its process disclosure. */
+  imagesInTurn?: boolean;
   /** Claims the containing activity group when this row is manually used. */
   onUserInteraction?: () => void;
   /** Live delegation statuses read from the turn's lifecycle-tool rows. */
@@ -108,6 +118,8 @@ function toolRowPropsEqual(
   if (
     previous.message !== next.message ||
     previous.variant !== next.variant ||
+    previous.autoOpen !== next.autoOpen ||
+    previous.imagesInTurn !== next.imagesInTurn ||
     previous.onUserInteraction !== next.onUserInteraction ||
     !subagentRunsEqual(previous.delegate, next.delegate)
   ) {
@@ -132,6 +144,8 @@ export const ToolRow = memo(function ToolRow({
   message,
   delegate,
   variant = "default",
+  autoOpen = false,
+  imagesInTurn = false,
   onUserInteraction,
   delegationStatuses,
   delegationTimings,
@@ -149,10 +163,17 @@ export const ToolRow = memo(function ToolRow({
   // (D227). Property reads only, so a streaming row can afford it every tick.
   const run = action === "run" ? runOutcome(message) : null;
   const failed = status === "error" || run === "failed";
-  // Tool details are always user-opened. Failure stays visible in the row head
-  // through its status icon/label without expanding the payload automatically.
-  const disclosure = useAutomaticDisclosure(false);
+  // Detailed mode opens the last tool of the last activity group. Compact keeps
+  // payloads collapsed so a live burst only updates the header. Failure and
+  // denial stay in the row head without expanding the payload automatically.
+  const revealRequest = useMessageRevealRequest(message.id);
+  const disclosure = useAutomaticDisclosure(
+    autoOpen && !failed && status !== "denied",
+    revealRequest,
+    disclosureKey("tool", message.id),
+  );
   const { open, toggle: toggleDisclosure, collapse: collapseDisclosure } = disclosure;
+  const titleRef = disclosure.titleRef;
   const toggleRow = useCallback(() => {
     onUserInteraction?.();
     toggleDisclosure();
@@ -199,15 +220,25 @@ export const ToolRow = memo(function ToolRow({
   // The delegate's last answer row is its report, so the body must not print
   // the same text a second time.
   const nestedReport = delegate?.items.some((item) => item.kind === "answer");
-  // Streaming updates replace the message object each tick; only pay the
-  // full payload walk once the row is actually expanded.
-  const blocks =
-    variant !== "topology" && open && hasDetails
-      ? buildToolPresentation(message, {
-          hideSummaryArg: true,
-          ...(nestedReport ? { hideDelegateReport: true } : {}),
-        })
-      : null;
+  // Keep mounted output and its reading position while an ancestor is folded,
+  // but defer formatting hidden streaming updates until it becomes visible.
+  const presentation = useRef<{
+    message: UiMessage;
+    nestedReport: boolean | undefined;
+    blocks: ReturnType<typeof buildToolPresentation>;
+  } | null>(null);
+  if (variant !== "topology" && open && hasDetails && disclosure.parentVisible &&
+    (presentation.current?.message !== message || presentation.current?.nestedReport !== nestedReport)) {
+    presentation.current = {
+      message,
+      nestedReport,
+      blocks: buildToolPresentation(message, {
+        hideSummaryArg: true,
+        ...(nestedReport ? { hideDelegateReport: true } : {}),
+      }),
+    };
+  }
+  const blocks = variant !== "topology" && open && hasDetails ? presentation.current?.blocks : null;
   const outcome =
     variant === "topology" ? subagentOutcome(message, delegationStatuses) : null;
   // A bare `running` Task row (no delegation result yet) is still being
@@ -318,8 +349,9 @@ export const ToolRow = memo(function ToolRow({
       {variant === "topology" ? (
         <button
           className="subagent-topology-node-header"
+          data-subagent-trigger={panelSelectionId}
           aria-expanded={panelOpen}
-          aria-controls={hasDetails ? "subagent-panel" : undefined}
+          aria-controls={panelOpen ? "subagent-panel" : undefined}
           disabled={!hasDetails}
           title={[agentName || rawName, modelLabel, summary].filter(Boolean).join(" · ")}
           onClick={() => {
@@ -377,6 +409,7 @@ export const ToolRow = memo(function ToolRow({
       ) : (
         <div className={`tool-row-head${runHead ? " is-run" : ""}`}>
           <button
+            ref={titleRef}
             className="tool-row-header"
             aria-expanded={open}
             aria-controls={hasDetails ? detailsId : undefined}
@@ -488,14 +521,15 @@ export const ToolRow = memo(function ToolRow({
         </span>
       ) : null}
       {blocks && blocks.length > 0 ? (
-        <div className="tool-row-body" id={detailsId}>
+        <div className="tool-row-body" id={detailsId} ref={disclosure.bodyRef} {...disclosure.bodyEvents}>
           <DisclosureCollapseRail
-            label={t("chat.collapseDetails")}
+            label={t("chat.collapseToolOutput")}
             onCollapse={collapseRow}
           />
           <ToolDetailBlocks blocks={blocks} plain={runHead} />
         </div>
       ) : null}
+      {!imagesInTurn && <GeneratedImages message={message} />}
       {inlineOpen && delegate ? (
         <SubagentRunRows
           run={delegate}
@@ -514,7 +548,7 @@ export const ToolRow = memo(function ToolRow({
  * one level in and stay collapsed with the call. Only one level is possible: a
  * delegate has no `Task` tool of its own (ADR 0062).
  */
-export function SubagentRunRows({
+export const SubagentRunRows = memo(function SubagentRunRows({
   run,
   agentName,
   onCollapse,
@@ -564,7 +598,7 @@ export function SubagentRunRows({
       />
     </div>
   );
-}
+});
 
 /**
  * Nested follow-scroll for one expanded delegate (D302). Mounted only once
@@ -588,6 +622,7 @@ function SubagentRunFollow({
     handleScroll,
     jumpToLatest,
     scheduleFollowScroll,
+    disclosureAnchorNotifier,
   } = useFollowScroll();
 
   useLayoutEffect(() => {
@@ -596,59 +631,66 @@ function SubagentRunFollow({
   }, [items, scheduleFollowScroll, scrollable]);
 
   return (
-    <div className="subagent-run-follow">
-      {/* The rows scroll inside the run rather than growing the transcript
-        * (D271). Follow sticks to the latest output while pinned (D302).
-        * Labelled and focusable so a keyboard reader can reach the scroll
-        * area the pointer can already use. */}
-      <div
-        ref={scrollRef}
-        className={`subagent-run-rows${scrollable ? "" : " is-panel-flow"}`}
-        role="group"
-        tabIndex={scrollable ? 0 : undefined}
-        aria-labelledby={headingId}
-        onScroll={scrollable ? handleScroll : undefined}
-      >
-        <div ref={contentRef}>
-          {items.map((item) =>
-            item.kind === "tool" ? (
-              <Fragment key={item.message.id}>
-                <ToolRow message={item.message} />
-                <ReviewChangeCard message={item.message} />
-              </Fragment>
-            ) : item.kind === "thinking" ? (
-              <ThinkingRow
-                key={`thinking-${item.message.id}`}
-                message={item.message}
-                streaming={item.message.status === "streaming"}
-              />
-            ) : (
-              <div className="subagent-answer" data-message-id={item.message.id} key={`answer-${item.message.id}`}>
-                {item.message.content ? (
-                  <div className="prose-chat">
-                    <Markdown source={item.message.content} />
-                  </div>
-                ) : null}
-                {item.message.error ? (
-                  <AssistantErrorMessage message={item.message} />
-                ) : null}
-              </div>
-            ),
-          )}
-        </div>
-      </div>
-      {scrollable && showJump ? (
-        <TooltipButton
-          type="button"
-          className="jump-latest-btn"
-          ariaLabel={t("chat.scrollToBottom")}
-          tooltip={t("chat.scrollToBottom")}
-          onClick={jumpToLatest}
+    <DisclosureAnchorContext.Provider value={disclosureAnchorNotifier}>
+      <div className="subagent-run-follow">
+        {/* The rows scroll inside the run rather than growing the transcript
+          * (D271). Follow sticks to the latest output while pinned (D302).
+          * Labelled and focusable so a keyboard reader can reach the scroll
+          * area the pointer can already use. */}
+        <div
+          ref={scrollRef}
+          data-scroll-owner="follow"
+          className={`subagent-run-rows${scrollable ? "" : " is-panel-flow"}`}
+          role="group"
+          tabIndex={scrollable ? 0 : undefined}
+          aria-labelledby={headingId}
+          onScroll={scrollable ? handleScroll : undefined}
         >
-          <IconArrowDown size={14} />
-        </TooltipButton>
-      ) : null}
-    </div>
+          <div ref={contentRef}>
+            {items.map((item) =>
+              item.kind === "tool" ? (
+                <Fragment key={item.message.id}>
+                  <ToolRow message={item.message} />
+                  <ReviewChangeCard message={item.message} />
+                </Fragment>
+              ) : item.kind === "thinking" ? (
+                <ThinkingRow
+                  key={`thinking-${item.message.id}`}
+                  message={item.message}
+                  streaming={item.message.status === "streaming"}
+                />
+              ) : (
+                <div
+                  className="subagent-answer"
+                  data-message-id={item.message.id}
+                  key={`answer-${item.message.id}`}
+                >
+                  {item.message.content ? (
+                    <div className="prose-chat">
+                      <Markdown source={item.message.content} />
+                    </div>
+                  ) : null}
+                  {item.message.error ? (
+                    <AssistantErrorMessage message={item.message} />
+                  ) : null}
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+        {scrollable && showJump ? (
+          <TooltipButton
+            type="button"
+            className="jump-latest-btn"
+            ariaLabel={t("chat.scrollToBottom")}
+            tooltip={t("chat.scrollToBottom")}
+            onClick={jumpToLatest}
+          >
+            <IconArrowDown size={14} />
+          </TooltipButton>
+        ) : null}
+      </div>
+    </DisclosureAnchorContext.Provider>
   );
 }
 

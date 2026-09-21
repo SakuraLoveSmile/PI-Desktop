@@ -258,8 +258,9 @@ test("every Task row renders as one accessible delegation topology", () => {
   assert.match(transcriptSource, /role="list"/);
   assert.match(transcriptSource, /variant="topology"/);
   assert.match(transcriptSource, /className="subagent-topology-node-header"/);
+  assert.match(transcriptSource, /data-subagent-trigger=\{panelSelectionId\}/);
+  assert.match(transcriptSource, /aria-controls=\{panelOpen \? "subagent-panel" : undefined\}/);
   assert.match(transcriptSource, /aria-expanded=\{panelOpen\}/);
-  assert.match(transcriptSource, /aria-controls=\{hasDetails \? "subagent-panel" : undefined\}/);
   const topologyNode = transcriptSource.slice(
     transcriptSource.indexOf('className="subagent-topology-node-header"'),
     transcriptSource.indexOf(
@@ -398,7 +399,7 @@ test("an expanded delegate run follows the latest output while pinned (D302)", (
   assert.match(followScrollSource, /isRecentScrollGesture\(/);
   assert.match(
     followScrollSource,
-    /const followScrollNow = useCallback\(\(\) => \{\s*if \(!pinnedRef\.current\) return;\s*cancelFollowScroll\(\);\s*scrollToBottom\(\);/,
+    /const followScrollNow = useCallback\(\(\) => \{[\s\S]{0,400}?if \(!pinnedRef\.current\) return;\s*cancelFollowScroll\(\);\s*scrollToBottom\(\);/,
   );
   assert.match(followScrollSource, /new ResizeObserver\(followScrollNow\)/);
   assert.doesNotMatch(

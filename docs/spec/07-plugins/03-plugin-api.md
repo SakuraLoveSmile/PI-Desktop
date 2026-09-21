@@ -53,9 +53,18 @@ type PluginAppearance = {
 ```
 
 Panels read the same value through the bridge channel `app.getAppearance` and
-receive live updates on the `appearance:changed` event (below). On hosts older
-than the channel, the call rejects with `UNSUPPORTED`; panels should fall back
-to the OS preference and their own in-panel choice.
+receive live updates on the `appearance:changed` event (below). Plugin processes
+receive the same event on `pi.events`. On hosts older than the channel, the call
+rejects with `UNSUPPORTED`; panels should fall back to the OS preference and
+their own in-panel choice.
+
+`app.getLocale` is the same language tag as `getAppearance().locale`. Plugin-owned
+UI (panels, views, widgets, settings destinations, toasts, runtime command titles)
+localizes from this value. The host does not grow `{ en, "zh-CN" }` maps on more
+contribution fields; generated `contributes.settings` titles stay plain strings
+(ADR 0280). Host-owned identity (`manifest.i18n`) and already-shipped chrome
+labels (`ui.title`, view titles, destinations) keep their existing contracts
+(ADR 0267, ADR 0082).
 
 `app.setTheme` (requires `ui.theme`, ADR 0260) applies the app theme
 preference the Settings picker writes. It accepts a built-in preference or a
@@ -98,11 +107,14 @@ pi.plugin.getDataPath(): Promise<string> // plugin-private directory
 The installed Plugins page renders every `contributes.settings` field and
 persists edits in the plugin's private settings file. Supported generated
 controls are `string`, `number`, `boolean`, `select`, `json`, and `shortcut`.
-Shortcut settings are plugin-local: they invoke the declared `command` only
-while the PI-Desktop app window is focused and while the plugin's activation
-scope matches the current project. They are never registered as OS-global
-shortcuts in this release. The host emits `plugin:settingsChanged` after a
-user edit so a plugin can refresh in-memory configuration.
+Generated `title` / `description` / `enum[].label` are author-language strings;
+the host does not resolve locale maps on them. A plugin that needs a localized
+settings surface ships `settingsDestinations` and reads `pi.app.getLocale`
+(ADR 0280). Shortcut settings are plugin-local: they invoke the declared
+`command` only while the PI-Desktop app window is focused and while the plugin's
+activation scope matches the current project. They are never registered as
+OS-global shortcuts in this release. The host emits `plugin:settingsChanged`
+after a user edit so a plugin can refresh in-memory configuration.
 
 ### commands
 ```ts
@@ -116,7 +128,23 @@ pi.commands.register(def: {
 pi.commands.unregister(id: string): Promise<void>
 ```
 
+### speech (`speech.adapter.register`)
+```ts
+pi.speech.registerAdapter(adapter: {
+  protocol: string
+  label: string
+  roles: Array<"transcribe" | "synthesize">
+  handle: (input) => Promise<{ kind: "text"; text: string } | { kind: "audio"; mimeType: string; data: string } | { kind: "http"; call: SpeechHttpCall }>
+}): Promise<void>
+pi.speech.unregisterAdapter(protocol: string): Promise<void>
+```
+
+The handle stays in the plugin process. Built-in protocol ids `openai_audio`
+and `openai_chat_audio` are reserved. HTTP plans are executed by the host with
+the bound provider key and must stay on that origin.
+
 ### ui
+
 ```ts
 pi.ui.openPanel(options?: { title?: string }): Promise<void>
 pi.ui.closePanel(): Promise<void>
@@ -246,6 +274,9 @@ picked through `requestDirectory()` when the mode declares
 anything outside it prompts the user, and the credential deny-list overrides both
 (see [04-plugin-security.md](04-plugin-security.md) §6). `remove` is
 non-recursive and moves the path to the OS trash.
+Under the `workspace` root, paths are relative to the project of the tool session
+that invoked the call, falling back to the visible workspace for a panel call,
+which has no tool session (ADR 0266).
 
 `list` returns one directory's entries, name-sorted, so a plugin can walk a tree
 lazily instead of pulling a whole-repo `glob` and reassembling it. It applies the
@@ -420,6 +451,50 @@ storage. P2/P3 operations (session create, message mutation, arbitrary re-bindin
 provider/model binding, batch delete, and tags) are intentionally not part of
 this contract.
 
+### usage (requires `usage.read`)
+
+Read-only completed-turn facts for the non-deleted sessions the user can
+still see. The host serves one flat fact row per turn — counters and
+identifiers only; no message body, no transcript projection, and no write
+path. Deliberately **no dashboard shape**: streaks, heatmaps, per-model
+shares, and top-session rankings are the plugin's own computation on top of
+these rows, so changing a metric definition later is never a breaking SDK
+change.
+
+```ts
+pi.usage.listTurns(input?: {
+  fromMs?: number      // inclusive window start, epoch ms; default toMs - 30 days
+  toMs?: number        // inclusive window end, epoch ms; default now
+  projectId?: number | null
+  sessionId?: string
+  cursor?: string      // opaque page cursor from the previous nextCursor
+  limit?: number       // 1..=500 rows; default 200
+}): Promise<{
+  turns: Array<{
+    turnId: string; sessionId: string; sessionTitle: string | null
+    projectId: number | null; providerId: string | null; modelId: string | null
+    startedAt: number; endedAt: number
+    inputTokens: number; outputTokens: number
+    cacheReadTokens: number; cacheWriteTokens: number; reasoningTokens: number
+  }>
+  nextCursor: string | null
+}>
+```
+
+Semantics:
+
+- Only completed turns of non-deleted sessions are listed. A session the
+  user deleted leaves the listing.
+- Rows are ordered by `endedAt` ascending with a keyset cursor, so paging is
+  stable while the window fills; the ranking a dashboard shows is its own
+  sort, not the host's.
+- The window spans at most 365 days; `limit` is 1..=500 (default 200). The
+  Electron side validates first, and the host RPC re-checks the same bounds.
+  Absent and `null` bounds are equivalent; an empty session title is returned
+  as `null`.
+- A missing or malformed `usage_json` yields zero cache/reasoning counters —
+  never a partial row.
+
 ### session collaboration (requires `desktop.control`)
 
 The official Session Orchestrator composes the reviewed desktop-control
@@ -463,6 +538,13 @@ reuses that session's project, model, context, and permission configuration;
 and `result` are bounded projections and do not load a full transcript.
 `cancel` interrupts only the exact queued delivery or bound turn and retains
 the target session and history.
+
+A named `spawn` `modelKey` is an AI-driven delegation choice and needs that
+model's own `ModelBinding.availableForSubagents` opt-in; the host answers
+`PERMISSION_DENIED` for a model the user has not enabled, before creating a
+worker. Omitting `modelKey` still inherits — the first enabled model, else the
+default — and naming the default model's own key is that same inheritance
+rather than a selection (ADR subagent-model-opt-in).
 
 `list` returns at most 100 non-deleted Agent sessions that can receive a
 message, including sessions created independently of Session Orchestrator. Each
@@ -509,8 +591,18 @@ a secret. `includeSessionContext: true` also requires `session.read` and an
 in-flight tool session; the host serializes that context and, if `messages` is
 empty, appends `Please respond to the request.` System prompt
 ≤ 32 KiB; combined messages ≤ 200k characters; eight calls per plugin per
-rolling 60s (`RATE_LIMITED`); 90s budget (`TIMEOUT`). Empty model output is
-`INVALID_ARGUMENT`.
+rolling 60s (`RATE_LIMITED`); 90s budget (`TIMEOUT`). Provider 429 and other
+transient provider failures are retried inside the same call under the shared
+provider retry budget (ADR 0206) and a `Retry-After` header is honored. Empty
+model output is `INVALID_ARGUMENT`.
+
+When the call still fails, the plugin receives the host's classified code
+rather than a single generic failure — `PROVIDER_RATE_LIMITED` once the retry
+budget is exhausted, `PROVIDER_UNAUTHORIZED`, `CONTEXT_TOO_LARGE`,
+`NETWORK_ERROR` — so it can pace itself and report the cause. The broker
+answers with whichever code the failing service classified, in the same
+`data.errorCode` → `errorCode` → `code` precedence every other host boundary
+uses.
 
 ### clipboard / shell
 ```ts
@@ -618,6 +710,14 @@ pi.net.fetch(input: {
 }): Promise<{ status: number; headers: Record<string, string>; bodyText: string }>
 ```
 
+`fetch` answers with the upstream response unchanged — `status`, `headers`, and
+`bodyText` — so a `429` is data your plugin can read, `Retry-After` included,
+rather than an error the host hides. The host does not retry, throttle, or
+re-issue the request: retry and backoff after a `429` are your plugin's own
+policy, and the response headers are the only backoff signal you get. A failed
+call (`status >= 400`) is audited as `ok: false`, together with the
+`retryAfter` it advertised when the response states one (§7).
+
 ```ts
 pi.net.websocket.connect(input: {
   url: string
@@ -706,6 +806,24 @@ recognition and speech synthesis remain page-owned. A panel should provide a
 text fallback and announce permission or recognition failures through its
 accessible status.
 
+## Scenic Settings contribution
+
+`contributes.scenicThemes` is a declarative presentation contribution, not a
+plugin page API. It provides localized card metadata for same-plugin themes and
+declared preview assets. The host owns the Settings DOM, styles, selection,
+focus behavior, slider draft, and Apply action. The plugin receives no Settings
+bridge, renderer DOM access, arbitrary CSS, JavaScript, navigation, or actions.
+
+The host persists Apply through the existing typed theme-variable boundary and
+only for the declared `--nexus-backdrop-blur` variable. `ui.panel` windows and
+`contributes.views` retain their independent native-view implementation.
+
+Theme assets declared for scenic cards may be package-relative, in which case
+the host resolves them inside the installed plugin package before rewriting the
+matching CSS `url()` or card preview to `plugin-asset:`. Absolute declared
+assets retain the external-path route. Neither route grants a plugin arbitrary
+filesystem access (ADR 0288).
+
 ### audio (requires `audio.capture.background` / `audio.playback.background`)
 
 **Callable, but the device backend is not implemented in this branch.**
@@ -776,7 +894,7 @@ command belonging to that plugin.
 `command` must already be registered by the calling plugin; anything else fails
 `INVALID_ARGUMENT`. An accelerator reserved by the operating system, one
 PI-Desktop itself currently spends (by default `Alt+Space` opens the plugin
-launcher and `Mod+Shift+W` summons the window; once the user rebinds one of
+launcher and `Alt+Shift+W` shows or hides the window; once the user rebinds one of
 them, the freed accelerator is available again), or one held by another plugin
 is refused rather than taken over, and a refused re-registration leaves the
 previous binding in place.
@@ -838,6 +956,9 @@ Delivered today:
   first push.
 - `plugin:settingsChanged` is delivered after edits from the generated Plugins
   settings UI.
+- `appearance:changed` — payload is `PluginAppearance`, sent whenever the app
+  palette or language changes, so a plugin process can relabel live the same way
+  an open panel does (ADR 0280).
 - `session:modelChanged` — `{ sessionId, modelKey, thinkingLevel }`, sent after
   a successful `session.configure` that changes provider, model, or thinking
   level.
@@ -864,8 +985,6 @@ A throwing handler is logged and does not affect other listeners or the plugin.
 
 Planned events:
 - `session:activated`
-- `app:themeChanged` — for now, panels follow the palette live through the
-  panel event `appearance:changed`; the plugin-process event remains planned.
 
 ## 6. Panel bridge API
 
@@ -887,6 +1006,32 @@ Detached panel pages using the current chrome contract declare
 `<meta name="pi-plugin-chrome" content="v2">` and use the published variable
 for normal-flow top spacing. The host preserves that page-owned spacing. A
 page without the marker remains supported through the legacy additive offset.
+
+### 6.1 Floating widgets
+
+A manifest may declare `"ui": { "shape": "widget" }`. The panel then opens as a
+floating widget: the same sandboxed, permission-gated page in a transparent,
+frameless window with no 46px drag band, no control capsule, and no rectangular
+native shadow. The page owns its whole rectangle and normally paints a
+silhouette smaller than it — a round orb, for instance — so the host must not
+draw a frame around that silhouette.
+
+- `--pi-plugin-titlebar-height` is `0px`, and the legacy additive top offset is
+  not applied either, whatever chrome marker the page declares.
+- The placement is published before page scripts run as
+  `document.documentElement.dataset.piPluginPanelShape`: `panel`, `widget`, or
+  `view`.
+- Dragging uses a whole-window drag map: empty space moves the window, while
+  standard controls (`button`, `input`, `a`, `[tabindex]`, …) and every element
+  marked `data-pi-plugin-no-drag` stay clickable.
+- A widget has no capsule, so the host owns an equivalent menu behind the
+  surface's own context menu: close, minimize, and always on top. A plugin may
+  still close its own widget through `ui.closePanel()`.
+- `ui.width` / `ui.height` are honoured down to 120×120 (a panel's minimum stays
+  360×280). `ui.alwaysOnTop` pins a widget above other windows, and
+  `ui.resizable` defaults to `false` for a widget and `true` for a panel.
+- Nothing else changes: same preload, same `pluginBridge` channels, same
+  permission gate, same session partition and egress policy.
 
 A docked view may also be given one subject to show. The `location` a work-panel
 tab already carries is delivered to any contributed view — not only
@@ -971,6 +1116,8 @@ Log fields:
 - ts
 - sessionId?
 - ok / errorCode
+- status / retryAfter (`net.fetch`: the upstream status of a completed call, and
+  for a failed one the `Retry-After` it stated — never the header set or body)
 
 ## 8. Versioning strategy
 
@@ -988,6 +1135,7 @@ The desktop plugin runtime now implements the MVP host API surface used by local
   `fs.writeText` / `fs.glob` / `fs.list` / `fs.remove` / `fs.requestDirectory`,
   bounded by `manifest.fs` (ADR 0088)
 - `agent.registerTool` / `unregisterTool` / `agent.complete`
+- `speech.registerAdapter` / `unregisterAdapter` (`speech.adapter.register`)
 - `models.list`, `session.getLlmContext`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `browser.*` (guest CDP; `browser.cdp`)

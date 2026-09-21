@@ -1,9 +1,8 @@
 import {
   memo,
   useCallback,
+  useContext,
   useId,
-  useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -14,13 +13,21 @@ import type {
   UiMessage,
 } from "@pi-desktop/shared";
 import {
+  formatCompactTokenCount,
+  isCertificateVerificationError,
   THINKING_LEVELS,
   type ThinkingLevel,
 } from "@pi-desktop/shared";
 import { useOpenChatFileRef, useOpenPreviewTarget } from "../../../hooks/use-preview-target";
+import { useDisclosureAnchorNotifier } from "../../../lib/disclosure-anchor-context";
+import { isThinkingActive, resolveThinkingDisplayMode } from "../../../lib/turn-process";
+import { TranscriptSearchContext } from "../../../lib/transcript-search-context";
+import { disclosureKey, useAutomaticDisclosure } from "./disclosure";
+export { useAutomaticDisclosure } from "./disclosure";
 import { messageThinking as thinkingText } from "../../../lib/assistant-turns";
 import { useReferencedImageDataUrl } from "../../../lib/use-referenced-image-data-url";
-import { isHtmlFilePath, splitChatText } from "../../../lib/chat-links";
+import { useVerifiedChatText } from "../../../hooks/use-verified-chat-text";
+import { isHtmlFilePath } from "../../../lib/chat-links";
 import type { SourcePositionProps } from "../../../lib/markdown-source";
 import { getToolAction, type ToolAction } from "../../../lib/tool-display";
 import { calculateTokenRate } from "../../../lib/context-usage";
@@ -50,6 +57,17 @@ import {
   IconWrench,
 } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
+
+/**
+ * Legacy message navigation reveals the row it names, at message precision.
+ * Item-level targeting is not part of this change.
+ */
+export function useMessageRevealRequest(messageId: string) {
+  const target = useContext(TranscriptSearchContext);
+  return target && target.messageId === messageId
+    ? target.requestId
+    : undefined;
+}
 
 export function CopyButton({
   text,
@@ -87,16 +105,6 @@ export function CopyButton({
     </TooltipButton>
   );
 }
-
-
-export function formatTokenCount(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
-  if (value >= 10_000) return `${Math.round(value / 1000)}k`;
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  return String(value);
-}
-
-
 export function MessageMeta({
   modelId,
   usage,
@@ -127,7 +135,7 @@ export function MessageMeta({
       {showThroughput ? (
         <span className="message-meta-chip throughput">
           {t("chat.usageThroughputEstimated", {
-            count: formatTokenCount(throughput),
+            count: formatCompactTokenCount(throughput),
           })}
         </span>
       ) : null}
@@ -138,10 +146,21 @@ export function MessageMeta({
 export function AssistantErrorMessage({ message }: { message: UiMessage }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(true);
+  const detailsToggleRef = useRef<HTMLButtonElement | null>(null);
+  const notifyDisclosureAnchor = useDisclosureAnchorNotifier();
   const detailsId = useId();
   const error = message.error;
   if (!error) return null;
-  const localizedKey = `errors.${error.code}`;
+  const networkDetails = error.details;
+  const certificateFailure =
+    error.code === "NETWORK_ERROR" &&
+    networkDetails !== null && typeof networkDetails === "object" &&
+    isCertificateVerificationError(
+      (networkDetails as { networkCode?: unknown }).networkCode,
+    );
+  const localizedKey = certificateFailure
+    ? "errors.providerCertificate"
+    : `errors.${error.code}`;
   const localized = t(localizedKey);
   const summary = localized === localizedKey ? t("chat.responseFailed") : localized;
   const configurationError = [
@@ -149,6 +168,15 @@ export function AssistantErrorMessage({ message }: { message: UiMessage }) {
     "PROVIDER_SECRET_MISSING",
     "PROVIDER_UNAUTHORIZED",
   ].includes(error.code);
+  // The transport errno is what separates "DNS did not resolve" from "TLS was
+  // rejected" from "the socket died" for the user; the localized summary can
+  // only say "can't reach the provider" (issue #234).
+  const networkCode = (() => {
+    const details = error.details;
+    if (!details || typeof details !== "object") return undefined;
+    const value = (details as { networkCode?: unknown }).networkCode;
+    return typeof value === "string" ? value : undefined;
+  })();
 
   return (
     <section className="message-error" aria-label={t("chat.responseError")}>
@@ -158,15 +186,25 @@ export function AssistantErrorMessage({ message }: { message: UiMessage }) {
         </span>
         <div className="message-error-copy">
           <strong>{summary}</strong>
-          <code>{error.code}</code>
+          <code>
+            {error.code}
+            {networkCode ? ` · ${networkCode}` : ""}
+          </code>
         </div>
         <div className="message-error-actions">
           <button
             type="button"
+            ref={detailsToggleRef}
             className="message-error-toggle"
             aria-expanded={open}
             aria-controls={detailsId}
-            onClick={() => setOpen((value) => !value)}
+            onClick={() => {
+              // The raw detail block changes the row's height, so this manual
+              // disclosure holds its own reading position like the others
+              // (#324).
+              notifyDisclosureAnchor?.(detailsToggleRef.current);
+              setOpen((value) => !value);
+            }}
           >
             <IconChevronRight size={12} aria-hidden />
             {open ? t("chat.hideErrorDetails") : t("chat.showErrorDetails")}
@@ -292,47 +330,6 @@ export function ToolActionIcon({ action }: { action: ToolAction }) {
   }
 }
 
-/**
- * Automatic disclosure is deliberately separate from user disclosure state.
- * A running process may open its latest details and close them when it settles,
- * but one user click takes ownership for the rest of that component's lifetime.
- * Layout effects keep the automatic transition from moving the transcript for a
- * painted frame.
- */
-export function useAutomaticDisclosure(automaticOpen: boolean, revealRequest?: number) {
-  const [open, setOpen] = useState(automaticOpen || revealRequest !== undefined);
-  const userInteractedRef = useRef(false);
-  const previousAutomaticOpenRef = useRef(automaticOpen);
-
-  useLayoutEffect(() => {
-    if (userInteractedRef.current) return;
-    if (previousAutomaticOpenRef.current === automaticOpen) return;
-    previousAutomaticOpenRef.current = automaticOpen;
-    setOpen(automaticOpen);
-  }, [automaticOpen]);
-
-  const claim = useCallback(() => {
-    userInteractedRef.current = true;
-  }, []);
-
-  useLayoutEffect(() => {
-    if (revealRequest === undefined) return;
-    claim();
-    setOpen(true);
-  }, [claim, revealRequest]);
-
-  const toggle = useCallback(() => {
-    claim();
-    setOpen((value) => !value);
-  }, [claim]);
-
-  const collapse = useCallback(() => {
-    claim();
-    setOpen(false);
-  }, [claim]);
-
-  return { open, toggle, collapse, claim };
-}
 
 /** Actions whose path/url argument makes sense to preview in the panel. */
 export const PREVIEWABLE_ACTIONS = new Set<ToolAction>(["read", "write", "edit", "fetch"]);
@@ -427,12 +424,11 @@ export function MessageAttachmentImage({
 }
 
 /** Plain user text: @paths become composer-like chips; URLs stay text links. */
-export function LinkifiedText({ text }: { text: string }) {
+export function LinkifiedText({ text, attachments }: { text: string; attachments?: readonly MessageAttachment[] }) {
   const { t } = useTranslation();
-  const root = useAppStore((s) => s.workspace?.path);
   const openTarget = useOpenPreviewTarget();
   const openFileRef = useOpenChatFileRef();
-  const segments = useMemo(() => splitChatText(text, root), [text, root]);
+  const segments = useVerifiedChatText(text, attachments);
   let offset = 0;
   return (
     <>
@@ -517,8 +513,10 @@ export const ThinkingRow = memo(function ThinkingRow({
 }) {
   const { t } = useTranslation();
   const detailsId = useId();
-  const { open, toggle: toggleDisclosure, collapse: collapseDisclosure } =
-    useAutomaticDisclosure(autoOpen);
+  const revealRequest = useMessageRevealRequest(message.id);
+  const disclosure = useAutomaticDisclosure(autoOpen, revealRequest, disclosureKey("thinking", message.id));
+  const { open, toggle: toggleDisclosure, collapse: collapseDisclosure } = disclosure;
+  const titleRef = disclosure.titleRef;
   const toggleRow = useCallback(() => {
     onUserInteraction?.();
     toggleDisclosure();
@@ -527,11 +525,27 @@ export const ThinkingRow = memo(function ThinkingRow({
     onUserInteraction?.();
     collapseDisclosure();
   }, [collapseDisclosure, onUserInteraction]);
+  const compact = useAppStore(
+    (state) => resolveThinkingDisplayMode(state.settings?.thinkingDisplayMode) === "compact",
+  );
+  if (compact) {
+    return isThinkingActive(message, streaming) ? (
+      <div className="tool-row thinking thinking-compact" role="status">
+        <span className="tool-row-icon" aria-hidden>
+          <IconSparkles size={15} />
+        </span>
+        <span className="tool-row-name running">
+          {t("chat.thinking", { defaultValue: "Thinking" })}
+        </span>
+      </div>
+    ) : null;
+  }
   const text = thinkingText(message);
   const summary = text.replace(/\s+/g, " ").trim();
   return (
     <div className={`tool-row thinking ${open ? "open" : ""}`}>
       <button
+        ref={titleRef}
         className="tool-row-header"
         aria-expanded={open}
         aria-controls={detailsId}
@@ -550,7 +564,7 @@ export const ThinkingRow = memo(function ThinkingRow({
         </span>
       </button>
       {open ? (
-        <div className="tool-row-body" id={detailsId}>
+        <div className="tool-row-body" id={detailsId} ref={disclosure.bodyRef} {...disclosure.bodyEvents}>
           <DisclosureCollapseRail
             label={t("chat.thinkingHide")}
             onCollapse={collapseRow}

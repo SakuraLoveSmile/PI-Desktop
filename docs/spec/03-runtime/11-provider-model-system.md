@@ -68,11 +68,11 @@ inside the `openai_compatible` provider path: the preset fixes the endpoint to
 models from `/models`, and sends chat turns through pi-ai's OpenAI Chat
 Completions adapter. It does not create a second transport or a closed model
 allowlist. Agent-runtime injects OpenCode routing headers on every LLM
-request (session turns, subagents, prompt enhancement, and plugin
-one-shots): `x-opencode-session` is the durable conversation id (or a
-per-call UUID when the caller has no session), `x-opencode-client` is
-`pi-desktop`, and `User-Agent` is `pi-desktop/<APP_VERSION>` unless the row
-sets `headers["User-Agent"]`. A custom OpenAI-compatible row whose base URL
+request (session turns, subagents, context-compaction summaries, prompt
+enhancement, and plugin one-shots): `x-opencode-session` is the durable
+conversation id (or a per-call UUID when the caller has no session),
+`x-opencode-client` is `pi-desktop`, and `User-Agent` is
+`pi-desktop/<APP_VERSION>` unless the row sets `headers["User-Agent"]`. A custom OpenAI-compatible row whose base URL
 host is `opencode.ai` receives the same headers. pi-ai is not relied on to
 emit `x-opencode-session`. Each provider row (AI service or OAuth account)
 may set optional `headers`; empty keeps adapter defaults. A fetch wrapper is
@@ -192,7 +192,7 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    preserving all raw records in the file for future surfaces. Image input is
    sent as a transient image content block only when the model accepts image
    input. PDF capability is surfaced and retained in model metadata; because
-   pi-ai 0.85 has no native PDF content block, PDF attachments remain bounded
+   pi-ai 0.86.1 has no native PDF content block, PDF attachments remain bounded
    file references rather than being incorrectly encoded as images.
 7. User-edited `ModelBinding` values remain explicit provider configuration:
    they control selected request limits, enabled thinking levels, the default
@@ -208,8 +208,9 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
 8. Settings renders the seven canonical thinking levels for every binding.
    Published levels begin selected for a known reasoning model. A non-reasoning
    or unknown model shows the same choices unselected, with a short manual
-   override note. `defaultThinkingLevel` is chosen from the levels the binding
-   enables, so a stored default is always part of the explicit set.
+   override note. `defaultThinkingLevel` is chosen from `omit` plus the levels
+   the binding enables, so a stored default is either `omit` or part of that
+   explicit set.
 9. `supportsImages` and `supportsDocuments` are three-state overrides. Absent
    or `null` follows the published models.dev modality, so a catalog correction
    still reaches a saved binding; `true` or `false` is the user's explicit
@@ -218,12 +219,25 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    self-hosted endpoint routinely accepts input its catalog entry omits.
    Enabling image input turns on the transient image content block; enabling PDF
    input records the capability but does not change the encoding, since pi-ai
-   0.85 has no PDF content block and PDFs stay bounded file references.
+   0.86.1 has no PDF content block and PDFs stay bounded file references.
 10. The settings checkboxes show the effective answer against the published
     baseline, and setting one back to the published value stores "follow the
     catalog" rather than an equal-valued override. Agreeing with models.dev is
     therefore the reset, and no separate reset control or per-capability
     explanatory copy is required.
+10a. `nativeWebSearch` is a two-state opt-in (absent means off; there is no
+    catalog baseline because models.dev publishes no hosted-tool capability).
+    When enabled and the model's resolved wire API is `anthropic-messages`,
+    `openai-responses`, or `azure-openai-responses` (stored apiStyle
+    `anthropic_messages` / `responses`), the adapter attaches the provider's
+    hosted web search tool (`web_search_20250305` / `web_search`), extracts
+    the search activity into `UiMessage.hostedSearch` (`rounds` for display,
+    `replay` for convertMessages), and restores those raw blocks on later
+    turns including after a restart (ADR 0297). The checkbox is disabled
+    when the provider's API style is neither of those two. Gateways that do
+    not support the tool surface the provider error; the remedy is unchecking.
+    Search runs on the provider: there is no local fetch and no permission
+    prompt. Compaction still drops search blocks.
 11. `ModelInfo` is the published record the settings surface compares against,
     so a stored binding must not shape its capabilities or reasoning fields.
     Effective limits, reasoning and thinking levels are resolved through the
@@ -305,9 +319,13 @@ type UserModelConfig = {
 type ModelBinding = {
   id: string
   contextWindow: number
+  /** Where `contextWindow` came from; absent on records older than the marker,
+   * which then resolve through the historical rule (see
+   * `13-model-catalog-and-selection.md` §9.1). */
+  contextWindowSource?: "catalog" | "user"
   maxTokens: number
   thinkingLevels: ThinkingLevel[]
-  defaultThinkingLevel: ThinkingLevel | null
+  defaultThinkingLevel: SessionThinkingLevel | null
   availableForSubagents?: boolean // opt-in for AI-driven delegation
 }
 
@@ -351,7 +369,9 @@ normal pin resolution, including when `Task.model` repeats that definition's
 own pin key. On-demand matching uses unique provider id/vendor/name lookup and
 must not overwrite a pin with another account's credentials. If vendor/model aliases collide across accounts, the
 opted-in account uses its exact provider ID as the override key. Selection priority remains Task.model → definition pin
-→ session model (D278; ADR subagent-model-opt-in).
+→ session model (D278; ADR subagent-model-opt-in). The opt-in governs every entry point that lets the AI pick a model
+for delegated work, not only `Task.model`: a `session/collaboration/spawn` `modelKey` naming a model without it is
+refused with `PERMISSION_DENIED`, while omitting the key, or naming the default model's own key, still inherits.
 
 ## 8. Secrets
 
@@ -417,7 +437,7 @@ same vendor key.
 
 ### Anthropic token endpoint rate limits
 
-The pinned pi-ai 0.85.1 patch gives Anthropic authorization-code exchange and
+The pinned pi-ai 0.86.1 patch gives Anthropic authorization-code exchange and
 refresh a shared, bounded token-request policy: retry only an explicit HTTP
 429, at most three total requests. Wait at least 1 s then 2 s, or longer when
 `Retry-After` gives delta seconds or an HTTP date. A server delay beyond the
@@ -657,7 +677,7 @@ response, it stops consuming the stream instead of awaiting the server's
 TCP FIN. Upstream pi-ai keeps iterating until the server closes the
 connection, which hangs the turn behind reverse proxies that hold the idle
 connection open. Until the fix ships upstream, `patches/` carries a pnpm
-patch on `@earendil-works/pi-ai@0.85.1` that breaks the event loop on the
+patch on `@earendil-works/pi-ai@0.86.1` that breaks the event loop on the
 terminal event (the OpenAI SDK aborts the underlying request when the
 consumer stops iterating). Drop the patch once a pi-ai release includes the
 fix.

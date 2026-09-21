@@ -7,6 +7,7 @@ import {
   subagentProviderLookupError,
 } from "@pi-desktop/agent-runtime";
 import { loadBuiltinSkillBody } from "../builtin-skills";
+import { createImageGenerationTool } from "../services/image-generation-service";
 import { registerPluginDevTools } from "../plugin-dev-tools";
 import { resolveLocalFile } from "../browser-view";
 import { modelConfigFromModelsDev } from "../models-dev-catalog";
@@ -14,7 +15,7 @@ import { AgentSidecar } from "../agent-sidecar";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { BrowserHost } from "../browser-host";
-import type { InflightCheckpointer } from "../inflight-checkpoint";
+import type { InflightCheckpointer } from "@pi-desktop/host-runtime";
 import { summarizeToolResult, type Logger } from "../logger";
 import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { PluginRuntime } from "../plugin-runtime";
@@ -469,6 +470,7 @@ export function createSidecarRuntime({
   });
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
+  s.setLocalTool("GenerateImages", createImageGenerationTool({ dataDir, getHost: () => runtimeState.host }));
   s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {
     const raw = String((args as { path?: unknown })?.path ?? "").trim();
     if (!raw) {

@@ -8,26 +8,7 @@ import {
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { Button, Input, cx } from "../ui";
-
-function SettingsRow({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="settings-row">
-      <div className="settings-row-copy">
-        <div className="settings-row-title">{title}</div>
-        {description ? <div className="settings-row-desc">{description}</div> : null}
-      </div>
-      <div className="settings-row-control">{children}</div>
-    </div>
-  );
-}
+import { SettingsRow } from "../../features/settings/primitives";
 
 const MODES: NetworkProxyMode[] = ["system", "direct", "custom"];
 
@@ -80,7 +61,7 @@ export function NetworkProxySection({
     if (mode === saved.mode) return;
     setTestState("idle");
     if (mode !== "custom") {
-      void persist({ mode });
+      void persist({ mode, allowFakeIp: saved.allowFakeIp });
       return;
     }
     const parsed = parseProxyUrl(urlDraft);
@@ -90,6 +71,7 @@ export function NetworkProxySection({
       mode: "custom",
       url,
       bypass: bypassDraft.trim() || undefined,
+      allowFakeIp: saved.allowFakeIp,
     });
   };
 
@@ -108,6 +90,7 @@ export function NetworkProxySection({
       mode: "custom",
       url: parsed.value.href,
       bypass: bypassDraft.trim() || undefined,
+      allowFakeIp: saved.allowFakeIp,
     });
   };
 
@@ -117,7 +100,7 @@ export function NetworkProxySection({
     setBypassDraft(next);
     if (next === (saved.bypass ?? DEFAULT_NETWORK_PROXY_BYPASS)) return;
     if (!saved.url) return;
-    void persist({ mode: "custom", url: saved.url, bypass: next });
+    void persist({ mode: "custom", url: saved.url, bypass: next, allowFakeIp: saved.allowFakeIp });
   };
 
   const runTest = async () => {
@@ -129,8 +112,9 @@ export function NetworkProxySection({
             mode: "custom",
             url: urlDraft.trim() || saved.url,
             bypass: bypassDraft.trim() || undefined,
+            allowFakeIp: saved.allowFakeIp,
           }
-        : { mode: saved.mode };
+        : { mode: saved.mode, allowFakeIp: saved.allowFakeIp };
     try {
       const result = await api.testNetworkProxy(payload);
       if (result.ok) {
@@ -181,6 +165,23 @@ export function NetworkProxySection({
               </button>
             ))}
           </div>
+        </SettingsRow>
+        <SettingsRow
+          title={t("settings.proxyFakeIp")}
+          description={t("settings.proxyFakeIpDesc")}
+        >
+          <button
+            type="button"
+            className={cx("settings-toggle", saved.allowFakeIp && "on")}
+            role="switch"
+            aria-checked={saved.allowFakeIp === true}
+            aria-label={t("settings.proxyFakeIp")}
+            onClick={() =>
+              void persist({ ...saved, allowFakeIp: saved.allowFakeIp !== true })
+            }
+          >
+            <span className="settings-toggle-thumb" />
+          </button>
         </SettingsRow>
 
         {saved.mode === "custom" ? (

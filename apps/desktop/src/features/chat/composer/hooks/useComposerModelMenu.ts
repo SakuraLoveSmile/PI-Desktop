@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import type {
   Mode,
   ProviderPublic,
-  ThinkingLevel,
+  SessionThinkingLevel,
 } from "@pi-desktop/shared";
 import {
   initialThinkingLevelForBinding,
+  isImageGenerationModel,
   modelIdsMatch,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../../../../stores/app-store";
@@ -17,10 +18,12 @@ import {
 } from "../../../../lib/composer-models";
 import { providerThinkingLevels } from "../../../../lib/session-thinking";
 import {
+  sessionThinkingMenuLevels,
   thinkingLevelForProvider,
   thinkingProviderForModel,
   type ComposerMenuView,
 } from "../model";
+import { createLatestCommitQueue } from "../thinking-commit-queue";
 
 type UseComposerModelMenuOptions = {
   mode: Mode;
@@ -28,7 +31,7 @@ type UseComposerModelMenuOptions = {
   provider: ProviderPublic | undefined;
   modelId: string | undefined;
   thinkingProvider: ProviderPublic | null | undefined;
-  thinkingLevel: ThinkingLevel;
+  thinkingLevel: SessionThinkingLevel;
   controlsBlocked: boolean;
 };
 
@@ -42,6 +45,7 @@ export function useComposerModelMenu({
   controlsBlocked,
 }: UseComposerModelMenuOptions) {
   const providers = useAppStore((s) => s.providers);
+  const imageGeneration = useAppStore((s) => s.settings?.imageGeneration);
   const providerModels = useAppStore((s) => s.providerModels);
   const loadProviderModels = useAppStore((s) => s.loadProviderModels);
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
@@ -55,6 +59,42 @@ export function useComposerModelMenu({
   const modelSearchRef = useRef<HTMLInputElement>(null);
   const modelListRef = useRef<HTMLDivElement>(null);
   const thinkingListRef = useRef<HTMLDivElement>(null);
+  const thinkingConfigRef = useRef({
+    mode,
+    providerId: provider?.id,
+    modelId,
+    configureActiveSession,
+    showToast,
+  });
+  thinkingConfigRef.current = {
+    mode,
+    providerId: provider?.id,
+    modelId,
+    configureActiveSession,
+    showToast,
+  };
+  const thinkingQueueRef = useRef<ReturnType<typeof createLatestCommitQueue<SessionThinkingLevel>> | null>(
+    null,
+  );
+  if (!thinkingQueueRef.current) {
+    thinkingQueueRef.current = createLatestCommitQueue<SessionThinkingLevel>({
+      send: async (level) => {
+        const current = thinkingConfigRef.current;
+        await current.configureActiveSession({
+          mode: current.mode,
+          providerId: current.providerId,
+          modelId: current.modelId,
+          thinkingLevel: level,
+        });
+      },
+      onError: (error) => {
+        const current = thinkingConfigRef.current;
+        current.showToast(error instanceof Error ? error.message : String(error), {
+          variant: "error",
+        });
+      },
+    });
+  }
 
   const thinkingProvider =
     resolvedThinkingProvider ??
@@ -64,9 +104,7 @@ export function useComposerModelMenu({
       provider ? providerModels[provider.id] : undefined,
     );
   const availableThinkingLevels = providerThinkingLevels(thinkingProvider);
-  const thinkingMenuLevels: ThinkingLevel[] = availableThinkingLevels.length
-    ? availableThinkingLevels
-    : ["off"];
+  const thinkingMenuLevels = sessionThinkingMenuLevels(availableThinkingLevels);
   const modelGroups = useMemo(
     () =>
       providers
@@ -79,6 +117,7 @@ export function useComposerModelMenu({
           const models = composerModelsForProvider(
             candidate,
             providerModels[candidate.id],
+            imageGeneration,
           );
           return {
             provider: candidate,
@@ -88,7 +127,7 @@ export function useComposerModelMenu({
           };
         })
         .filter((group) => group.models.length > 0),
-    [providers, providerModels],
+    [providers, providerModels, imageGeneration],
   );
   const queryNeedle = query.trim().toLowerCase();
   const filteredModelGroups = useMemo(
@@ -158,9 +197,14 @@ export function useComposerModelMenu({
     setModelHighlight(-1);
     setThinkingHighlight(-1);
   }, [open]);
+  useEffect(() => {
+    thinkingQueueRef.current?.invalidate();
+  }, [activeSessionId, provider?.id, modelId]);
 
   useEffect(() => {
-    if (controlsBlocked) setOpen(false);
+    if (!controlsBlocked) return;
+    setOpen(false);
+    thinkingQueueRef.current?.invalidate();
   }, [controlsBlocked]);
 
   useEffect(() => {
@@ -204,6 +248,9 @@ export function useComposerModelMenu({
   };
 
   const selectModel = async (candidate: ProviderPublic, nextModelId: string) => {
+    thinkingQueueRef.current?.invalidate();
+    await thinkingQueueRef.current?.idle();
+    if (isImageGenerationModel(useAppStore.getState().settings?.imageGeneration, candidate.id, nextModelId)) return;
     try {
       const nextModelProvider = thinkingProviderForModel(
         candidate,
@@ -236,22 +283,23 @@ export function useComposerModelMenu({
     }
   };
 
-  const selectThinkingLevel = async (level: ThinkingLevel) => {
-    try {
-      await configureActiveSession({
-        mode,
-        providerId: provider?.id,
-        modelId,
-        thinkingLevel: level,
-      });
-      setView("root");
-      setModelHighlight(-1);
-      setThinkingHighlight(-1);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), {
-        variant: "error",
-      });
-    }
+  /**
+   * Commit a reasoning level without leaving the menu surface. Latest-wins:
+   * a drag that crosses several stops only persists the last pending level
+   * after the in-flight write settles. Returns false when the configuration
+   * is rejected or invalidated by a session/model change.
+   */
+  const commitThinkingLevel = (level: SessionThinkingLevel) => {
+    const queue = thinkingQueueRef.current;
+    if (!queue) return Promise.resolve(false);
+    return queue.commit(level);
+  };
+
+  const selectThinkingLevel = async (level: SessionThinkingLevel) => {
+    if (!(await commitThinkingLevel(level))) return;
+    setView("root");
+    setModelHighlight(-1);
+    setThinkingHighlight(-1);
   };
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -321,6 +369,7 @@ export function useComposerModelMenu({
     thinkingMenuLevels,
     showView,
     selectModel,
+    commitThinkingLevel,
     selectThinkingLevel,
     onMenuKeyDown,
     controlsBlocked,

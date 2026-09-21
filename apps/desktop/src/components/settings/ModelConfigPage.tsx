@@ -4,12 +4,13 @@
  *
  * The default picker lists each configured model, while provider rows use
  * `models[0]` as the provider's quick default. Editing the default provider
- * re-syncs `settings.defaultModelId` when that first model changes.
+ * preserves `settings.defaultModelId` while that model remains configured.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   OAUTH_AUTH_KIND,
+  isImageGenerationModel,
   modelIdsMatch,
   type ModelBinding,
   type ProviderPublic,
@@ -32,12 +33,13 @@ import {
 } from "../icons";
 import { AnchoredMenu } from "./AnchoredMenu";
 import {
-  defaultModelIdOf,
   defaultModelOptions,
   displayedDefaultModelId,
 } from "./default-model";
 import { copyProviderConfiguration, type ProviderCopyDraft } from "./provider-copy";
+import { ImageGenerationModelRow } from "./ImageGenerationModelRow";
 import { ProviderSetupDialog } from "./ProviderSetupDialog";
+import { useProviderReorder } from "./useProviderReorder";
 import { VendorAccountsSection } from "./VendorAccountsSection";
 
 const DELETE_CONFIRM_MS = 3000;
@@ -109,15 +111,16 @@ export function ModelConfigPage() {
 
   const providerReady = (provider: ProviderPublic) =>
     provider.enabled &&
-    !!defaultModelIdOf(provider) &&
+    defaultModelOptions([provider], settings?.imageGeneration).length > 0 &&
     (provider.hasSecret || provider.hasOauth || provider.authKind === "none");
 
   const aiProviders = useMemo(
     () => providers.filter((provider) => provider.authKind !== OAUTH_AUTH_KIND),
     [providers],
   );
+  const reorder = useProviderReorder(aiProviders, busyId !== null || testingId !== null || setupFor !== null);
   const readyProviders = providers.filter(providerReady);
-  const defaultModelOptionsList = defaultModelOptions(readyProviders);
+  const defaultModelOptionsList = defaultModelOptions(readyProviders, settings?.imageGeneration);
   const visibleDefaultModelOptions = useMemo(() => {
     const query = defaultModelQuery.trim().toLowerCase();
     if (!query) return defaultModelOptionsList;
@@ -126,15 +129,20 @@ export function ModelConfigPage() {
     );
   }, [defaultModelOptionsList, defaultModelQuery]);
 
+
   if (!settings) return null;
 
   const defaultProvider =
     providers.find((provider) => provider.id === settings.defaultProviderId) ?? null;
   const editingProvider =
     setupFor ? providers.find((provider) => provider.id === setupFor) ?? null : null;
-  const defaultProviderReady = defaultProvider !== null && providerReady(defaultProvider);
+  const defaultProviderReady = defaultProvider !== null && providerReady(defaultProvider) &&
+    !isImageGenerationModel(settings.imageGeneration, defaultProvider.id,
+      displayedDefaultModelId(defaultProvider, settings.defaultModelId));
+
 
   const setDefaultModel = async (provider: ProviderPublic, modelId: string) => {
+    if (isImageGenerationModel(useAppStore.getState().settings?.imageGeneration, provider.id, modelId)) return;
     setBusyId(provider.id);
     try {
       await api.setSettings({
@@ -155,13 +163,16 @@ export function ModelConfigPage() {
   };
 
   /**
-   * A saved provider that is also the global default may have changed its first
-   * model, which is what `settings.defaultModelId` points at.
+   * Preserve the selected app default unless it was removed from the provider.
    */
-  const afterSaved = async (saved: ProviderPublic, models: ModelBinding[]) => {
+  const afterSaved = async (saved: ProviderPublic, models: ModelBinding[], imageModelId?: string) => {
     const firstModelId = models[0]?.id;
     try {
-      if (copyDraft) {
+      if (imageModelId) {
+        await api.setSettings({ ...(await api.getSettings()), imageGeneration: { providerId: saved.id, modelId: imageModelId } });
+        useAppStore.setState({ settings: await api.getSettings() });
+        showToast(t("settings.providerSaved"), { variant: "success" });
+      } else if (copyDraft) {
         showToast(t("settings.providerSaved"), { variant: "success" });
       } else if (!editingProvider) {
         await api.setSettings({
@@ -171,7 +182,10 @@ export function ModelConfigPage() {
         });
         showToast(t("settings.providerSaved"), { variant: "success" });
       } else {
-        if (settings.defaultProviderId === saved.id && firstModelId) {
+        if (
+          settings.defaultProviderId === saved.id && firstModelId &&
+          !models.some((model) => modelIdsMatch(model.id, settings.defaultModelId ?? ""))
+        ) {
           await api.setSettings({ ...settings, defaultModelId: firstModelId });
         }
         showToast(t("settings.providerUpdated"), { variant: "success" });
@@ -313,7 +327,7 @@ export function ModelConfigPage() {
                 {t("settings.defaultModel")}
               </div>
               {defaultProviderReady ? (
-                <div className="settings-row-desc model-default-value">
+                <div className="settings-row-detail model-default-value">
                   <span className="model-default-provider">{defaultProvider.name}</span>
                   <span className="model-default-sep" aria-hidden>
                     ·
@@ -324,7 +338,7 @@ export function ModelConfigPage() {
                   </span>
                 </div>
               ) : (
-                <div className="settings-row-desc model-default-value">
+                <div className="settings-row-detail model-default-value">
                   <span className="model-default-empty">
                     {readyProviders.length === 0
                       ? t("settings.defaultModelNone")
@@ -412,6 +426,7 @@ export function ModelConfigPage() {
               </div>
             </AnchoredMenu>
           </div>
+          <ImageGenerationModelRow settings={settings} providers={providers} />
         </div>
       </section>
 
@@ -447,10 +462,10 @@ export function ModelConfigPage() {
               </Button>
             </div>
           ) : (
-            <ul className="model-provider-list">
-              {aiProviders.map((provider) => {
+            <ul className="model-provider-list" aria-busy={reorder.saving}>
+              {reorder.providers.map((provider) => {
                 const isDefault = settings.defaultProviderId === provider.id;
-                const rowBusy = busyId === provider.id || testingId === provider.id;
+                const rowBusy = reorder.saving || busyId === provider.id || testingId === provider.id;
                 const confirming = confirmDeleteId === provider.id;
                 const modelCount = provider.models?.length ?? 0;
                 // A plugin-declared row is refreshed from the plugin's manifest
@@ -461,7 +476,11 @@ export function ModelConfigPage() {
                 return (
                   <li
                     key={provider.id}
-                    className={cx("model-provider-row", !provider.enabled && "is-disabled")}
+                    className={cx("model-provider-row", !provider.enabled && "is-disabled", reorder.draggingId === provider.id && "is-dragging")}
+                    data-provider-id={provider.id}
+                    aria-label={t("settings.reorderProvider", { name: provider.name })}
+                    ref={reorder.rowRef(provider.id)}
+                    {...reorder.rowEvents(provider.id)}
                   >
                     <div className="model-provider-row-copy">
                       <div className="model-provider-row-title">
@@ -509,7 +528,7 @@ export function ModelConfigPage() {
                           variant="ghost"
                           disabled={rowBusy || !providerReady(provider)}
                           onClick={() =>
-                            void setDefaultModel(provider, defaultModelIdOf(provider) ?? "")
+                            void setDefaultModel(provider, defaultModelOptions([provider], settings.imageGeneration)[0]?.modelId ?? "")
                           }
                         >
                           {t("settings.makeDefault")}
@@ -518,7 +537,7 @@ export function ModelConfigPage() {
                       {!ownedByPlugin ? (
                         <TooltipButton
                           type="button"
-                          className="icon-btn model-provider-icon-btn"
+                          className="icon-btn icon-btn-square model-provider-icon-btn"
                           tooltip={t("settings.copyProvider")}
                           ariaLabel={t("settings.copyProvider")}
                           disabled={rowBusy}
@@ -533,7 +552,7 @@ export function ModelConfigPage() {
                       {ownedByPlugin && provider.authKind === "api_key" ? (
                         <TooltipButton
                           type="button"
-                          className="icon-btn model-provider-icon-btn"
+                          className="icon-btn icon-btn-square model-provider-icon-btn"
                           tooltip={t("settings.pluginProviderKey")}
                           ariaLabel={t("settings.pluginProviderKey")}
                           disabled={rowBusy}
@@ -547,7 +566,7 @@ export function ModelConfigPage() {
                       ) : null}
                       <TooltipButton
                         type="button"
-                        className="icon-btn model-provider-icon-btn"
+                        className="icon-btn icon-btn-square model-provider-icon-btn"
                         tooltip={
                           ownedByPlugin
                             ? t("settings.pluginProviderManaged", { plugin: ownedByPlugin })
@@ -562,7 +581,7 @@ export function ModelConfigPage() {
                       <TooltipButton
                         type="button"
                         className={cx(
-                          "icon-btn model-provider-icon-btn",
+                          "icon-btn icon-btn-square model-provider-icon-btn",
                           testingId === provider.id && "is-testing",
                         )}
                         tooltip={t("settings.testConnection")}
@@ -585,7 +604,7 @@ export function ModelConfigPage() {
                       ) : (
                         <TooltipButton
                           type="button"
-                          className="icon-btn model-provider-icon-btn is-danger"
+                          className="icon-btn icon-btn-square model-provider-icon-btn is-danger"
                           tooltip={
                             ownedByPlugin
                               ? t("settings.pluginProviderManaged", { plugin: ownedByPlugin })
@@ -712,7 +731,8 @@ export function ModelConfigPage() {
           provider={editingProvider}
           initialDraft={copyDraft}
           onClose={() => { setSetupFor(null); setCopyDraft(null); }}
-          onSaved={(saved, models) => void afterSaved(saved, models)}
+          imageModelId={settings.imageGeneration?.providerId === editingProvider?.id ? settings.imageGeneration?.modelId : undefined}
+          onSaved={afterSaved}
         />
       ) : null}
     </div>

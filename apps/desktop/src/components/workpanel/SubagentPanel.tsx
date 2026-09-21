@@ -21,6 +21,8 @@ import { useFollowScroll } from "../../hooks/use-follow-scroll";
 import { useTranscriptView } from "../../hooks/use-transcript-view";
 import { useTranscriptSearchFocus } from "../../hooks/use-transcript-search-focus";
 import { IconArrowDown } from "../icons";
+import { DisclosureAnchorContext } from "../../lib/disclosure-anchor-context";
+import { TranscriptDisclosureProvider } from "../../features/chat/transcript/disclosure";
 import { TooltipButton } from "../ui";
 import { SubagentDetail } from "../ChatTranscript";
 
@@ -50,6 +52,14 @@ function findSelectedSubagent(
 }
 
 export function SubagentPanel({ selection }: { selection: SubagentPanelSelection }) {
+  return (
+    <TranscriptDisclosureProvider key={`${selection.sessionId}:${selection.delegationId}`}>
+      <SubagentPanelSurface selection={selection} />
+    </TranscriptDisclosureProvider>
+  );
+}
+
+function SubagentPanelSurface({ selection }: { selection: SubagentPanelSelection }) {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const transcript = useTranscriptView(selection.sessionId);
@@ -93,6 +103,7 @@ export function SubagentPanel({ selection }: { selection: SubagentPanelSelection
     jumpToLatest,
     scheduleFollowScroll,
     releaseFollow,
+    disclosureAnchorNotifier,
   } = useFollowScroll();
 
   useLayoutEffect(() => {
@@ -113,6 +124,7 @@ export function SubagentPanel({ selection }: { selection: SubagentPanelSelection
   });
 
   return (
+    <DisclosureAnchorContext.Provider value={disclosureAnchorNotifier}>
     <section
       id="subagent-panel"
       className="subagent-panel"
@@ -122,6 +134,7 @@ export function SubagentPanel({ selection }: { selection: SubagentPanelSelection
     >
       <div
         ref={scrollRef}
+        data-scroll-owner="follow"
         className="subagent-panel-scroll"
         onScroll={handleScroll}
         role="log"
@@ -163,5 +176,6 @@ export function SubagentPanel({ selection }: { selection: SubagentPanelSelection
           : t("panel.subagentEmpty")}
       </span>
     </section>
+    </DisclosureAnchorContext.Provider>
   );
 }

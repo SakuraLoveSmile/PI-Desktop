@@ -12,10 +12,15 @@ allowBuilds:
   '@google/genai': true
   protobufjs: true
   electron-winstaller: true
+  node-pty: true
 # Advisory fixes for transitives whose parents still resolve the vulnerable
 # version. Drop each one once its parent ships a release that resolves the
 # patched version on its own.
 overrides:
+  # Tailwind's CSS optimizer in 4.3.3 emits a false warning for the valid
+  # Custom Highlight API selector `::highlight()`. The parser fix ships in
+  # lightningcss 1.33.0.
+  '@tailwindcss/node>lightningcss': 1.33.0
   # Ships in the app. mermaid allows ^3.3.3 but resolves its own copy, so the
   # renderer would load an unpatched sanitizer next to our patched one.
   dompurify@3: '>=3.4.13 <4' # detached-subtree XSS, via mermaid
@@ -38,9 +43,12 @@ overrides:
 # Drop this list once the pinned @earendil-works packages are older than
 # pnpm's supply-chain age gate (packages published within the last day).
 minimumReleaseAgeExclude:
-  - '@earendil-works/chord@0.85.1'
-  - '@earendil-works/pi-agent-core@0.85.1'
-  - '@earendil-works/pi-ai@0.85.1'
-  - '@earendil-works/pi-telemetry@0.85.1'
+  - '@earendil-works/chord@0.86.1'
+  - '@earendil-works/pi-agent-core@0.86.1'
+  - '@earendil-works/pi-ai@0.86.1'
+  - '@earendil-works/pi-telemetry@0.86.1'
+  - '@earendil-works/pi-coding-agent@0.86.1'
+  - '@earendil-works/pi-tui@0.86.1'
 patchedDependencies:
-  '@earendil-works/pi-ai@0.85.1': patches/@earendil-works__pi-ai@0.85.1.patch
+  '@earendil-works/pi-agent-core@0.86.1': patches/@earendil-works__pi-agent-core@0.86.1.patch
+  '@earendil-works/pi-ai@0.86.1': patches/@earendil-works__pi-ai@0.86.1.patch

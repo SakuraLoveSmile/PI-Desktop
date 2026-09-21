@@ -13,6 +13,7 @@ import {
 import { TooltipButton } from "../../../components/ui";
 import { composerModelBadges } from "../../../lib/composer-models";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
+import { ThinkingLevelSlider } from "./ThinkingLevelSlider";
 
 type ModelMenuController = ReturnType<typeof useComposerModelMenu>;
 
@@ -59,6 +60,7 @@ export function ComposerModelPicker({
     thinkingMenuLevels,
     showView,
     selectModel,
+    commitThinkingLevel,
     selectThinkingLevel,
     onMenuKeyDown,
   } = controller;
@@ -106,7 +108,7 @@ export function ComposerModelPicker({
               <span className="composer-model-thinking-level">{thinkingLabel}</span>
             </>
           ) : null}
-          <IconChevronDown size={12} aria-hidden="true" />
+          <IconChevronDown size={12} aria-hidden="true" className="composer-model-thinking-chevron" />
         </TooltipButton>
       )}
     >
@@ -136,6 +138,18 @@ export function ComposerModelPicker({
             <span className="composer-menu-entry-value">{thinkingLabel}</span>
             <IconChevronRight size={14} aria-hidden="true" />
           </button>
+          {/* The slider sits directly under the Reasoning level entry
+              (issue #417): one drag adjusts the level without entering the
+              submenu, while the entry itself opens the classic radio list. */}
+          {thinkingMenuLevels.length > 1 ? (
+            <ThinkingLevelSlider
+              key={`${selectedProviderId}:${selectedModelId}:${thinkingMenuLevels.join("|")}`}
+              levels={thinkingMenuLevels}
+              level={thinkingLevel}
+              label={t("chat.reasoningLevel")}
+              commit={commitThinkingLevel}
+            />
+          ) : null}
         </div>
       ) : (
         <>

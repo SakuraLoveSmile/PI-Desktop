@@ -3,14 +3,16 @@ import {
   ErrorCodes as SharedErrorCodes,
   isActiveInProject,
   isCommandShellCatalog,
+  isImageGenerationModel,
   normalizeMode,
+  resolveBindingContextWindow,
   trustedExtensionAgentKeyFromProviderId,
   type CommandShellCatalog,
   type McpServerRecord,
   type ModelBinding,
   type Mode,
   type Risk,
-  type ThinkingLevel,
+  type SessionThinkingLevel,
   type UserSkillRecord,
   type UserSubagentRecord,
 } from "@pi-desktop/shared";
@@ -18,6 +20,7 @@ import {
   capabilitiesFromModelConfig,
   clampThinkingLevel,
   genericModelConfig,
+  loadCustomSystemPrompt,
   loadInstructionChain,
   loadSubagentDefinitions,
   modelConfigWithBinding,
@@ -77,7 +80,7 @@ export type SessionLaunchRuntimeDependencies = {
     modelConfig: ReturnType<typeof modelConfigWithBinding>;
     capabilities: ReturnType<typeof capabilitiesFromModelConfig>;
   };
-  normalizeThinkingLevel: (value: unknown) => ThinkingLevel;
+  normalizeThinkingLevel: (value: unknown) => SessionThinkingLevel;
 };
 
 export function createSessionLaunchRuntime({
@@ -187,6 +190,31 @@ export function createSessionLaunchRuntime({
   }
 
   /**
+   * Handles whose shipped definition the user turned off (D202 activation for
+   * builtins, which are constants and so have no document to scan).
+   *
+   * host-core owns the state. An unavailable host, or a failed read, contributes
+   * no exclusions: losing a delegate the user kept is worse than offering one
+   * they switched off.
+   */
+  async function disabledBuiltinSubagents(): Promise<string[]> {
+    if (!runtimeState.host?.isAvailable()) return [];
+    try {
+      const result = await runtimeState.host!.call<{ disabled: string[] }>(
+        "agents.disabledBuiltins",
+      );
+      return result.disabled ?? [];
+    } catch (error) {
+      if (!isHostUnavailable(error)) {
+        logger.app("plugin", "warn", "builtin subagent state failed", {
+          data: String(error),
+        });
+      }
+      return [];
+    }
+  }
+
+  /**
    * Load one of the user's own skill documents by id, or `null` if there is no
    * such skill — so the caller can fall through to the plugin catalog.
    *
@@ -237,7 +265,7 @@ export function createSessionLaunchRuntime({
       turnId?: string;
       providerId?: string;
       modelId?: string;
-      thinkingLevel?: ThinkingLevel;
+      thinkingLevel?: SessionThinkingLevel;
     } = {},
   ) {
     if (!runtimeState.host) throw new Error("host unavailable");
@@ -299,6 +327,11 @@ export function createSessionLaunchRuntime({
         errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
       });
     }
+    if (isImageGenerationModel(settings.imageGeneration, provider.id, modelId)) {
+      throw Object.assign(new Error("The image model cannot be used for conversation; select a chat model"), {
+        errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
+      });
+    }
     // The authenticated collection owns a vendor account's available model IDs
     // and wire endpoint. models.dev owns metadata; one account can span multiple
     // wire APIs and gateway catalogs.
@@ -321,7 +354,11 @@ export function createSessionLaunchRuntime({
       (modelsDevModel
         ? modelConfigFromModelsDev(modelsDevModel, baseUrl)
         : genericModelConfig(modelId, baseUrl ?? ""));
-    const modelConfig = modelConfigWithBinding(catalogModelConfig, storedModel);
+    const resolvedLimits = resolveBindingContextWindow(catalogModelConfig, storedModel);
+    const modelConfig = modelConfigWithBinding(
+      resolvedLimits.catalogConfig,
+      resolvedLimits.binding,
+    );
     const thinkingCapabilities = capabilitiesFromModelConfig(modelConfig);
     const thinkingLevel = clampThinkingLevel(
       thinkingCapabilities,
@@ -336,6 +373,9 @@ export function createSessionLaunchRuntime({
         ? session.projectPath.trim()
         : undefined;
     let projectInstructions = await loadInstructionChain(projectPath);
+    // pi-compatible SYSTEM.md / APPEND_SYSTEM.md (issue #542): resolved once
+    // per launch; a change retires the runtime through the reuse match.
+    const customSystemPrompt = await loadCustomSystemPrompt(projectPath);
     let projectMemory: string | undefined;
     if (projectPath) {
       try {
@@ -429,6 +469,8 @@ export function createSessionLaunchRuntime({
     // skills above; a delegate the model can see is one it will try to call.
     const subagentCatalog = await loadSubagentDefinitions(projectPath, {
       userDocuments: await activeUserSubagentDocuments(projectPath),
+      // A switched-off builtin is dropped from what this prompt may delegate to.
+      disabledBuiltins: await disabledBuiltinSubagents(),
     });
     const subagentBindings = await resolveSubagentProviders({
       definitions: subagentCatalog.definitions,
@@ -575,10 +617,12 @@ export function createSessionLaunchRuntime({
         ),
         ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
         thinkingLevel,
+        infiniteProviderRetry: settings.infiniteProviderRetry === true,
         commandShell,
         scratchDir: join(dataDir, "scratch", sessionId),
         attachmentsDir: join(dataDir, "attachments"),
         projectPath,
+        customSystemPrompt,
         projectInstructions,
         projectMemory,
         provider: {
@@ -646,6 +690,7 @@ export function createSessionLaunchRuntime({
     refreshUserMcp,
     activeUserSkills,
     activeUserSubagentDocuments,
+    disabledBuiltinSubagents,
     loadUserSkillBody,
     resolveEffectiveCommandShell,
     resolveAgentRuntimeLaunch,

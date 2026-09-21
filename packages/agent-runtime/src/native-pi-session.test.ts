@@ -327,7 +327,12 @@ describe("native continuation review regressions", () => {
     }`);
     const requests: { systemPrompt?: string; tools: unknown[]; messages: unknown }[] = [];
     vi.spyOn(ModelRuntime.prototype, "streamSimple").mockImplementation((_model, context) => {
-      requests.push({ systemPrompt: context.systemPrompt, tools: context.tools ?? [], messages: context.messages });
+      const systemMessage = context.messages.find((message) => message.role === "system");
+      requests.push({
+        systemPrompt: typeof systemMessage?.content === "string" ? systemMessage.content : undefined,
+        tools: context.tools ?? [],
+        messages: context.messages,
+      });
       return fauxStream();
     });
     const service = new NativePiSessionService(f);
@@ -384,7 +389,7 @@ describe("native continuation review regressions", () => {
 });
 
 
-describe("native side-chat forks", () => {
+describe("native fork children", () => {
   function forkFixture() {
     const root = mkdtempSync(join(tmpdir(), "pi-desktop-native-fork-"));
     roots.push(root);
@@ -441,7 +446,7 @@ describe("native side-chat forks", () => {
       const [summary] = await service.list();
       const parentBytes = readFileSync(f.file, "utf8");
       const before = groupEntries(f.group);
-      const child = service.fork({ id: summary.id, title: "Side chat: hello" });
+      const child = service.fork({ id: summary.id, title: "Fork: hello" });
 
       const childPath = newChildPath(f, before);
       const childEntries = readFileSync(childPath, "utf8").trimEnd().split("\n").map((line) => JSON.parse(line));
@@ -458,11 +463,11 @@ describe("native side-chat forks", () => {
       // The child continues the parent from the branch endpoint, and the
       // parent is byte-identical after the fork.
       expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
-      expect(child.title).toBe("Side chat: hello");
+      expect(child.title).toBe("Fork: hello");
       expect(child.messages.map((message) => message.content)).toEqual(["hello", "first answer", "compacted", "second answer"]);
       expect(child).toMatchObject({ source: "pi-native", modelId: "test-model", thinkingLevel: "high" });
       expect(child.capabilities?.canPrompt).toBe(true);
-      expect(service.detail(child.id)?.title).toBe("Side chat: hello");
+      expect(service.detail(child.id)?.title).toBe("Fork: hello");
     } finally { service.disposeAll(); }
   });
 
@@ -523,8 +528,9 @@ describe("native side-chat forks", () => {
       expect(after.match(/fixture reply/g)).toHaveLength(1);
       const reopened = SessionManager.open(childPath);
       const branch = reopened.getBranch().filter((entry) => entry.type === "message");
-      expect(branch.map((entry) => entry.message.role)).toEqual(["user", "user", "assistant"]);
-      expect(new Set(branch.map((entry) => entry.id)).size).toBe(3);
+      const visibleBranch = branch.filter((entry) => entry.message.role !== "system");
+      expect(visibleBranch.map((entry) => entry.message.role)).toEqual(["user", "user", "assistant"]);
+      expect(new Set(visibleBranch.map((entry) => entry.id)).size).toBe(3);
       expect(reopened.getSessionId()).toBe(childId);
       expect(readFileSync(f.file, "utf8")).toBe(parentBytes);
     } finally { service.disposeAll(); }

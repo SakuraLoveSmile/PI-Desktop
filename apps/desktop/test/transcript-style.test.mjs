@@ -56,8 +56,9 @@ test("tool rows render structured blocks instead of dumping JSON", async () => {
   assert.doesNotMatch(transcriptSource, /getToolSections|hasToolSections/);
   assert.doesNotMatch(permissionSource, /JSON\.stringify|formatToolValue/);
   assert.match(transcriptSource, /buildToolPresentation\(message, \{\n\s+hideSummaryArg: true,/);
-  // Blocks stay behind the open guard so streaming ticks stay cheap.
-  assert.match(transcriptSource, /open && hasDetails\s*\?\s*buildToolPresentation/);
+  // Formatting remains lazy and the cached blocks are read only while visible.
+  assert.match(transcriptSource, /if \(variant !== "topology" && open && hasDetails && disclosure\.parentVisible/);
+  assert.match(transcriptSource, /const blocks = variant !== "topology" && open && hasDetails \? presentation\.current\?\.blocks : null/);
   assert.match(transcriptSource, /<ToolChips chips=\{chips\} \/>/);
   assert.match(transcriptSource, /<ToolDetailBlocks blocks=\{blocks\} plain=\{runHead\} \/>/);
   assert.match(permissionSource, /<ToolDetailBlocks blocks=\{argBlocks\} \/>/);
@@ -91,6 +92,11 @@ test("tool block bodies stay bounded and role-coded", () => {
   assert.ok(fileItem);
   assert.match(fileItem, /display:\s*block;/);
   assert.match(fileItem, /width:\s*100%;/);
+  // A column flex list with a height cap shrinks every row whose overflow
+  // is not visible: the automatic minimum size is zero, so a long result is
+  // pressed into a sliver and the paths are clipped away. Rows keep their
+  // content height and the list scrolls instead.
+  assert.match(fileItem, /flex:\s*none;/);
   // stderr and error notes carry the error hue, host notices stay neutral.
   assert.match(stylesSource, /\.tool-row-content\.is-error \{[\s\S]*?var\(--ds-error\)/);
   assert.match(stylesSource, /\.tool-chip\.is-error \{[\s\S]*?var\(--ds-error\)/);
@@ -104,6 +110,62 @@ test("tool block bodies stay bounded and role-coded", () => {
   assert.doesNotMatch(permissionArgs, /white-space|font-family/);
 });
 
+test("tool details do not add a second visual indent", () => {
+  const toolDetailStyles = stylesSource.match(
+    /\.tool-row:not\(\.thinking\):not\(\.subagent-topology-node\) > \.tool-row-body \{([^}]*)\}/
+  )?.[1];
+  assert.ok(toolDetailStyles);
+  assert.match(toolDetailStyles, /margin-left:\s*0;/);
+  assert.match(toolDetailStyles, /padding-left:\s*0;/);
+  // Thinking and topology have separate visual hierarchies and keep their
+  // dedicated layout rules rather than inheriting the flat tool detail rule.
+  assert.match(stylesSource, /\.subagent-topology-node > \.tool-row-body,[\s\S]*?margin-left:\s*38px;/);
+});
+
+/*
+ * The width regression this guards: a content-sized `inline-flex` disclosure
+ * header stopped at its own label, so a tool call never used the conversation
+ * width — it stayed narrower than the prose, ignored the dragged band width,
+ * and let a long label overrun the chip. The header row now claims the band at
+ * every level, the label ellipsizes, and the caret trails the row.
+ */
+test("tool-call disclosure headers span the conversation band", () => {
+  const header = stylesSource.match(/\n\.tool-activity-header \{([^}]*)\}/)?.[1];
+  assert.ok(header);
+  assert.match(header, /display:\s*flex;/);
+  assert.match(header, /width:\s*100%;/);
+  assert.match(header, /min-width:\s*0;/);
+  // A chip default (content width) or a max-width cap would freeze the row.
+  assert.doesNotMatch(header, /inline-flex|max-width/);
+
+  const label = stylesSource.match(/\n\.tool-activity-label \{([^}]*)\}/)?.[1];
+  assert.ok(label);
+  assert.match(label, /text-overflow:\s*ellipsis;/);
+  assert.match(label, /min-width:\s*0;/);
+  assert.match(label, /white-space:\s*nowrap;/);
+
+  const caret = stylesSource.match(/\n\.tool-activity-caret \{([^}]*)\}/)?.[1];
+  assert.ok(caret);
+  assert.match(caret, /margin-inline-start:\s*auto;/);
+
+  // No level keeps its own width or label override: every disclosure header
+  // resolves through the single base row.
+  assert.doesNotMatch(
+    stylesSource,
+    /\.(process-activity-group|turn-process) > \.tool-activity-header[^{]*\{[^}]*width:/,
+  );
+  assert.doesNotMatch(
+    stylesSource,
+    /\.tool-activity-group\.has-subagents \.tool-activity-header \{[^}]*width:/,
+  );
+
+  // A tool row itself owns the column so no parent display mode can shrink it.
+  const row = stylesSource.match(/\n\.tool-row \{([^}]*)\}/)?.[1];
+  assert.ok(row);
+  assert.match(row, /width:\s*100%;/);
+  assert.match(row, /min-width:\s*0;/);
+});
+
 test("assistant turns stay transparent full-width prose", () => {
   assert.match(
     stylesSource,
@@ -111,7 +173,7 @@ test("assistant turns stay transparent full-width prose", () => {
   );
   assert.match(
     stylesSource,
-    /\.message-row\.assistant[\s\S]*?\.message-col[\s\S]*?width:\s*min\(100%,\s*720px\);/,
+    /\.message-row\.assistant[\s\S]*?\.message-col[\s\S]*?width:\s*min\(100%,\s*var\(--chat-prose-max-width,\s*720px\)\);/,
   );
   // D323: the live parent turn stays transparent; no rail, no reserved
   // inset, no whole-turn tile. The tile belongs only to the delegation card.
@@ -236,7 +298,7 @@ test("editing a user prompt regenerates it and keeps the old branch reachable", 
   assert.doesNotMatch(transcriptSource, /editAssistantMessage/);
   assert.doesNotMatch(storeSource, /editAssistantMessage/);
   // Slash prompts edit their typed form so the resend re-expands the template.
-  assert.match(transcriptSource, /const editSeed = \(editableUserMessage && message\.command\) \|\| requestTextWithoutAnnotations\(message\.content/);
+  assert.match(transcriptSource, /const editSeed =\s*\(editableUserMessage && message\.command\) \|\| \(message\.content \|\| ""\);/);
   // Same branch mechanics as regenerate, so main archives the replaced turn
   // as a revision the pager can walk back to.
   assert.match(storeSource, /editUserMessage:\s*async \(messageId, content, attachments\)/);
@@ -257,6 +319,16 @@ test("editing a user prompt regenerates it and keeps the old branch reachable", 
     stylesSource,
     /\.message-row\.user \.message-col:has\(\.message-edit\)/,
   );
+  assert.match(
+    stylesSource,
+    /\.message-edit \{[\s\S]*?background:\s*var\(--ds-tile-deep\);[\s\S]*?box-shadow:\s*none;/,
+  );
+  assert.match(
+    stylesSource,
+    /\.message-edit:focus-within \{[\s\S]*?box-shadow:\s*inset/,
+  );
+  assert.match(transcriptSource, /className="icon-btn message-edit-cancel"/);
+  assert.match(transcriptSource, /className="send-btn message-edit-submit"/);
 });
 
 test("message toolbars are icon-only with hover tooltips", () => {
@@ -292,7 +364,7 @@ test("message toolbars are icon-only with hover tooltips", () => {
 });
 
 test("streaming assistant turns hide answer copy until idle", () => {
-  assert.ok(transcriptSource.includes("{complete ? ("));
+  assert.ok(transcriptSource.includes("{complete && actionMessage ? ("));
   assert.ok(
     transcriptSource.includes(
       '<CopyButton text={content} label={t("chat.copy")} />',
