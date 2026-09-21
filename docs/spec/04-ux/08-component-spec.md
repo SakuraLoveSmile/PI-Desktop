@@ -1045,6 +1045,11 @@ entirely inside the plugin's isolated page:
   A failed switch or one exceeding the existing 15-second load wait remains
   hidden until retried; a late network completion does not automatically reveal it.
 
+- Main-frame same-document navigation (fragment links and History API routes) updates
+  the browser address, history controls, and loading state without requiring a
+  full document load. Subframe events and events from an invalidated session or
+  replaced main frame must not publish browser state.
+
 ### 5.3 States
 
 | State | Behavior |

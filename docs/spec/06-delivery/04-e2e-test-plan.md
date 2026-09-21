@@ -3523,6 +3523,20 @@ identify the platform validation still needed.
   controlled native-browser/Host boundaries, and deterministic timers. Native
   Electron compositing and the reporter's live sessions are not covered.
 
+#### E2E-BROWSER-in-page-navigation: Browser chrome follows same-document navigation
+
+- **Preconditions**: Browser plugin enabled; a local page has a fragment link
+  and a History API route control.
+- **Steps**: Open the page; click the fragment link; change the route with
+  `history.pushState`; use Back, Forward, and Reload. Switch to another session
+  and verify late events from the old page cannot update the new preview.
+- **Expected**: The address matches the main document URL and history buttons
+  reflect its history. Loading settles back to Reload. Subframe, replaced-frame,
+  and invalidated-session events cannot change the toolbar.
+- **Coverage**: `browser-pane-navigation.test.mjs` for published state and event
+  isolation; native Electron click-through for actual same-document events.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.3.
+
 #### E2E-060: Files tab browsing stays inside the workspace
 
 - **Preconditions**: Workspace with file artifacts for nested source, large
