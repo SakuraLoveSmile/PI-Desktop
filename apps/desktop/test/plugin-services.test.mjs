@@ -43,6 +43,23 @@ function forkPluginProcess({ entry }) {
   };
 }
 
+function fakePluginProcess() {
+  let onMessage = () => {};
+  let onExit = () => {};
+  return {
+    postMessage: (message) => {
+      if (message.t === "init") {
+        queueMicrotask(() => onMessage({ t: "res", id: message.id, ok: true, value: null }));
+      }
+    },
+    onMessage: (handler) => { onMessage = handler; },
+    onExit: (handler) => { onExit = handler; },
+    onLog: () => {},
+    kill: () => {},
+    emitExit: (code) => onExit(code),
+  };
+}
+
 function createRuntime(t) {
   const audits = [];
   const changes = [];
@@ -332,7 +349,7 @@ test("a crashed host process is restarted with backoff and the restart is counte
               // crash report has to carry (issue #747).
               if (countStart() === 1) {
                 setTimeout(() => {
-                  process.stderr.write("fixture service worker died\\n");
+                  process.stderr.write("fixture older line\\nfixture service worker died");
                   process.exit(7);
                 }, 30);
               }
@@ -372,6 +389,46 @@ test("a crashed host process is restarted with backoff and the restart is counte
   assert.equal(running.restarts, 1);
   assert.equal(readFileSync(startsFile, "utf8"), "2");
   assert.ok(audits.some((a) => a.api === "plugin.service.restart" && a.ok));
+});
+
+test("Windows hard-fault exit codes stay unsigned across crash surfaces", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "pi-crash-format-plugin-"));
+  writeFileSync(
+    join(dir, "manifest.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      id: "com.example.crash-format",
+      name: "Crash Format Plugin",
+      version: "0.0.1",
+      main: "main.js",
+      permissions: [],
+      contributes: {},
+    }),
+    "utf8",
+  );
+  writeFileSync(join(dir, "main.js"), "module.exports = {};", "utf8");
+  let child;
+  const audits = [];
+  const crashes = [];
+  const runtime = new PluginRuntime({
+    hostEntry: hostProcessEntry,
+    spawnProcess: () => {
+      child = fakePluginProcess();
+      return child;
+    },
+    audit: (entry) => audits.push(entry),
+    onPluginCrash: (info) => crashes.push(info),
+  });
+  t.after(() => runtime.disposeAll());
+
+  await runtime.loadFromPath(dir);
+  child.emitExit(-1073741819);
+
+  const crash = audits.find((entry) => entry.api === "plugin.crash");
+  assert.equal(crash.exitCode, 3221225477);
+  assert.equal(crash.exitCodeHex, "0xC0000005");
+  assert.equal(crashes[0].exitCode, 3221225477);
+  assert.equal(crashes[0].exitCodeHex, "0xC0000005");
 });
 
 test("autoRestart:false leaves a crashed service down", async (t) => {

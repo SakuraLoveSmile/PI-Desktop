@@ -201,8 +201,8 @@ Fields:
 - source (`installed` | `dev` | `marketplace`)
 - ts
 - errorCode?
-    - attempt? / delayMs? (service restarts)
-    - exitCode? (crash), message? (the plugin's newest output line)
+- attempt? / delayMs? (service restarts)
+- exitCode? (crash), exitCodeHex? (Windows hard fault), message? (the plugin's newest output line)
 
 ## 9. Uninstall strategy
 

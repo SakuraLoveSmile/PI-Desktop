@@ -197,7 +197,7 @@ rollback all registrations from this plugin
 - TS
 - 错误代码？
 - 尝试？ / 延迟女士？ （服务重新启动）
-- exitCode?（崩溃）、message?（插件最新一行输出）
+- exitCode?（崩溃）、exitCodeHex?（Windows 硬故障）、message?（插件最新一行输出）
 
 ## 9. 卸载策略
 

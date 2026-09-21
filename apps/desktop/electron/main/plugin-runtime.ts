@@ -387,7 +387,10 @@ export type PluginHostServices = {
   onPluginCrash?: (info: {
     pluginId: string;
     name: string;
+    /** Unsigned process exit code, matching the human-readable crash detail. */
     exitCode: number;
+    /** Hex form for Windows hard-fault codes, when applicable. */
+    exitCodeHex?: string;
     /** The plugin's own last output line, when it printed one before dying. */
     lastOutput?: string;
   }) => void;
@@ -638,6 +641,21 @@ const PLUGIN_LOG_TAIL_LINE_CHARS = 400;
 /** One line a plugin host process wrote to its own stdout/stderr. */
 type PluginLogLine = { level: string; message: string };
 
+/** Convert Electron's signed Windows status into the process's unsigned code. */
+function childExitUnsigned(code: number): number {
+  if (!Number.isFinite(code)) return code;
+  return code < 0 ? code + 0x1_0000_0000 : code;
+}
+
+/** Hex form for Windows hard-fault codes, when the status is in that range. */
+function childExitHex(code: number): string | undefined {
+  const unsigned = childExitUnsigned(code);
+  if (!Number.isFinite(unsigned) || unsigned < 0x8000_0000 || unsigned > 0xffff_ffff) {
+    return undefined;
+  }
+  return `0x${unsigned.toString(16).toUpperCase()}`;
+}
+
 /**
  * `exit code N`, plus the unsigned hex form in the range a Windows process
  * reports for a hard fault. Electron hands `code` through as a signed int, so
@@ -646,10 +664,43 @@ type PluginLogLine = { level: string; message: string };
  */
 function childExitLabel(code: number): string {
   if (!Number.isFinite(code)) return "exit code unknown";
-  const unsigned = code < 0 ? code + 0x1_0000_0000 : code;
-  const hex =
-    unsigned >= 0x8000_0000 ? ` (0x${unsigned.toString(16).toUpperCase()})` : "";
-  return `exit code ${unsigned}${hex}`;
+  const unsigned = childExitUnsigned(code);
+  const hex = childExitHex(code);
+  return `exit code ${unsigned}${hex ? ` (${hex})` : ""}`;
+}
+
+function rememberPluginLogLine(
+  tail: PluginLogLine[],
+  level: string,
+  message: string,
+): void {
+  if (!message.trim()) return;
+  tail.push({ level, message: message.slice(0, PLUGIN_LOG_TAIL_LINE_CHARS) });
+  if (tail.length > PLUGIN_LOG_TAIL_LINES) tail.shift();
+}
+
+/** Append arbitrary stream chunks while retaining complete logical lines. */
+function appendPluginLogChunk(
+  tail: PluginLogLine[],
+  fragments: Map<string, string>,
+  level: string,
+  chunk: string,
+): void {
+  const normalized = `${fragments.get(level) ?? ""}${chunk}`.replace(/\r\n?/g, "\n");
+  const lines = normalized.split("\n");
+  fragments.set(level, lines.pop() ?? "");
+  for (const line of lines) rememberPluginLogLine(tail, level, line);
+}
+
+/** Include a final unterminated line before a crash report snapshots the tail. */
+function flushPluginLogTail(
+  tail: PluginLogLine[],
+  fragments: Map<string, string>,
+): void {
+  for (const [level, fragment] of fragments) {
+    rememberPluginLogLine(tail, level, fragment);
+  }
+  fragments.clear();
 }
 
 /** The newest plugin-output line, flattened for a one-line report. */
@@ -731,6 +782,8 @@ type LoadedPlugin = {
   disposing: boolean;
   /** Newest host-process output lines, so a crash report can quote them. */
   logTail: PluginLogLine[];
+  /** Unterminated stdout/stderr fragments waiting for their newline. */
+  logFragments: Map<string, string>;
 };
 
 type PluginApiError = Error & { code?: string };
@@ -1751,6 +1804,7 @@ export class PluginRuntime {
       nextCallId: 1,
       disposing: false,
       logTail: [],
+      logFragments: new Map(),
     };
     this.loaded.set(manifest.id, loaded);
 
@@ -1758,14 +1812,9 @@ export class PluginRuntime {
     child.onExit((code) => this.handleChildExit(loaded, code));
     child.onLog?.((level, message) => {
       if (!message) return;
-      // Keep the newest lines on the record itself: a crash report has to carry
-      // whatever the plugin printed before it died, and the audit thread alone
-      // cannot be quoted in the error a user pastes into an issue.
-      loaded.logTail.push({
-        level,
-        message: message.slice(0, PLUGIN_LOG_TAIL_LINE_CHARS),
-      });
-      if (loaded.logTail.length > PLUGIN_LOG_TAIL_LINES) loaded.logTail.shift();
+      // Stream data events are arbitrary chunks, not logical lines. Keep the
+      // audit shape unchanged, but only put complete lines in the crash tail.
+      appendPluginLogChunk(loaded.logTail, loaded.logFragments, level, message);
       this.services.audit?.({
         pluginId: manifest.id,
         api: "plugin.stdio",
@@ -2784,8 +2833,11 @@ export class PluginRuntime {
     // output line rides along because a plugin that died on a thrown error
     // usually printed the reason first, and the report a user can paste is the
     // one place that evidence has to survive.
+    flushPluginLogTail(loaded.logTail, loaded.logFragments);
     const detail = childExitDetail(code, loaded.logTail);
     const lastOutput = lastLogLine(loaded.logTail);
+    const exitCode = childExitUnsigned(code);
+    const exitCodeHex = childExitHex(code);
     this.rejectPending(
       loaded,
       apiError(
@@ -2801,7 +2853,8 @@ export class PluginRuntime {
       api: "plugin.crash",
       ok: false,
       errorCode: "PLUGIN_CRASHED",
-      exitCode: code,
+      exitCode,
+      ...(exitCodeHex ? { exitCodeHex } : {}),
       ...(lastOutput ? { message: lastOutput } : {}),
       ts: Date.now(),
     });
@@ -2809,7 +2862,8 @@ export class PluginRuntime {
     this.services.onPluginCrash?.({
       pluginId,
       name: loaded.manifest.name,
-      exitCode: code,
+      exitCode,
+      ...(exitCodeHex ? { exitCodeHex } : {}),
       ...(lastOutput ? { lastOutput } : {}),
     });
     this.superviseCrash(loaded, code);
