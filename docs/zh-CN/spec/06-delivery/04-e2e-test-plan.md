@@ -8550,3 +8550,27 @@ the latest destination. These assertions measure work counts, not device FPS.
   `fork_preserves_referenced_pasted_files_independently` 和 `sessions::fork_files`
   覆盖附件归属、删除、重复与截断分支、保留的压缩检查点引用、过期输入、失败回滚
   及符号链接拒绝。
+
+## 原生搜索续跑契约（离线 sidecar）
+
+**范围：** ADR 0297；供应商原生搜索内容、估算、本地工具、Task 委派及历史恢复。不调用真实模型或搜索服务。
+
+**入口：** `pnpm test:e2e:hosted-search` 自行重建 shared 与 agent-runtime sidecar。
+通过普通 stdio RPC 驱动该产物，使用隔离数据目录、合成 Host 与仅回环地址的 Responses 服务。
+只测源码或使用已有桌面安装包不满足本测试。
+
+| 场景 | 必须观察到的结果 |
+| --- | --- |
+| 搜索后新用户消息 | 合法搜索项被回放，第二轮正常结束。 |
+| 搜索后普通本地工具 | 真实工具轮完成，下一模型请求准备无类型或估算错误。 |
+| 搜索后 Task | 实际委派流程使用合成模型，父代理继续且不重复报告本地错误。 |
+| 保存搜索历史后恢复 | 新运行时保留搜索回放，不添加假工具字段或改写原记录。 |
+| 真实前缀变化使 usage 失效 | 隔离 sidecar 在真实 Read 轮中更新指令；此前非零 usage 不再覆盖该前缀，续跑正常结束。 |
+| 非法历史回放容器 | 恢复返回安全的 INTERNAL/context-validation；不发送模型请求或持久化 Host RPC，进程仍健康。内存中输入不变性由回放单元测试验证。 |
+| 未知历史搜索阶段 | 明确拒绝该记录，而不是静默丢弃搜索内容；其余断言同上。 |
+
+**配套检查：** Responses/Azure/Anthropic 请求契约、搜索阶段类型、有效/零/失效 usage、
+真实与无变化的系统前缀及工具增删、搜索数据增长、中文输出预算；结构化本地准备失败不重试、不 fetch，普通传输重试与取消保持正确。依赖升级必须对锁定版本运行这些检查，记录测试的 bundle。
+
+**证据：** 记录构建和测试退出码、基线 SHA、依赖版本、产物标识及独立评审，报告位于
+`docs/project/hosted-search-contract-verification.md`。不得记录真实会话或凭据。未执行明确标为 NOT RUN，不得标为 PASS。
