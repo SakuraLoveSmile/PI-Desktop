@@ -1,5 +1,9 @@
 # Unreleased changes
 
+- Skills now discovers installed pi CLI npm skill packages and offers explicit
+  import with a source and executable-extension confirmation. Imported packages
+  remain managed in Plugins; discovery never enables code automatically.
+
 - The Composer reasoning slider now moves smoothly to clicked or
   keyboard-selected levels, follows dragging immediately, and respects
   reduced-motion settings. Rapid clicks redirect the animation; failed saves
