@@ -2741,6 +2741,10 @@ reasoning-level control.
   current reply/tool batch completes normally, before every waiting row. The
   first promoted row starts the turn and the rest join it as adjacent user
   messages, so the block is answered once. When idle it starts immediately.
+- A pending queue row is locked until Host admission returns its durable id: move
+  up/down, Send now, edit, and remove are disabled. All five tooltips explain
+  that it is saving; Send now also displays the localized Saving label. Direct edit/remove actions leave the pending row and draft
+  unchanged; after admission, ordinary waiting-row actions become available.
 - A promoted row is locked: move up/down, edit, and remove are disabled with
   their tooltip and `aria-disabled` state intact, and the Send now button reads
   as already decided (`chat.sendNowPending`). The row carries a distinct
