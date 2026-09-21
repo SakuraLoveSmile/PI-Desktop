@@ -260,9 +260,9 @@ function scanUrl(text: string, start: number): string {
       depth -= 1;
     }
   }
-  // Punctuation after a parenthesized destination belongs to the sentence.
-  // Preserve extensions such as "(draft).html" and existing non-parenthesized URLs.
-  return text.slice(start, end).replace(/(?<=\))[.,!?;:，。！？；：]+$/u, "");
+  // Sentence punctuation belongs to the surrounding prose, regardless of
+  // whether the URL itself ends with a parenthesized path segment.
+  return text.slice(start, end).replace(/[.,!?;:，。！？；：]+$/u, "");
 }
 
 /**
