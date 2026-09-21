@@ -521,6 +521,13 @@ describe("SubagentRun watchdogs", () => {
     expect(freshClaim(rateLimited, "stream")).toBeUndefined();
     // Permanent failures stay terminal.
     expect(freshClaim(classifyAgentError("401: invalid api key"), "request")).toBeUndefined();
+
+    const { run: infinite } = createRun({ infiniteProviderRetry: true });
+    const infiniteClaim = (error: unknown, phase: string) =>
+      (infinite as any).claimProviderRetry(error, phase);
+    for (let attempt = 1; attempt <= PROVIDER_TRANSIENT_MAX_RETRIES + 2; attempt += 1) {
+      expect(infiniteClaim(gateway502, "stream")).toBe(attempt);
+    }
   });
 
   it("never terminates the delegate on a turn count", async () => {

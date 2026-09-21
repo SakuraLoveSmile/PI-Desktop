@@ -183,6 +183,11 @@ HTTP 429 处理是一个逻辑回合策略。此路径禁用了 pi-ai 的嵌套
 子代理和一次性 composer 提示增强使用相同的错误码、预算大小和
 优先级。
 
+应用设置 `infiniteProviderRetry` 默认关闭。开启后，主会话及其内置子代理只跳过可重试
+网络/瞬时故障（含 `PROVIDER_RATE_LIMITED`）的次数上限。退避、`Retry-After`、可见重试状态和
+停止路径不变。不可重试错误、上下文恢复、压缩、工具执行和一次性补全仍走原有有界预算。
+开启后可能在用户停止回合前持续消耗 API 用量。
+
 当 429 预算耗尽时，最终的助手错误和生命周期 `error` 只发出一次。
 提供程序故障在可用时于 `AppError.details` 中携带有界诊断：
 `phase`（`request` 或 `stream`）、`providerStatus`、`providerCode`、

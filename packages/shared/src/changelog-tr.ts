@@ -10,6 +10,7 @@ export const trEntries: ChangelogEntry[] = [
       "Sağlayıcıları düzenlerken seçili varsayılan model korunur; model kaldırılırsa güvenli bir yedek kullanılır.",
       "İç içe düşünme ve araç etkinliği bölümlerini okumak, gezinmek ve kurtarmak kolaylaşır.",
       "Composer düzenleri, akıl yürütme kontrolleri ve çalışma alanı tema tutarlılığı iyileştirilir.",
+      "Ayarlara, ağ ve geçici sağlayıcı hatalarını başarılı olana kadar yeniden deneyen isteğe bağlı bir anahtar ekler.",
     ],
   },
 

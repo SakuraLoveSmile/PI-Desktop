@@ -823,6 +823,8 @@ export type AgentRuntimeOptions = {
   turnId?: string;
   provider: RuntimeProviderConfig;
   thinkingLevel: SessionThinkingLevel;
+  /** Persisted opt-in for retrying transient provider failures until success. */
+  infiniteProviderRetry?: boolean;
   systemPrompt?: string;
   /** pi-compatible SYSTEM.md / APPEND_SYSTEM.md resolved for the session (issue #542). */
   customSystemPrompt?: CustomSystemPrompt;
@@ -1581,6 +1583,8 @@ export class DesktopAgentRuntime {
   private providerTransientRetryAttempt = 0;
   /** Shared OpenCode-style 429 retry count across setup and stream phases. */
   private providerRateLimitRetryAttempt = 0;
+  /** Opt-in mode removes only the retry-count ceiling; abort and backoff stay intact. */
+  private infiniteProviderRetry = false;
   private activeProviderRetryAttempt = 0;
   private providerRetryInProgress = false;
   private suppressProviderRetryRunEnd = false;
@@ -1668,6 +1672,7 @@ export class DesktopAgentRuntime {
     this.planningState = proposalKindForMode(this.mode) ? "planning" : "inactive";
     this.provider = opts.provider;
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
+    this.infiniteProviderRetry = opts.infiniteProviderRetry === true;
     this.host = opts.host;
     this.hostCloseUnsubscribe = this.host.onClose?.(() => {
       this.cleanupActiveToolProgress();
@@ -1877,6 +1882,7 @@ Delegation rules:
                 phase: "retrying",
                 since: Date.now(),
                 attempt,
+                ...(this.infiniteProviderRetry ? { infinite: true } : {}),
                 retryDelayMs: delayMs,
                 error: this.retryActivityError(error),
               });
@@ -1950,6 +1956,12 @@ Delegation rules:
     process.stderr.write(
       `[agent-runtime] event handler failed (session=${this.sessionId} turn=${this.turnId} event=${event.type}): ${detail}\n`,
     );
+  }
+
+  /** Update the opt-in retry policy without rebuilding an idle runtime. */
+  setInfiniteProviderRetry(enabled: boolean): void {
+    if (this.disposed) throw new Error("runtime disposed");
+    this.infiniteProviderRetry = enabled;
   }
 
   /** Switch the planning state on this Agent without creating another Agent. */
@@ -4199,6 +4211,7 @@ Delegation rules:
           parentToolCallId: toolCallId,
           task,
           provider,
+          infiniteProviderRetry: this.infiniteProviderRetry,
           thinkingLevel,
           fallbackModels: (definition.fallbackModels ?? []).map((pin) => ({
             key: subagentModelKey(pin),
@@ -5336,8 +5349,10 @@ Delegation rules:
     phase: "request" | "stream",
   ): number | undefined {
     if (!error.retriable) return undefined;
+    const infinite = this.infiniteProviderRetry;
     if (error.code === "PROVIDER_RATE_LIMITED") {
       if (
+        !infinite &&
         this.providerRateLimitRetryAttempt >=
         PROVIDER_RATE_LIMIT_MAX_RETRIES
       ) {
@@ -5353,7 +5368,10 @@ Delegation rules:
     // next must not multiply the budget or reset it by changing phase.
     void phase;
     if (!isTransientProviderRetryCode(error.code)) return undefined;
-    if (this.providerTransientRetryAttempt >= PROVIDER_TRANSIENT_MAX_RETRIES) {
+    if (
+      !infinite &&
+      this.providerTransientRetryAttempt >= PROVIDER_TRANSIENT_MAX_RETRIES
+    ) {
       return undefined;
     }
     const attempt = ++this.providerTransientRetryAttempt;
@@ -5520,6 +5538,7 @@ Delegation rules:
         phase: "retrying",
         since: Date.now(),
         attempt: retryAttempt,
+        ...(this.infiniteProviderRetry ? { infinite: true } : {}),
         retryDelayMs: delayMs,
         error: this.retryActivityError(retryError),
       });

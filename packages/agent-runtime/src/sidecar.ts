@@ -96,6 +96,7 @@ type RuntimeParams = {
   /** Durable host turn ID for the prompt currently being executed. */
   turnId?: string;
   thinkingLevel?: SessionThinkingLevel;
+  infiniteProviderRetry?: boolean;
   provider: RuntimeProviderConfig;
   commandShell: CommandShellOption;
   pluginTools?: PluginToolDef[];
@@ -349,6 +350,7 @@ async function runtimeFor(
   }
   if (reusable) {
     reusable.setCompactionSettings(params.compactionSettings);
+    reusable.setInfiniteProviderRetry(params.infiniteProviderRetry === true);
     reusable.setMode(mode);
     return reusable;
   }
@@ -385,6 +387,7 @@ async function runtimeFor(
     provider,
     commandShell: params.commandShell,
     thinkingLevel,
+    infiniteProviderRetry: params.infiniteProviderRetry === true,
     history,
     compaction,
     compactionSettings: params.compactionSettings,

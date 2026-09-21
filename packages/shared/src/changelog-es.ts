@@ -10,6 +10,7 @@ export const esEntries: ChangelogEntry[] = [
       "El modelo predeterminado seleccionado se conserva al editar proveedores y se aplica un respaldo seguro si se elimina.",
       "Las secciones anidadas de pensamiento y actividad de herramientas son más fáciles de leer, recorrer y recuperar.",
       "Mejora los diseños del Composer, los controles de razonamiento y la coherencia de temas del espacio de trabajo.",
+      "Añade un interruptor opcional en Ajustes para reintentar fallos de red y temporales del proveedor hasta que tengan éxito.",
     ],
   },
 

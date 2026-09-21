@@ -10,6 +10,7 @@ export const deEntries: ChangelogEntry[] = [
       "Das ausgewählte Standardmodell bleibt beim Bearbeiten von Anbietern erhalten und fällt sicher zurück, wenn es entfernt wird.",
       "Verschachtelte Denk- und Werkzeugaktivitäten lassen sich leichter lesen, navigieren und wiederherstellen.",
       "Composer-Layouts, Reasoning-Steuerung und die Theme-Konsistenz im Arbeitsbereich wurden verbessert.",
+      "Optionale Einstellung, Netzwerk- und vorübergehende Anbieterfehler bis zum Erfolg zu wiederholen.",
     ],
   },
 

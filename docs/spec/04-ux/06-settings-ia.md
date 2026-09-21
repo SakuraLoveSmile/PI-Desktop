@@ -152,8 +152,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   control column.
 - **Defaults** card: the host-backed default operating mode (Agent / Plan / Goal),
   command shell selection, Link open destination, context usage display
-  (remaining or used), thinking display mode, Enter-to-send control, and the large text paste
-  threshold. Link open destination uses the Work panel browser by default
+  (remaining or used), thinking display mode, Enter-to-send control, the
+  infinite provider retry switch, and the large text paste threshold. The
+  retry switch is off by default and explains that network/transient provider
+  failures keep retrying until success; Stop still cancels the turn and the
+  setting may continue API usage while enabled. Link open destination uses the Work panel browser by default
   and routes chat, transcript, and plugin HTTP(S) clicks to the system
   browser when set to Default OS browser. Plugin/settings clicks that want
   the work panel return to chat first so the dock is visible, without
