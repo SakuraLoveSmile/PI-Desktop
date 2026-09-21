@@ -5526,8 +5526,9 @@ identify the platform validation still needed.
   - Non-429 transient failures share one bounded budget of ten retries after
     the initial attempt, for eleven provider attempts total, shared by request
     setup and stream delivery. Each retry waits for an abortable bounded
-    backoff, removes the failed assistant from model context, and produces no
-    duplicate assistant bubble or terminal error notification.
+    backoff, removes the entire failed assistant suffix from model context,
+    and produces no duplicate assistant bubble or terminal error notification. A retry never
+    calls native continuation while an assistant remains the last model message.
   - A mid-stream 502 is retried rather than surfacing immediately. The
     mixed-phase fixture spends one counter across both phases and makes eleven
     attempts in total, not one retry per phase. A complete successful response

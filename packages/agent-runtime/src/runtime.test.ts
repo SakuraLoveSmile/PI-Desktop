@@ -3838,6 +3838,19 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       errorMessage: "terminated",
       timestamp: 2,
     };
+    const toolUseMessage = {
+      role: "assistant",
+      content: [{ type: "toolCall", id: "call-1", name: "Read", arguments: {} }],
+      stopReason: "toolUse",
+      timestamp: 1,
+    };
+    const toolResultMessage = {
+      role: "toolResult",
+      toolCallId: "call-1",
+      content: [{ type: "text", text: "result" }],
+      isError: false,
+      timestamp: 1,
+    };
     const successfulMessage = {
       role: "assistant",
       content: [{ type: "text", text: "recovered response" }],
@@ -3859,6 +3872,9 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     agent.prompt = vi.fn(async () => {
       agent.state.messages = [
         { role: "user", content: "hello", timestamp: 1 },
+        toolUseMessage,
+        toolResultMessage,
+        failedMessage,
         failedMessage,
       ];
       await handleAgentEvent({ type: "message_start", message: failedMessage });
@@ -3868,7 +3884,8 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     });
     agent.waitForIdle = vi.fn(async () => undefined);
     agent.continue = vi.fn(async () => {
-      expect(agent.state.messages.filter((message: any) => message.role !== "system")).toHaveLength(1);
+      expect(agent.state.messages.filter((message: any) => message.role !== "system")).toHaveLength(3);
+      expect(agent.state.messages.at(-1)?.role).toBe("toolResult");
       await handleAgentEvent({ type: "agent_start" });
       await handleAgentEvent({ type: "turn_start" });
       await handleAgentEvent({
@@ -3897,6 +3914,34 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       }),
     );
 
+    await runtime.dispose();
+  });
+
+  it("does not continue steering after a recovery becomes pending", async () => {
+    const runtime = createRuntime({ onEvent: vi.fn() });
+    const agent = (runtime as any).agent;
+    agent.state.messages = [
+      { role: "user", content: "hello", timestamp: 1 },
+      { role: "assistant", content: [], timestamp: 2 },
+    ];
+    (runtime as any).acceptingSteering = true;
+    (runtime as any).pendingSteering = new Map([
+      [{ role: "user", content: "steer", timestamp: 3 }, "steer-1"],
+    ]);
+    const continueCalls: number[] = [];
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => {
+      continueCalls.push(continueCalls.length + 1);
+      if (continueCalls.length === 1) {
+        (runtime as any).suppressProviderRetryRunEnd = true;
+        return;
+      }
+      throw new Error("Cannot continue from message role: assistant");
+    });
+
+    await expect((runtime as any).waitForIdleAndSteering()).resolves.toBeUndefined();
+
+    expect(continueCalls).toEqual([1]);
     await runtime.dispose();
   });
 
