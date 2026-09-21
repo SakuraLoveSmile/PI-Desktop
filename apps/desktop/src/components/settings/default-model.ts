@@ -87,3 +87,41 @@ export function hasResolvedDefaultModel(
   if (!provider) return false;
   return !!displayedDefaultModelId(provider, defaultModelId)?.trim();
 }
+
+/**
+ * Whether the provider can run a chat default right now: enabled, credentialed
+ * (API key, vendor login or none needed) and actually configuring at least one
+ * non-image model.
+ *
+ * `defaultModelOptions` is the same expansion the default picker lists, so a
+ * provider the picker would not offer cannot hold a default either.
+ */
+export function providerServesChatModels(
+  provider: ProviderPublic,
+  imageGeneration?: ImageGenerationBindings | null,
+): boolean {
+  return provider.enabled &&
+    (provider.hasSecret || !!provider.hasOauth || provider.authKind === "none") &&
+    defaultModelOptions([provider], imageGeneration).length > 0;
+}
+
+/**
+ * Whether adding a provider must leave the app's chat default alone.
+ *
+ * `hasResolvedDefaultModel` alone only asks whether the default provider still
+ * *names* a model, which a disabled or credential-less row does as well: every
+ * session it launches then fails with `PROVIDER_SECRET_MISSING` while the
+ * provider the user just configured is never used. The default therefore counts
+ * as kept only while its provider is runnable — the same readiness the picker
+ * and the provider rows demand.
+ */
+export function keepsAppDefaultModel(
+  providers: readonly ProviderPublic[],
+  defaultProviderId?: string,
+  defaultModelId?: string,
+  imageGeneration?: ImageGenerationBindings | null,
+): boolean {
+  const provider = providers.find((candidate) => candidate.id === defaultProviderId);
+  if (!provider || !providerServesChatModels(provider, imageGeneration)) return false;
+  return hasResolvedDefaultModel(providers, defaultProviderId, defaultModelId);
+}

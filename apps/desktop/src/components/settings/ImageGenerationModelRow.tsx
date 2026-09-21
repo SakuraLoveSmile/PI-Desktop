@@ -7,6 +7,7 @@ import {
   type ProviderPublic,
 } from "@pi-desktop/shared";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";
+import { imageGenerationBindingAvailable } from "./image-generation-default";
 
 function imageModelOptionId(binding: ImageGenerationBinding): string {
   return `${binding.providerId}\u0000${binding.modelId}`;
@@ -33,16 +34,15 @@ export function ImageGenerationModelRow({
     modelIdsMatch(candidate.modelId, binding.modelId),
   );
   const provider = providers.find((entry) => entry.id === binding.providerId);
-  const valid = !!provider?.enabled && provider.authKind !== "oauth" &&
-    !!provider.baseUrl && (provider.hasSecret || provider.authKind === "none") &&
-    provider.models.some((model) => model.id === binding.modelId);
+  // The same availability rule that decides whether this binding may stay the
+  // app default, so the row can never claim a pairing the runtime rejects.
+  const valid = imageGenerationBindingAvailable(provider, binding.modelId);
   const options = candidates.map((candidate) => {
     const candidateProvider = providers.find((entry) => entry.id === candidate.providerId);
-    const available = candidateProvider?.enabled &&
-      candidateProvider.authKind !== "oauth" &&
-      !!candidateProvider.baseUrl &&
-      (candidateProvider.hasSecret || candidateProvider.authKind === "none") &&
-      candidateProvider.models.some((model) => model.id === candidate.modelId);
+    const available = imageGenerationBindingAvailable(
+      candidateProvider,
+      candidate.modelId,
+    );
     return {
       id: imageModelOptionId(candidate),
       label: `${candidateProvider?.name ?? candidate.providerId} · ${candidate.modelId}`,

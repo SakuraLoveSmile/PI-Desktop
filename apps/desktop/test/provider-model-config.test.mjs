@@ -306,13 +306,18 @@ test("adding a service only claims the app default while none resolves", () => {
     /\} else if \(!editingProvider\) \{([\s\S]*?)\n      \} else \{/,
   );
   assert.ok(branch, "the add-provider branch moved");
-  const guard = branch[1].indexOf("hasResolvedDefaultModel(");
+  const guard = branch[1].indexOf("keepsAppDefaultModel(");
   const write = branch[1].indexOf("api.setSettings(");
   assert.ok(guard >= 0, "the add branch must ask whether a default already resolves");
   assert.ok(write > guard, "the default write must sit inside that guard");
   // Which provider wins is decided by the shared resolver, whose behaviour is
-  // pinned by default-model-display.test.mjs.
-  assert.match(pageSource, /hasResolvedDefaultModel,\n\} from "\.\/default-model"/);
+  // pinned by default-model-display.test.mjs. That resolver also requires the
+  // default provider to be runnable (enabled, credentialed, a chat model
+  // configured), so a keyless default row cannot block the new provider.
+  assert.match(pageSource, /keepsAppDefaultModel,[\s\S]{0,80}\} from "\.\/default-model"/);
+  // Provider readiness is one rule for the picker and the add guard.
+  assert.match(pageSource, /const providerReady = \(provider: ProviderPublic\) =>\n\s+providerServesChatModels\(provider, imageGenerationCandidates\)/);
+  assert.doesNotMatch(pageSource, /provider\.hasOauth \|\|/);
 });
 
 test("a saved image selection never takes the app's image default", () => {

@@ -12,7 +12,9 @@ import test from "node:test";
 import {
   defaultModelIdOf,
   displayedDefaultModelId,
+  keepsAppDefaultModel,
   providerOffersModel,
+  providerServesChatModels,
   hasResolvedDefaultModel,
 } from "../src/components/settings/default-model.ts";
 
@@ -129,4 +131,111 @@ test("an empty default resolves to nothing, so the new provider claims it", () =
   // A stored id the default provider does not serve is not a default either:
   // the row renders the empty state, so the next provider may fill it.
   assert.equal(hasResolvedDefaultModel([empty], "p1", "gpt-5"), false);
+});
+
+/**
+ * Which provider owns the app default after a new one is added.
+ *
+ * `hasResolvedDefaultModel` only asks whether the default provider still
+ * *names* a model — a disabled or credential-less row does — so on its own it
+ * keeps a default whose every launch dies with `PROVIDER_SECRET_MISSING` while
+ * the provider the user just configured is never used. `keepsAppDefaultModel`
+ * adds the readiness the picker already demands. The branch below mirrors the
+ * add-provider branch of `ModelConfigPage.afterSaved`.
+ */
+const addProvider = (providers, settings, saved) => {
+  const firstModelId = saved.models[0]?.id;
+  if (!keepsAppDefaultModel(
+    providers,
+    settings.defaultProviderId,
+    settings.defaultModelId,
+    settings.imageGenerationModels,
+  )) {
+    return { ...settings, defaultProviderId: saved.id, defaultModelId: firstModelId ?? "" };
+  }
+  return settings;
+};
+test("a runnable default provider keeps the app default when one is added", () => {
+  const current = provider({ models: [binding("gpt-5"), binding("gpt-5-mini")] });
+  const added = provider({ id: "p2", name: "Provider Two", models: [binding("llama-4")] });
+  const settings = { defaultProviderId: "p1", defaultModelId: "gpt-5-mini" };
+  assert.equal(keepsAppDefaultModel([current], "p1", "gpt-5-mini"), true);
+  assert.deepEqual(addProvider([current], settings, added), {
+    defaultProviderId: "p1",
+    defaultModelId: "gpt-5-mini",
+  });
+});
+test("a default provider without a usable key lets the new provider take over", () => {
+  // The real user path: the key was removed (or never entered) while
+  // `defaultProviderId` kept pointing at the row, so the next session failed.
+  const starved = provider({
+    models: [binding("gpt-5"), binding("gpt-5-mini")],
+    hasSecret: false,
+    hasOauth: false,
+  });
+  const added = provider({ id: "p2", name: "Provider Two", models: [binding("llama-4")] });
+  const settings = { defaultProviderId: "p1", defaultModelId: "gpt-5-mini" };
+  // The old guard asked only this and answered yes, which was the regression.
+  assert.equal(hasResolvedDefaultModel([starved], "p1", "gpt-5-mini"), true);
+  assert.equal(keepsAppDefaultModel([starved], "p1", "gpt-5-mini"), false);
+  assert.deepEqual(addProvider([starved], settings, added), {
+    defaultProviderId: "p2",
+    defaultModelId: "llama-4",
+  });
+});
+
+test("a disabled default provider lets the new provider take over", () => {
+  const off = provider({ models: [binding("gpt-5")], enabled: false });
+  const added = provider({ id: "p2", name: "Provider Two", models: [binding("llama-4")] });
+  assert.equal(keepsAppDefaultModel([off], "p1", "gpt-5"), false);
+  assert.equal(
+    addProvider([off], { defaultProviderId: "p1", defaultModelId: "gpt-5" }, added)
+      .defaultProviderId,
+    "p2",
+  );
+});
+
+test("a default provider with nothing left to run lets the new provider take over", () => {
+  // Either no chat model at all, or only the image model the default picker
+  // excludes: both leave the default provider unable to run anything.
+  const bare = provider({ models: [], defaultModelId: undefined });
+  const imageOnly = provider({ models: [binding("gpt-image-1")] });
+  const added = provider({ id: "p2", name: "Provider Two", models: [binding("llama-4")] });
+  assert.equal(providerServesChatModels(bare), false);
+  assert.equal(keepsAppDefaultModel([bare], "p1", ""), false);
+  assert.equal(
+    keepsAppDefaultModel([imageOnly], "p1", "gpt-image-1", {
+      providerId: "p1",
+      modelId: "gpt-image-1",
+    }),
+    false,
+  );
+  assert.equal(
+    addProvider([bare], { defaultProviderId: "p1", defaultModelId: "" }, added)
+      .defaultProviderId,
+    "p2",
+  );
+});
+
+test("a vendor-login default provider still holds the default", () => {
+  // OAuth is a valid chat credential even though image generation refuses it,
+  // so the add guard must not turn this into a stolen default.
+  const vendor = provider({
+    models: [binding("claude-opus-4.6")],
+    authKind: "oauth",
+    hasSecret: true,
+    hasOauth: true,
+  });
+  assert.equal(providerServesChatModels(vendor), true);
+  assert.equal(keepsAppDefaultModel([vendor], "p1", "claude-opus-4.6"), true);
+});
+
+test("a default provider that is gone still lets the new provider take over", () => {
+  const added = provider({ id: "p2", name: "Provider Two", models: [binding("llama-4")] });
+  assert.equal(keepsAppDefaultModel([added], "deleted-provider", "gpt-5"), false);
+  assert.equal(
+    addProvider([added], { defaultProviderId: "deleted-provider", defaultModelId: "gpt-5" }, added)
+      .defaultProviderId,
+    "p2",
+  );
 });
