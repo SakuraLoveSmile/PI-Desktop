@@ -8563,3 +8563,12 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`。
 - **验收 / 里程碑**：C、Quality / M6+。
 - **状态**：组件与状态层用户路径由 `queue-pending-actions.test.mjs` 覆盖。
+
+### E2E-SCHEDULED-legacy-pause
+
+- **场景**：旧任务维护。
+- **预期**：Agent 工具可对缺少 schedule 的旧版自动任务修改标题、提示词或暂停，
+  包括回传未变化的 cadence；维护不会启用任务或捕获前台工作区。显式启用、改变
+  cadence 或提供 schedule 时仍执行校验，Manual 转 Hourly 的默认间隔行为不变。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-legacy-maintenance.mjs`
+  使用隔离的真实 Host 与 SQLite 配置，不向真实提供商发送推理请求。

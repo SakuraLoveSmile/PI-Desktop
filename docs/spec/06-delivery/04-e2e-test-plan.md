@@ -14402,3 +14402,9 @@ the latest destination. These assertions measure work counts, not device FPS.
   `fork_preserves_referenced_pasted_files_independently` and `sessions::fork_files`
   cover ownership, deletion, repeated/bounded forks, retained checkpoint paths,
   expired inputs, rollback, and symlink rejection.
+
+### E2E-SCHEDULED-legacy-pause
+
+- **Scenario:** Legacy task maintenance.
+- **Expected:** Agent tools allow title, prompt and pause updates on legacy automatic tasks without a schedule, including an echoed unchanged cadence. These edits do not arm the task or capture the foreground workspace. Explicit enabling, a cadence change or a supplied schedule still follows schedule validation. Resume requires an explicit valid schedule; Manual-to-Hourly retains its existing default interval behavior.
+- **Automation:** `node --experimental-strip-types scripts/e2e-scheduled-legacy-maintenance.mjs` uses an isolated real Host and SQLite profile. Inference is not sent to a live provider.
