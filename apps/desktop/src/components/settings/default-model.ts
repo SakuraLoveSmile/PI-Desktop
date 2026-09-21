@@ -7,7 +7,7 @@
  * is not configured, so these helpers keep the two notions apart: what a
  * provider itself offers, and what is safe to display for it.
  */
-import { isImageGenerationModel, modelIdsMatch, type ImageGenerationBinding, type ProviderPublic } from "@pi-desktop/shared";
+import { isImageGenerationModel, modelIdsMatch, type ImageGenerationBindings, type ProviderPublic } from "@pi-desktop/shared";
 
 export type DefaultModelOption = {
   provider: ProviderPublic;
@@ -17,7 +17,7 @@ export type DefaultModelOption = {
 /** Expand runnable providers into the model choices they actually configure. */
 export function defaultModelOptions(
   providers: readonly ProviderPublic[],
-  imageGeneration?: ImageGenerationBinding | null,
+  imageGeneration?: ImageGenerationBindings | null,
 ): DefaultModelOption[] {
   return providers.flatMap((provider) => {
     const modelIds = (provider.models ?? [])

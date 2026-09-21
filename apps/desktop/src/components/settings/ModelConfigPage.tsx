@@ -10,8 +10,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   OAUTH_AUTH_KIND,
+  imageGenerationBindings,
   isImageGenerationModel,
   modelIdsMatch,
+  type ImageGenerationBinding,
   type ModelBinding,
   type ProviderPublic,
 } from "@pi-desktop/shared";
@@ -78,6 +80,7 @@ export function ModelConfigPage() {
   const [defaultModelQuery, setDefaultModelQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [changingImageModel, setChangingImageModel] = useState(false);
   const [refreshingCatalog, setRefreshingCatalog] = useState(false);
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatus | null>(null);
   // Two-step delete: the first click arms the row, the second removes it.
@@ -109,9 +112,13 @@ export function ModelConfigPage() {
     })();
   }, []);
 
+  const imageGenerationCandidates = useMemo(
+    () => imageGenerationBindings(settings?.imageGenerationModels, settings?.imageGeneration),
+    [settings?.imageGenerationModels, settings?.imageGeneration],
+  );
   const providerReady = (provider: ProviderPublic) =>
     provider.enabled &&
-    defaultModelOptions([provider], settings?.imageGeneration).length > 0 &&
+    defaultModelOptions([provider], imageGenerationCandidates).length > 0 &&
     (provider.hasSecret || provider.hasOauth || provider.authKind === "none");
 
   const aiProviders = useMemo(
@@ -120,7 +127,7 @@ export function ModelConfigPage() {
   );
   const reorder = useProviderReorder(aiProviders, busyId !== null || testingId !== null || setupFor !== null);
   const readyProviders = providers.filter(providerReady);
-  const defaultModelOptionsList = defaultModelOptions(readyProviders, settings?.imageGeneration);
+  const defaultModelOptionsList = defaultModelOptions(readyProviders, imageGenerationCandidates);
   const visibleDefaultModelOptions = useMemo(() => {
     const query = defaultModelQuery.trim().toLowerCase();
     if (!query) return defaultModelOptionsList;
@@ -137,12 +144,19 @@ export function ModelConfigPage() {
   const editingProvider =
     setupFor ? providers.find((provider) => provider.id === setupFor) ?? null : null;
   const defaultProviderReady = defaultProvider !== null && providerReady(defaultProvider) &&
-    !isImageGenerationModel(settings.imageGeneration, defaultProvider.id,
+    !isImageGenerationModel(imageGenerationCandidates, defaultProvider.id,
       displayedDefaultModelId(defaultProvider, settings.defaultModelId));
 
 
   const setDefaultModel = async (provider: ProviderPublic, modelId: string) => {
-    if (isImageGenerationModel(useAppStore.getState().settings?.imageGeneration, provider.id, modelId)) return;
+    if (isImageGenerationModel(
+      imageGenerationBindings(
+        useAppStore.getState().settings?.imageGenerationModels,
+        useAppStore.getState().settings?.imageGeneration,
+      ),
+      provider.id,
+      modelId,
+    )) return;
     setBusyId(provider.id);
     try {
       await api.setSettings({
@@ -165,13 +179,42 @@ export function ModelConfigPage() {
   /**
    * Preserve the selected app default unless it was removed from the provider.
    */
-  const afterSaved = async (saved: ProviderPublic, models: ModelBinding[], imageModelId?: string) => {
+  const afterSaved = async (
+    saved: ProviderPublic,
+    models: ModelBinding[],
+    imageModelIds?: string[],
+  ) => {
     const firstModelId = models[0]?.id;
     try {
-      if (imageModelId) {
-        await api.setSettings({ ...(await api.getSettings()), imageGeneration: { providerId: saved.id, modelId: imageModelId } });
-        useAppStore.setState({ settings: await api.getSettings() });
-        showToast(t("settings.providerSaved"), { variant: "success" });
+      if (imageModelIds !== undefined) {
+        const current = await api.getSettings();
+        const existing = imageGenerationBindings(
+          current.imageGenerationModels,
+          current.imageGeneration,
+        );
+        const selected = [...new Set(imageModelIds)].map((modelId) => ({
+          providerId: saved.id,
+          modelId,
+        }));
+        const nextCandidates = [
+          ...existing.filter((binding) => binding.providerId !== saved.id),
+          ...selected,
+        ];
+        const active = current.imageGeneration;
+        const nextActive = active && nextCandidates.some((binding) =>
+          binding.providerId === active.providerId &&
+          modelIdsMatch(binding.modelId, active.modelId),
+        )
+          ? active
+          : nextCandidates[0] ?? null;
+        const nextSettings = {
+          ...current,
+          imageGenerationModels: nextCandidates,
+          imageGeneration: nextActive,
+        };
+        await api.setSettings(nextSettings);
+        useAppStore.setState({ settings: nextSettings });
+        showToast(t("settings.imageModelSelected"), { variant: "success" });
       } else if (copyDraft) {
         showToast(t("settings.providerSaved"), { variant: "success" });
       } else if (!editingProvider) {
@@ -197,6 +240,28 @@ export function ModelConfigPage() {
       showToast(error instanceof Error ? error.message : String(error), {
         variant: "error",
       });
+    }
+  };
+
+  const setImageGenerationDefault = async (binding: ImageGenerationBinding) => {
+    setChangingImageModel(true);
+    try {
+      const current = await api.getSettings();
+      const candidates = imageGenerationBindings(
+        current.imageGenerationModels,
+        current.imageGeneration,
+      );
+      if (!isImageGenerationModel(candidates, binding.providerId, binding.modelId)) return;
+      const nextSettings = { ...current, imageGeneration: binding };
+      await api.setSettings(nextSettings);
+      useAppStore.setState({ settings: nextSettings });
+      showToast(t("settings.imageModelSelected"), { variant: "success" });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), {
+        variant: "error",
+      });
+    } finally {
+      setChangingImageModel(false);
     }
   };
 
@@ -426,7 +491,14 @@ export function ModelConfigPage() {
               </div>
             </AnchoredMenu>
           </div>
-          <ImageGenerationModelRow settings={settings} providers={providers} />
+          {imageGenerationCandidates.length > 0 ? (
+            <ImageGenerationModelRow
+              settings={settings}
+              providers={providers}
+              busy={changingImageModel}
+              onChange={setImageGenerationDefault}
+            />
+          ) : null}
         </div>
       </section>
 
@@ -528,7 +600,7 @@ export function ModelConfigPage() {
                           variant="ghost"
                           disabled={rowBusy || !providerReady(provider)}
                           onClick={() =>
-                            void setDefaultModel(provider, defaultModelOptions([provider], settings.imageGeneration)[0]?.modelId ?? "")
+                            void setDefaultModel(provider, defaultModelOptions([provider], imageGenerationCandidates)[0]?.modelId ?? "")
                           }
                         >
                           {t("settings.makeDefault")}
@@ -731,7 +803,11 @@ export function ModelConfigPage() {
           provider={editingProvider}
           initialDraft={copyDraft}
           onClose={() => { setSetupFor(null); setCopyDraft(null); }}
-          imageModelId={settings.imageGeneration?.providerId === editingProvider?.id ? settings.imageGeneration?.modelId : undefined}
+          imageModelIds={editingProvider
+            ? imageGenerationCandidates
+                .filter((binding) => binding.providerId === editingProvider.id)
+                .map((binding) => binding.modelId)
+            : undefined}
           onSaved={afterSaved}
         />
       ) : null}

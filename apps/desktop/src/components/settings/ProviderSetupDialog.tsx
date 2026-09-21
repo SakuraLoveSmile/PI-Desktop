@@ -120,8 +120,8 @@ export type ProviderSetupDialogProps = {
   provider?: ProviderPublic | null;
   initialDraft?: ProviderCopyDraft | null;
   onClose: () => void;
-  imageModelId?: string;
-  onSaved: (provider: ProviderPublic, models: ModelBinding[], imageModelId?: string) => void | Promise<void>;
+  imageModelIds?: string[];
+  onSaved: (provider: ProviderPublic, models: ModelBinding[], imageModelIds?: string[]) => void | Promise<void>;
 };
 
 export function ProviderSetupDialog({
@@ -129,10 +129,10 @@ export function ProviderSetupDialog({
   initialDraft,
   onClose,
   onSaved,
-  imageModelId,
+  imageModelIds,
 }: ProviderSetupDialogProps) {
   const { t } = useTranslation();
-  const [imageModelDraft, setImageModelDraft] = useState<string | undefined>();
+  const [imageModelDraft, setImageModelDraft] = useState<string[] | undefined>();
   const editing = !!provider;
   const apiKeyRef = useRef<HTMLInputElement>(null);
   const [service, setService] = useState(() => initialDraft
@@ -272,6 +272,9 @@ export function ProviderSetupDialog({
       return;
     }
     const persisted = selection.bindingsToPersist;
+    const imageModelIdsToSave = imageModelDraft?.filter((imageModelId) =>
+      persisted.some((model) => model.id === imageModelId),
+    );
     setSaving(true);
     setError("");
     try {
@@ -287,7 +290,7 @@ export function ProviderSetupDialog({
           headers,
           ...(apiKey ? { secretValue: apiKey } : {}),
         });
-        await onSaved(result.provider ?? provider, persisted, persisted.some((model) => model.id === imageModelDraft) ? imageModelDraft : undefined);
+        await onSaved(result.provider ?? provider, persisted, imageModelIdsToSave);
       } else {
         const result = await api.createProvider({
           name: providerName,
@@ -302,13 +305,21 @@ export function ProviderSetupDialog({
           apiStyle: resolvedApiStyle,
           headers,
         });
-        await onSaved(result.provider, persisted, persisted.some((model) => model.id === imageModelDraft) ? imageModelDraft : undefined);
+        await onSaved(result.provider, persisted, imageModelIdsToSave);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateImageModelDraft = (id: string, selected: boolean) => {
+    setImageModelDraft((current) => {
+      const next = current ?? imageModelIds ?? [];
+      if (selected) return next.includes(id) ? next : [...next, id];
+      return next.filter((entry) => entry !== id);
+    });
   };
 
   const canSave =
@@ -532,8 +543,8 @@ export function ProviderSetupDialog({
             busy={saving}
             onReload={discovery.reload}
             apiStyle={resolvedApiStyle}
-            imageModelId={imageModelDraft ?? imageModelId}
-            onImageModelChange={setImageModelDraft}
+            imageModelIds={imageModelDraft ?? imageModelIds}
+            onImageModelChange={updateImageModelDraft}
           />
         </div>
       </div>

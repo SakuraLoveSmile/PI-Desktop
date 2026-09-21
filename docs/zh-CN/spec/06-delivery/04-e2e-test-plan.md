@@ -8277,21 +8277,26 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 - **Preconditions:** Isolated desktop profile and workspace, built image feature,
   local chat and OpenAI Images HTTP fixtures; no live provider credentials.
-- **Steps:** Open Models settings; verify the conversation and image defaults
-  share a compact panel. Submit a two-image request through the composer, then
-  edit the first output through a follow-up message. Collapse tool details.
-  Clear the binding and follow the visible configuration action back to Models.
-- **Expected:** A 12px default-row gap, decoded image previews outside collapsed
-  process details, multipart source upload for editing, preserved originals,
-  and no image HTTP request while unconfigured.
-- **Settings interactions:** The image summary has no Change/Clear buttons and
-  matches the default model's provider/model text styles. Select another
-  provider's image model in Advanced and save; the summary changes while the
-  chat default stays unchanged. Missing/disabled bindings show only Currently
-  unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
-- **Conversation selection:** The selected image provider/model is absent from
+- **Steps:** Open Models settings with no image model configured; verify the image
+  summary row is absent. Open a provider's Advanced model settings and verify
+  **Set as image model** is grouped with the image/document attachment
+  capabilities and can be checked for multiple models. Save, use the image
+  summary menu to choose one marked model as the default, then submit a
+  two-image request through the composer and edit the first output through a
+  follow-up message. Collapse tool details.
+- **Expected:** After saving, the image summary appears with a 12px default-row
+  gap and lists all marked candidates, the selected default is changeable
+  without changing the chat default, decoded image previews stay outside
+  collapsed process details, multipart source upload is used for editing,
+  originals are preserved, and no image HTTP request occurs while unconfigured.
+- **Settings interactions:** The unconfigured state renders no image summary.
+  Mark candidates in the attachment capability group, save, and select one
+  from the summary menu. An existing missing/disabled candidate shows only
+  Currently unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
+- **Conversation selection:** Every marked image provider/model is absent from
   default and Composer candidates. Other providers retain same-ID models. An
-  existing session pinned to the image binding is rejected before inference.
+  existing session pinned to any marked image binding is rejected before
+  inference.
 - **Transport contracts:** Real stdio reverse RPC retains a thrown local image
   error's stable code in the production ParentHostProxy. Local HTTP tests check
   single/multiple binary multipart fields and boundaries, DALL-E `b64_json`

@@ -16,6 +16,7 @@ import {
   bindingForCustomModel,
   bindingFromModelInfo,
   formatTokenCount,
+  modelIdsMatch,
   modelMatchesFilter,
   nativeWebSearchSupportedOn,
   publishedThinkingLevels,
@@ -179,8 +180,8 @@ export function applyVisibleModelSelection(
 }
 
 export type ModelSelectionPanesProps = {
-  imageModelId?: string;
-  onImageModelChange?: (id: string) => void;
+  imageModelIds?: string[];
+  onImageModelChange?: (id: string, selected: boolean) => void;
   discovery: ProviderModelsState & { canReload?: boolean };
   selection: ModelSelection;
   /** Heading of the discovered list: a service's models, or an account's. */
@@ -209,7 +210,7 @@ export function ModelSelectionPanes({
   busy = false,
   onReload,
   apiStyle,
-  imageModelId,
+  imageModelIds,
   onImageModelChange,
 }: ModelSelectionPanesProps) {
   const { t } = useTranslation();
@@ -535,6 +536,9 @@ export function ModelSelectionPanes({
                 publishedContextWindow !== undefined;
               const publishedDocuments = info ? modelMatchesFilter(info, "pdf") : false;
               const expanded = expandedModelId === binding.id;
+              const imageModelSelected = imageModelIds?.some((modelId) =>
+                modelIdsMatch(modelId, binding.id),
+              ) ?? false;
               const advancedId = `model-advanced-${binding.id}`;
               return (
                 <li
@@ -602,7 +606,6 @@ export function ModelSelectionPanes({
                     id={advancedId}
                     hidden={!expanded}
                   >
-                    {onImageModelChange ? <button type="button" className="provider-chosen-advanced-toggle" disabled={busy || imageModelId === binding.id} onClick={() => onImageModelChange(binding.id)}>{t(imageModelId === binding.id ? "settings.imageModelSelected" : "settings.setImageModel")}</button> : null}
                     <label className="provider-chosen-field">
                       <span className="provider-chosen-field-label">
                         {t("settings.modelAlias")}
@@ -829,6 +832,30 @@ export function ModelSelectionPanes({
                             updateBinding(binding.id, { supportsDocuments: next })
                           }
                         />
+                        {onImageModelChange ? (
+                          <label className="provider-chosen-capability">
+                            <input
+                              type="checkbox"
+                              checked={imageModelSelected}
+                              disabled={busy}
+                              aria-label={t(
+                                imageModelSelected
+                                  ? "settings.imageModelSelected"
+                                  : "settings.setImageModel",
+                              )}
+                              onChange={(event) =>
+                                onImageModelChange(binding.id, event.target.checked)
+                              }
+                            />
+                            <span>
+                              {t(
+                                imageModelSelected
+                                  ? "settings.imageModelSelected"
+                                  : "settings.setImageModel",
+                              )}
+                            </span>
+                          </label>
+                        ) : null}
                         <span className="provider-chosen-delegation">
                           <label className="provider-chosen-capability">
                             <input
