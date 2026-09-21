@@ -14347,3 +14347,19 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Status:** Automated by `node --experimental-strip-types
   scripts/e2e-scheduled-workspace.mjs`, using production Electron dispatch and
   real Rust/stdio/SQLite. Only external inference is replaced with an observer.
+
+### E2E-SESSION-temporary-attachment-fork: Preview and independent branch inputs
+
+- **Steps**: In a task without a project, paste text above the long-paste
+  threshold, send it, and click its transcript attachment. Return from the
+  preview, create a branch, and open the same attachment in the child. Delete
+  the source task and reopen the child attachment; branch the child again.
+- **Expected**: Every preview shows the original saved bytes. Each branch path
+  belongs to that branch's scratch input directory. No project is required, and
+  no access to another task's scratch directory is granted. A bounded fork
+  excludes later-only and unreferenced inputs.
+- **Automation**: `scripts/e2e-composer-paste.mjs` covers long-text save, real
+  Electron file read, temporary-task preview, and back navigation. Host tests
+  `fork_preserves_referenced_pasted_files_independently` and `sessions::fork_files`
+  cover ownership, deletion, repeated/bounded forks, retained checkpoint paths,
+  expired inputs, rollback, and symlink rejection.
