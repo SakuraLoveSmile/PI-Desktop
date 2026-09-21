@@ -22,6 +22,7 @@ globalThis.piSkillDiscoveryProbe = async () => {
   let calls = 0;
   let cancel = true;
   let fail = false;
+  let runtimeFailure = false;
   api.discoverPiSkills = async () => {
     if (fail) throw new Error("Discovery unavailable");
     return { candidates: [{ ...candidate }], errors: [] };
@@ -29,6 +30,7 @@ globalThis.piSkillDiscoveryProbe = async () => {
   api.importPiSkills = async id => {
     assert(id === candidate.id, "wrong candidate"); calls++;
     if (!cancel) candidate.imported = true;
+    if (runtimeFailure) throw new Error("Plugin process failed");
     return { canceled: cancel };
   };
   const container = document.createElement("div"); document.body.append(container);
@@ -53,6 +55,16 @@ globalThis.piSkillDiscoveryProbe = async () => {
   flushSync(() => button("Refresh pi CLI skills").click());
   await until(() => !button("Refresh pi CLI skills").disabled);
   assert(!container.querySelector('[role="alert"]'), "retry must clear previous failure");
+  candidate.imported = false;
+  flushSync(() => button("Refresh pi CLI skills").click());
+  await until(() => Boolean(button("Import and enable")));
+  runtimeFailure = true;
+  flushSync(() => button("Import and enable").click());
+  await until(() => Boolean(container.querySelector('[role="alert"]')));
+  await until(() => Boolean(button("Already imported")));
+  assert(button("Already imported").disabled, "host registration must survive a runtime failure");
+  assert(container.textContent?.includes("Plugin process failed"), "rediscovery must not hide the import error");
+  assert(container.textContent?.includes("manage imported packages in Plugins"), "recovery location must remain visible");
   root.unmount(); container.remove();
-  return { ok: true, scenarios: ["discover without import", "cancel", "enable", "duplicate", "failure and retry"] };
+  return { ok: true, scenarios: ["discover without import", "cancel", "enable", "duplicate", "failure and retry", "registered import runtime failure"] };
 };

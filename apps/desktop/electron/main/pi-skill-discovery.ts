@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
+import type { Dirent } from "node:fs";
 import { lstat, readdir, readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import type { PiSkillDiscovery, PiSkillPackageCandidate } from "@pi-desktop/shared";
 import { discoverImportedPackageSkills } from "./imported-package-skills";
 
-const MAX_PACKAGES = 256;
 const MAX_METADATA_BYTES = 256 * 1024;
 
 async function readMetadata(path: string): Promise<string> {
@@ -21,23 +21,32 @@ export async function discoverPiSkillPackages(modules: string, importedDescripti
   const errors: string[] = [];
   const importedSources = new Set(importedDescriptions);
   const paths: string[] = [];
+  let entries: Dirent[];
   try {
     const info = await lstat(modules);
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("pi npm directory must not be a symbolic link");
     modules = await realpath(modules);
-    for (const entry of await readdir(modules, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.isSymbolicLink() || entry.name.startsWith(".")) continue;
-      if (entry.name.startsWith("@")) {
-        for (const child of await readdir(join(modules, entry.name), { withFileTypes: true })) {
-          if (child.isDirectory() && !child.isSymbolicLink()) paths.push(join(modules, entry.name, child.name));
-          if (paths.length > MAX_PACKAGES) throw new Error("pi npm discovery exceeds 256 packages");
-        }
-      } else paths.push(join(modules, entry.name));
-      if (paths.length > MAX_PACKAGES) throw new Error("pi npm discovery exceeds 256 packages");
-    }
+    entries = await readdir(modules, { withFileTypes: true });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return { candidates, errors };
     throw error;
+  }
+  // npm hoists ordinary dependencies beside installed pi packages. Their count
+  // must not hide valid skills; metadata reads below yield between packages.
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.isSymbolicLink() || entry.name.startsWith(".")) continue;
+    const path = join(modules, entry.name);
+    if (!entry.name.startsWith("@")) {
+      paths.push(path);
+      continue;
+    }
+    try {
+      for (const child of await readdir(path, { withFileTypes: true })) {
+        if (child.isDirectory() && !child.isSymbolicLink()) paths.push(join(path, child.name));
+      }
+    } catch (error) {
+      errors.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
   for (const path of paths.sort()) {
     try {

@@ -31,7 +31,12 @@ export function PiSkillDiscoveryPanel() {
         }
         setRefresh(value => value + 1);
       }
-    } catch (reason) { setError(String(reason)); }
+    } catch (reason) {
+      setError(String(reason));
+      // Host registration can succeed before the runtime fails to start.
+      // Rediscover so a registered import stays manageable through Plugins.
+      setRefresh(value => value + 1);
+    }
     finally { setBusy(false); }
   }
   return <section className="settings-card-block pi-skill-discovery" aria-label={t("plugins.piSkillsTitle")}>

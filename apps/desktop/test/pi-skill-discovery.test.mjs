@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { register } from 'node:module';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 register(new URL('./helpers/ts-import-hooks.mjs', import.meta.url));
@@ -24,12 +24,35 @@ test('discovers installed plain and scoped packages without importing or executi
   assert.ok(result.candidates.every(c => c.skills.length === 1 && !c.hasExtensions && !c.imported));
   assert.equal(existsSync(f.imports), false);
 });
+test('hoisted npm dependencies do not prevent discovery of installed skills', async t => {
+  const f = fixture(t);
+  for (let index = 0; index < 300; index++) {
+    const name = `dependency-${index}`;
+    f.write(name, 'package.json', JSON.stringify({ name, version: '1.0.0' }));
+  }
+  f.pkg('planning-with-files');
+  f.pkg('@scope/skills');
+  const result = await discoverPiSkillPackages(f.modules);
+  assert.deepEqual(result.candidates.map(candidate => candidate.name), ['@scope/skills', 'planning-with-files']);
+  assert.deepEqual(result.errors, []);
+  assert.equal(existsSync(f.imports), false);
+});
 test('one malformed package does not hide healthy candidates; links are not followed', async t => {
   const f = fixture(t); f.pkg('healthy'); f.write('broken', 'package.json', '{');
   symlinkSync(join(f.modules, 'healthy'), join(f.modules, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
   const result = await discoverPiSkillPackages(f.modules);
   assert.deepEqual(result.candidates.map(c => c.name), ['healthy']);
   assert.ok(result.errors.some(e => e.includes('broken')));
+});
+test('an unreadable scope reports a diagnostic without hiding healthy packages', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, async t => {
+  const f = fixture(t); f.pkg('healthy');
+  const blocked = join(f.modules, '@blocked');
+  mkdirSync(blocked); chmodSync(blocked, 0);
+  try {
+    const result = await discoverPiSkillPackages(f.modules);
+    assert.deepEqual(result.candidates.map(candidate => candidate.name), ['healthy']);
+    assert.ok(result.errors.some(error => error.includes('@blocked') && error.includes('EACCES')));
+  } finally { chmodSync(blocked, 0o755); }
 });
 test('existing imports remain recognized after rediscovery without a second registry', async t => {
   const f = fixture(t); f.pkg('planning-with-files');
@@ -67,7 +90,13 @@ function harness(f, t, confirm = async () => ({ response: 1 })) {
     dialogs: { showMessageBox: confirm }, getLocale: () => 'en',
     getNpmPath: () => undefined, setNpmPath: () => {},
     getImportedDescriptions: async () => descriptions,
-    loadDevPlugin: async path => { const result = await runtime.loadFromPath(path); const { readFileSync } = await import("node:fs"); descriptions.push(JSON.parse(readFileSync(join(path, "manifest.json"), "utf8")).description); return result; }, runCommand: async () => ({ handled: false }),
+    loadDevPlugin: async path => {
+      const { readFileSync } = await import("node:fs");
+      // Production persists host registration before starting the plugin child.
+      descriptions.push(JSON.parse(readFileSync(join(path, "manifest.json"), "utf8")).description);
+      return runtime.loadFromPath(path);
+    },
+    runCommand: async () => ({ handled: false }),
   }, f.modules);
   return { runtime, discover: () => handlers.get(IPC.invoke.piSkillDiscover)(), enable: id => handlers.get(IPC.invoke.piSkillImport)({ id }) };
 }

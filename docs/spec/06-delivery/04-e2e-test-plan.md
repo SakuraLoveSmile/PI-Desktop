@@ -14354,11 +14354,15 @@ the latest destination. These assertions measure work counts, not device FPS.
   a package declaring `pi.skills`, optionally executable extensions. No provider.
 - **Steps:** Open Skills, discover the candidate, cancel import, confirm import,
   read the registered skill body and resources, reload, and attempt a duplicate.
-  Change metadata during confirmation; retry discovery after an error.
+  Change metadata during confirmation; retry discovery after an error; discover
+  with more than 256 hoisted dependencies and an unreadable scope. Simulate a
+  runtime load failure after host registration and inspect the refreshed state.
 - **Expected:** No implicit import/execution, native explicit consent, preserved
   resources and runtime skill body, stable imported state, no duplicate import,
   stale consent refusal, and visible/recoverable errors. Unregistered leftover
-  directories do not count as imports; scoped packages are discovered.
+  directories do not count as imports; scoped packages are discovered. Unrelated
+  dependencies and unreadable scopes do not hide healthy skills. A registered
+  import remains marked imported after runtime failure while its error stays visible.
 - **Specs:** 07-plugins/16-trusted-extensions; ADR pi-npm-skill-discovery.
 - **Acceptance:** Plugin skill discovery and explicit trust boundary.
 - **Milestone:** Post-MVP compatibility.

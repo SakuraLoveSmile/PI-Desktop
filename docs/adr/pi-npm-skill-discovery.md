@@ -17,9 +17,11 @@ packages that also contain executable extensions.
 The Skills page requests read-only candidates from the installed package level
 of `~/.pi/agent/npm/node_modules`, including scoped packages. Electron main
 reuses the existing `pi.skills` declaration parser. Discovery neither imports
-nor executes code. Package metadata is bounded to 256 KiB, package enumeration
-to 256 entries, and contribution traversal retains the importer's bounds and
-path validation. Invalid packages produce diagnostics without hiding valid peers.
+nor executes code. Package metadata is bounded to 256 KiB and contribution
+traversal retains the importer's bounds and path validation. Metadata reads
+are asynchronous; hoisted npm dependencies do not impose a skill-discovery
+cutoff. Invalid packages and unreadable scopes produce diagnostics without
+hiding valid peers.
 
 The renderer sends a candidate identifier, never a source path. Main rediscovers
 the candidate, displays native confirmation including its source and whether it
