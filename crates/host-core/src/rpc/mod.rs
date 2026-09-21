@@ -702,6 +702,37 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
             }
         }
     }
+    if let Some(candidates) = object.get("imageGenerationModels").filter(|v| !v.is_null()) {
+        let Some(candidates) = candidates.as_array() else {
+            return Err(rpc_err(
+                1002,
+                "imageGenerationModels must be an array",
+                "INVALID_PARAMS",
+            ));
+        };
+        if candidates.len() > 128 {
+            return Err(rpc_err(
+                1002,
+                "imageGenerationModels contains too many models",
+                "INVALID_PARAMS",
+            ));
+        }
+        for binding in candidates {
+            for (key, max) in [("providerId", 128), ("modelId", 256)] {
+                if !binding
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .is_some_and(|s| !s.trim().is_empty() && s.len() <= max)
+                {
+                    return Err(rpc_err(
+                        1002,
+                        "invalid image generation candidate",
+                        "INVALID_PARAMS",
+                    ));
+                }
+            }
+        }
+    }
     if let Some(template_value) = object.get("promptEnhancementUserTemplate") {
         if let Some(message) =
             prompt_enhancement_template_error("promptEnhancementUserTemplate", template_value)
@@ -8634,6 +8665,12 @@ mod image_generation_settings_tests {
             json!({}),
             json!({"imageGeneration": null}),
             json!({"imageGeneration": {"providerId": "p", "modelId": "image"}}),
+            json!({"imageGenerationModels": null}),
+            json!({"imageGenerationModels": []}),
+            json!({"imageGenerationModels": [
+                {"providerId": "p", "modelId": "image-one"},
+                {"providerId": "q", "modelId": "image-two"}
+            ]}),
         ] {
             assert!(validate_settings_value(&value).is_ok());
         }
@@ -8643,6 +8680,13 @@ mod image_generation_settings_tests {
             json!({"providerId": "p", "modelId": " "}),
         ] {
             assert!(validate_settings_value(&json!({"imageGeneration": value})).is_err());
+        }
+        for value in [
+            json!(false),
+            json!({}),
+            json!([{"providerId": "p", "modelId": " "}]),
+        ] {
+            assert!(validate_settings_value(&json!({"imageGenerationModels": value})).is_err());
         }
     }
 }
