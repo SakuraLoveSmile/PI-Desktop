@@ -8594,3 +8594,12 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`。
 - **验收 / 里程碑**：C、Quality / M6+。
 - **状态**：组件与状态层用户路径由 `queue-pending-actions.test.mjs` 覆盖。
+
+### E2E-SCHEDULED-paths
+
+- **场景**：工作区身份。
+- **预期**：保存和读取工作区绑定时统一使用现有项目路径规范化规则。Windows
+  路径的斜杠方向、大小写、末尾分隔符和扩展路径前缀差异不影响同项目会话；
+  缺失的旧版绑定与显式 null 保持不同语义，其他项目不能查询或修改绑定任务。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-paths.mjs`
+  使用隔离的真实 Host 与 SQLite 配置，不向真实提供商发送推理请求。
