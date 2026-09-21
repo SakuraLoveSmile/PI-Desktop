@@ -1,5 +1,10 @@
 # Unreleased changes
 
+- Trusted extension startup, shutdown, and notification handlers now have
+  bounded waits. Stop cancels pending hook waits before a model request, and
+  disposal ignores late results and runs shutdown once. Deferred event
+  registrations now appear in plugin diagnostics.
+
 - The Composer reasoning slider now moves smoothly to clicked or
   keyboard-selected levels, follows dragging immediately, and respects
   reduced-motion settings. Rapid clicks redirect the animation; failed saves

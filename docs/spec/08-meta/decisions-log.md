@@ -6530,3 +6530,17 @@ that was sitting at the bottom — including after the turn had finished.
   new is persisted and no permission or API surface changes; the existing
   `plugin.stdio` audit stream is otherwise unchanged.
 - See `07-plugins/05-plugin-lifecycle.md` §3.1.
+
+## 2026-09-21 — Bound Desktop trusted-extension lifecycle waits
+
+- Apply the existing 30-second handler budget to notification, startup and
+  shutdown handlers as well as result handlers; module loading and factory
+  initialization each use the same budget. This changes previously unbounded
+  waits, including event handlers waiting for a UI answer.
+- Abort retires current waits; disposal rejects new dispatches and runs shutdown
+  once. Late settlements cannot supply results to the retired dispatch. Existing
+  fail-open error handling, result folding, plugin ownership and permissions
+  remain unchanged. In-process code is not forcibly terminated.
+- Deferred events remain registrable and now appear in existing diagnostics.
+  See `07-plugins/16-trusted-extensions.md` §6 and
+  `E2E-HOOKS-cancel-and-dispose`.

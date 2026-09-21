@@ -5265,7 +5265,7 @@ eleven-tool-round desktop paths are verified by
 | 后MVP | E2E-022A、E2E-022B、E2E-022C、E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M（插件路线图 R2/R3/R6） |
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
-| 受信任扩展（R7 v1） | E2E-DIALOG-long-text-boundaries、E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
+| 受信任扩展（R7 v1） | E2E-DIALOG-long-text-boundaries、E2E-241、E2E-242、E2E-HOOKS-cancel-and-dispose、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | 受信任扩展（R7 v1 npm 恢复） | E2E-PLUGIN-import-extension-recovers-missing-npm |
 | Post-MVP 回归覆盖（插件工具调度） | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
 | M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
@@ -8398,9 +8398,24 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **状态：** 运行时层已自动化；无 UI 驱动读取插件页的错误文本。
 
 
+
 #### E2E-CHAT-parenthesized-url：用户消息中的完整网址
 
 - **步骤**：在用户消息中发送 `https://en.wikipedia.org/wiki/React_(software)` 并点击链接，再验证正文用圆括号包裹该网址、网址后跟句号及紧接另一链接或文件引用的情况。
 - **预期**：打开包含 `(software)` 的完整网址，进入 React 软件词条；正文外层的右括号和紧跟 URL 右括号的句末标点不属于链接，相邻引用仍能独立点击。嵌套圆括号、查询和片段内的圆括号、百分号编码的圆括号均保持完整。
 - **覆盖**：`chat-links.test.mjs`；桌面端通过正常浏览器目标实际点击验证。
 - **链接规格**：`04-ux/08-component-spec.md` §8.3。
+
+### E2E-HOOKS-cancel-and-dispose
+
+- **前置条件：** 隔离 Desktop 配置、本地确定性模型，以及含等待型请求前处理器的可信插件。
+- **步骤：** 发送消息，在处理器等待时停止，释放旧处理器后再次发送。另测等待时销毁
+  Runtime，并加载启动/关闭挂起以及注册未接通事件的夹具。
+- **预期：** 被停止或销毁的请求不调用模型，后续消息正常完成。迟到结果不能重启工作。
+  关闭只执行一次，各处理器等待有界，未接通事件产生诊断但不禁用正常处理器。
+- **规范：** 07-plugins/16 §6。
+- **验收：** 取消及时生效，扩展生命周期等待有界。
+- **里程碑：** Hooks P0。
+- **状态：** Runner 与真实 Runtime/本地 HTTP 集成通过
+  `extensions/runner.test.ts`、`extensions/runtime-lifecycle.test.ts` 自动验证。
+  现有可信扩展 E2E 覆盖 Electron 接线；本停止/销毁场景尚未由渲染层驱动。

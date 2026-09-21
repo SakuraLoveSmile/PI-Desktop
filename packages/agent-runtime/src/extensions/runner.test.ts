@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearTrustedExtensionCache, TrustedExtensionRunner } from "./runner.js";
 import type {
   TrustedExtensionBridge,
@@ -20,6 +20,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -84,6 +85,148 @@ function fakeBridge(
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe("TrustedExtensionRunner", () => {
+  it("bounds startup and shutdown waits and reports the stalled event", async () => {
+    const ext = spec("stalled", `export default function (pi) {
+      pi.on("session_start", (_event, ctx) => { pi.setSessionName("starting"); return new Promise(() => {}); });
+      pi.on("session_shutdown", () => { pi.setSessionName("closing"); return new Promise(() => {}); });
+    }`);
+    const { bridge, log } = fakeBridge();
+    const runner = new TrustedExtensionRunner({ specs: [ext], bridge });
+    vi.useFakeTimers();
+    const loading = runner.load();
+    await vi.waitFor(() => expect(log.sessionName).toBe("starting"));
+    await vi.advanceTimersByTimeAsync(30_000);
+    await loading;
+    const closing = runner.dispose();
+    await vi.waitFor(() => expect(log.sessionName).toBe("closing"));
+    await vi.advanceTimersByTimeAsync(30_000);
+    await closing;
+    expect(runner.getDiagnostics()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "handler_timeout", member: "session_start" }),
+      expect.objectContaining({ kind: "handler_timeout", member: "session_shutdown" }),
+    ]));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("retires pending dispatches before shutdown and ignores their late results", async () => {
+    const ext = spec("late", `export default function (pi) {
+      pi.on("tool_call", async (_event, ctx) => {
+        pi.setSessionName("waiting");
+        await ctx.ui.confirm("wait", "release");
+        return { block: true, reason: "late" };
+      });
+      pi.on("tool_call", () => { pi.setSessionName("stale handler"); });
+      pi.on("session_shutdown", () => { pi.setSessionName("closed"); });
+    }`);
+    const { bridge, log } = fakeBridge();
+    let release!: (value: TrustedExtensionUiResponse) => void;
+    bridge.requestUi = () => new Promise((resolve) => { release = resolve; });
+    const runner = new TrustedExtensionRunner({ specs: [ext], bridge });
+    await runner.load();
+    const pending = runner.emit("tool_call", { type: "tool_call" });
+    await runner.dispose();
+    release({ kind: "confirm", value: true });
+    expect(await pending).toBeUndefined();
+    expect(log.sessionName).toBe("closed");
+    expect(runner.getDiagnostics()).toEqual([]);
+  });
+
+  it("runs shutdown once when two owners dispose concurrently", async () => {
+    const ext = spec("shutdown", `export default function (pi) {
+      pi.on("session_shutdown", async (_event, ctx) => {
+        await ctx.ui.confirm("closing", "release");
+      });
+    }`);
+    const { bridge } = fakeBridge();
+    const request = vi.fn(async () => ({ kind: "confirm" as const, value: true }));
+    bridge.requestUi = request;
+    const runner = new TrustedExtensionRunner({ specs: [ext], bridge });
+    await runner.load();
+    await Promise.all([runner.dispose(), runner.dispose()]);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not publish a factory that is still loading when disposed", async () => {
+    const ext = spec("factory", `export default async function (pi) {
+      pi.registerCommand("late", { handler: () => {} });
+      pi.setSessionName("factory entered");
+      await new Promise(() => {});
+    }`);
+    const { bridge, log } = fakeBridge();
+    const runner = new TrustedExtensionRunner({ specs: [ext], bridge });
+    const loading = runner.load();
+    await vi.waitFor(() => expect(log.sessionName).toBe("factory entered"));
+    await runner.dispose();
+    await loading;
+    expect(log.commands.flat()).toEqual([]);
+    expect(runner.getLoadReports()).toEqual([]);
+  });
+
+  it("times out one result handler, ignores its late failure, and preserves the next result", async () => {
+    const ext = spec("timeout", `export default function (pi) {
+      pi.on("tool_call", async (_event, ctx) => {
+        await ctx.ui.confirm("wait", "release");
+        throw new Error("late failure");
+      });
+      pi.on("tool_call", () => ({ block: true, reason: "second handler" }));
+    }`);
+    const { bridge } = fakeBridge();
+    let release!: (value: TrustedExtensionUiResponse) => void;
+    bridge.requestUi = () => new Promise((resolve) => { release = resolve; });
+    const runner = new TrustedExtensionRunner({ specs: [ext], bridge });
+    await runner.load();
+    vi.useFakeTimers();
+    const pending = runner.emit("tool_call", { type: "tool_call" });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await pending).toEqual({ block: true, reason: "second handler" });
+    release({ kind: "confirm", value: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(runner.getDiagnostics()).toEqual([
+      expect.objectContaining({ kind: "handler_timeout", member: "tool_call", count: 1 }),
+    ]);
+    await runner.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("reports deferred events without preventing supported handlers from loading", async () => {
+    const ext = spec("capabilities", `export default function (pi) {
+      pi.on("input", () => {});
+      pi.on("resources_discover", () => {});
+      pi.on("before_agent_start", () => ({ systemPrompt: "supported" }));
+    }`);
+    const { bridge } = fakeBridge();
+    const runner = new TrustedExtensionRunner({ specs: [ext], bridge });
+    await runner.load();
+    expect(runner.getDiagnostics().map((entry) => entry.member)).toEqual([
+      "on:input", "on:resources_discover",
+    ]);
+    expect(await runner.emit("before_agent_start", {})).toEqual({ systemPrompt: "supported" });
+    await runner.dispose();
+  });
+
+  it("skips a stalled factory and still loads a healthy extension", async () => {
+    const stalled = spec("stalled-factory", `export default async function (pi) {
+      pi.setSessionName("factory waiting");
+      await new Promise(() => {});
+    }`);
+    const healthy = spec("healthy", `export default function (pi) {
+      pi.on("before_agent_start", () => ({ systemPrompt: "healthy" }));
+    }`);
+    const { bridge, log } = fakeBridge();
+    const runner = new TrustedExtensionRunner({ specs: [stalled, healthy], bridge });
+    vi.useFakeTimers();
+    const loading = runner.load();
+    await vi.waitFor(() => expect(log.sessionName).toBe("factory waiting"));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect((await loading).map((report) => report.state)).toEqual(["error", "loaded"]);
+    expect(await runner.emit("before_agent_start", {})).toEqual({ systemPrompt: "healthy" });
+    expect(runner.getDiagnostics()).toEqual([
+      expect.objectContaining({ kind: "factory_error", message: "handler exceeded 30000ms" }),
+    ]);
+    await runner.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("loads a TypeScript extension, registers its tool, and runs hooks", async () => {
     const ext = spec(
       "fx",
@@ -239,6 +382,7 @@ export default function (pi: any) {
       "unsupported_api:sendMessage": 2,
       "unsupported_api:ui.setWidget": 1,
       "unsupported_api:on:made_up_event": 1,
+      "unsupported_api:on:user_bash": 1,
     });
     expect(log.ui).toEqual([
       { kind: "setStatus", key: "k", text: "busy" },
