@@ -8002,6 +8002,7 @@ identify the platform validation still needed.
 | C — Conversation & stream (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
 | Quality (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
 | M6+ (delegate context budget) | E2E-SUBAGENT-context-overflow-compacts-before-failing, E2E-SUBAGENT-context-overflow-reports-actionable-failure, E2E-SUBAGENT-resume-seeds-within-context-budget |
+| C / F / Quality — The context estimate stays safe (calibration) | E2E-CONTEXT-estimate-calibration-stays-safe |
 | C — Conversation & stream (unique tool-call ids) | E2E-RUNTIME-unique-tool-call-ids-per-request |
 | Quality (unique tool-call ids) | E2E-RUNTIME-unique-tool-call-ids-per-request |
 | G — Plugin host lifecycle (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
@@ -14160,6 +14161,27 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Limits:** OS-root inclusion is checked without installing a root. The TLS
   success fixture uses a child-only extra CA; it does not reproduce a specific
   antivirus installation or claim native macOS/Linux verification.
+
+### E2E-CONTEXT-estimate-calibration-stays-safe
+
+- **Preconditions:** Deterministic provider fixture whose reported usage can be
+  scripted; a session whose occupancy is close to the hard boundary; no real
+  provider credentials.
+- **Steps:** Report usage below the prediction repeatedly and confirm the
+  displayed occupancy never falls below the floor and compaction still fires;
+  report usage far outside the plausible band and confirm the value does not
+  move; run a CJK-heavy session and compare the displayed occupancy with the
+  reported usage.
+- **Expected:** The calibrated occupancy stays within 0.85×–6× of the raw
+  estimate, moves up as soon as there is evidence, moves down only after
+  agreeing samples, and a projection at 1.18× the hard limit still compacts.
+  Misreports move it in neither direction. CJK text no longer reads at a
+  quarter of its measured cost.
+- **Specs linked:** `03-runtime/02-agent-runtime.md` §5.1,
+  `08-meta/decisions-log.md` D606
+- **Acceptance:** C (chat and stream), F (persistence), Quality
+- **Status:** Unit-covered (`context-calibration.test.ts`, including the CJK and
+  boundary cases); desktop E2E pending
 
 ### E2E-RUNTIME-unique-tool-call-ids-per-request
 
