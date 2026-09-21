@@ -545,6 +545,11 @@ export function ProviderSetupDialog({
             apiStyle={resolvedApiStyle}
             imageModelIds={imageModelDraft ?? imageModelIds}
             onImageModelChange={updateImageModelDraft}
+            lookupContext={{
+              baseUrl: requestBaseUrl,
+              vendorKey: namedPreset?.vendorKey ?? "custom",
+              providerId: provider?.id,
+            }}
           />
         </div>
       </div>

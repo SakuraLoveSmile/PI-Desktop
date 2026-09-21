@@ -4,7 +4,8 @@
  *
  * The default picker lists each configured model, while provider rows use
  * `models[0]` as the provider's quick default. Editing the default provider
- * preserves `settings.defaultModelId` while that model remains configured.
+ * preserves `settings.defaultModelId` while that model remains configured, and
+ * adding a provider claims the chat or image default only while none resolves.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,7 +38,9 @@ import { AnchoredMenu } from "./AnchoredMenu";
 import {
   defaultModelOptions,
   displayedDefaultModelId,
+  hasResolvedDefaultModel,
 } from "./default-model";
+import { planImageGenerationDefaults } from "./image-generation-default";
 import { copyProviderConfiguration, type ProviderCopyDraft } from "./provider-copy";
 import { ImageGenerationModelRow } from "./ImageGenerationModelRow";
 import { ProviderSetupDialog } from "./ProviderSetupDialog";
@@ -177,7 +180,9 @@ export function ModelConfigPage() {
   };
 
   /**
-   * Preserve the selected app default unless it was removed from the provider.
+   * Preserve the selected app defaults unless they were removed from the
+   * provider or no longer resolve, and let a newly added provider claim a
+   * default only while none resolves.
    */
   const afterSaved = async (
     saved: ProviderPublic,
@@ -188,41 +193,33 @@ export function ModelConfigPage() {
     try {
       if (imageModelIds !== undefined) {
         const current = await api.getSettings();
-        const existing = imageGenerationBindings(
-          current.imageGenerationModels,
-          current.imageGeneration,
+        const plan = planImageGenerationDefaults(
+          current,
+          saved.id,
+          imageModelIds,
+          [...providers.filter((provider) => provider.id !== saved.id), saved],
         );
-        const selected = [...new Set(imageModelIds)].map((modelId) => ({
-          providerId: saved.id,
-          modelId,
-        }));
-        const nextCandidates = [
-          ...existing.filter((binding) => binding.providerId !== saved.id),
-          ...selected,
-        ];
-        const active = current.imageGeneration;
-        const nextActive = active && nextCandidates.some((binding) =>
-          binding.providerId === active.providerId &&
-          modelIdsMatch(binding.modelId, active.modelId),
-        )
-          ? active
-          : nextCandidates[0] ?? null;
-        const nextSettings = {
-          ...current,
-          imageGenerationModels: nextCandidates,
-          imageGeneration: nextActive,
-        };
+        const nextSettings = { ...current, ...plan };
         await api.setSettings(nextSettings);
         useAppStore.setState({ settings: nextSettings });
         showToast(t("settings.imageModelSelected"), { variant: "success" });
       } else if (copyDraft) {
         showToast(t("settings.providerSaved"), { variant: "success" });
       } else if (!editingProvider) {
-        await api.setSettings({
-          ...settings,
-          defaultProviderId: saved.id,
-          defaultModelId: firstModelId ?? "",
-        });
+        // A freshly added provider must not take over the app default: whatever
+        // the user already picked keeps running until they change it themselves.
+        const keepsCurrentDefault = hasResolvedDefaultModel(
+          providers,
+          settings.defaultProviderId,
+          settings.defaultModelId,
+        );
+        if (!keepsCurrentDefault) {
+          await api.setSettings({
+            ...settings,
+            defaultProviderId: saved.id,
+            defaultModelId: firstModelId ?? "",
+          });
+        }
         showToast(t("settings.providerSaved"), { variant: "success" });
       } else {
         if (

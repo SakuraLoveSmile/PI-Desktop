@@ -67,3 +67,23 @@ export function displayedDefaultModelId(
     ? settingsModelId
     : defaultModelIdOf(provider);
 }
+
+/**
+ * Whether the app default already names a model that still resolves.
+ *
+ * A non-empty `settings.defaultModelId` is not proof of a default: the value
+ * outlives the provider it was picked from, so once that provider is deleted
+ * or its binding list is emptied the value names nothing. Callers that would
+ * otherwise adopt a default for a freshly added provider resolve through the
+ * default provider row — the same pairing the summary line shows — and keep
+ * the current value only when a real model stands behind it.
+ */
+export function hasResolvedDefaultModel(
+  providers: readonly ProviderPublic[],
+  defaultProviderId?: string,
+  defaultModelId?: string,
+): boolean {
+  const provider = providers.find((candidate) => candidate.id === defaultProviderId);
+  if (!provider) return false;
+  return !!displayedDefaultModelId(provider, defaultModelId)?.trim();
+}

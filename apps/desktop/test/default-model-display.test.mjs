@@ -4,7 +4,8 @@
  * `settings.defaultModelId` is a single global value while each provider owns
  * its own binding list, so the two can disagree. The summary line renders the
  * default provider's name and a model id side by side, which asserts a pairing
- * — these tests pin that the pairing shown is one that actually exists.
+ * — these tests pin that the pairing shown is one that actually exists, and
+ * that adding a provider only claims the default while none resolves.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -12,6 +13,7 @@ import {
   defaultModelIdOf,
   displayedDefaultModelId,
   providerOffersModel,
+  hasResolvedDefaultModel,
 } from "../src/components/settings/default-model.ts";
 
 /** Minimal provider row; only the fields these resolvers read. */
@@ -93,4 +95,38 @@ test("a provider with nothing configured resolves to undefined", () => {
   const p = provider({ models: [], defaultModelId: undefined });
   assert.equal(defaultModelIdOf(p), undefined);
   assert.equal(displayedDefaultModelId(p, "gpt-5"), undefined);
+});
+
+/**
+ * Adding a provider must not steal a default the user already runs. The guard
+ * resolves the stored value exactly the way the summary line does, so a stale
+ * id left behind by a deleted provider still lets the new provider take over.
+ */
+test("a default that still resolves is kept when another provider is added", () => {
+  const p = provider({ models: [binding("gpt-5"), binding("gpt-5-mini")] });
+  assert.equal(hasResolvedDefaultModel([p], "p1", "gpt-5-mini"), true);
+});
+
+test("the default provider's own models count as a configured default", () => {
+  // `defaultModelId` can be empty while the default provider already serves
+  // models: the summary line shows that pairing, so a second provider must not
+  // replace what the user is running.
+  const p = provider({ models: [binding("gpt-5")] });
+  assert.equal(hasResolvedDefaultModel([p], "p1", ""), true);
+  assert.equal(hasResolvedDefaultModel([p], "p1", undefined), true);
+});
+
+test("a default whose provider is gone does not block a newly added one", () => {
+  const p = provider({ models: [binding("gpt-5")] });
+  assert.equal(hasResolvedDefaultModel([p], "deleted-provider", "gpt-5"), false);
+  assert.equal(hasResolvedDefaultModel([p], undefined, "gpt-5"), false);
+  assert.equal(hasResolvedDefaultModel([p], "", "gpt-5"), false);
+});
+
+test("an empty default resolves to nothing, so the new provider claims it", () => {
+  const empty = provider({ models: [], defaultModelId: undefined });
+  assert.equal(hasResolvedDefaultModel([empty], "p1", ""), false);
+  // A stored id the default provider does not serve is not a default either:
+  // the row renders the empty state, so the next provider may fill it.
+  assert.equal(hasResolvedDefaultModel([empty], "p1", "gpt-5"), false);
 });

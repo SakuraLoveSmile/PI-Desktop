@@ -32,10 +32,17 @@ import {
   MAX_OUTPUT_PRESETS,
   matchPresetIndex,
 } from "../../lib/model-limit-presets";
+import { api } from "../../lib/api";
 import { Button, Field, HelpIcon, Input, Tooltip, TooltipButton, cx } from "../ui";
 import { IconClose, IconGripVertical, IconHelp, IconPlus, IconRefresh, IconSearch } from "../icons";
 import { SettingsMenuSelect } from "./SettingsMenuSelect";
 import { filterChosenModels, hidesAddedBinding } from "./model-chosen-filter";
+import {
+  applyCustomModelLookup,
+  customModelLookupInput,
+  customModelSeedBinding,
+  type CustomModelLookupContext,
+} from "./model-custom-lookup";
 import { describeModelsFetchError } from "./model-fetch-error";
 import type { ProviderModelsState } from "./useProviderModels";
 import { useModelReorder } from "./useModelReorder";
@@ -196,6 +203,12 @@ export type ModelSelectionPanesProps = {
    * tool offer the checkbox at all.
    */
   apiStyle?: string;
+  /**
+   * What this entry knows about where a hand-typed id belongs. The picker
+   * passes it to the model-library lookup that seeds a custom row's published
+   * limits; absent fields only widen the catalog search.
+   */
+  lookupContext?: CustomModelLookupContext;
 };
 
 /**
@@ -211,6 +224,7 @@ export function ModelSelectionPanes({
   onReload,
   apiStyle,
   imageModelIds,
+  lookupContext,
   onImageModelChange,
 }: ModelSelectionPanesProps) {
   const { t } = useTranslation();
@@ -326,6 +340,33 @@ export function ModelSelectionPanes({
       current.map((binding) => (binding.id === id ? { ...binding, ...update } : binding)),
     );
 
+  /**
+   * Ask the host for the model library's record of a just-added hand-typed id
+   * and upgrade the row in place.
+   *
+   * The lookup is asynchronous, so the row may have been edited, removed, or
+   * replaced by the time it answers; `applyCustomModelLookup` only replaces the
+   * untouched seed. A miss or a failed call is the generic seed it already is.
+   */
+  const enrichCustomModel = async (seed: ModelBinding) => {
+    let info: ModelInfo | null = null;
+    try {
+      const result = await api.lookupProviderModel(
+        customModelLookupInput(seed.id, lookupContext),
+      );
+      info = result?.info ?? null;
+    } catch {
+      return;
+    }
+    setModels((current) => applyCustomModelLookup(current, seed, info));
+  };
+
+  /**
+   * A hand-typed id is matched against the discovered rows first, then against
+   * the model library through the host. The row lands immediately with the
+   * generic seed, so a slow or failed lookup still leaves exactly one usable
+   * row; a published record upgrades that same row when it arrives.
+   */
   const addCustomModel = () => {
     const id = customModelId.trim();
     if (!id) {
@@ -336,12 +377,18 @@ export function ModelSelectionPanes({
       setCustomModelError(t("settings.modelAlreadyAdded"));
       return;
     }
-    const binding = bindingForCustomModel(id);
+    const discovered = rows.find((row) => row.id.toLowerCase() === id.toLowerCase());
+    const binding = customModelSeedBinding(id, discovered?.info);
     setModels((current) => [...current, binding]);
-    setExpandedModelId(id);
+    // Expand the row under the id it is stored with: a discovered row keeps the
+    // service's spelling, which can differ from what the user typed.
+    setExpandedModelId(binding.id);
     setCustomModelId("");
     setCustomModelError("");
     keepAddedModelVisible([binding]);
+    // A discovered row already carries the published record, so only the
+    // not-yet-known id needs the extra lookup.
+    if (!discovered?.info) void enrichCustomModel(binding);
   };
 
   const fetchFailed = discovery.status === "error";
