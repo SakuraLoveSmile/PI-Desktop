@@ -5184,6 +5184,7 @@ eleven-tool-round desktop paths are verified by
 
 | 验收 | 应用场景 |
 |---|---|
+| C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — 桌面定时任务 | E2E-SCHEDULED-desktop-automation-lifecycle |
 | A / C — Unicode stdio 成帧 | E2E-RPC-unicode-separators |
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
@@ -8457,3 +8458,20 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **预期**：打开包含 `(software)` 的完整网址，进入 React 软件词条；正文外层的右括号和紧跟 URL 右括号的句末标点不属于链接，相邻引用仍能独立点击。嵌套圆括号、查询和片段内的圆括号、百分号编码的圆括号均保持完整。
 - **覆盖**：`chat-links.test.mjs`；桌面端通过正常浏览器目标实际点击验证。
 - **链接规格**：`04-ux/08-component-spec.md` §8.3。
+
+### E2E-SCHEDULED-manual-workspace-binding
+
+- **Preconditions:** Built request candidate; isolated host data and two project
+  directories. No provider credentials or paid API.
+- **Steps:** Create Manual and Hourly tasks in project A and without a project;
+  restart the host, switch to B, Run now, rename through the editor payload,
+  and Run now again.
+- **Expected:** Each result session and edited task retain the original binding,
+  including no-project tasks. Legacy cadence-only tasks keep their previous
+  fallback until explicitly configured (covered by host RPC tests).
+- **Specs:** 04-ux/01-ui-ia §3.4.
+- **Acceptance:** Saved workspace binding across run, edit and restart.
+- **Milestone:** Maintenance.
+- **Status:** Automated by `node --experimental-strip-types
+  scripts/e2e-scheduled-workspace.mjs`, using production Electron dispatch and
+  real Rust/stdio/SQLite. Only external inference is replaced with an observer.
