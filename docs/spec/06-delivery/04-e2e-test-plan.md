@@ -7930,6 +7930,7 @@ identify the platform validation still needed.
 | Acceptance | Scenarios |
 |---|---|
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
+| C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |
 | A / C — Unicode stdio framing | E2E-RPC-unicode-separators |
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
@@ -14302,3 +14303,20 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Milestone:** Maintenance.
 - **Status:** `node scripts/e2e-scheduled-hourly-update.mjs` exercises the real
   Rust host, permission path, stdio and SQLite; no model inference or desktop UI.
+
+### E2E-SCHEDULED-manual-workspace-binding
+
+- **Preconditions:** Built request candidate; isolated host data and two project
+  directories. No provider credentials or paid API.
+- **Steps:** Create Manual and Hourly tasks in project A and without a project;
+  restart the host, switch to B, Run now, rename through the editor payload,
+  and Run now again.
+- **Expected:** Each result session and edited task retain the original binding,
+  including no-project tasks. Legacy cadence-only tasks keep their previous
+  fallback until explicitly configured (covered by host RPC tests).
+- **Specs:** 04-ux/01-ui-ia §3.4.
+- **Acceptance:** Saved workspace binding across run, edit and restart.
+- **Milestone:** Maintenance.
+- **Status:** Automated by `node --experimental-strip-types
+  scripts/e2e-scheduled-workspace.mjs`, using production Electron dispatch and
+  real Rust/stdio/SQLite. Only external inference is replaced with an observer.
