@@ -3079,6 +3079,11 @@ identify the platform validation still needed.
   again with the native folder picker. 3) Confirm the Primary row cannot be
   removed. 4) Save and inspect the sidebar row, Project archive roots, and
   active workspace. 5) Restart the app and inspect the group again.
+- **Background-update regression**: Open Edit project from Settings, change the
+  name and remove the additional folder, then complete a background task before
+  saving. Both draft edits must remain visible and save together. The isolated
+  rendered test is `node scripts/e2e-project-edit.mjs`; it uses real page/store
+  wiring with a controlled host IPC boundary and does not prove disk persistence.
 - **Expected**: Both project menus offer Edit project. The editor keeps focus
   contained, trims the name, limits it to 80 Unicode characters, preserves the
   Primary folder as the first row, and updates the root count without removing
