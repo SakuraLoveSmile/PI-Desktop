@@ -8563,3 +8563,12 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **规格**：`04-ux/08-component-spec.md`、`04-ux/09-interaction-patterns.md`。
 - **验收 / 里程碑**：C、Quality / M6+。
 - **状态**：组件与状态层用户路径由 `queue-pending-actions.test.mjs` 覆盖。
+
+### E2E-SCHEDULED-project-removal
+
+- **场景**：删除项目与自动任务。
+- **预期**：删除项目会暂停其绑定任务，并保留任务定义、schedule、工作区绑定和
+  运行历史；已准入的任务会阻止删除。其他项目和未绑定旧任务不受影响。用户显式
+  恢复或 Run now 可以重新创建项目，暂停状态下的自动轮询不会这样做。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-project-removal.mjs`
+  使用隔离的真实 Host 与 SQLite 配置，不向真实提供商发送推理请求。
