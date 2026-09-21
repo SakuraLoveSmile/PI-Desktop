@@ -151,17 +151,19 @@ Each scenario is documented in this format:
 ## E2E Main Integration Validation
 
 Every code-bearing change must pass the E2E suites relevant to its regression
-surface on the integrated local `main` that carries the change, before the
-request branch is pushed and the pull request is opened. Code-bearing changes
-include Renderer, Electron Main, Preload, Agent Runtime, Rust host-core,
-sessions, transcripts, plans, plugins, MCP, permissions, provider/model
-runtime, persistence, process lifecycle, packaging/runtime startup, and build
-or CI behavior that affects application execution. Documentation-only changes
-are exempt when they do not alter executable behavior.
+surface on a candidate that already contains the latest `origin/main`, before
+the request branch is pushed and the pull request is opened. Code-bearing
+changes include Renderer, Electron Main, Preload, Agent Runtime, Rust
+host-core, sessions, transcripts, plans, plugins, MCP, permissions,
+provider/model runtime, persistence, process lifecycle, packaging/runtime
+startup, and build or CI behavior that affects application execution.
+Documentation-only changes are exempt when they do not alter executable
+behavior.
 
-Run the selected suites from the latest integrated local `main` checkout and
-commit. An E2E run on the request branch is exploratory and does not satisfy
-this gate.
+Run the selected suites from the request worktree after `pnpm check:pr-base`
+passes. An E2E run on a branch that is behind `origin/main` is exploratory and
+does not satisfy this gate. Do not merge the task into local `main` to create
+the candidate.
 
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
@@ -1486,8 +1488,11 @@ identify the platform validation still needed.
   or Agent|Plan|Goal mode control. The
   left-of-input Composer chip owns the active session's Agent/Plan/Goal switch,
   and the Composer-right combined chip owns model and reasoning selection. The
-  task title is the only visible title text and is capped at 10 characters
-  with an ellipsis; project scope is available through its tooltip. The sidebar
+  task title is the only visible title text and uses the available width,
+  with an ellipsis only on overflow. Check an English title longer than 10
+  characters in wide and narrow layouts, with the sidebar expanded/collapsed
+  and the work panel open/closed; titles must not overlap the action buttons.
+  The complete title and project scope remain available through its tooltip. The sidebar
   toggle is present only in the collapsed state (no
   duplicate of the sidebar's control). On every other route the frameless drag
   band renders instead (no chat top-bar controls) while retaining the same
