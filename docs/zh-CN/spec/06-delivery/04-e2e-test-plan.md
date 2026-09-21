@@ -8513,3 +8513,18 @@ the latest destination. These assertions measure work counts, not device FPS.
   `providers::tests::a_stored_array_survives_an_entry_that_lost_a_field`）；
   宿主 RPC 路径由 `scripts/e2e-smoke.mjs` 覆盖提供商的创建与列举，但没有套件
   驱动手工编辑的 `config_json`。
+
+### E2E-SETTINGS-destination-scroll-reset
+
+- 打开设置 → AI，滚动到中间，再选择快捷键：标题和首项从顶部显示。滚动后
+  返回 AI，该页也从顶部显示。
+- 再次选择当前分类，或不离开当前页更新设置，保留内容区滚动位置。
+- 覆盖内置分类 → 插件、插件 → 插件、插件 → 先前选择的内置分类；再次
+  选择当前插件分类时保留位置。
+- 从其他分类及 AI 当前页通过全局搜索设置锚点进入 AI，目标项可见，消费
+  锚点后保持定位。
+- 在明暗两种主题下运行。
+- 自动化覆盖：`pnpm test:e2e:settings-scroll` 在隔离 Electron 中挂载真实
+  SettingsPage、store、翻译和构建后的 CSS。仅 preload 数据使用 fixture；
+  搜索导航调用 SearchDialog 使用的公开 store 入口。该测试覆盖渲染层交互，
+  不覆盖 host 持久化或完整全局搜索弹窗。
