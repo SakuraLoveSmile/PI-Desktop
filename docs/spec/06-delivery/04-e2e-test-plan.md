@@ -14179,7 +14179,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 #### E2E-CHAT-parenthesized-url: Complete URLs in user messages
 
-- **Steps**: Send `https://en.wikipedia.org/wiki/React_(software)` in a user message and click its link. Repeat with the URL wrapped in prose parentheses.
-- **Expected**: The complete URL, including `(software)`, opens the React software article. The outer prose closing parenthesis is not part of the link. Nested parentheses, query/fragment parentheses and percent-encoded parentheses remain intact.
+- **Steps**: Send `https://en.wikipedia.org/wiki/React_(software)` in a user message and click its link. Repeat with the URL wrapped in prose parentheses, followed by a sentence-ending period, and followed immediately by another link or file reference.
+- **Expected**: The complete URL, including `(software)`, opens the React software article. The outer prose closing parenthesis and sentence-ending punctuation after the URL parenthesis are not part of the link. Adjacent references remain independently clickable. Nested parentheses, query/fragment parentheses and percent-encoded parentheses remain intact.
 - **Coverage**: `chat-links.test.mjs`; native desktop click-through with the normal browser destination.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3.
