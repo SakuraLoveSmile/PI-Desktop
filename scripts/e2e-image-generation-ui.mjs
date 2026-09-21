@@ -35,7 +35,7 @@ try {
   });
   await writeFile(
     join(temp, "index.html"),
-    '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'self\'; style-src \'self\' \'unsafe-inline\'"><title>Image generation interactions</title><body><script src="renderer.js"></script>',
+    '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:"><title>Image generation interactions</title><body><script src="renderer.js"></script>',
   );
   await writeFile(
     join(temp, "main.cjs"),

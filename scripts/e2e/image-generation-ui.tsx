@@ -169,7 +169,7 @@ globalThis.imageGenerationProbe = async () => {
       },
     } as UiMessage;
     render(message);
-    await until(() => !!container.querySelector("img"), "generated preview missing");
+    await until(() => (container.querySelector("img")?.naturalWidth ?? 0) > 0, "generated preview did not decode");
     assert(container.textContent?.includes("IMAGE_TIMEOUT"), "partial failure missing");
     render({
       ...message,
