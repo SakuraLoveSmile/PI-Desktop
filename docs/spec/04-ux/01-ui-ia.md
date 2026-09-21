@@ -275,6 +275,11 @@ auto-approve a contract.
 The user must explicitly switch it to Agent before enabling unattended
 execution.
 
+Agent tools can change a Manual task to Hourly by supplying only its id and
+`cadence: "hourly"`; no calendar time is required. Preserve existing schedule
+fields and paused state. Daily and Weekly still require a valid saved or supplied
+schedule. Renaming an Hourly task does not restart its interval.
+
 ### 3.5 Extensions
 
 The Extensions destination is a focused plugin surface with a compact header and

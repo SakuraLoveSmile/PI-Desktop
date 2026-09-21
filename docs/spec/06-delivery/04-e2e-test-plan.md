@@ -7929,6 +7929,7 @@ identify the platform validation still needed.
 
 | Acceptance | Scenarios |
 |---|---|
+| C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |
 | A / C — Unicode stdio framing | E2E-RPC-unicode-separators |
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
@@ -14286,3 +14287,18 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Expected**: The complete URL, including `(software)`, opens the React software article. The outer prose closing parenthesis and sentence-ending punctuation after the URL parenthesis are not part of the link. Adjacent references remain independently clickable. Nested parentheses, query/fragment parentheses and percent-encoded parentheses remain intact.
 - **Coverage**: `chat-links.test.mjs`; native desktop click-through with the normal browser destination.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3.
+
+### E2E-SCHEDULED-manual-to-hourly
+
+- **Preconditions:** Built host candidate, isolated data directory, no provider.
+- **Steps:** Through `tools.execute`, create a paused Manual task, update only
+  its id and cadence to Hourly, rename it, restart, and list tasks again.
+- **Expected:** Update succeeds without calendar fields; the next occurrence is
+  one hour away. Prompt, paused state and saved configuration survive. Rename
+  does not reset the interval. RPC tests also cover required Daily/Weekly times
+  and retention of an existing custom schedule.
+- **Specs:** 04-ux/01-ui-ia §3.4.
+- **Acceptance:** C / F — task configuration and persistence.
+- **Milestone:** Maintenance.
+- **Status:** `node scripts/e2e-scheduled-hourly-update.mjs` exercises the real
+  Rust host, permission path, stdio and SQLite; no model inference or desktop UI.
