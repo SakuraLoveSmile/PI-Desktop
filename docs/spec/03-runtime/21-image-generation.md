@@ -51,6 +51,11 @@ explicit path prefix is retained. Generation uses `POST images/generations` with
 the prompt, model and `n: 1`. No browser mask editor is included. A configured
 service may implement generation without editing; its error is reported without
 silently switching to generation or another model.
+For exact DALL-E 2/3 model IDs, generation requests explicitly ask for
+`response_format: b64_json`; the same form field is used for DALL-E edits where
+supported. GPT Image and unknown compatible model IDs omit that parameter.
+Editing retains binary multipart uploads (`image` for one reference, `image[]`
+for multiple), with the transport generating the Content-Type boundary.
 
 Each batch snapshots the binding and provider before dispatch, uses two workers,
 and returns results in input order. Each output has a 180-second request budget.
@@ -72,6 +77,10 @@ Each result records index, status (`succeeded`, `failed`, `cancelled`), successf
 path/MIME type or a safe error code. New files get unique names in session scratch;
 editing never overwrites its source. The tool result and transcript retain file
 references, not Base64. Existing bounded image reads and file viewers serve previews.
+Thrown local-tool errors preserve stable `errorCode` values across the real
+sidecar RPC boundary, independently of ordinary structured tool-result failures.
+Existing RPC code, message and data are retained; arbitrary Error properties
+are not serialized. The sidecar receiver exposes the code alongside its data.
 Successful images and per-item failures render even when only part of a batch
 completed. Missing configuration returns a structured error and a Settings → Models
 navigation action. The same references render after session reload/restart.

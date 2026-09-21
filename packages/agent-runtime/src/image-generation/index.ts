@@ -46,12 +46,17 @@ export async function generateOneImage(
   const headers = new Headers(endpoint.headers);
   headers.set("Content-Type", "application/json");
   if (endpoint.apiKey) headers.set("Authorization", `Bearer ${endpoint.apiKey}`);
-  let body: BodyInit = JSON.stringify({ model: endpoint.modelId, prompt, n: 1 });
+  const responseFormat = /^dall-e-[23]$/i.test(endpoint.modelId) ? "b64_json" : undefined;
+  let body: BodyInit = JSON.stringify({
+    model: endpoint.modelId, prompt, n: 1,
+    ...(responseFormat ? { response_format: responseFormat } : {}),
+  });
   if (images.length) {
     const form = new FormData();
     form.set("model", endpoint.modelId);
     form.set("prompt", prompt);
     form.set("n", "1");
+    if (responseFormat) form.set("response_format", responseFormat);
     images.forEach((image, index) =>
       form.append(
         images.length === 1 ? "image" : "image[]",

@@ -10,9 +10,9 @@ const sidecars: AgentSidecar[] = [];
 afterEach(async () => {
   await Promise.all(sidecars.splice(0).map((sidecar) => sidecar.dispose()));
 });
-function harness(allowed = true) {
+function harness(allowed = true, childSource = child, esm = false) {
   const sidecar = new AgentSidecar({
-    launch: { command: process.execPath, args: ["-e", child] },
+    launch: { command: process.execPath, args: [...(esm ? ["--input-type=module"] : []), "-e", childSource] },
     onStderr: () => {},
   });
   sidecars.push(sidecar);
@@ -48,6 +48,42 @@ it("authorizes image calls through the host before executing the local handler",
   });
   expect((await execute()).ok).toBe(true);
   expect(calls).toEqual(["tools.execute", "generated"]);
+});
+
+it("preserves stable local error codes through real reverse RPC", async () => {
+  const { sidecar, execute } = harness();
+  sidecar.setLocalTool("GenerateImages", async () => {
+    throw Object.assign(new Error("Image request failed"), {
+      errorCode: "IMAGE_TIMEOUT", data: { retryable: false }, secret: "must-not-cross",
+    });
+  });
+  await expect(execute()).rejects.toMatchObject({
+    code: -32000, errorCode: "IMAGE_TIMEOUT",
+    data: { errorCode: "IMAGE_TIMEOUT", retryable: false },
+  });
+});
+
+it("delivers stable error codes to the production ParentHostProxy in a real child", async () => {
+  const receiverUrl = new URL("../../agent-runtime/src/parent-host-proxy.ts", import.meta.url).href;
+  const source = `
+    import { createInterface } from 'node:readline';
+    const { ParentHostProxy } = await import(${JSON.stringify(receiverUrl)});
+    const proxy = new ParentHostProxy();
+    createInterface({input:process.stdin}).on('line', async line => {
+      const message = JSON.parse(line);
+      if (proxy.handleParentMessage(message)) return;
+      try {
+        const result = await proxy.call(message.params.method, message.params.params);
+        console.log(JSON.stringify({id:message.id,result}));
+      } catch (error) {
+        console.log(JSON.stringify({id:message.id,result:{code:error.code,errorCode:error.errorCode,data:error.data}}));
+      }
+    });`;
+  const { sidecar, execute } = harness(true, source, true);
+  sidecar.setLocalTool("GenerateImages", async () => {
+    throw Object.assign(new Error("limited"), { errorCode: "IMAGE_HTTP_429" });
+  });
+  expect(await execute()).toEqual({ code: -32000, errorCode: "IMAGE_HTTP_429", data: { errorCode: "IMAGE_HTTP_429" } });
 });
 
 it("denied and Plan calls never reach the image service", async () => {

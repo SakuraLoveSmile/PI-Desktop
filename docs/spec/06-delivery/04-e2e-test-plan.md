@@ -27,6 +27,12 @@
 - **Conversation selection:** The selected image provider/model is absent from
   default and Composer candidates. Other providers retain same-ID models. An
   existing session pinned to the image binding is rejected before inference.
+- **Transport contracts:** Real stdio reverse RPC retains a thrown local image
+  error's stable code in the production ParentHostProxy. Local HTTP tests check
+  single/multiple binary multipart fields and boundaries, DALL-E `b64_json`
+  requests, GPT Image parameter omission, bounded responses, and rejection of
+  more than four references before I/O. These are protocol tests, not official
+  provider account/live compatibility certification.
 - **Status:** Automated in `node scripts/e2e-image-chat.mjs`; optional screenshots
   use `PI_IMAGE_CHAT_EVIDENCE_DIR`. The images are deterministic raster fixtures,
   not evidence of real-model quality or provider compatibility.

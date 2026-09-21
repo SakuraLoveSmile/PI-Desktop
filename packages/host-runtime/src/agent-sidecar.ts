@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { DEFAULT_RPC_TIMEOUT_MS, IMAGE_BATCH_TIMEOUT_MS, imageGenerationPrompts, readNdjsonLines, rpcTimeoutMs } from "@pi-desktop/shared";
+import { DEFAULT_RPC_TIMEOUT_MS, IMAGE_BATCH_TIMEOUT_MS, imageGenerationPrompts, readNdjsonLines, rpcTimeoutMs, rpcErrorFromWire, rpcErrorToWire } from "@pi-desktop/shared";
 import type { ProcessExitHandler, StderrHandler } from "./host-process.js";
 
 // stderr lines kept per sidecar so an unexpected exit can be reported with the
@@ -567,16 +567,12 @@ export class AgentSidecar {
         this.writeToChild(
           JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
         );
-      } catch (e: any) {
+      } catch (e: unknown) {
         this.writeToChild(
           JSON.stringify({
             jsonrpc: "2.0",
             id: msg.id,
-            error: {
-              code: e?.code ?? -32000,
-              message: e instanceof Error ? e.message : String(e),
-              data: e?.data,
-            },
+            error: rpcErrorToWire(e),
           }) + "\n",
         );
       }
@@ -589,13 +585,7 @@ export class AgentSidecar {
         this.pending.delete(String(msg.id));
         if (pending.timer) clearTimeout(pending.timer);
         if (msg.error) {
-          const err = new Error(msg.error.message) as Error & {
-            code?: number;
-            data?: unknown;
-          };
-          err.code = msg.error.code;
-          err.data = msg.error.data;
-          pending.reject(err);
+          pending.reject(rpcErrorFromWire(msg.error));
         } else {
           pending.resolve(msg.result);
         }
