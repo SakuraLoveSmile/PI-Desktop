@@ -522,6 +522,7 @@ export const de = {
     "reject": "Ablehnen",
     "untitled": "Unbenannter Plan",
     "openArtifact": "Offener Plan",
+    "openArtifactLabel": "Offenes Planartefakt {{path}}",
   },
   "goal": {
     "planning": "Ziel definieren",
@@ -539,6 +540,7 @@ export const de = {
     "reject": "Ablehnen",
     "untitled": "Ziel ohne Titel",
     "openArtifact": "Ziel öffnen",
+    "openArtifactLabel": "Zielartefakt öffnen {{path}}",
   },
   "onboarding": {
     "title": "Erste Schritte",
