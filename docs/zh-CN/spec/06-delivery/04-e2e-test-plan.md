@@ -99,6 +99,12 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 
 每个代码 pull request 都必须在打开或更新前，在已经包含最新 `origin/main` 的候选上通过与其回归面相关的 E2E（`pnpm check:pr-base`）。不得打开落后于 `origin/main` 的 PR。不要为了跑 E2E 把任务合进本地 `main`。代码变更包括渲染器、Electron Main、Preload、Agent Runtime、Rust host-core、会话、转录、计划、插件、MCP、权限、供应商/模型运行时、持久化、进程生命周期、打包/启动，以及影响应用执行的构建或 CI 行为。仅文档更改在不影响可执行行为时可豁免。
 
+### E2E 环境复用
+
+task-candidate E2E 从请求工作树运行，但使用主工作区已经准备好的宿主开发环境。必要时通过引用或链接复用兼容的 Node/pnpm 工具链、`node_modules`、Electron、Rust/Cargo 目标、包存储、构建缓存和忽略的配置。
+
+不得为了 E2E 单独运行 `pnpm install`、`npm install`，或创建第二套依赖/运行时环境。只隔离可变测试状态：临时 profile、数据目录、socket、端口、日志和工件。仅当宿主环境缺失或不兼容时才安装或重建依赖，并记录原因；干净的 CI 和发布 runner 可以按 lockfile 安装。
+
 根目录 `package.json` 是可执行命令的事实来源。最低选择如下：
 
 - 跨域运行时、host 或 IPC：`pnpm test:e2e`。

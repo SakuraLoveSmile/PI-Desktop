@@ -194,6 +194,20 @@ passes. An E2E run on a branch that is behind `origin/main` is exploratory and
 does not satisfy this gate. Do not merge the task into local `main` to create
 the candidate.
 
+### E2E environment reuse
+
+Task-candidate E2E runs from the request worktree after the candidate is
+prepared, but uses the host development environment already provisioned in the
+primary checkout. Reuse the compatible Node/pnpm toolchain, `node_modules`,
+Electron, Rust/Cargo targets, package-manager stores, build caches, and ignored
+configuration by reference or link when needed.
+
+Do not run `pnpm install`, `npm install`, or create a second dependency/runtime
+environment solely for E2E. Isolate only mutable test state: temporary
+profiles, data directories, sockets, ports, logs, and artifacts. Install or
+rebuild dependencies only when the host environment is missing or incompatible
+and record the reason. Clean CI and release runners may install from lockfiles.
+
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
 
