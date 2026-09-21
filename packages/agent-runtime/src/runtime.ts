@@ -10,6 +10,7 @@ import {
   BACKGROUND_CONTEXT,
   compact,
   convertToLlm,
+  estimateContextTokens,
   estimateTokens,
   prepareCompaction,
   withAbortSignal,
@@ -124,6 +125,10 @@ import {
 } from "./agent-messages.js";
 import { buildSessionContext } from "./session-context.js";
 import {
+  dedupeToolCallMessages,
+  reportDuplicateToolCallDrop,
+} from "./tool-call-dedupe.js";
+import {
   apiBindingForProviderModel,
   buildProviderModel,
   copilotRequestHeaders,
@@ -214,6 +219,11 @@ import {
   streamIdleTimeoutMs,
   withStreamIdleTimeout,
 } from "./provider-retry.js";
+
+import {
+  ContextEstimateCalibration,
+  type ContextCalibration,
+} from "./context-calibration.js";
 
 import { rebuildNodeNetworkTransport } from "./node-proxy.js";
 import {
@@ -602,6 +612,7 @@ const AGENT_CORE_TOOL_NAMES = new Set([
 ]);
 const MAX_ON_DEMAND_TOOL_PROMPT_ENTRIES = 64;
 const MAX_TOOL_SEARCH_RESULT_NAMES = 24;
+
 
 /** Tools that ask the host to switch this session into a contract mode (D198). */
 const ENTER_TOOL_NAMES: Record<ProposalKind, string> = {
@@ -1562,6 +1573,13 @@ export class DesktopAgentRuntime {
   private providerRequestBytes?: number;
   private providerRequestMessages?: number;
   /**
+   * The estimate that describes the provider attempt in flight, parked by
+   * `streamFn` and consumed when that attempt settles with a usage report.
+   * Without the pair there is nothing to measure the estimator against.
+   */
+  private inFlightContextEstimate?: ContextCalibration;
+  private readonly contextCalibration = new ContextEstimateCalibration();
+  /**
    * Transport cause of the last provider attempt that rejected before any
    * response arrived, captured where the original Error still exists. pi-ai
    * only forwards a flattened `errorMessage`, so without this the real errno is
@@ -1795,6 +1813,12 @@ Delegation rules:
         this.providerRetryHeaders = undefined;
         this.providerRequestBytes = undefined;
         this.providerRequestMessages = context.messages?.length;
+        // Park what this request is expected to cost, so the usage report that
+        // settles it can be measured against it (`contextBudget` corrects the
+        // same shape).
+        this.inFlightContextEstimate = estimateContextTokens(
+          context.messages ?? [],
+        );
         // A new model request starts a new transport streak: the evidence that
         // justified a rebuild does not carry into the next request (issue #234).
         this.providerFetchFailure = undefined;
@@ -1898,9 +1922,12 @@ Delegation rules:
       // A vendor account has no long-lived key. Leaving it unset keeps pi-ai
       // from overriding the auth the provider just resolved for this request.
       getApiKey: async () => runtimeApiKey || undefined,
+      // The provider's rule that a tool-call id is unique is enforced here, on
+      // the last view before the wire: the request is the only place it can be
+      // guaranteed for both a rebuilt context and one that grew in this process.
       convertToLlm: (messages) =>
         alignRetainedReasoningIdentity(
-          convertToLlm(messages),
+          convertToLlm(this.dropDuplicateToolCalls(messages)),
           this.reasoningReplayIdentity(),
         ),
       prepareNextTurnWithContext: (context, signal) =>
@@ -2690,6 +2717,29 @@ Delegation rules:
       (entry) =>
         entry.message.role !== "assistant" || entry.message.content.length > 0,
     );
+  }
+
+  /**
+   * A `tool_use` id has to be unique across the request: Anthropic-family
+   * endpoints (DeepSeek's included) reject the whole turn with "tool_use ids
+   * must be unique" (issue #718), and a session that hits that 400 cannot
+   * continue. Every message the next request carries passes through here, so
+   * this is the one place that can guarantee the provider's rule for both a
+   * rebuilt context and one that grew during this process.
+   *
+   * The transcript is append-only and tolerates a retried append, so the same
+   * call can reach the request twice: under the same row id (which the host's
+   * keep-last dedupe already collapses) or a new one (which it cannot). The
+   * first occurrence wins, and a later call *or* a later result for that id is
+   * dropped, so the pair the provider validates stays well-formed — one call,
+   * one result. What was dropped is logged with its ids, because the next
+   * report of this should name the writer instead of only the provider's
+   * sentence.
+   */
+  private dropDuplicateToolCalls(messages: AgentMessage[]): AgentMessage[] {
+    const drop = dedupeToolCallMessages(messages);
+    reportDuplicateToolCallDrop(this.sessionId, drop);
+    return drop.messages;
   }
 
   private entriesWithCompaction(
@@ -5577,7 +5627,7 @@ Delegation rules:
     // agentLoopContinue refuses a transcript ending in an assistant message,
     // and this one carries nothing worth resending anyway.
     const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role === "assistant") messages.pop();
+    while (messages.at(-1)?.role === "assistant") messages.pop();
     this.setAgentMessages(messages);
 
     const promptBefore = this.agent.state.systemPrompt;
@@ -5628,7 +5678,7 @@ Delegation rules:
         this.suppressOverflowRunEnd = false;
         this.overflowRecoveryAttempted = true;
         const messages = [...this.agent.state.messages];
-        if (messages.at(-1)?.role === "assistant") messages.pop();
+        while (messages.at(-1)?.role === "assistant") messages.pop();
         this.setAgentMessages(messages);
         const compacted = await this.runCompaction(
           "overflow",
@@ -5685,7 +5735,7 @@ Delegation rules:
     // assistant message. The progress text is already visible in the reused
     // bubble, so it must not be sent back as model context.
     const messages = [...this.agent.state.messages];
-    if (messages.at(-1)?.role === "assistant") messages.pop();
+    while (messages.at(-1)?.role === "assistant") messages.pop();
     this.setAgentMessages(messages);
 
     const promptBefore = this.agent.state.systemPrompt;
@@ -5722,7 +5772,56 @@ Delegation rules:
   }
 
   private contextBudget(messages: AgentMessage[]): ContextBudget {
-    return contextBudgetFor(this.model, messages);
+    const budget = contextBudgetFor(this.model, messages);
+    // Correct the raw estimate with what past requests actually cost. The
+    // `chars / 4` tail is biased on CJK text, and a projection with no usage
+    // anchor is missing the system/tool overhead; below the sample threshold
+    // `correct()` returns the raw value unchanged, and the downward direction
+    // is bounded by `CONTEXT_CALIBRATION_FACTOR_MIN`.
+    return {
+      ...budget,
+      tokens: this.contextCalibration.correct(estimateContextTokens(messages)),
+    };
+  }
+
+  /**
+   * Fold one provider report into the estimate calibration.
+   *
+   * Only a completed, non-aborted response is a measurement: a failed stream
+   * never carried the request, and counting one would teach the estimator from
+   * a request the provider rejected. The pair is recorded against the estimate
+   * parked by `streamFn`, which describes the same context.
+   *
+   * The measured value is the request side only (`input + cacheRead +
+   * cacheWrite`): the response's own output is not in the projection the parked
+   * estimate described, and it becomes part of the *next* request's anchor.
+   */
+  private recordContextCalibration(
+    usage: MessageUsage | undefined,
+    unusable: boolean,
+  ): void {
+    const estimate = this.inFlightContextEstimate;
+    this.inFlightContextEstimate = undefined;
+    if (!estimate || unusable || !usage) return;
+    const realRequestTokens =
+      usage.inputTokens +
+      (usage.cacheReadTokens ?? 0) +
+      (usage.cacheWriteTokens ?? 0);
+    if (realRequestTokens <= 0) return;
+    const anchored =
+      estimate.lastUsageIndex !== null && estimate.usageTokens > 0;
+    if (anchored) {
+      this.contextCalibration.recordAnchored(
+        estimate.usageTokens,
+        estimate.trailingTokens,
+        realRequestTokens,
+      );
+    } else {
+      this.contextCalibration.recordUnanchored(
+        Math.max(0, Math.round(estimate.tokens)),
+        realRequestTokens,
+      );
+    }
   }
 
   private automaticCompactionNeeded(
@@ -6884,6 +6983,11 @@ Delegation rules:
             );
           }
           const usage = usageFromPi((event.message as any).usage as Usage | undefined);
+          // Measure the estimator against this request: the parked estimate
+          // describes the same context, and only a settled, non-aborted
+          // response actually carried the request. Consumed either way, so a
+          // failed attempt cannot pair with a later usage report.
+          this.recordContextCalibration(usage, failed || aborted);
           const hostedSearch = hostedSearchFromMessage({
             content: (event.message as any).content,
             citations: (event.message as any).hostedSearchCitations,
@@ -7668,6 +7772,15 @@ Delegation rules:
       try {
         await this.agent.continue();
         await this.agent.waitForIdle();
+        // The steering continuation may itself finish with a recoverable
+        // provider/silent/overflow/progress failure. Let runPendingRecoveries
+        // repair that assistant tail before another steering continuation.
+        if (
+          this.suppressOverflowRunEnd ||
+          this.suppressProviderRetryRunEnd ||
+          this.suppressSilentTurnRunEnd ||
+          this.suppressProgressTurnRunEnd
+        ) return;
       } finally {
         this.steeringContinuation = false;
       }

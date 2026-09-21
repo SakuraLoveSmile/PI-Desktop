@@ -484,6 +484,26 @@ boundary falls, not what survives it. The active-user retention limit is 20,000
 tokens, capped at half the hard budget so retention alone cannot fill a small
 window and leave the summary no room. None of these values are configurable.
 
+**Estimate calibration (D606).** Every threshold above is compared against one
+number, and that number is corrected against what requests actually cost. pi's
+`estimateContextTokens` anchors on the last assistant usage and estimates
+everything after it as `chars / 4`: that constant under-counts CJK text, and
+with no anchor left it omits the system prompt and the tool schemas, which the
+next request still pays for. The two errors are measured and applied
+separately — the per-character bias as a scale-free ratio over the guessed
+tail, and an unanchored residual as a ratio only for observations taken at a
+comparable scale (0.5×–2× of the estimate), otherwise as the observed overhead
+capped at 32,000 tokens.
+
+The correction is asymmetric because this number gates compaction: upward
+applies once three observations exist, downward needs three agreeing samples,
+is capped at 15 % per step and can never take the value below 85 % of the raw
+estimate, so a projection at 1.18× the hard limit (`1 / 0.85`) still compacts.
+A report outside 0.5×–3× of what the calibration predicted is treated as a
+misreport, and two consecutive misreports freeze the downward direction until a
+usable report arrives.
+
+
 The provider request layer also caps the concrete output budget before every
 parent, subagent, and one-shot request. It estimates the serialized input with
 the pi-ai chars/4 baseline plus a CJK correction, then reserves the larger of
@@ -667,6 +687,17 @@ criterion-by-criterion report of what was met and the evidence observed.
   restored into durable UI messages or transcript records.
 - Failed assistant messages remain durable diagnostic transcript entries but
   are never restored into pi model context on a later turn.
+- A tool-call id is unique in every request. The transcript is an append-only
+  snapshot stream that tolerates a retried append, so the same call can reach
+  the assembled context twice — under one row id, which the host's keep-last
+  read already collapses, or under two, which it cannot. The last view before
+  the wire therefore keeps the first occurrence of each `toolCall` id and drops
+  a later call or a later result for it, so the pair the provider validates
+  stays well-formed; a request with no duplicates is returned unchanged. A drop
+  is reported once on the `agent` log channel with the session and the ids
+  (D608). Anthropic-family endpoints, including DeepSeek's, reject the whole
+  turn with `tool_use ids must be unique` (issue #718), which leaves the session
+  unable to continue.
 - Restored checkpoints clear provider usage from retained assistant messages
   for budgeting. That usage measured the pre-compacted request and must not
   make the summary + tail appear as large as the discarded context.

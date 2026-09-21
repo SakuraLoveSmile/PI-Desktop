@@ -1003,8 +1003,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 #### E2E-038：设置拥有项目存档目标
 
 - **先决条件**：应用程序运行时至少有一个已配置的提供程序、一个受支持的本地会话存储、一个保留的项目和一个存档的项目。
-- **步骤**：1) 打开设置。 2) 检查完整的设置导轨。 3) 打开Basics 并使用可搜索主题选择器更改其外观卡中的主题。 4) 打开全局 AI 并检查权限和默认项卡，包括命令 Shell 行；确认上下文管理没有设置卡。 5) 打开快捷方式并检查键盘快捷方式卡。 6) 打开指令并保存全局指令。 7) 打开模型配置并检查提供商工作室。 8) 按顺序打开“导入”、“项目存档”和“信息”。 9) 搜索设置“项目”或“存档”。 10) 在项目存档中，将每个分组条的计数与其呈现的行进行比较。 11) 将排序控件从“最近”切换到“名称”。 12) 搜索已知的会话标题，检查其展开的项目行，然后显示八个以上的会话；通过清晰的功能来清除搜索。 13) 打开行菜单，使用 Escape 并按下外部按钮将其关闭。 14) 恢复存档的项目，然后激活它。 15) 返回应用程序外壳并打开插件。
-- **预期**：该导轨按顺序包含基础知识、全局 AI/AI、快捷方式、说明、模型配置、导入、项目存档和信息，每个都有其语义 Lucide 图标（滑块/火花/键盘/文件文本/机器人/下载/存档/信息）；行按四个柔和的非交互标题分组：Personal / 个人包含基础知识、全局 AI 和快捷键，Agent / 智能体包含说明和模型配置，Workspace / 工作区包含导入和项目存档，About / 关于包含信息；分组之间使用留白而不是分割线，搜索保持目的地结果扁平，并将空分组及其标题一起隐藏。外观保留在基础下，权限、默认项和命令 Shell 行位于全局 AI 下；可用的已选 Shell 由选择器表示，不重复显示“已配置”状态；默认、回退和无实际 Shell 状态仍明确展示；上下文管理没有设置卡；键盘快捷键和全局指令都有自己的目的地；开发者生活在 Info 下；项目存档显示活动、关闭和存档的持久行，无需可见性切换，将它们分组在一个面板内始终可见的固定/所有项目/存档分组条 (D168/D267) 下，并带有每个部分的计数。该目的地不呈现英雄区块，也没有页面级计数器串：引导区是一条安静的说明行，每个分组条的计数与其呈现的行一致；按名称排序会重新排序每个部分内的行，而不隐藏任何行；搜索匹配项目字段和会话标题并报告匹配计数，会话标题结果扩展其所属项目，按最新活动和相对更新时间列出会话，并以八个批次显示历史记录；清除搜索将恢复完整索引。行菜单在 Escape 和外部按下时关闭。恢复使存档保持打开状态，激活返回以与侧栏中保留的恢复项目聊天；主页侧边栏和全局页面结果没有独立的项目目标；设置搜索找到项目存档；插件仍然是一个独立的应用程序外壳目的地。
+- **步骤**：1) 打开设置。 2) 检查完整的设置导轨。 3) 打开Basics 并使用可搜索主题选择器更改其外观卡中的主题。 4) 打开全局 AI 并检查权限和默认项卡，包括命令 Shell 行；确认上下文管理没有设置卡。 5) 打开快捷方式并检查键盘快捷方式卡。 6) 打开指令并保存全局指令。 7) 打开模型配置并检查提供商工作室。 8) 按顺序打开“导入”、“项目存档”和“信息”。 9) 搜索设置“项目”或“存档”。 10) 在项目存档中，将每个分组条的计数与其呈现的行进行比较。 11) 将排序控件从“最近”切换到“名称”。 12) 搜索已知的会话标题，检查其展开的项目行，然后显示八个以上的会话；通过清晰的功能来清除搜索。 13) 打开行菜单，使用 Escape 并按下外部按钮将其关闭。 14) 恢复存档的项目，然后激活它。 15) 归档一个项目会话，从项目归档中打开它，然后返回项目归档。 16) 返回应用程序外壳并打开插件。
+- **预期**：该导轨按顺序包含基础知识、全局 AI/AI、快捷方式、说明、模型配置、导入、项目存档和信息，每个都有其语义 Lucide 图标（滑块/火花/键盘/文件文本/机器人/下载/存档/信息）；行按四个柔和的非交互标题分组：Personal / 个人包含基础知识、全局 AI 和快捷键，Agent / 智能体包含说明和模型配置，Workspace / 工作区包含导入和项目存档，About / 关于包含信息；分组之间使用留白而不是分割线，搜索保持目的地结果扁平，并将空分组及其标题一起隐藏。外观保留在基础下，权限、默认项和命令 Shell 行位于全局 AI 下；可用的已选 Shell 由选择器表示，不重复显示“已配置”状态；默认、回退和无实际 Shell 状态仍明确展示；上下文管理没有设置卡；键盘快捷键和全局指令都有自己的目的地；开发者生活在 Info 下；项目存档显示活动、关闭和存档的持久行，无需可见性切换，将它们分组在一个面板内始终可见的固定/所有项目/存档分组条 (D168/D267) 下，并带有每个部分的计数。该目的地不呈现英雄区块，也没有页面级计数器串：引导区是一条安静的说明行，每个分组条的计数与其呈现的行一致；按名称排序会重新排序每个部分内的行，而不隐藏任何行；搜索匹配项目字段和会话标题并报告匹配计数，会话标题结果扩展其所属项目，按最新活动和相对更新时间列出会话，并以八个批次显示历史记录；清除搜索将恢复完整索引。行菜单在 Escape 和外部按下时关闭。恢复使存档保持打开状态，激活返回以与侧栏中保留的恢复项目聊天。打开归档会话时，应用会先成功选择该会话，再清除它的归档状态；聊天页选中该会话，项目侧边栏重新显示它，返回项目归档后它也不再处于归档状态。主页侧边栏和全局页面结果没有独立的项目目标；设置搜索找到项目存档；插件仍然是一个独立的应用程序外壳目的地。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/01-ui-ia.md`、`03-runtime/11-provider-model-system.md`
 - **接受**：B（模型配置），F（会话导入）
 - **里程碑**：M4
@@ -1214,6 +1214,8 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - **规格链接**：`07-plugins/07-plugin-marketplace.md`
 - **接受**：G（市场详细信息用户体验）
 - **状态**：已记录
+
+- **焦点回归**：在浅色和深色主题下打开市场卡片，再按 Escape。与鼠标关闭一样，Escape 关闭后卡片不残留横线或焦点框。再用 Tab 和 Shift+Tab 导航：详情按钮显示完整、未裁剪的焦点框，安装按钮仍可单独获得焦点。 自动化焦点状态回归：`node scripts/e2e-plugin-detail-focus.mjs`；焦点框外观需进行视觉验证。
 
 #### E2E-024W：插件剪贴板历史捕获有界的文本和图片
 
@@ -2225,6 +2227,7 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   `chat-context-menu-items.test.mjs`、`chat-context-menu-surface.test.mjs`）；
   完整 UI 场景草稿
 
+- **完整历史回归**：打开包含 140 条消息的会话，不向上翻页，选择复制整个对话；剪贴板必须包含第 1–140 条消息。从搜索上下文窗口和长消息截断预览重复验证。保留当前可见的生成中文字；读取失败时提示错误，剪贴板保持不变。仅在选择复制后读取完整历史，不改变阅读位置。运行 `node scripts/e2e-copy-conversation.mjs`。
 - 编辑时复制应使用草稿选区，无选区时复制整份草稿；选中消息文本应选中草稿。菜单不提供编辑、删除或版本切换；取消后原消息及其菜单保持不变。自动化验证：`node scripts/e2e-message-edit-copy.mjs`。
 
 #### E2E-060b：镀铬中性灰色调
@@ -5285,6 +5288,9 @@ eleven-tool-round desktop paths are verified by
 | C — 对话和直播（委托上下文预算） | E2E-SUBAGENT-context-overflow-compacts-before-failing、E2E-SUBAGENT-context-overflow-reports-actionable-failure、E2E-SUBAGENT-resume-seeds-within-context-budget |
 | 品质（委托上下文预算） | E2E-SUBAGENT-context-overflow-compacts-before-failing、E2E-SUBAGENT-context-overflow-reports-actionable-failure、E2E-SUBAGENT-resume-seeds-within-context-budget |
 | M6+（委托上下文预算） | E2E-SUBAGENT-context-overflow-compacts-before-failing、E2E-SUBAGENT-context-overflow-reports-actionable-failure、E2E-SUBAGENT-resume-seeds-within-context-budget |
+| C / F / 品质 —— 上下文估算保持安全（校准） | E2E-CONTEXT-estimate-calibration-stays-safe |
+| C — 对话与流式（工具调用 id 唯一） | E2E-RUNTIME-unique-tool-call-ids-per-request |
+| 品质（工具调用 id 唯一） | E2E-RUNTIME-unique-tool-call-ids-per-request |
 | G — 插件宿主生命周期（崩溃上报） | E2E-PLUGIN-crash-report-names-the-exit-code |
 | 品质（崩溃上报） | E2E-PLUGIN-crash-report-names-the-exit-code |
 
@@ -7897,9 +7903,11 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 | ID | 场景 | 验证 |
 |---|---|---|
-| E2E-MCP-MARKET-NET-BOUNDARY | URL guard 拒绝凭据、回环、私网、special-use IPv4、v4-mapped、ULA、site-local 和 link-local 及尾点绕过形态；Main 固定已检查的公网地址并逐跳复核 HTTPS 重定向 | 确定性 guard 断言；DNS pin 与响应上限 source-contract 覆盖 |
-| E2E-MCP-MARKET-SEMANTICS | Registry 记录映射为安装模板时保留包版本、named/positional runtime/package 参数与 required/optional 环境变量语义 | 确定性映射断言 |
+| E2E-MCP-MARKET-NET-BOUNDARY | URL guard 拒绝凭据、回环、私网、special-use IPv4、v4-mapped、ULA、site-local 和 link-local 及尾点绕过形态；direct/unknown 默认固定已检查的公网地址，完整 proxied 线路使用 session 传输，显式 `allowFakeIp` 可覆盖透明路由器 fake-IP 源但不允许真实私网答案 | 确定性 guard 断言；DNS pin、代理线路选择、fake-IP 选项范围与响应上限 source-contract 覆盖 |
+| E2E-MCP-MARKET-SEMANTICS | Registry 记录映射为安装模板时保留包版本、named/positional runtime/package 参数与 required/optional 环境变量语义；远端 header 变量同时识别注册表的 `{name}` 与目录的 `${NAME}` 两种写法，仅为已声明的可编辑值显示输入，保留未声明花括号字面量，并按各 header 的作用域处理默认值、固定值与可选标记，不合并不同 header 的同名输入（ADR registry-header-variable-spelling） | 确定性映射断言 |
 | E2E-MCP-MARKET-INSTALL | 内置目录条目经 `resolveCatalogEntry` 解析并通过宿主 `mcp.upsert` RPC 安装；记录落盘 `~/.agents/servers/` | 真实宿主二进制，隔离临时 HOME |
+| E2E-MCP-MARKET-HEADER-SCOPE | Registry header-local `{token}` resolves only in its header; same-named URL path/query tokens remain literal through mapping, resolution, host upsert/list and persistence. URL templates retain only legacy `${NAME}` substitution. When `headerBindings` exists (even empty or partial), unbound tokens in every header stay literal and never consume another header's input or default | shared regressions plus real host binary with isolated temporary storage; remote entry disabled, no network call |
+| E2E-MCP-MARKET-partial-header-bindings-stay-literal | Resolve a catalog with only Authorization bound and another header using the same `{token}` / `${token}`; an undeclared `${UNBOUND}` in a third header also remains literal through host upsert/list and disk persistence | real host binary, disabled remote entry, synthetic input and isolated temporary storage; no network call |
 
 
 #### E2E-SKILL-MARKET-NET-BOUNDARY：技能源公网 HTTPS 策略拒绝私网与回环
@@ -8334,6 +8342,29 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **规格：** 04-ux/06-settings-ia、04-ux/08-component-spec、
   04-ux/09-interaction-patterns；ADR turn-process-and-thinking-display。
 
+### E2E-CONTEXT-estimate-calibration-stays-safe
+
+- **先决条件：** 可脚本化上报用量的确定性提供商夹具；占用接近硬边界的会话；不使用真实凭据。
+- **步骤：** 连续上报低于预测的用量，确认显示占用不低于下限且压缩仍然触发；上报远离合理区间的用量，确认数值不动；跑一个
+  中文为主的会话，比较显示占用与上报用量。
+- **预期：** 校准后的占用保持在原始估算的 0.85×–6× 之内；有证据即上调；只有方向一致的样本才下调；处在硬限制 1.18× 的
+  投影仍触发压缩；误报不产生任何方向的移动；中文文本不再只有实测成本的四分之一。
+- **规格：** 03-runtime/02-agent-runtime §5.1、08-meta/decisions-log D606。**验收：** C（对话与流）、F（持久化）、品质。
+  **状态：** 单元测试覆盖（含中文与边界用例）；桌面 E2E 待补。
+
+### E2E-RUNTIME-unique-tool-call-ids-per-request
+
+- **先决条件：** 一份把同一次工具调用携带两次的会话转录（重试追加让该调用落在第二个行 id 上），在确定性提供商夹具下加载进
+  重新创建的运行时；不使用真实凭据。
+- **步骤：** 发一条提示，使运行时组装并发出请求。读取夹具收到的出站请求与 `agent` 日志通道。再用工具调用本就唯一的转录重复一次。
+- **预期：** 出站请求对那个 id 只携带一个 `toolCall` 与恰好一个对应结果，因此提供商不可能回 `tool_use ids must be unique`；
+  日志通道出现一行，带会话与 id。唯一转录的请求逐字不变，且不产生任何日志。
+- **规格：** 03-runtime/02-agent-runtime §5、08-meta/decisions-log D608。**验收：** C（对话与流）、品质。
+  **里程碑：** Post-MVP 回归覆盖。
+- **自动化：** `packages/agent-runtime/src/runtime.test.ts` 用真实的运行时覆盖两半：重复历史（丢弃 + 一行日志）与唯一历史
+  （同一对象、无日志）。
+- **状态：** 单元测试覆盖；没有端到端驱动对重复转录发出真实提供商请求。
+
 ### E2E-MCP-HTTP-ACK — HTTP acknowledgement and authorization status
 
 - **Preconditions**: A local mock Streamable HTTP server returns JSON for
@@ -8365,3 +8396,11 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **自动化：** `apps/desktop/test/plugin-services.test.mjs` 真实 fork 宿主进程、以夹具退出码杀死它，并断言服务状态与审计记录上的
   退出码及原始 stderr 缺失；`plugin-isolation.test.mjs` 与关闭用例覆盖"退出不是崩溃"那一半。
 - **状态：** 运行时层已自动化；无 UI 驱动读取插件页的错误文本。
+
+
+#### E2E-CHAT-parenthesized-url：用户消息中的完整网址
+
+- **步骤**：在用户消息中发送 `https://en.wikipedia.org/wiki/React_(software)` 并点击链接，再验证正文用圆括号包裹该网址、网址后跟句号及紧接另一链接或文件引用的情况。
+- **预期**：打开包含 `(software)` 的完整网址，进入 React 软件词条；正文外层的右括号和紧跟 URL 右括号的句末标点不属于链接，相邻引用仍能独立点击。嵌套圆括号、查询和片段内的圆括号、百分号编码的圆括号均保持完整。
+- **覆盖**：`chat-links.test.mjs`；桌面端通过正常浏览器目标实际点击验证。
+- **链接规格**：`04-ux/08-component-spec.md` §8.3。
