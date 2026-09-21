@@ -3570,6 +3570,14 @@ identify the platform validation still needed.
   `chat-context-menu-items.test.mjs`, `chat-context-menu-surface.test.mjs`);
   full UI scenario Draft
 
+- **Full-history regression**: Open a 140-message session without scrolling
+  back and choose Copy conversation. The clipboard must contain messages
+  1–140, not only the loaded tail. Repeat from a search context window and
+  with a truncated long message. Preserve visible in-flight text; a failed
+  history read must report an error and leave the clipboard unchanged.
+  Copy must not load history until selected or change the reading position.
+  Run `node scripts/e2e-copy-conversation.mjs`.
+
 #### E2E-060b: Neutral gray accent across chrome
 
 - **Preconditions**: App running in dark and light themes; plugins page and a

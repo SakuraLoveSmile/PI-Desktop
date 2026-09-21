@@ -2225,6 +2225,7 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
   `chat-context-menu-items.test.mjs`、`chat-context-menu-surface.test.mjs`）；
   完整 UI 场景草稿
 
+- **完整历史回归**：打开包含 140 条消息的会话，不向上翻页，选择复制整个对话；剪贴板必须包含第 1–140 条消息。从搜索上下文窗口和长消息截断预览重复验证。保留当前可见的生成中文字；读取失败时提示错误，剪贴板保持不变。仅在选择复制后读取完整历史，不改变阅读位置。运行 `node scripts/e2e-copy-conversation.mjs`。
 - 编辑时复制应使用草稿选区，无选区时复制整份草稿；选中消息文本应选中草稿。菜单不提供编辑、删除或版本切换；取消后原消息及其菜单保持不变。自动化验证：`node scripts/e2e-message-edit-copy.mjs`。
 
 #### E2E-060b：镀铬中性灰色调
