@@ -53,6 +53,9 @@ import {
 import { useSmoothText } from "../../../hooks/useSmoothText";
 import { TurnProcess } from "./TurnProcess";
 
+import { EntryExtraStack } from "./EntryExtraStack";
+import { ActionBarSlots } from "./ActionBarSlots";
+import { useSlotEntries } from "../../../plugins/renderer-slots/use-slots";
 type AssistantTurnProps = {
   entry: AssistantTurnEntry;
   isActive: boolean;
@@ -295,6 +298,8 @@ export const AssistantTurn = memo(function AssistantTurn({
   const responseOutputTokens = assistantTurnResponseOutputTokens(entry);
   const modelId = metaMessage?.modelId ?? latestUsageMessage?.modelId;
   const hasError = messages.some((message) => Boolean(message.error));
+  const assistantActionLeft = useSlotEntries("assistantAction", "left");
+  const assistantActionRight = useSlotEntries("assistantAction", "right");
   const complete =
     !isActive && !hasError && Boolean(content) && Boolean(actionMessage);
   const streaming =
@@ -422,6 +427,7 @@ export const AssistantTurn = memo(function AssistantTurn({
         ) : null}
         {complete && actionMessage ? (
           <div className="message-actions">
+          <ActionBarSlots slot="assistantAction" message={actionMessage} left={assistantActionLeft} right={assistantActionRight}>
             <MessageTimestamp createdAt={actionMessage.createdAt} />
             <CopyButton text={content} label={t("chat.copy")} />
             <TooltipButton
@@ -440,7 +446,11 @@ export const AssistantTurn = memo(function AssistantTurn({
             >
               <IconReview size={13} />
             </TooltipButton>
+          </ActionBarSlots>
           </div>
+        ) : null}
+        {complete && actionMessage ? (
+          <EntryExtraStack message={actionMessage} />
         ) : null}
       </div>
     </div>

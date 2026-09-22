@@ -10,6 +10,13 @@ import {
 import type { AppState } from "../../../stores/app-store";
 import { ComposerPermissionPicker } from "./ComposerPermissionPicker";
 import { ContextUsageInspector } from "../../../components/ContextUsageInspector";
+import { useAppStore } from "../../../stores/app-store";
+import {
+  useComposerControlEntries,
+  useComposerTriggerEntry,
+} from "./use-plugin-composer-slots";
+import { SlotBoundary } from "../../../plugins/renderer-slots/use-slots";
+import { dispatchFor } from "../../../plugins/renderer-host/dispatch";
 import { TooltipButton } from "../../../components/ui";
 import {
   IconArrowUp,
@@ -105,6 +112,8 @@ export function ComposerToolbar({
   onVoiceToggle,
   onVoiceCancel,
 }: ComposerToolbarProps) {
+  const leftControls = useComposerControlEntries("left");
+  const rightControls = useComposerControlEntries("right");
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
   const steeringShortcut = keybindingDisplayParts("Alt+Enter", platform).join("+");
   return (
@@ -186,9 +195,11 @@ export function ComposerToolbar({
                   });
                 }
           }} />
+        <PluginControlGroup entries={leftControls} side="left" />
       </div>
 
       <div className="composer-right">
+        <PluginControlGroup entries={rightControls} side="right" />
         {contextUsage ? <ContextUsageInspector {...contextUsage} /> : null}
         <ComposerModelPicker
           t={t}
@@ -271,5 +282,34 @@ export function ComposerToolbar({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The `composerControl` outlet for one side: each registration renders its
+ * component inside its own boundary. Props are the position and the plugin's
+ * own dispatch relay — a rendering position, no draft data.
+ */
+function PluginControlGroup({
+  entries,
+  side,
+}: {
+  entries: ReturnType<typeof useComposerControlEntries>;
+  side: "left" | "right";
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <>
+      {entries.map((entry) => (
+        <SlotBoundary key={entry.id} entry={entry} slot="composerControl">
+          <span className="pi-plugin-control" data-pi-plugin={entry.pluginId}>
+            {entry.component({
+              position: side,
+              dispatch: dispatchFor(entry.pluginId),
+            }) as React.ReactNode}
+          </span>
+        </SlotBoundary>
+      ))}
+    </>
   );
 }

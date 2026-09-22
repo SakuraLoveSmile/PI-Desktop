@@ -42,6 +42,9 @@ import { TooltipButton } from "./ui";
 import { ContextMenu, useContextMenu } from "./ContextMenu";
 import { MarkdownTable } from "./MarkdownTable";
 import { markdownTableData } from "../lib/markdown-table";
+import { PluginBlockRenderer } from "./PluginBlockRenderer";
+import { blockRendererCandidate } from "../lib/block-renderer";
+import { useSlotEntryForKey } from "../plugins/renderer-slots/use-slots";
 import { api } from "../lib/api";
 import { openHttpUrl } from "../lib/open-http-url";
 import {
@@ -454,6 +457,12 @@ function PreBlock({
 }: ComponentProps<"pre"> & SourcePositionProps & { node?: unknown }) {
   const { closedFence, renderDiagrams } = useContext(MarkdownBlockContext);
   const info = extractCode(children);
+  // Hooks stay unconditional: the fence language and closed-ness can flip
+  // between streaming renders, so the lookup must run on every render.
+  const blockEntry = useSlotEntryForKey(
+    "blockRenderer",
+    closedFence ? blockRendererCandidate(info?.lang ?? "") : undefined,
+  );
   if (!info) return <pre {...rest}>{children}</pre>;
   if (
     renderDiagrams &&
@@ -461,6 +470,18 @@ function PreBlock({
     info.lang.toLowerCase() === "mermaid"
   ) {
     return <MermaidBlock code={info.code} {...sourcePositionProps(rest)} />;
+  }
+  if (blockEntry) {
+    return (
+      <PluginBlockRenderer
+        entry={blockEntry}
+        language={info.lang}
+        source={info.code}
+        fallback={
+          <CodeBlock code={info.code} lang={info.lang} {...sourcePositionProps(rest)} />
+        }
+      />
+    );
   }
   return <CodeBlock code={info.code} lang={info.lang} {...sourcePositionProps(rest)} />;
 }
