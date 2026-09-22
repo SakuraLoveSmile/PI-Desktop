@@ -607,7 +607,8 @@ sklm: {
       namePlaceholder: "Nom de la source",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "Cette skill dépasse la limite de 128 Ko une fois les ressources jointes.",
-      sourceUnsafe: "L'URL doit être une adresse https publique",
+      sourceUnsafe:
+        "L'URL source doit être une adresse http ou https, pas une adresse de métadonnées cloud. Pour du HTTP en clair sur votre machine ou votre réseau local, activez « Autoriser le HTTP en clair pour mes propres services locaux et du réseau local » dans les réglages Réseau.",
       pageInfo: "Page {{page}} sur {{pages}} · {{total}} skills",
       pagePrev: "Précédente",
       pageNext: "Suivante",
@@ -973,7 +974,8 @@ sklm: {
       namePlaceholder: "Nom de la source",
       urlHint: "https://… (endpoint de registre ou JSON de catalogue)",
       officialSource: "Registre officiel",
-      sourceUnsafe: "L'URL doit être une adresse https publique",
+      sourceUnsafe:
+        "L'URL source doit être une adresse http ou https, pas une adresse de métadonnées cloud. Pour du HTTP en clair sur votre machine ou votre réseau local, activez « Autoriser le HTTP en clair pour mes propres services locaux et du réseau local » dans les réglages Réseau.",
       pageInfo: "Page {{page}} sur {{pages}} · {{total}} serveurs",
       pagePrev: "Précédente",
       pageNext: "Suivante",
@@ -1177,6 +1179,11 @@ sklm: {
     "proxyTesting": "Test…",
     "proxyTestOk": "Connecté",
     "proxyTestFail": "Impossible de se connecter : {{message}}",
+    "networkAllowInsecureUserEndpoints": "Autoriser le HTTP en clair pour mes propres services locaux et du réseau local",
+    "networkAllowInsecureUserEndpointsDesc":
+      "Concerne les adresses que vous saisissez vous-même : un service de modèles, un serveur MCP ou une source du marché sur cette machine ou votre réseau local. HTTPS vers une adresse locale n'a pas besoin de cette option.",
+    "networkAllowInsecureUserEndpointsWarning":
+      "Le HTTP en clair n'est pas chiffré : toute personne sur le même segment réseau peut intercepter le trafic et les identifiants acceptés par ce service.",
     "defaultsTitle": "Valeurs par défaut",
     "defaultModel": "Modèle par défaut",
     "defaultModelNone": "Aucun fournisseur d'IA prêt",

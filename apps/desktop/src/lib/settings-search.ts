@@ -73,6 +73,8 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.proxyCustom",
       "settings.proxyUrl",
       "settings.proxyFakeIp",
+      "settings.networkAllowInsecureUserEndpoints",
+      "settings.networkAllowInsecureUserEndpointsDesc",
     ],
   },
   {

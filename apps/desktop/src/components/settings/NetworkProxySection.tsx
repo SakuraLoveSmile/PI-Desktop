@@ -136,6 +136,23 @@ export function NetworkProxySection({
     }
   };
 
+  const insecureUserEndpoints =
+    settings.networkPolicy?.allowInsecureUserEndpoints === true;
+
+  /**
+   * Only the `networkPolicy` field is written: the settings write merges this
+   * patch into the stored settings, so every other preference is carried over
+   * untouched.
+   */
+  const persistUserEndpointPolicy = async (allowInsecureUserEndpoints: boolean) => {
+    setSaveError(false);
+    try {
+      await saveSettings({ networkPolicy: { allowInsecureUserEndpoints } });
+    } catch {
+      setSaveError(true);
+    }
+  };
+
   return (
     <section className="settings-card-block">
       <h3 className="settings-card-heading">{t("settings.network")}</h3>
@@ -253,6 +270,33 @@ export function NetworkProxySection({
               </div>
             </SettingsRow>
           </>
+        ) : null}
+
+        <SettingsRow
+          title={t("settings.networkAllowInsecureUserEndpoints")}
+          description={t("settings.networkAllowInsecureUserEndpointsDesc")}
+        >
+          <span className="settings-network-checkbox">
+            <input
+              type="checkbox"
+              checked={insecureUserEndpoints}
+              aria-label={t("settings.networkAllowInsecureUserEndpoints")}
+              aria-describedby="network-insecure-endpoints-warning"
+              onChange={(event) =>
+                void persistUserEndpointPolicy(event.target.checked)
+              }
+            />
+          </span>
+        </SettingsRow>
+
+        {insecureUserEndpoints ? (
+          <div
+            id="network-insecure-endpoints-warning"
+            className="settings-network-warning"
+            role="alert"
+          >
+            {t("settings.networkAllowInsecureUserEndpointsWarning")}
+          </div>
         ) : null}
 
         {saveError ? (

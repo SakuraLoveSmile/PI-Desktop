@@ -10,6 +10,7 @@ import { net, session } from "electron";
 import type { SkillCatalogEntry, SkillMarketSource } from "@pi-desktop/shared";
 import { createPublicHttpsClient } from "./public-https-fetch";
 import { currentNetworkProxy } from "./network-proxy";
+import { allowInsecureUserEndpointsEnabled } from "./endpoint-policy";
 import {
   createSkillMarketAggregator,
   type SkillMarketDocument,
@@ -29,8 +30,13 @@ const client = createPublicHttpsClient({
   fetchImpl: (url, init) => net.fetch(url, init),
   routeImpl: (url) => session.defaultSession.resolveProxy(url),
   allowFakeIp: () => currentNetworkProxy().allowFakeIp === true,
+  // A source URL the user typed may be a LAN or loopback catalog; the opt-in
+  // for a plaintext hop to it is the stored `networkPolicy`.
+  allowInsecureUserEndpoints: () => allowInsecureUserEndpointsEnabled(),
 });
-const aggregator = createSkillMarketAggregator(client.request);
+const aggregator = createSkillMarketAggregator(client.request, {
+  allowInsecureUserEndpoints: () => allowInsecureUserEndpointsEnabled(),
+});
 
 export function searchSkillMarket(
   query: string,

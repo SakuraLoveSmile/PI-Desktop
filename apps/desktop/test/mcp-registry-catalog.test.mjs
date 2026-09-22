@@ -22,6 +22,18 @@ test("fake-IP proxy routes use the session transport without weakening direct pi
   assert.match(source, /MAX_SOURCE_RESPONSE_BYTES/);
   assert.match(source, /currentNetworkProxy\(\)\.allowFakeIp/);
   assert.match(source, /allowFakeIp && addressKind === "benchmark"/);
+  // The source URL is an address the user typed, so only the first hop is judged
+  // for a user-supplied endpoint; every redirect target is third-party content
+  // and keeps the public-only rule.
+  assert.match(source, /hop === 0 \? "user" : "third-party"/);
+  assert.match(source, /const userSupplied = origin === "user"/);
+  assert.match(
+    source,
+    /isSafeMarketSourceUrl\(url, \{ allowInsecureHttp: allowInsecureUserEndpointsEnabled\(\) \}\)/,
+  );
+  assert.match(source, /: isSafePublicHttpsUrl\(url\)/);
+  assert.match(source, /isAcceptableUserEndpointAddress\(address\.address, addressKind, route\)/);
+  assert.match(source, /: isAcceptableResolvedAddress\(addressKind, route\)/);
 });
 
 test("market source responses and caches are bounded", () => {

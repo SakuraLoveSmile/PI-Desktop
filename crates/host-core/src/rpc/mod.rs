@@ -727,6 +727,25 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
     let Some(object) = value.as_object() else {
         return Ok(());
     };
+    if let Some(policy) = object.get("networkPolicy").filter(|v| !v.is_null()) {
+        let Some(policy) = policy.as_object() else {
+            return Err(rpc_err(
+                1002,
+                "networkPolicy must be an object",
+                "INVALID_PARAMS",
+            ));
+        };
+        if policy
+            .get("allowInsecureUserEndpoints")
+            .is_some_and(|flag| !flag.is_boolean())
+        {
+            return Err(rpc_err(
+                1002,
+                "allowInsecureUserEndpoints must be a boolean",
+                "INVALID_PARAMS",
+            ));
+        }
+    }
     if let Some(binding) = object.get("imageGeneration").filter(|v| !v.is_null()) {
         for (key, max) in [("providerId", 128), ("modelId", 256)] {
             if !binding

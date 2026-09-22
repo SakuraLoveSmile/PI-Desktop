@@ -18,8 +18,16 @@ export const NETWORK_PROXY_SCHEMES = [
 ] as const;
 export type NetworkProxyScheme = (typeof NETWORK_PROXY_SCHEMES)[number];
 
+/**
+ * Default bypass list for custom mode.
+ *
+ * Loopback plus the private ranges a user's own LAN devices live in. A proxy is
+ * for reaching the public internet; sending `192.168.0.0/16` through it is how
+ * a local model server, NAS or MCP endpoint stops answering. `<local>` keeps
+ * Chromium's own single-label rule.
+ */
 export const DEFAULT_NETWORK_PROXY_BYPASS =
-  "localhost,127.0.0.1,::1,<local>";
+  "localhost,127.0.0.1,::1,<local>,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16";
 
 export const PROXY_ENV_KEYS = [
   "HTTP_PROXY",

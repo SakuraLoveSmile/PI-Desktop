@@ -610,7 +610,8 @@ sklm: {
       namePlaceholder: "源名称",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "展开相邻资源后超过 128 KB 文档上限，无法安装。",
-      sourceUnsafe: "源地址必须是公网 https 地址",
+      sourceUnsafe:
+        "源地址必须是 http/https 地址，且不能指向云元数据之类的地址。要用明文 http 访问自己的本机或局域网服务，请在网络设置里开启“允许对自填的本机/局域网服务使用明文 HTTP”。",
       pageInfo: "第 {{page}} / {{pages}} 页 · 共 {{total}} 个",
       pagePrev: "上一页",
       pageNext: "下一页",
@@ -958,7 +959,8 @@ sklm: {
       namePlaceholder: "源名称",
       urlHint: "https://…(registry 端点或目录 JSON)",
       officialSource: "官方注册表",
-      sourceUnsafe: "源地址必须是公网 https 地址",
+      sourceUnsafe:
+        "源地址必须是 http/https 地址，且不能指向云元数据之类的地址。要用明文 http 访问自己的本机或局域网服务，请在网络设置里开启“允许对自填的本机/局域网服务使用明文 HTTP”。",
       pageInfo: "第 {{page}} / {{pages}} 页 · 共 {{total}} 个",
       pagePrev: "上一页",
       pageNext: "下一页",
@@ -1163,6 +1165,11 @@ sklm: {
     proxyTesting: "测试中…",
     proxyTestOk: "已连接",
     proxyTestFail: "无法连接：{{message}}",
+    networkAllowInsecureUserEndpoints: "允许对自填的本机/局域网服务使用明文 HTTP",
+    networkAllowInsecureUserEndpointsDesc:
+      "只影响你自己填写的地址：本机或局域网上的模型服务、MCP 服务器、市场源。用 HTTPS 访问局域网地址不需要开启此项。",
+    networkAllowInsecureUserEndpointsWarning:
+      "明文 HTTP 不加密：同一网段的其他人可能截获这条连接，以及服务所接受的凭据。",
     defaultsTitle: "默认项",
     defaultModel: "默认模型",
     defaultModelNone: "还没有可用的 AI 服务",

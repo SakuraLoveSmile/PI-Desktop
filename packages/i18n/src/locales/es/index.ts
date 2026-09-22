@@ -607,7 +607,8 @@ sklm: {
       namePlaceholder: "Nombre de la fuente",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "Esta skill supera el límite de 128 KB del documento tras adjuntar recursos.",
-      sourceUnsafe: "La URL debe ser una dirección https pública",
+      sourceUnsafe:
+        "La URL de origen debe ser http o https, no una dirección de metadatos en la nube. Para usar http sin cifrar en tu equipo o la LAN, activa «Permitir HTTP sin cifrar para mis propios servicios locales y de la LAN» en los ajustes de Red.",
       pageInfo: "Página {{page}} de {{pages}} · {{total}} skills",
       pagePrev: "Anterior",
       pageNext: "Siguiente",
@@ -973,7 +974,8 @@ sklm: {
       namePlaceholder: "Nombre de la fuente",
       urlHint: "https://… (endpoint de registro o JSON de catálogo)",
       officialSource: "Registro oficial",
-      sourceUnsafe: "La URL debe ser una dirección https pública",
+      sourceUnsafe:
+        "La URL de origen debe ser http o https, no una dirección de metadatos en la nube. Para usar http sin cifrar en tu equipo o la LAN, activa «Permitir HTTP sin cifrar para mis propios servicios locales y de la LAN» en los ajustes de Red.",
       pageInfo: "Página {{page}} de {{pages}} · {{total}} servidores",
       pagePrev: "Anterior",
       pageNext: "Siguiente",
@@ -1177,6 +1179,11 @@ sklm: {
     "proxyTesting": "Probando…",
     "proxyTestOk": "Conectado",
     "proxyTestFail": "No se pudo conectar: ​​{{message}}",
+    "networkAllowInsecureUserEndpoints": "Permitir HTTP sin cifrar para mis propios servicios locales y de la LAN",
+    "networkAllowInsecureUserEndpointsDesc":
+      "Se aplica a las direcciones que escribes tú: un servicio de modelos, un servidor MCP o una fuente del mercado en este equipo o en tu LAN. HTTPS a una dirección de la LAN no necesita esta opción.",
+    "networkAllowInsecureUserEndpointsWarning":
+      "El HTTP sin cifrar no protege la conexión: cualquiera en el mismo segmento de red puede interceptar el tráfico y las credenciales que acepta el servicio.",
     "defaultsTitle": "Valores predeterminados",
     "defaultModel": "Modelo predeterminado",
     "defaultModelNone": "No hay ningún proveedor de IA listo",

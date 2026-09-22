@@ -616,7 +616,8 @@ sklm: {
       namePlaceholder: "소스 이름",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "리소스를 첨부한 뒤 문서가 128KB 제한을 초과합니다.",
-      sourceUnsafe: "소스 URL은 공개 https 주소여야 합니다",
+      sourceUnsafe:
+        "소스 URL은 http 또는 https 주소여야 하며 클라우드 메타데이터 주소는 안 됩니다. 내 컴퓨터나 LAN에서 평문 http를 쓰려면 네트워크 설정에서 “직접 입력한 로컬·LAN 서비스에 평문 HTTP 허용”을 켜세요.",
       pageInfo: "{{page}} / {{pages}} 페이지 · 총 {{total}}개",
       pagePrev: "이전 페이지",
       pageNext: "다음 페이지",
@@ -983,7 +984,8 @@ sklm: {
       namePlaceholder: "소스 이름",
       urlHint: "https://… (레지스트리 엔드포인트 또는 카탈로그 JSON)",
       officialSource: "공식 레지스트리",
-      sourceUnsafe: "소스 URL은 공개 https 주소여야 합니다",
+      sourceUnsafe:
+        "소스 URL은 http 또는 https 주소여야 하며 클라우드 메타데이터 주소는 안 됩니다. 내 컴퓨터나 LAN에서 평문 http를 쓰려면 네트워크 설정에서 “직접 입력한 로컬·LAN 서비스에 평문 HTTP 허용”을 켜세요.",
       pageInfo: "{{page}} / {{pages}} 페이지 · 총 {{total}}개",
       pagePrev: "이전 페이지",
       pageNext: "다음 페이지",
@@ -1190,6 +1192,11 @@ sklm: {
     proxyTesting: "테스트 중…",
     proxyTestOk: "연결됨",
     proxyTestFail: "연결할 수 없습니다: {{message}}",
+    networkAllowInsecureUserEndpoints: "직접 입력한 로컬·LAN 서비스에 평문 HTTP 허용",
+    networkAllowInsecureUserEndpointsDesc:
+      "직접 입력한 주소에만 적용됩니다: 이 컴퓨터나 LAN에 있는 모델 서비스, MCP 서버, 마켓 소스. LAN 주소에 HTTPS를 쓰면 이 항목이 필요하지 않습니다.",
+    networkAllowInsecureUserEndpointsWarning:
+      "평문 HTTP는 암호화되지 않습니다: 같은 네트워크 대역에 있는 사람이 이 연결과 서비스가 받는 자격 증명을 가로챌 수 있습니다.",
     defaultsTitle: "기본값",
     defaultModel: "기본 모델",
     defaultModelNone: "사용 가능한 AI 프로바이더 없음",

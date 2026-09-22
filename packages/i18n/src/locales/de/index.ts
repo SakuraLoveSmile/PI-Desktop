@@ -607,7 +607,8 @@ sklm: {
       namePlaceholder: "Quellenname",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "Diese Skill überschreitet nach dem Anhängen der Ressourcen das 128-KB-Dokumentlimit.",
-      sourceUnsafe: "Quell-URL muss eine öffentliche https-Adresse sein",
+      sourceUnsafe:
+        "Quell-URL muss eine http- oder https-Adresse sein, keine Cloud-Metadaten-Adresse. Für Klartext-HTTP auf dem eigenen Rechner oder im LAN in den Netzwerkeinstellungen „Klartext-HTTP für eigene lokale und LAN-Endpunkte zulassen“ einschalten.",
       pageInfo: "Seite {{page}} von {{pages}} · {{total}} Skills",
       pagePrev: "Zurück",
       pageNext: "Weiter",
@@ -973,7 +974,8 @@ sklm: {
       namePlaceholder: "Quellenname",
       urlHint: "https://… (Registry-Endpunkt oder Katalog-JSON)",
       officialSource: "Offizielle Registry",
-      sourceUnsafe: "Quell-URL muss eine öffentliche https-Adresse sein",
+      sourceUnsafe:
+        "Quell-URL muss eine http- oder https-Adresse sein, keine Cloud-Metadaten-Adresse. Für Klartext-HTTP auf dem eigenen Rechner oder im LAN in den Netzwerkeinstellungen „Klartext-HTTP für eigene lokale und LAN-Endpunkte zulassen“ einschalten.",
       pageInfo: "Seite {{page}} von {{pages}} · {{total}} Server",
       pagePrev: "Zurück",
       pageNext: "Weiter",
@@ -1177,6 +1179,11 @@ sklm: {
     "proxyTesting": "Wird getestet…",
     "proxyTestOk": "Verbunden",
     "proxyTestFail": "Verbindung konnte nicht hergestellt werden: {{message}}",
+    "networkAllowInsecureUserEndpoints": "Klartext-HTTP für eigene lokale und LAN-Endpunkte zulassen",
+    "networkAllowInsecureUserEndpointsDesc":
+      "Gilt für Endpunkte, die du selbst einträgst: einen Modelldienst, MCP-Server oder eine Marktquelle auf diesem Rechner oder im LAN. HTTPS zu einer LAN-Adresse braucht diesen Schalter nicht.",
+    "networkAllowInsecureUserEndpointsWarning":
+      "Klartext-HTTP ist nicht verschlüsselt. Wer im selben Netzsegment sitzt, kann diesen Datenverkehr und die Zugangsdaten, die der Dienst annimmt, mitlesen.",
     "defaultsTitle": "Standardwerte",
     "defaultModel": "Standardmodell",
     "defaultModelNone": "Kein KI-Anbieter bereit",

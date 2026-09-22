@@ -610,7 +610,8 @@ sklm: {
       namePlaceholder: "源名稱",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "展開相鄰資源後超過 128 KB 文件上限，無法安裝。",
-      sourceUnsafe: "源位址必須是公網 https 位址",
+      sourceUnsafe:
+        "源位址必須是 http/https 位址，且不能指向雲端中繼資料之類的位址。要用明文 http 存取自己的本機或區域網路服務，請在網路設定中開啟「允許對自填的本機／區域網路服務使用明文 HTTP」。",
       pageInfo: "第 {{page}} / {{pages}} 頁 · 共 {{total}} 個",
       pagePrev: "上一頁",
       pageNext: "下一頁",
@@ -958,7 +959,8 @@ sklm: {
       namePlaceholder: "源名稱",
       urlHint: "https://…(registry 端點或目錄 JSON)",
       officialSource: "官方註冊表",
-      sourceUnsafe: "源位址必須是公網 https 位址",
+      sourceUnsafe:
+        "源位址必須是 http/https 位址，且不能指向雲端中繼資料之類的位址。要用明文 http 存取自己的本機或區域網路服務，請在網路設定中開啟「允許對自填的本機／區域網路服務使用明文 HTTP」。",
       pageInfo: "第 {{page}} / {{pages}} 頁 · 共 {{total}} 個",
       pagePrev: "上一頁",
       pageNext: "下一頁",
@@ -1163,6 +1165,11 @@ sklm: {
     proxyTesting: "測試中…",
     proxyTestOk: "已連線",
     proxyTestFail: "無法連線：{{message}}",
+    networkAllowInsecureUserEndpoints: "允許對自填的本機／區域網路服務使用明文 HTTP",
+    networkAllowInsecureUserEndpointsDesc:
+      "只影響你自己填寫的位址：本機或區域網路上的模型服務、MCP 伺服器、市場來源。用 HTTPS 存取區域網路位址不需要開啟此項。",
+    networkAllowInsecureUserEndpointsWarning:
+      "明文 HTTP 不加密：同一網段的其他使用者可能截獲這條連線，以及服務所接受的憑證。",
     defaultsTitle: "預設項",
     defaultModel: "預設模型",
     defaultModelNone: "還沒有可用的 AI 服務",

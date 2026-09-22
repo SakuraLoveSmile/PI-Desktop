@@ -5,6 +5,7 @@ import {
   isGitCloneRepoName,
   parseGitCloneUrl,
 } from "../../src/lib/git-clone-url.ts";
+import { allowInsecureUserEndpointsEnabled } from "./endpoint-policy.ts";
 
 export { parseGitCloneUrl } from "../../src/lib/git-clone-url.ts";
 
@@ -70,7 +71,9 @@ export async function cloneGitRepository(input: {
   name?: string;
   run?: typeof runGitClone;
 }): Promise<string> {
-  const target = parseGitCloneUrl(input.url);
+  const target = parseGitCloneUrl(input.url, {
+    allowInsecureHttp: allowInsecureUserEndpointsEnabled(),
+  });
   if (!target) {
     throw codedError("INVALID_ARGUMENT", "Enter a git repository URL");
   }

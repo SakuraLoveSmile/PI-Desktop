@@ -614,7 +614,8 @@ sklm: {
       namePlaceholder: "Source name",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "This skill is larger than the 128 KB document limit after attaching resources.",
-      sourceUnsafe: "Source URL must be a public https address",
+      sourceUnsafe:
+        "Source URL must be an http or https address, and not a cloud metadata address. For plain http on your own machine or LAN, turn on “Allow plain HTTP for my own local and LAN endpoints” in Network settings.",
       pageInfo: "Page {{page}} of {{pages}} · {{total}} skills",
       pagePrev: "Previous page",
       pageNext: "Next page",
@@ -845,7 +846,8 @@ sklm: {
       namePlaceholder: "Source name",
       urlHint: "https://… (registry endpoint or catalog JSON)",
       officialSource: "Official registry",
-      sourceUnsafe: "Source URL must be a public https address",
+      sourceUnsafe:
+        "Source URL must be an http or https address, and not a cloud metadata address. For plain http on your own machine or LAN, turn on “Allow plain HTTP for my own local and LAN endpoints” in Network settings.",
       pageInfo: "Page {{page}} of {{pages}} · {{total}} servers",
       pagePrev: "Previous page",
       pageNext: "Next page",
@@ -1192,6 +1194,11 @@ sklm: {
     proxyTesting: "Testing…",
     proxyTestOk: "Connected",
     proxyTestFail: "Couldn't connect: {{message}}",
+    networkAllowInsecureUserEndpoints: "Allow plain HTTP for my own local and LAN endpoints",
+    networkAllowInsecureUserEndpointsDesc:
+      "Applies to endpoints you enter yourself: a model service, MCP server, or market source on this machine or your LAN. HTTPS to a LAN address does not need this switch.",
+    networkAllowInsecureUserEndpointsWarning:
+      "Plain HTTP is not encrypted. Anyone on the same network segment can intercept this traffic and the credentials the endpoint accepts.",
     defaultsTitle: "Defaults",
     defaultModel: "Default model",
     defaultModelNone: "No AI provider ready",

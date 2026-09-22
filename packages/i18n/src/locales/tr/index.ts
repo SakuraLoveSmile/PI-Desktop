@@ -616,7 +616,8 @@ sklm: {
       namePlaceholder: "Kaynak adı",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "Kaynaklar eklendikten sonra bu beceri 128 KB belge sınırını aşıyor.",
-      sourceUnsafe: "Kaynak URL'si genel bir https adresi olmalıdır",
+      sourceUnsafe:
+        "Kaynak URL'si http veya https bir adres olmalı, bulut meta veri adresi olmamalıdır. Kendi makinenizde veya LAN'ınızda düz http için Ağ ayarlarında “Kendi yerel ve LAN servislerim için düz HTTP'ye izin ver” seçeneğini açın.",
       pageInfo: "Sayfa {{page}} / {{pages}} · {{total}} skill",
       pagePrev: "Önceki sayfa",
       pageNext: "Sonraki sayfa",
@@ -973,7 +974,8 @@ sklm: {
       namePlaceholder: "Kaynak adı",
       urlHint: "https://… (kayıt uç noktası veya katalog JSON)",
       officialSource: "Resmî kayıt",
-      sourceUnsafe: "Kaynak URL'si genel bir https adresi olmalıdır",
+      sourceUnsafe:
+        "Kaynak URL'si http veya https bir adres olmalı, bulut meta veri adresi olmamalıdır. Kendi makinenizde veya LAN'ınızda düz http için Ağ ayarlarında “Kendi yerel ve LAN servislerim için düz HTTP'ye izin ver” seçeneğini açın.",
       pageInfo: "Sayfa {{page}} / {{pages}} · {{total}} sunucu",
       pagePrev: "Önceki sayfa",
       pageNext: "Sonraki sayfa",
@@ -1180,6 +1182,11 @@ sklm: {
     proxyTesting: "Deneniyor…",
     proxyTestOk: "Bağlandı",
     proxyTestFail: "Bağlanılamadı: {{message}}",
+    networkAllowInsecureUserEndpoints: "Kendi yerel ve LAN servislerim için düz HTTP'ye izin ver",
+    networkAllowInsecureUserEndpointsDesc:
+      "Yalnızca kendi girdiğin adresler için geçerlidir: bu makinede veya LAN'ında çalışan bir model servisi, MCP sunucusu ya da pazar kaynağı. LAN adresine HTTPS kullanıyorsan bu anahtar gerekmez.",
+    networkAllowInsecureUserEndpointsWarning:
+      "Düz HTTP şifrelenmez: aynı ağ kesimindeki kişiler bu bağlantıyı ve servisin kabul ettiği kimlik bilgilerini ele geçirebilir.",
     defaultsTitle: "Varsayılanlar",
     defaultModel: "Varsayılan model",
     defaultModelNone: "Hazır AI servisi yok",
