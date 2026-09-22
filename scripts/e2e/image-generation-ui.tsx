@@ -388,7 +388,7 @@ globalThis.imageGenerationProbe = async () => {
       ok: true,
       locales: ["en", "zh-CN"],
       scenarios: [
-        "remove-marked-model-cancel-save-reopen-and-fallback",
+        "remove-marked-model-cancel-save-reopen-and-clear",
         "advanced-save-cancel",
         "unmark-only-image-model-save-reopen-chat-selection",
         "advanced-provider-switch",

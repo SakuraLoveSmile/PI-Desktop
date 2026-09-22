@@ -205,6 +205,8 @@ export function ModelConfigPage() {
           saved.id,
           imageModelIds,
           [...providers.filter((provider) => provider.id !== saved.id), saved],
+          current.imageGeneration?.providerId === saved.id &&
+            !saved.models.some((model) => modelIdsMatch(model.id, current.imageGeneration?.modelId ?? "")),
         );
         const nextSettings = {
           ...current,
