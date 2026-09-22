@@ -1,8 +1,15 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { Agent, fetch as fetchPinned } from "undici";
+import { classifyIpLiteral, isProxyFakeIpAddress } from "@pi-desktop/shared";
 
 export const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
+export type ImageDownloadOptions = {
+  /** Explicitly permits router/TUN benchmark fake-IP answers. */
+  allowFakeIp?: boolean;
+  /** Proxy-aware transport used when a fake-IP answer must be resolved by the proxy. */
+  fetchImpl?: typeof fetch;
+};
 export function imageError(code: string): Error & { errorCode: string } {
   return Object.assign(new Error(code), { errorCode: code });
 }
@@ -64,6 +71,7 @@ export function publicImageAddress(address: string): boolean {
 export async function downloadGeneratedImage(
   raw: string,
   signal: AbortSignal,
+  options: ImageDownloadOptions = {},
 ): Promise<Uint8Array> {
   let url: URL;
   try {
@@ -82,8 +90,22 @@ export async function downloadGeneratedImage(
   const hostname = url.hostname.replace(/^\[|\]$/g, "");
   const answers = await lookup(hostname, { all: true });
   signal.throwIfAborted();
-  if (!answers.length || answers.some((answer) => !publicImageAddress(answer.address)))
+  const hasUnsafeAddress = answers.some((answer) => !publicImageAddress(answer.address));
+  const hasFakeIp = answers.some((answer) => hasFakeIpAddress(answer.address));
+  const onlyFakeIp = answers.length > 0 && answers.every((answer) => hasFakeIpAddress(answer.address));
+  if (
+    !answers.length ||
+    (hasUnsafeAddress && !(options.allowFakeIp === true && hasFakeIp && onlyFakeIp))
+  )
     throw imageError("IMAGE_UNSAFE_URL");
+  if (options.allowFakeIp === true && hasFakeIp) {
+    const response = await (options.fetchImpl ?? fetch)(url, {
+      signal,
+      redirect: "error",
+    });
+    if (!response.ok) throw imageError("IMAGE_DOWNLOAD_FAILED");
+    return await boundedBytes(response, MAX_IMAGE_BYTES);
+  }
   const address = answers[0];
   const dispatcher = new Agent({
     connect: {
@@ -100,6 +122,10 @@ export async function downloadGeneratedImage(
   } finally {
     await dispatcher.destroy();
   }
+}
+
+function hasFakeIpAddress(address: string): boolean {
+  return isProxyFakeIpAddress(classifyIpLiteral(address));
 }
 
 export function generatedImageType(bytes: Uint8Array): { mimeType: string; extension: string } {

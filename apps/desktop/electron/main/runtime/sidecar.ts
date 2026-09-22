@@ -470,7 +470,11 @@ export function createSidecarRuntime({
   });
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
-  s.setLocalTool("GenerateImages", createImageGenerationTool({ dataDir, getHost: () => runtimeState.host }));
+  s.setLocalTool("GenerateImages", createImageGenerationTool({
+    dataDir,
+    getHost: () => runtimeState.host,
+    allowFakeIp: () => currentNetworkProxy().allowFakeIp === true,
+  }));
   s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {
     const raw = String((args as { path?: unknown })?.path ?? "").trim();
     if (!raw) {
