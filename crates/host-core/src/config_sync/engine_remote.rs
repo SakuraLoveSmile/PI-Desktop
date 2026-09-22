@@ -1,4 +1,9 @@
 use super::*;
+/// Ceiling for one resource object read back from a revision. A resource is
+/// produced by the skill packager, so the receiver must accept exactly what the
+/// packager accepts: a smaller receiver bound would turn an accepted upload
+/// into a failed download.
+const MAX_REMOTE_RESOURCE_BYTES: usize = crate::user_skills::MAX_SKILL_RESOURCE_BYTES;
 
 pub(super) fn remote_prefix(config: &StoredConfig) -> String {
     format!("vault/{}/", config.vault_id)
@@ -307,7 +312,7 @@ pub(super) async fn read_remote_revision(
             &config.vault_id,
             &ciphertext,
         )?;
-        if bytes.len() > 128 * 1024 {
+        if bytes.len() > MAX_REMOTE_RESOURCE_BYTES {
             bail!("CONFIG_SYNC_LIMIT_EXCEEDED: remote resource is too large");
         }
         resources.insert(object_id, bytes);
