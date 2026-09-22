@@ -221,9 +221,8 @@
 应用必须保持运行。每 30 秒检查一次，超过 90 秒的错过时段与重叠运行被跳过；
 重启只安排未来时段。旧任务需明确保存周期后才自动执行。新任务保存所选项目、Ask 权限和当前默认 provider/model；这些值只属于当前任务。任务文本标为“指令”，项目、权限和模型选择器嵌在指令框底部，并复用主 Composer 的容器、芯片和锚定菜单样式。两处直接共用权限选择组件和支持搜索、服务商分组、能力标记的模型列表。任务的模型按钮只显示模型名或别名，不拼接服务商名称；选择结果只更新任务草稿，不更改当前对话或应用默认设置。指令输入区域使用独立圆角边框及与底栏不同的底色，不显示原生缩放手柄，长文本在输入区内滚动。缺少模型字段的旧任务继续跟随应用默认值，已保存但不可用的模型保留显示且不会被静默替换。选择 Auto 时明确提示受限操作可能无需询问。没有显式选择时，首次设置仍保存当前项目，
 前台项目切换不会改变绑定。
-Manual tasks, including tasks saved without a project, retain that binding across
-Run now, renaming, cadence changes, and restart. Only legacy tasks without a
-saved binding capture the current project on their first explicit configuration.
+这也包括手动任务与未保存项目的任务：立即运行、重命名与周期变更都保留该绑定，重启后同样如此。
+只有没有已存绑定的旧任务，才会在首次显式配置时捕获当前项目。
 缺少已存权限字段的旧自动任务仍使用 Ask，不自动抢占当前页面。
 新任务默认为 Agent。允许保留已迁移的 Plan 或 Goal 任务
 已存储，但在提供商、工件之前明确拒绝无人值守的运行，

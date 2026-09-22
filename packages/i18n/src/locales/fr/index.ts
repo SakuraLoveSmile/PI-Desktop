@@ -1558,7 +1558,6 @@ sklm: {
     "weekday": "Jour de la semaine",
     "localTimeHint": "Utilise le fuseau horaire local. Gardez PI-Desktop ouvert ; les exécutions manquées sont ignorées.",
     "projectHint": "Le projet actuel est enregistré. Le modèle par défaut est utilisé.",
-    "executionSettingsHint": "Le projet, le mode d’autorisation et le modèle sont enregistrés uniquement pour cette tâche.",
     "autoPermissionHint": "Le mode Auto peut exécuter des actions restreintes sans confirmation. Utilisez-le uniquement pour des tâches fiables.",
     "unavailableModel": "{{provider}} / {{model}} (indisponible)",
     "save": "Enregistrer la tâche",

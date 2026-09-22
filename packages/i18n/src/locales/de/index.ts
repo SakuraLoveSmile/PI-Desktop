@@ -1558,7 +1558,6 @@ sklm: {
     "weekday": "Wochentag",
     "localTimeHint": "Verwendet die lokale Zeitzone. PI-Desktop muss geöffnet bleiben; verpasste Ausführungen werden übersprungen.",
     "projectHint": "Das aktuelle Projekt wird gespeichert. Ausführungen verwenden das Standardmodell.",
-    "executionSettingsHint": "Projekt, Berechtigungsmodus und Modell werden nur für diese Aufgabe gespeichert.",
     "autoPermissionHint": "Auto kann eingeschränkte Aktionen ohne Nachfrage ausführen. Verwenden Sie es nur für vertrauenswürdige Aufgaben.",
     "unavailableModel": "{{provider}} / {{model}} (nicht verfügbar)",
     "save": "Aufgabe speichern",

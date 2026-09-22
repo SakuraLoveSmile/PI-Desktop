@@ -1544,7 +1544,6 @@ sklm: {
     weekday: "星期",
     localTimeHint: "按电脑本地时区执行。请保持 PI-Desktop 运行；错过的任务不补跑。",
     projectHint: "保存时绑定当前项目，执行时使用默认模型。",
-    executionSettingsHint: "项目、权限和模型只保存到当前任务，不会影响其他任务。",
     autoPermissionHint: "全自动可在无人确认时执行受限操作，请只用于可信任务。",
     unavailableModel: "{{provider}} / {{model}}（当前不可用）",
     save: "保存任务",

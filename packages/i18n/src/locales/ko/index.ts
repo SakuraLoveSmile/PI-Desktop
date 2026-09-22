@@ -1574,7 +1574,6 @@ sklm: {
     weekday: "요일",
     localTimeHint: "컴퓨터의 현지 시간대를 사용합니다. 앱을 실행 상태로 유지하세요. 놓친 실행은 건너뜁니다.",
     projectHint: "현재 프로젝트를 저장하고 기본 모델로 실행합니다.",
-    executionSettingsHint: "프로젝트, 권한 모드, 모델은 이 작업에만 저장됩니다.",
     autoPermissionHint: "자동 모드는 묻지 않고 제한된 작업을 실행할 수 있습니다. 신뢰하는 작업에만 사용하세요.",
     unavailableModel: "{{provider}} / {{model}} (현재 사용할 수 없음)",
     save: "작업 저장",

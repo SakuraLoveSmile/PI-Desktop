@@ -1558,7 +1558,6 @@ sklm: {
     "weekday": "Día de la semana",
     "localTimeHint": "Usa la zona horaria local. Mantén PI-Desktop abierto; las ejecuciones omitidas no se recuperan.",
     "projectHint": "Se guarda el proyecto actual. Se utiliza el modelo predeterminado.",
-    "executionSettingsHint": "El proyecto, el modo de permisos y el modelo se guardan solo para esta tarea.",
     "autoPermissionHint": "El modo automático puede ejecutar acciones restringidas sin preguntar. Úsalo solo para tareas de confianza.",
     "unavailableModel": "{{provider}} / {{model}} (no disponible)",
     "save": "Guardar tarea",
