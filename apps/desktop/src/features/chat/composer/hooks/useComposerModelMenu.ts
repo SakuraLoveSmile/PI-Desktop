@@ -221,7 +221,7 @@ export function useComposerModelMenu({
   useEffect(() => {
     if (!open) return;
     requestAnimationFrame(() => {
-      if (view === "root") rootMenuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      if (view === "root") rootMenuRef.current?.querySelector<HTMLButtonElement>(".composer-menu-entry")?.focus();
       if (view === "model") modelSearchRef.current?.focus();
       if (view === "thinking") thinkingListRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
       if (view === "model" && modelHighlight >= 0) {

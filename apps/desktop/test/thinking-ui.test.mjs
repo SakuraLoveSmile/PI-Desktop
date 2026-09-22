@@ -16,6 +16,10 @@ const composerSource = await readComposerSource();
 const composerToolbarSource = await readComposerModule("ComposerToolbar.tsx");
 const composerModelPickerSource = await readComposerModule("ComposerModelPicker.tsx");
 const composerPermissionPickerSource = await readComposerModule("ComposerPermissionPicker.tsx");
+const scheduledModelPickerSource = await readFile(
+  new URL("../src/features/scheduled/ScheduledModelPicker.tsx", import.meta.url),
+  "utf8",
+);
 const transcriptSource = await readTranscriptSource();
 const transcriptSharedSource = await readTranscriptModule("shared.tsx");
 const transcriptToolRowSource = await readTranscriptModule("ToolRow.tsx");
@@ -88,13 +92,18 @@ test("Composer owns the mode and model controls", () => {
   const modeControl = leftToolbar.indexOf(
     'className="icon-btn mode-chip composer-mode-chip"',
   );
-  const permissionControl = composerPermissionPickerSource.indexOf('className="composer-permission"');
+  const permissionControl = leftToolbar.indexOf("<ComposerPermissionPicker");
   const rightToolbar = composerToolbarSource.slice(
     composerToolbarSource.indexOf('<div className="composer-right">'),
   );
 
   assert.ok(modeControl >= 0);
   assert.ok(permissionControl > modeControl);
+  // The task draft has no session, so its picker must not claim one: with
+  // `activeSessionId` unset the menu resolves the selected model's binding
+  // default thinking level instead of pinning the draft to its current value.
+  assert.match(scheduledModelPickerSource, /activeSessionId: null/);
+  assert.doesNotMatch(scheduledModelPickerSource, /useId\(/);
   assert.doesNotMatch(leftToolbar, /composer-thinking|thinking-chip/);
   assert.doesNotMatch(topbarSource, /ModelSelect|model-chip/);
   assert.doesNotMatch(topbarSource, /ct-mode|ct-mode-btn|configureActiveSession/);

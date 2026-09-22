@@ -77,13 +77,6 @@
   max-width: min(190px, 42cqw);
 }
 
-.scheduled-execution-permission {
-  max-width: min(160px, 34cqw);
-}
-
-.scheduled-execution-model {
-  max-width: min(300px, 48cqw);
-}
 
 .scheduled-execution-toolbar .settings-menu-select-anchor,
 .scheduled-execution-toolbar .settings-menu-select-trigger {
@@ -92,8 +85,6 @@
 
 @container (max-width: 440px) {
   .scheduled-execution-project { max-width: 34cqw; }
-  .scheduled-execution-permission { max-width: 28cqw; }
-  .scheduled-execution-model { max-width: 30cqw; }
 }
 
 @container (max-width: 350px) {

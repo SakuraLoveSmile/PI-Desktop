@@ -1,6 +1,6 @@
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { imageGenerationBindings } from "@pi-desktop/shared";
+import { imageGenerationBindings, modelIdsMatch } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { composerModelDisplayName, composerModelsForProvider } from "../../lib/composer-models";
 import { ComposerModelPicker } from "../chat/composer/ComposerModelPicker";
@@ -15,7 +15,6 @@ export function ScheduledModelPicker({ value, disabled, onChange }: {
   onChange: (selection: ScheduledModelSelection) => void;
 }) {
   const { t } = useTranslation();
-  const draftId = useId();
   const providers = useAppStore(s => s.providers);
   const providerModels = useAppStore(s => s.providerModels);
   const settings = useAppStore(s => s.settings);
@@ -23,12 +22,12 @@ export function ScheduledModelPicker({ value, disabled, onChange }: {
   const images = useMemo(() => imageGenerationBindings(settings?.imageGenerationModels,
     settings?.imageGeneration), [settings?.imageGenerationModels, settings?.imageGeneration]);
   const selected = provider && composerModelsForProvider(provider, providerModels[provider.id], images)
-    .find(model => model.modelId === value.modelId);
+    .find(model => modelIdsMatch(model.modelId, value.modelId ?? ""));
   const thinkingProvider = thinkingProviderForModel(provider, value.modelId,
     provider ? providerModels[provider.id] : undefined);
   const thinkingLevel = thinkingLevelForProvider(thinkingProvider, value.thinkingLevel ?? "off");
   const controller = useComposerModelMenu({
-    mode: "agent", activeSessionId: draftId, provider, modelId: value.modelId,
+    mode: "agent", activeSessionId: null, provider, modelId: value.modelId,
     thinkingProvider, thinkingLevel, controlsBlocked: disabled,
     configureActiveSession: async configuration => {
       onChange({providerId: configuration.providerId ?? value.providerId,
