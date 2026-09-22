@@ -8,6 +8,16 @@ export const fr = {
     "loadingView": "Chargement de la vue…",
     "uiCrashed": "Un problème s'est produit avec l'interface"
   },
+  "startup": {
+    "slowTitle": "Démarrage toujours en cours…",
+    "slowBody": "PI-Desktop met plus de temps que d'habitude à joindre votre service local. Le démarrage peut encore aboutir de lui-même — vous pouvez patienter ou récupérer d'abord les journaux.",
+    "stalledTitle": "PI-Desktop n'a pas pu terminer son démarrage",
+    "stalledBody": "Cette fenêtre n'a jamais reçu vos discussions ni vos paramètres, donc rien ne peut encore s'afficher. Rien n'a été supprimé — vos données sont toujours sur le disque.",
+    "retrying": "Nouvelle tentative…",
+    "copyDiagnostics": "Copier les diagnostics",
+    "diagnosticsCopied": "Diagnostics copiés",
+    "diagnosticsFailed": "Impossible de copier les diagnostics"
+  },
   "common": {
     "close": "Fermer",
     "cancel": "Annuler",
@@ -233,6 +243,8 @@ export const fr = {
     "slashGroupExtensions": "Commandes d'extension",
     "slashGroupSkills": "Compétences",
     "slashEmpty": "Aucune commande correspondante",
+"slashCommandSourceUnavailable": "Liste des commandes indisponible, rien n'a été envoyé. Réessayez.",
+    "sessionTranscriptEmpty": "L'historique de cette session n'a pas pu être lu. Rouvrez la session pour réessayer.",
     "fileMenu": "Références de fichiers",
     "removeFileReference": "Supprimer la référence de fichier {{name}}",
     "messageAttachments": "Pièces jointes à ce message",
@@ -595,7 +607,8 @@ sklm: {
       namePlaceholder: "Nom de la source",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "Cette skill dépasse la limite de 128 Ko une fois les ressources jointes.",
-      sourceUnsafe: "L'URL doit être une adresse https publique",
+      sourceUnsafe:
+        "L'URL source doit être une adresse http ou https, pas une adresse de métadonnées cloud. Pour du HTTP en clair sur votre machine ou votre réseau local, activez « Mode réseau souple » dans les réglages Réseau.",
       pageInfo: "Page {{page}} sur {{pages}} · {{total}} skills",
       pagePrev: "Précédente",
       pageNext: "Suivante",
@@ -679,9 +692,6 @@ sklm: {
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
       endpoint: "WebDAV URL",
       endpointPlaceholder: "https://dav.example.com/",
-      allowInsecureHttp: "Allow HTTP for a trusted LAN address",
-      allowInsecureHttpWarning:
-        "HTTP does not encrypt WebDAV credentials. Enable only for a trusted LAN address; public HTTP endpoints are rejected.",
       remoteMode: "Compatibilité du serveur",
       remoteModeHint:
         "Le mode strict exige des écritures conditionnelles fiables. Utilisez le mode de compatibilité uniquement avec un serveur qui ignore If-Match/If-None-Match.",
@@ -720,6 +730,19 @@ sklm: {
       save: "Save and sync",
       configured: "Cloud sync configuration saved.",
       syncNow: "Sync now",
+      progressTitle: "Synchronisation…",
+      progress: {
+        phase: {
+          capture: "Collecte des modifications locales",
+          download: "Téléchargement des modifications distantes",
+          merge: "Fusion des modifications",
+          upload: "Envoi des modifications",
+          apply: "Application des modifications",
+          cleanup: "Nettoyage",
+        },
+        objects: "{{done}} / {{total}}",
+        bytes: "{{done}} / {{total}}",
+      },
       statusTitle: "Sync status",
       statusLabel: "Current state",
       lastSuccess: "Last successful run: {{date}}",
@@ -948,7 +971,8 @@ sklm: {
       namePlaceholder: "Nom de la source",
       urlHint: "https://… (endpoint de registre ou JSON de catalogue)",
       officialSource: "Registre officiel",
-      sourceUnsafe: "L'URL doit être une adresse https publique",
+      sourceUnsafe:
+        "L'URL source doit être une adresse http ou https, pas une adresse de métadonnées cloud. Pour du HTTP en clair sur votre machine ou votre réseau local, activez « Mode réseau souple » dans les réglages Réseau.",
       pageInfo: "Page {{page}} sur {{pages}} · {{total}} serveurs",
       pagePrev: "Précédente",
       pageNext: "Suivante",
@@ -1144,8 +1168,14 @@ sklm: {
     "proxyUrlPlaceholder": "chaussettes5://127.0.0.1:1080",
     "proxyBypass": "Contourner",
     "proxyBypassDesc": "Hôtes qui ignorent le proxy.",
-    proxyFakeIp: "Autoriser les fake-IP du proxy pour les sources du marché",
-    proxyFakeIpDesc: "À activer uniquement avec un proxy transparent de routeur/TUN. Les autres adresses privées restent bloquées.",
+    networkRelaxedMode: "Mode réseau souple",
+    networkRelaxedModeDesc:
+      "Les adresses que vous saisissez vous-même sont accessibles — un service de modèles, un serveur MCP, une source du marché ou un dépôt git sur cette machine ou votre réseau local. Le HTTP en clair est autorisé et les réponses fake-IP d'un proxy transparent sont tolérées.",
+    networkRelaxedModeStrictDesc:
+      "Seuls les points de terminaison HTTPS publics restent accessibles : une adresse du réseau local ou une connexion en clair est refusée, tout comme les réponses fake-IP du proxy.",
+    networkInsecureNoticeTitle: "HTTP en clair vers votre propre réseau",
+    networkInsecureNoticeBody:
+      "Vous accédez en HTTP non chiffré à une adresse que vous avez saisie, sur cette machine ou votre réseau local. Une personne sur le même segment de réseau peut peut-être lire les identifiants de ce trafic. Passez en mode strict dans les réglages Réseau pour refuser ces connexions.",
     "proxyInvalid": "Saisissez une URL http, https ou chaussettes5 avec un hôte.",
     "proxySaveError": "Impossible d'enregistrer le proxy.",
     "proxyTest": "Test",
@@ -1526,8 +1556,10 @@ sklm: {
     "legacyHint": "Modifiez et enregistrez la planification pour activer les exécutions automatiques.",
     "time": "Heure",
     "weekday": "Jour de la semaine",
-    "localTimeHint": "Utilise le fuseau horaire local. Gardez PI-Desktop ouvert ; les exécutions manquées sont ignorées. Les actions restreintes nécessitent une autorisation.",
+    "localTimeHint": "Utilise le fuseau horaire local. Gardez PI-Desktop ouvert ; les exécutions manquées sont ignorées.",
     "projectHint": "Le projet actuel est enregistré. Le modèle par défaut est utilisé.",
+    "autoPermissionHint": "Le mode Auto peut exécuter des actions restreintes sans confirmation. Utilisez-le uniquement pour des tâches fiables.",
+    "unavailableModel": "{{provider}} / {{model}} (indisponible)",
     "save": "Enregistrer la tâche",
     "cancel": "Annuler",
     "runs": "Historique",
@@ -1548,7 +1580,7 @@ sklm: {
     "title": "Planifié",
     "emptyTitle": "Aucune tâche planifiée",
     "create": "Créer une tâche",
-    "prompt": "Invite",
+    "prompt": "Instruction",
     "promptPlaceholder": "par ex. Résumez l'état de git et les problèmes ouverts chaque matin",
     "cadence": "Cadence",
     "cadenceManual": "Manuel",

@@ -8,6 +8,16 @@ export const es = {
     "loadingView": "Cargando vista…",
     "uiCrashed": "Algo salió mal con la interfaz"
   },
+  "startup": {
+    "slowTitle": "Aún iniciando…",
+    "slowBody": "PI-Desktop está tardando más de lo habitual en alcanzar tu servicio local. Puede que aún termine por sí solo — puedes esperar o recoger los registros primero.",
+    "stalledTitle": "PI-Desktop no pudo terminar de iniciarse",
+    "stalledBody": "Esta ventana nunca recibió tus chats y tu configuración, así que todavía no hay nada que mostrar. No se eliminó nada — tus datos siguen en el disco.",
+    "retrying": "Reintentando…",
+    "copyDiagnostics": "Copiar diagnósticos",
+    "diagnosticsCopied": "Diagnósticos copiados",
+    "diagnosticsFailed": "No se pudieron copiar los diagnósticos"
+  },
   "common": {
     "close": "Cerrar",
     "cancel": "Cancelar",
@@ -233,6 +243,8 @@ export const es = {
     "slashGroupExtensions": "Comandos de extensión",
     "slashGroupSkills": "Habilidades",
     "slashEmpty": "No hay comandos coincidentes",
+"slashCommandSourceUnavailable": "La lista de comandos no está disponible, así que no se envió nada. Inténtalo de nuevo.",
+    "sessionTranscriptEmpty": "No se pudo leer el historial de esta sesión. Vuelve a abrirla para intentarlo de nuevo.",
     "fileMenu": "Referencias de archivos",
     "removeFileReference": "Eliminar referencia de archivo {{name}}",
     "messageAttachments": "Archivos adjuntos en este mensaje",
@@ -595,7 +607,8 @@ sklm: {
       namePlaceholder: "Nombre de la fuente",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "Esta skill supera el límite de 128 KB del documento tras adjuntar recursos.",
-      sourceUnsafe: "La URL debe ser una dirección https pública",
+      sourceUnsafe:
+        "La URL de origen debe ser http o https, no una dirección de metadatos en la nube. Para usar http sin cifrar en tu equipo o la LAN, activa «Modo de red flexible» en los ajustes de Red.",
       pageInfo: "Página {{page}} de {{pages}} · {{total}} skills",
       pagePrev: "Anterior",
       pageNext: "Siguiente",
@@ -679,9 +692,6 @@ sklm: {
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
       endpoint: "WebDAV URL",
       endpointPlaceholder: "https://dav.example.com/",
-      allowInsecureHttp: "Allow HTTP for a trusted LAN address",
-      allowInsecureHttpWarning:
-        "HTTP does not encrypt WebDAV credentials. Enable only for a trusted LAN address; public HTTP endpoints are rejected.",
       remoteMode: "Compatibilidad del servidor",
       remoteModeHint:
         "El modo estricto requiere escrituras condicionales fiables. Usa el modo de compatibilidad solo con servidores que ignoran If-Match/If-None-Match.",
@@ -720,6 +730,19 @@ sklm: {
       save: "Save and sync",
       configured: "Cloud sync configuration saved.",
       syncNow: "Sync now",
+      progressTitle: "Sincronizando…",
+      progress: {
+        phase: {
+          capture: "Recopilando cambios locales",
+          download: "Descargando cambios remotos",
+          merge: "Combinando cambios",
+          upload: "Subiendo cambios",
+          apply: "Aplicando cambios",
+          cleanup: "Limpiando",
+        },
+        objects: "{{done}} / {{total}}",
+        bytes: "{{done}} / {{total}}",
+      },
       statusTitle: "Sync status",
       statusLabel: "Current state",
       lastSuccess: "Last successful run: {{date}}",
@@ -948,7 +971,8 @@ sklm: {
       namePlaceholder: "Nombre de la fuente",
       urlHint: "https://… (endpoint de registro o JSON de catálogo)",
       officialSource: "Registro oficial",
-      sourceUnsafe: "La URL debe ser una dirección https pública",
+      sourceUnsafe:
+        "La URL de origen debe ser http o https, no una dirección de metadatos en la nube. Para usar http sin cifrar en tu equipo o la LAN, activa «Modo de red flexible» en los ajustes de Red.",
       pageInfo: "Página {{page}} de {{pages}} · {{total}} servidores",
       pagePrev: "Anterior",
       pageNext: "Siguiente",
@@ -1144,8 +1168,14 @@ sklm: {
     "proxyUrlPlaceholder": "calcetines5://127.0.0.1:1080",
     "proxyBypass": "Omitir",
     "proxyBypassDesc": "Hosts que omiten el proxy.",
-    proxyFakeIp: "Permitir fake-IP del proxy para fuentes del mercado",
-    proxyFakeIpDesc: "Actívalo solo con un proxy transparente de router/TUN. Las demás direcciones privadas siguen bloqueadas.",
+    networkRelaxedMode: "Modo de red flexible",
+    networkRelaxedModeDesc:
+      "Las direcciones que escribes tú son accesibles —un servicio de modelos, un servidor MCP, una fuente del mercado o un remoto de git en este equipo o en tu LAN—, se permite el HTTP sin cifrar y se toleran las respuestas fake-IP de un proxy transparente.",
+    networkRelaxedModeStrictDesc:
+      "Solo siguen siendo accesibles los endpoints HTTPS públicos: se rechazan las direcciones de la LAN y las conexiones en claro, y también las respuestas fake-IP del proxy.",
+    networkInsecureNoticeTitle: "HTTP sin cifrar hacia tu propia red",
+    networkInsecureNoticeBody:
+      "Estás accediendo por HTTP sin cifrar a una dirección que escribiste tú, en este equipo o en tu LAN. Alguien en el mismo segmento de red podría leer las credenciales de ese tráfico. Cambia a modo estricto en los ajustes de Red para rechazar esas conexiones.",
     "proxyInvalid": "Ingrese una URL http, https o Socks5 con un host.",
     "proxySaveError": "No se pudo guardar el proxy.",
     "proxyTest": "Prueba",
@@ -1526,8 +1556,10 @@ sklm: {
     "legacyHint": "Edita y guarda la programación para activar las ejecuciones automáticas.",
     "time": "Hora",
     "weekday": "Día de la semana",
-    "localTimeHint": "Usa la zona horaria local. Mantén PI-Desktop abierto; las ejecuciones omitidas no se recuperan. Las acciones restringidas requieren autorización.",
+    "localTimeHint": "Usa la zona horaria local. Mantén PI-Desktop abierto; las ejecuciones omitidas no se recuperan.",
     "projectHint": "Se guarda el proyecto actual. Se utiliza el modelo predeterminado.",
+    "autoPermissionHint": "El modo automático puede ejecutar acciones restringidas sin preguntar. Úsalo solo para tareas de confianza.",
+    "unavailableModel": "{{provider}} / {{model}} (no disponible)",
     "save": "Guardar tarea",
     "cancel": "Cancelar",
     "runs": "Historial",
@@ -1548,7 +1580,7 @@ sklm: {
     "title": "Programado",
     "emptyTitle": "No hay tareas programadas",
     "create": "Crear tarea",
-    "prompt": "Mensaje",
+    "prompt": "Instrucción",
     "promptPlaceholder": "p.e. Resumir el estado de git y los problemas abiertos cada mañana",
     "cadence": "Cadencia",
     "cadenceManual": "Manual",
