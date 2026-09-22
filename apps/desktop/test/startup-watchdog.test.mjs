@@ -2,8 +2,8 @@
  * Issue #831: a launch that never receives its initial state left the window on
  * the boot surface forever. These tests cover the watchdog's own bounds (they
  * are the contract that keeps a slow boot from being called a failure), its
- * timer ownership, the diagnostics report behind the copy action, and the
- * wiring that puts the recovery surface in front of the user.
+ * timer ownership, the retry path, the diagnostics report behind the copy
+ * action, and the wiring that puts the recovery surface in front of the user.
  */
 import { readAppSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
@@ -15,7 +15,6 @@ import {
   STARTUP_STALLED_MS,
   buildStartupDiagnostics,
   createStartupWatchdog,
-  startupPhaseFor,
 } from "../src/lib/startup-watchdog.ts";
 import { loadStyles } from "./helpers/styles.mjs";
 
@@ -23,6 +22,8 @@ const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 const [
   shell,
+  hook,
+  store,
   recovery,
   apiSource,
   mainIpc,
@@ -33,6 +34,8 @@ const [
   traditional,
 ] = await Promise.all([
   readAppSource(),
+  read("../src/features/app/useStartupWatchdog.ts"),
+  read("../src/stores/app-store.ts"),
   read("../src/components/StartupRecovery.tsx"),
   read("../src/lib/api.ts"),
   read("../electron/main/ipc/app-ipc.ts"),
@@ -59,6 +62,8 @@ function fakeScheduler() {
       },
     },
     armed: () => pending.size,
+    /** Waiting bounds, lowest first. */
+    bounds: () => [...pending.values()].map((entry) => entry.ms).sort((a, b) => a - b),
     fire: (ms) => {
       for (const [handle, entry] of [...pending]) {
         if (entry.ms !== ms) continue;
@@ -69,18 +74,9 @@ function fakeScheduler() {
   };
 }
 
-test("a boot is only slow after the hint, and only stalled after the ceiling", () => {
+test("the two bounds are the documented ones, above the RPC ceiling", () => {
   assert.equal(STARTUP_SLOW_HINT_MS, 30_000);
   assert.equal(STARTUP_STALLED_MS, 180_000);
-  assert.equal(startupPhaseFor(0), "starting");
-  assert.equal(startupPhaseFor(STARTUP_SLOW_HINT_MS - 1), "starting");
-  assert.equal(startupPhaseFor(STARTUP_SLOW_HINT_MS), "slow");
-  assert.equal(startupPhaseFor(STARTUP_STALLED_MS - 1), "slow");
-  assert.equal(startupPhaseFor(STARTUP_STALLED_MS), "stalled");
-  assert.equal(startupPhaseFor(9_999_999), "stalled");
-});
-
-test("the stalled bound outlives every startup read that can fail on its own", () => {
   // A renderer startup read that never settles rejects only at the shared RPC
   // ceiling. Declaring the boot stalled before that would turn a slow but
   // successful launch into an error screen, so the bound has to stay above it.
@@ -91,7 +87,7 @@ test("the stalled bound outlives every startup read that can fail on its own", (
   assert.ok(STARTUP_SLOW_HINT_MS < DEFAULT_RPC_TIMEOUT_MS);
 });
 
-test("the watchdog announces each bound once, in order", () => {
+test("the watchdog arms exactly those bounds and announces them in order", () => {
   const fake = fakeScheduler();
   const phases = [];
   const watchdog = createStartupWatchdog({
@@ -100,7 +96,7 @@ test("the watchdog announces each bound once, in order", () => {
   });
 
   watchdog.start();
-  assert.equal(fake.armed(), 2);
+  assert.deepEqual(fake.bounds(), [STARTUP_SLOW_HINT_MS, STARTUP_STALLED_MS]);
   // Arming is not a phase: nothing is published until a bound actually passes.
   assert.deepEqual(phases, []);
 
@@ -201,8 +197,13 @@ test("the recovery surface stays operable with no backend at all", () => {
   assert.match(recovery, /t\("errors\.action\.retry"\)/);
   assert.match(recovery, /t\("status\.openLogs"\)/);
   assert.match(recovery, /t\("tray\.quit"\)/);
-  // A copy that fails still says so instead of looking like a dead button.
+  // A retry in flight says so, and cannot be started twice from the button.
+  assert.match(recovery, /disabled=\{retrying\}/);
+  assert.match(recovery, /t\("startup\.retrying"\)/);
+  // A copy that fails still says so instead of looking like a dead button, and
+  // the label is announced rather than only re-drawn.
   assert.match(recovery, /setCopyState\("failed"\)/);
+  assert.match(recovery, /aria-live="polite">\{copyLabel\}/);
   assert.match(recovery, /startup\.diagnosticsCopied/);
   assert.match(recovery, /startup\.diagnosticsFailed/);
   // The version read is bounded: a wedged bridge must not hang the action.
@@ -214,23 +215,58 @@ test("the shell watches the wait and renders the recovery surface", () => {
   assert.match(shell, /useStartupWatchdog\(ready\)/);
   assert.match(shell, /import \{ StartupRecovery \} from "\.\.\/\.\.\/components\/StartupRecovery"/);
   assert.match(shell, /<StartupRecovery[\s\S]*onRetry=\{retryStartup\}/);
+  assert.match(shell, /<StartupRecovery[\s\S]*retrying=\{startupRetrying\}/);
   assert.match(shell, /startupPhase !== "starting"/);
   // Exactly one boot surface is mounted: the splash yields to the recovery.
   assert.match(shell, /const splash = showSplash && startupPhase === "starting"/);
-  // Window controls are the only ones Windows/Linux have; they must be there
-  // while the recovery surface owns the window.
-  assert.match(shell, /\{\(ready \|\| startupPhase !== "starting"\) && !showSplash \? \(/);
-  assert.match(shell, /startupWaitedMs/);
+});
+
+test("the boot surfaces keep the window controls, so a stuck launch is closable", () => {
+  // `showSplash` stays true while the shell is not ready, so a bare
+  // `!showSplash` test would leave the recovery surface with no controls at all
+  // on the frameless Windows/Linux builds. This is the regression that shipped
+  // once already: the assertion pins the phase-aware condition.
+  assert.match(
+    shell,
+    /\{\(ready && !showSplash\) \|\| startupPhase !== "starting" \? \(\s*<WindowControls \/>/,
+  );
+  assert.equal((shell.match(/<WindowControls\s*\/>/g) ?? []).length, 1);
+  assert.match(css, /\.app-shell:has\(> \.startup-recovery\) > \.window-controls \{\n\s+z-index: 1500;/);
+});
+
+test("the menu acknowledgement follows a retried startup too", () => {
+  // The first attempt's `finally` is exactly what never runs when the watchdog
+  // had to take over, so the shell must acknowledge readiness on `ready`.
+  assert.match(
+    shell,
+    /useEffect\(\(\) => \{\s*if \(!ready\) return;\s*void api\.menuRendererReady\(\)\.catch\(\(\) => undefined\);\s*\}, \[ready\]\);/,
+  );
 });
 
 test("the watchdog hook owns its timers and keeps the wait alive on retry", () => {
-  const hook = shell.match(/useStartupWatchdog\.ts[\s\S]*$/)?.[0] ?? shell;
   assert.match(hook, /return \(\) => watchdog\.stop\(\)/);
   assert.match(hook, /setAttempt\(\(current\) => current \+ 1\)/);
   // A boot that does finish must clear the phase, or the surface would outlive
   // the data it was covering.
-  assert.match(hook, /if \(ready\) \{\n\s+setPhase\("starting"\);/);
+  assert.match(hook, /if \(ready\) \{[\s\S]*setPhase\("starting"\);/);
   assert.match(hook, /void useAppStore\.getState\(\)\.bootstrap\(\)/);
+  // A retry restarts the clock without walking the visible phase backwards, and
+  // only one retry may be in flight.
+  assert.match(hook, /PHASE_RANK\[next\] > PHASE_RANK\[current\] \? next : current/);
+  assert.match(hook, /if \(retryingRef\.current\) return;/);
+  assert.match(hook, /if \(next === "stalled"\) \{[\s\S]*setRetrying\(false\)/);
+});
+
+test("a superseded startup attempt cannot publish over the retry", () => {
+  // The retried attempt is usually one that never settled: without a generation
+  // guard it could land after the retry already showed the shell and reset the
+  // view the user is working in.
+  assert.match(store, /const generation = \+\+bootstrapGeneration;/);
+  assert.equal(
+    (store.match(/if \(generation !== bootstrapGeneration\) return;/g) ?? []).length,
+    2,
+    "both the success and the failure path must refuse to publish",
+  );
 });
 
 test("quitting from the recovery surface is main-process owned", () => {
@@ -244,10 +280,6 @@ test("the recovery surface layers above the splash and below the window controls
   assert.match(css, /\.startup-recovery \{[\s\S]*position: fixed;[\s\S]*inset: 0;/);
   assert.match(css, /\.app-shell > \.startup-splash \{\n\s+z-index: 1300;/);
   assert.match(css, /\.startup-recovery \{[\s\S]*z-index: 1400;/);
-  assert.match(
-    css,
-    /\.app-shell:has\(> \.startup-recovery\) > \.window-controls \{\n\s+z-index: 1500;/,
-  );
   assert.match(css, /\.startup-recovery-actions \{[\s\S]*flex-wrap: wrap;/);
   // The surface is draggable like the splash, but its controls are not.
   assert.match(css, /\.startup-recovery \{[\s\S]*-webkit-app-region: drag;/);
@@ -269,6 +301,7 @@ test("the recovery copy is catalog-backed in every mirrored locale", () => {
       "copyDiagnostics",
       "diagnosticsCopied",
       "diagnosticsFailed",
+      "retrying",
     ]) {
       assert.match(catalog, new RegExp(`${key}:`), `${name} is missing startup.${key}`);
     }

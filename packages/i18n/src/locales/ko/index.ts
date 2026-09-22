@@ -13,6 +13,7 @@ export const ko = {
     slowBody: "PI-Desktop이 로컬 서비스에 연결되는 데 평소보다 오래 걸리고 있습니다. 스스로 완료될 수도 있으니 기다리거나, 먼저 로그를 수집해 두세요.",
     stalledTitle: "PI-Desktop이 시작을 완료하지 못했습니다",
     stalledBody: "이 창은 대화와 설정을 받지 못해 아직 표시할 내용이 없습니다. 삭제된 것은 없으며 데이터는 여전히 디스크에 있습니다.",
+    retrying: "다시 시도하는 중…",
     copyDiagnostics: "진단 정보 복사",
     diagnosticsCopied: "진단 정보 복사됨",
     diagnosticsFailed: "진단 정보를 복사하지 못했습니다",

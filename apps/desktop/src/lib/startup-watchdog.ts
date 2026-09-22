@@ -39,18 +39,6 @@ export const STARTUP_SLOW_HINT_MS = 30_000;
  */
 export const STARTUP_STALLED_MS = 180_000;
 
-/** Phase for the time already spent waiting for the initial state. */
-export function startupPhaseFor(
-  elapsedMs: number,
-  bounds: { slowMs?: number; stalledMs?: number } = {},
-): StartupPhase {
-  const slowMs = bounds.slowMs ?? STARTUP_SLOW_HINT_MS;
-  const stalledMs = bounds.stalledMs ?? STARTUP_STALLED_MS;
-  if (elapsedMs >= stalledMs) return "stalled";
-  if (elapsedMs >= slowMs) return "slow";
-  return "starting";
-}
-
 /** The two timers a watchdog needs; injectable so tests need no real clock. */
 export type StartupWatchdogScheduler = {
   setTimeout: (handler: () => void, ms: number) => unknown;
@@ -124,9 +112,10 @@ export type StartupDiagnosticsInput = {
  * The report behind "copy diagnostics".
  *
  * Built only from what the renderer already holds: asking the local service for
- * more would repeat the very call that is not answering. Deliberately plain text
- * so it can be pasted into a bug report as-is, and deliberately free of anything
- * the user did not already see (no paths, tokens, or session content).
+ * more would repeat the very call that is not answering. Plain text so it can be
+ * pasted into a bug report as-is, and limited to facts the user already saw — no
+ * session content, no file paths, no credentials. The error and reported-down
+ * text it carries is the app's own message, the same one the user is looking at.
  */
 export function buildStartupDiagnostics(input: StartupDiagnosticsInput): string {
   const seconds = Math.round(input.elapsedMs / 1000);

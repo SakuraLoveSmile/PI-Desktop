@@ -27,12 +27,15 @@ export function StartupRecovery({
   phase,
   waitedMs,
   onRetry,
+  retrying,
   down,
 }: {
   phase: StartupPhase;
   /** Waited time, read when the report is copied — never during render. */
   waitedMs: () => number;
   onRetry: () => void;
+  /** True while the retry the user asked for is still in flight. */
+  retrying?: boolean;
   /** What the main process last reported as down, when it reported anything. */
   down?: { component?: string; message?: string } | null;
 }) {
@@ -122,8 +125,9 @@ export function StartupRecovery({
               type="button"
               className="btn btn-primary"
               onClick={onRetry}
+              disabled={retrying}
             >
-              {t("errors.action.retry")}
+              {retrying ? t("startup.retrying") : t("errors.action.retry")}
             </button>
           )}
           <button
@@ -138,7 +142,8 @@ export function StartupRecovery({
             className="btn btn-secondary"
             onClick={() => void copyDiagnostics()}
           >
-            {copyLabel}
+            {/* The label is the only outcome of the copy: announce it. */}
+            <span aria-live="polite">{copyLabel}</span>
           </button>
           <button
             type="button"

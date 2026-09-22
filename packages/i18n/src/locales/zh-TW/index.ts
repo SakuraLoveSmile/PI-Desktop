@@ -13,6 +13,7 @@ export const zhTW = {
     slowBody: "PI-Desktop 連接本地服務比平時更久，可能還是會自己完成啟動——你可以繼續等待，也可以先把日誌收好。",
     stalledTitle: "PI-Desktop 未能完成啟動",
     stalledBody: "這個視窗一直沒拿到你的會話與設定，所以暫時沒有內容可以顯示。資料沒有被刪除，仍在磁碟上。",
+    retrying: "正在重試…",
     copyDiagnostics: "複製診斷資訊",
     diagnosticsCopied: "診斷資訊已複製",
     diagnosticsFailed: "無法複製診斷資訊",

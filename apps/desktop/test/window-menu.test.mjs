@@ -166,11 +166,11 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   assert.match(controlsSource, /ariaLabel=\{t\("window\.minimize"/);
   assert.match(controlsSource, /ariaLabel=\{t\("window\.close"/);
   assert.equal((appSource.match(/<WindowControls\s*\/>/g) ?? []).length, 1);
-  // The controls are rendered under the boot surfaces too, so a window that
+  // The controls are rendered under the recovery surface too, so a window that
   // never reaches the shell is still closable (issue #831).
   assert.match(
     appSource,
-    /\{shell\}[\s\S]*?\{\(ready \|\| startupPhase !== "starting"\) && !showSplash \?/,
+    /\{shell\}[\s\S]*?\{\(ready && !showSplash\) \|\| startupPhase !== "starting" \?/,
   );
   assert.match(
     stylesSource,

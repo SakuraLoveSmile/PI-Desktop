@@ -614,11 +614,11 @@ test("preview mode keeps shell actions and restores routes before navigation", (
   assert.match(appSource, /className=\{cx\([\s\S]*?"window-chrome-row"/);
   assert.match(appSource, /data-nav="new-task"/);
   assert.match(appSource, /<CollapsedTitlebarActions[\s\S]*?onNewTask=/);
-  // The boot surfaces (splash and startup recovery) own the window before the
-  // shell is ready, so the controls follow whichever of them is up.
+  // `showSplash` stays true until the shell is ready, so the controls have to
+  // follow the boot surface that is actually up (splash or startup recovery).
   assert.match(
     appSource,
-    /\{\(ready \|\| startupPhase !== "starting"\) && !showSplash \? \(\s*<WindowControls \/>/,
+    /\{\(ready && !showSplash\) \|\| startupPhase !== "starting" \? \(\s*<WindowControls \/>/,
   );
   assert.match(appSource, /const workPanelMaximizedRef = useRef\(false\)/);
   assert.match(

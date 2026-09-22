@@ -13,6 +13,7 @@ export const tr = {
     slowBody: "PI-Desktop yerel servise ulaşmakta normalden uzun sürüyor. Kendiliğinden tamamlanabilir — bekleyebilir ya da önce günlükleri toplayabilirsiniz.",
     stalledTitle: "PI-Desktop başlatmayı tamamlayamadı",
     stalledBody: "Bu pencere sohbetlerinizi ve ayarlarınızı hiç almadı, bu yüzden henüz gösterilecek bir şey yok. Hiçbir şey silinmedi — verileriniz hâlâ diskte.",
+    retrying: "Yeniden deneniyor…",
     copyDiagnostics: "Tanılamaları kopyala",
     diagnosticsCopied: "Tanılamalar kopyalandı",
     diagnosticsFailed: "Tanılamalar kopyalanamadı",

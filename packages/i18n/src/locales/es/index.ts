@@ -13,6 +13,7 @@ export const es = {
     "slowBody": "PI-Desktop está tardando más de lo habitual en alcanzar tu servicio local. Puede que aún termine por sí solo — puedes esperar o recoger los registros primero.",
     "stalledTitle": "PI-Desktop no pudo terminar de iniciarse",
     "stalledBody": "Esta ventana nunca recibió tus chats y tu configuración, así que todavía no hay nada que mostrar. No se eliminó nada — tus datos siguen en el disco.",
+    "retrying": "Reintentando…",
     "copyDiagnostics": "Copiar diagnósticos",
     "diagnosticsCopied": "Diagnósticos copiados",
     "diagnosticsFailed": "No se pudieron copiar los diagnósticos"

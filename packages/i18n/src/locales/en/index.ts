@@ -11,6 +11,7 @@ export const en = {
     slowBody: "PI-Desktop is taking longer than usual to reach your local service. It may still finish on its own — you can wait, or collect the logs first.",
     stalledTitle: "PI-Desktop couldn't finish starting",
     stalledBody: "This window never received your chats and settings, so there is nothing to show yet. Nothing was deleted — your data is still on disk.",
+    retrying: "Trying again…",
     copyDiagnostics: "Copy diagnostics",
     diagnosticsCopied: "Diagnostics copied",
     diagnosticsFailed: "Couldn't copy diagnostics",

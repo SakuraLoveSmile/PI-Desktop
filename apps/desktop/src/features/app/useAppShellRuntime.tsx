@@ -551,6 +551,16 @@ export function useAppShellRuntime() {
     });
   }, [bootstrap]);
 
+  // The menu/tray acknowledgement also follows `ready`, not only the first
+  // attempt's `finally`. A startup the watchdog retried is exactly one whose
+  // first attempt never settled, so that `finally` would never run and main
+  // would keep gating menu commands and tray activation on a shell that is
+  // already on screen. Repeating the call is harmless.
+  useEffect(() => {
+    if (!ready) return;
+    void api.menuRendererReady().catch(() => undefined);
+  }, [ready]);
+
   // The Host owns the prompt queue (D375); mirror it whenever the visible
   // session changes so a reload or a switch shows the durable entries.
   useEffect(() => {
@@ -822,6 +832,7 @@ export function useAppShellRuntime() {
     phase: startupPhase,
     waitedMs: startupWaitedMs,
     retry: retryStartup,
+    retrying: startupRetrying,
   } = useStartupWatchdog(ready);
   const showSplash = splashPhase !== "done";
   // The splash and the recovery surface answer the same question ("nothing to
@@ -915,6 +926,7 @@ export function useAppShellRuntime() {
     startupPhase,
     startupWaitedMs,
     retryStartup,
+    startupRetrying,
     sidebarToggleShortcut,
     workPanelToggleTooltip,
   };

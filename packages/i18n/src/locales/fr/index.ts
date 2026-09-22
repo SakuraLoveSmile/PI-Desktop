@@ -13,6 +13,7 @@ export const fr = {
     "slowBody": "PI-Desktop met plus de temps que d'habitude à joindre votre service local. Le démarrage peut encore aboutir de lui-même — vous pouvez patienter ou récupérer d'abord les journaux.",
     "stalledTitle": "PI-Desktop n'a pas pu terminer son démarrage",
     "stalledBody": "Cette fenêtre n'a jamais reçu vos discussions ni vos paramètres, donc rien ne peut encore s'afficher. Rien n'a été supprimé — vos données sont toujours sur le disque.",
+    "retrying": "Nouvelle tentative…",
     "copyDiagnostics": "Copier les diagnostics",
     "diagnosticsCopied": "Diagnostics copiés",
     "diagnosticsFailed": "Impossible de copier les diagnostics"

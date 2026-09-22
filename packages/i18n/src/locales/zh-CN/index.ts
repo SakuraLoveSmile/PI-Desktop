@@ -13,6 +13,7 @@ export const zhCN = {
     slowBody: "PI-Desktop 连接本地服务比平时更久，可能还会自己完成启动——你可以继续等待，也可以先把日志收好。",
     stalledTitle: "PI-Desktop 未能完成启动",
     stalledBody: "这个窗口一直没拿到你的会话和设置，所以暂时没有内容可以显示。数据没有被删除，仍在磁盘上。",
+    retrying: "正在重试…",
     copyDiagnostics: "复制诊断信息",
     diagnosticsCopied: "诊断信息已复制",
     diagnosticsFailed: "无法复制诊断信息",

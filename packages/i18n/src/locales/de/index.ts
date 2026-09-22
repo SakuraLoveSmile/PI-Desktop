@@ -13,6 +13,7 @@ export const de = {
     "slowBody": "PI-Desktop braucht länger als sonst, um Ihren lokalen Dienst zu erreichen. Der Start kann noch von selbst abschließen — Sie können warten oder zuerst die Protokolle sichern.",
     "stalledTitle": "PI-Desktop konnte den Start nicht abschließen",
     "stalledBody": "Dieses Fenster hat Ihre Chats und Einstellungen nie erhalten, daher gibt es noch nichts anzuzeigen. Es wurde nichts gelöscht — Ihre Daten sind noch auf dem Datenträger.",
+    "retrying": "Erneuter Versuch…",
     "copyDiagnostics": "Diagnosen kopieren",
     "diagnosticsCopied": "Diagnosen kopiert",
     "diagnosticsFailed": "Diagnosen konnten nicht kopiert werden"
