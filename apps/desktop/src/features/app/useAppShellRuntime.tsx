@@ -29,6 +29,7 @@ import {
 import { browserPluginTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
 import { useSidebarTransition } from "./useSidebarTransition";
+import { useStartupWatchdog } from "./useStartupWatchdog";
 import { useTraySessions } from "./useTraySessions";
 
 const MODIFIER_ONLY_KEYS = new Set([
@@ -817,8 +818,17 @@ export function useAppShellRuntime() {
     };
   }, [ready]);
 
+  const {
+    phase: startupPhase,
+    waitedMs: startupWaitedMs,
+    retry: retryStartup,
+  } = useStartupWatchdog(ready);
   const showSplash = splashPhase !== "done";
-  const splash = showSplash ? (
+  // The splash and the recovery surface answer the same question ("nothing to
+  // show yet"), and on macOS the shell hides every child except the splash while
+  // it animates. Exactly one of them is mounted, so neither has to fight the
+  // other's layering.
+  const splash = showSplash && startupPhase === "starting" ? (
     <StartupSplash exiting={splashPhase === "exiting"} />
   ) : null;
 
@@ -902,6 +912,9 @@ export function useAppShellRuntime() {
     setArchMismatch,
     showSplash,
     splash,
+    startupPhase,
+    startupWaitedMs,
+    retryStartup,
     sidebarToggleShortcut,
     workPanelToggleTooltip,
   };

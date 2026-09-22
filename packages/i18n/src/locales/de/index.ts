@@ -8,6 +8,15 @@ export const de = {
     "loadingView": "Ansicht wird geladen…",
     "uiCrashed": "Mit der Schnittstelle ist ein Fehler aufgetreten"
   },
+  "startup": {
+    "slowTitle": "Startet noch…",
+    "slowBody": "PI-Desktop braucht länger als sonst, um Ihren lokalen Dienst zu erreichen. Der Start kann noch von selbst abschließen — Sie können warten oder zuerst die Protokolle sichern.",
+    "stalledTitle": "PI-Desktop konnte den Start nicht abschließen",
+    "stalledBody": "Dieses Fenster hat Ihre Chats und Einstellungen nie erhalten, daher gibt es noch nichts anzuzeigen. Es wurde nichts gelöscht — Ihre Daten sind noch auf dem Datenträger.",
+    "copyDiagnostics": "Diagnosen kopieren",
+    "diagnosticsCopied": "Diagnosen kopiert",
+    "diagnosticsFailed": "Diagnosen konnten nicht kopiert werden"
+  },
   "common": {
     "close": "Schließen",
     "cancel": "Abbrechen",

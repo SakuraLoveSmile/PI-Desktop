@@ -8,6 +8,15 @@ export const tr = {
     loadingView: "Görünüm yükleniyor…",
     uiCrashed: "Arayüzde bir sorun oluştu",
   },
+  startup: {
+    slowTitle: "Hâlâ başlatılıyor…",
+    slowBody: "PI-Desktop yerel servise ulaşmakta normalden uzun sürüyor. Kendiliğinden tamamlanabilir — bekleyebilir ya da önce günlükleri toplayabilirsiniz.",
+    stalledTitle: "PI-Desktop başlatmayı tamamlayamadı",
+    stalledBody: "Bu pencere sohbetlerinizi ve ayarlarınızı hiç almadı, bu yüzden henüz gösterilecek bir şey yok. Hiçbir şey silinmedi — verileriniz hâlâ diskte.",
+    copyDiagnostics: "Tanılamaları kopyala",
+    diagnosticsCopied: "Tanılamalar kopyalandı",
+    diagnosticsFailed: "Tanılamalar kopyalanamadı",
+  },
   /** Verbs and states that mean the same thing wherever they appear. */
   common: {
     close: "Kapat",

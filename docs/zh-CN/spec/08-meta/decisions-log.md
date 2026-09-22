@@ -4677,3 +4677,19 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `apps/desktop/test/default-model-display.test.mjs` 与
   `apps/desktop/test/image-generation-default.test.mjs` 固定，
   `provider-model-config.test.mjs` 断言新增分支会走这两个判断。
+
+## 2026-09-22 —— 从未拿到初始状态的渲染器有了有界表面与退出通道（D613）
+
+- 渲染器的启动过程本身没有超时：`bootstrap()` 要么发布初始状态，要么什么都不发布，
+  因此一次始终没有落地的读取会让窗口一直停在启动表面上——没有菜单、没有数据，除了
+  强杀进程无事可做（issue #831）。渲染器现在自己监视这段等待：
+  `STARTUP_SLOW_HINT_MS`（30 秒）在不判定启动失败的前提下为启动表面加上日志、诊断与
+  退出，`STARTUP_STALLED_MS`（180 秒）把它变成恢复表面，后者还提供重跑
+  `bootstrap()` 的重试。
+- 两个界限都高于 main↔host 的 RPC 上限（`DEFAULT_RPC_TIMEOUT_MS`，130 秒），因此慢
+  但成功的启动不会被读成失败；看门狗从不取消它所监视的启动，成功完成的启动会用 shell
+  替换该表面。恢复表面替换启动画面（同一时刻只挂载一个启动表面），渲染器绘制的窗口
+  控制按钮保持在其之上，因此无边框的 Windows/Linux 窗口始终可以关闭。
+- 渲染器新增退出通道 `pi-desktop/app/quit`（`api.quitApp()`），其处理函数与“退出”
+  菜单项一样调用 `app.quit()`，因此有序关停、确认对话框和关闭行为都仍是应用已有的
+  那一套。参见 `03-runtime/07-process-model.md` §3 与 E2E-076。
