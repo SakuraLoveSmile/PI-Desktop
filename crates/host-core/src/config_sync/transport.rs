@@ -5,6 +5,7 @@ use std::net::IpAddr;
 use uuid::Uuid;
 
 const MAX_REMOTE_OBJECT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_REMOTE_LIST_ENTRIES: usize = 4096;
 
 #[derive(Debug, Clone)]
 pub struct WebDavConfig {
@@ -19,6 +20,7 @@ pub struct WebDavConfig {
 #[derive(Debug, Clone)]
 pub struct ProbeResult {
     pub conditional_writes: bool,
+    pub append_only: bool,
     pub missing_object_status: Option<u16>,
 }
 
@@ -238,6 +240,96 @@ impl WebDavTransport {
         Ok(Some((Self::limited_bytes(response).await?, etag)))
     }
 
+    pub async fn put_unconditional(&self, relative: &str, body: Vec<u8>) -> Result<()> {
+        let response = self
+            .send(Method::PUT, relative, Some(body), HeaderMap::new())
+            .await?;
+        if !response.status().is_success() {
+            bail!(
+                "CONFIG_SYNC_REMOTE: WebDAV unconditional write returned {}",
+                response.status()
+            );
+        }
+        Ok(())
+    }
+
+    /// List direct children of a WebDAV collection. Append-only compatibility
+    /// mode uses this to discover per-device heads without overwriting a
+    /// shared mutable head. The returned names are intentionally opaque; the
+    /// caller validates them against its domain-specific identifier rules.
+    pub async fn list_children(&self, relative: &str) -> Result<Vec<String>> {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            reqwest::header::HeaderName::from_static("depth"),
+            HeaderValue::from_static("1"),
+        );
+        headers.insert(
+            reqwest::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/xml; charset=utf-8"),
+        );
+        let body = br#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:"><D:prop><D:resourcetype/></D:prop></D:propfind>"#
+            .to_vec();
+        let response = self
+            .send(
+                Method::from_bytes(b"PROPFIND").expect("PROPFIND is a valid method"),
+                relative,
+                Some(body),
+                headers,
+            )
+            .await?;
+        if response.status().as_u16() == 405 || response.status().as_u16() == 501 {
+            bail!("CONFIG_SYNC_UNSUPPORTED: WebDAV directory listing is not supported");
+        }
+        if response.status().as_u16() != 207 && !response.status().is_success() {
+            bail!(
+                "CONFIG_SYNC_REMOTE: WebDAV directory listing returned {}",
+                response.status()
+            );
+        }
+        let body = Self::limited_bytes(response).await?;
+        let text = String::from_utf8(body).context("decode WebDAV directory listing")?;
+        let collection_url = self.url(relative)?;
+        let collection_path = collection_url.path().trim_end_matches('/').to_string();
+        let collection_origin = (
+            collection_url.scheme().to_string(),
+            collection_url.host_str().map(str::to_string),
+            collection_url.port_or_known_default(),
+        );
+        let hrefs = regex::Regex::new(
+            r"(?is)<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?href[^>]*>(.*?)</(?:[A-Za-z_][A-Za-z0-9_.-]*:)?href\s*>",
+        )
+        .expect("static WebDAV href expression")
+        .captures_iter(&text)
+        .filter_map(|capture| capture.get(1).map(|value| value.as_str().trim()))
+        .map(xml_unescape)
+        .filter_map(|href| {
+            let href = href
+                .split(['?', '#'])
+                .next()
+                .unwrap_or(&href);
+            let href_url = self.base.join(href).ok()?;
+            let href_origin = (
+                href_url.scheme().to_string(),
+                href_url.host_str().map(str::to_string),
+                href_url.port_or_known_default(),
+            );
+            if href_origin != collection_origin {
+                return None;
+            }
+            let child_path = href_url.path().trim_end_matches('/');
+            let prefix = format!("{collection_path}/");
+            let name = child_path.strip_prefix(&prefix)?;
+            (!name.is_empty() && !name.contains('/')).then(|| name.to_string())
+        })
+        .take(MAX_REMOTE_LIST_ENTRIES + 1)
+        .collect::<Vec<_>>();
+        if hrefs.len() > MAX_REMOTE_LIST_ENTRIES {
+            bail!("CONFIG_SYNC_LIMIT_EXCEEDED: WebDAV directory has too many entries");
+        }
+        Ok(hrefs)
+    }
+
     pub async fn put_if_none(&self, relative: &str, body: Vec<u8>) -> Result<bool> {
         let mut headers = HeaderMap::new();
         headers.insert(IF_NONE_MATCH, HeaderValue::from_static("*"));
@@ -321,6 +413,12 @@ impl WebDavTransport {
             .get(&probe)
             .await?
             .is_some_and(|(bytes, _)| bytes == second_body);
+        let probe_name = probe.rsplit('/').next().unwrap_or_default();
+        let append_only = match self.list_children(".probe").await {
+            Ok(children) => children.iter().any(|child| child == probe_name),
+            Err(error) if error.to_string().starts_with("CONFIG_SYNC_UNSUPPORTED") => false,
+            Err(error) => return Err(error),
+        };
         self.delete(&probe).await?;
         let missing_object_status = match self
             .send(Method::GET, &probe, None, HeaderMap::new())
@@ -336,9 +434,19 @@ impl WebDavTransport {
                 && matched_update
                 && stale_rejected
                 && updated_readable,
+            append_only,
             missing_object_status,
         })
     }
+}
+
+fn xml_unescape(value: &str) -> String {
+    value
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
 }
 
 fn strong_etag(headers: &HeaderMap) -> Option<String> {
@@ -364,7 +472,7 @@ pub fn remote_error_is_offline(error: &anyhow::Error) -> bool {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeSet, HashMap, HashSet};
     use std::sync::{Arc, Mutex};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
@@ -444,6 +552,7 @@ pub(crate) mod tests {
             200 => "OK",
             201 => "Created",
             204 => "No Content",
+            207 => "Multi-Status",
             404 => "Not Found",
             405 => "Method Not Allowed",
             412 => "Precondition Failed",
@@ -490,6 +599,39 @@ pub(crate) mod tests {
                         (status, Vec::new(), None)
                     } else {
                         (404, Vec::new(), None)
+                    }
+                }
+                "PROPFIND" => {
+                    let collection = path.trim_end_matches('/');
+                    if !state.collections.contains(collection) {
+                        (404, Vec::new(), None)
+                    } else {
+                        let prefix = format!("{collection}/");
+                        let mut entries = BTreeSet::new();
+                        entries.insert(format!("{collection}/"));
+                        for candidate in state
+                            .collections
+                            .iter()
+                            .map(String::as_str)
+                            .chain(state.objects.keys().map(String::as_str))
+                        {
+                            let Some(child) = candidate.strip_prefix(&prefix) else {
+                                continue;
+                            };
+                            if !child.is_empty() && !child.contains('/') {
+                                entries.insert(candidate.to_string());
+                            }
+                        }
+                        let mut xml = String::from(
+                            r#"<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">"#,
+                        );
+                        for entry in entries {
+                            xml.push_str(&format!(
+                                "<D:response><D:href>{entry}</D:href></D:response>"
+                            ));
+                        }
+                        xml.push_str("</D:multistatus>");
+                        (207, xml.into_bytes(), None)
                     }
                 }
                 "PUT" => {
@@ -539,6 +681,10 @@ pub(crate) mod tests {
 
     pub(crate) async fn fixture(weak_etag: bool) -> Fixture {
         fixture_with_options(weak_etag, None, false).await
+    }
+
+    pub(crate) async fn fixture_ignoring_preconditions() -> Fixture {
+        fixture_with_options(false, None, true).await
     }
 
     async fn fixture_with_options(
@@ -619,7 +765,9 @@ pub(crate) mod tests {
     async fn local_fixture_proves_conditional_writes() {
         let fixture = fixture(false).await;
         let transport = fixture_transport(&fixture.endpoint);
-        assert!(transport.probe().await.expect("probe").conditional_writes);
+        let probe = transport.probe().await.expect("probe");
+        assert!(probe.conditional_writes);
+        assert!(probe.append_only);
         fixture.task.abort();
     }
 
@@ -629,6 +777,26 @@ pub(crate) mod tests {
         let transport = fixture_transport(&fixture.endpoint);
         let probe = transport.probe().await.expect("probe");
         assert!(!probe.conditional_writes);
+        assert!(probe.append_only);
+        fixture.task.abort();
+    }
+
+    #[tokio::test]
+    async fn directory_listing_excludes_the_collection_itself() {
+        let fixture = fixture(false).await;
+        let transport = fixture_transport(&fixture.endpoint);
+        transport
+            .ensure_collection("heads")
+            .await
+            .expect("collection");
+        transport
+            .put_unconditional("heads/device-a", b"head".to_vec())
+            .await
+            .expect("head");
+        assert_eq!(
+            transport.list_children("heads").await.expect("listing"),
+            vec!["device-a".to_string()]
+        );
         fixture.task.abort();
     }
 

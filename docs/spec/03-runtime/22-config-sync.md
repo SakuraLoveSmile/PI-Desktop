@@ -69,8 +69,8 @@ fresh nonce. Resource object IDs are keyed content identifiers, so plaintext
 global hashes are not required. The vault envelope version is independent from
 the SQLite schema and is bumped when cryptographic derivation changes.
 
-The remote layout is an opaque header plus immutable revision/resource objects
-and one mutable encrypted head:
+The remote layout is an opaque header plus immutable revision/resource objects.
+Strict mode also has one mutable encrypted head:
 
 ```text
 <selected-directory>/header
@@ -79,19 +79,40 @@ and one mutable encrypted head:
 <selected-directory>/vault/<opaque-vault-id>/objects/<object-id>
 ```
 
-Initialization uses `If-None-Match: *`. Existing heads require a strong ETag
-and are published with `If-Match`. A failed precondition restarts
+Strict initialization uses `If-None-Match: *`. Existing heads require a strong
+ETag and are published with `If-Match`. A failed precondition restarts
 reconciliation from the newly read head; it never overwrites blindly. The
 capability probe writes a temporary object with conditional creation twice,
 obtains a strong ETag, verifies a matching `If-Match` update, and verifies a
 stale `If-Match` is rejected before the object is removed.
 
+The settings page also offers an explicit append-only compatibility mode for a
+server that ignores conditional headers. The probe must still prove bounded
+`PROPFIND` directory listing. Compatibility mode adds an opaque per-device
+pointer collection:
+
+```text
+<selected-directory>/vault/<opaque-vault-id>/heads/<device-id>
+```
+
+Each device overwrites only its own encrypted pointer and verifies it by
+reading it back. A sync lists all pointers, includes a legacy strict head when
+present, walks the bounded parent graph, removes ancestor pointers, and merges
+the remaining tips against the acknowledged base. New revisions and resources
+are unique immutable objects; an existing resource is read and authenticated
+before reuse. Compatibility mode retains immutable history and does not run
+remote cleanup because the server cannot provide a safe cross-device
+acknowledgement protocol. All devices sharing a vault must use the same mode.
+This mode is never selected silently and does not claim strict CAS guarantees.
+
 Some WebDAV gateways report a missing object as `502 Bad Gateway` instead of
 `404 Not Found`. The capability probe records this behavior for the selected
 endpoint after deleting its temporary object; subsequent reads treat only that
 observed status as absence. Other non-success responses remain errors. This
-does not relax conditional-write requirements: a server that ignores
-`If-None-Match` or `If-Match` remains unsupported for bidirectional sync.
+does not relax strict-mode conditional-write requirements: a server that
+ignores `If-None-Match` or `If-Match` is usable for bidirectional sync only
+after the user selects append-only compatibility mode and the directory-listing
+probe succeeds.
 
 HTTPS is required by default. The settings page may expose an explicit
 LAN-risk acknowledgement for HTTP, but Host accepts that exception only for
@@ -104,8 +125,10 @@ parameters are rejected.
 ## 4. Merge and activation
 
 The local encrypted base is the last acknowledged common revision. Capture,
-remote read, three-way merge, immutable object upload, CAS head publication,
-and local application are serialized per vault. Scalar settings merge by
+remote read, three-way merge, immutable object upload, head publication, and
+local application are serialized per vault. Strict mode uses CAS head
+publication; compatibility mode publishes a per-device pointer and merges
+discovered tips. Scalar settings merge by
 declared entity unit; provider records, MCP records, skill packages, and
 automation definitions are not merged as arbitrary JSON arrays. Tombstones
 represent explicit deletion; an unselected category is not deletion.
@@ -133,9 +156,13 @@ unchanged.
 ## 5. Settings workflow
 
 Settings → Cloud sync provides WebDAV endpoint credentials, vault password,
-device label, category selection, a capability test, sync-now, unlock, pause,
-folder mapping, approval/rejection, revision history/restore, vault-password
-rewrap, and disconnect controls. The renderer displays
+device label, server compatibility mode, category selection, a capability test,
+sync-now, unlock, pause, folder mapping, approval/rejection, revision
+history/restore, vault-password rewrap, and disconnect controls. Strict CAS is
+the default. Selecting append-only compatibility mode shows a persistent risk
+warning and requires confirmation before configuration is saved; its test
+success reports directory-listing support rather than conditional-write
+support. The renderer displays
 `notConfigured`, `locked`, `upToDate`, `localChangesPending`, `syncing`,
 `offline`, `unsupportedServer`, `conflict`, `awaitingActivation`, `paused`,
 and `error` as distinct states. Disconnect keeps local data and does not delete
@@ -162,12 +189,15 @@ unauthenticated local bundle is an error, not an empty state. Backup format
 versioning is independent from the SQLite schema; a newer format is rejected
 without truncating the local representation.
 
-Remote history retains the newest 30 reachable logical revisions and protects
-the current head, merge base, pending conflict references, and recovery points;
-unreferenced objects are deleted only after a grace period and successful
-publication. Restore publishes a new revision after a pre-restore encrypted
-local recovery point is written. A vault-password change CAS-updates the
-wrapped-key header without changing the vault data key; copied old keys are not
+Strict remote history retains the newest 30 reachable logical revisions and
+protects the current head, merge base, pending conflict references, and
+recovery points; unreferenced objects are deleted only after a grace period and
+successful publication. Compatibility mode retains immutable history because
+there is no safe cross-device cleanup acknowledgement. Restore publishes a new
+revision after a pre-restore encrypted local recovery point is written. A
+vault-password change CAS-updates the wrapped-key header in strict mode; in
+compatibility mode it uses an unconditional write followed by authenticated
+readback. Neither mode changes the vault data key; copied old keys are not
 cryptographically revoked, so device removal is not treated as revocation.
 
 Project-group mappings accept ordered multi-root bindings and preserve the

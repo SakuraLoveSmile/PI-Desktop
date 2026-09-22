@@ -8006,8 +8006,9 @@ identify the platform validation still needed.
 ### E2E-CONFIG-SYNC-webdav-portable-configuration
 
 - **Preconditions:** A built task candidate, isolated host profile, and a local
-  WebDAV fixture that supports strong ETags and conditional PUT. No real
-  WebDAV account, provider, or production desktop.
+  WebDAV fixture that supports strong ETags and conditional PUT, plus a fixture
+  variant that ignores conditional headers but supports `PROPFIND` directory
+  listing. No real WebDAV account, provider, or production desktop.
 - **Steps:** 1) Open Settings → Cloud sync and enter the fixture URL, device
   label, directory, and backup password. 2) Run the capability test and
   confirm it uses temporary objects. 3) Select provider/MCP/skill categories
@@ -8019,23 +8020,30 @@ identify the platform validation still needed.
   reject one staged entity, edit disjoint settings on both devices, and sync
   again. 7) Exercise a concurrent head writer, wrong password, weak ETag,
   ciphertext corruption, redirect, archive traversal, and network interruption.
-  8) Use the explicit LAN HTTP acknowledgement with a loopback/private fixture,
+  8) On the ignored-precondition fixture, select explicit compatibility mode,
+  confirm the warning, and configure two devices. Verify each device publishes
+  its own encrypted head under the heads collection, a concurrent update is
+  merged from both tips, and compatibility mode does not delete immutable
+  history. Cancel the confirmation once and verify configuration is not saved.
+  9) Use the explicit LAN HTTP acknowledgement with a loopback/private fixture,
   verify the setting survives a state refresh, and confirm a public HTTP
   endpoint is rejected even when the checkbox is selected.
-- **Expected:** The test refuses unreliable conditional writes. HTTP remains
-  opt-in and is accepted only for localhost, `.local`, or private/link-local
-  addresses; public HTTP endpoints are rejected and the UI explains the
-  credential exposure risk. A fixture that reports a missing object as 502 is
-  accepted only after the capability probe observes that endpoint-specific
-  behavior; a server that ignores conditional headers remains unsupported.
-  WebDAV sees
+- **Expected:** Strict mode refuses unreliable conditional writes. The explicit
+  compatibility mode accepts only a server that proves bounded directory
+  listing, explains that it is not atomic CAS, and retains per-device tips for
+  merge/recovery. A server that ignores conditional headers is never accepted
+  without that user selection. HTTP remains opt-in and is accepted only for
+  localhost, `.local`, or private/link-local addresses; public HTTP endpoints
+  are rejected and the UI explains the credential exposure risk. A fixture that
+  reports a missing object as 502 is accepted only after the capability probe
+  observes that endpoint-specific behavior. WebDAV sees
   only authenticated ciphertext and opaque object names; raw secrets never
   appear in renderer state or logs. Identical and disjoint edits converge,
   conflicts remain reviewable, explicit deletions use tombstones, category
   opt-out is not deletion, and executable imports remain inactive until local
   approval and mapping. Recovery never exposes a partial local apply.
 - **Specs:** `03-runtime/22-config-sync.md`, `03-runtime/14-secrets-storage.md`,
-  `05-security/01-security.md`, ADR 0300.
+  `05-security/01-security.md`, ADR 0300, ADR 0301.
 - **Acceptance:** F (persistence), Security, Quality.
 - **Milestone:** M6+.
 - **Status:** Draft; merge/crypto and in-process WebDAV conditional-write

@@ -5,12 +5,14 @@ import type {
   ConfigSyncCategorySelection,
   ConfigSyncHistoryEntry,
   ConfigSyncPendingApproval,
+  ConfigSyncRemoteMode,
   ConfigSyncState,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { Badge, Button, Field, Input, PasswordInput, cx } from "../ui";
 import { IconCloudDown, IconRefresh, IconShield, IconTrash } from "../icons";
 import { SettingsCard, SettingsRow } from "../../features/settings/primitives";
+import { SettingsMenuSelect } from "./SettingsMenuSelect";
 
 const CATEGORIES: Array<{
   id: Exclude<ConfigSyncCategory, "credentials" | "memory">;
@@ -86,12 +88,14 @@ export function ConfigSyncPage() {
   const [selection, setSelection] =
     useState<ConfigSyncCategorySelection>(DEFAULT_SELECTION);
   const [allowInsecureHttp, setAllowInsecureHttp] = useState(false);
+  const [remoteMode, setRemoteMode] = useState<ConfigSyncRemoteMode>("strict");
 
   const refresh = useCallback(async () => {
     try {
       const next = await api.configSyncGetState();
       setState(next);
       setAllowInsecureHttp(next.allowInsecureHttp === true);
+      setRemoteMode(next.remoteMode ?? "strict");
       if (next.configured) {
         setForm((current) => ({
           ...current,
@@ -135,6 +139,7 @@ export function ConfigSyncPage() {
     return api.onConfigSyncChanged((next) => {
       setState(next);
       setAllowInsecureHttp(next.allowInsecureHttp === true);
+      setRemoteMode(next.remoteMode ?? "strict");
     });
   }, [refresh]);
 
@@ -144,6 +149,13 @@ export function ConfigSyncPage() {
   const run = async (
     operation: "test" | "configure" | "sync" | "unlock" | "disconnect",
   ) => {
+    if (
+      operation === "configure" &&
+      remoteMode === "appendOnly" &&
+      !window.confirm(t("settings.configSync.appendOnlyConfirm"))
+    ) {
+      return;
+    }
     setBusy(operation);
     setError(null);
     setNotice(null);
@@ -160,11 +172,16 @@ export function ConfigSyncPage() {
           includeSecrets: selection.credentials,
           includeMemory: selection.memory,
           automaticSync: true,
+          remoteMode,
         });
         setNotice(
-          result.conditionalWrites
-            ? t("settings.configSync.testSuccess")
-            : t("settings.configSync.testUnsupported"),
+          remoteMode === "appendOnly"
+            ? result.appendOnly
+              ? t("settings.configSync.testAppendOnlySuccess")
+              : t("settings.configSync.testAppendOnlyUnsupported")
+            : result.conditionalWrites
+              ? t("settings.configSync.testSuccess")
+              : t("settings.configSync.testUnsupported"),
         );
       } else if (operation === "configure") {
         await api.configSyncConfigure({
@@ -179,6 +196,7 @@ export function ConfigSyncPage() {
           includeSecrets: selection.credentials,
           includeMemory: selection.memory,
           automaticSync: true,
+          remoteMode,
         });
         setState(await api.configSyncSyncNow());
         setForm((current) => ({ ...current, appPassword: "", backupPassword: "" }));
@@ -192,6 +210,7 @@ export function ConfigSyncPage() {
         setState(await api.configSyncDisconnect());
         setHistory([]);
         setAllowInsecureHttp(false);
+        setRemoteMode("strict");
         setForm((current) => ({ ...current, appPassword: "", backupPassword: "" }));
         setSelection(DEFAULT_SELECTION);
       }
@@ -392,6 +411,33 @@ export function ConfigSyncPage() {
               >
                 {t("settings.configSync.allowInsecureHttpWarning")}
               </div>
+            </div>
+          ) : null}
+          <Field
+            label={t("settings.configSync.remoteMode")}
+            hint={t("settings.configSync.remoteModeHint")}
+          >
+            <SettingsMenuSelect
+              fullWidth
+              label={t("settings.configSync.remoteMode")}
+              value={remoteMode}
+              disabled={busy !== null}
+              options={[
+                {
+                  id: "strict",
+                  label: t("settings.configSync.remoteModeStrict"),
+                },
+                {
+                  id: "appendOnly",
+                  label: t("settings.configSync.remoteModeAppendOnly"),
+                },
+              ]}
+              onChange={(value) => setRemoteMode(value as ConfigSyncRemoteMode)}
+            />
+          </Field>
+          {remoteMode === "appendOnly" ? (
+            <div className="settings-config-sync-warning" role="alert">
+              {t("settings.configSync.appendOnlyWarning")}
             </div>
           ) : null}
           <Field label={t("settings.configSync.username")}>

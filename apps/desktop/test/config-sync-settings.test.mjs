@@ -23,6 +23,10 @@ test("cloud sync keeps credentials and vault operations on the host boundary", (
   assert.match(syncPage, /setState\(await api\.configSyncSyncNow\(\)\)/);
   assert.match(syncPage, /allowInsecureHttp/);
   assert.match(syncPage, /settings\.configSync\.allowInsecureHttpWarning/);
+  assert.match(syncPage, /settings\.configSync\.remoteMode/);
+  assert.match(syncPage, /settings\.configSync\.appendOnlyWarning/);
+  assert.match(syncPage, /settings\.configSync\.appendOnlyConfirm/);
+  assert.match(syncPage, /remoteMode/);
   assert.match(syncPage, /api\.configSyncUnlock\(/);
   assert.match(syncPage, /api\.configSyncMapProject\(/);
   assert.match(syncPage, /api\.configSyncListHistory\(/);

@@ -682,6 +682,15 @@ sklm: {
       allowInsecureHttp: "Allow HTTP for a trusted LAN address",
       allowInsecureHttpWarning:
         "HTTP does not encrypt WebDAV credentials. Enable only for a trusted LAN address; public HTTP endpoints are rejected.",
+      remoteMode: "Compatibilidad del servidor",
+      remoteModeHint:
+        "El modo estricto requiere escrituras condicionales fiables. Usa el modo de compatibilidad solo con servidores que ignoran If-Match/If-None-Match.",
+      remoteModeStrict: "CAS estricto (recomendado)",
+      remoteModeAppendOnly: "Modo de compatibilidad (solo anexar)",
+      appendOnlyWarning:
+        "Este modo es para servidores WebDAV que ignoran las escrituras condicionales. Inicializa la bóveda en un dispositivo antes de unir otros. Usa cabeceras de anexado por dispositivo y conserva el historial remoto; todos los dispositivos que compartan esta bóveda deben usar el modo de compatibilidad. Los cambios simultáneos pueden requerir revisión.",
+      appendOnlyConfirm:
+        "Este servidor no puede aplicar escrituras condicionales. El modo de compatibilidad conserva el historial, pero no ofrece un compare-and-swap atómico. ¿Continuar?",
       username: "Username",
       appPassword: "App password",
       directory: "Remote directory",
@@ -703,6 +712,10 @@ sklm: {
       testSuccess: "The server supports the required conditional writes.",
       testUnsupported:
         "The server did not prove reliable conditional writes; sync is not enabled.",
+      testAppendOnlySuccess:
+        "The server supports directory listing for append-only compatibility mode.",
+      testAppendOnlyUnsupported:
+        "The server did not prove directory listing for compatibility mode; sync is not enabled.",
       enable: "Enable sync",
       save: "Save and sync",
       configured: "Cloud sync configuration saved.",
