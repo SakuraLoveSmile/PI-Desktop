@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { modelIdsMatch } from "@pi-desktop/shared";
+import { MODEL_VENDOR_PREFIXES, isProxyPrefix, modelIdsMatch, stripThinkingSuffix, stripVariantSuffix } from "@pi-desktop/shared";
 import type {
   ModelCost,
   ModelCostTier,
@@ -501,28 +501,6 @@ function normalizedModelId(value: string): string {
   return value.trim().toLowerCase();
 }
 
-const MODEL_VENDOR_PREFIXES = new Set([
-  "anthropic",
-  "amazon",
-  "aws",
-  "cohere",
-  "deepseek",
-  "deepseek-ai",
-  "gemini",
-  "google",
-  "meta",
-  "minimax",
-  "mistral",
-  "moonshot",
-  "moonshotai",
-  "openai",
-  "qwen",
-  "z-ai",
-  "zai",
-  "zhipuai",
-  "x-ai",
-  "xai",
-]);
 
 function modelVendorPrefixes(model: ModelsDevModel): string[] {
   const prefixes = new Set<string>();
@@ -813,27 +791,118 @@ class ModelsDevLookupIndex {
   }
 
   candidates(requested: string): readonly IndexedModel[] {
-    return this.byModelId.get(requested) ?? EMPTY_CANDIDATES;
+    const keys = lookupCandidateKeys(requested);
+    if (keys.length === 0) return EMPTY_CANDIDATES;
+    if (keys.length === 1) {
+      return this.byModelId.get(keys[0]) ?? EMPTY_CANDIDATES;
+    }
+    const result: IndexedModel[] = [];
+    const seen = new Set<IndexedModel>();
+    for (const key of keys) {
+      const bucket = this.byModelId.get(key);
+      if (!bucket) continue;
+      for (const entry of bucket) {
+        if (!seen.has(entry)) {
+          seen.add(entry);
+          result.push(entry);
+        }
+      }
+    }
+    return result;
   }
 }
 
-/** The normalized id, the `@region`-less base, and every vendor-prefixed form
- * `modelIdsMatch` treats as equivalent, so a query finds all matching catalog
- * models through the index without a full scan. */
+/** The normalized id, the `@region`-less base, the thinking-suffix stripped base,
+ * and every vendor-prefixed form `modelIdsMatch` treats as equivalent, so a query
+ * finds all matching catalog models through the index without a full scan. */
 function registrationKeys(modelId: string): string[] {
   const keys = new Set<string>();
   const raw = modelId.trim();
-  keys.add(normalizedModelId(raw));
-  const at = raw.indexOf("@");
-  if (at > 0) keys.add(normalizedModelId(raw.slice(0, at)));
+  const normalized = normalizedModelId(raw);
+  keys.add(normalized);
+
+  const at = normalized.indexOf("@");
+  if (at > 0) keys.add(normalized.slice(0, at));
+
+  const strippedVariant = stripVariantSuffix(normalized);
+  if (strippedVariant !== normalized) {
+    keys.add(strippedVariant);
+    const strippedAt = strippedVariant.indexOf("@");
+    if (strippedAt > 0) keys.add(strippedVariant.slice(0, strippedAt));
+  }
+
+  const lastSlash = normalized.lastIndexOf("/");
+  if (lastSlash > 0 && lastSlash < normalized.length - 1) {
+    const base = normalized.slice(lastSlash + 1);
+    keys.add(base);
+    const baseStripped = stripVariantSuffix(base);
+    if (baseStripped !== base) keys.add(baseStripped);
+  }
+
   for (const separator of ["/", "-", "."] as const) {
     for (const prefix of MODEL_VENDOR_PREFIXES) {
       const head = `${prefix}${separator}`;
-      if (raw.startsWith(head) && raw.length > head.length) {
-        keys.add(normalizedModelId(raw.slice(head.length)));
+      if (normalized.startsWith(head) && normalized.length > head.length) {
+        const rest = normalized.slice(head.length);
+        keys.add(rest);
+        const restStripped = stripVariantSuffix(rest);
+        if (restStripped !== rest) keys.add(restStripped);
       }
     }
   }
+  return [...keys];
+}
+
+/** Candidate keys derived from a requested model ID to search in the catalog index,
+ * covering proxy routing paths, vendor dash/dot prefixes, and thinking suffixes. */
+function lookupCandidateKeys(requested: string): string[] {
+  const raw = requested.trim();
+  if (!raw) return [];
+  const normalized = normalizedModelId(raw);
+  const keys = new Set<string>();
+
+  const addVariants = (str: string) => {
+    if (!str) return;
+    keys.add(str);
+    const at = str.indexOf("@");
+    if (at > 0) keys.add(str.slice(0, at));
+    const strippedVariant = stripVariantSuffix(str);
+    if (strippedVariant !== str) {
+      keys.add(strippedVariant);
+      const strippedAt = strippedVariant.indexOf("@");
+      if (strippedAt > 0) keys.add(strippedVariant.slice(0, strippedAt));
+    }
+  };
+
+  addVariants(normalized);
+
+  const slashParts = normalized.split("/");
+  if (slashParts.length > 1) {
+    for (let i = 1; i < slashParts.length; i++) {
+      addVariants(slashParts.slice(i).join("/"));
+    }
+  }
+
+  for (const key of [...keys]) {
+    for (const separator of ["-", "."] as const) {
+      for (const prefix of MODEL_VENDOR_PREFIXES) {
+        const head = `${prefix}${separator}`;
+        if (key.startsWith(head) && key.length > head.length) {
+          addVariants(key.slice(head.length));
+        }
+      }
+      let pos = key.indexOf(separator);
+      while (pos > 0 && pos < key.length - 1) {
+        const prefix = key.slice(0, pos);
+        const rest = key.slice(pos + 1);
+        if (isProxyPrefix(prefix, rest)) {
+          addVariants(rest);
+        }
+        pos = key.indexOf(separator, pos + 1);
+      }
+    }
+  }
+
   return [...keys];
 }
 
