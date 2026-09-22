@@ -689,6 +689,18 @@ sklm: {
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
       endpoint: "WebDAV URL",
       endpointPlaceholder: "https://dav.example.com/",
+      allowInsecureHttp: "Allow HTTP for a trusted LAN address",
+      allowInsecureHttpWarning:
+        "HTTP does not encrypt WebDAV credentials. Enable only for a trusted LAN address; public HTTP endpoints are rejected.",
+      remoteMode: "서버 호환 모드",
+      remoteModeHint:
+        "엄격 모드는 신뢰할 수 있는 조건부 쓰기를 요구합니다. If-Match/If-None-Match를 무시하는 서버에서만 호환 모드를 사용하세요.",
+      remoteModeStrict: "엄격한 CAS (권장)",
+      remoteModeAppendOnly: "호환 모드 (추가 전용)",
+      appendOnlyWarning:
+        "이 모드는 조건부 쓰기를 무시하는 WebDAV 서버용입니다. 다른 장치를 참여시키기 전에 한 장치에서 볼트를 초기화하세요. 장치별 추가 전용 헤드와 원격 기록을 사용하며, 이 볼트를 공유하는 모든 장치가 호환 모드를 사용해야 합니다. 동시 변경은 검토가 필요할 수 있습니다.",
+      appendOnlyConfirm:
+        "이 서버는 조건부 쓰기를 적용할 수 없습니다. 호환 모드는 기록을 보존하지만 원자적 compare-and-swap을 제공하지 않습니다. 계속하시겠습니까?",
       username: "Username",
       appPassword: "App password",
       directory: "Remote directory",
@@ -710,6 +722,10 @@ sklm: {
       testSuccess: "The server supports the required conditional writes.",
       testUnsupported:
         "The server did not prove reliable conditional writes; sync is not enabled.",
+      testAppendOnlySuccess:
+        "The server supports directory listing for append-only compatibility mode.",
+      testAppendOnlyUnsupported:
+        "The server did not prove directory listing for compatibility mode; sync is not enabled.",
       enable: "Enable sync",
       save: "Save and sync",
       configured: "Cloud sync configuration saved.",
