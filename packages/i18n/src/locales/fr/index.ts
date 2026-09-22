@@ -233,6 +233,8 @@ export const fr = {
     "slashGroupExtensions": "Commandes d'extension",
     "slashGroupSkills": "Compétences",
     "slashEmpty": "Aucune commande correspondante",
+"slashCommandSourceUnavailable": "Liste des commandes indisponible, rien n'a été envoyé. Réessayez.",
+    "sessionTranscriptEmpty": "L'historique de cette session n'a pas pu être lu. Rouvrez la session pour réessayer.",
     "fileMenu": "Références de fichiers",
     "removeFileReference": "Supprimer la référence de fichier {{name}}",
     "messageAttachments": "Pièces jointes à ce message",

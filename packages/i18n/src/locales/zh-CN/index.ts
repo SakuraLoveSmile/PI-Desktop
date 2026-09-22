@@ -235,6 +235,8 @@ export const zhCN = {
     slashGroupExtensions: "扩展命令",
     slashGroupSkills: "技能",
     slashEmpty: "没有匹配的指令",
+    slashCommandSourceUnavailable: "指令列表不可用，消息未发送。请重试。",
+    sessionTranscriptEmpty: "无法读取该会话的记录，请重新打开会话后重试。",
     fileMenu: "引用文件",
     removeFileReference: "移除文件引用 {{name}}",
     messageAttachments: "此消息中的附件",

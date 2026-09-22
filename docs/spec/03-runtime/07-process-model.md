@@ -145,6 +145,12 @@ Supervision parameters (the transports, restart policy, and turn lifecycle are
 renderer-facing status):
 
 - Child exit rejects all in-flight RPCs for that child immediately (no 130s timeout wait).
+- Every RPC carries a finite transport deadline. Bash and desktop-dispatched
+  (`plugin_*` / `mcp_*`) tools add the waits host-core can spend before it
+  reports an outcome, and `agent.compact` adds the sidecar's own summary budget
+  — its stream watchdog per attempt plus its retry backoff (**D614**, issue
+  #795); everything else uses the 130s default. Never widen the default to cover
+  a slow method: that also hides a genuinely lost reply on every other call.
 - An NDJSON request line over 64 MiB is drained and answered with `LIMIT_EXCEEDED`; it does not end the stdin reader (ADR 0216). Electron rejects the same size before writing stdin (ADR 0217).
 - The Windows Alt+Space hook retains only a weak stdout sender. After stdin EOF, serve drops the last strong sender and host-core exits. A leaked sender cannot block shutdown for more than 5 s (ADR 0217).
 

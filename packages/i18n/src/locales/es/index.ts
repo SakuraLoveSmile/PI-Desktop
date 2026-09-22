@@ -233,6 +233,8 @@ export const es = {
     "slashGroupExtensions": "Comandos de extensión",
     "slashGroupSkills": "Habilidades",
     "slashEmpty": "No hay comandos coincidentes",
+"slashCommandSourceUnavailable": "La lista de comandos no está disponible, así que no se envió nada. Inténtalo de nuevo.",
+    "sessionTranscriptEmpty": "No se pudo leer el historial de esta sesión. Vuelve a abrirla para intentarlo de nuevo.",
     "fileMenu": "Referencias de archivos",
     "removeFileReference": "Eliminar referencia de archivo {{name}}",
     "messageAttachments": "Archivos adjuntos en este mensaje",
