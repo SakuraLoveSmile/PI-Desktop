@@ -1242,6 +1242,12 @@ mod tests {
         Ok(())
     }
 
+    /// One packaged resource: above the 128 KiB document cap that used to bound
+    /// every resource, well below the resource cap that bounds it now.
+    fn portable_skill_resource() -> Vec<u8> {
+        vec![b'x'; 256 * 1024]
+    }
+
     #[tokio::test]
     async fn two_devices_sync_credentials_capabilities_and_disjoint_edit() -> Result<()> {
         if run_in_isolated_process(
@@ -1303,15 +1309,24 @@ mod tests {
                 enabled: Some(true),
                 ..McpServerInput::default()
             })?;
-            state.user_skills.create(UserSkillInput {
+            let portable_skill = state.user_skills.create(UserSkillInput {
                 id: Some("portable-skill".into()),
                 name: Some("Portable Skill".into()),
                 level: Some("project".into()),
                 project_path: Some(project_a.to_string_lossy().into_owned()),
                 body: Some("Use the portable project workflow.".into()),
                 enabled: Some(true),
+                shape: Some("dir".into()),
                 ..UserSkillInput::default()
             })?;
+            // A package resource larger than the 128 KiB document cap must
+            // survive capture, upload, read-back, and apply.
+            state.user_skills.write_package_files(
+                &portable_skill.id,
+                CapabilityLevel::Project,
+                Some(&project_a.to_string_lossy()),
+                &[("data/fonts.csv".into(), portable_skill_resource())],
+            )?;
             provider.id
         };
 
@@ -1463,6 +1478,21 @@ mod tests {
                 .list(CapabilityLevel::Project, Some(&project_b.to_string_lossy()),)?
                 .iter()
                 .any(|record| record.id == "portable-skill"));
+            let received_skill = state
+                .user_skills
+                .list(CapabilityLevel::Project, Some(&project_b.to_string_lossy()))?
+                .into_iter()
+                .find(|record| record.id == "portable-skill")
+                .expect("portable skill imported");
+            assert_eq!(
+                state.user_skills.package_files(
+                    &received_skill.id,
+                    CapabilityLevel::Project,
+                    Some(&project_b.to_string_lossy()),
+                )?,
+                vec![("data/fonts.csv".into(), portable_skill_resource())],
+                "packaged resource did not survive the sync round trip"
+            );
             assert_eq!(
                 state.db.get_setting("app")?.and_then(|value| {
                     value
