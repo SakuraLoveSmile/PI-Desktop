@@ -43,8 +43,28 @@ describe("generated image URL downloads", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("keeps real private answers blocked even when fake-IP is allowed", async () => {
-    lookupMock.mockResolvedValue(privateAnswer);
+  it("accepts a private answer, because the generator is the user's own service", async () => {
+    // The URL comes from the provider's response, but the provider is one the
+    // user configured, and a self-hosted generator (ComfyUI, SD-WebUI) hands
+    // back its own LAN address. It is dialed through the pinned path instead of
+    // the proxy-aware fetch, and the address policy no longer refuses it.
+    lookupMock.mockResolvedValue([
+      { address: "127.0.0.1", family: 4 },
+    ] as unknown as Awaited<ReturnType<typeof lookup>>);
+    const fetchImpl = vi.fn<typeof fetch>();
+    await expect(
+      downloadGeneratedImage("http://127.0.0.1:1/view.png", new AbortController().signal, {
+        allowFakeIp: true,
+        fetchImpl,
+      }),
+    ).rejects.not.toMatchObject({ errorCode: "IMAGE_UNSAFE_URL" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("keeps cloud metadata blocked even when fake-IP is allowed", async () => {
+    lookupMock.mockResolvedValue([
+      { address: "169.254.169.254", family: 4 },
+    ] as unknown as Awaited<ReturnType<typeof lookup>>);
     const fetchImpl = vi.fn<typeof fetch>();
     await expect(
       downloadGeneratedImage("https://images.example.test/result.png", new AbortController().signal, {
