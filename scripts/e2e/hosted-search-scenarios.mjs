@@ -191,64 +191,88 @@ export async function runScenarios(bundle, root, timeoutMs, report) {
     assert.equal(second.hostCalls.filter((call) => call.method === "session.get").length, 1);
     assert.equal(provider.requests.length, 2);
   });
-  for (const replay of [{ invalid: true }, [{ type: "hostedSearch", phase: "unknown", blockId: "private-fixture-value" }]]) {
-    await run(Array.isArray(replay) ? "invalid-search-phase" : "invalid-search-container", () => {
-      assert.fail("invalid restored history must never reach the provider");
-    }, async ({ provider, start, dir }) => {
-      const history = [{
-        id: "invalid-history", role: "assistant", content: "stored result", status: "complete",
-        createdAt: "2026-09-20T00:00:00.000Z",
-        hostedSearch: { status: "completed", rounds: [], replay },
-      }];
-      // Serve the malformed row to the failing session only: the recovery prompt
-      // below opens a clean session that must still be able to run.
-      const fixture = fixtureHost({ history: [] });
-      const host = (method, params) => method === "session.get" && params.id === "invalid-history"
-        ? { session: { id: params.id, messages: history } }
-        : fixture(method, params);
-      const sidecar = await start("runtime", host);
-      const healthBefore = await sidecar.call("sidecar.health");
-      assert.equal(healthBefore.runtimes, 0, "a fresh fixture process must not own a live runtime");
-      await assert.rejects(sidecar.call("agent.prompt", {
-        ...parameters(provider.baseUrl, dir, "invalid-history"), content: "Continue the restored history.",
-      }), (error) => {
-        const rpc = JSON.parse(error.message);
-        assert.equal(rpc.code, -32000);
-        assert.equal(rpc.data.errorCode, "INTERNAL");
-        assert.equal(rpc.data.retriable, false);
-        assert.deepEqual(rpc.data.details, { origin: "local", phase: "context-validation" });
-        assert.doesNotMatch(error.message, /private-fixture-value/);
-        return true;
-      });
-      assert.equal(provider.requests.length, 0);
-      // The child only ever receives `history` as an RPC JSON copy, so
-      // re-serialising the harness-side array proves nothing about the child's
-      // memory. What this harness can observe is the Host surface: a rejected
-      // restore may only read the session through the runtime constructor's
-      // session.get, and may not call any other Host method. In-memory
-      // immutability of the restored copy is covered by the source replay
-      // tests, not here.
-      const restoreCalls = sidecar.hostCalls.slice();
-      assert.deepEqual(restoreCalls.filter((call) => call.method !== "session.get"), [],
-        "a rejected restore must not issue persistence-mutating Host RPCs");
-      assert.equal(restoreCalls.filter((call) => call.method === "session.get").length, 1,
-        "restore must read the session exactly once before rejecting");
-      const healthAfter = await sidecar.call("sidecar.health");
-      assert.equal(healthAfter.ok, true, "invalid history must not terminate the process");
-      assert.equal(healthAfter.runtimes, healthBefore.runtimes,
-        "a rejected restore must not register or leak a runtime");
-      // Same child, clean session: a rejected restore must not wedge recovery.
-      const cleanDir = join(dir, "clean-session");
-      await mkdir(cleanDir, { recursive: true });
-      const clean = await startProvider(cleanDir, () => ({ text: "CLEAN_SESSION_OK" }));
-      try {
-        await sidecar.prompt(parameters(clean.baseUrl, dir, "clean-after-invalid"), "CLEAN_SESSION_PROMPT");
-        assertText(sidecar, "CLEAN_SESSION_OK");
-        assert.equal(clean.requests.length, 1, "the recovery session must make exactly one provider request");
-      } finally {
-        await clean.close();
-      }
+  await run("invalid-search-container", () => {
+    assert.fail("a corrupt replay container must never reach the provider");
+  }, async ({ provider, start, dir }) => {
+    const history = [{
+      id: "invalid-history", role: "assistant", content: "stored result", status: "complete",
+      createdAt: "2026-09-20T00:00:00.000Z",
+      hostedSearch: { status: "completed", rounds: [], replay: { invalid: true } },
+    }];
+    // Serve the malformed row to the failing session only: the recovery prompt
+    // below opens a clean session that must still be able to run.
+    const fixture = fixtureHost({ history: [] });
+    const host = (method, params) => method === "session.get" && params.id === "invalid-history"
+      ? { session: { id: params.id, messages: history } }
+      : fixture(method, params);
+    const sidecar = await start("runtime", host);
+    const healthBefore = await sidecar.call("sidecar.health");
+    assert.equal(healthBefore.runtimes, 0, "a fresh fixture process must not own a live runtime");
+    await assert.rejects(sidecar.call("agent.prompt", {
+      ...parameters(provider.baseUrl, dir, "invalid-history"), content: "Continue the restored history.",
+    }), (error) => {
+      const rpc = JSON.parse(error.message);
+      assert.equal(rpc.code, -32000);
+      assert.equal(rpc.data.errorCode, "INTERNAL");
+      assert.equal(rpc.data.retriable, false);
+      assert.deepEqual(rpc.data.details, { origin: "local", phase: "context-validation" });
+      return true;
     });
-  }
+    assert.equal(provider.requests.length, 0);
+    // The child only ever receives `history` as an RPC JSON copy, so
+    // re-serialising the harness-side array proves nothing about the child's
+    // memory. What this harness can observe is the Host surface: a rejected
+    // restore may only read the session through the runtime constructor's
+    // session.get, and may not call any other Host method. In-memory
+    // immutability of the restored copy is covered by the source replay
+    // tests, not here.
+    const restoreCalls = sidecar.hostCalls.slice();
+    assert.deepEqual(restoreCalls.filter((call) => call.method !== "session.get"), [],
+      "a rejected restore must not issue persistence-mutating Host RPCs");
+    assert.equal(restoreCalls.filter((call) => call.method === "session.get").length, 1,
+      "restore must read the session exactly once before rejecting");
+    const healthAfter = await sidecar.call("sidecar.health");
+    assert.equal(healthAfter.ok, true, "invalid history must not terminate the process");
+    assert.equal(healthAfter.runtimes, healthBefore.runtimes,
+      "a rejected restore must not register or leak a runtime");
+    // Same child, clean session: a rejected restore must not wedge recovery.
+    const cleanDir = join(dir, "clean-session");
+    await mkdir(cleanDir, { recursive: true });
+    const clean = await startProvider(cleanDir, () => ({ text: "CLEAN_SESSION_OK" }));
+    try {
+      await sidecar.prompt(parameters(clean.baseUrl, dir, "clean-after-invalid"), "CLEAN_SESSION_PROMPT");
+      assertText(sidecar, "CLEAN_SESSION_OK");
+      assert.equal(clean.requests.length, 1, "the recovery session must make exactly one provider request");
+    } finally {
+      await clean.close();
+    }
+  });
+
+  // A single stored block this app itself writes when a gateway drops ids is not
+  // a corrupt container: the message must continue without search replay rather
+  // than fail every later turn. The unreplayable block never reaches the provider.
+  await run("invalid-search-phase", (body) => {
+    assert.doesNotMatch(JSON.stringify(body), /private-fixture-value/,
+      "an unreplayable stored block must not be sent to the provider");
+    return { text: "DEGRADED_SEARCH_CONTINUED" };
+  }, async ({ provider, start, dir }) => {
+    const history = [{
+      id: "invalid-history", role: "assistant", content: "stored result", status: "complete",
+      createdAt: "2026-09-20T00:00:00.000Z",
+      hostedSearch: { status: "completed", rounds: [], replay: [
+        { type: "hostedSearch", phase: "unknown", blockId: "private-fixture-value" },
+      ] },
+    }];
+    const fixture = fixtureHost({ history: [] });
+    const host = (method, params) => method === "session.get" && params.id === "invalid-history"
+      ? { session: { id: params.id, messages: history } }
+      : fixture(method, params);
+    const sidecar = await start("runtime", host);
+    await sidecar.prompt(parameters(provider.baseUrl, dir, "invalid-history"), "Continue the restored history.");
+    assertText(sidecar, "DEGRADED_SEARCH_CONTINUED");
+    assert.equal(provider.requests.length, 1, "the turn must continue without the stored search replay");
+    const health = await sidecar.call("sidecar.health");
+    assert.equal(health.ok, true, "a degraded stored record must not terminate the process");
+  });
   return results;
 }

@@ -1,9 +1,20 @@
-import { describe, expect, it } from "vitest";
-import type { HostedSearch } from "@pi-desktop/shared";
+import { describe, expect, it, vi } from "vitest";
+import { hostedSearchFromMessage, type HostedSearch } from "@pi-desktop/shared";
 import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
 
 function stored(replay: HostedSearch["replay"]): HostedSearch {
   return { status: "completed", rounds: [], replay };
+}
+
+/** 捕获诊断输出：降级必须可观测，而不是静默丢弃。 */
+function withCapturedWarnings<T>(run: () => T): { result: T; warnings: unknown[] } {
+  const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    const result = run();
+    return { result, warnings: spy.mock.calls };
+  } finally {
+    spy.mockRestore();
+  }
 }
 
 describe("stored hosted-search replay boundary", () => {
@@ -44,9 +55,23 @@ describe("stored hosted-search replay boundary", () => {
     );
   });
 
-  it("reports a structured local error rather than dropping a corrupt replay phase", () => {
-    expect(() => restoreHostedSearchReplay(stored([
+  it("drops the whole replay rather than failing a turn on an unreplayable block", () => {
+    const { result, warnings } = withCapturedWarnings(() => restoreHostedSearchReplay(stored([
+      { type: "hostedSearch", phase: "server_tool_use", blockId: "srv_fixture", name: "web_search", input: { query: "fixture" } },
       { type: "hostedSearch", phase: "unsupported", blockId: "fixture" },
-    ]))).toThrow(expect.objectContaining({ code: "LOCAL_REQUEST_ERROR", phase: "context-validation" }));
+    ])));
+    // 整条丢弃：留下配对的另一半会制造适配器无法接受的孤立块。
+    expect(result).toEqual([]);
+    expect(warnings).toHaveLength(1);
+  });
+
+  it("reads a stored record the persistence layer writes when a gateway drops ids", () => {
+    const search = hostedSearchFromMessage({
+      content: [{ type: "hostedSearch", phase: "web_search_call", status: "completed" }],
+    });
+    expect(search?.replay).toHaveLength(1);
+    const { result, warnings } = withCapturedWarnings(() => restoreHostedSearchReplay(search));
+    expect(result).toEqual([]);
+    expect(warnings).toHaveLength(1);
   });
 });
