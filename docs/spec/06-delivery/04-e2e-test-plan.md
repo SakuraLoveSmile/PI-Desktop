@@ -8,6 +8,21 @@
 
 ## 1. Goals
 
+### E2E-IMAGES-remove-configured-model
+
+- **Preconditions:** API-boundary fixture with an image-marked model and another
+  configured model on its provider; repeat with legacy single binding and with
+  an additional runnable image candidate on another provider.
+- **Steps:** Remove the marked model in the provider editor without toggling its
+  image checkbox. Cancel once, repeat and Save, then reopen settings and editor.
+- **Expected:** Cancel preserves both configurations. Save removes the model and
+  its image candidate; the image default clears or switches to the remaining
+  runnable candidate. An unaffected chat default stays unchanged; a removed chat
+  default still falls back to the first configured model. Reload preserves results.
+- **Specs:** 03-runtime/21-image-generation. **Acceptance:** B.
+- **Milestone:** Maintenance. **Status:** Automated in English and Chinese by
+  `scripts/e2e-image-generation-ui.mjs`.
+
 ### E2E-IMAGES-desktop-conversation
 
 - **Preconditions:** Isolated desktop profile and workspace, built image feature,

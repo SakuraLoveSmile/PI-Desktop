@@ -192,6 +192,11 @@ export function ModelConfigPage() {
     imageModelIds?: string[],
   ) => {
     const firstModelId = models[0]?.id;
+    const replacementChatModelId =
+      settings.defaultProviderId === saved.id && firstModelId &&
+      !models.some((model) => modelIdsMatch(model.id, settings.defaultModelId ?? ""))
+        ? firstModelId
+        : undefined;
     try {
       if (imageModelIds !== undefined) {
         const current = await api.getSettings();
@@ -201,7 +206,11 @@ export function ModelConfigPage() {
           imageModelIds,
           [...providers.filter((provider) => provider.id !== saved.id), saved],
         );
-        const nextSettings = { ...current, ...plan };
+        const nextSettings = {
+          ...current,
+          ...plan,
+          ...(replacementChatModelId ? { defaultModelId: replacementChatModelId } : {}),
+        };
         await api.setSettings(nextSettings);
         useAppStore.setState({ settings: nextSettings });
         showToast(t("settings.imageModelSelected"), { variant: "success" });
@@ -226,11 +235,8 @@ export function ModelConfigPage() {
         }
         showToast(t("settings.providerSaved"), { variant: "success" });
       } else {
-        if (
-          settings.defaultProviderId === saved.id && firstModelId &&
-          !models.some((model) => modelIdsMatch(model.id, settings.defaultModelId ?? ""))
-        ) {
-          await api.setSettings({ ...settings, defaultModelId: firstModelId });
+        if (replacementChatModelId) {
+          await api.setSettings({ ...settings, defaultModelId: replacementChatModelId });
         }
         showToast(t("settings.providerUpdated"), { variant: "success" });
       }
