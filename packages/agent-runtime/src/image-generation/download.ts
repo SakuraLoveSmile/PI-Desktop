@@ -67,7 +67,11 @@ export function publicImageAddress(address: string): boolean {
   return false;
 }
 
-/** Pin the checked DNS answer to the connection; never forward provider headers. */
+/**
+ * Pin the checked DNS answer to the connection; never forward provider headers.
+ * An explicitly opted-in fake-IP answer is the one exception: it goes through the
+ * global fetch instead, which resolves the hostname again at connect time.
+ */
 export async function downloadGeneratedImage(
   raw: string,
   signal: AbortSignal,

@@ -48,6 +48,8 @@
   fake-IP option enabled, a URL response resolved to Clash's benchmark range
   is downloaded through the proxy-aware transport; without the option it stays
   `IMAGE_UNSAFE_URL`, and real private addresses remain blocked in both cases.
+  Covered by `packages/agent-runtime/src/image-generation/download.test.ts`,
+  not by the driver below.
 - **Status:** Automated in `node scripts/e2e-image-chat.mjs`; optional screenshots
   use `PI_IMAGE_CHAT_EVIDENCE_DIR`. The images are deterministic raster fixtures,
   not evidence of real-model quality or provider compatibility.
