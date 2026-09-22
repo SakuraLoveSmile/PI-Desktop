@@ -506,6 +506,59 @@
   color: var(--ds-danger);
 }
 
+/*
+ * A manual sync reports itself while its request is still open: the phase it
+ * is in, a bar once it announced a total, and the figures it has moved so far.
+ */
+.settings-config-sync-progress {
+  display: grid;
+  gap: 8px;
+  margin: 0 16px 14px;
+}
+
+.settings-config-sync-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-config-sync-progress-title {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium-plus);
+}
+
+.settings-config-sync-progress-phase {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.settings-config-sync-progress-bar {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
+}
+
+.settings-config-sync-progress-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ds-accent);
+  transition: width var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+.settings-config-sync-progress-figures {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
 .settings-config-sync-categories {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -15,6 +15,7 @@ import {
   isGlobalPermissionMode,
   isToolsOutputParams,
   AGENT_COMPACT_RPC_TIMEOUT_MS,
+  CONFIG_SYNC_RPC_TIMEOUT_MS,
   COMMAND_RPC_BUFFER_MS,
   COMPACTION_SUMMARY_MAX_RETRIES,
   COMPACTION_SUMMARY_RETRY_BUDGET_MS,
@@ -291,5 +292,21 @@ describe("Plan protocol contracts", () => {
     expect(
       rpcTimeoutMs("tools.execute", { toolName: "plugin_advisor_ask", timeoutMs: 0 }),
     ).toBe(310_000);
+  });
+
+  it("lets a whole cloud sync finish instead of failing on a lost reply", () => {
+    // The sync is one request that answers only when every phase is done, and
+    // the host keeps running after a transport deadline fires. The progress
+    // reports are the liveness signal, so the deadline is only a ceiling that
+    // stops a genuinely lost answer from hanging the caller forever.
+    expect(IPC.event.configSyncProgress).toBe(
+      "pi-desktop/configSync/event/progress",
+    );
+    expect(IPC_WHITELIST.has(IPC.event.configSyncProgress)).toBe(true);
+    expect(CONFIG_SYNC_RPC_TIMEOUT_MS).toBe(1_800_000);
+    expect(rpcTimeoutMs("configSync.syncNow", {})).toBe(
+      CONFIG_SYNC_RPC_TIMEOUT_MS,
+    );
+    expect(rpcTimeoutMs("configSync.getState", {})).toBe(130_000);
   });
 });

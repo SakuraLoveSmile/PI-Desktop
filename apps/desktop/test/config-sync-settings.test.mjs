@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { loadStyles } from "./helpers/styles.mjs";
+import {
+  CONFIG_SYNC_RPC_TIMEOUT_MS,
+  DEFAULT_RPC_TIMEOUT_MS,
+  rpcTimeoutMs,
+} from "@pi-desktop/shared";
 
 const read = (relativePath) =>
   readFile(new URL(relativePath, import.meta.url), "utf8");
@@ -11,6 +16,13 @@ const settingsIndex = await read("../src/lib/settings-search.ts");
 const syncPage = await read("../src/components/settings/ConfigSyncPage.tsx");
 const syncIpc = await read("../electron/main/ipc/config-sync-ipc.ts");
 const styles = await loadStyles();
+const syncProtocol = await read("../../../packages/shared/src/protocol.ts");
+const rpcTimeouts = await read("../../../packages/shared/src/rpc-timeouts.ts");
+const hostRuntime = await read("../electron/main/runtime/host.ts");
+const api = await read("../src/lib/api.ts");
+const progressModel = await read(
+  "../src/features/settings/config-sync-progress.ts",
+);
 
 test("cloud sync is a searchable settings destination", () => {
   assert.match(settingsPage, /tab === "sync" && <ConfigSyncPage \/>/);
@@ -47,4 +59,86 @@ test("cloud sync settings remain usable on narrow surfaces", () => {
     /\.settings-config-sync-form,\n  \.settings-config-sync-categories \{\n    grid-template-columns: minmax\(0, 1fr\);/s,
   );
   assert.match(styles, /\.settings-config-sync-approval \{[\s\S]*flex-direction: column;/s);
+});
+
+test("a running sync reports progress across the existing host bridge", () => {
+  // The sync is one request, so the report has to travel the same
+  // notification path the change notice already uses.
+  assert.match(
+    syncProtocol,
+    /configSyncProgress: "pi-desktop\/configSync\/event\/progress"/,
+  );
+  assert.match(
+    hostRuntime,
+    /method === "configSync\.progress"[\s\S]{0,400}sendToRenderer\(IPC\.event\.configSyncProgress/,
+  );
+  assert.match(
+    api,
+    /onConfigSyncProgress: \(listener: \(progress: ConfigSyncProgress\) => void\)/,
+  );
+});
+
+test("the sync card follows progress only while its own sync is running", () => {
+  // Automatic syncs stay silent, and the subscription is dropped with the page.
+  assert.match(syncPage, /useEffect\(\(\) => api\.onConfigSyncProgress\(/);
+  assert.match(syncPage, /busy === "sync" && progress/);
+  // The request's own answer ends the run, so the last report is cleared when
+  // it settles instead of outliving the sync it described.
+  assert.match(syncPage, /setProgress\(null\);/);
+});
+
+test("the sync card reports each phase with a readable fraction", () => {
+  assert.match(syncPage, /t\(syncProgress\.phaseKey\)/);
+  assert.match(syncPage, /settings\.configSync\.progressTitle/);
+  assert.match(syncPage, /settings\.configSync\.progress\.objects/);
+  assert.match(syncPage, /settings\.configSync\.progress\.bytes/);
+  assert.match(
+    progressModel,
+    /import type \{ ConfigSyncPhase, ConfigSyncProgress \} from "@pi-desktop\/shared";/,
+  );
+  assert.match(progressModel, /^export const CONFIG_SYNC_PHASE_KEYS/m);
+  for (const phase of [
+    "capture",
+    "download",
+    "merge",
+    "upload",
+    "apply",
+    "cleanup",
+  ]) {
+    assert.match(
+      progressModel,
+      new RegExp(`settings\\.configSync\\.progress\\.phase\\.${phase}`),
+    );
+  }
+});
+
+test("the sync card exposes the fraction to assistive technology", () => {
+  assert.match(syncPage, /role="progressbar"/);
+  assert.match(syncPage, /aria-valuemin=\{0\}/);
+  assert.match(syncPage, /aria-valuemax=\{100\}/);
+  assert.match(syncPage, /aria-valuenow=\{syncProgress\.percent\}/);
+  assert.match(
+    syncPage,
+    /aria-valuetext=\{syncProgress\.fraction \?\? undefined\}/,
+  );
+  // A report with no announced total draws no bar: the phase name stays the
+  // only status text, so the card never shows an invented fraction.
+  assert.match(syncPage, /\{syncProgress\.determinate \? \(/);
+  assert.match(
+    styles,
+    /\.settings-config-sync-progress-bar \{[\s\S]*?border-radius: var\(--radius-full\);/,
+  );
+  assert.match(styles, /\.settings-config-sync-progress-figures \{/);
+});
+
+test("a manual sync outlasts the flat default transport deadline", () => {
+  // The host cannot cancel a run that is already under way, so a deadline that
+  // fires while it is still working would only report a failure that is not
+  // one; the report events carry liveness instead.
+  assert.match(rpcTimeouts, /CONFIG_SYNC_RPC_TIMEOUT_MS = 1_800_000/);
+  assert.match(rpcTimeouts, /method === "configSync\.syncNow"/);
+  assert.equal(rpcTimeoutMs("configSync.syncNow", {}), CONFIG_SYNC_RPC_TIMEOUT_MS);
+  assert.ok(CONFIG_SYNC_RPC_TIMEOUT_MS > DEFAULT_RPC_TIMEOUT_MS);
+  // Every other config-sync call keeps the shared default.
+  assert.equal(rpcTimeoutMs("configSync.getState", {}), DEFAULT_RPC_TIMEOUT_MS);
 });
