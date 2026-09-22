@@ -1577,7 +1577,6 @@ sklm: {
     weekday: "Day of the week",
     localTimeHint: "Uses this computer’s local timezone. Keep PI-Desktop running; missed runs are skipped.",
     projectHint: "The current project is saved with this schedule. Runs use the default model.",
-    executionSettingsHint: "Project, permission mode, and model are saved only for this task.",
     autoPermissionHint: "Auto can run restricted actions without asking. Use it only for tasks you trust.",
     unavailableModel: "{{provider}} / {{model}} (unavailable)",
     save: "Save task",

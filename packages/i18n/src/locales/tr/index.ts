@@ -1564,7 +1564,6 @@ sklm: {
     weekday: "Haftanın günü",
     localTimeHint: "Yerel saat dilimini kullanır. PI-Desktop açık kalmalıdır; kaçırılan çalıştırmalar atlanır.",
     projectHint: "Geçerli proje kaydedilir. Varsayılan model kullanılır.",
-    executionSettingsHint: "Proje, izin modu ve model yalnızca bu görev için kaydedilir.",
     autoPermissionHint: "Otomatik mod, kısıtlı işlemleri sormadan çalıştırabilir. Yalnızca güvendiğiniz görevlerde kullanın.",
     unavailableModel: "{{provider}} / {{model}} (kullanılamıyor)",
     save: "Görevi kaydet",
