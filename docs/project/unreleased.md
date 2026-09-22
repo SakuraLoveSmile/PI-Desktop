@@ -4,6 +4,15 @@
   import with a source and executable-extension confirmation. Imported packages
   remain managed in Plugins; discovery never enables code automatically.
 
+- A stored hosted web-search record that cannot be replayed no longer fails every
+  later request in that conversation: the message continues without search replay,
+  so histories written before the contract change stay usable.
+
+- Hosted web search now has a complete replay and estimation contract, including
+  tool/Task continuation and restart recovery. Context rebuilding preserves
+  system-prefix semantics, and structured local preparation failures no longer
+  masquerade as retryable provider failures. Existing search histories need no migration.
+
 - The Composer reasoning slider now moves smoothly to clicked or
   keyboard-selected levels, follows dragging immediately, and respects
   reduced-motion settings. Rapid clicks redirect the animation; failed saves

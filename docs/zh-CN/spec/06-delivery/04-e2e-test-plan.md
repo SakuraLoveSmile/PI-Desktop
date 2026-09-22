@@ -9,6 +9,13 @@
 
 ---
 
+### E2E-IMAGES-deselect-default
+
+- **前提：** 只有一个服务商、一个模型，且该模型已标记为生图模型。
+- **步骤：** 在服务商编辑器取消生图勾选，先取消编辑，再重新操作并保存；重新打开设置和编辑器，选择该模型作为默认对话模型。
+- **预期：** 取消编辑保留原绑定；保存清除候选和默认生图绑定。重新打开后摘要行隐藏、复选框未勾选，模型恢复为可选对话模型。
+- **覆盖：** `scripts/e2e-image-generation-ui.mjs` 使用 API 边界 fixture 验证英文与中文交互；不代表真实服务商测试。
+
 ## 1. 目标
 
 - 记录 MVP 必须验证的每个用户可见和协议可见的行为。
@@ -5231,6 +5238,7 @@ eleven-tool-round desktop paths are verified by
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — 桌面定时任务 | E2E-SCHEDULED-desktop-automation-lifecycle |
+| F / Security / Quality — 便携式配置同步 | E2E-CONFIG-SYNC-webdav-portable-configuration |
 | A / C — Unicode stdio 成帧 | E2E-RPC-unicode-separators |
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | C / D / Quality — 侧边栏行状态 | E2E-LAYOUT-sidebar-row-states |
@@ -8366,6 +8374,16 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **状态：** `node scripts/e2e-scheduled.mjs` 自动化覆盖；按 AGENTS.md 在任务候选
   版本上运行，并记录已测提交与基线。
 
+### E2E-CONFIG-SYNC-webdav-portable-configuration
+
+- **前提：** 已构建的任务候选版本、隔离的 Host 配置，以及支持 strong ETag 和条件 PUT 的本地 WebDAV fixture。不使用真实 WebDAV 账户、provider 或生产桌面。
+- **步骤：** 1）打开设置 → 云同步，填写 fixture URL、设备标签、目录和备份密码。2）运行能力测试，确认使用临时对象。3）选择 provider/MCP/skill 类别，保持凭据和 memory 未选中；在第二次预览中启用凭据，确认只显示脱敏计数。4）配置设备 A，创建 user provider 和 MCP 定义并同步。5）让设备 B 连接同一 vault，同步后检查待激活/映射，并验证审批前不会运行命令或任务。6）批准一个变更后的安全实体，拒绝一个暂存实体，在两台设备上编辑不相交设置并再次同步。7）测试并发 head writer、错误密码、weak ETag、密文损坏、redirect、归档路径穿越和网络中断。
+- **预期：** 测试拒绝不可靠的条件写入。WebDAV 只能看到已认证的密文和不透明对象名；原始秘密不会出现在 Renderer 状态或日志中。相同和不相交的编辑会收敛，冲突保持可审查，明确删除使用 tombstone，类别退出不是删除，可执行导入在本地审批和映射前保持不激活。恢复不会暴露部分应用的本地配置。
+- **规格：** `03-runtime/22-config-sync.md`、`03-runtime/14-secrets-storage.md`、`05-security/01-security.md`、ADR 0300。
+- **验收：** F（持久化）、Security、Quality。
+- **里程碑：** M6+。
+- **状态：** Draft；合并/密码学和进程内 WebDAV 条件写入覆盖已存在。完整双设备进程路径和逐检查点本地恢复故障注入仍待自动化。
+
 ### E2E-DIALOG-long-text-boundaries
 
 - **前提：** 已构建渲染器，使用隔离的 Electron 组件测试窗口。组件、状态、翻译
@@ -8656,3 +8674,27 @@ the latest destination. These assertions measure work counts, not device FPS.
   缺失的旧版绑定与显式 null 保持不同语义，其他项目不能查询或修改绑定任务。
 - **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-paths.mjs`
   使用隔离的真实 Host 与 SQLite 配置，不向真实提供商发送推理请求。
+
+## 原生搜索续跑契约（离线 sidecar）
+
+**范围：** ADR 0297；供应商原生搜索内容、估算、本地工具、Task 委派及历史恢复。不调用真实模型或搜索服务。
+
+**入口：** `pnpm test:e2e:hosted-search` 自行重建 shared 与 agent-runtime sidecar。
+通过普通 stdio RPC 驱动该产物，使用隔离数据目录、合成 Host 与仅回环地址的 Responses 服务。
+只测源码或使用已有桌面安装包不满足本测试。
+
+| 场景 | 必须观察到的结果 |
+| --- | --- |
+| 搜索后新用户消息 | 合法搜索项被回放，第二轮正常结束。 |
+| 搜索后普通本地工具 | 真实工具轮完成，下一模型请求准备无类型或估算错误。 |
+| 搜索后 Task | 实际委派流程使用合成模型，父代理继续且不重复报告本地错误。 |
+| 保存搜索历史后恢复 | 新运行时保留搜索回放，不添加假工具字段或改写原记录。 |
+| 真实前缀变化使 usage 失效 | 隔离 sidecar 在真实 Read 轮中更新指令；此前非零 usage 不再覆盖该前缀，续跑正常结束。 |
+| 非法历史回放容器 | 恢复返回安全的 INTERNAL/context-validation；不发送模型请求或持久化 Host RPC，进程仍健康。内存中输入不变性由回放单元测试验证。 |
+| 未知历史搜索阶段 | 明确拒绝该记录，而不是静默丢弃搜索内容；其余断言同上。 |
+
+**配套检查：** Responses/Azure/Anthropic 请求契约、搜索阶段类型、有效/零/失效 usage、
+真实与无变化的系统前缀及工具增删、搜索数据增长、中文输出预算；结构化本地准备失败不重试、不 fetch，普通传输重试与取消保持正确。依赖升级必须对锁定版本运行这些检查，记录测试的 bundle。
+
+**证据：** 记录构建和测试退出码、基线 SHA、依赖版本、产物标识及独立评审，报告位于
+`docs/project/hosted-search-contract-verification.md`。不得记录真实会话或凭据。未执行明确标为 NOT RUN，不得标为 PASS。

@@ -292,3 +292,39 @@ test("a long candidate list is capped like the host and keeps the active binding
     "the active binding must stay in the capped candidate list",
   );
 });
+
+for (const candidates of [undefined, [], [binding("x", "chat-model")]]) {
+  test(`unchecking the only image model releases it for chat (${JSON.stringify(candidates)})`, async () => {
+    const { imageGenerationBindings } = await import("@pi-desktop/shared");
+    const { defaultModelOptions } = await import("../src/components/settings/default-model.ts");
+    const providers = [provider("x", ["chat-model"])];
+    const plan = planImageGenerationDefaults(
+      { imageGenerationModels: candidates, imageGeneration: binding("x", "chat-model") },
+      "x", [], providers,
+    );
+    assert.equal(plan.imageGeneration, null);
+    assert.deepEqual(plan.imageGenerationModels, []);
+    const reloaded = JSON.parse(JSON.stringify(plan));
+    assert.deepEqual(defaultModelOptions(providers,
+      imageGenerationBindings(reloaded.imageGenerationModels, reloaded.imageGeneration)
+    ).map(({ modelId }) => modelId), ["chat-model"]);
+  });
+}
+
+test("unchecking the active model selects a remaining runnable candidate", () => {
+  const plan = planImageGenerationDefaults(
+    { imageGenerationModels: [binding("x", "old"), binding("y", "other")],
+      imageGeneration: binding("x", "old") },
+    "x", ["next"], [provider("x", ["old", "next"]), provider("y", ["other"], { enabled: false })],
+  );
+  assert.deepEqual(plan.imageGeneration, binding("x", "next"));
+  assert.deepEqual(plan.imageGenerationModels, [binding("y", "other"), binding("x", "next")]);
+});
+
+test("saving the active provider preserves a still-selected default", () => {
+  const plan = planImageGenerationDefaults(
+    { imageGeneration: binding("x", "current") },
+    "x", ["first", "current"], [provider("x", ["first", "current"])],
+  );
+  assert.deepEqual(plan.imageGeneration, binding("x", "current"));
+});

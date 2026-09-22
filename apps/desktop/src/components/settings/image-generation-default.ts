@@ -6,7 +6,7 @@
  * Saving a provider may extend that list, but adding one must not take over the
  * default: the chat default's rule applies here too — the stored choice
  * survives while a configured provider can actually run it, and only an
- * unrunnable one is replaced.
+ * unrunnable or explicitly deselected one is replaced.
  *
  * "Can run it" is one rule everywhere: this file, the picker row
  * (`ImageGenerationModelRow.tsx`) and the runtime
@@ -96,7 +96,7 @@ function cappedImageGenerationCandidates(
  * The saved provider's selection replaces its own earlier candidates, while the
  * candidates of other providers stay listed — minus the rows whose provider no
  * longer exists, which nothing can pick or run. The active default moves only
- * when the stored choice stops being runnable, and then to the first candidate
+ * when explicitly deselected or no longer runnable, and then to the first candidate
  * that is, so a newly added provider claims the default exactly when nothing
  * else can hold it. When nothing can, the default stays empty rather than
  * naming a binding that would fail on the next request.
@@ -115,7 +115,11 @@ export function planImageGenerationDefaults(
     providerId: savedProviderId,
     modelId,
   }));
-  const active = current.imageGeneration ?? null;
+  const previous = current.imageGeneration ?? null;
+  const active = previous?.providerId === savedProviderId &&
+    !selected.some((binding) => modelIdsMatch(binding.modelId, previous.modelId))
+    ? null
+    : previous;
   const imageGenerationModels = cappedImageGenerationCandidates(
     [...existing.filter((binding) => binding.providerId !== savedProviderId), ...selected]
       .filter((binding) =>
