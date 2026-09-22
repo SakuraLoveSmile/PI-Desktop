@@ -4689,7 +4689,7 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `apps/desktop/test/image-generation-default.test.mjs` 固定，
   `provider-model-config.test.mjs` 断言新增分支会走这两个判断。
 
-## 2026-09-22 — 循环拥有自己的上下文数组（D619）
+## 2026-09-22 — 循环拥有自己的上下文数组（D620）
 
 - 当某个回合的较晚迭代跑了工具后，`state.messages` 会把那些迭代追加的每条消息存两份，而下一回合的首个请求正是用该数组组装的。
   其中“带文本与工具调用的辅助消息”的重复项在请求守卫（D608）之后残留为只剩文本的克隆，卡在调用与回答它的结果之间；pi-ai 随后会为

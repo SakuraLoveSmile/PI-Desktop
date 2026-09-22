@@ -409,7 +409,7 @@ export class SubagentRun {
         // `state.messages`. Handing over the live array stores each message of
         // the run's later iterations twice, which doubles the estimate at the
         // next boundary and leaves `useNextModel` a trailing assistant row it
-        // cannot resume from (D619).
+        // cannot resume from (D620).
         messages: [...this.agent.state.messages],
         tools: this.agent.state.tools,
       },

@@ -6610,7 +6610,7 @@ that was sitting at the bottom — including after the turn had finished.
   `apps/desktop/test/image-generation-default.test.mjs`, with
   `provider-model-config.test.mjs` asserting the add branch consults them.
 
-## 2026-09-22 — The loop owns its context array (D619)
+## 2026-09-22 — The loop owns its context array (D620)
 
 - A turn whose later iterations ran tools left `state.messages` holding two copies
   of every message those iterations appended, and the next turn's first request

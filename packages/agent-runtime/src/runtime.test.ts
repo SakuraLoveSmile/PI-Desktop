@@ -9324,7 +9324,7 @@ describe("compaction fallback retention (#827)", () => {
   });
 });
 
-describe("DesktopAgentRuntime loop context ownership (D613)", () => {
+describe("DesktopAgentRuntime loop context ownership (D620)", () => {
   /**
    * Rounds 1 and 2 answer with a tool call and round 3 closes the turn; with
    * `stopAfterFirstRound` the run ends on the tool round instead, the way a
@@ -9473,7 +9473,7 @@ describe("DesktopAgentRuntime loop context ownership (D613)", () => {
       // The loop appends the streamed assistant message and the tool results to
       // the context it was handed; pi's `message_end` listener appends the same
       // object to the state. Sharing one array stored every message of the
-      // later rounds twice (D613).
+      // later rounds twice (D620).
       const state = (runtime as any).agent.state.messages as AgentMessage[];
       expect(textBlocks(state)).toEqual(["round 1", "round 2", "round 3"]);
       expect(toolCallIds(state)).toEqual(["call-1", "call-2"]);
@@ -9496,7 +9496,7 @@ describe("DesktopAgentRuntime loop context ownership (D613)", () => {
 
       // A Stop ends the run on the second tool round, so those messages are the
       // ones the next turn's first request is built from — the request that
-      // production rejected with `Duplicate tool output for call_id` (D613).
+      // production rejected with `Duplicate tool output for call_id` (D620).
       await runtime.prompt("first task", "user-1", "turn-1");
 
       requests.length = 0;

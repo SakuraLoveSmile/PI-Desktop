@@ -6032,7 +6032,7 @@ Delegation rules:
       // request guard as a text-only clone sitting between the call and the
       // result answering it. pi-ai then closes the still-pending call with a
       // synthesized "No result provided" output next to the real one — two
-      // outputs for one call id, which the provider rejects (D619).
+      // outputs for one call id, which the provider rejects (D620).
       // `createContextSnapshot()` copies for the same reason.
       messages: [...this.agent.state.messages],
       tools,

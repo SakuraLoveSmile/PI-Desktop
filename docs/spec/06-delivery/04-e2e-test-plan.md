@@ -14442,7 +14442,7 @@ the latest destination. These assertions measure work counts, not device FPS.
   fixture's request carries exactly one result per call. No duplicate-drop line is
   logged, because the request guard had nothing to drop.
 - **Specs:** `03-runtime/02-agent-runtime.md` §5c,
-  `08-meta/decisions-log.md` D619.
+  `08-meta/decisions-log.md` D620.
 - **Acceptance:** C (conversation and stream), Quality.
 - **Milestone:** Post-MVP regression coverage.
 - **Automation:** `packages/agent-runtime/src/runtime.test.ts` (loop context

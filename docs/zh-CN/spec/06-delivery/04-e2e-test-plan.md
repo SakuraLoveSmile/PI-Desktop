@@ -8486,7 +8486,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **步骤：** 发一条提示，让运行时跑完两轮工具调用并在工具轮上结束回合；再发第二条提示。读取运行时保留的状态与夹具收到的出站请求。
 - **预期：** 保留的状态里每个流式辅助消息与每个工具结果都只有一份；没有结果与它回答的调用被隔开；夹具收到的请求对每次调用只带一个结果。
   不产生去重日志行，因为请求守卫没有任何东西需要丢弃。
-- **规格：** 03-runtime/02-agent-runtime §5c、08-meta/decisions-log D619。**验收：** C（对话与流）、品质。
+- **规格：** 03-runtime/02-agent-runtime §5c、08-meta/decisions-log D620。**验收：** C（对话与流）、品质。
   **里程碑：** Post-MVP 回归覆盖。
 - **自动化：** `packages/agent-runtime/src/runtime.test.ts`（loop context ownership）通过 `runtime.prompt()` 驱动真实 pi 循环，
   并读取 `convertToLlm` 交给提供商的视图；`subagent-loop-context.test.ts` 覆盖委托侧的回合边界。两者都到不了适配器自身的输出，

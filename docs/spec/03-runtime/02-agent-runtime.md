@@ -746,7 +746,7 @@ criterion-by-criterion report of what was met and the evidence observed.
   would leave a message sitting between a call and the result answering it. A
   message that replays a claimed call while carrying a new one keeps its new
   call in place; no writer produces that partial replay, and the guard does not
-  reorder messages to close the gap it leaves (D619).
+  reorder messages to close the gap it leaves (D620).
 - The agent loop owns its context array. `prepareNextTurn` hands pi a copy of
   the live state — for a delegate turn boundary too — exactly as pi's own
   `createContextSnapshot()` does for `prompt()` and `continue()`: pi's loop
@@ -760,7 +760,7 @@ criterion-by-criterion report of what was met and the evidence observed.
   real one, and the endpoint rejected the turn with
   `Duplicate tool output for call_id`. In a delegate the same doubling doubled
   the estimate at the following boundary and left the trailing row a fallback
-  carries onto a model it cannot resume from (D619).
+  carries onto a model it cannot resume from (D620).
 - Restored checkpoints clear provider usage from retained assistant messages
   for budgeting. That usage measured the pre-compacted request and must not
   make the summary + tail appear as large as the discarded context.
