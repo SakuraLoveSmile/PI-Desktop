@@ -81,40 +81,98 @@ pub(super) async fn sync_once(
         };
         let transport = transport_with_password(&config, transport_password)?;
         ensure_remote_collections(&transport, &config).await?;
-        let remote_head = read_remote_head(&transport, &config, &key).await?;
-        let (remote, remote_resources) = if let Some((head, _)) = remote_head.as_ref() {
-            let value = read_remote_revision(&transport, &config, &key, &head.revision_id).await?;
-            (Some(value.0), value.1)
-        } else {
-            (None, BTreeMap::new())
-        };
-        let merged = merge::three_way(base.as_ref(), &local.manifest, remote.as_ref())?;
-        if let (Some((head, _)), Some(remote)) = (remote_head.as_ref(), remote.as_ref()) {
-            // Skip publication when the acknowledged base, current local
-            // snapshot, and remote head agree for every subscribed domain.
-            // A remote-only change in an opted-out category is already
-            // represented by the remote head. A fresh device with selected
-            // remote content still has to stage it for approval and
-            // activation, even though the merge result equals the remote
-            // entities.
-            let no_selected_change =
-                selected_manifests_equal(base.as_ref(), Some(remote), &selection(&config))
-                    && selected_manifests_equal(
-                        Some(&local.manifest),
+        let (remote_head, remote, remote_resources, remote_parent_ids, remote_conflicts) =
+            if config.remote_mode == RemoteMode::AppendOnly {
+                let append_only = read_append_only_remote(&transport, &config, &key).await?;
+                if let Some(append_only) = append_only {
+                    let remote_merge = merge_append_only_tips(base.as_ref(), &append_only.tips)?;
+                    let remote = RevisionManifest {
+                        format: REVISION_FORMAT.into(),
+                        version: 1,
+                        revision_id: append_only
+                            .tip_ids
+                            .first()
+                            .cloned()
+                            .unwrap_or_else(|| "remote-merge".into()),
+                        parents: append_only.tip_ids.clone(),
+                        created_at: Utc::now().to_rfc3339(),
+                        entities: remote_merge.entities,
+                        resource_ids: append_only.resources.keys().cloned().collect(),
+                    };
+                    (
+                        None,
                         Some(remote),
-                        &selection(&config),
-                    );
-            if no_selected_change && remote.entities == merged.entities {
-                let mut st = state.lock().await;
-                let mut next_config = config.clone();
-                next_config.last_success_at = Some(Utc::now().to_rfc3339());
-                next_config.last_revision_id = Some(head.revision_id.clone());
-                next_config.last_local_digest = Some(local_digest);
-                next_config.local_change_seen_at = None;
-                clear_error(&mut next_config);
-                save_config(&st, &next_config)?;
-                send_state_notification(tx, &mut st);
-                return Ok(());
+                        append_only.resources,
+                        append_only.tip_ids,
+                        remote_merge.conflicts,
+                    )
+                } else {
+                    (None, None, BTreeMap::new(), Vec::new(), Vec::new())
+                }
+            } else {
+                let remote_head = read_remote_head(&transport, &config, &key).await?;
+                let (remote, remote_resources) = if let Some((head, _)) = remote_head.as_ref() {
+                    let value =
+                        read_remote_revision(&transport, &config, &key, &head.revision_id).await?;
+                    (Some(value.0), value.1)
+                } else {
+                    (None, BTreeMap::new())
+                };
+                let parent_ids = remote_head
+                    .as_ref()
+                    .map(|(head, _)| vec![head.revision_id.clone()])
+                    .unwrap_or_default();
+                (
+                    remote_head,
+                    remote,
+                    remote_resources,
+                    parent_ids,
+                    Vec::new(),
+                )
+            };
+        let merge::MergeResult {
+            entities: local_entities,
+            conflicts: local_conflicts,
+        } = merge::three_way(base.as_ref(), &local.manifest, remote.as_ref())?;
+        let merged = merge::MergeResult {
+            entities: local_entities,
+            conflicts: remote_conflicts
+                .into_iter()
+                .chain(local_conflicts)
+                .collect(),
+        };
+        let can_skip_publication =
+            config.remote_mode == RemoteMode::Strict || remote_parent_ids.len() <= 1;
+        if can_skip_publication {
+            if let (Some(remote), true) = (remote.as_ref(), !remote_parent_ids.is_empty()) {
+                // Skip publication when the acknowledged base, current local
+                // snapshot, and remote head agree for every subscribed domain.
+                // A remote-only change in an opted-out category is already
+                // represented by the remote head. A fresh device with selected
+                // remote content still has to stage it for approval and
+                // activation, even though the merge result equals the remote
+                // entities.
+                let no_selected_change =
+                    selected_manifests_equal(base.as_ref(), Some(remote), &selection(&config))
+                        && selected_manifests_equal(
+                            Some(&local.manifest),
+                            Some(remote),
+                            &selection(&config),
+                        )
+                        && merged.conflicts.is_empty()
+                        && remote.entities == merged.entities;
+                if no_selected_change {
+                    let mut st = state.lock().await;
+                    let mut next_config = config.clone();
+                    next_config.last_success_at = Some(Utc::now().to_rfc3339());
+                    next_config.last_revision_id = remote_parent_ids.first().cloned();
+                    next_config.last_local_digest = Some(local_digest);
+                    next_config.local_change_seen_at = None;
+                    clear_error(&mut next_config);
+                    save_config(&st, &next_config)?;
+                    send_state_notification(tx, &mut st);
+                    return Ok(());
+                }
             }
         }
         let mut resources = local.resources.clone();
@@ -125,10 +183,7 @@ pub(super) async fn sync_once(
                 format: REVISION_FORMAT.into(),
                 version: 1,
                 revision_id: revision_id.clone(),
-                parents: remote_head
-                    .as_ref()
-                    .map(|(head, _)| vec![head.revision_id.clone()])
-                    .unwrap_or_default(),
+                parents: remote_parent_ids.clone(),
                 created_at: Utc::now().to_rfc3339(),
                 entities: merged.entities.clone(),
                 resource_ids: resources.keys().cloned().collect(),
@@ -136,19 +191,31 @@ pub(super) async fn sync_once(
             resources,
         };
         upload_snapshot(&transport, &config, &key, &candidate).await?;
-        let head = RemoteHead {
-            format: FORMAT.into(),
-            version: 1,
-            revision_id: candidate.manifest.revision_id.clone(),
+        let published = if config.remote_mode == RemoteMode::AppendOnly {
+            publish_append_only_head(
+                &transport,
+                &config,
+                &key,
+                &config.device_id,
+                &candidate.manifest.revision_id,
+            )
+            .await
+            .map(|_| true)?
+        } else {
+            let head = RemoteHead {
+                format: FORMAT.into(),
+                version: 1,
+                revision_id: candidate.manifest.revision_id.clone(),
+            };
+            publish_head(
+                &transport,
+                &config,
+                &key,
+                &head,
+                remote_head.as_ref().map(|(_, etag)| etag.as_str()),
+            )
+            .await?
         };
-        let published = publish_head(
-            &transport,
-            &config,
-            &key,
-            &head,
-            remote_head.as_ref().map(|(_, etag)| etag.as_str()),
-        )
-        .await?;
         if !published {
             let jitter_ms = u64::from(Uuid::new_v4().as_bytes()[0] % 31);
             tokio::time::sleep(std::time::Duration::from_millis(
@@ -173,6 +240,7 @@ pub(super) async fn sync_once(
             store_pending(&st, &key, &journal)?;
         }
         let mut next_config = config.clone();
+        let candidate_revision_id = candidate.manifest.revision_id.clone();
         let apply_bundle_state = PendingBundle {
             manifest: candidate.manifest,
             local_before: Some(local.manifest.clone()),
@@ -180,7 +248,7 @@ pub(super) async fn sync_once(
             approvals: pending.approvals,
             conflicts: pending.conflicts,
             journal_state: "applying".into(),
-            remote_revision_id: head.revision_id,
+            remote_revision_id: candidate_revision_id,
         };
         apply_bundle(
             state,
@@ -191,8 +259,10 @@ pub(super) async fn sync_once(
             &apply_bundle_state,
         )
         .await?;
-        if let Err(error) = cleanup_history(state, &transport, &config, &key).await {
-            tracing::warn!(error = %error, "config sync history cleanup failed after sync");
+        if config.remote_mode == RemoteMode::Strict {
+            if let Err(error) = cleanup_history(state, &transport, &config, &key).await {
+                tracing::warn!(error = %error, "config sync history cleanup failed after sync");
+            }
         }
         let mut st = state.lock().await;
         send_state_notification(tx, &mut st);

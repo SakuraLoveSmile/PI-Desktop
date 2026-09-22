@@ -4678,6 +4678,50 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `apps/desktop/test/image-generation-default.test.mjs` 固定，
   `provider-model-config.test.mjs` 断言新增分支会走这两个判断。
 
+## 2026-09-22 —— 指令源不可读时拒绝斜杠提交（D613，issue #795）
+
+- Composer 在发送时读取合并后的指令列表，并把失败吞成 `null`，而提交路径无法把它与
+  “没有这个指令”区分开。于是在该 IPC 读取失败时输入的 `/compact` 会作为字面提示词发给
+  模型，模型据此把它当成指令执行。
+- 解析现在返回三种结果，而不再是一个可空值：已解析（内置 / 插件 / 扩展分发）、未知
+  （模板、别名与无 id 条目继续走提示词路径）、不可用。不可用时拒绝提交、保留草稿并显示
+  `chat.slashCommandSourceUnavailable`。失败的读取不写 TTL 缓存，因此下一次发送会重试；
+  缓存仍热时，一次数据源抖动不会影响解析。
+- 拒绝是刻意 fail-closed：只有指令源能判断 `/name` 是否为控制指令，因此读不到时，看起来像
+  普通文本的名称也会被拒绝，而不是靠猜测。模板与确实未知的别名保持原有提示词路径。由
+  `apps/desktop/test/slash-command-source.test.mjs` 与
+  `03-runtime/01-ipc-protocol.md` §13c 固定。
+
+## 2026-09-22 —— 手动压缩有自己的传输超时与持久化判定（D614，issue #795）
+
+- `agent.compact` 是阻塞式 RPC，会在 sidecar 内消耗一次完整的模型摘要请求：pi 序列化会话、
+  流式生成摘要，并重试瞬时失败。它此前沿用扁平的 130 秒传输默认值，因此 888KB 上下文约
+  158 秒的压缩以 `sidecar RPC timeout` 结束，而 sidecar 仍在继续工作并落盘了检查点——用户
+  被告知压缩失败，而下一个回合证明它其实成功了。
+- 超时现在由 sidecar 真正执行的预算推导：每次尝试的流空转看门狗（180 秒）、`1 + 3` 次
+  尝试、2/4/8 秒重试退避，以及传输余量 —— 即 `AGENT_COMPACT_RPC_TIMEOUT_MS`，刻意按方法
+  区分，而不是放宽全局默认值。
+- 两条宿主路径（Electron 的 `agentCompact` IPC 与 `RuntimeService.compact`）也不再把手动
+  压缩的传输超时当作 sidecar 的判定：它们会重新读取持久化的 `session.compaction` 记录，
+  发现新检查点已落盘就报告成功、记录该不一致，否则原样抛出超时。sidecar 自己报告的判定
+  绝不会被这样改写。由 `packages/host-runtime/src/runtime-service.test.ts`、
+  `packages/shared/src/protocol.test.ts`、
+  `apps/desktop/test/plugin-timeout-budgets.test.mjs` 与
+  `03-runtime/01-ipc-protocol.md` §5.4 固定。
+
+## 2026-09-22 —— 空记录读取会重试，且绝不入缓存（D615，issue #795）
+
+- 渲染层把每一次持久化 `session.get` 窗口都当真，并写入缓存。当宿主正在重写记录文件时，
+  对拥有数千条消息的会话返回的空窗口被当成“空快照”存下，侧边栏悬停预取又反复送出它，
+  于是面板一直空白，只有重启应用才能恢复。此前没有任何逻辑区分“读取失败或读到陈旧数据”
+  与“真的空会话”，也没有任何路径重试。
+- 现在的判断依据是会话自己的计数：若侧边栏计为有历史的会话返回零条消息，就再读一次，
+  随后保留用户已有的快照，否则显示 `chat.sessionTranscriptEmpty`。这类空页绝不会写入记录
+  缓存，因此悬停预取不会污染之后每次打开。
+- 这是防御措施，而不是宿主侧根因：记录重写是报告者 0.15.1 的存储布局，而读取侧仍然返回
+  “会话存在但没有消息”，而不是报告记录不可读。见 `04-ux/09-interaction-patterns.md`
+  §跨选项卡的会话隔离。
+
 ## 2026-09-22 —— 从未拿到初始状态的渲染器有了有界表面与退出通道（D616）
 
 - 渲染器的启动过程本身没有超时：`bootstrap()` 要么发布初始状态，要么什么都不发布，

@@ -36,7 +36,7 @@ pub(super) async fn ensure_remote_collections(
     transport
         .ensure_collection(&format!("vault/{}", config.vault_id))
         .await?;
-    for child in ["objects", "revisions"] {
+    for child in ["objects", "revisions", "heads"] {
         transport
             .ensure_collection(&format!("vault/{}/{}", config.vault_id, child))
             .await?;
@@ -58,6 +58,16 @@ pub(super) fn object_path(config: &StoredConfig, object_id: &str) -> Result<Stri
 
 pub(super) fn head_path(config: &StoredConfig) -> String {
     remote_path(config, "head")
+}
+
+pub(super) fn compatibility_heads_path(config: &StoredConfig) -> String {
+    remote_path(config, "heads")
+}
+
+pub(super) fn compatibility_head_path(config: &StoredConfig, device_id: &str) -> Result<String> {
+    validate_remote_id(&config.vault_id, "vault")?;
+    validate_remote_id(device_id, "device")?;
+    Ok(remote_path(config, &format!("heads/{device_id}")))
 }
 
 pub(super) fn serialize_json<T: Serialize>(value: &T) -> Result<Vec<u8>> {
@@ -83,6 +93,192 @@ pub(super) async fn read_remote_head(
     }
     validate_remote_id(&head.revision_id, "revision")?;
     Ok(Some((head, etag)))
+}
+
+#[derive(Debug)]
+pub(super) struct AppendOnlyRemote {
+    pub tip_ids: Vec<String>,
+    pub tips: Vec<RevisionManifest>,
+    pub resources: BTreeMap<String, Vec<u8>>,
+}
+
+fn is_ancestor(
+    manifests: &BTreeMap<String, RevisionManifest>,
+    ancestor: &str,
+    descendant: &str,
+) -> bool {
+    let mut pending = vec![descendant.to_string()];
+    let mut seen = BTreeSet::new();
+    while let Some(revision_id) = pending.pop() {
+        if !seen.insert(revision_id.clone()) {
+            continue;
+        }
+        if revision_id == ancestor {
+            return true;
+        }
+        if let Some(manifest) = manifests.get(&revision_id) {
+            pending.extend(manifest.parents.iter().cloned());
+        }
+    }
+    false
+}
+
+pub(super) async fn read_append_only_remote(
+    transport: &WebDavTransport,
+    config: &StoredConfig,
+    key: &VaultKey,
+) -> Result<Option<AppendOnlyRemote>> {
+    let mut head_revision_ids = BTreeSet::new();
+    for device_id in transport
+        .list_children(&compatibility_heads_path(config))
+        .await?
+    {
+        validate_remote_id(&device_id, "device")?;
+        let path = compatibility_head_path(config, &device_id)?;
+        let Some((ciphertext, _)) = transport.get(&path).await? else {
+            bail!("CONFIG_SYNC_REMOTE: compatibility head disappeared");
+        };
+        let plain = decrypt_object(
+            key,
+            &format!("append-head/{device_id}"),
+            &config.vault_id,
+            &ciphertext,
+        )?;
+        let head: RemoteHead =
+            serde_json::from_slice(&plain).context("decode compatibility head")?;
+        if head.format != FORMAT || head.version != 1 {
+            bail!("CONFIG_SYNC_UNSUPPORTED: compatibility head format is not supported");
+        }
+        validate_remote_id(&head.revision_id, "revision")?;
+        head_revision_ids.insert(head.revision_id);
+    }
+
+    // A vault created by strict mode may be joined explicitly in append-only
+    // mode. Treat the old shared head as one input while the first
+    // compatibility head is published; strict-mode devices are warned in the
+    // UI and must not remain subscribed to the same vault.
+    if let Some((ciphertext, _)) = transport.get(&head_path(config)).await? {
+        let plain = decrypt_object(key, "head", &config.vault_id, &ciphertext)?;
+        let head: RemoteHead = serde_json::from_slice(&plain).context("decode legacy head")?;
+        if head.format != FORMAT || head.version != 1 {
+            bail!("CONFIG_SYNC_UNSUPPORTED: legacy head format is not supported");
+        }
+        validate_remote_id(&head.revision_id, "revision")?;
+        head_revision_ids.insert(head.revision_id);
+    }
+
+    if head_revision_ids.is_empty() {
+        return Ok(None);
+    }
+
+    let mut manifests = BTreeMap::new();
+    let mut pending = head_revision_ids.iter().cloned().collect::<Vec<_>>();
+    while let Some(revision_id) = pending.pop() {
+        if manifests.contains_key(&revision_id) {
+            continue;
+        }
+        if manifests.len() >= MAX_HISTORY_SCAN {
+            bail!("CONFIG_SYNC_LIMIT_EXCEEDED: compatibility history is too large");
+        }
+        let manifest = read_remote_manifest(transport, config, key, &revision_id).await?;
+        pending.extend(manifest.parents.iter().cloned());
+        manifests.insert(revision_id, manifest);
+    }
+
+    let tip_ids = head_revision_ids
+        .iter()
+        .filter(|candidate| {
+            !head_revision_ids
+                .iter()
+                .any(|other| *candidate != other && is_ancestor(&manifests, candidate, other))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let mut tips = Vec::new();
+    let mut resources = BTreeMap::new();
+    for revision_id in &tip_ids {
+        let (manifest, revision_resources) =
+            read_remote_revision(transport, config, key, revision_id).await?;
+        for (object_id, bytes) in revision_resources {
+            if let Some(existing) = resources.get(&object_id) {
+                if existing != &bytes {
+                    bail!("CONFIG_SYNC_CRYPTO: compatibility resource id collision");
+                }
+            } else {
+                resources.insert(object_id, bytes);
+            }
+        }
+        tips.push(manifest);
+    }
+    if resources.len() > MAX_RESOURCES {
+        bail!("CONFIG_SYNC_LIMIT_EXCEEDED: compatibility revision references too many resources");
+    }
+    Ok(Some(AppendOnlyRemote {
+        tip_ids,
+        tips,
+        resources,
+    }))
+}
+
+pub(super) fn merge_append_only_tips(
+    base: Option<&RevisionManifest>,
+    tips: &[RevisionManifest],
+) -> Result<merge::MergeResult> {
+    let Some(first) = tips.first() else {
+        return Ok(merge::MergeResult {
+            entities: Vec::new(),
+            conflicts: Vec::new(),
+        });
+    };
+    let mut accumulator = first.clone();
+    let mut conflicts = Vec::new();
+    for tip in tips.iter().skip(1) {
+        let merged = merge::three_way(base, &accumulator, Some(tip))?;
+        accumulator.entities = merged.entities;
+        conflicts.extend(merged.conflicts);
+    }
+    Ok(merge::MergeResult {
+        entities: accumulator.entities,
+        conflicts,
+    })
+}
+
+pub(super) async fn publish_append_only_head(
+    transport: &WebDavTransport,
+    config: &StoredConfig,
+    key: &VaultKey,
+    device_id: &str,
+    revision_id: &str,
+) -> Result<()> {
+    let path = compatibility_head_path(config, device_id)?;
+    validate_remote_id(revision_id, "revision")?;
+    let head = RemoteHead {
+        format: FORMAT.into(),
+        version: 1,
+        revision_id: revision_id.into(),
+    };
+    let encrypted = encrypt_object(
+        key,
+        &format!("append-head/{device_id}"),
+        &config.vault_id,
+        &serialize_json(&head)?,
+    )?;
+    transport.put_unconditional(&path, encrypted).await?;
+    let Some((stored, _)) = transport.get(&path).await? else {
+        bail!("CONFIG_SYNC_REMOTE: compatibility head disappeared after upload");
+    };
+    let plain = decrypt_object(
+        key,
+        &format!("append-head/{device_id}"),
+        &config.vault_id,
+        &stored,
+    )?;
+    let stored: RemoteHead = serde_json::from_slice(&plain)?;
+    if stored.revision_id != revision_id {
+        bail!("CONFIG_SYNC_CONFLICT: compatibility head was changed during publication");
+    }
+    Ok(())
 }
 
 pub(super) async fn read_remote_revision(
@@ -224,7 +420,13 @@ pub(super) async fn upload_snapshot(
             &config.vault_id,
             bytes,
         )?;
-        transport.put_if_none(&path, encrypted).await?;
+        if config.remote_mode == RemoteMode::AppendOnly {
+            if transport.get(&path).await?.is_none() {
+                transport.put_unconditional(&path, encrypted).await?;
+            }
+        } else {
+            transport.put_if_none(&path, encrypted).await?;
+        }
         let Some((existing, _)) = transport.get(&path).await? else {
             bail!("CONFIG_SYNC_REMOTE: immutable resource disappeared after upload");
         };
@@ -246,7 +448,11 @@ pub(super) async fn upload_snapshot(
         &manifest_bytes,
     )?;
     let path = revision_path(config, &snapshot.manifest.revision_id)?;
-    transport.put_if_none(&path, encrypted).await?;
+    if config.remote_mode == RemoteMode::AppendOnly {
+        transport.put_unconditional(&path, encrypted).await?;
+    } else {
+        transport.put_if_none(&path, encrypted).await?;
+    }
     let Some((existing, _)) = transport.get(&path).await? else {
         bail!("CONFIG_SYNC_REMOTE: immutable revision disappeared after upload");
     };
@@ -277,5 +483,71 @@ pub(super) async fn publish_head(
             .await
     } else {
         Ok(transport.put_if_none(&head_path(config), encrypted).await?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn application_entity(payload: serde_json::Value) -> PortableEntity {
+        let mut entity = PortableEntity {
+            domain: domains::DOMAIN_APPLICATION.to_string(),
+            entity_id: "application".to_string(),
+            label: "Application".to_string(),
+            deleted: false,
+            requires_approval: false,
+            secret_bearing: false,
+            mapping_required: false,
+            digest: String::new(),
+            payload,
+            resource_ids: Vec::new(),
+        };
+        domains::refresh_digest(&mut entity);
+        entity
+    }
+
+    fn manifest(
+        revision_id: &str,
+        parents: Vec<String>,
+        entity: PortableEntity,
+    ) -> RevisionManifest {
+        RevisionManifest {
+            format: REVISION_FORMAT.to_string(),
+            version: 1,
+            revision_id: revision_id.to_string(),
+            parents,
+            created_at: "2026-09-22T00:00:00Z".to_string(),
+            entities: vec![entity],
+            resource_ids: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn append_only_tips_merge_disjoint_application_fields() {
+        let base = manifest(
+            "base",
+            Vec::new(),
+            application_entity(json!({"theme": "light", "language": "en"})),
+        );
+        let theme_tip = manifest(
+            "theme-tip",
+            vec!["base".to_string()],
+            application_entity(json!({"theme": "dark", "language": "en"})),
+        );
+        let language_tip = manifest(
+            "language-tip",
+            vec!["base".to_string()],
+            application_entity(json!({"theme": "light", "language": "zh-CN"})),
+        );
+
+        let merged = merge_append_only_tips(Some(&base), &[theme_tip, language_tip])
+            .expect("append-only tips merge");
+        assert!(merged.conflicts.is_empty());
+        assert_eq!(
+            merged.entities[0].payload,
+            json!({"theme": "dark", "language": "zh-CN"})
+        );
     }
 }
