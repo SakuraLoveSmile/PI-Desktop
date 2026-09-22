@@ -14516,9 +14516,11 @@ the latest destination. These assertions measure work counts, not device FPS.
   the content keeps its scroll position.
 - Repeat for built-in → plugin, plugin → plugin, and plugin → the previously
   selected built-in destination. Re-selecting a plugin keeps its position.
-- Follow a global search setting anchor into AI from another destination and
-  within AI: the target row is visible, and consuming the anchor keeps that
-  position.
+- Follow a global search setting anchor into AI from another destination,
+  from an open plugin destination, and within AI: the plugin page is gone and
+  the target row is visible before the next paint. Consuming the anchor keeps
+  that position. An external tab change with no anchor also leaves the plugin
+  and starts at the top.
 - Run in light and dark themes.
 - Automated coverage: `pnpm test:e2e:settings-scroll` mounts the production
   SettingsPage, store, translations, and built CSS in isolated Electron. Only

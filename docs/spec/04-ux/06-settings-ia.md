@@ -7,8 +7,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - Switching to a different Settings destination starts the content pane at the
   top, including plugin destinations. Re-selecting the current destination or
   updating settings in place preserves the current scroll position. Global
-  search deep links still scroll to their target row after the destination
-  changes; consuming the search anchor does not reset the pane again.
+  search deep links leave an open plugin destination, then scroll to their
+  target row before paint. Consuming the search anchor does not reset the pane
+  again.
 - Settings remains usable when an unrelated startup read fails: a successfully
   loaded settings snapshot is retained independently from the remaining
   bootstrap data. If the settings read itself is unavailable, the content pane

@@ -80,6 +80,25 @@ window.settingsScrollProbe = async () => {
     await scroll();
     await select("AI");
     assert(pane().scrollTop === 0, "Extension → unchanged built-in tab must start at top");
+    await select("Themes A");
+    await scroll();
+    flushSync(() => useAppStore.getState().setSettingsTab("shortcuts"));
+    assert(!document.querySelector(".plugin-scenic-theme-card"), "External tab change must leave the plugin");
+    assert(document.querySelector(".settings-section-title")?.textContent?.includes("Shortcuts"), "Shortcuts must replace the plugin");
+    assert(pane().scrollTop === 0, "External tab change must start at the top");
+    await select("Themes A");
+    await scroll();
+    flushSync(() => {
+      useAppStore.getState().setSettingsAnchor("settings.enterToSend");
+      useAppStore.getState().setSettingsTab("ai");
+    });
+    assert(!document.querySelector(".plugin-scenic-theme-card"), "Search must leave the plugin destination");
+    const fromPlugin = document.querySelector(".settings-anchor-flash");
+    assert(fromPlugin && pane().scrollTop > 0, "Search from a plugin must be positioned before paint");
+    const fromPluginBounds = fromPlugin.getBoundingClientRect();
+    const fromPluginViewport = pane().getBoundingClientRect();
+    assert(fromPluginBounds.top >= fromPluginViewport.top && fromPluginBounds.bottom <= fromPluginViewport.bottom,
+      "Search from a plugin must show the target");
     // The same public store entry points used by SearchDialog.openSettingsHit.
     await select("Shortcuts");
     await scroll();
@@ -87,9 +106,8 @@ window.settingsScrollProbe = async () => {
       useAppStore.getState().setSettingsAnchor("settings.enterToSend");
       useAppStore.getState().setSettingsTab("ai");
     });
-    await settle();
     const target = document.querySelector(".settings-anchor-flash");
-    assert(target && pane().scrollTop > 0, "Search anchor must win over destination reset");
+    assert(target && pane().scrollTop > 0, "Search anchor must be positioned before paint");
     const bounds = target.getBoundingClientRect();
     const viewport = pane().getBoundingClientRect();
     assert(bounds.top >= viewport.top && bounds.bottom <= viewport.bottom,
@@ -100,6 +118,8 @@ window.settingsScrollProbe = async () => {
     assert(pane().scrollTop === anchoredPosition, "Consuming anchor must not reset scroll");
     pane().scrollTop = 0;
     flushSync(() => useAppStore.getState().setSettingsAnchor("settings.enterToSend"));
+    const withinTab = document.querySelector(".settings-anchor-flash");
+    assert(withinTab && pane().scrollTop > 0, "Search within the active tab must be positioned before paint");
     await settle();
     assert(pane().scrollTop > 0, "Search within the active tab must still locate its row");
     checks.push({ theme, ok: true });

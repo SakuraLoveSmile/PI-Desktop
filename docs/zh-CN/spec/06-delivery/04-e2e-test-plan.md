@@ -8620,8 +8620,9 @@ the latest destination. These assertions measure work counts, not device FPS.
 - 再次选择当前分类，或不离开当前页更新设置，保留内容区滚动位置。
 - 覆盖内置分类 → 插件、插件 → 插件、插件 → 先前选择的内置分类；再次
   选择当前插件分类时保留位置。
-- 从其他分类及 AI 当前页通过全局搜索设置锚点进入 AI，目标项可见，消费
-  锚点后保持定位。
+- 从其他分类、当前打开的插件分类，以及 AI 当前页通过全局搜索设置锚点进入
+  AI：插件页关闭，目标项在下一次绘制前可见，消费锚点后保持定位。没有锚点的
+  外部切页也会离开插件，并从顶部开始。
 - 在明暗两种主题下运行。
 - 自动化覆盖：`pnpm test:e2e:settings-scroll` 在隔离 Electron 中挂载真实
   SettingsPage、store、翻译和构建后的 CSS。仅 preload 数据使用 fixture；

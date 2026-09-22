@@ -79,6 +79,7 @@ export function SettingsPage() {
   const tab = useAppStore((s) => s.settingsTab);
   const setSettingsTab = useAppStore((s) => s.setSettingsTab);
   const settingsAnchor = useAppStore((s) => s.settingsAnchor);
+  const settingsTabNonce = useAppStore((s) => s.settingsTabNonce);
   const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
   const setPage = useAppStore((s) => s.setPage);
   const settings = useAppStore((s) => s.settings);
@@ -97,6 +98,17 @@ export function SettingsPage() {
   const [settingsRecoveryFailed, setSettingsRecoveryFailed] = useState(false);
   const [extensions, setExtensions] = useState<PluginScenicThemesDestinationMeta[]>([]);
   const [activeExtension, setActiveExtension] = useState<PluginScenicThemesDestinationMeta | null>(null);
+  const seenSettingsTabNonce = useRef(settingsTabNonce);
+  // setSettingsTab means "show this built-in category", even when the tab id
+  // does not change. Dismiss a plugin page before paint; an anchor-only deep
+  // link has to do the same or the row lookup hits the plugin instead.
+  if (
+    seenSettingsTabNonce.current !== settingsTabNonce ||
+    (activeExtension && settingsAnchor)
+  ) {
+    seenSettingsTabNonce.current = settingsTabNonce;
+    if (activeExtension) setActiveExtension(null);
+  }
   const contentRef = useRef<HTMLDivElement>(null);
   const destination = activeExtension ? `extension:${activeExtension.ref}` : `builtin:${tab}`;
 
@@ -145,10 +157,12 @@ export function SettingsPage() {
   }, [settings, recoverSettings]);
 
   // Arriving from the global search dialog: scroll to and flash the row
-  // whose title matches the pending anchor key. Rows are located by their
-  // translated title so async tab content (providers, import) needs no
-  // per-row wiring; a short retry window covers late mounts.
-  useEffect(() => {
+  // whose title matches the pending anchor key. This runs after the
+  // destination reset and before paint, so a category change does not flash
+  // the top. Rows are located by their translated title so async tab content
+  // (providers, import) needs no per-row wiring; a short retry window covers
+  // late mounts.
+  useLayoutEffect(() => {
     if (!settingsAnchor) return;
     const target = t(settingsAnchor).trim();
     let cancelled = false;
