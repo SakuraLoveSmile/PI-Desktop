@@ -509,11 +509,15 @@
 /*
  * A manual sync reports itself while its request is still open: the phase it
  * is in, a bar once it announced a total, and the figures it has moved so far.
+ * It sits between the cards rather than inside one, because the first enable —
+ * the slowest sync of all — runs before the status card exists. The page stack
+ * spaces the cards around it, so only the inset that lines it up with their
+ * content is left here.
  */
 .settings-config-sync-progress {
   display: grid;
   gap: 8px;
-  margin: 0 16px 14px;
+  margin: 0 16px;
 }
 
 .settings-config-sync-progress-head {

@@ -58,10 +58,12 @@ export type ConfigSyncPhase =
  *
  * The sync is a single request, so without these the interface has nothing to
  * show between the click and the answer. `done`/`total` are that phase's units
- * (objects for `download`/`upload`, entities for `capture`/`apply`, and always
- * 0 for `merge`/`cleanup`); `total === 0` means the size of the phase is not
- * known in advance. `bytesDone`/`bytesTotal` are a byte pair that only
- * `upload` reports in full — `download` reports `bytesDone` alone — and
+ * — objects for `download`/`upload` (the device tips being read, in append-only
+ * mode) and entities for `capture`/`merge`/`apply`, while `cleanup` reports the
+ * phase without counting it — and `total === 0` means the size of the phase is
+ * not known in advance. `bytesDone`/`bytesTotal` are a byte pair that only
+ * `upload` reports in full — `download` reports `bytesDone` alone, because a
+ * remote manifest names resources by id rather than by length — and
  * `bytesTotal === 0` means the byte count is not known.
  */
 export type ConfigSyncProgress = {

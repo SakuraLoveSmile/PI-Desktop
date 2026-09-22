@@ -380,10 +380,13 @@ export function ConfigSyncPage() {
   const locked = state?.locked === true;
   const categories = selection;
   const isHttpEndpoint = /^http:\/\//i.test(form.endpoint.trim());
-  // The report only exists for a sync this page started: an automatic run
-  // stays quiet, and no report outlives the request that produced it.
+  // The report only exists for a sync this page started: an automatic run stays
+  // quiet, and no report outlives the request that produced it. Enabling a
+  // vault runs the same full sync as "sync now", so both operations are watched.
   const syncProgress =
-    busy === "sync" && progress ? configSyncProgressView(progress) : null;
+    (busy === "sync" || busy === "configure") && progress
+      ? configSyncProgressView(progress)
+      : null;
 
   return (
     <div className="settings-stack settings-config-sync">
@@ -552,6 +555,55 @@ export function ConfigSyncPage() {
         ) : null}
       </SettingsCard>
 
+      {/* A sync this page started reports itself here, above the cards: the
+          first enable is the slowest sync of all, and it runs while the status
+          card below has nothing to show yet. */}
+      {syncProgress ? (
+        <div className="settings-config-sync-progress">
+          <div className="settings-config-sync-progress-head">
+            <span className="settings-config-sync-progress-title">
+              {t("settings.configSync.progressTitle")}
+            </span>
+            <span className="settings-config-sync-progress-phase" role="status">
+              {t(syncProgress.phaseKey)}
+            </span>
+          </div>
+          {syncProgress.determinate ? (
+            <div
+              className="settings-config-sync-progress-bar"
+              role="progressbar"
+              aria-label={t("settings.configSync.progressTitle")}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={syncProgress.percent}
+              aria-valuetext={syncProgress.fraction ?? undefined}
+            >
+              <span
+                className="settings-config-sync-progress-bar-fill"
+                style={{ width: `${syncProgress.percent}%` }}
+              />
+            </div>
+          ) : null}
+          {syncProgress.determinate ? (
+            <div className="settings-config-sync-progress-figures">
+              {syncProgress.objects ? (
+                <span>
+                  {t(
+                    "settings.configSync.progress.objects",
+                    syncProgress.objects,
+                  )}
+                </span>
+              ) : null}
+              {syncProgress.bytes ? (
+                <span>
+                  {t("settings.configSync.progress.bytes", syncProgress.bytes)}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {configured ? (
         <>
           <SettingsCard title={t("settings.configSync.statusTitle")}>
@@ -571,51 +623,6 @@ export function ConfigSyncPage() {
               <SettingsRow title={t("settings.configSync.lastError")}>
                 <span className="settings-config-sync-error">{state.lastError}</span>
               </SettingsRow>
-            ) : null}
-            {syncProgress ? (
-              <div className="settings-config-sync-progress">
-                <div className="settings-config-sync-progress-head">
-                  <span className="settings-config-sync-progress-title">
-                    {t("settings.configSync.progressTitle")}
-                  </span>
-                  <span className="settings-config-sync-progress-phase" role="status">
-                    {t(syncProgress.phaseKey)}
-                  </span>
-                </div>
-                {syncProgress.determinate ? (
-                  <div
-                    className="settings-config-sync-progress-bar"
-                    role="progressbar"
-                    aria-label={t("settings.configSync.progressTitle")}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={syncProgress.percent}
-                    aria-valuetext={syncProgress.fraction ?? undefined}
-                  >
-                    <span
-                      className="settings-config-sync-progress-bar-fill"
-                      style={{ width: `${syncProgress.percent}%` }}
-                    />
-                  </div>
-                ) : null}
-                {syncProgress.determinate ? (
-                  <div className="settings-config-sync-progress-figures">
-                    {syncProgress.objects ? (
-                      <span>
-                        {t(
-                          "settings.configSync.progress.objects",
-                          syncProgress.objects,
-                        )}
-                      </span>
-                    ) : null}
-                    {syncProgress.bytes ? (
-                      <span>
-                        {t("settings.configSync.progress.bytes", syncProgress.bytes)}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
             ) : null}
             {locked ? (
               <SettingsRow
