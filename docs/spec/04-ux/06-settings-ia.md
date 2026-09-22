@@ -55,7 +55,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   8. **Subagents / 子智能体** — Lucide `Bot` (built-in and personal parallel agents)
   9. **Import / 导入** — Lucide `Download` (bring sessions and model configuration in from other tools)
   10. **Projects / 项目** — Lucide `Archive` (durable project index)
-  11. **Cloud sync / 云同步** — Lucide `CloudDownload` (encrypted portable configuration backup and bidirectional sync)
+  11. **Cloud sync / 云同步** — Lucide `CloudDownload` (encrypted portable configuration backup and bidirectional sync; developer mode only)
   12. **Remote Hosts / 远程主机** — Lucide `Globe` (SSH bootstrap and pairing inventory; developer mode only)
   13. **Info / 信息** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
@@ -64,11 +64,18 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   scanability, the destinations are shown in four titled visual clusters:
   `Preferences` / `偏好` (General, AI, Shortcuts), `Agent` / `智能体`
   (Instructions, Models, Skills, MCP, Subagents), `Workspace` / `工作区`
-  (Import, Projects), and `System` / `系统` (Cloud sync, Remote Hosts, Info). Headings are
+  (Import, Projects), and `System` / `系统` (Cloud sync, Remote Hosts, Info;
+  Cloud sync and Remote Hosts are developer-only). Headings are
   muted, non-interactive labels and use whitespace for separation; no divider
   lines are rendered. These are visual landmarks only, not a second navigation
   level.
   When search filters the directory, empty clusters and their headings disappear.
+- **Cloud sync / 云同步** is a developer-only, Experimental destination: its
+  rail row, page, and settings-search hits exist only while
+  `AppSettings.developerMode` is `true`. With developer mode off the row is
+  absent rather than disabled, settings search returns no hit for it, and a
+  rail position left on it falls back to General. The row and page title carry
+  the Experimental badge (`settings.configSync.experimental`)
 - **Remote Hosts / 远程主机** is a developer-only, Experimental destination: its
   rail row, its page, and its settings-search hits exist only while
   `AppSettings.developerMode` is `true`. With developer mode off the row is
@@ -716,7 +723,7 @@ system while preserving their different data ownership:
   - the developer mode switch unlocks the Open console button, F12 on every
     platform, Ctrl+Shift+I on Windows/Linux, the macOS View-menu developer
     tools item, Copy conversation ID / Open session path on the conversation
-    overflow menu, and the Remote Hosts destination on the rail
+    overflow menu, and the Cloud sync / Remote Hosts destinations on the rail
   - disabling developer mode closes an open console and disables or removes
     every entry point; Settings search indexes the card, switch, and console
     action
@@ -745,8 +752,8 @@ system while preserving their different data ownership:
 - Back to app returns to chat shell from the rail's pinned footer action
 - Developer-only destinations join and leave the rail, the page, and settings
   search as one unit: while developer mode is off the rail omits the row,
-  settings search returns no hit for it, and an open Remote Hosts page returns
-  to General
+  settings search returns no hit for it, and an open Cloud sync or Remote Hosts
+  page returns to General
 
 ## 4. Acceptance
 
@@ -755,8 +762,8 @@ system while preserving their different data ownership:
    foot on the main sidebar's footer icon line, and exactly General / 常规, AI,
    Shortcuts / 快捷键, Instructions / 指令, Models / 模型, Skills / 技能, MCP,
    Subagents / 子智能体, Import / 导入, Projects / 项目, Cloud sync / 云同步,
-   Remote Hosts / 远程主机, and Info / 信息 in that order, with Remote Hosts /
-   远程主机 present only while developer mode is on. The rows are grouped under Preferences / 偏好,
+   Remote Hosts / 远程主机, and Info / 信息 in that order. Cloud sync / 云同步
+   and Remote Hosts / 远程主机 appear only while developer mode is on. The rows are grouped under Preferences / 偏好,
    Agent / 智能体, Workspace / 工作区, and System / 系统. There is no
    Usage / 用量 destination.
 3. Appearance is part of General and has no standalone rail destination

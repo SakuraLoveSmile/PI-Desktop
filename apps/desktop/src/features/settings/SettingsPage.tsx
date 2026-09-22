@@ -70,6 +70,7 @@ type NavItem = {
   titleKey: string;
   icon: ReactNode;
   group: SettingsNavGroupId;
+  experimentalBadgeKey?: string;
   /** i18n keys of the rows inside the tab; search matches their translations. */
   keywordKeys: string[];
 };
@@ -87,8 +88,8 @@ export function SettingsPage() {
   const refreshProviders = useAppStore((s) => s.refreshProviders);
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
 
-  // Developer-only destinations (Remote Hosts) exist only while developer
-  // mode is on; the rail, the page, and settings search drop them together.
+  // Developer-only destinations (Cloud sync and Remote Hosts) exist only
+  // while developer mode is on; the rail, page, and search drop them together.
   const developerMode = settings?.developerMode === true;
   const navEntries = useMemo(() => visibleSettingsNav(developerMode), [developerMode]);
   const tabHidden = isSettingsDestinationHidden(tab, developerMode);
@@ -131,8 +132,8 @@ export function SettingsPage() {
   }, [activeExtension, extensions, setSettingsTab]);
 
   // A hidden destination must not keep rendering: leave the page the rail no
-  // longer offers (for example Remote Hosts once developer mode is switched
-  // off) and fall back to General.
+  // longer offers (for example Cloud sync or Remote Hosts after developer mode
+  // is switched off) and fall back to General.
   useEffect(() => {
     if (!settings || !tabHidden) return;
     setSettingsTab("general");
@@ -237,6 +238,7 @@ export function SettingsPage() {
       titleKey: entry.titleKey,
       icon: iconFor[entry.id],
       group: entry.group,
+      experimentalBadgeKey: entry.experimentalBadgeKey,
       keywordKeys: entry.keywordKeys,
     }));
   }, [navEntries]);
@@ -266,8 +268,8 @@ export function SettingsPage() {
     return [...groups.entries()].map(([id, items]) => ({ id, items }));
   }, [filteredItems]);
 
-  const activeTitleKey =
-    navItems.find((item) => item.id === tab)?.titleKey ?? "settings.title";
+  const activeNavItem = navItems.find((item) => item.id === tab);
+  const activeTitleKey = activeNavItem?.titleKey ?? "settings.title";
   const tabNeedsSettings = ["general", "ai", "shortcuts", "agent"].includes(tab);
 
   return (
@@ -310,9 +312,9 @@ export function SettingsPage() {
                   >
                     <span className="settings-nav-icon">{item.icon}</span>
                     <span className="settings-nav-label">{t(item.labelKey)}</span>
-                    {item.id === "remoteHosts" ? (
+                    {item.experimentalBadgeKey ? (
                       <Badge tone="warning" className="settings-nav-experimental">
-                        {t("settings.remoteHosts.experimental")}
+                        {t(item.experimentalBadgeKey)}
                       </Badge>
                     ) : null}
                   </button>
@@ -364,8 +366,8 @@ export function SettingsPage() {
           <div className="settings-content-enter">
           <h1 className="settings-section-title">
             <span>{activeExtension?.label ?? t(activeTitleKey)}</span>
-            {!activeExtension && tab === "remoteHosts" && !tabHidden ? (
-              <Badge tone="warning">{t("settings.remoteHosts.experimental")}</Badge>
+            {!activeExtension && activeNavItem?.experimentalBadgeKey ? (
+              <Badge tone="warning">{t(activeNavItem.experimentalBadgeKey)}</Badge>
             ) : null}
           </h1>
 
@@ -544,7 +546,7 @@ export function SettingsPage() {
 
           {tab === "projects" && <ProjectsPage />}
 
-          {tab === "sync" && <ConfigSyncPage />}
+          {tab === "sync" && !tabHidden && <ConfigSyncPage />}
 
           {tab === "remoteHosts" && !tabHidden && <RemoteHostsPage />}
 
