@@ -1,9 +1,11 @@
 use anyhow::{bail, Context, Result};
 use reqwest::header::{HeaderMap, HeaderValue, ETAG, IF_MATCH, IF_NONE_MATCH, LOCATION};
 use reqwest::{Client, Method, StatusCode, Url};
+use std::net::IpAddr;
 use uuid::Uuid;
 
 const MAX_REMOTE_OBJECT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_REMOTE_LIST_ENTRIES: usize = 4096;
 
 #[derive(Debug, Clone)]
 pub struct WebDavConfig {
@@ -12,11 +14,14 @@ pub struct WebDavConfig {
     pub password: String,
     pub directory: String,
     pub allow_insecure_http: bool,
+    pub missing_object_status: Option<u16>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ProbeResult {
     pub conditional_writes: bool,
+    pub append_only: bool,
+    pub missing_object_status: Option<u16>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +31,7 @@ pub struct WebDavTransport {
     username: String,
     password: String,
     directory: String,
+    missing_object_status: Option<StatusCode>,
 }
 
 fn validate_relative_directory(value: &str) -> Result<String> {
@@ -50,6 +56,36 @@ fn validate_relative_directory(value: &str) -> Result<String> {
     Ok(parts.join("/"))
 }
 
+fn is_lan_http_host(host: &str) -> bool {
+    let host = host
+        .trim()
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if matches!(host.as_str(), "localhost" | "localhost.localdomain") || host.ends_with(".local") {
+        return true;
+    }
+
+    match host.parse::<IpAddr>() {
+        Ok(IpAddr::V4(address)) => {
+            let octets = address.octets();
+            address.is_loopback()
+                || address.is_link_local()
+                || octets[0] == 10
+                || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                || (octets[0] == 192 && octets[1] == 168)
+        }
+        Ok(IpAddr::V6(address)) => {
+            let segments = address.segments();
+            address.is_loopback()
+                || (segments[0] & 0xfe00) == 0xfc00
+                || (segments[0] & 0xffc0) == 0xfe80
+        }
+        Err(_) => false,
+    }
+}
+
 fn validate_endpoint(raw: &str, allow_insecure_http: bool) -> Result<Url> {
     let mut url = Url::parse(raw.trim()).context("parse WebDAV endpoint")?;
     if !matches!(url.scheme(), "https" | "http") {
@@ -60,6 +96,11 @@ fn validate_endpoint(raw: &str, allow_insecure_http: bool) -> Result<Url> {
     }
     if url.host_str().is_none() || !url.username().is_empty() || url.password().is_some() {
         bail!("CONFIG_SYNC_INVALID: endpoint must not contain userinfo");
+    }
+    if url.scheme() == "http" && !is_lan_http_host(url.host_str().unwrap_or_default()) {
+        bail!(
+            "CONFIG_SYNC_INVALID: HTTP is limited to localhost, .local, or private LAN addresses"
+        );
     }
     url.set_query(None);
     url.set_fragment(None);
@@ -83,7 +124,13 @@ impl WebDavTransport {
             username: config.username.trim().to_string(),
             password: config.password.clone(),
             directory,
+            missing_object_status: compatible_missing_object_status(config.missing_object_status),
         })
+    }
+
+    pub fn with_probe_result(mut self, probe: &ProbeResult) -> Self {
+        self.missing_object_status = compatible_missing_object_status(probe.missing_object_status);
+        self
     }
 
     fn url(&self, relative: &str) -> Result<Url> {
@@ -178,7 +225,9 @@ impl WebDavTransport {
         let response = self
             .send(Method::GET, relative, None, HeaderMap::new())
             .await?;
-        if response.status() == StatusCode::NOT_FOUND {
+        if response.status() == StatusCode::NOT_FOUND
+            || self.missing_object_status == Some(response.status())
+        {
             return Ok(None);
         }
         if !response.status().is_success() {
@@ -189,6 +238,96 @@ impl WebDavTransport {
         }
         let etag = strong_etag(response.headers());
         Ok(Some((Self::limited_bytes(response).await?, etag)))
+    }
+
+    pub async fn put_unconditional(&self, relative: &str, body: Vec<u8>) -> Result<()> {
+        let response = self
+            .send(Method::PUT, relative, Some(body), HeaderMap::new())
+            .await?;
+        if !response.status().is_success() {
+            bail!(
+                "CONFIG_SYNC_REMOTE: WebDAV unconditional write returned {}",
+                response.status()
+            );
+        }
+        Ok(())
+    }
+
+    /// List direct children of a WebDAV collection. Append-only compatibility
+    /// mode uses this to discover per-device heads without overwriting a
+    /// shared mutable head. The returned names are intentionally opaque; the
+    /// caller validates them against its domain-specific identifier rules.
+    pub async fn list_children(&self, relative: &str) -> Result<Vec<String>> {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            reqwest::header::HeaderName::from_static("depth"),
+            HeaderValue::from_static("1"),
+        );
+        headers.insert(
+            reqwest::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/xml; charset=utf-8"),
+        );
+        let body = br#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:"><D:prop><D:resourcetype/></D:prop></D:propfind>"#
+            .to_vec();
+        let response = self
+            .send(
+                Method::from_bytes(b"PROPFIND").expect("PROPFIND is a valid method"),
+                relative,
+                Some(body),
+                headers,
+            )
+            .await?;
+        if response.status().as_u16() == 405 || response.status().as_u16() == 501 {
+            bail!("CONFIG_SYNC_UNSUPPORTED: WebDAV directory listing is not supported");
+        }
+        if response.status().as_u16() != 207 && !response.status().is_success() {
+            bail!(
+                "CONFIG_SYNC_REMOTE: WebDAV directory listing returned {}",
+                response.status()
+            );
+        }
+        let body = Self::limited_bytes(response).await?;
+        let text = String::from_utf8(body).context("decode WebDAV directory listing")?;
+        let collection_url = self.url(relative)?;
+        let collection_path = collection_url.path().trim_end_matches('/').to_string();
+        let collection_origin = (
+            collection_url.scheme().to_string(),
+            collection_url.host_str().map(str::to_string),
+            collection_url.port_or_known_default(),
+        );
+        let hrefs = regex::Regex::new(
+            r"(?is)<(?:[A-Za-z_][A-Za-z0-9_.-]*:)?href[^>]*>(.*?)</(?:[A-Za-z_][A-Za-z0-9_.-]*:)?href\s*>",
+        )
+        .expect("static WebDAV href expression")
+        .captures_iter(&text)
+        .filter_map(|capture| capture.get(1).map(|value| value.as_str().trim()))
+        .map(xml_unescape)
+        .filter_map(|href| {
+            let href = href
+                .split(['?', '#'])
+                .next()
+                .unwrap_or(&href);
+            let href_url = self.base.join(href).ok()?;
+            let href_origin = (
+                href_url.scheme().to_string(),
+                href_url.host_str().map(str::to_string),
+                href_url.port_or_known_default(),
+            );
+            if href_origin != collection_origin {
+                return None;
+            }
+            let child_path = href_url.path().trim_end_matches('/');
+            let prefix = format!("{collection_path}/");
+            let name = child_path.strip_prefix(&prefix)?;
+            (!name.is_empty() && !name.contains('/')).then(|| name.to_string())
+        })
+        .take(MAX_REMOTE_LIST_ENTRIES + 1)
+        .collect::<Vec<_>>();
+        if hrefs.len() > MAX_REMOTE_LIST_ENTRIES {
+            bail!("CONFIG_SYNC_LIMIT_EXCEEDED: WebDAV directory has too many entries");
+        }
+        Ok(hrefs)
     }
 
     pub async fn put_if_none(&self, relative: &str, body: Vec<u8>) -> Result<bool> {
@@ -274,15 +413,40 @@ impl WebDavTransport {
             .get(&probe)
             .await?
             .is_some_and(|(bytes, _)| bytes == second_body);
+        let probe_name = probe.rsplit('/').next().unwrap_or_default();
+        let append_only = match self.list_children(".probe").await {
+            Ok(children) => children.iter().any(|child| child == probe_name),
+            Err(error) if error.to_string().starts_with("CONFIG_SYNC_UNSUPPORTED") => false,
+            Err(error) => return Err(error),
+        };
         self.delete(&probe).await?;
+        let missing_object_status = match self
+            .send(Method::GET, &probe, None, HeaderMap::new())
+            .await?
+            .status()
+        {
+            StatusCode::BAD_GATEWAY => Some(StatusCode::BAD_GATEWAY.as_u16()),
+            _ => None,
+        };
         Ok(ProbeResult {
             conditional_writes: !second
                 && readable
                 && matched_update
                 && stale_rejected
                 && updated_readable,
+            append_only,
+            missing_object_status,
         })
     }
+}
+
+fn xml_unescape(value: &str) -> String {
+    value
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
 }
 
 fn strong_etag(headers: &HeaderMap) -> Option<String> {
@@ -291,6 +455,10 @@ fn strong_etag(headers: &HeaderMap) -> Option<String> {
         return None;
     }
     Some(value.to_string())
+}
+
+fn compatible_missing_object_status(value: Option<u16>) -> Option<StatusCode> {
+    (value == Some(StatusCode::BAD_GATEWAY.as_u16())).then_some(StatusCode::BAD_GATEWAY)
 }
 
 pub fn remote_error_is_offline(error: &anyhow::Error) -> bool {
@@ -304,7 +472,7 @@ pub fn remote_error_is_offline(error: &anyhow::Error) -> bool {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeSet, HashMap, HashSet};
     use std::sync::{Arc, Mutex};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpListener, TcpStream};
@@ -316,6 +484,8 @@ pub(crate) mod tests {
         collections: HashSet<String>,
         next_etag: u64,
         weak_etag: bool,
+        missing_status: Option<u16>,
+        ignore_preconditions: bool,
     }
 
     async fn read_request(stream: &mut TcpStream) -> Option<(String, String, HeaderMap, Vec<u8>)> {
@@ -382,9 +552,11 @@ pub(crate) mod tests {
             200 => "OK",
             201 => "Created",
             204 => "No Content",
+            207 => "Multi-Status",
             404 => "Not Found",
             405 => "Method Not Allowed",
             412 => "Precondition Failed",
+            502 => "Bad Gateway",
             _ => "Bad Request",
         };
         let mut response = format!(
@@ -423,8 +595,43 @@ pub(crate) mod tests {
                             format!("\"{etag}\"")
                         };
                         (200, value.clone(), Some(etag))
+                    } else if let Some(status) = state.missing_status {
+                        (status, Vec::new(), None)
                     } else {
                         (404, Vec::new(), None)
+                    }
+                }
+                "PROPFIND" => {
+                    let collection = path.trim_end_matches('/');
+                    if !state.collections.contains(collection) {
+                        (404, Vec::new(), None)
+                    } else {
+                        let prefix = format!("{collection}/");
+                        let mut entries = BTreeSet::new();
+                        entries.insert(format!("{collection}/"));
+                        for candidate in state
+                            .collections
+                            .iter()
+                            .map(String::as_str)
+                            .chain(state.objects.keys().map(String::as_str))
+                        {
+                            let Some(child) = candidate.strip_prefix(&prefix) else {
+                                continue;
+                            };
+                            if !child.is_empty() && !child.contains('/') {
+                                entries.insert(candidate.to_string());
+                            }
+                        }
+                        let mut xml = String::from(
+                            r#"<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">"#,
+                        );
+                        for entry in entries {
+                            xml.push_str(&format!(
+                                "<D:response><D:href>{entry}</D:href></D:response>"
+                            ));
+                        }
+                        xml.push_str("</D:multistatus>");
+                        (207, xml.into_bytes(), None)
                     }
                 }
                 "PUT" => {
@@ -438,7 +645,10 @@ pub(crate) mod tests {
                         .and_then(|value| value.to_str().ok())
                         .and_then(|value| value.trim_matches('"').parse::<u64>().ok())
                         .is_some_and(|expected| state.etags.get(&path) == Some(&expected));
-                    if (none_match && existing) || (headers.contains_key(IF_MATCH) && !match_ok) {
+                    if !state.ignore_preconditions
+                        && ((none_match && existing)
+                            || (headers.contains_key(IF_MATCH) && !match_ok))
+                    {
                         (412, Vec::new(), None)
                     } else {
                         state.next_etag = state.next_etag.saturating_add(1);
@@ -470,12 +680,26 @@ pub(crate) mod tests {
     }
 
     pub(crate) async fn fixture(weak_etag: bool) -> Fixture {
+        fixture_with_options(weak_etag, None, false).await
+    }
+
+    pub(crate) async fn fixture_ignoring_preconditions() -> Fixture {
+        fixture_with_options(false, None, true).await
+    }
+
+    async fn fixture_with_options(
+        weak_etag: bool,
+        missing_status: Option<u16>,
+        ignore_preconditions: bool,
+    ) -> Fixture {
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind fixture");
         let address = listener.local_addr().expect("fixture address");
         let state = Arc::new(Mutex::new(FixtureState {
             weak_etag,
+            missing_status,
+            ignore_preconditions,
             ..FixtureState::default()
         }));
         let task = tokio::spawn(async move {
@@ -499,14 +723,21 @@ pub(crate) mod tests {
             password: String::new(),
             directory: "vault".into(),
             allow_insecure_http: true,
+            missing_object_status: None,
         })
         .expect("transport")
     }
 
     #[test]
-    fn endpoint_requires_https_unless_explicitly_acknowledged() {
-        assert!(validate_endpoint("http://dav.example.test/root", false).is_err());
-        assert!(validate_endpoint("http://dav.example.test/root", true).is_ok());
+    fn endpoint_requires_https_unless_explicitly_acknowledged_for_lan_hosts() {
+        assert!(validate_endpoint("http://192.168.1.10/root", false).is_err());
+        assert!(validate_endpoint("http://192.168.1.10/root", true).is_ok());
+        assert!(validate_endpoint("http://localhost/root", true).is_ok());
+        assert!(validate_endpoint("http://nas.local/root", true).is_ok());
+        assert!(validate_endpoint("http://0.0.0.0/root", true).is_err());
+        assert!(validate_endpoint("http://[::]/root", true).is_err());
+        assert!(validate_endpoint("http://dav.example.test/root", true).is_err());
+        assert!(validate_endpoint("https://dav.example.test/root", false).is_ok());
         assert!(validate_endpoint("https://user:pass@dav.example.test/root", true).is_err());
     }
 
@@ -534,7 +765,54 @@ pub(crate) mod tests {
     async fn local_fixture_proves_conditional_writes() {
         let fixture = fixture(false).await;
         let transport = fixture_transport(&fixture.endpoint);
-        assert!(transport.probe().await.expect("probe").conditional_writes);
+        let probe = transport.probe().await.expect("probe");
+        assert!(probe.conditional_writes);
+        assert!(probe.append_only);
+        fixture.task.abort();
+    }
+
+    #[tokio::test]
+    async fn probe_rejects_servers_that_ignore_conditional_headers() {
+        let fixture = fixture_with_options(false, None, true).await;
+        let transport = fixture_transport(&fixture.endpoint);
+        let probe = transport.probe().await.expect("probe");
+        assert!(!probe.conditional_writes);
+        assert!(probe.append_only);
+        fixture.task.abort();
+    }
+
+    #[tokio::test]
+    async fn directory_listing_excludes_the_collection_itself() {
+        let fixture = fixture(false).await;
+        let transport = fixture_transport(&fixture.endpoint);
+        transport
+            .ensure_collection("heads")
+            .await
+            .expect("collection");
+        transport
+            .put_unconditional("heads/device-a", b"head".to_vec())
+            .await
+            .expect("head");
+        assert_eq!(
+            transport.list_children("heads").await.expect("listing"),
+            vec!["device-a".to_string()]
+        );
+        fixture.task.abort();
+    }
+
+    #[tokio::test]
+    async fn probe_records_bad_gateway_as_the_missing_object_status() {
+        let fixture = fixture_with_options(false, Some(502), false).await;
+        let transport = fixture_transport(&fixture.endpoint);
+        let probe = transport.probe().await.expect("probe");
+        assert!(probe.conditional_writes);
+        assert_eq!(probe.missing_object_status, Some(502));
+        let transport = transport.with_probe_result(&probe);
+        assert!(transport
+            .get("missing")
+            .await
+            .expect("missing get")
+            .is_none());
         fixture.task.abort();
     }
 
