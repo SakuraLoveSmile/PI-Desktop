@@ -31,6 +31,8 @@ mod coordinator;
 mod handlers;
 #[path = "engine_history.rs"]
 mod history;
+#[path = "progress.rs"]
+mod progress;
 #[path = "engine_remote.rs"]
 mod remote;
 #[cfg(test)]
@@ -42,6 +44,7 @@ pub(crate) use handlers::{
     reject, restore, test, unlock,
 };
 use history::cleanup_history;
+use progress::{NoSyncProgress, ProgressNotifier, SyncPhase, SyncProgress, SyncProgressObserver};
 use remote::{
     ensure_remote_collections, merge_append_only_tips, object_path, publish_append_only_head,
     publish_head, read_append_only_remote, read_remote_head, read_remote_manifest,
@@ -1225,7 +1228,7 @@ mod tests {
         let config = load_config(&state)?.expect("configured device");
         let key = local_vault_key(&state, &config)?.expect("unlocked device");
         let transport = transport_with_password(&config, String::new())?;
-        let remote = read_append_only_remote(&transport, &config, &key)
+        let remote = read_append_only_remote(&transport, &config, &key, &NoSyncProgress)
             .await?
             .expect("compatibility revisions");
         assert!(!remote.tip_ids.is_empty());
@@ -1246,6 +1249,41 @@ mod tests {
     /// every resource, well below the resource cap that bounds it now.
     fn portable_skill_resource() -> Vec<u8> {
         vec![b'x'; 256 * 1024]
+    }
+
+    /// Records what a sync reported, in order, so a test can assert the phases
+    /// an interface is shown.
+    #[derive(Default)]
+    struct RecordedProgress(std::sync::Mutex<Vec<SyncProgress>>);
+
+    impl SyncProgressObserver for RecordedProgress {
+        fn report(&self, progress: SyncProgress) {
+            self.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .push(progress);
+        }
+    }
+
+    impl RecordedProgress {
+        fn phases(&self) -> Vec<SyncPhase> {
+            self.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .iter()
+                .map(|progress| progress.phase)
+                .collect()
+        }
+
+        fn last(&self, phase: SyncPhase) -> Option<SyncProgress> {
+            self.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .iter()
+                .rev()
+                .find(|progress| progress.phase == phase)
+                .copied()
+        }
     }
 
     #[tokio::test]
@@ -1358,7 +1396,34 @@ mod tests {
         }
 
         let (tx, _rx) = mpsc::unbounded_channel();
-        let initial_a_state = sync_now(device_a.clone(), tx.clone()).await?;
+        let progress = RecordedProgress::default();
+        coordinator::sync_once(&device_a, &tx, &progress).await?;
+        let initial_a_state = get_state(device_a.clone()).await?;
+        let phases = progress.phases();
+        assert_eq!(
+            phases.first(),
+            Some(&SyncPhase::Capture),
+            "a sync reports what it is doing from its first phase: {phases:?}"
+        );
+        for (before, after) in [
+            (SyncPhase::Capture, SyncPhase::Merge),
+            (SyncPhase::Merge, SyncPhase::Upload),
+            (SyncPhase::Upload, SyncPhase::Apply),
+        ] {
+            let before_at = phases.iter().position(|phase| *phase == before);
+            let after_at = phases.iter().position(|phase| *phase == after);
+            assert!(
+                matches!((before_at, after_at), (Some(left), Some(right)) if left < right),
+                "{before:?} must be reported before {after:?}: {phases:?}"
+            );
+        }
+        let upload = progress
+            .last(SyncPhase::Upload)
+            .expect("upload progress for a fresh device");
+        assert!(upload.total >= 2, "upload total: {upload:?}");
+        assert_eq!(upload.done, upload.total, "upload finished: {upload:?}");
+        assert!(upload.bytes_total > 0, "upload bytes: {upload:?}");
+        assert_eq!(upload.bytes_done, upload.bytes_total);
         assert!(pending_approvals(&initial_a_state).is_empty());
         {
             let state = device_a.lock().await;
@@ -1374,8 +1439,14 @@ mod tests {
             let (head, _) = read_remote_head(&transport, &config, &key)
                 .await?
                 .expect("remote head");
-            let (remote, _) =
-                read_remote_revision(&transport, &config, &key, &head.revision_id).await?;
+            let (remote, _) = read_remote_revision(
+                &transport,
+                &config,
+                &key,
+                &head.revision_id,
+                &NoSyncProgress,
+            )
+            .await?;
             assert!(!remote.entities.is_empty(), "remote entities missing");
             assert!(
                 load_base(&state, &key)?.is_none(),
@@ -1519,8 +1590,14 @@ mod tests {
             let (head, _) = read_remote_head(&transport, &config, &key)
                 .await?
                 .expect("remote head after device B edit");
-            let (remote, _) =
-                read_remote_revision(&transport, &config, &key, &head.revision_id).await?;
+            let (remote, _) = read_remote_revision(
+                &transport,
+                &config,
+                &key,
+                &head.revision_id,
+                &NoSyncProgress,
+            )
+            .await?;
             let remote_theme = remote
                 .entities
                 .iter()

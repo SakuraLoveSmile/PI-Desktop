@@ -132,6 +132,7 @@ pub(super) async fn read_append_only_remote(
     transport: &WebDavTransport,
     config: &StoredConfig,
     key: &VaultKey,
+    observer: &dyn SyncProgressObserver,
 ) -> Result<Option<AppendOnlyRemote>> {
     let mut head_revision_ids = BTreeSet::new();
     for device_id in transport
@@ -204,7 +205,7 @@ pub(super) async fn read_append_only_remote(
     let mut resources = BTreeMap::new();
     for revision_id in &tip_ids {
         let (manifest, revision_resources) =
-            read_remote_revision(transport, config, key, revision_id).await?;
+            read_remote_revision(transport, config, key, revision_id, observer).await?;
         for (object_id, bytes) in revision_resources {
             if let Some(existing) = resources.get(&object_id) {
                 if existing != &bytes {
@@ -291,6 +292,7 @@ pub(super) async fn read_remote_revision(
     config: &StoredConfig,
     key: &VaultKey,
     revision_id: &str,
+    observer: &dyn SyncProgressObserver,
 ) -> Result<(RevisionManifest, BTreeMap<String, Vec<u8>>)> {
     let manifest = read_remote_manifest(transport, config, key, revision_id).await?;
     let mut resource_ids = BTreeSet::new();
@@ -300,7 +302,10 @@ pub(super) async fn read_remote_revision(
     if resource_ids.len() > MAX_RESOURCES {
         bail!("CONFIG_SYNC_LIMIT_EXCEEDED: remote revision references too many resources");
     }
+    let total = resource_ids.len() as u64;
+    observer.report(SyncProgress::counted(SyncPhase::Download, 0, total, 0, 0));
     let mut resources = BTreeMap::new();
+    let mut bytes_done = 0u64;
     for object_id in resource_ids {
         let path = object_path(config, &object_id)?;
         let Some((ciphertext, _)) = transport.get(&path).await? else {
@@ -315,7 +320,15 @@ pub(super) async fn read_remote_revision(
         if bytes.len() > MAX_REMOTE_RESOURCE_BYTES {
             bail!("CONFIG_SYNC_LIMIT_EXCEEDED: remote resource is too large");
         }
+        bytes_done = bytes_done.saturating_add(bytes.len() as u64);
         resources.insert(object_id, bytes);
+        observer.report(SyncProgress::counted(
+            SyncPhase::Download,
+            resources.len() as u64,
+            total,
+            bytes_done,
+            0,
+        ));
     }
     Ok((manifest, resources))
 }
@@ -395,6 +408,7 @@ pub(super) async fn upload_snapshot(
     config: &StoredConfig,
     key: &VaultKey,
     snapshot: &LocalSnapshot,
+    observer: &dyn SyncProgressObserver,
 ) -> Result<()> {
     if snapshot.manifest.entities.len() > MAX_ENTITIES || snapshot.resources.len() > MAX_RESOURCES {
         bail!("CONFIG_SYNC_LIMIT_EXCEEDED: local revision is too large");
@@ -417,6 +431,21 @@ pub(super) async fn upload_snapshot(
             bail!("CONFIG_SYNC_LIMIT_EXCEEDED: local entity is too large or unsupported");
         }
     }
+    let total = snapshot.resources.len() as u64;
+    let bytes_total = snapshot
+        .resources
+        .values()
+        .map(|bytes| bytes.len() as u64)
+        .fold(0u64, u64::saturating_add);
+    let mut uploaded = 0u64;
+    let mut bytes_done = 0u64;
+    observer.report(SyncProgress::counted(
+        SyncPhase::Upload,
+        0,
+        total,
+        0,
+        bytes_total,
+    ));
     for (object_id, bytes) in &snapshot.resources {
         let path = object_path(config, object_id)?;
         let encrypted = encrypt_object(
@@ -444,6 +473,15 @@ pub(super) async fn upload_snapshot(
         if verified != *bytes {
             bail!("CONFIG_SYNC_CRYPTO: immutable resource id collision");
         }
+        uploaded = uploaded.saturating_add(1);
+        bytes_done = bytes_done.saturating_add(bytes.len() as u64);
+        observer.report(SyncProgress::counted(
+            SyncPhase::Upload,
+            uploaded,
+            total,
+            bytes_done,
+            bytes_total,
+        ));
     }
     let manifest_bytes = serialize_json(&snapshot.manifest)?;
     let encrypted = encrypt_object(
