@@ -1219,7 +1219,7 @@ Desktop create/update may save `workspacePath`, `permissionMode` and a paired
 values when present. Missing fields preserve legacy project capture, app-default
 model resolution and permission behavior. Invalid permission values and partial
 model pairs are rejected before mutation. Conversation tools do not expose these
-fields and remain bound to the calling session's project. See ADR 0304.
+fields and remain bound to the calling session's project. See ADR 0305.
 
 Tasks also persist optional `thinkingLevel` using the existing session values
 (including `off` and `omit`). The full Composer model/reasoning picker and

@@ -8438,7 +8438,7 @@ the latest destination. These assertions measure work counts, not device FPS.
   Agent sidecar；历史记录链接到持久化会话；自动执行不依赖渲染器发送提示词。
   宿主测试补充验证重复准入、错过时段、无效输入和重启恢复。
 - **规格：** 04-ux/01-ui-ia §3.4；03-runtime/04-data-storage §4.11；
-  ADR scheduled-desktop-automations；ADR 0304。
+  ADR scheduled-desktop-automations；ADR 0305。
 - **验收：** 定时执行与可恢复的运行历史。
 - **里程碑：** MVP 后的桌面自动化。
 - **状态：** `node scripts/e2e-scheduled.mjs` 自动化覆盖；按 AGENTS.md 在任务候选

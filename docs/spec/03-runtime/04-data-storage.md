@@ -1053,7 +1053,7 @@ These additive values stay in `config_json`; no physical migration is required.
 Missing model fields retain run-time app-default resolution. Missing permission
 keeps legacy behavior: Ask for automatic runs and inherited permission for Run now.
 See [the automation ADR](../../adr/scheduled-desktop-automations.md) and
-[ADR 0304](../../adr/0304-scheduled-task-execution-settings.md).
+[ADR 0305](../../adr/0305-scheduled-task-execution-settings.md).
 
 Tasks also persist optional `thinkingLevel` using the existing session values
 (including `off` and `omit`). The full Composer model/reasoning picker and

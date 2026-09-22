@@ -1,6 +1,6 @@
 # ADR: Desktop-owned automation dispatch with Host-owned schedules
 
-- Status: Accepted for implementation; amended by ADR 0304
+- Status: Accepted for implementation; amended by ADR 0305
 - Date: 2026-09-20
 
 ## Context
@@ -29,7 +29,7 @@ dispatches a turn, and scheduledListRuns exposes the existing run ledger.
 
 Automatic runs use the task's saved permission mode and default to Ask when the
 field is absent. Ask runs may wait for a user in their result conversation;
-selecting Auto is an explicit per-task choice under ADR 0304. Plan/Goal rejection
+selecting Auto is an explicit per-task choice under ADR 0305. Plan/Goal rejection
 remains. A saved provider/model pair is used when present; otherwise the app
 defaults are resolved at execution time. Retain the task's project even when the
 foreground workspace changes.
