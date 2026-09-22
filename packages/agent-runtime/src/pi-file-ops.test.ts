@@ -34,16 +34,35 @@ function messageEntry(id: string, message: AgentMessage, second: number): Entry 
     parentId: null,
     timestamp: `2026-09-22T00:00:0${second}.000Z`,
     message,
-  } as Entry;
+  } as unknown as Entry;
 }
 
+/** The name of the first content block, whatever the entry actually holds. */
 function nameOf(entry: Entry): unknown {
-  const message = entry.message as { content?: Array<{ name?: unknown }> } | undefined;
+  const message = (entry as { message?: { content?: Array<{ name?: unknown }> } }).message;
   return message?.content?.[0]?.name;
+}
+
+function toolCallNames(messages: AgentMessage[]): Array<string | undefined> {
+  return messages
+    .filter((message) => message.role === "assistant")
+    .flatMap((message) =>
+      (message.content as Array<{ type: string; name?: string }>)
+        .filter((block) => block.type === "toolCall")
+        .map((block) => block.name),
+    );
 }
 
 /** Small enough that the history ends up in `messagesToSummarize`. */
 const settings = { enabled: true, reserveTokens: 16_384, keepRecentTokens: 1 };
+
+function preparationOf(entries: Entry[], converted: boolean) {
+  const prepared = converted
+    ? prepareCompaction(withPiFileOpToolNames(entries), settings)
+    : prepareCompaction(entries, settings);
+  if (!prepared.ok) throw new Error("prepareCompaction refused the fixture");
+  return prepared.value;
+}
 
 describe("withPiFileOpToolNames", () => {
   it("spells the tool calls pi's file-op collector reads the way pi spells them", () => {
@@ -58,11 +77,11 @@ describe("withPiFileOpToolNames", () => {
     expect(mapped.map(nameOf)).toEqual(["read", "write", "edit"]);
   });
 
-  it("leaves every other tool name and every other message untouched", () => {
+  it("leaves every other tool name untouched", () => {
     const entries = [
-      messageEntry("a1", toolCallMessage("Grep", "src/a.txt"), 2),
-      messageEntry("a2", toolCallMessage("Bash", "src/b.txt", "call-2"), 3),
-      messageEntry("a3", toolCallMessage("plugin_x_tool", "src/c.txt", "call-3"), 4),
+      messageEntry("a1", toolCallMessage("Grep", "src/a.txt"), 1),
+      messageEntry("a2", toolCallMessage("Bash", "src/b.txt", "call-2"), 2),
+      messageEntry("a3", toolCallMessage("plugin_x_tool", "src/c.txt", "call-3"), 3),
     ];
 
     // Nothing needed converting, so the array comes back as it was handed in.
@@ -83,7 +102,7 @@ describe("withPiFileOpToolNames", () => {
 
   it("survives entries without a message and messages without content blocks", () => {
     const entries = [
-      { type: "compaction", id: "c1", timestamp: "2026-09-22T00:00:01.000Z" } as Entry,
+      { type: "compaction", id: "c1", timestamp: "2026-09-22T00:00:01.000Z" } as unknown as Entry,
       messageEntry("a1", { role: "assistant", content: [] } as unknown as AgentMessage, 2),
       messageEntry("a2", { role: "toolResult", toolCallId: "call-1" } as unknown as AgentMessage, 3),
     ];
@@ -101,8 +120,7 @@ describe("pi's file-op collection through the adapter", () => {
   ];
 
   it("collects the files a checkpoint used to report as empty", () => {
-    const prepared = prepareCompaction(withPiFileOpToolNames(entries), settings);
-    const preparation = prepared.value;
+    const preparation = preparationOf(entries, true);
 
     expect(preparation).toBeDefined();
     expect([...preparation!.fileOps.read]).toEqual(["src/a.txt"]);
@@ -112,7 +130,7 @@ describe("pi's file-op collection through the adapter", () => {
   it("collects nothing from the same history without the adapter", () => {
     // The regression this adapter exists for: pi's collector switches on
     // `read` / `write` / `edit`, so our capitalized names matched nothing.
-    const preparation = prepareCompaction(entries, settings).value;
+    const preparation = preparationOf(entries, false);
 
     expect(preparation).toBeDefined();
     expect(preparation!.fileOps.read.size).toBe(0);
@@ -120,16 +138,9 @@ describe("pi's file-op collection through the adapter", () => {
     expect(preparation!.fileOps.written.size).toBe(0);
   });
 
-  it("still names the summarized tool calls, so the request text changes only in spelling", () => {
-    const preparation = prepareCompaction(withPiFileOpToolNames(entries), settings).value;
-    const names = preparation!.messagesToSummarize
-      .filter((message) => message.role === "assistant")
-      .flatMap((message) =>
-        (message.content as Array<{ type: string; name?: string }>)
-          .filter((block) => block.type === "toolCall")
-          .map((block) => block.name),
-      );
+  it("names the summarized tool calls the way pi reads them", () => {
+    const preparation = preparationOf(entries, true);
 
-    expect(names).toEqual(["read", "edit"]);
+    expect(toolCallNames(preparation!.messagesToSummarize)).toEqual(["read", "edit"]);
   });
 });
