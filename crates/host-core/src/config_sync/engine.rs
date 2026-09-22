@@ -43,7 +43,8 @@ pub(crate) use handlers::{
 };
 use history::cleanup_history;
 use remote::{
-    ensure_remote_collections, object_path, publish_head, read_remote_head, read_remote_manifest,
+    ensure_remote_collections, merge_append_only_tips, object_path, publish_append_only_head,
+    publish_head, read_append_only_remote, read_remote_head, read_remote_manifest,
     read_remote_revision, revision_path, upload_snapshot, validate_remote_id,
 };
 
@@ -59,6 +60,18 @@ const MAX_HISTORY_SCAN: usize = 256;
 const MAX_RETAINED_REVISIONS: usize = 30;
 const HISTORY_GRACE_SECONDS: i64 = 60 * 60;
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum RemoteMode {
+    #[default]
+    Strict,
+    AppendOnly,
+}
+
+fn new_device_id() -> String {
+    Uuid::new_v4().to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoredConfig {
@@ -69,6 +82,13 @@ pub struct StoredConfig {
     pub directory: String,
     pub device_label: String,
     pub allow_insecure_http: bool,
+    #[serde(default)]
+    pub remote_mode: RemoteMode,
+    #[serde(default = "new_device_id")]
+    pub device_id: String,
+    /// Endpoint-specific compatibility for servers that report missing GETs as 502.
+    #[serde(default)]
+    pub missing_object_status: Option<u16>,
     pub categories: BTreeMap<String, bool>,
     pub include_secrets: bool,
     pub include_memory: bool,
@@ -207,6 +227,8 @@ struct PublicState {
     directory: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     device_label: Option<String>,
+    allow_insecure_http: bool,
+    remote_mode: RemoteMode,
     categories: BTreeMap<String, bool>,
     include_secrets: bool,
     include_memory: bool,
@@ -348,6 +370,7 @@ fn transport_with_password(config: &StoredConfig, password: String) -> Result<We
         password,
         directory: config.directory.clone(),
         allow_insecure_http: config.allow_insecure_http,
+        missing_object_status: config.missing_object_status,
     })
 }
 
@@ -621,6 +644,8 @@ pub fn public_state(st: &mut AppState) -> Result<Value> {
             username: None,
             directory: None,
             device_label: None,
+            allow_insecure_http: false,
+            remote_mode: RemoteMode::Strict,
             categories: default_categories(),
             include_secrets: false,
             include_memory: false,
@@ -714,6 +739,8 @@ pub fn public_state(st: &mut AppState) -> Result<Value> {
         username: Some(config_ref.username.clone()),
         directory: Some(config_ref.directory.clone()),
         device_label: Some(config_ref.device_label.clone()),
+        allow_insecure_http: config_ref.allow_insecure_http,
+        remote_mode: config_ref.remote_mode,
         categories: config_ref.categories.clone(),
         include_secrets: config_ref.include_secrets,
         include_memory: config_ref.include_memory,
@@ -792,6 +819,13 @@ fn config_from_input(
         .and_then(Value::as_bool)
         .or_else(|| existing.map(|value| value.include_secrets))
         .unwrap_or(false);
+    let remote_mode = input
+        .get("remoteMode")
+        .and_then(Value::as_str)
+        .map(parse_remote_mode)
+        .transpose()?
+        .or_else(|| existing.map(|value| value.remote_mode))
+        .unwrap_or_default();
     let mut categories = parse_category_selection(
         input.get("categories"),
         existing.map(|value| &value.categories),
@@ -810,6 +844,12 @@ fn config_from_input(
             .and_then(Value::as_bool)
             .or_else(|| existing.map(|value| value.allow_insecure_http))
             .unwrap_or(false),
+        remote_mode,
+        device_id: existing
+            .map(|value| value.device_id.clone())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(new_device_id),
+        missing_object_status: existing.and_then(|value| value.missing_object_status),
         categories,
         include_secrets,
         include_memory,
@@ -847,6 +887,14 @@ fn config_from_input(
             .map(|value| value.recovery_points.clone())
             .unwrap_or_default(),
     })
+}
+
+fn parse_remote_mode(value: &str) -> Result<RemoteMode> {
+    match value {
+        "strict" => Ok(RemoteMode::Strict),
+        "appendOnly" => Ok(RemoteMode::AppendOnly),
+        _ => bail!("CONFIG_SYNC_INVALID: unsupported WebDAV sync mode"),
+    }
 }
 
 fn mark_error(config: &mut StoredConfig, error: &anyhow::Error) {
@@ -1084,6 +1132,14 @@ mod tests {
         data_dir: &Path,
         endpoint: &str,
     ) -> Result<Arc<Mutex<AppState>>> {
+        configure_test_device_mode(data_dir, endpoint, "strict").await
+    }
+
+    async fn configure_test_device_mode(
+        data_dir: &Path,
+        endpoint: &str,
+        remote_mode: &str,
+    ) -> Result<Arc<Mutex<AppState>>> {
         let state = Arc::new(Mutex::new(AppState::open(data_dir)?));
         configure(
             state.clone(),
@@ -1095,6 +1151,7 @@ mod tests {
                 "deviceLabel": "test-device",
                 "backupPassword": "portable-backup-password",
                 "allowInsecureHttp": true,
+                "remoteMode": remote_mode,
                 "categories": {
                     "application": true,
                     "providers": true,
@@ -1112,12 +1169,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn append_only_mode_syncs_with_a_server_that_ignores_preconditions() -> Result<()> {
+        let fixture = crate::config_sync::transport::tests::fixture_ignoring_preconditions().await;
+        let device_a_dir = tempfile::tempdir()?;
+        let device_b_dir = tempfile::tempdir()?;
+        let device_a =
+            configure_test_device_mode(device_a_dir.path(), &fixture.endpoint, "appendOnly")
+                .await?;
+        let device_b =
+            configure_test_device_mode(device_b_dir.path(), &fixture.endpoint, "appendOnly")
+                .await?;
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let (a_state, b_state) = tokio::join!(
+            sync_now(device_a.clone(), tx.clone()),
+            sync_now(device_b.clone(), tx.clone())
+        );
+        assert!(
+            a_state.is_ok(),
+            "device A compatibility sync failed: {a_state:?}"
+        );
+        assert!(
+            b_state.is_ok(),
+            "device B compatibility sync failed: {b_state:?}"
+        );
+
+        let state = device_a.lock().await;
+        let config = load_config(&state)?.expect("configured device");
+        let key = local_vault_key(&state, &config)?.expect("unlocked device");
+        let transport = transport_with_password(&config, String::new())?;
+        let remote = read_append_only_remote(&transport, &config, &key)
+            .await?
+            .expect("compatibility revisions");
+        assert!(!remote.tip_ids.is_empty());
+        assert!(remote.tip_ids.len() <= 2);
+        assert!(
+            transport
+                .list_children(&remote::compatibility_heads_path(&config))
+                .await?
+                .len()
+                >= 2
+        );
+
+        fixture.task.abort();
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn two_devices_sync_credentials_capabilities_and_disjoint_edit() -> Result<()> {
         let fixture = crate::config_sync::transport::tests::fixture(false).await;
         let device_a_dir = tempfile::tempdir()?;
         let device_b_dir = tempfile::tempdir()?;
         let device_a = configure_test_device(device_a_dir.path(), &fixture.endpoint).await?;
         let device_b = configure_test_device(device_b_dir.path(), &fixture.endpoint).await?;
+        let device_a_state = get_state(device_a.clone()).await?;
+        assert_eq!(device_a_state.get("allowInsecureHttp"), Some(&json!(true)));
         let project_a = device_a_dir.path().join("project");
         let project_b = device_b_dir.path().join("project");
         std::fs::create_dir_all(&project_a)?;

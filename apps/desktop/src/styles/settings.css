@@ -469,6 +469,20 @@
   width: 100%;
 }
 
+.settings-config-sync-http-option {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ds-warning) 32%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ds-warning) 7%, transparent);
+}
+
+.settings-config-sync-http-option .settings-config-sync-warning {
+  margin: 0;
+}
+
 .settings-config-sync-actions {
   display: flex;
   align-items: center;
