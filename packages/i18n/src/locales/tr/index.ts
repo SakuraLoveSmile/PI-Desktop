@@ -242,6 +242,8 @@ export const tr = {
     slashGroupExtensions: "Uzantı komutları",
     slashGroupSkills: "Beceriler",
     slashEmpty: "Eşleşen komut yok",
+    slashCommandSourceUnavailable: "Komut listesi yüklenemedi, hiçbir şey gönderilmedi. Tekrar deneyin.",
+    sessionTranscriptEmpty: "Bu oturumun geçmişi okunamadı. Yeniden denemek için oturumu tekrar açın.",
     fileMenu: "Dosya başvuruları",
     removeFileReference: "{{name}} dosya başvurusunu kaldır",
     messageAttachments: "Bu iletideki ekler",

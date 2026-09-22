@@ -240,6 +240,8 @@ export const en = {
     slashGroupExtensions: "Extension commands",
     slashGroupSkills: "Skills",
     slashEmpty: "No matching commands",
+    slashCommandSourceUnavailable: "Command list unavailable, so nothing was sent. Try again.",
+    sessionTranscriptEmpty: "This session's history could not be read. Reopen the session to try again.",
     fileMenu: "File references",
     removeFileReference: "Remove file reference {{name}}",
     messageAttachments: "Attachments in this message",

@@ -233,6 +233,8 @@ export const de = {
     "slashGroupExtensions": "Erweiterungsbefehle",
     "slashGroupSkills": "Fähigkeiten",
     "slashEmpty": "Keine übereinstimmenden Befehle",
+"slashCommandSourceUnavailable": "Befehlsliste nicht verfügbar, es wurde nichts gesendet. Bitte erneut versuchen.",
+    "sessionTranscriptEmpty": "Der Verlauf dieser Sitzung konnte nicht gelesen werden. Bitte die Sitzung erneut öffnen.",
     "fileMenu": "Dateiverweise",
     "removeFileReference": "Dateiverweis {{name}} entfernen",
     "messageAttachments": "Anhänge in dieser Nachricht",

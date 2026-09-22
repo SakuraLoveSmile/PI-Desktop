@@ -8674,3 +8674,20 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 **证据：** 记录构建和测试退出码、基线 SHA、依赖版本、产物标识及独立评审，报告位于
 `docs/project/hosted-search-contract-verification.md`。不得记录真实会话或凭据。未执行明确标为 NOT RUN，不得标为 PASS。
+
+## Composer 指令源、手动压缩与空记录读取（#795）
+
+**范围：** composer 的斜杠分发、手动压缩 RPC，以及渲染层的持久化记录读取。不调用真实模型或
+提供商。
+
+| 场景 | 必须观察到的结果 |
+| --- | --- |
+| `composer/commands` 失败时输入 `/compact` | 提交被拒绝并显示 `chat.slashCommandSourceUnavailable`，草稿保留，没有任何提示词进入会话。失败的读取不入缓存，因此下一次发送会重试。 |
+| 指令源缓存仍热 | 内置指令仍在本地分发；模板与未知别名仍走提示词路径。 |
+| 手动压缩超过其传输超时 | 宿主重新读取持久化压缩记录：发现新检查点已落盘就报告成功并记录该不一致，未落盘则原样抛出超时。sidecar 自己报告的判定绝不被改写。 |
+| 有历史的会话读到空记录窗口 | 选择流程再读一次，随后保留用户已有的快照，否则显示 `chat.sessionTranscriptEmpty`；这类空页绝不入缓存，因此悬停预取不会反复提供它。 |
+
+**自动化：** `node --test apps/desktop/test/slash-command-source.test.mjs`、
+`node --test apps/desktop/test/session-transcript-empty-read.test.mjs`、
+`node --test apps/desktop/test/plugin-timeout-budgets.test.mjs`、
+`pnpm --filter @pi-desktop/shared test`、`pnpm --filter @pi-desktop/host-runtime test`。

@@ -235,6 +235,8 @@ export const zhTW = {
     slashGroupExtensions: "擴充命令",
     slashGroupSkills: "技能",
     slashEmpty: "沒有匹配的指令",
+    slashCommandSourceUnavailable: "指令清單無法載入，訊息未傳送。請重試。",
+    sessionTranscriptEmpty: "無法讀取此工作階段的記錄，請重新開啟後再試一次。",
     fileMenu: "引用檔案",
     removeFileReference: "移除檔案引用 {{name}}",
     messageAttachments: "此訊息中的附件",

@@ -242,6 +242,8 @@ export const ko = {
     slashGroupExtensions: "확장 명령",
     slashGroupSkills: "스킬",
     slashEmpty: "일치하는 명령 없음",
+    slashCommandSourceUnavailable: "명령 목록을 불러오지 못해 전송하지 않았습니다. 다시 시도하세요.",
+    sessionTranscriptEmpty: "이 세션의 기록을 읽지 못했습니다. 세션을 다시 열어 시도하세요.",
     fileMenu: "파일 참조",
     removeFileReference: "파일 참조 {{name}} 제거",
     messageAttachments: "이 메시지의 첨부 파일",
