@@ -343,6 +343,8 @@ export const IPC = {
     /** Host-originated app settings mutation (e.g. plugin `app.setTheme`). */
     settingsChanged: "pi-desktop/app/event/settingsChanged",
     configSyncChanged: "pi-desktop/configSync/event/changed",
+    /** What a running sync is doing, while it is still running. */
+    configSyncProgress: "pi-desktop/configSync/event/progress",
     extensionsUiPrompt: "pi-desktop/extensions/event/uiPrompt",
     extensionsStatus: "pi-desktop/extensions/event/status",
     pluginLauncherShown: "pi-desktop/pluginLauncher/event/shown",
