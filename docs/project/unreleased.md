@@ -1,5 +1,9 @@
 # Unreleased changes
 
+- Resuming a subagent no longer selects another definition's private model
+  binding. On-demand delegation permissions are checked again on the next parent
+  turn, so revoking automatic delegation takes effect without restarting the runtime.
+
 - A stored hosted web-search record that cannot be replayed no longer fails every
   later request in that conversation: the message continues without search replay,
   so histories written before the contract change stay usable.

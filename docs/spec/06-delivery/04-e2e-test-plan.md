@@ -10761,6 +10761,14 @@ are withdrawn with ADR 0165.
   UI/persistence journey and live external provider execution remain manual;
   this fixture does not claim a complete native UI journey.
 
+- **Authorization regression coverage (#841)**: `pnpm test:e2e:subagent-models`
+  grants a model on demand, reuses the runtime, then revokes it without changing
+  the launch catalog. The next prompt must reauthorize and issue no child request.
+  A transcript-restored resume with a colliding model id must use the session
+  binding rather than another definition's private account. Runtime tests also
+  cover own pins/fallbacks, opted-in bindings, visible fallback metadata, live-key
+  reauthorization, and late RPC responses crossing parent turns.
+
 #### E2E-170: Shell titlebars use borderless chrome
 
 - **Preconditions**: PI-Desktop is open in chat, at least one destination page,
