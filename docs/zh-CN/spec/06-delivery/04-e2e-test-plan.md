@@ -9,6 +9,16 @@
 
 ---
 
+### E2E-IMAGES-provider-save-feedback
+
+- **前提：** 生图配置 UI fixture，中英文界面。
+- **步骤：** 勾选生图模型并保存服务商；从摘要菜单切换默认生图模型；
+  再取消唯一生图模型的标记并保存。
+- **预期：** 服务商编辑确认“服务已更新”，清除生图选择后也不会提示已选择
+  生图模型；摘要菜单切换仍显示生图选择成功提示。绑定保存行为不变。
+- **规格：** 03-runtime/21-image-generation。**验收：** B。
+- **里程碑：** 维护。**状态：** `scripts/e2e-image-generation-ui.mjs` 自动覆盖。
+
 ### E2E-IMAGES-deselect-default
 
 - **前提：** 只有一个服务商、一个模型，且该模型已标记为生图模型。
@@ -2278,6 +2288,33 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
 - **完整历史回归**：打开包含 140 条消息的会话，不向上翻页，选择复制整个对话；剪贴板必须包含第 1–140 条消息。从搜索上下文窗口和长消息截断预览重复验证。保留当前可见的生成中文字；读取失败时提示错误，剪贴板保持不变。仅在选择复制后读取完整历史，不改变阅读位置。运行 `node scripts/e2e-copy-conversation.mjs`。
 - 编辑时复制应使用草稿选区，无选区时复制整份草稿；选中消息文本应选中草稿。菜单不提供编辑、删除或版本切换；取消后原消息及其菜单保持不变。自动化验证：`node scripts/e2e-message-edit-copy.mjs`。
 
+#### E2E-CHAT-copy-formula-as-tex：复制渲染后的公式得到源码
+
+复制之后公式的边界仍然可解析：相邻的行内围栏之间补一个分隔符；正文里的每个美元
+符号都会被转义，本会把围栏转义掉的反斜杠串同理。annotation 里的空白原样保留；
+加宽过的多行行内公式用一个字面的 `<span>` 包住，以免它粘在行首时开出块级公式。
+TeX 里的换行不做压平，因为它可能用来终止 `%` 注释。这个包裹是 `text/plain` 里的
+Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编辑器不作兼容承诺。
+回归覆盖两个复制入口，以及相邻公式、围栏两侧的正文美元符号、格式化包装、行与块
+的边界、补白，以及含 TeX 注释的多行公式各自的 Markdown 往返。
+含 `- x`、`+ x`、`* x`、`> x` 或内部空行的块级公式，复制之后必须仍是同一个公式
+节点。共享的 remark 语法把尚未闭合的公式留在流式尾块里直到围栏闭合，其后的正文
+及其源码偏移保持不变。脚注定义出现在引用之后——紧随其后，或稍后才流式到达——会
+渲染成真正的引用与脚注区，而不是字面的 `[^1]`；这正是把切片脱离整条消息单独解析
+时，按块切分要付的代价。CRLF、普通列表、引用块、GFM 表格、围栏代码，以及那些
+必须继续切分的源文，由 `markdown-blocks.test.mjs` 覆盖。
+
+
+- **前提条件**：助手回答里既有句中的行内公式，也有独占若干行的块级公式，还有句中的 `\[ … \]` 公式与独占若干行的 `\[ … \]` 公式、一个 `\( … \)` 公式、一个含字面 `$` 的公式、一个值里带换行的行内公式与另一个值的两端各带一个换行的行内公式，以及一段不含公式的正文；另有与公式同处一个选区的：源码跨多行折行的段落、无序列表、表格、一个单元格里放着 `\[ … \]` 公式的表格、内含空行的围栏代码块，以及一个正文被 chrome 打断的回合，该 chrome 仅因继承外壳的 `user-select: none` 而不可选（工具行的分节标题）。
+- **步骤**：1）选中含行内公式的整句并按 Ctrl/Cmd+C。2）选中块级公式并复制。3）从公式中间选到该句末尾并复制。4）把一段正文、一个公式和另一段正文一起选中并复制。5）选中不含公式的正文并复制。6）分别复制折行段落、列表、两个表格和代码块。7）分别复制两个 `\[ … \]` 公式、那个 `\( … \)` 公式、含字面 `$` 的公式，以及值里带换行的那两个公式。8）从句末反向选到句首选中一个公式并复制。9）在公式处于选中状态时右键该回合并选择复制，再右键另一个回合并选择复制。10）按「选中文本」菜单项的方式选中整个回合的内容——选区锚在回合上，而复制事件落在回合内部的某个段落上——并复制。11）选中一个始终不越出该公式的范围——在它的渲染内部拖选——并复制。12）把每次结果重新交给同一个回答渲染器渲染一遍——即粘回输入框并发送后得到的东西——再把它画出的公式与选区覆盖的公式逐一比对。
+- **预期**：每个公式都以它被写下时的 TeX 进入剪贴板——行内 `$…$`，块级 `$$…$$` 独占行——而不是 KaTeX 画出的字形，也不是两棵树带来的同一个表达式的两份。含字面 `$` 的公式会像代码段的围栏那样把定界符加长到盖过它，粘回去仍是公式而不是普通文字；值里带换行的行内公式则保持窄形式，因为 `$$` 落在行首会开出块级公式并吞掉整段；值的两端各带一个换行的那个，复制时会自己补上一对空白，因为语法在这里吃掉一个换行就像吃掉一个空格。从公式中间开始的选区会复制整个公式，而始终不越出某个公式的选区只复制出该公式本身。选区里其余内容与平台原本复制到的逐字节一致：折行段落仍是一整行，列表每项一行，表格单元格之间是制表符、每行一行并保留平台为末行补上的换行，代码块保留自己的空行。复制本就会略过的 chrome 不会进入剪贴板：无论 `base.css` 是按选择器把它标为 `user-select: none`（代码块的语言标签），还是它仅因继承外壳默认值而不可选（工具行的分节标题、紧凑思考行）。不含公式的选区交回平台原样写入；含公式的选区则无论复制事件落在它内部多深的位置，都以源码进入剪贴板——所以锚在整个回合上的选区（即「选中文本」产生的那种）也会复制成 TeX，哪怕 Chromium 把事件抬在了回合内部的某个段落上。右键复制与 Ctrl/Cmd+C 对同一个选区得到同一个字符串，而右键一个并不持有该选区的回合读不到任何摘录，因此复制退回该回合自己的源码。粘回的公式渲染回它来处的那个公式——TeX 相同，块级仍是块级——`\[ … \]` 也不例外：它被画在所属句子的段落里，复制出来时 `$$` 独占一行，足以在粘回去时开出块级公式；`\( … \)` 保持行内。表格单元格同样适用，且这一条是实测而非推断：`.katex-display` 盒子对平台自己的读法同样会断开该行，因此围栏旁边不会出现制表符，公式仍以块级形式复制，相邻单元格完整地落在自己的行上。反向选区在复制之后仍然是反向的。复制只写 `text/plain`——不会把 `text/html` flavour 放上剪贴板。
+- **链接规格**：`04-ux/08-component-spec.md` §8.7，ADR 0268，
+  决策日志 D619，issue #414
+- **验收**：C（聊天流），质量
+- **里程碑**：M5
+- **状态**：已自动化（`pnpm test:e2e:copy-tex`，真实 Chromium），另有
+  `selection-tex.test.mjs`
+
 #### E2E-060b：镀铬中性灰色调
 
 - **先决条件**：应用程序在深色和浅色主题中运行；插件页面和
@@ -2727,9 +2764,9 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   设置 → 信息。
 - **预期**：更新状态报告 `available`（手动平台）或
   通过应用内下载 Windows NSIS / Linux AppImage 取得进展
-  `availableVersion` 等于较新的稳定标签。Windows 便携版运行
-  （`PORTABLE_EXECUTABLE_FILE`）保持手动通知加链接路径，不得下载或运行
-  NSIS 安装程序。客户不得举报
+  `availableVersion` 等于较新的稳定标签。Windows 便携版 ZIP 运行保持手动通知加链接路径，
+  不得下载或运行 NSIS 安装程序；旧便携版 exe 在存在 `PORTABLE_EXECUTABLE_FILE` 时同样
+  保持手动更新。客户不得举报
   最新只是因为没有较新的版本共享相同的 `rc` 预发行版
   频道。
 - **链接规格**：`04-ux/09-interaction-patterns.md`，
@@ -3142,9 +3179,11 @@ IPC 请求无法关闭。
   3. 等待 sessions/settings 引导程序完成。
   4. 如果可用，请对 OS `prefers-reduced-motion: reduce` 重复此操作。
   5. 在 macOS 上，将启动面与 shell 出现后的侧边栏玻璃态对比。
+  6. 在 `bootstrap` 一直被搁置、超过看门狗界限时重复一次，在 30 秒与超过 180 秒时观察启动表面（issue #831）。
 - **预期**：
 - 准备之前：带有品牌标志、外壳名称、标语和可访问的启动状态 (`data-testid="startup-splash"`) 的全窗口启动画面。
   - 准备好后：启动画面会短暂淡出（或立即减少运动）退出，并且主外壳（或设置页面）在下面是交互式的。
+  - 如果初始状态始终没有到达，启动画面不是被一直保留而是被替换：启动表面在 30 秒（`STARTUP_SLOW_HINT_MS`）时加上日志、诊断与退出且不报告失败，在 180 秒（`STARTUP_STALLED_MS`）时变成恢复表面，并额外提供重试（`data-testid="startup-recovery"`）；每个操作都不依赖后端，Windows/Linux 上渲染器绘制的窗口控制按钮保持在该表面之上，退出走 `pi-desktop/app/quit`。
   - macOS 上启动页与侧边栏使用同一套玻璃 tint/sheen，叠在原生 `sidebar` vibrancy 之上；已挂载的 shell 在退出淡出前保持隐藏，再交叉淡入。其他平台仍为不透明的 `--ds-bg-primary`。
   - 没有简单的无品牌“开始...”居中文本作为唯一的启动 UI。
   - Overlay/dialog 输入动作使用共享令牌；减少的运动可以保持状态变化，而无需装饰持续时间。
@@ -5319,7 +5358,7 @@ eleven-tool-round desktop paths are verified by
 | 后MVP | E2E-022A、E2E-022B、E2E-022C、E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M（插件路线图 R2/R3/R6） |
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
-| 受信任扩展（R7 v1） | E2E-DIALOG-long-text-boundaries、E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
+| 受信任扩展（R7 v1） | E2E-DIALOG-long-text-boundaries、E2E-241、E2E-242、E2E-HOOKS-cancel-and-dispose、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | 受信任扩展（R7 v1 npm 恢复） | E2E-PLUGIN-import-extension-recovers-missing-npm |
 | Post-MVP 回归覆盖（插件工具调度） | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
 | M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
@@ -5345,6 +5384,8 @@ eleven-tool-round desktop paths are verified by
 | C / F / 品质 —— 上下文估算保持安全（校准） | E2E-CONTEXT-estimate-calibration-stays-safe |
 | C — 对话与流式（工具调用 id 唯一） | E2E-RUNTIME-unique-tool-call-ids-per-request |
 | 品质（工具调用 id 唯一） | E2E-RUNTIME-unique-tool-call-ids-per-request |
+| C — 对话与流式（循环上下文归属） | E2E-RUNTIME-loop-context-ownership |
+| 品质（循环上下文归属） | E2E-RUNTIME-loop-context-ownership |
 | G — 插件宿主生命周期（崩溃上报） | E2E-PLUGIN-crash-report-names-the-exit-code |
 | 品质（崩溃上报） | E2E-PLUGIN-crash-report-names-the-exit-code |
 | F — 持久化（存储的模型绑定数组） | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
@@ -6629,6 +6670,14 @@ eleven-tool-round desktop paths are verified by
   验证独立许可、撤销和多账号别名冲突，连接测试检查按需唯一匹配。设置复选框 UI/持久化旅程及外部真实提供商执行仍需手动验证；
   此夹具不代表完整原生 UI 旅程已通过。
 
+- **Authorization regression coverage (#841)**: `pnpm test:e2e:subagent-models`
+  grants a model on demand, reuses the runtime, then revokes it without changing
+  the launch catalog. The next prompt must reauthorize and issue no child request.
+  A transcript-restored resume with a colliding model id must use the session
+  binding rather than another definition's private account. Runtime tests also
+  cover own pins/fallbacks, opted-in bindings, visible fallback metadata, live-key
+  reauthorization, and late RPC responses crossing parent turns.
+
 #### E2E-167：原生边缘调整大小保持流畅并保存稳定边界
 
 - **前置条件**：PI-Desktop 在 macOS、Windows 或 Linux 上以普通、未最大化
@@ -7088,21 +7137,22 @@ eleven-tool-round desktop paths are verified by
 - **验收**：A（应用启动）、质量（全新安装打包）
 - **里程碑**：M6+
 - **状态**：源码契约已覆盖；全新 Windows x64 与 ARM64 资格验证仍需运行器验证（适用变更合入前需在具备条件的环境中运行 E2E）
-#### E2E-211：Windows 便携版 exe 无需安装即可启动（D364）
+#### E2E-211：Windows 便携版 ZIP 解压后即可启动（D603）
 
 - **前提条件**：Windows x64 标签或 `dist:win` 包已从共享 electron-builder 配置
-  产出 `PI-Desktop-Setup-<version>.exe` 和 `PI-Desktop-Portable-<version>.exe`；
+  产出 `PI-Desktop-Setup-<version>.exe` 和 `PI-Desktop-Portable-<version>.zip`；
   有干净用户配置；账户是无需管理员提升的标准用户。
-- **步骤**：1) 检查发布目录和 `latest.yml`。2) 不运行 NSIS 安装程序，直接启动
-  便携版 exe。3) 确认进程环境包含 `PORTABLE_EXECUTABLE_FILE`。4) 调用检查更新。
-  5) 确认设置 → 信息提供发布页而不是“重启以更新”。6) 退出并再次启动同一便携文件。
+- **步骤**：1) 检查发布目录和 `latest.yml`。2) 将便携版 ZIP 解压到用户可写目录，
+  不运行 NSIS 安装程序。3) 启动解压后的 `PI-Desktop.exe`。4) 确认没有管理员提示，
+  且运行中的应用显示 PI-Desktop 图标和任务栏入口。5) 调用检查更新。6) 确认设置 → 信息
+  提供发布页而不是“重启以更新”。7) 退出并再次启动解压后的可执行文件。
 - **预期**：两个 Windows 工件都无空格并已上传。`latest.yml` 只指向 NSIS 安装程序。
-  便携版 exe 无需安装向导或管理员提示即可启动，使用现有应用数据目录，
-  并报告更新模式 `manual`。可用更新不会下载或运行
+  ZIP 解压后的应用无需安装向导或管理员提示即可启动，保持正常的 PI-Desktop 任务栏
+  标识和图标，使用现有应用数据目录，并报告更新模式 `manual`。可用更新不会下载或运行
   `PI-Desktop-Setup-<version>.exe`。再次启动从同一配置恢复会话。
 - **链接规格**：`01-product/01-product-scope.md`、
   `06-delivery/06-release-runbook.md`、`03-runtime/07-process-model.md`、
-  ADR 0197 / D364
+  ADR 0197 / D603
 - **验收**：质量（发布打包）
 - **里程碑**：M6+
 - **状态**：单元/源合同已覆盖（`auto-update.test.mjs`）；本机 Windows 启动仍为
@@ -7689,12 +7739,12 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 - **里程碑**：M2
 - **状态**：单元覆盖（`packages/shared/src/composer-trigger.test.ts`、`apps/desktop/test/composer-ime.test.mjs`）；渲染桌面旅程为草稿（除非明确要求，不本地运行 E2E）
 
-#### E2E-CLONE-public-hostname-rejects-private
+#### E2E-CLONE-accepts-a-lan-remote-and-rejects-metadata
 
 - **前提条件**：首页项目切换菜单的「克隆 Git 项目」可用。
-- **步骤**：1）输入 `https://127.0.0.1/org/repo.git`、`http://localhost/org/repo.git`、`https://10.0.0.5/org/repo.git` 和 `git@127.0.0.1:org/repo.git`。2）输入 `https://github.com/org/repo.git` 和 `git@github.com:org/repo.git`。
-- **预期**：私网、回环和链路本地远程在 `git clone` 运行前被拒绝。公网 GitHub HTTPS 与 SSH 仍解析出文件夹名。`file:` 和带密码的 URL 继续被拒绝。
-- **链接规格**：`04-ux/01-ui-ia.md`、ADR 0247、D416
+- **步骤**：1）输入 `https://192.168.1.5/org/repo.git`、`http://10.0.0.7/org/repo.git` 和 `git@192.168.1.5:org/repo.git`。2）输入 `https://169.254.169.254/org/repo.git` 和 `https://metadata.google.internal/org/repo.git`。3）输入 `https://github.com/org/repo.git` 和 `git@github.com:org/repo.git`。
+- **预期**：用户自己填写的局域网或回环远端被接受并解析出文件夹名，因为这是用户自己的地址。云元数据主机仍然拒绝，`file:` 与带密码的 URL 也一样，都在 `git clone` 运行前拒绝。公网 GitHub HTTPS 与 SSH 仍解析成功。
+- **链接规格**：`04-ux/01-ui-ia.md`、ADR 0247、ADR 0304、D416
 - **验收**：安全、D（工作区）
 - **里程碑**：M5
 - **状态**：单元覆盖（`apps/desktop/test/git-clone.test.mjs`）
@@ -7959,18 +8009,18 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
 
 | ID | 场景 | 验证 |
 |---|---|---|
-| E2E-MCP-MARKET-NET-BOUNDARY | URL guard 拒绝凭据、回环、私网、special-use IPv4、v4-mapped、ULA、site-local 和 link-local 及尾点绕过形态；direct/unknown 默认固定已检查的公网地址，完整 proxied 线路使用 session 传输，显式 `allowFakeIp` 可覆盖透明路由器 fake-IP 源但不允许真实私网答案 | 确定性 guard 断言；DNS pin、代理线路选择、fake-IP 选项范围与响应上限 source-contract 覆盖 |
+| E2E-MCP-MARKET-NET-BOUNDARY | URL guard 拒绝凭据、云元数据、unspecified、multicast、reserved 及尾点绕过形态——即使由用户自己填写；对**第三方跳**（重定向目标、目录正文）拒绝回环、私网、special-use IPv4、v4-mapped、ULA、site-local 与 link-local；同一形态由用户填进源地址字段时被接受，明文 `http` 需 `networkPolicy.allowInsecureUserEndpoints`；direct/unknown 默认固定已检查的地址，完整 proxied 线路使用 session 传输，显式 `allowFakeIp` 可覆盖透明路由器 fake-IP 源但不允许真实私网答案 | 确定性 guard 断言；DNS pin、代理线路选择、fake-IP 选项范围与响应上限 source-contract 覆盖 |
 | E2E-MCP-MARKET-SEMANTICS | Registry 记录映射为安装模板时保留包版本、named/positional runtime/package 参数与 required/optional 环境变量语义；远端 header 变量同时识别注册表的 `{name}` 与目录的 `${NAME}` 两种写法，仅为已声明的可编辑值显示输入，保留未声明花括号字面量，并按各 header 的作用域处理默认值、固定值与可选标记，不合并不同 header 的同名输入（ADR registry-header-variable-spelling） | 确定性映射断言 |
 | E2E-MCP-MARKET-INSTALL | 内置目录条目经 `resolveCatalogEntry` 解析并通过宿主 `mcp.upsert` RPC 安装；记录落盘 `~/.agents/servers/` | 真实宿主二进制，隔离临时 HOME |
 | E2E-MCP-MARKET-HEADER-SCOPE | Registry header-local `{token}` resolves only in its header; same-named URL path/query tokens remain literal through mapping, resolution, host upsert/list and persistence. URL templates retain only legacy `${NAME}` substitution. When `headerBindings` exists (even empty or partial), unbound tokens in every header stay literal and never consume another header's input or default | shared regressions plus real host binary with isolated temporary storage; remote entry disabled, no network call |
 | E2E-MCP-MARKET-partial-header-bindings-stay-literal | Resolve a catalog with only Authorization bound and another header using the same `{token}` / `${token}`; an undeclared `${UNBOUND}` in a third header also remains literal through host upsert/list and disk persistence | real host binary, disabled remote entry, synthetic input and isolated temporary storage; no network call |
 
 
-#### E2E-SKILL-MARKET-NET-BOUNDARY：技能源公网 HTTPS 策略拒绝私网与回环
+#### E2E-SKILL-MARKET-NET-BOUNDARY：用户自填源可达局域网，第三方内容不行
 
 - **前提条件**：共享 public-network helper，以及可注入 fetch/DNS/线路 的主进程公网 HTTPS 客户端。
-- **步骤**：1）分类 trailing-dot localhost、IPv4 回环、IPv4-mapped IPv6、ULA、link-local、RFC1918 与 `http://`。2）将公网主机名解析到私网 A 记录。3）跟随 Location 为 `https://127.0.0.1/` 的 302。4）报告 `proxied` 线路与 TUN fake-IP 答案（`198.18.0.1`），同一答案在 `DIRECT` 线路、读不出线路、以及列表中含 `DIRECT` 的线路上的表现。5）让第一跳为 `proxied`，其重定向目标为 `direct`。
-- **预期**：上述绕过形态全部拒绝；公共 CDN 放行。解析到私网地址或 redirect 到回环会抛出策略错误，且不会请求私网目标。判定型拒绝不重试；本地解析没有返回答案时会重试,并且报为 `NETWORK_RESOLVE_FAILED`（`kind` 为 `unresolved`）,而不是报成地址校验拒绝——守卫并未得出判定,任何文案都不得声称它得出了。本地代理伪造的 fake-IP 答案（如 Clash 默认的 `198.18.0.0/15`）在守卫判定它的线路上——`direct` 或读不出线路——仍被拒绝且不重试,并以 `kind` 为 `fake-ip`、`reason` 为 `non-public-address`、`addressKind` 为 `benchmark` 记录,与真实私网目标（`kind` 为 `policy`、`addressKind` 为 `private`）清楚区分——对后者守卫判定了目标,对前者没有；同一答案在 `proxied` 线路上放行。其余每次拒绝都带上 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1）及其 `reason`、被解析到的地址、地址类别与判定该地址的线路,使安装面板能给出原因并提供重试,而不是让安装按钮无解释地保持禁用；市场列表也能把被拒绝的源与单纯不可达的源区分开。其他所有非公网类别在任何线路上都拒绝；每一个重定向跳都按自己的线路判定（ADR 0272）。
+- **步骤**：1）把 trailing-dot localhost、IPv4 回环、IPv4-mapped IPv6、ULA、link-local、RFC1918 与 `http://` 各分类两次：一次作为用户自己填写的源地址，一次作为目录正文里的文档 URL。2）将公网主机名解析到私网 A 记录。3）跟随 Location 为 `https://127.0.0.1/` 的 302。4）报告 `proxied` 线路与 TUN fake-IP 答案（`198.18.0.1`），同一答案在 `DIRECT` 线路、读不出线路、以及列表中含 `DIRECT` 的线路上的表现。5）让第一跳为 `proxied`，其重定向目标为 `direct`。
+- **预期**：用户自己填写的源地址可以是回环或局域网目录——`https` 始终允许，`http` 仅在 `networkPolicy.allowInsecureUserEndpoints` 打开时允许；而同一地址作为目录内部的文档 URL 或重定向目标时一律拒绝；云元数据、`unspecified`、`multicast`、`reserved` 在任何输入上都拒绝。公共 CDN 放行。用户源解析到私网地址会被正常抓取；第三方跳解析到私网地址会抛出策略错误，且不会请求私网目标。判定型拒绝不重试；本地解析没有返回答案时会重试,并且报为 `NETWORK_RESOLVE_FAILED`（`kind` 为 `unresolved`）,而不是报成地址校验拒绝——守卫并未得出判定,任何文案都不得声称它得出了。本地代理伪造的 fake-IP 答案（如 Clash 默认的 `198.18.0.0/15`）在守卫判定它的线路上——`direct` 或读不出线路——仍被拒绝且不重试,并以 `kind` 为 `fake-ip`、`reason` 为 `non-public-address`、`addressKind` 为 `benchmark` 记录,与真实私网目标（`kind` 为 `policy`、`addressKind` 为 `private`）清楚区分——对后者守卫判定了目标,对前者没有；同一答案在 `proxied` 线路上放行。其余每次拒绝都带上 `NETWORK_POLICY_BLOCKED`（spec 08 §3.1）及其 `reason`、被解析到的地址、地址类别与判定该地址的线路,使安装面板能给出原因并提供重试,而不是让安装按钮无解释地保持禁用；市场列表也能把被拒绝的源与单纯不可达的源区分开。其他所有非公网类别在任何线路上都拒绝；每一个重定向跳都按自己的线路判定（ADR 0272）。
 - **链接规格**：`05-security/01-security.md`、ADR 0243、ADR 0272、`03-runtime/01-ipc-protocol.md` §12b
 - **验收**：Security、Quality
 - **里程碑**：M6+
@@ -8319,6 +8369,19 @@ the latest destination. These assertions measure work counts, not device FPS.
   default.
 - **Status:** Contract-covered; no end-to-end driver waits out a real 70s call.
 
+### E2E-IMAGES-remove-configured-model
+
+- **前提：** API 边界 fixture，服务商包含已标记的生图模型及另一个模型；
+  分别测试旧版单绑定和另一服务商仍有可用生图候选的情况。
+- **步骤：** 不操作生图复选框，直接移除已标记模型；先取消，再重复并保存，
+  重新打开设置和编辑器。
+- **预期：** 取消保留配置；保存清除已移除模型的生图候选并清空生图默认值，即使
+  仍有其他可用候选；保留仍存在的聊天默认模型，被移除的聊天默认模型按原有
+  规则改为第一个剩余模型，重新打开后状态保持。
+- **规格：** 03-runtime/21-image-generation。**验收：** B。
+- **里程碑：** 维护。**状态：** `scripts/e2e-image-generation-ui.mjs`
+  使用中英文自动覆盖。
+
 ### E2E-IMAGES-desktop-conversation
 
 - **Preconditions:** Isolated desktop profile and workspace, built image feature,
@@ -8349,6 +8412,10 @@ the latest destination. These assertions measure work counts, not device FPS.
   requests, GPT Image parameter omission, bounded responses, and rejection of
   more than four references before I/O. These are protocol tests, not official
   provider account/live compatibility certification.
+- **Proxy fake-IP:** 明确开启“设置 → 通用 → 网络”的代理 fake-IP 选项后，解析
+  到 Clash 基准测试段的图片 URL 会通过代理感知传输下载；未开启时仍返回
+  `IMAGE_UNSAFE_URL`，真实私网地址在两种情况下都继续阻止。该行为由
+  `packages/agent-runtime/src/image-generation/download.test.ts` 覆盖，不由下面的驱动脚本覆盖。
 - **Status:** Automated in `node scripts/e2e-image-chat.mjs`; optional screenshots
   use `PI_IMAGE_CHAT_EVIDENCE_DIR`. The images are deterministic raster fixtures,
   not evidence of real-model quality or provider compatibility.
@@ -8356,19 +8423,22 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 ### E2E-SCHEDULED-desktop-automation-lifecycle
 
+- **补充覆盖：** 共用模型／推理等级首层菜单、可搜索模型子菜单、键盘选择、保存重开 `high`、应用默认设置不变，以及运行会话中的已存推理等级。
+
+
 - **前提：** 独立桌面配置、构建后的任务候选版本、本地 SSE 模拟模型；不使用真实
   服务凭据或付费 API。
-- **步骤：** 点击页脚时钟；创建每天上午 09:00 的任务；编辑名称；暂停／启用；立即运行；
+- **步骤：** 点击页脚时钟；创建每天上午 09:00 的任务；选择另一个已保存项目、Auto 权限和非默认模型；编辑名称；暂停／启用；立即运行；
   打开结果会话；验证周期／四个时段主题下拉菜单、星期多选及选中标记、保存回显、空选择与固定时间；
   验证方向键、Home/End、Enter、Escape／Tab 和外部点击关闭；
   验证每小时无时间输入且首次等待一小时；设置每天任务在下一个真实分钟执行；
   观察自动完成；删除已结束的任务。普通 Agent 对话经模型工具调用发现、创建、查询、
   修改任务到 15:30，再删除；验证页面显示具体时间，改名保存不覆盖。模型为本地确定性夹具。
-- **预期：** 配置持久化并显示下次时间；暂停后不触发；手动与自动入口均调用真实
+- **预期：** 项目、权限和精确 provider/model 只保存在该任务，重新打开仍显示相同值并实际传到 sidecar，其他任务不受影响；项目、权限和模型控件保持嵌在“指令”框的 Composer 风格底栏中，窄窗口也不产生横向溢出；缺少新增字段的旧记录保持原默认行为。配置持久化并显示下次时间；暂停后不触发；手动与自动入口均调用真实
   Agent sidecar；历史记录链接到持久化会话；自动执行不依赖渲染器发送提示词。
   宿主测试补充验证重复准入、错过时段、无效输入和重启恢复。
 - **规格：** 04-ux/01-ui-ia §3.4；03-runtime/04-data-storage §4.11；
-  ADR scheduled-desktop-automations。
+  ADR scheduled-desktop-automations；ADR 0305。
 - **验收：** 定时执行与可恢复的运行历史。
 - **里程碑：** MVP 后的桌面自动化。
 - **状态：** `node scripts/e2e-scheduled.mjs` 自动化覆盖；按 AGENTS.md 在任务候选
@@ -8464,7 +8534,22 @@ the latest destination. These assertions measure work counts, not device FPS.
   **里程碑：** Post-MVP 回归覆盖。
 - **自动化：** `packages/agent-runtime/src/runtime.test.ts` 用真实的运行时覆盖两半：重复历史（丢弃 + 一行日志）与唯一历史
   （同一对象、无日志）。
+
 - **状态：** 单元测试覆盖；没有端到端驱动对重复转录发出真实提供商请求。
+
+### E2E-RUNTIME-loop-context-ownership
+
+- **先决条件：** 一个确定性提供商夹具：前两轮各回一次工具调用，并在第二轮之后像用户 Stop 那样结束回合；不使用真实凭据。
+- **步骤：** 发一条提示，让运行时跑完两轮工具调用并在工具轮上结束回合；再发第二条提示。读取运行时保留的状态与夹具收到的出站请求。
+- **预期：** 保留的状态里每个流式辅助消息与每个工具结果都只有一份；没有结果与它回答的调用被隔开；夹具收到的请求对每次调用只带一个结果。
+  不产生去重日志行，因为请求守卫没有任何东西需要丢弃。
+- **规格：** 03-runtime/02-agent-runtime §5c、08-meta/decisions-log D620。**验收：** C（对话与流）、品质。
+  **里程碑：** Post-MVP 回归覆盖。
+- **自动化：** `packages/agent-runtime/src/runtime.test.ts`（loop context ownership）通过 `runtime.prompt()` 驱动真实 pi 循环，
+  并读取 `convertToLlm` 交给提供商的视图；`subagent-loop-context.test.ts` 覆盖委托侧的回合边界。两者都到不了适配器自身的输出，
+  因此由 `tool-call-dedupe.test.ts`（request wire contract）直接驱动 pi-ai 的消息变换，固定「请求把调用与结果隔开时同一个 call id
+  会拿到两条输出」这一机制。
+- **状态：** 单元测试覆盖；没有端到端驱动从「循环追加过的上下文」构建新回合的请求。
 
 ### E2E-MCP-HTTP-ACK — HTTP acknowledgement and authorization status
 
@@ -8690,3 +8775,39 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Coverage:** Host fork regression, renderer session-fork-running tests,
   session IPC contract tests, and real-model desktop acceptance. A local model
   fixture or mocked component result is not real-model acceptance evidence.
+
+### E2E-HOOKS-cancel-and-dispose
+
+- **#816 扩展验收：** 命令弹窗显示期间 Stop，真实渲染层移除弹窗，后续弹窗和 exec
+  不再发生，下一命令或回合正常。Electron 驱动通过 CDP 检查 DOM；Runner 测试覆盖
+  长命令、上下文等待取消、工具进度退役及头部副本；进程测试通过就绪信号同步真实父子进程。
+
+- **前置条件：** 隔离 Desktop 配置、本地确定性模型，以及含等待型请求前处理器的可信插件。
+- **步骤：** 发送消息，在处理器等待时停止，释放旧处理器后再次发送。另测等待时销毁
+  Runtime，并加载启动/关闭挂起以及注册未接通事件的夹具。
+- **预期：** 被停止或销毁的请求不调用模型，后续消息正常完成。迟到结果不能重启工作。
+  关闭只执行一次，各处理器等待有界，未接通事件产生诊断但不禁用正常处理器。
+- **规范：** 07-plugins/16 §6。
+- **验收：** 取消及时生效，扩展生命周期等待有界。
+- **里程碑：** Hooks P0。
+- **状态：** Runner 与真实 Runtime/本地 HTTP 集成通过
+  `extensions/runner.test.ts`、`extensions/runtime-lifecycle.test.ts` 自动验证。
+  可信扩展 Electron 驱动通过 CDP 在真实渲染层执行 Stop 路径，并记录弹窗显示和
+  退役后的状态。
+## Composer 指令源、手动压缩与空记录读取（#795）
+
+**范围：** composer 的斜杠分发、手动压缩 RPC，以及渲染层的持久化记录读取。不调用真实模型或
+提供商。
+
+| 场景 | 必须观察到的结果 |
+| --- | --- |
+| `composer/commands` 失败时输入 `/compact` | 提交被拒绝并显示 `chat.slashCommandSourceUnavailable`，草稿保留，没有任何提示词进入会话。失败的读取不入缓存，因此下一次发送会重试。 |
+| 指令源缓存仍热 | 内置指令仍在本地分发；模板与未知别名仍走提示词路径。 |
+| 手动压缩超过其传输超时 | 宿主重新读取持久化压缩记录：发现新检查点已落盘就报告成功并记录该不一致，未落盘则原样抛出超时。sidecar 自己报告的判定绝不被改写。 |
+| 有历史的会话读到空记录窗口 | 选择流程再读一次，随后保留用户已有的快照，否则显示 `chat.sessionTranscriptEmpty`；这类空页绝不入缓存，因此悬停预取不会反复提供它。 |
+
+**自动化：** `node --test apps/desktop/test/slash-command-source.test.mjs`、
+`node --test apps/desktop/test/session-transcript-empty-read.test.mjs`、
+`node --test apps/desktop/test/plugin-timeout-budgets.test.mjs`、
+`pnpm --filter @pi-desktop/shared test`、`pnpm --filter @pi-desktop/host-runtime test`。
+
