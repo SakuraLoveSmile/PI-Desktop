@@ -99,6 +99,12 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 
 每个代码 pull request 都必须在打开或更新前，在已经包含最新 `origin/main` 的候选上通过与其回归面相关的 E2E（`pnpm check:pr-base`）。不得打开落后于 `origin/main` 的 PR。不要为了跑 E2E 把任务合进本地 `main`。代码变更包括渲染器、Electron Main、Preload、Agent Runtime、Rust host-core、会话、转录、计划、插件、MCP、权限、供应商/模型运行时、持久化、进程生命周期、打包/启动，以及影响应用执行的构建或 CI 行为。仅文档更改在不影响可执行行为时可豁免。
 
+### E2E 环境复用
+
+task-candidate E2E 从请求工作树运行，但使用主工作区已经准备好的宿主开发环境。必要时通过引用或链接复用兼容的 Node/pnpm 工具链、`node_modules`、Electron、Rust/Cargo 目标、包存储、构建缓存和忽略的配置。
+
+不得为了 E2E 单独运行 `pnpm install`、`npm install`，或创建第二套依赖/运行时环境。只隔离可变测试状态：临时 profile、数据目录、socket、端口、日志和工件。仅当宿主环境缺失或不兼容时才安装或重建依赖，并记录原因；干净的 CI 和发布 runner 可以按 lockfile 安装。
+
 根目录 `package.json` 是可执行命令的事实来源。最低选择如下：
 
 - 跨域运行时、host 或 IPC：`pnpm test:e2e`。
@@ -238,6 +244,26 @@ unit/integration 测试；代码 pull request 使用有选择且高价值的 E2E
 - **接受**：B（添加提供商，保存密钥）
 - **里程碑**：M2
 - **状态**：自动（协议烟雾：提供商创建+秘密，无明文回显）
+
+#### E2E-PROVIDER-defaults-survive-an-added-provider：新增提供商不改写应用默认值
+
+- **前提条件**：应用运行；提供商 A 已保存并设为应用默认模型；另有提供商 B 提供不同的模型；A 上配置了一个图片模型，另一家服务上也配置了一个。
+- **步骤**：1) 打开设置 → 模型配置，新增提供商 B，保存时不动「默认模型」行。2) 确认「默认模型」行仍是提供商 A 与其确切模型，且新建会话使用它。3) 将某个图片模型设为默认画图模型，再新增一个同样提供图片模型的服务并保存。4) 确认「默认画图模型」行仍指向原绑定，而选择器的候选里出现新提供商的图片模型。5) 删除拥有默认值的那家提供商，再新增一个既提供对话模型又提供图片模型的服务并保存。6) 确认两个默认值此时都解析到新增的服务。
+- **预期**：新增提供商保存后不会改写仍然可解析的应用默认值：默认模型保留「默认模型」行已经展示的那对提供商/模型，默认画图模型保留其存储绑定，同时候选列表继续增长。只有已无法解析的默认值（提供商被删除，或其模型已从提供商移除）才会由新增的提供商填补，因此只有在应用否则将无从运行时才会写入设置。显式的「设为默认」操作、编辑路径，以及回落到首个剩余绑定的行为都不变。
+- **链接规格**：`03-runtime/13-model-catalog-and-selection.md`
+- **接受**：B（模型选择）
+- **里程碑**：M6
+- **状态**：已文档化；由 `apps/desktop/test/default-model-display.test.mjs`、`apps/desktop/test/image-generation-default.test.mjs`、`apps/desktop/test/provider-model-config.test.mjs` 覆盖
+
+#### E2E-PROVIDER-custom-model-limits：手输的自定义模型 id 从模型库取限额
+
+- **前提条件**：应用运行；models.dev 快照随构建发布；已打开某个提供商编辑器。
+- **步骤**：1) 在「添加模型」输入框里输入模型库已发布的模型 id 并添加，确认新行的上下文长度、最大输出与思考等级与已发布记录一致，而不是 128,000 / 8,192 且无思考等级。2) 输入模型库未发布的 id 并添加，确认该行沿用通用种子 128,000 / 8,192 且无思考等级。3) 在服务模型列表不可用的状态下添加一个 id，确认该行仍然只出现一次且可编辑。4) 添加一个 id 后立刻修改其限额（此时查询尚未返回），确认手输的值被保留。
+- **预期**：`providers.lookupModel` 只从本地快照回答手输 id —— 不访问提供商网络、不调用主机 —— 命中时按「被勾选的模型」同样的口径播种绑定（已发布的上下文长度、最大输出、思考等级，`contextWindowSource: "catalog"`），而存储的 id 保持用户输入的原样。未命中、调用失败，或该 id 已被本次发现结果描述过时，行为与之前一致：一行可用，通用种子，列表既不卡住也不重复。
+- **链接规格**：`03-runtime/12-provider-config-schema.md`、`03-runtime/13-model-catalog-and-selection.md`
+- **接受**：B（多模型提供商配置）
+- **里程碑**：M2
+- **状态**：已文档化；由 `apps/desktop/test/model-custom-lookup.test.mjs` 与 `apps/desktop/test/provider-lookup-model-handler.test.mjs` 覆盖
 
 #### E2E-005H：从较长的服务模型列表一次全选当前可见模型
 
@@ -8289,21 +8315,26 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 - **Preconditions:** Isolated desktop profile and workspace, built image feature,
   local chat and OpenAI Images HTTP fixtures; no live provider credentials.
-- **Steps:** Open Models settings; verify the conversation and image defaults
-  share a compact panel. Submit a two-image request through the composer, then
-  edit the first output through a follow-up message. Collapse tool details.
-  Clear the binding and follow the visible configuration action back to Models.
-- **Expected:** A 12px default-row gap, decoded image previews outside collapsed
-  process details, multipart source upload for editing, preserved originals,
-  and no image HTTP request while unconfigured.
-- **Settings interactions:** The image summary has no Change/Clear buttons and
-  matches the default model's provider/model text styles. Select another
-  provider's image model in Advanced and save; the summary changes while the
-  chat default stays unchanged. Missing/disabled bindings show only Currently
-  unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
-- **Conversation selection:** The selected image provider/model is absent from
+- **Steps:** Open Models settings with no image model configured; verify the image
+  summary row is absent. Open a provider's Advanced model settings and verify
+  **Set as image model** is grouped with the image/document attachment
+  capabilities and can be checked for multiple models. Save, use the image
+  summary menu to choose one marked model as the default, then submit a
+  two-image request through the composer and edit the first output through a
+  follow-up message. Collapse tool details.
+- **Expected:** After saving, the image summary appears with a 12px default-row
+  gap and lists all marked candidates, the selected default is changeable
+  without changing the chat default, decoded image previews stay outside
+  collapsed process details, multipart source upload is used for editing,
+  originals are preserved, and no image HTTP request occurs while unconfigured.
+- **Settings interactions:** The unconfigured state renders no image summary.
+  Mark candidates in the attachment capability group, save, and select one
+  from the summary menu. An existing missing/disabled candidate shows only
+  Currently unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
+- **Conversation selection:** Every marked image provider/model is absent from
   default and Composer candidates. Other providers retain same-ID models. An
-  existing session pinned to the image binding is rejected before inference.
+  existing session pinned to any marked image binding is rejected before
+  inference.
 - **Transport contracts:** Real stdio reverse RPC retains a thrown local image
   error's stable code in the production ParentHostProxy. Local HTTP tests check
   single/multiple binary multipart fields and boundaries, DALL-E `b64_json`
@@ -8578,3 +8609,41 @@ the latest destination. These assertions measure work counts, not device FPS.
   SettingsPage、store、翻译和构建后的 CSS。仅 preload 数据使用 fixture；
   搜索导航调用 SearchDialog 使用的公开 store 入口。该测试覆盖渲染层交互，
   不覆盖 host 持久化或完整全局搜索弹窗。
+
+### E2E-SCHEDULED-dispatch
+
+- **场景**：独立分发到期任务。
+- **预期**：Electron runner 无需等待其他任务的提示词准备即可准入彼此独立的
+  到期任务；本地所有权按任务 ID 和 Host 实例保留，Host 继续负责 enabled、
+  due 和重叠检查。停止只阻止新轮询，错误仍可观察，迟到 90 秒的规则不变。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-dispatch.mjs`
+### E2E-SCHEDULED-project-removal
+
+- **场景**：删除项目与自动任务。
+- **预期**：删除项目会暂停其绑定任务，并保留任务定义、schedule、工作区绑定和
+  运行历史；已准入的任务会阻止删除。其他项目和未绑定旧任务不受影响。用户显式
+  恢复或 Run now 可以重新创建项目，暂停状态下的自动轮询不会这样做。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-project-removal.mjs`
+### E2E-SCHEDULED-legacy-pause
+
+- **场景**：旧任务维护。
+- **预期**：Agent 工具可对缺少 schedule 的旧版自动任务修改标题、提示词或暂停，
+  包括回传未变化的 cadence；维护不会启用任务或捕获前台工作区。显式启用、改变
+  cadence 或提供 schedule 时仍执行校验，Manual 转 Hourly 的默认间隔行为不变。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-legacy-maintenance.mjs`
+### E2E-SCHEDULED-calendar-intent
+
+- **场景**：日历配置意图。
+- **预期**：可选的 `config_json.calendarConfigured` 区分明确设置的每日／每周
+  日历时间与 Hourly 内部占位 schedule。旧版 Daily／Weekly 保留日历语义；
+  旧版 Hourly 转换时必须明确提供 schedule。已知配置可跨 Hourly 与重启保留，
+  包括午夜；仅修改元数据以及 Manual 转 Hourly 的行为不变。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-calendar-intent.mjs`
+### E2E-SCHEDULED-paths
+
+- **场景**：工作区身份。
+- **预期**：保存和读取工作区绑定时统一使用现有项目路径规范化规则。Windows
+  路径的斜杠方向、大小写、末尾分隔符和扩展路径前缀差异不影响同项目会话；
+  缺失的旧版绑定与显式 null 保持不同语义，其他项目不能查询或修改绑定任务。
+- **自动化**：`node --experimental-strip-types scripts/e2e-scheduled-paths.mjs`
+  使用隔离的真实 Host 与 SQLite 配置，不向真实提供商发送推理请求。

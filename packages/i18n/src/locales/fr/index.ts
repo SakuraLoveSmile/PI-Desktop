@@ -522,6 +522,7 @@ export const fr = {
     "reject": "Rejeter",
     "untitled": "Plan sans titre",
     "openArtifact": "Plan ouvert",
+    "openArtifactLabel": "Artefact de plan ouvert {{path}}",
   },
   "goal": {
     "planning": "Définition de l'objectif",
@@ -539,6 +540,7 @@ export const fr = {
     "reject": "Rejeter",
     "untitled": "Objectif sans titre",
     "openArtifact": "Objectif ouvert",
+    "openArtifactLabel": "Artefact d'objectif ouvert {{path}}",
   },
   "onboarding": {
     "title": "Commencer",
