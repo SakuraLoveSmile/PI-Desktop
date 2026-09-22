@@ -68,7 +68,10 @@ upstream provider stopped processing or billing. Completed output files survive.
 Responses accept exactly one Base64 image or HTTPS image URL per request. JSON and
 download bodies are bounded; image files are capped at 16 MiB and restricted to
 PNG, JPEG and WebP signatures. Downloads use checked, pinned public DNS addresses,
-reject redirects and private destinations, and never receive provider headers.
+reject redirects and private destinations, and never receive provider headers. When
+Settings > General > Network explicitly enables proxy fake-IP support, a
+benchmark-range fake-IP answer uses the app's proxy-aware transport; real private,
+loopback, link-local and metadata addresses remain blocked.
 Input edits accept the session project, that session's scratch directory and the
 attachment store after realpath containment. Each edit input set is capped at
 32 MiB, with a 64 MiB input cache budget for the batch. Credentials remain outside the renderer and tool results.
