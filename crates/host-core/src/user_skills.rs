@@ -1361,5 +1361,10 @@ fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationSc
     }
 }
 
+/// Package bounds are asserted in their own module: `tests.rs` is close to the
+/// rust file-size limit, and these tests share one fixture.
+#[cfg(test)]
+mod package_tests;
+
 #[cfg(test)]
 mod tests;
