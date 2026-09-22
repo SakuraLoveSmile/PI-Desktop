@@ -1277,7 +1277,11 @@
   width: max-content;
   max-width: 100%;
   min-width: 0;
-  height: 30px;
+  /* Every Settings row that holds a value uses the same height: these pill
+     selects stand beside the row's text inputs, so they take the shared field
+     metric instead of a shorter pill that reads as a different control. */
+  min-height: var(--ds-field-height);
+  height: var(--ds-field-height);
   border-radius: var(--radius-full);
   border: 0;
   /* D297: controls on a tile row are raised fills, not ringed boxes. */
@@ -1438,7 +1442,9 @@
   width: max-content;
   max-width: 100%;
   min-width: 0;
-  height: 30px;
+  /* One closed-trigger height for every picker: the metric a text input in the
+     same Settings row resolves to, so the two never disagree (see the token). */
+  height: var(--ds-field-height);
   padding: 0 10px 0 12px;
   border-radius: var(--radius-full);
   background: var(--ds-raised);
@@ -1450,6 +1456,15 @@
 .settings-menu-select-anchor.is-full .settings-menu-select-trigger {
   display: flex;
   width: 100%;
+}
+
+/* A stretched trigger is a form field, not a Settings-row pill: it stands as
+   tall as the input in the same grid row (provider setup, config sync).
+   `:where()` keeps this at the field metric's own specificity, so a surface
+   that owns a denser metric (the subagent sheet) still wins with a single
+   class instead of depending on stylesheet order. */
+:where(.settings-menu-select-anchor.is-full) .settings-menu-select-trigger {
+  height: var(--ds-field-height);
 }
 
 .settings-language-trigger:hover,
