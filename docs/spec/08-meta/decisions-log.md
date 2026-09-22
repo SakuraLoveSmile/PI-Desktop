@@ -6596,7 +6596,7 @@ that was sitting at the bottom — including after the turn had finished.
   `apps/desktop/test/image-generation-default.test.mjs`, with
   `provider-model-config.test.mjs` asserting the add branch consults them.
 
-## 2026-09-22 — A failed compaction keeps the recent window (D613, issue #827)
+## 2026-09-22 — A failed compaction keeps the recent window (D617, issue #827)
 
 - An automatic compaction whose summary request failed installed a
   retained-tail checkpoint that carried at most the latest user message, and a
