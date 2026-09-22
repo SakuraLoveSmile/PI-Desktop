@@ -241,6 +241,46 @@ globalThis.imageGenerationProbe = async () => {
       );
       assert(!unsetImageRow, "unset image model row should be hidden");
 
+      // Issue #826: release the only chat model through the real edit/save path.
+      providers.splice(0, providers.length, chatProvider);
+      settings = {
+        ...settings,
+        imageGeneration: { providerId: "chat", modelId: "chat-model" },
+        imageGenerationModels: [{ providerId: "chat", modelId: "chat-model" }],
+      };
+      flushSync(() => useAppStore.setState({ settings, providers: [...providers] }));
+      const editOnlyProvider = () => click(container.querySelector<HTMLButtonElement>(
+        'button[aria-label="' + i18n.t("settings.editProvider") + '"]',
+      ));
+      editOnlyProvider();
+      await until(() => !!imageModelToggle(i18n.t("settings.imageModelSelected")), "selected image checkbox missing");
+      click(imageModelToggle(i18n.t("settings.imageModelSelected")));
+      click(button(i18n.t("settings.cancel")));
+      assert(settings.imageGeneration?.modelId === "chat-model", "cancel cleared the image default");
+      editOnlyProvider();
+      await until(() => !!imageModelToggle(i18n.t("settings.imageModelSelected")), "selected checkbox did not reopen");
+      click(imageModelToggle(i18n.t("settings.imageModelSelected")));
+      click(button(i18n.t("settings.saveProvider")));
+      await until(() => !document.querySelector(".provider-setup-dialog"), "unmark save did not finish");
+      assert(settings.imageGeneration === null, "unmark kept the old image default");
+      assert(settings.imageGenerationModels?.length === 0, "unmark kept image candidates");
+      // Remount settings from the saved API value, then reopen the provider.
+      flushSync(() => root.render(null));
+      flushSync(() => useAppStore.setState({ settings: structuredClone(settings) }));
+      render();
+      assert(!container.querySelector(".model-image-row"), "image summary returned after reopen");
+      editOnlyProvider();
+      await until(() => !!imageModelToggle(i18n.t("settings.setImageModel")), "unmarked checkbox did not persist");
+      assert(!imageModelToggle(i18n.t("settings.setImageModel"))?.checked, "reopened model is still marked");
+      click(button(i18n.t("settings.cancel")));
+      click(container.querySelector<HTMLButtonElement>(".model-default-trigger"));
+      await until(() => !!document.querySelector('[aria-label="Chat · chat-model"]'), "released chat model is missing");
+      click(document.querySelector<HTMLButtonElement>('[aria-label="Chat · chat-model"]'));
+      await until(() => !document.querySelector(".model-default-list"), "chat selection did not finish");
+      assert(settings.defaultProviderId === "chat" && settings.defaultModelId === "chat-model", "released model cannot be the chat default");
+      providers.splice(0, providers.length, provider, alternate, chatProvider);
+      flushSync(() => useAppStore.setState({ providers: [...providers] }));
+
     }
     const message = {
       id: "image",
@@ -290,6 +330,7 @@ globalThis.imageGenerationProbe = async () => {
       locales: ["en", "zh-CN"],
       scenarios: [
         "advanced-save-cancel",
+        "unmark-only-image-model-save-reopen-chat-selection",
         "advanced-provider-switch",
         "read-only-summary-typography",
         "unconfigured-summary-hidden",
