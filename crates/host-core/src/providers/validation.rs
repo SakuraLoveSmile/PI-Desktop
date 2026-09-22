@@ -148,7 +148,7 @@ pub(crate) fn normalize_headers_input(
 /// when reading a stored map, exposed for data the user did not type here. A
 /// bundle written by a peer on an older build, or a backup taken before this
 /// rule existed, can hold a value this build refuses; dropping the row keeps
-/// the rest of the revision applying instead of failing it whole (D619).
+/// the rest of the revision applying instead of failing it whole (D621).
 pub(crate) fn storable_headers(raw: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     let mut by_lower: BTreeMap<String, (String, String)> = BTreeMap::new();
     for (key, value) in raw {
@@ -159,10 +159,7 @@ pub(crate) fn storable_headers(raw: &BTreeMap<String, String>) -> BTreeMap<Strin
             );
         }
     }
-    by_lower
-        .into_values()
-        .take(MAX_HEADERS)
-        .collect()
+    by_lower.into_values().take(MAX_HEADERS).collect()
 }
 
 pub(crate) fn normalize_thinking_levels(levels: &[String]) -> Vec<String> {

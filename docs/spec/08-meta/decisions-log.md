@@ -6947,7 +6947,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `Glob`, `Bash`, plugin and MCP names keep the spelling we register, and the
   summarized text changes only where pi consumes the name.
 
-## 2026-09-22 — Provider header values fold fullwidth input instead of failing the turn (D619)
+## 2026-09-22 — Provider header values fold fullwidth input instead of failing the turn (D621)
 
 - A custom provider header value holding a fullwidth character — `０` (U+FF10)
   is what an IME or a fullwidth-formatted page gives for `0` — reached

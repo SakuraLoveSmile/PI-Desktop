@@ -1436,7 +1436,9 @@ fn header_values_fold_fullwidth_and_reject_non_latin1() {
 
     // A control character is the same class of failure — it never reaches a
     // header either — so it is named too.
-    let err = normalize_one_header("X-Title", "ab\u{0}cd").unwrap_err().to_string();
+    let err = normalize_one_header("X-Title", "ab\u{0}cd")
+        .unwrap_err()
+        .to_string();
     assert!(err.contains("U+0000 at character index 2"), "{err}");
 
     // A character above U+00FF is the fault wherever it sits, and the reported
@@ -1472,7 +1474,9 @@ fn header_values_fold_fullwidth_and_reject_non_latin1() {
     // (4096 bytes, `MAX_HEADER_VALUE_BYTES`) becomes storable — the one input
     // class this change newly accepts.
     let long_fullwidth = "\u{FF41}".repeat(4096);
-    assert!(normalize_one_header("X-Title", &long_fullwidth).unwrap().is_some());
+    assert!(normalize_one_header("X-Title", &long_fullwidth)
+        .unwrap()
+        .is_some());
     let long_ascii = "a".repeat(4097);
     let err = normalize_one_header("X-Title", &long_ascii)
         .unwrap_err()
@@ -1543,7 +1547,13 @@ fn provider_api_keys_fold_fullwidth_on_write_and_read() {
     );
 
     // The settings save path folds on write too.
-    set_provider_secret(&db, &secrets, &provider.id, Some("\u{FF53}\u{FF4B}-\u{FF11}")).unwrap();
+    set_provider_secret(
+        &db,
+        &secrets,
+        &provider.id,
+        Some("\u{FF53}\u{FF4B}-\u{FF11}"),
+    )
+    .unwrap();
     assert_eq!(
         get_secret_for_provider(&db, &secrets, &provider.id)
             .unwrap()

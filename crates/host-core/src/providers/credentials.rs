@@ -67,7 +67,10 @@ pub(crate) fn retain_storable_headers(payload: &mut serde_json::Value) {
     if storable.is_empty() {
         object.remove("headers");
     } else {
-        object.insert("headers".into(), serde_json::to_value(storable).unwrap_or_default());
+        object.insert(
+            "headers".into(),
+            serde_json::to_value(storable).unwrap_or_default(),
+        );
     }
 }
 /// Set or clear optional headers. An empty map clears them and drops leftover `userAgent`.

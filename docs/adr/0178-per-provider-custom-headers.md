@@ -49,7 +49,7 @@ optional `headers` map in `config_json.headers`.
   ByteString` mid-turn. The interactive write refuses those with the character
   and its index named; the read path and an incoming sync bundle fold and drop
   them, so a store or a peer that predates the rule cannot fail a turn or a
-  whole revision. See D619.
+  whole revision. See D621.
 - Not a secret. No SQLite or host-protocol version bump.
 - UI is an explicit Advanced settings button in the upper-right dialog actions
   (named, custom, and vendor account) that opens a separate compact modal. The
