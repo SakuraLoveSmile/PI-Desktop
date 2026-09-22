@@ -3142,9 +3142,11 @@ IPC 请求无法关闭。
   3. 等待 sessions/settings 引导程序完成。
   4. 如果可用，请对 OS `prefers-reduced-motion: reduce` 重复此操作。
   5. 在 macOS 上，将启动面与 shell 出现后的侧边栏玻璃态对比。
+  6. 在 `bootstrap` 一直被搁置、超过看门狗界限时重复一次，在 30 秒与超过 180 秒时观察启动表面（issue #831）。
 - **预期**：
 - 准备之前：带有品牌标志、外壳名称、标语和可访问的启动状态 (`data-testid="startup-splash"`) 的全窗口启动画面。
   - 准备好后：启动画面会短暂淡出（或立即减少运动）退出，并且主外壳（或设置页面）在下面是交互式的。
+  - 如果初始状态始终没有到达，启动画面不是被一直保留而是被替换：启动表面在 30 秒（`STARTUP_SLOW_HINT_MS`）时加上日志、诊断与退出且不报告失败，在 180 秒（`STARTUP_STALLED_MS`）时变成恢复表面，并额外提供重试（`data-testid="startup-recovery"`）；每个操作都不依赖后端，Windows/Linux 上渲染器绘制的窗口控制按钮保持在该表面之上，退出走 `pi-desktop/app/quit`。
   - macOS 上启动页与侧边栏使用同一套玻璃 tint/sheen，叠在原生 `sidebar` vibrancy 之上；已挂载的 shell 在退出淡出前保持隐藏，再交叉淡入。其他平台仍为不透明的 `--ds-bg-primary`。
   - 没有简单的无品牌“开始...”居中文本作为唯一的启动 UI。
   - Overlay/dialog 输入动作使用共享令牌；减少的运动可以保持状态变化，而无需装饰持续时间。
@@ -8693,3 +8695,19 @@ the latest destination. These assertions measure work counts, not device FPS.
   `extensions/runner.test.ts`、`extensions/runtime-lifecycle.test.ts` 自动验证。
   可信扩展 Electron 驱动通过 CDP 在真实渲染层执行 Stop 路径，并记录弹窗显示和
   退役后的状态。
+## Composer 指令源、手动压缩与空记录读取（#795）
+
+**范围：** composer 的斜杠分发、手动压缩 RPC，以及渲染层的持久化记录读取。不调用真实模型或
+提供商。
+
+| 场景 | 必须观察到的结果 |
+| --- | --- |
+| `composer/commands` 失败时输入 `/compact` | 提交被拒绝并显示 `chat.slashCommandSourceUnavailable`，草稿保留，没有任何提示词进入会话。失败的读取不入缓存，因此下一次发送会重试。 |
+| 指令源缓存仍热 | 内置指令仍在本地分发；模板与未知别名仍走提示词路径。 |
+| 手动压缩超过其传输超时 | 宿主重新读取持久化压缩记录：发现新检查点已落盘就报告成功并记录该不一致，未落盘则原样抛出超时。sidecar 自己报告的判定绝不被改写。 |
+| 有历史的会话读到空记录窗口 | 选择流程再读一次，随后保留用户已有的快照，否则显示 `chat.sessionTranscriptEmpty`；这类空页绝不入缓存，因此悬停预取不会反复提供它。 |
+
+**自动化：** `node --test apps/desktop/test/slash-command-source.test.mjs`、
+`node --test apps/desktop/test/session-transcript-empty-read.test.mjs`、
+`node --test apps/desktop/test/plugin-timeout-budgets.test.mjs`、
+`pnpm --filter @pi-desktop/shared test`、`pnpm --filter @pi-desktop/host-runtime test`。
