@@ -12,7 +12,7 @@ import {
   currentNetworkProxy,
   testNetworkProxy,
 } from "./network-proxy";
-import { setInsecureEndpointNoticeSink } from "./endpoint-policy";
+import { installInsecureEndpointNotice } from "./network-notice";
 import {
   APP_ID,
   APP_NAME,
@@ -836,17 +836,10 @@ function sendToRenderer(channel: string, payload: unknown) {
     // it. Notifying a gone frame is routine teardown, never an error:
     // supervision must keep running with no window attached.
   }
+
 }
 
-/**
- * The relaxed network mode may carry one plaintext hop to an endpoint the user
- * typed. Tell the shell once, through the same channel as every other
- * host-originated event; the shell owns the wording and records the
- * acknowledgement in settings (ADR 0304).
- */
-setInsecureEndpointNoticeSink((host) => {
-  sendToRenderer(IPC.event.insecureEndpointNotice, { host });
-});
+installInsecureEndpointNotice(sendToRenderer);
 
 let appliedMenuSettings: string | null = null;
 

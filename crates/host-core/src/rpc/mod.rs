@@ -766,9 +766,10 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
                 "INVALID_PARAMS",
             ));
         };
-        if policy.get("mode").is_some_and(|mode| {
-            !matches!(mode.as_str(), Some("relaxed") | Some("strict"))
-        }) {
+        if policy
+            .get("mode")
+            .is_some_and(|mode| !matches!(mode.as_str(), Some("relaxed") | Some("strict")))
+        {
             return Err(rpc_err(
                 1002,
                 "networkPolicy.mode must be relaxed or strict",
