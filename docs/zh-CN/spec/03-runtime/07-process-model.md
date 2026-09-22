@@ -113,6 +113,10 @@ Windows 安装包目标为 x64。Windows host-core 使用
 监管参数（传输、重启策略与回合生命周期位于 `packages/host-runtime`，ADR 0284；Electron main 适配它们并负责面向渲染层的状态）：
 
 - 子进程退出立即拒绝该子进程的所有正在进行的 RPC（无 130 秒超时等待）。
+- 每个 RPC 都带有有限的传输超时。Bash 与桌面分发的（`plugin_*` / `mcp_*`）工具会
+  叠加 host-core 在报告结果前可能消耗的等待，`agent.compact` 则叠加 sidecar 自身的摘要
+  预算——每次尝试的流空转看门狗加上重试退避（**D614**，issue #795）；其余调用使用 130
+  秒默认值。绝不要为了迁就某个慢方法而放宽默认值：那会同时掩盖其他调用上真正丢失的回复。
 - 超过 64 MiB 的 NDJSON 请求行以 `LIMIT_EXCEEDED` 应答，不结束 stdin 读取器（ADR 0216）。Electron 在写入 stdin 前拒绝同样大小的载荷（ADR 0217）。
 - Windows Alt+Space 钩子只保留 stdout 发送端的弱引用。stdin EOF 后 serve 丢弃最后一个强引用，host-core 退出；泄漏的发送端不能把关闭卡住超过 5 秒（ADR 0217）。
 - 使用指数退避 `0.5s → 1s → 2s` 自动重启（上限 4 秒）。

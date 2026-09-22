@@ -242,6 +242,8 @@ export const tr = {
     slashGroupExtensions: "Uzantı komutları",
     slashGroupSkills: "Beceriler",
     slashEmpty: "Eşleşen komut yok",
+    slashCommandSourceUnavailable: "Komut listesi yüklenemedi, hiçbir şey gönderilmedi. Tekrar deneyin.",
+    sessionTranscriptEmpty: "Bu oturumun geçmişi okunamadı. Yeniden denemek için oturumu tekrar açın.",
     fileMenu: "Dosya başvuruları",
     removeFileReference: "{{name}} dosya başvurusunu kaldır",
     messageAttachments: "Bu iletideki ekler",
@@ -686,6 +688,18 @@ sklm: {
       connectionDescription: "Şifreli bir WebDAV kasası üzerinden taşınabilir yapılandırmayı senkronize edin.",
       endpoint: "WebDAV URL'si",
       endpointPlaceholder: "https://dav.example.com/",
+      allowInsecureHttp: "Allow HTTP for a trusted LAN address",
+      allowInsecureHttpWarning:
+        "HTTP does not encrypt WebDAV credentials. Enable only for a trusted LAN address; public HTTP endpoints are rejected.",
+      remoteMode: "Sunucu uyumluluğu",
+      remoteModeHint:
+        "Katı mod güvenilir koşullu yazma işlemleri gerektirir. Uyumluluk modunu yalnızca If-Match/If-None-Match'i yok sayan sunucularda kullanın.",
+      remoteModeStrict: "Katı CAS (önerilen)",
+      remoteModeAppendOnly: "Uyumluluk modu (yalnızca ekleme)",
+      appendOnlyWarning:
+        "Bu mod, koşullu yazmaları yok sayan WebDAV sunucuları içindir. Diğer cihazları katmadan önce kasayı bir cihazda başlatın. Cihaz başına ekleme amaçlı başlıklar kullanır ve uzak geçmişi korur; bu kasayı paylaşan tüm cihazlar uyumluluk modunu kullanmalıdır. Eşzamanlı değişiklikler incelenmeyi gerektirebilir.",
+      appendOnlyConfirm:
+        "Bu sunucu koşullu yazmaları uygulayamıyor. Uyumluluk modu geçmişi korur ancak atomik compare-and-swap sağlayamaz. Devam edilsin mi?",
       username: "Kullanıcı adı",
       appPassword: "Uygulama parolası",
       directory: "Uzak dizin",
@@ -705,6 +719,8 @@ sklm: {
       test: "Sunucuyu test et",
       testSuccess: "Sunucu gerekli koşullu yazma işlemlerini destekliyor.",
       testUnsupported: "Sunucu güvenilir koşullu yazmayı kanıtlayamadı; senkronizasyon etkinleştirilmedi.",
+      testAppendOnlySuccess: "Sunucu, ekleme amaçlı uyumluluk modu için dizin listelemeyi destekliyor.",
+      testAppendOnlyUnsupported: "Sunucu, uyumluluk modu için dizin listelemeyi kanıtlayamadı; senkronizasyon etkinleştirilmedi.",
       enable: "Senkronizasyonu etkinleştir",
       save: "Kaydet ve senkronize et",
       configured: "Bulut senkronizasyonu yapılandırması kaydedildi.",
