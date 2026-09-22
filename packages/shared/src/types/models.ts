@@ -21,34 +21,131 @@ export type SubagentThinkingLevel = SessionThinkingLevel;
 export type ModelProviderMetadata = string | Record<string, unknown>;
 export type ModelExperimentalMetadata = boolean | Record<string, unknown>;
 
-const MODEL_VENDOR_PREFIXES = new Set([
-  "anthropic",
+export const MODEL_VENDOR_PREFIXES = new Set([
   "amazon",
+  "anthropic",
   "aws",
+  "azure",
   "cohere",
   "deepseek",
   "deepseek-ai",
   "gemini",
   "google",
   "meta",
+  "meta-llama",
   "minimax",
   "mistral",
   "moonshot",
   "moonshotai",
   "openai",
   "qwen",
+  "tencent",
+  "x-ai",
+  "xai",
   "z-ai",
   "zai",
   "zhipuai",
-  "x-ai",
-  "xai",
 ]);
 
-/** Match a configured model ID with a namespaced models.dev ID. */
-export function modelIdsMatch(candidate: string, requested: string): boolean {
-  const left = candidate.trim().toLowerCase();
-  const right = requested.trim().toLowerCase();
-  if (!left || !right) return false;
+const THINKING_SUFFIX_REGEX = /[-:](?:thinking|think|minimal|low|high|xhigh|max)$/i;
+const ENDPOINT_SUFFIX_REGEX = /[-:](?:agent|latest)$/i;
+
+function stripRegion(value: string): string {
+  const at = value.indexOf("@");
+  return at > 0 ? value.slice(0, at) : value;
+}
+
+export function stripThinkingSuffix(value: string): string {
+  let current = value;
+  while (THINKING_SUFFIX_REGEX.test(current)) {
+    current = current.replace(THINKING_SUFFIX_REGEX, "");
+  }
+  return current;
+}
+
+export function stripEndpointSuffix(value: string): string {
+  let current = value;
+  while (ENDPOINT_SUFFIX_REGEX.test(current)) {
+    current = current.replace(ENDPOINT_SUFFIX_REGEX, "");
+  }
+  return current;
+}
+
+export function stripVariantSuffix(value: string): string {
+  let current = value;
+  let changed = true;
+  while (changed) {
+    const next = current
+      .replace(THINKING_SUFFIX_REGEX, "")
+      .replace(ENDPOINT_SUFFIX_REGEX, "");
+    changed = next !== current;
+    current = next;
+  }
+  return current;
+}
+
+function canonicalVendor(prefix: string): string {
+  if (prefix === "deepseek-ai") return "deepseek";
+  if (prefix === "gemini") return "google";
+  if (prefix === "x-ai") return "xai";
+  if (prefix === "z-ai" || prefix === "zhipuai") return "zai";
+  if (prefix === "moonshotai") return "moonshot";
+  if (prefix === "meta-llama") return "meta";
+  if (prefix === "aws") return "amazon";
+  return prefix;
+}
+
+function extractKnownVendor(id: string): string | undefined {
+  const parts = id.split("/");
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    if (MODEL_VENDOR_PREFIXES.has(part)) {
+      return canonicalVendor(part);
+    }
+  }
+  const lastPart = parts[parts.length - 1];
+  for (const separator of ["-", "."] as const) {
+    const prefix = lastPart.split(separator)[0];
+    if (MODEL_VENDOR_PREFIXES.has(prefix)) {
+      return canonicalVendor(prefix);
+    }
+  }
+  return undefined;
+}
+
+function stripVendorPrefix(id: string): string {
+  for (const separator of ["-", "."] as const) {
+    for (const prefix of MODEL_VENDOR_PREFIXES) {
+      const head = `${prefix}${separator}`;
+      if (id.startsWith(head) && id.length > head.length) {
+        return id.slice(head.length);
+      }
+    }
+  }
+  return id;
+}
+const KNOWN_TIER_SUFFIXES = new Set([
+  "fast",
+  "mini",
+  "nano",
+  "small",
+  "medium",
+  "large",
+  "turbo",
+  "instruct",
+]);
+
+export function isProxyPrefix(prefix: string, model: string): boolean {
+  if (!prefix || prefix.includes("/")) return false;
+  if (KNOWN_TIER_SUFFIXES.has(model)) return false;
+  const prefixVendor = extractKnownVendor(prefix);
+  const modelVendor = extractKnownVendor(model);
+  if (prefixVendor && modelVendor && prefixVendor !== modelVendor) return false;
+  return true;
+}
+
+
+function normalizedMatch(left: string, right: string): boolean {
   if (left === right) return true;
   if (left.endsWith(`/${right}`) || right.endsWith(`/${left}`)) return true;
   // Some providers use `model@region` aliases; the base model remains the
@@ -58,18 +155,86 @@ export function modelIdsMatch(candidate: string, requested: string): boolean {
     const leftPrefix = left.split(`${separator}${right}`, 1)[0];
     if (
       left.startsWith(`${leftPrefix}${separator}${right}`) &&
-      MODEL_VENDOR_PREFIXES.has(leftPrefix)
+      (MODEL_VENDOR_PREFIXES.has(leftPrefix) || isProxyPrefix(leftPrefix, right))
     ) {
       return true;
     }
     const rightPrefix = right.split(`${separator}${left}`, 1)[0];
     if (
       right.startsWith(`${rightPrefix}${separator}${left}`) &&
-      MODEL_VENDOR_PREFIXES.has(rightPrefix)
+      (MODEL_VENDOR_PREFIXES.has(rightPrefix) || isProxyPrefix(rightPrefix, left))
     ) {
       return true;
     }
   }
+
+  // Cross-namespace matching for custom proxy paths:
+  // e.g. `google/gemini-2.5-flash` vs `proxy/gemini-2.5-flash`
+  const bareLeft = stripVendorPrefix(left.includes("/") ? left.slice(left.lastIndexOf("/") + 1) : left);
+  const bareRight = stripVendorPrefix(right.includes("/") ? right.slice(right.lastIndexOf("/") + 1) : right);
+
+  if (bareLeft && bareRight) {
+    if (bareLeft === bareRight) {
+      const leftVendor = extractKnownVendor(left);
+      const rightVendor = extractKnownVendor(right);
+      if (leftVendor && rightVendor && leftVendor !== rightVendor) {
+        return false;
+      }
+      return true;
+    }
+
+    for (const separator of ["-", "."] as const) {
+      const leftPrefix = bareLeft.split(`${separator}${bareRight}`, 1)[0];
+      if (
+        bareLeft.startsWith(`${leftPrefix}${separator}${bareRight}`) &&
+        (MODEL_VENDOR_PREFIXES.has(leftPrefix) || isProxyPrefix(leftPrefix, bareRight))
+      ) {
+        const leftVendor = extractKnownVendor(left);
+        const rightVendor = extractKnownVendor(right);
+        if (leftVendor && rightVendor && leftVendor !== rightVendor) return false;
+        return true;
+      }
+      const rightPrefix = bareRight.split(`${separator}${bareLeft}`, 1)[0];
+      if (
+        bareRight.startsWith(`${rightPrefix}${separator}${bareLeft}`) &&
+        (MODEL_VENDOR_PREFIXES.has(rightPrefix) || isProxyPrefix(rightPrefix, bareLeft))
+      ) {
+        const leftVendor = extractKnownVendor(left);
+        const rightVendor = extractKnownVendor(right);
+        if (leftVendor && rightVendor && leftVendor !== rightVendor) return false;
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/** Match a configured model ID with a namespaced models.dev ID. */
+export function modelIdsMatch(candidate: string, requested: string): boolean {
+  const left = candidate.trim().toLowerCase();
+  const right = requested.trim().toLowerCase();
+  if (!left || !right) return false;
+
+  const cleanLeft = stripRegion(left);
+  const cleanRight = stripRegion(right);
+
+  if (normalizedMatch(cleanLeft, cleanRight)) return true;
+
+  // Suffixes indicating thinking mode or reasoning effort (e.g. -thinking, -high, -low)
+  const deThunkLeft = stripThinkingSuffix(cleanLeft);
+  const deThunkRight = stripThinkingSuffix(cleanRight);
+  if (deThunkLeft !== cleanLeft || deThunkRight !== cleanRight) {
+    if (normalizedMatch(deThunkLeft, deThunkRight)) return true;
+  }
+
+  // Suffixes indicating deployment variants or endpoints (e.g. -agent, -latest)
+  const strippedLeft = stripVariantSuffix(cleanLeft);
+  const strippedRight = stripVariantSuffix(cleanRight);
+  if (strippedLeft !== deThunkLeft || strippedRight !== deThunkRight) {
+    if (normalizedMatch(strippedLeft, strippedRight)) return true;
+  }
+
   return false;
 }
 

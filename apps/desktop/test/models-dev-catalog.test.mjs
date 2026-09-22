@@ -208,6 +208,82 @@ test("model IDs match provider namespaces without matching model variants", () =
   assert.equal(modelIdsMatch("claude-opus-5@default", "claude-opus-5"), true);
   assert.equal(modelIdsMatch("claude-opus-5-fast", "claude-opus-5"), false);
 });
+test("model IDs match proxy routing prefixes, reasoning effort suffixes, and endpoint aliases", () => {
+  // Proxy routing path prefixes
+  assert.equal(modelIdsMatch("claude-opus-4.6", "proxy/claude-opus-4.6"), true);
+  assert.equal(modelIdsMatch("claude-opus-4.6", "custom/claude-opus-4.6"), true);
+  assert.equal(modelIdsMatch("claude-opus-4.6", "relay/claude-opus-4.6"), true);
+  assert.equal(modelIdsMatch("claude-opus-4.6", "gateway-01/claude-opus-4.6"), true);
+  assert.equal(modelIdsMatch("openai/gpt-4o", "hub/openai/gpt-4o"), true);
+  assert.equal(modelIdsMatch("openai/gpt-4o", "proxy/gpt-4o"), true);
+
+  // Proxy dash prefixes
+  assert.equal(modelIdsMatch("claude-opus-4.6", "myproxy-claude-opus-4.6"), true);
+
+  // Cross-namespace matching when one side has custom proxy routing
+  assert.equal(modelIdsMatch("google/gemini-2.5-flash", "proxy/gemini-2.5-flash"), true);
+
+  // Conflicting known vendors must not match
+  assert.equal(modelIdsMatch("google/gemini-2.5-flash", "openai/gemini-2.5-flash"), false);
+
+  // Reasoning effort / thinking suffixes
+  assert.equal(modelIdsMatch("claude-opus-4.6", "proxy/claude-opus-4.6-thinking"), true);
+  assert.equal(modelIdsMatch("claude-opus-4.6", "myproxy-claude-opus-4.6-thinking"), true);
+  assert.equal(modelIdsMatch("claude-opus-4.6", "claude-opus-4.6:thinking"), true);
+  assert.equal(modelIdsMatch("google/gemini-2.5-flash", "gemini-2.5-flash-high"), true);
+  assert.equal(modelIdsMatch("google/gemini-2.5-flash", "gemini-2.5-flash-low"), true);
+  assert.equal(modelIdsMatch("google/gemini-2.5-flash", "gemini-2.5-flash:minimal"), true);
+
+  // Endpoint and release variant suffixes (-agent, -latest)
+  assert.equal(modelIdsMatch("claude-opus-4.6", "proxy/claude-opus-4.6-agent"), true);
+  assert.equal(modelIdsMatch("claude-opus-4.6", "proxy/claude-opus-4.6-latest"), true);
+  assert.equal(modelIdsMatch("google/gemini-pro-latest", "proxy/gemini-pro-agent"), true);
+  assert.equal(modelIdsMatch("google/gemini-pro-latest", "gemini-pro"), true);
+  assert.equal(modelIdsMatch("claude-opus-4.6", "proxy/claude-opus-4.6-agent-thinking"), true);
+
+  // Legitimate model speed/size tiers must NOT be stripped as thinking or endpoint suffixes
+  assert.equal(modelIdsMatch("claude-opus-5", "claude-opus-5-fast"), false);
+  assert.equal(modelIdsMatch("gpt-4o", "gpt-4o-mini"), false);
+  assert.equal(modelIdsMatch("gpt-4", "gpt-4o"), false);
+});
+
+test("matches custom proxy model IDs and reasoning variants in catalog lookup", async (t) => {
+  const catalog = await loadFixtureCatalog(t);
+
+  // Proxy routing path prefix
+  const pathMatch = catalog.findModel({ vendorKey: "custom", modelId: "proxy/claude-opus-4.6" });
+  assert.ok(pathMatch);
+  assert.equal(pathMatch?.modelId, "claude-opus-4.6");
+  assert.equal(pathMatch?.reasoning, true);
+  assert.deepEqual(pathMatch?.reasoningOptions?.[0]?.values, ["low", "medium", "high", "xhigh", "max"]);
+
+  // Proxy routing path prefix with thinking suffix
+  const pathThinkingMatch = catalog.findModel({ vendorKey: "custom", modelId: "proxy/claude-opus-4.6-thinking" });
+  assert.ok(pathThinkingMatch);
+  assert.equal(pathThinkingMatch?.modelId, "claude-opus-4.6");
+  assert.equal(pathThinkingMatch?.reasoning, true);
+
+  // Proxy routing path prefix with endpoint suffix (-agent)
+  const pathAgentMatch = catalog.findModel({ vendorKey: "custom", modelId: "proxy/claude-opus-4.6-agent" });
+  assert.ok(pathAgentMatch);
+  assert.equal(pathAgentMatch?.modelId, "claude-opus-4.6");
+  assert.equal(pathAgentMatch?.reasoning, true);
+
+  // Proxy dash prefix
+  const dashMatch = catalog.findModel({ vendorKey: "custom", modelId: "myproxy-claude-opus-4.6" });
+  assert.ok(dashMatch);
+  assert.equal(dashMatch?.modelId, "claude-opus-4.6");
+
+  // Proxy dash prefix with thinking suffix
+  const dashThinkingMatch = catalog.findModel({ vendorKey: "custom", modelId: "myproxy-claude-opus-4.6-thinking" });
+  assert.ok(dashThinkingMatch);
+  assert.equal(dashThinkingMatch?.modelId, "claude-opus-4.6");
+
+  // Colon thinking suffix
+  const colonMatch = catalog.findModel({ vendorKey: "custom", modelId: "claude-opus-4.6:thinking" });
+  assert.ok(colonMatch);
+  assert.equal(colonMatch?.modelId, "claude-opus-4.6");
+});
 
 test("models.dev records retain all published model parameters and modalities", () => {
   const [provider] = parseModelsDevCatalog(catalogFixture);
