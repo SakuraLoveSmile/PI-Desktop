@@ -8,6 +8,16 @@
 
 ## 1. Goals
 
+### E2E-IMAGES-provider-save-feedback
+
+- **Preconditions:** Image configuration UI fixture; English and Chinese.
+- **Steps:** Mark image models and save the provider; choose a different image
+  default from its summary; then unmark the sole image model and save.
+- **Expected:** Provider edits confirm the provider update, including after
+  clearing the image selection. Explicit default selection keeps its specific
+  image-selection confirmation. Persisted bindings retain their existing behavior.
+- **Specs:** 03-runtime/21-image-generation. **Acceptance:** B.
+- **Milestone:** Maintenance. **Status:** Automated by
 ### E2E-IMAGES-remove-configured-model
 
 - **Preconditions:** API-boundary fixture with an image-marked model and another
@@ -61,6 +71,12 @@
   requests, GPT Image parameter omission, bounded responses, and rejection of
   more than four references before I/O. These are protocol tests, not official
   provider account/live compatibility certification.
+- **Proxy fake-IP:** With the explicit Settings → General → Network proxy
+  fake-IP option enabled, a URL response resolved to Clash's benchmark range
+  is downloaded through the proxy-aware transport; without the option it stays
+  `IMAGE_UNSAFE_URL`, and real private addresses remain blocked in both cases.
+  Covered by `packages/agent-runtime/src/image-generation/download.test.ts`,
+  not by the driver below.
 - **Status:** Automated in `node scripts/e2e-image-chat.mjs`; optional screenshots
   use `PI_IMAGE_CHAT_EVIDENCE_DIR`. The images are deterministic raster fixtures,
   not evidence of real-model quality or provider compatibility.

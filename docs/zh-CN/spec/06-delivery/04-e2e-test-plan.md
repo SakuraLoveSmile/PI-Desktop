@@ -9,6 +9,16 @@
 
 ---
 
+### E2E-IMAGES-provider-save-feedback
+
+- **前提：** 生图配置 UI fixture，中英文界面。
+- **步骤：** 勾选生图模型并保存服务商；从摘要菜单切换默认生图模型；
+  再取消唯一生图模型的标记并保存。
+- **预期：** 服务商编辑确认“服务已更新”，清除生图选择后也不会提示已选择
+  生图模型；摘要菜单切换仍显示生图选择成功提示。绑定保存行为不变。
+- **规格：** 03-runtime/21-image-generation。**验收：** B。
+- **里程碑：** 维护。**状态：** `scripts/e2e-image-generation-ui.mjs` 自动覆盖。
+
 ### E2E-IMAGES-deselect-default
 
 - **前提：** 只有一个服务商、一个模型，且该模型已标记为生图模型。
@@ -8402,6 +8412,10 @@ the latest destination. These assertions measure work counts, not device FPS.
   requests, GPT Image parameter omission, bounded responses, and rejection of
   more than four references before I/O. These are protocol tests, not official
   provider account/live compatibility certification.
+- **Proxy fake-IP:** 明确开启“设置 → 通用 → 网络”的代理 fake-IP 选项后，解析
+  到 Clash 基准测试段的图片 URL 会通过代理感知传输下载；未开启时仍返回
+  `IMAGE_UNSAFE_URL`，真实私网地址在两种情况下都继续阻止。该行为由
+  `packages/agent-runtime/src/image-generation/download.test.ts` 覆盖，不由下面的驱动脚本覆盖。
 - **Status:** Automated in `node scripts/e2e-image-chat.mjs`; optional screenshots
   use `PI_IMAGE_CHAT_EVIDENCE_DIR`. The images are deterministic raster fixtures,
   not evidence of real-model quality or provider compatibility.
