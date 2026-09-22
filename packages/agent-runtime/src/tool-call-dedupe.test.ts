@@ -71,7 +71,7 @@ describe("dedupeToolCallMessages", () => {
     // The shape production hit: pi's loop appends the streamed assistant
     // message and its tool result to the context it was handed, while its own
     // `message_end` listener appends the same objects to the session state, so
-    // one round reached the next turn as two copies of each (D613). The
+    // one round reached the next turn as two copies of each (D619). The
     // assistant message carries text *and* a call, so dropping only the call
     // block would leave a text-only clone between the call and its result.
     const assistant = assistantMessage([
@@ -175,9 +175,9 @@ describe("dedupeToolCallMessages", () => {
  * The failure this guard exists for is invisible in the runtime's own view of a
  * request: pi-ai synthesizes the second output inside its provider transform,
  * after the point a scripted provider can capture. Driving that transform is
- * what pins the mechanism the endpoint rejects (D613).
+ * what pins the mechanism the endpoint rejects (D619).
  */
-describe("request wire contract (D613)", () => {
+describe("request wire contract (D619)", () => {
   /** Only the fields the transform reads for a non-normalizing API. */
   const model = {
     api: "openai-completions",

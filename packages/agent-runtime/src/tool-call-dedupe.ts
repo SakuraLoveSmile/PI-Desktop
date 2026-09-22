@@ -23,7 +23,7 @@ function isRecord(value: unknown): value is RecordLike {
  * so a replay can address the server-side item, and the adapter sends only the
  * part before the separator as `call_id`. Two entries whose composite ids
  * differ in the item half therefore still collide on the wire, so every
- * comparison below uses this wire-visible id (D613).
+ * comparison below uses this wire-visible id (D619).
  */
 function wireCallId(id: string): string {
   const separator = id.indexOf("|");
@@ -40,7 +40,7 @@ function wireCallId(id: string): string {
  * A request that separates a call from its result is not merely untidy: pi-ai
  * closes a call whose result does not follow it with a synthesized
  * "No result provided" output *and* sends the real result, so one call id
- * carries two outputs and the endpoint rejects the whole turn (D608, D613).
+ * carries two outputs and the endpoint rejects the whole turn (D608, D619).
  * Dropping a replayed assistant message whole — rather than keeping the text it
  * is left with — is what keeps that separation out of the request, and the
  * duplication the runtime itself produces repeats a message whole, so that is

@@ -7,7 +7,7 @@ import type { RuntimeProviderConfig } from "./provider-binding.js";
  * What a turn boundary decides — compact, degrade, or report an overflow — is
  * covered by `subagent-context.test.ts`. This file pins the update the delegate
  * hands the agent loop instead, because that array is the context every later
- * iteration of a run appends to (D613).
+ * iteration of a run appends to (D619).
  */
 vi.mock("./subagent-context.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./subagent-context.js")>();
@@ -88,7 +88,7 @@ function assistantMessage(text: string) {
   };
 }
 
-describe("SubagentRun loop context ownership (D613)", () => {
+describe("SubagentRun loop context ownership (D619)", () => {
   it("hands the loop its own context array at a protected turn boundary", async () => {
     const agent = createDelegate();
     agent.state.messages = [
@@ -110,7 +110,7 @@ describe("SubagentRun loop context ownership (D613)", () => {
     // store every message of the run's later iterations twice, and the trailing
     // row `useNextModel` slices off before a fallback would then leave an
     // assistant row at the head of what `continue()` refuses to resume from
-    // (D613).
+    // (D619).
     expect(carried).not.toBe(agent.state.messages);
     const streamed = assistantMessage("round 2");
     carried.push(streamed);
