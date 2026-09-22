@@ -4677,3 +4677,22 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `apps/desktop/test/default-model-display.test.mjs` 与
   `apps/desktop/test/image-generation-default.test.mjs` 固定，
   `provider-model-config.test.mjs` 断言新增分支会走这两个判断。
+
+## 2026-09-22 — 循环拥有自己的上下文数组（D613）
+
+- 当某个回合的较晚迭代跑了工具后，`state.messages` 会把那些迭代追加的每条消息存两份，而下一回合的首个请求正是用该数组组装的。
+  其中“带文本与工具调用的辅助消息”的重复项在请求守卫（D608）之后残留为只剩文本的克隆，卡在调用与回答它的结果之间；pi-ai 随后会为
+  这个仍处于待配对的调用合成一条 “No result provided” 输出，与真实结果并列，于是同一个 call id 带上了两条输出，端点以
+  `Duplicate tool output for call_id`（HTTP 400，不可重试）拒绝整个回合。该数组会被复用，因此其后每个回合都以同样方式失败，
+  `继续` 也无法让会话恢复。
+- pi-ai 的循环会把每个流式辅助消息与每个工具结果 push 进它拿到的上下文，而它自己的 `message_end` 监听器又把同一个消息对象 push 回
+  `state.messages`。`rebuiltAgentContext()` 返回的正是这个活数组，两次 push 因此落在同一个数组里；现在它返回副本，与 pi 自己的
+  `createContextSnapshot()` 在 `prompt()` 与 `continue()` 里的做法一致。委托侧的回合边界此前交出的也是同一个活数组
+  （`subagent.ts` 的 `prepareNextTurn`），现已同样改为副本。每个消息边界处循环视图与 `state.messages` 携带同样的消息、同样的顺序，
+  只是不再是同一个数组——这正是把重复项挡在下一回合请求之外的原因。
+- `convertToLlm` 处的请求守卫（D608）改为与提供商实际校验的对象一致：调用与结果的 id 按“上线可见”的那一段比较；当结果与调用在 item
+  段上不一致时，结果改挂到调用的 id 上；当一条辅助消息里的工具调用全部已被占用时，整条消息被丢弃，而不再保留那个把调用与结果隔开的克隆。
+  丢弃日志同时给出被移除的消息条数。若一条消息在复写某个已占用调用的同时还带一个新调用，则保留该消息及其新调用——这是守卫接受的唯一一种
+  id 复用；目前没有写入方会产生这种部分复写。
+- 不涉及提供商传输、宿主协议、版本、存储迁移、转录重写，也不改变压缩/保留/预算规则。
+  `03-runtime/02-agent-runtime.md` §5c 与 E2E-RUNTIME-loop-context-ownership 记录了该契约与覆盖情况。

@@ -6595,3 +6595,38 @@ that was sitting at the bottom — including after the turn had finished.
   by `apps/desktop/test/default-model-display.test.mjs` and
   `apps/desktop/test/image-generation-default.test.mjs`, with
   `provider-model-config.test.mjs` asserting the add branch consults them.
+
+## 2026-09-22 — The loop owns its context array (D613)
+
+- A turn whose later iterations ran tools left `state.messages` holding two copies
+  of every message those iterations appended, and the next turn's first request
+  was assembled from that array. The duplicate of an assistant message that
+  carried text plus a tool call survived the request guard (D608) as a text-only
+  clone sitting between the call and the result answering it; pi-ai then closed
+  the still-pending call with a synthesized "No result provided" output next to
+  the real one, so one call id carried two outputs and the endpoint rejected the
+  whole turn with `Duplicate tool output for call_id` (HTTP 400, not retriable).
+  The array is reused, so every following turn failed the same way and `继续`
+  could not recover the session.
+- pi-ai's loop appends each streamed assistant message and each tool result to
+  the context it was handed, while its own `message_end` listener appends the
+  same message object to `state.messages`. `rebuiltAgentContext()` returned that
+  live array, so both appends landed in one array; it now returns a copy, exactly
+  like pi's own `createContextSnapshot()` does for `prompt()` and `continue()`.
+  The delegate's turn boundary handed over the same live array
+  (`subagent.ts` `prepareNextTurn`) and now copies too. The loop's view and
+  `state.messages` carry the same messages in the same order at each message
+  boundary, they are simply no longer the same array — which is what keeps the
+  duplicates out of the next request.
+- The request guard at `convertToLlm` (D608) now matches what the provider
+  validates: call and result ids are compared by their wire-visible part, a
+  result whose item half disagrees with its call is paired to the call's id, and
+  an assistant message whose tool calls were all already claimed is dropped whole
+  instead of being kept as the clone that separates a call from its result. The
+  drop log line also states how many messages were removed. A message that
+  replays one claimed call while carrying a new one is left in place with its new
+  call, the only id sharing the guard accepts; no writer reaches that shape.
+- No provider transport, host protocol, version, storage migration, transcript
+  rewrite, or compaction/retention/budget rule changes.
+  `03-runtime/02-agent-runtime.md` §5c and
+  E2E-RUNTIME-loop-context-ownership record the contract and its coverage.
