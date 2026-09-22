@@ -1168,8 +1168,35 @@ mod tests {
         Ok(state)
     }
 
+    fn run_in_isolated_process(test_name: &str) -> Result<bool> {
+        const ISOLATED_PROCESS: &str = "PI_DESKTOP_CONFIG_SYNC_TEST_CHILD";
+        if std::env::var(ISOLATED_PROCESS).as_deref() == Ok(test_name) {
+            return Ok(false);
+        }
+        // Capture includes global capabilities. Isolate their root in a
+        // child process so parallel tests cannot repoint it to user data.
+        let agents_dir = tempfile::tempdir()?;
+        let output = std::process::Command::new(std::env::current_exe()?)
+            .args(["--exact", test_name, "--nocapture"])
+            .env(ISOLATED_PROCESS, test_name)
+            .env(crate::agent_capabilities::AGENTS_DIR_ENV, agents_dir.path())
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "isolated config sync test failed: {}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        Ok(true)
+    }
+
     #[tokio::test]
     async fn append_only_mode_syncs_with_a_server_that_ignores_preconditions() -> Result<()> {
+        if run_in_isolated_process(
+            "config_sync::engine::tests::append_only_mode_syncs_with_a_server_that_ignores_preconditions",
+        )? {
+            return Ok(());
+        }
         let fixture = crate::config_sync::transport::tests::fixture_ignoring_preconditions().await;
         let device_a_dir = tempfile::tempdir()?;
         let device_b_dir = tempfile::tempdir()?;
@@ -1217,6 +1244,12 @@ mod tests {
 
     #[tokio::test]
     async fn two_devices_sync_credentials_capabilities_and_disjoint_edit() -> Result<()> {
+        if run_in_isolated_process(
+            "config_sync::engine::tests::two_devices_sync_credentials_capabilities_and_disjoint_edit",
+        )? {
+            return Ok(());
+        }
+
         let fixture = crate::config_sync::transport::tests::fixture(false).await;
         let device_a_dir = tempfile::tempdir()?;
         let device_b_dir = tempfile::tempdir()?;
