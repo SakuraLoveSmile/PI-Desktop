@@ -14,6 +14,11 @@ import {
   isCommandShellOption,
   isGlobalPermissionMode,
   isToolsOutputParams,
+  AGENT_COMPACT_RPC_TIMEOUT_MS,
+  COMMAND_RPC_BUFFER_MS,
+  COMPACTION_SUMMARY_MAX_RETRIES,
+  COMPACTION_SUMMARY_RETRY_BUDGET_MS,
+  STREAM_IDLE_TIMEOUT_MS,
   rpcTimeoutMs,
   type PlanExecution,
   type PlanArtifact,
@@ -242,6 +247,28 @@ describe("Plan protocol contracts", () => {
     expect(rpcTimeoutMs("tools.abort", { sessionId: "s", toolCallId: "t" })).toBe(
       130_000,
     );
+  });
+
+  it("outlasts the whole model request a manual compaction spends (#795)", () => {
+    // One summary prompt plus the sidecar's retry budget: every attempt that
+    // stops producing events is cut by the stream watchdog, and each retry pays
+    // its backoff wait. A flat 130s fired on a ~158s compaction, so Electron
+    // reported a failure while the sidecar persisted the checkpoint anyway.
+    expect(STREAM_IDLE_TIMEOUT_MS).toBe(180_000);
+    expect(COMPACTION_SUMMARY_MAX_RETRIES).toBe(3);
+    expect(COMPACTION_SUMMARY_RETRY_BUDGET_MS).toBe(14_000);
+    expect(AGENT_COMPACT_RPC_TIMEOUT_MS).toBe(
+      (1 + COMPACTION_SUMMARY_MAX_RETRIES) * STREAM_IDLE_TIMEOUT_MS +
+        COMPACTION_SUMMARY_RETRY_BUDGET_MS +
+        COMMAND_RPC_BUFFER_MS,
+    );
+    expect(AGENT_COMPACT_RPC_TIMEOUT_MS).toBe(744_000);
+    expect(rpcTimeoutMs("agent.compact", { sessionId: "s" })).toBe(
+      AGENT_COMPACT_RPC_TIMEOUT_MS,
+    );
+    // The deadline is per-method on purpose: widening the global default would
+    // hide a genuinely lost reply on every other call.
+    expect(rpcTimeoutMs("agent.getStatus", { sessionId: "s" })).toBe(130_000);
   });
 
   it("covers the permission wait, the admission queue, and host-core dispatch", () => {
