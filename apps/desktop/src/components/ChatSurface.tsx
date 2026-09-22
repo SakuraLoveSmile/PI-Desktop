@@ -44,7 +44,11 @@ function projectName(path?: string | null, name?: string | null) {
  * per-session drafts already, and remounting it on every switch discarded its
  * measured metrics and focus.
  */
-export const ChatSurface = memo(function ChatSurface() {
+export const ChatSurface = memo(function ChatSurface({
+  visible = true,
+}: {
+  visible?: boolean;
+}) {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const selectingSessionId = useAppStore((state) => state.selectingSessionId);
@@ -194,7 +198,7 @@ export const ChatSurface = memo(function ChatSurface() {
               <SessionPane
                 key={id}
                 sessionId={id}
-                visible={id === visibleSessionId}
+                visible={visible && id === visibleSessionId}
               />
             ))}
           </div>
