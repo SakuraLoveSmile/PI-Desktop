@@ -406,7 +406,7 @@ For every pi loop turn:
    summary family, generation is mandatory; the runtime preflights the summary
    input against the model window, reduces it once, and then splits a range that
    still does not fit into chunks that each do, so a prompt too large for one
-   request is summarized by several (ADR 0301). An automatic summary failure
+   request is summarized by several (ADR 0302). An automatic summary failure
    first attempts a deterministic retained-tail checkpoint, while manual
    compaction still reports `CONTEXT_COMPACTION_FAILED`
 5. successful generation or deterministic recovery first appends the
@@ -436,7 +436,7 @@ compacted range, every role, bounded by the keep-recent target and by what the
 safe budget leaves once the carried-forward summary and the recovery notice are
 paid for — and records `details.retainedTailShape` as `recent_window`, so a
 rebuild replays that window instead of narrowing it back to one user message
-(ADR 0301, issue #827). It drops the assistant messages pi drops from the
+(ADR 0302, issue #827). It drops the assistant messages pi drops from the
 rebuilt context anyway (error, aborted, deferred) and any tool result whose tool
 call is not in the window, because a provider rejects a result whose call is
 missing. An `active_turn` fallback also keeps the active task's user message
@@ -551,7 +551,7 @@ is split into contiguous chunks that each do: at most 16 requests, each carrying
 the previous chunk's summary through pi's update-the-summary prompt, with the
 range's file list appended on the last one, and the checkpoint reports the summed
 usage of the requests that produced it. A budget therefore decides how many
-requests a summary takes, not whether the model is asked at all (ADR 0301); only
+requests a summary takes, not whether the model is asked at all (ADR 0302); only
 an empty range, or one past that request bound, still gives up on the summary
 (ADR 0282). If normal compaction still fails during an automatic threshold or
 overflow recovery, the runtime persists a short recovery checkpoint with the

@@ -1,4 +1,4 @@
-# ADR 0301: A failed compaction keeps the recent window, and an oversized summary is chunked
+# ADR 0302: A failed compaction keeps the recent window, and an oversized summary is chunked
 
 - Status: Accepted for implementation
 - Date: 2026-09-22

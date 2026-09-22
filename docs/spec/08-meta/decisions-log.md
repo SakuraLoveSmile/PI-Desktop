@@ -6620,4 +6620,4 @@ that was sitting at the bottom — including after the turn had finished.
   most 16 requests, each carrying the previous chunk's summary, and the
   checkpoint reports the summed usage of the requests that produced it. Only an
   empty range, or one past that request bound, still falls back on budget
-  grounds. See ADR 0301, `03-runtime/02-agent-runtime.md`, ADR 0049, ADR 0282.
+  grounds. See ADR 0302, `03-runtime/02-agent-runtime.md`, ADR 0049, ADR 0282.

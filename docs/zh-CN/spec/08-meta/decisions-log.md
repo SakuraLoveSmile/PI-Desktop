@@ -4693,4 +4693,4 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `summary_budget` / `summary_provider` / `checkpoint_oversized`，而不是提供商错误文本。
 - 单次缩减后仍过大的摘要提示不再被跳过：范围会被切成每片都能放下的连续分片，最多 16 次
   请求，每次携带上一片的摘要，检查点报告这些请求的用量总和。只有空范围或超过该请求上限
-  的范围才因预算原因回退。见 ADR 0301、`03-runtime/02-agent-runtime.md`、ADR 0049、ADR 0282。
+  的范围才因预算原因回退。见 ADR 0302、`03-runtime/02-agent-runtime.md`、ADR 0049、ADR 0282。
