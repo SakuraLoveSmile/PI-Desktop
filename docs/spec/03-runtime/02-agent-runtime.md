@@ -575,6 +575,15 @@ be left with the guard off and no way to restore it. Manual `/compact` remains
 available while the session is idle. Checkpoint generation is abortable and
 counts as running state until durable persistence completes.
 
+The file list a checkpoint carries is read out of the summarized range by pi's
+own collector, which recognizes the lowercase spellings `read` / `write` /
+`edit` — the names pi's tools carry. PI-Desktop registers `Read` / `Write` /
+`Edit`, so the runtime converts exactly those three on the way into pi's
+preparation (`withPiFileOpToolNames`): nothing stored changes, and every other
+tool name is left spelled the way we register it. Without that conversion a
+checkpoint's `readFiles` / `modifiedFiles` and the `<read-files>` section of a
+summary were always empty (D618).
+
 A delegate (§5f) runs the same derivation against its own resolved model and
 compacts at its own turn boundaries, without a durable checkpoint chain of
 its own (ADR 0299).
