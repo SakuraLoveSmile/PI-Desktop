@@ -6596,7 +6596,7 @@ that was sitting at the bottom — including after the turn had finished.
   `apps/desktop/test/image-generation-default.test.mjs`, with
   `provider-model-config.test.mjs` asserting the add branch consults them.
 
-## 2026-09-22 — A renderer that never reaches its first state gets a bounded surface and a quit channel (D613)
+## 2026-09-22 — A renderer that never reaches its first state gets a bounded surface and a quit channel (D616)
 
 - The renderer's startup had no timeout of its own: `bootstrap()` either
   publishes the initial state or nothing, so one read that never settled left the

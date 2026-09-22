@@ -4678,7 +4678,7 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
   `apps/desktop/test/image-generation-default.test.mjs` 固定，
   `provider-model-config.test.mjs` 断言新增分支会走这两个判断。
 
-## 2026-09-22 —— 从未拿到初始状态的渲染器有了有界表面与退出通道（D613）
+## 2026-09-22 —— 从未拿到初始状态的渲染器有了有界表面与退出通道（D616）
 
 - 渲染器的启动过程本身没有超时：`bootstrap()` 要么发布初始状态，要么什么都不发布，
   因此一次始终没有落地的读取会让窗口一直停在启动表面上——没有菜单、没有数据，除了
