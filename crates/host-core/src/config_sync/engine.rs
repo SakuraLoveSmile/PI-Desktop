@@ -1113,6 +1113,29 @@ mod tests {
 
     #[tokio::test]
     async fn two_devices_sync_credentials_capabilities_and_disjoint_edit() -> Result<()> {
+        const ISOLATED_PROCESS: &str = "PI_DESKTOP_CONFIG_SYNC_TEST_CHILD";
+        if std::env::var_os(ISOLATED_PROCESS).is_none() {
+            // Capture includes global capabilities. Isolate their root in a
+            // child process so parallel tests cannot repoint it to user data.
+            let agents_dir = tempfile::tempdir()?;
+            let output = std::process::Command::new(std::env::current_exe()?)
+                .args([
+                    "--exact",
+                    "config_sync::engine::tests::two_devices_sync_credentials_capabilities_and_disjoint_edit",
+                    "--nocapture",
+                ])
+                .env(ISOLATED_PROCESS, "1")
+                .env(crate::agent_capabilities::AGENTS_DIR_ENV, agents_dir.path())
+                .output()?;
+            anyhow::ensure!(
+                output.status.success(),
+                "isolated config sync test failed: {}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            );
+            return Ok(());
+        }
+
         let fixture = crate::config_sync::transport::tests::fixture(false).await;
         let device_a_dir = tempfile::tempdir()?;
         let device_b_dir = tempfile::tempdir()?;
