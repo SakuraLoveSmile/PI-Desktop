@@ -8,6 +8,16 @@ export const de = {
     "loadingView": "Ansicht wird geladen…",
     "uiCrashed": "Mit der Schnittstelle ist ein Fehler aufgetreten"
   },
+  "startup": {
+    "slowTitle": "Startet noch…",
+    "slowBody": "PI-Desktop braucht länger als sonst, um Ihren lokalen Dienst zu erreichen. Der Start kann noch von selbst abschließen — Sie können warten oder zuerst die Protokolle sichern.",
+    "stalledTitle": "PI-Desktop konnte den Start nicht abschließen",
+    "stalledBody": "Dieses Fenster hat Ihre Chats und Einstellungen nie erhalten, daher gibt es noch nichts anzuzeigen. Es wurde nichts gelöscht — Ihre Daten sind noch auf dem Datenträger.",
+    "retrying": "Erneuter Versuch…",
+    "copyDiagnostics": "Diagnosen kopieren",
+    "diagnosticsCopied": "Diagnosen kopiert",
+    "diagnosticsFailed": "Diagnosen konnten nicht kopiert werden"
+  },
   "common": {
     "close": "Schließen",
     "cancel": "Abbrechen",
@@ -233,6 +243,8 @@ export const de = {
     "slashGroupExtensions": "Erweiterungsbefehle",
     "slashGroupSkills": "Fähigkeiten",
     "slashEmpty": "Keine übereinstimmenden Befehle",
+"slashCommandSourceUnavailable": "Befehlsliste nicht verfügbar, es wurde nichts gesendet. Bitte erneut versuchen.",
+    "sessionTranscriptEmpty": "Der Verlauf dieser Sitzung konnte nicht gelesen werden. Bitte die Sitzung erneut öffnen.",
     "fileMenu": "Dateiverweise",
     "removeFileReference": "Dateiverweis {{name}} entfernen",
     "messageAttachments": "Anhänge in dieser Nachricht",
@@ -679,6 +691,18 @@ sklm: {
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
       endpoint: "WebDAV URL",
       endpointPlaceholder: "https://dav.example.com/",
+      allowInsecureHttp: "HTTP für eine vertrauenswürdige LAN-Adresse zulassen",
+      allowInsecureHttpWarning:
+        "HTTP verschlüsselt WebDAV-Anmeldedaten nicht. Nur für eine vertrauenswürdige LAN-Adresse aktivieren; öffentliche HTTP-Endpunkte werden abgelehnt.",
+      remoteMode: "Server-Kompatibilität",
+      remoteModeHint:
+        "Der strikte Modus erfordert zuverlässige bedingte Schreibvorgänge. Verwende den Kompatibilitätsmodus nur für Server, die If-Match/If-None-Match ignorieren.",
+      remoteModeStrict: "Striktes CAS (empfohlen)",
+      remoteModeAppendOnly: "Kompatibilitätsmodus (nur anhängen)",
+      appendOnlyWarning:
+        "Dieser Modus ist für WebDAV-Server gedacht, die bedingte Schreibvorgänge ignorieren. Initialisiere den Tresor zuerst auf einem Gerät, bevor weitere Geräte beitreten. Er verwendet gerätespezifische Anhängeköpfe und behält den Remote-Verlauf; alle Geräte in diesem Tresor müssen den Kompatibilitätsmodus verwenden. Gleichzeitige Änderungen müssen möglicherweise geprüft werden.",
+      appendOnlyConfirm:
+        "Dieser Server kann bedingte Schreibvorgänge nicht erzwingen. Der Kompatibilitätsmodus behält den Verlauf, bietet aber kein atomares Compare-and-Swap. Fortfahren?",
       username: "Username",
       appPassword: "App password",
       directory: "Remote directory",
@@ -700,10 +724,27 @@ sklm: {
       testSuccess: "The server supports the required conditional writes.",
       testUnsupported:
         "The server did not prove reliable conditional writes; sync is not enabled.",
+      testAppendOnlySuccess:
+        "The server supports directory listing for append-only compatibility mode.",
+      testAppendOnlyUnsupported:
+        "The server did not prove directory listing for compatibility mode; sync is not enabled.",
       enable: "Enable sync",
       save: "Save and sync",
       configured: "Cloud sync configuration saved.",
       syncNow: "Sync now",
+      progressTitle: "Synchronisierung läuft…",
+      progress: {
+        phase: {
+          capture: "Lokale Änderungen werden erfasst",
+          download: "Remote-Änderungen werden geladen",
+          merge: "Änderungen werden zusammengeführt",
+          upload: "Änderungen werden hochgeladen",
+          apply: "Änderungen werden angewendet",
+          cleanup: "Aufräumen",
+        },
+        objects: "{{done}} / {{total}}",
+        bytes: "{{done}} / {{total}}",
+      },
       statusTitle: "Sync status",
       statusLabel: "Current state",
       lastSuccess: "Last successful run: {{date}}",

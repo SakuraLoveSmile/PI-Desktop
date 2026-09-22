@@ -141,7 +141,10 @@ cannot access the endpoint, WebDAV password, backup password, vault key, or
 portable secret values. Host-core validates the selected HTTPS endpoint,
 rejects userinfo and redirects, constrains relative paths, bounds remote object
 size and KDF parameters, and requires strong conditional-write behavior before
-publishing a head.
+publishing a shared head in strict mode. An explicitly confirmed append-only
+compatibility mode may be used after a bounded `PROPFIND` directory-listing
+probe succeeds; it publishes per-device encrypted pointers and retains
+immutable history rather than pretending an unconditional `PUT` is CAS.
 
 Every remote payload is authenticated ciphertext. The WebDAV server receives
 neither the vault password nor the local machine encryption key. Credentials
@@ -154,9 +157,12 @@ Imported commands, endpoints, scripts, skills, plugins, and automations are
 staged behind a digest-bound local approval. Local paths and approvals are
 overlays, not shared entities. A new device therefore cannot execute a
 synchronized capability merely because its desired enabled flag was imported.
-The server can still deny availability or replay a valid old head to a fresh
-device that has no trusted history; sync does not claim availability or
-freshness against a malicious server.
+The compatibility-mode warning states that all devices sharing a vault must
+use the same mode and that concurrent changes can still require review. It
+does not weaken approval, secret export, redirect, path, object-size, or
+freshness protections. The server can still deny availability or replay a
+valid old head to a fresh device that has no trusted history; sync does not
+claim availability or freshness against a malicious server.
 
 ## 5. Command execution
 
@@ -204,12 +210,13 @@ freshness against a malicious server.
 - Feed manifests bind artifacts with electron-builder hashes. An error,
   unavailable feed, hash mismatch, or invalid updater state must not install.
 - Packaged macOS, Windows NSIS, and Linux AppImage download and install in-app
-  from the GitHub Releases feed. Linux deb/rpm and Windows portable detect a
-  release and open the fixed releases page.
+  from the GitHub Releases feed. Linux deb/rpm and Windows ZIP detect a
+  release and open the fixed releases page. Legacy Windows portable
+  executables remain manual when `PORTABLE_EXECUTABLE_FILE` is present.
 - D126 tag releases publish Windows NSIS and Linux AppImage installers with
   their update manifests, plus Linux deb/rpm packages and a Windows portable
-  exe. The NSIS and AppImage artifacts activate the existing in-app lanes.
-  The portable exe uses notify-and-link delivery and does not write
+  ZIP. The NSIS and AppImage artifacts activate the existing in-app lanes.
+  The portable ZIP uses notify-and-link delivery and does not write
   `latest.yml`. macOS tag artifacts are Developer ID-signed, notarized, and
   stapled before upload; rollback and staged-rollout qualification remain
   release follow-ups.

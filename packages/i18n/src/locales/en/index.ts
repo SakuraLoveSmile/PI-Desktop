@@ -6,6 +6,16 @@ export const en = {
     loadingView: "Loading view…",
     uiCrashed: "Something went wrong with the interface",
   },
+  startup: {
+    slowTitle: "Still starting…",
+    slowBody: "PI-Desktop is taking longer than usual to reach your local service. It may still finish on its own — you can wait, or collect the logs first.",
+    stalledTitle: "PI-Desktop couldn't finish starting",
+    stalledBody: "This window never received your chats and settings, so there is nothing to show yet. Nothing was deleted — your data is still on disk.",
+    retrying: "Trying again…",
+    copyDiagnostics: "Copy diagnostics",
+    diagnosticsCopied: "Diagnostics copied",
+    diagnosticsFailed: "Couldn't copy diagnostics",
+  },
   /** Verbs and states that mean the same thing wherever they appear. */
   common: {
     close: "Close",
@@ -240,6 +250,8 @@ export const en = {
     slashGroupExtensions: "Extension commands",
     slashGroupSkills: "Skills",
     slashEmpty: "No matching commands",
+    slashCommandSourceUnavailable: "Command list unavailable, so nothing was sent. Try again.",
+    sessionTranscriptEmpty: "This session's history could not be read. Reopen the session to try again.",
     fileMenu: "File references",
     removeFileReference: "Remove file reference {{name}}",
     messageAttachments: "Attachments in this message",
@@ -925,6 +937,18 @@ sklm: {
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
       endpoint: "WebDAV URL",
       endpointPlaceholder: "https://dav.example.com/",
+      allowInsecureHttp: "Allow HTTP for a trusted LAN address",
+      allowInsecureHttpWarning:
+        "HTTP does not encrypt WebDAV credentials. Enable only for a trusted LAN address; public HTTP endpoints are rejected.",
+      remoteMode: "Server compatibility",
+      remoteModeHint:
+        "Strict mode requires reliable conditional writes. Use compatibility mode only for a server that ignores If-Match/If-None-Match.",
+      remoteModeStrict: "Strict CAS (recommended)",
+      remoteModeAppendOnly: "Compatibility mode (append-only)",
+      appendOnlyWarning:
+        "This mode is for WebDAV servers that ignore conditional writes. Initialize the vault on one device before joining from others. It uses per-device append-only heads and retains remote history; every device sharing this vault must use compatibility mode. Concurrent changes may still require review.",
+      appendOnlyConfirm:
+        "This server mode cannot enforce conditional writes. Compatibility mode retains history but cannot provide atomic compare-and-swap. Continue?",
       username: "Username",
       appPassword: "App password",
       directory: "Remote directory",
@@ -947,10 +971,27 @@ sklm: {
       testSuccess: "The server supports the required conditional writes.",
       testUnsupported:
         "The server did not prove reliable conditional writes; sync is not enabled.",
+      testAppendOnlySuccess:
+        "The server supports directory listing for append-only compatibility mode.",
+      testAppendOnlyUnsupported:
+        "The server did not prove directory listing for compatibility mode; sync is not enabled.",
       enable: "Enable sync",
       save: "Save and sync",
       configured: "Cloud sync configuration saved.",
       syncNow: "Sync now",
+      progressTitle: "Syncing…",
+      progress: {
+        phase: {
+          capture: "Collecting local changes",
+          download: "Downloading remote changes",
+          merge: "Merging changes",
+          upload: "Uploading changes",
+          apply: "Applying changes",
+          cleanup: "Cleaning up",
+        },
+        objects: "{{done}} / {{total}}",
+        bytes: "{{done}} / {{total}}",
+      },
       statusTitle: "Sync status",
       statusLabel: "Current state",
       lastSuccess: "Last successful run: {{date}}",
