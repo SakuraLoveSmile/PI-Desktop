@@ -6655,3 +6655,23 @@ that was sitting at the bottom — including after the turn had finished.
   reporter's 0.15.1 storage layout, and the read side still answers "session
   exists, no messages" instead of reporting an unreadable transcript. See
   `04-ux/09-interaction-patterns.md` §Session isolation across tabs.
+
+## 2026-09-22 — A renderer that never reaches its first state gets a bounded surface and a quit channel (D616)
+
+- The renderer's startup had no timeout of its own: `bootstrap()` either
+  publishes the initial state or nothing, so one read that never settled left the
+  window on the boot surface with no menu, no data, and nothing to act on except
+  force-quitting the process (issue #831). The renderer now watches its own wait.
+  `STARTUP_SLOW_HINT_MS` (30s) adds logs, diagnostics, and quit to the boot
+  surface without calling the boot a failure; `STARTUP_STALLED_MS` (180s) turns it
+  into the recovery surface, which also offers a retry that re-runs `bootstrap()`.
+- Both bounds sit above the main↔host RPC ceiling (`DEFAULT_RPC_TIMEOUT_MS`,
+  130s), so a slow but successful boot is never read as a failure, and the
+  watchdog never cancels the startup it watches: a boot that finishes replaces the
+  surface with the shell. The recovery surface replaces the splash (exactly one
+  boot surface is mounted), and the renderer-drawn window controls stay above it,
+  so a frameless Windows/Linux window can always be closed.
+- The renderer gains the quit channel `pi-desktop/app/quit` (`api.quitApp()`),
+  whose handler calls `app.quit()` exactly like the Quit menu item, so the ordered
+  shutdown, the confirmation dialog, and the close behavior stay the ones the app
+  already has. See `03-runtime/07-process-model.md` §3 and E2E-076.
