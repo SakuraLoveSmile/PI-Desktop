@@ -6675,3 +6675,29 @@ that was sitting at the bottom — including after the turn had finished.
   whose handler calls `app.quit()` exactly like the Quit menu item, so the ordered
   shutdown, the confirmation dialog, and the close behavior stay the ones the app
   already has. See `03-runtime/07-process-model.md` §3 and E2E-076.
+
+## 2026-09-22 — A failed compaction keeps the recent window (D617, issue #827)
+
+- An automatic compaction whose summary request failed installed a
+  retained-tail checkpoint that carried at most the latest user message, and a
+  rebuild narrowed a stored checkpoint's tail the same way. A long turn
+  therefore reached the next model request as one user sentence: the reported
+  session lost roughly 168 messages (3 user / 34 assistant / 131 tool) between
+  two checkpoints while the transcript on disk and the UI row stayed intact.
+- The fallback now retains the real recent window — the newest contiguous
+  messages of the compacted range, every role, bounded by the keep-recent
+  target and by what the carried summary and the recovery notice leave — and
+  marks it with `details.retainedTailShape`, so a rebuild replays it. A
+  checkpoint without the marker (every successful checkpoint, and every record
+  written before it existed) still normalizes to the latest user message. An
+  `active_turn` fallback also keeps the active task's user message when the
+  window cannot hold it, the fallback drops the assistant messages pi drops
+  anyway and any tool result whose call is not in the window, and
+  `details.failureReason` records `no_new_history` / `summary_budget` /
+  `summary_provider` / `checkpoint_oversized` instead of provider error text.
+- A summary prompt that is still too large after the single reduced pass is no
+  longer skipped: the range is split into contiguous chunks that each fit, at
+  most 16 requests, each carrying the previous chunk's summary, and the
+  checkpoint reports the summed usage of the requests that produced it. Only an
+  empty range, or one past that request bound, still falls back on budget
+  grounds. See ADR 0302, `03-runtime/02-agent-runtime.md`, ADR 0049, ADR 0282.
