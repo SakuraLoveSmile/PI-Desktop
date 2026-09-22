@@ -8,6 +8,16 @@ export const de = {
     "loadingView": "Ansicht wird geladen…",
     "uiCrashed": "Mit der Schnittstelle ist ein Fehler aufgetreten"
   },
+  "startup": {
+    "slowTitle": "Startet noch…",
+    "slowBody": "PI-Desktop braucht länger als sonst, um Ihren lokalen Dienst zu erreichen. Der Start kann noch von selbst abschließen — Sie können warten oder zuerst die Protokolle sichern.",
+    "stalledTitle": "PI-Desktop konnte den Start nicht abschließen",
+    "stalledBody": "Dieses Fenster hat Ihre Chats und Einstellungen nie erhalten, daher gibt es noch nichts anzuzeigen. Es wurde nichts gelöscht — Ihre Daten sind noch auf dem Datenträger.",
+    "retrying": "Erneuter Versuch…",
+    "copyDiagnostics": "Diagnosen kopieren",
+    "diagnosticsCopied": "Diagnosen kopiert",
+    "diagnosticsFailed": "Diagnosen konnten nicht kopiert werden"
+  },
   "common": {
     "close": "Schließen",
     "cancel": "Abbrechen",
@@ -241,6 +251,8 @@ export const de = {
     "slashGroupExtensions": "Erweiterungsbefehle",
     "slashGroupSkills": "Fähigkeiten",
     "slashEmpty": "Keine übereinstimmenden Befehle",
+"slashCommandSourceUnavailable": "Befehlsliste nicht verfügbar, es wurde nichts gesendet. Bitte erneut versuchen.",
+    "sessionTranscriptEmpty": "Der Verlauf dieser Sitzung konnte nicht gelesen werden. Bitte die Sitzung erneut öffnen.",
     "fileMenu": "Dateiverweise",
     "removeFileReference": "Dateiverweis {{name}} entfernen",
     "messageAttachments": "Anhänge in dieser Nachricht",
@@ -603,7 +615,8 @@ sklm: {
       namePlaceholder: "Quellenname",
       urlHint: "https://…/catalog.json",
       documentTooLarge: "Diese Skill überschreitet nach dem Anhängen der Ressourcen das 128-KB-Dokumentlimit.",
-      sourceUnsafe: "Quell-URL muss eine öffentliche https-Adresse sein",
+      sourceUnsafe:
+        "Quell-URL muss eine http- oder https-Adresse sein, keine Cloud-Metadaten-Adresse. Für Klartext-HTTP auf dem eigenen Rechner oder im LAN in den Netzwerkeinstellungen „Lockerer Netzwerkmodus“ einschalten.",
       pageInfo: "Seite {{page}} von {{pages}} · {{total}} Skills",
       pagePrev: "Zurück",
       pageNext: "Weiter",
@@ -687,9 +700,6 @@ sklm: {
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
       endpoint: "WebDAV URL",
       endpointPlaceholder: "https://dav.example.com/",
-      allowInsecureHttp: "HTTP für eine vertrauenswürdige LAN-Adresse zulassen",
-      allowInsecureHttpWarning:
-        "HTTP verschlüsselt WebDAV-Anmeldedaten nicht. Nur für eine vertrauenswürdige LAN-Adresse aktivieren; öffentliche HTTP-Endpunkte werden abgelehnt.",
       remoteMode: "Server-Kompatibilität",
       remoteModeHint:
         "Der strikte Modus erfordert zuverlässige bedingte Schreibvorgänge. Verwende den Kompatibilitätsmodus nur für Server, die If-Match/If-None-Match ignorieren.",
@@ -728,6 +738,19 @@ sklm: {
       save: "Save and sync",
       configured: "Cloud sync configuration saved.",
       syncNow: "Sync now",
+      progressTitle: "Synchronisierung läuft…",
+      progress: {
+        phase: {
+          capture: "Lokale Änderungen werden erfasst",
+          download: "Remote-Änderungen werden geladen",
+          merge: "Änderungen werden zusammengeführt",
+          upload: "Änderungen werden hochgeladen",
+          apply: "Änderungen werden angewendet",
+          cleanup: "Aufräumen",
+        },
+        objects: "{{done}} / {{total}}",
+        bytes: "{{done}} / {{total}}",
+      },
       statusTitle: "Sync status",
       statusLabel: "Current state",
       lastSuccess: "Last successful run: {{date}}",
@@ -956,7 +979,8 @@ sklm: {
       namePlaceholder: "Quellenname",
       urlHint: "https://… (Registry-Endpunkt oder Katalog-JSON)",
       officialSource: "Offizielle Registry",
-      sourceUnsafe: "Quell-URL muss eine öffentliche https-Adresse sein",
+      sourceUnsafe:
+        "Quell-URL muss eine http- oder https-Adresse sein, keine Cloud-Metadaten-Adresse. Für Klartext-HTTP auf dem eigenen Rechner oder im LAN in den Netzwerkeinstellungen „Lockerer Netzwerkmodus“ einschalten.",
       pageInfo: "Seite {{page}} von {{pages}} · {{total}} Server",
       pagePrev: "Zurück",
       pageNext: "Weiter",
@@ -1152,8 +1176,14 @@ sklm: {
     "proxyUrlPlaceholder": "sock5://127.0.0.1:1080",
     "proxyBypass": "Bypass",
     "proxyBypassDesc": "Hosts, die den Proxy überspringen.",
-    proxyFakeIp: "Proxy-Fake-IP für Marktquellen zulassen",
-    proxyFakeIpDesc: "Nur für einen transparenten Router-/TUN-Proxy aktivieren. Andere private Adressen bleiben blockiert.",
+    networkRelaxedMode: "Lockerer Netzwerkmodus",
+    networkRelaxedModeDesc:
+      "Selbst eingetragene Endpunkte sind erreichbar – ein Modelldienst, MCP-Server, eine Marktquelle oder ein Git-Remote auf deinem Rechner oder im LAN. Klartext-HTTP ist erlaubt, und Fake-IP-Antworten eines transparenten Proxys werden toleriert.",
+    networkRelaxedModeStrictDesc:
+      "Nur öffentliche HTTPS-Endpunkte bleiben erreichbar: eine LAN-Adresse oder eine Klartextverbindung wird abgelehnt, ebenso Fake-IP-Antworten eines Proxys.",
+    networkInsecureNoticeTitle: "Klartext-HTTP in dein eigenes Netz",
+    networkInsecureNoticeBody:
+      "Du erreichst eine selbst eingetragene Adresse – auf deinem Rechner oder im LAN – über unverschlüsseltes HTTP. Wer im selben Netzsegment sitzt, kann die Zugangsdaten in diesem Datenverkehr möglicherweise mitlesen. Stell in den Netzwerkeinstellungen auf „Strict“ um, um solche Verbindungen abzulehnen.",
     "proxyInvalid": "Geben Sie eine http-, https- oder sock5-URL mit einem Host ein.",
     "proxySaveError": "Der Proxy konnte nicht gespeichert werden.",
     "proxyTest": "Test",
@@ -1534,8 +1564,10 @@ sklm: {
     "legacyHint": "Zeitplan bearbeiten und speichern, um automatische Ausführungen zu aktivieren.",
     "time": "Uhrzeit",
     "weekday": "Wochentag",
-    "localTimeHint": "Verwendet die lokale Zeitzone. PI-Desktop muss geöffnet bleiben; verpasste Ausführungen werden übersprungen. Eingeschränkte Aktionen erfordern eine Genehmigung.",
+    "localTimeHint": "Verwendet die lokale Zeitzone. PI-Desktop muss geöffnet bleiben; verpasste Ausführungen werden übersprungen.",
     "projectHint": "Das aktuelle Projekt wird gespeichert. Ausführungen verwenden das Standardmodell.",
+    "autoPermissionHint": "Auto kann eingeschränkte Aktionen ohne Nachfrage ausführen. Verwenden Sie es nur für vertrauenswürdige Aufgaben.",
+    "unavailableModel": "{{provider}} / {{model}} (nicht verfügbar)",
     "save": "Aufgabe speichern",
     "cancel": "Abbrechen",
     "runs": "Ausführungsverlauf",
@@ -1556,7 +1588,7 @@ sklm: {
     "title": "Geplant",
     "emptyTitle": "Keine geplanten Aufgaben",
     "create": "Aufgabe erstellen",
-    "prompt": "Eingabeaufforderung",
+    "prompt": "Anweisung",
     "promptPlaceholder": "z.B. Fassen Sie jeden Morgen den Git-Status und offene Probleme zusammen.",
     "cadence": "Kadenz",
     "cadenceManual": "Manuell",

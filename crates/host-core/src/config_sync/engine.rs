@@ -31,6 +31,8 @@ mod coordinator;
 mod handlers;
 #[path = "engine_history.rs"]
 mod history;
+#[path = "progress.rs"]
+mod progress;
 #[path = "engine_remote.rs"]
 mod remote;
 #[cfg(test)]
@@ -42,6 +44,7 @@ pub(crate) use handlers::{
     reject, restore, test, unlock,
 };
 use history::cleanup_history;
+use progress::{NoSyncProgress, ProgressNotifier, SyncPhase, SyncProgress, SyncProgressObserver};
 use remote::{
     ensure_remote_collections, merge_append_only_tips, object_path, publish_append_only_head,
     publish_head, read_append_only_remote, read_remote_head, read_remote_manifest,
@@ -81,7 +84,6 @@ pub struct StoredConfig {
     pub username: String,
     pub directory: String,
     pub device_label: String,
-    pub allow_insecure_http: bool,
     #[serde(default)]
     pub remote_mode: RemoteMode,
     #[serde(default = "new_device_id")]
@@ -363,13 +365,20 @@ fn webdav_password(st: &AppState, config: &StoredConfig) -> Result<String> {
         .ok_or_else(|| anyhow!("CONFIG_SYNC_LOCKED: WebDAV app password is not available"))
 }
 
+/// Build the WebDAV transport from a stored configuration.
+///
+/// The plaintext hop is no longer the per-endpoint acknowledgement the sync
+/// settings used to carry: `networkPolicy.mode` decides. `relaxed` keeps an
+/// `http` endpoint reachable when it is a loopback, `.local` or private LAN
+/// host, `strict` refuses plaintext outright, and a public `http` host is
+/// refused in both modes.
 fn transport_with_password(config: &StoredConfig, password: String) -> Result<WebDavTransport> {
     WebDavTransport::new(&WebDavConfig {
         endpoint: config.endpoint.clone(),
         username: config.username.clone(),
         password,
         directory: config.directory.clone(),
-        allow_insecure_http: config.allow_insecure_http,
+        allow_insecure_http: crate::network_policy::relaxed(),
         missing_object_status: config.missing_object_status,
     })
 }
@@ -644,7 +653,7 @@ pub fn public_state(st: &mut AppState) -> Result<Value> {
             username: None,
             directory: None,
             device_label: None,
-            allow_insecure_http: false,
+            allow_insecure_http: crate::network_policy::relaxed(),
             remote_mode: RemoteMode::Strict,
             categories: default_categories(),
             include_secrets: false,
@@ -739,7 +748,7 @@ pub fn public_state(st: &mut AppState) -> Result<Value> {
         username: Some(config_ref.username.clone()),
         directory: Some(config_ref.directory.clone()),
         device_label: Some(config_ref.device_label.clone()),
-        allow_insecure_http: config_ref.allow_insecure_http,
+        allow_insecure_http: crate::network_policy::relaxed(),
         remote_mode: config_ref.remote_mode,
         categories: config_ref.categories.clone(),
         include_secrets: config_ref.include_secrets,
@@ -839,11 +848,10 @@ fn config_from_input(
         username,
         directory,
         device_label,
-        allow_insecure_http: input
-            .get("allowInsecureHttp")
-            .and_then(Value::as_bool)
-            .or_else(|| existing.map(|value| value.allow_insecure_http))
-            .unwrap_or(false),
+        // `allowInsecureHttp` used to live here as a per-endpoint
+        // acknowledgement. The plaintext decision now belongs to
+        // `networkPolicy.mode`, so the key a stored configuration may still
+        // carry is ignored rather than rewritten.
         remote_mode,
         device_id: existing
             .map(|value| value.device_id.clone())
@@ -1168,8 +1176,35 @@ mod tests {
         Ok(state)
     }
 
+    fn run_in_isolated_process(test_name: &str) -> Result<bool> {
+        const ISOLATED_PROCESS: &str = "PI_DESKTOP_CONFIG_SYNC_TEST_CHILD";
+        if std::env::var(ISOLATED_PROCESS).as_deref() == Ok(test_name) {
+            return Ok(false);
+        }
+        // Capture includes global capabilities. Isolate their root in a
+        // child process so parallel tests cannot repoint it to user data.
+        let agents_dir = tempfile::tempdir()?;
+        let output = std::process::Command::new(std::env::current_exe()?)
+            .args(["--exact", test_name, "--nocapture"])
+            .env(ISOLATED_PROCESS, test_name)
+            .env(crate::agent_capabilities::AGENTS_DIR_ENV, agents_dir.path())
+            .output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "isolated config sync test failed: {}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        Ok(true)
+    }
+
     #[tokio::test]
     async fn append_only_mode_syncs_with_a_server_that_ignores_preconditions() -> Result<()> {
+        if run_in_isolated_process(
+            "config_sync::engine::tests::append_only_mode_syncs_with_a_server_that_ignores_preconditions",
+        )? {
+            return Ok(());
+        }
         let fixture = crate::config_sync::transport::tests::fixture_ignoring_preconditions().await;
         let device_a_dir = tempfile::tempdir()?;
         let device_b_dir = tempfile::tempdir()?;
@@ -1198,7 +1233,7 @@ mod tests {
         let config = load_config(&state)?.expect("configured device");
         let key = local_vault_key(&state, &config)?.expect("unlocked device");
         let transport = transport_with_password(&config, String::new())?;
-        let remote = read_append_only_remote(&transport, &config, &key)
+        let remote = read_append_only_remote(&transport, &config, &key, &NoSyncProgress)
             .await?
             .expect("compatibility revisions");
         assert!(!remote.tip_ids.is_empty());
@@ -1215,8 +1250,65 @@ mod tests {
         Ok(())
     }
 
+    /// One packaged resource: above the 128 KiB document cap that used to bound
+    /// every resource, well below the resource cap that bounds it now.
+    fn portable_skill_resource() -> Vec<u8> {
+        vec![b'x'; 256 * 1024]
+    }
+
+    /// Records what a sync reported, in order, so a test can assert the phases
+    /// an interface is shown.
+    #[derive(Default)]
+    struct RecordedProgress(std::sync::Mutex<Vec<SyncProgress>>);
+
+    impl SyncProgressObserver for RecordedProgress {
+        fn report(&self, progress: SyncProgress) {
+            self.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .push(progress);
+        }
+    }
+
+    impl RecordedProgress {
+        fn phases(&self) -> Vec<SyncPhase> {
+            self.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .iter()
+                .map(|progress| progress.phase)
+                .collect()
+        }
+
+        fn last(&self, phase: SyncPhase) -> Option<SyncProgress> {
+            self.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .iter()
+                .rev()
+                .find(|progress| progress.phase == phase)
+                .copied()
+        }
+
+        fn all(&self, phase: SyncPhase) -> Vec<SyncProgress> {
+            self.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .iter()
+                .filter(|progress| progress.phase == phase)
+                .copied()
+                .collect()
+        }
+    }
+
     #[tokio::test]
     async fn two_devices_sync_credentials_capabilities_and_disjoint_edit() -> Result<()> {
+        if run_in_isolated_process(
+            "config_sync::engine::tests::two_devices_sync_credentials_capabilities_and_disjoint_edit",
+        )? {
+            return Ok(());
+        }
+
         let fixture = crate::config_sync::transport::tests::fixture(false).await;
         let device_a_dir = tempfile::tempdir()?;
         let device_b_dir = tempfile::tempdir()?;
@@ -1270,15 +1362,24 @@ mod tests {
                 enabled: Some(true),
                 ..McpServerInput::default()
             })?;
-            state.user_skills.create(UserSkillInput {
+            let portable_skill = state.user_skills.create(UserSkillInput {
                 id: Some("portable-skill".into()),
                 name: Some("Portable Skill".into()),
                 level: Some("project".into()),
                 project_path: Some(project_a.to_string_lossy().into_owned()),
                 body: Some("Use the portable project workflow.".into()),
                 enabled: Some(true),
+                shape: Some("dir".into()),
                 ..UserSkillInput::default()
             })?;
+            // A package resource larger than the 128 KiB document cap must
+            // survive capture, upload, read-back, and apply.
+            state.user_skills.write_package_files(
+                &portable_skill.id,
+                CapabilityLevel::Project,
+                Some(&project_a.to_string_lossy()),
+                &[("data/fonts.csv".into(), portable_skill_resource())],
+            )?;
             provider.id
         };
 
@@ -1310,7 +1411,45 @@ mod tests {
         }
 
         let (tx, _rx) = mpsc::unbounded_channel();
-        let initial_a_state = sync_now(device_a.clone(), tx.clone()).await?;
+        let progress = RecordedProgress::default();
+        coordinator::sync_once(&device_a, &tx, &progress).await?;
+        let initial_a_state = get_state(device_a.clone()).await?;
+        let captures = progress.all(SyncPhase::Capture);
+        assert_eq!(
+            captures.len(),
+            2,
+            "capture reports that it started and what it collected: {captures:?}"
+        );
+        assert_eq!(captures[0], SyncProgress::started(SyncPhase::Capture));
+        assert!(
+            captures[1].total > 0,
+            "capture counts what it collected: {captures:?}"
+        );
+        let phases = progress.phases();
+        assert_eq!(
+            phases.first(),
+            Some(&SyncPhase::Capture),
+            "a sync reports what it is doing from its first phase: {phases:?}"
+        );
+        for (before, after) in [
+            (SyncPhase::Capture, SyncPhase::Merge),
+            (SyncPhase::Merge, SyncPhase::Upload),
+            (SyncPhase::Upload, SyncPhase::Apply),
+        ] {
+            let before_at = phases.iter().position(|phase| *phase == before);
+            let after_at = phases.iter().position(|phase| *phase == after);
+            assert!(
+                matches!((before_at, after_at), (Some(left), Some(right)) if left < right),
+                "{before:?} must be reported before {after:?}: {phases:?}"
+            );
+        }
+        let upload = progress
+            .last(SyncPhase::Upload)
+            .expect("upload progress for a fresh device");
+        assert!(upload.total >= 2, "upload total: {upload:?}");
+        assert_eq!(upload.done, upload.total, "upload finished: {upload:?}");
+        assert!(upload.bytes_total > 0, "upload bytes: {upload:?}");
+        assert_eq!(upload.bytes_done, upload.bytes_total);
         assert!(pending_approvals(&initial_a_state).is_empty());
         {
             let state = device_a.lock().await;
@@ -1326,8 +1465,14 @@ mod tests {
             let (head, _) = read_remote_head(&transport, &config, &key)
                 .await?
                 .expect("remote head");
-            let (remote, _) =
-                read_remote_revision(&transport, &config, &key, &head.revision_id).await?;
+            let (remote, _) = read_remote_revision(
+                &transport,
+                &config,
+                &key,
+                &head.revision_id,
+                &NoSyncProgress,
+            )
+            .await?;
             assert!(!remote.entities.is_empty(), "remote entities missing");
             assert!(
                 load_base(&state, &key)?.is_none(),
@@ -1430,6 +1575,21 @@ mod tests {
                 .list(CapabilityLevel::Project, Some(&project_b.to_string_lossy()),)?
                 .iter()
                 .any(|record| record.id == "portable-skill"));
+            let received_skill = state
+                .user_skills
+                .list(CapabilityLevel::Project, Some(&project_b.to_string_lossy()))?
+                .into_iter()
+                .find(|record| record.id == "portable-skill")
+                .expect("portable skill imported");
+            assert_eq!(
+                state.user_skills.package_files(
+                    &received_skill.id,
+                    CapabilityLevel::Project,
+                    Some(&project_b.to_string_lossy()),
+                )?,
+                vec![("data/fonts.csv".into(), portable_skill_resource())],
+                "packaged resource did not survive the sync round trip"
+            );
             assert_eq!(
                 state.db.get_setting("app")?.and_then(|value| {
                     value
@@ -1456,8 +1616,14 @@ mod tests {
             let (head, _) = read_remote_head(&transport, &config, &key)
                 .await?
                 .expect("remote head after device B edit");
-            let (remote, _) =
-                read_remote_revision(&transport, &config, &key, &head.revision_id).await?;
+            let (remote, _) = read_remote_revision(
+                &transport,
+                &config,
+                &key,
+                &head.revision_id,
+                &NoSyncProgress,
+            )
+            .await?;
             let remote_theme = remote
                 .entities
                 .iter()

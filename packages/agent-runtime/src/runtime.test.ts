@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { estimateContextTokens as estimateAgentContextTokens, estimateTokens, type Agent } from "@earendil-works/pi-agent-core";
+import { estimateContextTokens as estimateAgentContextTokens, estimateTokens, type Agent, type AgentMessage } from "@earendil-works/pi-agent-core";
 import {
+  createAssistantMessageEventStream,
   getCurrentTools,
   getCurrentSystemMessage,
   toToolDeclaration,
+  type AssistantMessage,
 } from "@earendil-works/pi-ai";
 import { formatSessionMessage, type SessionMessageOrigin } from "@pi-desktop/shared";
 import { estimateContextTokens as estimateTranscriptTokens } from "@earendil-works/pi-ai/utils/estimate";
@@ -6532,6 +6534,50 @@ describe("DesktopAgentRuntime subagents", () => {
     await runtime.dispose();
   });
 
+  it("rechecks an on-demand grant after revocation on the next prompt (#841)", async () => {
+    const selected = { ...provider, modelId: "new-model", modelConfig: undefined };
+    const host = { call: vi.fn().mockResolvedValue(selected) };
+    const runtime = createRuntime({ subagents: [explorer], host });
+    const agent = (runtime as unknown as { agent: Agent }).agent;
+    vi.spyOn(agent, "prompt").mockResolvedValue();
+    vi.spyOn(agent, "waitForIdle").mockResolvedValue();
+    subagentRuns.calls.length = 0;
+    subagentRuns.deferred = false;
+    try {
+      await taskTool(runtime).execute("granted", { agent: "explorer", task: "Search.", model: "new/new-model" });
+      expect(subagentRuns.calls).toHaveLength(1);
+      host.call.mockRejectedValue(new Error("model is not enabled for delegation"));
+      expect(runtimeMatches(runtime)).toBe(true);
+      await runtime.prompt("Search again.");
+      const denied = await taskTool(runtime).execute("revoked", { agent: "explorer", task: "Search.", model: "new/new-model" });
+      expect(denied.details.error).toContain("not available for delegation");
+      expect(subagentRuns.calls).toHaveLength(1);
+      expect(host.call).toHaveBeenLastCalledWith("provider.resolveSubagentModel", { key: "new/new-model" });
+    } finally { await runtime.dispose(); }
+  });
+
+  it("discards an on-demand grant returned after its prompt ended (#841)", async () => {
+    let resolveGrant: (value: RuntimeProviderConfig) => void = () => {};
+    const host = { call: vi.fn().mockImplementation(() => new Promise<RuntimeProviderConfig>((resolve) => { resolveGrant = resolve; })) };
+    const runtime = createRuntime({ subagents: [explorer], host });
+    const agent = (runtime as unknown as { agent: Agent }).agent;
+    vi.spyOn(agent, "prompt").mockResolvedValue();
+    vi.spyOn(agent, "waitForIdle").mockResolvedValue();
+    subagentRuns.calls.length = 0;
+    subagentRuns.deferred = false;
+    try {
+      const pending = taskTool(runtime).execute("pending", { agent: "explorer", task: "Search.", model: "new/new-model" });
+      await runtime.prompt("A new turn.");
+      resolveGrant({ ...provider, modelId: "new-model", modelConfig: undefined });
+      const expired = await pending;
+      expect(expired.details.error).toContain("not available for delegation");
+      host.call.mockRejectedValue(new Error("model is not enabled for delegation"));
+      const denied = await taskTool(runtime).execute("revoked", { agent: "explorer", task: "Search.", model: "new/new-model" });
+      expect(denied.details.error).toContain("not available for delegation");
+      expect(subagentRuns.calls).toHaveLength(0);
+    } finally { await runtime.dispose(); }
+  });
+
   it("is the only tool allowed to run in parallel", async () => {
     const runtime = createRuntime({ subagents: [explorer] });
     const catalog = (runtime as any).toolCatalog as Map<string, any>;
@@ -7932,6 +7978,91 @@ describe("DesktopAgentRuntime subagents", () => {
       await runtime.dispose();
     });
 
+    it.each(["session", "opt-in", "definition", "fallback", "missing"])("resumes only an authorized %s binding with a colliding private pin (#841)", async (source) => {
+      const privatePin = { ...provider, id: "other-account", modelId: "recorded-model", modelConfig: undefined };
+      const authorized = { ...privatePin, id: "authorized-account" };
+      const own = { providerId: authorized.id, modelId: authorized.modelId };
+      const target = {
+        ...explorer,
+        ...(source === "definition" ? { model: own } : {}),
+        ...(source === "fallback" ? { fallbackModels: [own] } : {}),
+      };
+      const runtime = createRuntime({
+        provider: source === "session" ? authorized : provider,
+        subagents: [target],
+        subagentProviders: {
+          "other/recorded-model": privatePin,
+          ...(source !== "missing" ? { "authorized-account/recorded-model": authorized } : {}),
+        },
+        subagentModelKeys: source === "opt-in" ? ["authorized-account/recorded-model"] : [],
+        history: [restartedTaskRow("task-1", "del-1", { status: "completed", modelId: "recorded-model" }), delegateRow("child-1", "task-1")],
+      });
+      subagentRuns.calls.length = 0;
+      subagentRuns.deferred = false;
+      try {
+        const result = await startTask(runtime, "task-2", { agent: "explorer", task: "Continue.", resume: "del-1" });
+        expect(result.details.error).toBeUndefined();
+        expect(subagentRuns.calls[0].provider).toBe(source === "missing" ? provider : authorized);
+        const records = (runtime as unknown as { delegations: Map<string, { modelChangedFrom?: string }> }).delegations;
+        expect(records.get(result.details.delegationId)?.modelChangedFrom).toBe(source === "missing" ? "recorded-model" : undefined);
+      } finally { await runtime.dispose(); }
+    });
+
+    it.each([true, false])("reauthorizes a live resume key after its turn grant expires: allowed=%s (#841)", async (allowed) => {
+      const selected = { ...provider, id: "dynamic", modelId: "dynamic-model", modelConfig: undefined };
+      const host = { call: allowed ? vi.fn().mockResolvedValue(selected) : vi.fn().mockRejectedValue(new Error("revoked")) };
+      const runtime = createRuntime({
+        subagents: [explorer], host,
+        history: [restartedTaskRow("task-1", "del-1", { status: "completed", modelId: selected.modelId }), delegateRow("child-1", "task-1")],
+      });
+      const registry = (runtime as unknown as { delegationChains: { lookup(id: string): { latestModelKey?: string } | undefined } }).delegationChains;
+      const chain = registry.lookup("del-1");
+      if (!chain) throw new Error("fixture chain missing");
+      chain.latestModelKey = "dynamic/dynamic-model";
+      subagentRuns.calls.length = 0;
+      subagentRuns.deferred = false;
+      try {
+        await startTask(runtime, "task-2", { agent: "explorer", task: "Continue.", resume: "del-1" });
+        expect(host.call).toHaveBeenCalledWith("provider.resolveSubagentModel", { key: "dynamic/dynamic-model" });
+        expect(subagentRuns.calls[0].provider).toBe(allowed ? selected : provider);
+      } finally { await runtime.dispose(); }
+    });
+
+    it("does not start a resumed delegate after Stop during authorization (#841)", async () => {
+      let resolveGrant: (value: RuntimeProviderConfig) => void = () => {};
+      const host = { call: vi.fn().mockImplementation(() => new Promise<RuntimeProviderConfig>((resolve) => { resolveGrant = resolve; })) };
+      const runtime = createRuntime({ subagents: [explorer], host,
+        history: [restartedTaskRow("task-1", "del-1", { status: "completed", modelId: provider.modelId }), delegateRow("child-1", "task-1")],
+      });
+      const registry = (runtime as unknown as { delegationChains: { lookup(id: string): { latestModelKey?: string } | undefined } }).delegationChains;
+      const chain = registry.lookup("del-1");
+      if (!chain) throw new Error("fixture chain missing");
+      chain.latestModelKey = "dynamic/local-model";
+      subagentRuns.calls.length = 0;
+      try {
+        const pending = startTask(runtime, "task-2", { agent: "explorer", task: "Continue.", resume: "del-1" });
+        await runtime.abort();
+        resolveGrant(provider);
+        expect((await pending).details.error).toContain("parent turn ended");
+        expect(subagentRuns.calls).toHaveLength(0);
+      } finally { await runtime.dispose(); }
+    });
+
+    it("allows only one parallel resume while model authorization yields (#841)", async () => {
+      const runtime = createRuntime({
+        subagents: [explorer],
+        history: [restartedTaskRow("task-1", "del-1", { status: "completed", modelId: provider.modelId }), delegateRow("child-1", "task-1")],
+      });
+      subagentRuns.calls.length = 0;
+      subagentRuns.deferred = true;
+      try {
+        const results = await Promise.all(["task-2", "task-3"].map((id) => startTask(runtime, id, { agent: "explorer", task: "Continue.", resume: "del-1" })));
+        expect(results.filter((result) => !result.details.error)).toHaveLength(1);
+        expect(results.find((result) => result.details.error)?.details.error).toContain("still running");
+        expect(subagentRuns.calls).toHaveLength(1);
+      } finally { subagentRuns.deferred = false; await runtime.dispose(); }
+    });
+
     it("keeps a resumed chain on its recorded model after the session model moved", async () => {
       const remote = {
         ...provider,
@@ -8880,4 +9011,511 @@ describe("context estimate calibration", () => {
     await runtime.dispose();
   });
 });
+});
+
+describe("compaction fallback retention (#827)", () => {
+  function messageEntry(
+    id: string,
+    parentId: string | null,
+    message: unknown,
+    seq: number,
+  ) {
+    return {
+      type: "message" as const,
+      id,
+      seq,
+      parentId,
+      timestamp: Date.parse("2026-09-21T18:00:00Z") + seq * 1_000,
+      message,
+    };
+  }
+
+  function userNote(text: string, timestamp: number) {
+    return { role: "user", content: [{ type: "text", text }], timestamp };
+  }
+
+  function assistantNote(text: string, timestamp: number) {
+    return { ...assistantMessage({ content: [{ type: "text", text }] }), timestamp };
+  }
+
+  /**
+   * `toolName` is what pi's file-operation extraction matches on, and it knows
+   * the lowercase names: a chunk test that asserts the file list has to use one.
+   */
+  function toolStep(ids: string[], timestamp: number, toolName = "Read") {
+    return {
+      ...assistantMessage({
+        content: ids.map((id, index) => ({
+          type: "toolCall" as const,
+          id,
+          name: toolName,
+          arguments: { path: `large-${index}.txt` },
+        })),
+        stopReason: "toolUse",
+      }),
+      timestamp,
+    };
+  }
+
+  function toolOutput(toolCallId: string, text: string, timestamp: number) {
+    return {
+      role: "toolResult" as const,
+      toolCallId,
+      toolName: "Read",
+      content: [{ type: "text" as const, text }],
+      isError: false,
+      timestamp,
+    };
+  }
+
+  function appendedCheckpoint(host: { call: ReturnType<typeof vi.fn> }) {
+    const call = host.call.mock.calls.find(
+      ([method]) => method === "session.appendCompaction",
+    );
+    return (call?.[1] as any)?.compaction;
+  }
+
+  function failingSummary(runtime: DesktopAgentRuntime) {
+    return vi.spyOn(runtime as any, "generateCompaction").mockResolvedValue({
+      ok: false,
+      error: {
+        code: "summarization_failed",
+        message: "provider terminated the summary request",
+      },
+    });
+  }
+
+  function replayedMessages(runtime: DesktopAgentRuntime) {
+    return (runtime as any).agent.state.messages.filter(
+      (message: any) => message.role !== "system",
+    );
+  }
+
+  it("keeps the real recent window when an automatic summary fails", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const runtime = createRuntime({ host });
+    (runtime as any).fullEntries = [
+      messageEntry("user-1", null, userNote("start the migration", 1), 0),
+      messageEntry("assistant-1", "user-1", assistantNote("I mapped the schema.", 2), 1),
+      messageEntry("assistant-2", "assistant-1", toolStep(["tool-1"], 3), 2),
+      messageEntry(
+        "tool-1",
+        "assistant-2",
+        toolOutput("tool-1", "CREATE TABLE projects (id TEXT)", 4),
+        3,
+      ),
+      messageEntry("user-2", "tool-1", userNote("now rename the column", 5), 4),
+    ];
+    failingSummary(runtime);
+
+    await expect(
+      (runtime as any).runCompaction("threshold", false, "active_turn"),
+    ).resolves.toBe(true);
+
+    const checkpoint = appendedCheckpoint(host);
+    expect(checkpoint.details).toMatchObject({
+      fallback: "retained_tail",
+      failureCode: "CONTEXT_COMPACTION_FAILED",
+      failureReason: "summary_provider",
+      retainedTailMode: "active_turn",
+      retainedTailShape: "recent_window",
+      retainedTailCount: 5,
+    });
+    // The whole window survives, not the one latest user line: the earlier
+    // decision, the tool output, and the in-flight request all outlive the
+    // failed summary.
+    expect(checkpoint.retainedTail.map((message: any) => message.role)).toEqual([
+      "user",
+      "assistant",
+      "assistant",
+      "toolResult",
+      "user",
+    ]);
+    expect(checkpoint.summary).toContain(COMPACTION_FALLBACK_MARKER);
+    // A failed summary must not tell the model that one leftover user line is
+    // the source of truth for the whole continuation.
+    expect(checkpoint.summary).not.toContain("source of truth");
+
+    const replayed = replayedMessages(runtime);
+    expect(replayed.map((message: any) => message.role)).toEqual([
+      "compactionSummary",
+      "user",
+      "assistant",
+      "assistant",
+      "toolResult",
+      "user",
+    ]);
+    expect(
+      replayed
+        .filter((message: any) => message.role === "toolResult")
+        .map((message: any) => message.content[0].text),
+    ).toEqual(["CREATE TABLE projects (id TEXT)"]);
+    await runtime.dispose();
+  });
+
+  it("restores the same window for a completed turn without inventing a request", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const runtime = createRuntime({ host });
+    (runtime as any).fullEntries = [
+      messageEntry("user-1", null, userNote("start the migration", 1), 0),
+      messageEntry("assistant-1", "user-1", assistantNote("I mapped the schema.", 2), 1),
+      messageEntry("assistant-2", "assistant-1", toolStep(["tool-1"], 3), 2),
+      messageEntry(
+        "tool-1",
+        "assistant-2",
+        toolOutput("tool-1", "CREATE TABLE projects (id TEXT)", 4),
+        3,
+      ),
+      messageEntry(
+        "assistant-3",
+        "tool-1",
+        assistantNote("The migration is complete: 3 files changed.", 5),
+        4,
+      ),
+    ];
+    failingSummary(runtime);
+
+    await expect((runtime as any).runCompaction("threshold", false)).resolves.toBe(
+      true,
+    );
+
+    const checkpoint = appendedCheckpoint(host);
+    const replayed = replayedMessages(runtime);
+    expect(replayed.map((message: any) => message.role)).toEqual([
+      "compactionSummary",
+      "user",
+      "assistant",
+      "assistant",
+      "toolResult",
+      "assistant",
+    ]);
+    // The window ends on the finished assistant message, so nothing in it reads
+    // as a request the next task still has to answer (#563, #224).
+    expect(replayed.at(-1).role).toBe("assistant");
+    await runtime.dispose();
+  });
+
+  it("summarizes a range no single prompt can carry instead of skipping it", async () => {
+    const constrained: RuntimeProviderConfig = {
+      ...provider,
+      modelConfig: {
+        ...provider.modelConfig!,
+        contextWindow: 32_000,
+        maxTokens: 4_096,
+      },
+    };
+    const runtime = createRuntime({ provider: constrained });
+    const resultCount = 600;
+    (runtime as any).fullEntries = [
+      messageEntry(
+        "old-user",
+        null,
+        { role: "user", content: "inspect the repository", timestamp: 1 },
+        0,
+      ),
+      messageEntry(
+        "carrier",
+        "old-user",
+        toolStep(
+          Array.from({ length: resultCount }, (_, index) => `tool-${index}`),
+          2,
+          "read",
+        ),
+        1,
+      ),
+      ...Array.from({ length: resultCount }, (_, index) =>
+        messageEntry(
+          `tool-${index}`,
+          index === 0 ? "carrier" : `tool-${index - 1}`,
+          toolOutput(`tool-${index}`, "r".repeat(2_000), 3),
+          index + 2,
+        ),
+      ),
+    ];
+    const generate = vi
+      .spyOn(runtime as any, "generateCompaction")
+      .mockImplementation(async () => ({
+        ok: true,
+        value: {
+          summary: `part ${generate.mock.calls.length}`,
+          tokensBefore: 80_000,
+          usage: {
+            input: 10,
+            output: 5,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 15,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          details: { readFiles: ["large-0.txt"], modifiedFiles: [] },
+        },
+      }));
+
+    const build = await (runtime as any).buildCheckpoint(
+      new AbortController().signal,
+      "active_turn",
+    );
+
+    expect(build.ok).toBe(true);
+    const calls = generate.mock.calls.map(([preparation]: any[]) => preparation);
+    expect(calls.length).toBeGreaterThan(1);
+    expect(calls.length).toBeLessThanOrEqual(16);
+    // Every request after the first carries its predecessor's summary, so the
+    // chain converges on one summary for the whole range.
+    expect(calls[0].previousSummary).toBeUndefined();
+    for (let index = 1; index < calls.length; index += 1) {
+      expect(calls[index].previousSummary).toBe(`part ${index}`);
+    }
+    // Coverage: the chunks are contiguous and together carry every message, so
+    // nothing leaves the context without the summary covering it.
+    const summarized = calls.flatMap(
+      (preparation: any) => preparation.messagesToSummarize,
+    );
+    expect(summarized).toHaveLength(resultCount + 2);
+    expect(summarized[0].content).toBe("inspect the repository");
+    expect(
+      summarized.filter((message: any) => message.role === "toolResult"),
+    ).toHaveLength(resultCount);
+    // The range's file operations ride on the last request only, so pi appends
+    // the file list to the installed summary exactly once.
+    expect(calls[0].fileOps.read.size).toBe(0);
+    expect(calls.at(-1)!.fileOps).toBe((build as any).preparation.fileOps);
+    // One checkpoint, not a fallback: the model still summarized the range.
+    const checkpoint = (build as any).checkpoint;
+    expect(checkpoint.summary).toBe(`part ${calls.length}`);
+    expect(checkpoint.usage).toMatchObject({ totalTokens: 15 * calls.length });
+    expect(checkpoint.details).toMatchObject({
+      strategy: "summary",
+      retainedTailMode: "active_turn",
+      readFiles: ["large-0.txt"],
+    });
+    expect(checkpoint.details.fallback).toBeUndefined();
+    await runtime.dispose();
+  });
+
+  it("records why a fallback had to run", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const runtime = createRuntime({ host });
+    (runtime as any).fullEntries = [
+      messageEntry("user-1", null, userNote("continue the migration", 1), 0),
+    ];
+
+    await expect(
+      (runtime as any).recoverCompactionFailure(
+        (runtime as any).entriesWithCompaction(),
+        (runtime as any).contextBudget(
+          (runtime as any).liveSessionContext().messages,
+        ),
+        "threshold",
+        false,
+        undefined,
+        "Compaction summary input exceeds the safe model budget",
+        "active_turn",
+        "summary_budget",
+      ),
+    ).resolves.toBe(true);
+
+    expect(appendedCheckpoint(host).details).toMatchObject({
+      failureReason: "summary_budget",
+      retainedTailMode: "active_turn",
+      retainedTailShape: "recent_window",
+    });
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime loop context ownership (D620)", () => {
+  /**
+   * Rounds 1 and 2 answer with a tool call and round 3 closes the turn; with
+   * `stopAfterFirstRound` the run ends on the tool round instead, the way a
+   * user Stop does. Every round records the request view the provider saw.
+   */
+  function scriptCallRounds(
+    runtime: DesktopAgentRuntime,
+    requests: AgentMessage[][],
+    options: { stopAfterRound?: number } = {},
+  ): void {
+    let round = 0;
+    (runtime as any).models = {
+      streamSimple: (_model: unknown, context: { messages: AgentMessage[] }) => {
+        round += 1;
+        const current = round;
+        requests.push([...context.messages]);
+        if (current === options.stopAfterRound) {
+          runtime.requestGracefulStop();
+        }
+        const withCall = current <= 2;
+        const message = assistantMessage({
+          content: withCall
+            ? [
+                { type: "text", text: `round ${current}` },
+                {
+                  type: "toolCall",
+                  id: `call-${current}`,
+                  name: "plugin_demo_probe",
+                  arguments: {},
+                },
+              ]
+            : [{ type: "text", text: `round ${current}` }],
+          stopReason: withCall ? "toolUse" : "stop",
+        }) as unknown as AssistantMessage;
+        const stream = createAssistantMessageEventStream();
+        queueMicrotask(() => {
+          stream.push({ type: "start", partial: message });
+          stream.push({
+            type: "done",
+            reason: withCall ? "toolUse" : "stop",
+            message,
+          });
+          stream.end(message);
+        });
+        return stream;
+      },
+    };
+  }
+
+  function probeRuntime(
+    requests: AgentMessage[][],
+    options: { stopAfterRound?: number } = {},
+  ): DesktopAgentRuntime {
+    const runtime = createRuntime({
+      host: {
+        call: vi.fn(async (method: string) =>
+          method === "tools.execute"
+            ? {
+                ok: true,
+                content: {
+                  content: [{ type: "text", text: "probe ok" }],
+                  details: {},
+                },
+              }
+            : undefined,
+        ),
+      } as never,
+      pluginTools: [
+        { name: "plugin_demo_probe", description: "probe", parameters: {} },
+      ],
+    });
+    scriptCallRounds(runtime, requests, options);
+    return runtime;
+  }
+
+  function textBlocks(messages: AgentMessage[]): string[] {
+    return messages.flatMap((message) =>
+      message.role === "assistant"
+        ? ((message as { content: unknown[] }).content ?? [])
+            .filter(
+              (block): block is { type: string; text: string } =>
+                typeof block === "object" &&
+                block !== null &&
+                (block as { type?: string }).type === "text",
+            )
+            .map((block) => block.text)
+        : [],
+    );
+  }
+
+  function toolCallIds(messages: AgentMessage[]): string[] {
+    return messages.flatMap((message) =>
+      message.role === "assistant"
+        ? ((message as { content: unknown[] }).content ?? [])
+            .filter(
+              (block): block is { type: string; id: string } =>
+                typeof block === "object" &&
+                block !== null &&
+                (block as { type?: string }).type === "toolCall",
+            )
+            .map((block) => block.id)
+        : [],
+    );
+  }
+
+  function resultIds(messages: AgentMessage[]): string[] {
+    return messages
+      .filter((message) => message.role === "toolResult")
+      .map((message) => (message as { toolCallId?: string }).toolCallId ?? "");
+  }
+
+  /** Every result has to sit directly behind the assistant that carries its call. */
+  function expectResultsFollowTheirCalls(messages: AgentMessage[]): void {
+    for (let index = 0; index < messages.length; index += 1) {
+      const message = messages[index] as { role?: string; toolCallId?: string };
+      if (message.role !== "toolResult") continue;
+      let previous = index - 1;
+      while (
+        previous >= 0 &&
+        (messages[previous] as { role?: string }).role === "system"
+      ) {
+        previous -= 1;
+      }
+      const carrier = messages[previous] as { role?: string; content?: unknown[] };
+      expect(carrier?.role).toBe("assistant");
+      expect(
+        (carrier?.content ?? []).some(
+          (block) =>
+            typeof block === "object" &&
+            block !== null &&
+            (block as { type?: string }).type === "toolCall" &&
+            (block as { id?: string }).id === message.toolCallId,
+        ),
+      ).toBe(true);
+    }
+  }
+
+  it("stores one copy of every message the loop appends", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const requests: AgentMessage[][] = [];
+      const runtime = probeRuntime(requests);
+
+      await runtime.prompt("first task", "user-1", "turn-1");
+
+      // The loop appends the streamed assistant message and the tool results to
+      // the context it was handed; pi's `message_end` listener appends the same
+      // object to the state. Sharing one array stored every message of the
+      // later rounds twice (D620).
+      const state = (runtime as any).agent.state.messages as AgentMessage[];
+      expect(textBlocks(state)).toEqual(["round 1", "round 2", "round 3"]);
+      expect(toolCallIds(state)).toEqual(["call-1", "call-2"]);
+      expect(resultIds(state)).toEqual(["call-1", "call-2"]);
+      // Nothing was duplicated, so the request guard had nothing to report.
+      const log = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+      expect(log).not.toContain("duplicate tool call");
+
+      await runtime.dispose();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("opens the next turn from a stopped tool round without guard repairs", async () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const requests: AgentMessage[][] = [];
+      const runtime = probeRuntime(requests, { stopAfterRound: 2 });
+
+      // A Stop ends the run on the second tool round, so those messages are the
+      // ones the next turn's first request is built from — the request that
+      // production rejected with `Duplicate tool output for call_id` (D620).
+      await runtime.prompt("first task", "user-1", "turn-1");
+
+      requests.length = 0;
+      await runtime.prompt("second task", "user-2", "turn-2");
+
+      // `streamSimple` sees the view `convertToLlm` produced, so this is the
+      // request the guard let through unrepaired, not the adapter's output: the
+      // second output pi-ai synthesizes for an unanswered call is pinned
+      // directly in `tool-call-dedupe.test.ts` (request wire contract).
+      const wire = requests[0]!;
+      expect(toolCallIds(wire)).toEqual(["call-1", "call-2"]);
+      expect(resultIds(wire)).toEqual(["call-1", "call-2"]);
+      expectResultsFollowTheirCalls(wire);
+      const log = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+      expect(log).not.toContain("duplicate tool call");
+
+      await runtime.dispose();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
 });
