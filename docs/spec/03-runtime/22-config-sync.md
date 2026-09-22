@@ -43,8 +43,10 @@ repositories or arbitrary files. Imported instruction files are written only
 after their scope is explicitly selected, mapped where required, and approved.
 Directory-shaped skills carry bounded sibling resources as authenticated
 objects. Package paths, symlinks, collisions, file counts, and total size are
-validated by Host before approved resources are written; scripts are stored as
-bytes and are never executed by import.
+validated by Host before approved resources are written: at most 256 resources
+per package, 2 MiB per resource, and 16 MiB per package, while the skill
+document itself stays capped at 128 KiB because it can reach a prompt. Scripts
+are stored as bytes and are never executed by import.
 
 Project and workspace bindings are represented by opaque logical identifiers.
 Host-core assigns a persistent logical identity to each registered standalone
