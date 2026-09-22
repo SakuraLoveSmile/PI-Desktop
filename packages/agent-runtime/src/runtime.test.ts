@@ -7,6 +7,8 @@ import {
   toToolDeclaration,
   type AssistantMessage,
 } from "@earendil-works/pi-ai";
+import { formatSessionMessage, type SessionMessageOrigin } from "@pi-desktop/shared";
+import { estimateContextTokens as estimateTranscriptTokens } from "@earendil-works/pi-ai/utils/estimate";
 import { buildSessionContext } from "./session-context.js";
 import {
   COMPACTION_FALLBACK_MARKER,
