@@ -1300,6 +1300,8 @@ sklm: {
     "headersJsonCopied": "En-têtes JSON copiés",
     "importHeadersJson": "Importer JSON",
     "headersImportError": "Utilisez un objet JSON avec des noms d'en-tête et des valeurs de chaîne.",
+    "headersFullwidthFolded": "Les valeurs contenant des caractères pleine largeur sont enregistrées en demi-largeur.",
+    "headersValueNotLatin1": "Les valeurs d'en-tête doivent être en Latin-1 : le texte chinois, les emoji et similaires ne peuvent pas être transmis dans un en-tête HTTP.",
     "changeDefaultModel": "Modifier",
     "presetCustomEndpoint": "Point de terminaison personnalisé",
     "customModelHint": "Ajoutez un identifiant que le catalogue n'a pas encore publié.",

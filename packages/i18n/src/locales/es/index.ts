@@ -1300,6 +1300,8 @@ sklm: {
     "headersJsonCopied": "Encabezados JSON copiados",
     "importHeadersJson": "Importar JSON",
     "headersImportError": "Utilice un objeto JSON con nombres de encabezado y valores de cadena.",
+    "headersFullwidthFolded": "Los valores con caracteres de ancho completo se guardan como de ancho medio.",
+    "headersValueNotLatin1": "Los valores de encabezado deben ser Latin-1: el texto en chino, los emoji y similares no pueden viajar en un encabezado HTTP.",
     "changeDefaultModel": "Cambiar",
     "presetCustomEndpoint": "Punto final personalizado",
     "customModelHint": "Agregue un ID que el catálogo aún no publica.",

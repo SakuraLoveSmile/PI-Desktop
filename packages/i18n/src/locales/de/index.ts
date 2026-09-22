@@ -1300,6 +1300,8 @@ sklm: {
     "headersJsonCopied": "Header-JSON kopiert",
     "importHeadersJson": "JSON importieren",
     "headersImportError": "Verwenden Sie ein JSON-Objekt mit Header-Namen und Zeichenfolgenwerten.",
+    "headersFullwidthFolded": "Werte mit Vollbreiten-Zeichen werden halbbreit gespeichert.",
+    "headersValueNotLatin1": "Header-Werte müssen Latin-1 sein: chinesischer Text, Emoji und Ähnliches lassen sich nicht in einem HTTP-Header übertragen.",
     "changeDefaultModel": "Ändern",
     "presetCustomEndpoint": "Benutzerdefinierter Endpunkt",
     "customModelHint": "Fügen Sie eine ID hinzu, die der Katalog noch nicht veröffentlicht.",

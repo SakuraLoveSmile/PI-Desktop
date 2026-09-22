@@ -1287,6 +1287,8 @@ sklm: {
     headersJsonCopied: "请求头 JSON 已复制",
     importHeadersJson: "导入 JSON",
     headersImportError: "JSON 须是由请求头名称和字符串值组成的对象。",
+    headersFullwidthFolded: "含全角字符的值会按半角保存。",
+    headersValueNotLatin1: "请求头的值只能是 Latin-1：中文、emoji 等字符无法写入 HTTP 头，保存会被拒绝。",
     changeDefaultModel: "更改",
     presetCustomEndpoint: "自定义端点",
     customModelHint: "添加目录尚未发布的模型 ID。",

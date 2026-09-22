@@ -1319,6 +1319,8 @@ sklm: {
     headersJsonCopied: "Headers JSON copied",
     importHeadersJson: "Import JSON",
     headersImportError: "Use a JSON object with header names and string values.",
+    headersFullwidthFolded: "Fullwidth characters are saved as half-width.",
+    headersValueNotLatin1: "Header values must be Latin-1: Chinese text, emoji and the like cannot travel in an HTTP header.",
     changeDefaultModel: "Change",
     presetCustomEndpoint: "Custom endpoint",
     customModelHint: "Add an ID the catalog does not publish yet.",
