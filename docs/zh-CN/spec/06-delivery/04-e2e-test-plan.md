@@ -9,6 +9,16 @@
 
 ---
 
+### E2E-IMAGES-provider-save-feedback
+
+- **前提：** 生图配置 UI fixture，中英文界面。
+- **步骤：** 勾选生图模型并保存服务商；从摘要菜单切换默认生图模型；
+  再取消唯一生图模型的标记并保存。
+- **预期：** 服务商编辑确认“服务已更新”，清除生图选择后也不会提示已选择
+  生图模型；摘要菜单切换仍显示生图选择成功提示。绑定保存行为不变。
+- **规格：** 03-runtime/21-image-generation。**验收：** B。
+- **里程碑：** 维护。**状态：** `scripts/e2e-image-generation-ui.mjs` 自动覆盖。
+
 ### E2E-IMAGES-deselect-default
 
 - **前提：** 只有一个服务商、一个模型，且该模型已标记为生图模型。
@@ -8358,6 +8368,19 @@ the latest destination. These assertions measure work counts, not device FPS.
   `desktop_dispatch_outlasts_every_electron_budget_it_wraps` covers the dispatch
   default.
 - **Status:** Contract-covered; no end-to-end driver waits out a real 70s call.
+
+### E2E-IMAGES-remove-configured-model
+
+- **前提：** API 边界 fixture，服务商包含已标记的生图模型及另一个模型；
+  分别测试旧版单绑定和另一服务商仍有可用生图候选的情况。
+- **步骤：** 不操作生图复选框，直接移除已标记模型；先取消，再重复并保存，
+  重新打开设置和编辑器。
+- **预期：** 取消保留配置；保存清除已移除模型的生图候选并清空生图默认值，即使
+  仍有其他可用候选；保留仍存在的聊天默认模型，被移除的聊天默认模型按原有
+  规则改为第一个剩余模型，重新打开后状态保持。
+- **规格：** 03-runtime/21-image-generation。**验收：** B。
+- **里程碑：** 维护。**状态：** `scripts/e2e-image-generation-ui.mjs`
+  使用中英文自动覆盖。
 
 ### E2E-IMAGES-desktop-conversation
 
