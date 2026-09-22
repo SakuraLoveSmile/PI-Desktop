@@ -58,6 +58,11 @@ attachment store after realpath containment. Each edit input set is capped at
 
 ## Results and recovery
 
+Saving a provider confirms the provider was saved or updated, including when
+image capabilities were marked or unmarked. It must not claim that an image
+model was selected after deselection. Choosing an image default from the
+summary menu retains the image-selection confirmation.
+
 Each result records index, status (`succeeded`, `failed`, `cancelled`), successful
 path/MIME type or a safe error code. New files get unique names in session scratch;
 editing never overwrites its source. The tool result and transcript retain file
