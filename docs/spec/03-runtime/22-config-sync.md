@@ -86,10 +86,20 @@ capability probe writes a temporary object with conditional creation twice,
 obtains a strong ETag, verifies a matching `If-Match` update, and verifies a
 stale `If-Match` is rejected before the object is removed.
 
-HTTPS is required by default. Redirects, endpoint userinfo, path traversal,
+Some WebDAV gateways report a missing object as `502 Bad Gateway` instead of
+`404 Not Found`. The capability probe records this behavior for the selected
+endpoint after deleting its temporary object; subsequent reads treat only that
+observed status as absence. Other non-success responses remain errors. This
+does not relax conditional-write requirements: a server that ignores
+`If-None-Match` or `If-Match` remains unsupported for bidirectional sync.
+
+HTTPS is required by default. The settings page may expose an explicit
+LAN-risk acknowledgement for HTTP, but Host accepts that exception only for
+localhost, `.local` names, or private/link-local IP addresses. Public HTTP
+endpoints remain rejected. The warning explains that HTTP does not protect
+WebDAV credentials in transit. Redirects, endpoint userinfo, path traversal,
 unsafe remote names, oversized objects, weak ETags, and unbounded KDF
-parameters are rejected. An HTTP exception, when exposed by a future UI, must
-be an explicit LAN-risk acknowledgement.
+parameters are rejected.
 
 ## 4. Merge and activation
 

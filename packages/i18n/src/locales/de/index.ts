@@ -679,6 +679,9 @@ sklm: {
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
       endpoint: "WebDAV URL",
       endpointPlaceholder: "https://dav.example.com/",
+      allowInsecureHttp: "HTTP für eine vertrauenswürdige LAN-Adresse zulassen",
+      allowInsecureHttpWarning:
+        "HTTP verschlüsselt WebDAV-Anmeldedaten nicht. Nur für eine vertrauenswürdige LAN-Adresse aktivieren; öffentliche HTTP-Endpunkte werden abgelehnt.",
       username: "Username",
       appPassword: "App password",
       directory: "Remote directory",

@@ -8019,7 +8019,16 @@ identify the platform validation still needed.
   reject one staged entity, edit disjoint settings on both devices, and sync
   again. 7) Exercise a concurrent head writer, wrong password, weak ETag,
   ciphertext corruption, redirect, archive traversal, and network interruption.
-- **Expected:** The test refuses unreliable conditional writes. WebDAV sees
+  8) Use the explicit LAN HTTP acknowledgement with a loopback/private fixture,
+  verify the setting survives a state refresh, and confirm a public HTTP
+  endpoint is rejected even when the checkbox is selected.
+- **Expected:** The test refuses unreliable conditional writes. HTTP remains
+  opt-in and is accepted only for localhost, `.local`, or private/link-local
+  addresses; public HTTP endpoints are rejected and the UI explains the
+  credential exposure risk. A fixture that reports a missing object as 502 is
+  accepted only after the capability probe observes that endpoint-specific
+  behavior; a server that ignores conditional headers remains unsupported.
+  WebDAV sees
   only authenticated ciphertext and opaque object names; raw secrets never
   appear in renderer state or logs. Identical and disjoint edits converge,
   conflicts remain reviewable, explicit deletions use tombstones, category

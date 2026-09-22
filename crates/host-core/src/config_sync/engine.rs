@@ -69,6 +69,9 @@ pub struct StoredConfig {
     pub directory: String,
     pub device_label: String,
     pub allow_insecure_http: bool,
+    /// Endpoint-specific compatibility for servers that report missing GETs as 502.
+    #[serde(default)]
+    pub missing_object_status: Option<u16>,
     pub categories: BTreeMap<String, bool>,
     pub include_secrets: bool,
     pub include_memory: bool,
@@ -207,6 +210,7 @@ struct PublicState {
     directory: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     device_label: Option<String>,
+    allow_insecure_http: bool,
     categories: BTreeMap<String, bool>,
     include_secrets: bool,
     include_memory: bool,
@@ -348,6 +352,7 @@ fn transport_with_password(config: &StoredConfig, password: String) -> Result<We
         password,
         directory: config.directory.clone(),
         allow_insecure_http: config.allow_insecure_http,
+        missing_object_status: config.missing_object_status,
     })
 }
 
@@ -621,6 +626,7 @@ pub fn public_state(st: &mut AppState) -> Result<Value> {
             username: None,
             directory: None,
             device_label: None,
+            allow_insecure_http: false,
             categories: default_categories(),
             include_secrets: false,
             include_memory: false,
@@ -714,6 +720,7 @@ pub fn public_state(st: &mut AppState) -> Result<Value> {
         username: Some(config_ref.username.clone()),
         directory: Some(config_ref.directory.clone()),
         device_label: Some(config_ref.device_label.clone()),
+        allow_insecure_http: config_ref.allow_insecure_http,
         categories: config_ref.categories.clone(),
         include_secrets: config_ref.include_secrets,
         include_memory: config_ref.include_memory,
@@ -810,6 +817,7 @@ fn config_from_input(
             .and_then(Value::as_bool)
             .or_else(|| existing.map(|value| value.allow_insecure_http))
             .unwrap_or(false),
+        missing_object_status: existing.and_then(|value| value.missing_object_status),
         categories,
         include_secrets,
         include_memory,
@@ -1118,6 +1126,8 @@ mod tests {
         let device_b_dir = tempfile::tempdir()?;
         let device_a = configure_test_device(device_a_dir.path(), &fixture.endpoint).await?;
         let device_b = configure_test_device(device_b_dir.path(), &fixture.endpoint).await?;
+        let device_a_state = get_state(device_a.clone()).await?;
+        assert_eq!(device_a_state.get("allowInsecureHttp"), Some(&json!(true)));
         let project_a = device_a_dir.path().join("project");
         let project_b = device_b_dir.path().join("project");
         std::fs::create_dir_all(&project_a)?;

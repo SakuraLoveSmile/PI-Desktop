@@ -676,6 +676,8 @@ sklm: {
       connectionDescription: "通过加密的 WebDAV 保管库同步可移植配置。不会包含对话历史、源文件或运行时状态。",
       endpoint: "WebDAV 地址",
       endpointPlaceholder: "https://dav.example.com/",
+      allowInsecureHttp: "允许在受信任的内网地址使用 HTTP",
+      allowInsecureHttpWarning: "HTTP 不会加密 WebDAV 凭据。仅对你控制的受信任内网地址启用；公网 HTTP 地址会被拒绝。",
       username: "用户名",
       appPassword: "应用密码",
       directory: "远程目录",

@@ -43,7 +43,12 @@ Host-core 持有 vault key、WebDAV 传输、修订状态、合并基线、待�
 
 初始化使用 `If-None-Match: *`。已有 head 必须有 strong ETag，并使用 `If-Match` 发布。前置条件失败时会从重新读取的 head 开始重新协调；绝不会盲目覆盖。能力探测会用临时对象进行两次条件创建，取得 strong ETag，验证匹配的 `If-Match` 更新，并验证旧的 `If-Match` 会被拒绝，然后删除该对象。
 
-默认要求 HTTPS。redirect、endpoint userinfo、路径穿越、不安全远端名称、过大对象、weak ETag 和无界 KDF 参数都会被拒绝。未来 UI 若暴露 HTTP 例外，必须要求明确确认 LAN 风险。
+部分 WebDAV 网关会把不存在的对象返回为 `502 Bad Gateway`，而不是
+`404 Not Found`。能力探测会在删除临时对象后记录所选 endpoint 的这一行为；后续读取只会将该
+endpoint 已观测到的状态视为对象不存在，其他非成功响应仍然报错。这不会放宽条件写要求：忽略
+`If-None-Match` 或 `If-Match` 的服务器仍不支持双向同步。
+
+默认要求 HTTPS。设置页可显式确认 LAN HTTP 风险，但 Host 仅接受 localhost、`.local` 或私有／链路本地 IP；公网 HTTP 仍会被拒绝。redirect、endpoint userinfo、路径穿越、不安全远端名称、过大对象、weak ETag 和无界 KDF 参数都会被拒绝。
 
 ## 4. 合并与激活
 

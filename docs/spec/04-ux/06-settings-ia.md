@@ -156,7 +156,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - **Safety**: the page never renders raw credentials or vault keys. Imported
   MCP, skills, subagents, plugins, automations, and project-scoped data remain
   pending until local activation approval and any required folder mapping are
-  complete. Disconnect preserves local and remote data.
+  complete. HTTPS remains the default. For a trusted LAN endpoint, the page
+  can explicitly acknowledge HTTP risk; public HTTP endpoints are rejected and
+  the warning explains that WebDAV credentials are not encrypted in transit.
+  Disconnect preserves local and remote data.
 - **State and recovery**: show distinct configured, locked, syncing, offline,
   unsupported-server, conflict, awaiting-activation, paused, and error states.
   Users can sync now, unlock, pause this device, approve/reject staged items,

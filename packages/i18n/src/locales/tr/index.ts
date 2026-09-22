@@ -686,6 +686,9 @@ sklm: {
       connectionDescription: "Şifreli bir WebDAV kasası üzerinden taşınabilir yapılandırmayı senkronize edin.",
       endpoint: "WebDAV URL'si",
       endpointPlaceholder: "https://dav.example.com/",
+      allowInsecureHttp: "Allow HTTP for a trusted LAN address",
+      allowInsecureHttpWarning:
+        "HTTP does not encrypt WebDAV credentials. Enable only for a trusted LAN address; public HTTP endpoints are rejected.",
       username: "Kullanıcı adı",
       appPassword: "Uygulama parolası",
       directory: "Uzak dizin",

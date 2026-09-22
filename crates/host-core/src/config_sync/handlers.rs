@@ -75,6 +75,7 @@ pub(crate) async fn test(state: Arc<Mutex<AppState>>, params: Value) -> Result<V
                 directory: directory.trim().into(),
                 device_label: "test".into(),
                 allow_insecure_http: allow_insecure,
+                missing_object_status: None,
                 categories: default_categories(),
                 include_secrets: false,
                 include_memory: false,
@@ -163,6 +164,8 @@ pub(crate) async fn configure(state: Arc<Mutex<AppState>>, params: Value) -> Res
     if !probe.conditional_writes {
         bail!("CONFIG_SYNC_UNSUPPORTED: WebDAV server did not prove reliable conditional writes");
     }
+    let transport = transport.with_probe_result(&probe);
+    config.missing_object_status = probe.missing_object_status;
     transport.ensure_collection("vault").await?;
     let remote_header = transport.get("header").await?;
     if let Some((bytes, _)) = remote_header {

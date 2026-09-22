@@ -37,7 +37,16 @@ folder paths never become cross-device identity.
 WebDAV initialization and head publication require reliable conditional writes:
 `If-None-Match: *` for creation and strong-ETag `If-Match` for updates. A CAS
 failure restarts reconciliation. Servers that cannot prove this capability are
-reported as unsupported rather than silently using last-writer-wins.
+reported as unsupported rather than silently using last-writer-wins. HTTPS is
+the default transport; the settings UI may explicitly acknowledge LAN HTTP
+risk, and Host restricts that exception to localhost, `.local`, or private /
+link-local IP addresses. Public HTTP endpoints remain rejected.
+
+The capability probe may record an endpoint-specific `502 Bad Gateway` response
+for a missing object, because some WebDAV gateways use that status instead of
+`404`. Only that observed status is treated as absence for subsequent reads;
+arbitrary `502` responses are not globally treated as an empty remote. This
+compatibility does not allow servers that ignore conditional-write headers.
 
 ## Consequences
 

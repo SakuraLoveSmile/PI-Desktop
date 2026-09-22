@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use reqwest::header::{HeaderMap, HeaderValue, ETAG, IF_MATCH, IF_NONE_MATCH, LOCATION};
 use reqwest::{Client, Method, StatusCode, Url};
+use std::net::IpAddr;
 use uuid::Uuid;
 
 const MAX_REMOTE_OBJECT_BYTES: usize = 64 * 1024 * 1024;
@@ -12,11 +13,13 @@ pub struct WebDavConfig {
     pub password: String,
     pub directory: String,
     pub allow_insecure_http: bool,
+    pub missing_object_status: Option<u16>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ProbeResult {
     pub conditional_writes: bool,
+    pub missing_object_status: Option<u16>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +29,7 @@ pub struct WebDavTransport {
     username: String,
     password: String,
     directory: String,
+    missing_object_status: Option<StatusCode>,
 }
 
 fn validate_relative_directory(value: &str) -> Result<String> {
@@ -50,6 +54,36 @@ fn validate_relative_directory(value: &str) -> Result<String> {
     Ok(parts.join("/"))
 }
 
+fn is_lan_http_host(host: &str) -> bool {
+    let host = host
+        .trim()
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if matches!(host.as_str(), "localhost" | "localhost.localdomain") || host.ends_with(".local") {
+        return true;
+    }
+
+    match host.parse::<IpAddr>() {
+        Ok(IpAddr::V4(address)) => {
+            let octets = address.octets();
+            address.is_loopback()
+                || address.is_link_local()
+                || octets[0] == 10
+                || (octets[0] == 172 && (16..=31).contains(&octets[1]))
+                || (octets[0] == 192 && octets[1] == 168)
+        }
+        Ok(IpAddr::V6(address)) => {
+            let segments = address.segments();
+            address.is_loopback()
+                || (segments[0] & 0xfe00) == 0xfc00
+                || (segments[0] & 0xffc0) == 0xfe80
+        }
+        Err(_) => false,
+    }
+}
+
 fn validate_endpoint(raw: &str, allow_insecure_http: bool) -> Result<Url> {
     let mut url = Url::parse(raw.trim()).context("parse WebDAV endpoint")?;
     if !matches!(url.scheme(), "https" | "http") {
@@ -60,6 +94,11 @@ fn validate_endpoint(raw: &str, allow_insecure_http: bool) -> Result<Url> {
     }
     if url.host_str().is_none() || !url.username().is_empty() || url.password().is_some() {
         bail!("CONFIG_SYNC_INVALID: endpoint must not contain userinfo");
+    }
+    if url.scheme() == "http" && !is_lan_http_host(url.host_str().unwrap_or_default()) {
+        bail!(
+            "CONFIG_SYNC_INVALID: HTTP is limited to localhost, .local, or private LAN addresses"
+        );
     }
     url.set_query(None);
     url.set_fragment(None);
@@ -83,7 +122,13 @@ impl WebDavTransport {
             username: config.username.trim().to_string(),
             password: config.password.clone(),
             directory,
+            missing_object_status: compatible_missing_object_status(config.missing_object_status),
         })
+    }
+
+    pub fn with_probe_result(mut self, probe: &ProbeResult) -> Self {
+        self.missing_object_status = compatible_missing_object_status(probe.missing_object_status);
+        self
     }
 
     fn url(&self, relative: &str) -> Result<Url> {
@@ -178,7 +223,9 @@ impl WebDavTransport {
         let response = self
             .send(Method::GET, relative, None, HeaderMap::new())
             .await?;
-        if response.status() == StatusCode::NOT_FOUND {
+        if response.status() == StatusCode::NOT_FOUND
+            || self.missing_object_status == Some(response.status())
+        {
             return Ok(None);
         }
         if !response.status().is_success() {
@@ -275,12 +322,21 @@ impl WebDavTransport {
             .await?
             .is_some_and(|(bytes, _)| bytes == second_body);
         self.delete(&probe).await?;
+        let missing_object_status = match self
+            .send(Method::GET, &probe, None, HeaderMap::new())
+            .await?
+            .status()
+        {
+            StatusCode::BAD_GATEWAY => Some(StatusCode::BAD_GATEWAY.as_u16()),
+            _ => None,
+        };
         Ok(ProbeResult {
             conditional_writes: !second
                 && readable
                 && matched_update
                 && stale_rejected
                 && updated_readable,
+            missing_object_status,
         })
     }
 }
@@ -291,6 +347,10 @@ fn strong_etag(headers: &HeaderMap) -> Option<String> {
         return None;
     }
     Some(value.to_string())
+}
+
+fn compatible_missing_object_status(value: Option<u16>) -> Option<StatusCode> {
+    (value == Some(StatusCode::BAD_GATEWAY.as_u16())).then_some(StatusCode::BAD_GATEWAY)
 }
 
 pub fn remote_error_is_offline(error: &anyhow::Error) -> bool {
@@ -316,6 +376,8 @@ pub(crate) mod tests {
         collections: HashSet<String>,
         next_etag: u64,
         weak_etag: bool,
+        missing_status: Option<u16>,
+        ignore_preconditions: bool,
     }
 
     async fn read_request(stream: &mut TcpStream) -> Option<(String, String, HeaderMap, Vec<u8>)> {
@@ -385,6 +447,7 @@ pub(crate) mod tests {
             404 => "Not Found",
             405 => "Method Not Allowed",
             412 => "Precondition Failed",
+            502 => "Bad Gateway",
             _ => "Bad Request",
         };
         let mut response = format!(
@@ -423,6 +486,8 @@ pub(crate) mod tests {
                             format!("\"{etag}\"")
                         };
                         (200, value.clone(), Some(etag))
+                    } else if let Some(status) = state.missing_status {
+                        (status, Vec::new(), None)
                     } else {
                         (404, Vec::new(), None)
                     }
@@ -438,7 +503,10 @@ pub(crate) mod tests {
                         .and_then(|value| value.to_str().ok())
                         .and_then(|value| value.trim_matches('"').parse::<u64>().ok())
                         .is_some_and(|expected| state.etags.get(&path) == Some(&expected));
-                    if (none_match && existing) || (headers.contains_key(IF_MATCH) && !match_ok) {
+                    if !state.ignore_preconditions
+                        && ((none_match && existing)
+                            || (headers.contains_key(IF_MATCH) && !match_ok))
+                    {
                         (412, Vec::new(), None)
                     } else {
                         state.next_etag = state.next_etag.saturating_add(1);
@@ -470,12 +538,22 @@ pub(crate) mod tests {
     }
 
     pub(crate) async fn fixture(weak_etag: bool) -> Fixture {
+        fixture_with_options(weak_etag, None, false).await
+    }
+
+    async fn fixture_with_options(
+        weak_etag: bool,
+        missing_status: Option<u16>,
+        ignore_preconditions: bool,
+    ) -> Fixture {
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind fixture");
         let address = listener.local_addr().expect("fixture address");
         let state = Arc::new(Mutex::new(FixtureState {
             weak_etag,
+            missing_status,
+            ignore_preconditions,
             ..FixtureState::default()
         }));
         let task = tokio::spawn(async move {
@@ -499,14 +577,21 @@ pub(crate) mod tests {
             password: String::new(),
             directory: "vault".into(),
             allow_insecure_http: true,
+            missing_object_status: None,
         })
         .expect("transport")
     }
 
     #[test]
-    fn endpoint_requires_https_unless_explicitly_acknowledged() {
-        assert!(validate_endpoint("http://dav.example.test/root", false).is_err());
-        assert!(validate_endpoint("http://dav.example.test/root", true).is_ok());
+    fn endpoint_requires_https_unless_explicitly_acknowledged_for_lan_hosts() {
+        assert!(validate_endpoint("http://192.168.1.10/root", false).is_err());
+        assert!(validate_endpoint("http://192.168.1.10/root", true).is_ok());
+        assert!(validate_endpoint("http://localhost/root", true).is_ok());
+        assert!(validate_endpoint("http://nas.local/root", true).is_ok());
+        assert!(validate_endpoint("http://0.0.0.0/root", true).is_err());
+        assert!(validate_endpoint("http://[::]/root", true).is_err());
+        assert!(validate_endpoint("http://dav.example.test/root", true).is_err());
+        assert!(validate_endpoint("https://dav.example.test/root", false).is_ok());
         assert!(validate_endpoint("https://user:pass@dav.example.test/root", true).is_err());
     }
 
@@ -535,6 +620,31 @@ pub(crate) mod tests {
         let fixture = fixture(false).await;
         let transport = fixture_transport(&fixture.endpoint);
         assert!(transport.probe().await.expect("probe").conditional_writes);
+        fixture.task.abort();
+    }
+
+    #[tokio::test]
+    async fn probe_rejects_servers_that_ignore_conditional_headers() {
+        let fixture = fixture_with_options(false, None, true).await;
+        let transport = fixture_transport(&fixture.endpoint);
+        let probe = transport.probe().await.expect("probe");
+        assert!(!probe.conditional_writes);
+        fixture.task.abort();
+    }
+
+    #[tokio::test]
+    async fn probe_records_bad_gateway_as_the_missing_object_status() {
+        let fixture = fixture_with_options(false, Some(502), false).await;
+        let transport = fixture_transport(&fixture.endpoint);
+        let probe = transport.probe().await.expect("probe");
+        assert!(probe.conditional_writes);
+        assert_eq!(probe.missing_object_status, Some(502));
+        let transport = transport.with_probe_result(&probe);
+        assert!(transport
+            .get("missing")
+            .await
+            .expect("missing get")
+            .is_none());
         fixture.task.abort();
     }
 

@@ -21,6 +21,8 @@ test("cloud sync is a searchable settings destination", () => {
 test("cloud sync keeps credentials and vault operations on the host boundary", () => {
   assert.match(syncPage, /api\.configSyncConfigure\(/);
   assert.match(syncPage, /setState\(await api\.configSyncSyncNow\(\)\)/);
+  assert.match(syncPage, /allowInsecureHttp/);
+  assert.match(syncPage, /settings\.configSync\.allowInsecureHttpWarning/);
   assert.match(syncPage, /api\.configSyncUnlock\(/);
   assert.match(syncPage, /api\.configSyncMapProject\(/);
   assert.match(syncPage, /api\.configSyncListHistory\(/);

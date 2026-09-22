@@ -101,6 +101,8 @@ export type ConfigSyncState = {
   username?: string;
   directory?: string;
   deviceLabel?: string;
+  /** True only when the configured WebDAV endpoint is an acknowledged LAN HTTP target. */
+  allowInsecureHttp?: boolean;
   categories: ConfigSyncCategorySelection;
   includeSecrets: boolean;
   includeMemory: boolean;
