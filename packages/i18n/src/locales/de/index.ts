@@ -679,6 +679,18 @@ sklm: {
         "Synchronize portable configuration through an encrypted WebDAV vault. Conversation history, source files, and runtime state are never included.",
       endpoint: "WebDAV URL",
       endpointPlaceholder: "https://dav.example.com/",
+      allowInsecureHttp: "HTTP für eine vertrauenswürdige LAN-Adresse zulassen",
+      allowInsecureHttpWarning:
+        "HTTP verschlüsselt WebDAV-Anmeldedaten nicht. Nur für eine vertrauenswürdige LAN-Adresse aktivieren; öffentliche HTTP-Endpunkte werden abgelehnt.",
+      remoteMode: "Server-Kompatibilität",
+      remoteModeHint:
+        "Der strikte Modus erfordert zuverlässige bedingte Schreibvorgänge. Verwende den Kompatibilitätsmodus nur für Server, die If-Match/If-None-Match ignorieren.",
+      remoteModeStrict: "Striktes CAS (empfohlen)",
+      remoteModeAppendOnly: "Kompatibilitätsmodus (nur anhängen)",
+      appendOnlyWarning:
+        "Dieser Modus ist für WebDAV-Server gedacht, die bedingte Schreibvorgänge ignorieren. Initialisiere den Tresor zuerst auf einem Gerät, bevor weitere Geräte beitreten. Er verwendet gerätespezifische Anhängeköpfe und behält den Remote-Verlauf; alle Geräte in diesem Tresor müssen den Kompatibilitätsmodus verwenden. Gleichzeitige Änderungen müssen möglicherweise geprüft werden.",
+      appendOnlyConfirm:
+        "Dieser Server kann bedingte Schreibvorgänge nicht erzwingen. Der Kompatibilitätsmodus behält den Verlauf, bietet aber kein atomares Compare-and-Swap. Fortfahren?",
       username: "Username",
       appPassword: "App password",
       directory: "Remote directory",
@@ -700,6 +712,10 @@ sklm: {
       testSuccess: "The server supports the required conditional writes.",
       testUnsupported:
         "The server did not prove reliable conditional writes; sync is not enabled.",
+      testAppendOnlySuccess:
+        "The server supports directory listing for append-only compatibility mode.",
+      testAppendOnlyUnsupported:
+        "The server did not prove directory listing for compatibility mode; sync is not enabled.",
       enable: "Enable sync",
       save: "Save and sync",
       configured: "Cloud sync configuration saved.",

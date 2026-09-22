@@ -147,8 +147,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### Cloud sync
 
 - **Connection**: WebDAV URL, username, app password, remote directory, device
-  label, and a separate backup/vault password. The test action uses only a
-  temporary remote object and must prove conditional creation and readback.
+  label, a separate backup/vault password, and a server compatibility mode.
+  Strict CAS is the default. The test action uses only temporary remote
+  objects; strict mode must prove conditional creation and readback, while
+  append-only compatibility mode must prove bounded directory listing. Choosing
+  compatibility mode shows a persistent warning and requires confirmation
+  before save. The warning explains that all devices in the vault must use the
+  same mode, history is retained, and concurrent changes may still require
+  review.
 - **Portable configuration**: supported categories are selected by default;
   credentials and project memory are explicit opt-ins. The preview reports
   supported, excluded, secret-bearing, mapping-required, and pending-approval
@@ -156,7 +162,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - **Safety**: the page never renders raw credentials or vault keys. Imported
   MCP, skills, subagents, plugins, automations, and project-scoped data remain
   pending until local activation approval and any required folder mapping are
-  complete. Disconnect preserves local and remote data.
+  complete. HTTPS remains the default. For a trusted LAN endpoint, the page
+  can explicitly acknowledge HTTP risk; public HTTP endpoints are rejected and
+  the warning explains that WebDAV credentials are not encrypted in transit.
+  Disconnect preserves local and remote data.
 - **State and recovery**: show distinct configured, locked, syncing, offline,
   unsupported-server, conflict, awaiting-activation, paused, and error states.
   Users can sync now, unlock, pause this device, approve/reject staged items,

@@ -594,7 +594,12 @@ export const api = {
   configSyncConfigure: (input: ConfigSyncConfigureInput) =>
     invoke<ConfigSyncState>(IPC.invoke.configSyncConfigure, input),
   configSyncTest: (input: Omit<ConfigSyncConfigureInput, "backupPassword"> & { backupPassword?: string }) =>
-    invoke<{ ok: boolean; conditionalWrites: boolean; message?: string }>(
+    invoke<{
+      ok: boolean;
+      conditionalWrites: boolean;
+      appendOnly: boolean;
+      message?: string;
+    }>(
       IPC.invoke.configSyncTest,
       input,
     ),
