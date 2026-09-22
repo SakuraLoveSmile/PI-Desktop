@@ -15,6 +15,7 @@ import { loadStyles } from "./helpers/styles.mjs";
 const composerSource = await readComposerSource();
 const composerToolbarSource = await readComposerModule("ComposerToolbar.tsx");
 const composerModelPickerSource = await readComposerModule("ComposerModelPicker.tsx");
+const composerPermissionPickerSource = await readComposerModule("ComposerPermissionPicker.tsx");
 const transcriptSource = await readTranscriptSource();
 const transcriptSharedSource = await readTranscriptModule("shared.tsx");
 const transcriptToolRowSource = await readTranscriptModule("ToolRow.tsx");
@@ -80,14 +81,14 @@ test("thinking levels use their canonical English values without i18n", () => {
 });
 
 test("Composer owns the mode and model controls", () => {
-  const leftToolbar = composerSource.slice(
-    composerSource.indexOf('<div className="composer-left">'),
-    composerSource.indexOf('<div className="composer-right">'),
+  const leftToolbar = composerToolbarSource.slice(
+    composerToolbarSource.indexOf('<div className="composer-left">'),
+    composerToolbarSource.indexOf('<div className="composer-right">'),
   );
   const modeControl = leftToolbar.indexOf(
     'className="icon-btn mode-chip composer-mode-chip"',
   );
-  const permissionControl = leftToolbar.indexOf('className="composer-permission"');
+  const permissionControl = composerPermissionPickerSource.indexOf('className="composer-permission"');
   const rightToolbar = composerToolbarSource.slice(
     composerToolbarSource.indexOf('<div className="composer-right">'),
   );
