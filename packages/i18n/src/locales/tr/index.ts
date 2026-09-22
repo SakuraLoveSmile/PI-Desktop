@@ -1307,6 +1307,8 @@ sklm: {
     headersJsonCopied: "Başlıklar JSON olarak kopyalandı",
     importHeadersJson: "JSON içe aktar",
     headersImportError: "JSON, başlık adları ve metin değerlerinden oluşan bir nesne olmalıdır.",
+    headersFullwidthFolded: "Tam genişlikli karakter içeren değerler yarım genişlikte kaydedilir.",
+    headersValueNotLatin1: "Başlık değerleri Latin-1 olmalıdır: Çince metin, emoji ve benzerleri bir HTTP başlığında taşınamaz.",
     changeDefaultModel: "Değiştir",
     presetCustomEndpoint: "Özel uç nokta",
     customModelHint: "Katalogda henüz yayınlanmayan bir kimlik ekleyin.",

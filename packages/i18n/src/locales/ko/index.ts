@@ -1317,6 +1317,8 @@ sklm: {
     headersJsonCopied: "헤더 JSON 복사됨",
     importHeadersJson: "JSON 가져오기",
     headersImportError: "헤더 이름과 문자열 값을 가진 JSON 객체를 사용하세요.",
+    headersFullwidthFolded: "전각 문자가 포함된 값은 반각으로 저장됩니다.",
+    headersValueNotLatin1: "헤더 값은 Latin-1이어야 합니다. 한글, 이모지 등은 HTTP 헤더로 전송할 수 없습니다.",
     changeDefaultModel: "변경",
     presetCustomEndpoint: "사용자 지정 엔드포인트",
     customModelHint: "카탈로그에 아직 게시되지 않은 ID를 추가하세요.",
