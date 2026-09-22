@@ -522,6 +522,7 @@ export const es = {
     "reject": "Rechazar",
     "untitled": "Plan sin título",
     "openArtifact": "Plan abierto",
+    "openArtifactLabel": "Artefacto de plan abierto {{path}}",
   },
   "goal": {
     "planning": "Definición de meta",
@@ -539,6 +540,7 @@ export const es = {
     "reject": "Rechazar",
     "untitled": "Objetivo sin título",
     "openArtifact": "Objetivo abierto",
+    "openArtifactLabel": "Artefacto de objetivo abierto {{path}}",
   },
   "onboarding": {
     "title": "Comenzar",

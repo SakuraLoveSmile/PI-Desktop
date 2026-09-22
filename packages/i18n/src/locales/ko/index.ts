@@ -531,6 +531,7 @@ export const ko = {
     reject: "거부",
     untitled: "제목 없는 계획",
     openArtifact: "계획 열기",
+    openArtifactLabel: "계획 아티팩트 {{path}} 열기",
   },
   goal: {
     planning: "목표 정의 중",
@@ -548,6 +549,7 @@ export const ko = {
     reject: "거부",
     untitled: "제목 없는 목표",
     openArtifact: "목표 열기",
+    openArtifactLabel: "목표 아티팩트 {{path}} 열기",
   },
   onboarding: {
     title: "시작하기",

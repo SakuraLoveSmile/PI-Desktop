@@ -6556,3 +6556,42 @@ that was sitting at the bottom — including after the turn had finished.
 - `contextWindow` and `maxTokens` are therefore optional on the wire, and each entry of the array is decoded on its own. An absent key, or an explicit `0`, reads as zero and is seeded with the generic default (128,000 / 8,192) by the normalisation that already existed for the explicit zero — the same value a record carrying only `defaultModelId` is materialized with, and the same value a plugin manifest that declares no limits already produces. The two paths now agree instead of one rejecting what the other accepts.
 - An entry that still fails to decode costs itself, not the array: the readable entries survive in their stored order, and the failure is reported on the host log with the provider id, the entry's index and the reason, so it is locatable rather than silent. An absent `models` key, an empty array, and an array whose every entry was unreadable all still read as the legacy binding, so a provider stays selectable whatever its stored shape; only the third is reported, because an empty array is a legal state and an absent one predates bindings.
 - Nothing is rewritten on disk and the write path remains explicit: `providers.update` still persists exactly the bindings the client sends. Before accepting an explicit model-array replacement, the host checks the stored value and rejects it with `MODEL_BINDINGS_DEGRADED` when the value is degraded, so a partial settings view cannot erase unreadable entries; unrelated provider fields remain updatable. See `03-runtime/12-provider-config-schema.md` §2.
+
+## 2026-09-21 — A hand-typed custom model id is seeded from the model library (D611)
+
+- Adding a custom model by id gave every binding the generic 128,000 / 8,192
+  seed and no thinking levels, even when the model library already published
+  that id, so the user had to retype limits the app could have known.
+- The settings picker now matches the typed id against models.dev through a new
+  snapshot-only renderer channel, `providers.lookupModel`, and seeds the binding
+  the way a picked model is seeded — published context window, max output
+  tokens, and thinking levels — while the stored id stays exactly what the user
+  typed. The row is written first with the generic seed and upgraded in place
+  when the answer arrives, so a slow, failed, or unpublished lookup still leaves
+  exactly one usable row, and an edit or delete made meanwhile is never
+  overwritten.
+- No provider network request, host call, schema, or persisted-data change; a
+  miss behaves exactly as before. See `03-runtime/12-provider-config-schema.md`
+  §2 and §9.
+
+## 2026-09-21 — Adding a provider never takes over an app default (D612)
+
+- The provider add flow wrote `defaultProviderId`/`defaultModelId`, and the
+  image flow wrote `imageGeneration`, whether or not the app already had one, so
+  configuring a second service silently moved the default away from the model
+  the user was running.
+- The add flow now follows the rule editing already followed: a stored default
+  survives while it still resolves, and only an unresolvable one is replaced.
+  For the model default that means the default provider row still exists and
+  still offers the model — the same resolution the settings summary renders
+  through — so an id left behind by a deleted provider is not a default and a
+  newly added provider may fill what would otherwise render as unset. The image
+  default uses the mirrored rule against its stored binding, and its candidate
+  list still accumulates the new provider's image models, so nothing vanishes
+  from the picker.
+- Settings are written only when no default resolves; the explicit "make
+  default" action, the edit path, and the fallback to the first remaining
+  binding after removing the selected model are unchanged. Behaviour is pinned
+  by `apps/desktop/test/default-model-display.test.mjs` and
+  `apps/desktop/test/image-generation-default.test.mjs`, with
+  `provider-model-config.test.mjs` asserting the add branch consults them.

@@ -526,6 +526,7 @@ export const zhTW = {
     reject: "拒絕",
     untitled: "未命名規劃",
     openArtifact: "開啟規劃",
+    openArtifactLabel: "開啟規劃檔案 {{path}}",
   },
   goal: {
     planning: "正在明確目標",
@@ -543,6 +544,7 @@ export const zhTW = {
     reject: "拒絕",
     untitled: "未命名目標",
     openArtifact: "開啟目標",
+    openArtifactLabel: "開啟目標檔案 {{path}}",
   },
   onboarding: {
     title: "開始使用",

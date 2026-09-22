@@ -531,6 +531,7 @@ export const tr = {
     reject: "Reddet",
     untitled: "Adsız plan",
     openArtifact: "Planı aç",
+    openArtifactLabel: "Plan dosyasını aç {{path}}",
   },
   goal: {
     planning: "Hedef tanımlanıyor",
@@ -548,6 +549,7 @@ export const tr = {
     reject: "Reddet",
     untitled: "Adsız hedef",
     openArtifact: "Hedefi aç",
+    openArtifactLabel: "Hedef dosyasını aç {{path}}",
   },
   onboarding: {
     title: "Başlayın",

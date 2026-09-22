@@ -526,6 +526,7 @@ export const zhCN = {
     reject: "拒绝",
     untitled: "未命名规划",
     openArtifact: "打开规划",
+    openArtifactLabel: "打开规划文件 {{path}}",
   },
   goal: {
     planning: "正在明确目标",
@@ -543,6 +544,7 @@ export const zhCN = {
     reject: "拒绝",
     untitled: "未命名目标",
     openArtifact: "打开目标",
+    openArtifactLabel: "打开目标文件 {{path}}",
   },
   onboarding: {
     title: "开始使用",

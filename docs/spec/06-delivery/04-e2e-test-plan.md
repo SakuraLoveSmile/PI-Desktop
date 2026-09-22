@@ -12,21 +12,26 @@
 
 - **Preconditions:** Isolated desktop profile and workspace, built image feature,
   local chat and OpenAI Images HTTP fixtures; no live provider credentials.
-- **Steps:** Open Models settings; verify the conversation and image defaults
-  share a compact panel. Submit a two-image request through the composer, then
-  edit the first output through a follow-up message. Collapse tool details.
-  Clear the binding and follow the visible configuration action back to Models.
-- **Expected:** A 12px default-row gap, decoded image previews outside collapsed
-  process details, multipart source upload for editing, preserved originals,
-  and no image HTTP request while unconfigured.
-- **Settings interactions:** The image summary has no Change/Clear buttons and
-  matches the default model's provider/model text styles. Select another
-  provider's image model in Advanced and save; the summary changes while the
-  chat default stays unchanged. Missing/disabled bindings show only Currently
-  unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
-- **Conversation selection:** The selected image provider/model is absent from
+- **Steps:** Open Models settings with no image model configured; verify the image
+  summary row is absent. Open a provider's Advanced model settings and verify
+  **Set as image model** is grouped with the image/document attachment
+  capabilities and can be checked for multiple models. Save, use the image
+  summary menu to choose one marked model as the default, then submit a
+  two-image request through the composer and edit the first output through a
+  follow-up message. Collapse tool details.
+- **Expected:** After saving, the image summary appears with a 12px default-row
+  gap and lists all marked candidates, the selected default is changeable
+  without changing the chat default, decoded image previews stay outside
+  collapsed process details, multipart source upload is used for editing,
+  originals are preserved, and no image HTTP request occurs while unconfigured.
+- **Settings interactions:** The unconfigured state renders no image summary.
+  Mark candidates in the attachment capability group, save, and select one
+  from the summary menu. An existing missing/disabled candidate shows only
+  Currently unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
+- **Conversation selection:** Every marked image provider/model is absent from
   default and Composer candidates. Other providers retain same-ID models. An
-  existing session pinned to the image binding is rejected before inference.
+  existing session pinned to any marked image binding is rejected before
+  inference.
 - **Transport contracts:** Real stdio reverse RPC retains a thrown local image
   error's stable code in the production ParentHostProxy. Local HTTP tests check
   single/multiple binary multipart fields and boundaries, DALL-E `b64_json`
@@ -193,6 +198,20 @@ Run the selected suites from the request worktree after `pnpm check:pr-base`
 passes. An E2E run on a branch that is behind `origin/main` is exploratory and
 does not satisfy this gate. Do not merge the task into local `main` to create
 the candidate.
+
+### E2E environment reuse
+
+Task-candidate E2E runs from the request worktree after the candidate is
+prepared, but uses the host development environment already provisioned in the
+primary checkout. Reuse the compatible Node/pnpm toolchain, `node_modules`,
+Electron, Rust/Cargo targets, package-manager stores, build caches, and ignored
+configuration by reference or link when needed.
+
+Do not run `pnpm install`, `npm install`, or create a second dependency/runtime
+environment solely for E2E. Isolate only mutable test state: temporary
+profiles, data directories, sockets, ports, logs, and artifacts. Install or
+rebuild dependencies only when the host environment is missing or incompatible
+and record the reason. Clean CI and release runners may install from lockfiles.
 
 Use the root `package.json` as the source of truth for executable commands.
 The minimum selection is:
@@ -518,6 +537,26 @@ identify the platform validation still needed.
 - **Acceptance**: B (multi-model provider configuration, save key)
 - **Milestone**: M2
 - **Status**: Manual UI + automated protocol smoke (provider create + secret, no plaintext echo)
+
+#### E2E-PROVIDER-defaults-survive-an-added-provider: An added provider leaves the app defaults alone
+
+- **Preconditions**: App running; provider A saved and set as the app default model; a second provider B serving different models; one image-capable model configured on A and another on a different service.
+- **Steps**: 1) Open Settings → Model configuration and add provider B; save without touching the Default model row. 2) Confirm the Default model row still names provider A and its exact model, and that a new session starts on it. 3) Set an image model as the default image model, then add a provider that also serves image models; save. 4) Confirm the Default image model row still names the earlier binding while the picker lists the new provider's image models as candidates. 5) Delete the provider that owned a default, then add a service that serves a model and an image model; save. 6) Confirm both defaults now resolve to that newly added provider.
+- **Expected**: Saving a new provider never repoints an app default that still resolves: the model default keeps the pairing the Default model row already renders, and the image default keeps its stored binding while its candidate list grows. Only a default that no longer resolves — its provider deleted, or its model removed from the provider — is filled by the newly added provider, so settings are written only when the app would otherwise have nothing to run. The explicit make-default actions, the edit path, and the fallback to the first remaining binding are unchanged.
+- **Specs linked**: `03-runtime/13-model-catalog-and-selection.md`
+- **Acceptance**: B (model selection)
+- **Milestone**: M6
+- **Status**: Documented; covered by `apps/desktop/test/default-model-display.test.mjs`, `apps/desktop/test/image-generation-default.test.mjs`, `apps/desktop/test/provider-model-config.test.mjs`
+
+#### E2E-PROVIDER-custom-model-limits: A hand-typed custom model id takes its limits from the model library
+
+- **Preconditions**: App running; the models.dev snapshot ships with the build; a provider editor is open.
+- **Steps**: 1) Type a model id the snapshot publishes into the add-model field and add it; confirm the new row's context window, max output tokens and thinking levels match the published record instead of 128,000 / 8,192 with none. 2) Type an id the snapshot does not publish and add it; confirm the row keeps the generic 128,000 / 8,192 seed and no thinking levels. 3) Add an id while the service list is unreachable; confirm the row still appears exactly once and stays editable. 4) Add an id and edit its limits immediately, before the lookup answers; confirm the typed values survive.
+- **Expected**: `providers.lookupModel` answers a hand-typed id from the local snapshot only — no provider network request and no host call — and a hit seeds the binding the way a picked model is seeded (published context window, max output tokens, thinking levels, `contextWindowSource: "catalog"`) while the stored id stays exactly what the user typed. A miss, a failed call, or an id the current discovery already described leaves the previous behavior intact: one usable row, the generic seed, and no stalled or duplicated list.
+- **Specs linked**: `03-runtime/12-provider-config-schema.md`, `03-runtime/13-model-catalog-and-selection.md`
+- **Acceptance**: B (multi-model provider configuration)
+- **Milestone**: M2
+- **Status**: Documented; covered by `apps/desktop/test/model-custom-lookup.test.mjs` and `apps/desktop/test/provider-lookup-model-handler.test.mjs`
 
 #### E2E-PROVIDER-configured-models-search: The chosen pane's search narrows the configured list
 
@@ -13775,44 +13814,56 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   acceptance remains outstanding. Required post-integration suites: `test:e2e`,
   `test:e2e:subagents`, `test:e2e:subagent-models`.
 
-#### E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list: A plugin-declared provider is a Host-owned, read-only row
+#### E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list: A plugin-declared provider is a Host-owned row with thinking controls
 
 - **Preconditions**: An installed local plugin declares one provider in
-  `contributes.providers` with the `provider.register` permission, one model, a
-  fixture `baseUrl`, and a key the user stores once through Settings.
-- **Steps**: 1) Enable the plugin and open Settings → Providers. 2) Select the
-  row as the session model and run a turn. 3) Try to edit it, then delete it,
-  through the user path. 4) Disable the plugin, inspect the list and the stored
-  credential, and re-enable it. 5) Uninstall the plugin; reinstall and enable
-  it, then remove the declaration from its manifest and reload. 6) Load a
-  manifest that declares providers without `provider.register`. 7) Load a
-  manifest that declares an `oauth` block and `authKind: "oauth"`.
+  `contributes.providers` with the `provider.register` permission, one model,
+  a fixture `baseUrl`, `thinkingLevels: ["off", "low", "high"]`, and
+  `defaultThinkingLevel: "high"`; a key is stored once through Settings.
+- **Steps**: 1) Enable the plugin and open Settings → Providers. 2) Inspect
+  the model binding and Composer thinking selector, then select the row as the
+  session model and run a turn. 3) Change the session thinking level and run a
+  second turn. 4) Try to edit the provider, then delete it, through the user
+  path. 5) Disable the plugin, inspect the list and stored credential, and
+  re-enable it. 6) Uninstall the plugin; reinstall and enable it, then remove
+  the declaration from its manifest and reload. 7) Load a manifest that
+  declares providers without `provider.register`. 8) Load a manifest that
+  declares an `oauth` block and `authKind: "oauth"`. 9) Load manifests whose
+  model uses a non-array `thinkingLevels`, a non-string entry, or a non-string
+  `defaultThinkingLevel`.
 - **Expected**: Step 1 shows one row in the native provider list with
   `ownerPluginId` set to the plugin and the row id
-  `plugin:<pluginId>:<declaredId>`. Step 2 binds the session like any provider
-  row. Step 3 refuses both actions with an error whose message begins
-  `PROVIDER_OWNED_BY_PLUGIN` and leaves the row unchanged. Step 4 keeps the row
-  and sets `enabled = 0` while `secret:provider:<id>:api_key` stays stored, so
-  re-enabling restores the credential. Step 5 deletes the rows and both
-  credential refs (`:api_key` and `:oauth`) in both orders — uninstall, and a
-  manifest that no longer declares the provider. Steps 6 and 7 fail manifest
-  validation as `PLUGIN_INVALID` — the missing-permission message and
-  `plugin OAuth providers are not supported in this release` /
+  `plugin:<pluginId>:<declaredId>`. Its model binding contains the normalized
+  levels `off`, `low`, and `high` in declaration order, with `high` as the
+  default. Step 2 shows those declared levels in the thinking selector and
+  starts the session at `high`; the turn uses that choice. Step 3 persists and
+  uses the changed session level without changing the provider declaration.
+  Step 4 refuses both actions with an error whose message begins
+  `PROVIDER_OWNED_BY_PLUGIN` and leaves the row unchanged. Step 5 keeps the
+  row and sets `enabled = 0` while `secret:provider:<id>:api_key` stays stored,
+  so re-enabling restores the credential and thinking binding. Step 6 deletes
+  the row and both credential refs (`:api_key` and `:oauth`) in both orders —
+  uninstall, and a manifest that no longer declares the provider. Steps 7 and
+  8 fail manifest validation as `PLUGIN_INVALID` — the missing-permission
+  message and `plugin OAuth providers are not supported in this release` /
   `unsupported authKind oauth` — and neither failure changes plugin enablement.
+  Step 9 rejects each malformed thinking-level field with `PLUGIN_INVALID` and
+  leaves plugin enablement unchanged.
 - **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4, §5.4, §7;
   `07-plugins/13-plugin-permissions-matrix.md`; `03-runtime/04-data-storage.md`
-  §4.3, §7; `03-runtime/12-provider-config-schema.md` §2, §9;
+  §4.3, §7; `03-runtime/11-provider-model-system.md` §6.2;
+  `03-runtime/12-provider-config-schema.md` §2, §9;
   `03-runtime/06-host-rpc-protocol.md`; ADR 0259; D427
 - **Acceptance**: B (model config), E (tools & permissions), F (persistence),
   G (plugins), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`): the
   declared row materializing as `plugin:<pluginId>:<declaredId>` in the native
-  provider list with its `ownerPluginId`, endpoint and models, and no row owned
-  by any other plugin, pass. Ownership refusal (`PROVIDER_OWNED_BY_PLUGIN`),
-  disable/enable, undeclare and uninstall cleanup, and the manifest refusals are
-  covered by host-core unit tests; the renderer's read-only row presentation
-  remains additional validation.
+  provider list with its `ownerPluginId`, endpoint, models, and thinking
+  binding passes. Ownership refusal (`PROVIDER_OWNED_BY_PLUGIN`),
+  disable/enable, undeclare and uninstall cleanup, and the manifest refusals
+  are covered by host-core unit tests; the renderer's read-only row and
+  thinking-selector presentation remain additional validation.
 
 #### E2E-CHAT-disclosure-toggle-keeps-reading-position
 
@@ -14426,3 +14477,29 @@ the latest destination. These assertions measure work counts, not device FPS.
   `fork_preserves_referenced_pasted_files_independently` and `sessions::fork_files`
   cover ownership, deletion, repeated/bounded forks, retained checkpoint paths,
   expired inputs, rollback, and symlink rejection.
+
+### E2E-SCHEDULED-dispatch
+
+- **Scenario:** Independent task dispatch.
+- **Expected:** The Electron runner admits independent due tasks without awaiting another task's prompt setup. Local in-flight ownership is keyed by task ID and Host instance until setup settles; Host remains authoritative for enabled, due and overlap checks. A replaced Host's completion cannot clear its successor's local ownership. Stop prevents new polls; admitted work keeps the existing execution/failure lifecycle. Failures remain observable and the 90-second late policy is unchanged.
+- **Automation:** `node --experimental-strip-types scripts/e2e-scheduled-dispatch.mjs` uses an isolated real Host and SQLite profile. Inference is not sent to a live provider.
+### E2E-SCHEDULED-project-removal
+
+- **Scenario:** Project removal and automations.
+- **Expected:** Removing a project pauses its bound scheduled tasks without deleting their definitions, schedule, workspace binding or run history. Session references in history may become null when the project's conversations are removed. Already admitted task runs block removal even before a conversation turn starts. Tasks belonging to other projects and unbound legacy tasks are unaffected. Explicit resume or Run now may recreate a project from the preserved path; automatic polling cannot do so while paused.
+- **Automation:** `node --experimental-strip-types scripts/e2e-scheduled-project-removal.mjs` uses an isolated real Host and SQLite profile. Inference is not sent to a live provider.
+### E2E-SCHEDULED-legacy-pause
+
+- **Scenario:** Legacy task maintenance.
+- **Expected:** Agent tools allow title, prompt and pause updates on legacy automatic tasks without a schedule, including an echoed unchanged cadence. These edits do not arm the task or capture the foreground workspace. Explicit enabling, a cadence change or a supplied schedule still follows schedule validation. Resume requires an explicit valid schedule; Manual-to-Hourly retains its existing default interval behavior.
+- **Automation:** `node --experimental-strip-types scripts/e2e-scheduled-legacy-maintenance.mjs` uses an isolated real Host and SQLite profile. Inference is not sent to a live provider.
+### E2E-SCHEDULED-calendar-intent
+
+- **Scenario:** Calendar intent.
+- **Expected:** The optional config_json.calendarConfigured boolean distinguishes an explicitly configured Daily/Weekly calendar from Hourly's internal schedule placeholder. Without the key, legacy Daily/Weekly schedules are treated as configured; legacy Hourly schedules retain their values but require an explicit schedule when converting to Daily/Weekly. Known calendar intent survives Hourly and restart, including midnight. Clearing or replacing the calendar with a different non-calendar placeholder clears intent. This additive extension needs no table/schema migration; older versions ignore it and cannot enforce the new conversion guard. Metadata-only edits and Manual-to-Hourly remain unchanged.
+- **Automation:** `node --experimental-strip-types scripts/e2e-scheduled-calendar-intent.mjs` uses an isolated real Host and SQLite profile. Inference is not sent to a live provider.
+### E2E-SCHEDULED-paths
+
+- **Scenario:** Workspace identity.
+- **Expected:** Stored workspace bindings use the existing project canonicalization contract on both write and read. On Windows, slash direction, case, trailing separators and extended path prefixes do not hide a task from its own project's conversation. The distinction between missing legacy bindings and explicit null remains unchanged. Foreign-project tools cannot list or mutate bound tasks.
+- **Automation:** `node --experimental-strip-types scripts/e2e-scheduled-paths.mjs` uses an isolated real Host and SQLite profile. Inference is not sent to a live provider.
