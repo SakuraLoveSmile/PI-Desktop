@@ -35,6 +35,8 @@ export type ConfigSyncStatus =
   | "paused"
   | "error";
 
+export type ConfigSyncRemoteMode = "strict" | "appendOnly";
+
 export type ConfigSyncCategorySelection = Record<ConfigSyncCategory, boolean>;
 
 export type ConfigSyncPreferences = {
@@ -43,6 +45,7 @@ export type ConfigSyncPreferences = {
   directory: string;
   deviceLabel: string;
   allowInsecureHttp?: boolean;
+  remoteMode?: ConfigSyncRemoteMode;
   categories: ConfigSyncCategorySelection;
   includeSecrets: boolean;
   includeMemory: boolean;
@@ -101,6 +104,9 @@ export type ConfigSyncState = {
   username?: string;
   directory?: string;
   deviceLabel?: string;
+  /** True only when the configured WebDAV endpoint is an acknowledged LAN HTTP target. */
+  allowInsecureHttp?: boolean;
+  remoteMode: ConfigSyncRemoteMode;
   categories: ConfigSyncCategorySelection;
   includeSecrets: boolean;
   includeMemory: boolean;
@@ -124,6 +130,7 @@ export type ConfigSyncConfigureInput = {
   /** Required when creating or unlocking the encrypted vault. */
   backupPassword: string;
   allowInsecureHttp?: boolean;
+  remoteMode?: ConfigSyncRemoteMode;
   categories?: Partial<ConfigSyncCategorySelection>;
   includeSecrets?: boolean;
   includeMemory?: boolean;
