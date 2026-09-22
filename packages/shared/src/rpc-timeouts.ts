@@ -64,6 +64,18 @@ export const AGENT_COMPACT_RPC_TIMEOUT_MS =
   (1 + COMPACTION_SUMMARY_MAX_RETRIES) * STREAM_IDLE_TIMEOUT_MS +
   COMPACTION_SUMMARY_RETRY_BUDGET_MS +
   COMMAND_RPC_BUFFER_MS;
+
+/**
+ * `configSync.syncNow` runs a whole sync in one request: a sequence of network
+ * round trips whose steps the host reports through `configSync.progress`. The
+ * host cannot cancel a run that is already under way and keeps going after a
+ * transport deadline expires, so the progress events are the liveness signal
+ * and the deadline only exists to stop a promise hanging forever when the
+ * response is genuinely lost. No part of the run has a wall clock the
+ * transport could read, so this is a ceiling for the whole run, not a measured
+ * budget.
+ */
+export const CONFIG_SYNC_RPC_TIMEOUT_MS = 1_800_000;
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -94,14 +106,16 @@ export function isRpcTimeoutError(error: unknown): boolean {
  * effective execution timeout — plus transport slack, so the transport never
  * gives up before host-core reports its own timeout. A manual context
  * checkpoint carries the same property against the sidecar's summary request
- * (`AGENT_COMPACT_RPC_TIMEOUT_MS`). Every call has a finite deadline so a lost
- * response cannot leave a pending promise forever.
+ * (`AGENT_COMPACT_RPC_TIMEOUT_MS`), and a manual cloud sync carries it against
+ * the whole remote run (`CONFIG_SYNC_RPC_TIMEOUT_MS`). Every call has a finite
+ * deadline so a lost response cannot leave a pending promise forever.
  */
 export function rpcTimeoutMs(
   method: string,
   params: unknown,
 ): number {
   if (method === "agent.compact") return AGENT_COMPACT_RPC_TIMEOUT_MS;
+  if (method === "configSync.syncNow") return CONFIG_SYNC_RPC_TIMEOUT_MS;
   if (method !== "tools.execute") return DEFAULT_RPC_TIMEOUT_MS;
 
   const input = isRecord(params) ? params : undefined;

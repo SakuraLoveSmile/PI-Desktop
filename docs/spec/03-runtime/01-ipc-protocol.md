@@ -2303,3 +2303,10 @@ renderer. The `configSync.changed` event carries the same redacted state and
 is emitted by Host-originated changes, including the Host scheduler. Main is a
 transport/lifecycle coordinator and does not schedule, merge, encrypt, or
 apply configuration.
+
+A manual sync reports `configSync.progress` while it runs: the phase
+(`capture`, `download`, `merge`, `upload`, `apply`, or `cleanup`), the units
+done and total for that phase, and the bytes when they are known. A long upload
+of many resource objects is therefore not an interface with nothing to show.
+Background polls report nothing, since only the manual path has a caller
+watching.

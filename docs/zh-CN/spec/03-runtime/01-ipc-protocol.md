@@ -1841,3 +1841,5 @@ unchanged. See [provider configuration](12-provider-config-schema.md).
 | `pi-desktop/configSync/disconnect` | `configSync.disconnect` | 移除本地同步元数据和 key；不会删除远端 vault 数据 |
 
 输入密码只会被传给需要它的操作。原始秘密、vault key、解密资源或远端 archive 不会返回到 Renderer。`configSync.changed` 事件携带相同的脱敏状态，并由 Host 发起的变更（包括 Host scheduler）触发。Main 只是传输/生命周期协调器，不负责调度、合并、加密或应用配置。
+
+手动同步会在运行期间报告 `configSync.progress`：当前阶段（`capture`、`download`、`merge`、`upload`、`apply` 或 `cleanup`）、该阶段已完成与总量，以及已知时的字节数。因此上传大量资源对象时，界面不会无内容可显示。后台轮询不报告进度，因为只有手动路径有调用方在等待。

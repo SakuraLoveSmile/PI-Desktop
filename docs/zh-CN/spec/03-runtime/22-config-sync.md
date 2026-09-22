@@ -70,6 +70,8 @@ Host 绝不会仅因为 UI flag 被设置就激活暂存的可执行内容。新
 
 设置 → 云同步提供 WebDAV endpoint 凭据、vault 密码、设备标签、服务器兼容模式、类别选择、能力测试、立即同步、解锁、暂停、文件夹映射、批准/拒绝、revision history/restore、vault 密码重新包裹以及断开连接控制。严格 CAS 是默认模式。选择追加式兼容模式会显示持续风险提示，并在保存配置前要求确认；其测试成功提示目录列表支持，而不是条件写支持。Renderer 将 `notConfigured`、`locked`、`upToDate`、`localChangesPending`、`syncing`、`offline`、`unsupportedServer`、`conflict`、`awaitingActivation`、`paused` 和 `error` 显示为不同状态。断开连接会保留本地数据，不会删除远端数据。
 
+手动同步会在运行期间报告它正在做什么。`configSync.progress` 携带当前阶段（`capture`、`download`、`merge`、`upload`、`apply` 或 `cleanup`）、该阶段已完成的单位数，以及已知时的字节数：`done`/`total` 在传输时计资源对象（追加式模式下计正在读取的设备 tip）、其他阶段计实体；`total` 为 0 表示该阶段无法预知总量；`bytesTotal` 为 0 表示字节数未知，这是下载阶段的常态。报告会节流，阶段变化绝不丢弃，状态事件与调用的返回值仍是终态信号。后台轮询不报告进度：只有手动路径有调用方在等待。
+
 凭据和 memory 默认未选中。设置预览报告 supported、excluded、secret-bearing、mapping-required 和 pending-activation 计数。原始秘密值、vault key 和备份密码永远不会跨过 Renderer 边界。
 
 Host 负责自动同步启用后的启动即时检查、30 秒本地变更防抖以及有界的五分钟远端轮询。失败网络请求使用带 jitter 且有上限的指数重试；paused、locked、不兼容、认证和错误密码状态不会启动重试循环。应用退出时 worker 会随 Host 取消；退出后没有额外 daemon。
