@@ -319,7 +319,7 @@ globalThis.imageGenerationProbe = async () => {
         click(button(i18n.t("settings.saveProvider")));
         await until(() => !document.querySelector(".provider-setup-dialog"), "model removal save did not finish");
         assert(!providers[0].models.some((model) => model.id === "image-one"), "model was not removed");
-        assert(settings.imageGeneration?.providerId === (remaining ? "q" : undefined),
+        assert(settings.imageGeneration?.providerId === undefined,
           "removed provider model kept the image default");
         assert(settings.imageGenerationModels?.length === (remaining ? 1 : 0),
           "removed provider model kept an image candidate");
