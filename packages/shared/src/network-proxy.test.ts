@@ -76,10 +76,12 @@ describe("validateNetworkProxy", () => {
       value: { mode: "direct" },
     });
   });
-  it("preserves the explicit fake-IP market opt-in without widening other modes", () => {
+  it("drops the retired fake-IP key from a stored proxy", () => {
+    // The fake-IP tolerance moved to `networkPolicy.mode`; an older stored value
+    // is ignored rather than refused, so an existing profile keeps loading.
     expect(validateNetworkProxy({ mode: "direct", allowFakeIp: true })).toEqual({
       ok: true,
-      value: { mode: "direct", allowFakeIp: true },
+      value: { mode: "direct" },
     });
     expect(validateNetworkProxy({ mode: "system", allowFakeIp: false })).toEqual({
       ok: true,

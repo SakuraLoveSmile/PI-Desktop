@@ -30,9 +30,8 @@ function repoNameFromPath(path: string): string | null {
  *
  * Plain `http`/`git` carries whatever credentials the endpoint accepts over a
  * plaintext hop, so — like every other user-supplied endpoint — it needs the
- * user's explicit `networkPolicy.allowInsecureUserEndpoints` opt-in
- * (`allowInsecureHttp`); `https`, `ssh` and `git@host:path` need no opt-in and
- * stay allowed by default.
+ * relaxed `networkPolicy.mode` (`allowInsecureHttp`); `https`, `ssh` and
+ * `git@host:path` need no opt-in and stay allowed by default.
  */
 function isAllowedGitHost(host: string): boolean {
   return isUserSuppliedHostname(host);

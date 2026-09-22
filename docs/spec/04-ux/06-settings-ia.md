@@ -140,12 +140,15 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - The selection persists as optional `AppSettings.networkProxy`
     (`mode` / `url` / `bypass`). Absent means System. No host protocol or
     storage schema version bump (D340 / ADR 0177).
-  - **Plaintext HTTP for your own endpoints**: one checkbox persisting as
-    `AppSettings.networkPolicy.allowInsecureUserEndpoints` (default off). It
-    lets an endpoint you typed yourself — a model base URL, an MCP server, a
-    market source — use `http`. The warning states that the connection is not
-    encrypted and that whatever that endpoint accepts can be read on the same
-    network segment. `https` to a LAN host needs no checkbox (ADR 0304).
+  - **Relaxed network mode**: one switch persisting as
+    `AppSettings.networkPolicy.mode` (`relaxed` | `strict`), **on by default**.
+    When it is on, an endpoint the user typed themselves — a model base URL, an
+    MCP server, a market source, a git remote — may be a loopback or LAN address,
+    may use plain `http`, and a transparent proxy's fake-IP answers are
+    tolerated. Off returns those endpoints to the public-HTTPS-only boundary.
+    The first plaintext hop to such an endpoint shows one informational notice.
+    The per-surface acknowledgements this replaced (`networkProxy.allowFakeIp`,
+    `configSync.allowInsecureHttp`) are gone (ADR 0304).
 - Platform-specific **Close behavior** remains in General because it changes
   application-window behavior rather than agent behavior.
 - File-open target, menu-bar behavior, and bottom-panel behavior are not

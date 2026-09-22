@@ -79,8 +79,8 @@ export async function applyNetworkProxy(
 export async function applyNetworkProxyFromAppSettings(
   settings: unknown,
 ): Promise<NetworkProxySettings> {
-  // The plaintext opt-in for user-supplied endpoints rides the same settings
-  // write as the proxy, so one call site mirrors both.
+  // The network policy and the proxy ride the same settings write, so one call
+  // site mirrors both.
   applyUserEndpointPolicyFromAppSettings(settings);
   const record =
     settings && typeof settings === "object"

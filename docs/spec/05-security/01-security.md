@@ -115,10 +115,10 @@ transparent router/TUN deployment. Install writes markdown only through
 is inlined.
 
 A source URL the user typed is judged by ADR 0304 instead: it may be a loopback
-or LAN catalog, and plain `http` to it needs the stored
-`networkPolicy.allowInsecureUserEndpoints` opt-in. Every document URL that
-arrives *inside* a catalog, and every redirect target, keeps the public-only
-policy above.
+or LAN catalog, and plain `http` to it is allowed because the relaxed network
+mode is on by default (`networkPolicy.mode`). Every document URL that arrives
+*inside* a catalog, and every redirect target, keeps the public-only policy
+above, in either mode.
 
 ## 4.2 MCP market egress
 
@@ -142,10 +142,11 @@ explicit local/LAN endpoints; the market path does not widen that policy.
 
 
 A market source URL the user typed is judged by ADR 0304 as well: it may be a
-loopback or LAN endpoint, with plain `http` behind
-`networkPolicy.allowInsecureUserEndpoints`. Everything a source returns —
+loopback or LAN endpoint, with plain `http` behind the relaxed network mode
+(`networkPolicy.mode`, on by default). Everything a source returns —
 registry records, catalog bodies, redirect targets — keeps the public-only
 policy above.
+
 ## 4.3 Portable configuration sync
 
 WebDAV sync is a host-core network boundary. The renderer and Agent Runtime

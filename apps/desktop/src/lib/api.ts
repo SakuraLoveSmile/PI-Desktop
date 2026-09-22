@@ -1462,6 +1462,12 @@ export const api = {
       listener((payload as { message: string }).message),
     );
   },
+  onInsecureEndpointNotice: (listener: (payload: { host: string }) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.insecureEndpointNotice, (payload) =>
+      listener(payload as { host: string }),
+    );
+  },
   onHostStatus: (listener: (status: HostStatusEvent) => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.hostStatus, (payload) =>

@@ -37,8 +37,11 @@ import {
   type RegistryRecord,
   type SourcedCatalogEntry,
 } from "@pi-desktop/shared";
-import { currentNetworkProxy } from "./network-proxy";
-import { allowInsecureUserEndpointsEnabled } from "./endpoint-policy";
+import {
+  allowInsecureUserEndpointsEnabled,
+  noteInsecureUserEndpoint,
+  relaxedNetworkPolicyEnabled,
+} from "./endpoint-policy";
 
 const PAGE_SIZE = 100;
 /** First browse paints two pages; every "load more" appends this many. */
@@ -123,6 +126,9 @@ async function resolvePublicUrl(
   const deadline = Date.now() + timeoutMs;
   const parsed = new URL(url);
   const host = parsed.hostname.toLowerCase().replace(/\.+$/, "");
+  if (userSupplied && parsed.protocol === "http:") {
+    noteInsecureUserEndpoint(host);
+  }
   const literal = host.startsWith("[") ? host.slice(1, -1) : host;
   const route = await resolveProxyRoute(url, timeoutMs);
   const remaining = deadline - Date.now();
@@ -136,7 +142,9 @@ async function resolvePublicUrl(
     remaining,
   );
   if (!addresses.length) throw new Error(`hostname does not resolve: ${host}`);
-  const allowFakeIp = currentNetworkProxy().allowFakeIp === true;
+  // Fake-IP answers are a property of the network policy, not of the proxy
+  // switch: the relaxed mode tolerates a transparent router's placeholders.
+  const allowFakeIp = relaxedNetworkPolicyEnabled();
   for (const address of addresses) {
     const addressKind = classifyIpLiteral(address.address);
     const acceptable = userSupplied

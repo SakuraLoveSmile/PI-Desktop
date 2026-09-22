@@ -3,16 +3,19 @@
  *
  * Address judgement lives in `public-network.ts`, which answers "is this
  * address public?". This module answers the separate question the app asks
- * before it applies that judgement: "did the user type this endpoint in
- * themselves, and did they accept the plaintext case for it?".
+ * before it applies that judgement: "how much does this app trust the endpoints
+ * the user typed?".
  *
  * Endpoints the user typed — a model base URL, an MCP server, a market source,
- * a git remote, a WebDAV root — are that person's own choice, so the guard
- * treats loopback and LAN addresses as reachable. Content the app did not
+ * a git remote, a WebDAV root — are that person's own choice, so the relaxed
+ * mode treats loopback and LAN addresses as reachable, allows plain `http`, and
+ * tolerates a transparent proxy's fake-IP answers. Content the app did not
  * receive from the user — a registry record, a market catalog body, an HTTP
- * redirect target — keeps the strict public-network policy, because that is
- * where the SSRF risk lives.
+ * redirect target — keeps the strict public-network policy in either mode,
+ * because that is where the SSRF risk lives.
  */
+
+export const NETWORK_POLICY_MODES = ["relaxed", "strict"] as const;
 
 /**
  * Who chose the address one request is judged for.
@@ -20,33 +23,45 @@
  * `user` is an endpoint the person typed into a settings field: their own
  * machine, their own LAN service, their own public server. `third-party` is
  * everything the app did not receive from them — a redirect target, a catalog
- * body, a registry record — which keeps the strict public-network policy,
- * because that is the input an attacker controls.
+ * body, a registry record — which keeps the strict public-network policy in
+ * either mode, because that is the input an attacker controls.
  */
 export type EndpointOrigin = "user" | "third-party";
+export type NetworkPolicyMode = (typeof NETWORK_POLICY_MODES)[number];
 
 /** `settings.networkPolicy`. */
 export type NetworkPolicySettings = {
   /**
-   * Permit plain `http` for a user-supplied endpoint. Off by default: on a LAN
-   * a plaintext hop carries whatever credentials that endpoint accepts, so it
-   * stays the user's explicit call rather than a default (the shape ADR 0300
-   * uses for a WebDAV endpoint).
+   * `relaxed` is the default: an endpoint the user typed may be a loopback or
+   * LAN address, plain `http` is usable, and a TUN proxy's fake-IP answers are
+   * tolerated. `strict` keeps the public-HTTPS-only boundary for those endpoints
+   * too.
    */
-  allowInsecureUserEndpoints?: boolean;
+  mode?: NetworkPolicyMode;
+  /**
+   * Set once the app has told the user that a plaintext hop to their own LAN is
+   * in use. The notice is informational; the mode stays what it was.
+   */
+  insecureNoticeAcknowledged?: boolean;
 };
 
-export const DEFAULT_NETWORK_POLICY: NetworkPolicySettings = {
-  allowInsecureUserEndpoints: false,
-};
+export const DEFAULT_NETWORK_POLICY: NetworkPolicySettings = { mode: "relaxed" };
 
 /** Keep only the fields this policy defines, with their usable values. */
 export function normalizeNetworkPolicy(value: unknown): NetworkPolicySettings {
   const record =
     value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const next: NetworkPolicySettings = {};
-  if (record.allowInsecureUserEndpoints === true) {
-    next.allowInsecureUserEndpoints = true;
+  const stored =
+    record.mode === "strict" || record.mode === "relaxed" ? record.mode : undefined;
+  // A build before the mode existed stored one bare flag for the plaintext case.
+  // Its `false` is the user's own answer, so it survives as `strict`; its `true`
+  // and its absence both mean the default, `relaxed`.
+  const legacy = record.allowInsecureUserEndpoints;
+  const next: NetworkPolicySettings = {
+    mode: stored ?? (legacy === false ? "strict" : "relaxed"),
+  };
+  if (record.insecureNoticeAcknowledged === true) {
+    next.insecureNoticeAcknowledged = true;
   }
   return next;
 }
@@ -62,24 +77,52 @@ export function validateNetworkPolicy(value: unknown): ValidateNetworkPolicyResu
   if (typeof value !== "object" || Array.isArray(value)) {
     return { ok: false, error: "networkPolicy must be an object" };
   }
-  const flag = (value as Record<string, unknown>).allowInsecureUserEndpoints;
-  if (flag !== undefined && typeof flag !== "boolean") {
-    return { ok: false, error: "allowInsecureUserEndpoints must be a boolean" };
+  const record = value as Record<string, unknown>;
+  if (
+    record.mode !== undefined &&
+    record.mode !== "relaxed" &&
+    record.mode !== "strict"
+  ) {
+    return { ok: false, error: "networkPolicy.mode must be relaxed or strict" };
+  }
+  if (
+    record.insecureNoticeAcknowledged !== undefined &&
+    typeof record.insecureNoticeAcknowledged !== "boolean"
+  ) {
+    return {
+      ok: false,
+      error: "insecureNoticeAcknowledged must be a boolean",
+    };
   }
   return { ok: true, value: normalizeNetworkPolicy(value) };
 }
 
 /**
- * Read the plaintext opt-in out of a whole settings object.
- *
- * Only the `networkPolicy` section is read. A top-level lookalike key must not
- * be able to turn the opt-in on: the host validates this section on write, and
- * any other spelling of the flag is a field nothing sets.
+ * Whether the relaxed mode is in force for `settings`. Absent settings and an
+ * absent `networkPolicy` section both mean yes: that is the documented default.
  */
-export function allowInsecureUserEndpoints(settings: unknown): boolean {
+export function isRelaxedNetworkPolicy(settings: unknown): boolean {
   const section =
     settings && typeof settings === "object"
       ? (settings as { networkPolicy?: unknown }).networkPolicy
       : undefined;
-  return normalizeNetworkPolicy(section).allowInsecureUserEndpoints === true;
+  return normalizeNetworkPolicy(section).mode !== "strict";
+}
+
+/**
+ * The reading every plaintext decision uses: relaxed mode is what allows a
+ * plain `http` hop to an endpoint the user typed.
+ */
+export function allowInsecureUserEndpoints(settings: unknown): boolean {
+  return isRelaxedNetworkPolicy(settings);
+}
+
+/** Whether the one-time plaintext notice still owes the user an explanation. */
+export function needsInsecureEndpointNotice(settings: unknown): boolean {
+  const section =
+    settings && typeof settings === "object"
+      ? (settings as { networkPolicy?: unknown }).networkPolicy
+      : undefined;
+  const policy = normalizeNetworkPolicy(section);
+  return policy.mode !== "strict" && policy.insecureNoticeAcknowledged !== true;
 }

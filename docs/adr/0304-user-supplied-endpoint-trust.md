@@ -34,11 +34,16 @@ result was one boundary with two different meanings in it.
    ULA, site-local and `.local` addresses, as well as any public address. It is
    an address the person typed: a model base URL, an MCP server, a market source
    URL, a git remote, a generated-image URL from a provider they configured.
-2. Plain `http` for such an endpoint requires the stored opt-in
-   `settings.networkPolicy.allowInsecureUserEndpoints` (default off) — the shape
-   ADR 0300 uses for WebDAV, and the reason ADR 0142 discloses the risk. `https`
-   to a private host needs no opt-in: the transport is protected and the address
-   is the user's own choice.
+2. One host-owned switch, **Relaxed network mode**
+   (`settings.networkPolicy.mode`, `relaxed` | `strict`), **defaults to
+   `relaxed`**. Relaxed is what lets such an endpoint resolve to loopback or a
+   LAN address, lets it use plain `http`, and tolerates a transparent proxy's
+   fake-IP answers; `strict` keeps the public-HTTPS-only boundary for those
+   endpoints too. The mode is the only switch: the earlier per-surface
+   acknowledgements (the plaintext flag, the WebDAV HTTP checkbox, the fake-IP
+   opt-in) are folded into it, and a stored `allowInsecureUserEndpoints: false`
+   migrates to `strict`. The first plaintext hop to a user endpoint tells the
+   shell once, and the acknowledgement is recorded in the same section.
 3. **Third-party content keeps the strict policy.** A registry record, a market
    catalog body, a document URL inside a catalog, and every HTTP redirect target
    are still judged by the public-only rule, with the resolved address pinned to
@@ -71,8 +76,9 @@ result was one boundary with two different meanings in it.
   a source that redirects, a catalog body, a registry record — and those paths
   stay on the public-only policy. Refusals still name the address class, so a
   proxy fake-IP artifact is told apart from a real private target (issue #419).
-- A plaintext hop to a LAN service is opt-in and warned about; whatever
-  credentials that endpoint accepts travel unencrypted across the local network.
+- A plaintext hop to a LAN service is on by default and announced once: whatever
+  credentials that endpoint accepts travel unencrypted across the local network,
+  so the user is told the first time it happens and can turn the mode off.
 - ADR 0247's consequence — "clone a private-host repository with an
   application-external git remote" — no longer applies. The decision items in
   ADR 0243, 0245 and 0247 that cover *user-supplied* URLs are amended here; their

@@ -157,6 +157,11 @@ export function createPublicHttpsClient(options: {
    * `networkPolicy`. Never widens the third-party policy.
    */
   allowInsecureUserEndpoints?: boolean | (() => boolean);
+  /**
+   * Called when a hop is about to travel as plain `http` to an endpoint the user
+   * typed. Informational: the caller tells the shell, and the request proceeds.
+   */
+  onInsecureUserEndpoint?: (host: string) => void;
   timeoutMs?: number;
 }): PublicHttpsClient {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -204,8 +209,11 @@ export function createPublicHttpsClient(options: {
         reason: "url-syntax",
       });
     }
-    const host = new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
-    if (host.startsWith("[") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return;
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase().replace(/\.+$/, "");
+    if (userSupplied && parsed.protocol === "http:") {
+      options.onInsecureUserEndpoint?.(host);
+    }
     const route = await hopRoute(url);
     let addresses: Array<{ address: string }>;
     try {

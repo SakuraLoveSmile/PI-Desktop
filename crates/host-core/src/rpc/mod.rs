@@ -679,6 +679,37 @@ fn normalize_settings_value(mut value: Value) -> Value {
                 Value::Number(DEFAULT_LARGE_PASTE_THRESHOLD.into()),
             );
         }
+        // The network policy replaced three per-feature switches. A section that
+        // is present is written back in the shape
+        // `packages/shared/src/network-policy.ts` defines: a usable `mode`, plus
+        // the one-time notice flag when it is set. Anything unusable falls back
+        // to the documented default, `relaxed`; the plaintext flag of a build
+        // before the mode existed survives as `strict`, because its `false` was
+        // the user's own answer.
+        let stored_policy = object
+            .get("networkPolicy")
+            .filter(|value| !value.is_null())
+            .cloned();
+        if let Some(stored_policy) = stored_policy {
+            let policy = stored_policy.as_object().cloned().unwrap_or_default();
+            let mode = match policy.get("mode").and_then(Value::as_str) {
+                Some("relaxed") => "relaxed",
+                Some("strict") => "strict",
+                _ => {
+                    if policy.get("allowInsecureUserEndpoints") == Some(&Value::Bool(false)) {
+                        "strict"
+                    } else {
+                        "relaxed"
+                    }
+                }
+            };
+            let mut next = serde_json::Map::new();
+            next.insert("mode".into(), Value::String(mode.into()));
+            if policy.get("insecureNoticeAcknowledged") == Some(&Value::Bool(true)) {
+                next.insert("insecureNoticeAcknowledged".into(), Value::Bool(true));
+            }
+            object.insert("networkPolicy".into(), Value::Object(next));
+        }
         // A blank override means "use the built-in default", and an unusable
         // one (wrong type, oversized, or a user template without the draft
         // variable) falls back to the default too, rather than leaving a
@@ -735,13 +766,22 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
                 "INVALID_PARAMS",
             ));
         };
+        if policy.get("mode").is_some_and(|mode| {
+            !matches!(mode.as_str(), Some("relaxed") | Some("strict"))
+        }) {
+            return Err(rpc_err(
+                1002,
+                "networkPolicy.mode must be relaxed or strict",
+                "INVALID_PARAMS",
+            ));
+        }
         if policy
-            .get("allowInsecureUserEndpoints")
+            .get("insecureNoticeAcknowledged")
             .is_some_and(|flag| !flag.is_boolean())
         {
             return Err(rpc_err(
                 1002,
-                "allowInsecureUserEndpoints must be a boolean",
+                "insecureNoticeAcknowledged must be a boolean",
                 "INVALID_PARAMS",
             ));
         }
@@ -1954,6 +1994,7 @@ async fn handle_request(
                 }
             }
             crate::network_proxy::apply_from_settings(Some(&settings));
+            crate::network_policy::apply_from_settings(Some(&settings));
             Ok(json!({ "ok": true }))
         }
 

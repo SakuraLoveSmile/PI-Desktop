@@ -20,7 +20,8 @@ test("fake-IP proxy routes use the session transport without weakening direct pi
   assert.match(source, /net\.fetch\(url/);
   assert.match(source, /requestPinnedHttps\(current, resolved/);
   assert.match(source, /MAX_SOURCE_RESPONSE_BYTES/);
-  assert.match(source, /currentNetworkProxy\(\)\.allowFakeIp/);
+  // The fake-IP tolerance is the network policy's, not the proxy's.
+  assert.match(source, /const allowFakeIp = relaxedNetworkPolicyEnabled\(\)/);
   assert.match(source, /allowFakeIp && addressKind === "benchmark"/);
   // The source URL is an address the user typed, so only the first hop is judged
   // for a user-supplied endpoint; every redirect target is third-party content
