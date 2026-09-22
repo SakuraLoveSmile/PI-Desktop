@@ -57,6 +57,13 @@ pub(crate) async fn test(state: Arc<Mutex<AppState>>, params: Value) -> Result<V
             .and_then(Value::as_bool)
             .or_else(|| existing.as_ref().map(|value| value.allow_insecure_http))
             .unwrap_or(false);
+        let remote_mode = params
+            .get("remoteMode")
+            .and_then(Value::as_str)
+            .map(parse_remote_mode)
+            .transpose()?
+            .or_else(|| existing.as_ref().map(|value| value.remote_mode))
+            .unwrap_or_default();
         let stored_password = st.secrets.get(WEBDAV_SECRET_REF)?;
         let password = params
             .get("appPassword")
@@ -75,6 +82,9 @@ pub(crate) async fn test(state: Arc<Mutex<AppState>>, params: Value) -> Result<V
                 directory: directory.trim().into(),
                 device_label: "test".into(),
                 allow_insecure_http: allow_insecure,
+                remote_mode,
+                device_id: Uuid::new_v4().to_string(),
+                missing_object_status: None,
                 categories: default_categories(),
                 include_secrets: false,
                 include_memory: false,
@@ -103,7 +113,11 @@ pub(crate) async fn test(state: Arc<Mutex<AppState>>, params: Value) -> Result<V
     };
     let transport = transport_with_password(&config, password)?;
     let probe = transport.probe().await?;
-    Ok(json!({ "ok": true, "conditionalWrites": probe.conditional_writes }))
+    Ok(json!({
+        "ok": true,
+        "conditionalWrites": probe.conditional_writes,
+        "appendOnly": probe.append_only,
+    }))
 }
 
 pub(crate) async fn configure(state: Arc<Mutex<AppState>>, params: Value) -> Result<Value> {
@@ -160,9 +174,21 @@ pub(crate) async fn configure(state: Arc<Mutex<AppState>>, params: Value) -> Res
         .map(str::to_string);
     let transport = transport_with_password(&config, transport_password.clone())?;
     let probe = transport.probe().await?;
-    if !probe.conditional_writes {
-        bail!("CONFIG_SYNC_UNSUPPORTED: WebDAV server did not prove reliable conditional writes");
+    match config.remote_mode {
+        RemoteMode::Strict if !probe.conditional_writes => {
+            bail!(
+                "CONFIG_SYNC_UNSUPPORTED: WebDAV server did not prove reliable conditional writes"
+            );
+        }
+        RemoteMode::AppendOnly if !probe.append_only => {
+            bail!(
+                "CONFIG_SYNC_UNSUPPORTED: WebDAV server did not prove append-only directory listing"
+            );
+        }
+        _ => {}
     }
+    let transport = transport.with_probe_result(&probe);
+    config.missing_object_status = probe.missing_object_status;
     transport.ensure_collection("vault").await?;
     let remote_header = transport.get("header").await?;
     if let Some((bytes, _)) = remote_header {
@@ -175,14 +201,37 @@ pub(crate) async fn configure(state: Arc<Mutex<AppState>>, params: Value) -> Res
         config.vault_id = remote.vault_id.clone();
         config.vault_header = remote;
     } else {
-        let created = transport
-            .put_if_none("header", serde_json::to_vec(&config.vault_header)?)
-            .await?;
-        if !created {
+        if config.remote_mode == RemoteMode::AppendOnly {
+            if had_existing {
+                bail!(
+                    "CONFIG_SYNC_CONFLICT: remote vault header is missing; compatibility mode will not reinitialize an existing vault"
+                );
+            }
+            transport
+                .put_unconditional("header", serde_json::to_vec(&config.vault_header)?)
+                .await?;
+        } else {
+            let created = transport
+                .put_if_none("header", serde_json::to_vec(&config.vault_header)?)
+                .await?;
+            if !created {
+                let Some((bytes, _)) = transport.get("header").await? else {
+                    bail!("CONFIG_SYNC_REMOTE: vault header disappeared during initialization");
+                };
+                let remote: VaultHeader = serde_json::from_slice(&bytes)?;
+                key = unlock_vault(&remote, backup_password)?;
+                config.vault_id = remote.vault_id.clone();
+                config.vault_header = remote;
+            }
+        }
+        if config.remote_mode == RemoteMode::AppendOnly {
             let Some((bytes, _)) = transport.get("header").await? else {
                 bail!("CONFIG_SYNC_REMOTE: vault header disappeared during initialization");
             };
             let remote: VaultHeader = serde_json::from_slice(&bytes)?;
+            if had_existing && config.vault_id != remote.vault_id {
+                bail!("CONFIG_SYNC_CONFLICT: selected WebDAV directory belongs to another vault");
+            }
             key = unlock_vault(&remote, backup_password)?;
             config.vault_id = remote.vault_id.clone();
             config.vault_header = remote;
