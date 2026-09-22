@@ -173,8 +173,9 @@ remote data.
 A manual sync reports what it is doing while it runs. `configSync.progress`
 carries the current phase — `capture`, `download`, `merge`, `upload`, `apply`,
 or `cleanup` — the units finished in that phase, and the bytes when they are
-known: `done`/`total` count resource objects while transferring and entities
-otherwise, a `total` of 0 means the phase cannot know its size, and a
+known: `done`/`total` count resource objects while transferring — the device
+tips being read, in append-only mode — and entities otherwise, a `total` of 0
+means the phase cannot know its size, and a
 `bytesTotal` of 0 means the byte size is unknown, which is the normal case for a
 download. Reports are throttled, a phase change is never dropped, and the state
 event plus the call's return value stay the terminal signal. Background polls

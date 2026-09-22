@@ -203,9 +203,20 @@ pub(super) async fn read_append_only_remote(
 
     let mut tips = Vec::new();
     let mut resources = BTreeMap::new();
-    for revision_id in &tip_ids {
+    let tip_total = tip_ids.len() as u64;
+    for (index, revision_id) in tip_ids.iter().enumerate() {
+        // Count tips, not the objects inside them: the tips are read one after
+        // another, so a per-object count inside each of them would restart and
+        // walk the bar backwards on a vault with more than one tip.
+        observer.report(SyncProgress::counted(
+            SyncPhase::Download,
+            index as u64,
+            tip_total,
+            0,
+            0,
+        ));
         let (manifest, revision_resources) =
-            read_remote_revision(transport, config, key, revision_id, observer).await?;
+            read_remote_revision(transport, config, key, revision_id, &NoSyncProgress).await?;
         for (object_id, bytes) in revision_resources {
             if let Some(existing) = resources.get(&object_id) {
                 if existing != &bytes {
@@ -217,6 +228,13 @@ pub(super) async fn read_append_only_remote(
         }
         tips.push(manifest);
     }
+    observer.report(SyncProgress::counted(
+        SyncPhase::Download,
+        tip_total,
+        tip_total,
+        0,
+        0,
+    ));
     if resources.len() > MAX_RESOURCES {
         bail!("CONFIG_SYNC_LIMIT_EXCEEDED: compatibility revision references too many resources");
     }
