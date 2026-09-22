@@ -204,6 +204,23 @@ mod tests {
         }
     }
 
+    /// The interval bounds how long a report may sit unsent, so a phase that
+    /// runs for minutes still moves. A larger constant would fail here.
+    #[test]
+    fn a_report_is_never_withheld_longer_than_the_interval() {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let notifier = ProgressNotifier::new(tx);
+        notifier.report(SyncProgress::counted(SyncPhase::Upload, 1, 9, 1024, 9216));
+        std::thread::sleep(Duration::from_millis(250));
+        notifier.report(SyncProgress::counted(SyncPhase::Upload, 2, 9, 2048, 9216));
+        let lines = reports(rx);
+        assert_eq!(
+            lines.len(),
+            2,
+            "a phase that keeps working keeps reporting: {lines:?}"
+        );
+        assert_eq!(lines[1]["params"]["done"], 2);
+    }
     #[test]
     fn a_phase_change_always_reports_and_the_rest_is_throttled() {
         let (tx, rx) = mpsc::unbounded_channel();

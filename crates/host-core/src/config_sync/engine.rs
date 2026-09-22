@@ -1284,6 +1284,16 @@ mod tests {
                 .find(|progress| progress.phase == phase)
                 .copied()
         }
+
+        fn all(&self, phase: SyncPhase) -> Vec<SyncProgress> {
+            self.0
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .iter()
+                .filter(|progress| progress.phase == phase)
+                .copied()
+                .collect()
+        }
     }
 
     #[tokio::test]
@@ -1399,6 +1409,17 @@ mod tests {
         let progress = RecordedProgress::default();
         coordinator::sync_once(&device_a, &tx, &progress).await?;
         let initial_a_state = get_state(device_a.clone()).await?;
+        let captures = progress.all(SyncPhase::Capture);
+        assert_eq!(
+            captures.len(),
+            2,
+            "capture reports that it started and what it collected: {captures:?}"
+        );
+        assert_eq!(captures[0], SyncProgress::started(SyncPhase::Capture));
+        assert!(
+            captures[1].total > 0,
+            "capture counts what it collected: {captures:?}"
+        );
         let phases = progress.phases();
         assert_eq!(
             phases.first(),
