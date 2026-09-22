@@ -28,6 +28,12 @@
   Mark candidates in the attachment capability group, save, and select one
   from the summary menu. An existing missing/disabled candidate shows only
   Currently unavailable. Covered in `scripts/e2e-image-generation-ui.mjs`.
+- **Image model deselection (#826):** With one provider and one model marked
+  for images, uncheck it in the provider editor. Cancel must preserve the image
+  default; Save must clear both its candidate and default binding. Reopen settings
+  and the editor: the image row stays hidden, the checkbox stays unchecked, and
+  the model can be selected as the chat default. Covered in English and Chinese
+  by `scripts/e2e-image-generation-ui.mjs` with an API-boundary fixture.
 - **Conversation selection:** Every marked image provider/model is absent from
   default and Composer candidates. Other providers retain same-ID models. An
   existing session pinned to any marked image binding is rejected before
