@@ -2299,7 +2299,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - **步骤**：1）选中含行内公式的整句并按 Ctrl/Cmd+C。2）选中块级公式并复制。3）从公式中间选到该句末尾并复制。4）把一段正文、一个公式和另一段正文一起选中并复制。5）选中不含公式的正文并复制。6）分别复制折行段落、列表、两个表格和代码块。7）分别复制两个 `\[ … \]` 公式、那个 `\( … \)` 公式、含字面 `$` 的公式，以及值里带换行的那两个公式。8）从句末反向选到句首选中一个公式并复制。9）在公式处于选中状态时右键该回合并选择复制，再右键另一个回合并选择复制。10）按「选中文本」菜单项的方式选中整个回合的内容——选区锚在回合上，而复制事件落在回合内部的某个段落上——并复制。11）选中一个始终不越出该公式的范围——在它的渲染内部拖选——并复制。12）把每次结果重新交给同一个回答渲染器渲染一遍——即粘回输入框并发送后得到的东西——再把它画出的公式与选区覆盖的公式逐一比对。
 - **预期**：每个公式都以它被写下时的 TeX 进入剪贴板——行内 `$…$`，块级 `$$…$$` 独占行——而不是 KaTeX 画出的字形，也不是两棵树带来的同一个表达式的两份。含字面 `$` 的公式会像代码段的围栏那样把定界符加长到盖过它，粘回去仍是公式而不是普通文字；值里带换行的行内公式则保持窄形式，因为 `$$` 落在行首会开出块级公式并吞掉整段；值的两端各带一个换行的那个，复制时会自己补上一对空白，因为语法在这里吃掉一个换行就像吃掉一个空格。从公式中间开始的选区会复制整个公式，而始终不越出某个公式的选区只复制出该公式本身。选区里其余内容与平台原本复制到的逐字节一致：折行段落仍是一整行，列表每项一行，表格单元格之间是制表符、每行一行并保留平台为末行补上的换行，代码块保留自己的空行。复制本就会略过的 chrome 不会进入剪贴板：无论 `base.css` 是按选择器把它标为 `user-select: none`（代码块的语言标签），还是它仅因继承外壳默认值而不可选（工具行的分节标题、紧凑思考行）。不含公式的选区交回平台原样写入；含公式的选区则无论复制事件落在它内部多深的位置，都以源码进入剪贴板——所以锚在整个回合上的选区（即「选中文本」产生的那种）也会复制成 TeX，哪怕 Chromium 把事件抬在了回合内部的某个段落上。右键复制与 Ctrl/Cmd+C 对同一个选区得到同一个字符串，而右键一个并不持有该选区的回合读不到任何摘录，因此复制退回该回合自己的源码。粘回的公式渲染回它来处的那个公式——TeX 相同，块级仍是块级——`\[ … \]` 也不例外：它被画在所属句子的段落里，复制出来时 `$$` 独占一行，足以在粘回去时开出块级公式；`\( … \)` 保持行内。表格单元格同样适用，且这一条是实测而非推断：`.katex-display` 盒子对平台自己的读法同样会断开该行，因此围栏旁边不会出现制表符，公式仍以块级形式复制，相邻单元格完整地落在自己的行上。反向选区在复制之后仍然是反向的。复制只写 `text/plain`——不会把 `text/html` flavour 放上剪贴板。
 - **链接规格**：`04-ux/08-component-spec.md` §8.7，ADR 0268，
-  决策日志 D618，issue #414
+  决策日志 D619，issue #414
 - **验收**：C（聊天流），质量
 - **里程碑**：M5
 - **状态**：已自动化（`pnpm test:e2e:copy-tex`，真实 Chromium），另有
@@ -2754,9 +2754,9 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   设置 → 信息。
 - **预期**：更新状态报告 `available`（手动平台）或
   通过应用内下载 Windows NSIS / Linux AppImage 取得进展
-  `availableVersion` 等于较新的稳定标签。Windows 便携版运行
-  （`PORTABLE_EXECUTABLE_FILE`）保持手动通知加链接路径，不得下载或运行
-  NSIS 安装程序。客户不得举报
+  `availableVersion` 等于较新的稳定标签。Windows 便携版 ZIP 运行保持手动通知加链接路径，
+  不得下载或运行 NSIS 安装程序；旧便携版 exe 在存在 `PORTABLE_EXECUTABLE_FILE` 时同样
+  保持手动更新。客户不得举报
   最新只是因为没有较新的版本共享相同的 `rc` 预发行版
   频道。
 - **链接规格**：`04-ux/09-interaction-patterns.md`，
@@ -5348,7 +5348,7 @@ eleven-tool-round desktop paths are verified by
 | 后MVP | E2E-022A、E2E-022B、E2E-022C、E2E-024I、E2E-024J、E2E-024K、E2E-024L、E2E-024M（插件路线图 R2/R3/R6） |
 | 基线后本地自动化 | E2E-220 |
 | MVP 后远程控制 | E2E-221、E2E-222、E2E-223、E2E-224、E2E-225、E2E-226、E2E-227、E2E-228、E2E-229、E2E-230、E2E-231、E2E-232 |
-| 受信任扩展（R7 v1） | E2E-DIALOG-long-text-boundaries、E2E-241、E2E-242、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
+| 受信任扩展（R7 v1） | E2E-DIALOG-long-text-boundaries、E2E-241、E2E-242、E2E-HOOKS-cancel-and-dispose、E2E-243、E2E-244、E2E-245、E2E-PLUGIN-imported-pi-package-skills、E2E-PLUGIN-import-extension-installs-dependencies、E2E-PLUGIN-import-extension-reports-missing-dependency、E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | 受信任扩展（R7 v1 npm 恢复） | E2E-PLUGIN-import-extension-recovers-missing-npm |
 | Post-MVP 回归覆盖（插件工具调度） | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
 | M6+（删除项目） | E2E-PROJECT-delete-removes-project-and-owned-sessions |
@@ -6658,6 +6658,14 @@ eleven-tool-round desktop paths are verified by
   验证独立许可、撤销和多账号别名冲突，连接测试检查按需唯一匹配。设置复选框 UI/持久化旅程及外部真实提供商执行仍需手动验证；
   此夹具不代表完整原生 UI 旅程已通过。
 
+- **Authorization regression coverage (#841)**: `pnpm test:e2e:subagent-models`
+  grants a model on demand, reuses the runtime, then revokes it without changing
+  the launch catalog. The next prompt must reauthorize and issue no child request.
+  A transcript-restored resume with a colliding model id must use the session
+  binding rather than another definition's private account. Runtime tests also
+  cover own pins/fallbacks, opted-in bindings, visible fallback metadata, live-key
+  reauthorization, and late RPC responses crossing parent turns.
+
 #### E2E-167：原生边缘调整大小保持流畅并保存稳定边界
 
 - **前置条件**：PI-Desktop 在 macOS、Windows 或 Linux 上以普通、未最大化
@@ -7117,21 +7125,22 @@ eleven-tool-round desktop paths are verified by
 - **验收**：A（应用启动）、质量（全新安装打包）
 - **里程碑**：M6+
 - **状态**：源码契约已覆盖；全新 Windows x64 与 ARM64 资格验证仍需运行器验证（适用变更合入前需在具备条件的环境中运行 E2E）
-#### E2E-211：Windows 便携版 exe 无需安装即可启动（D364）
+#### E2E-211：Windows 便携版 ZIP 解压后即可启动（D603）
 
 - **前提条件**：Windows x64 标签或 `dist:win` 包已从共享 electron-builder 配置
-  产出 `PI-Desktop-Setup-<version>.exe` 和 `PI-Desktop-Portable-<version>.exe`；
+  产出 `PI-Desktop-Setup-<version>.exe` 和 `PI-Desktop-Portable-<version>.zip`；
   有干净用户配置；账户是无需管理员提升的标准用户。
-- **步骤**：1) 检查发布目录和 `latest.yml`。2) 不运行 NSIS 安装程序，直接启动
-  便携版 exe。3) 确认进程环境包含 `PORTABLE_EXECUTABLE_FILE`。4) 调用检查更新。
-  5) 确认设置 → 信息提供发布页而不是“重启以更新”。6) 退出并再次启动同一便携文件。
+- **步骤**：1) 检查发布目录和 `latest.yml`。2) 将便携版 ZIP 解压到用户可写目录，
+  不运行 NSIS 安装程序。3) 启动解压后的 `PI-Desktop.exe`。4) 确认没有管理员提示，
+  且运行中的应用显示 PI-Desktop 图标和任务栏入口。5) 调用检查更新。6) 确认设置 → 信息
+  提供发布页而不是“重启以更新”。7) 退出并再次启动解压后的可执行文件。
 - **预期**：两个 Windows 工件都无空格并已上传。`latest.yml` 只指向 NSIS 安装程序。
-  便携版 exe 无需安装向导或管理员提示即可启动，使用现有应用数据目录，
-  并报告更新模式 `manual`。可用更新不会下载或运行
+  ZIP 解压后的应用无需安装向导或管理员提示即可启动，保持正常的 PI-Desktop 任务栏
+  标识和图标，使用现有应用数据目录，并报告更新模式 `manual`。可用更新不会下载或运行
   `PI-Desktop-Setup-<version>.exe`。再次启动从同一配置恢复会话。
 - **链接规格**：`01-product/01-product-scope.md`、
   `06-delivery/06-release-runbook.md`、`03-runtime/07-process-model.md`、
-  ADR 0197 / D364
+  ADR 0197 / D603
 - **验收**：质量（发布打包）
 - **里程碑**：M6+
 - **状态**：单元/源合同已覆盖（`auto-update.test.mjs`）；本机 Windows 启动仍为
@@ -8704,6 +8713,24 @@ the latest destination. These assertions measure work counts, not device FPS.
 **证据：** 记录构建和测试退出码、基线 SHA、依赖版本、产物标识及独立评审，报告位于
 `docs/project/hosted-search-contract-verification.md`。不得记录真实会话或凭据。未执行明确标为 NOT RUN，不得标为 PASS。
 
+### E2E-HOOKS-cancel-and-dispose
+
+- **#816 扩展验收：** 命令弹窗显示期间 Stop，真实渲染层移除弹窗，后续弹窗和 exec
+  不再发生，下一命令或回合正常。Electron 驱动通过 CDP 检查 DOM；Runner 测试覆盖
+  长命令、上下文等待取消、工具进度退役及头部副本；进程测试通过就绪信号同步真实父子进程。
+
+- **前置条件：** 隔离 Desktop 配置、本地确定性模型，以及含等待型请求前处理器的可信插件。
+- **步骤：** 发送消息，在处理器等待时停止，释放旧处理器后再次发送。另测等待时销毁
+  Runtime，并加载启动/关闭挂起以及注册未接通事件的夹具。
+- **预期：** 被停止或销毁的请求不调用模型，后续消息正常完成。迟到结果不能重启工作。
+  关闭只执行一次，各处理器等待有界，未接通事件产生诊断但不禁用正常处理器。
+- **规范：** 07-plugins/16 §6。
+- **验收：** 取消及时生效，扩展生命周期等待有界。
+- **里程碑：** Hooks P0。
+- **状态：** Runner 与真实 Runtime/本地 HTTP 集成通过
+  `extensions/runner.test.ts`、`extensions/runtime-lifecycle.test.ts` 自动验证。
+  可信扩展 Electron 驱动通过 CDP 在真实渲染层执行 Stop 路径，并记录弹窗显示和
+  退役后的状态。
 ## Composer 指令源、手动压缩与空记录读取（#795）
 
 **范围：** composer 的斜杠分发、手动压缩 RPC，以及渲染层的持久化记录读取。不调用真实模型或

@@ -390,7 +390,7 @@ function renderedText(
       //
       // The cost is the visible one and it is accepted: a payload pasted into
       // a terminal or another non-Markdown target shows `\$`. This flavour is
-      // Markdown source, on the same ground D618 drops `text/html` on, and a
+      // Markdown source, on the same ground D619 drops `text/html` on, and a
       // code block still carries its own copy button, which never reaches this
       // path and writes the literal text.
       const escaped = part.replace(/\\*\$/g, escape);
@@ -500,7 +500,7 @@ function mayContainKatex(host: Element): boolean {
  * platform's own `text/html` carried. Keeping the formatting would mean
  * reconstructing that flavour here — stripping the inert chrome, stripping the
  * bookkeeping, and splitting the paragraph the display slot nests in — which
- * is the hand-written structural walk this module exists to avoid. D618 weighs
+ * is the hand-written structural walk this module exists to avoid. D619 weighs
  * the trade and takes the deletion; reopen it there, not here.
  */
 export function texClipboardPayload(selection: Selection | null): string | null {

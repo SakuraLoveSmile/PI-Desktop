@@ -1904,7 +1904,7 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   additions and the `math-inline`/`math-display` classes on `code` (which keep
   TeX `\[…\]` in display layout) are admitted. KaTeX's Vite-inlined WOFF2 fonts
   are allowed by the renderer's `font-src 'self' data:` CSP directive.
-- **Copying a formula (D618)**: a selection that covers rendered math reaches
+- **Copying a formula (D619)**: a selection that covers rendered math reaches
   the clipboard as the TeX it was written in — `$…$` inline, `$$…$$` on its own
   lines, each run widened past any run inside the formula the way a code span's
   fence is, so a formula carrying a literal `$` still reads whole. Inline stays
@@ -3597,8 +3597,12 @@ default nor provider configuration. OAuth accounts remain in their separate sect
    groups model-level options by provider, marks the exact current entry, bounds
    its own height so many configured models scroll instead of stretching the
    card, flips above the trigger when there is no room below, and closes on
-   Escape, an outside press, or the trigger scrolling out of view;
-   global operating mode, command shell, and Enter-to-send live in the Settings
+   Escape, an outside press, or the trigger scrolling out of view.
+   A provider is named here the way the Composer model menu names it: an OAuth
+   row uses its non-secret account label when present, so two accounts of one
+   vendor do not collapse into identical group headings, summary lines, or
+   option names; the search matches the account label and the vendor name.
+   Global operating mode, command shell, and Enter-to-send live in the Settings
    AI destination
 2. **Vendor accounts** — section title + primary Add account action and one
    single-level list panel using the same row surface as AI services; one row

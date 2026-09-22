@@ -3773,7 +3773,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   backward after the copy. The copy
   writes `text/plain` only — no `text/html` flavour is put on the clipboard.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.7, ADR 0268,
-  decisions-log D618, issue #414
+  decisions-log D619, issue #414
 - **Acceptance**: C (chat stream), Quality
 - **Milestone**: M5
 - **Status**: Automated (`pnpm test:e2e:copy-tex`, real Chromium) plus
@@ -4306,8 +4306,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Expected**: Update state reports `available` (manual platforms) or
   advances through in-app download for packaged macOS, Windows NSIS, and
   Linux AppImage with `availableVersion` equal to the newer stable tag. A
-  Windows portable run (`PORTABLE_EXECUTABLE_FILE`) stays on the manual
-  notify-and-link path and must not download or run the NSIS installer. The
+  Windows portable ZIP run stays on the manual notify-and-link path and must
+  not download or run the NSIS installer; a legacy portable executable is
+  likewise manual when `PORTABLE_EXECUTABLE_FILE` is present. The
   client must not report up-to-date merely because no newer release shares the
   same `rc` prerelease channel.
 - **Specs linked**: `04-ux/09-interaction-patterns.md`,
@@ -7585,7 +7586,13 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   be entered. Press Test connection and confirm the result resolves the edited
   account. Open the Composer model menu and confirm the edited account label is
   used as the OAuth provider group heading, while the configured model alias is
-  shown on its model row. 5) Resolve
+  shown on its model row. With both Anthropic accounts configured, open the
+  Defaults picker and confirm the one provider name each group shows is that
+  account's own label, so the two accounts are not two identical `Anthropic`
+  groups, that the summary line above the Change action names the account
+  holding the current default, and that typing an account label filters to that
+  account's models while typing the vendor name still reaches both. Repeat the
+  same check on the Settings prompt-enhancement model picker. 5) Resolve
   and use each account separately, including model discovery and one streamed
   turn per account. 6) Start the device-code login on a second vendor, including
   Meta/Muse when available, then press Cancel while the dialog is polling;
@@ -8235,7 +8242,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-DIALOG-long-text-boundaries, E2E-241, E2E-242, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
+| Trusted extensions (R7 v1) | E2E-DIALOG-long-text-boundaries, E2E-241, E2E-242, E2E-HOOKS-cancel-and-dispose, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | Trusted extensions (R7 v1 npm recovery) | E2E-PLUGIN-import-extension-recovers-missing-npm |
 | Post-MVP regression coverage (plugin tool dispatch) | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
@@ -10858,6 +10865,14 @@ are withdrawn with ADR 0165.
   UI/persistence journey and live external provider execution remain manual;
   this fixture does not claim a complete native UI journey.
 
+- **Authorization regression coverage (#841)**: `pnpm test:e2e:subagent-models`
+  grants a model on demand, reuses the runtime, then revokes it without changing
+  the launch catalog. The next prompt must reauthorize and issue no child request.
+  A transcript-restored resume with a colliding model id must use the session
+  binding rather than another definition's private account. Runtime tests also
+  cover own pins/fallbacks, opted-in bindings, visible fallback metadata, live-key
+  reauthorization, and late RPC responses crossing parent turns.
+
 #### E2E-170: Shell titlebars use borderless chrome
 
 - **Preconditions**: PI-Desktop is open in chat, at least one destination page,
@@ -11757,26 +11772,29 @@ are withdrawn with ADR 0165.
 - **Milestone**: M6+
 - **Status**: Unit/source-contract-covered; full UI journey Draft
 
-#### E2E-211: Windows portable exe launches without an installer (D364)
+#### E2E-211: Windows portable ZIP launches after extraction (D603)
 
 - **Preconditions**: A Windows x64 tag or `dist:win` package has produced both
-  `PI-Desktop-Setup-<version>.exe` and `PI-Desktop-Portable-<version>.exe` from
+  `PI-Desktop-Setup-<version>.exe` and `PI-Desktop-Portable-<version>.zip` from
   the shared electron-builder config; a clean user profile is available; the
   account is a standard user without administrator elevation.
-- **Steps**: 1) Inspect the release directory and `latest.yml`. 2) Launch the
-  portable exe without running the NSIS installer. 3) Confirm the process
-  environment includes `PORTABLE_EXECUTABLE_FILE`. 4) Invoke Check for Updates.
-  5) Confirm Settings → Info offers the releases page rather than Restart to
-  update. 6) Quit and relaunch the same portable file.
+- **Steps**: 1) Inspect the release directory and `latest.yml`. 2) Extract the
+  portable ZIP to a user-writable directory without running the NSIS installer.
+  3) Launch the extracted `PI-Desktop.exe`. 4) Confirm there is no
+  administrator prompt and that the running app has the PI-Desktop icon and
+  taskbar entry. 5) Invoke Check for Updates. 6) Confirm Settings → Info offers
+  the releases page rather than Restart to update. 7) Quit and relaunch the
+  extracted executable.
 - **Expected**: Both Windows artifacts are space-free and uploaded. `latest.yml`
-  points at the NSIS installer only. The portable exe starts without a setup
-  wizard or administrator prompt, uses the existing application data directory,
-  and reports update mode `manual`. An available update does not download or
-  run `PI-Desktop-Setup-<version>.exe`. Relaunch restores sessions from that
-  same profile.
+  points at the NSIS installer only. The extracted ZIP app starts without a
+  setup wizard or administrator prompt, keeps the normal PI-Desktop taskbar
+  identity/icon, uses the existing application data directory, and reports
+  update mode `manual`. An available update does not download or run
+  `PI-Desktop-Setup-<version>.exe`. Relaunch restores sessions from that same
+  profile.
 - **Specs linked**: `01-product/01-product-scope.md`,
   `06-delivery/06-release-runbook.md`, `03-runtime/07-process-model.md`,
-  ADR 0197 / D364
+  ADR 0197 / D603
 - **Acceptance**: Quality (release packaging)
 - **Milestone**: M6+
 - **Status**: Unit/source-contract covered (`auto-update.test.mjs`); native
@@ -14663,6 +14681,31 @@ artifact identity and independent review in
 `docs/project/hosted-search-contract-verification.md`. Never record private
 conversation content or credentials. A skipped test remains NOT RUN, not PASS.
 
+### E2E-HOOKS-cancel-and-dispose
+
+- **Issue #816 extension:** Cancel a command while its prompt is visible and
+  verify the real renderer removes the dialog, no later prompts or exec occur,
+  and the next command/turn succeeds. The trusted-extension Electron driver
+  checks the DOM via CDP. Runner tests cover long commands, stopped context waits,
+  tool cancellation and late updates, detached header payloads and recovery;
+  process tests use a real parent/child tree with readiness synchronization.
+
+- **Preconditions:** An isolated Desktop profile, deterministic local provider,
+  and a trusted plugin with a waiting preflight handler.
+- **Steps:** Start a prompt; stop while the handler waits; release the old
+  handler; send another prompt. Repeat with runtime disposal. Load another
+  fixture with stalled startup/shutdown handlers and a deferred event.
+- **Expected:** No provider request starts for the stopped/disposed prompt;
+  the next prompt completes. Late results cannot restart work. Shutdown runs
+  once, waits time out per handler, and deferred registrations are diagnosed
+  without disabling supported handlers.
+- **Specs:** 07-plugins/16 §6.
+- **Acceptance:** Responsive cancellation and bounded extension lifecycle waits.
+- **Milestone:** Hooks P0.
+- **Status:** Runner and real Runtime/local-HTTP integration automated in
+  `extensions/runner.test.ts` and `extensions/runtime-lifecycle.test.ts`.
+  The trusted-extension Electron driver exercises the Stop path through the
+  real renderer via CDP and records the visible and retired dialog states.
 ## Composer command source, manual compaction, and empty transcript reads (#795)
 
 **Scope:** the composer's slash dispatch, the manual compaction RPC, and the

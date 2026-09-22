@@ -1365,7 +1365,7 @@ Renderer： `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/s
   `code` 上的 `math-inline`/`math-display` 类（保证 TeX `\[…\]` 使用块级布局）
   允许添加。 KaTeX 的 Vite 内联 WOFF2 字体被允许
 渲染器的 `font-src 'self' data:` CSP 指令。
-- **复制公式（D618）**：覆盖到渲染公式的选区，以公式被写下时的 TeX 进入剪贴板
+- **复制公式（D619）**：覆盖到渲染公式的选区，以公式被写下时的 TeX 进入剪贴板
   ——行内 `$…$`，块级 `$$…$$` 独占行；两者的定界符长度都像代码段的围栏那样，
   比公式内部出现的最长同字符串再长一位，因此含字面 `$` 的公式仍能被完整读回。
   行内保持窄形式，是因为行内公式的 TeX 可能带换行，而 `$$` 一旦落在行首就会

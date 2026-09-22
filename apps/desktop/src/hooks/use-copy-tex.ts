@@ -3,7 +3,7 @@ import { texClipboardPayload } from "../lib/selection-tex";
 
 /**
  * Ctrl/Cmd+C over a rendered formula puts its TeX source on the clipboard
- * (issue #414, D618).
+ * (issue #414, D619).
  *
  * The listener is on the document because `Markdown` renders no wrapper of its
  * own — answers, a work-panel file preview, and a plugin readme all reach the

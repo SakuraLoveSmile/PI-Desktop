@@ -438,6 +438,13 @@ Headroom 是 16,384 个代币储备底线的最大值，模型最大输出
 会话空闲时可用。检查点生成是可中止的并且
 计为运行状态，直到持久持久性完成。
 
+检查点携带的文件清单由 pi 自己的收集器从被摘要的区间里读出，它只认小写拼写
+`read` / `write` / `edit`——也就是 pi 自己工具的名字。PI-Desktop 注册的是
+`Read` / `Write` / `Edit`，因此运行时**只在交给 pi 的准备阶段**转换这三个名字
+（`withPiFileOpToolNames`）：存储内容不变，其它工具名一律保持我们注册的拼写。
+缺少这一步时，检查点的 `readFiles` / `modifiedFiles` 与摘要里的 `<read-files>` 段
+恒为空（D618）。
+
 委托（第 5f 节）对照它自己解析出的模型走同一条推导，并在它自己的回合边界上压缩，
 但没有属于它自己的持久检查点链（ADR 0299）。
 
@@ -713,6 +720,13 @@ Stop / 运行时销毁。主 Agent 用 `TaskStop` 判断要不要取消；运行
 `modelChangedFrom`。有意换模型意味着新建一个委托。未知 id、属于另一个定义的 id、
 不可恢复的状态、超出读预算的链，以及行已经不在的链，各自返回一个说明原因的工具错误；
 对未知 id，还会一并列出当前可复用的 id。
+
+On-demand grants expire at each new parent prompt or approved plan/goal execution;
+late responses cannot restore expired grants. Resume reauthorizes a remembered key
+when necessary. Model-id matching is limited to the current definition's pin and
+fallbacks, session inheritance, and current override grants; other definitions'
+private pins are excluded. A denied known key never selects another account by
+model id (#841).
 
 父级通过系统提示发现可复用的链：那里列出每条链最新的 `delegationId`、它的目标，以及它
 读过的文件最多 `MAX_RESUMABLE_LISTED_FILES`（8）个（超出部分带 `(+N more)` 后缀）。

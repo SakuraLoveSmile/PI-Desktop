@@ -117,6 +117,7 @@ import type {
   ConfigSyncMapProjectInput,
   ConfigSyncConfigureInput,
   ConfigSyncRestoreInput,
+  ConfigSyncProgress,
   ConfigSyncState,
   TrustedExtensionStatusEvent,
   TrustedExtensionUiPrompt,
@@ -1537,6 +1538,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.configSyncChanged, (payload) =>
       listener(payload as ConfigSyncState),
+    );
+  },
+  onConfigSyncProgress: (listener: (progress: ConfigSyncProgress) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.configSyncProgress, (payload) =>
+      listener(payload as ConfigSyncProgress),
     );
   },
   onPluginLauncherShown: (listener: () => void) => {
