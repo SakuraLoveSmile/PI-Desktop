@@ -6631,6 +6631,14 @@ eleven-tool-round desktop paths are verified by
   验证独立许可、撤销和多账号别名冲突，连接测试检查按需唯一匹配。设置复选框 UI/持久化旅程及外部真实提供商执行仍需手动验证；
   此夹具不代表完整原生 UI 旅程已通过。
 
+- **Authorization regression coverage (#841)**: `pnpm test:e2e:subagent-models`
+  grants a model on demand, reuses the runtime, then revokes it without changing
+  the launch catalog. The next prompt must reauthorize and issue no child request.
+  A transcript-restored resume with a colliding model id must use the session
+  binding rather than another definition's private account. Runtime tests also
+  cover own pins/fallbacks, opted-in bindings, visible fallback metadata, live-key
+  reauthorization, and late RPC responses crossing parent turns.
+
 #### E2E-167：原生边缘调整大小保持流畅并保存稳定边界
 
 - **前置条件**：PI-Desktop 在 macOS、Windows 或 Linux 上以普通、未最大化
