@@ -4765,3 +4765,15 @@ that amendment are retired by ADR 0268; the upstream work-panel lifecycle stays.
 - 单次缩减后仍过大的摘要提示不再被跳过：范围会被切成每片都能放下的连续分片，最多 16 次
   请求，每次携带上一片的摘要，检查点报告这些请求的用量总和。只有空范围或超过该请求上限
   的范围才因预算原因回退。见 ADR 0302、`03-runtime/02-agent-runtime.md`、ADR 0049、ADR 0282。
+
+## 2026-09-22 —— 交给 pi 的文件操作收集器使用它认识的拼写（D618，issue #827）
+
+- 检查点的 `readFiles` / `modifiedFiles` 以及摘要追加的 `<read-files>` 段来自 pi 自己的
+  `extractFileOpsFromMessage`，它只匹配小写名字 `read` / `write` / `edit`——即 pi 自己
+  工具的名字。PI-Desktop 注册的是 `Read` / `Write` / `Edit`，因此该收集器什么都匹配不到，
+  每个检查点都报出空文件清单；issue #827 在排查压缩报告时发现了这一点。
+- 转换只发生在边界这一侧：`withPiFileOpToolNames` 把交给 pi `prepareCompaction` 的条目
+  复制一份，并改写这三个名字的拼写。存储字节不变——transcript、检查点与重建后的上下文都
+  保留我们的拼写——而且当历史里没有这类调用时原样返回入参数组，常见路径不产生任何分配。
+- 只转换这三个名字。pi 的收集器不读其它名字，因此 `Grep`、`Glob`、`Bash`、插件与 MCP 名字
+  保持我们注册的拼写，被摘要的文本只在 pi 真正消费该名字的地方发生变化。

@@ -6715,3 +6715,20 @@ that was sitting at the bottom — including after the turn had finished.
   checkpoint reports the summed usage of the requests that produced it. Only an
   empty range, or one past that request bound, still falls back on budget
   grounds. See ADR 0302, `03-runtime/02-agent-runtime.md`, ADR 0049, ADR 0282.
+
+## 2026-09-22 — pi's file-op collector is fed the names it reads (D618, issue #827)
+
+- A checkpoint's `readFiles` / `modifiedFiles`, and the `<read-files>` section a
+  summary appends, come from pi's own `extractFileOpsFromMessage`, which switches
+  on the lowercase names `read` / `write` / `edit` — the names pi's tools carry.
+  PI-Desktop registers `Read` / `Write` / `Edit`, so the collector matched
+  nothing and every checkpoint reported an empty file list; issue #827 turned
+  this up while reading a compaction report.
+- The conversion stays on our side of the boundary. `withPiFileOpToolNames`
+  copies the entries handed to pi's `prepareCompaction` with exactly those three
+  names respelled; no stored byte changes — a transcript, a checkpoint and a
+  rebuilt context keep our names — and the input array comes back untouched when
+  no such call is present, so the common path allocates nothing.
+- Only those three are converted. pi's collector reads nothing else, so `Grep`,
+  `Glob`, `Bash`, plugin and MCP names keep the spelling we register, and the
+  summarized text changes only where pi consumes the name.

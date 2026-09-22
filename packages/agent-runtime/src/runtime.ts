@@ -2,6 +2,7 @@ import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import { imageGenerationDescription, imageGenerationParameters } from "./image-generation/tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
+import { withPiFileOpToolNames } from "./pi-file-ops.js";
 import { randomUUID } from "node:crypto";
 import {
   settledDelegationMessage,
@@ -5923,7 +5924,7 @@ Delegation rules:
     retainedUserTokens = this.retainedUserMessageBudget(budget),
     retentionMode: CompactionRetentionMode = "completed_turn",
   ) {
-    const prepared = prepareCompaction(entries, {
+    const prepared = prepareCompaction(withPiFileOpToolNames(entries), {
       enabled: this.compactionEnabled,
       reserveTokens: budget.requestHeadroom,
       keepRecentTokens: budget.keepRecentTokens,
