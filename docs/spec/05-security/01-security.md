@@ -114,6 +114,12 @@ transparent router/TUN deployment. Install writes markdown only through
 `skills.create`. The host document cap remains 128 KiB after sibling markdown
 is inlined.
 
+A source URL the user typed is judged by ADR 0304 instead: it may be a loopback
+or LAN catalog, and plain `http` to it is allowed because the relaxed network
+mode is on by default (`networkPolicy.mode`). Every document URL that arrives
+*inside* a catalog, and every redirect target, keeps the public-only policy
+above, in either mode.
+
 ## 4.2 MCP market egress
 
 The MCP market accepts only credentials-free public HTTPS sources and catalog
@@ -133,6 +139,13 @@ redirects do not forward caller headers.
 
 Manual user-owned MCP configuration remains covered by ADR 0142 and may use
 explicit local/LAN endpoints; the market path does not widen that policy.
+
+
+A market source URL the user typed is judged by ADR 0304 as well: it may be a
+loopback or LAN endpoint, with plain `http` behind the relaxed network mode
+(`networkPolicy.mode`, on by default). Everything a source returns —
+registry records, catalog bodies, redirect targets — keeps the public-only
+policy above.
 
 ## 4.3 Portable configuration sync
 
@@ -210,12 +223,13 @@ claim availability or freshness against a malicious server.
 - Feed manifests bind artifacts with electron-builder hashes. An error,
   unavailable feed, hash mismatch, or invalid updater state must not install.
 - Packaged macOS, Windows NSIS, and Linux AppImage download and install in-app
-  from the GitHub Releases feed. Linux deb/rpm and Windows portable detect a
-  release and open the fixed releases page.
+  from the GitHub Releases feed. Linux deb/rpm and Windows ZIP detect a
+  release and open the fixed releases page. Legacy Windows portable
+  executables remain manual when `PORTABLE_EXECUTABLE_FILE` is present.
 - D126 tag releases publish Windows NSIS and Linux AppImage installers with
   their update manifests, plus Linux deb/rpm packages and a Windows portable
-  exe. The NSIS and AppImage artifacts activate the existing in-app lanes.
-  The portable exe uses notify-and-link delivery and does not write
+  ZIP. The NSIS and AppImage artifacts activate the existing in-app lanes.
+  The portable ZIP uses notify-and-link delivery and does not write
   `latest.yml`. macOS tag artifacts are Developer ID-signed, notarized, and
   stapled before upload; rollback and staged-rollout qualification remain
   release follow-ups.
