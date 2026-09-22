@@ -107,9 +107,17 @@ Final evidence directory: `$PI_SCRATCH_DIR/hosted-search-e2e-CS9uZW`. The bundle
 | `search-task-delegation` | PASS; real Task/TaskWait and parent continuation | 4 |
 | `search-persist-restore` | PASS; disk JSON boundary and a new sidecar process | 2 |
 | `invalid-search-container` | PASS; safe local validation error, no persistence call/runtime leak | 0 |
-| `invalid-search-phase` | PASS; explicit rejection, no persistence call/runtime leak | 0 |
+| `invalid-search-phase` | PASS; the turn continued without the stored replay and the unreplayable block never reached the provider (behavior changed after this run — see the note below) | 1 |
 
 Each invalid-history case subsequently completes a clean session in the same process using a separate loopback fixture provider (one request). Those recovery requests are recorded separately and are not hidden in the malformed-history zero-request count. The changed-prefix artifact verifies changed request instructions; direct usage-anchor invalidation is asserted by the companion estimator/system tests rather than inferred solely from the RPC boundary.
+Behavior changed after this qualification: a stored record this app itself writes
+when a gateway drops ids (a display-only block with no replay id) used to reject
+the turn with a local context-validation error. It now degrades to "no replay"
+for that message, because rejecting it failed every later turn of that
+conversation. `invalid-search-container` still rejects: a container that is not a
+block list is a corrupt record, not an old readable one. The table above records
+the pre-fix run; `scripts/e2e/hosted-search-scenarios.mjs` holds the current
+expectations.
 
 ## Independent review and disposition
 

@@ -265,7 +265,9 @@ Catalog and custom model entry must support common capability classes:
 
 - Search content and progress events are declared adapter types, not disguised
   client tool calls. A search result or Responses search item does not require
-  `name` or `arguments`. Existing replay records remain compatible.
+  `name` or `arguments`. Existing replay records remain compatible: a stored
+  record this app wrote without replay ids degrades to "no replay" for that
+  message instead of failing the turn, so pre-upgrade history stays usable.
 - Replay and token estimation share the search-phase interpretation. Valid
   usage covers its prefix once; zero or invalidated usage triggers a complete
   estimate which includes search replay data. Display rounds and streaming

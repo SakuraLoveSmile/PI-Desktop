@@ -408,8 +408,15 @@ retain the existing network/retry and cancellation behavior.
 
 Restored-history validation may fail before a runtime stream exists. In that case
 the existing RPC error `data` carries `errorCode`, `retriable: false`, and safe
-`details` (`origin`, `phase`, optional cause type). No provider request is made;
-the sidecar stays available and the stored record is not rewritten or skipped.
+`details` (`origin`, `phase`, optional cause type). No provider request is made,
+the sidecar stays available, and a stored record is never rewritten. A container
+that is not a stored block list still fails this way.
+
+A single stored block that cannot be replayed is a different case: this app itself
+stores display-only blocks when a gateway drops ids, so the whole stored replay for
+that message degrades to "no replay" instead of failing every later turn. The turn
+continues, display rounds are unchanged, and the diagnostic records the block count
+and phases without copying search content, results or credentials.
 
 ## 5. UI handling guidelines
 
