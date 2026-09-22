@@ -6595,3 +6595,109 @@ that was sitting at the bottom — including after the turn had finished.
   by `apps/desktop/test/default-model-display.test.mjs` and
   `apps/desktop/test/image-generation-default.test.mjs`, with
   `provider-model-config.test.mjs` asserting the add branch consults them.
+
+## 2026-09-22 — An unreadable command source refuses a slash submission (D613, issue #795)
+
+- Composer send-time resolution read the merged command list and swallowed a
+  failure as `null`, which the submit path could not tell apart from "no such
+  command". `/compact` typed while that IPC read failed was therefore sent to the
+  model as literal prompt text, and the model acted on it as an instruction.
+- Resolution now answers with three outcomes instead of one nullable value:
+  resolved (builtin/plugin/extension dispatch), unknown (templates, aliases, and
+  id-less entries continue as prompt text), and unavailable. Unavailable refuses
+  the submission, keeps the draft, and shows
+  `chat.slashCommandSourceUnavailable`. The failed read leaves the TTL cache
+  cold, so the next submit retries it; a warm cache still resolves through a
+  source blip.
+- The refusal is fail-closed on purpose: only the command source can say whether
+  `/name` is a control command, so while it cannot be read a `name` that looks
+  like plain text is refused rather than guessed. Templates and genuinely unknown
+  aliases keep the old prompt path. Pinned by
+  `apps/desktop/test/slash-command-source.test.mjs` and
+  `03-runtime/01-ipc-protocol.md` §13c.
+
+## 2026-09-22 — A manual compaction has its own transport deadline and a durable verdict (D614, issue #795)
+
+- `agent.compact` is a blocking RPC that spends a whole model summary request
+  inside the sidecar: pi serializes the conversation, streams the summary, and
+  retries a transient failure. It ran under the flat 130s transport default, so a
+  ~158s compaction on an 888KB context ended as `sidecar RPC timeout` while the
+  sidecar kept working and persisted the checkpoint — the user was told the
+  compaction failed, and the next turn proved it had succeeded.
+- The deadline is now derived from the ceilings the sidecar actually enforces:
+  one stream watchdog (180s) per attempt, `1 + 3` attempts, the 2s/4s/8s retry
+  backoff, and transport slack — `AGENT_COMPACT_RPC_TIMEOUT_MS`, deliberately
+  per-method rather than a wider global default.
+- Either host path (Electron `agentCompact` IPC and `RuntimeService.compact`)
+  also stops treating a transport timeout as the sidecar's verdict: it re-reads
+  the durable `session.compaction` record and reports success when a new
+  checkpoint landed, logs the mismatch, and rethrows the timeout otherwise. A
+  verdict the sidecar reported itself is never reconciled. Pinned by
+  `packages/host-runtime/src/runtime-service.test.ts`,
+  `packages/shared/src/protocol.test.ts`,
+  `apps/desktop/test/plugin-timeout-budgets.test.mjs`, and
+  `03-runtime/01-ipc-protocol.md` §5.4.
+
+## 2026-09-22 — An empty transcript read is retried and never cached (D615, issue #795)
+
+- The renderer treated every durable `session.get` window as the truth, and
+  cached it. A window that came back empty for a session with thousands of
+  messages — the host answers such a read from a transcript file it may be
+  rewriting — was stored as an empty snapshot, hover prefetch re-served it, and
+  the pane stayed blank until the app restarted. Nothing distinguished a failed
+  or stale read from an empty conversation, and no path retried one.
+- A read is now judged against the session's own count: zero messages for a
+  session the sidebar counts as having history triggers one more read, then keeps
+  the snapshot the user already has, and otherwise reports
+  `chat.sessionTranscriptEmpty`. The empty page is never written to the
+  transcript cache, so a hover prefetch cannot poison every later open.
+- This is a defense, not the host-side root cause: the transcript rewrite is the
+  reporter's 0.15.1 storage layout, and the read side still answers "session
+  exists, no messages" instead of reporting an unreadable transcript. See
+  `04-ux/09-interaction-patterns.md` §Session isolation across tabs.
+
+## 2026-09-22 — A renderer that never reaches its first state gets a bounded surface and a quit channel (D616)
+
+- The renderer's startup had no timeout of its own: `bootstrap()` either
+  publishes the initial state or nothing, so one read that never settled left the
+  window on the boot surface with no menu, no data, and nothing to act on except
+  force-quitting the process (issue #831). The renderer now watches its own wait.
+  `STARTUP_SLOW_HINT_MS` (30s) adds logs, diagnostics, and quit to the boot
+  surface without calling the boot a failure; `STARTUP_STALLED_MS` (180s) turns it
+  into the recovery surface, which also offers a retry that re-runs `bootstrap()`.
+- Both bounds sit above the main↔host RPC ceiling (`DEFAULT_RPC_TIMEOUT_MS`,
+  130s), so a slow but successful boot is never read as a failure, and the
+  watchdog never cancels the startup it watches: a boot that finishes replaces the
+  surface with the shell. The recovery surface replaces the splash (exactly one
+  boot surface is mounted), and the renderer-drawn window controls stay above it,
+  so a frameless Windows/Linux window can always be closed.
+- The renderer gains the quit channel `pi-desktop/app/quit` (`api.quitApp()`),
+  whose handler calls `app.quit()` exactly like the Quit menu item, so the ordered
+  shutdown, the confirmation dialog, and the close behavior stay the ones the app
+  already has. See `03-runtime/07-process-model.md` §3 and E2E-076.
+
+## 2026-09-22 — A failed compaction keeps the recent window (D617, issue #827)
+
+- An automatic compaction whose summary request failed installed a
+  retained-tail checkpoint that carried at most the latest user message, and a
+  rebuild narrowed a stored checkpoint's tail the same way. A long turn
+  therefore reached the next model request as one user sentence: the reported
+  session lost roughly 168 messages (3 user / 34 assistant / 131 tool) between
+  two checkpoints while the transcript on disk and the UI row stayed intact.
+- The fallback now retains the real recent window — the newest contiguous
+  messages of the compacted range, every role, bounded by the keep-recent
+  target and by what the carried summary and the recovery notice leave — and
+  marks it with `details.retainedTailShape`, so a rebuild replays it. A
+  checkpoint without the marker (every successful checkpoint, and every record
+  written before it existed) still normalizes to the latest user message. An
+  `active_turn` fallback also keeps the active task's user message when the
+  window cannot hold it, the fallback drops the assistant messages pi drops
+  anyway and any tool result whose call is not in the window, and
+  `details.failureReason` records `no_new_history` / `summary_budget` /
+  `summary_provider` / `checkpoint_oversized` instead of provider error text.
+- A summary prompt that is still too large after the single reduced pass is no
+  longer skipped: the range is split into contiguous chunks that each fit, at
+  most 16 requests, each carrying the previous chunk's summary, and the
+  checkpoint reports the summed usage of the requests that produced it. Only an
+  empty range, or one past that request bound, still falls back on budget
+  grounds. See ADR 0302, `03-runtime/02-agent-runtime.md`, ADR 0049, ADR 0282.

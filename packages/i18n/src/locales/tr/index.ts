@@ -8,6 +8,16 @@ export const tr = {
     loadingView: "Görünüm yükleniyor…",
     uiCrashed: "Arayüzde bir sorun oluştu",
   },
+  startup: {
+    slowTitle: "Hâlâ başlatılıyor…",
+    slowBody: "PI-Desktop yerel servise ulaşmakta normalden uzun sürüyor. Kendiliğinden tamamlanabilir — bekleyebilir ya da önce günlükleri toplayabilirsiniz.",
+    stalledTitle: "PI-Desktop başlatmayı tamamlayamadı",
+    stalledBody: "Bu pencere sohbetlerinizi ve ayarlarınızı hiç almadı, bu yüzden henüz gösterilecek bir şey yok. Hiçbir şey silinmedi — verileriniz hâlâ diskte.",
+    retrying: "Yeniden deneniyor…",
+    copyDiagnostics: "Tanılamaları kopyala",
+    diagnosticsCopied: "Tanılamalar kopyalandı",
+    diagnosticsFailed: "Tanılamalar kopyalanamadı",
+  },
   /** Verbs and states that mean the same thing wherever they appear. */
   common: {
     close: "Kapat",
@@ -242,6 +252,8 @@ export const tr = {
     slashGroupExtensions: "Uzantı komutları",
     slashGroupSkills: "Beceriler",
     slashEmpty: "Eşleşen komut yok",
+    slashCommandSourceUnavailable: "Komut listesi yüklenemedi, hiçbir şey gönderilmedi. Tekrar deneyin.",
+    sessionTranscriptEmpty: "Bu oturumun geçmişi okunamadı. Yeniden denemek için oturumu tekrar açın.",
     fileMenu: "Dosya başvuruları",
     removeFileReference: "{{name}} dosya başvurusunu kaldır",
     messageAttachments: "Bu iletideki ekler",
