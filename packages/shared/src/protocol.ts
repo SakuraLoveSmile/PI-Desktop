@@ -55,6 +55,12 @@ export const IPC = {
     appHealth: "pi-desktop/app/health",
     appGetOnboarding: "pi-desktop/app/getOnboarding",
     appDismissOnboarding: "pi-desktop/app/dismissOnboarding",
+    /**
+     * Quit the whole application through the ordered shutdown. Exposed for the
+     * surfaces that own the window while the shell has no data yet — a stuck
+     * startup must always be able to exit the app (issue #831).
+     */
+    appQuit: "pi-desktop/app/quit",
     /** Installed system font families, resolved by Electron main. */
     systemFontsList: "pi-desktop/app/systemFonts",
     updatesGetState: "pi-desktop/updates/getState",

@@ -59,6 +59,19 @@ queued/running `plan_approvals` execution states interrupted and aborts their
 running turns. This internal process-epoch fence is not serialized or sent over
 the protocol.
 
+The renderer bootstrap has no timeout of its own, so the renderer watches its own
+wait for the first state. At `STARTUP_SLOW_HINT_MS` (30s) the boot surface adds
+logs, diagnostics, and quit without calling the boot a failure; at
+`STARTUP_STALLED_MS` (180s) it becomes the recovery surface, which also offers a
+retry. Both bounds sit above the main↔host RPC ceiling
+(`DEFAULT_RPC_TIMEOUT_MS`, 130s), so a slow but successful boot is never reported
+as a failure. The watchdog never cancels the startup it watches: a boot that
+finishes replaces the surface with the shell, and the recovery surface replaces
+the splash. The renderer-drawn window controls stay above that surface, so a
+frameless Windows/Linux window can always be closed, and quitting from it goes
+through the renderer quit channel (`pi-desktop/app/quit`), which runs the same
+ordered shutdown as the Quit menu item.
+
 After host-core is up, Electron main reads `AppSettings.networkProxy` and
 applies it before spawning the agent sidecar (D340). Chromium sessions use
 `session.setProxy`; main-process `fetch` is `net.fetch`; the sidecar receives
