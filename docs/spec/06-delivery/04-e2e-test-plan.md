@@ -14516,3 +14516,35 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Scenario:** Workspace identity.
 - **Expected:** Stored workspace bindings use the existing project canonicalization contract on both write and read. On Windows, slash direction, case, trailing separators and extended path prefixes do not hide a task from its own project's conversation. The distinction between missing legacy bindings and explicit null remains unchanged. Foreign-project tools cannot list or mutate bound tasks.
 - **Automation:** `node --experimental-strip-types scripts/e2e-scheduled-paths.mjs` uses an isolated real Host and SQLite profile. Inference is not sent to a live provider.
+
+## Hosted-search continuation contract (offline sidecar)
+
+**Scope:** ADR 0297; provider-hosted search content, estimation, local tools,
+Task delegation, and saved-history recovery. No real model or search service.
+
+**Entry:** `pnpm test:e2e:hosted-search`, which rebuilds the shared
+package and `@pi-desktop/agent-runtime` sidecar bundle. The test starts that
+bundle over its ordinary stdio RPC interface, with an isolated data root,
+a synthetic Host and a loopback-only Responses endpoint. Source-only mocks
+or an already installed desktop application do not satisfy this test.
+
+| Case | Required observation |
+| --- | --- |
+| Search then new user prompt | Valid search item is replayed and the second turn completes. |
+| Search then ordinary local tool | A real tool round completes and the next provider request is prepared without type/estimation failure. |
+| Search then Task | Actual delegation orchestration runs against a synthetic provider; parent continuation finishes without repeated local errors. |
+| Saved search history restored | A fresh runtime preserves search replay without adding fake tool fields or rewriting the original record. |
+| Usage invalidated by a real prefix change | The isolated sidecar changes instructions during a real Read round; the prior nonzero usage no longer covers that prefix, and continuation succeeds. |
+| Invalid saved replay container | Restore returns safe INTERNAL/context-validation, sends no provider request or persistence Host RPC, and keeps the process healthy. In-memory immutability is checked by the replay unit tests. |
+| Unknown saved search phase | The same explicit rejection is observed without silently discarding the search record. |
+
+**Companion gates:** Responses/Azure/Anthropic adapter contracts; typed search
+phases; zero/valid/stale usage; changed/unchanged system prefix and tool ledger;
+search content growth and CJK output budgets; structured local preparation
+failures without retry/fetch, ordinary transport retry and cancellation. Dependency upgrades must run
+these gates against the locked dependency version and record the tested bundle.
+
+**Evidence:** record build and test exit codes, baseline SHA, dependency versions,
+artifact identity and independent review in
+`docs/project/hosted-search-contract-verification.md`. Never record private
+conversation content or credentials. A skipped test remains NOT RUN, not PASS.

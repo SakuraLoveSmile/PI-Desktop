@@ -395,6 +395,22 @@ execution interrupted by abort or host recovery. `PLAN_KIND_MISMATCH` is a
 terminating tool error like `PLAN_NOT_ACTIVE`: the submit tool ran against the
 wrong contract, so no artifact is written and no approval row is created.
 
+### Local request preparation failures
+
+A structured `LOCAL_REQUEST_ERROR` from context validation, context estimation,
+or request preparation maps to the existing `INTERNAL` code with
+`retriable: false`. Preserve its local origin and phase before adapter errors
+are flattened to text. Diagnostics may retain the cause type, but must not
+copy request content, search results, credentials or arbitrary cause messages
+into the UI. Do not identify these failures by matching an exception sentence
+or by treating all JavaScript `TypeError`s alike: fetch transport failures
+retain the existing network/retry and cancellation behavior.
+
+Restored-history validation may fail before a runtime stream exists. In that case
+the existing RPC error `data` carries `errorCode`, `retriable: false`, and safe
+`details` (`origin`, `phase`, optional cause type). No provider request is made;
+the sidecar stays available and the stored record is not rewritten or skipped.
+
 ## 5. UI handling guidelines
 
 | class | UI behavior |
