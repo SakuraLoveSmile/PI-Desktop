@@ -40,6 +40,7 @@ type UseComposerSubmitOptions = {
     ComposerDraftController,
     | "ref"
     | "draftSnapshot"
+    | "draftRevision"
     | "clearDraftForKey"
     | "restoreDraftForKey"
     | "setValue"
@@ -207,6 +208,7 @@ export function useComposerSubmit({
     }
     invalidatePromptEnhancement();
     const submittedDraftKey = draftKey;
+    const submittedDraftRevision = draft.draftRevision(submittedDraftKey);
     const submittedDraft = draft.draftSnapshot(text);
     // Slash dispatch stays local for builtin and extension commands, while
     // templates, skills, and unknown aliases continue as normal prompt text. A
@@ -248,7 +250,7 @@ export function useComposerSubmit({
               ),
               draft.draftSnapshot(visibleCommandBody),
             );
-            if (accepted) draft.clearDraftForKey(submittedDraftKey, submittedDraft);
+            if (accepted) draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);
           } catch (error) {
             showToast(error instanceof Error ? error.message : String(error), {
               variant: "error",
@@ -259,7 +261,7 @@ export function useComposerSubmit({
         if (command.kind === "extension") {
           try {
             await runExtensionCommand(command.name, commandBody);
-            draft.clearDraftForKey(submittedDraftKey, submittedDraft);
+            draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);
           } catch (error) {
             showToast(error instanceof Error ? error.message : String(error), {
               variant: "error",
@@ -271,7 +273,7 @@ export function useComposerSubmit({
           try {
             if (command.kind === "builtin") await runPaletteCommand(command.id);
             else await api.executeCommand(command.id);
-            draft.clearDraftForKey(submittedDraftKey, submittedDraft);
+            draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);
           } catch (error) {
             showToast(error instanceof Error ? error.message : String(error), {
               variant: "error",
@@ -285,7 +287,7 @@ export function useComposerSubmit({
       showToast(t("errors.MODEL_NOT_CONFIGURED"), { variant: "error" });
       return;
     }
-    draft.clearDraftForKey(submittedDraftKey, submittedDraft);
+    draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);
     const accepted = steering
       ? await steerPrompt(inlineContent, submittedDraft)
       : await sendPrompt(inlineContent, submittedDraft);

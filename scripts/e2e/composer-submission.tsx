@@ -119,7 +119,7 @@ export async function verifyComposerSubmission(imagePath: string, i18n: i18n) {
       id: "builtin.agent.compact", name: "compact", title: "Compact", kind: "builtin",
     }] });
     try {
-      for (const change of ["text", "attachment", "switch", "unchanged"] as const) {
+      for (const change of ["text", "attachment", "switch", "unchanged", "reentered"] as const) {
         let finish!: () => void;
         let started!: () => void;
         const entered = new Promise<void>((resolve) => { started = resolve; });
@@ -136,6 +136,11 @@ export async function verifyComposerSubmission(imagePath: string, i18n: i18n) {
         await painted();
         if (change === "attachment") {
           prefill("/compact", [attachment]);
+        } else if (change === "reentered") {
+          editor().textContent = "Temporary draft during compaction";
+          flushSync(() => editor().dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" })));
+          editor().textContent = "/compact";
+          flushSync(() => editor().dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" })));
         } else if (change !== "unchanged") {
           editor().textContent = "Next message written during compaction";
           flushSync(() => editor().dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" })));
@@ -155,8 +160,13 @@ export async function verifyComposerSubmission(imagePath: string, i18n: i18n) {
           flushSync(() => useAppStore.setState({ activeSessionId: sessionId }));
           await painted();
         }
-        assert(editor().textContent === (change === "unchanged" ? "" : change === "attachment" ? "/compact" : "Next message written during compaction"),
-          `completed command must preserve a newer ${change} draft: ${JSON.stringify(editor().textContent)}`);
+        const expectedDraft = change === "unchanged"
+          ? ""
+          : change === "attachment" || change === "reentered"
+            ? "/compact"
+            : "Next message written during compaction";
+        assert(editor().textContent === expectedDraft,
+          `completed command must preserve the expected ${change} draft: ${JSON.stringify(editor().textContent)}`);
         if (change === "attachment") assert(host.querySelectorAll(".composer-image-attachment").length === 1,
           "completed command must preserve an image added while it was running");
       }
