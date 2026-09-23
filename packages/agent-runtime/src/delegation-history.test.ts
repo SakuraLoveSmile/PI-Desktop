@@ -329,8 +329,12 @@ describe("seedDelegateMessages", () => {
         { query: "BrowserPreview" },
         {
           content: [{ type: "text", text: "Activated on-demand tools: BrowserPreview." }],
-          addedToolNames: ["BrowserPreview", "BrowserPreview"],
-          details: { query: "BrowserPreview", activated: ["BrowserPreview"] },
+          addedToolNames: ["BrowserPreview"],
+          details: {
+            query: "BrowserPreview",
+            activated: ["BrowserPreview"],
+            addedToolNames: ["Glob"],
+          },
         },
         "call-1",
       ),
@@ -347,7 +351,7 @@ describe("seedDelegateMessages", () => {
       details: {
         query: "BrowserPreview",
         activated: ["BrowserPreview"],
-        addedToolNames: ["BrowserPreview"],
+        addedToolNames: ["Glob"],
       },
     });
   });

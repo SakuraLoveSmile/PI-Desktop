@@ -465,8 +465,15 @@ function toolResultFromUi(m: UiMessage, timestamp: number): ToolResultMessage {
             typeof name === "string" && name.length > 0,
         )
       : [];
+  const canonicalAddedToolNames =
+    isRecord(rawDetails) && Array.isArray(rawDetails.addedToolNames)
+      ? rawDetails.addedToolNames.filter(
+          (name: unknown): name is string =>
+            typeof name === "string" && name.length > 0,
+        )
+      : [];
   const details =
-    legacyAddedToolNames.length > 0
+    legacyAddedToolNames.length > 0 && canonicalAddedToolNames.length === 0
       ? {
           ...(isRecord(rawDetails) ? rawDetails : {}),
           addedToolNames: [...new Set(legacyAddedToolNames)],
