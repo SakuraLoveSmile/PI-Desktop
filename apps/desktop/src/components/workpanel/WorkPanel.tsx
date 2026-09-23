@@ -10,6 +10,11 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useBlockingOverlayActive } from "../../lib/blocking-overlay";
+import {
+  workPanelTabReorderScrollDelta,
+  workPanelTabReorderInsertAfter,
+  workPanelTabReorderShouldArm,
+} from "../../lib/work-panel-tab-reorder";
 import type { PluginViewMeta } from "@pi-desktop/shared";
 import {
   isKnownWorkPanelTab,
@@ -63,6 +68,22 @@ type WorkPanelResizeState = {
   minimumWidth: number;
   currentWidth: number;
   frame: number;
+};
+
+type WorkPanelTabReorderState = {
+  pointerId: number;
+  sourceTabId: string;
+  startClientX: number;
+  startClientY: number;
+  lastClientX: number;
+  lastClientY: number;
+  targetTabId: string | null;
+  insertAfter: boolean;
+  armed: boolean;
+  autoScrollFrame: number | null;
+  onMove: (event: PointerEvent) => void;
+  onUp: (event: PointerEvent) => void;
+  onCancel: (event: PointerEvent) => void;
 };
 
 type WorkPanelTool = {
@@ -177,6 +198,7 @@ export function WorkPanel({
   const pluginViews = useAppStore((s) => s.pluginViews);
   const width = useAppStore((s) => s.workPanelWidth);
   const activateTab = useAppStore((s) => s.activateWorkPanelTab);
+  const reorderTabs = useAppStore((s) => s.reorderWorkPanelTabs);
   const closeTab = useAppStore((s) => s.closeWorkPanelTab);
   const openWorkPanelTab = useAppStore((s) => s.openWorkPanelTab);
   const openNewWorkPanelTab = useAppStore((s) => s.openNewWorkPanelTab);
@@ -187,8 +209,16 @@ export function WorkPanel({
 
   const [panelDragWidth, setPanelDragWidth] = useState<number | null>(null);
   const panelResizeState = useRef<WorkPanelResizeState | null>(null);
+  const tabReorderState = useRef<WorkPanelTabReorderState | null>(null);
+  const tabStripRef = useRef<HTMLDivElement | null>(null);
+  const suppressTabClickRef = useRef(false);
   const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const newTabButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{
+    tabId: string;
+    insertAfter: boolean;
+  } | null>(null);
   const [nativeSurfaceReadyForExit, setNativeSurfaceReadyForExit] =
     useState(false);
 
@@ -250,6 +280,214 @@ export function WorkPanel({
     });
   }, [activeTabId, tabs.length]);
 
+  const finishTabReorder = useCallback(
+    (keepClickSuppressed = false) => {
+      const state = tabReorderState.current;
+      if (state) {
+        window.removeEventListener("pointermove", state.onMove, true);
+        window.removeEventListener("pointerup", state.onUp, true);
+        window.removeEventListener("pointercancel", state.onCancel, true);
+        if (state.autoScrollFrame !== null) {
+          cancelAnimationFrame(state.autoScrollFrame);
+          state.autoScrollFrame = null;
+        }
+        tabReorderState.current = null;
+      }
+      if (!keepClickSuppressed) suppressTabClickRef.current = false;
+      setDraggingTabId(null);
+      setDropIndicator(null);
+      document.documentElement.removeAttribute("data-work-panel-tab-reordering");
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !tabReorderState.current) return;
+      event.preventDefault();
+      finishTabReorder();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      finishTabReorder();
+    };
+  }, [finishTabReorder]);
+
+  const reorderTab = useCallback(
+    (sourceTabId: string, targetTabId: string, insertAfter: boolean) => {
+      if (sourceTabId === targetTabId) return;
+      reorderTabs(sourceTabId, targetTabId, insertAfter);
+      requestAnimationFrame(() => {
+        tabButtonRefs.current[sourceTabId]?.focus({ preventScroll: true });
+      });
+    },
+    [reorderTabs],
+  );
+
+  const beginTabReorder = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>, sourceTabId: string) => {
+      if (
+        event.button !== 0 ||
+        event.pointerType === "touch" ||
+        tabReorderState.current
+      ) {
+        return;
+      }
+      // A completed drag may not produce a click when released outside the
+      // strip. Clear the one-shot suppression before the next gesture so that
+      // later ordinary clicks are never swallowed.
+      suppressTabClickRef.current = false;
+
+      const updateDropTarget = (state: WorkPanelTabReorderState) => {
+        const strip = tabStripRef.current;
+        const target = strip
+          ? document
+              .elementFromPoint(state.lastClientX, state.lastClientY)
+              ?.closest<HTMLElement>("[data-work-panel-tab-id]")
+          : null;
+        if (!target || !strip?.contains(target)) {
+          state.targetTabId = null;
+          setDropIndicator(null);
+          return;
+        }
+
+        const targetTabId = target.dataset.workPanelTabId;
+        if (!targetTabId || targetTabId === state.sourceTabId) {
+          state.targetTabId = null;
+          setDropIndicator(null);
+          return;
+        }
+        const rect = target.getBoundingClientRect();
+        const insertAfter = workPanelTabReorderInsertAfter(
+          state.lastClientX,
+          rect.left,
+          rect.width,
+        );
+        state.targetTabId = targetTabId;
+        state.insertAfter = insertAfter;
+        setDropIndicator({ tabId: targetTabId, insertAfter });
+      };
+
+      const startAutoScroll = (state: WorkPanelTabReorderState) => {
+        if (state.autoScrollFrame !== null) return;
+
+        const tick = () => {
+          const current = tabReorderState.current;
+          const strip = tabStripRef.current;
+          if (!current || current !== state || !current.armed || !strip) {
+            state.autoScrollFrame = null;
+            return;
+          }
+
+          const stripRect = strip.getBoundingClientRect();
+          if (
+            current.lastClientY < stripRect.top ||
+            current.lastClientY > stripRect.bottom ||
+            strip.scrollWidth <= strip.clientWidth
+          ) {
+            current.autoScrollFrame = null;
+            return;
+          }
+
+          const delta = workPanelTabReorderScrollDelta(
+            current.lastClientX,
+            stripRect.left,
+            stripRect.right,
+          );
+          if (!delta) {
+            current.autoScrollFrame = null;
+            return;
+          }
+
+          const maxScrollLeft = strip.scrollWidth - strip.clientWidth;
+          const nextScrollLeft = Math.min(
+            maxScrollLeft,
+            Math.max(0, strip.scrollLeft + delta),
+          );
+          if (nextScrollLeft === strip.scrollLeft) {
+            current.autoScrollFrame = null;
+            return;
+          }
+
+          strip.scrollLeft = nextScrollLeft;
+          updateDropTarget(current);
+          current.autoScrollFrame = requestAnimationFrame(tick);
+        };
+
+        state.autoScrollFrame = requestAnimationFrame(tick);
+      };
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const state = tabReorderState.current;
+        if (!state || state.pointerId !== moveEvent.pointerId) return;
+        state.lastClientX = moveEvent.clientX;
+        state.lastClientY = moveEvent.clientY;
+        if (!state.armed) {
+          if (
+            !workPanelTabReorderShouldArm(
+              moveEvent.clientX - state.startClientX,
+              moveEvent.clientY - state.startClientY,
+            )
+          ) {
+            return;
+          }
+          state.armed = true;
+          suppressTabClickRef.current = true;
+          document.documentElement.setAttribute(
+            "data-work-panel-tab-reordering",
+            "true",
+          );
+          setDraggingTabId(state.sourceTabId);
+        }
+
+        moveEvent.preventDefault();
+        updateDropTarget(state);
+        startAutoScroll(state);
+      };
+
+      const onUp = (upEvent: PointerEvent) => {
+        const state = tabReorderState.current;
+        if (!state || state.pointerId !== upEvent.pointerId) return;
+        if (state.armed) {
+          upEvent.preventDefault();
+          if (state.targetTabId) {
+            reorderTab(state.sourceTabId, state.targetTabId, state.insertAfter);
+          }
+          finishTabReorder(true);
+          return;
+        }
+        finishTabReorder();
+      };
+
+      const onCancel = (cancelEvent: PointerEvent) => {
+        if (tabReorderState.current?.pointerId !== cancelEvent.pointerId) return;
+        finishTabReorder();
+      };
+
+      const state: WorkPanelTabReorderState = {
+        pointerId: event.pointerId,
+        sourceTabId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        lastClientX: event.clientX,
+        lastClientY: event.clientY,
+        targetTabId: null,
+        insertAfter: false,
+        armed: false,
+        autoScrollFrame: null,
+        onMove,
+        onUp,
+        onCancel,
+      };
+      tabReorderState.current = state;
+      window.addEventListener("pointermove", onMove, true);
+      window.addEventListener("pointerup", onUp, true);
+      window.addEventListener("pointercancel", onCancel, true);
+    },
+    [finishTabReorder, reorderTab],
+  );
+
   const selectTool = useCallback(
     (item: WorkPanelTool, sourceTabId?: string) => {
       if (sourceTabId) {
@@ -296,6 +534,13 @@ export function WorkPanel({
         closeTabAndFocus(tabId);
         return;
       }
+      if (event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+        event.preventDefault();
+        const target = tabs[index + (event.key === "ArrowLeft" ? -1 : 1)];
+        if (!target) return;
+        reorderTab(tabId, target.id, event.key === "ArrowRight");
+        return;
+      }
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
       const nextIndex =
@@ -311,7 +556,7 @@ export function WorkPanel({
       activateTab(nextTab.id);
       requestAnimationFrame(() => tabButtonRefs.current[nextTab.id]?.focus());
     },
-    [activateTab, closeTabAndFocus, tabs],
+    [activateTab, closeTabAndFocus, reorderTab, tabs],
   );
 
   const onTabStripWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -513,6 +758,7 @@ export function WorkPanel({
               </div>
             ) : (
               <div
+                ref={tabStripRef}
                 className="work-panel-tab-strip"
                 role="tablist"
                 aria-label={t("panel.tabsLabel")}
@@ -528,7 +774,17 @@ export function WorkPanel({
                         ) ?? TAB_ICONS.plugin
                       : TAB_ICONS[tab.kind];
                   return (
-                    <div className={cx("work-panel-tab", selected && "active")} key={tab.id}>
+                    <div
+                      className={cx(
+                        "work-panel-tab",
+                        selected && "active",
+                        draggingTabId === tab.id && "is-dragging",
+                        dropIndicator?.tabId === tab.id &&
+                          (dropIndicator.insertAfter ? "is-drop-after" : "is-drop-before"),
+                      )}
+                      data-work-panel-tab-id={tab.id}
+                      key={tab.id}
+                    >
                       <button
                         ref={(node) => {
                           tabButtonRefs.current[tab.id] = node;
@@ -539,9 +795,19 @@ export function WorkPanel({
                         aria-selected={selected}
                         aria-controls={`work-panel-surface-${tab.id}`}
                         tabIndex={selected ? 0 : -1}
+                        aria-grabbed={draggingTabId === tab.id}
+                        aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
                         className="work-panel-tab-button"
                         title={tab.resource ?? label}
-                        onClick={() => activateTab(tab.id)}
+                        onPointerDown={(event) => beginTabReorder(event, tab.id)}
+                        onDragStart={(event) => event.preventDefault()}
+                        onClick={() => {
+                          if (suppressTabClickRef.current) {
+                            suppressTabClickRef.current = false;
+                            return;
+                          }
+                          activateTab(tab.id);
+                        }}
                         onAuxClick={(event) => {
                           if (event.button !== 1) return;
                           event.preventDefault();
