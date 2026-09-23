@@ -108,6 +108,55 @@ test("context window prefers the selected model catalog over provider fallback",
   );
 });
 
+test("context window does not use metadata for a different full wire id", () => {
+  const providerModels = {
+    provider: [{
+      modelId: "model",
+      displayName: "Bare model",
+      providerId: "provider",
+      contextWindow: 512_000,
+      capabilities: ["text"],
+      source: "discovered",
+    }],
+  };
+  const providers = [{
+    id: "provider",
+    models: [{ id: "tenant/model", thinkingLevels: [] }],
+  }];
+
+  assert.equal(
+    resolveContextWindow("provider", "tenant/model", providerModels, providers),
+    128_000,
+  );
+  assert.equal(
+    resolveContextWindow("provider", "model", providerModels, providers),
+    512_000,
+  );
+});
+
+test("context window matches full wire ids when provider is not selected", () => {
+  const providerModels = {
+    first: [{
+      modelId: "model",
+      displayName: "Bare model",
+      providerId: "first",
+      contextWindow: 512_000,
+      capabilities: ["text"],
+      source: "discovered",
+    }],
+    second: [{
+      modelId: "tenant/model",
+      displayName: "Routed model",
+      providerId: "second",
+      contextWindow: 256_000,
+      capabilities: ["text"],
+      source: "discovered",
+    }],
+  };
+
+  assert.equal(resolveContextWindow(undefined, "tenant/model", providerModels, []), 256_000);
+});
+
 test("context window uses the selected binding before the model list loads", () => {
   const providers = [
     {

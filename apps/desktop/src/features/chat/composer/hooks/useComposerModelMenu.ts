@@ -11,6 +11,7 @@ import {
 } from "@pi-desktop/shared";
 import { useAppStore } from "../../../../stores/app-store";
 import {
+  composerModelBinding,
   composerModelMatchesQuery,
   composerModelsForProvider,
   sameComposerModelId,
@@ -152,6 +153,7 @@ export function useComposerModelMenu({
                   model,
                   group.providerSearchText,
                   queryNeedle,
+                  composerModelBinding(group.provider, model.modelId)?.alias,
                 ),
               ),
             }))
@@ -175,7 +177,7 @@ export function useComposerModelMenu({
       flatModels.findIndex(
         (entry) =>
           entry.provider.id === provider?.id &&
-          entry.model.modelId === modelId,
+          sameComposerModelId(entry.model.modelId, modelId ?? ""),
       ),
     [flatModels, provider?.id, modelId],
   );

@@ -529,6 +529,12 @@
   overflow-wrap: anywhere;
   white-space: normal;
 }
+.composer-model-display-name {
+  max-width: 100%;
+  color: var(--ds-text-faint);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
 
 .composer-model-option-meta {
   display: flex;

@@ -22,9 +22,7 @@ import { latestTurnContextInspector } from "../lib/latest-turn-context";
 import { isActivePlanExecution } from "../lib/plan-mode-state";
 import { headAsk, queuedAskCount } from "../lib/pending-asks";
 import type { QueuedPrompt } from "../lib/queued-prompts";
-import {
-  sameComposerModelId,
-} from "../lib/composer-models";
+import { composerModelDisplayName, sameComposerModelId } from "../lib/composer-models";
 import {
   providerThinkingLevels,
   resolveComposerThinkingProvider,
@@ -373,7 +371,12 @@ export function Composer({
     configuredThinkingLevel,
   );
   const thinkingLabel = thinkingLevel;
-  const modelLabel = modelId || t("chat.model");
+  const selectedModelInfo = selectedModelCatalog?.find((candidate) =>
+    sameComposerModelId(candidate.modelId, modelId ?? ""),
+  );
+  const modelLabel = modelId
+    ? composerModelDisplayName(provider, modelId, selectedModelInfo?.displayName)
+    : t("chat.model");
   const modelMenu = useComposerModelMenu({
     configureActiveSession,
     mode,

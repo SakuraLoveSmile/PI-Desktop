@@ -42,8 +42,8 @@ test("Composer only lists models configured for the provider", () => {
   assert.deepEqual(
     models.map(({ modelId, displayName }) => ({ modelId, displayName })),
     [
-      { modelId: "claude-opus-4-6", displayName: "claude-opus-4-6" },
-      { modelId: "x-ai/grok-4.6", displayName: "x-ai/grok-4.6" },
+      { modelId: "claude-opus-4-6", displayName: "Claude Opus 4.6" },
+      { modelId: "x-ai/grok-4.6", displayName: "Grok 4.6" },
     ],
   );
 });
@@ -78,42 +78,48 @@ test("legacy providers fall back to their default model binding", () => {
   );
 
   assert.deepEqual(models.map((item) => item.modelId), ["legacy-model"]);
-  assert.equal(models[0].displayName, "legacy-model");
+  assert.equal(models[0].displayName, "Legacy model");
 });
 
-test("a configured alias renames the composer row without changing its id", () => {
+test("a configured alias labels its row without losing the published name", () => {
+  const provider = {
+    id: "deepseek",
+    models: [{ ...binding("deepseek-v4-pro"), alias: "  pro  " }],
+  };
   const models = composerModelsForProvider(
-    {
-      id: "deepseek",
-      models: [{ ...binding("deepseek-v4-pro"), alias: "  pro  " }],
-    },
+    provider,
     [model("deepseek-v4-pro", "DeepSeek V4 Pro")],
   );
 
   assert.equal(models[0].modelId, "deepseek-v4-pro");
-  assert.equal(models[0].displayName, "deepseek-v4-pro");
+  assert.equal(models[0].displayName, "DeepSeek V4 Pro");
+  assert.equal(composerModelDisplayName(provider, "deepseek-v4-pro", models[0].displayName), "pro");
+  assert.equal(composerModelMatchesQuery(models[0], "provider", "PRO", "pro"), true);
+  assert.equal(composerModelMatchesQuery(models[0], "provider", "DeepSeek V4 Pro", "pro"), true);
 });
-
 test("a configured alias is visible before discovery data is available", () => {
-  const models = composerModelsForProvider(
-    {
-      id: "openai",
-      models: [{ ...binding("gpt-5.3-codex-spark"), alias: "  Spark  " }],
-    },
-    undefined,
-  );
+  const provider = {
+    id: "openai",
+    models: [{ ...binding("gpt-5.3-codex-spark"), alias: "  Spark  " }],
+  };
+  const models = composerModelsForProvider(provider, undefined);
 
   assert.equal(models[0].displayName, "gpt-5.3-codex-spark");
+  assert.equal(
+    composerModelDisplayName(provider, models[0].modelId, models[0].displayName),
+    "Spark",
+  );
 });
 
-test("the selected label shows its complete wire id even with an alias", () => {
+
+test("the display name prefers a configured alias while preserving model identity", () => {
   assert.equal(
     composerModelDisplayName(
       { id: "openai", models: [{ ...binding("openai/gpt-5.3-codex-spark"), alias: "Spark" }] },
-      "gpt-5.3-codex-spark",
+      "openai/gpt-5.3-codex-spark",
       "GPT-5.3 Codex Spark",
     ),
-    "gpt-5.3-codex-spark",
+    "Spark",
   );
 });
 
@@ -130,7 +136,7 @@ test("an exact binding alias wins over a broader equivalent id match", () => {
       "openai/gpt-5.3-codex-spark",
       "GPT-5.3 Codex Spark",
     ),
-    "openai/gpt-5.3-codex-spark",
+    "Namespaced",
   );
 });
 
@@ -143,7 +149,15 @@ test("a blank alias leaves the published display name alone", () => {
     [model("deepseek-v4-pro", "DeepSeek V4 Pro")],
   );
 
-  assert.equal(models[0].displayName, "deepseek-v4-pro");
+  assert.equal(models[0].displayName, "DeepSeek V4 Pro");
+  assert.equal(
+    composerModelDisplayName(
+      { id: "deepseek", models: [{ ...binding("deepseek-v4-pro"), alias: "   " }] },
+      "deepseek-v4-pro",
+      "DeepSeek V4 Pro",
+    ),
+    "DeepSeek V4 Pro",
+  );
 });
 
 test("composer model rows expose published reasoning and vision markers", () => {
@@ -234,9 +248,11 @@ test("prefixed and unprefixed wire ids remain separate even with one catalog nam
     { ...model("proxy/model", "Friendly"), capabilities: ["text", "vision"] },
   ]);
   assert.deepEqual(rows.map(({ modelId, displayName }) => [modelId, displayName]), [
-    ["proxy/model", "proxy/model"],
-    ["model", "model"],
+    ["proxy/model", "Friendly"],
+    ["model", "Friendly"],
   ]);
+  assert.equal(composerModelDisplayName(provider, "proxy/model", rows[0].displayName), "Short");
+  assert.equal(composerModelMatchesQuery(rows[0], "relay", "Short", "Short"), true);
   assert.deepEqual(composerModelBadges(rows[0], provider), []);
   assert.deepEqual(composerModelBadges(rows[1], provider), ["reasoning", "vision"]);
   assert.equal(composerModelBinding(provider, "proxy/model"), provider.models[0]);
@@ -251,5 +267,5 @@ test("legacy unprefixed selection does not borrow a prefixed route's metadata", 
   assert.equal(rows[0].displayName, "proxy/model");
   assert.deepEqual(rows[0].capabilities, ["text"]);
   assert.equal(composerModelBinding(provider, "model"), undefined);
-  assert.equal(composerModelDisplayName(provider, "model", rows[0].displayName), "model");
+  assert.equal(composerModelDisplayName(provider, "model"), "model");
 });

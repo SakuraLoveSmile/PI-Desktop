@@ -1,6 +1,6 @@
 import {
   effectiveContextWindow,
-  modelIdsMatch,
+  modelWireIdsEqual,
   type ContextUsageDisplay,
   type MessageUsage,
   type ModelBinding,
@@ -88,10 +88,10 @@ export function resolveContextWindow(
   const provider = providers.find((candidate) => candidate.id === providerId);
   const catalogModel = modelId
     ? providerId
-      ? providerModels[providerId]?.find((model) => modelIdsMatch(model.modelId, modelId))
+      ? providerModels[providerId]?.find((model) => modelWireIdsEqual(model.modelId, modelId))
       : Object.values(providerModels)
           .flat()
-          .find((model) => modelIdsMatch(model.modelId, modelId))
+          .find((model) => modelWireIdsEqual(model.modelId, modelId))
     : undefined;
   const catalogWindow = modelContextWindow(catalogModel);
   const configured = bindingContextWindow(provider, modelId);

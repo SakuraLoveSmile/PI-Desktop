@@ -2,7 +2,11 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { imageGenerationBindings } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { composerModelsForProvider, sameComposerModelId } from "../../lib/composer-models";
+import {
+  composerModelDisplayName,
+  composerModelsForProvider,
+  sameComposerModelId,
+} from "../../lib/composer-models";
 import { ComposerModelPicker } from "../chat/composer/ComposerModelPicker";
 import { useComposerModelMenu } from "../chat/composer/hooks/useComposerModelMenu";
 import { thinkingLevelForProvider, thinkingProviderForModel } from "../chat/composer/model";
@@ -35,10 +39,13 @@ export function ScheduledModelPicker({ value, disabled, onChange }: {
         thinkingLevel: configuration.thinkingLevel});
     },
   });
+  const selectedLabel = provider && selected
+    ? composerModelDisplayName(provider, value.modelId ?? "", selected.displayName)
+    : value.modelId ?? "";
   const label = selected && provider?.enabled
     ? `${provider.name}${providers.some(p => p.id !== provider.id &&
       p.name.toLowerCase() === provider.name.toLowerCase())
-      ? ` (${provider.id})` : ""} · ${value.modelId}`
+      ? ` (${provider.id})` : ""} · ${selectedLabel}`
     : value.providerId && value.modelId
       ? t("scheduled.unavailableModel", {provider: value.providerId, model: value.modelId})
       : t("settings.defaultModel");

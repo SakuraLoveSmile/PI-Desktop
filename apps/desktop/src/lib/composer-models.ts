@@ -43,11 +43,12 @@ export function composerModelsForProvider(
     const metadata = (discovered ?? []).find((model) =>
       sameComposerModelId(model.modelId, modelId),
     );
+    const displayName = metadata?.displayName?.trim() || modelId;
     return metadata
-      ? { ...metadata, modelId, displayName: modelId, providerId: provider.id }
+      ? { ...metadata, modelId, displayName, providerId: provider.id }
       : {
           modelId,
-          displayName: modelId,
+          displayName,
           providerId: provider.id,
           capabilities: ["text"],
           source: "user" as const,
@@ -55,13 +56,14 @@ export function composerModelsForProvider(
   });
 }
 
-/** The Composer always shows the complete selected wire id, even before discovery. */
+/** The Composer uses the configured alias, then published name, then wire id. */
 export function composerModelDisplayName(
-  _provider: ConfiguredProvider,
+  provider: ConfiguredProvider | undefined,
   modelId: string,
-  _fallback?: string,
+  fallback?: string,
 ): string {
-  return modelId;
+  const alias = provider ? composerModelBinding(provider, modelId)?.alias?.trim() : undefined;
+  return alias || fallback?.trim() || modelId;
 }
 
 /** Find only the binding for this complete wire id. */
@@ -92,16 +94,18 @@ export function composerModelBadges(
   return badges;
 }
 
-/** Search the full id, published family and owning provider name. */
+/** Search the full id, configured alias, published name, family and provider. */
 export function composerModelMatchesQuery(
   model: ModelInfo,
   providerName: string,
   query: string,
+  alias?: string,
 ): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
   const haystacks = [
     model.modelId,
+    alias ?? "",
     model.displayName ?? "",
     model.family ?? "",
     providerName,
