@@ -19,6 +19,7 @@ const headerEditorSource = await read("../src/components/settings/ProviderHeader
 const vendorDialogSource = await read("../src/components/settings/VendorAccountDialog.tsx");
 // The panes themselves live in the picker both dialogs render (D269).
 const pickerSource = await read("../src/components/settings/ModelSelectionPanes.tsx");
+const fetchErrorSource = await read("../src/components/settings/ModelsFetchErrorMessage.tsx");
 const styles = await loadStyles();
 
 /** Declaration block for exactly one selector, so matches cannot span rules. */
@@ -114,7 +115,7 @@ test("custom Name and Base URL sit on one row without helper copy", () => {
 });
 
 test("a failed model list uses a classified error, not a raw dump plus empty copy", () => {
-  assert.match(pickerSource, /describeModelsFetchError/);
+  assert.match(fetchErrorSource, /describeModelsFetchError/);
   assert.match(pickerSource, /ModelsFetchErrorMessage/);
   assert.match(pickerSource, /variant="placeholder"/);
   assert.match(pickerSource, /variant="banner"/);

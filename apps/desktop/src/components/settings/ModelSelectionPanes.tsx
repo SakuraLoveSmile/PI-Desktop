@@ -43,7 +43,7 @@ import {
   customModelSeedBinding,
   type CustomModelLookupContext,
 } from "./model-custom-lookup";
-import { describeModelsFetchError } from "./model-fetch-error";
+import { ModelsFetchErrorMessage } from "./ModelsFetchErrorMessage";
 import type { ProviderModelsState } from "./useProviderModels";
 import { useModelReorder } from "./useModelReorder";
 
@@ -992,58 +992,6 @@ export function ModelSelectionPanes({
           </Field>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ModelsFetchErrorMessage({
-  error,
-  variant,
-}: {
-  error?: string;
-  variant: "banner" | "placeholder";
-}) {
-  const { t } = useTranslation();
-  const view = describeModelsFetchError(error);
-  let summary = t("settings.modelsFetchFailed");
-  switch (view.kind) {
-    case "unauthorized":
-      summary = t("errors.PROVIDER_UNAUTHORIZED");
-      break;
-    case "notFound":
-      summary = t("settings.modelsFetchNotFound");
-      break;
-    case "rateLimited":
-      summary = t("errors.PROVIDER_RATE_LIMITED");
-      break;
-    case "timeout":
-      summary = t("errors.TIMEOUT");
-      break;
-    case "network":
-      summary = t("errors.NETWORK_ERROR");
-      break;
-    case "invalidResponse":
-      summary = t("settings.modelsFetchInvalidResponse");
-      break;
-    case "http":
-      summary = t("settings.modelsFetchFailedStatus", {
-        status: view.summaryParams?.status ?? 0,
-      });
-      break;
-  }
-  const className =
-    variant === "placeholder"
-      ? "provider-models-placeholder is-error"
-      : "provider-models-note is-error";
-  return (
-    <div className={className} role="alert">
-      <span className="provider-models-error-summary">{summary}</span>
-      {view.detail ? (
-        <span className="provider-models-error-detail">{view.detail}</span>
-      ) : null}
-      {variant === "placeholder" ? (
-        <span className="provider-models-error-hint">{t("settings.modelsFetchHint")}</span>
-      ) : null}
     </div>
   );
 }

@@ -7,6 +7,7 @@ const read = (rel) => readFile(new URL(rel, import.meta.url), "utf8");
 
 const setupSource = await read("../src/components/settings/ProviderSetupDialog.tsx");
 const pickerSource = await read("../src/components/settings/ServicePicker.tsx");
+const catalogSource = await read("../src/components/settings/service-catalog.ts");
 const hookSource = await read("../src/components/settings/useProviderModels.ts");
 const menuSource = await read("../src/components/settings/AnchoredMenu.tsx");
 const styles = await loadStyles();
@@ -17,11 +18,11 @@ test("the service control is a searchable anchored menu, not a native select", (
   assert.doesNotMatch(setupSource, /<optgroup/);
   assert.match(pickerSource, /<AnchoredMenu/);
   assert.match(pickerSource, /settings\.searchService/);
-  assert.match(pickerSource, /haystack\.includes\(needle\)/);
-  assert.match(pickerSource, /preset\.aliases/);
-  assert.match(pickerSource, /hostOf\(preset\.baseUrl\)/);
+  // Matching itself is covered behaviorally in service-catalog.test.mjs.
+  assert.match(pickerSource, /filterServiceOptions\(options, query\)/);
   // Filtering stays in the renderer; a keystroke must not IPC.
   assert.doesNotMatch(pickerSource, /api\./);
+  assert.doesNotMatch(catalogSource, /\bapi\.\w+\(/);
 });
 
 test("the service menu portals above the dialog overlay and hides until measured", () => {
@@ -40,17 +41,12 @@ test("the service menu portals above the dialog overlay and hides until measured
 });
 
 test("the service list is a flat vendor menu with custom first", () => {
-  assert.match(pickerSource, /id: CUSTOM_SERVICE/);
-  assert.match(pickerSource, /NAMED_ENDPOINT_PRESETS\.map/);
+  assert.match(pickerSource, /\[customServiceOption\(t\), \.\.\.namedServiceOptions\(t\)\]/);
   assert.match(pickerSource, /settings\.noServiceMatches/);
   assert.match(pickerSource, /role="option"/);
   assert.doesNotMatch(pickerSource, /presetGroupInternational|presetGroupChina/);
   assert.doesNotMatch(pickerSource, /NAMED_PRESET_GROUPS/);
-  assert.ok(
-    pickerSource.indexOf("id: CUSTOM_SERVICE") <
-      pickerSource.indexOf("NAMED_ENDPOINT_PRESETS.map"),
-    "custom should be listed before named vendors",
-  );
+  assert.doesNotMatch(catalogSource, /NAMED_PRESET_GROUPS/);
 });
 
 test("named add-path discovery waits for a key and does not flash loading", () => {

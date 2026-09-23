@@ -7,26 +7,18 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NAMED_ENDPOINT_PRESETS } from "@pi-desktop/shared";
 import { cx, Input } from "../ui";
 import { IconCheck, IconChevronDown, IconSearch } from "../icons";
 import { AnchoredMenu } from "./AnchoredMenu";
+import {
+  CUSTOM_SERVICE,
+  customServiceOption,
+  filterServiceOptions,
+  namedServiceOptions,
+  type ServiceOption,
+} from "./service-catalog";
 
-export const CUSTOM_SERVICE = "custom";
-
-type ServiceOption = {
-  id: string;
-  label: string;
-  haystack: string;
-};
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-}
+export { CUSTOM_SERVICE };
 
 export type ServicePickerProps = {
   value: string;
@@ -48,31 +40,12 @@ export function ServicePicker({
   const [restoreFocus, setRestoreFocus] = useState(true);
   const optionRefs = useRef(new Map<string, HTMLButtonElement>());
 
-  const customLabel = t("settings.presetCustomEndpoint");
-  const options = useMemo<ServiceOption[]>(() => {
-    const custom: ServiceOption = {
-      id: CUSTOM_SERVICE,
-      label: customLabel,
-      haystack: `${customLabel} custom endpoint`.toLowerCase(),
-    };
-    const named = NAMED_ENDPOINT_PRESETS.map((preset) => {
-      const label = t(preset.labelKey);
-      const aliases = preset.aliases?.join(" ") ?? "";
-      return {
-        id: preset.id,
-        label,
-        haystack:
-          `${label} ${preset.name} ${preset.id} ${preset.vendorKey} ${aliases} ${preset.baseUrl} ${hostOf(preset.baseUrl)}`.toLowerCase(),
-      };
-    });
-    return [custom, ...named];
-  }, [customLabel, t]);
+  const options = useMemo<ServiceOption[]>(
+    () => [customServiceOption(t), ...namedServiceOptions(t)],
+    [t],
+  );
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return options;
-    return options.filter((option) => option.haystack.includes(needle));
-  }, [options, query]);
+  const visible = useMemo(() => filterServiceOptions(options, query), [options, query]);
 
   const visibleIds = useMemo(() => visible.map((option) => option.id), [visible]);
 

@@ -38,6 +38,11 @@ const vendorAccountsSource = await readFile(
   new URL("../src/components/settings/VendorAccountsSection.tsx", import.meta.url),
   "utf8",
 );
+// Account lifecycle (remove with default repair, save) lives in the hook.
+const vendorAccountsHookSource = await readFile(
+  new URL("../src/components/settings/useVendorAccounts.ts", import.meta.url),
+  "utf8",
+);
 const vendorAccountDialogSource = await readFile(
   new URL("../src/components/settings/VendorAccountDialog.tsx", import.meta.url),
   "utf8",
@@ -283,11 +288,11 @@ test("model configuration separates AI services from independently removable ven
   );
   assert.doesNotMatch(providersSource, /provider-config-hero/);
   assert.doesNotMatch(providersSource, /settings-section-subtitle/);
-  assert.match(vendorAccountsSource, /api\.deleteOauthAccount\(account\.providerId\)/);
-  assert.match(vendorAccountsSource, /api\.updateProvider\(/);
-  assert.match(vendorAccountsSource, /oauthAccountLabel: form\.name\.trim\(\)/);
-  assert.match(vendorAccountsSource, /defaultModelId: form\.modelId\.trim\(\)/);
-  assert.match(vendorAccountsSource, /models: form\.models/);
+  assert.match(vendorAccountsHookSource, /api\.deleteOauthAccount\(account\.providerId\)/);
+  assert.match(vendorAccountsHookSource, /api\.updateProvider\(/);
+  assert.match(vendorAccountsHookSource, /oauthAccountLabel: form\.name\.trim\(\)/);
+  assert.match(vendorAccountsHookSource, /defaultModelId: form\.modelId\.trim\(\)/);
+  assert.match(vendorAccountsHookSource, /models: form\.models/);
   assert.match(vendorAccountsSource, /api\.testProvider\(provider\.id\)/);
   assert.match(vendorAccountsSource, /VendorAccountDialog/);
   assert.match(
@@ -305,9 +310,9 @@ test("model configuration separates AI services from independently removable ven
   assert.match(vendorAccountDialogSource, /useProviderModels/);
   assert.match(vendorAccountDialogSource, /<ModelSelectionPanes/);
   assert.match(vendorAccountDialogSource, /modelId: persisted\[0\]\.id/);
-  assert.match(vendorAccountsSource, /providerIsReady/);
-  assert.match(vendorAccountsSource, /defaultProviderId: next\?\.id \?\? ""/);
-  assert.match(vendorAccountsSource, /useAppStore\.setState\(\{ settings: nextSettings \}\)/);
+  assert.match(vendorAccountsHookSource, /providerIsReady/);
+  assert.match(vendorAccountsHookSource, /defaultProviderId: next\?\.id \?\? ""/);
+  assert.match(vendorAccountsHookSource, /useAppStore\.setState\(\{ settings: nextSettings \}\)/);
   assert.match(vendorPickerSource, /existing accounts do not disable a vendor/);
   assert.match(vendorPickerSource, /vendors\.map/);
 });
