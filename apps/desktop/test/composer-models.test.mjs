@@ -3,9 +3,11 @@ import test from "node:test";
 
 import {
   composerModelBadges,
+  composerModelBinding,
   composerModelDisplayName,
   composerModelMatchesQuery,
   composerModelsForProvider,
+  sameComposerModelId,
 } from "../src/lib/composer-models.ts";
 
 const binding = (id) => ({
@@ -40,8 +42,8 @@ test("Composer only lists models configured for the provider", () => {
   assert.deepEqual(
     models.map(({ modelId, displayName }) => ({ modelId, displayName })),
     [
-      { modelId: "claude-opus-4-6", displayName: "Claude Opus 4.6" },
-      { modelId: "x-ai/grok-4.6", displayName: "Grok 4.6" },
+      { modelId: "claude-opus-4-6", displayName: "claude-opus-4-6" },
+      { modelId: "x-ai/grok-4.6", displayName: "x-ai/grok-4.6" },
     ],
   );
 });
@@ -76,7 +78,7 @@ test("legacy providers fall back to their default model binding", () => {
   );
 
   assert.deepEqual(models.map((item) => item.modelId), ["legacy-model"]);
-  assert.equal(models[0].displayName, "Legacy model");
+  assert.equal(models[0].displayName, "legacy-model");
 });
 
 test("a configured alias renames the composer row without changing its id", () => {
@@ -89,7 +91,7 @@ test("a configured alias renames the composer row without changing its id", () =
   );
 
   assert.equal(models[0].modelId, "deepseek-v4-pro");
-  assert.equal(models[0].displayName, "pro");
+  assert.equal(models[0].displayName, "deepseek-v4-pro");
 });
 
 test("a configured alias is visible before discovery data is available", () => {
@@ -101,20 +103,17 @@ test("a configured alias is visible before discovery data is available", () => {
     undefined,
   );
 
-  assert.equal(models[0].displayName, "Spark");
+  assert.equal(models[0].displayName, "gpt-5.3-codex-spark");
 });
 
-test("the selected label keeps its alias across equivalent model ids", () => {
+test("the selected label shows its complete wire id even with an alias", () => {
   assert.equal(
     composerModelDisplayName(
-      {
-        id: "openai",
-        models: [{ ...binding("openai/gpt-5.3-codex-spark"), alias: "Spark" }],
-      },
+      { id: "openai", models: [{ ...binding("openai/gpt-5.3-codex-spark"), alias: "Spark" }] },
       "gpt-5.3-codex-spark",
       "GPT-5.3 Codex Spark",
     ),
-    "Spark",
+    "gpt-5.3-codex-spark",
   );
 });
 
@@ -131,7 +130,7 @@ test("an exact binding alias wins over a broader equivalent id match", () => {
       "openai/gpt-5.3-codex-spark",
       "GPT-5.3 Codex Spark",
     ),
-    "Namespaced",
+    "openai/gpt-5.3-codex-spark",
   );
 });
 
@@ -144,7 +143,7 @@ test("a blank alias leaves the published display name alone", () => {
     [model("deepseek-v4-pro", "DeepSeek V4 Pro")],
   );
 
-  assert.equal(models[0].displayName, "DeepSeek V4 Pro");
+  assert.equal(models[0].displayName, "deepseek-v4-pro");
 });
 
 test("composer model rows expose published reasoning and vision markers", () => {
@@ -220,4 +219,37 @@ test("composer model search matches id, name, family and provider", () => {
     );
   }
   assert.equal(composerModelMatchesQuery(model, "Anthropic", "gemini"), false);
+});
+
+test("prefixed and unprefixed wire ids remain separate even with one catalog name", () => {
+  const provider = {
+    id: "relay",
+    models: [
+      { ...binding("proxy/model"), alias: "Short", supportsImages: false },
+      { ...binding("model"), supportsImages: true },
+    ],
+  };
+  const rows = composerModelsForProvider(provider, [
+    { ...model("model", "Friendly"), reasoning: true, capabilities: ["text", "reasoning"] },
+    { ...model("proxy/model", "Friendly"), capabilities: ["text", "vision"] },
+  ]);
+  assert.deepEqual(rows.map(({ modelId, displayName }) => [modelId, displayName]), [
+    ["proxy/model", "proxy/model"],
+    ["model", "model"],
+  ]);
+  assert.deepEqual(composerModelBadges(rows[0], provider), []);
+  assert.deepEqual(composerModelBadges(rows[1], provider), ["reasoning", "vision"]);
+  assert.equal(composerModelBinding(provider, "proxy/model"), provider.models[0]);
+  assert.equal(composerModelBinding(provider, "model"), provider.models[1]);
+  assert.equal(sameComposerModelId("proxy/model", "model"), false);
+  assert.equal(sameComposerModelId("proxy/model", "PROXY/MODEL"), true);
+});
+
+test("legacy unprefixed selection does not borrow a prefixed route's metadata", () => {
+  const provider = { id: "relay", models: [binding("proxy/model")] };
+  const rows = composerModelsForProvider(provider, [model("model", "Friendly")]);
+  assert.equal(rows[0].displayName, "proxy/model");
+  assert.deepEqual(rows[0].capabilities, ["text"]);
+  assert.equal(composerModelBinding(provider, "model"), undefined);
+  assert.equal(composerModelDisplayName(provider, "model", rows[0].displayName), "model");
 });

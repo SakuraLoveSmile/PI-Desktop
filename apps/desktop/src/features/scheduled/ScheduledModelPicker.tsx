@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { imageGenerationBindings, modelIdsMatch } from "@pi-desktop/shared";
+import { imageGenerationBindings } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { composerModelDisplayName, composerModelsForProvider } from "../../lib/composer-models";
+import { composerModelsForProvider, sameComposerModelId } from "../../lib/composer-models";
 import { ComposerModelPicker } from "../chat/composer/ComposerModelPicker";
 import { useComposerModelMenu } from "../chat/composer/hooks/useComposerModelMenu";
 import { thinkingLevelForProvider, thinkingProviderForModel } from "../chat/composer/model";
@@ -22,7 +22,7 @@ export function ScheduledModelPicker({ value, disabled, onChange }: {
   const images = useMemo(() => imageGenerationBindings(settings?.imageGenerationModels,
     settings?.imageGeneration), [settings?.imageGenerationModels, settings?.imageGeneration]);
   const selected = provider && composerModelsForProvider(provider, providerModels[provider.id], images)
-    .find(model => modelIdsMatch(model.modelId, value.modelId ?? ""));
+    .find(model => sameComposerModelId(model.modelId, value.modelId ?? ""));
   const thinkingProvider = thinkingProviderForModel(provider, value.modelId,
     provider ? providerModels[provider.id] : undefined);
   const thinkingLevel = thinkingLevelForProvider(thinkingProvider, value.thinkingLevel ?? "off");
@@ -36,7 +36,9 @@ export function ScheduledModelPicker({ value, disabled, onChange }: {
     },
   });
   const label = selected && provider?.enabled
-    ? composerModelDisplayName(provider, selected.modelId, selected.displayName)
+    ? `${provider.name}${providers.some(p => p.id !== provider.id &&
+      p.name.toLowerCase() === provider.name.toLowerCase())
+      ? ` (${provider.id})` : ""} · ${value.modelId}`
     : value.providerId && value.modelId
       ? t("scheduled.unavailableModel", {provider: value.providerId, model: value.modelId})
       : t("settings.defaultModel");

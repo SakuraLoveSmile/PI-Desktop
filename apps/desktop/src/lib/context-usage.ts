@@ -67,7 +67,7 @@ function bindingContextWindow(
 ): Pick<ModelBinding, "contextWindow" | "contextWindowSource"> | undefined {
   if (!provider || !modelId) return undefined;
   const binding = provider.models?.find((candidate) =>
-    modelIdsMatch(candidate.id, modelId),
+    candidate.id.trim().toLowerCase() === modelId.trim().toLowerCase(),
   );
   if (!binding) return undefined;
   const value = positiveTokenCount(binding.contextWindow);
@@ -102,7 +102,10 @@ export function resolveContextWindow(
   );
   if (configuredWindow) return configuredWindow;
 
-  const providerWindow = providerContextWindow(provider);
+  // An enriched provider window may describe a different configured model.
+  const providerWindow = !modelId || !provider?.models?.length
+    ? providerContextWindow(provider)
+    : undefined;
   return providerWindow ?? DEFAULT_CONTEXT_WINDOW;
 }
 

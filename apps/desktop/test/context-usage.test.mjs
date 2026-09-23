@@ -104,7 +104,7 @@ test("context window prefers the selected model catalog over provider fallback",
   );
   assert.equal(
     resolveContextWindow("provider", "unknown-model", providerModels, providers),
-    64_000,
+    128_000,
   );
 });
 
@@ -128,6 +128,22 @@ test("context window uses the selected binding before the model list loads", () 
     resolveContextWindow("provider", "gpt-5.6-luna", {}, providers),
     1_050_000,
   );
+});
+
+test("context window does not borrow a sibling route's configured binding", () => {
+  const providers = [{
+    id: "provider",
+    contextWindow: 64_000,
+    models: [
+      { id: "model", contextWindow: 16_000, contextWindowSource: "user" },
+      { id: " PROXY/MODEL ", contextWindow: 32_000, contextWindowSource: "user" },
+    ],
+  }];
+  assert.equal(resolveContextWindow("provider", "proxy/model", {}, providers), 32_000);
+  assert.equal(resolveContextWindow("provider", "model", {}, providers), 16_000);
+  providers[0].models = [providers[0].models[0]];
+  assert.equal(resolveContextWindow("provider", "proxy/model", {}, providers), 128_000);
+  assert.equal(resolveContextWindow("other-provider", "model", {}, providers), 128_000);
 });
 
 test("context usage falls back to input and output when total is absent", () => {
