@@ -73,6 +73,9 @@ type WorkPanelResizeState = {
 type WorkPanelTabReorderState = {
   pointerId: number;
   sourceTabId: string;
+  activeSessionId: string | undefined;
+  activeTabId: string | null;
+  tabSignature: string;
   startClientX: number;
   startClientY: number;
   lastClientX: number;
@@ -206,12 +209,15 @@ export function WorkPanel({
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const tools = workPanelTools(t, pluginViews);
+  const tabSignature = JSON.stringify(
+    tabs.map(({ id, kind, resource, location }) => [id, kind, resource, location]),
+  );
 
   const [panelDragWidth, setPanelDragWidth] = useState<number | null>(null);
   const panelResizeState = useRef<WorkPanelResizeState | null>(null);
   const tabReorderState = useRef<WorkPanelTabReorderState | null>(null);
   const tabStripRef = useRef<HTMLDivElement | null>(null);
-  const suppressTabClickRef = useRef(false);
+  const suppressedTabClickPointerIdsRef = useRef<Set<number>>(new Set());
   const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const newTabButtonRef = useRef<HTMLButtonElement | null>(null);
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
@@ -280,36 +286,83 @@ export function WorkPanel({
     });
   }, [activeTabId, tabs.length]);
 
-  const finishTabReorder = useCallback(
-    (keepClickSuppressed = false) => {
-      const state = tabReorderState.current;
-      if (state) {
-        window.removeEventListener("pointermove", state.onMove, true);
-        window.removeEventListener("pointerup", state.onUp, true);
-        window.removeEventListener("pointercancel", state.onCancel, true);
-        if (state.autoScrollFrame !== null) {
-          cancelAnimationFrame(state.autoScrollFrame);
-          state.autoScrollFrame = null;
-        }
-        tabReorderState.current = null;
+  const finishTabReorder = useCallback(() => {
+    const state = tabReorderState.current;
+    if (state) {
+      window.removeEventListener("pointermove", state.onMove, true);
+      window.removeEventListener("pointerup", state.onUp, true);
+      window.removeEventListener("pointercancel", state.onCancel, true);
+      if (state.autoScrollFrame !== null) {
+        cancelAnimationFrame(state.autoScrollFrame);
+        state.autoScrollFrame = null;
       }
-      if (!keepClickSuppressed) suppressTabClickRef.current = false;
-      setDraggingTabId(null);
-      setDropIndicator(null);
-      document.documentElement.removeAttribute("data-work-panel-tab-reordering");
-    },
-    [],
-  );
+      tabReorderState.current = null;
+    }
+    setDraggingTabId(null);
+    setDropIndicator(null);
+    document.documentElement.removeAttribute("data-work-panel-tab-reordering");
+  }, []);
+
+  useLayoutEffect(() => {
+    const state = tabReorderState.current;
+    if (
+      state &&
+      (state.activeSessionId !== activeSessionId ||
+        state.activeTabId !== activeTabId ||
+        state.tabSignature !== tabSignature)
+    ) {
+      suppressedTabClickPointerIdsRef.current.add(state.pointerId);
+      finishTabReorder();
+    }
+  }, [activeSessionId, activeTabId, finishTabReorder, tabSignature]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !tabReorderState.current) return;
+      const state = tabReorderState.current;
+      if (event.key !== "Escape" || !state) return;
       event.preventDefault();
+      suppressedTabClickPointerIdsRef.current.add(state.pointerId);
       finishTabReorder();
     };
+    const onWindowBlur = () => {
+      const state = tabReorderState.current;
+      if (state) suppressedTabClickPointerIdsRef.current.add(state.pointerId);
+      finishTabReorder();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      // A reused pointer id starts a new gesture; unrelated pointers do not
+      // clear a canceled gesture's pending click suppression.
+      suppressedTabClickPointerIdsRef.current.delete(event.pointerId);
+    };
+    const onClick = (event: MouseEvent) => {
+      if (
+        event.detail === 0 ||
+        !("pointerId" in event) ||
+        typeof event.pointerId !== "number" ||
+        !suppressedTabClickPointerIdsRef.current.has(event.pointerId)
+      ) {
+        return;
+      }
+      suppressedTabClickPointerIdsRef.current.delete(event.pointerId);
+      if (
+        !(event.target instanceof Element) ||
+        !event.target.closest('[role="tab"]')
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("click", onClick, true);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("click", onClick, true);
+      suppressedTabClickPointerIdsRef.current.clear();
       finishTabReorder();
     };
   }, [finishTabReorder]);
@@ -334,10 +387,7 @@ export function WorkPanel({
       ) {
         return;
       }
-      // A completed drag may not produce a click when released outside the
-      // strip. Clear the one-shot suppression before the next gesture so that
-      // later ordinary clicks are never swallowed.
-      suppressTabClickRef.current = false;
+      // Pointer click suppression is armed only when this drag completes.
 
       const updateDropTarget = (state: WorkPanelTabReorderState) => {
         const strip = tabStripRef.current;
@@ -433,7 +483,6 @@ export function WorkPanel({
             return;
           }
           state.armed = true;
-          suppressTabClickRef.current = true;
           document.documentElement.setAttribute(
             "data-work-panel-tab-reordering",
             "true",
@@ -454,7 +503,8 @@ export function WorkPanel({
           if (state.targetTabId) {
             reorderTab(state.sourceTabId, state.targetTabId, state.insertAfter);
           }
-          finishTabReorder(true);
+          finishTabReorder();
+          suppressedTabClickPointerIdsRef.current.add(state.pointerId);
           return;
         }
         finishTabReorder();
@@ -462,12 +512,16 @@ export function WorkPanel({
 
       const onCancel = (cancelEvent: PointerEvent) => {
         if (tabReorderState.current?.pointerId !== cancelEvent.pointerId) return;
+        suppressedTabClickPointerIdsRef.current.delete(cancelEvent.pointerId);
         finishTabReorder();
       };
 
       const state: WorkPanelTabReorderState = {
         pointerId: event.pointerId,
         sourceTabId,
+        activeSessionId,
+        activeTabId,
+        tabSignature,
         startClientX: event.clientX,
         startClientY: event.clientY,
         lastClientX: event.clientX,
@@ -485,7 +539,7 @@ export function WorkPanel({
       window.addEventListener("pointerup", onUp, true);
       window.addEventListener("pointercancel", onCancel, true);
     },
-    [finishTabReorder, reorderTab],
+    [activeSessionId, activeTabId, finishTabReorder, reorderTab, tabSignature],
   );
 
   const selectTool = useCallback(
@@ -801,13 +855,7 @@ export function WorkPanel({
                         title={tab.resource ?? label}
                         onPointerDown={(event) => beginTabReorder(event, tab.id)}
                         onDragStart={(event) => event.preventDefault()}
-                        onClick={() => {
-                          if (suppressTabClickRef.current) {
-                            suppressTabClickRef.current = false;
-                            return;
-                          }
-                          activateTab(tab.id);
-                        }}
+                        onClick={() => activateTab(tab.id)}
                         onAuxClick={(event) => {
                           if (event.button !== 1) return;
                           event.preventDefault();
