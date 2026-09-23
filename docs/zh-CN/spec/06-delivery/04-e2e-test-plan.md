@@ -5282,6 +5282,7 @@ eleven-tool-round desktop paths are verified by
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | C / D / Quality — 侧边栏行状态 | E2E-LAYOUT-sidebar-row-states |
 | A / C / Quality — 侧栏材质与设置返回 | E2E-LAYOUT-sidebar-settings |
+| A / H / Quality — 渲染进程崩溃恢复 | E2E-RUNTIME-renderer-crash-recovery |
 | B / F / Security — 提供商复制 | E2E-PROVIDER-copy-config-without-credentials |
 | B / F / Quality — 已选模型顺序 | E2E-MODEL-selected-order-persists |
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |

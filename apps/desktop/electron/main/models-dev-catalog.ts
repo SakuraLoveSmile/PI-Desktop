@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { MODEL_VENDOR_PREFIXES, isProxyPrefix, modelIdsMatch, stripThinkingSuffix, stripVariantSuffix } from "@pi-desktop/shared";
+import { MODEL_VENDOR_PREFIXES, catalogModelIdsMatch, stripVariantSuffix } from "@pi-desktop/shared";
 import type {
   ModelCost,
   ModelCostTier,
@@ -812,98 +812,47 @@ class ModelsDevLookupIndex {
   }
 }
 
-/** The normalized id, the `@region`-less base, the thinking-suffix stripped base,
- * and every vendor-prefixed form `modelIdsMatch` treats as equivalent, so a query
- * finds all matching catalog models through the index without a full scan. */
-function registrationKeys(modelId: string): string[] {
+/** Index only aliases the matcher can accept: exact IDs, full slash-path
+ * leaves, known-vendor dash/dot prefixes, and the supported suffix variants.
+ * The matcher remains the final authority (including known-vendor conflicts). */
+function candidateKeys(modelId: string): string[] {
+  const normalized = normalizedModelId(modelId);
+  if (!normalized) return [];
   const keys = new Set<string>();
-  const raw = modelId.trim();
-  const normalized = normalizedModelId(raw);
-  keys.add(normalized);
-
   const at = normalized.indexOf("@");
-  if (at > 0) keys.add(normalized.slice(0, at));
+  const base = at > 0 ? normalized.slice(0, at) : normalized;
 
-  const strippedVariant = stripVariantSuffix(normalized);
-  if (strippedVariant !== normalized) {
-    keys.add(strippedVariant);
-    const strippedAt = strippedVariant.indexOf("@");
-    if (strippedAt > 0) keys.add(strippedVariant.slice(0, strippedAt));
-  }
-
-  const lastSlash = normalized.lastIndexOf("/");
-  if (lastSlash > 0 && lastSlash < normalized.length - 1) {
-    const base = normalized.slice(lastSlash + 1);
-    keys.add(base);
-    const baseStripped = stripVariantSuffix(base);
-    if (baseStripped !== base) keys.add(baseStripped);
-  }
-
-  for (const separator of ["/", "-", "."] as const) {
-    for (const prefix of MODEL_VENDOR_PREFIXES) {
-      const head = `${prefix}${separator}`;
-      if (normalized.startsWith(head) && normalized.length > head.length) {
-        const rest = normalized.slice(head.length);
-        keys.add(rest);
-        const restStripped = stripVariantSuffix(rest);
-        if (restStripped !== rest) keys.add(restStripped);
+  const add = (value: string) => {
+    if (!value) return;
+    keys.add(value);
+    const slash = value.lastIndexOf("/");
+    if (slash >= 0 && slash < value.length - 1) keys.add(value.slice(slash + 1));
+    for (const separator of ["-", "."] as const) {
+      for (const vendor of MODEL_VENDOR_PREFIXES) {
+        const head = `${vendor}${separator}`;
+        if (value.startsWith(head) && value.length > head.length) {
+          keys.add(value.slice(head.length));
+        }
       }
     }
+  };
+
+  // Strip a suffix only after the region, just as catalogModelIdsMatch does. Add
+  // aliases from both sides so a suffixed catalog ID or request can find its peer.
+  for (const value of new Set([normalized, base, stripVariantSuffix(base)])) {
+    add(value);
+    const slash = value.lastIndexOf("/");
+    if (slash >= 0 && slash < value.length - 1) add(value.slice(slash + 1));
   }
   return [...keys];
 }
 
-/** Candidate keys derived from a requested model ID to search in the catalog index,
- * covering proxy routing paths, vendor dash/dot prefixes, and thinking suffixes. */
+function registrationKeys(modelId: string): string[] {
+  return candidateKeys(modelId);
+}
+
 function lookupCandidateKeys(requested: string): string[] {
-  const raw = requested.trim();
-  if (!raw) return [];
-  const normalized = normalizedModelId(raw);
-  const keys = new Set<string>();
-
-  const addVariants = (str: string) => {
-    if (!str) return;
-    keys.add(str);
-    const at = str.indexOf("@");
-    if (at > 0) keys.add(str.slice(0, at));
-    const strippedVariant = stripVariantSuffix(str);
-    if (strippedVariant !== str) {
-      keys.add(strippedVariant);
-      const strippedAt = strippedVariant.indexOf("@");
-      if (strippedAt > 0) keys.add(strippedVariant.slice(0, strippedAt));
-    }
-  };
-
-  addVariants(normalized);
-
-  const slashParts = normalized.split("/");
-  if (slashParts.length > 1) {
-    for (let i = 1; i < slashParts.length; i++) {
-      addVariants(slashParts.slice(i).join("/"));
-    }
-  }
-
-  for (const key of [...keys]) {
-    for (const separator of ["-", "."] as const) {
-      for (const prefix of MODEL_VENDOR_PREFIXES) {
-        const head = `${prefix}${separator}`;
-        if (key.startsWith(head) && key.length > head.length) {
-          addVariants(key.slice(head.length));
-        }
-      }
-      let pos = key.indexOf(separator);
-      while (pos > 0 && pos < key.length - 1) {
-        const prefix = key.slice(0, pos);
-        const rest = key.slice(pos + 1);
-        if (isProxyPrefix(prefix, rest)) {
-          addVariants(rest);
-        }
-        pos = key.indexOf(separator, pos + 1);
-      }
-    }
-  }
-
-  return [...keys];
+  return candidateKeys(requested);
 }
 
 const EMPTY_CANDIDATES: readonly IndexedModel[] = [];
@@ -1020,21 +969,27 @@ export class ModelsDevCatalog {
   }
 
   private providerFor(input: { vendorKey?: string; baseUrl?: string }): ModelsDevProvider | undefined {
-    const byApi = [...this.providers.values()].find((provider) =>
+    const candidates = new Set(providerKeyCandidates(input.vendorKey));
+    const apiProviders = [...this.providers.values()].filter((provider) =>
       apiMatches(input.baseUrl, provider.api),
     );
-    if (byApi) return byApi;
-    const candidates = new Set(providerKeyCandidates(input.vendorKey));
-    for (const provider of this.providers.values()) {
-      if (candidates.has(normalizedProviderKey(provider.providerKey))) return provider;
+    if (apiProviders.length > 0) {
+      return apiProviders.find((provider) =>
+        candidates.has(normalizedProviderKey(provider.providerKey)),
+      ) ?? apiProviders[0];
     }
     const knownKey = Object.entries(KNOWN_PROVIDER_BASE_URLS).find(([, urls]) =>
       urls.some((url) => apiMatches(input.baseUrl, url)),
     )?.[0];
-    if (!knownKey) return undefined;
-    const knownCandidates = new Set(providerKeyCandidates(knownKey));
+    if (knownKey) {
+      const knownCandidates = new Set(providerKeyCandidates(knownKey));
+      const knownProvider = [...this.providers.values()].find((provider) =>
+        knownCandidates.has(normalizedProviderKey(provider.providerKey)),
+      );
+      if (knownProvider) return knownProvider;
+    }
     return [...this.providers.values()].find((provider) =>
-      knownCandidates.has(normalizedProviderKey(provider.providerKey)),
+      candidates.has(normalizedProviderKey(provider.providerKey)),
     );
   }
 
@@ -1061,7 +1016,9 @@ export class ModelsDevCatalog {
     }
     const candidates: Array<{ model: ModelsDevModel; score: number }> = [];
     for (const { model, provider } of [...preferred, ...rest]) {
-      if (!modelIdsMatch(model.modelId, requested)) continue;
+      // A known endpoint must not inherit another provider's capabilities.
+      if (preferredProvider && provider !== preferredProvider) continue;
+      if (!catalogModelIdsMatch(model.modelId, requested)) continue;
       let score = model.modelId.toLowerCase() === requested ? 20 : 10;
       if (provider === preferredProvider) score += 100;
       if (apiMatches(input.baseUrl, provider.api)) score += 80;

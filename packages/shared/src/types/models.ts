@@ -47,7 +47,7 @@ export const MODEL_VENDOR_PREFIXES = new Set([
   "zhipuai",
 ]);
 
-const THINKING_SUFFIX_REGEX = /[-:](?:thinking|think|minimal|low|high|xhigh|max)$/i;
+const THINKING_SUFFIX_REGEX = /[-:](?:thinking|think)$/i;
 const ENDPOINT_SUFFIX_REGEX = /[-:](?:agent|latest)$/i;
 
 function stripRegion(value: string): string {
@@ -99,143 +99,73 @@ function extractKnownVendor(id: string): string | undefined {
   const parts = id.split("/");
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
-    if (MODEL_VENDOR_PREFIXES.has(part)) {
-      return canonicalVendor(part);
-    }
+    if (MODEL_VENDOR_PREFIXES.has(part)) return canonicalVendor(part);
   }
+
   const lastPart = parts[parts.length - 1];
-  for (const separator of ["-", "."] as const) {
-    const prefix = lastPart.split(separator)[0];
-    if (MODEL_VENDOR_PREFIXES.has(prefix)) {
+  for (const prefix of MODEL_VENDOR_PREFIXES) {
+    if (lastPart === prefix || lastPart.startsWith(`${prefix}-`) || lastPart.startsWith(`${prefix}.`)) {
       return canonicalVendor(prefix);
     }
   }
   return undefined;
 }
 
-function stripVendorPrefix(id: string): string {
-  for (const separator of ["-", "."] as const) {
-    for (const prefix of MODEL_VENDOR_PREFIXES) {
-      const head = `${prefix}${separator}`;
-      if (id.startsWith(head) && id.length > head.length) {
-        return id.slice(head.length);
-      }
-    }
-  }
-  return id;
-}
-const KNOWN_TIER_SUFFIXES = new Set([
-  "fast",
-  "mini",
-  "nano",
-  "small",
-  "medium",
-  "large",
-  "turbo",
-  "instruct",
-]);
-
-export function isProxyPrefix(prefix: string, model: string): boolean {
-  if (!prefix || prefix.includes("/")) return false;
-  if (KNOWN_TIER_SUFFIXES.has(model)) return false;
-  const prefixVendor = extractKnownVendor(prefix);
-  const modelVendor = extractKnownVendor(model);
-  if (prefixVendor && modelVendor && prefixVendor !== modelVendor) return false;
-  return true;
+function pathLeaf(id: string): string {
+  const slash = id.lastIndexOf("/");
+  return slash >= 0 ? id.slice(slash + 1) : id;
 }
 
+function exactPathAliasMatch(left: string, right: string): boolean {
+  // Two independently routed paths cannot be identified by their leaf alone.
+  if (left.includes("/") === right.includes("/")) return false;
+  if (pathLeaf(left) !== pathLeaf(right)) return false;
 
-function normalizedMatch(left: string, right: string): boolean {
+  const leftVendor = extractKnownVendor(left);
+  const rightVendor = extractKnownVendor(right);
+  return !leftVendor || !rightVendor || leftVendor === rightVendor;
+}
+
+function normalizedMatch(left: string, right: string, allowPathLeaf = false): boolean {
+  const leftVendor = extractKnownVendor(left);
+  const rightVendor = extractKnownVendor(right);
+  if (leftVendor && rightVendor && leftVendor !== rightVendor) return false;
   if (left === right) return true;
   if (left.endsWith(`/${right}`) || right.endsWith(`/${left}`)) return true;
-  // Some providers use `model@region` aliases; the base model remains the
-  // same published record for matching purposes.
-  if (left.startsWith(`${right}@`) || right.startsWith(`${left}@`)) return true;
+
   for (const separator of ["-", "."] as const) {
-    const leftPrefix = left.split(`${separator}${right}`, 1)[0];
-    if (
-      left.startsWith(`${leftPrefix}${separator}${right}`) &&
-      (MODEL_VENDOR_PREFIXES.has(leftPrefix) || isProxyPrefix(leftPrefix, right))
-    ) {
-      return true;
-    }
-    const rightPrefix = right.split(`${separator}${left}`, 1)[0];
-    if (
-      right.startsWith(`${rightPrefix}${separator}${left}`) &&
-      (MODEL_VENDOR_PREFIXES.has(rightPrefix) || isProxyPrefix(rightPrefix, left))
-    ) {
-      return true;
+    for (const prefix of MODEL_VENDOR_PREFIXES) {
+      if (left === `${prefix}${separator}${right}`) return true;
+      if (right === `${prefix}${separator}${left}`) return true;
     }
   }
 
-  // Cross-namespace matching for custom proxy paths:
-  // e.g. `google/gemini-2.5-flash` vs `proxy/gemini-2.5-flash`
-  const bareLeft = stripVendorPrefix(left.includes("/") ? left.slice(left.lastIndexOf("/") + 1) : left);
-  const bareRight = stripVendorPrefix(right.includes("/") ? right.slice(right.lastIndexOf("/") + 1) : right);
-
-  if (bareLeft && bareRight) {
-    if (bareLeft === bareRight) {
-      const leftVendor = extractKnownVendor(left);
-      const rightVendor = extractKnownVendor(right);
-      if (leftVendor && rightVendor && leftVendor !== rightVendor) {
-        return false;
-      }
-      return true;
-    }
-
-    for (const separator of ["-", "."] as const) {
-      const leftPrefix = bareLeft.split(`${separator}${bareRight}`, 1)[0];
-      if (
-        bareLeft.startsWith(`${leftPrefix}${separator}${bareRight}`) &&
-        (MODEL_VENDOR_PREFIXES.has(leftPrefix) || isProxyPrefix(leftPrefix, bareRight))
-      ) {
-        const leftVendor = extractKnownVendor(left);
-        const rightVendor = extractKnownVendor(right);
-        if (leftVendor && rightVendor && leftVendor !== rightVendor) return false;
-        return true;
-      }
-      const rightPrefix = bareRight.split(`${separator}${bareLeft}`, 1)[0];
-      if (
-        bareRight.startsWith(`${rightPrefix}${separator}${bareLeft}`) &&
-        (MODEL_VENDOR_PREFIXES.has(rightPrefix) || isProxyPrefix(rightPrefix, bareLeft))
-      ) {
-        const leftVendor = extractKnownVendor(left);
-        const rightVendor = extractKnownVendor(right);
-        if (leftVendor && rightVendor && leftVendor !== rightVendor) return false;
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return allowPathLeaf && exactPathAliasMatch(left, right);
 }
 
-/** Match a configured model ID with a namespaced models.dev ID. */
+/** Compare configured binding IDs without collapsing distinct route paths or variants. */
 export function modelIdsMatch(candidate: string, requested: string): boolean {
+  const left = candidate.trim().toLowerCase();
+  const right = requested.trim().toLowerCase();
+  if (!left || !right) return false;
+  if (left.includes("@") && right.includes("@") && left !== right) return false;
+  return normalizedMatch(stripRegion(left), stripRegion(right));
+}
+
+/** Broader metadata-only aliases; never use for configured binding identity. */
+export function catalogModelIdsMatch(candidate: string, requested: string): boolean {
   const left = candidate.trim().toLowerCase();
   const right = requested.trim().toLowerCase();
   if (!left || !right) return false;
 
   const cleanLeft = stripRegion(left);
   const cleanRight = stripRegion(right);
+  if (normalizedMatch(cleanLeft, cleanRight, true)) return true;
 
-  if (normalizedMatch(cleanLeft, cleanRight)) return true;
-
-  // Suffixes indicating thinking mode or reasoning effort (e.g. -thinking, -high, -low)
-  const deThunkLeft = stripThinkingSuffix(cleanLeft);
-  const deThunkRight = stripThinkingSuffix(cleanRight);
-  if (deThunkLeft !== cleanLeft || deThunkRight !== cleanRight) {
-    if (normalizedMatch(deThunkLeft, deThunkRight)) return true;
-  }
-
-  // Suffixes indicating deployment variants or endpoints (e.g. -agent, -latest)
   const strippedLeft = stripVariantSuffix(cleanLeft);
   const strippedRight = stripVariantSuffix(cleanRight);
-  if (strippedLeft !== deThunkLeft || strippedRight !== deThunkRight) {
-    if (normalizedMatch(strippedLeft, strippedRight)) return true;
-  }
-
-  return false;
+  if (strippedLeft === cleanLeft && strippedRight === cleanRight) return false;
+  return normalizedMatch(strippedLeft, strippedRight, true);
 }
 
 /**
