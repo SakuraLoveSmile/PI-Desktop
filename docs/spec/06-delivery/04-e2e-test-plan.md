@@ -9162,6 +9162,10 @@ This test plan spec is accepted when:
 - Click **Continue** and expect the app to append the localized continuation
   prompt (`Continue the user's unfinished task.` / `继续用户未完成的任务`) to the
   same session and start the next turn without truncating the failed turn.
+- Activate the localized **Dismiss** action. Expect the error card to disappear
+  from the current transcript view while its underlying error message and raw
+  diagnostic data remain unchanged; navigating away and back in the same app
+  runtime keeps the dismissal.
 
 
 ### US-UI-61 Assistant context summary + retry (D103, D184, D244, D347)
@@ -10115,25 +10119,35 @@ This test plan spec is accepted when:
       node and the `TaskStop` row both read `stopped` (not `running`). End the
       turn and reload the session; confirm the card is not labelled working
       and does not keep ticking elapsed.
+  11. Inject synchronous `SubagentRun` initialization failure; confirm the
+      `Task` result is an error and `TaskList` has no permanently running row.
+  12. In a runtime fixture, make settled-row publication throw and confirm the
+      parent's idle auto-resume still returns the report. Stop a parent blocked
+      in auto-resume while a child ignores abort; confirm the parent ends and
+      reports idle without a timeout loop.
 - **Expected**: `Task` returns immediately with a `delegationId` and the parent
   keeps working; `TaskWait` converges with per-delegation reports and statuses;
-  `TaskList`/`TaskStop` drive the lifecycle; a `TaskStop` result and a finished
-  turn never leave a live “Subagent working” card; builtin `fixer` inherits the
-  selected session permission mode, so `auto` also covers explicit external
-  paths without a duplicate authorization prompt while `ask` and
-  `accept-edits` retain their approval boundaries; a global definition's
-  declared scope is dropped; the per-session running cap of 10 is enforced; no
-  delegate outlives its turn; reloaded transcripts keep their delegation
-  topology.
+  every terminal child state wakes the parent even if transcript publication
+  fails. A synchronous child initialization failure returns a tool error and
+  leaves no `running` delegation. User Stop/Dispose abort the parent wait as
+  well as delegates, and cancelled sessions do not remain `AGENT_BUSY` solely
+  because a child is still settling. `TaskList`/`TaskStop` drive the lifecycle;
+  a `TaskStop` result and a finished turn never leave a live “Subagent working”
+  card; builtin `fixer` inherits the selected session permission mode, so
+  `auto` also covers explicit external paths without a duplicate authorization
+  prompt while `ask` and `accept-edits` retain their approval boundaries; a
+  global definition's declared scope is dropped; the per-session running cap
+  of 10 is enforced; no delegate outlives its turn; reloaded transcripts keep
+  their delegation topology.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f/§5f.1/§7.1,
-  `03-runtime/03-tools-and-permissions.md` §10.2, `08-meta/decisions-log.md`
-  (D242 amends D231), ADR 0089 and ADR 0100
+  `03-runtime/03-tools-and-permissions.md` §10.2,
+  `08-meta/decisions-log.md` (D242 amends D231), ADR 0089 and ADR 0100
 - **Acceptance**: C (conversation), E (tools & permissions), F (persistence),
   Security, Quality
 - **Milestone**: M6+
-- **Status**: Draft (unit coverage in `packages/agent-runtime`
-  `runtime.test.ts` subagent suite and host-core `rpc/mod.rs` delegate-scope
-  tests; desktop journey pending)
+- **Status**: Unit coverage includes synchronous initialization failure,
+  completion-publication failure, and Stop during parent auto-resume in
+  `packages/agent-runtime/src/runtime.test.ts`; desktop journey pending
 
 #### E2E-162 / E2E-173: Delegate workflow scrolling
 
@@ -10926,32 +10940,46 @@ This test plan spec is accepted when:
 #### E2E-164: Context compaction preserves the active task boundary
 
 - **Preconditions**: A provider fixture can complete multiple sequential tasks,
-  trigger an automatic checkpoint at a terminal boundary, trigger an active-turn
-  checkpoint during a tool loop, and restart a session.
+  trigger inline automatic compaction at 90% of `hardLimit` (before the hard
+  boundary), exercise an active-turn checkpoint during a tool loop, and restart
+  a session.
 - **Steps**:
   1. Complete task A and task B in one session with distinct instructions and
      visible completion replies.
-  2. Trigger a checkpoint after a completed turn, then send task C and capture
-     the next provider request context.
-  3. Trigger compaction while task D still has tool results or `toolUse`
-     pending, and capture the next provider request.
-  4. Restart and reopen the session, then send another prompt.
-- **Expected**: A completed-turn checkpoint has an empty retained tail; the next
-  request contains its summary plus task C and no bare A/B prompts. An active
-  checkpoint retains exactly the latest active user prompt, with no older user
-  prompts or pre-boundary assistant/tool messages. Restart honors
-  `retainedTailMode`, and legacy multi-user tails normalize to the latest user
-  message. If automatic summary generation fails, the fallback retains a
-  bounded recent user tail even after a completed turn, and a later retry
-  removes only the synthetic recovery notice while preserving any carried
-  summary. The visible transcript remains complete and checkpoint rows remain.
+  2. Advance the context estimate to 91% of `hardLimit`, send task C, and capture
+     the first provider request; assert that compaction is installed first.
+  3. Trigger compaction during task D after tool results cross the 90% trigger
+     while remaining below the hard limit; capture the follow-up provider
+     request and confirm it uses the checkpoint.
+  4. Force summary plus retained-tail recovery to fail once below `hardLimit`
+     and once at/above it; the soft failure may proceed unchanged, while the
+     hard-boundary failure must not send the provider request.
+  5. Start an approved plan execution with the estimate at 91% of `hardLimit`;
+     capture the first request and confirm preflight compaction runs before
+     `continue()` while retaining the internal approved-plan instruction.
+  6. Restart and reopen the session, then send another prompt.
+- **Expected**: Automatic session compaction starts at
+   `floor(hardLimit * 0.9)` for prompt, approved-plan, and in-run turn
+   preflights; the estimate includes serialized messages, the active system
+   prompt, and tool schemas. A request is never issued at or above `hardLimit`.
+   A failed soft-trigger summary may proceed only while below the hard budget,
+   and hard-limit failure remains fail-closed. A completed-turn checkpoint has
+   an empty retained tail; the next request contains its summary plus task C
+   and no bare A/B prompts. An approved-plan checkpoint uses active-turn
+   retention so the instruction survives before `continue()`. An active
+   checkpoint retains exactly the latest active user prompt, with no older
+   user prompts or pre-boundary assistant/tool messages. Restart honors
+   `retainedTailMode`, and legacy multi-user tails normalize to the latest user
+   message. If automatic summary generation fails at the hard boundary, the
+   fallback retains a bounded recent user tail. The visible transcript remains
+   complete and checkpoint rows remain.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`,
   `03-runtime/04-data-storage.md`, `03-runtime/16-tool-result-limits.md`,
-  `08-meta/decisions-log.md` (D275), ADR 0136
+  `08-meta/decisions-log.md` (D623), ADR 0064, ADR 0136
 - **Acceptance**: C (chat/stream), F (persistence), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`packages/agent-runtime/src/runtime.test.ts`,
-  `context-compaction.test.mjs`); provider/UI journey Draft
+- **Status**: Unit-covered (`packages/agent-runtime/src/context-budget.test.ts`,
+  `runtime.test.ts`, `subagent-context.test.ts`); provider/UI journey Draft
 
 #### E2E-165: A2A and Peer tools are withdrawn
 

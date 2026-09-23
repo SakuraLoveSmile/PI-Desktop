@@ -7007,3 +7007,16 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   unmatched free-form IDs stay generic unknown, while published capabilities
   and explicit binding overrides retain their existing precedence. See
   `03-runtime/13-model-catalog-and-selection.md` §11.3.
+
+## 2026-09-23 — Compact before the hard request budget (D623, issue #970)
+
+- Automatic session and subagent compaction now starts at 90% of the derived
+  `hardLimit`, inline at the next request boundary. New user prompts are
+  included in the preflight estimate; tool results are measured before the
+  follow-up provider request.
+- `hardLimit` remains the final safety boundary. A failed summary below it may
+  proceed without a checkpoint; a context at or above it never reaches the
+  provider. This trades some additional summaries for fewer provider overflows.
+- The runtime remains inline-only: no background summary, user setting,
+  protocol change, or transcript/storage rewrite. See ADR 0064,
+  `03-runtime/02-agent-runtime.md`, and E2E-164.
