@@ -127,6 +127,7 @@ import {
   usageFromPi,
   usageToPi,
 } from "./agent-messages.js";
+import { withExplicitRequired } from "./tool-schema.js";
 import { buildSessionContext } from "./session-context.js";
 import {
   initialSystemTranscript,
@@ -2013,14 +2014,14 @@ Delegation rules:
       // ordering guarantee is untouched.
       toolExecution: "parallel",
       steeringMode: "all",
-      // A queued renderer prompt asks the current run to finish normally at
-      // the next turn boundary. pi-agent-core evaluates this after the
-      // assistant response and completed tool batch, before another provider
-      // request, so no second concurrent durable turn is created.
-      shouldStopAfterTurn: async () => {
-        if (!this.gracefulStopRequested) return false;
+      // pi-agent-core 0.87 replaces shouldStopAfterTurn with finishTurn. A
+      // queued renderer prompt ends a completed turn at the next boundary,
+      // without treating an error or abort as a graceful stop.
+      finishTurn: async ({ message }) => {
+        if (!this.gracefulStopRequested) return;
+        if (message.stopReason === "error" || message.stopReason === "aborted") return;
         this.gracefulStopRequested = false;
-        return true;
+        return { action: "end" };
       },
     });
 
@@ -3474,11 +3475,17 @@ Delegation rules:
       // an accidental parallel batch: everything is sequential except `Task`.
       // pi runs a whole batch sequentially when it holds one sequential tool,
       // so only an all-`Task` batch fans out.
-      catalog.set(tool.name, {
-        ...tool,
-        executionMode:
-          tool.name === SUBAGENT_TOOL_NAME ? "parallel" : "sequential",
-      });
+      // The provider-facing schema is settled here too, at the single origin of
+      // every tool, so the session agent and a delegated `Task` run send the
+      // same declaration (#864).
+      catalog.set(
+        tool.name,
+        withExplicitRequired({
+          ...tool,
+          executionMode:
+            tool.name === SUBAGENT_TOOL_NAME ? "parallel" : "sequential",
+        }),
+      );
     }
     this.toolCatalog = catalog;
     this.deferredToolNames = new Set(
@@ -3492,10 +3499,13 @@ Delegation rules:
       }
     }
     if (this.deferredToolNames.size > 0) {
-      this.toolCatalog.set(TOOL_SEARCH_NAME, {
-        ...this.buildToolSearchTool(),
-        executionMode: "sequential",
-      });
+      this.toolCatalog.set(
+        TOOL_SEARCH_NAME,
+        withExplicitRequired({
+          ...this.buildToolSearchTool(),
+          executionMode: "sequential",
+        }),
+      );
     }
   }
 
