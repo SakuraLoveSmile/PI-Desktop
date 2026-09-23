@@ -517,14 +517,14 @@ export function SettingsPage() {
                     type="button"
                     className={cx(
                       "settings-toggle",
-                      settings.smoothStreaming === true && "on",
+                      settings.smoothStreaming !== false && "on",
                     )}
                     role="switch"
-                    aria-checked={settings.smoothStreaming === true}
+                    aria-checked={settings.smoothStreaming !== false}
                     aria-label={t("settings.smoothStreaming")}
                     onClick={() =>
                       void saveSettings({
-                        smoothStreaming: settings.smoothStreaming !== true,
+                        smoothStreaming: !(settings.smoothStreaming !== false),
                       })
                     }
                   >

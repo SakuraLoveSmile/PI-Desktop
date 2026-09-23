@@ -147,7 +147,7 @@ export type AppSettings = {
    * Opt-in smooth streaming display (D152 amendment). When enabled, incoming
    * stream chunks are released character-by-character through a
    * requestAnimationFrame loop instead of appearing as whole blocks.
-   * Absent and false use direct rendering (D152 default). Automatically
+   * Absent and true enable smooth rendering; false disables it. Automatically
    * disabled when the system prefers reduced motion.
    */
   smoothStreaming?: boolean;

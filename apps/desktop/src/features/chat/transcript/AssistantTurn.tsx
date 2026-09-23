@@ -231,7 +231,7 @@ const SmoothMessageBubble = memo(function SmoothMessageBubble({
   streaming: boolean;
 }) {
   const smoothStreaming = useAppStore(
-    (s) => s.settings?.smoothStreaming === true,
+    (s) => s.settings?.smoothStreaming !== false,
   );
   const prefersReducedMotion =
     typeof window !== "undefined" &&
