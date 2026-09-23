@@ -289,6 +289,19 @@ globalThis.providerApiStyleProbe = async () => {
       assert(apiStyleTrigger()?.textContent?.includes(apiStyleLabel("chat_completions")), "named host overwrote manual format");
       results.push(`${locale}:saved-protocol-wins-over-preset`);
 
+      const legacyUnknown = { ...fixture("future_api_format"),
+        baseUrl: "https://relay.example/v1/chat/completions" };
+      render({ provider: legacyUnknown });
+      assert(apiStyleTrigger()?.textContent?.includes(apiStyleLabel("chat_completions")),
+        "unknown stored API format did not render with the compatible fallback");
+      const beforeUnknownSave = updates.length;
+      click(control("settings.saveProvider"));
+      await until(() => updates.length === beforeUnknownSave + 1, "save legacy unknown API format");
+      assert(updates.at(-1)?.apiStyle === "chat_completions" &&
+        updates.at(-1)?.baseUrl === "https://relay.example/v1",
+        "unknown stored format did not save the normalized compatible endpoint");
+      results.push(`${locale}:unknown-stored-api-format-open-save`);
+
       const codexAccount = { ...fixture("openai_codex_responses"), id: "codex-account", name: "OpenAI OAuth", vendorKey: "openai-codex", type: "native", protocol: "openai", authKind: "oauth" } satisfies ProviderPublic;
       let savedCodexAccount: VendorAccountForm | undefined;
       flushSync(() => root.render(<I18nextProvider i18n={i18n}><VendorAccountDialog provider={codexAccount} initialName={codexAccount.name} onClose={() => { closes++; }} onSave={(form) => { savedCodexAccount = structuredClone(form); }} saving={false} /></I18nextProvider>));
