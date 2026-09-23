@@ -796,8 +796,13 @@ identify the platform validation still needed.
   defaults return. 5) Edit the OAuth account Advanced headers, save, then
   run a turn that refreshes the access token. 6) Repeat against OpenCode Go
   and confirm `x-opencode-session` is still present. 7) Repeat against
-  Codex/Anthropic OAuth inference. 8) Attempt `Authorization` and CR/LF
-  values; save is rejected.
+  Codex/Anthropic OAuth inference. 8) Enter a value holding fullwidth
+  characters (`０`, `１２３`) and confirm the editor says it will be saved as
+  half-width, then save and reopen: the stored value is ASCII. 9) Enter a value
+  holding Han text or a NUL and confirm the editor warns before saving, then
+  save: it is rejected as `HEADERS_INVALID` with the character and its index
+  named. 10) Point the app at a store whose row was written before this rule and
+  run a turn. 11) Attempt `Authorization` and CR/LF values; save is rejected.
 - **Expected**: Non-empty custom headers are the last writer on that row's
   outbound HTTP (turns, subagents, one-shots, discovery, connection test,
   OAuth refresh). Empty restores pi-ai / `claude-cli` / OpenCode defaults.
@@ -811,7 +816,11 @@ identify the platform validation still needed.
   OpenCode still sends
   `x-opencode-session` and `x-opencode-client`. Codex
   and Anthropic still send the custom User-Agent despite adapter last-writes.
-  First OAuth login does not collect headers. Reserved keys and CR/LF are
+  First OAuth login does not collect headers. A fullwidth value saves as
+  half-width and is folded again on read, so a row stored before this rule runs
+  a turn instead of throwing. A value holding Han text or a control character is
+  refused at save with the character and index named, and dropped by the runtime
+  rather than thrown by `Headers.set`. Reserved keys and CR/LF are
   rejected. Advanced is a compact key/value editor, not a lone User-Agent
   field.
 - **Specs linked**: `03-runtime/12-provider-config-schema.md`,
@@ -4172,7 +4181,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   runnable with the generic text-only, non-reasoning shape; pi-ai supplies only
   the selected wire adapter, OAuth flow, and account model availability. A
   ChatGPT Plus/Pro or GitHub Copilot account lists `gpt-6-astra` from the
-  pinned pi-ai 0.86.1 catalog; models.dev then supplies its published metadata.
+  pinned pi-ai 0.87.0 catalog; models.dev then supplies its published metadata.
 - **Specs linked**: `02-architecture/02-tech-stack.md`,
   `03-runtime/11-provider-model-system.md`,
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0134
@@ -8153,30 +8162,38 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 ### E2E-CONFIG-SYNC-webdav-portable-configuration
 
-- **Preconditions:** A built task candidate, isolated host profile, and a local
+- **Preconditions:** A built task candidate, isolated host profile with
+  developer mode initially off, and a local
   WebDAV fixture that supports strong ETags and conditional PUT, plus a fixture
   variant that ignores conditional headers but supports `PROPFIND` directory
   listing. No real WebDAV account, provider, or production desktop.
-- **Steps:** 1) Open Settings → Cloud sync and enter the fixture URL, device
-  label, directory, and backup password. 2) Run the capability test and
-  confirm it uses temporary objects. 3) Select provider/MCP/skill categories
+- **Steps:** 1) Open Settings with developer mode off; confirm Cloud sync is
+  absent from the rail and settings search returns no Cloud sync result. 2) Open
+  Settings → Info → Developer, enable developer mode, and confirm Cloud sync
+  appears in the rail and settings search. Open it and confirm the Experimental
+  badge appears beside the rail row and page title. 3) Enter the fixture URL,
+  device label, directory, and backup password. 4) Run the capability test and
+  confirm it uses temporary objects. 5) Select provider/MCP/skill categories
   while leaving credentials and memory off; enable credentials in a second
-  preview and verify only redacted counts are shown. 4) Configure device A,
-  create a user provider and MCP definition, and sync. 5) Configure device B
+  preview and verify only redacted counts are shown. 6) Configure device A,
+  create a user provider and MCP definition, and sync. 7) Configure device B
   against the same vault, sync, inspect pending activation/mapping, and verify
-  no command or task runs before approval. 6) Approve a changed safe entity,
+  no command or task runs before approval. 8) Approve a changed safe entity,
   reject one staged entity, edit disjoint settings on both devices, and sync
-  again. 7) Exercise a concurrent head writer, wrong password, weak ETag,
+  again. 9) Exercise a concurrent head writer, wrong password, weak ETag,
   ciphertext corruption, redirect, archive traversal, and network interruption.
-  8) On the ignored-precondition fixture, select explicit compatibility mode,
+  10) On the ignored-precondition fixture, select explicit compatibility mode,
   confirm the warning, and configure two devices. Verify each device publishes
   its own encrypted head under the heads collection, a concurrent update is
   merged from both tips, and compatibility mode does not delete immutable
   history. Cancel the confirmation once and verify configuration is not saved.
-  9) Use the explicit LAN HTTP acknowledgement with a loopback/private fixture,
+  11) Use the explicit LAN HTTP acknowledgement with a loopback/private fixture,
   verify the setting survives a state refresh, and confirm a public HTTP
   endpoint is rejected even when the checkbox is selected.
-- **Expected:** Strict mode refuses unreliable conditional writes. The explicit
+- **Expected:** With developer mode off, Cloud sync is absent from the rail and
+  settings search; enabling developer mode reveals the destination and its
+  Experimental badges without changing sync behavior. Strict mode refuses
+  unreliable conditional writes. The explicit
   compatibility mode accepts only a server that proves bounded directory
   listing, explains that it is not atomic CAS, and retains per-device tips for
   merge/recovery. A server that ignores conditional headers is never accepted
@@ -8190,13 +8207,15 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   conflicts remain reviewable, explicit deletions use tombstones, category
   opt-out is not deletion, and executable imports remain inactive until local
   approval and mapping. Recovery never exposes a partial local apply.
-- **Specs:** `03-runtime/22-config-sync.md`, `03-runtime/14-secrets-storage.md`,
-  `05-security/01-security.md`, ADR 0300, ADR 0301.
+- **Specs:** `04-ux/06-settings-ia.md`, `03-runtime/22-config-sync.md`,
+  `03-runtime/14-secrets-storage.md`, `05-security/01-security.md`, ADR 0300,
+  ADR 0301.
 - **Acceptance:** F (persistence), Security, Quality.
 - **Milestone:** M6+.
 - **Status:** Draft; merge/crypto and in-process WebDAV conditional-write
-  coverage exists. The remaining automation is the full two-device process
-  path and checkpoint-level local recovery fault injection.
+  coverage exists. The Settings visibility gate is automated by
+  `pnpm test:e2e:settings-scroll`; the remaining automation is the full
+  two-device process path and checkpoint-level local recovery fault injection.
 
 ## 8. Traceability Matrix
 
@@ -8210,6 +8229,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | C / D / Quality — Sidebar row states | E2E-LAYOUT-sidebar-row-states |
 | A / C / Quality — Sidebar material and settings return | E2E-LAYOUT-sidebar-settings |
+| A / H / Quality — Renderer process crash recovery | E2E-RUNTIME-renderer-crash-recovery |
 | B / F / Security — Provider copy | E2E-PROVIDER-copy-config-without-credentials |
 | B / F / Quality — Selected model order | E2E-MODEL-selected-order-persists |
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150, E2E-168, E2E-204 |
@@ -10731,8 +10751,9 @@ This test plan spec is accepted when:
   catalog does not publish. OpenAI Codex's `openai-codex` adapter key resolves
   the matching `openai` models.dev record, so `gpt-6-astra` is not shown with
   generic 128,000 / 8,192 / no-reasoning defaults. The authenticated ChatGPT
-  list itself comes from the pinned pi-ai catalog (0.86.1 includes
-  `gpt-6-astra`); models.dev cannot add a missing OAuth ID. A model with no published
+  list comes from `GET {base}/codex/models` on the account token, so an id the
+  pin does not know yet is selectable when that response includes it; pi-ai is
+  only the fallback when the request fails. models.dev cannot add a missing OAuth ID. A model with no published
   record keeps its explicit levels and starts with all choices available for
   manual opt-in. The account's default model stays the head binding.
 - **Specs linked**: `04-ux/06-settings-ia.md`,
@@ -13620,7 +13641,10 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   1. In dark/light palettes and darwin/win32/linux CSS branches, compare the
      home sidebar and Settings rail color, image layers, size and position.
      Inspect transparent ancestors and opaque settings content/titlebar.
-  2. Return through Back to app while tracing sidebar insertion, width and
+  2. Before entering Settings, retain the current .chat-surface DOM node. While
+     Settings is open, verify the chat shell is hidden, inert, and still
+     contains that connected node. Return through Back to app and verify the
+     same node is revealed while tracing sidebar insertion, width and
      animationstart events. Repeat quick round trips, a previously collapsed
      sidebar, and settings navigation interrupting an entrance.
   3. Explicitly reopen a collapsed sidebar, then repeat settings return with
@@ -13635,6 +13659,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   stays at 275px without sidebar-in events; a collapsed sidebar stays absent.
   A real reopen still produces sidebar-in and a width ramp. Legacy theme color
   input remains supported for both rails, and a canonical override wins.
+  Portaled layers owned by the hidden chat surface stay hidden while Settings is
+  open; the shared app-level search, toast, and extension-prompt layers remain
+  available.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md` §1.4 and §1.7
 - **Acceptance**: A, C, Quality
@@ -13648,9 +13675,29 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Windows/Linux or OS material/theme validation. Optional
   `PI_DESKTOP_LAYOUT_ARTIFACT_DIR` captures renderer screenshots. State tests in
   `sidebar-settings-return.test.mjs` cover initial presentation, both interrupted
-  phases, hidden-state changes and reversals. `settings-dialog-overlay.test.mjs`
+  phases, hidden-state changes and reversals. The CDP layout journey verifies
+  that Settings preserves the same chat surface node across round trips.
+  `settings-dialog-overlay.test.mjs`
   covers the full-window overlay contract. `pnpm test:e2e:theme-surfaces`
   verifies the opaque fallback and legacy theme override in real Chromium.
+
+#### E2E-RUNTIME-renderer-crash-recovery
+
+- **Preconditions**: Built desktop with an isolated profile, the main window
+  ready on chat, and CDP enabled by the E2E harness.
+- **Steps**: Set a renderer-only sentinel, trigger `Page.crash`, then reconnect
+  to the existing page target if the renderer's CDP connection closes. Wait for
+  the chat surface to return and inspect the isolated diagnostics log.
+- **Expected**: The renderer document is recreated in the same app window, the
+  chat surface becomes usable, and `renderer.process.gone` records the exit
+  reason, exit code, and reload decision. The app does not open a second window.
+- **Specs linked**: `03-runtime/07-process-model.md`,
+  `03-runtime/09-logging-and-observability.md`
+- **Acceptance**: A, H, Quality
+- **Milestone**: Post-M6 desktop shell maintenance
+- **Status**: Automated by `pnpm test:e2e:layout` with CDP `Page.crash`; the
+  deterministic `renderer-recovery.test.mjs` covers clean exit, accepted close,
+  app shutdown, stale windows, destroyed contents, and future Electron reasons.
 
 #### E2E-AGENT-alt-enter-steers-active-turn: Enter follows up and Alt+Enter steers the active turn
 
@@ -13945,7 +13992,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   context-bearing custom-message entries, and a valid project cwd. A faux local
   model/auth binding is configured in the fixture Pi agent directory; Desktop
   provider secrets are absent. A fixture extension restores custom state in
-  `session_start` and contributes a skill through `resources_discover`.
+  `session_start`, contributes a skill through `resources_discover`, and uses
+  the 0.87 `turn_end` boundary to propose a `context_edit` for the settled
+  assistant entry.
 - **Steps:** Start PI-Desktop with fixture-only agent/session directories;
   refresh sessions; open the native row beside a Desktop row; submit one text
   prompt; stop or let the faux response settle; send the same text again with
@@ -13960,6 +14009,8 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   Exactly two durable SDK-ID user rows remain, including after abort; smart-stop
   never rewrites native history. Retries/compaction remain running and stoppable
   until one terminal completion; the owned idle lease accepts the second send.
+  The `context_edit` is appended under the same lease, affects the next model
+  request, and leaves the original assistant row visible in native detail.
   Compact and queue push/list reject before host access. Opaque host-turn queue
   remove/prioritize remain Desktop-only because native paths create no entries.
 - **Specs:** runtime §12; storage §12; security §12; ADR 0254.
@@ -13969,8 +14020,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 
 - **Preconditions:** A writable synthetic native v3 fixture is listed.
 - **Steps:** Acquire Desktop continuation ownership, then simulate a foreign
-  append/replacement before the next SDK append; also attempt a second Desktop
-  lease and stale leases whose owners are live, remote, malformed, or uncertain.
+  append/replacement before the extension's `appendContextEdit`; also attempt a
+  second Desktop lease and stale leases whose owners are live, remote,
+  malformed, or uncertain.
   Refresh list/detail with a dead same-host owner and unchanged or complete
   append-only extended bytes, then prompt through normal UI capabilities.
 - **Expected:** The second writer is refused; external divergence tears down
@@ -13978,8 +14030,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   appended and no bytes are truncated or rewritten; a lease releases on normal
   dispose and is reclaimed after crash only with a dead same-host owner and an
   unchanged target or same-file prefix-preserving complete parent-chain extension.
-  Uncooperative Pi clients can still race the OS append; no shared-lock guarantee
-  is claimed.
+  The context-edit append is refused by the same byte and parent check as other
+  SDK writes. Uncooperative Pi clients can still race the OS append; no
+  shared-lock guarantee is claimed.
 - **Specs:** runtime §12; storage §12; security §12; ADR 0254.
 - **Status:** Documented; run after integration into main.
 
@@ -14726,6 +14779,27 @@ the latest destination. These assertions measure work counts, not device FPS.
   cover ownership, deletion, repeated/bounded forks, retained checkpoint paths,
   expired inputs, rollback, and symlink rejection.
 
+### E2E-SETTINGS-destination-scroll-reset
+
+- Open Settings → AI and scroll midway down. Select Shortcuts: its title and
+  first settings appear at the top. Scroll and return to AI: it starts at top.
+- Re-select the active destination and update settings without navigating:
+  the content keeps its scroll position.
+- Repeat for built-in → plugin, plugin → plugin, and plugin → the previously
+  selected built-in destination. Re-selecting a plugin keeps its position.
+- Follow a global search setting anchor into AI from another destination,
+  from an open plugin destination, and within AI: the plugin page is gone and
+  the target row is visible before the next paint. Consuming the anchor keeps
+  that position. An external tab change with no anchor also leaves the plugin
+  and starts at the top.
+- Run in light and dark themes.
+- Automated coverage: `pnpm test:e2e:settings-scroll` mounts the production
+  SettingsPage, store, translations, and built CSS in isolated Electron. Only
+  preload data is stubbed; search navigation uses SearchDialog's public store
+  entry points. It also checks the Cloud sync developer-mode gate, Experimental
+  badges, and fallback to General. This covers renderer interaction, not host
+  persistence or the full global-search dialog.
+
 ### E2E-SCHEDULED-dispatch
 
 - **Scenario:** Independent task dispatch.
@@ -14826,4 +14900,3 @@ renderer's durable transcript reads. No real model or provider is contacted.
 `node --test apps/desktop/test/plugin-timeout-budgets.test.mjs`,
 `pnpm --filter @pi-desktop/shared test`, and
 `pnpm --filter @pi-desktop/host-runtime test`.
-

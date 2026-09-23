@@ -349,8 +349,8 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 #### E2E-005G：按供应商自定义 HTTP 请求头
 
 - **前提条件**：一个 API 密钥 AI 服务（含 OpenCode Go）和一个已登录的厂商 OAuth 账户。
-- **步骤**：打开高级设置弹框，确认只有标题栏关闭按钮而没有底部操作行；用常用预设添加 User-Agent，导入超过五行可见区域的 JSON，再复制请求头 JSON；确认列表最多显示五行，更多请求头在自身区域滚动；确认剪贴板是与持久化相同的规范化对象（忽略空名称，后者覆盖前者），并有本地化成功反馈。
-- **预期**：复制输出与保存到该行的 `pairsToRecord` 映射一致；导入仍接受两种 JSON 形状；窄宽度下工具栏换行而不溢出。空映射恢复适配器默认值。
+- **步骤**：打开高级设置弹框，确认只有标题栏关闭按钮而没有底部操作行；用常用预设添加 User-Agent，导入超过五行可见区域的 JSON，再复制请求头 JSON；确认列表最多显示五行，更多请求头在自身区域滚动；确认剪贴板是与持久化相同的规范化对象（忽略空名称，后者覆盖前者），并有本地化成功反馈。然后填入含全角字符的值（`０`、`１２３`），确认编辑器提示将按半角保存，保存后重新打开显示为 ASCII；再填入含汉字或 NUL 的值，确认保存前有提示、保存被拒并指出字符与下标；最后用规则生效前写入的数据打开一次回合。
+- **预期**：复制输出与保存到该行的 `pairsToRecord` 映射一致；导入仍接受两种 JSON 形状；窄宽度下工具栏换行而不溢出。空映射恢复适配器默认值。含全角字符的值保存为半角、读取时再次半角化，因此规则生效前存下的行仍能正常跑回合；含汉字或控制字符的值在保存时被拒（给出字符与字符下标），运行时直接丢弃而不是让 `Headers.set` 抛错。
 - **链接规格**：`03-runtime/12-provider-config-schema.md`、`04-ux/06-settings-ia.md`、ADR 0178
 - **验收**：B（模型配置）
 - **里程碑**：M2
@@ -5282,6 +5282,7 @@ eleven-tool-round desktop paths are verified by
 | C / G / Quality — Plugins navigation | E2E-NAV-plugins-button-goes-back |
 | C / D / Quality — 侧边栏行状态 | E2E-LAYOUT-sidebar-row-states |
 | A / C / Quality — 侧栏材质与设置返回 | E2E-LAYOUT-sidebar-settings |
+| A / H / Quality — 渲染器进程崩溃恢复 | E2E-RUNTIME-renderer-crash-recovery |
 | B / F / Security — 提供商复制 | E2E-PROVIDER-copy-config-without-credentials |
 | B / F / Quality — 已选模型顺序 | E2E-MODEL-selected-order-persists |
 | A — 应用程序启动 | E2E-001、E2E-002、E2E-003、E2E-004、E2E-067、E2E-076、E2E-079、E2E-092、E2E-097、E2E-143、E2E-150、E2E-168、E2E-204、E2E-217 |
@@ -6733,8 +6734,8 @@ eleven-tool-round desktop paths are verified by
   编辑器不再缺少高级设置。在账户模型上启用的等级会持久化，并在重新打开编辑器后
   依然存在。OpenAI Codex 的 `openai-codex` 适配器键会解析匹配的 `openai`
   models.dev 记录，因此 `gpt-6-astra` 不会显示为通用的 128,000 / 8,192 /
-  无推理默认值。已认证的 ChatGPT 列表本身来自已固定的 pi-ai 目录（0.86.1
-  包含 `gpt-6-astra`）；models.dev 不能补上缺失的 OAuth ID。没有已发布记录
+  无推理默认值。已认证的 ChatGPT 列表来自账户令牌的 `GET {base}/codex/models`，
+  所以 pin 里还没有的 id 只要响应里有就能选；请求失败才回退到 pi-ai。models.dev 不能补上缺失的 OAuth ID。没有已发布记录
   的模型则保留其已存等级不变。账户的默认模型仍是首个绑定。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/08-component-spec.md` §19、
   `03-runtime/11-provider-model-system.md` §10、`08-meta/decisions-log.md`
@@ -8446,13 +8447,13 @@ the latest destination. These assertions measure work counts, not device FPS.
 
 ### E2E-CONFIG-SYNC-webdav-portable-configuration
 
-- **前提：** 已构建的任务候选版本、隔离的 Host 配置，以及支持 strong ETag 和条件 PUT 的本地 WebDAV fixture。不使用真实 WebDAV 账户、provider 或生产桌面。
-- **步骤：** 1）打开设置 → 云同步，填写 fixture URL、设备标签、目录和备份密码。2）运行能力测试，确认使用临时对象。3）选择 provider/MCP/skill 类别，保持凭据和 memory 未选中；在第二次预览中启用凭据，确认只显示脱敏计数。4）配置设备 A，创建 user provider 和 MCP 定义并同步。5）让设备 B 连接同一 vault，同步后检查待激活/映射，并验证审批前不会运行命令或任务。6）批准一个变更后的安全实体，拒绝一个暂存实体，在两台设备上编辑不相交设置并再次同步。7）测试并发 head writer、错误密码、weak ETag、密文损坏、redirect、归档路径穿越和网络中断。8）使用回环／私有地址的 fixture 勾选“允许在受信任的内网地址使用 HTTP”，确认刷新状态后仍保留；即使勾选，公网 HTTP 地址也必须被拒绝。
-- **预期：** 测试拒绝不可靠的条件写入。HTTP 默认关闭，仅允许 localhost、`.local` 或私有／链路本地地址；公网 HTTP 地址会被拒绝，界面会提示凭据暴露风险。若 fixture 探测到该 endpoint 对不存在对象返回 502，后续只兼容该 endpoint 的这一行为；忽略条件头的服务器仍必须标记为不受支持。WebDAV 只能看到已认证的密文和不透明对象名；原始秘密不会出现在 Renderer 状态或日志中。相同和不相交的编辑会收敛，冲突保持可审查，明确删除使用 tombstone，类别退出不是删除，可执行导入在本地审批和映射前保持不激活。恢复不会暴露部分应用的本地配置。
-- **规格：** `03-runtime/22-config-sync.md`、`03-runtime/14-secrets-storage.md`、`05-security/01-security.md`、ADR 0300。
+- **前提：** 已构建的任务候选版本、默认关闭开发者模式的隔离 Host 配置，以及支持 strong ETag 和条件 PUT 的本地 WebDAV fixture。不使用真实 WebDAV 账户、provider 或生产桌面。
+- **步骤：** 1）开发者模式关闭时打开设置，确认导轨没有“云同步”，搜索也没有云同步结果。2）打开“设置 → 信息 → 开发者”，启用开发者模式，确认“云同步”出现在导轨和设置搜索中；打开该页，确认导轨行和页面标题均显示“实验性”徽章。3）填写 fixture URL、设备标签、目录和备份密码。4）运行能力测试，确认使用临时对象。5）选择 provider/MCP/skill 类别，保持凭据和 memory 未选中；在第二次预览中启用凭据，确认只显示脱敏计数。6）配置设备 A，创建 user provider 和 MCP 定义并同步。7）让设备 B 连接同一 vault，同步后检查待激活/映射，并验证审批前不会运行命令或任务。8）批准一个变更后的安全实体，拒绝一个暂存实体，在两台设备上编辑不相交设置并再次同步。9）测试并发 head writer、错误密码、weak ETag、密文损坏、redirect、归档路径穿越和网络中断。10）使用回环／私有地址的 fixture 勾选“允许在受信任的内网地址使用 HTTP”，确认刷新状态后仍保留；即使勾选，公网 HTTP 地址也必须被拒绝。
+- **预期：** 开发者模式关闭时，云同步页面及其设置搜索结果不可见；启用后入口可见并标记为实验性，云同步行为保持不变。测试拒绝不可靠的条件写入。HTTP 默认关闭，仅允许 localhost、`.local` 或私有／链路本地地址；公网 HTTP 地址会被拒绝，界面会提示凭据暴露风险。若 fixture 探测到该 endpoint 对不存在对象返回 502，后续只兼容该 endpoint 的这一行为；忽略条件头的服务器仍必须标记为不受支持。WebDAV 只能看到已认证的密文和不透明对象名；原始秘密不会出现在 Renderer 状态或日志中。相同和不相交的编辑会收敛，冲突保持可审查，明确删除使用 tombstone，类别退出不是删除，可执行导入在本地审批和映射前保持不激活。恢复不会暴露部分应用的本地配置。
+- **规格：** `04-ux/06-settings-ia.md`、`03-runtime/22-config-sync.md`、`03-runtime/14-secrets-storage.md`、`05-security/01-security.md`、ADR 0300。
 - **验收：** F（持久化）、Security、Quality。
 - **里程碑：** M6+。
-- **状态：** Draft；合并/密码学和进程内 WebDAV 条件写入覆盖已存在。完整双设备进程路径和逐检查点本地恢复故障注入仍待自动化。
+- **状态：** Draft；合并/密码学和进程内 WebDAV 条件写入覆盖已存在。云同步设置入口的开发者模式门控由 `pnpm test:e2e:settings-scroll` 自动验证；完整双设备进程路径和逐检查点本地恢复故障注入仍待自动化。
 
 ### E2E-DIALOG-long-text-boundaries
 
@@ -8722,6 +8723,22 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **验收 / 里程碑**：C、Quality / M6+。
 - **状态**：组件与状态层用户路径由 `queue-pending-actions.test.mjs` 覆盖。
 
+### E2E-SETTINGS-destination-scroll-reset
+
+- 打开设置 → AI，滚动到中间，再选择快捷键：标题和首项从顶部显示。滚动后
+  返回 AI，该页也从顶部显示。
+- 再次选择当前分类，或不离开当前页更新设置，保留内容区滚动位置。
+- 覆盖内置分类 → 插件、插件 → 插件、插件 → 先前选择的内置分类；再次
+  选择当前插件分类时保留位置。
+- 从其他分类、当前打开的插件分类，以及 AI 当前页通过全局搜索设置锚点进入
+  AI：插件页关闭，目标项在下一次绘制前可见，消费锚点后保持定位。没有锚点的
+  外部切页也会离开插件，并从顶部开始。
+- 在明暗两种主题下运行。
+- 自动化覆盖：`pnpm test:e2e:settings-scroll` 在隔离 Electron 中挂载真实
+  SettingsPage、store、翻译和构建后的 CSS。仅 preload 数据使用 fixture；
+  搜索导航调用 SearchDialog 使用的公开 store 入口。该测试覆盖渲染层交互，
+  不覆盖 host 持久化或完整全局搜索弹窗。
+
 ### E2E-SCHEDULED-dispatch
 
 - **场景**：独立分发到期任务。
@@ -8818,4 +8835,3 @@ the latest destination. These assertions measure work counts, not device FPS.
 `node --test apps/desktop/test/session-transcript-empty-read.test.mjs`、
 `node --test apps/desktop/test/plugin-timeout-budgets.test.mjs`、
 `pnpm --filter @pi-desktop/shared test`、`pnpm --filter @pi-desktop/host-runtime test`。
-

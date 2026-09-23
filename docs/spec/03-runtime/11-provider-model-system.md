@@ -192,7 +192,7 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    preserving all raw records in the file for future surfaces. Image input is
    sent as a transient image content block only when the model accepts image
    input. PDF capability is surfaced and retained in model metadata; because
-   pi-ai 0.86.1 has no native PDF content block, PDF attachments remain bounded
+   pi-ai 0.87.0 has no native PDF content block, PDF attachments remain bounded
    file references rather than being incorrectly encoded as images.
 7. User-edited `ModelBinding` values remain explicit provider configuration:
    they control selected request limits, enabled thinking levels, the default
@@ -219,7 +219,7 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    self-hosted endpoint routinely accepts input its catalog entry omits.
    Enabling image input turns on the transient image content block; enabling PDF
    input records the capability but does not change the encoding, since pi-ai
-   0.86.1 has no PDF content block and PDFs stay bounded file references.
+   0.87.0 has no PDF content block and PDFs stay bounded file references.
 10. The settings checkboxes show the effective answer against the published
     baseline, and setting one back to the published value stores "follow the
     catalog" rather than an equal-valued override. Agreeing with models.dev is
@@ -447,28 +447,40 @@ nothing may be cached in the payload or the runtime; and because the row's
 turns instead of rebuilding it. The sidecar therefore never holds the refresh
 token, and holds an access token only for the provider its session is bound to.
 
-Model discovery for such a row reads the authenticated catalog
-(`models.getAvailable`, which applies the vendor's own `filterModels`) rather
-than probing `/models`, and the connection test proves the account by resolving
-auth. For static OAuth vendors such as ChatGPT Plus/Pro (`openai-codex`), that
-catalog is the pinned pi-ai model list rather than a live vendor `/models`
-probe, so a newly published account model such as `gpt-6-astra` appears only
-after the pin includes it. xAI (`xai`, the Grok/X subscription) is the
-exception: a successful `GET /v1/models` with the resolved account token is the
-list of conversation models the account may use, including an id the pinned
-pi-ai catalog does not know yet. Image and video generators in that payload
-are dropped. When the request fails, the pinned catalog remains the fallback.
-models.dev still supplies metadata once the ID is available, but it cannot add
-the ID to the authenticated list. A vendor may
-span wire APIs — Copilot serves Anthropic, Chat Completions and Responses
-models — so the row's `apiStyle` follows the selected model.
+Model discovery for such a row reads the signed-in account's own model list,
+and the connection test still proves the account by resolving auth. pi-ai
+(`models.getAvailable`, including that vendor's `filterModels`) is the fallback
+when the account request fails or the payload is not a model list. The probe
+is the endpoint that vendor actually publishes:
+
+- ChatGPT Plus/Pro (`openai-codex`): `GET {base}/codex/models`, with the
+  account id taken from the access token. A `{ data: [...] }` payload is not
+  accepted. A newly published id such as `gpt-6-luna` is selectable without a
+  client update when that response includes it.
+- GitHub Copilot: `GET {base}/models` with the pinned IDE identity headers and
+  `X-GitHub-Api-Version`. Only ids with `model_picker_enabled === true` (and
+  not policy-disabled) are kept. An id the pin does not know is added only when
+  its family already maps to one wire API.
+- Anthropic: `GET {base}/v1/models` with the Claude Code OAuth headers
+  (`x-app: cli`, OAuth beta) when the token is an OAuth access token.
+- Kimi, Meta, xAI and OpenRouter: `GET {base}/models` (Anthropic-style `/v1`
+  for Kimi). xAI still drops image and video generators.
+- Radius keeps its gateway catalog refresh and is not probed again.
+
+Image, video, speech and embedding ids are dropped. A model models.dev does
+not know yet inherits limits from a pinned sibling of the same tier; xAI uses
+an explicit newest-first sibling (`grok-4.6`, then `grok-4.5`, then
+`grok-4.3`) so pin order cannot select an older Grok. A different tier is not
+used. models.dev still cannot add an id the account list did not return. A
+vendor may span wire APIs — Copilot serves Anthropic, Chat Completions and
+Responses models — so the row's `apiStyle` follows the selected model.
 Deleting a row calls the normal host `providers.delete` path, which removes its
 OAuth secret and metadata; it never logs out or deletes another row with the
 same vendor key.
 
 ### Anthropic token endpoint rate limits
 
-The pinned pi-ai 0.86.1 patch gives Anthropic authorization-code exchange and
+The pinned pi-ai 0.87.0 patch gives Anthropic authorization-code exchange and
 refresh a shared, bounded token-request policy: retry only an explicit HTTP
 429, at most three total requests. Wait at least 1 s then 2 s, or longer when
 `Retry-After` gives delta seconds or an HTTP date. A server delay beyond the
@@ -708,7 +720,7 @@ response, it stops consuming the stream instead of awaiting the server's
 TCP FIN. Upstream pi-ai keeps iterating until the server closes the
 connection, which hangs the turn behind reverse proxies that hold the idle
 connection open. Until the fix ships upstream, `patches/` carries a pnpm
-patch on `@earendil-works/pi-ai@0.86.1` that breaks the event loop on the
+patch on `@earendil-works/pi-ai@0.87.0` that breaks the event loop on the
 terminal event (the OpenAI SDK aborts the underlying request when the
 consumer stops iterating). Drop the patch once a pi-ai release includes the
 fix.
