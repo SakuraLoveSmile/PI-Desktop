@@ -143,6 +143,14 @@ export type AppSettings = {
    * or work panel compresses without rewriting the preference.
    */
   chatContentMaxWidth?: number;
+  /**
+   * Opt-in smooth streaming display (D152 amendment). When enabled, incoming
+   * stream chunks are released character-by-character through a
+   * requestAnimationFrame loop instead of appearing as whole blocks.
+   * Absent and false use direct rendering (D152 default). Automatically
+   * disabled when the system prefers reduced motion.
+   */
+  smoothStreaming?: boolean;
   onboardingDismissed: boolean;
 };
 
