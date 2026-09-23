@@ -146,10 +146,10 @@ test("composer hydrates from the shared cache and persists across unmount and hi
 test("composer handles home drafts, deleted sessions, and async sends by key", () => {
   assert.match(composer, /pruneComposerDrafts\(\[/);
   assert.match(composer, /HOME_DRAFT_KEY,/);
-  assert.match(composer, /const clearDraftForKey = \(key: string\)/);
+  assert.match(composer, /const clearDraftForKey = \(key: string, submitted\?: ComposerDraftSnapshot\)/);
   assert.match(composer, /deleteComposerDraft\(key\)/);
   assert.match(composer, /draftKeyForSession\(useAppStore\.getState\(\)\.activeSessionId\)/);
   assert.match(composer, /const submittedDraftKey = draftKey/);
-  assert.match(composer, /clearDraftForKey\(submittedDraftKey\)/);
+  assert.match(composer, /clearDraftForKey\(submittedDraftKey, submittedDraft\)/);
   assert.doesNotMatch(composer, /if \(accepted\) clearDraft\(\);/);
 });

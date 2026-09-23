@@ -1387,6 +1387,19 @@ identify the platform validation still needed.
   coverage in `scripts/e2e/composer-paste.tsx` (`pnpm test:e2e:composer-paste`);
   full UI scenario Draft
 
+#### E2E-011c-1: Preserve newer drafts after command completion
+
+- **Steps**: In session A, submit `/compact` and hold the local model response.
+  Replace the command text with a new draft, then release the response. Repeat
+  with an image added to the unchanged command text, and with navigation to B
+  before completion. Finally run the command without editing its draft.
+- **Expected**: Completion preserves the newer text and image attachments in A;
+  B's draft is untouched. Returning to A restores its newer draft. An unchanged
+  submitted command draft clears after success.
+- **Coverage**: `scripts/e2e/composer-submission.tsx`, executed by
+  `pnpm test:e2e:composer-paste`; real desktop recording uses isolated data and
+  a local model with a controlled response delay.
+
 #### E2E-011d: New task creates an immediate durable empty slot
 
 - **Preconditions**: Provider configured; at least one real session exists so

@@ -111,6 +111,60 @@ export async function verifyComposerSubmission(imagePath: string, i18n: i18n) {
       api.composerCommands = originalComposerCommands;
       useAppStore.setState({ showToast: originalShowToast });
     }
+    // A local command can finish after the user has started their next draft.
+    // Keep the real command dispatcher/store; delay only the compact API edge.
+    const originalCompact = api.compact;
+    const originalCommands = api.composerCommands;
+    api.composerCommands = async () => ({ commands: [{
+      id: "builtin.agent.compact", name: "compact", title: "Compact", kind: "builtin",
+    }] });
+    try {
+      for (const change of ["text", "attachment", "switch", "unchanged"] as const) {
+        let finish!: () => void;
+        let started!: () => void;
+        const entered = new Promise<void>((resolve) => { started = resolve; });
+        api.compact = async () => {
+          started();
+          await new Promise<void>((resolve) => { finish = resolve; });
+          return { accepted: true };
+        };
+        flushSync(() => useAppStore.setState({ activeSessionId: sessionId, isRunning: false }));
+        prefill("/compact", []);
+        await painted();
+        sendButton().click();
+        await entered;
+        await painted();
+        if (change === "attachment") {
+          prefill("/compact", [attachment]);
+        } else if (change !== "unchanged") {
+          editor().textContent = "Next message written during compaction";
+          flushSync(() => editor().dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" })));
+        }
+        await painted();
+        if (change === "switch") {
+          flushSync(() => useAppStore.setState({ activeSessionId: "other-draft-session" }));
+          await painted();
+          editor().textContent = "Destination draft";
+          flushSync(() => editor().dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" })));
+        }
+        finish();
+        await painted();
+        await painted();
+        if (change === "switch") {
+          assert(editor().textContent === "Destination draft", "command completion must not clear the destination draft");
+          flushSync(() => useAppStore.setState({ activeSessionId: sessionId }));
+          await painted();
+        }
+        assert(editor().textContent === (change === "unchanged" ? "" : change === "attachment" ? "/compact" : "Next message written during compaction"),
+          `completed command must preserve a newer ${change} draft: ${JSON.stringify(editor().textContent)}`);
+        if (change === "attachment") assert(host.querySelectorAll(".composer-image-attachment").length === 1,
+          "completed command must preserve an image added while it was running");
+      }
+    } finally {
+      api.compact = originalCompact;
+      api.composerCommands = originalCommands;
+      deleteComposerDraft("other-draft-session");
+    }
   } finally {
     flushSync(() => root.unmount());
     host.remove();

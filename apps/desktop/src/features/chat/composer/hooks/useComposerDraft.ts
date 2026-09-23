@@ -23,6 +23,7 @@ import {
   draftOwnerSessionId,
   flushScheduledHomeDraftAdopt,
   pruneComposerDrafts,
+  snapshotComposerDraft,
   readComposerDraft,
   writeComposerDraft,
 } from "../../../../lib/composer-draft-cache";
@@ -80,7 +81,7 @@ export type ComposerDraftController = {
   ) => void;
   snapshotReferences: (sourceSessionId: string) => ComposerDraftSnapshot["fileReferences"];
   draftSnapshot: (text: string) => ComposerDraftSnapshot;
-  clearDraftForKey: (key: string) => void;
+  clearDraftForKey: (key: string, submitted?: ComposerDraftSnapshot) => void;
   restoreDraftForKey: (key: string, snapshot: ComposerDraftSnapshot) => void;
 };
 
@@ -572,10 +573,25 @@ export function useComposerDraft({
         ...(token ? { token } : {}),
       }));
 
-  const clearDraftForKey = (key: string) => {
+  const clearDraftForKey = (key: string, submitted?: ComposerDraftSnapshot) => {
+    const currentKey = draftKeyForSession(useAppStore.getState().activeSessionId);
+    // Command completion owns only its submitted draft, including when the
+    // user has left this session and its newer draft now lives in the cache.
+    if (submitted) {
+      const current = currentKey === key && ref.current
+        ? snapshotComposerDraft(readLiveDraft(), fileReferencesRef.current, key)
+        : readComposerDraft(key);
+      if (!current || current.text.trim() !== submitted.text ||
+        current.fileReferences.length !== submitted.fileReferences.length ||
+        current.fileReferences.some((reference, index) => {
+          const expected = submitted.fileReferences[index];
+          return reference.path !== expected.path || reference.name !== expected.name ||
+            reference.kind !== expected.kind || reference.mimeType !== expected.mimeType ||
+            reference.token !== expected.token;
+        })) return;
+    }
     invalidatePromptEnhancement();
     deleteComposerDraft(key);
-    const currentKey = draftKeyForSession(useAppStore.getState().activeSessionId);
     if (currentKey !== key) return;
     deletedReferencesRef.current.clear();
     valueRef.current = "";

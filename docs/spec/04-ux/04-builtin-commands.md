@@ -98,6 +98,11 @@ the composer draft. Former builtin aliases are no longer resolved and are
 handled as ordinary unknown slash text unless supplied by another command
 source.
 
+When a command completes, it clears only the draft submitted with that command.
+Text or attachments edited while it runs remain available, including when the
+user switches sessions before completion. An unchanged command draft still
+clears on success; failed dispatch preserves the draft.
+
 ## 8. Composer skill entries
 
 Active built-in, plugin, and user-owned Skills also surface in the composer `/`
