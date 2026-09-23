@@ -64,10 +64,10 @@ import { useComposerModelMenu } from "../features/chat/composer/hooks/useCompose
 import { useVoiceInput } from "../features/voice/useVoiceInput";
 import { VoiceOverlay } from "../features/voice/VoiceOverlay";
 import "../styles/voice.css";
+import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
+import { ComposerStatus } from "../features/chat/composer/ComposerStatus";
 import { formatPluginTriggerInsert } from "@pi-desktop/shared";
 import { serializePluginTokens as serializePluginTokensForSend } from "../features/chat/composer/plugin-trigger";
-import { ComposerStatus } from "../features/chat/composer/ComposerStatus";
-import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
 import { registerComposerInsert } from "../features/chat/composer/insert-bridge";
 import {
   useComposerPluginTrigger,
@@ -440,8 +440,6 @@ export function Composer({
     sendBlocked,
     pasting,
     activeFileReferences,
-    serializePluginTokens: (draft: string) =>
-      serializePluginTokensForSend(draft, pluginTokensRef.current),
     t,
     sendPrompt,
     steerPrompt,
@@ -505,10 +503,6 @@ export function Composer({
     enabled: !inputBlocked,
   });
   const pluginTokens = useComposerPluginTokens();
-  // A ref keeps the submit serializer reading the latest token records
-  // without re-creating the submit callback on every keystroke.
-  const pluginTokensRef = useRef(pluginTokens.tokens);
-  pluginTokensRef.current = pluginTokens.tokens;
   const activeTrigger = pluginTrigger;
 
   // The accept route for `composer.acceptTriggerItem`: turn the picked item

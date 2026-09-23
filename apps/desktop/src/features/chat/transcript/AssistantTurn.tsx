@@ -52,10 +52,10 @@ import {
 } from "./TranscriptMenu";
 import { useSmoothText } from "../../../hooks/useSmoothText";
 import { TurnProcess } from "./TurnProcess";
-
 import { EntryExtraStack } from "./EntryExtraStack";
 import { ActionBarSlots } from "./ActionBarSlots";
 import { useSlotEntries } from "../../../plugins/renderer-slots/use-slots";
+
 type AssistantTurnProps = {
   entry: AssistantTurnEntry;
   isActive: boolean;

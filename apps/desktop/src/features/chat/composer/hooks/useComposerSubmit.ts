@@ -32,9 +32,6 @@ type UseComposerSubmitOptions = {
   sendBlocked: boolean;
   pasting: boolean;
   activeFileReferences: ComposerFileReference[];
-  /** Serializes plugin token records into the model-facing content at send
-   * time; absent when the composer has no plugin tokens. */
-  serializePluginTokens?: (draft: string) => string;
   t: TFunction;
   sendPrompt: AppState["sendPrompt"];
   steerPrompt: AppState["steerPrompt"];
@@ -80,7 +77,6 @@ export function useComposerSubmit({
   sendBlocked,
   pasting,
   activeFileReferences,
-  serializePluginTokens,
   t,
   sendPrompt,
   steerPrompt,
@@ -207,10 +203,7 @@ export function useComposerSubmit({
       text,
       activeFileReferences,
     );
-    const tokenContent = serializePluginTokens
-      ? serializePluginTokens(inlineContent)
-      : inlineContent;
-    const serializedContent = serializeComposerFileReferences(tokenContent, activeFileReferences);
+    const serializedContent = serializeComposerFileReferences(text, activeFileReferences);
     if (!serializedContent) return;
     if (sendBlocked) {
       if (pasting) showToast(t("chat.pasteInProgress"), { variant: "info" });
