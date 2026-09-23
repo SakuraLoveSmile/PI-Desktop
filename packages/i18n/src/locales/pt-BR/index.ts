@@ -301,6 +301,7 @@ export const ptBR = {
     responseFailed: "O assistente não conseguiu concluir esta resposta.",
     showErrorDetails: "Mostrar detalhes",
     hideErrorDetails: "Ocultar detalhes",
+    dismissError: "Dispensar mensagem de erro",
     copyErrorDetails: "Copiar detalhes",
     errorProvider: "Provedor de IA",
     errorModel: "Modelo",
