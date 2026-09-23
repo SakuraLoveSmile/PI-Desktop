@@ -87,7 +87,7 @@ Each ADR includes:
 | 0061 | Imperceptible background context compaction | Accepted (amends 0030 / 0049; clauses 2/4/6/7/8 amended by 0064) |
 | 0062 | Bounded Subagents Behind a Task Tool | Accepted for implementation (`maxTurns` clause withdrawn by 0253) |
 | 0063 | A Managed Surface for Global Subagent Definitions | Accepted for implementation (`maxTurns` field withdrawn by 0253) |
-| 0064 | Codex-parity context compaction | Accepted (amends 0061 / 0030) |
+| 0064 | Codex-parity context compaction | Accepted (amended by D623 / issue #970: 90% inline trigger) |
 | 0065 | Smooth shell layout and stream feedback | Accepted for implementation |
 | 0066 | Empty home direct bottom composer | Accepted for implementation (amends D111) |
 | 0067 | ChatGPT-inspired empty-home starter guidance | Superseded by D206 |
