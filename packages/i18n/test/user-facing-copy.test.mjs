@@ -193,6 +193,10 @@ test("pt-BR keeps security disclosures and action semantics intact", () => {
   assert.doesNotMatch(brazilian["chat.queuedPromptEmpty"], /vazi[oa]/i);
   assert.match(brazilian["chat.queuedPromptEmpty"], /mensagem na fila/i);
   assert.match(brazilian["settings.promptEnhancementCustomTemplate"], /modelo personalizado/i);
+  assert.equal(brazilian["settings.smoothStreaming"], "Exibição gradual");
+  assert.match(brazilian["settings.smoothStreamingDesc"], /caractere por caractere/i);
+  assert.match(brazilian["settings.smoothStreamingDesc"], /máquina de escrever/i);
+  assert.match(brazilian["settings.smoothStreamingDesc"], /reduzir animações/i);
 
   assert.doesNotMatch(brazilian["project.clear"], /excluir|deletar/i);
   assert.doesNotMatch(brazilian["notifications.clearAll"], /excluir|deletar/i);
