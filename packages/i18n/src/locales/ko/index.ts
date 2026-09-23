@@ -312,6 +312,7 @@ export const ko = {
     responseFailed: "어시스턴트가 이 답변을 완료하지 못했습니다.",
     showErrorDetails: "세부 정보 표시",
     hideErrorDetails: "세부 정보 숨기기",
+    dismissError: "오류 메시지 닫기",
     copyErrorDetails: "세부 정보 복사",
     errorProvider: "AI 프로바이더",
     errorModel: "모델",
