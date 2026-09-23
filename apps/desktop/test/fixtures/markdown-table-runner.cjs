@@ -93,6 +93,10 @@ app.whenReady().then(async () => {
     await key("Escape");
     await wait('!document.querySelector("[role=dialog]")');
   }
+  // Restore the viewport after narrow-layout checks so earlier feedback
+  // cannot cover the toolbar and intercept the error-path clicks.
+  win.setContentSize(1100, 800);
+  await wait('innerWidth === 1100 && innerHeight === 800');
   await evaluate('Object.defineProperty(navigator, "clipboard", {configurable:true,value:{writeText:async()=>{throw Error("denied")}}})');
   await click('button[aria-label="复制表格为 Markdown"]');
   await wait('window.tableFixture.toast()?.message === "无法复制表格"');
