@@ -310,6 +310,7 @@ export const tr = {
     responseFailed: "Asistan bu yanıtı tamamlayamadı.",
     showErrorDetails: "Ayrıntıları göster",
     hideErrorDetails: "Ayrıntıları gizle",
+    dismissError: "Hata mesajını kapat",
     copyErrorDetails: "Ayrıntıları kopyala",
     errorProvider: "AI servisi",
     errorModel: "Model",

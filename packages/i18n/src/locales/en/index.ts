@@ -308,6 +308,7 @@ export const en = {
     responseFailed: "The assistant couldn't complete this reply.",
     showErrorDetails: "Show details",
     hideErrorDetails: "Hide details",
+    dismissError: "Dismiss error message",
     copyErrorDetails: "Copy details",
     errorProvider: "AI provider",
     errorModel: "Model",

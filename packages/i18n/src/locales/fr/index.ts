@@ -301,6 +301,7 @@ export const fr = {
     "responseFailed": "L'assistant n'a pas pu terminer cette réponse.",
     "showErrorDetails": "Afficher les détails",
     "hideErrorDetails": "Masquer les détails",
+    "dismissError": "Fermer le message d’erreur",
     "copyErrorDetails": "Copier les détails",
     "errorProvider": "Fournisseur d'IA",
     "errorModel": "Modèle",

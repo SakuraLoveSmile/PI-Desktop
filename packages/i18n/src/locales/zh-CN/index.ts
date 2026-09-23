@@ -302,6 +302,7 @@ export const zhCN = {
     responseFailed: "助手没能完成这次回复。",
     showErrorDetails: "显示详情",
     hideErrorDetails: "隐藏详情",
+    dismissError: "关闭错误消息",
     copyErrorDetails: "复制详情",
     errorProvider: "AI 服务",
     errorModel: "模型",

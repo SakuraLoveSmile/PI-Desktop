@@ -302,6 +302,7 @@ export const zhTW = {
     responseFailed: "助手沒能完成這次回覆。",
     showErrorDetails: "顯示詳情",
     hideErrorDetails: "隱藏詳情",
+    dismissError: "關閉錯誤訊息",
     copyErrorDetails: "複製詳情",
     errorProvider: "AI 服務",
     errorModel: "模型",

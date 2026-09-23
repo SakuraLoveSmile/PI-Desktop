@@ -301,6 +301,7 @@ export const de = {
     "responseFailed": "Der Assistent konnte diese Antwort nicht fertigstellen.",
     "showErrorDetails": "Details anzeigen",
     "hideErrorDetails": "Details ausblenden",
+    "dismissError": "Fehlermeldung schließen",
     "copyErrorDetails": "Details kopieren",
     "errorProvider": "KI-Anbieter",
     "errorModel": "Modell",

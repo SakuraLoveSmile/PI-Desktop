@@ -301,6 +301,7 @@ export const es = {
     "responseFailed": "El asistente no pudo completar esta respuesta.",
     "showErrorDetails": "Mostrar detalles",
     "hideErrorDetails": "Ocultar detalles",
+    "dismissError": "Cerrar mensaje de error",
     "copyErrorDetails": "Copiar detalles",
     "errorProvider": "Proveedor de IA",
     "errorModel": "Modelo",
