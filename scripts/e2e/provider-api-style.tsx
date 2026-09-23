@@ -287,6 +287,11 @@ globalThis.providerApiStyleProbe = async () => {
       const manual = { ...fixture("chat_completions"), vendorKey: "openai" };
       render({ provider: manual });
       assert(apiStyleTrigger()?.textContent?.includes(apiStyleLabel("chat_completions")), "named host overwrote manual format");
+      const beforeManualSave = updates.length;
+      click(control("settings.saveProvider"));
+      await until(() => updates.length === beforeManualSave + 1, "save manual format provider");
+      assert(updates.at(-1)?.vendorKey === manual.vendorKey,
+        "a stored format differing from the preset dropped the row's vendor identity");
       results.push(`${locale}:saved-protocol-wins-over-preset`);
 
       const legacyUnknown = { ...fixture("future_api_format"),

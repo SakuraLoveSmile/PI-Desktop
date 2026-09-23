@@ -224,7 +224,11 @@ export function ProviderSetupDialog({
         const result = await api.updateProvider({
           id: provider.id,
           name: providerName,
-          vendorKey: namedPreset?.vendorKey ?? "custom",
+          // A row whose stored wire format differs from the published preset is
+          // no longer that preset, but its catalog identity is still its own.
+          // A row whose stored wire format differs from the published preset is
+          // no longer that preset, but its catalog identity is still its own.
+          vendorKey: namedPreset?.vendorKey ?? provider?.vendorKey ?? "custom",
           baseUrl: providerBaseUrl,
           defaultModelId: persisted[0]?.id,
           models: persisted,
@@ -506,7 +510,7 @@ export function ProviderSetupDialog({
             onImageModelChange={updateImageModelDraft}
             lookupContext={{
               baseUrl: requestBaseUrl,
-              vendorKey: namedPreset?.vendorKey ?? "custom",
+              vendorKey: namedPreset?.vendorKey ?? provider?.vendorKey ?? "custom",
               providerId: provider?.id,
             }}
           />
