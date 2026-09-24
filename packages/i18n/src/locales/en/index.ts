@@ -1191,6 +1191,8 @@ sklm: {
     infiniteProviderRetryDesc: "Keep retrying network and transient provider failures until the request succeeds. You can still stop the turn; API usage may continue while enabled.",
     smoothStreaming: "Smooth streaming",
     smoothStreamingDesc: "Release streamed text character by character for a typewriter effect. Automatically disabled when the system prefers reduced motion.",
+    preventScreenSleep: "Prevent screen sleep",
+    preventScreenSleepDesc: "Keep the display awake while the app is running. Uses system power management APIs on all platforms.",
     linkOpenTarget: "Link open destination",
     linkOpenTargetWorkpanel: "Work panel browser",
     linkOpenTargetExternal: "Default OS browser",

@@ -1144,6 +1144,8 @@ export const ptBR = {
     infiniteProviderRetryDesc: "Continua tentando indefinidamente em caso de falhas temporárias de rede ou do provedor. Ainda é possível interromper a rodada; enquanto esta opção estiver ativada, o consumo e os custos da API podem continuar.",
     smoothStreaming: "Exibição gradual",
     smoothStreamingDesc: "Exibe o texto recebido caractere por caractere, criando um efeito de máquina de escrever. É desativada automaticamente quando o sistema está configurado para reduzir animações.",
+    preventScreenSleep: "Impedir suspensão da tela",
+    preventScreenSleepDesc: "Mantém a tela ligada enquanto o app está em execução. Usa as APIs de gerenciamento de energia do sistema em todas as plataformas.",
     linkOpenTarget: "Destino ao abrir links",
     linkOpenTargetWorkpanel: "Navegador do painel de trabalho",
     linkOpenTargetExternal: "Navegador padrão do sistema",
