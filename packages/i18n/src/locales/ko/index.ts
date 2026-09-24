@@ -1358,6 +1358,8 @@ sklm: {
     removeModel: "모델 제거",
     reorderModel: "{{name}} 순서 변경. 드래그하거나 위쪽 및 아래쪽 화살표 키를 사용하세요.",
     reorderProvider: "{{name}} 순서 변경. 드래그하거나 위쪽 및 아래쪽 화살표 키를 사용하세요.",
+    serviceRowLabel: "{{name}}. Enter 키를 눌러 편집하고, 드래그하거나 위쪽 및 아래쪽 화살표 키로 순서를 변경하세요.",
+    serviceRowActions: "{{name}} 작업",
     providerOrderFailed: "공급자 순서를 저장하지 못했습니다: {{error}}",
     modelAlias: "별칭",
     modelAliasHint: "모델 이름이 표시되는 곳마다 사용됩니다. ID는 요청 식별자로 유지됩니다.",

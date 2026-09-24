@@ -1341,6 +1341,8 @@ sklm: {
     "removeModel": "Supprimer le modèle",
     "reorderModel": "Réordonner {{name}}. Faites glisser ou utilisez les flèches haut et bas.",
     "reorderProvider": "Réordonner {{name}}. Faites glisser ou utilisez les flèches haut et bas.",
+    "serviceRowLabel": "{{name}}. Appuyez sur Entrée pour modifier ; faites glisser ou utilisez les flèches haut et bas pour réordonner.",
+    "serviceRowActions": "Actions pour {{name}}",
     providerOrderFailed: "Impossible d’enregistrer l’ordre des fournisseurs : {{error}}",
     "modelAlias": "Alias",
     "modelAliasHint": "Affiché partout où le modèle est nommé ; l'id reste l'identité de la requête.",

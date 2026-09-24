@@ -1348,6 +1348,8 @@ sklm: {
     removeModel: "Modeli kaldır",
     reorderModel: "{{name}} sırasını değiştir. Sürükleyin veya Yukarı ve Aşağı ok tuşlarını kullanın.",
     reorderProvider: "{{name}} sırasını değiştir. Sürükleyin veya Yukarı ve Aşağı ok tuşlarını kullanın.",
+    serviceRowLabel: "{{name}}. Düzenlemek için Enter'a basın; sırayı değiştirmek için sürükleyin veya Yukarı ve Aşağı ok tuşlarını kullanın.",
+    serviceRowActions: "{{name}} eylemleri",
     providerOrderFailed: "Sağlayıcı sırası kaydedilemedi: {{error}}",
     modelAlias: "Takma ad",
     modelAliasHint: "Modelin adlandırıldığı her yerde gösterilir; istek kimliği model ID olarak kalır.",

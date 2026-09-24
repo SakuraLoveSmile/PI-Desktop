@@ -107,6 +107,11 @@ globalThis.imageGenerationProbe = async () => {
     assert(element, "missing click target");
     flushSync(() => element!.click());
   };
+  // A service row opens its own editor (D623); without a name, the first row.
+  const editProvider = (name?: string) =>
+    click([...container.querySelectorAll<HTMLElement>(".model-provider-row")].find(
+      (element) => !name || element.querySelector(".model-provider-row-name")?.textContent === name,
+    ));
   const button = (text: string) =>
     [...document.querySelectorAll<HTMLButtonElement>("button")].find(
       (element) => element.textContent?.trim() === text,
@@ -130,15 +135,8 @@ globalThis.imageGenerationProbe = async () => {
         (element) => element.textContent?.includes(i18n.t("settings.imageModel")),
       );
       assert(!initialImageRow, "unconfigured image model row should be hidden");
-      const edit =
-        container.querySelector<HTMLButtonElement>(
-          'button[aria-label="' + i18n.t("settings.editProvider") + '"]',
-        ) ??
-        container.querySelector<HTMLButtonElement>(
-          ".model-provider-row button[aria-label*='Edit']",
-        );
       // Enter from the real model settings page, not the advanced pane alone.
-      click(edit);
+      editProvider();
       await until(
         () => !!imageModelToggle(i18n.t("settings.setImageModel")),
         "advanced image-model capability missing",
@@ -147,11 +145,7 @@ globalThis.imageGenerationProbe = async () => {
       assert(!settings.imageGeneration, "draft selection persisted before Save");
       click(button(i18n.t("settings.cancel")));
       assert(!settings.imageGeneration, "cancel changed binding");
-      click(
-        container.querySelector<HTMLButtonElement>(
-          'button[aria-label="' + i18n.t("settings.editProvider") + '"]',
-        ),
-      );
+      editProvider();
       await until(
         () => !!imageModelToggle(i18n.t("settings.setImageModel")),
         "second edit did not mount",
@@ -205,8 +199,7 @@ globalThis.imageGenerationProbe = async () => {
       };
       assert(textStyle(row.querySelector(".model-default-provider")) === textStyle(defaultRow.querySelector(".model-default-provider")), "provider typography differs from default model");
       assert(textStyle(row.querySelector(".model-default-model")) === textStyle(defaultRow.querySelector(".model-default-model")), "model typography differs from default model");
-      const alternateRow = [...container.querySelectorAll<HTMLElement>(".model-provider-row")].find((element) => element.textContent?.includes("Images B"));
-      click(alternateRow?.querySelector<HTMLButtonElement>('button[aria-label="' + i18n.t("settings.editProvider") + '"]'));
+      editProvider("Images B");
       await until(
         () => !!imageModelToggle(i18n.t("settings.setImageModel")),
         "alternate provider edit missing",
@@ -258,9 +251,7 @@ globalThis.imageGenerationProbe = async () => {
         imageGenerationModels: [{ providerId: "chat", modelId: "chat-model" }],
       };
       flushSync(() => useAppStore.setState({ settings, providers: [...providers] }));
-      const editOnlyProvider = () => click(container.querySelector<HTMLButtonElement>(
-        'button[aria-label="' + i18n.t("settings.editProvider") + '"]',
-      ));
+      const editOnlyProvider = () => editProvider();
       editOnlyProvider();
       await until(() => !!imageModelToggle(i18n.t("settings.imageModelSelected")), "selected image checkbox missing");
       click(imageModelToggle(i18n.t("settings.imageModelSelected")));
@@ -306,9 +297,7 @@ globalThis.imageGenerationProbe = async () => {
           defaultModelId: remaining ? "chat-model" : "image-one",
         };
         flushSync(() => useAppStore.setState({ settings, providers: [...providers] }));
-        const editImages = () => click(container.querySelector<HTMLButtonElement>(
-          'button[aria-label="' + i18n.t("settings.editProvider") + '"]',
-        ));
+        const editImages = () => editProvider();
         const removeImage = async () => {
           await until(() => !!document.querySelector(".provider-chosen-row"), "chosen models missing");
           const chosen = [...document.querySelectorAll<HTMLElement>(".provider-chosen-row")]

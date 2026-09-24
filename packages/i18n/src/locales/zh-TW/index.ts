@@ -1328,6 +1328,8 @@ sklm: {
     removeModel: "移除模型",
     reorderModel: "調整 {{name}} 的順序。拖曳或使用上下方向鍵。",
     reorderProvider: "調整 {{name}} 的順序。拖曳或使用上下方向鍵。",
+    serviceRowLabel: "{{name}}。按 Enter 編輯；拖曳或使用上下方向鍵調整順序。",
+    serviceRowActions: "{{name}} 的操作",
     providerOrderFailed: "無法儲存供應商順序：{{error}}",
     modelAlias: "別名",
     modelAliasHint: "在顯示模型名稱的地方生效；請求仍使用模型 ID。",

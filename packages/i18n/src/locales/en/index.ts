@@ -1360,6 +1360,8 @@ sklm: {
     removeModel: "Remove model",
     reorderModel: "Reorder {{name}}. Drag or use the Up and Down arrow keys.",
     reorderProvider: "Reorder {{name}}. Drag or use the Up and Down arrow keys.",
+    serviceRowLabel: "{{name}}. Press Enter to edit; drag or use the Up and Down arrow keys to reorder.",
+    serviceRowActions: "Actions for {{name}}",
     providerOrderFailed: "Could not save provider order: {{error}}",
     modelAlias: "Alias",
     modelAliasHint: "Shown wherever the model is named. The id stays the request identity.",

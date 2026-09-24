@@ -1,20 +1,27 @@
 /**
- * Vendor (OAuth) accounts for the model settings page (ADR 0098).
+ * Vendor (OAuth) accounts for the model settings page (ADR 0098, D623).
  *
- * Owns what an account row needs beyond its provider row: the vendor list the
- * runtime reports, the login attempt in flight, and the two writes that must
- * keep the app default consistent — removing an account and saving its edits.
- * Rendering stays with the caller.
+ * Account rows share the AI service list with API services; this hook owns what
+ * such a row needs beyond its provider row: the vendor list the runtime
+ * reports, the login attempt in flight, and the writes that must keep the app
+ * default consistent — a finished login claiming an empty default, removing an
+ * account and saving its edits. Rendering stays with the caller.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { OAuthAccount, OAuthVendor, ProviderPublic } from "@pi-desktop/shared";
+import {
+  imageGenerationBindings,
+  type OAuthAccount,
+  type OAuthVendor,
+  type ProviderPublic,
+} from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import {
   beginOAuthLogin,
   type OAuthLoginSession,
 } from "../../lib/oauth-login-session";
+import { loginDefaultModel } from "./default-model";
 import type { VendorAccountForm } from "./VendorAccountDialog";
 
 /** A login in flight, together with the dialog reporting on it. */
@@ -35,6 +42,30 @@ function providerIsReady(provider: ProviderPublic, excludedId?: string): boolean
     !!provider.defaultModelId &&
     (provider.hasSecret || provider.hasOauth || provider.authKind === "none")
   );
+}
+
+/**
+ * Let a finished login claim the app default the way adding an API service
+ * does. Reads the host's rows and settings rather than the store, which has
+ * not seen the new account yet.
+ */
+async function claimLoginDefault(providerId: string): Promise<void> {
+  const [{ providers }, current] = await Promise.all([
+    api.listProviders(),
+    api.getSettings(),
+  ]);
+  const claim = loginDefaultModel(
+    providers,
+    providerId,
+    current,
+    imageGenerationBindings(current.imageGenerationModels, current.imageGeneration),
+  );
+  if (!claim) return;
+  await api.setSettings({
+    ...current,
+    defaultProviderId: claim.providerId,
+    defaultModelId: claim.modelId,
+  });
 }
 
 export function useVendorAccounts() {
@@ -68,18 +99,27 @@ export function useVendorAccounts() {
   // the renderer listening. Cancelling the attempt itself is the dialog's job.
   useEffect(() => () => login?.session.dispose(), [login]);
 
-  const accounts = useMemo<AccountEntry[]>(() => {
-    if (!vendors) return [];
-    return vendors.flatMap((vendor) => {
+  const accounts = useMemo(() => {
+    const byProvider = new Map<string, AccountEntry>();
+    for (const vendor of vendors ?? []) {
       const totalForVendor = vendor.accounts.length;
-      return vendor.accounts.map((account, index) => ({
-        vendor,
-        account,
-        ordinal: index + 1,
-        totalForVendor,
-      }));
-    });
+      vendor.accounts.forEach((account, index) => {
+        byProvider.set(account.providerId, {
+          vendor,
+          account,
+          ordinal: index + 1,
+          totalForVendor,
+        });
+      });
+    }
+    return byProvider;
   }, [vendors]);
+
+  /** The vendor account behind a provider row, once the vendor list loaded. */
+  const accountFor = useCallback(
+    (providerId: string): AccountEntry | null => accounts.get(providerId) ?? null,
+    [accounts],
+  );
 
   /**
    * Started from the caller's click handler, never from an effect: a click
@@ -94,38 +134,51 @@ export function useVendorAccounts() {
   };
 
   const finishLogin = useCallback(
-    (accountLabel?: string) => {
+    (accountLabel?: string, providerId?: string) => {
       const vendorName = login?.vendor.name ?? "";
       setLogin(null);
       void loadVendors();
-      void refreshProviders();
       showToast(
         accountLabel
           ? t("settings.vendorSignedInAs", { account: accountLabel })
           : t("settings.vendorSignedIn", { vendor: vendorName }),
         { variant: "success" },
       );
+      void (async () => {
+        try {
+          if (providerId) await claimLoginDefault(providerId);
+        } catch (error) {
+          showToast(error instanceof Error ? error.message : String(error), {
+            variant: "error",
+          });
+        } finally {
+          await refreshProviders();
+        }
+      })();
     },
     [login, loadVendors, refreshProviders, showToast, t],
   );
 
+  // Main discards the row a failed or cancelled login created before it
+  // reports the outcome, so the list can drop it now.
   const closeLogin = () => {
     setLogin(null);
     void loadVendors();
+    void refreshProviders();
   };
 
-  const removeAccount = async (entry: AccountEntry) => {
-    const { account, vendor } = entry;
-    setBusyAccountId(account.providerId);
+  const removeAccount = async (provider: ProviderPublic) => {
+    const vendorName = accounts.get(provider.id)?.vendor.name ?? provider.name;
+    setBusyAccountId(provider.id);
     try {
-      await api.deleteOauthAccount(account.providerId);
+      await api.deleteOauthAccount(provider.id);
 
       // A deleted account cannot remain the global default. Pick the first
       // still-ready service, including an API provider, so the model picker
       // does not point at a deleted row after refresh.
-      if (settings?.defaultProviderId === account.providerId) {
-        const next = providers.find((provider) =>
-          providerIsReady(provider, account.providerId),
+      if (settings?.defaultProviderId === provider.id) {
+        const next = providers.find((candidate) =>
+          providerIsReady(candidate, provider.id),
         );
         const nextSettings = {
           ...settings,
@@ -136,7 +189,7 @@ export function useVendorAccounts() {
         useAppStore.setState({ settings: nextSettings });
       }
       await Promise.all([loadVendors(), refreshProviders()]);
-      showToast(t("settings.vendorAccountRemoved", { vendor: vendor.name }), {
+      showToast(t("settings.vendorAccountRemoved", { vendor: vendorName }), {
         variant: "success",
       });
     } catch (error) {
@@ -184,7 +237,7 @@ export function useVendorAccounts() {
 
   return {
     vendors,
-    accounts,
+    accountFor,
     login,
     busyAccountId,
     savingAccount,
