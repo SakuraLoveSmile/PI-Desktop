@@ -1676,7 +1676,7 @@ export const ptBR = {
     subagent: "Subagente",
     subagentTask: "Tarefa",
     subagentTaskEmpty: "Nenhuma descrição de tarefa.",
-    subagentClose: "Fechar detalhes do subagente",
+    subagentReadOnly: "Subagentes são orientados pelo agente principal — a entrada não está disponível.",
     subagentEmpty: "Os detalhes do subagente não estão mais disponíveis.",
     resize: "Redimensionar painel de trabalho",
     maximize: "Expandir painel de trabalho",
@@ -1693,6 +1693,7 @@ export const ptBR = {
       browser: "Navegador",
       file: "Arquivos",
       plugin: "Visualização de plugin",
+      subagent: "Subagente",
     },
     pluginView: {
       failed: "Não foi possível carregar esta visualização. Recarregue o plugin e tente novamente."

@@ -1731,7 +1731,7 @@ sklm: {
     subagent: "Alt ajan",
     subagentTask: "Görev",
     subagentTaskEmpty: "Görev açıklaması yok.",
-    subagentClose: "Alt ajan ayrıntılarını kapat",
+    subagentReadOnly: "Alt ajanlar ana ajan tarafından yönetilir — girdi kullanılamaz.",
     subagentEmpty: "Alt ajan ayrıntıları artık kullanılamıyor.",
     resize: "Çalışma paneli genişliğini ayarla",
     maximize: "Expand work panel",
@@ -1748,6 +1748,7 @@ sklm: {
       browser: "Tarayıcı",
       file: "Dosyalar",
       plugin: "Eklenti görünümü",
+      subagent: "Alt ajan",
     },
     pluginView: {
       failed: "Bu görünüm yüklenemedi. Eklentiyi yeniden yükleyip deneyin.",
