@@ -226,6 +226,14 @@ export const ko = {
     sessionMissing: "해당 세션이 더 이상 존재하지 않습니다",
   },
   chat: {
+    tableActions: "표 작업",
+    copyTableMarkdown: "표를 Markdown으로 복사",
+    exportTableCsv: "표를 CSV로 다운로드",
+    tablePreview: "표 확대",
+    closeTablePreview: "표 미리보기 닫기",
+    tableCopied: "표가 복사되었습니다",
+    tableCopyFailed: "표를 복사할 수 없습니다",
+    tableExportFailed: "표를 다운로드할 수 없습니다",
     imagePreview: {
       title: "이미지 미리보기",
       download: "이미지 다운로드",

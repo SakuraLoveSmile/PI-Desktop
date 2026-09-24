@@ -224,6 +224,14 @@ export const en = {
     sessionMissing: "That session no longer exists",
   },
   chat: {
+    tableActions: "Table actions",
+    copyTableMarkdown: "Copy table as Markdown",
+    exportTableCsv: "Download table as CSV",
+    tablePreview: "Expand table",
+    closeTablePreview: "Close table preview",
+    tableCopied: "Table copied",
+    tableCopyFailed: "Could not copy the table",
+    tableExportFailed: "Could not download the table",
     imagePreview: {
       title: "Image preview",
       download: "Download image",

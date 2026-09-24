@@ -12,6 +12,9 @@
   subprocesses and queued or visible prompts. Late hook payload mutations are
   isolated; legitimate long commands and tools retain their runtime budget.
 
+- Copy individual Markdown tables, download them as CSV, or expand them for
+  reading without leaving the conversation.
+
 - A stored hosted web-search record that cannot be replayed no longer fails every
   later request in that conversation: the message continues without search replay,
   so histories written before the contract change stay usable.

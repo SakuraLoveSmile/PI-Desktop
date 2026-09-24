@@ -219,6 +219,14 @@ export const zhTW = {
     sessionMissing: "該對話已不存在",
   },
   chat: {
+    tableActions: "表格操作",
+    copyTableMarkdown: "複製表格為 Markdown",
+    exportTableCsv: "下載表格為 CSV",
+    tablePreview: "放大表格",
+    closeTablePreview: "關閉表格預覽",
+    tableCopied: "已複製表格",
+    tableCopyFailed: "無法複製表格",
+    tableExportFailed: "無法下載表格",
     imagePreview: {
       title: "圖片預覽",
       download: "下載圖片",
