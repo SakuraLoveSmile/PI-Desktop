@@ -1170,7 +1170,7 @@ sklm: {
     linkOpenTargetExternal: "系统默认浏览器",
     thinkingDisplayMode: "思考过程展示模式",
     thinkingDisplayModeDesc: "详细模式在可展开的处理过程中显示进度、嵌套工具分组和思考内容。精简模式默认折叠处理过程并隐藏思考内容。",
-    thinkingDisplayDetailed: "详细（默认）",
+    thinkingDisplayDetailed: "详细",
     thinkingDisplayCompact: "精简",
     contextUsageDisplay: "上下文用量读数",
     contextUsageDisplayRemaining: "剩余",

@@ -1194,7 +1194,7 @@ sklm: {
     linkOpenTargetExternal: "시스템 기본 브라우저",
     thinkingDisplayMode: "사고 과정 표시 모드",
     thinkingDisplayModeDesc: "상세 모드는 중첩된 도구 그룹과 사고 과정을 포함한 진행 상황을 펼칠 수 있는 처리 과정에 표시합니다. 간결 모드는 처리 과정을 접힌 상태로 시작하고 사고 과정을 숨깁니다.",
-    thinkingDisplayDetailed: "상세 (기본값)",
+    thinkingDisplayDetailed: "상세",
     thinkingDisplayCompact: "간결",
     contextUsageDisplay: "컨텍스트 사용량 표시",
     contextUsageDisplayRemaining: "남음",

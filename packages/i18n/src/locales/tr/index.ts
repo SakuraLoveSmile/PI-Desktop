@@ -1184,7 +1184,7 @@ sklm: {
     linkOpenTargetExternal: "Varsayılan sistem tarayıcısı",
     thinkingDisplayMode: "Düşünme görünümü",
     thinkingDisplayModeDesc: "Ayrıntılı mod ilerlemeyi, iç içe araç grupları ve düşünmeyle birlikte genişletilebilir bir işlemde gösterir. Sade mod işlemi daraltılmış olarak başlatır ve düşünmeyi gizler.",
-    thinkingDisplayDetailed: "Ayrıntılı (varsayılan)",
+    thinkingDisplayDetailed: "Ayrıntılı",
     thinkingDisplayCompact: "Sade",
     contextUsageDisplay: "Bağlam kullanımı göstergesi",
     contextUsageDisplayRemaining: "Kalan",

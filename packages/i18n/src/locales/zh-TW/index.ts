@@ -1170,7 +1170,7 @@ sklm: {
     linkOpenTargetExternal: "系統預設瀏覽器",
     thinkingDisplayMode: "思考過程顯示模式",
     thinkingDisplayModeDesc: "詳細模式在可展開的處理過程中顯示進度、巢狀工具群組和思考內容。精簡模式預設摺疊處理過程並隱藏思考內容。",
-    thinkingDisplayDetailed: "詳細（預設）",
+    thinkingDisplayDetailed: "詳細",
     thinkingDisplayCompact: "精簡",
     contextUsageDisplay: "上下文用量讀數",
     contextUsageDisplayRemaining: "剩餘",

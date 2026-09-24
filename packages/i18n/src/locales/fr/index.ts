@@ -1184,7 +1184,7 @@ sklm: {
     "linkOpenTargetExternal": "Navigateur par défaut du système",
     "thinkingDisplayMode": "Affichage du raisonnement",
     "thinkingDisplayModeDesc": "Le mode détaillé affiche la progression dans un processus dépliable avec des groupes d'outils imbriqués et le raisonnement. Le mode compact démarre avec le processus replié et masque le raisonnement.",
-    "thinkingDisplayDetailed": "Détaillé (par défaut)",
+    "thinkingDisplayDetailed": "Détaillé",
     "thinkingDisplayCompact": "Compact",
     "contextUsageDisplay": "Affichage de l'usage du contexte",
     "contextUsageDisplayRemaining": "Restant",

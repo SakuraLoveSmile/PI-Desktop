@@ -1196,7 +1196,7 @@ sklm: {
     linkOpenTargetExternal: "Default OS browser",
     thinkingDisplayMode: "Thinking display mode",
     thinkingDisplayModeDesc: "Detailed shows progress in an expandable process with nested tool groups and reasoning. Compact starts the process collapsed and hides reasoning.",
-    thinkingDisplayDetailed: "Detailed (default)",
+    thinkingDisplayDetailed: "Detailed",
     thinkingDisplayCompact: "Compact",
     contextUsageDisplay: "Context usage readout",
     contextUsageDisplayRemaining: "Remaining",

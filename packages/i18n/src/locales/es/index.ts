@@ -1184,7 +1184,7 @@ sklm: {
     "linkOpenTargetExternal": "Navegador predeterminado del sistema",
     "thinkingDisplayMode": "Visualización del razonamiento",
     "thinkingDisplayModeDesc": "Detallado muestra el progreso en un proceso expandible con grupos de herramientas anidados y razonamiento. Compacto inicia el proceso contraído y oculta el razonamiento.",
-    "thinkingDisplayDetailed": "Detallado (predeterminado)",
+    "thinkingDisplayDetailed": "Detallado",
     "thinkingDisplayCompact": "Compacto",
     "contextUsageDisplay": "Lectura del uso del contexto",
     "contextUsageDisplayRemaining": "Restante",
