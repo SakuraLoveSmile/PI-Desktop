@@ -15,7 +15,7 @@
   padding: 0;
   overflow: hidden;
   isolation: isolate;
-  background: #02040f;
+  background: var(--mid-autumn-egg-sky, #02040f);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "SF Pro Display", "PingFang SC", sans-serif;
