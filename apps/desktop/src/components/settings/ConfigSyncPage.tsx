@@ -10,7 +10,7 @@ import type {
   ConfigSyncState,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
-import { Badge, Button, Field, Input, PasswordInput, cx } from "../ui";
+import { Badge, Button, Field, Input, PasswordInput, SettingsToggle } from "../ui";
 import { IconCloudDown, IconRefresh, IconShield, IconTrash } from "../icons";
 import { SettingsCard, SettingsRow } from "../../features/settings/primitives";
 import { configSyncProgressView } from "../../features/settings/config-sync-progress";
@@ -624,16 +624,11 @@ export function ConfigSyncPage() {
                 title={t("settings.configSync.pauseTitle")}
                 description={t("settings.configSync.pauseDescription")}
               >
-                <button
-                  type="button"
-                  className={cx("settings-toggle", state?.paused && "on")}
-                  role="switch"
-                  aria-checked={state?.paused === true}
-                  aria-label={t("settings.configSync.pauseTitle")}
-                  onClick={() => void togglePause()}
-                >
-                  <span className="settings-toggle-thumb" />
-                </button>
+                <SettingsToggle
+                  checked={state?.paused === true}
+                  label={t("settings.configSync.pauseTitle")}
+                  onChange={() => void togglePause()}
+                />
               </SettingsRow>
             )}
             {!locked ? (
