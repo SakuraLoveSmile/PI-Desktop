@@ -1255,6 +1255,21 @@ Implementation: `components/ui.tsx → Checkbox`.
 Every standalone labeled checkbox **must** use `Checkbox`. Inline
 `<label><input type="checkbox"/>…</label>` is prohibited.
 
+### 11.11b CheckboxGroup
+
+Implementation: `components/ui.tsx → CheckboxGroup<T>`.
+
+| Property | Value |
+|---|---|
+| CSS class | `.ui-checkbox-group` (container), items use `Checkbox` |
+| Generic | `<T extends string>` for type-safe values/onChange |
+| Props | `values: T[]`, `onChange(values: T[])`, `options: { value: T; label: ReactNode }[]`, `label`, `disabled`, `minSelected` |
+| Minimum selection | `minSelected` (default 0) prevents unchecking below a threshold |
+
+Use `CheckboxGroup` when a set of options maps to an array of selected
+values (e.g. voice languages). For independent boolean fields with
+heterogeneous state shapes, use individual `Checkbox` components.
+
 ### 11.12 SettingsMenuSelect
 
 Implementation: `components/settings/SettingsMenuSelect.tsx`.
