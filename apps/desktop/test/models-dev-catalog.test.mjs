@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { apiStyleForAdapter, catalogModelIdsMatch, modelIdsMatch } from "@pi-desktop/shared";
 
 import {
@@ -158,6 +159,46 @@ test("cached matches remain scoped to the requested provider and endpoint", asyn
   }
 });
 
+test("unknown endpoints do not inherit ambiguous cross-provider metadata", async (t) => {
+  for (const order of [["alpha", "beta"], ["beta", "alpha"]]) {
+    const fixture = Object.fromEntries(order.map((key) => [key, {
+      api: `https://${key}.example/v1`,
+      models: {
+        "shared-model": {
+          id: "shared-model",
+          reasoning: key === "alpha",
+          limit: { context: key === "alpha" ? 128_000 : 32_000, output: 8_192 },
+        },
+      },
+    }]));
+    const catalog = await loadFixtureCatalog(t, fixture);
+    for (const modelId of ["shared-model", "proxy/shared-model"]) {
+      const unknown = { vendorKey: "custom", baseUrl: "https://relay.example/v1", modelId };
+      assert.equal(catalog.findModel(unknown), undefined, `ambiguous ${modelId} must miss`);
+      assert.equal(catalog.findModel(unknown), undefined, "ambiguous misses are cached");
+    }
+    const alpha = catalog.findModel({
+      vendorKey: "custom", baseUrl: "https://alpha.example/v1", modelId: "shared-model",
+    });
+    assert.equal(alpha?.providerKey, "alpha", "an exact endpoint scopes the lookup");
+    assert.equal(alpha?.reasoning, true);
+    assert.equal(alpha?.limit.context, 128_000);
+    const beta = catalog.findModel({ vendorKey: "beta", modelId: "shared-model" });
+    assert.equal(beta?.providerKey, "beta", "a known provider key scopes the lookup");
+    assert.equal(beta?.reasoning, false);
+    assert.equal(beta?.limit.context, 32_000);
+  }
+});
+
+test("an unknown endpoint can use a unique supported proxy alias", async (t) => {
+  const catalog = await loadFixtureCatalog(t, {
+    alpha: { models: { "shared-model": { id: "shared-model", reasoning: true } } },
+  });
+  assert.equal(catalog.findModel({
+    vendorKey: "custom", baseUrl: "https://relay.example/v1", modelId: "proxy/shared-model-thinking",
+  })?.providerKey, "alpha");
+});
+
 test("a known endpoint cannot borrow another provider's catalog model", async (t) => {
   const catalog = await loadFixtureCatalog(t, {
     alpha: { api: "https://alpha.example/v1", models: { "alpha-only": { id: "alpha-only" } } },
@@ -175,6 +216,19 @@ test("a shared catalog API prefers the explicitly selected vendor", async (t) =>
   const input = { vendorKey: "beta", baseUrl: "https://gateway.example/v1" };
   assert.equal(catalog.findModel({ ...input, modelId: "beta-only" })?.providerKey, "beta");
   assert.equal(catalog.findModel({ ...input, modelId: "alpha-only" }), undefined);
+});
+
+test("a shared catalog API with no vendor key cannot select the first publisher", async (t) => {
+  for (const order of [["alpha", "beta"], ["beta", "alpha"]]) {
+    const catalog = await loadFixtureCatalog(t, Object.fromEntries(order.map((key) => [key, {
+      api: "https://gateway.example/v1",
+      models: { "shared-model": { id: "shared-model", reasoning: key === "alpha",
+        limit: { context: key === "alpha" ? 128_000 : 32_000, output: 8_192 } } },
+    }])));
+    assert.equal(catalog.providerKeyForRow({ vendorKey: "custom", baseUrl: "https://gateway.example/v1" }), undefined);
+    assert.equal(catalog.findModel({ vendorKey: "custom", baseUrl: "https://gateway.example/v1", modelId: "shared-model" }), undefined);
+    assert.equal(catalog.findModel({ vendorKey: "beta", baseUrl: "https://gateway.example/v1", modelId: "shared-model" })?.providerKey, "beta");
+  }
 });
 
 test("a recognized endpoint takes priority over an unrelated vendor fallback", async (t) => {
@@ -831,6 +885,69 @@ test("the application loads the bundled release snapshot without network access"
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("the bundled snapshot maps the latest 0.87.1 model ids to usable metadata", async () => {
+  const catalog = new ModelsDevCatalog({
+    catalogPath: fileURLToPath(new URL("../resources/models.dev/api.json", import.meta.url)),
+  });
+  assert.equal(await catalog.ensureLoaded(), true);
+
+  const cases = [
+    {
+      vendorKey: "openai-codex",
+      baseUrl: "https://chatgpt.com/backend-api",
+      modelId: "gpt-6-sol",
+      contextWindow: 1_050_000,
+      maxTokens: 128_000,
+      thinkingLevels: ["off", "low", "medium", "high", "xhigh", "max"],
+    },
+    {
+      vendorKey: "openai-codex",
+      baseUrl: "https://chatgpt.com/backend-api",
+      modelId: "gpt-6-luna",
+      contextWindow: 1_050_000,
+      maxTokens: 128_000,
+      thinkingLevels: ["off", "low", "medium", "high", "xhigh", "max"],
+    },
+    {
+      vendorKey: "anthropic",
+      baseUrl: "https://api.anthropic.com",
+      modelId: "claude-opus-5-5",
+      contextWindow: 1_000_000,
+      maxTokens: 128_000,
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    },
+    {
+      vendorKey: "xai",
+      baseUrl: "https://api.x.ai/v1",
+      modelId: "grok-4.7",
+      contextWindow: 500_000,
+      maxTokens: 500_000,
+      thinkingLevels: ["low", "medium", "high", "xhigh"],
+    },
+  ];
+
+  for (const expected of cases) {
+    const model = catalog.findModel(expected);
+    assert.ok(model, `${expected.vendorKey}/${expected.modelId} must be in the snapshot`);
+    assert.equal(model.reasoning, true);
+    assert.deepEqual(model.thinkingLevels, expected.thinkingLevels);
+    assert.deepEqual(model.modalities.input, ["text", "image", "pdf"]);
+    const config = modelConfigFromModelsDev(model, expected.baseUrl);
+    assert.equal(config.contextWindow, expected.contextWindow);
+    assert.equal(config.maxTokens, expected.maxTokens);
+    assert.deepEqual(config.input, ["text", "image"]);
+  }
+
+  const copilotClaude = catalog.findModel({
+    vendorKey: "github-copilot",
+    baseUrl: "https://api.individual.githubcopilot.com",
+    modelId: "claude-opus-5.5",
+  });
+  assert.ok(copilotClaude, "GitHub Copilot must include Claude Opus 5.5");
+  assert.equal(copilotClaude.reasoning, true);
+  assert.equal(copilotClaude.limit.context, 1_000_000);
 });
 
 test("concurrent catalog reads share the bundled snapshot load", async () => {
