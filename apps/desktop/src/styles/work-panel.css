@@ -382,7 +382,7 @@
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 0 0 32px;
+  padding: 0 16px 32px;
 }
 
 .subagent-transcript-list {
@@ -419,6 +419,8 @@
 }
 
 .subagent-transcript-composer textarea {
+  font-size: var(--text-base);
+  line-height: var(--leading-chat);
   display: block;
   width: 100%;
   min-height: calc(var(--leading-chat) * 2em);
