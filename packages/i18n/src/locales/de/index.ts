@@ -1462,6 +1462,7 @@ sklm: {
     "promptEnhancementCustomTemplateDesc":
       "Ersetzt die eingebaute Nutzervorlage durch Ihre eigene. Der System-Prompt bleibt eingebaut.",
     "promptEnhancementCustomTemplateNeedsTemplate":
+    "promptEnhancementCustomTemplateActive": "Eigene Vorlage aktiv",
       "Speichern Sie zuerst eine eigene Vorlage; der Schalter wählt dann zwischen ihr und der eingebauten Vorlage.",
     "promptEnhancementEdit": "Bearbeiten",
     "promptEnhancementModelTitle": "Prompt-Verbesserung",
