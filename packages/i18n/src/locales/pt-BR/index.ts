@@ -216,6 +216,14 @@ export const ptBR = {
     sessionMissing: "Essa sessão não existe mais"
   },
   chat: {
+    tableActions: "Ações da tabela",
+    copyTableMarkdown: "Copiar tabela como Markdown",
+    exportTableCsv: "Baixar tabela como CSV",
+    tablePreview: "Expandir tabela",
+    closeTablePreview: "Fechar visualização da tabela",
+    tableCopied: "Tabela copiada",
+    tableCopyFailed: "Não foi possível copiar a tabela",
+    tableExportFailed: "Não foi possível baixar a tabela",
     imagePreview: {
       title: "Visualização de imagem",
       download: "Baixar imagem",
