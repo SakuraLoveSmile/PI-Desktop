@@ -1165,6 +1165,8 @@ sklm: {
     infiniteProviderRetryDesc: "網路或暫時性服務故障會持續重試直到成功。仍可隨時停止，但開啟後可能持續消耗 API 用量。",
     smoothStreaming: "平滑串流顯示",
     smoothStreamingDesc: "將串流文字逐字釋放，產生打字機效果。系統開啟「減少動態效果」時自動停用。",
+    preventScreenSleep: "防止螢幕休眠",
+    preventScreenSleepDesc: "應用程式執行時保持螢幕常亮，跨平台使用系統電源管理介面。",
     linkOpenTarget: "連結開啟位置",
     linkOpenTargetWorkpanel: "工作區瀏覽器",
     linkOpenTargetExternal: "系統預設瀏覽器",

@@ -1179,6 +1179,8 @@ sklm: {
     infiniteProviderRetryDesc: "Ağ ve geçici sağlayıcı hataları istek başarılı olana kadar yeniden denenir. Çalışmayı yine durdurabilirsiniz; açıkken API kullanımı sürebilir.",
     smoothStreaming: "Düzgün akış",
     smoothStreamingDesc: "Akan metni daktilo efekti için karakter karakter gösterir. Sistem hareket azaltmayı tercih ettiğinde otomatik devre dışı kalır.",
+    preventScreenSleep: "Ekran uykusunu engelle",
+    preventScreenSleepDesc: "Uygulama çalışırken ekranı açık tutar. Tüm platformlarda sistem güç yönetimi API'lerini kullanır.",
     linkOpenTarget: "Bağlantı açma hedefi",
     linkOpenTargetWorkpanel: "Çalışma paneli tarayıcısı",
     linkOpenTargetExternal: "Varsayılan sistem tarayıcısı",
