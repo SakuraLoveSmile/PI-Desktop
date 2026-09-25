@@ -1394,14 +1394,15 @@ test("the Anthropic thinking fallback stays off other wire APIs and non-Claude i
   assert.equal(completions.reasoningOptions, undefined);
   assert.equal(completions.thinkingLevelMap, undefined);
 
-  // Anthropic publishes no glm-5, so an Anthropic-protocol GLM row is unchanged.
-  const glm = catalogModelConfigFor(catalog, {
+  // An id absent from every publisher stays generic, even on Anthropic Messages.
+  const unlisted = catalogModelConfigFor(catalog, {
     ...customGateway,
     apiStyle: "anthropic_messages",
-    modelId: "glm-5",
+    modelId: "unlisted-reasoning-model",
   });
-  assert.equal(glm.source, "models.dev");
-  assert.deepEqual(glm.reasoningOptions, [{ type: "effort", values: ["low", "high"] }]);
+  assert.equal(unlisted.source, "generic");
+  assert.equal(unlisted.reasoningOptions, undefined);
+  assert.equal(unlisted.thinkingLevelMap, undefined);
 
   // Aliases of a Claude id are not an exact Anthropic id.
   const renamed = catalogModelConfigFor(catalog, {

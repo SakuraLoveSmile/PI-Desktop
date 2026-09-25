@@ -1,7 +1,6 @@
 import { IPC, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
 import {
   findSubagentProviderSource,
-  genericModelConfig,
   loadInstructionChain,
   modelConfigWithBinding,
   subagentProviderLookupError,
@@ -438,8 +437,12 @@ export function createSidecarRuntime({
       const vendorBinding = await vendorOAuth.bindingFor(provider.id, modelId);
       if (!vendorBinding) throw new Error(`vendor "${provider.name}" does not offer "${modelId}"`);
       catalogModelConfig =
-        vendorBinding.modelConfig ??
-        genericModelConfig(modelId, vendorBinding.baseUrl ?? provider.baseUrl ?? "");
+        vendorBinding.modelConfig ?? catalogModelConfigFor(modelsDevCatalog, {
+          vendorKey: provider.vendorKey,
+          baseUrl: vendorBinding.baseUrl ?? provider.baseUrl,
+          apiStyle: vendorBinding.apiStyle ?? provider.apiStyle,
+          modelId,
+        });
     } else {
       catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
         vendorKey: provider.vendorKey,
