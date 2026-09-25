@@ -20,7 +20,6 @@ import {
 import {
   capabilitiesFromModelConfig,
   clampThinkingLevel,
-  genericModelConfig,
   loadCustomSystemPrompt,
   loadInstructionChain,
   loadSubagentDefinitions,
@@ -543,7 +542,12 @@ export function createSessionLaunchRuntime({
           const vb = await vendorOAuth.bindingFor(row.id, binding.id);
           if (!vb) continue;
           catalogModelConfig =
-            vb.modelConfig ?? genericModelConfig(binding.id, vb.baseUrl ?? row.baseUrl ?? "");
+            vb.modelConfig ?? catalogModelConfigFor(modelsDevCatalog, {
+              vendorKey: row.vendorKey,
+              baseUrl: vb.baseUrl ?? row.baseUrl,
+              apiStyle: vb.apiStyle ?? row.apiStyle,
+              modelId: binding.id,
+            });
         } else {
           catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
             vendorKey: row.vendorKey,
