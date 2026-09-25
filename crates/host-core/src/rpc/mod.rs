@@ -3298,6 +3298,147 @@ async fn handle_request(
             }
             Ok(json!({ "ok": true, "changed": changed }))
         }
+        "goalReports.bindExecutionTurn" => {
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let turn_id = params
+                .get("turnId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "turnId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            crate::goal_reports::bind_execution_turn(&st.db, execution_id, turn_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": true }))
+        }
+        "goalReports.invalidateDraft" => {
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            crate::goal_reports::invalidate_draft(&st.db, execution_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": true }))
+        }
+        "goalReports.submitDraft" => {
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let draft = params
+                .get("draft")
+                .ok_or_else(|| rpc_err(1002, "draft required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            crate::goal_reports::submit_draft(&st.db, execution_id, draft)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": true }))
+        }
+        "goalReports.finalizeReport" => {
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let durable_seq = params
+                .get("durableSeq")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let status = params.get("status").and_then(|v| v.as_str());
+            let error_code = params.get("errorCode").and_then(|v| v.as_str());
+            let summary = {
+                let st = state.lock().await;
+                crate::goal_reports::finalize_report(
+                    &st.db,
+                    execution_id,
+                    durable_seq,
+                    status,
+                    error_code,
+                )
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            };
+            emit_notification(
+                &tx,
+                "goalReports.changed",
+                json!({
+                    "sessionId": summary.session_id,
+                    "reportId": summary.report_id,
+                    "executionId": summary.execution_id,
+                    "proposalId": summary.proposal_id,
+                    "status": summary.status,
+                    "integrity": summary.integrity,
+                    "verdict": summary.verdict,
+                }),
+            )
+            .await;
+            Ok(json!({ "report": summary }))
+        }
+        "goalReports.get" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let report_id = params
+                .get("reportId")
+                .or_else(|| params.get("executionId"))
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| {
+                    rpc_err(1002, "reportId or executionId required", "INVALID_PARAMS")
+                })?;
+            let st = state.lock().await;
+            let report = crate::goal_reports::get_report(&st.db, session_id, report_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "report": report }))
+        }
+        "goalReports.list" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let reports = crate::goal_reports::list_reports(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "reports": reports }))
+        }
+        "goalReports.retry" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let summary = {
+                let st = state.lock().await;
+                crate::goal_reports::retry_report(&st.db, session_id, execution_id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            };
+            emit_notification(
+                &tx,
+                "goalReports.changed",
+                json!({
+                    "sessionId": summary.session_id,
+                    "reportId": summary.report_id,
+                    "executionId": summary.execution_id,
+                    "proposalId": summary.proposal_id,
+                    "status": summary.status,
+                    "integrity": summary.integrity,
+                    "verdict": summary.verdict,
+                }),
+            )
+            .await;
+            Ok(json!({ "report": summary }))
+        }
 
         method if method.starts_with("scheduled.") => {
             let st = state.lock().await;

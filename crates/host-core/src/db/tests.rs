@@ -121,6 +121,22 @@ fn v18_database_migrates_session_thinking_omit() {
         .unwrap();
     assert!(sql.contains("'omit'"), "{sql}");
 }
+#[test]
+fn v19_database_migrates_to_v20_with_goal_reports() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        db.conn().pragma_update(None, "user_version", 19).unwrap();
+        let _ = db
+            .conn()
+            .execute_batch("DROP TABLE IF EXISTS goal_reports;");
+    }
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+    assert!(migration_backup_path(&path, 19).exists());
+    assert!(table_exists(db.conn(), "goal_reports"));
+}
 
 fn schema_version(conn: &Connection) -> i64 {
     conn.query_row("PRAGMA user_version", [], |row| row.get(0))

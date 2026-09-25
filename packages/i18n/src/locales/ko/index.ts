@@ -2,16 +2,16 @@ import type { EnglishCatalog } from "../en/index.js";
 
 export const ko = {
   app: {
-    shellName: "PI-Desktop",
+    shellName: "Pi-Desktop-Plus",
     tagline: "로컬 AI 코딩 파트너",
-    starting: "PI-Desktop 시작 중…",
+    starting: "Pi-Desktop-Plus 시작 중…",
     loadingView: "화면 불러오는 중…",
     uiCrashed: "인터페이스에 문제가 발생했습니다",
   },
   startup: {
     slowTitle: "아직 시작 중…",
-    slowBody: "PI-Desktop이 로컬 서비스에 연결되는 데 평소보다 오래 걸리고 있습니다. 스스로 완료될 수도 있으니 기다리거나, 먼저 로그를 수집해 두세요.",
-    stalledTitle: "PI-Desktop이 시작을 완료하지 못했습니다",
+    slowBody: "Pi-Desktop-Plus이 로컬 서비스에 연결되는 데 평소보다 오래 걸리고 있습니다. 스스로 완료될 수도 있으니 기다리거나, 먼저 로그를 수집해 두세요.",
+    stalledTitle: "Pi-Desktop-Plus이 시작을 완료하지 못했습니다",
     stalledBody: "이 창은 대화와 설정을 받지 못해 아직 표시할 내용이 없습니다. 삭제된 것은 없으며 데이터는 여전히 디스크에 있습니다.",
     retrying: "다시 시도하는 중…",
     copyDiagnostics: "진단 정보 복사",
@@ -37,13 +37,13 @@ export const ko = {
     unread: "읽지 않음",
     pinned: "고정됨",
     viewMore: "더 보기…",
-    open: "PI-Desktop 열기",
-    quit: "PI-Desktop 종료",
-    askTitle: "PI-Desktop을 백그라운드에서 계속 실행할까요?",
+    open: "Pi-Desktop-Plus 열기",
+    quit: "Pi-Desktop-Plus 종료",
+    askTitle: "Pi-Desktop-Plus을 백그라운드에서 계속 실행할까요?",
     askBody:
-      "창을 닫아도 PI-Desktop을 시스템 트레이에서 계속 실행하여 작업을 잃지 않을 수 있습니다. 이 설정은 언제든지 설정에서 변경할 수 있습니다.",
+      "창을 닫아도 Pi-Desktop-Plus을 시스템 트레이에서 계속 실행하여 작업을 잃지 않을 수 있습니다. 이 설정은 언제든지 설정에서 변경할 수 있습니다.",
     closeToTray: "트레이로 닫기",
-    confirmQuitTitle: "PI-Desktop을 종료할까요?",
+    confirmQuitTitle: "Pi-Desktop-Plus을 종료할까요?",
     confirmQuitBody:
       "정말 종료할까요? 실행 중인 모든 세션이 중지되며 저장하지 않은 변경 사항을 잃을 수 있습니다.",
     confirmQuit: "종료",
@@ -101,7 +101,7 @@ export const ko = {
     zoomOut: "축소",
     toggleFullScreen: "전체 화면 전환",
     toggleDevTools: "개발자 도구",
-    appHelp: "PI-Desktop 도움말",
+    appHelp: "Pi-Desktop-Plus 도움말",
     openLogs: "로그 열기",
     checkForUpdates: "업데이트 확인…",
   },
@@ -247,7 +247,7 @@ export const ko = {
     emptyTitle: "무엇을 만들어 볼까요?",
     emptyTitleInProject: "{{project}}에서 무엇을 만들어 볼까요?",
     emptyTitleTemporary: "무엇을 임시로 탐색해 볼까요?",
-    placeholder: "PI-Desktop에 무엇이든 도움을 요청하세요",
+    placeholder: "Pi-Desktop-Plus에 무엇이든 도움을 요청하세요",
     placeholderHome: "무엇이든 물어보세요",
     placeholderHint: "명령은 / · 파일은 @ 입력",
     placeholderHomeHint: "명령은 / · 파일은 @ 입력",
@@ -589,7 +589,7 @@ export const ko = {
   settings: {
     power: "전원",
     keepAwakeWhileRunning: "컴퓨터 절전 방지",
-    keepAwakeWhileRunningDesc: "PI-Desktop 실행 중 유휴 상태로 인한 시스템 절전을 방지합니다. 화면은 꺼질 수 있으며 수동 절전과 덮개 닫기는 그대로 작동합니다.",
+    keepAwakeWhileRunningDesc: "Pi-Desktop-Plus 실행 중 유휴 상태로 인한 시스템 절전을 방지합니다. 화면은 꺼질 수 있으며 수동 절전과 덮개 닫기는 그대로 작동합니다.",
     "imageModel": "이미지 생성 모델",
     "imageModelUnset": "설정되지 않음",
     "imageModelUnavailable": "현재 사용 불가",
@@ -683,7 +683,7 @@ sklm: {
     pluginProviderManaged:
       "이 프로바이더는 플러그인 “{{plugin}}”에서 제공하며 엔드포인트와 모델도 함께 제공합니다. “확장 기능” 페이지에서 켜거나 끌 수 있습니다.",
     pluginProviderKey: "API 키",
-    pluginProviderKeyHint: "PI-Desktop에 저장되고 런타임에서 사용됩니다. 플러그인은 이 키를 받지 않습니다.",
+    pluginProviderKeyHint: "Pi-Desktop-Plus에 저장되고 런타임에서 사용됩니다. 플러그인은 이 키를 받지 않습니다.",
     pluginProviderKeyRemove: "키 제거",
     pluginProviderKeySaved: "API 키가 저장됨",
     pluginProviderKeyRemoved: "API 키 제거됨",
@@ -1638,7 +1638,7 @@ sklm: {
     draft: "초안",
   },
   scheduled: {
-    description: "PI-Desktop이 열려 있는 동안 반복 에이전트 작업을 실행합니다.",
+    description: "Pi-Desktop-Plus이 열려 있는 동안 반복 에이전트 작업을 실행합니다.",
     edit: "작업 편집",
     hourlyHint: "저장 또는 활성화한 뒤 1시간마다 실행합니다. 앱을 다시 시작하면 간격을 새로 계산합니다.",
     morning: "오전",
@@ -1759,6 +1759,7 @@ sklm: {
       file: "파일",
       plugin: "플러그인 화면",
       subagent: "서브에이전트",
+      goalReport: "목표 보고서",
     },
     pluginView: {
       failed: "이 화면을 불러올 수 없습니다. 플러그인을 새로 고친 후 다시 시도하세요.",
@@ -2125,9 +2126,9 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
         "모델 할당량을 사용해 일회성 완성을 실행할 수 있습니다. 플러그인은 API 키를 받지 않습니다.",
       "agent.extension": "ExtensionAPI 모듈을 에이전트 프로세스 안에서 에이전트 자체 도구와 같은 권한으로 실행합니다. 신뢰하는 코드만 켜세요.",
       "provider.register":
-        "이 플러그인이 정의한 프로바이더를 설정의 프로바이더 목록에 추가합니다. 플러그인은 엔드포인트와 모델을 제공하며, API 키는 PI-Desktop에 남습니다.",
+        "이 플러그인이 정의한 프로바이더를 설정의 프로바이더 목록에 추가합니다. 플러그인은 엔드포인트와 모델을 제공하며, API 키는 Pi-Desktop-Plus에 남습니다.",
       "desktop.control":
-        "플러그인이 검토된 PI-Desktop 제어 카탈로그를 호출할 수 있습니다. 파괴적 작업에는 여전히 confirm=true가 필요하며 MCP bearer token은 노출되지 않습니다.",
+        "플러그인이 검토된 Pi-Desktop-Plus 제어 카탈로그를 호출할 수 있습니다. 파괴적 작업에는 여전히 confirm=true가 필요하며 MCP bearer token은 노출되지 않습니다.",
       "models.list": "로그인한 모델을 볼 수 있지만 키는 받지 않습니다.",
       "session.read":
         "현재 도구 호출이 처리 중인 대화와 도구 결과를 읽을 수 있습니다.",
@@ -2142,7 +2143,7 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       "audio.capture.background": "플러그인이 백그라운드에서 실행되는 동안 패널이 열려 있지 않아도 마이크를 캡처합니다.",
       "audio.playback.background": "패널이 열려 있지 않아도 플러그인이 스트리밍하는 오디오를 재생합니다.",
       "speech.adapter.register": "기존 제공자 키를 쓰는 받아쓰기 또는 낭독 프로토콜을 추가할 수 있습니다. 플러그인은 키를 보지 못합니다.",
-      "keyboard.globalShortcut": "PI-Desktop이 포커스되지 않은 상태에서 이 플러그인 자체 명령을 실행하는 시스템 전역 키보드 단축키를 등록합니다.",
+      "keyboard.globalShortcut": "Pi-Desktop-Plus이 포커스되지 않은 상태에서 이 플러그인 자체 명령을 실행하는 시스템 전역 키보드 단축키를 등록합니다.",
       "net.websocket": "플러그인이 선언한 호스트로 실시간 양방향 연결을 엽니다.",
       "bus.publish": "선언한 주제로 메시지를 보낼 수 있습니다.",
       "bus.subscribe": "선언한 주제의 메시지를 받을 수 있습니다.",
@@ -2375,7 +2376,7 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
     unsupportedGlibc:
       "이 Linux 빌드에는 glibc 2.35 이상이 필요합니다 (Ubuntu 22.04, Debian 12, Fedora 36+).",
     dbSchemaTooNew:
-      "이 PI-Desktop은 로컬 데이터보다 오래된 버전입니다(데이터 스키마 {{found}}, 이 버전은 {{supported}}까지 지원). 이 데이터를 마지막으로 연 최신 PI-Desktop 또는 그 이후 버전을 설치하세요.",
+      "이 Pi-Desktop-Plus은 로컬 데이터보다 오래된 버전입니다(데이터 스키마 {{found}}, 이 버전은 {{supported}}까지 지원). 이 데이터를 마지막으로 연 최신 Pi-Desktop-Plus 또는 그 이후 버전을 설치하세요.",
     archMismatch:
       "{{machineArch}} 기기에서 {{buildArch}} 빌드를 실행 중이므로 변환을 거쳐 더 느리게 동작합니다. {{machineArch}} 빌드를 설치하세요.",
     dismissArchMismatch: "닫기",
@@ -2462,6 +2463,35 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
       dismiss: "닫기",
     },
   },
+  goalReport: {
+    view: {
+        title: "목표 완료 보고서",
+        openInWorkPanel: "작업 패널에서 열기",
+        summary: "요약",
+        metrics: "메트릭",
+        criteria: "수락 기준",
+        steps: "실행 단계",
+        files: "변경된 파일",
+        checks: "검증 확인",
+        limitations: "제약 및 한계",
+        nextSteps: "다음 단계",
+        evidences: "검증 증거",
+        loading: "보고서 불러오는 중…",
+        loadFailed: "보고서 로드 실패",
+        retryLoad: "다시 시도",
+        fallbackNotice: "실행 기록에서 생성된 기본 대체 보고서입니다.",
+        verdictMet: "달성됨",
+        verdictPartial: "부분 달성",
+        verdictBlocked: "차단됨 / 미완료",
+        verdictUnknown: "알 수 없는 결과",
+        statusCompleted: "완료됨",
+        statusInterrupted: "중단됨",
+        remoteDisconnected: "원격 호스트 연결 끊김",
+        conclusion: "결론",
+        structured: "구조화됨",
+        fallback: "대체 보고서"
+    }
+},
 } satisfies EnglishCatalog;
 
 export default ko;
