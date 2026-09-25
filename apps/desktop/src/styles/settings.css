@@ -489,7 +489,8 @@
   gap: 8px;
 }
 
-.settings-config-sync > .settings-card-block:first-child .settings-config-sync-actions {
+.settings-config-sync > .settings-card-block:first-child .settings-config-sync-actions,
+.settings-config-sync > .settings-card-block:first-of-type .settings-config-sync-actions {
   padding: 0 16px 14px;
 }
 
@@ -503,6 +504,15 @@
 .settings-config-sync-message.error,
 .settings-config-sync-error {
   color: var(--ds-danger);
+}
+
+.settings-config-sync-refresh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 16px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
 }
 
 /*
@@ -3786,16 +3796,4 @@
 
 .sklm-page-jump::placeholder {
   color: var(--ds-text-muted);
-}
-
-/* Discovered local package paths remain readable at narrow settings widths. */
-.pi-skill-discovery .settings-row-detail {
-  overflow-wrap: anywhere;
-}
-.pi-skill-discovery .settings-row {
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-.pi-skill-discovery .settings-row-copy {
-  flex-basis: 240px;
 }

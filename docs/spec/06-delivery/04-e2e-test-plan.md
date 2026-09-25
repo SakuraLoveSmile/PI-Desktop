@@ -4213,22 +4213,26 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   turn; notification inbox starts empty.
 - **Steps**: 1) Focus and view session A, then complete a turn in A. 2) While
   still focused on A, fail a turn in background session B. 3) Unfocus the
-  window and complete another turn in A. 4) Abort a fourth turn. 5) Repeat each
-  terminal RPC. 6) Confirm the main titlebar has no bell, then open the bell in
-  the expanded sidebar footer and switch between All and Unread. 7) Mark one
+  window and complete another turn in A. 4) Restore/focus the app from its
+  taskbar or Dock without switching sessions and confirm A's visible terminal
+  outcome is acknowledged. 5) Abort a fourth turn. 6) Repeat each terminal
+  RPC. 7) Confirm the main titlebar has no bell, then open the bell in
+  the expanded sidebar footer and switch between All and Unread. 8) Mark one
   row read and confirm its session has no terminal sidebar mark, then
-  close/reopen the popover and restart the app. 8) Select the other session
-  from its terminal-marked sidebar row. 9) Generate a host fixture with 205
-  eligible terminal turns. 10) Use Mark all read, then Clear. 11) While a
+  close/reopen the popover and restart the app. 9) Select the other session
+  from its terminal-marked sidebar row. 10) Generate a host fixture with 205
+  eligible terminal turns. 11) Use Mark all read, then Clear. 12) While a
   native task banner and a renderer refresh are still in flight, deliver a
   delayed `notification.changed` payload for a cleared/read durable id and a
-  duplicate payload for an id that is already present. 12) On Windows, create
+  duplicate payload for an id that is already present. 13) On Windows, create
   one unread successful outcome while the bell has no failure rows. Open the
   empty bell popover, use Mark all read, then create another success and use
-  Clear. 13) Create enough unread outcomes for a two-digit count and inspect
+  Clear. 14) Create enough unread outcomes for a two-digit count and inspect
   the taskbar overlay before and after marking all outcomes read.
-- **Expected**: A's visible-current completion creates no row or terminal sidebar mark. Exactly two rows
-  exist, newest first: the unfocused A completion and background B failure,
+- **Expected**: A's visible-current completion creates no row or terminal
+  sidebar mark. Restoring/focusing the app with A already visible clears A's
+  matching durable outcome and taskbar count without clearing B. Exactly two
+  rows exist, newest first: the unfocused A completion and background B failure,
   with localized labels, snapshotted session titles, and B's stable code.
   Abort/repeated terminal calls create no row. The former footer Help shortcut
   is absent; the 32px footer bell and its upward-opening popover replace it.
@@ -8458,7 +8462,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   history. Cancel the confirmation once and verify configuration is not saved.
   11) Use the explicit LAN HTTP acknowledgement with a loopback/private fixture,
   verify the setting survives a state refresh, and confirm a public HTTP
-  endpoint is rejected even when the checkbox is selected.
+  endpoint is rejected even when the checkbox is selected. 12) Leave the
+  Cloud sync page with an unfinished connection edit, reopen it, and confirm
+  the non-sensitive draft is painted immediately while host state/history
+  refreshes in the background. Confirm a configured endpoint reuses its stored
+  WebDAV app password, while password fields themselves remain blank and no
+  vault password is written to renderer storage.
 - **Expected:** With developer mode off, Cloud sync is absent from the rail and
   settings search; enabling developer mode reveals the destination and its
   Experimental badges without changing sync behavior. Strict mode refuses
@@ -8475,16 +8484,19 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   appear in renderer state or logs. Identical and disjoint edits converge,
   conflicts remain reviewable, explicit deletions use tombstones, category
   opt-out is not deletion, and executable imports remain inactive until local
-  approval and mapping. Recovery never exposes a partial local apply.
+  approval and mapping. Reopening Settings does not block on history, and
+  unfinished non-sensitive connection choices survive navigation or reload.
+  Recovery never exposes a partial local apply.
 - **Specs:** `04-ux/06-settings-ia.md`, `03-runtime/22-config-sync.md`,
   `03-runtime/14-secrets-storage.md`, `05-security/01-security.md`, ADR 0300,
   ADR 0301.
 - **Acceptance:** F (persistence), Security, Quality.
 - **Milestone:** M6+.
-- **Status:** Draft; merge/crypto and in-process WebDAV conditional-write
-  coverage exists. The Settings visibility gate is automated by
-  `pnpm test:e2e:settings-scroll`; the remaining automation is the full
-  two-device process path and checkpoint-level local recovery fault injection.
+- **Status:** Draft; merge/crypto, in-process WebDAV conditional-write
+  coverage, and the two-device host/WebDAV path are automated by
+  `pnpm test:e2e:config-sync`. The Settings visibility gate is automated by
+  `pnpm test:e2e:settings-scroll`; full renderer-driven password persistence
+  assertions and checkpoint-level local recovery fault injection remain.
 
 ## 8. Traceability Matrix
 
@@ -8573,7 +8585,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | M5 (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
 | M6+ (Chat file references) | E2E-PLUGIN-file-view-collapse-persists |
 | M6+ (project folder roots) | E2E-PLUGIN-file-view-switches-folder-per-project |
-| Post-MVP | E2E-PLUGIN-pi-npm-skill-discovery, E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
+| Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
 | Trusted extensions (R7 v1) | E2E-DIALOG-long-text-boundaries, E2E-241, E2E-242, E2E-HOOKS-cancel-and-dispose, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
@@ -15068,30 +15080,6 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Status:** Automated by `node --experimental-strip-types
   scripts/e2e-scheduled-workspace.mjs`, using production Electron dispatch and
   real Rust/stdio/SQLite. Only external inference is replaced with an observer.
-
-### E2E-PLUGIN-pi-npm-skill-discovery
-
-- **Preconditions:** Isolated npm package directory and plugin import storage;
-  a package declaring `pi.skills`, optionally executable extensions. No provider.
-- **Steps:** Open Skills, discover the candidate, cancel import, confirm import,
-  read the registered skill body and resources, reload, and attempt a duplicate.
-  Change metadata during confirmation; retry discovery after an error; discover
-  with more than 256 hoisted dependencies and an unreadable scope. Simulate a
-  runtime load failure after host registration and inspect the refreshed state.
-- **Expected:** No implicit import/execution, native explicit consent, preserved
-  resources and runtime skill body, stable imported state, no duplicate import,
-  stale consent refusal, and visible/recoverable errors. Unregistered leftover
-  directories do not count as imports; scoped packages are discovered. Unrelated
-  dependencies and unreadable scopes do not hide healthy skills. A registered
-  import remains marked imported after runtime failure while its error stays visible.
-- **Specs:** 07-plugins/16-trusted-extensions; ADR pi-npm-skill-discovery.
-- **Acceptance:** Plugin skill discovery and explicit trust boundary.
-- **Milestone:** Post-MVP compatibility.
-- **Status:** Automated via `apps/desktop/test/pi-skill-discovery.test.mjs` (real
-  import and plugin child process, native dialog boundary controlled) and
-  `node scripts/e2e-pi-skill-discovery-ui.mjs` (real React/Chromium panel with
-  controlled IPC results). Optional `PI_SKILL_PACKAGE_FIXTURE` points to an
-  unpacked published package for the reported planning-with-files path.
 
 ### E2E-SESSION-temporary-attachment-fork: Preview and independent branch inputs
 
