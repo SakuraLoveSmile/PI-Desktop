@@ -936,6 +936,12 @@ export const api = {
     ).then(normalizePendingPlans),
   resolvePlan: (resolution: PlanResolveRequest) =>
     invoke<PlanResolutionResult>(IPC.invoke.plansResolve, resolution),
+  getGoalReport: (params: { sessionId: string; reportId?: string; executionId?: string }) =>
+    invoke<{ report: any }>(IPC.invoke.goalReportGet, params),
+  listGoalReports: (params: { sessionId: string }) =>
+    invoke<{ reports: any[] }>(IPC.invoke.goalReportList, params),
+  retryGoalReport: (params: { sessionId: string; executionId: string }) =>
+    invoke<{ report: any }>(IPC.invoke.goalReportRetry, params),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   /**
@@ -1456,6 +1462,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.plansChanged, (payload) =>
       listener(normalizePlansChangedEvent(payload)),
+    );
+  },
+  onGoalReportChanged: (listener: (event: any) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.goalReportChanged, (payload) =>
+      listener(payload),
     );
   },
   onOauthLogin: (listener: (event: OAuthLoginEvent) => void) => {

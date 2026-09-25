@@ -2651,6 +2651,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
         isError: false,
         terminate: false,
       })),
+      dispose: vi.fn(),
     };
     const runtime = createRuntime({ host, mode: "plan" });
     (runtime as any).extensionRunner = extensionRunner;

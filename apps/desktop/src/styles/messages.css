@@ -868,6 +868,168 @@
   margin: 10px 0 0 24px;
 }
 
+/* Goal Report Card in chat */
+.goal-report-card {
+  width: min(100%, var(--chat-prose-max-width, 720px));
+  margin: 12px 0 8px;
+  border-radius: var(--radius-md);
+  background: var(--ds-tile);
+  border: 1px solid color-mix(in oklab, var(--ds-border) 60%, transparent);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.goal-report-card.verdict-met {
+  border-left: 3px solid var(--ds-success, #22c55e);
+}
+
+.goal-report-card.verdict-partial {
+  border-left: 3px solid var(--ds-warning, #f59e0b);
+}
+
+.goal-report-card.verdict-blocked,
+.goal-report-card.status-interrupted {
+  border-left: 3px solid var(--ds-error, #ef4444);
+}
+
+.goal-report-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.goal-report-card-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--ds-accent);
+}
+
+.goal-report-card.verdict-met .goal-report-card-icon {
+  color: var(--ds-success, #22c55e);
+}
+
+.goal-report-card.verdict-partial .goal-report-card-icon {
+  color: var(--ds-warning, #f59e0b);
+}
+
+.goal-report-card.verdict-blocked .goal-report-card-icon {
+  color: var(--ds-error, #ef4444);
+}
+
+.goal-report-card-titles {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.goal-report-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.goal-report-card-title {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.goal-report-card-verdict-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.goal-report-card-verdict-badge.verdict-met {
+  background: color-mix(in oklab, var(--ds-success, #22c55e) 15%, transparent);
+  color: var(--ds-success, #22c55e);
+}
+
+.goal-report-card-verdict-badge.verdict-partial {
+  background: color-mix(in oklab, var(--ds-warning, #f59e0b) 15%, transparent);
+  color: var(--ds-warning, #f59e0b);
+}
+
+.goal-report-card-verdict-badge.verdict-blocked {
+  background: color-mix(in oklab, var(--ds-error, #ef4444) 15%, transparent);
+  color: var(--ds-error, #ef4444);
+}
+
+.goal-report-card-verdict-badge.verdict-unknown {
+  background: color-mix(in oklab, var(--ds-text-muted) 15%, transparent);
+  color: var(--ds-text-muted);
+}
+
+.goal-report-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-2xs);
+  color: var(--ds-text-muted);
+}
+
+.goal-report-card-status-badge {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+}
+
+.goal-report-card-fallback-badge {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-warning, #f59e0b) 12%, transparent);
+  color: var(--ds-warning, #f59e0b);
+}
+
+.goal-report-card-time {
+  margin-left: auto;
+}
+
+.goal-report-card-summary {
+  margin: 2px 0 0 28px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.goal-report-card-actions {
+  display: flex;
+  margin: 6px 0 0 28px;
+}
+
+.goal-report-card-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-accent) 12%, transparent);
+  color: var(--ds-accent);
+  border: 1px solid color-mix(in oklab, var(--ds-accent) 25%, transparent);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.goal-report-card-open-btn:hover {
+  background: color-mix(in oklab, var(--ds-accent) 20%, transparent);
+  border-color: var(--ds-accent);
+}
+
 .permission-card.risk-high {
   background: color-mix(in oklab, var(--ds-error) 7%, transparent);
 }

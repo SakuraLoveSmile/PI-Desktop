@@ -52,8 +52,8 @@ test("Windows runtime registers the canonical native application identity", () =
 });
 
 test("Windows packages pin PI-Desktop executable and shortcut names", () => {
-  assert.equal(packageJson.build.win.executableName, "PI-Desktop");
-  assert.equal(packageJson.build.nsis.shortcutName, "PI-Desktop");
+  assert.equal(packageJson.build.win.executableName, "Pi-Desktop-Plus");
+  assert.equal(packageJson.build.nsis.shortcutName, "Pi-Desktop-Plus");
 });
 
 test("Windows packages and windows use the canonical PI-Desktop icon", () => {
@@ -188,8 +188,8 @@ test(
         await readFile(join(brandedContents, "Resources", "icon.icns"), "utf8"),
         "canonical-icon",
       );
-      assert.match(plist, /<string>PI-Desktop<\/string>/);
-      assert.match(plist, /<string>net\.aiuo\.pi-desktop\.dev<\/string>/);
+      assert.match(plist, /<string>Pi-Desktop-Plus<\/string>/);
+      assert.match(plist, /<string>cn\.sakura\.pi-desktop\.dev<\/string>/);
       assert.equal(prepareMacDevelopmentBundle(options), brandedExecutable);
     } finally {
       await rm(root, { recursive: true, force: true });

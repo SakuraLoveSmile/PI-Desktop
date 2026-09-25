@@ -2,16 +2,16 @@ import type { EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
   app: {
-    shellName: "PI-Desktop",
+    shellName: "Pi-Desktop-Plus",
     tagline: "Parceiro local de programação com IA",
-    starting: "Iniciando o PI-Desktop…",
+    starting: "Iniciando o Pi-Desktop-Plus…",
     loadingView: "Carregando visualização…",
     uiCrashed: "Algo deu errado com a interface"
   },
   startup: {
     slowTitle: "Ainda iniciando…",
-    slowBody: "O PI-Desktop está demorando mais do que o habitual para se conectar ao seu serviço local. Ele ainda pode concluir por conta própria — você pode aguardar ou coletar os logs primeiro.",
-    stalledTitle: "O PI-Desktop não conseguiu concluir a inicialização",
+    slowBody: "O Pi-Desktop-Plus está demorando mais do que o habitual para se conectar ao seu serviço local. Ele ainda pode concluir por conta própria — você pode aguardar ou coletar os logs primeiro.",
+    stalledTitle: "O Pi-Desktop-Plus não conseguiu concluir a inicialização",
     stalledBody: "Esta janela nunca recebeu suas conversas e configurações, portanto não há nada para exibir ainda. Nada foi excluído — seus dados continuam no disco.",
     retrying: "Tentando novamente…",
     copyDiagnostics: "Copiar diagnósticos",
@@ -36,12 +36,12 @@ export const ptBR = {
     unread: "Não lida",
     pinned: "Fixada",
     viewMore: "Ver mais…",
-    open: "Abrir PI-Desktop",
-    quit: "Sair do PI-Desktop",
-    askTitle: "Manter o PI-Desktop em execução em segundo plano?",
-    askBody: "Ao fechar a janela, o PI-Desktop pode continuar em execução na bandeja do sistema para que nada seja perdido. Você pode alterar isso a qualquer momento nas Configurações.",
+    open: "Abrir Pi-Desktop-Plus",
+    quit: "Sair do Pi-Desktop-Plus",
+    askTitle: "Manter o Pi-Desktop-Plus em execução em segundo plano?",
+    askBody: "Ao fechar a janela, o Pi-Desktop-Plus pode continuar em execução na bandeja do sistema para que nada seja perdido. Você pode alterar isso a qualquer momento nas Configurações.",
     closeToTray: "Fechar para a bandeja",
-    confirmQuitTitle: "Sair do PI-Desktop?",
+    confirmQuitTitle: "Sair do Pi-Desktop-Plus?",
     confirmQuitBody: "Tem certeza de que deseja sair? Todas as sessões em execução serão interrompidas e as alterações não salvas poderão ser perdidas.",
     confirmQuit: "Sair"
   },
@@ -91,7 +91,7 @@ export const ptBR = {
     zoomOut: "Diminuir zoom",
     toggleFullScreen: "Alternar tela cheia",
     toggleDevTools: "Ferramentas de desenvolvedor",
-    appHelp: "Ajuda do PI-Desktop",
+    appHelp: "Ajuda do Pi-Desktop-Plus",
     openLogs: "Abrir logs",
     checkForUpdates: "Verificar atualizações…"
   },
@@ -237,7 +237,7 @@ export const ptBR = {
     emptyTitle: "Como posso ajudar você a construir?",
     emptyTitleInProject: "O que podemos construir em {{project}}?",
     emptyTitleTemporary: "O que você gostaria de explorar temporariamente?",
-    placeholder: "Peça ajuda ao PI-Desktop para qualquer tarefa",
+    placeholder: "Peça ajuda ao Pi-Desktop-Plus para qualquer tarefa",
     placeholderHome: "Pergunte qualquer coisa",
     placeholderHint: "Digite / para comandos · @ para arquivos",
     placeholderHomeHint: "Digite / para comandos · @ para arquivos",
@@ -582,7 +582,7 @@ export const ptBR = {
   settings: {
     power: "Energia",
     keepAwakeWhileRunning: "Manter o computador ativo",
-    keepAwakeWhileRunningDesc: "Impede a suspensão por inatividade enquanto o PI-Desktop estiver aberto. A tela pode apagar; a suspensão manual e ao fechar a tampa continuam funcionando.",
+    keepAwakeWhileRunningDesc: "Impede a suspensão por inatividade enquanto o Pi-Desktop-Plus estiver aberto. A tela pode apagar; a suspensão manual e ao fechar a tampa continuam funcionando.",
     imageModel: "Modelo de imagens",
     imageModelUnset: "Sem configurar",
     imageModelUnavailable: "Atualmente indisponível",
@@ -664,7 +664,7 @@ export const ptBR = {
     pluginProviderBy: "Fornecido por {{plugin}}",
     pluginProviderManaged: "Este provedor é gerenciado pelo plugin “{{plugin}}”, que fornece seu endpoint e modelos. Ative-o ou desative-o na página Extensões.",
     pluginProviderKey: "Chave API",
-    pluginProviderKeyHint: "Armazenada no PI-Desktop e usada pelo ambiente de execução. O plugin nunca a recebe.",
+    pluginProviderKeyHint: "Armazenada no Pi-Desktop-Plus e usada pelo ambiente de execução. O plugin nunca a recebe.",
     pluginProviderKeyRemove: "Excluir chave",
     pluginProviderKeySaved: "Chave API salva",
     pluginProviderKeyRemoved: "Chave API excluída",
@@ -1581,7 +1581,7 @@ export const ptBR = {
     draft: "Rascunho",
   },
   scheduled: {
-    description: "Executa tarefas recorrentes do agente enquanto o PI-Desktop estiver aberto.",
+    description: "Executa tarefas recorrentes do agente enquanto o Pi-Desktop-Plus estiver aberto.",
     edit: "Editar tarefa",
     hourlyHint: "Executa a cada hora, iniciando uma hora após salvar ou habilitar. Reiniciar o aplicativo inicia um novo intervalo.",
     morning: "Manhã",
@@ -1595,7 +1595,7 @@ export const ptBR = {
     legacyHint: "Edite e salve um agendamento para habilitar execuções automáticas.",
     time: "Hora",
     weekday: "Dia da semana",
-    localTimeHint: "Usa o fuso horário local deste computador. Mantenha o PI-Desktop aberto; execuções perdidas serão ignoradas.",
+    localTimeHint: "Usa o fuso horário local deste computador. Mantenha o Pi-Desktop-Plus aberto; execuções perdidas serão ignoradas.",
     projectHint: "O projeto atual é salvo com este agendamento. As execuções usam o modelo padrão.",
     autoPermissionHint: "O modo Automático pode executar ações restritas sem pedir confirmação. Use-o apenas em tarefas confiáveis.",
     unavailableModel: "{{provider}} / {{model}} (indisponível)",
@@ -1698,6 +1698,7 @@ export const ptBR = {
       file: "Arquivos",
       plugin: "Visualização de plugin",
       subagent: "Subagente",
+      goalReport: "Relatório da meta",
     },
     pluginView: {
       failed: "Não foi possível carregar esta visualização. Recarregue o plugin e tente novamente."
@@ -2055,8 +2056,8 @@ export const ptBR = {
       "agent.prompt.inject": "Pode alterar as instruções enviadas ao agente de IA.",
       "agent.complete": "Pode consumir sua cota de modelo para uma conclusão avulsa. O plugin nunca recebe suas chaves de API.",
       "agent.extension": "Executa módulos da ExtensionAPI dentro do processo do agente, com o mesmo nível de acesso que as ferramentas do próprio agente. Ative somente código em que você confia.",
-      "provider.register": "Adiciona os provedores que este plugin define à lista de provedores em Configurações. O plugin fornece o endpoint e os modelos; sua chave de API permanece no PI-Desktop.",
-      "desktop.control": "Permite que o plugin invoque o catálogo de controle revisado do PI-Desktop. Operações destrutivas ainda exigem confirm=true; o token bearer do MCP nunca é exposto.",
+      "provider.register": "Adiciona os provedores que este plugin define à lista de provedores em Configurações. O plugin fornece o endpoint e os modelos; sua chave de API permanece no Pi-Desktop-Plus.",
+      "desktop.control": "Permite que o plugin invoque o catálogo de controle revisado do Pi-Desktop-Plus. Operações destrutivas ainda exigem confirm=true; o token bearer do MCP nunca é exposto.",
       "models.list": "Pode ver em quais modelos você está conectado. Não recebe suas chaves de API.",
       "session.read": "Pode ler a conversa em que a chamada de ferramenta atual está sendo executada, incluindo os resultados das ferramentas.",
       "net.fetch": "Pode fazer solicitações de rede externas.",
@@ -2069,7 +2070,7 @@ export const ptBR = {
       "audio.capture.background": "Captura o microfone enquanto o plugin roda em segundo plano, mesmo sem painéis abertos.",
       "audio.playback.background": "Reproduz o áudio transmitido pelo plugin, mesmo sem painéis abertos.",
       "speech.adapter.register": "Pode adicionar um protocolo de transcrição ou fala usando suas chaves de provedor existentes. O plugin nunca vê a chave.",
-      "keyboard.globalShortcut": "Registra atalhos de teclado do sistema que acionam comandos próprios deste plugin mesmo quando o PI-Desktop não está em foco.",
+      "keyboard.globalShortcut": "Registra atalhos de teclado do sistema que acionam comandos próprios deste plugin mesmo quando o Pi-Desktop-Plus não está em foco.",
       "net.websocket": "Abre conexões bidirecionais em tempo real com os nomes de host declarados pelo plugin.",
       "bus.publish": "Pode enviar mensagens nos tópicos que declarou.",
       "bus.subscribe": "Pode receber mensagens nos tópicos que declarou.",
@@ -2291,7 +2292,7 @@ export const ptBR = {
     restored: "Conexão restaurada",
     fatal: "Não é possível conectar ao serviço local",
     unsupportedGlibc: "Esta versão para Linux requer glibc 2.35 ou superior (Ubuntu 22.04, Debian 12, Fedora 36+).",
-    dbSchemaTooNew: "Este PI-Desktop é mais antigo do que seus dados locais (esquema de dados {{found}}, esta versão suporta {{supported}}). Instale a versão mais recente do PI-Desktop que abriu estes dados pela última vez ou uma versão posterior.",
+    dbSchemaTooNew: "Este Pi-Desktop-Plus é mais antigo do que seus dados locais (esquema de dados {{found}}, esta versão suporta {{supported}}). Instale a versão mais recente do Pi-Desktop-Plus que abriu estes dados pela última vez ou uma versão posterior.",
     archMismatch: "Esta versão {{buildArch}} está sendo executada por emulação em uma máquina {{machineArch}} e terá desempenho mais lento. Instale a versão para {{machineArch}}.",
     dismissArchMismatch: "Dispensar",
     archNames: {
@@ -2380,7 +2381,36 @@ export const ptBR = {
       continue: "Continuar",
       dismiss: "Dispensar"
     }
-  }
+  },
+  goalReport: {
+    view: {
+        title: "Relatório de Conclusão da Meta",
+        openInWorkPanel: "Abrir no painel de trabalho",
+        summary: "Resumo",
+        metrics: "Métricas",
+        criteria: "Critérios de aceitação",
+        steps: "Etapas de execução",
+        files: "Arquivos alterados",
+        checks: "Verificações",
+        limitations: "Limitações",
+        nextSteps: "Próximos passos",
+        evidences: "Evidências de verificação",
+        loading: "Carregando relatório…",
+        loadFailed: "Falha ao carregar relatório",
+        retryLoad: "Tentar novamente",
+        fallbackNotice: "Relatório básico gerado a partir do histórico de execução.",
+        verdictMet: "Meta atingida",
+        verdictPartial: "Parcialmente atingida",
+        verdictBlocked: "Bloqueada / Incompleta",
+        verdictUnknown: "Resultado desconhecido",
+        statusCompleted: "Concluído",
+        statusInterrupted: "Interrompido",
+        remoteDisconnected: "Host remoto desconectado",
+        conclusion: "Conclusão",
+        structured: "Estruturado",
+        fallback: "Fallback"
+    }
+},
 } satisfies EnglishCatalog;
 
 export default ptBR;

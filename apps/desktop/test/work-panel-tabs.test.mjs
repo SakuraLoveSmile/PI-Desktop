@@ -8,6 +8,7 @@ const {
   closeWorkPanelTabState,
   emptyWorkPanelContext,
   fileWorkPanelTab,
+  goalReportWorkPanelTab,
   hasPluginView,
   isKnownWorkPanelTab,
   isToolWorkPanelTab,
@@ -338,4 +339,19 @@ test("repeated subagent labels gain a strip-order suffix, singletons stay bare",
     ["explorer#1", "reviewer", "explorer#2", "explorer#3"],
   );
   assert.deepEqual(subagentTabDisplayLabels(["explorer"]), ["explorer"]);
+});
+
+test("goal report tabs key by execution id and are recognized by the sanitizer", () => {
+  const tab = goalReportWorkPanelTab("exec-123", "Goal Report");
+  assert.equal(tab.id, "goalReport:exec-123");
+  assert.equal(tab.kind, "goalReport");
+  assert.equal(tab.resource, "exec-123");
+  assert.equal(tab.label, "Goal Report");
+  assert.equal(isKnownWorkPanelTab(tab), true);
+
+  const state = {
+    tabs: [tab],
+    activeTabId: tab.id,
+  };
+  assert.deepEqual(sanitizeWorkPanelTabsState(state), state);
 });
