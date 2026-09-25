@@ -25,6 +25,7 @@ Each ADR includes:
 | scheduled-desktop-automations | [Desktop automation scheduling](scheduled-desktop-automations.md) | Accepted for implementation |
 | subagent-model-fallback | [Ordered subagent model fallback](subagent-model-fallback.md) | Accepted for implementation |
 | subagent-model-opt-in | [Separate Subagent Model Opt-In from Definition Pins](subagent-model-opt-in.md) | Accepted for implementation |
+| temporary-goal-scratch-workspace | [Temporary Goal sessions own a persistent scratch workspace](temporary-goal-scratch-workspace.md) | Accepted |
 | 0001 | Use Electron as the desktop shell | Accepted |
 | 0002 | Use the pi Agent Harness as the kernel | Accepted |
 | 0003 | Hybrid runtime — Rust host core + Node pi agent sidecar | Superseded in part |

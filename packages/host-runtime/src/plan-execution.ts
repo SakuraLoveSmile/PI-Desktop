@@ -6,6 +6,7 @@
 import {
   normalizeGlobalPermissionMode,
   normalizeProposalKind,
+  type ArtifactWorkspaceKind,
   type PlanExecution,
 } from "@pi-desktop/shared";
 
@@ -37,6 +38,14 @@ export function planExecutionFromUnknown(value: unknown): PlanExecution | null {
   ) {
     return null;
   }
+  let workspaceKind: ArtifactWorkspaceKind = "project";
+  if (artifact.workspaceKind !== undefined) {
+    if (artifact.workspaceKind === "project" || artifact.workspaceKind === "scratch") {
+      workspaceKind = artifact.workspaceKind;
+    } else {
+      return null;
+    }
+  }
   return {
     id: value.id,
     proposalId: value.proposalId,
@@ -50,6 +59,7 @@ export function planExecutionFromUnknown(value: unknown): PlanExecution | null {
       relativePath: artifact.relativePath,
       sha256: artifact.sha256,
       sizeBytes: artifact.sizeBytes,
+      workspaceKind,
     },
     targetPermissionMode: normalizeGlobalPermissionMode(
       value.targetPermissionMode,

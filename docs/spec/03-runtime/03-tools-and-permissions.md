@@ -224,13 +224,16 @@ as binary content.
   composer clipboard paste of a session. Deleted with `session.delete`. A
   startup sweep removes scratch dirs whose session no longer exists and dirs
   untouched for over 7 days (crash/force-quit fallback; no scheduled job
-  needed).
+  needed). A live temporary session with a persisted Goal checkpoint retains
+  its entire scratch workspace, including execution outputs, until session
+  deletion; the ordinary scratch age sweep must not remove that workspace.
 - A project switch does not redirect or cancel a background session's tools;
   sessions A and B remain sandboxed to projects A and B respectively.
 - A Temporary/path-less session uses only its own scratch directory as its
   workspace root, even if another project is visible or recently active. It
-  never inherits that project. Plan and Goal still require a persisted project
-  root, so this binding does not expand contract-mode execution. High-risk
+  never inherits that project. Plan still requires a persisted project root.
+  Goal submission, approval, and execution use that same session-owned scratch
+  root when no project is bound, without changing the approval or permission policy. High-risk
   tools operate only inside the temporary session's scratch root.
 - Legacy calls that do not resolve to a durable session may use the selected
   host workspace only during the compatibility window.

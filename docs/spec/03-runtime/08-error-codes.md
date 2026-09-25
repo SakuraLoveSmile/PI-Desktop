@@ -147,7 +147,7 @@ does not turn temporary thread pressure into a host process exit.
 | `PLAN_REQUIRES_INTERACTIVE_SESSION` | no | unattended/scheduled Plan or Goal run cannot request approval |
 | `PLAN_NOT_FOUND` | no | no approval row matches the proposal id |
 | `PLAN_SESSION_NOT_FOUND` | no | the Plan/Goal RPC named a session the host does not have |
-| `PLAN_WORKSPACE_REQUIRED` | no | the session has no persisted project; temporary sessions cannot enter Plan or Goal |
+| `PLAN_WORKSPACE_REQUIRED` | no | Plan has no persisted project, or the required Goal workspace is unavailable; temporary Goals use their own session scratch directory |
 | `PLAN_ALREADY_ACTIVE` | no | the session already has a contract being negotiated |
 | `PLAN_ALREADY_PENDING` | no | a submit arrived while an approval for the same turn is still pending |
 | `PLAN_ALREADY_RESOLVED` | no | a second approve/reject reached an already-resolved approval |

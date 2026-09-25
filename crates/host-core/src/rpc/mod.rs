@@ -1126,30 +1126,39 @@ fn requires_external_path_permission(
     )
 }
 
-/// Plans are owned by the session's persisted project. Unlike the legacy
-/// tool compatibility resolver, a plan submission never inherits the mutable
-/// global workspace or accepts a session-less request.
-fn resolve_plan_workspace(state: &AppState, session_id: &str) -> Result<PathBuf, JsonRpcError> {
-    match sessions::get_session(&state.db, session_id) {
-        Ok(Some(_)) => {}
-        Ok(None) => return Err(plan_rpc_err("PLAN_SESSION_NOT_FOUND")),
-        Err(error) => return Err(rpc_err(1000, error.to_string(), "INTERNAL")),
-    }
-    resolve_persisted_project_workspace(state, session_id)?
-        .map(PathBuf::from)
-        .ok_or_else(|| plan_rpc_err("PLAN_WORKSPACE_REQUIRED"))
-}
-
-fn resolve_plan_workspace_if_available(
+/// Resolve the workspace for a contract artifact without consulting the
+/// mutable global workspace. Plans still require a persisted project, while
+/// Goals may use the session-owned scratch root when the session is temporary.
+fn resolve_plan_submission_workspace(
     state: &AppState,
     session_id: &str,
-) -> Result<Option<PathBuf>, JsonRpcError> {
+    kind: &'static str,
+) -> Result<(PathBuf, &'static str), JsonRpcError> {
     match sessions::get_session(&state.db, session_id) {
         Ok(Some(_)) => {}
         Ok(None) => return Err(plan_rpc_err("PLAN_SESSION_NOT_FOUND")),
         Err(error) => return Err(rpc_err(1000, error.to_string(), "INTERNAL")),
     }
-    Ok(resolve_persisted_project_workspace(state, session_id)?.map(PathBuf::from))
+    if let Some(project_path) = resolve_persisted_project_workspace(state, session_id)? {
+        return Ok((PathBuf::from(project_path), plans::WORKSPACE_KIND_PROJECT));
+    }
+    if kind == plans::KIND_GOAL {
+        let scratch = scratch::session_dir(&state.data_dir, session_id)
+            .ok_or_else(|| plan_rpc_err("PLAN_WORKSPACE_REQUIRED"))?;
+        std::fs::create_dir_all(&scratch)
+            .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
+        return Ok((scratch, plans::WORKSPACE_KIND_SCRATCH));
+    }
+    Err(plan_rpc_err("PLAN_WORKSPACE_REQUIRED"))
+}
+
+#[cfg(test)]
+fn resolve_plan_workspace(
+    state: &AppState,
+    session_id: &str,
+    kind: &'static str,
+) -> Result<PathBuf, JsonRpcError> {
+    resolve_plan_submission_workspace(state, session_id, kind).map(|(path, _)| path)
 }
 
 /// Push one notification line to the caller's stream.
@@ -2266,7 +2275,7 @@ async fn handle_request(
                 .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
             let session = match sessions::move_session_project(&st.db, session_id, project_path)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .map_err(plan_rpc_err)?
             {
                 sessions::MoveSessionProjectResult::Moved(session) => session,
                 sessions::MoveSessionProjectResult::NotFound => {
@@ -2366,8 +2375,7 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
-            let ok = sessions::delete_session(&st.db, id)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let ok = sessions::delete_session(&st.db, id).map_err(plan_rpc_err)?;
             if ok {
                 drop_session_side_data(&st, id);
             }
@@ -3087,7 +3095,8 @@ async fn handle_request(
             let proposal = {
                 let guard = state.lock().await;
                 let st = &*guard;
-                let workspace = resolve_plan_workspace(st, session_id)?;
+                let (workspace, artifact_workspace_kind) =
+                    resolve_plan_submission_workspace(st, session_id, kind)?;
                 st.plans
                     .submit(
                         &st.db,
@@ -3100,6 +3109,7 @@ async fn handle_request(
                             title,
                             markdown,
                             question,
+                            artifact_workspace_kind,
                         },
                     )
                     .map_err(plan_rpc_err)?
@@ -3146,7 +3156,34 @@ async fn handle_request(
                 let guard = state.lock().await;
                 let st = &*guard;
                 let workspace = if action == "approve" {
-                    resolve_plan_workspace_if_available(st, session_id)?
+                    let proposal = plans::get_proposal(&st.db, proposal_id)
+                        .map_err(plan_rpc_err)?
+                        .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))?;
+                    if proposal.session_id != session_id {
+                        return Err(plan_rpc_err("PLAN_APPROVAL_STALE"));
+                    }
+                    if proposal.status != plans::STATUS_PENDING {
+                        None
+                    } else {
+                        let ws_kind = proposal
+                            .artifact
+                            .as_ref()
+                            .and_then(|a| a.workspace_kind.as_deref())
+                            .unwrap_or(plans::WORKSPACE_KIND_PROJECT);
+                        let root = if ws_kind == plans::WORKSPACE_KIND_SCRATCH {
+                            let scratch = scratch::session_dir(&st.data_dir, session_id)
+                                .ok_or_else(|| plan_rpc_err("PLAN_WORKSPACE_REQUIRED"))?;
+                            if !scratch.is_dir() {
+                                return Err(plan_rpc_err("PLAN_WORKSPACE_REQUIRED"));
+                            }
+                            scratch
+                        } else {
+                            resolve_persisted_project_workspace(st, session_id)?
+                                .map(PathBuf::from)
+                                .ok_or_else(|| plan_rpc_err("PLAN_WORKSPACE_REQUIRED"))?
+                        };
+                        Some(root)
+                    }
                 } else {
                     None
                 };
@@ -4752,6 +4789,7 @@ mod tests {
         resolve_tool_workspace_for_call, scope_err, skill_err,
     };
     use crate::agent_capabilities::CapabilityLevel;
+    use crate::plans;
     use crate::plans::{PlanResolveParams, PlanSubmitParams};
     use crate::scheduled;
     use crate::sessions;
@@ -6122,11 +6160,31 @@ mod tests {
         assert!(resolved.is_dir());
         assert_ne!(resolved, active_project);
         assert_eq!(
-            resolve_plan_workspace(&state, &session.id)
-                .expect_err("temporary sessions must not enter Plan/Goal workspaces")
+            resolve_plan_workspace(&state, &session.id, plans::KIND_PLAN)
+                .expect_err("temporary sessions must not enter Plan workspaces")
                 .data
                 .unwrap()["errorCode"],
             "PLAN_WORKSPACE_REQUIRED"
+        );
+        assert_eq!(
+            resolve_plan_workspace(&state, &session.id, plans::KIND_GOAL).unwrap(),
+            expected
+        );
+        let project_goal = sessions::create_session(
+            &state.db,
+            Some("Project Goal".into()),
+            Some("goal".into()),
+            None,
+            None,
+            Some(active_project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        assert_eq!(
+            crate::workspace::simple_canonicalize(
+                &resolve_plan_workspace(&state, &project_goal.id, plans::KIND_GOAL).unwrap(),
+            )
+            .unwrap(),
+            crate::workspace::simple_canonicalize(&active_project).unwrap()
         );
         assert_eq!(
             resolve_tool_workspace(&state, "legacy-missing-session")
@@ -6135,6 +6193,266 @@ mod tests {
                 .unwrap()["errorCode"],
             "SESSION_NOT_FOUND"
         );
+    }
+
+    #[test]
+    fn temporary_goal_uses_isolated_scratch_for_submit_and_approve() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let active_project = data_dir.path().join("active-project");
+        fs::create_dir_all(&active_project).unwrap();
+        let state = AppState::open(data_dir.path()).unwrap();
+        let goal = sessions::create_session(
+            &state.db,
+            Some("Temporary Goal".into()),
+            Some("goal".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let other = sessions::create_session(
+            &state.db,
+            Some("Other Temporary Goal".into()),
+            Some("goal".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let turn = sessions::begin_turn(&state.db, &goal.id, None, None).unwrap();
+        let workspace = resolve_plan_workspace(&state, &goal.id, plans::KIND_GOAL).unwrap();
+        let proposal = state
+            .plans
+            .submit(
+                &state.db,
+                PlanSubmitParams {
+                    workspace_root: &workspace,
+                    session_id: &goal.id,
+                    turn_id: &turn,
+                    tool_call_id: "temporary-goal-submit",
+                    kind: plans::KIND_GOAL,
+                    title: "Keep artifacts isolated",
+                    markdown: "# Goal\n- preserve isolation",
+                    question: "Approve this goal?",
+                    artifact_workspace_kind: plans::WORKSPACE_KIND_SCRATCH,
+                },
+            )
+            .unwrap();
+        let protected = plans::temporary_goal_session_ids(&state.db).unwrap();
+        assert!(protected.contains(&goal.id));
+        assert!(!protected.contains(&other.id));
+        let artifact_path = workspace.join(&proposal.artifact.as_ref().unwrap().relative_path);
+        assert!(artifact_path.is_file());
+        assert!(!active_project.join(".pi/goal").exists());
+        assert!(!data_dir
+            .path()
+            .join("scratch")
+            .join(&other.id)
+            .join(".pi/goal")
+            .exists());
+
+        let resolution = state
+            .plans
+            .resolve(
+                &state.db,
+                PlanResolveParams {
+                    workspace_root: Some(&workspace),
+                    proposal_id: &proposal.id,
+                    session_id: &goal.id,
+                    turn_id: &turn,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("accept-edits"),
+                },
+            )
+            .unwrap();
+        assert_eq!(resolution.execution.unwrap().kind, plans::KIND_GOAL);
+        assert!(artifact_path.is_file());
+        assert_eq!(
+            sessions::get_session(&state.db, &goal.id)
+                .unwrap()
+                .unwrap()
+                .summary
+                .mode,
+            "agent"
+        );
+    }
+
+    #[test]
+    fn scratch_goal_blocks_move_and_delete_while_live_and_permits_after_reject() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let target_project = data_dir.path().join("target-project");
+        fs::create_dir_all(&target_project).unwrap();
+        let state = AppState::open(data_dir.path()).unwrap();
+        let goal = sessions::create_session(
+            &state.db,
+            Some("Temporary Goal Live".into()),
+            Some("goal".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let turn = sessions::begin_turn(&state.db, &goal.id, None, None).unwrap();
+        let workspace = resolve_plan_workspace(&state, &goal.id, plans::KIND_GOAL).unwrap();
+        let proposal = state
+            .plans
+            .submit(
+                &state.db,
+                PlanSubmitParams {
+                    workspace_root: &workspace,
+                    session_id: &goal.id,
+                    turn_id: &turn,
+                    tool_call_id: "live-goal-submit",
+                    kind: plans::KIND_GOAL,
+                    title: "Live goal guard",
+                    markdown: "# Live Goal\n- check guard",
+                    question: "Approve?",
+                    artifact_workspace_kind: plans::WORKSPACE_KIND_SCRATCH,
+                },
+            )
+            .unwrap();
+        sessions::end_turn(&state.db, &turn, "completed", None, None, false).unwrap();
+
+        // Pending scratch Goal blocks move and delete
+        let move_err =
+            sessions::move_session_project(&state.db, &goal.id, &target_project.to_string_lossy())
+                .unwrap_err();
+        assert_eq!(move_err.to_string(), "PLAN_CONFIGURATION_BLOCKED");
+
+        let delete_err = sessions::delete_session(&state.db, &goal.id).unwrap_err();
+        assert_eq!(delete_err.to_string(), "PLAN_CONFIGURATION_BLOCKED");
+
+        // Reject the proposal
+        state
+            .plans
+            .resolve(
+                &state.db,
+                PlanResolveParams {
+                    workspace_root: Some(&workspace),
+                    proposal_id: &proposal.id,
+                    session_id: &goal.id,
+                    turn_id: &turn,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "reject",
+                    target_permission_mode: None,
+                },
+            )
+            .unwrap();
+
+        // After reject, move succeeds
+        let moved =
+            sessions::move_session_project(&state.db, &goal.id, &target_project.to_string_lossy())
+                .unwrap();
+        assert!(matches!(
+            moved,
+            sessions::MoveSessionProjectResult::Moved(_)
+        ));
+
+        // Delete succeeds
+        assert!(sessions::delete_session(&state.db, &goal.id).unwrap());
+    }
+
+    #[test]
+    fn repeated_goal_resolution_returns_identical_execution_identity_without_disk_revalidation() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let state = AppState::open(data_dir.path()).unwrap();
+        let goal = sessions::create_session(
+            &state.db,
+            Some("Temporary Goal Idempotent".into()),
+            Some("goal".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let turn = sessions::begin_turn(&state.db, &goal.id, None, None).unwrap();
+        let workspace = resolve_plan_workspace(&state, &goal.id, plans::KIND_GOAL).unwrap();
+        let proposal = state
+            .plans
+            .submit(
+                &state.db,
+                PlanSubmitParams {
+                    workspace_root: &workspace,
+                    session_id: &goal.id,
+                    turn_id: &turn,
+                    tool_call_id: "idempotent-submit",
+                    kind: plans::KIND_GOAL,
+                    title: "Idempotent goal",
+                    markdown: "# Idempotent\n- repeat resolve",
+                    question: "Approve?",
+                    artifact_workspace_kind: plans::WORKSPACE_KIND_SCRATCH,
+                },
+            )
+            .unwrap();
+        let artifact_path = workspace.join(&proposal.artifact.as_ref().unwrap().relative_path);
+        assert!(artifact_path.is_file());
+
+        let res1 = state
+            .plans
+            .resolve(
+                &state.db,
+                PlanResolveParams {
+                    workspace_root: Some(&workspace),
+                    proposal_id: &proposal.id,
+                    session_id: &goal.id,
+                    turn_id: &turn,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("accept-edits"),
+                },
+            )
+            .unwrap();
+        let exec1 = res1.execution.expect("first resolution creates execution");
+
+        // Delete artifact file from disk to simulate unavailable file
+        fs::remove_file(&artifact_path).unwrap();
+        assert!(!artifact_path.exists());
+
+        // Repeated identical resolve succeeds without disk revalidation
+        let res2 = state
+            .plans
+            .resolve(
+                &state.db,
+                PlanResolveParams {
+                    workspace_root: Some(&workspace),
+                    proposal_id: &proposal.id,
+                    session_id: &goal.id,
+                    turn_id: &turn,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("accept-edits"),
+                },
+            )
+            .unwrap();
+        let exec2 = res2
+            .execution
+            .expect("repeated resolution returns execution");
+        assert_eq!(exec1.id, exec2.id);
+        assert_eq!(exec1.proposal_id, exec2.proposal_id);
+
+        // Conflicting permission mode fails
+        let conflict_err = state
+            .plans
+            .resolve(
+                &state.db,
+                PlanResolveParams {
+                    workspace_root: Some(&workspace),
+                    proposal_id: &proposal.id,
+                    session_id: &goal.id,
+                    turn_id: &turn,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("auto"),
+                },
+            )
+            .unwrap_err();
+        assert!(conflict_err.to_string().contains("PLAN_APPROVAL_CONFLICT"));
     }
 
     #[tokio::test]
@@ -6725,6 +7043,7 @@ mod tests {
                         title: "Plan",
                         markdown: "# Plan",
                         question: "Proceed?",
+                        artifact_workspace_kind: crate::plans::WORKSPACE_KIND_PROJECT,
                     },
                 )
                 .unwrap();

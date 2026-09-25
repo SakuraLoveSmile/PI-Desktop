@@ -549,6 +549,8 @@ export const es = {
     "untitled": "Plan sin título",
     "openArtifact": "Plan abierto",
     "openArtifactLabel": "Artefacto de plan abierto {{path}}",
+    "artifactSessionUnavailable": "La sesión propietaria de este plan ya no está disponible.",
+    "artifactScratchUnavailable": "El directorio de sesión temporal no está disponible.",
   },
   "goal": {
     "planning": "Definición de meta",
@@ -567,6 +569,8 @@ export const es = {
     "untitled": "Objetivo sin título",
     "openArtifact": "Objetivo abierto",
     "openArtifactLabel": "Artefacto de objetivo abierto {{path}}",
+    "artifactSessionUnavailable": "La sesión propietaria de este objetivo ya no está disponible.",
+    "artifactScratchUnavailable": "El directorio de sesión temporal no está disponible.",
   },
   "onboarding": {
     "title": "Comenzar",

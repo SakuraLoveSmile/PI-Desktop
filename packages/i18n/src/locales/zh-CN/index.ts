@@ -553,6 +553,8 @@ export const zhCN = {
     untitled: "未命名规划",
     openArtifact: "打开规划",
     openArtifactLabel: "打开规划文件 {{path}}",
+    artifactSessionUnavailable: "拥有此规划的会话已不可用。",
+    artifactScratchUnavailable: "临时会话目录不可用。",
   },
   goal: {
     planning: "正在明确目标",
@@ -571,6 +573,8 @@ export const zhCN = {
     untitled: "未命名目标",
     openArtifact: "打开目标",
     openArtifactLabel: "打开目标文件 {{path}}",
+    artifactSessionUnavailable: "拥有此目标的会话已不可用。",
+    artifactScratchUnavailable: "临时会话目录不可用。",
   },
   onboarding: {
     title: "开始使用",

@@ -5,17 +5,19 @@ pub(crate) const PROPOSAL_COLUMNS: &str = "request_id, session_id, turn_id, tool
     plan_json, title, question, status, created_at, updated_at, expires_at,
     resolved_at, action, target_permission_mode, feedback, error_code,
     artifact_relative_path, artifact_sha256, artifact_size_bytes, version,
-    execution_id, execution_state, kind";
+    execution_id, execution_state, kind, artifact_workspace_kind";
 
 pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PlanProposal> {
     let artifact_path: Option<String> = row.get(16)?;
     let artifact_sha256: Option<String> = row.get(17)?;
     let artifact_size: Option<i64> = row.get(18)?;
+    let artifact_workspace_kind: Option<String> = row.get(23)?;
     let artifact = match (artifact_path, artifact_sha256, artifact_size) {
         (Some(relative_path), Some(sha256), Some(size_bytes)) => Some(PlanArtifact {
             relative_path,
             sha256,
             size_bytes: size_bytes.max(0) as u64,
+            workspace_kind: artifact_workspace_kind,
         }),
         _ => None,
     };
@@ -60,6 +62,34 @@ pub(crate) fn get_proposal(db: &Database, id: &str) -> Result<Option<PlanProposa
         .prepare_cached(&sql)?
         .query_row(params![id], proposal_from_row)
         .optional()?)
+}
+
+pub(crate) fn temporary_goal_session_ids(
+    db: &Database,
+) -> Result<std::collections::HashSet<String>> {
+    let mut statement = db.conn().prepare(
+        "SELECT DISTINCT p.session_id
+         FROM plan_approvals p
+         JOIN sessions s ON s.id = p.session_id
+         WHERE p.artifact_workspace_kind = 'scratch'",
+    )?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+    Ok(rows.collect::<rusqlite::Result<std::collections::HashSet<_>>>()?)
+}
+
+pub(crate) fn has_live_scratch_goal(db: &Database, session_id: &str) -> Result<bool> {
+    expire_pending_approvals(db)?;
+    let blocked: bool = db.conn().query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM plan_approvals
+             WHERE session_id = ?1
+               AND artifact_workspace_kind = 'scratch'
+               AND (status = 'pending' OR execution_state IN ('queued', 'running'))
+         )",
+        params![session_id],
+        |row| row.get(0),
+    )?;
+    Ok(blocked)
 }
 
 /// The approval kind this session may submit, or `None` while it is executing

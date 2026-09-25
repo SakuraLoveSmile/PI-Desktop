@@ -180,6 +180,9 @@ impl Database {
             18 => {
                 migrate_v18_to_v19(&conn, path)?;
             }
+            19 => {
+                migrate_v19_to_v20(&conn, path)?;
+            }
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -210,6 +213,22 @@ impl Database {
         }
         if migrated_version == 18 {
             migrate_v18_to_v19(&conn, path)?;
+            migrated_version = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        }
+        if migrated_version == 19 {
+            migrate_v19_to_v20(&conn, path)?;
+        }
+        let has_workspace_kind: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'artifact_workspace_kind')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(false);
+        if !has_workspace_kind {
+            conn.execute_batch(
+                "ALTER TABLE plan_approvals ADD COLUMN artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch'));",
+            )?;
         }
         let db = Self { conn, data_dir };
         db.boot_maintenance()?;

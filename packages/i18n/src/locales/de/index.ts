@@ -549,6 +549,8 @@ export const de = {
     "untitled": "Unbenannter Plan",
     "openArtifact": "Offener Plan",
     "openArtifactLabel": "Offenes Planartefakt {{path}}",
+    "artifactSessionUnavailable": "Die Sitzung, die diesen Plan besitzt, ist nicht mehr verfügbar.",
+    "artifactScratchUnavailable": "Das temporäre Sitzungsverzeichnis ist nicht verfügbar.",
   },
   "goal": {
     "planning": "Ziel definieren",
@@ -567,6 +569,8 @@ export const de = {
     "untitled": "Ziel ohne Titel",
     "openArtifact": "Ziel öffnen",
     "openArtifactLabel": "Zielartefakt öffnen {{path}}",
+    "artifactSessionUnavailable": "Die Sitzung, die dieses Ziel besitzt, ist nicht mehr verfügbar.",
+    "artifactScratchUnavailable": "Das temporäre Sitzungsverzeichnis ist nicht verfügbar.",
   },
   "onboarding": {
     "title": "Erste Schritte",

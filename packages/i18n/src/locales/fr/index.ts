@@ -549,6 +549,8 @@ export const fr = {
     "untitled": "Plan sans titre",
     "openArtifact": "Plan ouvert",
     "openArtifactLabel": "Artefact de plan ouvert {{path}}",
+    "artifactSessionUnavailable": "La session propriétaire de ce plan n'est plus disponible.",
+    "artifactScratchUnavailable": "Le répertoire de session temporaire est indisponible.",
   },
   "goal": {
     "planning": "Définition de l'objectif",
@@ -567,6 +569,8 @@ export const fr = {
     "untitled": "Objectif sans titre",
     "openArtifact": "Objectif ouvert",
     "openArtifactLabel": "Artefact d'objectif ouvert {{path}}",
+    "artifactSessionUnavailable": "La session propriétaire de cet objectif n'est plus disponible.",
+    "artifactScratchUnavailable": "Le répertoire de session temporaire est indisponible.",
   },
   "onboarding": {
     "title": "Commencer",

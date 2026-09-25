@@ -558,6 +558,8 @@ export const ko = {
     untitled: "제목 없는 계획",
     openArtifact: "계획 열기",
     openArtifactLabel: "계획 아티팩트 {{path}} 열기",
+    artifactSessionUnavailable: "이 계획을 소유한 세션을 더 이상 사용할 수 없습니다.",
+    artifactScratchUnavailable: "임시 세션 디렉터리를 사용할 수 없습니다.",
   },
   goal: {
     planning: "목표 정의 중",
@@ -576,6 +578,8 @@ export const ko = {
     untitled: "제목 없는 목표",
     openArtifact: "목표 열기",
     openArtifactLabel: "목표 아티팩트 {{path}} 열기",
+    artifactSessionUnavailable: "이 목표를 소유한 세션을 더 이상 사용할 수 없습니다.",
+    artifactScratchUnavailable: "임시 세션 디렉터리를 사용할 수 없습니다.",
   },
   onboarding: {
     title: "시작하기",

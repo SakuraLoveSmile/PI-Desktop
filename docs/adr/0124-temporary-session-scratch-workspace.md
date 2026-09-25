@@ -23,8 +23,10 @@ hero copy for a temporary chat and for having no active session.
    mutable global workspace, and the existing containment and permission
    checks still apply. A missing-session compatibility call may retain the
    legacy global-workspace fallback.
-3. Plan and Goal workspace validation continues to require a persisted project
-   binding, so a scratch workspace does not broaden contract-mode execution.
+3. Originally Plan and Goal both required a persisted project binding.
+   [Temporary Goal workspaces](temporary-goal-scratch-workspace.md) amends this
+   for Goal only: its session scratch root also owns the checkpoint and approved
+   execution. Plan retains the persisted-project requirement.
 4. The renderer derives the empty-home hero state from the selected session:
    project sessions retain the project-underlined welcome, temporary sessions
    show dedicated temporary-chat copy without a project action, and no active
@@ -38,7 +40,7 @@ hero copy for a temporary chat and for having no active session.
   remains ephemeral and follows the existing session deletion/startup sweep.
 - Temporary sessions remain visibly and structurally distinct from project
   sessions without introducing a new session type or persistence migration.
-- Plan and Goal keep their existing project-root boundary.
+- Plan keeps its project-root boundary. Goal follows the amendment linked above.
 
 ## Alternatives considered
 

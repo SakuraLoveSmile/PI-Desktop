@@ -24,11 +24,11 @@ mod repository;
 
 pub use approval::{expire_pending_approvals, gate_session_configure};
 pub use model::{
-    kind_for_mode, normalize_kind, PlanArtifact, PlanExecution, PlanManager, PlanProposal,
-    PlanResolution, PlanResolveParams, PlanSubmitParams, EXECUTION_COMPLETED,
-    EXECUTION_INTERRUPTED, EXECUTION_QUEUED, EXECUTION_RUNNING, KIND_GOAL, KIND_PLAN,
-    PLAN_MAX_MARKDOWN_BYTES, STATUS_APPROVED, STATUS_EXPIRED, STATUS_INTERRUPTED, STATUS_PENDING,
-    STATUS_REJECTED,
+    kind_for_mode, normalize_kind, normalize_workspace_kind, PlanArtifact, PlanExecution,
+    PlanManager, PlanProposal, PlanResolution, PlanResolveParams, PlanSubmitParams,
+    EXECUTION_COMPLETED, EXECUTION_INTERRUPTED, EXECUTION_QUEUED, EXECUTION_RUNNING, KIND_GOAL,
+    KIND_PLAN, PLAN_MAX_MARKDOWN_BYTES, STATUS_APPROVED, STATUS_EXPIRED, STATUS_INTERRUPTED,
+    STATUS_PENDING, STATUS_REJECTED, WORKSPACE_KIND_PROJECT, WORKSPACE_KIND_SCRATCH,
 };
 
 pub(crate) use approval::plan_error;
@@ -37,8 +37,8 @@ pub(crate) use artifact::{
 };
 pub(crate) use execution::{execution_from_proposal, resolution_from_proposal};
 pub(crate) use repository::{
-    get_proposal, live_turn_belongs_to_session, proposal_from_row, session_submit_kind,
-    PROPOSAL_COLUMNS,
+    get_proposal, has_live_scratch_goal, live_turn_belongs_to_session, proposal_from_row,
+    session_submit_kind, temporary_goal_session_ids, PROPOSAL_COLUMNS,
 };
 
 #[cfg(test)]

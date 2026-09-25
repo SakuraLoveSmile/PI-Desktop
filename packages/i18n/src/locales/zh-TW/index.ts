@@ -553,6 +553,8 @@ export const zhTW = {
     untitled: "未命名規劃",
     openArtifact: "開啟規劃",
     openArtifactLabel: "開啟規劃檔案 {{path}}",
+    artifactSessionUnavailable: "擁有此規劃的對話已不可用。",
+    artifactScratchUnavailable: "暫存對話目錄不可用。",
   },
   goal: {
     planning: "正在明確目標",
@@ -571,6 +573,8 @@ export const zhTW = {
     untitled: "未命名目標",
     openArtifact: "開啟目標",
     openArtifactLabel: "開啟目標檔案 {{path}}",
+    artifactSessionUnavailable: "擁有此目標的對話已不可用。",
+    artifactScratchUnavailable: "暫存對話目錄不可用。",
   },
   onboarding: {
     title: "開始使用",
