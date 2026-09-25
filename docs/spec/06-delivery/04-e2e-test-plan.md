@@ -15213,3 +15213,27 @@ renderer's durable transcript reads. No real model or provider is contacted.
   `official-native-search.test.ts`; shared route tests reject lookalike hosts,
   unsafe URLs and unknown gateways. The UI fixture does not prove Host/SQLite
   persistence or live provider availability.
+
+### E2E-GOAL-temporary-workspace
+
+- **Preconditions:** Isolated Desktop profile/data directory, unrelated visible
+  project, temporary Goal session, loopback-only fixture model; no live keys.
+- **Steps:** Submit a Goal through the real sidecar, wait for its approval card,
+  open the exact artifact, approve Auto, and let the sidecar write the agreed
+  marker using the normal Write tool.
+- **Expected:** Submission pauses for approval; the artifact is under the
+  session's scratch `.pi/goal` directory and renders in the work panel. Approved
+  execution writes only in that session's workspace, keeps `projectPath` absent,
+  and returns the session to Agent. No implicit project or extra execution is
+  created. Existing project Plan/Goal behavior remains covered by the Plan suite.
+- **Recovery/negative coverage:** Rust regressions cover age-sweep retention,
+  orphan deletion, submission/approval isolation and temporary Plan rejection.
+  Runtime regressions cover failed/invalid submissions through the actual tool
+  outcome hook. Renderer tests cover delayed resolution with session changes.
+- **Specs:** 03-runtime/02-agent-runtime, 03-tools-and-permissions,
+  04-data-storage, 06-host-rpc-protocol; ADR temporary-goal-scratch-workspace.
+- **Acceptance:** A temporary Goal can be approved and produce inspectable work
+  without inheriting an unrelated workspace.
+- **Milestone:** Maintenance.
+- **Command:** `node scripts/e2e-temporary-goal.mjs` after the desktop and Host
+  builds. The script reports its isolated profile and screenshot directory.

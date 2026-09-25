@@ -49,12 +49,29 @@ pub fn remove_session_dir(data_dir: &Path, session_id: &str) {
 /// Startup sweep: drop scratch dirs whose session no longer exists and dirs
 /// untouched for more than MAX_AGE. Covers every path that skipped the
 /// regular per-session cleanup (crash, force-quit, external db edits).
-pub fn sweep(data_dir: &Path, live_session_ids: &HashSet<String>) {
+pub fn sweep(
+    data_dir: &Path,
+    live_session_ids: &HashSet<String>,
+    protected_session_ids: &HashSet<String>,
+) {
+    sweep_at(
+        data_dir,
+        live_session_ids,
+        protected_session_ids,
+        SystemTime::now(),
+    );
+}
+
+fn sweep_at(
+    data_dir: &Path,
+    live_session_ids: &HashSet<String>,
+    protected_session_ids: &HashSet<String>,
+    now: SystemTime,
+) {
     let base = base_dir(data_dir);
     let Ok(entries) = std::fs::read_dir(&base) else {
         return;
     };
-    let now = SystemTime::now();
     for entry in entries.flatten() {
         let path = entry.path();
         if !path.is_dir() {
@@ -68,7 +85,7 @@ pub fn sweep(data_dir: &Path, live_session_ids: &HashSet<String>) {
             .and_then(|mtime| now.duration_since(mtime).ok())
             .map(|age| age > MAX_AGE)
             .unwrap_or(false);
-        if live_session_ids.contains(&name) && !stale {
+        if live_session_ids.contains(&name) && (protected_session_ids.contains(&name) || !stale) {
             continue;
         }
         if let Err(error) = std::fs::remove_dir_all(&path) {
@@ -111,8 +128,28 @@ mod tests {
         std::fs::create_dir_all(&orphan).unwrap();
         let mut ids = HashSet::new();
         ids.insert("live".to_string());
-        sweep(dir.path(), &ids);
+        sweep(dir.path(), &ids, &HashSet::new());
         assert!(live.exists());
         assert!(!orphan.exists());
+    }
+
+    #[test]
+    fn sweep_preserves_stale_protected_goal_and_removes_other_stale_dirs() {
+        let dir = tempdir().unwrap();
+        let protected = session_dir(dir.path(), "goal").unwrap();
+        let ordinary = session_dir(dir.path(), "ordinary").unwrap();
+        let orphan = session_dir(dir.path(), "orphan").unwrap();
+        std::fs::create_dir_all(&protected).unwrap();
+        std::fs::create_dir_all(&ordinary).unwrap();
+        std::fs::create_dir_all(&orphan).unwrap();
+        let live = HashSet::from(["goal".to_string(), "ordinary".to_string()]);
+        let protected_ids = HashSet::from(["goal".to_string(), "orphan".to_string()]);
+        let future = SystemTime::now() + MAX_AGE + Duration::from_secs(1);
+
+        sweep_at(dir.path(), &live, &protected_ids, future);
+
+        assert!(protected.exists(), "stale Goal scratch must survive");
+        assert!(!ordinary.exists(), "stale ordinary scratch must be removed");
+        assert!(!orphan.exists(), "protected orphan must still be removed");
     }
 }

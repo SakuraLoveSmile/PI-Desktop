@@ -556,6 +556,8 @@ export const en = {
     untitled: "Untitled plan",
     openArtifact: "Open plan",
     openArtifactLabel: "Open plan artifact {{path}}",
+    artifactSessionUnavailable: "The session that owns this plan is no longer available.",
+    artifactScratchUnavailable: "The temporary session directory is unavailable.",
   },
   goal: {
     planning: "Defining goal",
@@ -574,6 +576,8 @@ export const en = {
     untitled: "Untitled goal",
     openArtifact: "Open goal",
     openArtifactLabel: "Open goal artifact {{path}}",
+    artifactSessionUnavailable: "The session that owns this goal is no longer available.",
+    artifactScratchUnavailable: "The temporary session directory is unavailable.",
   },
   onboarding: {
     title: "Get started",

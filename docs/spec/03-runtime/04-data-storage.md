@@ -583,6 +583,12 @@ always has the form `.pi/<kind>/<unique-name>.md`. One table serves both kinds
 (D198), so the single-pending-approval invariant, the execution queue, and every
 index are shared rather than duplicated.
 
+For an unbound temporary Goal session, `workspaceRoot` is its Host-owned
+`<data_dir>/scratch/<sessionId>` directory. The artifact keeps the same relative
+path/hash/size contract. Live sessions with a Goal checkpoint retain their
+scratch workspace across age sweeps; deleting the session still removes it.
+No database migration or automatic project binding is introduced.
+
 ```sql
 CREATE TABLE plan_approvals (
   request_id               TEXT PRIMARY KEY,

@@ -558,6 +558,8 @@ export const tr = {
     untitled: "Adsız plan",
     openArtifact: "Planı aç",
     openArtifactLabel: "Plan dosyasını aç {{path}}",
+    artifactSessionUnavailable: "Bu plana sahip oturum artık mevcut değil.",
+    artifactScratchUnavailable: "Geçici oturum dizini kullanılamıyor.",
   },
   goal: {
     planning: "Hedef tanımlanıyor",
@@ -576,6 +578,8 @@ export const tr = {
     untitled: "Adsız hedef",
     openArtifact: "Hedefi aç",
     openArtifactLabel: "Hedef dosyasını aç {{path}}",
+    artifactSessionUnavailable: "Bu hedefe sahip oturum artık mevcut değil.",
+    artifactScratchUnavailable: "Geçici oturum dizini kullanılamıyor.",
   },
   onboarding: {
     title: "Başlayın",

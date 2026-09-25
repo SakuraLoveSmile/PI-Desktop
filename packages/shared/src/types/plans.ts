@@ -37,11 +37,14 @@ export type PlanApprovalStatus =
 /** Compatibility name for the proposal-shaped approval wire record. */
 export type PlanProposalStatus = PlanApprovalStatus;
 
+export type ArtifactWorkspaceKind = "project" | "scratch";
+
 export type PlanArtifact = {
   /** Workspace-relative path of the host-created plan artifact. */
   relativePath: string;
   sha256: string;
   sizeBytes: number;
+  workspaceKind?: ArtifactWorkspaceKind;
 };
 
 export type PlanExecutionState =

@@ -1739,6 +1739,15 @@ export class DesktopAgentRuntime {
     target: string;
     lastErrorCode?: string;
   };
+  /** Why a Plan or Goal submission ended the turn, pending finalization. */
+  private pendingSubmissionOutcome?: {
+    kind: "plan" | "goal";
+    toolCallId: string;
+    turnEpoch: number;
+    status: "success" | "error";
+    errorCode?: string;
+    message?: string;
+  };
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
@@ -2047,6 +2056,9 @@ Delegation rules:
       // queued renderer prompt ends a completed turn at the next boundary,
       // without treating an error or abort as a graceful stop.
       finishTurn: async ({ message }) => {
+        if (this.pendingSubmissionOutcome?.turnEpoch === this.turnEpoch) {
+          return { action: "end" };
+        }
         if (!this.gracefulStopRequested) return;
         if (message.stopReason === "error" || message.stopReason === "aborted") return;
         this.gracefulStopRequested = false;
@@ -2218,13 +2230,26 @@ Delegation rules:
     };
   }
 
+  private isSubmissionTool(name: string): boolean {
+    return name === "SubmitPlan" || name === "SubmitGoal";
+  }
+
   private async afterToolCall(
     context: AfterToolCallContext,
   ): Promise<AfterToolCallResult | undefined> {
     const own = this.resolveOwnToolOutcome(context);
     const fromExtensions = await this.extensionToolResult(context, own);
     if (!fromExtensions) return own;
-    return { ...(own ?? {}), ...fromExtensions };
+    const merged: AfterToolCallResult = { ...(own ?? {}), ...fromExtensions };
+    if (this.isSubmissionTool(context.toolCall.name)) {
+      if (own?.isError || context.isError) {
+        merged.isError = true;
+      }
+      if (own?.terminate) {
+        merged.terminate = true;
+      }
+    }
+    return merged;
   }
 
   /** `tool_call` hook: an extension may block a call with a reason (spec 16 §6). */
@@ -5265,6 +5290,7 @@ Delegation rules:
             ? params.question.trim()
             : "";
         if (!title || !markdown.trim() || !question) {
+          this.failedHostToolCalls.add(toolCallId);
           return {
             content: [
               {
@@ -5293,6 +5319,16 @@ Delegation rules:
           const errorCode =
             (error as { data?: { errorCode?: string } })?.data?.errorCode ??
             "PLAN_SUBMIT_FAILED";
+          this.failedHostToolCalls.add(toolCallId);
+          this.terminatingToolCalls.add(toolCallId);
+          this.pendingSubmissionOutcome = {
+            kind,
+            toolCallId,
+            turnEpoch: this.turnEpoch,
+            status: "error",
+            errorCode,
+            message: `${modeLabel(kind)} submission failed: ${errorCode}`,
+          };
           return {
             content: [
               {
@@ -5316,6 +5352,16 @@ Delegation rules:
           typeof proposal.artifact.sha256 !== "string" ||
           typeof proposal.artifact.sizeBytes !== "number"
         ) {
+          this.failedHostToolCalls.add(toolCallId);
+          this.terminatingToolCalls.add(toolCallId);
+          this.pendingSubmissionOutcome = {
+            kind,
+            toolCallId,
+            turnEpoch: this.turnEpoch,
+            status: "error",
+            errorCode: "PLAN_SUBMIT_FAILED",
+            message: `${modeLabel(kind)} submission returned an invalid proposal.`,
+          };
           return {
             content: [
               {
@@ -5342,6 +5388,13 @@ Delegation rules:
           executionState: proposal.executionState,
           proposal,
         });
+        this.terminatingToolCalls.add(toolCallId);
+        this.pendingSubmissionOutcome = {
+          kind,
+          toolCallId,
+          turnEpoch: this.turnEpoch,
+          status: "success",
+        };
         return {
           content: [
             {
@@ -5731,6 +5784,7 @@ Delegation rules:
     this.mutationFailureCounts.clear();
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
+    this.pendingSubmissionOutcome = undefined;
     this.terminatingToolCalls.clear();
     this.turnHadError = false;
   }
@@ -7676,7 +7730,23 @@ Delegation rules:
           ...(subagentUsage ? { subagentUsage } : {}),
         });
         break;
-      case "agent_end":
+      case "agent_end": {
+        if (this.pendingSubmissionOutcome?.turnEpoch === this.turnEpoch) {
+          const outcome = this.pendingSubmissionOutcome;
+          this.pendingSubmissionOutcome = undefined;
+          this.acceptingSteering = false;
+          this.retainPendingSteering();
+          this.autonomousExecution = false;
+          this.clearAgentActivity();
+          if (outcome.status === "error") {
+            this.reportSubmissionTermination(outcome);
+          }
+          this.emit({
+            type: "agent_end",
+            messageIds: [],
+          });
+          break;
+        }
         // Input admitted after pi's last queue poll still belongs to this turn.
         // Continue after the current run settles; never wake the follow-up FIFO.
         if (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) break;
@@ -7698,6 +7768,7 @@ Delegation rules:
           messageIds: [],
         });
         break;
+      }
       default:
         break;
     }
@@ -7710,6 +7781,33 @@ Delegation rules:
    * learns the agent stopped on purpose, and the UI keeps its continue
    * affordance (spec 18-line-anchored-edit-contract §9.3).
    */
+  private reportSubmissionTermination(outcome: {
+    kind: "plan" | "goal";
+    toolCallId: string;
+    errorCode?: string;
+    message?: string;
+  }): void {
+    const errorCode = outcome.errorCode || "PLAN_SUBMIT_FAILED";
+    const recovery = `${modeLabel(outcome.kind)} submission could not be completed.`;
+    const message =
+      outcome.message ||
+      `${modeLabel(outcome.kind)} submission failed: ${errorCode}. ${recovery}`;
+    const error = {
+      code: errorCode,
+      message,
+      retriable: true,
+      details: {
+        kind: outcome.kind,
+        toolCallId: outcome.toolCallId,
+        errorCode,
+        recovery,
+      },
+    };
+    this.terminateParentTurn();
+    this.finalizeCurrentAssistant("error", error);
+    this.emit({ type: "error", error });
+  }
+
   private reportMutationTermination(): void {
     const termination = this.pendingMutationTermination;
     if (!termination) return;
@@ -8279,6 +8377,7 @@ Delegation rules:
     this.mutationFailureCounts.clear();
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
+    this.pendingSubmissionOutcome = undefined;
     this.terminatingToolCalls.clear();
     this.delegateToolCalls.clear();
     this.appendedDelegationRowIds.clear();

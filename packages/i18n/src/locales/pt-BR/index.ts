@@ -546,7 +546,9 @@ export const ptBR = {
     reject: "Rejeitar",
     untitled: "Plano sem título",
     openArtifact: "Abrir plano",
-    openArtifactLabel: "Abrir artefato do plano {{path}}"
+    openArtifactLabel: "Abrir artefato do plano {{path}}",
+    artifactSessionUnavailable: "A sessão proprietária deste plano não está mais disponível.",
+    artifactScratchUnavailable: "O diretório temporário da sessão está indisponível.",
   },
   goal: {
     planning: "Definindo objetivo",
@@ -564,7 +566,9 @@ export const ptBR = {
     reject: "Rejeitar",
     untitled: "Objetivo sem título",
     openArtifact: "Abrir objetivo",
-    openArtifactLabel: "Abrir artefato do objetivo {{path}}"
+    openArtifactLabel: "Abrir artefato do objetivo {{path}}",
+    artifactSessionUnavailable: "A sessão proprietária deste objetivo não está mais disponível.",
+    artifactScratchUnavailable: "O diretório temporário da sessão está indisponível.",
   },
   onboarding: {
     title: "Primeiros passos",

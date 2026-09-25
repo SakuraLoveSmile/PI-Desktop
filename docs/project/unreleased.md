@@ -46,3 +46,10 @@
 - OpenAI Codex OAuth models can now opt into provider-hosted native web search.
   The feature remains off by default and search history is replayed only for
   the same Codex model.
+
+- Temporary Goal sessions now own their Host scratch workspace: negotiate,
+  approve, and execute Goals without a pre-bound project. Proposals and execution
+  outputs remain isolated to the owning session scratch directory and survive age
+  sweeps for the lifetime of the session. Persisted origin markers preserve
+  artifact resolution even after moving to a project. Failed submissions visibly
+  terminate with structured errors rather than reporting false completions.
