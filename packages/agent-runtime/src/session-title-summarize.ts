@@ -51,17 +51,51 @@ export function sessionTitleSummarizeContext(
     ],
   };
 }
+const CJK_REGEX = /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/;
+const URL_PATTERN = /^(https?|ftp|file):\/\/\S+$/i;
+const ABSOLUTE_PATH_PATTERN = /^([a-zA-Z]:[\\/]|\/|\/{2}|\\{2})\S*/;
+
+export function truncateGraphemes(str: string, maxGraphemes: number): string {
+  if (typeof Intl !== "undefined" && Intl.Segmenter) {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    const segments = Array.from(segmenter.segment(str));
+    if (segments.length <= maxGraphemes) return str;
+    return segments.slice(0, maxGraphemes).map((s) => s.segment).join("").trim();
+  }
+  const chars = Array.from(str);
+  if (chars.length <= maxGraphemes) return str;
+  return chars.slice(0, maxGraphemes).join("").trim();
+}
+
+export function truncateWords(str: string, maxWords: number): string {
+  const words = str.split(" ");
+  if (words.length <= maxWords) return str;
+  return words.slice(0, maxWords).join(" ").trim();
+}
 
 export function cleanSummarizedTitle(raw: string): string {
   let text = raw.trim();
   // Remove markdown quotes, code blocks, bold markers
-  text = text.replace(/^[`"'\u201c\u201d\u300c\u300d]+|[`"'\u201c\u201d\u300c\u300d]+$/g, "").trim();
+  text = text.replace(/^[`"'“ ”「」]+|[`"'“ ”「」]+$/g, "").trim();
   // Remove possible "Title: " prefix
   text = text.replace(/^(Title|Session Title|会话标题|标题)\s*[:：]\s*/i, "").trim();
   // Collapse whitespace
   text = text.replace(/\s+/g, " ");
   // Remove trailing period or punctuation
   text = text.replace(/[.。!！?？]+$/, "").trim();
+
+  // Reject empty, pure URLs, or absolute paths
+  if (!text || URL_PATTERN.test(text) || ABSOLUTE_PATH_PATTERN.test(text)) {
+    return "";
+  }
+
+  // Enforce length caps: <= 25 graphemes for CJK text, <= 7 words for space-separated text
+  if (CJK_REGEX.test(text)) {
+    text = truncateGraphemes(text, 25);
+  } else {
+    text = truncateWords(text, 7);
+  }
+  text = text.replace(/[.。!！?？,，;；:：-]+$/, "").trim();
   return text.slice(0, 80);
 }
 

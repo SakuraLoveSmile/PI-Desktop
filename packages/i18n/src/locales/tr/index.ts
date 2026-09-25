@@ -1191,6 +1191,8 @@ sklm: {
     enterToSendDesc: "Kapalı: göndermek için ⌘/Ctrl+Enter.",
     infiniteProviderRetry: "Başarılı olana kadar yeniden dene",
     infiniteProviderRetryDesc: "Ağ ve geçici sağlayıcı hataları istek başarılı olana kadar yeniden denenir. Çalışmayı yine durdurabilirsiniz; açıkken API kullanımı sürebilir.",
+    autoGenerateSessionTitles: "Otomatik oturum başlıkları",
+    autoGenerateSessionTitlesDesc: "İlk turdan sonra konuşmayı otomatik olarak kısa bir başlıkla özetler. İlk istemin ve yanıtın sınırlı bir özetini seçilen modele gönderir ve kullanım oluşturabilir.",
     smoothStreaming: "Düzgün akış",
     smoothStreamingDesc: "Akan metni daktilo efekti için karakter karakter gösterir. Sistem hareket azaltmayı tercih ettiğinde otomatik devre dışı kalır.",
     preventScreenSleep: "Ekran uykusunu engelle",

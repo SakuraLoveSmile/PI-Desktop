@@ -1177,6 +1177,8 @@ sklm: {
     enterToSendDesc: "关闭后按 ⌘/Ctrl+Enter 发送。",
     infiniteProviderRetry: "无尽重试",
     infiniteProviderRetryDesc: "网络或临时服务故障会一直重试直到成功。仍可随时停止，但开启后可能持续消耗 API 用量。",
+    autoGenerateSessionTitles: "自动会话标题",
+    autoGenerateSessionTitlesDesc: "在首轮对话完成后自动生成简短的会话标题。会将首轮提示词与回答的简短摘要发送给所选模型，可能会消耗用量。",
     smoothStreaming: "平滑流式显示",
     smoothStreamingDesc: "将流式文本逐字释放，产生打字机效果。系统开启“减少动态效果”时自动禁用。",
     preventScreenSleep: "阻止屏幕休眠",

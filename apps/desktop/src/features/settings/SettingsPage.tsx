@@ -506,6 +506,21 @@ export function SettingsPage() {
                   />
                 </SettingsRow>
                 <SettingsRow
+                  title={t("settings.autoGenerateSessionTitles")}
+                  description={t("settings.autoGenerateSessionTitlesDesc")}
+                >
+                  <SettingsToggle
+                    checked={settings.autoGenerateSessionTitles !== false}
+                    label={t("settings.autoGenerateSessionTitles")}
+                    onChange={() =>
+                      void saveSettings({
+                        autoGenerateSessionTitles:
+                          !(settings.autoGenerateSessionTitles !== false),
+                      })
+                    }
+                  />
+                </SettingsRow>
+                <SettingsRow
                   title={t("settings.smoothStreaming")}
                   description={t("settings.smoothStreamingDesc")}
                 >

@@ -23,6 +23,8 @@ export type SessionMeta = {
   order?: number;
   /** Survives renderer restarts so automatic titles never replace a manual one. */
   manualTitle?: boolean;
+  /** Survives renderer restarts so an attempted automatic summarization does not recur. */
+  autoTitleAttempted?: boolean;
 };
 export const MAX_PROJECT_NAME_CHARS = 80;
 export type ProjectMeta = {
@@ -118,6 +120,8 @@ function cleanSessionMeta(value: unknown): Record<string, SessionMeta> {
     if (archived !== undefined) item.archived = archived;
     if (order !== undefined) item.order = order;
     if (manualTitle !== undefined) item.manualTitle = manualTitle;
+    const autoTitleAttempted = bool(raw.autoTitleAttempted);
+    if (autoTitleAttempted !== undefined) item.autoTitleAttempted = autoTitleAttempted;
     if (Object.keys(item).length) output[id] = item;
   }
   return output;
@@ -242,6 +246,14 @@ export function projectIsArchived(path: string, meta: Record<string, ProjectMeta
 export function projectIsCollapsed(path: string, meta: Record<string, ProjectMeta>): boolean {
   const key = normalizeProjectPath(path);
   return !!key && meta[key]?.collapsed === true;
+}
+export function markSessionAutoTitleAttempted(sessionId: string): void {
+  const current = loadSidebarPreferences();
+  current.sessionMeta[sessionId] = {
+    ...current.sessionMeta[sessionId],
+    autoTitleAttempted: true,
+  };
+  saveSidebarPreferences(current);
 }
 
 export type SidebarProject = Pick<ProjectWorkspace, "path" | "name" | "branch"> & {
