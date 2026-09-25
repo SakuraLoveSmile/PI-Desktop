@@ -37,8 +37,12 @@ test("a new service starts on a searchable chooser, not a closed menu (D625)", (
   assert.doesNotMatch(catalogSource, /\bapi\.\w+\(/);
 });
 
-test("subscriptions and API services share the chooser, custom endpoint last", () => {
-  assert.match(chooserSource, /\[\.\.\.namedServiceOptions\(t\), customServiceOption\(t\)\]/);
+test("subscriptions and API services share the chooser, custom endpoint first", () => {
+  assert.match(chooserSource, /\[customServiceOption\(t\), \.\.\.namedServiceOptions\(t\)\]/);
+  // The custom endpoint is the group's first tile, ahead of every named host.
+  const customAt = chooserSource.indexOf("customServiceOption(t)");
+  const namedAt = chooserSource.indexOf("namedServiceOptions(t)");
+  assert.ok(customAt > 0 && customAt < namedAt, "the custom endpoint leads the API-key group");
   assert.match(chooserSource, /settings\.chooserSubscriptions/);
   assert.match(chooserSource, /settings\.chooserApiKeys/);
   const subscriptionsAt = chooserSource.indexOf("settings.chooserSubscriptions");

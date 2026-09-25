@@ -5032,3 +5032,13 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   标记、自定义端点排最后、账号对话框打开在 `provider-models-summary` 上、每模型
   控件位于"管理模型"和折叠的"高级"展开项之后）。厂商 OAuth 账号仍由 ADR 0098
   管辖。
+
+## 2026-09-25 —— 自定义端点排在 API-key 组首位（D626）
+
+- 服务选择器按共享预设顺序列出 API-key 磁贴，把自定义端点放在它们之后，于是要
+  连上自己的地址就得先滚过所有具名厂商。自定义端点现在排在所在组首位：它是唯一
+  不需要先找到什么的选择，而该组仍然是"用 API key 连接"。分组顺序不变（订阅
+  仍在 API-key 服务之上），键盘遍历也仍从网格第一个磁贴进入。
+- 覆盖：更新后的 `apps/desktop/test/service-chooser.test.mjs`，以及
+  `scripts/e2e/provider-api-style.tsx` 探针——它现在断言第一个
+  `[data-service-id]` 磁贴是 `custom`，而不是最后一个。
