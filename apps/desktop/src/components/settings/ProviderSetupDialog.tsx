@@ -30,9 +30,19 @@ import { ServiceChooser } from "./ServiceChooser";
 import { CUSTOM_SERVICE } from "./service-catalog";
 import { useRecommendedModelSelection } from "./useRecommendedModelSelection";
 import type { ProviderCopyDraft } from "./provider-copy";
-import { isAccountOnlyApiStyle, needsCustomApiStyleChoice, providerSetupPreset } from "./provider-api-style";
+import {
+  API_STYLE_LABEL_KEYS,
+  isAccountOnlyApiStyle,
+  needsCustomApiStyleChoice,
+  providerSetupPreset,
+} from "./provider-api-style";
 
-import { getBaseUrlIssue, normalizeBaseUrlInput } from "./provider-endpoint-guidance";
+import {
+  endpointsEqual,
+  getBaseUrlIssue,
+  normalizeBaseUrlInput,
+  resolveEndpointDraft,
+} from "./provider-endpoint-guidance";
 import { ProviderEndpointGuidance } from "./ProviderEndpointGuidance";
 
 function serviceIdFor(provider?: ProviderPublic | null): string {
@@ -92,6 +102,8 @@ export function ProviderSetupDialog({
   const [error, setError] = useState("");
   const [testResult, setTestResult] = useState("");
   const [baseUrlTouched, setBaseUrlTouched] = useState(false);
+  // A format the user picked by hand outranks every inference about this row.
+  const [apiStyleTouched, setApiStyleTouched] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [managing, setManaging] = useState(false);
   const customModelRef = useRef<HTMLInputElement>(null);
@@ -102,7 +114,26 @@ export function ProviderSetupDialog({
   const custom = service === CUSTOM_SERVICE;
   const resolvedName = namedPreset ? name.trim() || namedPreset.name : name;
   const resolvedBaseUrl = namedPreset?.baseUrl ?? baseUrl;
-  const resolvedApiStyle: CatalogApiStyle = namedPreset?.apiStyle ?? apiStyle;
+  /*
+    Endpoint resolution decides the format when the endpoint itself names one:
+    a pasted operation, a published service address, or a known host. A format
+    that already has an owner — the user's own pick, a named preset's, or the
+    one stored on the row being edited — is never overridden. Inference is for
+    a row that does not have an answer yet.
+  */
+  const endpointDraft = resolveEndpointDraft(
+    resolvedBaseUrl,
+    namedPreset?.apiStyle ?? apiStyle,
+    named || editing || Boolean(initialDraft) || apiStyleTouched,
+  );
+  const resolvedApiStyle: CatalogApiStyle = endpointDraft.apiStyle;
+  // Said out loud next to the format selector: an automatic decision the user
+  // cannot see would be exactly the hidden rewrite this row must not have.
+  const endpointFormatNote = endpointDraft.autoDetected
+    ? t("settings.apiStyleAutoDetected", {
+        format: t(API_STYLE_LABEL_KEYS[resolvedApiStyle]),
+      })
+    : undefined;
   const baseUrlIssue = getBaseUrlIssue(resolvedBaseUrl);
   const baseUrlError =
     baseUrlTouched && baseUrlIssue ? t("settings.baseUrlInvalid") : undefined;
@@ -137,6 +168,23 @@ export function ProviderSetupDialog({
   });
   // Every edit made through the picker or the summary ends preselection.
   const selection = useModelSelection(discovery, models, recommended.setModels);
+
+  /*
+    The address that answered is what the field shows and the row saves. Only a
+    field still holding the address the answer belongs to is updated: a URL
+    typed since that probe belongs to the user, and a named preset carries its
+    own address. Comparing against the address the answer was produced for —
+    not against the field's rewritten form — is what keeps a fresh paste from
+    being reverted to the previous result.
+  */
+  const discoveredBaseUrl = discovery.effectiveBaseUrl;
+  const adoptedFrom = discovery.resolvedFrom;
+  useEffect(() => {
+    if (named || !discoveredBaseUrl || !adoptedFrom) return;
+    setBaseUrl((current) => (endpointsEqual(current, adoptedFrom) ? discoveredBaseUrl : current));
+  }, [named, discoveredBaseUrl, adoptedFrom]);
+
+
 
   // A list with nothing to recommend leaves the choice to the user, so the
   // picker opens instead of an empty summary.
@@ -174,6 +222,9 @@ export function ProviderSetupDialog({
     const previous = namedPreset;
     setService(next);
     setBaseUrlTouched(false);
+    // A format picked for the previous service does not carry over: the new
+    // service's own format, or the new address, decides again.
+    setApiStyleTouched(false);
     const preset = NAMED_ENDPOINT_PRESETS.find((item) => item.id === next);
     if (!preset) {
       if (next === CUSTOM_SERVICE && apiStyle === OPENCODE_GO_API_STYLE) {
@@ -406,7 +457,13 @@ export function ProviderSetupDialog({
             commitBaseUrl={commitBaseUrl}
             baseUrlError={baseUrlError}
             apiStyle={apiStyle}
-            onApiStyleChange={setApiStyle}
+            onApiStyleChange={(value) => {
+              // A hand-picked format is the user's answer and outranks the
+              // endpoint's own suggestion from here on.
+              setApiStyleTouched(true);
+              setApiStyle(value);
+            }}
+            apiStyleNote={endpointFormatNote}
             accountOnlyApiStyle={accountOnlyApiStyle}
             requiresApiStyleChoice={requiresApiStyleChoice}
             status={<ConnectionStatus active={discoveryActive} discovery={discovery} named={named} />}

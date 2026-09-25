@@ -1290,6 +1290,7 @@ export const ptBR = {
     presetTogether: "Together AI",
     presetFireworks: "Fireworks",
     presetDeepseek: "DeepSeek",
+    apiStyleAutoDetected: "Detectado automaticamente: {{format}}",
     endpointFormatGuidance: "Este URL de solicitação indica {{format}}. Aplique o formato e o endereço base correspondentes; isso não verifica a conexão nem a capacidade de pesquisa.",
     applyEndpointFormat: "Aplicar formato sugerido",
     presetAlibabaCn: "Qwen (DashScope)",

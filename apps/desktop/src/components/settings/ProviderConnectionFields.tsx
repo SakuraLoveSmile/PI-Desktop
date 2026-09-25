@@ -87,6 +87,8 @@ export type ProviderConnectionFieldsProps = {
   baseUrlError?: string;
   apiStyle: CatalogApiStyle;
   onApiStyleChange: (value: CatalogApiStyle) => void;
+  /** What the endpoint itself said about the format, when it said anything. */
+  apiStyleNote?: string;
   accountOnlyApiStyle: boolean;
   requiresApiStyleChoice: boolean;
   status: ReactNode;
@@ -112,6 +114,7 @@ export function ProviderConnectionFields({
   baseUrlError,
   apiStyle,
   onApiStyleChange,
+  apiStyleNote,
   accountOnlyApiStyle,
   requiresApiStyleChoice,
   status,
@@ -220,9 +223,9 @@ export function ProviderConnectionFields({
             </Field>
             <Field
               label={t("settings.apiStyle")}
-              hint={accountOnlyApiStyle ? t(requiresApiStyleChoice
+              hint={apiStyleNote ?? (accountOnlyApiStyle ? t(requiresApiStyleChoice
                 ? "settings.apiStyleChooseCustom"
-                : "settings.apiStyleLegacyAccount") : undefined}
+                : "settings.apiStyleLegacyAccount") : undefined)}
             >
               <SettingsMenuSelect
                 fullWidth

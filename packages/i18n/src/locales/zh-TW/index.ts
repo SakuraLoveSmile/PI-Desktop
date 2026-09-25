@@ -1313,6 +1313,7 @@ sklm: {
     presetTogether: "Together AI",
     presetFireworks: "Fireworks",
     presetDeepseek: "DeepSeek",
+    apiStyleAutoDetected: "自動辨識：{{format}}",
     endpointFormatGuidance: "此請求位址對應 {{format}}。可套用相符的介面格式和基礎位址；這不代表連線或搜尋能力已驗證。",
     applyEndpointFormat: "套用建議格式",
     presetAlibabaCn: "通義千問",

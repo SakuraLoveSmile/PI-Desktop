@@ -1329,6 +1329,7 @@ sklm: {
     presetTogether: "Together AI",
     presetFireworks: "Fireworks",
     presetDeepseek: "DeepSeek",
+    apiStyleAutoDetected: "Otomatik algılandı: {{format}}",
     endpointFormatGuidance: "Bu istek URL’si {{format}} biçimini gösteriyor. Eşleşen biçimi ve temel adresi uygulayın; bu, bağlantıyı veya arama yeteneğini test etmez.",
     applyEndpointFormat: "Önerilen biçimi uygula",
     presetAlibabaCn: "Qwen (DashScope)",

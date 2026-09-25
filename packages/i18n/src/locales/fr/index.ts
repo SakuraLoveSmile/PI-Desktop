@@ -1326,6 +1326,7 @@ sklm: {
     "presetTogether": "Ensemble AI",
     "presetFireworks": "Feux d'artifice",
     "presetDeepseek": "DeepSeek",
+    apiStyleAutoDetected: "Détecté automatiquement : {{format}}",
     endpointFormatGuidance: "Cette URL de requête indique {{format}}. Appliquez le format et l’adresse de base correspondants ; cela ne vérifie ni la connexion ni la recherche.",
     applyEndpointFormat: "Appliquer le format suggéré",
     "presetAlibabaCn": "Qwen (DashScope)",
