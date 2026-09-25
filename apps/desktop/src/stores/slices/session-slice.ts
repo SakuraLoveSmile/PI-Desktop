@@ -111,6 +111,7 @@ export function createSessionSlice({
   | "refreshSessions"
   | "restorePendingPlan"
   | "refreshPlanCheckpoints"
+  | "refreshGoalReports"
   | "prefetchSession"
   | "selectSession"
   | "newSession"
@@ -218,6 +219,21 @@ export function createSessionSlice({
       await Promise.allSettled(
         sessionIds.map((sessionId) => get().restorePendingPlan(sessionId)),
       );
+    },
+
+    refreshGoalReports: async (sessionId: string) => {
+      if (!sessionId) return;
+      try {
+        const { reports } = await api.listGoalReports({ sessionId });
+        set((state) => ({
+          goalReports: {
+            ...state.goalReports,
+            [sessionId]: reports ?? [],
+          },
+        }));
+      } catch {
+        // Silently skip if host call fails or session is non-existent
+      }
     },
 
     prefetchSession: async (id) => {
@@ -421,6 +437,7 @@ export function createSessionSlice({
         }
         rememberSessionCompactions(id, detail.session);
         void get().restorePendingPlan(id);
+        void get().refreshGoalReports(id);
         void get().acknowledgeSessionOutcome(id);
         const selected = get().sessions.find((session) => session.id === id);
         if (

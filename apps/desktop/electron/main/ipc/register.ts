@@ -1,3 +1,4 @@
+import { registerGoalReportIpc } from "./goal-report-ipc.js";
 import { join } from "node:path";
 import { dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
 import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";

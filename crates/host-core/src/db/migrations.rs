@@ -839,3 +839,26 @@ pub(crate) fn migrate_v18_to_v19(conn: &Connection, path: &Path) -> Result<()> {
     let _ = conn.pragma_update(None, "foreign_keys", true);
     result
 }
+
+fn migrate_v19_to_v20_tx(tx: &rusqlite::Transaction) -> Result<()> {
+    tx.execute_batch(crate::goal_reports::SCHEMA)?;
+    tx.pragma_update(None, "user_version", 20i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v19_to_v20(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 19)?;
+    conn.pragma_update(None, "foreign_keys", false)?;
+    let result = (|| {
+        let tx = conn.unchecked_transaction()?;
+        migrate_v19_to_v20_tx(&tx)?;
+        tx.commit().with_context(|| {
+            format!(
+                "commit schema v19 to v20 migration; backup {} remains",
+                backup.display()
+            )
+        })
+    })();
+    let _ = conn.pragma_update(None, "foreign_keys", true);
+    result
+}
