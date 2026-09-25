@@ -2172,6 +2172,7 @@ export {
   type PluginComposerControlSlotRegistration,
   type PluginSlotRegistration,
   type PluginDisposer,
+  type PluginLayer,
   type PluginRendererActionName,
   type PluginRendererActionMap,
   type PluginRendererDispatch,
