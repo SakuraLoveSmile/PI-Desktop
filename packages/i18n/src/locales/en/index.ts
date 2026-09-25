@@ -2076,6 +2076,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       commands: "Commands",
       tools: "Agent tools",
       agentExtension: "Agent extension",
+      rendererUi: "Chat UI extension",
       skills: "Skills",
       themes: "Theme",
       mcp: "MCP server",

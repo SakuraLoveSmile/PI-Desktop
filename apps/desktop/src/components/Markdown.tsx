@@ -139,7 +139,7 @@ function getThemeSnapshot(): ThemeMode {
 }
 
 function useThemeMode(): ThemeMode {
-  return useSyncExternalStore(subscribeTheme, getThemeSnapshot);
+  return useSyncExternalStore(subscribeTheme, getThemeSnapshot, getThemeSnapshot);
 }
 
 /* ---------- syntax highlighting ---------- */
@@ -174,7 +174,11 @@ function useHighlightedTokens(
 ): ThemedToken[][] | null {
   const resolved = resolveLang(lang);
   const mode = useThemeMode();
-  const version = useSyncExternalStore(subscribeHighlighter, getHighlightVersion);
+  const version = useSyncExternalStore(
+    subscribeHighlighter,
+    getHighlightVersion,
+    getHighlightVersion,
+  );
   useEffect(() => {
     if (resolved) ensureLang(resolved);
   }, [resolved]);
@@ -474,9 +478,11 @@ function PreBlock({
   if (blockEntry) {
     return (
       <PluginBlockRenderer
+        key={blockEntry.id}
         entry={blockEntry}
         language={info.lang}
         source={info.code}
+        sourcePosition={sourcePositionProps(rest)}
         fallback={
           <CodeBlock code={info.code} lang={info.lang} {...sourcePositionProps(rest)} />
         }

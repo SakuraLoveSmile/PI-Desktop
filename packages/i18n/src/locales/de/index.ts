@@ -2057,6 +2057,7 @@ sklm: {
       "commands": "Befehle",
       "tools": "Agententools",
       "agentExtension": "Agent-Erweiterung",
+      "rendererUi": "Chat-UI-Erweiterung",
       "skills": "Fähigkeiten",
       "themes": "Thema",
       "mcp": "MCP-Server",
