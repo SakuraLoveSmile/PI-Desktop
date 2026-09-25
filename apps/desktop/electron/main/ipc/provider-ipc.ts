@@ -3,7 +3,7 @@ import {
   ErrorCodes,
   inferEndpointProfile,
   normalizeApiStyle,
-  resolveBindingContextWindow,
+  resolveBindingLimits,
   type ModelBinding,
   type ProviderReorderInput,
   type OAuthRespondInput,
@@ -404,7 +404,7 @@ export function registerProviderIpc({
           modelId: model.modelId,
         });
         const storedModel = provider ? bindingForModel(provider, model.modelId) : undefined;
-        const resolvedModel = resolveBindingContextWindow(catalogModelConfig, storedModel);
+        const resolvedModel = resolveBindingLimits(catalogModelConfig, storedModel);
         const modelConfig = modelConfigWithBinding(
           resolvedModel.catalogConfig,
           resolvedModel.binding,

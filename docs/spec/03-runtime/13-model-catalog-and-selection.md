@@ -317,28 +317,31 @@ field records a models.dev match; a provider cache stores only normalized
 selection fields and is re-decorated from the local raw catalog on the next
 read.
 
-### 9.1 Effective context window
+### 9.1 Effective model limits
 
 The runtime, the context inspector and the settings surface resolve one effective
-model window. Every binding records where its `contextWindow` came from
-(`contextWindowSource`):
+model window and output cap. Every binding records where its `contextWindow` came
+from (`contextWindowSource`), and the same marker governs `maxTokens`:
 
 - `catalog` — the number is a models.dev snapshot, so a later correction to the
-  published `limit.context` replaces it. A refreshed record such as
-  `gpt-5.6-luna` (`1,050,000` tokens) stops appearing as a 128k model, and a limit
-  that models.dev corrects reaches the binding without deleting and re-adding the
-  model. Only a resolved models.dev record counts as published: when the lookup
-  misses and falls back to the generic shape (for example a custom gateway URL
-  serving an id several publishers list), its `128,000` is not a correction, and
-  the stored catalog snapshot stays in force.
+  published `limit.context` or `limit.output` replaces it. A refreshed record
+  such as `gpt-5.6-luna` (`1,050,000` tokens) stops appearing as a 128k model, a
+  row added while nothing published its id stops reporting the generic 8.2k
+  output once the record resolves, and a limit that models.dev corrects reaches
+  the binding without deleting and re-adding the model. Only a resolved
+  models.dev record counts as published: when the lookup misses and falls back to
+  the generic shape (for example a custom gateway URL serving an id several
+  publishers list), its `128,000` and `8,192` are not a correction, and the
+  stored catalog snapshot stays in force.
 - `user` — the number was entered through the per-model Advanced control (or the
   preset ladder in it) and is never replaced by the catalog, including the
-  `128,000` value that is otherwise the generic seed.
+  `128,000` and `8,192` values that are otherwise the generic seed.
 
 Bindings written before the marker name no source. They keep the historical rule,
 deterministically: a published `limit.context` replaces exactly the generic
-`128,000` seed, and every other stored value stays the explicit value. Unknown
-models still use the conservative 128k generic window and are never promoted from
+`128,000` seed and a published `limit.output` replaces exactly the generic
+`8,192`, and every other stored value stays the explicit value. Unknown models
+still use the conservative 128k / 8.2k generic limits and are never promoted from
 an ID pattern alone. The marker is optional in the persisted record, so a config
 written by an older version stays readable and a downgrade ignores it.
 
