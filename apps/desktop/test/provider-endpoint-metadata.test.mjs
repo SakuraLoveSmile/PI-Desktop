@@ -1,14 +1,16 @@
 /**
- * A custom endpoint on a published host still gets that publisher's metadata.
+ * A custom endpoint gets the metadata the catalog can justify for it.
  *
- * The reported failure: a custom row pointed at `https://open.bigmodel.cn/api/v1`
- * (the Zhipu OpenAI Responses endpoint) listed its models but showed a generic
- * 128k / 8k text-only row for every one of them, while the same models are fully
- * described in models.dev — the catalog only accepted that host's own published
- * path, and the row declared no publisher of its own.
+ * Two reported failures live here. A custom row pointed at
+ * `https://open.bigmodel.cn/api/v1` (Zhipu's OpenAI Responses endpoint) listed
+ * its models but showed a generic 128k / 8k text-only row for every one of them,
+ * because the catalog only accepted that host's own published path. And a row on
+ * a relay the catalog cannot place got nothing at all for models the catalog
+ * describes, because one publisher's record must never answer for another.
  *
- * This drives the real `providersListModels` handler with the bundled snapshot,
- * so it pins the whole chain: discovery, endpoint resolution, catalog anchoring.
+ * This drives the real handlers with the bundled snapshot, so it pins the whole
+ * chain: discovery, endpoint resolution, catalog anchoring, and the hand-typed
+ * id channel.
  */
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -29,8 +31,8 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-/** Register the real list-models handler against one row and one served list. */
-async function listModelsFor(t, row, body) {
+/** Register the real handlers against one row and one served model list. */
+async function handlersFor(t, row, body) {
   const catalog = new ModelsDevCatalog({ catalogPath });
   assert.equal(await catalog.ensureLoaded(), true, "the bundled snapshot must load");
 
@@ -64,23 +66,40 @@ async function listModelsFor(t, row, body) {
     bindingForModel: () => undefined,
   });
 
-  const handler = handlers.get(IPC.invoke.providersListModels);
-  assert.equal(typeof handler, "function", "list-models handler is not registered");
-  return { result: await handler({ providerId: row.id, source: "refresh" }), calls };
+  const listModels = handlers.get(IPC.invoke.providersListModels);
+  assert.equal(typeof listModels, "function", "list-models handler is not registered");
+  const lookupModel = handlers.get(IPC.invoke.providersLookupModel);
+  assert.equal(typeof lookupModel, "function", "model-lookup handler is not registered");
+
+  return {
+    calls,
+    row,
+    result: await listModels({ providerId: row.id, source: "refresh" }),
+    /** The hand-typed id channel a picker uses when a user types an id in. */
+    lookup: (input) => lookupModel(input),
+  };
 }
 
-test("a custom row on a published host gets that publisher's model metadata", async (t) => {
-  const row = {
-    id: "row-1",
-    name: "Zhipu",
+function rowOf(overrides) {
+  return {
+    name: "Row",
     vendorKey: "custom",
-    baseUrl: "https://open.bigmodel.cn/api/v1",
-    apiStyle: "responses",
+    apiStyle: "chat_completions",
     models: [],
     authKind: "api_key_and_base_url",
     headers: {},
+    ...overrides,
   };
-  const { result, calls } = await listModelsFor(t, row, {
+}
+
+test("a custom row on a published host gets that publisher's model metadata", async (t) => {
+  const row = rowOf({
+    id: "row-1",
+    name: "Zhipu",
+    baseUrl: "https://open.bigmodel.cn/api/v1",
+    apiStyle: "responses",
+  });
+  const { result, calls } = await handlersFor(t, row, {
     models: [{ slug: "glm-5.3", display_name: "glm-5.3" }],
   });
 
@@ -98,21 +117,48 @@ test("a custom row on a published host gets that publisher's model metadata", as
   }
 });
 
-test("a custom row on a host the catalog does not know keeps generic defaults", async (t) => {
-  const row = {
+test("a relay's list gets what every publisher of an id agrees on", async (t) => {
+  const row = rowOf({
     id: "row-2",
     name: "Relay",
-    vendorKey: "custom",
     baseUrl: "https://relay.example/v1",
-    apiStyle: "chat_completions",
-    models: [],
-    authKind: "api_key_and_base_url",
-    headers: {},
-  };
-  const { result } = await listModelsFor(t, row, { data: [{ id: "some-private-model" }] });
+  });
+  const { result } = await handlersFor(t, row, {
+    data: [{ id: "claude-sonnet-4-5" }, { id: "some-private-model" }],
+  });
 
-  const [model] = result.models;
-  assert.equal(model.catalogSource, undefined);
-  assert.equal(model.contextWindow, 128_000);
-  assert.deepEqual(model.capabilities, ["text"]);
+  const byId = new Map(result.models.map((model) => [model.modelId, model]));
+  const known = byId.get("claude-sonnet-4-5");
+  assert.equal(known.catalogSource, "models.dev", "several publishers state this id");
+  // Under-claimed: the lower median of the claims, not one publisher's number.
+  assert.ok(known.contextWindow >= 128_000 && known.contextWindow < 1_000_000);
+  assert.ok(known.capabilities.includes("tools"));
+  // An id no publisher states still lands on the generic seed.
+  const unknown = byId.get("some-private-model");
+  assert.equal(unknown.catalogSource, undefined);
+  assert.equal(unknown.contextWindow, 128_000);
+  assert.deepEqual(unknown.capabilities, ["text"]);
+});
+
+test("a hand-typed id on the same relay answers with the same record", async (t) => {
+  const row = rowOf({
+    id: "row-3",
+    name: "Relay",
+    baseUrl: "https://relay.example/v1",
+  });
+  const { lookup } = await handlersFor(t, row, { data: [] });
+
+  const known = await lookup({
+    modelId: "claude-sonnet-4-5",
+    baseUrl: row.baseUrl,
+    vendorKey: row.vendorKey,
+    providerId: row.id,
+  });
+  assert.ok(known.info, "a typed id the catalog knows must reach its record");
+  assert.equal(known.info.modelId, "claude-sonnet-4-5");
+  assert.ok(known.info.capabilities.includes("tools"));
+
+  // A private id stays generic, and the lookup never contacts the network.
+  const unknown = await lookup({ modelId: "some-private-model", baseUrl: row.baseUrl });
+  assert.equal(unknown.info, null);
 });
