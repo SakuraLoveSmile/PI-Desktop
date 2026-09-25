@@ -383,13 +383,33 @@ beside API format. `vendorKey` is the models.dev provider key.
 
 International: OpenAI (`responses`), Anthropic (`anthropic_messages`), Google
 Gemini (`google_generative_ai`), OpenRouter, Groq, xAI, Mistral, Together AI,
-Fireworks, OpenCode Go (`opencode_go`), Z.AI / Z.AI Coding Plan.
+Fireworks, OpenCode Go (`opencode_go`), Z.AI / Z.AI Coding Plan, Ant Ling,
+Baseten, Cerebras, Hugging Face (`huggingface`, aliases `hugging-face` / `hf`),
+Meta (`responses`), MiniMax (International) (`anthropic_messages` at
+`https://api.minimax.io/anthropic/v1`), Moonshot AI (International)
+(`moonshotai` at `https://api.moonshot.ai/v1`), NVIDIA (alias `nim`), OpenCode
+Zen (`opencode` at `https://opencode.ai/zen/v1`, alias `opencode-zen`), Vercel
+AI Gateway (`vercel` at `https://ai-gateway.vercel.sh/v1`, alias
+`vercel-ai-gateway`).
+
+`builtinProviders()` from pi-ai is the source for this list: every built-in
+provider is either reachable through one of the presets above or is an
+intentional exception with a recorded reason — Amazon Bedrock, Azure OpenAI,
+Cloudflare AI Gateway, Cloudflare Workers AI, and Google Vertex AI (their URLs
+carry account, region, project, or deployment ids), GitHub Copilot and OpenAI
+Codex (vendor-account rows), and Radius (`pi_messages` is account-only in this
+app). `packages/agent-runtime/src/pi-ai-provider-sync.test.ts` fails when a new
+built-in provider is neither covered nor excepted.
 
 China: DeepSeek, Qwen DashScope (`alibaba-cn`), Moonshot (`moonshotai-cn`),
 Zhipu AI / Coding Plan, SiliconFlow (`siliconflow-cn`), Volcengine Ark,
 MiniMax (`anthropic_messages` at `https://api.minimaxi.com/anthropic/v1`),
 MiniMax (OpenAI) (`chat_completions` at `https://api.minimaxi.com/v1`, aliases
-`minimax-openai` / `minimax-compatible`), Kimi For Coding (`anthropic_messages`).
+`minimax-openai` / `minimax-compatible`), Kimi For Coding (`anthropic_messages`),
+Qwen Token Plan (`alibaba-token-plan`, aliases `qwen-token-plan` /
+`qwen-token-plan-individual`), Qwen Token Plan (China)
+(`alibaba-token-plan-cn`, alias `qwen-token-plan-cn`), Xiaomi Token Plan
+(`xiaomi-token-plan-cn` / `-ams` / `-sgp`).
 
 Zhipu / Z.AI Completions requests still receive `thinkingFormat: "zai"` and
 `zaiToolStream: true`. pi-ai `zai-coding-cn` remains an alias of
