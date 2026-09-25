@@ -5,9 +5,9 @@
  * The old form opened on a closed Service menu, and subscriptions had their
  * own button and dialog further down the page, so the first decision was
  * where to look rather than what to connect. Subscriptions and API-key
- * services now sit side by side as tiles; the custom endpoint comes last,
- * because it is the one choice that asks for more than a key. Filtering never
- * talks to the host.
+ * services now sit side by side as tiles; the custom endpoint leads its
+ * group, because it is the one choice that needs no preset found first.
+ * Filtering never talks to the host.
  */
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
@@ -49,7 +49,7 @@ export function ServiceChooser({
   const gridRef = useRef<HTMLDivElement>(null);
 
   const serviceOptions = useMemo(
-    () => [...namedServiceOptions(t), customServiceOption(t)],
+    () => [customServiceOption(t), ...namedServiceOptions(t)],
     [t],
   );
   const subscriptionOptions = useMemo<SubscriptionOption[]>(

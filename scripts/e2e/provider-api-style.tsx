@@ -172,13 +172,13 @@ globalThis.providerApiStyleProbe = async () => {
     for (const locale of ["en", "zh-CN"]) {
       await i18n.changeLanguage(locale);
       render();
-      // A new service opens on the chooser (D625); the custom endpoint is the
-      // last tile, and picking it moves to the form.
+      // A new service opens on the chooser (D625, D626); the custom endpoint
+      // leads the API-key tiles, and picking it moves to the form.
       const tiles = [...document.querySelectorAll<HTMLButtonElement>("[data-service-id]")];
       assert(tiles.length > 1, `${locale}: service chooser tiles missing`);
-      assert(tiles.at(-1)?.dataset.serviceId === CUSTOM_SERVICE, `${locale}: custom endpoint is not last`);
+      assert(tiles.at(0)?.dataset.serviceId === CUSTOM_SERVICE, `${locale}: custom endpoint is not first`);
       assert(!apiStyleTrigger(), `${locale}: form rendered before a service was chosen`);
-      click(tiles.at(-1));
+      click(tiles.at(0));
       await frame();
       assert(!document.querySelector("[data-service-id]"), `${locale}: chooser stayed open after a pick`);
       await openApiStyleMenu();
