@@ -724,6 +724,18 @@ as empty. Connection testing reuses
 the same request builder, so "the model list loaded" and "the connection test
 passed" always describe the same URL, auth header and format.
 
+### Which publisher a row is read against
+
+A row that names no publisher of its own is read against the publisher its
+endpoint identifies, in this order: the catalog entry whose published base URL
+matches, the endpoint registry for a known host, then the catalog's own host
+when exactly one provider publishes from it. That is what keeps a custom row on
+a vendor's alternative API path — `https://open.bigmodel.cn/api/v1` for Zhipu's
+OpenAI Responses endpoint — from showing generic 128k / 8k / text-only defaults
+for models the catalog describes in full. A host two publishers share, or a host
+the catalog does not know, resolves to nothing: a missing record stays ahead of
+a wrong one. A model ID never decides which publisher is read.
+
 Metadata matching may follow a release stamp: `mify/mimo-v2.5-pro-0731` borrows
 the published record of `mimo-v2.5-pro`, and a record the catalog publishes
 under exactly the requested ID still wins over such an alias. The alias is

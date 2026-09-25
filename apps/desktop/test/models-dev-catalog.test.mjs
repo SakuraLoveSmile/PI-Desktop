@@ -1494,3 +1494,64 @@ test("an exact record answers an id its shorter siblings would only alias", asyn
   assert.equal(published?.providerKey, "alpha");
   assert.equal(published?.limit.context, 128_000);
 });
+
+/*
+  A custom endpoint is often the same publisher on another path.
+
+  The reported failure: a custom row at `https://open.bigmodel.cn/api/v1` listed
+  its models but every one of them showed generic defaults, because provider
+  matching only accepted models.dev's own path for that host.
+*/
+test("a custom endpoint on a uniquely published host inherits that publisher", async (t) => {
+  const catalog = await loadFixtureCatalog(t, {
+    alpha: {
+      api: "https://alpha.example/api/paas/v4",
+      models: {
+        "glm-5.3": {
+          id: "glm-5.3",
+          reasoning: true,
+          tool_call: true,
+          limit: { context: 1_000_000, output: 131_072 },
+        },
+      },
+    },
+  });
+  const model = catalog.findModel({
+    vendorKey: "custom",
+    baseUrl: "https://alpha.example/api/v1",
+    modelId: "glm-5.3",
+  });
+  assert.equal(model?.providerKey, "alpha");
+  assert.equal(model?.limit.context, 1_000_000);
+  assert.equal(model?.toolCall, true);
+
+  // The whole row's records are reachable, not just the one id.
+  assert.equal(
+    catalog.modelsForProvider({ vendorKey: "custom", baseUrl: "https://alpha.example/api/v1", providerId: "row" }).length,
+    1,
+  );
+});
+
+test("a host two publishers share stays unresolved rather than guessed", async (t) => {
+  const catalog = await loadFixtureCatalog(t, {
+    alpha: {
+      api: "https://shared.example/api/paas/v4",
+      models: { "glm-5.3": { id: "glm-5.3", reasoning: true, limit: { context: 1_000_000 } } },
+    },
+    beta: {
+      api: "https://shared.example/api/coding/v4",
+      models: { "glm-5.3": { id: "glm-5.3", reasoning: false, limit: { context: 32_000 } } },
+    },
+  });
+  // The path is not published, so the host is the only evidence — and it names
+  // two publishers. Missing metadata beats metadata from the wrong one.
+  assert.equal(
+    catalog.findModel({ vendorKey: "custom", baseUrl: "https://shared.example/v1", modelId: "glm-5.3" }),
+    undefined,
+  );
+  // Naming the publisher still resolves it.
+  assert.equal(
+    catalog.findModel({ vendorKey: "alpha", baseUrl: "https://shared.example/v1", modelId: "glm-5.3" })?.providerKey,
+    "alpha",
+  );
+});

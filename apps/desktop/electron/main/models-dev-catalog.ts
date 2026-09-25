@@ -629,6 +629,22 @@ export function apiMatches(left: string | undefined, right: string | undefined):
   return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
 }
 
+
+/**
+ * Hostname of a base URL, lowercased, or undefined when it has none.
+ *
+ * Only the host is read: two paths on one host can be the same publisher's
+ * different API surfaces, which is exactly what `apiMatches` cannot see.
+ */
+function hostOfUrl(value: string | undefined): string | undefined {
+  const raw = nonEmptyString(value);
+  if (!raw) return undefined;
+  try {
+    return new URL(raw).host.toLowerCase() || undefined;
+  } catch {
+    return undefined;
+  }
+}
 function isTextAgentModel(model: ModelsDevModel): boolean {
   return model.modalities.input.includes("text") && model.modalities.output.includes("text");
 }
@@ -989,6 +1005,8 @@ function borrowedModel(entries: readonly ModelsDevModel[]): ModelsDevModel | und
 export class ModelsDevCatalog {
   private providers = new Map<string, ModelsDevProvider>();
   private lookupIndex: ModelsDevLookupIndex | undefined;
+  /** Host → publishers, derived from the current provider map. */
+  private hostIndex: Map<string, ModelsDevProvider[]> | undefined;
   private readonly lookupMemo = new Map<string, ModelsDevModel | undefined>();
   private loadPromise: Promise<boolean> | undefined;
   private loaded = false;
@@ -1022,6 +1040,7 @@ export class ModelsDevCatalog {
         this.providers = new Map(parsed.map((provider) => [provider.providerKey, provider]));
         // Replacing the provider map invalidates the derived lookup index.
         this.lookupIndex = undefined;
+        this.hostIndex = undefined;
         this.lookupMemo.clear();
         this.loaded = true;
         this.source = "bundled";
@@ -1063,6 +1082,7 @@ export class ModelsDevCatalog {
         this.providers = new Map(parsed.map((provider) => [provider.providerKey, provider]));
         // Replacing the provider map invalidates the derived lookup index.
         this.lookupIndex = undefined;
+        this.hostIndex = undefined;
         this.lookupMemo.clear();
         this.loaded = true;
         this.source = "remote";
@@ -1117,9 +1137,41 @@ export class ModelsDevCatalog {
       );
       if (knownProvider) return knownProvider;
     }
-    return [...this.providers.values()].find((provider) =>
+    const byKey = [...this.providers.values()].find((provider) =>
       candidates.has(normalizedProviderKey(provider.providerKey)),
     );
+    return byKey ?? this.providerForUniqueHost(input.baseUrl);
+  }
+
+  /**
+   * Publisher that uniquely owns this host, when nothing else identified the row.
+   *
+   * A custom endpoint on a published host is still that publisher's deployment:
+   * a user who types `https://open.bigmodel.cn/api/v1` for the Responses API is
+   * on Zhipu, not on an anonymous gateway. The catalog's own `api` host is the
+   * evidence, and it is only used when exactly one provider publishes from it,
+   * so a shared or unknown host still resolves to nothing — missing metadata
+   * stays ahead of wrong metadata.
+   *
+   * Built lazily from the current provider map and cleared with the lookup
+   * index, so it can never describe a previous catalog generation.
+   */
+  private providerForUniqueHost(baseUrl: string | undefined): ModelsDevProvider | undefined {
+    const host = hostOfUrl(baseUrl);
+    if (!host) return undefined;
+    if (!this.hostIndex) {
+      const index = new Map<string, ModelsDevProvider[]>();
+      for (const provider of this.providers.values()) {
+        const providerHost = hostOfUrl(provider.api);
+        if (!providerHost) continue;
+        const bucket = index.get(providerHost);
+        if (bucket) bucket.push(provider);
+        else index.set(providerHost, [provider]);
+      }
+      this.hostIndex = index;
+    }
+    const bucket = this.hostIndex.get(host);
+    return bucket?.length === 1 ? bucket[0] : undefined;
   }
 
   findModel(input: { vendorKey?: string; baseUrl?: string; modelId: string }): ModelsDevModel | undefined {
