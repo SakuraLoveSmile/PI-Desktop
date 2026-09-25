@@ -8417,7 +8417,7 @@ Delegation rules:
     if (this.disposed) return;
     const runner = this.extensionRunner;
     this.extensionRunner = undefined;
-    const closingExtensions = runner?.dispose();
+    const closingExtensions = typeof runner?.dispose === "function" ? runner.dispose() : undefined;
     this.streamSink.dispose();
     this.disposed = true;
     this.acceptingSteering = false;
