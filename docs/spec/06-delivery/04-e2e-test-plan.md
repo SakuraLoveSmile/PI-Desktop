@@ -9429,9 +9429,10 @@ This test plan spec is accepted when:
 - In light and dark themes, keep session B selected while session A progresses
   through in-progress, completed, a new in-progress turn, failed, and aborted
   states. Repeat with reduced motion enabled and inspect keyboard focus.
-- Expect A to show an orange breathing dot while in progress, a green check on
-  completion, and a red circled alert on failure. Starting a new turn clears
-  A's earlier terminal mark; abort leaves no completed or failed mark.
+- Expect A to show an orange dot that breathes twice over 3.2 seconds and then
+  stays steady while in progress, a green check on completion, and a red circled
+  alert on failure. Starting a new turn clears A's earlier terminal mark; abort
+  leaves no completed or failed mark.
 - Expect selected idle B to show a static accent-blue outlined ring and active
   row background. If selected B starts work, its orange in-progress dot takes
   precedence until the turn settles; its latest terminal result remains hidden
@@ -9445,6 +9446,11 @@ This test plan spec is accepted when:
   Refresh notifications and restart the app; the acknowledged mark must not
   return. A terminal notification marked read from the inbox likewise produces
   no sidebar terminal mark.
+- Repeat for a running related-session marker in the hover card. After 3.2
+  seconds, neither running marker has an active animation; recording an otherwise
+  idle native macOS window must show no continuous frames from these markers.
+  Start a new turn and reopen the hover card: the bounded animation can play again.
+  GPU measurements must distinguish app frame submissions from whole-system load.
 
 ### US-UI-68 Session-scoped inline permissions and artifacts (D138/D142)
 - Run two sessions concurrently and keep A visible while B reaches a tool
