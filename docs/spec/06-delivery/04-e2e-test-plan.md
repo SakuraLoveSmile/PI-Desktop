@@ -13583,12 +13583,16 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   3. Confirm the model calls `Skill` with the exact id without calling
      `ToolSearch` first, and that the returned document is the skill body.
   4. Send `/<skill-id>` from the composer and inspect the following turn.
+  4a. Add a second active Skill with `/` after the first token, submit the
+      prompt, switch away from the session, and reopen it.
   5. Switch the session to Plan mode and inspect the tool list again.
   6. Disable or remove every Skill and start another Agent turn.
 - **Expected**: Whenever the skill catalog is non-empty, `Skill` ships with the
   first request and never appears under `# On-demand tools`, so both a matching
   task and a `/skill-id` invocation load the body without a discovery round
-  trip. `ToolSearch` still exists for the other on-demand capabilities and
+  trip. Both explicit Skills load in their selected order; after reopening,
+  each remains a separate transcript chip beside the user's prompt text.
+  `ToolSearch` still exists for the other on-demand capabilities and
   never returns `Skill`. Plan mode omits the tool and the `# Skills` section,
   and an empty catalog registers no `Skill` tool at all.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` (§7.1),
