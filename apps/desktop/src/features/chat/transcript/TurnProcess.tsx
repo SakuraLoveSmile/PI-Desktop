@@ -28,12 +28,14 @@ export function TurnProcess({
   turnParts,
   delegationStatuses,
   isActive,
+  hasAnswer,
   children,
 }: {
   turnId: string;
   processParts: readonly AssistantTurnPart[];
   turnParts: readonly AssistantTurnPart[];
   isActive: boolean;
+  hasAnswer?: boolean;
   delegationStatuses?: ReadonlyMap<string, SubagentOutcome>;
   children: ReactNode;
 }) {
@@ -63,7 +65,7 @@ export function TurnProcess({
     0, Math.floor(((isActive ? now : (endedAt ?? startedAt)) - startedAt) / 1000),
   );
   return (
-    <section className={`turn-process${disclosure.open ? " open" : ""}${isActive ? " active" : ""}`}>
+    <section className={`turn-process${hasAnswer ? " has-answer" : ""}${disclosure.open ? " open" : ""}${isActive ? " active" : ""}`}>
       <button
         type="button"
         ref={disclosure.titleRef}
