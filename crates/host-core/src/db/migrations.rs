@@ -841,7 +841,8 @@ pub(crate) fn migrate_v18_to_v19(conn: &Connection, path: &Path) -> Result<()> {
 }
 
 /// v20 adds `artifact_workspace_kind` to `plan_approvals` to durably distinguish
-/// between project-origin and scratch-origin contract checkpoints.
+/// between project-origin and scratch-origin contract checkpoints, and creates
+/// `goal_reports` storage for Goal completion reporting.
 pub(crate) fn migrate_v19_to_v20_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
     let has_workspace_kind: bool = tx.query_row(
         "SELECT EXISTS(
@@ -855,6 +856,7 @@ pub(crate) fn migrate_v19_to_v20_tx(tx: &rusqlite::Transaction<'_>) -> Result<()
             "ALTER TABLE plan_approvals ADD COLUMN artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch'));",
         )?;
     }
+    tx.execute_batch(crate::goal_reports::SCHEMA)?;
     tx.pragma_update(None, "user_version", 20i64)?;
     Ok(())
 }
