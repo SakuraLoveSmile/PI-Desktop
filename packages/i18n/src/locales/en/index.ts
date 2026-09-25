@@ -1203,6 +1203,8 @@ sklm: {
     enterToSendDesc: "Off: press ⌘/Ctrl+Enter to send.",
     infiniteProviderRetry: "Retry until success",
     infiniteProviderRetryDesc: "Keep retrying network and transient provider failures until the request succeeds. You can still stop the turn; API usage may continue while enabled.",
+    autoGenerateSessionTitles: "Automatic short titles",
+    autoGenerateSessionTitlesDesc: "Automatically summarize the conversation into a short title after the first turn. Sends a bounded excerpt of the first prompt and reply to the selected model and may incur usage.",
     smoothStreaming: "Smooth streaming",
     smoothStreamingDesc: "Release streamed text character by character for a typewriter effect. Automatically disabled when the system prefers reduced motion.",
     preventScreenSleep: "Prevent screen sleep",

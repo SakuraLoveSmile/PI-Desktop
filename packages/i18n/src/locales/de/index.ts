@@ -1191,6 +1191,8 @@ sklm: {
     "enterToSendDesc": "Aus: Zum Senden ⌘/Strg+Eingabe drücken.",
     "infiniteProviderRetry": "Bis zum Erfolg wiederholen",
     "infiniteProviderRetryDesc": "Netzwerk- und vorübergehende Anbieterfehler werden bis zum Erfolg wiederholt. Du kannst den Lauf weiterhin stoppen; der API-Verbrauch kann fortlaufen.",
+    "autoGenerateSessionTitles": "Automatische Sitzungstitel",
+    "autoGenerateSessionTitlesDesc": "Fasst das Gespräch nach der ersten Runde automatisch in einem kurzen Titel zusammen. Sendet einen begrenzten Auszug an das ausgewählte Modell; kann Guthaben verbrauchen.",
     "smoothStreaming": "Sanftes Streaming",
     "smoothStreamingDesc": "Gibt gestreamten Text zeichenweise aus, um einen Schreibmaschineneffekt zu erzeugen. Wird automatisch deaktiviert, wenn das System reduzierte Bewegung bevorzugt.",
     "preventScreenSleep": "Bildschirmsperre verhindern",

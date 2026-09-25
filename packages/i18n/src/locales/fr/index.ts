@@ -1191,6 +1191,8 @@ sklm: {
     "enterToSendDesc": "Désactivé : appuyez sur ⌘/Ctrl+Entrée pour envoyer.",
     "infiniteProviderRetry": "Réessayer jusqu’à réussite",
     "infiniteProviderRetryDesc": "Réessaie les erreurs réseau et temporaires jusqu’à la réussite. Vous pouvez toujours arrêter le tour ; la consommation d’API peut continuer.",
+    "autoGenerateSessionTitles": "Titres de session automatiques",
+    "autoGenerateSessionTitlesDesc": "Résume automatiquement la conversation en un titre court après le premier tour. Envoie un extrait limité au modèle sélectionné et peut entraîner une consommation.",
     "smoothStreaming": "Streaming fluide",
     "smoothStreamingDesc": "Libère le texte diffusé caractère par caractère pour un effet machine à écrire. Automatiquement désactivé lorsque le système préfère un mouvement réduit.",
     "preventScreenSleep": "Empêcher la mise en veille",

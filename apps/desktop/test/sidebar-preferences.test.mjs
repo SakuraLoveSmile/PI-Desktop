@@ -10,6 +10,7 @@ import {
   normalizeProjectName,
   saveSidebarPreferences,
   saveSidebarWidth,
+  markSessionAutoTitleAttempted,
   SIDEBAR_WIDTH_DEFAULT,
   SIDEBAR_WIDTH_MAX,
   SIDEBAR_WIDTH_MIN,
@@ -443,6 +444,34 @@ test("manual title metadata survives a renderer restart", () => {
     else delete globalThis.localStorage;
   }
 });
+test("autoTitleAttempted metadata survives a renderer restart and is marked via helper", () => {
+  const values = new Map();
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+    },
+  });
+  try {
+    saveSidebarPreferences({
+      sessionMeta: { session_1: { autoTitleAttempted: true } },
+      projectMeta: {},
+      projectSort: "recent",
+      sessionView: { sort: "recent", archived: false },
+      openProjectPaths: [],
+    });
+    assert.equal(loadSidebarPreferences().sessionMeta.session_1.autoTitleAttempted, true);
+
+    markSessionAutoTitleAttempted("session_2");
+    assert.equal(loadSidebarPreferences().sessionMeta.session_2.autoTitleAttempted, true);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "localStorage", previous);
+    else delete globalThis.localStorage;
+  }
+});
+
 
 test("renames a recent project without changing its recency", () => {
   const values = new Map([
