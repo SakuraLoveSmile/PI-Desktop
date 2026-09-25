@@ -4958,3 +4958,37 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   只查自身目录。后缀本身不赋予推理能力：未命中的自由格式 ID 仍是未知通用
   模型，已发布能力和显式绑定覆盖沿用既有优先级。见
   `03-runtime/13-model-catalog-and-selection.md` §11.2。
+
+## 2026-09-25 —— 模型设置统一为一份 AI 服务列表加一份已选模型摘要（D623）
+
+- 模型设置页在用户连接任何服务前要求太多。API-key 服务打开时是一个收起的
+  服务菜单，订阅式厂商在页面靠下有自己的按钮和对话框，插件声明的服务又在
+  另一处，于是第一步的决定是"去哪看"而不是"连什么"。用户反馈流程过于繁重。
+  本次重设计保留沉浸式、无边框的 D297 基调（in-flow 面用
+  `--ds-tile`/`--ds-raised` 与间距、不描边；只有浮层菜单和对话框保留 0.5px
+  描边和阴影），把这些选择收拢为一份列表和一条新增流程。
+- API 服务、插件声明的服务和厂商订阅账号现在共享同一份 AI 服务列表
+  （`ServiceList`、`ServiceRow`）。行本身就是入口——点击或回车打开它的编辑器
+  ——因此行上只保留启用开关和一个溢出菜单；点击挂在行元素而非按钮上，这样卡片
+  拖拽仍可从卡片任意处开始。账号行仍通过厂商账号编辑器与 `deleteOauthAccount`
+  存续，绝不走 provider CRUD，所以即便两类在同一列表渲染，所有权边界不变。
+- 新增服务从一个可搜索的选择器（`ServiceChooser`）开始，而非收起的菜单：订阅
+  与 API-key 服务并列成磁贴，自定义端点排最后，因为它是唯一需要不止一个密钥的
+  选择。过滤从不与 host 通信。选中磁贴后进入服务表单（`ProviderSetupDialog`，
+  两个视图），凭据行独立成组件（`ProviderConnectionFields`，D310 + D623）。
+- 服务对话框与厂商账号对话框都打开在已选模型摘要（`ChosenModelsSummary`）上，
+  完整的双栏选择器（`ModelSelectionPanes`）只需一次点击，因为多数人会保留服务
+  自带的模型。新的 API 服务会预选推荐模型（`recommended-models.ts`、
+  `useRecommendedModelSelection`）：只有可调用工具的对话模型才是候选，存在
+  models.dev 元数据时每个家族取最新稳定型（至多 `RECOMMENDED_MODEL_LIMIT` 个），
+  首个入选成为服务默认——因此保存一个密钥就足以开始对话。缺乏可信发现结果时
+  （密钥被拒、超时或网络失败）不预选；仅是没有 `/models` 路由的已知厂商仍算作
+  接受了密钥。
+- 覆盖测试：`apps/desktop/test/service-chooser.test.mjs`、
+  `service-catalog.test.mjs`、`service-row-status.test.mjs`、
+  `recommended-models.test.mjs`、`provider-form-layout.test.mjs`、
+  `default-model-display.test.mjs` 及更新后的 `settings-general.test.mjs`，
+  另加 `scripts/e2e/provider-api-style.tsx` 探针（选择器磁贴以 `data-service-id`
+  标记、自定义端点排最后、账号对话框打开在 `provider-models-summary` 上、每模型
+  控件位于"管理模型"和折叠的"高级"展开项之后）。厂商 OAuth 账号仍由 ADR 0098
+  管辖。

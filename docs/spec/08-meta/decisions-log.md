@@ -7006,3 +7006,48 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   unmatched free-form IDs stay generic unknown, while published capabilities
   and explicit binding overrides retain their existing precedence. See
   `03-runtime/13-model-catalog-and-selection.md` §11.3.
+
+## 2026-09-25 — Model settings unify around one AI service list and a chosen-models summary (D623)
+
+- The model settings page asked too much before a user could connect anything.
+  API-key services opened on a closed Service menu, vendor subscriptions had
+  their own button and dialog further down the page, and plugin-declared
+  services sat elsewhere again, so the first decision was where to look rather
+  than what to connect. Users reported the flow as needlessly heavy. This
+  redesign keeps the immersive, borderless D297 tone (in-flow surfaces use
+  `--ds-tile`/`--ds-raised` and spacing, no borders; only floating menus and
+  dialogs keep a 0.5px stroke and a shadow) and collapses the choices into one
+  list and one add flow.
+- API services, plugin-declared services and vendor subscription accounts now
+  share a single AI service list (`ServiceList`, `ServiceRow`). A row is itself
+  the way in — a click or Enter opens its editor — so the only controls left on
+  a row are the enable switch and one overflow menu; the click lives on the row
+  element rather than a button so a card drag still starts anywhere on the card.
+  An account row still lives and dies through the vendor-account editor and
+  `deleteOauthAccount`, never the provider CRUD, so ownership boundaries are
+  unchanged even though the two kinds render in one list.
+- Adding a service starts on a searchable chooser (`ServiceChooser`), not a
+  closed menu: subscriptions and API-key services sit side by side as tiles and
+  the custom endpoint comes last, because it is the one choice that asks for
+  more than a key. Filtering never talks to the host. Picking a tile moves to
+  the service form (`ProviderSetupDialog`, two views), and the credential rows
+  live in their own component (`ProviderConnectionFields`, D310 + D623).
+- Both the service dialog and the vendor-account dialog open on a chosen-models
+  summary (`ChosenModelsSummary`) with the full two-pane picker
+  (`ModelSelectionPanes`) one click away, because most people keep the models a
+  service starts with. A new API service preselects recommended models
+  (`recommended-models.ts`, `useRecommendedModelSelection`): only tool-capable
+  chat models are candidates, and when models.dev metadata is present the newest
+  stable model per family wins (up to `RECOMMENDED_MODEL_LIMIT`), with the first
+  pick becoming the service default — so saving a key is enough to start
+  chatting. Without trustworthy discovery (a rejected key, a timeout or a
+  network failure) nothing is preselected; a named vendor that simply has no
+  `/models` route still counts as accepting the key.
+- Covered by `apps/desktop/test/service-chooser.test.mjs`,
+  `service-catalog.test.mjs`, `service-row-status.test.mjs`,
+  `recommended-models.test.mjs`, `provider-form-layout.test.mjs`,
+  `default-model-display.test.mjs` and the updated `settings-general.test.mjs`,
+  plus the `scripts/e2e/provider-api-style.tsx` probe (chooser tiles keyed by
+  `data-service-id`, the custom endpoint last, and the account dialog opening on
+  `provider-models-summary` with per-model controls behind Manage models and a
+  folded Advanced disclosure). ADR 0098 still governs vendor OAuth accounts.

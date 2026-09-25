@@ -8,6 +8,7 @@ import { ProviderSetupDialog, type ProviderSetupDialogProps } from "../../apps/d
 import { VendorAccountDialog, type VendorAccountForm } from "../../apps/desktop/src/components/settings/VendorAccountDialog";
 import { API_STYLE_LABEL_KEYS, CUSTOM_PROVIDER_API_STYLES } from "../../apps/desktop/src/components/settings/provider-api-style";
 import { copyProviderConfiguration } from "../../apps/desktop/src/components/settings/provider-copy";
+import { CUSTOM_SERVICE } from "../../apps/desktop/src/components/settings/service-catalog";
 import { api } from "../../apps/desktop/src/lib/api";
 
 declare global { var providerApiStyleProbe: () => Promise<unknown>; }
@@ -156,13 +157,15 @@ globalThis.providerApiStyleProbe = async () => {
     for (const locale of ["en", "zh-CN"]) {
       await i18n.changeLanguage(locale);
       render();
-      const serviceTrigger = document.querySelector<HTMLButtonElement>(".provider-service-trigger");
-      assert(serviceTrigger, "service picker trigger missing");
-      serviceTrigger.scrollIntoView({ block: "center" });
+      // A new service opens on the chooser (D623); the custom endpoint is the
+      // last tile, and picking it moves to the form.
+      const tiles = [...document.querySelectorAll<HTMLButtonElement>("[data-service-id]")];
+      assert(tiles.length > 1, `${locale}: service chooser tiles missing`);
+      assert(tiles.at(-1)?.dataset.serviceId === CUSTOM_SERVICE, `${locale}: custom endpoint is not last`);
+      assert(!apiStyleTrigger(), `${locale}: form rendered before a service was chosen`);
+      click(tiles.at(-1));
       await frame();
-      click(serviceTrigger);
-      click(document.querySelector(".provider-service-option"));
-      await frame();
+      assert(!document.querySelector("[data-service-id]"), `${locale}: chooser stayed open after a pick`);
       await openApiStyleMenu();
       const newCustomOptions = optionSnapshot();
       assert(JSON.stringify(newCustomOptions.map((option) => option.label)) === JSON.stringify(customLabels()),
@@ -226,6 +229,15 @@ globalThis.providerApiStyleProbe = async () => {
       let savedCodexAccount: VendorAccountForm | undefined;
       flushSync(() => root.render(<I18nextProvider i18n={i18n}><VendorAccountDialog provider={codexAccount} initialName={codexAccount.name} onClose={() => { closes++; }} onSave={(form) => { savedCodexAccount = structuredClone(form); }} saving={false} /></I18nextProvider>));
       await pause(650);
+      // Models open as a summary (D623); the per-model controls sit behind
+      // Manage models and the row's own Advanced disclosure.
+      assert(document.querySelector(".provider-models-summary"), `${locale}: account dialog did not open on the summary`);
+      click(control("settings.manageModels"));
+      await frame();
+      const advancedToggle = document.querySelector<HTMLButtonElement>(".provider-chosen-advanced-toggle");
+      assert(advancedToggle?.getAttribute("aria-expanded") === "false", `${locale}: a model opened its advanced settings on its own`);
+      click(advancedToggle);
+      await frame();
       const findWebSearch = () => [...document.querySelectorAll<HTMLInputElement>("input[type=checkbox]")].find((input) => input.closest("label")?.textContent?.trim() === i18n.t("settings.nativeWebSearch"));
       const searchCheckbox = findWebSearch();
       assert(searchCheckbox, `${locale}: Codex web search checkbox missing`);
