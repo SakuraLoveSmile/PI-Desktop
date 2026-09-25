@@ -49,7 +49,7 @@ export type ComposerToolbarProps = {
   modelMenu: ModelMenuController;
   modelLabel: string;
   thinkingLabel: string;
-  contextUsage: ContextUsage | null;
+  contextUsage?: ContextUsage | null;
   enhancementDraft: string;
   value: string;
   modelReady: boolean;
@@ -191,7 +191,6 @@ export function ComposerToolbar({
       </div>
 
       <div className="composer-right">
-        {contextUsage ? <ContextUsageInspector {...contextUsage} /> : null}
         <ComposerModelPicker
           t={t}
           controller={modelMenu}

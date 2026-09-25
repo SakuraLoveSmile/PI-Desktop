@@ -58,6 +58,7 @@ import { ComposerImageAttachments } from "../features/chat/composer/ComposerImag
 import { ComposerInput } from "../features/chat/composer/ComposerInput";
 import { useComposerModelMenu } from "../features/chat/composer/hooks/useComposerModelMenu";
 import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
+import { ComposerUsageFooter } from "../features/chat/composer/ComposerUsageFooter";
 import { useVoiceInput } from "../features/voice/useVoiceInput";
 import { VoiceOverlay } from "../features/voice/VoiceOverlay";
 import "../styles/voice.css";
@@ -617,7 +618,6 @@ export function Composer({
             modelMenu={modelMenu}
             modelLabel={modelLabel}
             thinkingLabel={thinkingLabel}
-            contextUsage={composerContextUsage ?? null}
             enhancementDraft={enhancementDraft}
             value={value}
             modelReady={modelReady}
@@ -637,6 +637,9 @@ export function Composer({
             onVoiceCancel={voice.cancel}
           />
         </div>
+        {composerContextUsage ? (
+          <ComposerUsageFooter {...composerContextUsage} />
+        ) : null}
       </div>
     </div>
   );
