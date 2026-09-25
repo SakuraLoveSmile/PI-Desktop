@@ -13,7 +13,8 @@ export function ModelsFetchErrorMessage({
   variant,
 }: {
   error?: string;
-  variant: "banner" | "placeholder";
+  /** `status` is the one-line connection status under a service's key. */
+  variant: "banner" | "placeholder" | "status";
 }) {
   const { t } = useTranslation();
   const view = describeModelsFetchError(error);
@@ -46,7 +47,9 @@ export function ModelsFetchErrorMessage({
   const className =
     variant === "placeholder"
       ? "provider-models-placeholder is-error"
-      : "provider-models-note is-error";
+      : variant === "status"
+        ? "provider-connection-status is-error"
+        : "provider-models-note is-error";
   return (
     <div className={className} role="alert">
       <span className="provider-models-error-summary">{summary}</span>

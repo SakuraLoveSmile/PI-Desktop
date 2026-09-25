@@ -1,8 +1,11 @@
 /**
- * One form to add or edit an AI service.
+ * One dialog to add or edit an AI service, in two views (D623).
  *
- * Named services: pick a vendor and paste a key. Custom: name, URL, key and
- * API format on the common path. Models come from the service endpoint.
+ * A new service opens on the service chooser; picking a tile moves to the
+ * form. Named services: paste a key and the recommended models are chosen as
+ * soon as the service answers. Custom: name, URL, key and API format on the
+ * common path. Models come from the service endpoint; the full picker stays
+ * one click away behind the chosen-models summary.
  */
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,18 +16,22 @@ import {
   normalizeApiStyle,
   type CatalogApiStyle,
   type ModelBinding,
+  type OAuthVendor,
   type ProviderPublic,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { pairsToRecord, recordToPairs } from "../extensions/KeyValueRows";
 import { Button, Field, HelpIcon, Input, portalOverlay } from "../ui";
 import { ProviderHeadersEditor } from "./ProviderHeadersEditor";
-import { SettingsMenuSelect } from "./SettingsMenuSelect";
 import { useProviderModels } from "./useProviderModels";
 import { ModelSelectionPanes, useModelSelection } from "./ModelSelectionPanes";
-import { CUSTOM_SERVICE, ServicePicker } from "./ServicePicker";
+import { ChosenModelsSummary } from "./ChosenModelsSummary";
+import { ConnectionStatus, ProviderConnectionFields } from "./ProviderConnectionFields";
+import { ServiceChooser } from "./ServiceChooser";
+import { CUSTOM_SERVICE } from "./service-catalog";
+import { useRecommendedModelSelection } from "./useRecommendedModelSelection";
 import type { ProviderCopyDraft } from "./provider-copy";
-import { API_STYLE_LABEL_KEYS, CUSTOM_PROVIDER_API_STYLES, isAccountOnlyApiStyle, needsCustomApiStyleChoice, providerSetupPreset } from "./provider-api-style";
+import { isAccountOnlyApiStyle, needsCustomApiStyleChoice, providerSetupPreset } from "./provider-api-style";
 
 type BaseUrlIssue = "invalid";
 
@@ -98,21 +105,16 @@ function initialBaseUrl(provider?: ProviderPublic | null): string {
   return providerSetupPreset(provider)?.baseUrl ?? provider?.baseUrl ?? "";
 }
 
-function endpointHost(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.host}${parsed.pathname.replace(/\/+$/, "")}`;
-  } catch {
-    return url;
-  }
-}
-
 export type ProviderSetupDialogProps = {
   provider?: ProviderPublic | null;
   initialDraft?: ProviderCopyDraft | null;
   onClose: () => void;
   imageModelIds?: string[];
   onSaved: (provider: ProviderPublic, models: ModelBinding[], imageModelIds?: string[]) => void | Promise<void>;
+  /** Vendors a new row can sign in to instead of pasting a key. */
+  vendors?: OAuthVendor[] | null;
+  /** Leaves this dialog for the vendor's browser sign-in. */
+  onPickSubscription?: (vendor: OAuthVendor) => void;
 };
 
 export function ProviderSetupDialog({
@@ -121,6 +123,8 @@ export function ProviderSetupDialog({
   onClose,
   onSaved,
   imageModelIds,
+  vendors,
+  onPickSubscription,
 }: ProviderSetupDialogProps) {
   const { t } = useTranslation();
   const [imageModelDraft, setImageModelDraft] = useState<string[] | undefined>();
@@ -145,6 +149,10 @@ export function ProviderSetupDialog({
   const [error, setError] = useState("");
   const [testResult, setTestResult] = useState("");
   const [baseUrlTouched, setBaseUrlTouched] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const customModelRef = useRef<HTMLInputElement>(null);
+  const chooserOpen = choosing || !service;
 
   const namedPreset = NAMED_ENDPOINT_PRESETS.find((preset) => preset.id === service);
   const named = Boolean(namedPreset);
@@ -176,7 +184,22 @@ export function ProviderSetupDialog({
     },
     provider,
   );
-  const selection = useModelSelection(discovery, models, setModels);
+  const recommended = useRecommendedModelSelection({
+    // A copy keeps the models it was copied with.
+    enabled: !provider && !initialDraft?.models?.length,
+    serviceKey: `${service}|${requestBaseUrl}|${resolvedApiStyle}`,
+    discovery,
+    setModels,
+    namedService: named,
+  });
+  // Every edit made through the picker or the summary ends preselection.
+  const selection = useModelSelection(discovery, models, recommended.setModels);
+
+  // A list with nothing to recommend leaves the choice to the user, so the
+  // picker opens instead of an empty summary.
+  useEffect(() => {
+    if (recommended.noRecommendation) setManaging(true);
+  }, [recommended.noRecommendation]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -185,11 +208,16 @@ export function ProviderSetupDialog({
         setAdvancedOpen(false);
         return;
       }
+      // Changing an existing row's service backs out to its form.
+      if (choosing && service) {
+        setChoosing(false);
+        return;
+      }
       onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [advancedOpen, onClose, saving]);
+  }, [advancedOpen, choosing, onClose, saving, service]);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const focusAfterServiceChange = (next: string) => {
@@ -216,6 +244,22 @@ export function ProviderSetupDialog({
     setBaseUrl(preset.baseUrl);
     setApiStyle(preset.apiStyle);
     focusAfterServiceChange(next);
+  };
+
+  const pickService = (next: string) => {
+    setChoosing(false);
+    if (next === service) {
+      focusAfterServiceChange(next);
+      return;
+    }
+    // A key belongs to the service it was pasted for.
+    if (!provider) setApiKey("");
+    onServiceChange(next);
+  };
+
+  const addModelManually = () => {
+    setManaging(true);
+    window.setTimeout(() => customModelRef.current?.focus(), 0);
   };
 
   const commitBaseUrl = () => {
@@ -332,6 +376,146 @@ export function ProviderSetupDialog({
     !baseUrlIssue &&
     models.length > 0;
 
+  const formView = (
+    <>
+      <div className="provider-setup-head">
+        <h3 id="provider-setup-title" className="provider-setup-title">
+          {initialDraft ? t("settings.copyProviderTitle") : editing ? t("settings.editProviderTitle") : t("settings.addProviderTitle")}
+          {/* What a copy does and does not take is the title's own promise. */}
+          {initialDraft ? <HelpIcon label={t("settings.copyProviderHint")} /> : null}
+        </h3>
+        <div className="provider-setup-head-actions">
+          {named || custom ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={saving}
+              onClick={() => setAdvancedOpen(true)}
+            >
+              {t("settings.advancedSettings")}
+            </Button>
+          ) : null}
+          {provider ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={testing || saving}
+              onClick={() => void testConnection()}
+            >
+              {testing ? t("settings.testing") : t("settings.testConnection")}
+            </Button>
+          ) : null}
+          <Button variant="ghost" size="sm" disabled={saving} onClick={onClose}>
+            {t("settings.cancel")}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={!canSave}
+            onClick={() => void save()}
+          >
+            {saving ? t("settings.saving") : t("settings.saveProvider")}
+          </Button>
+        </div>
+      </div>
+
+      <div className="provider-setup-body">
+        {error ? <div className="provider-setup-error">{error}</div> : null}
+
+        <div className="provider-setup-credentials">
+          <ProviderConnectionFields
+            named={named}
+            custom={custom}
+            editing={editing}
+            saving={saving}
+            serviceLabel={namedPreset ? t(namedPreset.labelKey) : t("settings.presetCustomEndpoint")}
+            serviceBaseUrl={namedPreset?.baseUrl ?? ""}
+            onChangeService={() => setChoosing(true)}
+            apiKeyRef={apiKeyRef}
+            nameRef={nameRef}
+            apiKey={apiKey}
+            onApiKeyChange={setApiKey}
+            name={name}
+            onNameChange={setName}
+            baseUrl={baseUrl}
+            onBaseUrlChange={(value) => {
+              setBaseUrl(value);
+              setError("");
+            }}
+            commitBaseUrl={commitBaseUrl}
+            baseUrlError={baseUrlError}
+            apiStyle={apiStyle}
+            onApiStyleChange={setApiStyle}
+            accountOnlyApiStyle={accountOnlyApiStyle}
+            requiresApiStyleChoice={requiresApiStyleChoice}
+            status={<ConnectionStatus active={discoveryActive} discovery={discovery} named={named} />}
+          />
+
+          {testResult ? (
+            <div className="provider-credential-test">
+              <span className="provider-credential-test-result">{testResult}</span>
+            </div>
+          ) : null}
+        </div>
+
+        {managing ? (
+          <ModelSelectionPanes
+            discovery={discovery}
+            selection={selection}
+            listTitle={t("settings.serviceModels")}
+            busy={saving}
+            onReload={discovery.reload}
+            apiStyle={resolvedApiStyle}
+            imageModelIds={imageModelDraft ?? imageModelIds}
+            onImageModelChange={updateImageModelDraft}
+            customModelInputRef={customModelRef}
+            onCollapse={() => setManaging(false)}
+            lookupContext={{
+              baseUrl: requestBaseUrl,
+              vendorKey: namedPreset?.vendorKey ?? "custom",
+              providerId: provider?.id,
+            }}
+          />
+        ) : (
+          <ChosenModelsSummary
+            models={models}
+            discoveryStatus={discoveryActive ? discovery.status : "idle"}
+            busy={saving}
+            autoPicked={recommended.autoPicked}
+            onRemove={(id) =>
+              selection.setModels((current) => current.filter((entry) => entry.id !== id))
+            }
+            onManage={() => setManaging(true)}
+            onAddManually={addModelManually}
+          />
+        )}
+      </div>
+    </>
+  );
+
+  const chooserView = (
+    <>
+      <div className="provider-setup-head">
+        <h3 id="provider-setup-title" className="provider-setup-title">
+          {editing ? t("settings.changeServiceTitle") : t("settings.addProviderTitle")}
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={service ? () => setChoosing(false) : onClose}
+        >
+          {t("settings.cancel")}
+        </Button>
+      </div>
+      <ServiceChooser
+        vendors={editing ? null : vendors}
+        current={service}
+        onPickService={pickService}
+        onPickSubscription={editing ? undefined : onPickSubscription}
+      />
+    </>
+  );
+
   return portalOverlay(
     <div
       className="overlay provider-setup-overlay"
@@ -348,211 +532,7 @@ export function ProviderSetupDialog({
         aria-labelledby="provider-setup-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="provider-setup-head">
-          <h3 id="provider-setup-title" className="provider-setup-title">
-            {initialDraft ? t("settings.copyProviderTitle") : editing ? t("settings.editProviderTitle") : t("settings.addProviderTitle")}
-            {/* What a copy does and does not take is the title's own promise. */}
-            {initialDraft ? <HelpIcon label={t("settings.copyProviderHint")} /> : null}
-          </h3>
-          <div className="provider-setup-head-actions">
-            {named || custom ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={saving}
-                onClick={() => setAdvancedOpen(true)}
-              >
-                {t("settings.advancedSettings")}
-              </Button>
-            ) : null}
-            {provider ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={testing || saving}
-                onClick={() => void testConnection()}
-              >
-                {testing ? t("settings.testing") : t("settings.testConnection")}
-              </Button>
-            ) : null}
-            <Button variant="ghost" size="sm" disabled={saving} onClick={onClose}>
-              {t("settings.cancel")}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={!canSave}
-              onClick={() => void save()}
-            >
-              {saving ? t("settings.saving") : t("settings.saveProvider")}
-            </Button>
-          </div>
-        </div>
-
-        <div className="provider-setup-body">
-          {error ? <div className="provider-setup-error">{error}</div> : null}
-
-          <div className="provider-setup-credentials">
-            <div
-              className={
-                named
-                  ? "provider-setup-fields is-named"
-                  : custom
-                    ? "provider-setup-fields is-custom"
-                    : "provider-setup-fields is-empty"
-              }
-            >
-              <div
-                className={`provider-setup-field-row provider-setup-service-row ${
-                  named ? "is-named" : "is-single"
-                }`}
-              >
-                <div className="provider-setup-service">
-                  <Field label={t("settings.service")}>
-                    <ServicePicker
-                      value={service}
-                      autoFocus={!named && !custom}
-                      disabled={saving}
-                      onChange={onServiceChange}
-                    />
-                  </Field>
-                </div>
-
-                {named ? (
-                  <Field
-                    label={t("settings.apiKey")}
-                    hint={editing ? t("settings.apiKeyKeepHint") : undefined}
-                  >
-                    <Input
-                      ref={apiKeyRef}
-                      type="password"
-                      value={apiKey}
-                      placeholder="sk-…"
-                      className="font-mono text-sm-plus"
-                      autoComplete="off"
-                      autoFocus
-                      onChange={(event) => setApiKey(event.target.value)}
-                    />
-                  </Field>
-                ) : null}
-              </div>
-
-              {named && resolvedBaseUrl ? (
-                <div className="provider-setup-host" title={resolvedBaseUrl}>
-                  {endpointHost(resolvedBaseUrl)}
-                </div>
-              ) : null}
-
-              {custom ? (
-                <>
-                  <div className="provider-setup-field-row provider-setup-custom-identity-row">
-                    <Field label={t("settings.name")}>
-                      <Input
-                        ref={nameRef}
-                        value={name}
-                        autoFocus
-                        onChange={(event) => setName(event.target.value)}
-                      />
-                    </Field>
-                    <div className="provider-setup-base-url">
-                      <Field label={t("settings.baseUrl")}>
-                        <Input
-                          value={baseUrl}
-                          type="url"
-                          inputMode="url"
-                          autoComplete="url"
-                          className="font-mono text-sm-plus"
-                          placeholder="https://api.example.com/v1"
-                          aria-invalid={Boolean(baseUrlError)}
-                          aria-describedby={baseUrlError ? "provider-base-url-error" : undefined}
-                          onChange={(event) => {
-                            setBaseUrl(event.target.value);
-                            setError("");
-                          }}
-                          onBlur={commitBaseUrl}
-                        />
-                        {baseUrlError ? (
-                          <div
-                            id="provider-base-url-error"
-                            className="provider-setup-field-error"
-                            role="alert"
-                          >
-                            {baseUrlError}
-                          </div>
-                        ) : null}
-                      </Field>
-                    </div>
-                  </div>
-                  <div className="provider-setup-field-row provider-setup-custom-auth-row">
-                    <Field
-                      label={t("settings.apiKey")}
-                      hint={editing ? t("settings.apiKeyKeepHint") : undefined}
-                    >
-                      <Input
-                        ref={apiKeyRef}
-                        type="password"
-                        value={apiKey}
-                        placeholder="sk-…"
-                        className="font-mono text-sm-plus"
-                        autoComplete="off"
-                        onChange={(event) => setApiKey(event.target.value)}
-                      />
-                    </Field>
-                    <Field
-                      label={t("settings.apiStyle")}
-                      hint={accountOnlyApiStyle ? t(requiresApiStyleChoice
-                        ? "settings.apiStyleChooseCustom"
-                        : "settings.apiStyleLegacyAccount") : undefined}
-                    >
-                      <SettingsMenuSelect
-                        fullWidth
-                        label={t("settings.apiStyle")}
-                        value={apiStyle}
-                        disabled={saving}
-                        onChange={(id) => setApiStyle(id as CatalogApiStyle)}
-                        options={[
-                          ...(accountOnlyApiStyle
-                            ? [{
-                                id: apiStyle,
-                                label: t(API_STYLE_LABEL_KEYS[apiStyle]),
-                                disabled: true,
-                              }]
-                            : []),
-                          ...CUSTOM_PROVIDER_API_STYLES.map((style) => ({
-                            id: style,
-                            label: t(API_STYLE_LABEL_KEYS[style]),
-                          })),
-                        ]}
-                      />
-                    </Field>
-                  </div>
-                </>
-              ) : null}
-            </div>
-
-            {testResult ? (
-              <div className="provider-credential-test">
-                <span className="provider-credential-test-result">{testResult}</span>
-              </div>
-            ) : null}
-          </div>
-
-          <ModelSelectionPanes
-            discovery={discovery}
-            selection={selection}
-            listTitle={t("settings.serviceModels")}
-            busy={saving}
-            onReload={discovery.reload}
-            apiStyle={resolvedApiStyle}
-            imageModelIds={imageModelDraft ?? imageModelIds}
-            onImageModelChange={updateImageModelDraft}
-            lookupContext={{
-              baseUrl: requestBaseUrl,
-              vendorKey: namedPreset?.vendorKey ?? "custom",
-              providerId: provider?.id,
-            }}
-          />
-        </div>
+        {chooserOpen ? chooserView : formView}
       </div>
 
       {advancedOpen && (named || custom) ? (

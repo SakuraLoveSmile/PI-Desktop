@@ -56,8 +56,9 @@ const vendorAccountDialogSource = await readFile(
   new URL("../src/components/settings/VendorAccountDialog.tsx", import.meta.url),
   "utf8",
 );
-const vendorPickerSource = await readFile(
-  new URL("../src/components/settings/VendorPickerDialog.tsx", import.meta.url),
+// Subscriptions are picked in the service chooser since D623.
+const serviceChooserSource = await readFile(
+  new URL("../src/components/settings/ServiceChooser.tsx", import.meta.url),
   "utf8",
 );
 const oauthSource = await readFile(
@@ -322,12 +323,13 @@ test("model configuration lists AI services and vendor accounts together", () =>
   // Both credential kinds now pick from the same live, service-provided list.
   assert.match(vendorAccountDialogSource, /useProviderModels/);
   assert.match(vendorAccountDialogSource, /<ModelSelectionPanes/);
+  assert.match(vendorAccountDialogSource, /<ChosenModelsSummary/);
   assert.match(vendorAccountDialogSource, /modelId: persisted\[0\]\.id/);
   assert.match(vendorAccountsHookSource, /providerIsReady/);
   assert.match(vendorAccountsHookSource, /defaultProviderId: next\?\.id \?\? ""/);
   assert.match(vendorAccountsHookSource, /useAppStore\.setState\(\{ settings: nextSettings \}\)/);
-  assert.match(vendorPickerSource, /existing accounts do not disable a vendor/);
-  assert.match(vendorPickerSource, /vendors\.map/);
+  assert.match(serviceChooserSource, /existing accounts do not disable a\s+vendor/);
+  assert.match(serviceChooserSource, /vendors\.map/);
 });
 
 test("a service row opens its editor and keeps only a switch and one menu", () => {

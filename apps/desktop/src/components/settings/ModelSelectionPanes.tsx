@@ -8,7 +8,7 @@
  * guarantee lives here once instead of in a convention two files had to
  * remember.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 import {
   THINKING_LEVELS,
@@ -209,6 +209,10 @@ export type ModelSelectionPanesProps = {
    * limits; absent fields only widen the catalog search.
    */
   lookupContext?: CustomModelLookupContext;
+  /** Attached to the hand-typed id field, so a caller can focus it. */
+  customModelInputRef?: Ref<HTMLInputElement>;
+  /** Folds the picker back into the chosen-models summary (D623). */
+  onCollapse?: () => void;
 };
 
 /**
@@ -226,6 +230,8 @@ export function ModelSelectionPanes({
   imageModelIds,
   lookupContext,
   onImageModelChange,
+  customModelInputRef,
+  onCollapse,
 }: ModelSelectionPanesProps) {
   const { t } = useTranslation();
   const { rows, models, publishedLevelsById, setModels } = selection;
@@ -233,9 +239,9 @@ export function ModelSelectionPanes({
   const [chosenQuery, setChosenQuery] = useState("");
   const [customModelId, setCustomModelId] = useState("");
   const [customModelError, setCustomModelError] = useState("");
-  const [expandedModelId, setExpandedModelId] = useState<string | null>(
-    () => models[0]?.id ?? null,
-  );
+  // Nothing opens on its own: the advanced settings of one model are not
+  // what the picker is opened for.
+  const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
 
   // The returned list is short and already local, so filtering is client-side:
   // no host search and no debounced IPC round trip.
@@ -556,6 +562,16 @@ export function ModelSelectionPanes({
               onChange={(event) => setChosenQuery(event.target.value)}
             />
           </div>
+          {onCollapse ? (
+            <button
+              type="button"
+              className="provider-models-summary-manage"
+              aria-expanded
+              onClick={onCollapse}
+            >
+              {t("settings.collapseModels")}
+            </button>
+          ) : null}
         </div>
         {models.length === 0 ? (
           <div className="provider-chosen-empty">{t("settings.noModelsChosen")}</div>
@@ -971,6 +987,7 @@ export function ModelSelectionPanes({
           >
             <div className="provider-custom-model-row">
               <Input
+                ref={customModelInputRef}
                 value={customModelId}
                 placeholder={t("settings.customModelPlaceholder")}
                 className="font-mono text-sm"

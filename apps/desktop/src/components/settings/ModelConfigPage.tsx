@@ -29,7 +29,6 @@ import {
   IconCheck,
   IconChevronDown,
   IconConfig,
-  IconKey,
   IconPlus,
   IconServer,
   IconSearch,
@@ -50,7 +49,6 @@ import { ServiceList } from "./ServiceList";
 import { serviceRowKind } from "./service-row-status";
 import { useVendorAccounts } from "./useVendorAccounts";
 import { VendorAccountDialog, type VendorAccountForm } from "./VendorAccountDialog";
-import { VendorPickerDialog } from "./VendorPickerDialog";
 
 type CatalogStatus = {
   loaded: boolean;
@@ -91,7 +89,6 @@ export function ModelConfigPage() {
     removeAccount,
     saveAccount,
   } = useVendorAccounts();
-  const [pickingVendor, setPickingVendor] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -515,18 +512,6 @@ export function ModelConfigPage() {
             ) : null}
           </div>
           <div className="provider-section-head-actions">
-            {vendors?.length ? (
-              <Button
-                variant="secondary"
-                disabled={login !== null}
-                onClick={() => setPickingVendor(true)}
-              >
-                <span className="model-config-btn-inner">
-                  <IconKey size={14} />
-                  <span>{t("settings.vendorAddAccount")}</span>
-                </span>
-              </Button>
-            ) : null}
             <Button
               variant="primary"
               className="model-provider-add"
@@ -568,8 +553,7 @@ export function ModelConfigPage() {
                 editingAccountId !== null ||
                 busyAccountId !== null ||
                 savingAccount ||
-                login !== null ||
-                pickingVendor
+                login !== null
               }
               isRowBusy={(id) => busyId === id || testingId === id || busyAccountId === id}
               testingId={testingId}
@@ -648,19 +632,14 @@ export function ModelConfigPage() {
                 .map((binding) => binding.modelId)
             : undefined}
           onSaved={afterSaved}
-        />
-      ) : null}
-
-      {pickingVendor && vendors ? (
-        <VendorPickerDialog
           vendors={vendors}
-          onPick={(vendor) => {
-            setPickingVendor(false);
+          onPickSubscription={(vendor) => {
+            setSetupFor(null);
+            setCopyDraft(null);
             // Started here, not in the dialog: a click happens once, where
             // StrictMode would run a mount effect twice and open two browsers.
             startLogin(vendor);
           }}
-          onClose={() => setPickingVendor(false)}
         />
       ) : null}
 
