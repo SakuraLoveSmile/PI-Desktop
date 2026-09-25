@@ -345,3 +345,66 @@ export function calculateCacheRate(
   if (promptTokens <= 0) return undefined;
   return Math.round((cacheReadTokens / promptTokens) * 100);
 }
+
+export type ComposerUsageFooterMetrics = {
+  outputSpeed?: {
+    rate: number;
+    estimated: boolean;
+  };
+  turnTotal?: number;
+  cacheHitRate?: number;
+  context: {
+    display: ContextUsageDisplay;
+    percent: number;
+    tokens: number;
+    remainingPercent: number;
+    level: "comfortable" | "warning" | "critical";
+  };
+};
+
+export function resolveComposerUsageFooterMetrics({
+  usage,
+  turnUsage,
+  contextWindow,
+  responseDurationMs,
+  responseOutputTokens,
+  responseOutputEstimated = false,
+  contextUsageDisplay = "remaining",
+}: {
+  usage: MessageUsage;
+  turnUsage: MessageUsage;
+  contextWindow: number;
+  responseDurationMs?: number;
+  responseOutputTokens?: number;
+  responseOutputEstimated?: boolean;
+  contextUsageDisplay?: ContextUsageDisplay;
+}): ComposerUsageFooterMetrics {
+  const rate = calculateTokenRate(
+    responseOutputTokens ?? turnUsage.outputTokens,
+    responseDurationMs,
+  );
+  const total = usageTokenTotal(turnUsage);
+  const cacheHitRate = calculateCacheRate(usage.inputTokens, usage.cacheReadTokens);
+  const context = calculateContextUsage(usage, contextWindow);
+  const displayMode = resolveContextUsageDisplay(contextUsageDisplay);
+  const view = contextUsageView(context, displayMode);
+  const level =
+    context.remainingPercent <= 10
+      ? "critical"
+      : context.remainingPercent <= 25
+        ? "warning"
+        : "comfortable";
+
+  return {
+    outputSpeed: rate !== undefined ? { rate, estimated: responseOutputEstimated } : undefined,
+    turnTotal: total > 0 ? total : undefined,
+    cacheHitRate,
+    context: {
+      display: displayMode,
+      percent: view.percent,
+      tokens: view.tokens,
+      remainingPercent: context.remainingPercent,
+      level,
+    },
+  };
+}
