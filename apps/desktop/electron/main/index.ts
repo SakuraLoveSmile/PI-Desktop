@@ -1128,6 +1128,7 @@ const planRuntime = createPlanRuntime({
   resolveAgentRuntimeLaunch,
   isQuitting: () => quitting,
   onTurnSettled: sessionCollaboration.settle,
+  persistenceOutbox,
 });
 const {
   finishTurn,

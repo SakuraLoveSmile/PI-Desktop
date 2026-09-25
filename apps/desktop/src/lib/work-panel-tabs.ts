@@ -3,7 +3,8 @@ export type WorkPanelTabKind =
   | "review"
   | "file"
   | "plugin"
-  | "subagent";
+  | "subagent"
+  | "goalReport";
 
 export type WorkPanelTab = {
   id: string;
@@ -115,6 +116,18 @@ export function subagentWorkPanelTab(
   };
 }
 
+export function goalReportWorkPanelTab(
+  executionId: string,
+  label?: string,
+): WorkPanelTab {
+  return {
+    id: `goalReport:${executionId}`,
+    kind: "goalReport",
+    resource: executionId,
+    ...(label ? { label } : {}),
+  };
+}
+
 export const BROWSER_PLUGIN_TAB = {
   pluginId: "pi.browser",
   viewId: "browser",
@@ -205,7 +218,7 @@ export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
     Boolean(tab) &&
     (tab.kind === "new" || tab.kind === "review" ||
       tab.kind === "file" || tab.kind === "plugin" ||
-      tab.kind === "subagent")
+      tab.kind === "subagent" || tab.kind === "goalReport")
   );
 }
 

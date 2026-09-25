@@ -221,7 +221,7 @@ export class PluginWebSocketRegistry {
         reject(new PluginSocketError("TIMEOUT", `connection timed out after ${timeoutMs}ms`));
       }, timeoutMs);
       // A pending connect must not keep the app alive or leave a live handle.
-      timer.unref?.();
+      // timer.unref?.();
     });
 
     try {

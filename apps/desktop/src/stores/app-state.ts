@@ -7,6 +7,7 @@ import type {
   AppVersionInfo,
   AskToolResolution,
   ContextCompactionMark,
+  GoalReportSummary,
   Mode,
   ModelInfo,
   OnboardingState,
@@ -168,6 +169,8 @@ export type AppState = {
   pendingPlans: Record<string, PlanProposal>;
   /** Latest immutable Plan checkpoint/execution snapshot per session. */
   planCheckpoints: Record<string, PlanProposal>;
+  /** Goal completion report summaries per session. */
+  goalReports: Record<string, GoalReportSummary[]>;
   toasts: ToastItem[];
   notifications: AppNotification[];
   unreadNotificationCount: number;
@@ -326,6 +329,7 @@ export type AppState = {
   acknowledgeSessionOutcome: (sessionId: string) => Promise<void>;
   restorePendingPlan: (sessionId: string) => Promise<PendingPlanRefreshResult>;
   refreshPlanCheckpoints: () => Promise<void>;
+  refreshGoalReports: (sessionId: string) => Promise<void>;
   handleAgentEvent: (envelope: AgentEventEnvelope) => void;
   handlePlansChanged: (event: PlanningStateEvent) => void;
   setPage: (page: AppState["page"], opts?: { record?: boolean }) => void;
