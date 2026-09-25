@@ -1,5 +1,5 @@
 /**
- * One dialog to add or edit an AI service, in two views (D623).
+ * One dialog to add or edit an AI service, in two views (D625).
  *
  * A new service opens on the service chooser; picking a tile moves to the
  * form. Named services: paste a key and the recommended models are chosen as
@@ -12,7 +12,6 @@ import { useTranslation } from "react-i18next";
 import {
   NAMED_ENDPOINT_PRESETS,
   OPENCODE_GO_API_STYLE,
-  modelIdsMatch,
   normalizeApiStyle,
   type CatalogApiStyle,
   type ModelBinding,
@@ -33,64 +32,8 @@ import { useRecommendedModelSelection } from "./useRecommendedModelSelection";
 import type { ProviderCopyDraft } from "./provider-copy";
 import { isAccountOnlyApiStyle, needsCustomApiStyleChoice, providerSetupPreset } from "./provider-api-style";
 
-type BaseUrlIssue = "invalid";
-
-function endpointPathSuffixes(apiStyle: CatalogApiStyle): string[] {
-  switch (apiStyle) {
-    case "anthropic_messages":
-    case "pi_messages":
-      return ["/messages", "/models"];
-    case "chat_completions":
-      return ["/chat/completions", "/models"];
-    case "responses":
-    case "openai_codex_responses":
-    case "opencode_go":
-      return ["/responses", "/models"];
-    case "google_generative_ai":
-      return ["/models"];
-    default:
-      return ["/chat/completions", "/models"];
-  }
-}
-
-function getBaseUrlIssue(value: string): BaseUrlIssue | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  try {
-    const parsed = new URL(trimmed);
-    if (
-      !["http:", "https:"].includes(parsed.protocol) ||
-      !parsed.hostname ||
-      parsed.username ||
-      parsed.password ||
-      parsed.search ||
-      parsed.hash
-    ) {
-      return "invalid";
-    }
-    return null;
-  } catch {
-    return "invalid";
-  }
-}
-
-/** Keep pasted operation URLs usable by storing the service root instead. */
-function normalizeBaseUrlInput(value: string, apiStyle: CatalogApiStyle): string {
-  const trimmed = value.trim();
-  if (!trimmed || getBaseUrlIssue(trimmed)) return trimmed;
-
-  let normalized = trimmed.replace(/\/+$/, "");
-  const suffixes = endpointPathSuffixes(apiStyle).sort(
-    (left, right) => right.length - left.length,
-  );
-  for (const suffix of suffixes) {
-    if (normalized.toLowerCase().endsWith(suffix)) {
-      normalized = normalized.slice(0, -suffix.length).replace(/\/+$/, "");
-      break;
-    }
-  }
-  return normalized || trimmed;
-}
+import { getBaseUrlIssue, normalizeBaseUrlInput } from "./provider-endpoint-guidance";
+import { ProviderEndpointGuidance } from "./ProviderEndpointGuidance";
 
 function serviceIdFor(provider?: ProviderPublic | null): string {
   if (!provider) return "";
@@ -98,7 +41,7 @@ function serviceIdFor(provider?: ProviderPublic | null): string {
 }
 
 function initialName(provider?: ProviderPublic | null): string {
-  return providerSetupPreset(provider)?.name ?? provider?.name ?? "";
+  return provider?.name ?? providerSetupPreset(provider)?.name ?? "";
 }
 
 function initialBaseUrl(provider?: ProviderPublic | null): string {
@@ -312,7 +255,7 @@ export function ProviderSetupDialog({
     // existing save path when the image selection did not change.
     const imageSelection = imageModelDraft ?? imageModelIds;
     const remainingImageModels = imageSelection?.filter((imageModelId) =>
-      persisted.some((model) => modelIdsMatch(model.id, imageModelId)),
+      persisted.some((model) => model.id.toLowerCase() === imageModelId.toLowerCase()),
     );
     const imageModelIdsToSave = imageModelDraft !== undefined ||
       remainingImageModels?.length !== imageSelection?.length
@@ -325,7 +268,9 @@ export function ProviderSetupDialog({
         const result = await api.updateProvider({
           id: provider.id,
           name: providerName,
-          vendorKey: namedPreset?.vendorKey ?? "custom",
+          // A row whose stored wire format differs from the published preset is
+          // no longer that preset, but its catalog identity is still its own.
+          vendorKey: namedPreset?.vendorKey ?? provider?.vendorKey ?? "custom",
           baseUrl: providerBaseUrl,
           defaultModelId: persisted[0]?.id,
           models: persisted,
@@ -361,9 +306,9 @@ export function ProviderSetupDialog({
     setImageModelDraft((current) => {
       const next = current ?? imageModelIds ?? [];
       if (selected) {
-        return next.some((entry) => modelIdsMatch(entry, id)) ? next : [...next, id];
+        return next.some((entry) => entry.toLowerCase() === id.toLowerCase()) ? next : [...next, id];
       }
-      return next.filter((entry) => !modelIdsMatch(entry, id));
+      return next.filter((entry) => entry.toLowerCase() !== id.toLowerCase());
     });
   };
 
@@ -422,6 +367,22 @@ export function ProviderSetupDialog({
       <div className="provider-setup-body">
         {error ? <div className="provider-setup-error">{error}</div> : null}
 
+        <ProviderEndpointGuidance
+          baseUrl={resolvedBaseUrl}
+          apiStyle={resolvedApiStyle}
+          disabled={saving}
+          onApply={(suggestion) => {
+            const preset = NAMED_ENDPOINT_PRESETS.find((item) =>
+              item.baseUrl === suggestion.baseUrl && item.apiStyle === suggestion.apiStyle,
+            );
+            setService(preset?.id ?? CUSTOM_SERVICE);
+            setBaseUrl(suggestion.baseUrl);
+            setApiStyle(suggestion.apiStyle);
+            setError("");
+            setTestResult("");
+          }}
+        />
+
         <div className="provider-setup-credentials">
           <ProviderConnectionFields
             named={named}
@@ -472,7 +433,7 @@ export function ProviderSetupDialog({
             onCollapse={() => setManaging(false)}
             lookupContext={{
               baseUrl: requestBaseUrl,
-              vendorKey: namedPreset?.vendorKey ?? "custom",
+              vendorKey: namedPreset?.vendorKey ?? provider?.vendorKey ?? "custom",
               providerId: provider?.id,
             }}
           />

@@ -19,6 +19,7 @@ import { WorkPanel } from "../../components/workpanel/WorkPanel";
 import { useCopyTex } from "../../hooks/use-copy-tex";
 import { api } from "../../lib/api";
 import { PortalVisibilityProvider } from "../../lib/portal-visibility";
+import { MidAutumnEggHost } from "../mid-autumn-egg/MidAutumnEggHost";
 import { CollapsedTitlebarActions, RoutePending } from "./chrome";
 import { useAppShellRuntime } from "./useAppShellRuntime";
 
@@ -49,9 +50,6 @@ export function AppShell() {
     ready,
     page,
     activeSessionId,
-    subagentPanel,
-    subagentPanelOpen,
-    closeSubagentPanel,
     workPanelOpen,
     searchOpen,
     setSearchOpen,
@@ -274,8 +272,6 @@ export function AppShell() {
                 onExitAnimationEnd={() =>
                   finishWorkPanelExit(workPanelExitGeneration.current)
                 }
-                subagentPanel={subagentPanelOpen ? subagentPanel : null}
-                onCloseSubagentPanel={closeSubagentPanel}
                 containerWidth={shellWidth}
                 sidebarWidth={sidebarWidth}
                 sidebarCollapsed={sidebarCollapsed}
@@ -309,6 +305,7 @@ export function AppShell() {
         ) : null}
         <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
         <ToastHost />
+        <MidAutumnEggHost ready={ready} showSplash={showSplash} />
         <ExtensionPromptHost />
         {page === "settings" ? <UpdateBanner /> : null}
       </>
