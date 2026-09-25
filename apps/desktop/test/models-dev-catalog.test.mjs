@@ -216,12 +216,12 @@ test("an unknown endpoint borrows only what every publisher of the id agrees on"
   }
 });
 
-test("an unknown endpoint can use a unique supported proxy alias", async (t) => {
+test("an unknown endpoint can use a unique exact last-segment match", async (t) => {
   const catalog = await loadFixtureCatalog(t, {
     alpha: { models: { "shared-model": { id: "shared-model", reasoning: true } } },
   });
   assert.equal(catalog.findModel({
-    vendorKey: "custom", baseUrl: "https://relay.example/v1", modelId: "proxy/shared-model-thinking",
+    vendorKey: "custom", baseUrl: "https://relay.example/v1", modelId: "proxy/shared-model",
   })?.providerKey, "alpha");
 });
 
@@ -337,111 +337,170 @@ test("model IDs match provider namespaces without matching model variants", () =
   assert.equal(modelIdsMatch("proxy/openai/gpt-4o", "openai/gpt-4o"), true);
   assert.equal(modelIdsMatch("openai/gpt-4o", "proxy/gpt-4o"), false);
 });
-test("catalog metadata IDs match exact proxy paths and supported variants", () => {
+test("catalog metadata IDs match only exact case-insensitive last segments", () => {
   for (const [catalogId, request] of [
     ["claude-opus-4.6", "proxy/claude-opus-4.6"],
-    ["claude-opus-4.6", "custom/claude-opus-4.6"],
-    ["claude-opus-4.6", "relay/claude-opus-4.6"],
-    ["claude-opus-4.6", "gateway-01/claude-opus-4.6"],
-    ["openai/gpt-4o", "hub/openai/gpt-4o"],
-    ["claude-opus-4.6", "proxy/claude-opus-4.6-thinking"],
-    ["claude-opus-4.6", "claude-opus-4.6:thinking"],
-    ["claude-opus-4.6", "proxy/claude-opus-4.6-agent"],
-    ["claude-opus-4.6", "proxy/claude-opus-4.6-latest"],
-    ["claude-opus-4.6", "proxy/claude-opus-4.6-agent-thinking"],
-    ["proxy/nested/claude-opus-4.6@us-east", "claude-opus-4.6-thinking"],
-    ["anthropic-claude-opus-4.6", "claude-opus-4.6@us-east"],
-    ["google/gemini-pro-latest", "gemini-pro"],
+    ["openai/gpt-4o", "hub/gpt-4o"],
+    ["google/gemini-2.5-flash", "openai/gemini-2.5-flash"],
+    ["proxy/nested/claude-opus-4.6", "other/CLAUDE-OPUS-4.6"],
+    ["gateway-a/foo", "gateway-b/foo"],
   ]) {
     assert.equal(catalogModelIdsMatch(catalogId, request), true, `${catalogId} / ${request}`);
     assert.equal(catalogModelIdsMatch(request, catalogId), true, `${request} / ${catalogId}`);
   }
 
   for (const [catalogId, request] of [
-    ["google/gemini-2.5-flash", "openai/gemini-2.5-flash"],
-    ["claude-opus-4.6", "myproxy-claude-opus-4.6"],
-    ["claude-opus-4.6", "myproxy-claude-opus-4.6-thinking"],
-    ["google/gemini-2.5-flash", "gemini-2.5-flash-high"],
-    ["google/gemini-2.5-flash", "gemini-2.5-flash-low"],
-    ["google/gemini-2.5-flash", "gemini-2.5-flash:minimal"],
-    ["claude-opus-5", "claude-opus-5-fast"],
-    ["gpt-4o", "gpt-4o-mini"],
-    ["gpt-4", "gpt-4o"],
-    ["model", "other-model"],
-    ["custom", "gemini-3.1-pro-preview-customtools"],
-    ["groq/whisper-large-v3", "deepseek-v3"],
-    ["vercel/bfl/flux-kontext-max", "qwen-max"],
-    ["alibaba/qwen3-asr-flash", "qwen-flash"],
-    ["openai/gpt-4o", "proxy/gpt-4o"],
-    ["google/gemini-2.5-flash", "proxy/gemini-2.5-flash"],
-    ["proxy/nested/claude-opus-4.6", "other/claude-opus-4.6"],
-    ["claude-opus-4-6-max", "qwen-max"],
+    ["claude-opus-4.6", "proxy/claude-opus-4.6-thinking"],
+    ["claude-opus-4.6", "claude-opus-4.6:thinking"],
+    ["claude-opus-4.6", "proxy/claude-opus-4.6-agent"],
+    ["claude-opus-4.6", "proxy/claude-opus-4.6-latest"],
+    ["anthropic-claude-opus-4.6", "claude-opus-4.6"],
+    ["google/gemini-pro-latest", "ag/gemini-pro-agent"],
+    ["foo", "foo-think"],
+    ["foo", "foo-agent"],
+    ["foo", "foo-latest"],
+    ["foo@us-east", "foo"],
   ]) {
     assert.equal(catalogModelIdsMatch(catalogId, request), false, `${catalogId} / ${request}`);
     assert.equal(catalogModelIdsMatch(request, catalogId), false, `${request} / ${catalogId}`);
   }
-  assert.equal(catalogModelIdsMatch("gateway-a/foo", "gateway-b/foo"), false);
-  assert.equal(catalogModelIdsMatch("foo", "foo-think"), true);
-  assert.equal(catalogModelIdsMatch("foo", "foo-agent"), true);
-  assert.equal(catalogModelIdsMatch("foo", "foo-latest"), true);
 });
 
-test("catalog lookup indexes exact path leaves and known vendor variants without broad aliases", async (t) => {
-  const ids = [
-    "model", "custom", "groq/whisper-large-v3", "vercel/bfl/flux-kontext-max",
-    "alibaba/qwen3-asr-flash", "proxy/nested/claude-opus-4.6@us-east",
-    "anthropic-claude-sonnet-4", "openai.gpt-4o", "google/gemini-2.5-flash",
-  ];
-  const catalog = await loadFixtureCatalog(t, {
-    gateway: { models: Object.fromEntries(ids.map((id) => [id, { id }])) },
-  });
-  for (const [request, expected] of [
-    ["other-model", undefined],
-    ["gemini-3.1-pro-preview-customtools", undefined],
-    ["deepseek-v3", undefined],
-    ["qwen-max", undefined],
-    ["qwen-flash", undefined],
-    ["myproxy-claude-opus-4.6", undefined],
-    ["gemini-2.5-flash-high", undefined],
-    ["gemini-2.5-flash-low", undefined],
-    ["claude-opus-4.6-thinking", "proxy/nested/claude-opus-4.6@us-east"],
-    ["proxy/claude-opus-4.6-thinking", undefined],
-    ["claude-sonnet-4-agent", "anthropic-claude-sonnet-4"],
-    ["proxy/gemini-2.5-flash", undefined],
-    ["gpt-4o@eu", "openai.gpt-4o"],
-  ]) {
-    assert.equal(catalog.findModel({ vendorKey: "custom", modelId: request })?.modelId, expected, request);
-  }
-  assert.equal(catalog.findModel({ vendorKey: "custom", modelId: "openai/gemini-2.5-flash" }), undefined);
-});
-
-test("matches supported proxy path and reasoning variants in catalog lookup", async (t) => {
-  const catalog = await loadFixtureCatalog(t);
-  for (const modelId of [
-    "proxy/claude-opus-4.6", "proxy/claude-opus-4.6-thinking",
-    "proxy/claude-opus-4.6-agent", "claude-opus-4.6:thinking",
-    "anthropic-claude-opus-4.6",
-  ]) {
-    const match = catalog.findModel({ vendorKey: "custom", modelId });
-    assert.equal(match?.modelId, "claude-opus-4.6", modelId);
-    assert.equal(match.reasoning, true);
-  }
-  for (const modelId of ["myproxy-claude-opus-4.6", "myproxy-claude-opus-4.6-thinking"]) {
-    assert.equal(catalog.findModel({ vendorKey: "custom", modelId }), undefined);
-  }
-});
-
-test("metadata lookup can share routed leaves and narrow suffix aliases without merging bindings", async (t) => {
+test("catalog lookup uses exact last segments and rejects ambiguous matches", async (t) => {
   const catalog = await loadFixtureCatalog(t, {
     gateway: { models: {
-      "gateway-a/foo": { id: "gateway-a/foo" },
-      "bar-agent": { id: "bar-agent" },
+      "model": { id: "model" },
+      "nested/unique-model": { id: "nested/unique-model", reasoning: true },
+      "google/gemini-pro-latest": { id: "google/gemini-pro-latest", reasoning: true },
+      "route-a/shared-leaf": { id: "route-a/shared-leaf", reasoning: true },
+      "route-b/shared-leaf": { id: "route-b/shared-leaf", reasoning: false },
+      "regional@us-east": { id: "regional@us-east" },
     } },
   });
-  assert.equal(modelIdsMatch("gateway-a/foo", "gateway-b/foo"), false);
-  assert.equal(modelIdsMatch("bar", "bar-agent"), false);
-  assert.equal(catalog.findModel({ modelId: "gateway-b/foo" }), undefined);
-  assert.equal(catalog.findModel({ modelId: "bar-thinking" })?.modelId, "bar-agent");
+
+  assert.equal(
+    catalog.findModel({ vendorKey: "custom", modelId: "proxy/UNIQUE-MODEL" })?.modelId,
+    "nested/unique-model",
+  );
+  assert.equal(catalog.findModel({ vendorKey: "custom", modelId: "other/model" })?.modelId, "model");
+  assert.equal(catalog.findModel({ vendorKey: "custom", modelId: "proxy/shared-leaf" }), undefined);
+  assert.equal(catalog.findModel({ vendorKey: "gateway", modelId: "proxy/shared-leaf" }), undefined);
+  assert.equal(catalog.findModel({ vendorKey: "custom", modelId: "ag/gemini-pro-agent" }), undefined);
+  assert.equal(catalog.findModel({ vendorKey: "custom", modelId: "regional" }), undefined);
+  assert.equal(
+    catalog.findModel({ vendorKey: "custom", modelId: "proxy/regional@us-east" })?.modelId,
+    "regional@us-east",
+  );
+});
+
+test("ambiguous leaf matches prefer one official provider", async (t) => {
+  for (const order of [["relay", "openai"], ["openai", "relay"]]) {
+    const definitions = {
+      relay: { models: { "route/shared-leaf": {
+        id: "route/shared-leaf", reasoning: false, tool_call: false,
+        limit: { context: 32_000 },
+      } } },
+      openai: { models: { "shared-leaf": {
+        id: "shared-leaf", reasoning: true, tool_call: true,
+        reasoning_options: [{ type: "effort", values: ["low", "medium", "high"] }],
+        limit: { context: 128_000 },
+      } } },
+    };
+    const catalog = await loadFixtureCatalog(t, Object.fromEntries(
+      order.map((key) => [key, definitions[key]]),
+    ));
+    const match = catalog.findModel({ vendorKey: "custom", modelId: "proxy/shared-leaf" });
+    assert.equal(match?.providerKey, "openai");
+    assert.equal(match?.reasoning, true);
+    assert.equal(match?.limit.context, 128_000);
+  }
+});
+
+test("official source keys ignore a cloud publisher carrying another vendor's model", async (t) => {
+  const catalog = await loadFixtureCatalog(t, {
+    xai: { models: { "grok-4.6": {
+      id: "grok-4.6", reasoning: true, tool_call: true,
+      reasoning_options: [{ type: "effort", values: ["low", "medium", "high", "xhigh"] }],
+      limit: { context: 500_000 },
+    } } },
+    "google-vertex": { models: { "xai/grok-4.6": {
+      id: "xai/grok-4.6", reasoning: true, tool_call: true,
+      limit: { context: 524_288 },
+    } } },
+    relay: { models: { "x-ai/grok-4.6": {
+      id: "x-ai/grok-4.6", reasoning: false, tool_call: false,
+    } } },
+  });
+  const match = catalog.findModel({ vendorKey: "custom", modelId: "ycj/grok-4.6" });
+  assert.equal(match?.providerKey, "xai");
+  assert.equal(match?.limit.context, 500_000);
+});
+
+test("ambiguous non-official leaf matches share unanimous capabilities", async (t) => {
+  const catalog = await loadFixtureCatalog(t, {
+    relayA: { models: { "route-a/shared-leaf": {
+      id: "route-a/shared-leaf", reasoning: true, tool_call: true,
+      reasoning_options: [{ type: "effort", values: ["low", "high"] }],
+      modalities: { input: ["text", "image"], output: ["text"] },
+      limit: { context: 64_000, output: 8_192 },
+    } } },
+    relayB: { models: { "route-b/shared-leaf": {
+      id: "route-b/shared-leaf", reasoning: true, tool_call: true,
+      reasoning_options: [{ type: "effort", values: ["low", "high"] }],
+      modalities: { input: ["image", "text"], output: ["text"] },
+      limit: { context: 128_000, output: 16_384 },
+    } } },
+  });
+  const match = catalog.findModel({ vendorKey: "custom", modelId: "proxy/shared-leaf" });
+  assert.ok(match);
+  assert.equal(match.reasoning, true);
+  assert.equal(match.toolCall, true);
+  assert.deepEqual(match.thinkingLevels, ["low", "high"]);
+  assert.deepEqual(match.modalities.input.toSorted(), ["image", "text"]);
+});
+
+test("ambiguous leaf matches with conflicting capabilities remain unmatched", async (t) => {
+  const catalog = await loadFixtureCatalog(t, {
+    relayA: { models: { "route-a/shared-leaf": {
+      id: "route-a/shared-leaf", reasoning: true, tool_call: true,
+    } } },
+    relayB: { models: { "route-b/shared-leaf": {
+      id: "route-b/shared-leaf", reasoning: false, tool_call: true,
+    } } },
+  });
+  assert.equal(
+    catalog.findModel({ vendorKey: "custom", modelId: "proxy/shared-leaf" }),
+    undefined,
+  );
+});
+
+test("gemini agent routes do not collapse to gemini latest catalog entries", async (t) => {
+  const catalog = await loadFixtureCatalog(t, {
+    google: { models: {
+      "gemini-pro-latest": { id: "gemini-pro-latest", reasoning: true },
+    } },
+  });
+  assert.equal(
+    catalog.findModel({ vendorKey: "custom", modelId: "ag/gemini-pro-agent" }),
+    undefined,
+  );
+});
+
+test("catalog lookup never collapses reasoning or release suffix variants", async (t) => {
+  const catalog = await loadFixtureCatalog(t);
+  const exact = catalog.findModel({ vendorKey: "custom", modelId: "proxy/claude-opus-4.6" });
+  assert.equal(exact?.modelId, "claude-opus-4.6");
+  assert.equal(exact.reasoning, true);
+
+  for (const modelId of [
+    "proxy/claude-opus-4.6-thinking",
+    "proxy/claude-opus-4.6-agent",
+    "proxy/claude-opus-4.6-latest",
+    "claude-opus-4.6:thinking",
+    "anthropic-claude-opus-4.6",
+  ]) {
+    assert.equal(catalog.findModel({ vendorKey: "custom", modelId }), undefined, modelId);
+  }
 });
 
 /*
@@ -764,7 +823,7 @@ test("an exact record outranks a shipped publisher's other spelling of the id", 
   assert.ok(info.capabilities.includes("audio"));
 });
 
-test("borrowing stays exact-id, provider-scoped and absent for unknown ids", async (t) => {
+test("unique leaf enrichment coexists with exact-id borrowing and unknown misses", async (t) => {
   const catalog = await loadFixtureCatalog(t, {
     gateway: { api: "https://gateway.example/v1", models: {} },
     publisherA: { models: {
@@ -773,10 +832,11 @@ test("borrowing stays exact-id, provider-scoped and absent for unknown ids", asy
     } },
   });
   const input = { vendorKey: "gateway", baseUrl: "https://gateway.example/v1" };
-  // A near-miss id is not a reason to reuse a sibling's limits.
+  // Near-miss and unknown ids do not reuse a sibling's limits.
   assert.equal(catalog.findModel({ ...input, modelId: "Vendor/Known-3000" }), undefined);
-  assert.equal(catalog.findModel({ ...input, modelId: "Other/Known" }), undefined);
   assert.equal(catalog.findModel({ ...input, modelId: "unknown-model-xyz" }), undefined);
+  // A different route with the same unique final segment is valid enrichment.
+  assert.equal(catalog.findModel({ ...input, modelId: "Other/Known" })?.modelId, "Vendor/Known");
   // Exact ids still resolve, including a case-only difference.
   assert.equal(catalog.findModel({ ...input, modelId: "vendor/known" })?.limit.context, 262_144);
   assert.equal(catalog.findModel({ ...input, modelId: "Vendor/Known" })?.limit.context, 262_144);
@@ -1580,7 +1640,7 @@ const customGateway = {
   baseUrl: "https://gateway.example/v1",
 };
 
-test("a custom Anthropic gateway reads Anthropic's own record and its thinking shape", async (t) => {
+test("a custom gateway enriches an ambiguous Claude leaf from the official provider", async (t) => {
   const catalog = await loadFixtureCatalog(t, ambiguousClaudeFixture);
   const config = catalogModelConfigFor(catalog, {
     ...customGateway,
@@ -1588,20 +1648,10 @@ test("a custom Anthropic gateway reads Anthropic's own record and its thinking s
     modelId: "claude-opus-5-5",
   });
 
-  /*
-    Anthropic publishes this id, so the record of the publisher the app ships
-    answers — not a median shared with a reseller's smaller deployment of the
-    same id, which would halve the window Anthropic itself states.
-  */
   assert.equal(config.source, "models.dev");
   assert.equal(config.contextWindow, 1_000_000);
   assert.equal(config.maxTokens, 128_000);
   assert.equal(config.reasoning, true);
-  /*
-    No publisher describes this endpoint's reasoning wire shape, so the borrowed
-    record states none — and Anthropic's own record is what says whether the id
-    takes adaptive or budget thinking.
-  */
   assert.deepEqual(config.reasoningOptions, [
     { type: "effort", values: ["low", "medium", "high", "xhigh", "max"] },
   ]);
@@ -1615,15 +1665,18 @@ test("a custom Anthropic gateway reads Anthropic's own record and its thinking s
   });
 });
 
-test("the Anthropic thinking fallback stays off other wire APIs and non-Claude ids", async (t) => {
+test("official-provider enrichment is API-style independent while unknown ids stay generic", async (t) => {
   const catalog = await loadFixtureCatalog(t, ambiguousClaudeFixture);
   const completions = catalogModelConfigFor(catalog, {
     ...customGateway,
     apiStyle: "chat_completions",
     modelId: "claude-opus-5-5",
   });
-  assert.equal(completions.reasoningOptions, undefined);
-  assert.equal(completions.thinkingLevelMap, undefined);
+  assert.equal(completions.source, "models.dev");
+  assert.equal(completions.contextWindow, 1_000_000);
+  assert.deepEqual(completions.reasoningOptions, [
+    { type: "effort", values: ["low", "medium", "high", "xhigh", "max"] },
+  ]);
 
   // An id absent from every publisher stays generic, even on Anthropic Messages.
   const unlisted = catalogModelConfigFor(catalog, {

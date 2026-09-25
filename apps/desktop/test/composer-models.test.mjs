@@ -42,8 +42,8 @@ test("Composer only lists models configured for the provider", () => {
   assert.deepEqual(
     models.map(({ modelId, displayName }) => ({ modelId, displayName })),
     [
-      { modelId: "claude-opus-4-6", displayName: "Claude Opus 4.6" },
-      { modelId: "x-ai/grok-4.6", displayName: "Grok 4.6" },
+      { modelId: "claude-opus-4-6", displayName: "claude-opus-4-6" },
+      { modelId: "x-ai/grok-4.6", displayName: "x-ai/grok-4.6" },
     ],
   );
 });
@@ -78,10 +78,10 @@ test("legacy providers fall back to their default model binding", () => {
   );
 
   assert.deepEqual(models.map((item) => item.modelId), ["legacy-model"]);
-  assert.equal(models[0].displayName, "Legacy model");
+  assert.equal(models[0].displayName, "legacy-model");
 });
 
-test("a configured alias labels its row without losing the published name", () => {
+test("a configured alias labels its row while displayName shows the wire id", () => {
   const provider = {
     id: "deepseek",
     models: [{ ...binding("deepseek-v4-pro"), alias: "  pro  " }],
@@ -92,10 +92,10 @@ test("a configured alias labels its row without losing the published name", () =
   );
 
   assert.equal(models[0].modelId, "deepseek-v4-pro");
-  assert.equal(models[0].displayName, "DeepSeek V4 Pro");
+  assert.equal(models[0].displayName, "deepseek-v4-pro");
   assert.equal(composerModelDisplayName(provider, "deepseek-v4-pro", models[0].displayName), "pro");
   assert.equal(composerModelMatchesQuery(models[0], "provider", "PRO", "pro"), true);
-  assert.equal(composerModelMatchesQuery(models[0], "provider", "DeepSeek V4 Pro", "pro"), true);
+  assert.equal(composerModelMatchesQuery(models[0], "provider", "DeepSeek V4 Pro", "pro"), false);
 });
 test("a configured alias is visible before discovery data is available", () => {
   const provider = {
@@ -140,7 +140,7 @@ test("an exact binding alias wins over a broader equivalent id match", () => {
   );
 });
 
-test("a blank alias leaves the published display name alone", () => {
+test("a blank alias leaves the wire id as display name", () => {
   const models = composerModelsForProvider(
     {
       id: "deepseek",
@@ -149,14 +149,14 @@ test("a blank alias leaves the published display name alone", () => {
     [model("deepseek-v4-pro", "DeepSeek V4 Pro")],
   );
 
-  assert.equal(models[0].displayName, "DeepSeek V4 Pro");
+  assert.equal(models[0].displayName, "deepseek-v4-pro");
   assert.equal(
     composerModelDisplayName(
       { id: "deepseek", models: [{ ...binding("deepseek-v4-pro"), alias: "   " }] },
       "deepseek-v4-pro",
-      "DeepSeek V4 Pro",
+      "deepseek-v4-pro",
     ),
-    "DeepSeek V4 Pro",
+    "deepseek-v4-pro",
   );
 });
 
@@ -248,8 +248,8 @@ test("prefixed and unprefixed wire ids remain separate even with one catalog nam
     { ...model("proxy/model", "Friendly"), capabilities: ["text", "vision"] },
   ]);
   assert.deepEqual(rows.map(({ modelId, displayName }) => [modelId, displayName]), [
-    ["proxy/model", "Friendly"],
-    ["model", "Friendly"],
+    ["proxy/model", "proxy/model"],
+    ["model", "model"],
   ]);
   assert.equal(composerModelDisplayName(provider, "proxy/model", rows[0].displayName), "Short");
   assert.equal(composerModelMatchesQuery(rows[0], "relay", "Short", "Short"), true);

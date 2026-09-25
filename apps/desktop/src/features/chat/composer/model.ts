@@ -127,14 +127,28 @@ export function thinkingProviderForModel(
 ): ProviderPublic | null | undefined {
   if (!provider || !modelId) return provider;
   const model = modelCatalog?.find((candidate) => sameComposerModelId(candidate.modelId, modelId));
-  if (!model) return provider;
 
   const binding = provider.models.find((candidate) =>
-    sameComposerModelId(candidate.id, model.modelId),
+    sameComposerModelId(candidate.id, modelId),
   );
   const configuredLevels = binding
     ? THINKING_LEVELS.filter((level) => binding.thinkingLevels.includes(level))
     : undefined;
+
+  if (!model) {
+    // No catalog match: all thinking levels selectable, default off.
+    // A binding override still takes precedence when present.
+    const supportsReasoning = configuredLevels
+      ? configuredLevels.some((level) => level !== "off")
+      : true;
+    return {
+      ...provider,
+      supportsReasoning,
+      supportedThinkingLevels:
+        configuredLevels ?? [...THINKING_LEVELS],
+    };
+  }
+
   const supportsReasoning = configuredLevels
     ? configuredLevels.some((level) => level !== "off")
     : model.reasoning === true || model.capabilities.includes("reasoning");

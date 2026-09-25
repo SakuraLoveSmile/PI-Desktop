@@ -91,11 +91,10 @@ export function nearestSupportedThinkingLevel(
 /**
  * Thinking level a new draft or session starts at for a model binding.
  *
- * Prefer the stored default when it is still enabled, including `omit` on a
- * reasoning binding. Otherwise clamp that default onto the enabled ladder.
- * With no stored default, fall back to the strongest enabled level so a
- * reasoning model never starts at `off` merely because Settings has not
- * picked a default yet.
+ * Prefer an explicitly stored default when it is still enabled, including
+ * `omit` on a reasoning binding. Otherwise clamp that explicit default onto
+ * the enabled ladder. With no stored default, start at `off`; available
+ * reasoning levels remain selectable but are never enabled implicitly.
  */
 export function initialThinkingLevelForBinding(
   binding: ThinkingLevelBindingSource | null | undefined,
@@ -105,7 +104,7 @@ export function initialThinkingLevelForBinding(
   const stored = binding?.defaultThinkingLevel;
   if (stored === "omit") return enablesReasoning(enabled) ? "omit" : "off";
   if (stored != null) return nearestSupportedThinkingLevel(stored, enabled);
-  return highestSupportedThinkingLevel(enabled);
+  return "off";
 }
 
 /** Published record a thinking-level candidate list can be derived from. */

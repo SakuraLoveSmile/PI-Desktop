@@ -54,14 +54,14 @@ describe("initialThinkingLevelForBinding", () => {
     ).toBe("high");
   });
 
-  it("falls back to the strongest enabled level when no default is stored", () => {
+  it("defaults to off when no default is stored", () => {
     expect(
       initialThinkingLevelForBinding({
         thinkingLevels: ["low", "high", "max"],
         defaultThinkingLevel: null,
       }),
-    ).toBe("max");
-    expect(initialThinkingLevelForBinding(undefined, ["low", "high"])).toBe("high");
+    ).toBe("off");
+    expect(initialThinkingLevelForBinding(undefined, ["low", "high"])).toBe("off");
   });
 
   it("honors an explicit off default and empty bindings", () => {
