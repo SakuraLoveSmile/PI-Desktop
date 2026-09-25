@@ -20,7 +20,7 @@ const vendorDialogSource = await read("../src/components/settings/VendorAccountD
 // The panes themselves live in the picker both dialogs render (D269).
 const pickerSource = await read("../src/components/settings/ModelSelectionPanes.tsx");
 const fetchErrorSource = await read("../src/components/settings/ModelsFetchErrorMessage.tsx");
-// The credential rows live in their own component since D623.
+// The credential rows live in their own component since D625.
 const fieldsSource = await read("../src/components/settings/ProviderConnectionFields.tsx");
 const summarySource = await read("../src/components/settings/ChosenModelsSummary.tsx");
 const styles = await loadStyles();
@@ -377,7 +377,7 @@ test("Advanced says a fullwidth value folds and a non-Latin-1 value is refused",
   assert.match(block(".provider-setup-header-note"), /color: var\(--ds-text-muted\)/);
 });
 
-test("models open as a summary with the full picker one click away (D623)", () => {
+test("models open as a summary with the full picker one click away (D625)", () => {
   for (const source of [setupSource, vendorDialogSource]) {
     assert.match(source, /managing \?/);
     assert.match(source, /<ChosenModelsSummary/);

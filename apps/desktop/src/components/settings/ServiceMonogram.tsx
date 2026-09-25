@@ -1,5 +1,5 @@
 /**
- * The letter tile that leads an AI service (D623).
+ * The letter tile that leads an AI service (D625).
  *
  * Deliberately no brand artwork or colour: every service sits in the same
  * quiet raised tone, so a row is told apart by its name and the tile only gives

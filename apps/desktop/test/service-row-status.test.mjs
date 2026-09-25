@@ -1,5 +1,5 @@
 /**
- * Behavior of the unified AI service row (D623): API services, plugin services
+ * Behavior of the unified AI service row (D625): API services, plugin services
  * and vendor subscription accounts share one list, so each row derives its
  * title, badges and meta line from the provider row alone plus, for accounts,
  * the vendor entry the runtime reports.

@@ -1,6 +1,6 @@
 /**
  * The connection half of the AI service form: which service, its key, and for
- * a custom endpoint the name, URL and API format (D310, D623).
+ * a custom endpoint the name, URL and API format (D310, D625).
  *
  * The chosen service reads as a settled fact with a Change action rather than
  * an open menu, and a status line under the key says whether the service

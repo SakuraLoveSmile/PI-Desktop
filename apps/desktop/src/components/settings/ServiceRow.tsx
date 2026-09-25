@@ -1,5 +1,5 @@
 /**
- * One row of the AI service list (D623): an API service, a plugin-declared
+ * One row of the AI service list (D625): an API service, a plugin-declared
  * service or a vendor subscription account.
  *
  * The row itself is the way in — a click or Enter opens its editor — so the
@@ -11,7 +11,7 @@
 import { Fragment, useRef, useState, type HTMLAttributes, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProviderPublic } from "@pi-desktop/shared";
-import { Badge, Button, Field, Input, TooltipButton, cx } from "../ui";
+import { Badge, Button, Field, Input, SettingsToggle, cx } from "../ui";
 import { CapabilityRowMenu, type CapabilityMenuItem } from "./AgentCapabilityLayout";
 import { ServiceMonogram } from "./ServiceMonogram";
 import {
@@ -170,22 +170,12 @@ export function ServiceRow({
         {/* A plugin refreshes its row from its manifest on every load, so the
             switch is not the user's to flip; an account has none at all. */}
         {kind !== "account" ? (
-          <TooltipButton
-            type="button"
-            className={cx("settings-toggle", provider.enabled && "on")}
-            role="switch"
-            aria-checked={provider.enabled}
-            tooltip={
-              kind === "plugin"
-                ? t("settings.pluginProviderManaged", { plugin: provider.ownerPluginId })
-                : t("settings.enabledToggle")
-            }
-            ariaLabel={t("settings.enabledToggle")}
+          <SettingsToggle
+            checked={provider.enabled}
+            label={t("settings.enabledToggle")}
             disabled={busy || kind === "plugin"}
-            onClick={onToggleEnabled}
-          >
-            <span className="settings-toggle-thumb" />
-          </TooltipButton>
+            onChange={onToggleEnabled}
+          />
         ) : null}
         <CapabilityRowMenu
           label={t("settings.serviceRowActions", { name: title.label })}

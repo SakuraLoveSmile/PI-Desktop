@@ -1,5 +1,5 @@
 /**
- * Preselect recommended models on a new AI service (D623).
+ * Preselect recommended models on a new AI service (D625).
  *
  * The add form used to open with nothing chosen, so saving a key was never
  * enough: every user had to find a chat model in a list of dozens. This hook

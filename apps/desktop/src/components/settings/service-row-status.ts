@@ -1,5 +1,5 @@
 /**
- * What one row of the AI service list says about itself (D623).
+ * What one row of the AI service list says about itself (D625).
  *
  * API services, plugin-declared services and vendor subscription accounts share
  * one list. These pure helpers decide a row's kind, title, badges and meta line

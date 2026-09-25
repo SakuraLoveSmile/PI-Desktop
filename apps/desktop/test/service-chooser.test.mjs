@@ -21,7 +21,7 @@ const rule = (selector) => {
   return match[1];
 };
 
-test("a new service starts on a searchable chooser, not a closed menu (D623)", () => {
+test("a new service starts on a searchable chooser, not a closed menu (D625)", () => {
   assert.match(setupSource, /<ServiceChooser/);
   assert.match(setupSource, /const chooserOpen = choosing \|\| !service/);
   assert.match(setupSource, /\{chooserOpen \? chooserView : formView\}/);

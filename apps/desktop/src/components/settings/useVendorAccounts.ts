@@ -1,5 +1,5 @@
 /**
- * Vendor (OAuth) accounts for the model settings page (ADR 0098, D623).
+ * Vendor (OAuth) accounts for the model settings page (ADR 0098, D625).
  *
  * Account rows share the AI service list with API services; this hook owns what
  * such a row needs beyond its provider row: the vendor list the runtime

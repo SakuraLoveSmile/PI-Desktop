@@ -1,5 +1,5 @@
 /**
- * The AI service list (D623): API services, plugin-declared services and
+ * The AI service list (D625): API services, plugin-declared services and
  * vendor subscription accounts in one card list with one drag order.
  *
  * The list owns only transient row state — which row's menu or key entry is

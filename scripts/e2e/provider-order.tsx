@@ -177,7 +177,7 @@ globalThis.providerOrderProbe = async (restart = false) => {
     click(document.querySelector('[aria-label="A · deepseek-reasoner"]'));
     await until(() => useAppStore.getState().settings?.defaultModelId === "deepseek-reasoner",
       "default picker did not select the second model");
-    // The row itself opens its editor (D623).
+    // The row itself opens its editor (D625).
     const edit = async (name: string) => {
       await until(() => row(name).getAttribute("aria-disabled") !== "true", "provider is still saving");
       click(row(name));

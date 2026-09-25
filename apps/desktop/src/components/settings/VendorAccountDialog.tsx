@@ -7,7 +7,7 @@
  * than every model the vendor publishes. Choosing among those rows is
  * `ModelSelectionPanes`, the same picker the AI service dialog renders, so an
  * account is not a reduced version of a service. Like a service, the dialog
- * opens on the chosen-models summary and the picker is one click away (D623).
+ * opens on the chosen-models summary and the picker is one click away (D625).
  */
 import { useEffect, useRef, useState } from "react";
 import {

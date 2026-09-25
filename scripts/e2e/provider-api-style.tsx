@@ -164,11 +164,15 @@ globalThis.providerApiStyleProbe = async () => {
   };
   const searchInput = () => [...document.querySelectorAll<HTMLInputElement>("input[type=checkbox]")]
     .find((input) => input.closest("label")?.textContent?.trim() === i18n.t("settings.nativeWebSearch"));
+  const openModelManager = async () => {
+    click(control("settings.manageModels"));
+    await until(() => Boolean(searchInput()), "model capability settings");
+  };
   try {
     for (const locale of ["en", "zh-CN"]) {
       await i18n.changeLanguage(locale);
       render();
-      // A new service opens on the chooser (D623); the custom endpoint is the
+      // A new service opens on the chooser (D625); the custom endpoint is the
       // last tile, and picking it moves to the form.
       const tiles = [...document.querySelectorAll<HTMLButtonElement>("[data-service-id]")];
       assert(tiles.length > 1, `${locale}: service chooser tiles missing`);
@@ -244,6 +248,7 @@ globalThis.providerApiStyleProbe = async () => {
         const original = { ...fixture("chat_completions"), name: "My service", vendorKey, baseUrl,
           models: [{ ...fixture("chat_completions").models[0], id: modelId }] };
         render({ provider: original });
+        await openModelManager();
         await until(() => Boolean(searchInput()), "official model settings");
         assert(!searchInput()?.disabled && !searchInput()?.checked, `${vendorKey}: search must be directly selectable and default off`);
         assert(!document.querySelector(".provider-endpoint-guidance"), "official search requires an extra interface action");
@@ -252,6 +257,7 @@ globalThis.providerApiStyleProbe = async () => {
         click(control("settings.cancel"));
         assert(updates.length === count, "cancel persisted the search opt-in");
         render({ provider: original });
+        await openModelManager();
         click(searchInput());
         click(control("settings.saveProvider"));
         await until(() => updates.length === count + 1, "save search opt-in");
@@ -261,6 +267,7 @@ globalThis.providerApiStyleProbe = async () => {
         assert(update.name === original.name && !("secretValue" in update), "search opt-in replaced name or key");
         assert(update.models?.[0].nativeWebSearch === true && update.models[0].alias === "Fixture alias", "model settings lost");
         render({ provider: { ...original, ...update } });
+        await openModelManager();
         assert(searchInput()?.checked && !searchInput()?.disabled, "search opt-in was lost on reopen");
         click(searchInput());
         click(control("settings.saveProvider"));
@@ -316,7 +323,7 @@ globalThis.providerApiStyleProbe = async () => {
       const accountAdvanced = document.querySelector<HTMLButtonElement>(".provider-chosen-advanced-toggle");
       if (accountAdvanced?.getAttribute("aria-expanded") === "false") click(accountAdvanced);
       await pause(650);
-      // Models open as a summary (D623); the per-model controls sit behind
+      // Models open as a summary (D625); the per-model controls sit behind
       // Manage models and the row's own Advanced disclosure.
       assert(document.querySelector(".provider-models-summary"), `${locale}: account dialog did not open on the summary`);
       click(control("settings.manageModels"));

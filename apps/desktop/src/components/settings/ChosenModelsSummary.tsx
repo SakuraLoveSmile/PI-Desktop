@@ -1,5 +1,5 @@
 /**
- * The chosen models of a service or account, as a short list (D623).
+ * The chosen models of a service or account, as a short list (D625).
  *
  * Most people keep the models a service starts with, so the form shows what
  * is chosen and leaves the two-pane picker one click away instead of opening

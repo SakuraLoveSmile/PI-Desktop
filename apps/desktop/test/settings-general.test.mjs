@@ -34,7 +34,7 @@ const marketplaceSettingsSource = await readFile(
   ),
   "utf8",
 );
-// API services and vendor accounts share one list (D623).
+// API services and vendor accounts share one list (D625).
 const serviceListSource = await readFile(
   new URL("../src/components/settings/ServiceList.tsx", import.meta.url),
   "utf8",
@@ -56,7 +56,7 @@ const vendorAccountDialogSource = await readFile(
   new URL("../src/components/settings/VendorAccountDialog.tsx", import.meta.url),
   "utf8",
 );
-// Subscriptions are picked in the service chooser since D623.
+// Subscriptions are picked in the service chooser since D625.
 const serviceChooserSource = await readFile(
   new URL("../src/components/settings/ServiceChooser.tsx", import.meta.url),
   "utf8",
@@ -290,7 +290,7 @@ test("default model selector shows every configured model under its provider", (
 });
 
 test("model configuration lists AI services and vendor accounts together", () => {
-  // One list (D623): nothing filters OAuth rows out, and no second section.
+  // One list (D625): nothing filters OAuth rows out, and no second section.
   assert.doesNotMatch(providersSource, /authKind !== OAUTH_AUTH_KIND/);
   assert.doesNotMatch(providersSource, /VendorAccountsSection/);
   assert.match(providersSource, /<ServiceList\s+providers=\{providers\}/);
