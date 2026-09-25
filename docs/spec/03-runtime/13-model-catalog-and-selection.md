@@ -482,6 +482,15 @@ different full route paths never match solely because they share a leaf. It
 narrowly strips trailing `-` or `:` `thinking`, `think`, `agent` or `latest`
 tokens (including before `@region`). It does not strip arbitrary
 dash-separated proxy prefixes or effort tokens such as `low`, `high` or `max`.
+
+When nothing matches outright, the lookup falls back to the whole published ID
+the served name reduces to: the ID behind one route prefix (`test/mimo-v2.5`) and
+that ID without one deployment marker (`mimo-v2.5-pro-test`, `gemini-2.5-pro-1m`).
+Only a marker that names a variant of a published model is read that way —
+`-test`, `-preview`, `-beta`, `-1m`, `-128k`; `-asr`, `-tts` and `-pro` name
+models of their own, so an unpublished ID carrying one of those stays unknown
+instead of inheriting a sibling's limits. This fallback reads a whole published
+ID and never follows a chain of aliases.
 The catalog index uses bounded candidate keys for these aliases, then checks
 the matcher; a known catalog provider selected by vendor key or API URL limits
 the lookup to that provider, never borrowing another provider's capabilities.
@@ -497,7 +506,8 @@ weights, so an endpoint serving `Vendor/Model` ids can have no record of its own
 while several other publishers state the identical id. When the row resolves to
 a catalog provider whose own record is missing, `findModel` consults the other
 publishers of the **exact** id instead of leaving the model on the generic
-128k text-only shape (issue #938).
+128k text-only shape (issue #938), and reads a whole published id the served name
+reduces to when no publisher states the id itself.
 
 The borrow is bounded:
 
@@ -506,14 +516,22 @@ The borrow is bounded:
   it, stays authoritative.
 - A provider sharing the row's own endpoint is an alias for the row, so its
   silence is an answer about this deployment and nothing is borrowed past it.
-- Only a case-insensitive identical id transfers; a record reached through an
-  alias (a bare route leaf, a vendor-prefixed variant) is a different id and
-  keeps its own limits.
-- Tool support must be unanimous across those publishers, because a wrong `true`
-  puts tool declarations on the wire that the endpoint may reject. Reasoning,
-  image/PDF input and attachment are the intersection, so a borrow may only
-  under-claim; a user who knows the endpoint does more still enables it in
-  Advanced. Limits are the medians the publishers state, never one host's cap.
+- Only a case-insensitive identical id transfers, or a whole published id the
+  served name reduces to (`test/mimo-v2.5-pro-test` → `mimo-v2.5-pro`). A record
+  the index reaches through an alias is a different id and keeps its own limits.
+- The publishers this app ships a provider for answer before arbitrary resellers
+  do, in the same order the unanchored borrow uses: an id a shipped publisher
+  states describes the model, while a reseller's copy describes its own
+  deployment of it. Within that tier a record under exactly this id outranks one
+  reached through another spelling of it, so a copy carrying only the text half
+  cannot narrow what the model's own record states about vision.
+- Tool support follows the majority of the publishers that state it, because a
+  wrong `true` puts tool declarations on the wire that the endpoint may reject,
+  while one dissenting reseller must not void a record a hundred of them agree
+  on; an even split claims nothing. Reasoning, image/PDF input and attachment are
+  the intersection, so a borrow may only under-claim; a user who knows the
+  endpoint does more still enables it in Advanced. Limits are the medians the
+  publishers state, never one host's cap.
 - An id no publisher states stays an unknown generic model.
 
 This changes metadata only. The configured wire id, provider identity, and the
