@@ -360,8 +360,14 @@ export function ModelSelectionPanes({
     } catch {
       return;
     }
-    // A catalog hit for a different wire id is not metadata for this row.
-    if (info && info.modelId.toLowerCase() !== seed.id.toLowerCase()) return;
+    /*
+      The host answered for the id this row was added with, so the record is this
+      row's — including when the same model is published under another spelling
+      of it (a route prefix, a date, a marker the deployment appends). That is the
+      resolution the runtime reads for the row too, so checking the spelling again
+      here would only drop an answer the rest of the app uses. The stored wire id
+      stays exactly what the user typed.
+    */
     setModels((current) => applyCustomModelLookup(current, seed, info));
   };
 
