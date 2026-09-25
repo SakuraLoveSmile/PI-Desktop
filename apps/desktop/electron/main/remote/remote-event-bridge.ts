@@ -222,6 +222,12 @@ export function createRemoteEventBridge(options: RemoteEventBridgeOptions): Remo
             toPlanningStateAgentEvent(remoteSessionId, planning),
           );
         }
+        if (isRecord(payload) && isRecord(payload.goalReport)) {
+          emit(IPC.event.goalReportChanged, {
+            ...payload.goalReport,
+            sessionId: remoteSessionId,
+          });
+        }
         return;
       }
       case "approval.requested": {

@@ -1,7 +1,7 @@
 export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 20 as const;
-export const APP_ID = "net.aiuo.pi-desktop";
-export const APP_NAME = "PI-Desktop";
+export const APP_ID = "cn.sakura.pi-desktop";
+export const APP_NAME = "Pi-Desktop-Plus";
 export const APP_VERSION = "0.15.6";
 
 export const APP_MENU_COMMANDS = [
@@ -178,6 +178,9 @@ export const IPC = {
     askToolResolve: "pi-desktop/agent/askTool/resolve",
     plansPending: "pi-desktop/plans/pending",
     plansResolve: "pi-desktop/plans/resolve",
+    goalReportGet: "pi-desktop/goalReport/get",
+    goalReportList: "pi-desktop/goalReport/list",
+    goalReportRetry: "pi-desktop/goalReport/retry",
     /**
      * List every paired remote `pi-host` this desktop knows, redacted so no
      * device token reaches the renderer. See ADR 0286 (R2b pairing UX).
@@ -383,6 +386,7 @@ export const IPC = {
     sessionsChanged: "pi-desktop/session/event/changed",
     notificationActivated: "pi-desktop/notification/event/activated",
     plansChanged: "pi-desktop/plans/event/changed",
+    goalReportChanged: "pi-desktop/goalReport/event/changed",
     providersOauth: "pi-desktop/providers/oauth/event",
     mcpOauth: "pi-desktop/mcp/oauth/event",
     updatesState: "pi-desktop/updates/event/state",

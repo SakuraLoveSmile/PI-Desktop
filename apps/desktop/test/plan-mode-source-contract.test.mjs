@@ -44,8 +44,8 @@ test("renderer exposes Agent, Plan, and Goal as the only operating modes", () =>
   assert.match(composerSource, /settings\.modeGoal/);
   assert.match(composerSource, /IconListChecks/);
   assert.match(composerSource, /IconTarget/);
-  assert.match(settingsSource, /value:\s*"plan",\s*label:\s*t\("settings\.modePlan"\)/);
-  assert.match(settingsSource, /value:\s*"goal",\s*label:\s*t\("settings\.modeGoal"\)/);
+  assert.match(settingsSource, /(?:\["plan",\s*"settings\.modePlan"\]|value:\s*"plan",\s*label:\s*t\("settings\.modePlan"\))/);
+  assert.match(settingsSource, /(?:\["goal",\s*"settings\.modeGoal"\]|value:\s*"goal",\s*label:\s*t\("settings\.modeGoal"\))/);
   assert.match(commandsSource, /case "builtin\.mode\.plan"/);
   assert.match(commandsSource, /case "builtin\.mode\.goal"/);
   for (const source of [composerSource, settingsSource, commandsSource]) {

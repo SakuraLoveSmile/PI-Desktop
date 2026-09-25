@@ -1,5 +1,5 @@
 #!/bin/bash
-# Open a trusted unsigned PI-Desktop installation on macOS.
+# Open a trusted unsigned Pi-Desktop-Plus installation on macOS.
 #
 # This helper removes only Apple's quarantine attribute from the known
 # application locations. It never uses sudo and never accepts an arbitrary
@@ -7,8 +7,8 @@
 
 set -euo pipefail
 
-readonly APP_BUNDLE_NAME="PI-Desktop.app"
-readonly EXPECTED_BUNDLE_ID="net.aiuo.pi-desktop"
+readonly APP_BUNDLE_NAME="Pi-Desktop-Plus.app"
+readonly EXPECTED_BUNDLE_ID="cn.sakura.pi-desktop"
 
 show_alert() {
   local title="$1"
@@ -39,8 +39,8 @@ done
 
 if [[ -z "$app_path" ]]; then
   show_alert \
-    "PI-Desktop is not installed" \
-    "Drag PI-Desktop.app to Applications, then double-click this helper again."
+    "Pi-Desktop-Plus is not installed" \
+    "Drag Pi-Desktop-Plus.app to Applications, then double-click this helper again."
   exit 1
 fi
 
@@ -50,8 +50,8 @@ if [[ -f "$app_path/Contents/Info.plist" ]]; then
 fi
 if [[ "$bundle_identifier" != "$EXPECTED_BUNDLE_ID" ]]; then
   show_alert \
-    "This is not a PI-Desktop app" \
-    "The helper only opens the official PI-Desktop bundle."
+    "This is not a Pi-Desktop-Plus app" \
+    "The helper only opens the Pi-Desktop-Plus bundle."
   exit 1
 fi
 
@@ -61,7 +61,7 @@ quarantine_attributes="$(/usr/bin/xattr -r -l "$app_path" 2>/dev/null || true)"
 if [[ "$quarantine_attributes" == *"com.apple.quarantine"* ]]; then
   if ! /usr/bin/xattr -r -d com.apple.quarantine "$app_path"; then
     show_alert \
-      "PI-Desktop could not be opened" \
+      "Pi-Desktop-Plus could not be opened" \
       "macOS could not clear the quarantine attribute. Try moving the app to Applications and run this helper again."
     exit 1
   fi
