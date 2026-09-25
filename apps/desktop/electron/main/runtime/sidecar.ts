@@ -10,7 +10,7 @@ import { loadBuiltinSkillBody } from "../builtin-skills";
 import { createImageGenerationTool } from "../services/image-generation-service";
 import { registerPluginDevTools } from "../plugin-dev-tools";
 import { resolveLocalFile } from "../browser-view";
-import { modelConfigFromModelsDev } from "../models-dev-catalog";
+import { catalogModelConfigFor } from "../models-dev-catalog";
 import { AgentSidecar } from "../agent-sidecar";
 import { relaxedNetworkPolicyEnabled } from "../endpoint-policy";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
@@ -441,14 +441,12 @@ export function createSidecarRuntime({
         vendorBinding.modelConfig ??
         genericModelConfig(modelId, vendorBinding.baseUrl ?? provider.baseUrl ?? "");
     } else {
-      const model = modelsDevCatalog.findModel({
+      catalogModelConfig = catalogModelConfigFor(modelsDevCatalog, {
         vendorKey: provider.vendorKey,
         baseUrl: provider.baseUrl,
+        apiStyle: provider.apiStyle,
         modelId,
       });
-      catalogModelConfig = model
-        ? modelConfigFromModelsDev(model, provider.baseUrl)
-        : genericModelConfig(modelId, provider.baseUrl ?? "");
     }
     const { modelConfig, capabilities } = effectiveSubagentModelConfig(
       provider,

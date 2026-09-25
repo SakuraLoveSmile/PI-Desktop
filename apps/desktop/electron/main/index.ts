@@ -685,7 +685,6 @@ const providerCatalogRuntime = createProviderCatalogRuntime({
 });
 const {
   bindingForModel,
-  modelsDevModelFor,
   effectiveSubagentModelConfig,
   enrichProvider,
   enrichProviderList,
@@ -709,7 +708,6 @@ const createdSessionLaunchRuntime = createSessionLaunchRuntime({
   getWorkspacePath: currentWorkspacePath,
   pluginActiveInProject,
   bindingForModel,
-  modelsDevModelFor,
   effectiveSubagentModelConfig,
   normalizeThinkingLevel,
 });

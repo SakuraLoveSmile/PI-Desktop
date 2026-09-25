@@ -310,7 +310,8 @@ test("provider settings persist model-local limits and thinking configuration", 
 });
 
 test("main forwards the complete models.dev model record to the sidecar", () => {
-  assert.match(sessionLaunchSource, /modelConfigFromModelsDev/);
+  // catalogModelConfigFor returns modelConfigFromModelsDev for a resolved record.
+  assert.match(sessionLaunchSource, /catalogModelConfigFor/);
   assert.doesNotMatch(sessionLaunchSource, /resolvePiModelConfig/);
   assert.match(sessionLaunchSource, /\.\.\.\(modelConfig \? \{ modelConfig \} : \{\}\)/);
   assert.doesNotMatch(sessionLaunchSource, /modelCompat/);
