@@ -11587,14 +11587,20 @@ are withdrawn with ADR 0165.
   project's second folder, then one that resolves in its primary folder. 8)
   Right-click the sent `@path` chip, the inline-code reference, the markdown
   link, the local image, a tool row's file path, a tool result's file list, and
-  an attachment thumbnail; then right-click a reference that matches nothing.
+  an attachment thumbnail; then right-click a reference that matches nothing. 9)
+  On that chip, use Copy full path and Copy relative path, then do the same on a
+  reference that resolves in the session scratch store.
 - **Expected**:
-  - Right-clicking a file reference opens the renderer's own menu with one
-    item, Show in folder, which reveals the named file in the system file
-    manager. The inline-code reference, the file link, the local image, a tool
-    row's path, a tool result's file or match list, and an attachment thumbnail
-    offer the same item, and a reference that matches nothing reports itself
-    instead of revealing a same-named file elsewhere.
+  - Right-clicking a file reference opens the renderer's own menu with the
+    file's own folder (Show in folder) and both of its addresses (Copy full
+    path, Copy relative path). The inline-code reference, the file link, the
+    local image, a tool row's path, a tool result's file or match list, and an
+    attachment thumbnail offer the same items, and a reference that matches
+    nothing reports itself instead of revealing a same-named file elsewhere.
+  - A copy writes exactly what it names: the absolute address for the full copy
+    and the project-relative spelling for the relative one; a scratch or
+    attachment file reports that it has no relative path instead of copying an
+    absolute one under that name.
   - A project file opens in the File Manager work-panel view on that file, with
     its ancestor folders expanded and the file selected; no host `file:` tab is
     added for it.

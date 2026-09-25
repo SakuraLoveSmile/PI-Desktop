@@ -17,8 +17,8 @@
 import { useCallback, type MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useContextMenu, type ContextMenuItem } from "../components/ContextMenu";
-import { IconFolderOpen } from "../components/icons";
-import { useRevealChatFileRef } from "./use-preview-target";
+import { IconCopy, IconFolderOpen } from "../components/icons";
+import { useCopyChatFileRef, useRevealChatFileRef } from "./use-preview-target";
 
 export type ChatFileMenuTarget = {
   /** The reference as the surface spelled it, before completion. */
@@ -30,6 +30,7 @@ export type ChatFileMenuTarget = {
 export function useChatFileMenuItems() {
   const { t } = useTranslation();
   const revealFileRef = useRevealChatFileRef();
+  const copyFileRef = useCopyChatFileRef();
   return useCallback(
     ({ path, baseDir }: ChatFileMenuTarget): ContextMenuItem[] => [
       {
@@ -38,8 +39,21 @@ export function useChatFileMenuItems() {
         icon: <IconFolderOpen size={14} />,
         onSelect: () => revealFileRef(path, baseDir),
       },
+      {
+        id: "copy-full-path",
+        label: t("chat.copyFullPath"),
+        icon: <IconCopy size={14} />,
+        separatorBefore: true,
+        onSelect: () => copyFileRef(path, baseDir, "absolute"),
+      },
+      {
+        id: "copy-relative-path",
+        label: t("chat.copyRelativePath"),
+        icon: <IconCopy size={14} />,
+        onSelect: () => copyFileRef(path, baseDir, "relative"),
+      },
     ],
-    [revealFileRef, t],
+    [copyFileRef, revealFileRef, t],
   );
 }
 

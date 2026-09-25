@@ -58,8 +58,10 @@ function isDotRelative(path: string): boolean {
 export type ResolvedChatFileRef = {
   /** The address the host accepts for this reference. */
   path: string;
-  /** The primary folder's own spelling; workspace-relative surfaces take this. */
-  relativePath: string;
+  /** The absolute path; the one spelling that resolves from anywhere. */
+  absolutePath: string;
+  /** Project-relative spelling; null when the file sits outside the project. */
+  relativePath: string | null;
   /** True for a match inside a folder the open project registers (ADR 0249). */
   inProject: boolean;
   /** True when that folder is the project's primary one. */
@@ -98,7 +100,8 @@ function useResolveChatFileRef() {
       if (match.root !== "workspace") {
         return {
           path: match.absolutePath,
-          relativePath: match.absolutePath,
+          absolutePath: match.absolutePath,
+          relativePath: null,
           inProject: false,
           primary: false,
         };
@@ -109,6 +112,7 @@ function useResolveChatFileRef() {
       const primary = match.projectRoot ? match.projectRoot.primary : true;
       return {
         path: primary ? match.relativePath : match.absolutePath,
+        absolutePath: match.absolutePath,
         relativePath: match.relativePath,
         inProject: true,
         primary,
@@ -147,6 +151,7 @@ export function useOpenChatFileRef() {
         if (
           resolved.inProject &&
           resolved.primary &&
+          resolved.relativePath &&
           isHtmlFilePath(resolved.relativePath)
         ) {
           openUrl(resolved.relativePath);
@@ -185,6 +190,47 @@ export function useRevealChatFileRef() {
           await api.fsReveal(resolved.path);
         } catch {
           showToast(t("chat.fileRevealFailed"), { variant: "error" });
+        }
+      })();
+    },
+    [resolveRef, showToast, t],
+  );
+}
+
+/**
+ * Copy a reference as an address a user can paste somewhere else.
+ *
+ * "Full" is the absolute path, the one spelling that resolves from any working
+ * directory. "Relative" is the project-relative spelling, and only a file
+ * inside the open project has one: a scratch or attachment file says so
+ * instead of handing back an absolute path under a name that promises
+ * something else.
+ */
+export function useCopyChatFileRef() {
+  const { t } = useTranslation();
+  const resolveRef = useResolveChatFileRef();
+  const showToast = useAppStore((s) => s.showToast);
+
+  return useCallback(
+    (
+      path: string,
+      baseDir: string | undefined,
+      kind: "absolute" | "relative",
+    ) => {
+      void (async () => {
+        const resolved = await resolveRef(path, baseDir);
+        if (!resolved) return;
+        const value =
+          kind === "absolute" ? resolved.absolutePath : resolved.relativePath;
+        if (!value) {
+          showToast(t("chat.relativePathUnavailable"), { variant: "error" });
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(value);
+          showToast(t("chat.copied"), { variant: "success" });
+        } catch {
+          showToast(t("chat.copyFailed"), { variant: "error" });
         }
       })();
     },

@@ -69,6 +69,25 @@ const state = {
 let nextMatch = null;
 let revealFails = false;
 
+
+let clipboardFails = false;
+const copied = [];
+
+/*
+  The hooks read `navigator.clipboard` off the global, exactly as the app does,
+  so what a copy claims is asserted against what actually reached the clipboard.
+*/
+Object.defineProperty(globalThis, "navigator", {
+  value: {
+    clipboard: {
+      writeText: async (value) => {
+        if (clipboardFails) throw new Error("clipboard refused");
+        copied.push(value);
+      },
+    },
+  },
+  configurable: true,
+});
 const translate = () => ({
   t: (key, values) => `${key}:${values?.name ?? ""}`,
 });
@@ -100,7 +119,7 @@ const { useChatFileMenu, useChatFileMenuItems } = loadModule(
     react: React,
     "react/jsx-runtime": jsxRuntime,
     "react-i18next": { useTranslation: translate },
-    "../components/icons": { IconFolderOpen: () => null },
+    "../components/icons": { IconCopy: () => null, IconFolderOpen: () => null },
     "../components/ContextMenu": {
       useContextMenu: () => ({
         contextMenu: null,
@@ -118,6 +137,7 @@ function reset(match) {
   Object.values(calls).forEach((list) => list.splice(0, list.length));
   nextMatch = match;
   revealFails = false;
+  clipboardFails = false;
 }
 
 /** The match the main process reports for a file of the project's main folder. */
@@ -213,7 +233,7 @@ test("a refused reveal is reported instead of failing silently", async () => {
   );
 });
 
-test("the menu a reference opens carries that one item and nothing else", () => {
+test("the menu a reference opens carries the reveal and both copies", () => {
   reset(projectMatch());
   let openFileMenu = null;
   function Harness() {
@@ -224,7 +244,90 @@ test("the menu a reference opens carries that one item and nothing else", () => 
   openFileMenu({}, { path: "src/dir/a.ts" });
   assert.deepEqual(
     calls.menus.map((menu) => menu.items.map((item) => [item.id, item.label])),
-    [[["reveal-in-folder", "chat.revealFileInFolder:"]]],
+    [
+      [
+        ["reveal-in-folder", "chat.revealFileInFolder:"],
+        ["copy-full-path", "chat.copyFullPath:"],
+        ["copy-relative-path", "chat.copyRelativePath:"],
+      ],
+    ],
+  );
+});
+
+/** Run one copy item of the reference menu on the reference it names. */
+async function copyRef(path, kind) {
+  let copy = null;
+  let items = null;
+  function Harness() {
+    copy = previewTarget.useCopyChatFileRef();
+    items = useChatFileMenuItems()({ path });
+    return null;
+  }
+  renderToStaticMarkup(React.createElement(Harness));
+  const id = kind === "absolute" ? "copy-full-path" : "copy-relative-path";
+  const item = items.find((entry) => entry.id === id);
+  assert.ok(item, "the reference offers the copy");
+  copy(path, undefined, kind);
+  await flush();
+}
+
+test("a project file copies its full address and its project-relative one", async () => {
+  reset(projectMatch());
+  copied.length = 0;
+  await copyRef("src/dir/a.ts", "absolute");
+  await copyRef("src/dir/a.ts", "relative");
+  assert.deepEqual(copied, ["C:/project/src/dir/a.ts", "src/dir/a.ts"]);
+  assert.deepEqual(
+    calls.toasts.map(([message]) => message),
+    ["chat.copied:", "chat.copied:"],
+  );
+});
+
+test("a sibling folder file copies its full address and its own relative one", async () => {
+  reset(
+    projectMatch({
+      relativePath: "lib/only-here.ts",
+      absolutePath: "C:/project-second/lib/only-here.ts",
+      projectRoot: { primary: false },
+    }),
+  );
+  copied.length = 0;
+  await copyRef("lib/only-here.ts", "absolute");
+  await copyRef("lib/only-here.ts", "relative");
+  assert.deepEqual(copied, [
+    "C:/project-second/lib/only-here.ts",
+    "lib/only-here.ts",
+  ]);
+});
+
+test("a file outside the project has nothing relative to copy", async () => {
+  reset({
+    root: "scratch",
+    relativePath: "notes.md",
+    absolutePath: "C:/data/scratch/session-1/notes.md",
+    matchedBy: "exact-relative",
+  });
+  copied.length = 0;
+  await copyRef("notes.md", "absolute");
+  await copyRef("notes.md", "relative");
+  // The full address is still the file's own; the relative one is refused
+  // instead of handing back the absolute path under that name.
+  assert.deepEqual(copied, ["C:/data/scratch/session-1/notes.md"]);
+  assert.deepEqual(
+    calls.toasts.map(([message]) => message),
+    ["chat.copied:", "chat.relativePathUnavailable:"],
+  );
+});
+
+test("a refused clipboard reports itself", async () => {
+  reset(projectMatch());
+  copied.length = 0;
+  clipboardFails = true;
+  await copyRef("src/dir/a.ts", "absolute");
+  assert.deepEqual(copied, []);
+  assert.deepEqual(
+    calls.toasts.map(([message]) => message),
+    ["chat.copyFailed:"],
   );
 });
 
@@ -282,11 +385,15 @@ test("a URL never reaches the reveal", () => {
   assert.ok(markdown.includes('if (!/^https?:\\/\\//i.test(href)) {'));
 });
 
-test("the reveal labels ship in the catalogs the menu reads", () => {
+test("the reference labels ship in the catalogs the menu reads", () => {
   const en = read("../../../packages/i18n/src/locales/en/index.ts");
   const zhCN = read("../../../packages/i18n/src/locales/zh-CN/index.ts");
   assert.match(en, /revealFileInFolder: "Show in folder"/);
   assert.match(en, /fileRevealFailed: "Could not show the file in its folder\."/);
+  assert.match(en, /copyFullPath: "Copy full path"/);
+  assert.match(en, /copyRelativePath: "Copy relative path"/);
   assert.match(zhCN, /revealFileInFolder: "在文件夹中显示"/);
   assert.match(zhCN, /fileRevealFailed: "无法在文件夹中打开该文件。"/);
+  assert.match(zhCN, /copyFullPath: "复制完整地址"/);
+  assert.match(zhCN, /copyRelativePath: "复制相对地址"/);
 });
