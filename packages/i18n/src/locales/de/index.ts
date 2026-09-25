@@ -320,6 +320,8 @@ export const de = {
     "errorModel": "Modell",
     "previewFile": "Vorschau im Seitenbereich",
     "fileRefMissing": "Keine Datei entspricht {{name}}",
+    "revealFileInFolder": "Im Ordner anzeigen",
+    "fileRevealFailed": "Die Datei konnte nicht im Ordner angezeigt werden.",
     "previewUrl": "Im Seitenbrowser öffnen",
     "openFile": "Mit Standardanwendung öffnen",
     "retry": "Neu generieren",

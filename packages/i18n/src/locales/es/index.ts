@@ -320,6 +320,8 @@ export const es = {
     "errorModel": "Modelo",
     "previewFile": "Vista previa en el panel lateral",
     "fileRefMissing": "Ningún archivo coincide con {{name}}",
+    "revealFileInFolder": "Mostrar en carpeta",
+    "fileRevealFailed": "No se pudo mostrar el archivo en su carpeta.",
     "previewUrl": "Abrir en el navegador lateral",
     "openFile": "Abrir con aplicación predeterminada",
     "retry": "Regenerar",

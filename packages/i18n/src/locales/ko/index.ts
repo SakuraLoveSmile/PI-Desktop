@@ -329,6 +329,8 @@ export const ko = {
     errorModel: "모델",
     previewFile: "사이드 패널에서 미리 보기",
     fileRefMissing: "{{name}}과(와) 일치하는 파일이 없습니다",
+    revealFileInFolder: "폴더에서 보기",
+    fileRevealFailed: "폴더에서 파일을 표시할 수 없습니다.",
     previewUrl: "사이드 브라우저에서 열기",
     openFile: "기본 애플리케이션으로 열기",
     retry: "다시 생성",

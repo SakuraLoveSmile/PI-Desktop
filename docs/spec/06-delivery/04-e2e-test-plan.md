@@ -11584,8 +11584,17 @@ are withdrawn with ADR 0165.
   and a path heading of the `Grep` result. 6) Disable the File Manager plugin,
   click a project file reference and the tool row summary again, then re-enable
   it and click both once more. 7) Click a reference that resolves in the
-  project's second folder, then one that resolves in its primary folder.
+  project's second folder, then one that resolves in its primary folder. 8)
+  Right-click the sent `@path` chip, the inline-code reference, the markdown
+  link, the local image, a tool row's file path, a tool result's file list, and
+  an attachment thumbnail; then right-click a reference that matches nothing.
 - **Expected**:
+  - Right-clicking a file reference opens the renderer's own menu with one
+    item, Show in folder, which reveals the named file in the system file
+    manager. The inline-code reference, the file link, the local image, a tool
+    row's path, a tool result's file or match list, and an attachment thumbnail
+    offer the same item, and a reference that matches nothing reports itself
+    instead of revealing a same-named file elsewhere.
   - A project file opens in the File Manager work-panel view on that file, with
     its ancestor folders expanded and the file selected; no host `file:` tab is
     added for it.

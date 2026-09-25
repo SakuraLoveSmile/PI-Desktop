@@ -329,6 +329,8 @@ export const tr = {
     errorModel: "Model",
     previewFile: "Yan panelde önizle",
     fileRefMissing: "{{name}} ile eşleşen dosya yok",
+    revealFileInFolder: "Klasörde göster",
+    fileRevealFailed: "Dosya klasörde gösterilemedi.",
     previewUrl: "Yan tarayıcıda aç",
     openFile: "Varsayılan uygulamayla aç",
     retry: "Yeniden oluştur",

@@ -318,6 +318,8 @@ export const ptBR = {
     errorModel: "Modelo",
     previewFile: "Pré-visualizar no painel lateral",
     fileRefMissing: "Nenhum arquivo corresponde a {{name}}",
+    revealFileInFolder: "Mostrar na pasta",
+    fileRevealFailed: "Não foi possível mostrar o arquivo na pasta.",
     previewUrl: "Abrir no navegador lateral",
     openFile: "Abrir no aplicativo padrão",
     retry: "Regenerar",

@@ -320,6 +320,8 @@ export const fr = {
     "errorModel": "Modèle",
     "previewFile": "Aperçu dans le panneau latéral",
     "fileRefMissing": "Aucun fichier ne correspond à {{name}}",
+    "revealFileInFolder": "Afficher dans le dossier",
+    "fileRevealFailed": "Impossible d'afficher le fichier dans son dossier.",
     "previewUrl": "Ouvrir dans le navigateur latéral",
     "openFile": "Ouvrir avec l'application par défaut",
     "retry": "Régénérer la branche",
