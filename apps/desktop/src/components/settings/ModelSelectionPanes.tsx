@@ -211,8 +211,8 @@ export type ModelSelectionPanesProps = {
   lookupContext?: CustomModelLookupContext;
   /** Attached to the hand-typed id field, so a caller can focus it. */
   customModelInputRef?: Ref<HTMLInputElement>;
-  /** Folds the picker back into the chosen-models summary (D625). */
-  onCollapse?: () => void;
+  /** The chosen list is exactly what the recommendation picked. */
+  autoPicked?: boolean;
 };
 
 /**
@@ -231,7 +231,7 @@ export function ModelSelectionPanes({
   lookupContext,
   onImageModelChange,
   customModelInputRef,
-  onCollapse,
+  autoPicked = false,
 }: ModelSelectionPanesProps) {
   const { t } = useTranslation();
   const { rows, models, publishedLevelsById, setModels } = selection;
@@ -561,17 +561,10 @@ export function ModelSelectionPanes({
               onChange={(event) => setChosenQuery(event.target.value)}
             />
           </div>
-          {onCollapse ? (
-            <button
-              type="button"
-              className="provider-models-summary-manage"
-              aria-expanded
-              onClick={onCollapse}
-            >
-              {t("settings.collapseModels")}
-            </button>
-          ) : null}
         </div>
+        {autoPicked && models.length > 0 ? (
+          <div className="provider-models-summary-hint">{t("settings.modelsAutoPicked")}</div>
+        ) : null}
         {models.length === 0 ? (
           <div className="provider-chosen-empty">{t("settings.noModelsChosen")}</div>
         ) : visibleChosen.length === 0 ? (
