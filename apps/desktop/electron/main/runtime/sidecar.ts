@@ -23,6 +23,7 @@ import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { RuntimeState } from "./context";
 import type { FinishTurn } from "./plans";
+import { formatSkillToolContent, type LoadedSkillDocument } from "../skill-document";
 
 export type SidecarRuntimeDependencies = {
   runtimeState: RuntimeState;
@@ -53,7 +54,10 @@ export type SidecarRuntimeDependencies = {
   browserHost: BrowserHost;
   plugins: PluginRuntime;
   sessionProjects: Map<string, string | null>;
-  loadUserSkillBody: (id: string, projectPath: string | null) => Promise<any>;
+  loadUserSkillBody: (
+    id: string,
+    projectPath: string | null,
+  ) => Promise<LoadedSkillDocument | null>;
   activeUserSkills: (projectPath: string | undefined) => Promise<any[]>;
   pluginActiveInProject: (pluginId: string, projectPath: string | null | undefined) => boolean;
   currentNetworkProxy: () => any;
@@ -562,13 +566,13 @@ export function createSidecarRuntime({
       // Bundled skills answer first; they are not owned by any plugin. A user
       // skill is looked up next, and only then a plugin's — the ids cannot
       // collide, since a plugin skill id always carries a `<pluginId>/` prefix.
-      const skill =
+      const skill: LoadedSkillDocument =
         loadBuiltinSkillBody(id) ??
         (await loadUserSkillBody(id, projectPath)) ??
         plugins.loadSkillBody(id);
       return {
         ok: true,
-        content: `# Skill: ${skill.name} (${skill.id})\n\n${skill.body}`,
+        content: formatSkillToolContent(skill),
       };
     } catch (error) {
       const userIds = (await activeUserSkills(projectPath ?? undefined)).map(
