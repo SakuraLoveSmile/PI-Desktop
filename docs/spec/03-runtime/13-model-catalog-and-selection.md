@@ -192,19 +192,25 @@ Each session stores:
 - `thinkingLevel` (`off|minimal|low|medium|high|xhigh|max|omit`)
 
 Changing model or thinking level mid-session affects subsequent turns only.
-The stored thinking preference survives restart; the effective request level
-is clamped against the selected model binding's enabled levels at execution
-time, except `omit`, which is preserved on a reasoning model and sends no
-thinking override. An empty binding or a binding containing only `off`
-resolves to `off`.
+The stored thinking preference survives restart. An explicit switch to a
+different provider/model in Composer resets `thinkingLevel` to the target
+binding's `defaultThinkingLevel`, clamped to its enabled levels; if unset, it
+uses the normal new-session fallback. Selecting the already-active
+provider/model preserves a manually selected level. The effective request
+level remains clamped against the selected model binding's enabled levels at
+execution time, except `omit`, which is preserved on a reasoning model and
+sends no thinking override. An empty binding or a binding containing only
+`off` resolves to `off`.
 
-For a newly created session, the renderer resolves the selected (or app-default)
-model's `ModelBinding`. A reasoning model starts at that binding's
-`defaultThinkingLevel` (`omit` is preserved; other values are clamped onto the
-enabled levels). When the default is unset it falls back to the highest enabled
-level seeded from published `supportedThinkingLevels`. A non-reasoning or
-unknown model starts at `off` until the user enables a non-`off` level. This is
-a creation default only and never rewrites an existing session's stored choice.
+For a newly created session or explicit model switch, the renderer resolves the
+selected (or app-default) model's `ModelBinding`. A reasoning model starts at
+that binding's `defaultThinkingLevel` (`omit` is preserved; other values are
+clamped onto the enabled levels). When the default is unset it falls back to
+the highest enabled level seeded from published `supportedThinkingLevels`. A
+non-reasoning or unknown model starts at `off` until the user enables a
+non-`off` level. Changing a default in Settings does not rewrite existing
+sessions; an existing session keeps its stored choice until a different model
+is explicitly selected.
 
 Unpinned sessions still advertise that inherited default model's reasoning
 capability on session list/get/create/fork/configure. Enrichment does not pin

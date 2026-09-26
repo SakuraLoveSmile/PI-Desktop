@@ -2943,8 +2943,9 @@ reasoning-level control.
   highest enabled level. Published levels seed a new binding; an explicit
   binding can opt into a level the catalog omits. Non-reasoning models and
   missing capability metadata start at `off` until a user enables a non-`off`
-  level; reopening or reusing an existing session preserves its durable
-  selection.
+  level. Reopening an existing session preserves its durable selection;
+  explicitly switching to a different model applies that binding's default,
+  while selecting the already-active model preserves a manually chosen level.
 - The model menu lists only enabled, runnable providers with configured model
   bindings. Cached or freshly discovered rows may enrich those configured
   models, but unconfigured discovery results never appear in the conversation
