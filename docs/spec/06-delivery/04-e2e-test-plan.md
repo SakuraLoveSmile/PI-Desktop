@@ -8535,6 +8535,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | F — Persistence (import visibility) | E2E-257 |
 | G — Plugins (import visibility) | E2E-257 |
 | Quality (import visibility) | E2E-257 |
+| Quality (Windows updater cache) | E2E-260 |
 | G — Plugins (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | Security (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | Quality (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
@@ -8581,6 +8582,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+ (Selected model order) | E2E-MODEL-selected-order-persists |
 | M6+ (Session list responsiveness) | E2E-SESSION-list-refresh-keeps-desktop-responsive |
+| M6+ (Windows updater cache) | E2E-260 |
 | M6+ (Independent session communication) | E2E-SESSION-independent-top-level-communication, E2E-SESSION-hover-card-model-and-links |
 | M5 (Chat file references) | E2E-CHAT-shorthand-file-ref-opens-the-matching-file, E2E-CHAT-file-ref-opens-the-surface-that-owns-it |
 | M6+ (Chat file references) | E2E-PLUGIN-file-view-collapse-persists |
@@ -15294,3 +15296,13 @@ renderer's durable transcript reads. No real model or provider is contacted.
   `official-native-search.test.ts`; shared route tests reject lookalike hosts,
   unsafe URLs and unknown gateways. The UI fixture does not prove Host/SQLite
   persistence or live provider availability.
+
+#### E2E-260: Windows updater cache can be relocated and reclaimed safely
+
+- **Preconditions:** Packaged Windows x64 NSIS install, isolated user profile, and a writable cache directory on a non-system volume. Use a local updater-feed fixture; do not contact GitHub or a paid service.
+- **Steps:** 1) Seed the legacy `%LOCALAPPDATA%` updater cache with `installer.exe`, `current.blockmap`, and a staged update. 2) Launch with `PI_DESKTOP_UPDATE_CACHE_DIR` set to the isolated cache base. 3) Confirm Main adopts the baselines and staged update into the configured cache and removes the legacy cache. 4) Complete the staged update and launch the new version. 5) When the fixture reports no newer version, inspect the configured cache.
+- **Expected:** `app-update.yml` determines the cache subdirectory; the pending update and differential baselines survive relocation; when the running version is current only `pending/` is removed, while `installer.exe` and `current.blockmap` remain for the next delta. The default path remains unchanged when the override is unset. The app does not write the download into `Program Files`.
+- **Specs:** `03-runtime/07-process-model.md`, ADR 0022.
+- **Acceptance:** Cache-path, migration, and cleanup unit tests pass; Windows task-candidate validation confirms the updater feed transport, installer handoff, and filesystem behavior without a live release feed.
+- **Milestone:** M6+
+- **Status:** Unit and source-contract covered (`update-cache.test.mjs`, `auto-update.test.mjs`); Windows installer/E2E validation remains required.

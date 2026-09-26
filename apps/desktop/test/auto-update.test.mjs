@@ -312,3 +312,16 @@ test("shared shipped-locale changelog is the in-app notes source of truth", () =
   assert.match(stylesSource, /\.update-notice-notes/);
   assert.match(stylesSource, /\.update-settings-notes/);
 });
+
+test("update cache relocation and cleanup preserve the delta-update path", async () => {
+  const updateCacheSource = await read("../electron/main/update-cache.ts");
+  const maintenanceSource = await read("../electron/main/update-cache-maintenance.ts");
+  assert.match(updateCacheSource, /PI_DESKTOP_UPDATE_CACHE_DIR/);
+  assert.match(updaterSource, /new RelocatedNsisUpdater\(baseCachePath\)/);
+  assert.match(updaterSource, /relocateUpdateCacheBasePath\(this\.app, baseCachePath\)/);
+  assert.match(maintenanceSource, /readFileSync\([\s\S]*app-update\.yml/);
+  assert.match(mainSource, /reclaimRelocatedUpdateCache/);
+  assert.match(updateCacheSource, /UPDATE_INSTALLER_BASELINE_NAME/);
+  assert.match(updateCacheSource, /UPDATE_BLOCKMAP_BASELINE_NAME/);
+  assert.match(updateCacheSource, /UPDATE_DOWNLOAD_DIR_NAME/);
+});

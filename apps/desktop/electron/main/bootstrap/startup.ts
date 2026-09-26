@@ -357,7 +357,11 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // GitHub discovery is delayed and time-bounded. Never start it before the
     // first window exists: a hung feed used to sit in "checking" for ~60s and
     // compete with boot for the net stack.
-    updater.startAutoCheck();
+    // Adopt legacy NSIS baselines before the delayed feed check can start. The
+    // filesystem work runs after the first window exists and never blocks boot.
+    void updater
+      .reclaimRelocatedUpdateCache()
+      .finally(() => updater.startAutoCheck());
     // createWindow awaits the initial load (loadFile resolves on
     // did-finish-load), so the page is up; give React a beat to mount its
     // event subscriptions before pushing the boot outcome.
