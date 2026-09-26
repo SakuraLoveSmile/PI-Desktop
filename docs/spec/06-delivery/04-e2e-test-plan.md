@@ -12070,11 +12070,13 @@ are withdrawn with ADR 0165.
   `08-meta/decisions-log.md` (D330)
 - **Acceptance**: B (settings), C (conversation & stream), Security, Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`apps/desktop/test/markdown-link-menu.test.mjs`,
+- **Status**: Wrapped destinations, plain-click routing, and pointer context-menu
+  presence are covered in `pnpm test:e2e:transcript`; settings persistence,
+  browser-action activation, and keyboard menu navigation remain Draft. Unit
+  coverage: `apps/desktop/test/markdown-link-menu.test.mjs`,
   `apps/desktop/test/markdown-link-destinations.test.mjs`,
   `apps/desktop/test/markdown-math-rendering.test.mjs`, locale catalog tests,
-  `apps/desktop/test/open-http-url.test.mjs`); full UI
-  journey Draft (run only in a capable environment when this surface changes)
+  and `apps/desktop/test/open-http-url.test.mjs`.
 
 #### E2E-201: Alias a configured model and copy a model id
 
