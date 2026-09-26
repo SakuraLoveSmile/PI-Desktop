@@ -1890,7 +1890,9 @@ identify the platform validation still needed.
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance**: C
 - **Milestone**: M2
-- **Status**: Draft
+- **Status**: Component-covered by `pnpm test:e2e:composer-model-selection`
+  (isolated React/Electron with the real Composer hook); full provider/session
+  desktop journey remains Draft.
 
 #### E2E-COMPOSER-narrow-controls: Composer controls adapt to a narrow chat column
 
