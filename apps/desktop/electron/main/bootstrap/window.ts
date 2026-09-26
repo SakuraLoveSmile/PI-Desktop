@@ -9,7 +9,7 @@ import {
   MAC_TRAFFIC_LIGHT_POSITION,
   type CloseBehavior,
 } from "@pi-desktop/shared";
-import type { BrowserPane } from "../browser-view";
+import type { BrowserHost } from "../browser-host";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { PluginViewHost } from "../plugin-view-host";
@@ -95,7 +95,7 @@ export type WindowLifecycleDependencies = {
   askCloseBehavior: (window: BrowserWindow) => Promise<CloseBehavior | null>;
   applyCloseBehavior: (behavior: CloseBehavior) => void;
   createTray: () => void;
-  browserPane: BrowserPane;
+  browserHost: BrowserHost;
   pluginViews: PluginViewHost;
   logger: Pick<Logger, "app">;
 };
@@ -119,7 +119,7 @@ export async function createWindow({
   askCloseBehavior,
   applyCloseBehavior,
   createTray,
-  browserPane,
+  browserHost,
   pluginViews,
   logger,
 }: WindowLifecycleDependencies): Promise<void> {
@@ -461,6 +461,7 @@ export async function createWindow({
   });
   let windowCloseAccepted = false;
   window.webContents.on("did-start-loading", () => {
+    browserHost.disposeGuest();
     windowState.notificationViewingSessionId = null;
     if (windowState.mainWindow === window) resetMenuRendererReady(window);
   });
@@ -648,7 +649,7 @@ export async function createWindow({
   screen.on("display-added", reconcileDisplayTopology);
   screen.on("display-removed", reconcileDisplayTopology);
 
-  browserPane.setWindow(window);
+  browserHost.setWindow(window);
   pluginViews.setWindow(window);
   window.on("closed", () => {
     screen.removeListener("display-metrics-changed", reconcileDisplayTopology);
@@ -673,7 +674,7 @@ export async function createWindow({
     }
     if (windowState.mainWindow !== window) return;
     windowState.mainWindow = null;
-    browserPane.setWindow(null);
+    browserHost.setWindow(null);
     pluginViews.setWindow(null);
     if (
       process.platform !== "darwin" &&
