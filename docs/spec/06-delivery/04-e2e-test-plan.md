@@ -1865,29 +1865,34 @@ identify the platform validation still needed.
 
 #### E2E-089: Composer model menu opens upward and switches model
 
-- **Preconditions**: Chat route active; provider configured.
+- **Preconditions**: Chat route active; provider configured with two reasoning
+  models whose binding defaults differ.
 - **Steps**: 1) Click the Composer-right model × reasoning chip. 2) Confirm the
   menu opens upward from the bottom composer. 3) Enter Model, select a different
-  provider/model, and return to the root. 4) Enter Reasoning level and select a
-  supported level. 5) Open Settings from the command palette or application menu.
+  provider/model, and return to the root. 4) Confirm its default thinking level,
+  choose another supported level, then reselect the same model. 5) Open Settings
+  from the command palette or application menu.
 - **Expected**: The trigger uses a Bot icon while retaining the current model
   and reasoning labels. The root shows only Model and Reasoning level entries.
   The Model submenu lists enabled runnable providers and only the model bindings
   saved for each provider, with each model row visibly indented beneath its provider
   heading. Cached or freshly discovered models may supply display names and
   metadata for those bindings, but unconfigured discovery results are absent;
-  configured IDs remain available when discovery is unavailable. The Reasoning
-  level submenu lists only the selected model's published levels. Selecting
-  updates the active session model/reasoning configuration without dismissing
-  the menu; Settings opens from the command palette/menu. The Composer model
-  trigger ellipsizes long IDs. Each option shows one display name only, and
-  hovering a long option exposes its complete display name in the tooltip
-  without changing the menu layout or adding a visible model ID.
+  configured IDs remain available when discovery is unavailable. The root slider
+  lists the selected model's supported levels. Selecting a different model
+  updates the active session to that binding's default thinking level; selecting
+  the already-active model preserves a manually selected level. Settings opens
+  from the command palette/menu. The Composer model trigger ellipsizes long IDs.
+  Each option shows one display name only, and hovering a long option exposes its
+  complete display name in the tooltip without changing the menu layout or adding
+  a visible model ID.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11, model menu),
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance**: C
 - **Milestone**: M2
-- **Status**: Draft
+- **Status**: Component-covered by `pnpm test:e2e:composer-model-selection`
+  (isolated React/Electron with the real Composer hook); full provider/session
+  desktop journey remains Draft.
 
 #### E2E-COMPOSER-narrow-controls: Composer controls adapt to a narrow chat column
 
