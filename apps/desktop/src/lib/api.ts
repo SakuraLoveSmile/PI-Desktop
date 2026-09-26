@@ -390,6 +390,7 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     fontScale?: unknown;
     chatContentMaxWidth?: unknown;
     infiniteProviderRetry?: unknown;
+    autoGenerateSessionTitles?: unknown;
     smoothStreaming?: unknown;
     networkProxy?: unknown;
     networkPolicy?: unknown;
@@ -432,6 +433,14 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     typeof value.infiniteProviderRetry !== "boolean"
   ) {
     throw Object.assign(new Error("infiniteProviderRetry is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, "autoGenerateSessionTitles") &&
+    typeof value.autoGenerateSessionTitles !== "boolean"
+  ) {
+    throw Object.assign(new Error("autoGenerateSessionTitles is invalid"), {
       errorCode: "INVALID_PARAMS",
     });
   }

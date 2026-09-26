@@ -36,6 +36,11 @@ export type AppSettings = {
    * Absent and false use the bounded ten-retry policy.
    */
   infiniteProviderRetry?: boolean;
+  /**
+   * Automatically generate short session titles using the selected model.
+   * Absent and true enable automatic summarization; false disables it.
+   */
+  autoGenerateSessionTitles?: boolean;
   /** Prevent idle system sleep while this desktop app runs; off when absent. */
   keepAwakeWhileRunning?: boolean;
   /** Configured command shell for the agent Bash protocol tool. */
