@@ -7155,3 +7155,15 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   duplicating an id), plus the `scripts/e2e/provider-api-style.tsx` and
   `scripts/e2e/image-generation-ui.tsx` probes, which no longer click Manage
   models.
+## 2026-09-26 — Bound aggregate image history without an arbitrary message cutoff (D628)
+
+- Vision history restoration keeps the existing 10 MB per-image ceiling and adds
+  a 50 MB aggregate raw-byte budget per runtime rebuild. Eligible refs are
+  considered newest-first; every image remains a provider image block when the
+  history fits, and only older attachments beyond the budget fall back to a
+  safe `@path`. The current prompt row is excluded before hydration so it cannot
+  consume the history allowance.
+- The sidecar reads only files admitted by the budget and clears stale transient
+  base64 from restored attachment objects. Durable host messages remain
+  metadata/ref-only. See ADR 0101, `03-runtime/01-ipc-protocol.md` §5.1,
+  `03-runtime/02-agent-runtime.md` §5c, and E2E-102j.
