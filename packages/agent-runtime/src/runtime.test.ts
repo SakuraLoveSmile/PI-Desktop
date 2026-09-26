@@ -2414,6 +2414,12 @@ describe("DesktopAgentRuntime plan transitions", () => {
       question: proposal.question,
     });
     expect(submitResult.terminate).toBe(true);
+    await expect(agent.afterToolCall({
+      toolCall: { id: "submit-call-1", name: "SubmitPlan", arguments: {} },
+      args: {},
+      result: submitResult,
+      isError: false,
+    })).resolves.toEqual({ terminate: true });
     expect(runtime.getMode()).toBe("plan");
     expect(runtime.getStatus().planningState).toBe("awaiting_approval");
     expect(agent.state.tools.map((tool: any) => tool.name)).toContain("SubmitPlan");
@@ -2484,6 +2490,12 @@ describe("DesktopAgentRuntime plan transitions", () => {
     });
 
     expect(submitResult.terminate).toBe(true);
+    await expect(agent.afterToolCall({
+      toolCall: { id: "submit-goal-call", name: "SubmitGoal", arguments: {} },
+      args: {},
+      result: submitResult,
+      isError: false,
+    })).resolves.toEqual({ terminate: true });
     expect(runtime.getMode()).toBe("goal");
     expect(runtime.getStatus().planningState).toBe("awaiting_approval");
     expect(host.call).toHaveBeenLastCalledWith(
@@ -2495,6 +2507,209 @@ describe("DesktopAgentRuntime plan transitions", () => {
         markdown: proposal.markdown,
       }),
     );
+
+    await runtime.dispose();
+  });
+
+  it.each([
+    ["plan", "SubmitPlan"],
+    ["goal", "SubmitGoal"],
+  ] as const)("marks a rejected %s submission as a tool error in pi", async (kind, toolName) => {
+    const host = { call: vi.fn() };
+    const runtime = createRuntime({ host, mode: kind });
+    const agent = (runtime as any).agent;
+    const submitTool = agent.state.tools.find((tool: any) => tool.name === toolName);
+    host.call.mockResolvedValueOnce({ isError: true, terminate: true, errorCode: "PLAN_WORKSPACE_REQUIRED" });
+
+    const result = await submitTool.execute(`submit-${kind}`, {
+      title: "Temporary goal",
+      markdown: "# Goal\n\n## Acceptance criteria\n- works",
+      question: "Approve?",
+    });
+    expect(result).toMatchObject({ isError: true, terminate: true });
+
+    await expect(agent.afterToolCall({
+      toolCall: { id: `submit-${kind}`, name: toolName, arguments: {} },
+      args: {},
+      result,
+      isError: false,
+    })).resolves.toMatchObject({ isError: true, terminate: true });
+
+    await runtime.dispose();
+  });
+  it.each([
+    ["plan", "SubmitPlan"],
+    ["goal", "SubmitGoal"],
+  ] as const)(
+    "emits structured error before agent_end and ends turn when %s submission fails",
+    async (kind, toolName) => {
+      const onEvent = vi.fn();
+      const host = { call: vi.fn() };
+      const runtime = createRuntime({ host, mode: kind, onEvent });
+      const agent = (runtime as any).agent;
+      const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+      const submitTool = agent.state.tools.find((tool: any) => tool.name === toolName);
+
+      host.call.mockRejectedValueOnce({
+        data: { errorCode: "PLAN_WORKSPACE_REQUIRED" },
+      });
+
+      const submitResult = await submitTool.execute(`submit-${kind}`, {
+        title: "Test contract",
+        markdown: "# Test contract\n\n## Acceptance criteria\n- ok",
+        question: "Approve?",
+      });
+      expect(submitResult.isError).toBe(true);
+      expect(submitResult.terminate).toBe(true);
+
+      const turnDecision = await agent.finishTurn({
+        message: { role: "assistant", content: [], stopReason: "toolUse" },
+      });
+      expect(turnDecision).toEqual({ action: "end" });
+
+      // In agent_end, fatal submission emits error event before agent_end event
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+
+      const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+      const errorIdx = events.findIndex((e) => e.type === "error");
+      const agentEndIdx = events.findIndex((e) => e.type === "agent_end");
+
+      expect(errorIdx).toBeGreaterThanOrEqual(0);
+      expect(agentEndIdx).toBeGreaterThan(errorIdx);
+      expect(events[errorIdx].error.code).toBe("PLAN_WORKSPACE_REQUIRED");
+
+      await runtime.dispose();
+    },
+  );
+
+  it("terminates turn on submission and retains steering without consuming it", async () => {
+    const onEvent = vi.fn();
+    const host = { call: vi.fn() };
+    const runtime = createRuntime({ host, mode: "goal", onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const submitTool = agent.state.tools.find((tool: any) => tool.name === "SubmitGoal");
+
+    const proposal = {
+      id: "proposal-goal-steer",
+      sessionId: "session-1",
+      turnId: "turn-1",
+      toolCallId: "submit-goal-steer",
+      kind: "goal",
+      title: "Goal with steering",
+      markdown: "# Goal",
+      question: "Approve?",
+      artifact: {
+        relativePath: ".pi/goal/proposal.md",
+        sha256: "hash1",
+        sizeBytes: 10,
+        workspaceKind: "scratch",
+      },
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    (runtime as any).turnId = "turn-1";
+    (runtime as any).acceptingSteering = true;
+    (runtime as any).turnEpoch = 1;
+    (runtime as any).agent.state.isStreaming = true;
+    host.call.mockImplementationOnce(async () => {
+      runtime.steer(
+        { text: "user steering while submitting" },
+        "turn-1",
+        { id: "ui-steering-1", role: "user", content: "user steering while submitting", createdAt: new Date().toISOString() } as any,
+      );
+      return { status: "pending", proposal };
+    });
+
+    await submitTool.execute("submit-goal-steer", {
+      title: proposal.title,
+      markdown: proposal.markdown,
+      question: proposal.question,
+    });
+    // finishTurn must end the turn regardless of pending steering
+    const turnDecision = await agent.finishTurn({
+      message: { role: "assistant", content: [], stopReason: "toolUse" },
+    });
+    expect(turnDecision).toEqual({ action: "end" });
+
+    // agent_end should retain steering and terminate cleanly
+    await handleAgentEvent({ type: "agent_end", messages: [] });
+
+    expect(runtime.getStatus().planningState).toBe("awaiting_approval");
+    expect((runtime as any).acceptingSteering).toBe(false);
+    expect((runtime as any).pendingSteering.size).toBe(0);
+
+    await runtime.dispose();
+  });
+
+  it("prevents extensions from clearing isError or terminate on SubmitPlan and SubmitGoal", async () => {
+    const host = { call: vi.fn() };
+    const extensionRunner = {
+      hasHandlers: vi.fn((type: string) => type === "tool_result"),
+      emit: vi.fn(async (_type: string, _payload: any) => ({
+        isError: false,
+        terminate: false,
+      })),
+      dispose: vi.fn(),
+    };
+    const runtime = createRuntime({ host, mode: "plan" });
+    (runtime as any).extensionRunner = extensionRunner;
+    const agent = (runtime as any).agent;
+    const submitTool = agent.state.tools.find((tool: any) => tool.name === "SubmitPlan");
+
+    host.call.mockRejectedValueOnce({
+      data: { errorCode: "PLAN_WORKSPACE_REQUIRED" },
+    });
+
+    const submitResult = await submitTool.execute("submit-plan-override", {
+      title: "Plan title",
+      markdown: "# Plan",
+      question: "Approve?",
+    });
+
+    const afterResult = await agent.afterToolCall({
+      toolCall: { id: "submit-plan-override", name: "SubmitPlan", arguments: {} },
+      args: {},
+      result: submitResult,
+      isError: true,
+    });
+
+    // Even though extension tried to clear isError and terminate, they remain true
+    expect(afterResult.isError).toBe(true);
+    expect(afterResult.terminate).toBe(true);
+
+    await runtime.dispose();
+  });
+
+  it("clears turn-scoped submission outcome on new turn recovery reset", async () => {
+    const host = { call: vi.fn() };
+    const runtime = createRuntime({ host, mode: "goal" });
+    const agent = (runtime as any).agent;
+    const submitTool = agent.state.tools.find((tool: any) => tool.name === "SubmitGoal");
+
+    host.call.mockRejectedValueOnce({
+      data: { errorCode: "PLAN_SUBMIT_FAILED" },
+    });
+
+    await submitTool.execute("submit-fail", {
+      title: "Fail goal",
+      markdown: "# Fail",
+      question: "Approve?",
+    });
+
+    expect((runtime as any).pendingSubmissionOutcome).toBeDefined();
+
+    // Reset recovery state for the next turn
+    (runtime as any).resetRunRecoveryState();
+
+    expect((runtime as any).pendingSubmissionOutcome).toBeUndefined();
+
+    // finishTurn on the new turn does not end automatically
+    const decision = await agent.finishTurn({
+      message: { role: "assistant", content: [], stopReason: "stop" },
+    });
+    expect(decision).toBeUndefined();
 
     await runtime.dispose();
   });

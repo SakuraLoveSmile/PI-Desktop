@@ -4,6 +4,10 @@ import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import { imageGenerationDescription, imageGenerationParameters } from "./image-generation/tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
+import {
+  GoalReportDraftManager,
+  SUBMIT_GOAL_REPORT_TOOL_NAME,
+} from "./goal-report-tool.js";
 import { randomUUID } from "node:crypto";
 import {
   settledDelegationMessage,
@@ -1739,6 +1743,15 @@ export class DesktopAgentRuntime {
     target: string;
     lastErrorCode?: string;
   };
+  /** Why a Plan or Goal submission ended the turn, pending finalization. */
+  private pendingSubmissionOutcome?: {
+    kind: "plan" | "goal";
+    toolCallId: string;
+    turnEpoch: number;
+    status: "success" | "error";
+    errorCode?: string;
+    message?: string;
+  };
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
@@ -1769,6 +1782,7 @@ export class DesktopAgentRuntime {
   private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
   private hostCloseUnsubscribe?: () => void;
   private turnSubagentUsage?: MessageUsage;
+  private goalReportDraftManager?: GoalReportDraftManager;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
@@ -2047,6 +2061,9 @@ Delegation rules:
       // queued renderer prompt ends a completed turn at the next boundary,
       // without treating an error or abort as a graceful stop.
       finishTurn: async ({ message }) => {
+        if (this.pendingSubmissionOutcome?.turnEpoch === this.turnEpoch) {
+          return { action: "end" };
+        }
         if (!this.gracefulStopRequested) return;
         if (message.stopReason === "error" || message.stopReason === "aborted") return;
         this.gracefulStopRequested = false;
@@ -2218,13 +2235,26 @@ Delegation rules:
     };
   }
 
+  private isSubmissionTool(name: string): boolean {
+    return name === "SubmitPlan" || name === "SubmitGoal";
+  }
+
   private async afterToolCall(
     context: AfterToolCallContext,
   ): Promise<AfterToolCallResult | undefined> {
     const own = this.resolveOwnToolOutcome(context);
     const fromExtensions = await this.extensionToolResult(context, own);
     if (!fromExtensions) return own;
-    return { ...(own ?? {}), ...fromExtensions };
+    const merged: AfterToolCallResult = { ...(own ?? {}), ...fromExtensions };
+    if (this.isSubmissionTool(context.toolCall.name)) {
+      if (own?.isError || context.isError) {
+        merged.isError = true;
+      }
+      if (own?.terminate) {
+        merged.terminate = true;
+      }
+    }
+    return merged;
   }
 
   /** `tool_call` hook: an extension may block a call with a reason (spec 16 §6). */
@@ -3479,6 +3509,9 @@ Delegation rules:
     // Trusted extension tools are non-core: the per-mode allowlist and
     // ToolSearch deferral treat them like plugin tools (spec 16 §7).
     const extensionTools = this.extensionRunner?.getAgentTools() ?? [];
+    const goalReportTools = this.goalReportDraftManager
+      ? [this.goalReportDraftManager.buildTool()]
+      : [];
     return [
       ...builtins,
       askTool,
@@ -3488,6 +3521,7 @@ Delegation rules:
       ...subagentTools,
       ...contextTools,
       ...extensionTools,
+      ...goalReportTools,
     ];
   }
 
@@ -3576,6 +3610,7 @@ Delegation rules:
       name === SUBAGENT_WAIT_TOOL_NAME ||
       name === SUBAGENT_LIST_TOOL_NAME ||
       name === SUBAGENT_STOP_TOOL_NAME ||
+      name === SUBMIT_GOAL_REPORT_TOOL_NAME ||
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)
         : proposalKindForMode(this.mode)
@@ -5265,6 +5300,7 @@ Delegation rules:
             ? params.question.trim()
             : "";
         if (!title || !markdown.trim() || !question) {
+          this.failedHostToolCalls.add(toolCallId);
           return {
             content: [
               {
@@ -5293,6 +5329,16 @@ Delegation rules:
           const errorCode =
             (error as { data?: { errorCode?: string } })?.data?.errorCode ??
             "PLAN_SUBMIT_FAILED";
+          this.failedHostToolCalls.add(toolCallId);
+          this.terminatingToolCalls.add(toolCallId);
+          this.pendingSubmissionOutcome = {
+            kind,
+            toolCallId,
+            turnEpoch: this.turnEpoch,
+            status: "error",
+            errorCode,
+            message: `${modeLabel(kind)} submission failed: ${errorCode}`,
+          };
           return {
             content: [
               {
@@ -5316,6 +5362,16 @@ Delegation rules:
           typeof proposal.artifact.sha256 !== "string" ||
           typeof proposal.artifact.sizeBytes !== "number"
         ) {
+          this.failedHostToolCalls.add(toolCallId);
+          this.terminatingToolCalls.add(toolCallId);
+          this.pendingSubmissionOutcome = {
+            kind,
+            toolCallId,
+            turnEpoch: this.turnEpoch,
+            status: "error",
+            errorCode: "PLAN_SUBMIT_FAILED",
+            message: `${modeLabel(kind)} submission returned an invalid proposal.`,
+          };
           return {
             content: [
               {
@@ -5342,6 +5398,13 @@ Delegation rules:
           executionState: proposal.executionState,
           proposal,
         });
+        this.terminatingToolCalls.add(toolCallId);
+        this.pendingSubmissionOutcome = {
+          kind,
+          toolCallId,
+          turnEpoch: this.turnEpoch,
+          status: "success",
+        };
         return {
           content: [
             {
@@ -5731,6 +5794,7 @@ Delegation rules:
     this.mutationFailureCounts.clear();
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
+    this.pendingSubmissionOutcome = undefined;
     this.terminatingToolCalls.clear();
     this.turnHadError = false;
   }
@@ -7585,6 +7649,9 @@ Delegation rules:
         break;
       }
       case "tool_execution_start": {
+        if (event.toolName !== SUBMIT_GOAL_REPORT_TOOL_NAME) {
+          void this.goalReportDraftManager?.invalidate();
+        }
         const startedAt = Date.now();
         this.clearAgentActivity();
         this.activeToolCalls.set(event.toolCallId, {
@@ -7676,7 +7743,23 @@ Delegation rules:
           ...(subagentUsage ? { subagentUsage } : {}),
         });
         break;
-      case "agent_end":
+      case "agent_end": {
+        if (this.pendingSubmissionOutcome?.turnEpoch === this.turnEpoch) {
+          const outcome = this.pendingSubmissionOutcome;
+          this.pendingSubmissionOutcome = undefined;
+          this.acceptingSteering = false;
+          this.retainPendingSteering();
+          this.autonomousExecution = false;
+          this.clearAgentActivity();
+          if (outcome.status === "error") {
+            this.reportSubmissionTermination(outcome);
+          }
+          this.emit({
+            type: "agent_end",
+            messageIds: [],
+          });
+          break;
+        }
         // Input admitted after pi's last queue poll still belongs to this turn.
         // Continue after the current run settles; never wake the follow-up FIFO.
         if (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) break;
@@ -7691,6 +7774,10 @@ Delegation rules:
         this.acceptingSteering = false;
         this.retainPendingSteering();
         this.autonomousExecution = false;
+        if (this.goalReportDraftManager) {
+          this.goalReportDraftManager = undefined;
+          this.rebuildToolCatalog();
+        }
         this.clearAgentActivity();
         this.reportMutationTermination();
         this.emit({
@@ -7698,6 +7785,7 @@ Delegation rules:
           messageIds: [],
         });
         break;
+      }
       default:
         break;
     }
@@ -7710,6 +7798,33 @@ Delegation rules:
    * learns the agent stopped on purpose, and the UI keeps its continue
    * affordance (spec 18-line-anchored-edit-contract §9.3).
    */
+  private reportSubmissionTermination(outcome: {
+    kind: "plan" | "goal";
+    toolCallId: string;
+    errorCode?: string;
+    message?: string;
+  }): void {
+    const errorCode = outcome.errorCode || "PLAN_SUBMIT_FAILED";
+    const recovery = `${modeLabel(outcome.kind)} submission could not be completed.`;
+    const message =
+      outcome.message ||
+      `${modeLabel(outcome.kind)} submission failed: ${errorCode}. ${recovery}`;
+    const error = {
+      code: errorCode,
+      message,
+      retriable: true,
+      details: {
+        kind: outcome.kind,
+        toolCallId: outcome.toolCallId,
+        errorCode,
+        recovery,
+      },
+    };
+    this.terminateParentTurn();
+    this.finalizeCurrentAssistant("error", error);
+    this.emit({ type: "error", error });
+  }
+
   private reportMutationTermination(): void {
     const termination = this.pendingMutationTermination;
     if (!termination) return;
@@ -7860,6 +7975,37 @@ Delegation rules:
     this.autonomousExecution = true;
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
+    if (kind === "goal") {
+      this.goalReportDraftManager = new GoalReportDraftManager({
+        executionId: execution.id,
+        sessionId: execution.sessionId,
+        onDraftSubmitted: async (draft) => {
+          try {
+            await this.host.call("goalReports.submitDraft", {
+              executionId: execution.id,
+              draft,
+            });
+          } catch {
+            // Non-fatal draft persistence error
+          }
+        },
+        onDraftInvalidated: async () => {
+          try {
+            await this.host.call("goalReports.invalidateDraft", {
+              executionId: execution.id,
+            });
+          } catch {
+            // Non-fatal
+          }
+        },
+      });
+      this.rebuildToolCatalog();
+    } else {
+      if (this.goalReportDraftManager) {
+        this.goalReportDraftManager = undefined;
+        this.rebuildToolCatalog();
+      }
+    }
     const instruction =
       kind === "goal"
         ? [
@@ -7874,6 +8020,7 @@ Delegation rules:
             "Choose your own approach with the normal Agent tools. Then verify every acceptance criterion yourself, running the checks the contract names rather than assuming they pass.",
             "Keep working while a criterion is still unmet and you have an untried approach. Stop early only if a boundary in the contract blocks you or a criterion cannot be verified; say which one and why.",
             "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
+            "Call SubmitGoalReport with your final structured report (summary, verdict, metrics, criteria checklist, steps, and verification evidence) once your verification is complete.",
           ].join("\n")
         : [
             "Execute the approved implementation plan now.",
@@ -7967,6 +8114,10 @@ Delegation rules:
     this.pendingUserMessageId = userMessageId;
     this.resetRunRecoveryState();
     this.autonomousExecution = false;
+    if (this.goalReportDraftManager) {
+      this.goalReportDraftManager = undefined;
+      this.rebuildToolCatalog();
+    }
     // Main resolves this provenance from the Host ledger. Never infer it from
     // prompt text, model output, extension content, or restored history.
     const origin = typeof input === "string" ? undefined : input.sessionMessage;
@@ -8165,6 +8316,7 @@ Delegation rules:
   }
 
   steer(input: RuntimePrompt, expectedTurnId: string, message: UiMessage): { accepted: boolean; turnId: string } {
+    void this.goalReportDraftManager?.invalidate();
     this.steeringContext(expectedTurnId);
     const queued: AgentMessage = { role: "user", content: promptContent(input), timestamp: Date.now() };
     this.pendingSteering.set(queued, message.id);
@@ -8265,7 +8417,7 @@ Delegation rules:
     if (this.disposed) return;
     const runner = this.extensionRunner;
     this.extensionRunner = undefined;
-    const closingExtensions = runner?.dispose();
+    const closingExtensions = typeof runner?.dispose === "function" ? runner.dispose() : undefined;
     this.streamSink.dispose();
     this.disposed = true;
     this.acceptingSteering = false;
@@ -8279,6 +8431,7 @@ Delegation rules:
     this.mutationFailureCounts.clear();
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
+    this.pendingSubmissionOutcome = undefined;
     this.terminatingToolCalls.clear();
     this.delegateToolCalls.clear();
     this.appendedDelegationRowIds.clear();

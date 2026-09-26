@@ -26,7 +26,7 @@ import {
   MAIN_PANE_MIN_WIDTH,
   workPanelWidthForSidebarReopen,
 } from "../../lib/work-panel-resize";
-import { browserPluginTab } from "../../lib/work-panel-tabs";
+import { browserPluginTab, goalReportWorkPanelTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
 import { useSidebarTransition } from "./useSidebarTransition";
 import { useStartupWatchdog } from "./useStartupWatchdog";
@@ -587,6 +587,16 @@ export function useAppShellRuntime() {
           ...browserPluginTab(event.path ?? event.url),
         });
     });
+    const offGoalReportChanged = api.onGoalReportChanged((event) => {
+      const store = useAppStore.getState();
+      void store.refreshGoalReports(event.sessionId);
+      if (event.sessionId === store.activeSessionId) {
+        store.openWorkPanelTabForSession(
+          event.sessionId,
+          goalReportWorkPanelTab(event.executionId),
+        );
+      }
+    });
     const offHostStatus = api.onHostStatus((status) => {
       if (status.archMismatch) setArchMismatch(status.archMismatch);
       if (status.ok) {
@@ -781,6 +791,7 @@ export function useAppShellRuntime() {
       offToast();
       offInsecureEndpoint();
       offBrowserPreview();
+      offGoalReportChanged();
       offHostStatus();
       offNotificationChanged();
       offSessionsChanged();

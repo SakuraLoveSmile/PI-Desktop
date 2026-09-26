@@ -680,6 +680,12 @@ boundaries that must not be crossed — not a list of implementation steps. A
 submit tool is rejected with `PLAN_KIND_MISMATCH` when the session's active kind
 is the other one, and with `PLAN_NOT_ACTIVE` when no contract is active.
 
+A temporary Goal session uses its own Host-managed scratch workspace for the
+checkpoint and execution outputs. Its project binding remains absent; another
+visible project is never used. Plan retains its project requirement. Submission
+failures must reach the tool error channel rather than appear as successful
+submissions, and must not publish an approval or launch execution.
+
 Goal approval commits exactly what Plan approval commits: `mode = agent`, the
 explicit permission mode, an execution ID, and `execution_state = queued` on the
 same row. The queued execution instruction differs by kind. An approved plan is

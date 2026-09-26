@@ -44,8 +44,8 @@ test("renderer exposes Agent, Plan, and Goal as the only operating modes", () =>
   assert.match(composerSource, /settings\.modeGoal/);
   assert.match(composerSource, /IconListChecks/);
   assert.match(composerSource, /IconTarget/);
-  assert.match(settingsSource, /\["plan", "settings\.modePlan"\]/);
-  assert.match(settingsSource, /\["goal", "settings\.modeGoal"\]/);
+  assert.match(settingsSource, /(?:\["plan",\s*"settings\.modePlan"\]|value:\s*"plan",\s*label:\s*t\("settings\.modePlan"\))/);
+  assert.match(settingsSource, /(?:\["goal",\s*"settings\.modeGoal"\]|value:\s*"goal",\s*label:\s*t\("settings\.modeGoal"\))/);
   assert.match(commandsSource, /case "builtin\.mode\.plan"/);
   assert.match(commandsSource, /case "builtin\.mode\.goal"/);
   for (const source of [composerSource, settingsSource, commandsSource]) {
@@ -166,10 +166,7 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.doesNotMatch(transcriptSource, /PlanApprovalCard|plan-approval-card/);
   assert.doesNotMatch(transcriptSource, /\bpendingPlan\b/);
   assert.match(storeSource, /openPlanArtifact/);
-  assert.match(
-    storeSource,
-    /preferredFileWorkPanelTab\(relativePath, pluginViews\)/,
-  );
+  assert.match(storeSource, /resolvePlanArtifactPath\(proposal\)/);
   assert.match(barSource, /const isPending = proposal\.status === "pending"/);
   const resolveBlock = interactionSource.slice(interactionSource.indexOf("resolvePlan: async"));
   assert.match(resolveBlock, /await api\.resolvePlan\(resolution\)/);
@@ -207,7 +204,7 @@ test("the startup artifact restore resolves launchable views first", () => {
   // Every slice call site forwards the live list, so a stub list cannot hide
   // the wrong surface behind a green run.
   for (const slice of [eventsSource, sessionSource]) {
-    assert.match(slice, /openPlanArtifact\([\s\S]{0,120}?get\(\)\.pluginViews/);
+    assert.match(slice, /void openPlanArtifact\([\s\S]{0,120}?get\(\)\.pluginViews/);
   }
 });
 

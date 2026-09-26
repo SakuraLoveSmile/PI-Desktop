@@ -1737,6 +1737,9 @@ pub fn configure_session_with_thinking(
 }
 
 pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
+    if crate::plans::has_live_scratch_goal(db, id)? {
+        return Err(anyhow!("PLAN_CONFIGURATION_BLOCKED"));
+    }
     let n = db
         .conn()
         .prepare_cached("DELETE FROM sessions WHERE id = ?1")?
@@ -1746,6 +1749,7 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
         // failed scheduled-run cleanup) also drops the transcript files.
         invalidate_transcript_layout(id);
         transcripts::remove_session_files(db.data_dir(), id);
+        crate::goal_reports::remove_session_files(db.data_dir(), id);
     }
     Ok(n > 0)
 }
@@ -1773,6 +1777,7 @@ pub fn rename_session(db: &Database, id: &str, title: &str) -> Result<bool> {
 }
 
 /// Outcome of moving a session to a different project.
+#[derive(Debug)]
 pub enum MoveSessionProjectResult {
     Moved(Box<SessionSummary>),
     NotFound,
@@ -1796,6 +1801,9 @@ pub fn move_session_project(
     }
     if session_has_running_turn(db, id)? {
         return Ok(MoveSessionProjectResult::Busy);
+    }
+    if crate::plans::has_live_scratch_goal(db, id)? {
+        return Err(anyhow!("PLAN_CONFIGURATION_BLOCKED"));
     }
     let project_id = db.ensure_project(project_path, false)?;
     db.conn()
