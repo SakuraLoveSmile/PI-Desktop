@@ -157,6 +157,9 @@ export function createProviderCatalogRuntime({
         ...(bindingResolved.binding.contextWindowSource
           ? { contextWindowSource: bindingResolved.binding.contextWindowSource }
           : {}),
+        ...(bindingResolved.binding.maxTokensSource
+          ? { maxTokensSource: bindingResolved.binding.maxTokensSource }
+          : {}),
       };
     });
     return {

@@ -276,6 +276,14 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **里程碑**：M2
 - **状态**：自动（协议烟雾：提供商创建+秘密，无明文回显）
 
+#### E2E-PROVIDER-keep-explicit-model-overrides：目录刷新不覆盖用户限额与能力选择
+
+- **前提条件**：已配置一个目录发布上下文窗口、最大输出 token 和图片输入能力的模型。
+- **步骤**：编辑该模型，将最大输出 token 设为通用种子值 8,192；将图片输入开关先关再开，使显式选择与当前目录值相同；保存并重开设置。再用更新后的目录记录刷新该模型。
+- **预期**：最大输出 token 仍是 8,192，且来源标记为 `user`，即使上下文窗口来源为 `catalog`；图片输入仍保持用户显式选择。目录修正只更新来源标记为 `catalog` 的限额，不会把用户显式设置重新解释为跟随目录。
+- **关联规格**：`03-runtime/11-provider-model-system.md`、`03-runtime/12-provider-config-schema.md`、`03-runtime/13-model-catalog-and-selection.md`
+- **状态**：由 shared/runtime 与 host-core 回归测试覆盖；真实桌面 UI 验收待执行
+
 #### E2E-PROVIDER-defaults-survive-an-added-provider：新增提供商不改写应用默认值
 
 - **前提条件**：应用运行；提供商 A 已保存并设为应用默认模型；另有提供商 B 提供不同的模型；A 上配置了一个图片模型，另一家服务上也配置了一个。
