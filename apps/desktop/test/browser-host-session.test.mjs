@@ -93,6 +93,11 @@ test("background navigation targets that session's last selected tab", async () 
   await h.host.navigate({ url: "https://fixture.invalid/queued" }, "C");
   await open(h, "C", "c", "old.html");
   assert.equal(h.host.getState().url, "https://fixture.invalid/queued");
+  h.host.setChromeSession("E"); // A session may exist without a concrete resource tab.
+  h.host.setChromeSession("A", "a");
+  await h.host.navigate({ url: "https://fixture.invalid/first-e" }, "E");
+  await open(h, "E", "e", "old-e.html");
+  assert.equal(h.host.getState().url, "https://fixture.invalid/first-e");
   h.host.setChromeSession("C", "blank");
   assert.equal(h.host.getState(), null);
 });

@@ -208,8 +208,9 @@ export class BrowserHost {
     const id = sessionId?.trim();
     const target = location.trim();
     if (!id || !target) return;
-    if (this.selectedTabs.has(id)) {
-      const key = this.key(id, this.selectedTabs.get(id) ?? null);
+    const tabId = this.selectedTabs.get(id);
+    if (tabId != null) {
+      const key = this.key(id, tabId);
       this.locations.set(key, target);
       if (this.active?.key !== key) this.pendingTabs.add(key);
     } else {
