@@ -531,6 +531,10 @@ pi.browser.cdp(input: { method: string; params?: unknown }): Promise<unknown>
 内存中，最多保留 30 天、500 条和 256 MiB；单条文本最多 100 KiB UTF-8 字节，图片
 最多 50 MiB。图片统一返回 PNG 字节及像素尺寸。没有粘贴过的复制内容不会被记录。
 
+`navigate` 在当前主框架导航提交（含重定向）时返回，不等待慢图片或子框架。
+`browser:state` 立即报告加载状态，导航失败时可带 `loadError`。
+可选的 `sessionId`、`tabId` 标识宿主管理的工作面板目标；插件不能通过导航参数指定这些身份。
+
 ### 服务（需要 `background.service`）
 ```ts
 pi.services.register(service: {

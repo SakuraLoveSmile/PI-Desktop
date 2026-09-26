@@ -180,16 +180,13 @@ export function registerPluginUiIpc({
       viewId?: string;
       sessionId?: string;
       location?: string;
+      tabId?: string;
     }) => {
       const pluginId = String(payload?.pluginId ?? "");
       const viewId = String(payload?.viewId ?? "");
       const sessionId = String(payload?.sessionId ?? "").trim();
       const location = String(payload?.location ?? "").trim();
       const isBrowserView = pluginId === BROWSER_PLUGIN_ID && viewId === BROWSER_VIEW_ID;
-      if (isBrowserView && sessionId) browserHost.setChromeSession(sessionId);
-      if (isBrowserView && sessionId && location) {
-        browserHost.rememberLocation(sessionId, location);
-      }
       const loaded = plugins.getLoaded(pluginId);
       if (!loaded) throw new Error("plugin not loaded");
       if (!loaded.permissions.has("ui.view")) {
@@ -204,6 +201,8 @@ export function registerPluginUiIpc({
       if (!view) throw new Error("plugin has no such view");
       const htmlPath = join(loaded.path, view.entry);
       if (!existsSync(htmlPath)) throw new Error("view entry missing");
+      const switched = isBrowserView && sessionId
+        ? browserHost.setChromeSession(sessionId, typeof payload.tabId === "string" ? payload.tabId : undefined, location) : false;
       pluginViews.open({
         pluginId,
         viewId,
@@ -216,7 +215,7 @@ export function registerPluginUiIpc({
         // view receives the opener's subject untouched (D320 follow-up).
         ...(isBrowserView || !location ? {} : { location }),
       });
-      if (isBrowserView && location) {
+      if (isBrowserView && location && !switched && browserHost.getState()?.url !== location) {
         void browserHost.navigate(
           { path: location, url: location },
           sessionId || undefined,

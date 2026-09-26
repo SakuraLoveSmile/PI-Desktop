@@ -81,6 +81,7 @@ export class BrowserHost {
   private holePluginId: string | null = null;
   private readonly locations = new Map<string, string>();
   private chromeSessionId: string | null = null;
+  private chromeTabId: string | null = null;
   private started = false;
   private navigationEpoch = 0;
 
@@ -94,19 +95,37 @@ export class BrowserHost {
     this.applyGuest();
   }
 
-  setChromeSession(sessionId: string | undefined): void {
+  getContext(): { sessionId?: string; tabId?: string } {
+    return { ...(this.chromeSessionId ? { sessionId: this.chromeSessionId } : {}),
+      ...(this.chromeTabId ? { tabId: this.chromeTabId } : {}) };
+  }
+
+  publishState(state: BrowserState): void {
+    if (this.chromeSessionId && state.url) this.rememberLocation(this.chromeSessionId, state.url);
+    this.deps.onState({ ...state, ...this.getContext() });
+  }
+
+  private locationKey(sessionId: string, tabId = this.chromeTabId): string {
+    return JSON.stringify([sessionId, tabId]);
+  }
+
+  setChromeSession(sessionId: string | undefined, tabId?: string, location?: string): boolean {
     const next = sessionId?.trim() || null;
-    if (this.chromeSessionId === next) return;
+    const nextTab = tabId ?? (next === this.chromeSessionId ? this.chromeTabId : null);
+    if (this.chromeSessionId === next && this.chromeTabId === nextTab) return false;
     this.chromeSessionId = next;
+    this.chromeTabId = nextTab;
     this.navigationEpoch += 1;
     this.pane.invalidateNavigation();
     this.started = false;
     this.pane.setVisible(false);
     if (next) {
+      if (location && !this.locations.has(this.locationKey(next))) this.rememberLocation(next, location);
       void this.rebindSession(next).catch((error) => {
         console.warn("Browser preview session restore failed", error);
       });
     }
+    return true;
   }
 
   /**
@@ -139,7 +158,7 @@ export class BrowserHost {
     const id = sessionId?.trim();
     const value = location.trim();
     if (!id || !value) return;
-    this.locations.set(id, value);
+    this.locations.set(this.locationKey(id, id === this.chromeSessionId ? this.chromeTabId : null), value);
   }
 
   async navigate(
@@ -158,7 +177,7 @@ export class BrowserHost {
       target,
       this.deps.getFileRoot(sessionId ?? this.chromeSessionId ?? undefined),
     );
-    if (state) this.deps.onState(state);
+    if (state) this.publishState(state);
     return state;
   }
 
@@ -167,7 +186,8 @@ export class BrowserHost {
   }
 
   getState(): BrowserState | null {
-    return this.pane.getState();
+    const state = this.pane.getState();
+    return state ? { ...state, ...this.getContext() } : null;
   }
 
   openExternal(): void {
@@ -269,7 +289,7 @@ export class BrowserHost {
   }
 
   private async rebindSession(sessionId: string): Promise<void> {
-    const location = this.locations.get(sessionId);
+    const location = this.locations.get(this.locationKey(sessionId));
     if (!location) return;
     await this.navigateGuest(location, this.deps.getFileRoot(sessionId));
   }
@@ -283,9 +303,13 @@ export class BrowserHost {
     if (epoch !== this.navigationEpoch) return null;
     const state = await this.pane.navigateAndWait(target, fileRoot);
     if (epoch !== this.navigationEpoch) return null;
-    // A failed or timed-out load is not evidence that the previous session's
-    // document has been replaced. Only a completed navigation makes it ready.
-    if (state) this.started = true;
+    // Only a committed current document may become visible. Invalid input has
+    // no native load event, so it needs an explicit failure state as well.
+    this.started = state !== null;
+    if (!state && !this.pane.getState()?.loadError) {
+      this.publishState({ url: target, title: "", isLoading: false,
+        canGoBack: false, canGoForward: false, loadError: "INVALID_URL" });
+    }
     this.applyGuest();
     return state;
   }

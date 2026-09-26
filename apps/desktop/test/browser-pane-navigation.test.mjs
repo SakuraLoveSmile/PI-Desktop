@@ -92,6 +92,8 @@ test("late native navigation events cannot publish after the session is invalida
   wc.url = "https://fixture.invalid/second";
   wc.pendingLoads.shift().resolve();
   await second;
+  assert.equal(published.at(-1).url, "https://fixture.invalid/second");
+  published.length = 0;
 
   wc.emit("did-navigate", {}, "https://fixture.invalid/first");
   wc.emit("did-fail-load", {}, -3, "aborted", "https://fixture.invalid/first", true);
@@ -111,6 +113,8 @@ async function loadedPage() {
   wc.url = "https://fixture.invalid/page";
   wc.pendingLoads.shift().resolve();
   await request;
+  assert.equal(published[0].isLoading, true);
+  published.length = 0;
   return { pane, wc, published };
 }
 

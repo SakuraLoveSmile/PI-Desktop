@@ -40,8 +40,10 @@ guest.
    workspace file into the guest when that session's chrome is visible and
    reveals the plugin view. Plugin CDP stays Agent-only (`plugin_*`).
 6. **v1 is a singleton guest.** Session locations are remembered and rebound
-   when the originating conversation's plugin tab is shown (D142). Background
-   sessions do not steal the visible guest.
+   when the originating conversation's plugin tab is shown (D142). Browser
+   resource tabs additionally retain their individual current locations; they
+   reuse the guest and reload on selection rather than retaining separate DOM
+   state/history. Background sessions do not steal the visible guest.
 
 This supersedes ADR 0105 clause 4 (Browser remains a host-built launcher) and
 the host-launcher clause of ADR 0019. Guest ownership and navigation policy

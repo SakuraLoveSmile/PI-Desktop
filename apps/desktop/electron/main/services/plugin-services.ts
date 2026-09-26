@@ -549,7 +549,17 @@ export function createPluginServices({
       });
     }
   };
-  const browserPane = new BrowserPane(emitBrowserState);
+  const browserPane = new BrowserPane((state) => browserHost.publishState(state), (url) => {
+    const { sessionId } = browserHost.getContext();
+    void (async () => {
+      const settings = await getHost()?.call<AppSettings>("settings.get");
+      if (!sessionId || settings?.linkOpenTarget === "external" || !/^https?:/i.test(url)) {
+        await shell.openExternal(url);
+      } else {
+        sendToRenderer(IPC.event.browserPreview, { sessionId, url });
+      }
+    })().catch((error) => logger.app("plugin", "warn", "browser.link.open.failed", { data: String(error) }));
+  });
   const pluginViews = new PluginViewHost(({ pluginId, url }) => {
     logger.app("plugin", "warn", "plugin.api", {
       pluginId,
