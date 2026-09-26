@@ -12043,7 +12043,13 @@ are withdrawn with ADR 0165.
      Open in default browser, Open in work panel, and Copy link address. Repeat
      the menu actions with keyboard focus and Arrow/Home/End navigation.
   4. Repeat a link click with Ctrl/Cmd, Shift, and Alt held.
+  5. Render and use links whose HTTP(S) destination is wrapped as a nested
+     linked-host Markdown destination, such as
+     `[#1106](([github.com](https://github.com/vastsa/PI-Desktop/issues/1106)))`.
 - **Expected**:
+  - Wrapped linked-host destinations resolve to their inner HTTP(S) URL before
+    sanitization, so the link is clickable and its right-click menu offers both
+    browser destinations and Copy link address.
   - The Work panel browser is the default plain-click destination.
   - The Default OS browser setting routes chat, transcript, and plugin HTTP(S)
     clicks through the main-owned external opener, including markdown links,
@@ -12064,9 +12070,13 @@ are withdrawn with ADR 0165.
   `08-meta/decisions-log.md` (D330)
 - **Acceptance**: B (settings), C (conversation & stream), Security, Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`apps/desktop/test/markdown-link-menu.test.mjs`,
-  locale catalog tests, `apps/desktop/test/open-http-url.test.mjs`); full UI
-  journey Draft (run only in a capable environment when this surface changes)
+- **Status**: Wrapped destinations, plain-click routing, and pointer context-menu
+  presence are covered in `pnpm test:e2e:transcript`; settings persistence,
+  browser-action activation, and keyboard menu navigation remain Draft. Unit
+  coverage: `apps/desktop/test/markdown-link-menu.test.mjs`,
+  `apps/desktop/test/markdown-link-destinations.test.mjs`,
+  `apps/desktop/test/markdown-math-rendering.test.mjs`, locale catalog tests,
+  and `apps/desktop/test/open-http-url.test.mjs`.
 
 #### E2E-201: Alias a configured model and copy a model id
 
