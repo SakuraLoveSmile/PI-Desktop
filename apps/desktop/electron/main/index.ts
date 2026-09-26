@@ -272,6 +272,19 @@ const updater = new AppUpdaterController({
   currentVersion: APP_VERSION,
   isPackaged: !isDevelopmentBuild,
   getLocale: () => mainState.updaterLocale,
+  readUpdateSettings: async () => {
+    const host = getHost();
+    if (!host?.isAvailable()) throw new Error("host unavailable");
+    return host.call<{
+      updatePreference?: unknown;
+      lastNotifiedUpdateVersion?: unknown;
+    }>("settings.get");
+  },
+  persistLastNotifiedVersion: async (version) => {
+    const host = getHost();
+    if (!host?.isAvailable()) throw new Error("host unavailable");
+    await host.call("settings.set", { lastNotifiedUpdateVersion: version });
+  },
 });
 
 /**
@@ -350,7 +363,6 @@ const {
   pluginPanels,
   pluginViews,
   browserHost,
-  browserPane,
   announceTurnEnded,
   speech,
 } = pluginServices;
@@ -517,7 +529,7 @@ applicationLifecycle = createApplicationLifecycle({
   showPluginLauncher: showPluginLauncherForLifecycle,
   askCloseBehavior: askCloseBehaviorForLifecycle,
   applyCloseBehavior: applyCloseBehaviorForLifecycle,
-  browserPane,
+  browserHost,
   pluginViews,
   plugins,
   logger,
@@ -966,7 +978,7 @@ registerShutdownHandlers({
   plugins,
   userMcp,
   mcpOAuth,
-  browserPane,
+  browserHost,
   pluginViews,
   updater,
   logger,

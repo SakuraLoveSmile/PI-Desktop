@@ -553,6 +553,8 @@ export function createProjectSlice({
     deleteSession: async (id) => {
       if (!id) return;
       await api.deleteSession(id);
+      void api.pluginViewClose("pi.browser", "browser", { sessionId: id })
+        .catch((error) => get().showToast(String(error), { variant: "error" }));
       clearLocalSessionState(
         { get, set, runtime, manualSessionTitles, withoutRecordKey },
         id,
