@@ -89,3 +89,18 @@ builds NSIS and ZIP separately and stamps the ZIP app metadata with
 even though ordinary ZIP launches do not set `PORTABLE_EXECUTABLE_FILE`. Users
 extract the archive and run `PI-Desktop.exe`; the NSIS lane and existing data
 directory remain unchanged.
+
+## Amendment (issue #1098)
+
+For Windows NSIS installs, `PI_DESKTOP_UPDATE_CACHE_DIR` may set an absolute,
+writable base for electron-updater's download cache. Main reads the cache's
+subdirectory name from the packaged `app-update.yml`, adopts the installer and
+block-map differential baselines plus any staged update from `%LOCALAPPDATA%`
+on startup, then removes the legacy cache directory only when empty. Unknown
+files and already-populated destinations are preserved rather than overwritten
+or recursively deleted. Once the feed confirms the running version is current,
+Main deletes only the obsolete `pending/` staging directory and keeps the
+baselines for the next differential update. The default
+cache location remains unchanged unless the variable is set. Main does not write
+to the installation directory: the NSIS script still writes its `installer.exe`
+baseline to `%LOCALAPPDATA%`, which Main adopts on the next launch.

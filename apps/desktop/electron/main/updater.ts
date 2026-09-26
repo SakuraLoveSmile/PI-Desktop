@@ -12,12 +12,17 @@
  *    NSIS installer must not replace a no-install run.
  *  - Linux deb (no $APPIMAGE in env) → notify + link.
  *  - Unpackaged dev runs → disabled (no app-update.yml in resources).
+ *
+ * The installer download cache lives in the user cache directory rather than
+ * beside the installation; `PI_DESKTOP_UPDATE_CACHE_DIR` relocates it, and
+ * `./update-cache` owns what may be reclaimed from it (#1098).
  */
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { app, shell } from "electron";
 import electronUpdaterPkg from "electron-updater";
-import type { UpdateInfo, ProgressInfo } from "electron-updater";
+import type { AppUpdater, UpdateInfo, ProgressInfo } from "electron-updater";
 import {
   formatChangelogNotes,
   IPC,
@@ -27,11 +32,33 @@ import {
 import type { Logger } from "./logger";
 import { parseAllowedExternalUrl } from "./safe-open-external";
 import {
+  defaultUpdateCacheBasePath,
+  relocateUpdateCacheBasePath,
+  resolveUpdateCacheOverride,
+  UPDATE_CACHE_DIR_ENV,
+} from "./update-cache";
+import { UpdateCacheMaintenance } from "./update-cache-maintenance";
+import {
   raceWithTimeout,
   UPDATE_CHECK_TIMEOUT_CODE,
 } from "./update-timeout";
 
-const { autoUpdater } = electronUpdaterPkg;
+const { NsisUpdater, autoUpdater } = electronUpdaterPkg;
+
+/** Windows NSIS updater with a caller-selected cache base. */
+class RelocatedNsisUpdater extends NsisUpdater {
+  constructor(baseCachePath: string) {
+    super();
+    relocateUpdateCacheBasePath(this.app, baseCachePath);
+  }
+}
+
+function createRelocatedUpdater(
+  platform: NodeJS.Platform,
+  baseCachePath: string,
+): AppUpdater | null {
+  return platform === "win32" ? new RelocatedNsisUpdater(baseCachePath) : null;
+}
 
 export const RELEASES_URL = "https://github.com/vastsa/PI-Desktop/releases/latest";
 
@@ -51,6 +78,11 @@ export type UpdaterOptions = {
    * Called when attaching notes to update state; defaults to English.
    */
   getLocale?: () => string | null | undefined;
+  /**
+   * `PI_DESKTOP_UPDATE_CACHE_DIR`; an absolute directory moves the updater's
+   * download cache out of the user cache directory. Empty keeps the default.
+   */
+  updateCacheDirOverride?: string | null;
   /** Overrides for tests. */
   platform?: NodeJS.Platform;
   isPackaged?: boolean;
@@ -94,6 +126,8 @@ export class AppUpdaterController {
    * is about to see is the update restart.
    */
   private installRequested = false;
+  private readonly autoUpdater: AppUpdater;
+  private readonly cacheMaintenance: UpdateCacheMaintenance;
 
   private readPackagedDistribution(
     isPackaged: boolean,
@@ -139,6 +173,38 @@ export class AppUpdaterController {
       process.env,
       distribution,
     );
+    const defaultCacheBasePath = defaultUpdateCacheBasePath({
+      platform,
+      env: process.env,
+      home: homedir(),
+    });
+    const requestedCacheBasePath =
+      options.updateCacheDirOverride ??
+      resolveUpdateCacheOverride(process.env[UPDATE_CACHE_DIR_ENV]);
+    const relocated =
+      mode !== "in-app" || !requestedCacheBasePath
+        ? null
+        : createRelocatedUpdater(platform, requestedCacheBasePath);
+    const activeBasePath =
+      relocated && requestedCacheBasePath
+        ? requestedCacheBasePath
+        : defaultCacheBasePath;
+    const legacyBasePath = relocated ? defaultCacheBasePath : null;
+    if (requestedCacheBasePath && !relocated && mode !== "disabled") {
+      this.logger.app(
+        "updater",
+        "warn",
+        "update cache relocation is not supported on this target",
+        { data: { platform } },
+      );
+    }
+    this.autoUpdater = relocated ?? autoUpdater;
+    this.cacheMaintenance = new UpdateCacheMaintenance({
+      resourcesPath: process.resourcesPath,
+      activeBasePath,
+      legacyBasePath,
+      logger: this.logger,
+    });
     this.state = {
       mode,
       status: "idle",
@@ -158,17 +224,17 @@ export class AppUpdaterController {
     if (this.listenersAttached) return;
     this.listenersAttached = true;
 
-    autoUpdater.autoDownload = this.state.mode === "in-app";
+    this.autoUpdater.autoDownload = this.state.mode === "in-app";
     // electron-updater defaults allowPrerelease=true when the installed
     // version has a prerelease component (e.g. 0.2.0-rc.6). That pins the
     // GitHub provider to the same custom channel ("rc") and never offers a
     // newer stable release such as 0.2.2. Always track GitHub's latest
     // stable release so RC installs can graduate to stable.
-    autoUpdater.allowPrerelease = false;
+    this.autoUpdater.allowPrerelease = false;
     // Even if the user ignores the restart prompt, a downloaded update
     // lands on the next normal quit.
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.logger = {
+    this.autoUpdater.autoInstallOnAppQuit = true;
+    this.autoUpdater.logger = {
       info: (m: unknown) =>
         this.logger.app("updater", "info", "updater diagnostic", {
           data: { detail: String(m) },
@@ -187,10 +253,10 @@ export class AppUpdaterController {
         }),
     };
 
-    autoUpdater.on("checking-for-update", () => {
+    this.autoUpdater.on("checking-for-update", () => {
       this.setState({ status: "checking", error: undefined });
     });
-    autoUpdater.on("update-available", (info: UpdateInfo) => {
+    this.autoUpdater.on("update-available", (info: UpdateInfo) => {
       this.setState({
         status: this.state.mode === "in-app" ? "downloading" : "available",
         availableVersion: info.version,
@@ -198,15 +264,21 @@ export class AppUpdaterController {
         progressPercent: this.state.mode === "in-app" ? 0 : undefined,
       });
     });
-    autoUpdater.on("update-not-available", () => {
+    this.autoUpdater.on("update-not-available", () => {
       this.setState({
         status: "up-to-date",
         availableVersion: undefined,
         releaseNotes: undefined,
         progressPercent: undefined,
       });
+      // In-app installs have no newer staged installer after the feed reports
+      // current. Keep the differential baselines for the next update. Manual
+      // delivery modes may share a cache with an installed NSIS copy.
+      if (this.state.mode === "in-app") {
+        void this.cacheMaintenance.discardDownloadedInstaller();
+      }
     });
-    autoUpdater.on("download-progress", (progress: ProgressInfo) => {
+    this.autoUpdater.on("download-progress", (progress: ProgressInfo) => {
       this.setState({
         status: "downloading",
         // Preserve notes already attached when discovery advanced to download.
@@ -215,7 +287,7 @@ export class AppUpdaterController {
         progressPercent: Math.round(progress.percent),
       });
     });
-    autoUpdater.on("update-downloaded", (info: UpdateInfo) => {
+    this.autoUpdater.on("update-downloaded", (info: UpdateInfo) => {
       this.setState({
         status: "downloaded",
         availableVersion: info.version,
@@ -223,7 +295,7 @@ export class AppUpdaterController {
         progressPercent: 100,
       });
     });
-    autoUpdater.on("error", (error: Error) => {
+    this.autoUpdater.on("error", (error: Error) => {
       // Auto checks fail quietly (offline, private repo, rate limits);
       // the renderer only surfaces errors when `manual` is set.
       this.logger.app("updater", "warn", "updater error", { data: String(error) });
@@ -273,7 +345,7 @@ export class AppUpdaterController {
       // first-window path. The race only bounds *our* wait; electron-updater
       // may still finish later and emit available/up-to-date.
       await raceWithTimeout(
-        autoUpdater.checkForUpdates(),
+        this.autoUpdater.checkForUpdates(),
         timeoutMs,
         "update check",
       );
@@ -310,7 +382,7 @@ export class AppUpdaterController {
     if (this.state.status === "downloading" || this.state.status === "downloaded") {
       return this.state;
     }
-    await autoUpdater.downloadUpdate();
+    await this.autoUpdater.downloadUpdate();
     return this.state;
   }
 
@@ -334,7 +406,12 @@ export class AppUpdaterController {
     // the shutdown handler must already know this quit is the update restart.
     this.installRequested = true;
     // Fires 'before-quit' first, so host/sidecar shutdown still runs.
-    autoUpdater.quitAndInstall(false, true);
+    this.autoUpdater.quitAndInstall(false, true);
+  }
+  /** Adopt legacy NSIS cache files before the first update check. */
+  reclaimRelocatedUpdateCache(): Promise<void> {
+    if (this.state.mode === "disabled") return Promise.resolve();
+    return this.cacheMaintenance.reclaimLegacyCache();
   }
 
   async openReleases(): Promise<void> {

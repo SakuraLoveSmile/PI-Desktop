@@ -259,6 +259,23 @@ front of the launcher or a plugin panel (ADR 0086).
 reaches `downloaded`. Electron still emits `before-quit`, so the normal
 sidecar/host shutdown sequence runs before the updater replaces the app.
 
+For Windows NSIS installs, `PI_DESKTOP_UPDATE_CACHE_DIR` may override the
+electron-updater cache base with an absolute, writable directory. The packaged
+`app-update.yml` remains authoritative for the cache subdirectory name. On first
+startup after relocation, Main adopts the differential installer and block map
+from the legacy `%LOCALAPPDATA%` cache, preserves any staged update, then removes
+the old cache directory only when empty. Unknown files and an already-populated
+destination are preserved rather than overwritten or recursively deleted. When
+the update feed confirms the running version is current, Main removes only the
+`pending/` download staging directory; differential baselines stay available for
+the next small update. Do not point the override at an installation directory
+that requires elevation to write.
+
+The download-and-install path remains owned by Electron Main. The installer itself
+still creates `installer.exe` in `%LOCALAPPDATA%`; relocation adopts that copy on
+the next launch rather than changing the NSIS installer or writing into
+`Program Files` (issue #1098).
+
 ## 6. Dev vs release
 
 ### Dev
