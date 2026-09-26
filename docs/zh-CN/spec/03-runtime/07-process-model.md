@@ -72,7 +72,7 @@ queued/running `plan_approvals` 执行状态已中断并中止它们
 |---|---|
 | Renderer 崩溃 | 重新加载窗口，保留 host/agent 进程；同一主机重新加载仅恢复实时待处理的 Plan/Goal 批准及其截止日期，而不是终端卡 |
 | Rust 主机崩溃 | 将应用程序标记为降级、中断 pending/queued/running 审批工作、将待处理会话保留在其合同模式（Plan 或 Goal）中并将已批准的会话保留在 Agent 中、尝试重新启动主机并关闭活动会话失败 |
-| Node 代理崩溃 | 中止活动轮次和实时批准 waiters/queue 条目，在合同模式下保留待处理会话，在 Rust 中保留已批准的 Agent 模式，重新启动 sidecar，并且从不重播执行 |
+| Node 代理崩溃 | 中止活动轮次和实时批准 waiters/queue 条目，在合同模式下保留待处理会话，在 Rust 中保留已批准的 Agent 模式，重新启动 sidecar，并且从不重播执行；sidecar 退出时对其 stderr 尾部做分类——V8 堆耗尽横幅使所属回合以 `AGENT_SIDECAR_OOM` 收尾，其他意外退出以 `AGENT_SIDECAR_CRASHED` 收尾（issue #1077） |
 | Electron 主要崩溃 | 完整的应用程序退出 |
 
 Crashpad 在 `ready` 之前以本地模式启动（`uploadToServer: false`），转储放在
