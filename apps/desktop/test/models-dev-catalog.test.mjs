@@ -164,7 +164,7 @@ test("cached matches remain scoped to the requested provider and endpoint", asyn
   }
 });
 
-test("an unknown endpoint borrows only what every publisher of the id agrees on", async (t) => {
+test("unknown endpoints do not inherit ambiguous cross-provider metadata", async (t) => {
   for (const order of [["alpha", "beta"], ["beta", "alpha"]]) {
     const fixture = Object.fromEntries(order.map((key) => [key, {
       api: `https://${key}.example/v1`,
@@ -177,32 +177,11 @@ test("an unknown endpoint borrows only what every publisher of the id agrees on"
       },
     }]));
     const catalog = await loadFixtureCatalog(t, fixture);
-    /*
-      No provider identity: neither publisher may answer alone. What every one of
-      them states can be claimed, and it under-claims — reasoning only when all
-      report it, limits as the lower median of the claims.
-    */
-    const unknown = { vendorKey: "custom", baseUrl: "https://relay.example/v1", modelId: "shared-model" };
-    const consensus = catalog.findModel(unknown);
-    assert.equal(consensus?.limit.context, 32_000, "the lower median, not the larger claim");
-    assert.equal(consensus?.limit.output, 8_192);
-    assert.equal(consensus?.reasoning, false, "one publisher's reasoning claim must not transfer");
-    assert.equal(catalog.findModel(unknown), consensus, "a consensus is cached like any other answer");
-    /*
-      A deployment that puts the model behind a route prefix still serves that
-      model: `proxy/shared-model` reads the record `shared-model` is published
-      under, with the same consensus rules. Two *different* route paths that
-      merely share a leaf are still not one model — the matcher rejects those
-      rather than averaging them.
-    */
-    const prefixed = catalog.findModel({
-      vendorKey: "custom",
-      baseUrl: "https://relay.example/v1",
-      modelId: "proxy/shared-model",
-    });
-    assert.equal(prefixed?.modelId, "shared-model");
-    assert.equal(prefixed?.limit.context, 32_000);
-    assert.equal(prefixed?.reasoning, false);
+    for (const modelId of ["shared-model", "proxy/shared-model"]) {
+      const unknown = { vendorKey: "custom", baseUrl: "https://relay.example/v1", modelId };
+      assert.equal(catalog.findModel(unknown), undefined, `ambiguous ${modelId} must miss`);
+      assert.equal(catalog.findModel(unknown), undefined, "ambiguous misses are cached");
+    }
     const alpha = catalog.findModel({
       vendorKey: "custom", baseUrl: "https://alpha.example/v1", modelId: "shared-model",
     });
@@ -252,17 +231,7 @@ test("a shared catalog API with no vendor key cannot select the first publisher"
         limit: { context: key === "alpha" ? 128_000 : 32_000, output: 8_192 } } },
     }])));
     assert.equal(catalog.providerKeyForRow({ vendorKey: "custom", baseUrl: "https://gateway.example/v1" }), undefined);
-    /*
-      The row has no publisher of its own, so the id answers with what both
-      publishers of that endpoint state — never with the first one indexed.
-    */
-    const consensus = catalog.findModel({
-      vendorKey: "custom",
-      baseUrl: "https://gateway.example/v1",
-      modelId: "shared-model",
-    });
-    assert.equal(consensus?.reasoning, false);
-    assert.equal(consensus?.limit.context, 32_000);
+    assert.equal(catalog.findModel({ vendorKey: "custom", baseUrl: "https://gateway.example/v1", modelId: "shared-model" }), undefined);
     assert.equal(catalog.findModel({ vendorKey: "beta", baseUrl: "https://gateway.example/v1", modelId: "shared-model" })?.providerKey, "beta");
   }
 });
@@ -578,31 +547,19 @@ test("a borrowed record under-claims instead of asserting one publisher's extras
   assert.equal(info.capabilities.includes("reasoning"), false);
 });
 
-test("an even split on tool support claims no tools but still borrows the limits", async (t) => {
-  /*
-    Tool support follows the majority of the publishers that state it. One
-    dissenting reseller must not decide the claim for a deployment it does not
-    describe, but neither may one agreeing reseller: an id a relay lists can be
-    stated by a hundred publishers. Two publishers that split evenly state no
-    majority, so the borrow keeps the limits and leaves tool support unclaimed
-    instead of refusing outright — refusing is what left whole model lists on
-    the generic seed.
-  */
+test("an even split on tool support leaves conflicting leaves unmatched", async (t) => {
+  // Conflicting capability signatures (tool_call) mean shared-capabilities enrichment
+  // must miss — no majority/consensus borrow for an unanchored / empty-gateway row.
   const catalog = await loadFixtureCatalog(t, {
     gateway: { api: "https://gateway.example/v1", models: {} },
     publisherA: { models: { "Vendor/Split": { id: "Vendor/Split", tool_call: true, limit: { context: 262_144 } } } },
     publisherB: { models: { "Vendor/Split": { id: "Vendor/Split", tool_call: false, limit: { context: 262_144 } } } },
   });
-  const match = catalog.findModel({
+  assert.equal(catalog.findModel({
     vendorKey: "gateway",
     baseUrl: "https://gateway.example/v1",
     modelId: "Vendor/Split",
-  });
-  assert.ok(match, "a split must not drop the id to the generic shape");
-  assert.equal(match.toolCall, undefined, "an even split claims no tool support");
-  assert.equal(match.limit.context, 262_144);
-  const info = modelInfoFromModelsDev(match, "provider-1");
-  assert.equal(info.capabilities.includes("tools"), false);
+  }), undefined);
 });
 
 test("a borrowed record never replaces what the row's own catalog provider publishes", async (t) => {
@@ -624,11 +581,7 @@ test("a borrowed record never replaces what the row's own catalog provider publi
   assert.equal(match.toolCall, false);
 });
 
-test("publishers that disagree about capabilities narrow the borrowed record", async (t) => {
-  // A disputed capability shape is never resolved by picking one publisher:
-  // the disagreement narrows the claim instead of voiding the borrow.
-  // Reasoning follows the intersection, so it is reported only when every
-  // publisher states it.
+test("publishers that disagree about capabilities remain unmatched", async (t) => {
   const catalog = await loadFixtureCatalog(t, {
     gateway: { api: "https://gateway.example/v1", models: {} },
     publisherA: { models: { "Vendor/Disputed": {
@@ -638,21 +591,16 @@ test("publishers that disagree about capabilities narrow the borrowed record", a
       id: "Vendor/Disputed", tool_call: false, reasoning: false, limit: { context: 262_144 },
     } } },
   });
-  const match = catalog.findModel({
+  assert.equal(catalog.findModel({
     vendorKey: "gateway",
     baseUrl: "https://gateway.example/v1",
     modelId: "Vendor/Disputed",
-  });
-  assert.ok(match, "a disputed capability shape must not void the borrow");
-  assert.equal(match.toolCall, undefined);
-  assert.equal(match.reasoning, false);
-  assert.equal(match.limit.context, 262_144);
+  }), undefined);
 });
 
-test("a majority of the publishers that state tool support decides the borrow", async (t) => {
-  // The counterpart of the even split above: with a clear majority the claim
-  // is stated, so a relay listing an id many publishers agree on keeps its
-  // tool support instead of dropping to text-only defaults.
+test("a majority of publishers with conflicting capability signatures stays unmatched", async (t) => {
+  // #1047 does not majority-vote across publishers for an empty/unanchored row.
+  // Conflicting tool_call signatures ⇒ unmatched.
   const catalog = await loadFixtureCatalog(t, {
     gateway: { api: "https://gateway.example/v1", models: {} },
     publisherA: { models: { "Vendor/Majority": { id: "Vendor/Majority", tool_call: true, limit: { context: 262_144 } } } },
@@ -660,26 +608,16 @@ test("a majority of the publishers that state tool support decides the borrow", 
     publisherC: { models: { "Vendor/Majority": { id: "Vendor/Majority", tool_call: true, limit: { context: 1_048_576 } } } },
     publisherD: { models: { "Vendor/Majority": { id: "Vendor/Majority", tool_call: false, limit: { context: 1_048_576 } } } },
   });
-  const match = catalog.findModel({
+  assert.equal(catalog.findModel({
     vendorKey: "gateway",
     baseUrl: "https://gateway.example/v1",
     modelId: "Vendor/Majority",
-  });
-  assert.ok(match, "a clear majority still borrows");
-  assert.equal(match.toolCall, true);
-  // Limits are still the lower median, so one small window is not rounded up
-  // and one dissenting publisher does not drag the majority's window down.
-  assert.equal(match.limit.context, 1_048_576);
-  const info = modelInfoFromModelsDev(match, "provider-1");
-  assert.equal(info.capabilities.includes("tools"), true);
+  }), undefined);
 });
 
-test("the publishers this app ships decide an id that resellers also state", async (t) => {
-  /*
-    A relay's list names ids arbitrary resellers carry too, and a reseller's
-    flags describe its own deployment: here two resellers outvote the shipped
-    publisher and both are wrong about the tools it accepts.
-  */
+test("conflicting reseller and shipped records for a leaf stay unmatched without an official", async (t) => {
+  // deepseek is not an official/source family for #1047 disambiguation, and the
+  // capability signatures conflict, so an unanchored relay must miss.
   const catalog = await loadFixtureCatalog(t, {
     gateway: { api: "https://gateway.example/v1", models: {} },
     deepseek: { models: { "shared-model": {
@@ -692,16 +630,11 @@ test("the publishers this app ships decide an id that resellers also state", asy
       id: "shared-model", tool_call: false, limit: { context: 131_072, output: 8_192 },
     } } },
   });
-  const match = catalog.findModel({
+  assert.equal(catalog.findModel({
     vendorKey: "custom",
     baseUrl: "https://relay.example/v1",
     modelId: "shared-model",
-  });
-  assert.ok(match, "a shipped publisher states the id");
-  assert.equal(match.providerKey, "deepseek", "the shipped publisher's record answers");
-  assert.equal(match.toolCall, true);
-  assert.equal(match.limit.context, 1_000_000);
-  assert.equal(match.limit.output, 393_216);
+  }), undefined);
 });
 
 test("resellers still answer for an id no shipped publisher states", async (t) => {
@@ -726,13 +659,9 @@ test("resellers still answer for an id no shipped publisher states", async (t) =
   assert.equal(match.limit.context, 262_144);
 });
 
-test("a route prefix and a deployment marker still reach the published model", async (t) => {
-  /*
-    Relays name a published model behind a route of their own and append markers
-    of their own: `test/mimo-v2.5`, `mimo-v2.5-thinking`, `test/mimo-v2.5-pro-test`.
-    All three are that published model. A suffix the catalog uses for a model of
-    its own — `-asr` — is not a marker, so an id carrying one stays unknown.
-  */
+test("a route prefix reaches a unique leaf while deployment markers stay unmatched", async (t) => {
+  // Exact last-segment match allows `test/mimo-v2.5` → `mimo-v2.5`.
+  // Markers like `-thinking` / `-test` are part of the leaf and do not strip.
   const catalog = await loadFixtureCatalog(t, {
     gateway: { api: "https://gateway.example/v1", models: {} },
     xiaomi: { models: {
@@ -749,18 +678,15 @@ test("a route prefix and a deployment marker still reach the published model", a
   const relay = (modelId) =>
     catalog.findModel({ vendorKey: "custom", baseUrl: "https://relay.example/v1", modelId });
 
-  for (const served of ["test/mimo-v2.5", "mimo-v2.5-thinking", "mimo-v2.5"]) {
+  for (const served of ["test/mimo-v2.5", "mimo-v2.5"]) {
     assert.equal(relay(served)?.modelId, "mimo-v2.5", `${served} reads the published model`);
     assert.equal(relay(served)?.limit.context, 1_048_576);
   }
   const info = modelInfoFromModelsDev(relay("test/mimo-v2.5"), "provider-1");
   assert.ok(info.capabilities.includes("vision"));
 
-  // The prefix and the marker together, as one deployment writes them.
-  assert.equal(relay("test/mimo-v2.5-pro-test")?.modelId, "mimo-v2.5-pro");
-  assert.equal(relay("test/mimo-v2.5-pro-test")?.limit.output, 131_072);
-
-  // `-asr` names a model of its own, so nothing is borrowed for it.
+  assert.equal(relay("mimo-v2.5-thinking"), undefined);
+  assert.equal(relay("test/mimo-v2.5-pro-test"), undefined);
   assert.equal(relay("mimo-v2.5-asr"), undefined);
 });
 
@@ -791,13 +717,9 @@ test("a shipped publisher answers first for a row anchored to a reseller", async
   assert.equal(match.limit.output, 500_000);
 });
 
-test("an exact record outranks a shipped publisher's other spelling of the id", async (t) => {
-  /*
-    Both are shipped publishers, and `XiaomiMiMo/MiMo-V2.5` is the same model as
-    `mimo-v2.5`. Only the exact id decides what the model can take: a publisher
-    that lists the text half alone must not narrow the model's own record into
-    text-only.
-  */
+test("ambiguous same-leaf spellings with conflicting modalities stay unmatched", async (t) => {
+  // `mimo-v2.5` and `XiaomiMiMo/MiMo-V2.5` share a case-insensitive leaf but
+  // disagree on modalities, and neither publisher is an official/source family.
   const catalog = await loadFixtureCatalog(t, {
     gateway: { api: "https://gateway.example/v1", models: {} },
     xiaomi: { models: { "mimo-v2.5": {
@@ -811,16 +733,11 @@ test("an exact record outranks a shipped publisher's other spelling of the id", 
       limit: { context: 1_048_576, output: 131_072 },
     } } },
   });
-  const match = catalog.findModel({
+  assert.equal(catalog.findModel({
     vendorKey: "custom",
     baseUrl: "https://relay.example/v1",
     modelId: "mimo-v2.5",
-  });
-  assert.equal(match?.providerKey, "xiaomi");
-  assert.deepEqual(match.modalities.input, ["text", "image", "audio"]);
-  const info = modelInfoFromModelsDev(match, "provider-1");
-  assert.ok(info.capabilities.includes("vision"), "the sibling's text-only record must not narrow it");
-  assert.ok(info.capabilities.includes("audio"));
+  }), undefined);
 });
 
 test("unique leaf enrichment coexists with exact-id borrowing and unknown misses", async (t) => {
@@ -1717,7 +1634,7 @@ test("a resolved catalog record still wins over the Anthropic thinking fallback"
   under the id that owns the weights. The alias only ever borrows metadata: the
   id the row is addressed with stays the discovery result.
 */
-test("a dated snapshot borrows its published model's metadata without changing the wire id", async (t) => {
+test("a dated snapshot leaf does not borrow an undated published model", async (t) => {
   const catalog = await loadFixtureCatalog(t, {
     mify: {
       api: "https://api.mify.example/v1",
@@ -1732,17 +1649,13 @@ test("a dated snapshot borrows its published model's metadata without changing t
       },
     },
   });
-  const model = catalog.findModel({ vendorKey: "mify", modelId: "mify/mimo-v2.5-pro-0731" });
-  assert.equal(model?.modelId, "mimo-v2.5-pro");
-  assert.equal(model?.limit.context, 262_144);
-
-  const info = modelInfoFromModelsDev(model, "provider-1");
-  const binding = bindingForCustomModelInfo("mify/mimo-v2.5-pro-0731", info);
-  assert.equal(binding.id, "mify/mimo-v2.5-pro-0731");
-  assert.equal(binding.contextWindow, 262_144);
+  assert.equal(
+    catalog.findModel({ vendorKey: "mify", modelId: "mify/mimo-v2.5-pro-0731" }),
+    undefined,
+  );
 });
 
-test("an exact record answers an id its shorter siblings would only alias", async (t) => {
+test("exact published leaves resolve without release-stamp aliasing", async (t) => {
   const catalog = await loadFixtureCatalog(t, {
     alpha: { api: "https://alpha.example/v1", models: {
       "foo-v2": { id: "foo-v2", limit: { context: 32_000 } },
@@ -1756,22 +1669,19 @@ test("an exact record answers an id its shorter siblings would only alias", asyn
   assert.equal(exact?.modelId, "foo-v2-0731");
   assert.equal(exact?.limit.context, 128_000);
 
-  // A stamp nothing publishes borrows the model it was cut from.
-  const borrowed = catalog.findModel({ vendorKey: "alpha", modelId: "foo-v2-0815" });
-  assert.equal(borrowed?.modelId, "foo-v2");
+  // Unpublished stamps do not strip down to a shorter sibling.
+  assert.equal(catalog.findModel({ vendorKey: "alpha", modelId: "foo-v2-0815" }), undefined);
 
-  /*
-    An id only its siblings state answers with their consensus rather than with
-    one publisher's record — the dated sibling's claim included, the lower
-    median of the three is what every publisher can be said to support.
-  */
-  const consensus = catalog.findModel({
+  // Same leaf, identical capabilities (limits are not part of the signature) ⇒
+  // shared-capabilities enrichment with the lower median window.
+  const shared = catalog.findModel({
     vendorKey: "custom",
     baseUrl: "https://relay.example/v1",
     modelId: "foo-v2",
   });
-  assert.equal(consensus?.limit.context, 64_000);
-  // …but a record the catalog publishes in full answers for itself.
+  assert.equal(shared?.limit.context, 32_000);
+
+  // A uniquely published dated leaf still enriches.
   const published = catalog.findModel({
     vendorKey: "custom",
     baseUrl: "https://relay.example/v1",
@@ -1818,7 +1728,7 @@ test("a custom endpoint on a uniquely published host inherits that publisher", a
   );
 });
 
-test("a host two publishers share borrows only their consensus", async (t) => {
+test("a host two publishers share leaves conflicting leaves unmatched", async (t) => {
   const catalog = await loadFixtureCatalog(t, {
     alpha: {
       api: "https://shared.example/api/paas/v4",
@@ -1829,19 +1739,11 @@ test("a host two publishers share borrows only their consensus", async (t) => {
       models: { "glm-5.3": { id: "glm-5.3", reasoning: false, limit: { context: 32_000 } } },
     },
   });
-  /*
-    The typed path is not published, so the host is the only evidence — and it
-    names two publishers, neither of which may answer alone. What both state is
-    what a row without an identity gets: reasoning only when both claim it, and
-    the lower median of the limits.
-  */
-  const consensus = catalog.findModel({
+  assert.equal(catalog.findModel({
     vendorKey: "custom",
     baseUrl: "https://shared.example/v1",
     modelId: "glm-5.3",
-  });
-  assert.equal(consensus?.reasoning, false);
-  assert.equal(consensus?.limit.context, 32_000);
+  }), undefined);
   // Naming the publisher still resolves it to that publisher's own record.
   const alpha = catalog.findModel({
     vendorKey: "alpha",
