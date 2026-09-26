@@ -851,7 +851,11 @@ type ToolsExecuteResult = {
 
 `SubmitPlan` and `SubmitGoal` are handled as host transitions before generic
 tool execution. The host preserves the exact Markdown bytes in a new unique
-artifact under the kind's directory before publishing the proposal.
+artifact under the kind's directory before publishing the proposal. For a
+temporary Goal, the root is the owning session's scratch directory; for a
+project Goal it is the persisted project root. Approval resolves the root from
+the stored proposal kind, since approved sessions switch back to Agent mode.
+Plan still requires a persisted project. No global workspace fallback is used.
 
 ```ts
 // Identical shape for both kinds; the tool name selects the kind.

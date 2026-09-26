@@ -121,6 +121,65 @@ fn v18_database_migrates_session_thinking_omit() {
         .unwrap();
     assert!(sql.contains("'omit'"), "{sql}");
 }
+#[test]
+fn v19_database_migrates_to_v20_with_goal_reports() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        db.conn().pragma_update(None, "user_version", 19).unwrap();
+        let _ = db
+            .conn()
+            .execute_batch("DROP TABLE IF EXISTS goal_reports;");
+    }
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+    assert!(migration_backup_path(&path, 19).exists());
+    assert!(table_exists(db.conn(), "goal_reports"));
+}
+
+#[test]
+fn v19_database_migrates_plan_approvals_workspace_kind() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO sessions (id, created_at, updated_at) VALUES ('s1', 1, 1)",
+                [],
+            )
+            .unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO plan_approvals (
+                     request_id, session_id, turn_id, tool_call_id, kind, plan_json,
+                     status, created_at, updated_at
+                 ) VALUES ('p1', 's1', 't1', 'c1', 'plan', '# Plan', 'pending', 1, 1)",
+                [],
+            )
+            .unwrap();
+        db.conn()
+            .execute(
+                "ALTER TABLE plan_approvals DROP COLUMN artifact_workspace_kind",
+                [],
+            )
+            .unwrap();
+        db.conn().pragma_update(None, "user_version", 19).unwrap();
+    }
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+    assert!(migration_backup_path(&path, 19).exists());
+    let workspace_kind: String = db
+        .conn()
+        .query_row(
+            "SELECT artifact_workspace_kind FROM plan_approvals WHERE request_id = 'p1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(workspace_kind, "project");
+}
 
 fn schema_version(conn: &Connection) -> i64 {
     conn.query_row("PRAGMA user_version", [], |row| row.get(0))

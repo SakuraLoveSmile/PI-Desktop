@@ -2,16 +2,16 @@ import type { EnglishCatalog } from "../en/index.js";
 
 export const zhTW = {
   app: {
-    shellName: "PI-Desktop",
+    shellName: "Pi-Desktop-Plus",
     tagline: "本地 AI 程式設計助手",
-    starting: "正在啟動 PI-Desktop…",
+    starting: "正在啟動 Pi-Desktop-Plus…",
     loadingView: "正在載入頁面…",
     uiCrashed: "介面出現了問題",
   },
   startup: {
     slowTitle: "仍在啟動…",
-    slowBody: "PI-Desktop 連接本地服務比平時更久，可能還是會自己完成啟動——你可以繼續等待，也可以先把日誌收好。",
-    stalledTitle: "PI-Desktop 未能完成啟動",
+    slowBody: "Pi-Desktop-Plus 連接本地服務比平時更久，可能還是會自己完成啟動——你可以繼續等待，也可以先把日誌收好。",
+    stalledTitle: "Pi-Desktop-Plus 未能完成啟動",
     stalledBody: "這個視窗一直沒拿到你的會話與設定，所以暫時沒有內容可以顯示。資料沒有被刪除，仍在磁碟上。",
     retrying: "正在重試…",
     copyDiagnostics: "複製診斷資訊",
@@ -36,13 +36,13 @@ export const zhTW = {
     unread: "未讀",
     pinned: "釘選",
     viewMore: "查看更多…",
-    open: "開啟 PI-Desktop",
-    quit: "退出 PI-Desktop",
-    askTitle: "關閉後繼續在後臺執行 PI-Desktop？",
+    open: "開啟 Pi-Desktop-Plus",
+    quit: "退出 Pi-Desktop-Plus",
+    askTitle: "關閉後繼續在後臺執行 Pi-Desktop-Plus？",
     askBody:
-      "關閉視窗後，PI-Desktop 可以繼續在系統托盤中執行，避免丟失任何內容。你隨時可以在設定中更改此選項。",
+      "關閉視窗後，Pi-Desktop-Plus 可以繼續在系統托盤中執行，避免丟失任何內容。你隨時可以在設定中更改此選項。",
     closeToTray: "關閉到托盤",
-    confirmQuitTitle: "確定退出 PI-Desktop？",
+    confirmQuitTitle: "確定退出 Pi-Desktop-Plus？",
     confirmQuitBody:
       "退出將停止所有正在進行的會話，未儲存的內容可能會丟失。你確定要退出嗎？",
     confirmQuit: "退出",
@@ -94,7 +94,7 @@ export const zhTW = {
     zoomOut: "縮小",
     toggleFullScreen: "切換全屏",
     toggleDevTools: "開發者工具",
-    appHelp: "PI-Desktop 幫助",
+    appHelp: "Pi-Desktop-Plus 幫助",
     openLogs: "開啟日誌",
     checkForUpdates: "檢查更新…",
   },
@@ -240,7 +240,7 @@ export const zhTW = {
     emptyTitle: "今天想做點什麼？",
     emptyTitleInProject: "今天想在 {{project}} 裡做點什麼？",
     emptyTitleTemporary: "臨時聊點什麼？",
-    placeholder: "讓 PI-Desktop 幫你做任何事",
+    placeholder: "讓 Pi-Desktop-Plus 幫你做任何事",
     placeholderHome: "隨便問問",
     placeholderHint: "輸入 / 使用命令 · @ 引用檔案",
     placeholderHomeHint: "輸入 / 使用命令 · @ 引用檔案",
@@ -553,6 +553,8 @@ export const zhTW = {
     untitled: "未命名規劃",
     openArtifact: "開啟規劃",
     openArtifactLabel: "開啟規劃檔案 {{path}}",
+    artifactSessionUnavailable: "擁有此規劃的對話已不可用。",
+    artifactScratchUnavailable: "暫存對話目錄不可用。",
   },
   goal: {
     planning: "正在明確目標",
@@ -571,6 +573,8 @@ export const zhTW = {
     untitled: "未命名目標",
     openArtifact: "開啟目標",
     openArtifactLabel: "開啟目標檔案 {{path}}",
+    artifactSessionUnavailable: "擁有此目標的對話已不可用。",
+    artifactScratchUnavailable: "暫存對話目錄不可用。",
   },
   onboarding: {
     title: "開始使用",
@@ -584,7 +588,7 @@ export const zhTW = {
   settings: {
     power: "電源",
     keepAwakeWhileRunning: "保持電腦喚醒",
-    keepAwakeWhileRunningDesc: "PI-Desktop 執行期間阻止電腦因閒置自動休眠。螢幕仍可能關閉；手動睡眠和闔蓋休眠不受影響。",
+    keepAwakeWhileRunningDesc: "Pi-Desktop-Plus 執行期間阻止電腦因閒置自動休眠。螢幕仍可能關閉；手動睡眠和闔蓋休眠不受影響。",
     imageModel: "生圖模型",
     imageModelUnset: "未設定",
     imageModelUnavailable: "暫不可用",
@@ -673,7 +677,7 @@ sklm: {
     pluginProviderManaged:
       "此服務來自外掛“{{plugin}}”，介面地址和模型均由該外掛提供。可在“擴充套件”頁面啟用或停用。",
     pluginProviderKey: "API 金鑰",
-    pluginProviderKeyHint: "儲存在 PI-Desktop 中，由執行環境使用。外掛拿不到此金鑰。",
+    pluginProviderKeyHint: "儲存在 Pi-Desktop-Plus 中，由執行環境使用。外掛拿不到此金鑰。",
     pluginProviderKeyRemove: "移除金鑰",
     pluginProviderKeySaved: "API 金鑰已儲存",
     pluginProviderKeyRemoved: "API 金鑰已移除",
@@ -1622,7 +1626,7 @@ sklm: {
     legacyHint: "請編輯並儲存執行週期，以啟用自動執行。",
     time: "執行時間",
     weekday: "星期",
-    localTimeHint: "依電腦本地時區執行。請保持 PI-Desktop 執行；錯過的任務不補跑。",
+    localTimeHint: "依電腦本地時區執行。請保持 Pi-Desktop-Plus 執行；錯過的任務不補跑。",
     projectHint: "儲存時綁定目前專案，執行時使用預設模型。",
     autoPermissionHint: "全自動可在無人確認時執行受限操作，請只用於可信任務。",
     unavailableModel: "{{provider}} / {{model}}（目前無法使用）",
@@ -1729,6 +1733,7 @@ sklm: {
       file: "檔案",
       plugin: "外掛檢視",
       subagent: "子智慧體",
+      goalReport: "目標報告",
     },
     pluginView: {
       failed: "無法載入該檢視。請重新載入外掛後重試。",
@@ -2086,8 +2091,8 @@ sklm: {
       "agent.prompt.inject": "可能修改傳送給智慧體的指令。",
       "agent.complete": "會消耗你的模型額度發起一次補全。外掛拿不到 API 金鑰。",
       "agent.extension": "在 agent 程序內執行 ExtensionAPI 模組，擁有與 agent 自身工具相同的權限。只啟用你信任的程式碼。",
-      "provider.register": "把此外掛定義的服務新增到設定的服務列表。介面地址和模型由外掛提供，API 金鑰則留在 PI-Desktop 中。",
-      "desktop.control": "允許外掛呼叫經過審查的 PI-Desktop 操作目錄；破壞性操作仍需 confirm=true，外掛永遠拿不到 MCP bearer token。",
+      "provider.register": "把此外掛定義的服務新增到設定的服務列表。介面地址和模型由外掛提供，API 金鑰則留在 Pi-Desktop-Plus 中。",
+      "desktop.control": "允許外掛呼叫經過審查的 Pi-Desktop-Plus 操作目錄；破壞性操作仍需 confirm=true，外掛永遠拿不到 MCP bearer token。",
       "models.list": "可以看到你已登入的模型，但拿不到金鑰。",
       "session.read": "可以讀取當前這次工具呼叫所在會話發給模型的對話，包括工具結果。",
       "net.fetch": "可發起出站網路請求。",
@@ -2100,7 +2105,7 @@ sklm: {
       "audio.capture.background": "外掛在後臺執行時（沒有開啟面板）也能擷取麥克風。",
       "audio.playback.background": "即使沒有開啟面板，也能播放外掛推送的音訊。",
       "speech.adapter.register": "可以新增轉寫或朗讀協定，沿用你既有的服務金鑰。外掛拿不到金鑰。",
-      "keyboard.globalShortcut": "註冊系統級快捷鍵，在 PI-Desktop 未聚焦時觸發此外掛自己的命令。",
+      "keyboard.globalShortcut": "註冊系統級快捷鍵，在 Pi-Desktop-Plus 未聚焦時觸發此外掛自己的命令。",
       "net.websocket": "與外掛宣告的網域建立即時雙向連線。",
       "bus.publish": "可在其宣告的主題上傳送訊息。",
       "bus.subscribe": "可在其宣告的主題上接收訊息。",
@@ -2327,7 +2332,7 @@ sklm: {
     unsupportedGlibc:
       "目前 Linux 建置需要 glibc 2.35 或更新版本（Ubuntu 22.04、Debian 12、Fedora 36+）。",
     dbSchemaTooNew:
-      "目前的 PI-Desktop 比本機資料更舊（資料庫 schema {{found}}，此版本僅支援 {{supported}}）。請安裝上次開啟這些資料的較新版本，或更高版本。",
+      "目前的 Pi-Desktop-Plus 比本機資料更舊（資料庫 schema {{found}}，此版本僅支援 {{supported}}）。請安裝上次開啟這些資料的較新版本，或更高版本。",
     archMismatch:
       "目前安裝的是 {{buildArch}} 版本，而這台機器是 {{machineArch}}，需要透過轉譯執行，速度較慢。請改裝 {{machineArch}} 版本。",
     dismissArchMismatch: "知道了",
@@ -2411,6 +2416,35 @@ sklm: {
       dismiss: "關閉",
     },
   },
+  goalReport: {
+    view: {
+        title: "目標完成報告",
+        openInWorkPanel: "在工作區面板中查看",
+        summary: "執行概要",
+        metrics: "指標",
+        criteria: "驗收標準",
+        steps: "執行步驟",
+        files: "變更檔案",
+        checks: "驗證檢查",
+        limitations: "局限與邊界",
+        nextSteps: "後續建議",
+        evidences: "驗證證據",
+        loading: "正在載入報告…",
+        loadFailed: "載入報告失敗",
+        retryLoad: "重試",
+        fallbackNotice: "由執行記錄產生的保底基礎報告。",
+        verdictMet: "已達成",
+        verdictPartial: "部分達成",
+        verdictBlocked: "受阻 / 未完成",
+        verdictUnknown: "未知結果",
+        statusCompleted: "已完成",
+        statusInterrupted: "已中斷",
+        remoteDisconnected: "遠端主機中斷連線",
+        conclusion: "結論",
+        structured: "結構化",
+        fallback: "保底降級"
+    }
+},
 } satisfies EnglishCatalog;
 
 export default zhTW;

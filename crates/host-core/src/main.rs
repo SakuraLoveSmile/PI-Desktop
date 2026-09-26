@@ -4,6 +4,7 @@ mod artifacts;
 mod audit;
 mod config_sync;
 mod db;
+mod goal_reports;
 mod keyboard;
 mod mcp_servers;
 mod network_policy;
@@ -63,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| {
             dirs::home_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
-                .join(".pi-desktop")
+                .join(".pi-desktop-plus")
         });
 
     std::fs::create_dir_all(&data_dir)?;
@@ -83,10 +84,21 @@ async fn main() -> anyhow::Result<()> {
         let st = state.lock().await;
         // Only sweep with a real session list: an empty fallback on a db
         // error would wipe scratch dirs of sessions that still exist.
-        if let Ok(list) = sessions::list_sessions(&st.db) {
-            let live: std::collections::HashSet<String> = list.into_iter().map(|s| s.id).collect();
-            scratch::sweep(&data_dir, &live);
-            review::sweep(&data_dir, &live);
+        match sessions::list_sessions(&st.db) {
+            Ok(list) => {
+                let live: std::collections::HashSet<String> =
+                    list.into_iter().map(|s| s.id).collect();
+                match plans::temporary_goal_session_ids(&st.db) {
+                    Ok(protected) => scratch::sweep(&data_dir, &live, &protected),
+                    Err(error) => {
+                        tracing::warn!(%error, "temporary Goal scratch protection query failed; skipping scratch sweep")
+                    }
+                }
+                review::sweep(&data_dir, &live);
+            }
+            Err(error) => {
+                tracing::warn!(%error, "sessions list query failed; skipping scratch sweep")
+            }
         }
     }
     rpc::serve(state).await

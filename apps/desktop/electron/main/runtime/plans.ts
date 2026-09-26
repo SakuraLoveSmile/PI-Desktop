@@ -1,3 +1,4 @@
+import type { PersistenceOutbox } from "../persistence-outbox";
 import { ErrorCodes, IPC, type AgentEventEnvelope, type AppNotification, type PlanExecution, type PlanExecutionFinishStatus, type UiMessage } from "@pi-desktop/shared";
 import { executionFromResponse, executionListFromResponse, planExecutionFromUnknown } from "@pi-desktop/host-runtime";
 import type { RuntimeState } from "./context";
@@ -66,6 +67,7 @@ export type PlanRuntimeDependencies = {
   resolveAgentRuntimeLaunch: (...args: any[]) => Promise<any>;
   isQuitting: () => boolean;
   onTurnSettled?: (sessionId: string, turnId: string) => Promise<void>;
+  persistenceOutbox?: PersistenceOutbox;
 };
 
 export function createPlanRuntime({
@@ -91,6 +93,7 @@ export function createPlanRuntime({
   resolveAgentRuntimeLaunch,
   isQuitting,
   onTurnSettled,
+  persistenceOutbox,
 }: PlanRuntimeDependencies): {
   finishTurn: FinishTurn;
   finishApprovedExecution: (executionId: string, status: PlanExecutionFinishStatus, errorCode?: string) => Promise<void>;
@@ -100,6 +103,7 @@ export function createPlanRuntime({
 } {
 // Read the shared turn state once, by the names the finalizer below uses. The
 // instance is owned by the coordination factory; this module only reads it.
+const approvedExecutionKinds = new Map<string, string>();
 const {
   activeTurns,
   activeTurnUsages,
@@ -347,11 +351,38 @@ async function finishApprovedExecution(
       status,
       errorCode,
     };
+    if (persistenceOutbox && runtimeState.host) {
+      try {
+        await persistenceOutbox.flush(() => runtimeState.host);
+      } catch (flushErr) {
+        logger.app("runtime", "warn", "outbox flush before execution finalization failed", {
+          data: { executionId, error: String(flushErr) },
+        });
+      }
+    }
     await runtimeState.host.call("plans.finishExecution", {
       executionId,
       status: pending.status,
       ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
     });
+    const execKind = approvedExecutionKinds.get(executionId);
+    approvedExecutionKinds.delete(executionId);
+    if (execKind !== "plan") {
+      try {
+        await runtimeState.host.call("goalReports.finalizeReport", {
+          executionId,
+          status: pending.status,
+          ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
+        });
+      } catch (reportErr: any) {
+        // INVALID_ARGUMENT is expected if the execution was not a goal; log other failures
+        if (!String(reportErr?.message || reportErr).includes("not a goal")) {
+          logger.app("runtime", "warn", "goal report finalization notice", {
+            data: { executionId, error: String(reportErr) },
+          });
+        }
+      }
+    }
     finishedApprovedExecutions.add(executionId);
     startedApprovedExecutions.delete(executionId);
     pendingExecutionFinishes.delete(executionId);
@@ -429,6 +460,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
     };
     claimed = true;
     claimedExecutionSessions.set(execution.id, execution.sessionId);
+    approvedExecutionKinds.set(execution.id, execution.kind);
 
     const [settings, sessionResult] = await Promise.all([
       runtimeState.host.call("settings.get"),
@@ -460,6 +492,19 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       turnId,
     });
     startedApprovedExecutions.add(execution.id);
+    if (execution.kind === "goal") {
+      try {
+        await runtimeState.host.call("goalReports.bindExecutionTurn", {
+          executionId: execution.id,
+          turnId,
+        });
+      } catch (bindErr) {
+        logger.app("runtime", "warn", "failed to bind goal report execution turn", {
+          sessionId: execution.sessionId,
+          data: { executionId: execution.id, turnId, error: String(bindErr) },
+        });
+      }
+    }
     const accepted = await runtimeState.sidecar.call<{ accepted: boolean }>(
       "agent.executeApprovedPlan",
       {

@@ -249,6 +249,7 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   turn_id               TEXT NOT NULL,
   tool_call_id          TEXT NOT NULL UNIQUE,
   kind                  TEXT NOT NULL DEFAULT 'plan' CHECK (kind IN ('plan', 'goal')),
+  artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch')),
   plan_json             TEXT NOT NULL,
   title                 TEXT NOT NULL DEFAULT '',
   question              TEXT NOT NULL DEFAULT '',

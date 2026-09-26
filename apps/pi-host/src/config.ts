@@ -82,7 +82,7 @@ export function parseArgs(argv: string[]): CliArgs {
 }
 
 export function resolveConfig(args: CliArgs, env: NodeJS.ProcessEnv = process.env): PiHostConfig {
-  const dataDir = resolve(String(args["data-dir"] ?? env.PI_DESKTOP_DATA_DIR ?? join(homedir(), ".pi-desktop")));
+  const dataDir = resolve(String(args["data-dir"] ?? env.PI_DESKTOP_DATA_DIR ?? join(homedir(), ".pi-desktop-plus")));
   const port = Number(args.port ?? env.PI_HOST_PORT ?? DEFAULT_PORT);
   if (!Number.isInteger(port) || port < 0 || port > 65_535) {
     throw Object.assign(new Error(`invalid port ${String(args.port ?? env.PI_HOST_PORT)}`), { errorCode: "INVALID_ARGUMENT" });

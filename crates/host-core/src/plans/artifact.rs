@@ -137,6 +137,7 @@ pub(crate) fn publish_artifact(
                 relative_path,
                 sha256: sha256_hex(bytes),
                 size_bytes: bytes.len() as u64,
+                workspace_kind: None,
             },
             path,
         ));

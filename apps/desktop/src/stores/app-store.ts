@@ -101,7 +101,11 @@ import {
 import { settleStoppedAssistantMetrics } from "../lib/context-usage";
 import { formatToolValue } from "../lib/tool-display";
 import { withReviewChangeState } from "../lib/workspace-review";
-import { preferredFileWorkPanelTab } from "../lib/work-panel-tabs";
+import { fileWorkPanelTab, preferredFileWorkPanelTab } from "../lib/work-panel-tabs";
+import {
+  PlanArtifactResolutionError,
+  resolvePlanArtifactPath,
+} from "../lib/plan-artifact";
 import {
   clearSessionPermissions,
   enqueuePermission,
@@ -308,17 +312,32 @@ function sessionModeForPlanningState(
 
 export type AppState = import("./app-state").AppState;
 
-function openPlanArtifact(
+async function openPlanArtifact(
   proposal: PlanProposal,
   openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
   pluginViews: AppState["pluginViews"],
 ) {
-  const relativePath = proposal.artifact?.relativePath;
-  if (!relativePath) return;
-  openWorkPanelTabForSession(
-    proposal.sessionId,
-    preferredFileWorkPanelTab(relativePath, pluginViews),
-  );
+  try {
+    const resolved = await resolvePlanArtifactPath(proposal);
+    if (!resolved) return;
+    openWorkPanelTabForSession(
+      proposal.sessionId,
+      resolved.temporary
+        ? fileWorkPanelTab(resolved.path)
+        : preferredFileWorkPanelTab(resolved.path, pluginViews),
+    );
+  } catch (error) {
+    storeAccess?.get().showToast(
+      error instanceof PlanArtifactResolutionError
+        ? i18n.t(
+            `${proposal.kind === "plan" ? "plan" : "goal"}.${error.code === "session-unavailable" ? "artifactSessionUnavailable" : "artifactScratchUnavailable"}`,
+          )
+        : error instanceof Error
+          ? error.message
+          : String(error),
+      { variant: "error" },
+    );
+  }
 }
 
 function decorateSessions(
@@ -694,7 +713,7 @@ export const useAppStore = create<AppState>((set, get) => {
       // and then take a second tab from `selectSession`.
       await get().refreshPluginViews();
       for (const proposal of activePendingPlans) {
-        openPlanArtifact(
+        void openPlanArtifact(
           proposal,
           get().openWorkPanelTabForSession,
           get().pluginViews,
