@@ -50,6 +50,7 @@ type ChatRefRootEntry = {
 };
 
 const MAX_REF_LENGTH = 512;
+const ATTACHMENT_HASH_PATTERN = /^[0-9a-f]{64}$/i;
 /** A tail longer than this is a user quoting a full path, not a shorthand. */
 const MAX_FUZZY_TAIL_SEGMENTS = 6;
 /** Bound for the scratch/attachment walk; those trees are small by design. */
@@ -302,13 +303,17 @@ export async function resolveChatFileRef(
   if (isAttachmentBlobRef(ref)) {
     const attachmentsRoot = roots.attachments;
     if (!attachmentsRoot) return null;
-    const digest = segmentsOf(cleanRef(ref)).at(-1);
-    if (!digest) return null;
-    const absolutePath = join(resolve(attachmentsRoot), digest);
+    const blobHash = segmentsOf(cleanRef(ref)).at(-1);
+    if (!blobHash || !ATTACHMENT_HASH_PATTERN.test(blobHash)) return null;
+    const resolvedRoot = resolve(attachmentsRoot);
+    const absolutePath = join(resolvedRoot, blobHash.toLowerCase());
+    if (!absolutePath.startsWith(resolvedRoot + sep) && absolutePath !== resolvedRoot) {
+      return null;
+    }
     if (!(await isRegularFile(absolutePath))) return null;
     return {
       root: "attachments",
-      relativePath: digest,
+      relativePath: blobHash.toLowerCase(),
       absolutePath,
       matchedBy: "exact-relative",
     };
