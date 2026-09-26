@@ -191,6 +191,7 @@
       };
 
       let navigationRequest = 0;
+      let displayedContext = "";
       const t = (key) => copy[locale]?.[key] ?? copy.en[key] ?? key;
 
       const applyCopy = () => {
@@ -218,6 +219,10 @@
       };
 
       const paint = (state) => {
+        const context = state?.sessionId && state?.tabId
+          ? JSON.stringify([state.sessionId, state.tabId]) : displayedContext;
+        const contextChanged = context !== displayedContext;
+        displayedContext = context;
         started = Boolean(state?.url) && !state?.loadError;
         empty.hidden = started && !state?.isLoading;
         const phase = state?.loadError === "ERR_ABORTED" ? "stopped" : state?.loadError ? "failed" : state?.isLoading ? "loading" : "empty";
@@ -229,7 +234,7 @@
         external.disabled = !state?.url;
         reload.title = state?.isLoading ? t("stop") : t("reload");
         reload.setAttribute("aria-label", reload.title);
-        if (!inputFocused && state?.url) input.value = state.url;
+        if (contextChanged || !inputFocused) input.value = state?.url ?? "";
         reportHole();
       };
 

@@ -520,7 +520,8 @@ pi.browser.console(input?: { limit?: number }): Promise<{ messages: unknown[] }>
 pi.browser.cdp(input: { method: string; params?: unknown }): Promise<unknown>
 ```
 
-访客页是宿主拥有的 `WebContentsView`（`persist:work-browser`）。
+当前访客页是宿主拥有的 `WebContentsView`（`persist:work-browser`），各资源标签保留自己的页面。
+后台会话导航保留给该会话上次选中的标签；尚无标签时由首个标签消费，不导航或返回其他会话的页面。
 `setBounds` 相对调用插件视图的内容区，并被夹紧，因此访客页不能盖住聊天/输入框。
 `cdp` 默认拒绝；cookie、storage、target 和网络拦截方法以 `PERMISSION_DENIED` 失败。
 代理调用的会话身份来自进行中的 `plugins.execute` `sessionId`，而不是插件参数（D333 / ADR 0170）。

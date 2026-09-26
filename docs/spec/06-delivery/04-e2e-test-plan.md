@@ -3796,10 +3796,18 @@ identify the platform validation still needed.
   Set Link open destination to External and repeat the new-window link.
 - **Expected**: The current document displays after main-frame commit; slow
   assets do not strand the empty state. New links preserve earlier resource
-  tabs. Each tab restores its last address; same-tab navigation updates only its
+  tabs. Tab switching retains forms, scroll positions, JS state and independent history
+  without another page request. Each tab keeps its last address; same-tab navigation updates only its
   originating tab. Failure/stop leave usable address controls. External mode
   does not create a work-panel tab. Session switches and invalid schemes retain
   their security and visibility gates.
+- **Additional paths**: Invoke BrowserPreview through ToolSearch/BrowserPreview
+  while a tab has unsent form input: only a new tab navigates. Queue navigation
+  for an inactive session with an existing tab, then return and verify the queued
+  destination wins over an old load completion. Open a blank tab and inspect its
+  empty address and state. Close a background tab and verify its WebContents is
+  destroyed without affecting its sibling; deleting a session and plugin/window
+  disposal release the appropriate retained pages.
 - **Status**: Targeted isolated Electron validation; no new repository test suite.
 
 #### E2E-BROWSER-in-page-navigation: Browser chrome follows same-document navigation

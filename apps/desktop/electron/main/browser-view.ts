@@ -176,12 +176,15 @@ export class BrowserPane {
     return new Promise<BrowserState | null>((resolve) => {
       let settled = false;
       let started = false;
+      const destinations = new Set([target]);
       const finish = (committed: boolean, error?: string) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         wc.removeListener("did-start-navigation", onStart);
         wc.removeListener("did-navigate", onCommit);
+        wc.removeListener("did-redirect-navigation", onRedirect);
+        wc.removeListener("did-fail-load", onFailure);
         if (epoch !== this.navigationEpoch) { resolve(null); return; }
         this.cancelPending = null;
         this.pendingTarget = null;
@@ -194,17 +197,25 @@ export class BrowserPane {
       const onStart = (_event: unknown, url: string, inPlace: boolean, mainFrame: boolean) => {
         if (mainFrame && !inPlace && url === target) started = true;
       };
+      const onRedirect = (_event: unknown, url: string, inPlace: boolean, mainFrame: boolean) => {
+        if (started && mainFrame && !inPlace && epoch === this.navigationEpoch) destinations.add(url);
+      };
+      const onFailure = (_event: unknown, code: number, description: string, url: string, mainFrame: boolean) => {
+        if (mainFrame !== false && code !== -3 && destinations.has(url)) finish(false, description);
+      };
       const onCommit = (_event: unknown, url: string) => {
         // A current main-frame commit is ready to display even if images or
         // subframes are still loading. Old-session events cannot satisfy it.
-        if (started && epoch === this.navigationEpoch && url === wc.getURL()) finish(true);
+        if (started && epoch === this.navigationEpoch && destinations.has(url) && url === wc.getURL()) finish(true);
       };
       const timer = setTimeout(() => finish(false, "ERR_TIMED_OUT"), Math.max(1, timeoutMs));
       this.cancelPending = () => finish(false);
       wc.on("did-start-navigation", onStart);
       wc.on("did-navigate", onCommit);
+      wc.on("did-redirect-navigation", onRedirect);
+      wc.on("did-fail-load", onFailure);
       void wc.loadURL(target).then(
-        () => finish(true),
+        () => { if (destinations.has(wc.getURL())) finish(true); },
         (error: unknown) => finish(false, error instanceof Error ? error.message : String(error)),
       );
     });
@@ -250,6 +261,7 @@ export class BrowserPane {
   setVisible(visible: boolean): void {
     this.visible = visible;
     if (!this.view) return;
+    this.view.setVisible?.(visible);
     if (visible) this.attach();
     else this.detach();
   }
@@ -353,6 +365,7 @@ export class BrowserPane {
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
+        backgroundThrottling: true,
         partition: PARTITION,
       },
     });

@@ -310,6 +310,11 @@ export function createWorkPanelSlice({
     });
   },
   closeWorkPanelTab: (tabId) => {
+    const current = get();
+    if (current.activeSessionId && current.workPanelTabs.some((tab) => tab.id === tabId && tab.resource === "pi.browser/browser")) {
+      void api.pluginViewClose("pi.browser", "browser", { sessionId: current.activeSessionId, tabId })
+        .catch((error) => get().showToast(String(error), { variant: "error" }));
+    }
     set((state) => {
       const sessionId = state.activeSessionId;
       if (!sessionId) return {};

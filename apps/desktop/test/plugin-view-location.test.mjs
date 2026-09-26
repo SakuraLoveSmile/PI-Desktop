@@ -200,5 +200,5 @@ test("pi.browser keeps its own location channel", () => {
     /\.\.\.\(isBrowserView \|\| !location \? \{\} : \{ location \}\),/,
   );
   assert.match(body, /browserHost\.setChromeSession\(sessionId,.*location\)/);
-  assert.match(body, /void browserHost\.navigate\(/);
+  assert.doesNotMatch(body, /browserHost\.navigate\(/);
 });

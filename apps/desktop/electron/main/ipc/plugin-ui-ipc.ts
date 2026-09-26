@@ -201,8 +201,9 @@ export function registerPluginUiIpc({
       if (!view) throw new Error("plugin has no such view");
       const htmlPath = join(loaded.path, view.entry);
       if (!existsSync(htmlPath)) throw new Error("view entry missing");
-      const switched = isBrowserView && sessionId
-        ? browserHost.setChromeSession(sessionId, typeof payload.tabId === "string" ? payload.tabId : undefined, location) : false;
+      if (isBrowserView && sessionId) {
+        browserHost.setChromeSession(sessionId, typeof payload.tabId === "string" ? payload.tabId : undefined, location);
+      }
       pluginViews.open({
         pluginId,
         viewId,
@@ -215,19 +216,18 @@ export function registerPluginUiIpc({
         // view receives the opener's subject untouched (D320 follow-up).
         ...(isBrowserView || !location ? {} : { location }),
       });
-      if (isBrowserView && location && !switched && browserHost.getState()?.url !== location) {
-        void browserHost.navigate(
-          { path: location, url: location },
-          sessionId || undefined,
-        );
-      }
       return { ok: true };
     },
   );
 
   handle(
     IPC.invoke.pluginViewClose,
-    async (payload: { pluginId?: string; viewId?: string }) => {
+    async (payload: { pluginId?: string; viewId?: string; sessionId?: string; tabId?: string }) => {
+      if (payload.pluginId === BROWSER_PLUGIN_ID && payload.viewId === BROWSER_VIEW_ID && typeof payload.sessionId === "string") {
+        if (typeof payload.tabId === "string") browserHost.closeTab(payload.sessionId, payload.tabId);
+        else browserHost.closeSession(payload.sessionId);
+        return { ok: true };
+      }
       pluginViews.close(String(payload?.pluginId ?? ""), String(payload?.viewId ?? ""));
       return { ok: true };
     },

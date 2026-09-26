@@ -124,7 +124,7 @@ export function browserPluginTab(location?: string): WorkPanelTab {
   const base = pluginWorkPanelTab(BROWSER_PLUGIN_TAB.pluginId, BROWSER_PLUGIN_TAB.viewId);
   if (!location) return base;
   const target = location.trim();
-  return { ...base, id: `${base.id}:${++newWorkPanelTabSequence}`, location: target, label: browserTabLabel(target) };
+  return { ...base, id: `${base.id}:${Date.now().toString(36)}-${++newWorkPanelTabSequence}`, location: target, label: browserTabLabel(target) };
 }
 
 export function browserTabLabel(location: string): string {

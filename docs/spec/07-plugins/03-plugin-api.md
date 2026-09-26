@@ -649,7 +649,10 @@ loading immediately and optionally includes `loadError` for failed navigation.
 Optional `sessionId` and `tabId` identify the host-owned work-panel destination;
 plugins do not select these identities through navigation arguments.
 
-The guest page is a host-owned `WebContentsView` (`persist:work-browser`).
+The current guest page is a host-owned `WebContentsView` (`persist:work-browser`).
+Each resource tab retains its own page. A navigation for a background session is
+queued for that session's last selected tab, or its first tab when none exists.
+It does not navigate or return another session's visible page.
 `setBounds` is content-relative to the calling plugin view and is clamped so
 the guest cannot cover chat/composer. `cdp` is deny-by-default; cookie,
 storage, target, and network-interception methods fail with
