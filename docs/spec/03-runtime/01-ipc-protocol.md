@@ -202,7 +202,7 @@ from the published model record plus the exact binding's `supportsImages`
 override. An absent or `null` override follows the published image capability;
 `true` enables and `false` disables image input for that configured model.
 For a vision-capable model, images within the 10 MB per-image bound become
-transient pi-ai image blocks. Restored history also has a 50 MB aggregate raw
+transient pi-ai image blocks. Restored history also has a 30 MB aggregate raw
 image-byte budget: the sidecar considers persisted attachments newest-first and
 preserves every eligible image when the total fits. If the budget is exceeded,
 older images use the existing safe `@path` fallback. Unknown/custom models

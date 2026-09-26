@@ -7158,7 +7158,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 ## 2026-09-26 — Bound aggregate image history without an arbitrary message cutoff (D628)
 
 - Vision history restoration keeps the existing 10 MB per-image ceiling and adds
-  a 50 MB aggregate raw-byte budget per runtime rebuild. Eligible refs are
+  a 30 MB aggregate raw-byte budget per runtime rebuild. Eligible refs are
   considered newest-first; every image remains a provider image block when the
   history fits, and only older attachments beyond the budget fall back to a
   safe `@path`. The current prompt row is excluded before hydration so it cannot

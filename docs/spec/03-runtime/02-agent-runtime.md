@@ -732,7 +732,7 @@ criterion-by-criterion report of what was met and the evidence observed.
   well-formed for every provider API.
 Vision runtimes hydrate persisted image refs only from the session-bound
 attachment, scratch, and project roots. Each image remains subject to the 10 MB
-inline safety bound, and restored history has a 50 MB aggregate raw-byte budget.
+safety bound, and restored history has a 30 MB aggregate raw-byte budget.
 The newest refs are considered first; all eligible images remain image blocks
 when the history fits, while over-budget or oversized images become safe
 `@path` fallbacks. Reads are bounded by the admitted file size. Base64 is

@@ -7367,7 +7367,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 - **Preconditions**: A vision-capable model, a session with no compaction boundary
   across the fixture turns, six distinct user image turns whose combined raw
-  image size is below 50 MB, and a later text-only user turn. Capture the
+  image size is below 30 MB, and a later text-only user turn. Capture the
   provider request during runtime recreation and edit/resend.
 - **Steps**:
   1. Send the six image turns and then a text-only turn.

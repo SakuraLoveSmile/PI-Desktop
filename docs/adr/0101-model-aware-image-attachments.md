@@ -36,7 +36,7 @@ renderer discovery and user-entered model ids are not sufficient evidence.
    inline limit, the prompt receives a safe `@path` fallback. Replayed
    content-store images are copied into the session scratch `replayed/`
    directory before that fallback is exposed to the model.
-6. Restored vision history has a 50 MB aggregate raw-image-byte budget in
+6. Restored vision history has a 30 MB aggregate raw-image-byte budget in
    addition to the 10 MB per-image limit. The sidecar considers newest
    attachments first, preserving all images when the history fits; older images
    beyond the budget use the safe path fallback. The current prompt row is

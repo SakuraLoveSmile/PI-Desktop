@@ -32,7 +32,6 @@ describe("hydrateAttachmentHistory", () => {
     await withTempDir(async (tmp) => {
       const imgPath = resolve(tmp, "sample.png");
       await writeFile(imgPath, "fake-png-bytes");
-
       const history = [
         userMessage("msg-1", [
           {
@@ -56,11 +55,11 @@ describe("hydrateAttachmentHistory", () => {
     });
   });
 
-  it("preserves all image turns when their aggregate size is within budget", async () => {
+  it("preserves historical image turns beyond ten messages when within the default byte budget", async () => {
     await withTempDir(async (tmp) => {
       const history: UiMessage[] = [];
       const payloads: string[] = [];
-      for (let i = 1; i <= 6; i++) {
+      for (let i = 1; i <= 12; i++) {
         const payload = `image-${i}`;
         const imgPath = resolve(tmp, `sample-${i}.png`);
         await writeFile(imgPath, payload);
@@ -78,11 +77,9 @@ describe("hydrateAttachmentHistory", () => {
         );
       }
 
-      const budget = payloads.reduce((total, payload) => total + payload.length, 0);
       const hydrated = await hydrateAttachmentHistory(history, {
         projectPath: tmp,
         supportsVision: true,
-        maxInlinedImageHistoryBytes: budget,
       });
 
       for (let i = 0; i < payloads.length; i++) {
@@ -93,41 +90,45 @@ describe("hydrateAttachmentHistory", () => {
     });
   });
 
-  it("bounds aggregate bytes across many attachments in one message and keeps the newest first", async () => {
+  it("bounds actual aggregate bytes across many attachments in one message", async () => {
     await withTempDir(async (tmp) => {
-      const payloads = ["old1", "old2", "new3"];
-      const attachments = await Promise.all(
-        payloads.map(async (payload, index) => {
-          const imgPath = resolve(tmp, `sample-${index + 1}.png`);
-          await writeFile(imgPath, payload);
-          return {
-            name: `sample-${index + 1}.png`,
-            ref: imgPath,
-            kind: "image" as const,
-            mimeType: "image/png",
-            // The on-disk size, not caller-supplied metadata, controls the budget.
-            size: 1,
-          };
-        }),
-      );
-      const history = [userMessage("msg-many-images", attachments)];
+      const attachments: NonNullable<UiMessage["attachments"]> = [];
+      for (let i = 1; i <= 5; i++) {
+        const imgPath = resolve(tmp, `burst-${i}.png`);
+        await writeFile(imgPath, "x".repeat(100));
+        attachments.push({
+          name: `burst-${i}.png`,
+          ref: imgPath,
+          kind: "image",
+          mimeType: "image/png",
+          // Deliberately incorrect metadata must not bypass the actual byte budget.
+          size: 1,
+          ...(i === 1 ? { data: "stale-base64-must-be-cleared" } : {}),
+        });
+      }
+      const history = [userMessage("msg-burst", attachments)];
 
       const hydrated = await hydrateAttachmentHistory(history, {
         projectPath: tmp,
         supportsVision: true,
-        maxInlinedImageHistoryBytes: 8,
+        maxInlinedImageBytes: 250,
       });
-
-      expect(hydrated[0]?.attachments?.map((attachment) => attachment.data)).toEqual([
+      const result = hydrated[0];
+      expect(result?.attachments?.map((attachment) => attachment.data)).toEqual([
         undefined,
-        Buffer.from("old2").toString("base64"),
-        Buffer.from("new3").toString("base64"),
+        undefined,
+        undefined,
+        Buffer.from("x".repeat(100)).toString("base64"),
+        Buffer.from("x".repeat(100)).toString("base64"),
       ]);
-      expect(hydrated[0]?.content).toContain("sample-1.png");
+      for (let i = 1; i <= 3; i++) {
+        expect(result?.content).toContain(`burst-${i}.png`);
+        expect(result?.attachments?.[i - 1]?.ref).toContain(`burst-${i}.png`);
+      }
     });
   });
 
-  it("treats a zero history budget as no images inlined", async () => {
+  it("treats a zero history byte budget as no images inlined", async () => {
     await withTempDir(async (tmp) => {
       const imgPath = resolve(tmp, "sample.png");
       await writeFile(imgPath, "image");
@@ -146,7 +147,7 @@ describe("hydrateAttachmentHistory", () => {
       const hydrated = await hydrateAttachmentHistory(history, {
         projectPath: tmp,
         supportsVision: true,
-        maxInlinedImageHistoryBytes: 0,
+        maxInlinedImageBytes: 0,
       });
 
       expect(hydrated[0]?.attachments?.[0]?.data).toBeUndefined();

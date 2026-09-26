@@ -7,12 +7,11 @@ import {
   formatFileInsert,
   isSvgAttachment,
   MAX_INLINE_IMAGE_BYTES,
+  MAX_INLINED_IMAGE_HISTORY_BYTES,
   SVG_MIME_TYPE,
   type MessageAttachment,
   type UiMessage,
 } from "@pi-desktop/shared";
-
-const DEFAULT_MAX_INLINE_IMAGE_HISTORY_BYTES = MAX_INLINE_IMAGE_BYTES * 5;
 
 type ResolvedAttachment = {
   attachment: MessageAttachment;
@@ -28,10 +27,11 @@ export type AttachmentHistoryContext = {
   attachmentsDir?: string;
   supportsVision: boolean;
   /**
-   * Maximum aggregate raw image bytes inlined while restoring history (default: 50 MB).
+   * Maximum aggregate raw image bytes inlined during history restoration
+   * (default: 30 MB, hard-capped by MAX_INLINED_IMAGE_HISTORY_BYTES).
    * The newest attachments are considered first; older ones use the safe path fallback.
    */
-  maxInlinedImageHistoryBytes?: number;
+  maxInlinedImageBytes?: number;
 };
 
 function pathInside(root: string, candidate: string): boolean {
@@ -96,12 +96,12 @@ export async function hydrateAttachmentHistory(
   params: AttachmentHistoryContext,
 ): Promise<UiMessage[]> {
   const supportsVision = params.supportsVision;
-  const requestedBudget = params.maxInlinedImageHistoryBytes;
-  const maxInlinedImageHistoryBytes =
+  const requestedBudget = params.maxInlinedImageBytes;
+  const maxInlinedImageBytes =
     requestedBudget === undefined || !Number.isFinite(requestedBudget)
-      ? DEFAULT_MAX_INLINE_IMAGE_HISTORY_BYTES
+      ? MAX_INLINED_IMAGE_HISTORY_BYTES
       : Math.min(
-          DEFAULT_MAX_INLINE_IMAGE_HISTORY_BYTES,
+          MAX_INLINED_IMAGE_HISTORY_BYTES,
           Math.max(0, Math.floor(requestedBudget)),
         );
   const roots = [
@@ -180,7 +180,7 @@ export async function hydrateAttachmentHistory(
   // Allocate the byte budget in reverse transcript order, then reverse attachment
   // order within a message. This preserves every image when the history fits while
   // keeping the most recent visual context when the aggregate exceeds the cap.
-  let remainingBytes = maxInlinedImageHistoryBytes;
+  let remainingBytes = maxInlinedImageBytes;
   const selectedForInlining: ResolvedAttachment[] = [];
   for (let messageIndex = resolvedHistory.length - 1; messageIndex >= 0; messageIndex--) {
     const resolved = resolvedHistory[messageIndex];
