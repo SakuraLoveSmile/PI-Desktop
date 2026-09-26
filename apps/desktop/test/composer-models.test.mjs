@@ -9,6 +9,7 @@ import {
   composerModelsForProvider,
   sameComposerModelId,
 } from "../src/lib/composer-models.ts";
+import { thinkingProviderForModel } from "../src/features/chat/composer/model.ts";
 
 const binding = (id) => ({
   id,
@@ -60,6 +61,57 @@ test("configured models remain selectable when discovery is unavailable", () => 
   assert.equal(models.length, 1);
   assert.equal(models[0].modelId, "my-model-v2");
   assert.equal(models[0].displayName, "my-model-v2");
+});
+
+test("unmatched models expose the full thinking ladder unless a binding overrides it", () => {
+  const provider = {
+    id: "custom",
+    models: [],
+    supportsReasoning: false,
+    supportedThinkingLevels: ["off"],
+  };
+  const unmatched = thinkingProviderForModel(provider, "route/model", undefined);
+
+  assert.deepEqual(unmatched?.supportedThinkingLevels, [
+    "off",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+  ]);
+  assert.equal(unmatched?.supportsReasoning, true);
+
+  const emptyBinding = thinkingProviderForModel(
+    {
+      ...provider,
+      models: [binding("route/model")],
+    },
+    "route/model",
+    undefined,
+  );
+  assert.deepEqual(emptyBinding?.supportedThinkingLevels, [
+    "off",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+  ]);
+  assert.equal(emptyBinding?.supportsReasoning, true);
+
+  const constrained = thinkingProviderForModel(
+    {
+      ...provider,
+      models: [{ ...binding("route/model"), thinkingLevels: ["off"] }],
+    },
+    "route/model",
+    undefined,
+  );
+  assert.deepEqual(constrained?.supportedThinkingLevels, ["off"]);
+  assert.equal(constrained?.supportsReasoning, false);
 });
 
 test("Composer preserves configured order even when discovery returns another order", () => {

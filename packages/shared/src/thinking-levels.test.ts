@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   highestSupportedThinkingLevel,
   initialThinkingLevelForBinding,
+  initialThinkingLevelForUnmatchedModel,
   canonicalThinkingLevel,
   isSessionThinkingLevel,
   nearestSupportedThinkingLevel,
@@ -54,14 +55,14 @@ describe("initialThinkingLevelForBinding", () => {
     ).toBe("high");
   });
 
-  it("defaults to off when no default is stored", () => {
+  it("falls back to the strongest enabled level when no default is stored", () => {
     expect(
       initialThinkingLevelForBinding({
         thinkingLevels: ["low", "high", "max"],
         defaultThinkingLevel: null,
       }),
-    ).toBe("off");
-    expect(initialThinkingLevelForBinding(undefined, ["low", "high"])).toBe("off");
+    ).toBe("max");
+    expect(initialThinkingLevelForBinding(undefined, ["low", "high"])).toBe("high");
   });
 
   it("honors an explicit off default and empty bindings", () => {
@@ -77,6 +78,24 @@ describe("initialThinkingLevelForBinding", () => {
         defaultThinkingLevel: null,
       }),
     ).toBe("off");
+  });
+});
+
+describe("initialThinkingLevelForUnmatchedModel", () => {
+  it("starts unmatched models at off without overriding an explicit default", () => {
+    expect(
+      initialThinkingLevelForUnmatchedModel({
+        thinkingLevels: ["low", "high", "max"],
+        defaultThinkingLevel: null,
+      }),
+    ).toBe("off");
+    expect(initialThinkingLevelForUnmatchedModel(undefined, ["low", "high"])).toBe("off");
+    expect(
+      initialThinkingLevelForUnmatchedModel({
+        thinkingLevels: ["low", "high"],
+        defaultThinkingLevel: "low",
+      }),
+    ).toBe("low");
   });
 });
 

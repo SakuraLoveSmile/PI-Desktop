@@ -138,14 +138,17 @@ export function thinkingProviderForModel(
   if (!model) {
     // No catalog match: all thinking levels selectable, default off.
     // A binding override still takes precedence when present.
-    const supportsReasoning = configuredLevels
-      ? configuredLevels.some((level) => level !== "off")
+    // An empty binding is the generic seed for an unknown model, not an
+    // explicit disable; `off` is the persisted opt-out for that case.
+    const unmatchedLevels = configuredLevels?.length ? configuredLevels : undefined;
+    const supportsReasoning = unmatchedLevels
+      ? unmatchedLevels.some((level) => level !== "off")
       : true;
     return {
       ...provider,
       supportsReasoning,
       supportedThinkingLevels:
-        configuredLevels ?? [...THINKING_LEVELS],
+        unmatchedLevels ?? [...THINKING_LEVELS],
     };
   }
 
