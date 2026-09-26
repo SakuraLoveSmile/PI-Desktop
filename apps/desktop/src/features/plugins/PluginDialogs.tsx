@@ -1,4 +1,4 @@
-import { Button, SettingsToggle, cx } from "../../components/ui";
+import { Button, SettingsToggle, cx, portalOverlay } from "../../components/ui";
 import { IconCheck, IconShield, IconSparkles, IconTriangleAlert } from "../../components/icons";
 import { PluginInstallDialog } from "../../components/plugins/PluginInstallDialog";
 import { PluginSettingsSheet } from "../../components/plugins/PluginSettingsSheet";
@@ -37,7 +37,8 @@ export function PluginDialogs({
 }: PluginsPageModel) {
   return (
     <>
-    {pendingReview ? (
+      {pendingReview
+        ? portalOverlay(
         <div className="plugins-modal-backdrop" role="presentation">
           <div
             className="plugins-modal"
@@ -90,9 +91,11 @@ export function PluginDialogs({
               </Button>
             </div>
           </div>
-        </div>
-    ) : null}
-    {pendingInstall ? (
+        </div>,
+      )
+        : null}
+      {pendingInstall
+        ? portalOverlay(
         <div className="plugins-modal-backdrop" role="presentation">
           <div
             className="plugins-modal"
@@ -148,8 +151,9 @@ export function PluginDialogs({
               </Button>
             </div>
           </div>
-        </div>
-    ) : null}
+        </div>,
+      )
+        : null}
       {installJob ? (
         <PluginInstallDialog
           job={installJob}
@@ -172,7 +176,8 @@ export function PluginDialogs({
           }}
         />
       ) : null}
-      {templatePick ? (
+      {templatePick
+        ? portalOverlay(
         <div className="plugins-modal-backdrop" role="presentation">
           <div
             className="plugins-modal"
@@ -245,8 +250,9 @@ export function PluginDialogs({
               </Button>
             </div>
           </div>
-        </div>
-      ) : null}
+        </div>,
+      )
+        : null}
     </>
   );
 }

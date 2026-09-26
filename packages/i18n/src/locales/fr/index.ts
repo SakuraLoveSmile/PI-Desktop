@@ -99,6 +99,13 @@ export const fr = {
   "updates": {
     "title": "Mises à jour",
     "desc": "Les mises à jour sont téléchargées à partir des versions de GitHub.",
+    "preferenceTitle": "Mode de mise à jour",
+    "preferenceDesc": "Le mode automatique télécharge et installe les mises à jour ; le mode manuel vérifie et avertit une fois par nouvelle version.",
+    "automatic": "Automatique",
+    "manual": "Manuel",
+    "automaticUnsupported": "Ce paquet ne prend pas en charge l'installation automatique.",
+    "automaticPortableWarning": "Les mises à jour automatiques peuvent remplacer une copie portable par la version installée.",
+    "preferenceSaveFailed": "Impossible d'enregistrer le mode de mise à jour.",
     "check": "Vérifier les mises à jour",
     "checking": "Vérifier les mises à jour…",
     "upToDate": "Vous utilisez la dernière version.",

@@ -99,6 +99,13 @@ export const de = {
   "updates": {
     "title": "Updates",
     "desc": "Updates werden von GitHub Releases heruntergeladen.",
+    "preferenceTitle": "Update-Verhalten",
+    "preferenceDesc": "Automatisch lädt Updates herunter und installiert sie; Manuell prüft und erinnert einmal pro neuer Version.",
+    "automatic": "Automatisch",
+    "manual": "Manuell",
+    "automaticUnsupported": "Dieses Paket unterstützt keine automatische Installation.",
+    "automaticPortableWarning": "Bei automatischen Updates kann eine portable Kopie durch die installierte Version ersetzt werden.",
+    "preferenceSaveFailed": "Die Update-Einstellung konnte nicht gespeichert werden.",
     "check": "Nach Updates suchen",
     "checking": "Nach Updates suchen…",
     "upToDate": "Sie sind auf der neuesten Version.",

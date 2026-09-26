@@ -106,6 +106,13 @@ export const en = {
   updates: {
     title: "Updates",
     desc: "Updates are downloaded from GitHub Releases.",
+    preferenceTitle: "Update behavior",
+    preferenceDesc: "Automatic mode downloads and installs updates; Manual mode checks and reminds you once per new version.",
+    automatic: "Automatic",
+    manual: "Manual",
+    automaticUnsupported: "Automatic installation isn't supported by this package.",
+    automaticPortableWarning: "Automatic updates can replace an extracted portable copy with the installed version.",
+    preferenceSaveFailed: "Couldn't save the update preference.",
     check: "Check for updates",
     checking: "Checking for updates…",
     upToDate: "You're on the latest version.",
