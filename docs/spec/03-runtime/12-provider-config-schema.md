@@ -724,7 +724,11 @@ unknown OpenAI-compatible endpoint. Every published model-list shape is read —
 OpenAI Responses endpoint returns — so an endpoint that answers is never treated
 as empty. Connection testing reuses
 the same request builder, so "the model list loaded" and "the connection test
-passed" always describe the same URL, auth header and format.
+passed" always describe the same URL, auth header and format. Anthropic-style
+endpoints that return 404 because they intentionally publish no model list may
+instead pass connection testing through a same-origin `OPTIONS /v1/messages`
+route probe; this proves reachability without sending credentials or a billable
+model request, while model IDs remain manual.
 
 ### Which publisher a row is read against
 
