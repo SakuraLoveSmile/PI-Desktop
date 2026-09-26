@@ -11,8 +11,8 @@ import {
   PERMISSION_MODES,
   sessionThinkingMenuLevels,
 } from "@pi-desktop/shared";
-import { sameComposerModelId } from "../../../lib/composer-models";
-import { providerThinkingLevels } from "../../../lib/session-thinking";
+import { sameComposerModelId } from "../../../lib/composer-models.ts";
+import { providerThinkingLevels } from "../../../lib/session-thinking.ts";
 
 export const COMPOSER_MIN_HEIGHT_PX = 28;
 export const COMPOSER_MAX_VISIBLE_ROWS = 7;
@@ -38,7 +38,7 @@ export const MODE_LABEL_KEYS: Record<Mode, string> = {
   goal: "settings.modeGoal",
 };
 
-export { PERMISSION_MODE_I18N_KEYS } from "../../../lib/permission-mode-labels";
+export { PERMISSION_MODE_I18N_KEYS } from "../../../lib/permission-mode-labels.ts";
 
 export const THINKING_LEVELS: readonly ThinkingLevel[] = [
   "off",
