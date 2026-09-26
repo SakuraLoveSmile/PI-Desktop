@@ -17,6 +17,12 @@ export type AttachmentHistoryContext = {
   projectPath?: string;
   attachmentsDir?: string;
   supportsVision: boolean;
+  /**
+   * Maximum count of recent user messages whose image attachments may be inlined as
+   * base64 strings into V8 memory during history restoration (default: 5).
+   * Older images retain their file reference and fallback path without multiplying base64 heaps.
+   */
+  maxInlinedImageMessages?: number;
 };
 
 function pathInside(root: string, candidate: string): boolean {
@@ -54,6 +60,7 @@ export async function hydrateAttachmentHistory(
   params: AttachmentHistoryContext,
 ): Promise<UiMessage[]> {
   const supportsVision = params.supportsVision;
+  const maxInlinedImageMessages = params.maxInlinedImageMessages ?? 5;
   const roots = [
     params.scratchDir,
     params.projectPath,
@@ -68,8 +75,23 @@ export async function hydrateAttachmentHistory(
       }
     }),
   );
+
+  // Identify user messages eligible for inlining base64 images (the latest N user messages with attachments).
+  // Older historical messages avoid holding multi-megabyte base64 strings in V8 memory (#1077).
+  const userMessagesWithAttachmentsIndices: number[] = [];
+  for (let i = 0; i < history.length; i++) {
+    const msg = history[i];
+    if (msg?.role === "user" && msg.attachments?.some((a) => a.kind === "image")) {
+      userMessagesWithAttachmentsIndices.push(i);
+    }
+  }
+  const eligibleIndices = new Set(
+    userMessagesWithAttachmentsIndices.slice(-maxInlinedImageMessages)
+  );
+
   const resolveAttachment = async (
     sourceAttachment: NonNullable<UiMessage["attachments"]>[number],
+    allowInlining: boolean,
   ): Promise<{ attachment: MessageAttachment; fallbackPath?: string }> => {
     // Old transcripts can still label SVG as an image. Normalize before every
     // early return, and discard any stale transient data without mutating history.
@@ -94,7 +116,7 @@ export async function hydrateAttachmentHistory(
       if (!canonicalRoots.some((root) => root && pathInside(root, canonical))) {
         return { attachment };
       }
-      const shouldInline = attachment.kind === "image" && supportsVision;
+      const shouldInline = allowInlining && attachment.kind === "image" && supportsVision;
       const size = (await stat(canonical)).size;
       const bytes =
         shouldInline && size <= MAX_INLINE_IMAGE_BYTES
@@ -117,9 +139,12 @@ export async function hydrateAttachmentHistory(
   };
 
   return Promise.all(
-    history.map(async (message) => {
+    history.map(async (message, index) => {
       if (message.role !== "user" || !message.attachments?.length) return message;
-      const resolved = await Promise.all(message.attachments.map(resolveAttachment));
+      const allowInlining = eligibleIndices.has(index);
+      const resolved = await Promise.all(
+        message.attachments.map((a) => resolveAttachment(a, allowInlining))
+      );
       const fallbackPaths = resolved
         .map((item) => item.fallbackPath)
         .filter((path): path is string => Boolean(path))
