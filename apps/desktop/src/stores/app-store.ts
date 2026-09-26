@@ -3,9 +3,7 @@ import i18n from "i18next";
 import type {
   AgentEventEnvelope,
   AgentStatus,
-  AgentPromptAttachment,
   AskToolResolution,
-  AppError,
   AppNotification,
   AppSettings,
   AppVersionInfo,
@@ -14,7 +12,6 @@ import type {
   ModelInfo,
   OnboardingState,
   Mode,
-  PlanProposal,
   PlanResolveRequest,
   PlanResolutionResult,
   PlanningState,
@@ -24,19 +21,16 @@ import type {
   PluginViewMeta,
   PermissionMode,
   ProjectWorkspace,
-  ProposalKind,
   ProviderPublic,
   ReviewRollbackResult,
   SessionDetail,
   SessionSummary,
   ThinkingLevel,
-  UiMessage,
 } from "@pi-desktop/shared";
 import {
   contextCompactionMark,
   ErrorCodes as SharedErrorCodes,
   initialThinkingLevelForBinding,
-  modeForProposalKind,
   migrateKeybindingOverrides,
   modelIdsMatch,
   normalizeMode,
@@ -68,7 +62,6 @@ import {
   releaseSessionPane,
   retainSessionPane,
 } from "../lib/session-panes";
-import { normalizeProjectPath, sessionMatchesProject } from "../lib/sidebar-session-groups";
 import {
   dedupeSessionMessages,
   mergeLiveSessionMessages,
@@ -88,20 +81,15 @@ import {
   projectIsPinned,
   projectWorkspaceFromPath,
   saveSidebarPreferences,
-  sessionIsArchived,
-  sessionIsPinned,
   sortProjects,
   sortSessions,
   normalizeProjectName,
-  type ProjectMeta,
   type ProjectSort,
-  type SessionMeta,
   type SessionSort,
 } from "../lib/sidebar-preferences";
 import { settleStoppedAssistantMetrics } from "../lib/context-usage";
 import { formatToolValue } from "../lib/tool-display";
 import { withReviewChangeState } from "../lib/workspace-review";
-import { preferredFileWorkPanelTab } from "../lib/work-panel-tabs";
 import {
   clearSessionPermissions,
   enqueuePermission,
@@ -132,7 +120,6 @@ import {
 } from "../lib/plan-mode-state";
 import {
   resolveComposerSmartStop,
-  type ComposerDraftSnapshot,
   type ComposerPrefill,
 } from "../lib/composer-smart-stop";
 import {
@@ -207,43 +194,9 @@ export { isDefaultSessionTitle } from "./runtime/session-title-runtime";
 
 export type { WorkPanelTab } from "../lib/work-panel-tabs";
 
-function promptAttachmentsFromDraft(
-  references: ComposerDraftSnapshot["fileReferences"],
-): AgentPromptAttachment[] {
-  return references.flatMap((reference) => {
-    const kind =
-      reference.kind ??
-      (/\.(avif|bmp|gif|heic|jpe?g|png|tiff?|webp)$/i.test(reference.path)
-        ? "image"
-        : "file");
-    // Inline chips use tokens for both files and images. Ordinary file chips
-    // already serialize to @path text (the model can Read them); only image
-    // chips need the structured transport for vision/fallback handling.
-    if (reference.token && kind !== "image") return [];
-    return [
-      {
-        path: reference.path,
-        name: reference.name,
-        kind,
-        ...(reference.mimeType ? { mimeType: reference.mimeType } : {}),
-      },
-    ];
-  });
-}
-
-function promptAttachmentsFromMessage(
-  attachments: UiMessage["attachments"],
-): AgentPromptAttachment[] {
-  return (attachments ?? []).map((attachment) => ({
-    path: attachment.ref,
-    name: attachment.name,
-    kind: attachment.kind,
-    ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
-    ...(attachment.size !== undefined ? { size: attachment.size } : {}),
-  }));
-}
-
 import {
+  promptAttachmentsFromDraft,
+  promptAttachmentsFromMessage,
   withoutRecordKey,
   viewingSessionIdForPrompt,
   messageErrorFromUnknown,

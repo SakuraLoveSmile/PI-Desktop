@@ -372,8 +372,9 @@ const modelsDevCatalog = new ModelsDevCatalog({
 
 const vendorOAuth = new VendorOAuth({
   call: <T,>(method: string, params?: unknown): Promise<T> => {
-    if (!host) throw new Error("host unavailable");
-    return host.call<T>(method, params);
+    const currentHost = getHost();
+    if (!currentHost) throw new Error("host unavailable");
+    return currentHost.call<T>(method, params);
   },
   emit: (event) => sendToRenderer(IPC.event.providersOauth, event),
   openExternal: async (url) => {
@@ -642,7 +643,7 @@ const {
 
 wirePluginThemeRuntimeServices({
   plugins,
-  getHost: () => host,
+  getHost,
   sendToRenderer,
   applyAppThemePreference,
   broadcastAppearance,
@@ -651,7 +652,7 @@ wirePluginThemeRuntimeServices({
 closeBehaviorRuntime = createCloseBehaviorRuntime({
   state: windowLifecycleState,
   dataDir,
-  getLocale: () => updaterLocale,
+  getLocale: () => mainState.updaterLocale,
   createTray,
 });
 const {
@@ -664,7 +665,7 @@ const createdLauncher = createLauncher({
   state: windowLifecycleState,
   launcherState,
   appState: applicationLifecycleState,
-  getHost: () => host,
+  getHost,
   logger,
   safeOpenExternal,
   toggleMainWindow,
@@ -768,7 +769,7 @@ const sessionCollaboration = createSessionCollaborationService({
     return persistenceOutbox.size() === 0;
   },
   isPluginLoaded: (pluginId) => plugins.listLoaded().some((plugin) => plugin.manifest.id === pluginId),
-  isQuitting: () => quitting,
+  isQuitting: () => mainState.quitting,
   onChanged: () => sendToRenderer(IPC.event.sessionsChanged, { reason: "session.collaboration" }),
   log: (message, data) => logger.app("runtime", "warn", message, { data }),
 });
@@ -794,7 +795,7 @@ const planRuntime = createPlanRuntime({
   emitAgentEvent: (envelope) => emitAgentEvent(envelope),
   acquireSessionOperation,
   resolveAgentRuntimeLaunch,
-  isQuitting: () => quitting,
+  isQuitting: () => mainState.quitting,
   onTurnSettled: sessionCollaboration.settle,
 });
 const {
@@ -1074,7 +1075,7 @@ registerShutdownHandlers({
 
 registerApplicationActivation({
   restoreMainWindow,
-  isQuitting: () => quitting,
+  isQuitting: () => mainState.quitting,
   isApplicationBooted: () => applicationLifecycleState.applicationBooted,
   hasVisibleWindow,
 });

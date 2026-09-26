@@ -3,10 +3,12 @@ import { nativeTheme } from "electron";
 import type {
   AppMenuCommand,
   CloseBehavior,
-  WindowBounds,
-  WorkPanelReservationState,
 } from "@pi-desktop/shared";
-import { emptyWorkPanelReservationState } from "../work-panel-window";
+import {
+  emptyWorkPanelReservationState,
+  type WindowBounds,
+  type WorkPanelReservationState,
+} from "../work-panel-window";
 import type { WindowLifecycleState } from "./window";
 import type { LauncherState } from "./launcher";
 import type { RuntimeState } from "../runtime/context";

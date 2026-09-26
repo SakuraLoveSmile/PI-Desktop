@@ -188,6 +188,10 @@ test("an attachment blob reference rejects invalid hash formats or non-hex chara
     null,
   );
   assert.equal(
+    await resolve("Attachments/not-a-valid-sha256", { attachments }),
+    null,
+  );
+  assert.equal(
     await resolve(`attachments/${"z".repeat(64)}`, { attachments }),
     null,
   );

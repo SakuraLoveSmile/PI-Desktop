@@ -275,6 +275,9 @@ export async function resolveChatFileRef(
   const rootList = orderedRoots(roots);
   if (rootList.length === 0) return null;
 
+  const cleanedPosixRef = toPosix(cleanRef(ref));
+  const isAttachmentRef = /^attachments(?:\/|$)/i.test(cleanedPosixRef);
+
   // 1. An absolute reference that already names a real path inside a known root
   //    is unambiguous evidence, so it outranks every shorthand rule below. A
   //    POSIX-style path on Windows finds nothing here, which is correct: step 2
@@ -300,10 +303,11 @@ export async function resolveChatFileRef(
   //    filesystem path: it names a stored blob by hash, and the files-tab
   //    contract spells it that way. Resolve it against the attachment root
   //    directly instead of searching for a path that cannot exist.
-  if (isAttachmentBlobRef(ref)) {
+  if (isAttachmentRef) {
+    if (!isAttachmentBlobRef(cleanedPosixRef)) return null;
     const attachmentsRoot = roots.attachments;
     if (!attachmentsRoot) return null;
-    const blobHash = segmentsOf(cleanRef(ref)).at(-1);
+    const blobHash = segmentsOf(cleanedPosixRef).at(-1);
     if (!blobHash || !ATTACHMENT_HASH_PATTERN.test(blobHash)) return null;
     const resolvedRoot = resolve(attachmentsRoot);
     const absolutePath = join(resolvedRoot, blobHash.toLowerCase());
