@@ -796,3 +796,65 @@
 .composer-directory-drop-action:hover {
   background: var(--ds-tile-hover);
 }
+
+/* Composer usage statistics footer (T4) */
+.composer-usage-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 6px 4px 0;
+  font-size: var(--text-xs);
+  color: var(--ds-text-muted);
+  user-select: none;
+}
+
+.composer-usage-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.composer-usage-label {
+  color: var(--ds-text-secondary);
+}
+
+.composer-usage-value {
+  color: var(--ds-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-usage-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  transition: color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.composer-usage-btn:hover .composer-usage-label,
+.composer-usage-btn:hover .composer-usage-value {
+  color: var(--ds-accent);
+}
+
+.composer-usage-btn:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+
+.composer-usage-context[data-level="warning"] .composer-usage-value {
+  color: var(--ds-warning);
+}
+
+.composer-usage-context[data-level="critical"] .composer-usage-value {
+  color: var(--ds-danger);
+}

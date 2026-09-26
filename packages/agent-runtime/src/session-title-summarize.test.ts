@@ -35,6 +35,24 @@ describe("cleanSummarizedTitle", () => {
     const long = "A".repeat(100);
     expect(cleanSummarizedTitle(long).length).toBe(80);
   });
+  it("rejects pure URLs and absolute filesystem paths", () => {
+    expect(cleanSummarizedTitle("https://github.com/earendil-works/pi-desktop")).toBe("");
+    expect(cleanSummarizedTitle("http://localhost:8000/api/v1")).toBe("");
+    expect(cleanSummarizedTitle("/Users/alice/projects/test")).toBe("");
+    expect(cleanSummarizedTitle("C:\\Users\\Bob\\Documents")).toBe("");
+    expect(cleanSummarizedTitle("C:/Windows/System32")).toBe("");
+  });
+
+  it("enforces <= 25 graphemes for CJK titles and <= 7 words for space-separated titles", () => {
+    const cjkLong = "这是一个非常长的主题用于测试二十五个字符限制以及是否能够正确截断标题文本";
+    const cjkClean = cleanSummarizedTitle(cjkLong);
+    expect(Array.from(cjkClean).length).toBeLessThanOrEqual(25);
+
+    const enLong = "This is a very long title with more than seven words in it";
+    const enClean = cleanSummarizedTitle(enLong);
+    expect(enClean.split(" ").length).toBeLessThanOrEqual(7);
+    expect(enClean).toBe("This is a very long title with");
+  });
 });
 
 describe("sessionTitleSummarizeContext", () => {

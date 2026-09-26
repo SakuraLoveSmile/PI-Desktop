@@ -14,6 +14,7 @@ import {
   toolTokenUsage,
   usageTokenTotal,
   settleStoppedAssistantMetrics,
+  resolveComposerUsageFooterMetrics,
 } from "../src/lib/context-usage.ts";
 
 test("context usage exposes the remaining ring percentage", () => {
@@ -335,4 +336,85 @@ test("tool usage aggregates repeated calls in first-seen order", () => {
       estimated: true,
     },
   ]);
+});
+
+test("resolveComposerUsageFooterMetrics computes honest metrics", () => {
+
+  const metrics = resolveComposerUsageFooterMetrics({
+    usage: {
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheReadTokens: 300,
+      totalTokens: 150,
+    },
+    turnUsage: {
+      inputTokens: 100,
+      outputTokens: 50,
+      totalTokens: 150,
+    },
+    contextWindow: 1000,
+    responseDurationMs: 1000,
+    responseOutputTokens: 50,
+    responseOutputEstimated: false,
+    contextUsageDisplay: "remaining",
+  });
+
+  assert.equal(metrics.outputSpeed?.rate, 50);
+  assert.equal(metrics.outputSpeed?.estimated, false);
+  assert.equal(metrics.turnTotal, 150);
+  assert.equal(metrics.cacheHitRate, 75); // 300 / (100 + 300) = 75%
+  assert.equal(metrics.context.display, "remaining");
+  assert.equal(metrics.context.level, "comfortable");
+});
+
+test("resolveComposerUsageFooterMetrics marks estimated speed and missing cache as undefined", () => {
+
+  const metrics = resolveComposerUsageFooterMetrics({
+    usage: {
+      inputTokens: 500,
+      outputTokens: 100,
+      totalTokens: 600,
+    },
+    turnUsage: {
+      inputTokens: 500,
+      outputTokens: 100,
+      totalTokens: 600,
+    },
+    contextWindow: 1000,
+    responseDurationMs: 2000,
+    responseOutputTokens: 80,
+    responseOutputEstimated: true,
+    contextUsageDisplay: "used",
+  });
+
+  assert.equal(metrics.outputSpeed?.rate, 40);
+  assert.equal(metrics.outputSpeed?.estimated, true);
+  assert.equal(metrics.turnTotal, 600);
+  assert.equal(metrics.cacheHitRate, undefined);
+  assert.equal(metrics.context.display, "used");
+  assert.equal(metrics.context.level, "comfortable");
+});
+
+test("resolveComposerUsageFooterMetrics warns on low context remaining", () => {
+
+  const metrics = resolveComposerUsageFooterMetrics({
+    usage: {
+      inputTokens: 800,
+      outputTokens: 150,
+      totalTokens: 950,
+    },
+    turnUsage: {
+      inputTokens: 800,
+      outputTokens: 150,
+      totalTokens: 950,
+    },
+    contextWindow: 1000,
+    contextUsageDisplay: "remaining",
+  });
+
+  assert.equal(metrics.outputSpeed, undefined);
+  assert.equal(metrics.turnTotal, 950);
+  assert.equal(metrics.cacheHitRate, undefined);
+  assert.equal(metrics.context.remainingPercent, 5);
+  assert.equal(metrics.context.level, "critical");
 });

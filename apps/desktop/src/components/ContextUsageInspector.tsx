@@ -40,6 +40,7 @@ export function ContextUsageInspector({
   responseDurationMs,
   responseOutputTokens,
   responseOutputEstimated = false,
+  variant = "ring",
 }: {
   usage: MessageUsage;
   turnUsage: MessageUsage;
@@ -48,6 +49,7 @@ export function ContextUsageInspector({
   responseDurationMs?: number;
   responseOutputTokens?: number;
   responseOutputEstimated?: boolean;
+  variant?: "ring" | "footer";
 }) {
   const { t } = useTranslation();
   const panelId = useId();
@@ -359,6 +361,41 @@ export function ContextUsageInspector({
       ) : null}
     </div>
   ) : null;
+
+  if (variant === "footer") {
+    return (
+      <div
+        className="composer-usage-item composer-usage-context"
+        data-level={level}
+        data-open={open ? "true" : "false"}
+      >
+        <TooltipButton
+          ref={triggerRef}
+          type="button"
+          className="composer-usage-btn composer-usage-context-btn"
+          tooltip={t("chat.usageContextAria", ariaArguments)}
+          ariaLabel={t("chat.usageContextAria", ariaArguments)}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? panelId : undefined}
+          onClick={toggleInspector}
+        >
+          <span className="composer-usage-label">
+            {t("chat.usageContextLabel")}
+          </span>
+          <span className="composer-usage-value">
+            {display.percent}%{" "}
+            {display.display === "used"
+              ? t("chat.usageContextAriaUsed")
+              : t("chat.usageContextAriaRemaining")}
+          </span>
+        </TooltipButton>
+        {popover && typeof document !== "undefined"
+          ? portalToBody(popover)
+          : null}
+      </div>
+    );
+  }
 
   return (
     <div

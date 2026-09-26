@@ -849,6 +849,15 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
             ));
         }
     }
+    if let Some(auto_title) = object.get("autoGenerateSessionTitles") {
+        if !auto_title.is_boolean() {
+            return Err(rpc_err(
+                1002,
+                "autoGenerateSessionTitles must be a boolean",
+                "INVALID_PARAMS",
+            ));
+        }
+    }
     if let Some(keep_awake) = object.get("keepAwakeWhileRunning") {
         if !keep_awake.is_boolean() {
             return Err(rpc_err(
@@ -6705,6 +6714,19 @@ mod tests {
         handle_request(
             state.clone(),
             "settings.set",
+            json!({ "autoGenerateSessionTitles": false }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let title_settings = handle_request(state.clone(), "settings.get", json!({}), tx.clone())
+            .await
+            .unwrap();
+        assert_eq!(title_settings["autoGenerateSessionTitles"], false);
+
+        handle_request(
+            state.clone(),
+            "settings.set",
             json!({ "keepAwakeWhileRunning": true }),
             tx.clone(),
         )
@@ -6734,6 +6756,16 @@ mod tests {
         .await
         .unwrap_err();
         assert_eq!(invalid_retry.data.unwrap()["errorCode"], "INVALID_PARAMS");
+
+        let invalid_title = handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "autoGenerateSessionTitles": "yes" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(invalid_title.data.unwrap()["errorCode"], "INVALID_PARAMS");
 
         let invalid_threshold = handle_request(
             state.clone(),

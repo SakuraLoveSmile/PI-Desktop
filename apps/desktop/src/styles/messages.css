@@ -3226,6 +3226,35 @@
   min-width: 0;
 }
 
+.turn-process.has-answer {
+  margin: 4px 0 6px;
+}
+
+.turn-process > .tool-activity-header {
+  min-height: 24px;
+  padding: 1px 4px;
+  font-size: var(--text-xs-plus);
+  color: var(--ds-text-muted);
+}
+
+.turn-process > .tool-activity-header:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-secondary);
+}
+
+.turn-process > .tool-activity-header > .tool-activity-icon {
+  color: var(--ds-text-muted);
+}
+
+.turn-process > .tool-activity-header > .tool-activity-caret {
+  color: var(--ds-text-muted);
+}
+
+.turn-process > .tool-activity-header > .tool-activity-count {
+  font-size: var(--text-xs);
+  color: var(--ds-text-faint);
+}
+
 .turn-process.open > .tool-activity-header > .tool-activity-caret,
 .process-activity-group.open > .tool-activity-header > .tool-activity-caret {
   transform: rotate(90deg);
@@ -3233,7 +3262,7 @@
 
 .turn-process-body {
   position: relative;
-  padding-left: 18px;
+  padding-left: 14px;
 }
 
 .turn-process-body[hidden],
