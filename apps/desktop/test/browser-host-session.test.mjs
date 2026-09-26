@@ -131,6 +131,12 @@ test("same-tab navigation supersedes an older request and retains sibling pages"
   oldRoot.resolve("/projects/A"); await older;
   assert.equal(h.loads.length, 2);
   assert.equal(h.host.getState().url, "https://fixture.invalid/newer");
+  await open(h, "B", "b", "B.html");
+  const fromOldChrome = h.host.navigate({ url: "https://fixture.invalid/a-late" }, "A", "a");
+  h.roots.at(-1).resolve("/projects/A"); await settled(); h.loads.at(-1).finish(); await fromOldChrome;
+  assert.equal(h.host.getState().url, "B.html");
+  h.host.setChromeSession("A", "a");
+  assert.equal(h.host.getState().url, "https://fixture.invalid/a-late");
 });
 
 test("closing the panel keeps a pending page hidden until the panel returns", async () => {

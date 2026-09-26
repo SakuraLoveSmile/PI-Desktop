@@ -218,10 +218,14 @@ export class BrowserHost {
     }
   }
 
-  async navigate(input: BrowserNavigateInput, sessionId?: string): Promise<BrowserState | null> {
+  async navigate(input: BrowserNavigateInput, sessionId?: string, tabId?: string): Promise<BrowserState | null> {
     const target = String(input.path ?? input.url ?? "").trim();
     if (!target) return this.getState();
     const id = sessionId?.trim() || this.active?.sessionId || "";
+    if (tabId !== undefined) {
+      const page = this.pages.get(this.key(id, tabId));
+      return page ? this.navigatePage(page, target) : null;
+    }
     if (!this.active) {
       this.active = this.pageFor(id, this.selectedTabs.get(id) ?? null);
       this.selectedTabs.set(id, this.active.tabId);
@@ -265,16 +269,20 @@ export class BrowserHost {
     return state ? { ...state, ...this.contextFor(page) } : null;
   }
 
-  action(action: "back" | "forward" | "reload" | "stop"): void {
-    if (this.active?.state) this.active.pane.action(action);
+  action(action: "back" | "forward" | "reload" | "stop", sessionId?: string, tabId?: string): void {
+    const page = sessionId !== undefined && tabId !== undefined
+      ? this.pages.get(this.key(sessionId, tabId)) : this.active;
+    if (page?.state) page.pane.action(action);
   }
 
   getState(): BrowserState | null {
     return this.active?.state ? { ...this.active.state, ...this.getContext() } : null;
   }
 
-  openExternal(): void {
-    if (this.active?.started) this.active.pane.openExternal();
+  openExternal(sessionId?: string, tabId?: string): void {
+    const page = sessionId !== undefined && tabId !== undefined
+      ? this.pages.get(this.key(sessionId, tabId)) : this.active;
+    if (page?.started) page.pane.openExternal();
   }
 
   private currentPage(): BrowserPage {

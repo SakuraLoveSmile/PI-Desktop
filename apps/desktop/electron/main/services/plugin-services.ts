@@ -610,12 +610,12 @@ export function createPluginServices({
     agentExtensionsChanged: () =>
       sendToRenderer(IPC.event.pluginChanged, { reason: "agentExtensions" }),
     browser: {
-      navigate: (input, sessionId) => browserHost.navigate(input, sessionId),
-      action: (action) => browserHost.action(action),
+      navigate: (input, sessionId, tabId) => browserHost.navigate(input, sessionId, tabId),
+      action: (action, sessionId, tabId) => browserHost.action(action, sessionId, tabId),
       setBounds: (pluginId, hole) => browserHost.setGuestHole(pluginId, hole),
       setVisible: (pluginId, visible) => browserHost.setGuestVisible(pluginId, visible),
       getState: () => browserHost.getState(),
-      openExternal: () => browserHost.openExternal(),
+      openExternal: (sessionId, tabId) => browserHost.openExternal(sessionId, tabId),
       snapshot: () => browserHost.snapshot(),
       screenshot: (input, sessionId) => browserHost.screenshot(input, sessionId),
       click: (uid) => browserHost.click(uid),

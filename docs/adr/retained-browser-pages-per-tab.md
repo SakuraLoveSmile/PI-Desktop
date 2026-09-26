@@ -24,7 +24,10 @@ BrowserPreview validates the request and asks the renderer to open a new resourc
 tab. Only that tab starts its navigation. Background browser.navigate records an
 intent for the session's last selected tab; before a session has a tab, its first
 tab consumes that intent once. Older load completion cannot overwrite an intent.
-An empty tab has no inherited native page state.
+An empty tab has no inherited native page state. Bundled browser chrome tags
+its navigation/action requests with the owning session/tab; a delayed reply
+cannot repaint another tab. Agent-facing methods retain runtime-owned session
+identity rather than accepting these UI routing fields.
 
 Closing a tab releases its page and CDP state. Session deletion, plugin disposal,
 renderer reload, window destruction and application shutdown release the corresponding pages.

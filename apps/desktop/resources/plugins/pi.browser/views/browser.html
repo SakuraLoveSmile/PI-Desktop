@@ -192,6 +192,7 @@
 
       let navigationRequest = 0;
       let displayedContext = "";
+      let navigationContext;
       const t = (key) => copy[locale]?.[key] ?? copy.en[key] ?? key;
 
       const applyCopy = () => {
@@ -223,6 +224,10 @@
           ? JSON.stringify([state.sessionId, state.tabId]) : displayedContext;
         const contextChanged = context !== displayedContext;
         displayedContext = context;
+        if (contextChanged) {
+          navigationRequest += 1;
+          navigationContext = { sessionId: state.sessionId, tabId: state.tabId };
+        }
         started = Boolean(state?.url) && !state?.loadError;
         empty.hidden = started && !state?.isLoading;
         const phase = state?.loadError === "ERR_ABORTED" ? "stopped" : state?.loadError ? "failed" : state?.isLoading ? "loading" : "empty";
@@ -256,18 +261,18 @@
         if (!value) return;
         const request = ++navigationRequest;
         paint({ url: value, isLoading: true });
-        void bridge.invoke("browser.navigate", { url: value }).then((state) => {
+        void bridge.invoke("browser.navigate", { url: value, ...navigationContext }).then((state) => {
           if (request === navigationRequest && state) paint(state);
         }).catch(() => {
           if (request === navigationRequest) paint({ url: value, loadError: "navigation failed" });
         });
       });
-      back.addEventListener("click", () => void bridge.invoke("browser.action", { action: "back" }));
-      forward.addEventListener("click", () => void bridge.invoke("browser.action", { action: "forward" }));
+      back.addEventListener("click", () => void bridge.invoke("browser.action", { action: "back", ...navigationContext }));
+      forward.addEventListener("click", () => void bridge.invoke("browser.action", { action: "forward", ...navigationContext }));
       reload.addEventListener("click", () => {
-        void bridge.invoke("browser.action", { action: reload.title === t("stop") ? "stop" : "reload" });
+        void bridge.invoke("browser.action", { action: reload.title === t("stop") ? "stop" : "reload", ...navigationContext });
       });
-      external.addEventListener("click", () => void bridge.invoke("browser.openExternal"));
+      external.addEventListener("click", () => void bridge.invoke("browser.openExternal", navigationContext));
       input.addEventListener("focus", () => {
         inputFocused = true;
         input.select();
