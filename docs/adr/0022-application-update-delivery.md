@@ -1,9 +1,9 @@
 # ADR 0022: Application Update Delivery
 
-- Status: Accepted (amended by D364 / D603 / ADR 0197, D450 / ADR 0289)
+- Status: Accepted (amended by D364 / D603 / D628 / ADR 0197, D450 / ADR 0289; issue #1098)
 - Date: 2026-07-26
 - Deciders: PI-Desktop core
-- Related: D120, D126, D364, D603, D010, D450, ADR 0021, ADR 0197, ADR 0289
+- Related: D120, D126, D364, D603, D628, D010, D450, ADR 0021, ADR 0197, ADR 0289
 
 ## Context
 
@@ -104,3 +104,20 @@ baselines for the next differential update. The default
 cache location remains unchanged unless the variable is set. Main does not write
 to the installation directory: the NSIS script still writes its `installer.exe`
 baseline to `%LOCALAPPDATA%`, which Main adopts on the next launch.
+
+
+## Amendment (D628)
+
+Settings → Info exposes a persisted per-install `updatePreference` with
+`automatic` and `manual` values. Automatic preserves the existing in-app
+installer lane. Manual continues stable-release checks but disables automatic
+download and install-on-quit, and raises one reminder per discovered version.
+The last reminded version is stored in the existing Host-owned app settings
+JSON and is intentionally omitted from portable configuration sync.
+
+Installed Windows NSIS, packaged macOS, and Linux AppImage default to Automatic.
+Windows ZIP/portable packages default to Manual; opting into Automatic is
+available on supported Windows packages only after the UI warns that NSIS may
+replace the extracted no-install copy. Unsupported installer formats remain
+Manual. This additive setting requires no database schema or host protocol
+version change.

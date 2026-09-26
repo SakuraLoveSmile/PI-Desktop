@@ -101,6 +101,13 @@ export const zhTW = {
   updates: {
     title: "軟體更新",
     desc: "更新通過 GitHub Releases 分發。",
+    preferenceTitle: "更新方式",
+    preferenceDesc: "自動更新會下載並安裝更新；手動更新只檢查，並對每個新版本提醒一次。",
+    automatic: "自動更新",
+    manual: "手動更新",
+    automaticUnsupported: "此安裝套件不支援自動安裝更新。",
+    automaticPortableWarning: "便攜版或 ZIP 切換為自動更新後，可能會被安裝版取代。",
+    preferenceSaveFailed: "無法儲存更新方式。",
     check: "檢查更新",
     checking: "正在檢查更新…",
     upToDate: "已是最新版本。",

@@ -268,6 +268,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     applyDeveloperMode,
     applyPreventScreenSleep,
     applyKeepAwakeWhileRunning,
+    applyUpdatePreference: (preference) => updater.setPreference(preference),
     resolveEffectiveCommandShell,
   });
   registerConfigSyncIpc({
