@@ -243,162 +243,31 @@ function promptAttachmentsFromMessage(
   }));
 }
 
-// Sessions created before locale switches keep their old default title, so
-// match against every locale's defaults (case-insensitive), not just the
-// active locale's.
-function withoutRecordKey<T>(record: Record<string, T>, key: string): Record<string, T> {
-  const next = { ...record };
-  delete next[key];
-  return next;
-}
+import {
+  withoutRecordKey,
+  viewingSessionIdForPrompt,
+  messageErrorFromUnknown,
+  assistantErrorMessage,
+  sessionModeForPlanningState,
+  openPlanArtifact,
+  decorateSessions,
+  promoteProjectPath,
+  removeProjectPath,
+  upsertWorkspace,
+  withProjectDisplayName,
+  preferencesFromState,
+  withCompactionMark,
+} from "./helpers/store-helpers";
 
-function viewingSessionIdForPrompt(
-  state: Pick<AppState, "page" | "activeSessionId">,
-  sessionId: string,
-): string | null {
-  return state.page === "chat" && state.activeSessionId === sessionId
-    ? sessionId
-    : null;
-}
+export type AppState = import("./app-state").AppState;
 
 export const SESSION_TRANSCRIPT_PAGE_SIZE = 100;
 export const SESSION_TRANSCRIPT_CONTENT_LIMIT = 64 * 1024;
 export { RETAINED_SESSION_PANE_LIMIT };
-// Preserve the original 320px tool-content minimum beside the 44px activity rail.
 export { WORK_PANEL_DEFAULT_WIDTH, WORK_PANEL_MIN_WIDTH };
-
-function messageErrorFromUnknown(error: unknown): AppError {
-  const value = error as {
-    code?: string;
-    message?: string;
-    retriable?: boolean;
-  };
-  return {
-    code: value?.code || "INTERNAL",
-    message:
-      error instanceof Error
-        ? error.message
-        : typeof value?.message === "string"
-          ? value.message
-          : String(error),
-    retriable: value?.retriable === true,
-  };
-}
-
-function assistantErrorMessage(error: AppError): UiMessage {
-  return {
-    id: crypto.randomUUID(),
-    role: "assistant",
-    content: "",
-    createdAt: new Date().toISOString(),
-    status: "error",
-    isError: true,
-    error,
-  };
-}
-
-/** Project planning state and proposal kind determine the durable mode shown in the sidebar. */
-function sessionModeForPlanningState(
-  state: PlanningState,
-  kind: ProposalKind | undefined,
-): Mode {
-  if (state === "inactive") return "agent";
-  return modeForProposalKind(kind ?? "plan");
-}
-
-export type AppState = import("./app-state").AppState;
-
-function openPlanArtifact(
-  proposal: PlanProposal,
-  openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
-  pluginViews: AppState["pluginViews"],
-) {
-  const relativePath = proposal.artifact?.relativePath;
-  if (!relativePath) return;
-  openWorkPanelTabForSession(
-    proposal.sessionId,
-    preferredFileWorkPanelTab(relativePath, pluginViews),
-  );
-}
-
-function decorateSessions(
-  sessions: SessionSummary[],
-  meta: Record<string, SessionMeta>,
-): SessionSummary[] {
-  return sessions.map((session) => ({
-    ...session,
-    pinned: sessionIsPinned(session.id, meta),
-    archived: sessionIsArchived(session.id, meta),
-  }));
-}
-
-function promoteProjectPath(paths: string[], rawPath: string): string[] {
-  const key = normalizeProjectPath(rawPath);
-  if (!key) return paths;
-  const withoutPath = paths.filter(
-    (path) => normalizeProjectPath(path) !== key,
-  );
-  return [...withoutPath, rawPath];
-}
-
-function removeProjectPath(paths: string[], rawPath: string): string[] {
-  const key = normalizeProjectPath(rawPath);
-  return key
-    ? paths.filter((path) => normalizeProjectPath(path) !== key)
-    : paths;
-}
-
-function upsertWorkspace(
-  projects: ProjectWorkspace[],
-  workspace: ProjectWorkspace,
-): ProjectWorkspace[] {
-  const key = normalizeProjectPath(workspace.path);
-  if (!key) return projects;
-  const index = projects.findIndex((item) => normalizeProjectPath(item.path) === key);
-  if (index < 0) return [...projects, workspace];
-  const next = projects.slice();
-  next[index] = { ...next[index], ...workspace };
-  return next;
-}
-
-function withProjectDisplayName(
-  workspace: ProjectWorkspace,
-  projectMeta: Record<string, ProjectMeta>,
-): ProjectWorkspace {
-  const key = normalizeProjectPath(workspace.path);
-  const name = key ? projectMeta[key]?.name : undefined;
-  return name ? { ...workspace, name } : workspace;
-}
-
-function preferencesFromState(state: Pick<
-  AppState,
-  | "sessionMeta"
-  | "projectMeta"
-  | "projectSort"
-  | "sessionView"
-  | "openProjectPaths"
->) {
-  return {
-    sessionMeta: state.sessionMeta,
-    projectMeta: state.projectMeta,
-    projectSort: state.projectSort,
-    sessionView: state.sessionView,
-    openProjectPaths: state.openProjectPaths,
-  };
-}
 
 function persistCurrentSidebar(getState: () => AppState): void {
   saveSidebarPreferences(preferencesFromState(getState()));
-}
-
-/** Append a freshly installed checkpoint, or replace a retried one by id. */
-function withCompactionMark(
-  marks: AppState["sessionCompactions"][string] | undefined,
-  mark: AppState["sessionCompactions"][string][number],
-): AppState["sessionCompactions"][string] {
-  const existing = marks?.find((m) => m.id === mark.id);
-  const merged = { ...mark, summary: mark.summary ?? existing?.summary };
-  return [...(marks ?? []).filter((m) => m.id !== mark.id), merged];
 }
 
 let storeAccess: StoreAccess | null = null;
