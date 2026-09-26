@@ -5078,7 +5078,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - 覆盖：`apps/desktop/test/update-preference.test.mjs`、更新后的
   `apps/desktop/test/auto-update.test.mjs` 与 E2E-UPDATE-preference-and-once-only-reminder。
 
-## 2026-09-27 —— 路由模型元数据采用保守的末段匹配（D629，PR #1047）
+## 2026-09-27 —— 路由模型元数据采用保守的末段匹配（D630，PR #1047）
 
 - 取代 D622 中用于运行期补全的宽泛目录别名。只比较大小写不敏感的最后一个 `/` 段，
   让路由或网关 wire ID 可以命中目录记录，同时不再把任意 thinking、发布日期、部署标记
