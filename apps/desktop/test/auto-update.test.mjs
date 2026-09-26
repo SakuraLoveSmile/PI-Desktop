@@ -93,18 +93,20 @@ test("main process registers update handlers and the auto-check lifecycle", () =
 });
 
 test("updater gates delivery mode by platform and delivery policy", () => {
-  // Packaged macOS, Windows NSIS, and Linux AppImage use in-app delivery.
-  // Dev builds are disabled outright.
-  assert.match(updaterSource, /if \(!isPackaged\) return "disabled"/);
-  assert.match(updaterSource, /win32.*in-app|in-app.*win32/s);
-  assert.match(
-    updaterSource,
-    /PORTABLE_EXECUTABLE_FILE[\s\S]*distribution === "zip"/,
-  );
+  // The pure policy tests cover platform capability and portable defaults.
+  assert.match(updaterSource, /resolveUpdateModePolicy/);
+  assert.match(updaterSource, /resolveDefaultUpdatePreference/);
+  assert.match(updaterSource, /supportsAutomaticUpdates/);
   assert.match(updaterSource, /piDistribution/);
-  assert.match(updaterSource, /platform === "darwin"[\s\S]*return "in-app"/);
-  assert.match(updaterSource, /APPIMAGE/);
-  assert.match(updaterSource, /autoInstallOnAppQuit = true/);
+  assert.match(updaterSource, /autoUpdater\.autoDownload = false/);
+  assert.match(updaterSource, /autoUpdater\.autoInstallOnAppQuit = false/);
+  assert.match(updaterSource, /autoUpdater\.autoDownload = mode === "in-app"/);
+  assert.match(updaterSource, /autoUpdater\.autoInstallOnAppQuit = mode === "in-app"/);
+  assert.match(updaterSource, /this\.applyPreference\(preference, false\)/);
+  assert.match(updaterSource, /manualReminderTracker/);
+  assert.match(updaterSource, /applyPreference\(this\.preference, false\)/);
+  assert.match(updaterSource, /resolveStoredUpdatePreference/);
+  assert.match(updaterSource, /if \(!preferenceChanged\) return/);
   assert.match(
     updaterSource,
     /allowPrerelease = false/,
@@ -176,8 +178,11 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(bannerSource, /releaseNotes/);
   assert.match(bannerSource, /availableVersion}:\$\{update\.status/);
   assert.match(bannerSource, /className="update-notice"/);
+  assert.match(bannerSource, /manualReminder === true/);
   assert.match(bannerSource, /role="progressbar"/);
-  assert.match(settingsSource, /<UpdatesRow currentVersion=/);
+  assert.match(settingsSource, /<UpdatesRow[\s\S]*currentVersion=\{version\?\.version\}/);
+  assert.match(settingsSource, /settings=\{settings\}/);
+  assert.match(settingsSource, /saveSettings=\{saveSettings\}/);
   assert.match(settingsSource, /update-settings-notes/);
   assert.match(settingsSource, /updates\.whatsNew/);
   assert.match(settingsSource, /updates\.releaseNotes/);
@@ -221,6 +226,13 @@ test("check-for-updates is reachable from the application menu", () => {
       "closeReleaseNotes",
       "currentBadge",
       "availableBadge",
+      "preferenceTitle",
+      "preferenceDesc",
+      "automatic",
+      "manual",
+      "automaticUnsupported",
+      "automaticPortableWarning",
+      "preferenceSaveFailed",
     ]) {
       assert.match(source, new RegExp(`${key}:`), key);
     }

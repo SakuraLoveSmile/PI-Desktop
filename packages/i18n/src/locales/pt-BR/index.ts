@@ -98,6 +98,13 @@ export const ptBR = {
   updates: {
     title: "Atualizações",
     desc: "As atualizações são baixadas do GitHub Releases.",
+    preferenceTitle: "Comportamento das atualizações",
+    preferenceDesc: "O modo automático baixa e instala atualizações; o manual verifica e avisa uma vez por nova versão.",
+    automatic: "Automático",
+    manual: "Manual",
+    automaticUnsupported: "Este pacote não oferece instalação automática.",
+    automaticPortableWarning: "No modo automático, uma cópia portátil ou ZIP pode ser substituída pela versão instalada.",
+    preferenceSaveFailed: "Não foi possível salvar a preferência de atualização.",
     check: "Verificar atualizações",
     checking: "Verificando atualizações…",
     upToDate: "Você está na versão mais recente.",

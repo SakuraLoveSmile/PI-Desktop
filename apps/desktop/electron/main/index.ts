@@ -272,6 +272,19 @@ const updater = new AppUpdaterController({
   currentVersion: APP_VERSION,
   isPackaged: !isDevelopmentBuild,
   getLocale: () => mainState.updaterLocale,
+  readUpdateSettings: async () => {
+    const host = getHost();
+    if (!host?.isAvailable()) throw new Error("host unavailable");
+    return host.call<{
+      updatePreference?: unknown;
+      lastNotifiedUpdateVersion?: unknown;
+    }>("settings.get");
+  },
+  persistLastNotifiedVersion: async (version) => {
+    const host = getHost();
+    if (!host?.isAvailable()) throw new Error("host unavailable");
+    await host.call("settings.set", { lastNotifiedUpdateVersion: version });
+  },
 });
 
 /**

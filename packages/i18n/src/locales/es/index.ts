@@ -99,6 +99,13 @@ export const es = {
   "updates": {
     "title": "Actualizaciones",
     "desc": "Las actualizaciones se descargan de las versiones de GitHub.",
+    "preferenceTitle": "Comportamiento de actualización",
+    "preferenceDesc": "El modo automático descarga e instala actualizaciones; el manual comprueba y avisa una vez por versión nueva.",
+    "automatic": "Automático",
+    "manual": "Manual",
+    "automaticUnsupported": "Este paquete no admite la instalación automática.",
+    "automaticPortableWarning": "Las actualizaciones automáticas pueden reemplazar una copia portable por la versión instalada.",
+    "preferenceSaveFailed": "No se pudo guardar la preferencia de actualización.",
     "check": "Buscar actualizaciones",
     "checking": "Buscando actualizaciones...",
     "upToDate": "Estás en la última versión.",

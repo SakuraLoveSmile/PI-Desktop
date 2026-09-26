@@ -108,6 +108,13 @@ export const tr = {
   updates: {
     title: "Güncellemeler",
     desc: "Güncellemeler GitHub Releases’ten indirilir.",
+    preferenceTitle: "Güncelleme davranışı",
+    preferenceDesc: "Otomatik mod güncellemeleri indirip kurar; manuel mod denetler ve her yeni sürüm için bir kez bildirir.",
+    automatic: "Otomatik",
+    manual: "Manuel",
+    automaticUnsupported: "Bu paket otomatik kurulumu desteklemiyor.",
+    automaticPortableWarning: "Taşınabilir veya ZIP sürümünde otomatik güncelleme, kurulu sürümle değiştirebilir.",
+    preferenceSaveFailed: "Güncelleme tercihi kaydedilemedi.",
     check: "Güncellemeleri denetle",
     checking: "Güncellemeler denetleniyor…",
     upToDate: "En son sürümü kullanıyorsunuz.",

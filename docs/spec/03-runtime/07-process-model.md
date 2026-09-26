@@ -303,11 +303,17 @@ the next launch rather than changing the NSIS installer or writing into
   pure-JS helpers it calls without changing process or protocol ownership
 - renderer dependencies ship through Vite output rather than duplicate raw
   package trees; no interactive PTY native module is packaged
-- packaged builds use the Main-owned update controller. macOS, non-AppImage
-  Linux, and Windows ZIP runs are manual-delivery modes; legacy Windows
-  portable executables remain manual when `PORTABLE_EXECUTABLE_FILE` is set.
-  Windows NSIS and Linux AppImage use the in-app feeds published by D126 tag
-  releases
+- packaged builds use the Main-owned update controller and a persisted
+  per-install `updatePreference`. Automatic mode keeps the existing in-app
+  download/install flow on supported packages; Manual mode checks the fixed
+  stable feed without starting downloads or installing on quit, and reminds
+  once per available version. Defaults are Automatic for Windows NSIS,
+  packaged macOS, and Linux AppImage; Windows ZIP/portable and packages without
+  automatic-install support default to Manual. Windows ZIP/portable users can
+  explicitly opt into Automatic after a warning that the NSIS installer may
+  replace the extracted copy. Preference and last-reminded version use the
+  existing host-owned app settings JSON; neither is included in portable
+  configuration sync.
 
 ## 7. Remote target topology (post-MVP)
 

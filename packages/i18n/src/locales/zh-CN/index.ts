@@ -101,6 +101,13 @@ export const zhCN = {
   updates: {
     title: "软件更新",
     desc: "更新通过 GitHub Releases 分发。",
+    preferenceTitle: "更新方式",
+    preferenceDesc: "自动更新会下载并安装更新；手动更新只检查，并对每个新版本提醒一次。",
+    automatic: "自动更新",
+    manual: "手动更新",
+    automaticUnsupported: "此安装包不支持自动安装更新。",
+    automaticPortableWarning: "便携版或 ZIP 切换为自动更新后，可能会被安装版替换。",
+    preferenceSaveFailed: "无法保存更新方式。",
     check: "检查更新",
     checking: "正在检查更新…",
     upToDate: "已是最新版本。",

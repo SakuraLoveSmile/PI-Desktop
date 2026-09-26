@@ -108,6 +108,13 @@ export const ko = {
   updates: {
     title: "업데이트",
     desc: "업데이트는 GitHub Releases에서 다운로드됩니다.",
+    preferenceTitle: "업데이트 방식",
+    preferenceDesc: "자동 업데이트는 업데이트를 다운로드하고 설치하며, 수동 업데이트는 확인 후 새 버전마다 한 번만 알립니다.",
+    automatic: "자동 업데이트",
+    manual: "수동 업데이트",
+    automaticUnsupported: "이 패키지는 자동 설치를 지원하지 않습니다.",
+    automaticPortableWarning: "포터블 또는 ZIP에서 자동 업데이트를 선택하면 설치 버전으로 대체될 수 있습니다.",
+    preferenceSaveFailed: "업데이트 방식을 저장하지 못했습니다.",
     check: "업데이트 확인",
     checking: "업데이트 확인 중…",
     upToDate: "최신 버전을 사용 중입니다.",
