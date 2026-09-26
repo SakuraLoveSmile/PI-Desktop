@@ -241,7 +241,12 @@ mod tests {
             &mut compactions,
         )
         .unwrap();
-        let target = dir.path().join("scratch").join("child").join("pasted").join("input.txt");
+        let target = dir
+            .path()
+            .join("scratch")
+            .join("child")
+            .join("pasted")
+            .join("input.txt");
         assert_eq!(fs::read_to_string(&target).unwrap(), "bytes");
         assert_eq!(
             records[0].blocks[0]["ref"],

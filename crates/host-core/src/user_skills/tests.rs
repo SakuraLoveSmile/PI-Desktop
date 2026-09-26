@@ -732,10 +732,7 @@ fn imports_a_directory_with_skill_md_in_link_mode() {
     payload.mode = Some("link".into());
     let record = match registry.import(source_dir.to_str().unwrap(), payload) {
         Ok(record) => record,
-        Err(err)
-            if cfg!(windows)
-                && format!("{err:#}").contains("1314") =>
-        {
+        Err(err) if cfg!(windows) && format!("{err:#}").contains("1314") => {
             // Unprivileged Windows environments without Developer Mode enabled
             // cannot create filesystem symlinks (os error 1314).
             return;
@@ -777,10 +774,7 @@ fn imports_a_file_in_link_mode() {
     payload.mode = Some("link".into());
     let record = match registry.import(source.to_str().unwrap(), payload) {
         Ok(record) => record,
-        Err(err)
-            if cfg!(windows)
-                && format!("{err:#}").contains("1314") =>
-        {
+        Err(err) if cfg!(windows) && format!("{err:#}").contains("1314") => {
             // Unprivileged Windows environments without Developer Mode enabled
             // cannot create filesystem symlinks (os error 1314).
             return;
