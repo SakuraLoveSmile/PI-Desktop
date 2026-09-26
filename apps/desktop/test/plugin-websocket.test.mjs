@@ -293,7 +293,8 @@ test("releasePlugin terminates every socket of that plugin only", async () => {
   assert.equal(registry.list(PLUGIN_ID).length, 1);
 });
 
-test("a timed-out connect refuses and leaves nothing behind", async () => {
+test("a timed-out connect refuses and leaves nothing behind", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   const transport = fakeTransport();
   const registry = new PluginWebSocketRegistry({
     createSocket: transport.factory,
@@ -301,8 +302,13 @@ test("a timed-out connect refuses and leaves nothing behind", async () => {
     connectTimeoutMs: 20,
   });
 
+  const pending = registry.connect({
+    pluginId: PLUGIN_ID,
+    url: "wss://voice.example.com/live",
+  });
+  t.mock.timers.tick(20);
   await assert.rejects(
-    registry.connect({ pluginId: PLUGIN_ID, url: "wss://voice.example.com/live" }),
+    pending,
     (error) => error.code === "TIMEOUT",
   );
   assert.deepEqual(registry.list(PLUGIN_ID), []);

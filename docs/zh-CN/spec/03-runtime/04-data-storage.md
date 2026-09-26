@@ -1,4 +1,4 @@
-# 04. 数据存储（架构 v17）
+# 04. 数据存储（架构 v21）
 
 > **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/04-data-storage) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
@@ -354,12 +354,14 @@ CREATE TABLE sessions (
   project_id  INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   provider_id TEXT,                            -- loose ref, see below
   model_id    TEXT,
-  mode        TEXT NOT NULL DEFAULT 'agent',   -- plan | agent
+  mode        TEXT NOT NULL DEFAULT 'agent',   -- plan | goal | agent
   thinking_level TEXT NOT NULL DEFAULT 'off'
                 CHECK (thinking_level IN ('off', 'minimal', 'low', 'medium',
                                           'high', 'xhigh', 'max', 'omit')),
   permission_mode TEXT NOT NULL DEFAULT 'inherit' -- D115: inherit follows settings
                 CHECK (permission_mode IN ('inherit', 'ask', 'accept-edits', 'auto')),
+  execution_profile TEXT NOT NULL DEFAULT 'standard'
+                CHECK (execution_profile IN ('standard', 'team')),
   source      TEXT,                            -- import origin: claude-code | codex | opencode | pi
   deleted_at  INTEGER,                         -- plugin trash marker; null means active
   pinned      INTEGER NOT NULL DEFAULT 0,
@@ -436,6 +438,9 @@ CREATE INDEX idx_session_import_origins_plugin
   将实时计划返回到可编辑状态。渲染器可能会保留最新的
   proposal/execution 每个会话的快照仅适用于其当前生命周期
   现场主持活动； `plans.pending` 仅重新水化挂起的行。
+- `execution_profile` 与 `mode` 正交：`standard` 是默认值并保留单 Agent
+  工具目录；`team` 将该会话设为 Host 所有 Expert Team 的 Lead。已有行迁移为
+  `standard`。
 - 新会话默认为 `agent`。导入的旧 `chat` 值已标准化
   至 `plan`；分叉会话复制持久模式，但从不复制挂起模式，
   已排队或正在运行批准行。
@@ -652,6 +657,26 @@ CREATE UNIQUE INDEX idx_session_collaboration_receipt
 - 协作来源存储在转录行 `meta` 的 `sessionMessage` 中，并以
   `UiMessage.sessionMessage` 投影到 UI。宿主校验阻止伪造、剥离、编辑或重新生成协作输入
   变成人类输入。该元数据是增量字段，不需要给 `messages` 增加列。
+
+### 4.6d Goal reports 与 Expert Team 状态（架构 v20-v21）
+
+Goal report 的身份和生命周期由 Host 存储在 `goal_reports`，以
+`execution_id` 为键并归属一个 session。报告正文通过原子发布写入
+`goal_reports/<sessionId>/<executionId>.json`；行记录路径、hash、字节数和
+持久转录序号。状态为 `draft`、`pending`、`ready` 或 `failed`；完整性为
+`structured` 或 `fallback`，结论为 `met`、`partial`、`blocked` 或 `unknown`。
+删除 session 会级联删除记录并移除对应报告文件。报告内容不会从转录文本推断。
+
+Expert Team 状态由 Host 存在三个表中（ADR 0307）：
+
+- `teams` 以 Lead session 为键，保存 revision 和暂停状态。
+- `team_members` 将持久 member session 绑定到 Lead，保存 Team 内唯一名称、
+  fresh/fork 上下文、生命周期阶段、模型绑定和错误。
+- `team_tasks` 保存有 revision 的共享任务板、所有者、依赖、建议写入范围、
+  状态和软删除标记。
+
+属于 Team 的 member session 不允许删除。删除 Lead 时会以一个事务将成员重置为
+`standard` 并移除 Team 状态；成员 session 及其转录仍作为独立会话保留。
 
 ### 4.7 messages — 转录索引
 
@@ -1114,7 +1139,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
 - JSON 列在热路径上盲读（按原样发送到渲染器）；
   任何过滤或求和的内容都是按规则提升的列。
 
-## 7. 版本控制、v7 重置和 v8 到 v16 迁移
+## 7. 版本控制、v7 重置和 v8 到 v21 迁移
 
 - `PRAGMA user_version` 保留模式权限；未来的结构性变化
   再次添加有序的 Rust 迁移 fns，每个都在一个事务中，并带有一个
@@ -1125,7 +1150,7 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   旧文件中的会话、提供程序和设置不会保留；
   存档仍保留以供手动恢复。所有 v7 之前的迁移代码
   （v1 `settings.sqlite` 导入，v2→v6 链）被删除。
-- 全新安装直接运行完整的 v16 DDL。
+- 全新安装直接运行完整的 v21 DDL。
 - **架构 v15 是增量的。** 它增加 `turn_queue` 表及其两个索引（D386 / ADR 0213），使 Host
   拥有的回合队列在重启后存活；不改动任何已有行，迁移前保留 `pi.sqlite.v14.bak`。
 - **架构 v16 是增量的。** 它增加会话协作 link 和投递表、生命周期索引，以及可为空的
@@ -1136,6 +1161,14 @@ outbox 排空。渲染器侧的停止绝不重写已有已开始回复的转录
   —— 所有 v17 之前的行保持 NULL 归属。该步骤之前保留 `pi.sqlite.v16.bak` 副本。
   v15→v16 会话协作步骤现在写入 `16`（它自己的版本）而不是最新的架构常量，
   因此 v15 文件可以在一次启动中走完两个步骤。
+- **架构 v18 到 v19 是增量的。** 它增加 `omit` thinking level，同时保留已存会话设置（ADR 0295）。
+- **架构 v19 到 v20 是增量的。** 它增加
+  `plan_approvals.artifact_workspace_kind` 和 Goal completion `goal_reports`；事务前保留
+  `pi.sqlite.v19.bak`。
+- **架构 v20 到 v21 是增量的。** 它增加 `sessions.execution_profile` 以及
+  `teams`、`team_members`、`team_tasks`（ADR 0307）。该步骤也会幂等补齐 Goal v20 对象，
+  因此来自任一未发布 v20 分支的数据库都能保留数据升级。事务前保留
+  `pi.sqlite.v20.bak`。
 - **架构 v7 首先到达 v8，然后使用受保护的路径。** v7→v8
   迁移之后是相同的受保护的 v8→v15 迁移；架构-v9 和
   schema-v10 数据库采用相同的受保护路径并接收精确的可读数据
@@ -1341,4 +1374,3 @@ preference does not rewrite provider configuration or require a schema migration
 schedule 就推断为日历配置；旧版 Hourly 行保留字段，但转换时需要明确确认日历时间。
 已知意图在周期切换和数据库重开后仍然保留。该新增 JSON 字段不需要表或 schema
 版本迁移；旧版本会忽略它，也无法执行新的转换保护。
-

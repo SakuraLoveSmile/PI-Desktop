@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const APP_NAME = "Pi-Desktop-Plus";
 const DEV_BUNDLE_ID = "cn.sakura.pi-desktop.dev";
-const BRANDING_SCHEMA = "v3";
+const BRANDING_SCHEMA = "v4";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DESKTOP_ROOT = join(ROOT, "apps", "desktop");
 
@@ -54,7 +54,7 @@ export function prepareMacDevelopmentBundle({
     .update(readFileSync(iconPath))
     .digest("hex")
     .slice(0, 12);
-  const cacheKey = `${electronVersion}-${iconHash}-${BRANDING_SCHEMA}`;
+  const cacheKey = `${electronVersion}-${iconHash}-${APP_NAME}-${DEV_BUNDLE_ID}-${BRANDING_SCHEMA}`;
   const targetRoot = join(cacheRoot, cacheKey);
   const targetBundle = join(targetRoot, `${APP_NAME}.app`);
   const targetExecutable = join(

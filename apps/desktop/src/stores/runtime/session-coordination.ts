@@ -307,6 +307,7 @@ export function createSessionCoordination({
         providerId: inherited.providerId,
         modelId: inherited.modelId,
         projectPath: projectPath ?? undefined,
+        executionProfile: draftConfig?.executionProfile ?? "standard",
       });
     } catch (error) {
       if (previousSessionId && runtime.navigationIntentIsCurrent(active)) {

@@ -630,11 +630,35 @@ export function createSessionSlice({
             modelId: config.modelId ?? state.draftConfiguration?.modelId,
             permissionMode:
               config.permissionMode ?? state.draftConfiguration?.permissionMode,
+            executionProfile:
+              config.executionProfile ?? state.draftConfiguration?.executionProfile,
           },
         }));
         return;
       }
       if (get().pendingPlans[sessionId]?.status === "pending") return;
+      if (config.executionProfile === "standard") {
+        const active = get().sessions.find((s) => s.id === sessionId);
+        if (active?.executionProfile === "team") {
+          try {
+            const roster = await api.getTeamRoster(sessionId);
+            const activeMember = roster.members.find(
+              (m) =>
+                m.phase === "running" ||
+                m.phase === "provisioning" ||
+                get().runningSessions[m.memberSessionId],
+            );
+            if (activeMember) {
+              throw new Error(i18n.t("chat.profileBlockedByRunningTeammate"));
+            }
+            await api.teamPause(sessionId);
+          } catch (err) {
+            if ((err as Error)?.message === i18n.t("chat.profileBlockedByRunningTeammate")) {
+              throw err;
+            }
+          }
+        }
+      }
       if (
         get().runningSessions[sessionId] ||
         runtime.sessionConfigurationFlushes.has(sessionId)

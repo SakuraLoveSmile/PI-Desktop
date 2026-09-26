@@ -32,7 +32,7 @@ const [
     read("../src/lib/app-language.ts"),
   ]);
 
-test("renderer surfaces the PI-Desktop brand instead of the Codex shell brand", () => {
+test("renderer surfaces the Pi-Desktop-Plus brand instead of the Codex shell brand", () => {
   assert.match(english, /shellName:\s*"Pi-Desktop-Plus"/);
   assert.match(chinese, /shellName:\s*"Pi-Desktop-Plus"/);
   assert.match(english, /placeholder:\s*"Ask Pi-Desktop-Plus to help with anything"/);

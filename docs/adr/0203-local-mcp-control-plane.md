@@ -77,3 +77,16 @@ dangerous-operation confirmation (including session configure), secret
 stripping, catalog exclusions, loopback bind refusal, mutation-only renderer
 refresh, and inactive shutdown manifests. E2E-220 records the full Electron
 journey; full local desktop E2E remains deferred by repository policy.
+
+## Durable turn observation amendment (2026-09-26)
+
+External schedulers cannot infer successful completion from an idle runtime: an
+error, cancellation, or restart also makes the agent idle. Expose the existing
+host-owned durable turn state through the additive, read-only `pi_turn_get`
+(`turn/get`, host `session.getTurn`) rather than adding a second event service
+or granting database access. Match both session and turn identifiers, return
+NOT_FOUND for absent or cross-session rows, and keep remote hosts excluded.
+The bearer boundary, default-off startup, and persistence schema are unchanged.
+The IPC/host protocol specs define the response; targeted host and MCP tests
+cover state, identity, and authentication. This does not itself prove an
+external scheduler has collected the complete transcript.

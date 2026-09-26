@@ -58,6 +58,7 @@ test("skills and MCP filter one list by level instead of stacking two sections",
   assert.match(layout, /agent-capability-list/);
   assert.match(layout, /<SegmentedControl/);
   assert.match(ui, /role = "radiogroup"/);
+  assert.match(layout, /label=\{t\("settings\.capabilityFilterLabel"\)\}/);
   assert.match(layout, /settings\.capabilityFilterAll/);
   // Subagents are global-only, so they get no level filter and no project.
   assert.doesNotMatch(subagents, /AgentProjectPicker|projectPath|CapabilityFilter/);

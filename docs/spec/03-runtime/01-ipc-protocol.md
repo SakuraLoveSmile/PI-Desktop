@@ -2150,8 +2150,8 @@ server uses MCP protocol version `2025-06-18` and supports `initialize`,
 or the compatible `2025-03-26` value and never echoes an unsupported client
 version. Listen is asserted to be loopback after bind. It accepts the standard
 POST transport; GET is handled with 405 because this server does not offer an
-SSE stream. Clients poll `pi_session_get` or `pi_agent_status` for turn
-progress.
+SSE stream. Clients poll `pi_agent_status` for the live runtime and
+`pi_turn_get` for a durable turn's terminal state.
 
 ### Connection and authentication
 
@@ -2194,10 +2194,44 @@ The named tools cover the common Agent workflow:
 - `pi_session_list`, `pi_session_create`, `pi_session_get`,
   `pi_session_rename`, `pi_session_fork`, `pi_session_delete`,
   `pi_session_configure`
-- `pi_agent_prompt`, `pi_agent_status`, `pi_agent_stop`, `pi_agent_abort`,
-  `pi_agent_compact`
+- `pi_agent_prompt`, `pi_agent_status`, `pi_turn_get`, `pi_agent_stop`,
+  `pi_agent_abort`, `pi_agent_compact`
 - `pi_plans_pending`, `pi_plans_resolve`
 - `pi_workspace_diff`, `pi_fs_list`, `pi_fs_read`
+
+`pi_turn_get` reads one durable turn's terminal state so an external scheduler
+can detect settlement without watching the renderer. It mirrors the
+`turn/get` operation over the `pi-desktop/turn/get` channel and the
+`session.getTurn` host method:
+
+```json
+{
+  "sessionId": "…",
+  "turnId": "…"
+}
+```
+
+Both fields are required. The row is looked up by `turnId` **and** `sessionId`
+against the persisted `turns` table, so a turn belonging to another session is
+indistinguishable from an unknown one. The result is:
+
+```json
+{
+  "sessionId": "…",
+  "turnId": "…",
+  "status": "running"
+}
+```
+
+`status` is one of `running`, `completed`, `error`, or `aborted`; `errorCode`
+and `endedAt` are omitted until the turn reaches a terminal state, when they
+appear with `endedAt` as an ISO8601/RFC3339 instant. A missing row, including a
+cross-session `turnId`, fails with code `NOT_FOUND` (`isError: true` plus
+`structuredContent.error`), and a blank or absent id fails with
+`INVALID_PARAMS`. The tool is read-only: it returns no prompt, transcript, or
+credential material, adds no port, token, auth scope, table, or write
+permission, and is routed to the local host only — a session owned by a paired
+remote host is not served and reports `NOT_FOUND`.
 
 `pi_control_describe` returns the reviewed operation catalog. `pi_desktop_invoke`
 accepts an operation id and positional IPC arguments:

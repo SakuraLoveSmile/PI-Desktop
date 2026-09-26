@@ -360,7 +360,7 @@ test("the vendor account dialog hosts the same panes in the same shell", () => {
 test("Advanced says a fullwidth value folds and a non-Latin-1 value is refused", () => {
   // The rule itself lives in @pi-desktop/shared (unit-tested there) and is
   // mirrored in host-core; this pins that the editor asks it and renders both
-  assert.match(headerEditorSource, /import \{ APP_VERSION, inspectHeaderValue \}/);
+  assert.match(headerEditorSource, /import \{ APP_NAME, APP_VERSION, inspectHeaderValue \}/);
   assert.match(headerEditorSource, /inspectHeaderValue\(pair\.value\)/);
   // Only a row that will be persisted may claim it folds: the hint has to
   // agree with what the host and the runtime do with the row.

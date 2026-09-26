@@ -31,8 +31,7 @@ test("a development build owns a different data directory than the shipped app",
     join(home, DEVELOPMENT_DATA_DIR_NAME),
   );
 
-  // A shipped installation must keep the directory its users already have, so
-  // the split can only have moved the development side.
+  // Both Plus profiles are independent of the original PI-Desktop roots.
   assert.equal(INSTALLATION_DATA_DIR_NAME, ".pi-desktop-plus");
   assert.equal(DEVELOPMENT_DATA_DIR_NAME, ".pi-desktop-plus-dev");
   assert.equal(DEVELOPMENT_INSTALLATION_NAME, "Pi-Desktop-Plus Dev");

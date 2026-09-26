@@ -1,3 +1,36 @@
+fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
+    let msg = e.to_string();
+    let code_str = if msg.contains("TEAM_UNAUTHORIZED") {
+        "TEAM_UNAUTHORIZED"
+    } else if msg.contains("TEAM_NOT_FOUND") {
+        "TEAM_NOT_FOUND"
+    } else if msg.contains("TEAM_TARGET_NOT_FOUND") {
+        "TEAM_TARGET_NOT_FOUND"
+    } else if msg.contains("TEAM_MEMBER_LIMIT_EXCEEDED") {
+        "TEAM_MEMBER_LIMIT_EXCEEDED"
+    } else if msg.contains("TEAM_MEMBER_NAME_COLLISION") {
+        "TEAM_MEMBER_NAME_COLLISION"
+    } else if msg.contains("TEAM_TASK_NOT_FOUND") {
+        "TEAM_TASK_NOT_FOUND"
+    } else if msg.contains("TEAM_TASK_REVISION_CONFLICT") {
+        "TEAM_TASK_REVISION_CONFLICT"
+    } else if msg.contains("TEAM_TASK_DEPENDENCY_CYCLE") {
+        "TEAM_TASK_DEPENDENCY_CYCLE"
+    } else if msg.contains("TEAM_TASK_UNKNOWN_DEPENDENCY") {
+        "TEAM_TASK_UNKNOWN_DEPENDENCY"
+    } else if msg.contains("TEAM_TASK_LIMIT_EXCEEDED") {
+        "TEAM_TASK_LIMIT_EXCEEDED"
+    } else if msg.contains("TEAM_MAILBOX_FULL") {
+        "TEAM_MAILBOX_FULL"
+    } else if msg.contains("TEAM_MESSAGE_PAYLOAD_TOO_LARGE") {
+        "TEAM_MESSAGE_PAYLOAD_TOO_LARGE"
+    } else if msg.contains("INVALID_PARAMS") {
+        "INVALID_PARAMS"
+    } else {
+        "INTERNAL"
+    };
+    rpc_err(1002, msg, code_str)
+}
 mod config_sync_rpc;
 mod scheduled_rpc;
 mod scheduled_tools;
@@ -1555,6 +1588,241 @@ async fn handle_request(
     }
 
     match method {
+        method if method.starts_with("team.") => {
+            let st = state.lock().await;
+            match method {
+                "team.getRoster" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let members =
+                        crate::team::list_team_members(&st.db, team_id).map_err(team_rpc_err)?;
+                    let team = crate::team::get_team(&st.db, team_id).map_err(team_rpc_err)?;
+                    Ok(json!({
+                        "teamSessionId": team_id,
+                        "revision": team.as_ref().map(|t| t.revision).unwrap_or(1),
+                        "paused": team.as_ref().map(|t| t.paused).unwrap_or(false),
+                        "members": members,
+                    }))
+                }
+                "team.getBoard" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let projection = crate::team::get_team_board_projection(&st.db, team_id)
+                        .map_err(team_rpc_err)?;
+                    Ok(json!(projection))
+                }
+                "team.createMember" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    let name = params
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "name required", "INVALID_PARAMS"))?;
+                    let description = params.get("description").and_then(|v| v.as_str());
+                    let context_kind = params.get("contextKind").and_then(|v| v.as_str());
+                    let model_id = params.get("modelId").and_then(|v| v.as_str());
+                    let provider_id = params.get("providerId").and_then(|v| v.as_str());
+                    let member = crate::team::create_team_member(
+                        &st.db,
+                        crate::team::CreateMemberParams {
+                            team_session_id: team_id,
+                            caller_session_id: caller_id,
+                            name,
+                            description,
+                            context_kind,
+                            model_id,
+                            provider_id,
+                        },
+                    )
+                    .map_err(team_rpc_err)?;
+                    Ok(json!({ "member": member }))
+                }
+                "team.createTask" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let subject = params
+                        .get("subject")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "subject required", "INVALID_PARAMS"))?;
+                    let task_id = params.get("taskId").and_then(|v| v.as_str());
+                    let description = params.get("description").and_then(|v| v.as_str());
+                    let blocked_by =
+                        params
+                            .get("blockedBy")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|x| x.as_str().map(String::from))
+                                    .collect::<Vec<_>>()
+                            });
+                    let write_scopes =
+                        params
+                            .get("writeScopes")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|x| x.as_str().map(String::from))
+                                    .collect::<Vec<_>>()
+                            });
+                    let owner_session_id = params.get("ownerSessionId").and_then(|v| v.as_str());
+                    let owner_member_name = params.get("ownerMemberName").and_then(|v| v.as_str());
+                    let task = crate::team::create_team_task(
+                        &st.db,
+                        crate::team::CreateTaskParams {
+                            team_session_id: team_id,
+                            task_id,
+                            subject,
+                            description,
+                            blocked_by,
+                            write_scopes,
+                            owner_session_id,
+                            owner_member_name,
+                        },
+                    )
+                    .map_err(team_rpc_err)?;
+                    Ok(json!({ "task": task }))
+                }
+                "team.updateTask" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let task_id = params
+                        .get("taskId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "taskId required", "INVALID_PARAMS"))?;
+                    let expected_revision = params
+                        .get("expectedRevision")
+                        .and_then(|v| v.as_i64())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "expectedRevision required", "INVALID_PARAMS")
+                        })?;
+                    let subject = params.get("subject").and_then(|v| v.as_str());
+                    let description = params.get("description").and_then(|v| v.as_str());
+                    let status = params.get("status").and_then(|v| v.as_str());
+                    let owner_session_id = params.get("ownerSessionId").map(|v| v.as_str());
+                    let owner_member_name = params.get("ownerMemberName").map(|v| v.as_str());
+                    let blocked_by =
+                        params
+                            .get("blockedBy")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|x| x.as_str().map(String::from))
+                                    .collect::<Vec<_>>()
+                            });
+                    let write_scopes =
+                        params
+                            .get("writeScopes")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|x| x.as_str().map(String::from))
+                                    .collect::<Vec<_>>()
+                            });
+                    let deleted = params.get("deleted").and_then(|v| v.as_bool());
+                    let task = crate::team::update_team_task(
+                        &st.db,
+                        crate::team::UpdateTaskParams {
+                            team_session_id: team_id,
+                            task_id,
+                            expected_revision,
+                            subject,
+                            description,
+                            status,
+                            owner_session_id,
+                            owner_member_name,
+                            blocked_by,
+                            write_scopes,
+                            deleted,
+                        },
+                    )
+                    .map_err(team_rpc_err)?;
+                    Ok(json!({ "task": task }))
+                }
+                "team.sendMessage" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    let target_id = params
+                        .get("target")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "target required", "INVALID_PARAMS"))?;
+                    let content = params
+                        .get("content")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
+                    let idempotency_key = params.get("idempotencyKey").and_then(|v| v.as_str());
+                    let msg = crate::team::send_team_message(
+                        &st.db,
+                        crate::team::SendMessageParams {
+                            team_session_id: team_id,
+                            caller_session_id: caller_id,
+                            target_identifier: target_id,
+                            content,
+                            idempotency_key,
+                        },
+                    )
+                    .map_err(team_rpc_err)?;
+                    Ok(json!({ "message": msg }))
+                }
+                "team.listMessages" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let session_id = params
+                        .get("sessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+                    let msgs = crate::team::list_member_messages(&st.db, team_id, session_id)
+                        .map_err(team_rpc_err)?;
+                    Ok(json!({ "messages": msgs }))
+                }
+                "team.pause" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let team = crate::team::pause_team(&st.db, team_id).map_err(team_rpc_err)?;
+                    Ok(json!({ "team": team }))
+                }
+                "team.resume" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let team = crate::team::resume_team(&st.db, team_id).map_err(team_rpc_err)?;
+                    Ok(json!({ "team": team }))
+                }
+                _ => Err(rpc_err(
+                    1004,
+                    format!("unknown method: {method}"),
+                    "METHOD_NOT_FOUND",
+                )),
+            }
+        }
         method if method.starts_with("session.collaboration.") => {
             let st = state.lock().await;
             crate::session_collaboration::handle(&st.db, method, &params)
@@ -2217,6 +2485,17 @@ async fn handle_request(
             } else {
                 None
             };
+            let execution_profile = match params.get("executionProfile") {
+                Some(v) => {
+                    let s = v.as_str().ok_or_else(|| {
+                        rpc_err(1002, "executionProfile must be a string", "INVALID_PARAMS")
+                    })?;
+                    sessions::validate_execution_profile(s)
+                        .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+                    Some(s.to_string())
+                }
+                None => None,
+            };
             let session = sessions::create_session_with_options(
                 &st.db,
                 sessions::SessionCreateOptions {
@@ -2242,6 +2521,7 @@ async fn handle_request(
                         .map(str::to_string),
                     thinking_level,
                     permission_mode,
+                    execution_profile,
                 },
             )
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
@@ -2347,6 +2627,29 @@ async fn handle_request(
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "session": session }))
         }
+        "session.getTurn" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let turn_id = params
+                .get("turnId")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "turnId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let turn = sessions::get_turn_state(&st.db, session_id, turn_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            match turn {
+                Some(turn) => {
+                    serde_json::to_value(turn).map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
+                }
+                None => Err(rpc_err(1007, "turn not found", "NOT_FOUND")),
+            }
+        }
         "session.configure" => {
             let id = params
                 .get("id")
@@ -2357,8 +2660,19 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "mode required", "INVALID_PARAMS"))?;
             let thinking_level = thinking_level_param(&params)?;
+            let execution_profile = match params.get("executionProfile") {
+                Some(v) => {
+                    let s = v.as_str().ok_or_else(|| {
+                        rpc_err(1002, "executionProfile must be a string", "INVALID_PARAMS")
+                    })?;
+                    sessions::validate_execution_profile(s)
+                        .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+                    Some(s)
+                }
+                None => None,
+            };
             let st = state.lock().await;
-            let session = sessions::configure_session_with_thinking(
+            let session = sessions::configure_session_with_profile(
                 &st.db,
                 id,
                 mode,
@@ -2366,6 +2680,7 @@ async fn handle_request(
                 params.get("modelId").and_then(|v| v.as_str()),
                 thinking_level.as_deref(),
                 params.get("permissionMode").and_then(|v| v.as_str()),
+                execution_profile,
             )
             .map_err(|e| {
                 let message = e.to_string();
@@ -2384,6 +2699,16 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            crate::team::can_delete_session(&st.db, id).map_err(|error| {
+                let message = error.to_string();
+                if message.starts_with("TEAM_MEMBER_DELETION_BLOCKED:") {
+                    rpc_err(1002, message, "TEAM_MEMBER_DELETION_BLOCKED")
+                } else {
+                    rpc_err(1000, message, "INTERNAL")
+                }
+            })?;
+            crate::team::cleanup_team_on_lead_delete(&st.db, id)
+                .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
             let ok = sessions::delete_session(&st.db, id).map_err(plan_rpc_err)?;
             if ok {
                 drop_session_side_data(&st, id);
@@ -5715,6 +6040,77 @@ mod tests {
         .await
         .unwrap_err();
         assert_eq!(malformed.data.unwrap()["errorCode"], "INVALID_PARAMS");
+    }
+
+    #[tokio::test]
+    async fn session_create_and_configure_rpc_execution_profile() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let def = handle_request(
+            state.clone(),
+            "session.create",
+            json!({ "mode": "agent" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(def["session"]["executionProfile"], "standard");
+        let def_id = def["session"]["id"].as_str().unwrap();
+
+        let team = handle_request(
+            state.clone(),
+            "session.create",
+            json!({ "mode": "agent", "executionProfile": "team" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(team["session"]["executionProfile"], "team");
+
+        let invalid_create = handle_request(
+            state.clone(),
+            "session.create",
+            json!({ "mode": "agent", "executionProfile": "invalid" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(invalid_create.data.unwrap()["errorCode"], "INVALID_PARAMS");
+
+        let configured = handle_request(
+            state.clone(),
+            "session.configure",
+            json!({
+                "id": def_id,
+                "mode": "agent",
+                "executionProfile": "team"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(configured["session"]["executionProfile"], "team");
+
+        let invalid_configure = handle_request(
+            state.clone(),
+            "session.configure",
+            json!({
+                "id": def_id,
+                "mode": "agent",
+                "executionProfile": "bad_profile"
+            }),
+            tx,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            invalid_configure.data.unwrap()["errorCode"],
+            "INVALID_PARAMS"
+        );
     }
 
     #[tokio::test]
@@ -9296,6 +9692,97 @@ mod tests {
         let st = state.lock().await;
         assert_eq!(st.plugins.locale(), "en-US");
     }
+
+    /// `session.getTurn` reads the durable turn row keyed by both ids: a
+    /// running turn reports `running` with no terminal fields, and the same
+    /// turn after a settlement reports its status, error code and RFC3339 end
+    /// instant. A cross-session or unknown turn is `NOT_FOUND` with no leak of
+    /// the other session's turn.
+    #[tokio::test]
+    async fn session_get_turn_reads_durable_state_by_session_and_turn() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session =
+            sessions::create_session(&app_state.db, None, None, None, None, None).unwrap();
+        let other = sessions::create_session(&app_state.db, None, None, None, None, None).unwrap();
+        let turn = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        let running = handle_request(
+            state.clone(),
+            "session.getTurn",
+            json!({ "sessionId": session.id, "turnId": turn }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(running["sessionId"], json!(session.id));
+        assert_eq!(running["turnId"], json!(turn));
+        assert_eq!(running["status"], json!("running"));
+        assert!(running.get("errorCode").is_none());
+        assert!(running.get("endedAt").is_none());
+
+        handle_request(
+            state.clone(),
+            "session.endTurn",
+            json!({
+                "turnId": turn,
+                "status": "error",
+                "errorCode": "PROVIDER_ERROR",
+                "createNotification": false
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+
+        let terminal = handle_request(
+            state.clone(),
+            "session.getTurn",
+            json!({ "sessionId": session.id, "turnId": turn }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(terminal["status"], json!("error"));
+        assert_eq!(terminal["errorCode"], json!("PROVIDER_ERROR"));
+        let ended_at = terminal["endedAt"]
+            .as_str()
+            .expect("terminal turn carries an endedAt");
+        assert!(chrono::DateTime::parse_from_rfc3339(ended_at).is_ok());
+
+        // A turn id belonging to another session is indistinguishable from an
+        // unknown one, and neither case echoes the owning session.
+        for params in [
+            json!({ "sessionId": other.id, "turnId": turn }),
+            json!({ "sessionId": session.id, "turnId": "missing-turn" }),
+        ] {
+            let error =
+                handle_request(state.clone(), "session.getTurn", params.clone(), tx.clone())
+                    .await
+                    .expect_err("unknown or cross-session turns are not found");
+            assert_eq!(error.code, 1007);
+            assert_eq!(error.data.unwrap()["errorCode"], "NOT_FOUND");
+            assert!(!error.message.contains(&session.id));
+            assert!(!error.message.contains(&other.id));
+        }
+
+        // Both ids are required and blank values are invalid, not empty reads.
+        for params in [
+            json!({ "turnId": turn }),
+            json!({ "sessionId": session.id }),
+            json!({ "sessionId": "  ", "turnId": turn }),
+            json!({ "sessionId": session.id, "turnId": "" }),
+        ] {
+            let error = handle_request(state.clone(), "session.getTurn", params, tx.clone())
+                .await
+                .expect_err("missing or blank ids are invalid params");
+            assert_eq!(error.code, 1002);
+            assert_eq!(error.data.unwrap()["errorCode"], "INVALID_PARAMS");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -9330,5 +9817,170 @@ mod image_generation_settings_tests {
         ] {
             assert!(validate_settings_value(&json!({"imageGenerationModels": value})).is_err());
         }
+    }
+
+    #[tokio::test]
+    async fn team_rpc_full_journey() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        // 1. Create team session
+        let created = handle_request(
+            state.clone(),
+            "session.create",
+            json!({ "mode": "agent", "executionProfile": "team" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let team_id = created["session"]["id"].as_str().unwrap();
+
+        // 2. Spawn teammate via RPC
+        let spawned = handle_request(
+            state.clone(),
+            "team.createMember",
+            json!({
+                "teamSessionId": team_id,
+                "callerSessionId": team_id,
+                "name": "explorer",
+                "description": "Finds files",
+                "contextKind": "fresh"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(spawned["member"]["name"], "explorer");
+        let member_session_id = spawned["member"]["memberSessionId"].as_str().unwrap();
+
+        // 3. Get roster
+        let roster = handle_request(
+            state.clone(),
+            "team.getRoster",
+            json!({ "teamSessionId": team_id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(roster["members"].as_array().unwrap().len(), 1);
+
+        // 4. Create and update task
+        let task_res = handle_request(
+            state.clone(),
+            "team.createTask",
+            json!({
+                "teamSessionId": team_id,
+                "taskId": "task-1",
+                "subject": "Inspect repository structure",
+                "writeScopes": ["crates/host-core"]
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(task_res["task"]["subject"], "Inspect repository structure");
+
+        let update_res = handle_request(
+            state.clone(),
+            "team.updateTask",
+            json!({
+                "teamSessionId": team_id,
+                "taskId": "task-1",
+                "expectedRevision": 1,
+                "status": "in_progress",
+                "ownerMemberName": "explorer"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(update_res["task"]["status"], "in_progress");
+
+        // 5. Get board projection
+        let board = handle_request(
+            state.clone(),
+            "team.getBoard",
+            json!({ "teamSessionId": team_id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(board["tasks"].as_array().unwrap().len(), 1);
+
+        // 6. Send message
+        let send_res = handle_request(
+            state.clone(),
+            "team.sendMessage",
+            json!({
+                "teamSessionId": team_id,
+                "callerSessionId": team_id,
+                "target": "explorer",
+                "content": "Please start inspecting"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(send_res["message"]["status"], "queued");
+
+        // 7. Pause and resume team
+        let pause_res = handle_request(
+            state.clone(),
+            "team.pause",
+            json!({ "teamSessionId": team_id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(pause_res["team"]["paused"], true);
+
+        let resume_res = handle_request(
+            state.clone(),
+            "team.resume",
+            json!({ "teamSessionId": team_id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resume_res["team"]["paused"], false);
+
+        // 8. Member deletion blocked
+        let del_member_err = handle_request(
+            state.clone(),
+            "session.delete",
+            json!({ "id": member_session_id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            del_member_err.data.unwrap()["errorCode"],
+            "TEAM_MEMBER_DELETION_BLOCKED"
+        );
+
+        // 9. Lead deletion cleans up team and resets member
+        let del_lead_res = handle_request(
+            state.clone(),
+            "session.delete",
+            json!({ "id": team_id }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(del_lead_res["ok"], true);
+
+        // Member is now standalone standard session
+        let get_member = handle_request(
+            state.clone(),
+            "session.get",
+            json!({ "id": member_session_id }),
+            tx,
+        )
+        .await
+        .unwrap();
+        assert_eq!(get_member["session"]["executionProfile"], "standard");
     }
 }

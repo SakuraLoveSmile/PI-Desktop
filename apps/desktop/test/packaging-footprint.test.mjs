@@ -252,7 +252,7 @@ test("macOS DMG is a two-icon install; ZIP keeps the unsigned helper", () => {
   ]);
   assert.doesNotMatch(
     JSON.stringify(packageJson.build.dmg.contents),
-    /Pi-Desktop-Plus-macOS-open\.command|Pi-Desktop-Plus-macOS-open\.command|Open PI-Desktop\.command|opening-help|If app won't open/,
+    /Pi-Desktop-Plus-macOS-open\.command|PI-Desktop-macOS-open\.command|Open PI-Desktop\.command|opening-help|If app won't open/,
     "the DMG must not expose the unsigned helper or opening note",
   );
   assert.deepEqual([...dmgBackground.subarray(0, 8)], [

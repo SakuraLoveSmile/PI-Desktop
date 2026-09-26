@@ -1,5 +1,5 @@
 #!/bin/bash
-# Open a trusted unsigned Pi-Desktop-Plus installation on macOS.
+# Open a trusted unsigned PI-Desktop installation on macOS.
 #
 # This helper removes only Apple's quarantine attribute from the known
 # application locations. It never uses sudo and never accepts an arbitrary

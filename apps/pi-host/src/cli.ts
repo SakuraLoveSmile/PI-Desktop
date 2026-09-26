@@ -17,7 +17,7 @@ async function main(): Promise<void> {
       [
         "pi-host — headless PI Agent Host (RACP-WS on loopback)",
         "",
-        "  --data-dir <dir>          host data directory (default ~/.pi-desktop)",
+        "  --data-dir <dir>          host data directory (default ~/.pi-desktop-plus)",
         "  --port <n>                loopback port (default 0 = pick free)",
         "  --host <addr>             bind address; loopback only",
         "  --pair                    print a single-use pairing token at start",

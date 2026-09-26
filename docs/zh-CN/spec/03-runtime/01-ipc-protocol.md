@@ -1735,7 +1735,7 @@ Electron Main 只绑定 `127.0.0.1`，并在 `/mcp` 提供 Streamable HTTP MCP�
 `resources/list` 和 `logging/setLevel`。`initialize` 只协商 `2025-06-18` 或兼容的
 `2025-03-26`，不会回显不支持的客户端版本。监听地址在 bind 后必须仍是回环。
 服务接受标准 POST 传输；由于不提供 SSE 流，GET 会返回 405。客户端通过轮询
-`pi_session_get` 或 `pi_agent_status` 观察回合进度。
+`pi_agent_status` 观察实时运行状态，通过 `pi_turn_get` 观察持久回合的终态。
 
 ### 连接与认证
 
@@ -1773,10 +1773,39 @@ Electron 等待主机关闭之前会停止服务，并将清单标记为非活�
 - `pi_session_list`、`pi_session_create`、`pi_session_get`、
   `pi_session_rename`、`pi_session_fork`、`pi_session_delete`、
   `pi_session_configure`
-- `pi_agent_prompt`、`pi_agent_status`、`pi_agent_stop`、`pi_agent_abort`、
-  `pi_agent_compact`
+- `pi_agent_prompt`、`pi_agent_status`、`pi_turn_get`、`pi_agent_stop`、
+  `pi_agent_abort`、`pi_agent_compact`
 - `pi_plans_pending`、`pi_plans_resolve`
 - `pi_workspace_diff`、`pi_fs_list`、`pi_fs_read`
+
+`pi_turn_get` 读取单个持久回合的终态，使外部调度器无需监视渲染进程即可判断结算。
+它对应 `pi-desktop/turn/get` 通道上的 `turn/get` 操作和 `session.getTurn` 主机方法：
+
+```json
+{
+  "sessionId": "…",
+  "turnId": "…"
+}
+```
+
+两个字段都必填。该行按 `turnId` **和** `sessionId` 在持久化的 `turns` 表中查找，
+因此属于其他会话的回合与未知回合无法区分。结果为：
+
+```json
+{
+  "sessionId": "…",
+  "turnId": "…",
+  "status": "running"
+}
+```
+
+`status` 为 `running`、`completed`、`error` 或 `aborted` 之一；`errorCode` 和
+`endedAt` 在回合进入终态前省略，进入终态后出现，其中 `endedAt` 为
+ISO8601/RFC3339 时刻。缺少对应行（包括跨会话的 `turnId`）会以 `NOT_FOUND` 失败
+（`isError: true` 加 `structuredContent.error`），id 为空或缺失会以
+`INVALID_PARAMS` 失败。该工具是只读的：不返回提示词、转录或凭据材料，不新增
+端口、token、认证范围、表或写权限，且只路由到本机主机 —— 由已配对远端主机持有的
+会话不被服务，并报告 `NOT_FOUND`。
 
 `pi_control_describe` 返回经过审查的操作目录。`pi_desktop_invoke` 接受操作 id
 和位置参数形式的 IPC 参数：

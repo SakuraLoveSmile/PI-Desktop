@@ -89,6 +89,37 @@ fn validate_thinking_level(level: &str) -> Result<()> {
     }
 }
 
+/// Execution profile (ADR 0304): `standard` is a standalone agent session,
+/// while `team` indicates a team lead orchestrating named teammates.
+pub const EXECUTION_PROFILES: [&str; 2] = ["standard", "team"];
+
+pub fn is_valid_execution_profile(profile: &str) -> bool {
+    EXECUTION_PROFILES.contains(&profile)
+}
+
+fn default_execution_profile() -> String {
+    "standard".to_string()
+}
+
+#[allow(dead_code)]
+pub fn normalize_execution_profile(profile: Option<&str>) -> String {
+    match profile {
+        Some(p) if is_valid_execution_profile(p) => p.to_string(),
+        _ => default_execution_profile(),
+    }
+}
+
+pub fn validate_execution_profile(profile: &str) -> Result<()> {
+    if is_valid_execution_profile(profile) {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "executionProfile must be one of {}",
+            EXECUTION_PROFILES.join(", ")
+        ))
+    }
+}
+
 /// Wire format is unchanged from v1: RFC3339 timestamps, `projectPath`
 /// resolved from the projects table, flat tool fields on messages. Storage is
 /// schema v7 (D119): transcript content lives in per-session JSONL files and
@@ -111,6 +142,8 @@ pub struct SessionSummary {
     pub thinking_level: String,
     #[serde(default = "default_permission_mode")]
     pub permission_mode: String,
+    #[serde(default = "default_execution_profile")]
+    pub execution_profile: String,
     pub updated_at: String,
     pub created_at: String,
 }
@@ -1112,7 +1145,7 @@ fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
 
 const SUMMARY_SELECT: &str =
     "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
-            s.thinking_level, s.permission_mode, s.updated_at, s.created_at
+            s.thinking_level, s.permission_mode, s.execution_profile, s.updated_at, s.created_at
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
      WHERE s.deleted_at IS NULL";
 
@@ -1127,8 +1160,11 @@ pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sess
         mode: row.get(6)?,
         thinking_level: row.get(7)?,
         permission_mode: row.get(8)?,
-        updated_at: ms_to_ts(row.get(9)?),
-        created_at: ms_to_ts(row.get(10)?),
+        execution_profile: row
+            .get::<_, Option<String>>(9)?
+            .unwrap_or_else(default_execution_profile),
+        updated_at: ms_to_ts(row.get(10)?),
+        created_at: ms_to_ts(row.get(11)?),
     })
 }
 
@@ -1202,6 +1238,7 @@ pub struct SessionCreateOptions {
     pub project_path: Option<String>,
     pub thinking_level: Option<String>,
     pub permission_mode: Option<String>,
+    pub execution_profile: Option<String>,
 }
 
 pub fn create_session_with_thinking(
@@ -1223,6 +1260,7 @@ pub fn create_session_with_thinking(
             project_path,
             thinking_level,
             permission_mode: None,
+            execution_profile: None,
         },
     )
 }
@@ -1244,6 +1282,7 @@ pub fn create_session_with_options(
         project_path,
         thinking_level,
         permission_mode,
+        execution_profile,
     } = options;
     let now = now_ms();
     let id = Uuid::new_v4().to_string();
@@ -1253,6 +1292,13 @@ pub fn create_session_with_options(
     validate_thinking_level(&thinking_level)?;
     let permission_mode = permission_mode.unwrap_or_else(default_permission_mode);
     validate_permission_mode(&permission_mode)?;
+    let execution_profile = match execution_profile {
+        Some(profile) => {
+            validate_execution_profile(&profile)?;
+            profile
+        }
+        None => default_execution_profile(),
+    };
     let project_id = match project_path
         .as_deref()
         .filter(|path| !path.trim().is_empty())
@@ -1268,8 +1314,8 @@ pub fn create_session_with_options(
         .prepare_cached(
             "INSERT INTO sessions (
                 id, title, project_id, provider_id, model_id, mode, thinking_level,
-                permission_mode, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
+                permission_mode, execution_profile, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
         )?
         .execute(params![
             id,
@@ -1280,6 +1326,7 @@ pub fn create_session_with_options(
             mode,
             thinking_level,
             permission_mode,
+            execution_profile,
             now
         ])?;
     Ok(SessionSummary {
@@ -1292,6 +1339,7 @@ pub fn create_session_with_options(
         mode,
         thinking_level,
         permission_mode,
+        execution_profile,
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
     })
@@ -1302,6 +1350,16 @@ pub fn session_permission_mode(db: &Database, id: &str) -> Result<Option<String>
     Ok(db
         .conn()
         .prepare_cached("SELECT permission_mode FROM sessions WHERE id = ?1")?
+        .query_row(params![id], |row| row.get(0))
+        .optional()?)
+}
+
+/// The persisted per-session execution profile, or None for unknown sessions.
+#[allow(dead_code)]
+pub fn session_execution_profile(db: &Database, id: &str) -> Result<Option<String>> {
+    Ok(db
+        .conn()
+        .prepare_cached("SELECT execution_profile FROM sessions WHERE id = ?1")?
         .query_row(params![id], |row| row.get(0))
         .optional()?)
 }
@@ -1619,10 +1677,10 @@ pub fn fork_session_through(
             .prepare_cached(
                 "INSERT INTO sessions (
                     id, title, project_id, provider_id, model_id, mode, thinking_level,
-                    permission_mode, source, pinned, last_seq, created_at, updated_at
+                    permission_mode, execution_profile, source, pinned, last_seq, created_at, updated_at
                  )
                  SELECT ?1, ?2, project_id, provider_id, model_id, mode, thinking_level,
-                        permission_mode, NULL, 0, ?3, ?4, ?4
+                        permission_mode, execution_profile, NULL, 0, ?3, ?4, ?4
                  FROM sessions WHERE id = ?5",
             )?
             .execute(params![id, title, records.len() as i64, now, source_id])?;
@@ -1652,6 +1710,7 @@ pub fn fork_session_through(
         mode: source.summary.mode,
         thinking_level: source.summary.thinking_level,
         permission_mode: source.summary.permission_mode,
+        execution_profile: source.summary.execution_profile,
         updated_at: created_at.clone(),
         created_at,
     };
@@ -1692,6 +1751,29 @@ pub fn configure_session_with_thinking(
     thinking_level: Option<&str>,
     permission_mode: Option<&str>,
 ) -> Result<Option<SessionSummary>> {
+    configure_session_with_profile(
+        db,
+        id,
+        mode,
+        provider_id,
+        model_id,
+        thinking_level,
+        permission_mode,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn configure_session_with_profile(
+    db: &Database,
+    id: &str,
+    mode: &str,
+    provider_id: Option<&str>,
+    model_id: Option<&str>,
+    thinking_level: Option<&str>,
+    permission_mode: Option<&str>,
+    execution_profile: Option<&str>,
+) -> Result<Option<SessionSummary>> {
     if !(is_valid_mode(mode) || mode == "chat") {
         return Err(anyhow!("mode must be plan or agent"));
     }
@@ -1701,6 +1783,9 @@ pub fn configure_session_with_thinking(
     }
     if let Some(mode) = permission_mode {
         validate_permission_mode(mode)?;
+    }
+    if let Some(profile) = execution_profile {
+        validate_execution_profile(profile)?;
     }
     crate::plans::gate_session_configure(
         db,
@@ -1718,7 +1803,9 @@ pub fn configure_session_with_thinking(
              SET mode = ?2, provider_id = COALESCE(?3, provider_id),
                  model_id = COALESCE(?4, model_id),
                  thinking_level = COALESCE(?5, thinking_level),
-                 permission_mode = COALESCE(?6, permission_mode), updated_at = ?7
+                 permission_mode = COALESCE(?6, permission_mode),
+                 execution_profile = COALESCE(?7, execution_profile),
+                 updated_at = ?8
              WHERE id = ?1",
         )?
         .execute(params![
@@ -1728,6 +1815,7 @@ pub fn configure_session_with_thinking(
             model_id,
             thinking_level,
             permission_mode,
+            execution_profile,
             now_ms()
         ])?;
     if changed == 0 {
@@ -3290,11 +3378,16 @@ pub fn import_session(
             }
             "external".to_string()
         });
+        let execution_profile = match summary.execution_profile.as_str() {
+            p if is_valid_execution_profile(p) => p,
+            _ => "standard",
+        };
         tx.prepare_cached(
             "INSERT INTO sessions (
-                id, title, project_id, provider_id, model_id, mode, thinking_level, source,
+                id, title, project_id, provider_id, model_id, mode, thinking_level,
+                permission_mode, execution_profile, source,
                 last_seq, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         )?
         .execute(params![
             summary.id,
@@ -3304,6 +3397,8 @@ pub fn import_session(
             summary.model_id,
             mode,
             summary.thinking_level,
+            summary.permission_mode,
+            execution_profile,
             source,
             records.len() as i64,
             ts_to_ms(&summary.created_at),
@@ -3336,6 +3431,42 @@ pub fn session_count(db: &Database) -> Result<i64> {
     Ok(db
         .conn()
         .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))?)
+}
+
+/// Read-only projection of one persisted turn, keyed by both session and turn.
+/// `status` is the persisted domain {running, completed, error, aborted};
+/// `endedAt` is the wire-format RFC3339 timestamp of the terminal write.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TurnState {
+    pub session_id: String,
+    pub turn_id: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ended_at: Option<String>,
+}
+
+/// Fetch a turn's state. A missing row and a turn owned by another session
+/// both yield `Ok(None)` so callers cannot probe turns across sessions.
+pub fn get_turn_state(db: &Database, session_id: &str, turn_id: &str) -> Result<Option<TurnState>> {
+    let row: Option<(String, Option<String>, Option<i64>)> = db
+        .conn()
+        .prepare_cached(
+            "SELECT status, error_code, ended_at FROM turns WHERE id = ?1 AND session_id = ?2",
+        )?
+        .query_row(params![turn_id, session_id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .optional()?;
+    Ok(row.map(|(status, error_code, ended_at)| TurnState {
+        session_id: session_id.to_string(),
+        turn_id: turn_id.to_string(),
+        status,
+        error_code,
+        ended_at: ended_at.map(ms_to_ts),
+    }))
 }
 
 // ---- turns ------------------------------------------------------------------
@@ -4264,6 +4395,86 @@ mod tests {
     }
 
     #[test]
+    fn create_and_configure_session_execution_profile() {
+        let db = test_db();
+        let default_session = create_session(&db, None, None, None, None, None).unwrap();
+        assert_eq!(default_session.execution_profile, "standard");
+        assert_eq!(
+            session_execution_profile(&db, &default_session.id).unwrap(),
+            Some("standard".into())
+        );
+
+        let team_session = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                title: Some("Team Lead".into()),
+                execution_profile: Some("team".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(team_session.execution_profile, "team");
+        assert_eq!(
+            session_execution_profile(&db, &team_session.id).unwrap(),
+            Some("team".into())
+        );
+
+        // Invalid profile is rejected
+        assert!(create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                execution_profile: Some("swarm".into()),
+                ..Default::default()
+            },
+        )
+        .is_err());
+
+        // Fork preserves execution profile
+        let ForkSessionResult::Created(forked) =
+            fork_session_through(&db, &team_session.id, None, None).unwrap()
+        else {
+            panic!("expected Created");
+        };
+        assert_eq!(forked.summary.execution_profile, "team");
+        assert_eq!(
+            session_execution_profile(&db, &forked.summary.id).unwrap(),
+            Some("team".into())
+        );
+
+        // Configure profile updates execution_profile
+        let configured = configure_session_with_profile(
+            &db,
+            &default_session.id,
+            "agent",
+            None,
+            None,
+            None,
+            None,
+            Some("team"),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(configured.execution_profile, "team");
+        assert_eq!(
+            session_execution_profile(&db, &default_session.id).unwrap(),
+            Some("team".into())
+        );
+
+        // Configure with invalid profile is rejected
+        assert!(configure_session_with_profile(
+            &db,
+            &default_session.id,
+            "agent",
+            None,
+            None,
+            None,
+            None,
+            Some("invalid"),
+        )
+        .is_err());
+    }
+
+    #[test]
     fn rename_session_normalizes_title_without_touching_activity() {
         let db = test_db();
         let session = create_session(&db, Some("Original".into()), None, None, None, None).unwrap();
@@ -4344,6 +4555,7 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
+            execution_profile: "standard".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
         };
@@ -4394,6 +4606,7 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
+            execution_profile: "standard".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
@@ -5133,6 +5346,7 @@ mod tests {
             mode: "agent".into(),
             thinking_level: "medium".into(),
             permission_mode: "inherit".into(),
+            execution_profile: "standard".into(),
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };

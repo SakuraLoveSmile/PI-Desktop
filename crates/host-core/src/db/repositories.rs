@@ -136,6 +136,7 @@ impl Database {
                 tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
                 tx.execute_batch(crate::session_collaboration::SCHEMA)?;
                 tx.execute_batch(crate::goal_reports::SCHEMA)?;
+                tx.execute_batch(TEAM_SCHEMA)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
             }
@@ -184,6 +185,7 @@ impl Database {
             19 => {
                 migrate_v19_to_v20(&conn, path)?;
             }
+            20 => {}
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
                 drop(conn);
@@ -218,20 +220,11 @@ impl Database {
         }
         if migrated_version == 19 {
             migrate_v19_to_v20(&conn, path)?;
+            migrated_version = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         }
-        let has_workspace_kind: bool = conn
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'artifact_workspace_kind')",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or(false);
-        if !has_workspace_kind {
-            conn.execute_batch(
-                "ALTER TABLE plan_approvals ADD COLUMN artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch'));",
-            )?;
+        if migrated_version == 20 {
+            migrate_v20_to_v21(&conn, path)?;
         }
-        conn.execute_batch(crate::goal_reports::SCHEMA)?;
         let db = Self { conn, data_dir };
         db.boot_maintenance()?;
         crate::session_collaboration::recover(&db)?;

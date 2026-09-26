@@ -240,6 +240,12 @@ type ToolBudgetHealth = {
   `CONFLICT`, normalized by Electron to `AGENT_BUSY`. The source turn continues
   without sharing runtime state with the child.
 - `session.get`
+- `session.getTurn({ sessionId, turnId })` — 只读，对协议 v11 为增量新增。返回单个
+  持久化回合的状态 `{ sessionId, turnId, status, errorCode?, endedAt? }`，其中
+  `status` 为持久域 `running | completed | error | aborted`，`endedAt` 为终态写入
+  （`session.endTurn`）的 RFC3339 时刻。该行按 `turnId` **和** `sessionId` 匹配，
+  因此属于其他会话的 turn id 与未知 id 一样返回 `NOT_FOUND`；空 id 为
+  `INVALID_PARAMS`。响应绝不包含提示词、转录或凭据材料。
 - `session.delete`
 - `session.getScratchPath` — 会话的 scratch 目录（D114），按需创建
 - `session.rename`

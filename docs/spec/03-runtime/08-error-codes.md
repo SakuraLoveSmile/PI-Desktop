@@ -307,6 +307,29 @@ codes surface through the same error object as any other call.
 | `PAIRING_TOKEN_EXPIRED` | no | the single-use pairing token expired before pairing completed |
 | `CAPABILITY_UNAVAILABLE` | no | an operation was requested for a capability the host advertised as unavailable (e.g. attachments, tool relay) |
 
+### 3.9 Expert Team collaboration (ADR 0307)
+
+Emitted by host-core and the agent runtime when coordinating an Expert Team session
+with teammates, shared task boards, and peer mailboxes.
+
+| code | retriable | meaning |
+|---|---|---|
+| `TEAM_UNAVAILABLE` | no | the session does not have team execution profile enabled or team runtime is unavailable |
+| `TEAM_UNSUPPORTED_AGENT` | no | the specified agent template or model cannot be provisioned as a teammate |
+| `TEAM_MEMBER_LIMIT_EXCEEDED` | no | the team roster has reached its maximum member limit (8 members) |
+| `TEAM_MEMBER_NOT_FOUND` | no | the specified team member does not exist in the active roster |
+| `TEAM_MEMBER_ALREADY_EXISTS` | no | a team member with the specified member id or name already exists |
+| `TEAM_MEMBER_DELETION_BLOCKED` | no | teammate session cannot be deleted while team tasks or execution are active |
+| `TEAM_TASK_NOT_FOUND` | no | the specified task id does not exist on the team task board |
+| `TEAM_TASK_LIMIT_EXCEEDED` | no | the team task board has reached its maximum capacity (256 tasks) |
+| `TEAM_TASK_REVISION_MISMATCH` | yes | optimistic concurrency control conflict; task revision does not match expected revision |
+| `TEAM_TASK_DEPENDENCY_CYCLE` | no | adding the specified dependency would introduce a cycle in the task DAG |
+| `TEAM_TASK_MISSING_DEPENDENCY` | no | one or more declared task dependencies do not exist on the board |
+| `TEAM_MAILBOX_LIMIT_EXCEEDED` | yes | teammate mailbox queue has reached its maximum backlog limit (64 messages) |
+| `TEAM_MESSAGE_TOO_LARGE` | no | team message payload exceeds maximum permitted size (64 KiB) |
+| `TEAM_PAUSED` | yes | team coordination is currently paused; action cannot proceed until resumed |
+| `TEAM_PERMISSION_DENIED` | no | team operation or cross-member action is not permitted by member role or authority |
+
 ## 4. Mapping rules
 
 ### Host RPC numeric → AppError.code

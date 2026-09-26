@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+  ExecutionProfile,
   Mode,
   PermissionMode,
 } from "@pi-desktop/shared";
@@ -309,6 +310,10 @@ export function Composer({
   const mode: Mode = activeSession
     ? activeSession.mode
     : (draftConfiguration?.mode ?? settings?.defaultMode ?? "agent");
+  const executionProfile: ExecutionProfile =
+    activeSession?.executionProfile ??
+    draftConfiguration?.executionProfile ??
+    "standard";
   const planningLive =
     isRunning &&
     planningState === "planning" &&
@@ -603,6 +608,7 @@ export function Composer({
           <ComposerToolbar
             t={t}
             mode={mode}
+            executionProfile={executionProfile}
             planningLive={planningLive}
             providerId={provider?.id}
             modelId={modelId}

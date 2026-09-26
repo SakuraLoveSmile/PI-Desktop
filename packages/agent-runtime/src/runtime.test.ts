@@ -350,7 +350,7 @@ describe("custom system prompt files (issue #542)", () => {
     const prompt = promptOf(runtime);
 
     expect(prompt).toContain(persona);
-    expect(prompt).not.toContain("You are PI-Desktop");
+    expect(prompt).not.toContain("You are Pi-Desktop-Plus");
     // Operational rules from the default prompt must survive the replacement.
     expect(prompt).toContain("Collaboration: answer in the same language");
     expect(prompt).toContain("Searching and reading: prefer the Read");
@@ -371,10 +371,10 @@ describe("custom system prompt files (issue #542)", () => {
     const prompt = promptOf(runtime);
 
     expect(prompt).toContain(appendix);
-    expect(prompt).toContain("You are PI-Desktop");
+    expect(prompt).toContain("You are Pi-Desktop-Plus");
     expect(prompt).toContain("Run unit tests.");
     expect(prompt.indexOf(appendix)).toBeGreaterThan(
-      prompt.indexOf("You are PI-Desktop"),
+      prompt.indexOf("You are Pi-Desktop-Plus"),
     );
     expect(prompt.indexOf("Run unit tests.")).toBeGreaterThan(
       prompt.indexOf(appendix),
@@ -391,7 +391,7 @@ describe("custom system prompt files (issue #542)", () => {
 
     expect(prompt).toContain(persona);
     expect(prompt).toContain(appendix);
-    expect(prompt).not.toContain("You are PI-Desktop");
+    expect(prompt).not.toContain("You are Pi-Desktop-Plus");
 
     await runtime.dispose();
   });
@@ -400,7 +400,7 @@ describe("custom system prompt files (issue #542)", () => {
     const runtime = createRuntime();
     const prompt = promptOf(runtime);
 
-    expect(prompt).toContain("You are PI-Desktop");
+    expect(prompt).toContain("You are Pi-Desktop-Plus");
     expect(prompt).not.toContain("MARKER-XYZ-123");
 
     await runtime.dispose();

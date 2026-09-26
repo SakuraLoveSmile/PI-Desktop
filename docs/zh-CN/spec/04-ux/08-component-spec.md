@@ -2576,7 +2576,11 @@ CLAUDE CODE              ~/code/pi                                  4
 
 - 类型切换器是一个由 `tab` 控件组成的 `tablist`，每个控件都带有
   `aria-selected` 和命名其面板的 `aria-controls`。每个面板都是一个由其选项卡
-  标记的 `tabpanel`；非活动面板是 `hidden`，而不是被视觉覆盖。
+  标记的 `tabpanel`；非活动面板是 `hidden`，而不是被视觉覆盖。选项卡 ID 保持稳定，
+  不随本地化标签变化；每个 `aria-controls` 目标都存在，且面板的 `aria-labelledby`
+  会引用同一个选项卡。
+  只有当前选中的选项卡位于 Tab 顺序中。左/右箭头移动并选择上一个/下一个选项卡，
+  到达两端时循环；Home/End 选择第一个/最后一个选项卡，选中面板随之切换。
 - 每个公开按钮都会公开 `aria-expanded` 并引用其主体
   `aria-controls`。
 - 全局和分组复选框具有本地化的可访问名称，并携带不确定状态。

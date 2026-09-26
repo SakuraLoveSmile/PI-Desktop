@@ -1,7 +1,8 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, SetStateAction } from "react";
 import type { TFunction } from "i18next";
 import {
   keybindingDisplayParts,
+  type ExecutionProfile,
   type Mode,
   type PermissionMode,
   type ShortcutPlatform,
@@ -21,6 +22,8 @@ import {
 import { ModeIcon } from "./ComposerModeIcon";
 import { VoiceMicButton } from "../../voice/VoiceMicButton";
 import { ComposerModelPicker } from "./ComposerModelPicker";
+import { ComposerExecutionProfilePicker } from "./ComposerExecutionProfilePicker";
+import { ComposerContractPicker } from "./ComposerContractPicker";
 import {
   MODE_LABEL_KEYS,
   nextMode,
@@ -34,6 +37,7 @@ type ContextUsage = Parameters<typeof ContextUsageInspector>[0];
 export type ComposerToolbarProps = {
   t: TFunction;
   mode: Mode;
+  executionProfile?: ExecutionProfile;
   planningLive: boolean;
   providerId?: string;
   modelId?: string;
@@ -73,6 +77,7 @@ export type ComposerToolbarProps = {
 export function ComposerToolbar({
   t,
   mode,
+  executionProfile = "standard",
   planningLive,
   providerId,
   modelId,
@@ -107,6 +112,8 @@ export function ComposerToolbar({
   onVoiceToggle,
   onVoiceCancel,
 }: ComposerToolbarProps) {
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [contractOpen, setContractOpen] = useState(false);
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
   const steeringShortcut = keybindingDisplayParts("Alt+Enter", platform).join("+");
   return (
@@ -120,6 +127,8 @@ export function ComposerToolbar({
             ariaLabel={t("chat.addFiles")}
             disabled={controlsBlocked || pasting}
             onClick={() => {
+              setProfileOpen(false);
+              setContractOpen(false);
               setPermissionOpen(false);
               void pickAndAttach();
             }}
@@ -136,24 +145,23 @@ export function ComposerToolbar({
             onCancel={onVoiceCancel}
           />
         )}
-        <TooltipButton
-          type="button"
-          className="icon-btn mode-chip composer-mode-chip"
-          data-mode={mode}
-          data-planning={planningLive ? "true" : undefined}
-          tooltip={planningLive ? t(`${mode}.planning`) : t("settings.mode")}
-          ariaLabel={planningLive ? t(`${mode}.planning`) : t("settings.mode")}
+        <ComposerExecutionProfilePicker
+          t={t}
+          executionProfile={executionProfile}
           disabled={controlsBlocked}
-          onClick={async () => {
-            modelMenu.setOpen(false);
-            setPermissionOpen(false);
-            const next: Mode = nextMode(mode);
+          controlsBlocked={controlsBlocked}
+          runActive={runActive}
+          open={profileOpen}
+          setOpen={setProfileOpen}
+          onSelectProfile={async (profile) => {
             try {
               await configureActiveSession({
-                mode: next,
+                mode,
                 providerId,
                 modelId,
                 thinkingLevel,
+                permissionMode: composerPermissionMode,
+                executionProfile: profile,
               });
             } catch (error) {
               showToast(error instanceof Error ? error.message : String(error), {
@@ -161,14 +169,42 @@ export function ComposerToolbar({
               });
             }
           }}
-        >
-          <span className="composer-mode-chip-face" key={mode}>
-            <ModeIcon mode={mode} />
-            <span className="composer-mode-chip-label text-sm">
-              {t(MODE_LABEL_KEYS[mode])}
-            </span>
-          </span>
-        </TooltipButton>
+          onCloseOtherMenus={() => {
+            setContractOpen(false);
+            setPermissionOpen(false);
+            modelMenu.setOpen(false);
+          }}
+        />
+        <ComposerContractPicker
+          t={t}
+          mode={mode}
+          planningLive={planningLive}
+          disabled={controlsBlocked}
+          controlsBlocked={controlsBlocked}
+          open={contractOpen}
+          setOpen={setContractOpen}
+          onSelectMode={async (nextMode) => {
+            try {
+              await configureActiveSession({
+                mode: nextMode,
+                providerId,
+                modelId,
+                thinkingLevel,
+                permissionMode: composerPermissionMode,
+                executionProfile,
+              });
+            } catch (error) {
+              showToast(error instanceof Error ? error.message : String(error), {
+                variant: "error",
+              });
+            }
+          }}
+          onCloseOtherMenus={() => {
+            setProfileOpen(false);
+            setPermissionOpen(false);
+            modelMenu.setOpen(false);
+          }}
+        />
         <ComposerPermissionPicker t={t} mode={mode}
           composerPermissionMode={composerPermissionMode}
           permissionOpen={permissionOpen} setPermissionOpen={setPermissionOpen}
@@ -200,7 +236,11 @@ export function ComposerToolbar({
           selectedProviderId={providerId}
           selectedModelId={modelId}
           controlsBlocked={controlsBlocked}
-          onCloseOtherMenus={() => setPermissionOpen(false)}
+          onCloseOtherMenus={() => {
+            setProfileOpen(false);
+            setContractOpen(false);
+            setPermissionOpen(false);
+          }}
         />
         <TooltipButton
           type="button"
