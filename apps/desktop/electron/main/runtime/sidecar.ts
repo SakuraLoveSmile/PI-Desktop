@@ -21,7 +21,6 @@ import type { InflightCheckpointer } from "@pi-desktop/host-runtime";
 import { summarizeToolResult, type Logger } from "../logger";
 import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { PluginRuntime } from "../plugin-runtime";
-import type { UserMcpRuntime } from "../user-mcp";
 import type { RuntimeState } from "./context";
 import type { FinishTurn } from "./plans";
 
@@ -543,7 +542,7 @@ export function createSidecarRuntime({
     });
     return {
       ok: true,
-      content: `Previewing ${raw} in the work-panel Browser plugin. Live reload is active — subsequent edits to the file or sibling assets re-render automatically.`,
+      content: `Requested a new Browser tab for ${raw}. Once loaded, live reload updates the page when the file or sibling assets change.`,
     };
   });
   // Plugin skills (D174): the model loads a declared skill document by id.

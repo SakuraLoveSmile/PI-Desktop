@@ -1762,6 +1762,9 @@ identify the platform validation still needed.
   the Installed / Marketplace segmented control and search field sit at their
   intended offset instead of at the window's top edge. `.page-frame` reserves
   `--ds-toolbar-height` plus an 8px buffer on darwin, win32, and linux alike.
+  Scrolling Plugins, Scheduled, and Pull requests uses a destination-owned
+  scroller rather than the chat transcript scroller, so the bottom rows remain
+  fully painted and reachable instead of inheriting the Composer occlusion mask.
   The plugin detail sheet stacks above the band (`z-index: 60`) and keeps its
   own head at the top edge, with its close button opting out of the drag
   rectangle.
@@ -1769,7 +1772,8 @@ identify the platform validation still needed.
 - **Acceptance**: C (UI), Quality
 - **Milestone**: M2
 - **Status**: Source-level regression covered
-  (`apps/desktop/test/plugins-page-style.test.mjs`); full UI scenario Draft
+  (`apps/desktop/test/plugins-page-style.test.mjs`,
+  `apps/desktop/test/route-scroll.test.mjs`); full UI scenario Draft
 
 #### E2E-088: Composer Agent/Plan/Goal chip updates the session
 
@@ -3771,13 +3775,40 @@ identify the platform validation still needed.
   disposing cannot be undone by a delayed completion. Same-session navigation
   keeps its current page visible. Invalid, failed, or timed-out loads do not
   report the previous document as the destination being ready. A switch that
-  exceeds the existing 15-second load wait stays hidden until retried; automatic
-  late reveal is not promised.
+  exceeds the 15-second main-frame wait stays hidden with an error until retried.
+  Slow images/subframes do not delay revealing a committed current document.
+  Start navigation during an unfinished page load: the old ERR_ABORTED event
+  must not prevent the new address, title, and loading state from updating.
 - **Specs linked**: `04-ux/08-component-spec.md` §5.3; ADR 0028, ADR 0170.
 - **Status**: Automated service-path coverage in `browser-host-session.test.mjs`
   and `browser-pane-navigation.test.mjs`: production BrowserHost/BrowserPane,
   controlled native-browser/Host boundaries, and deterministic timers. Native
   Electron compositing and the reporter's live sessions are not covered.
+
+#### E2E-BROWSER-responsive-resource-tabs
+
+- **Preconditions**: Browser enabled; isolated profile; local HTML with a
+  17-second image, a delayed main response, and ordinary/new-window links.
+- **Steps**: Submit the slow-image URL once; observe loading feedback and page
+  display before the image finishes. Open two chat links and a website
+  new-window link; switch tabs, navigate within one, then switch away and back.
+  Repeat with a delayed main response, Stop, failed navigation, and a retry.
+  Set Link open destination to External and repeat the new-window link.
+- **Expected**: The current document displays after main-frame commit; slow
+  assets do not strand the empty state. New links preserve earlier resource
+  tabs. Tab switching retains forms, scroll positions, JS state and independent history
+  without another page request. Each tab keeps its last address; same-tab navigation updates only its
+  originating tab. Failure/stop leave usable address controls. External mode
+  does not create a work-panel tab. Session switches and invalid schemes retain
+  their security and visibility gates.
+- **Additional paths**: Invoke BrowserPreview through ToolSearch/BrowserPreview
+  while a tab has unsent form input: only a new tab navigates. Queue navigation
+  for an inactive session with an existing tab, then return and verify the queued
+  destination wins over an old load completion. Open a blank tab and inspect its
+  empty address and state. Close a background tab and verify its WebContents is
+  destroyed without affecting its sibling; deleting a session and plugin/window
+  disposal release the appropriate retained pages.
+- **Status**: Targeted isolated Electron validation; no new repository test suite.
 
 #### E2E-BROWSER-in-page-navigation: Browser chrome follows same-document navigation
 
