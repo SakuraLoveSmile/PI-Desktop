@@ -41,7 +41,15 @@ export function sidecarCrashErrorCode(kind: SidecarCrashKind): string {
  * an unknown native failure still settles under an honest generic code.
  */
 export function classifySidecarCrash(stderrTail: unknown): SidecarCrash {
-  const text = typeof stderrTail === "string" ? stderrTail : "";
+  // The transport hands the tail over as the `string[]` it buffered
+  // (`AgentSidecar.notifyExit`), but older exit payloads and direct callers
+  // may pass a joined string; accept both so the real exit path is always
+  // inspected (PR #1080 review).
+  const text = Array.isArray(stderrTail)
+    ? stderrTail.filter((line) => typeof line === "string").join("\n")
+    : typeof stderrTail === "string"
+      ? stderrTail
+      : "";
   for (const marker of OOM_MARKERS) {
     if (text.includes(marker)) return { kind: "oom", marker };
   }

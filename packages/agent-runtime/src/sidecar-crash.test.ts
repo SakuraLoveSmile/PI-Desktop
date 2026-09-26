@@ -45,6 +45,32 @@ describe("classifySidecarCrash", () => {
     expect(classifySidecarCrash(undefined).kind).toBe("crashed");
     expect(classifySidecarCrash(null).kind).toBe("crashed");
   });
+  it("inspects the real exit payload: the transport hands over string[] lines", () => {
+    // `AgentSidecar.notifyExit` passes `this.stderrTail.slice()` — an array of
+    // buffered lines, not a joined string. This is the shape the desktop exit
+    // path actually receives (PR #1080 review).
+    const crash = classifySidecarCrash(OOM_TAIL.split("\n"));
+    expect(crash.kind).toBe("oom");
+    expect(crash.marker).toBeTruthy();
+    expect(sidecarCrashErrorCode(crash.kind)).toBe("AGENT_SIDECAR_OOM");
+
+    const generic = classifySidecarCrash(["Segmentation fault", "core dumped"]);
+    expect(generic.kind).toBe("crashed");
+  });
+
+  it("filters non-string array entries instead of treating the array as absent", () => {
+    const crash = classifySidecarCrash([
+      "FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory",
+      undefined,
+      42,
+    ] as unknown[]);
+    expect(crash.kind).toBe("oom");
+  });
+
+  it("non-array, non-string tails (undefined from an old exit payload) are not oom", () => {
+    expect(classifySidecarCrash(undefined).kind).toBe("crashed");
+    expect(classifySidecarCrash(null).kind).toBe("crashed");
+  });
 
   it("both classified codes are registered shared error codes", () => {
     expect(ErrorCodes.AGENT_SIDECAR_OOM).toBe("AGENT_SIDECAR_OOM");

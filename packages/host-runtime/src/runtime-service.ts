@@ -646,7 +646,7 @@ export class RuntimeService implements RuntimePort {
     // The sidecar handle's exit info carries no stderr tail, so this path
     // cannot classify a heap exhaustion; it still names the failure honestly
     // instead of borrowing plan-approval vocabulary (issue #1077).
-    await this.finishTurn(sessionId, "aborted", "AGENT_SIDECAR_CRASHED", {
+    await this.finishTurn(sessionId, "aborted", ErrorCodes.AGENT_SIDECAR_CRASHED, {
       turnId: crashedTurnId,
       recoverInflight: true,
     });

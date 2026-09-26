@@ -2430,6 +2430,8 @@ sklm: {
       "子智能体的任务超出了其模型的上下文上限。请缩小任务范围、为它选择上下文窗口更大的模型，或让它一次读取更少的内容。",
     AGENT_BUSY: "此对话正在处理中。请等待完成，或先停止当前任务。",
     TURN_ABORTED: "已停止。",
+    AGENT_SIDECAR_CRASHED: "AI 运行时在处理这条消息时崩溃了。本回合已停止，请重试。",
+    AGENT_SIDECAR_OOM: "这段对话超出了 AI 运行时的内存上限。请新建对话或减少让 Agent 处理的内容，然后再试。",
     workspaceActivationFailed: "无法激活项目工作区",
     sessionNotFound: "未找到会话",
     noActiveSession: "没有活动会话",

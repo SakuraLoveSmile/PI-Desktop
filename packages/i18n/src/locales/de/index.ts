@@ -2439,6 +2439,8 @@ sklm: {
     "SUBAGENT_CONTEXT_OVERFLOW": "Die Aufgabe eines Subagenten hat das Kontextlimit seines Modells überschritten. Grenzen Sie die Aufgabe ein, geben Sie dem Subagenten ein Modell mit größerem Kontextfenster oder lassen Sie ihn weniger auf einmal lesen.",
     "AGENT_BUSY": "Dieser Chat funktioniert bereits. Warten Sie, bis der Vorgang abgeschlossen ist, oder stoppen Sie ihn zuerst.",
     "TURN_ABORTED": "Gestoppt.",
+    "AGENT_SIDECAR_CRASHED": "Die KI-Laufzeit ist bei der Bearbeitung abgestürzt. Dieser Durchlauf wurde gestoppt; versuchen Sie es erneut.",
+    "AGENT_SIDECAR_OOM": "Diese Unterhaltung hat den Speicher der KI-Laufzeit überschritten. Beginnen Sie einen neuen Chat oder reduzieren Sie, womit der Agent arbeitet, und versuchen Sie es erneut.",
     "workspaceActivationFailed": "Projekt-Arbeitsbereich konnte nicht aktiviert werden",
     "sessionNotFound": "Sitzung nicht gefunden",
     "noActiveSession": "Keine aktive Sitzung",
