@@ -67,6 +67,8 @@ export function ImportSection() {
         role="tablist"
         className="import-segment"
         itemClassName="import-segment-btn"
+        tabIdPrefix="import"
+        panelIdPrefix="import-panel"
       />
 
       {IMPORT_KINDS.map((entry) => (

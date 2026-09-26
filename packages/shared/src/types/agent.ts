@@ -1,4 +1,5 @@
 /** Shared public types grouped by the owning application domain. */
+import type { ExecutionProfile } from "./common.js";
 import type { AppError } from "../errors.js";
 import type { PlanExecution, PlanningStateEvent } from "./plans.js";
 import type { ContextCompactionFallback, ContextCompactionMark, ContextCompactionReason } from "./sessions.js";
@@ -56,6 +57,7 @@ export type AgentPromptRequest = {
    * once it lands.
    */
   permissionMode?: RacpPermissionMode;
+  executionProfile?: ExecutionProfile;
 };
 
 export type AgentPromptAttachment = {

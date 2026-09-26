@@ -10,7 +10,7 @@
 //!    the same way it already bypasses parent `.gitignore` rules.
 //! 3. Workspace rules: a gitignore-style `.pi-desktopignore` at the workspace
 //!    root, honored by unscoped walks.
-//! 4. User global rules: `<data_dir>/ignore` (`~/.pi-desktop/ignore` by
+//! 4. User global rules: `<data_dir>/ignore` (`~/.pi-desktop-plus/ignore` by
 //!    default), honored by unscoped walks.
 
 use ignore::WalkBuilder;

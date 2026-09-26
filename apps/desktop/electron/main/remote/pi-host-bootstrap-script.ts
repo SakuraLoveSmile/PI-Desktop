@@ -103,7 +103,10 @@ need tar
 node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || printf '0')
 [ "$node_major" -ge "$MIN_NODE_MAJOR" ] 2>/dev/null || die "node-too-old"
 
-work="$HOME/.pi-desktop/pi-host/.bootstrap"
+host_root="\${PI_HOST_INSTALL_DIR:-$HOME/.pi-desktop-plus/pi-host}"
+data_root="\${PI_DESKTOP_DATA_DIR:-$HOME/.pi-desktop-plus}"
+host_entry="$host_root/current/pi-host.js"
+work="$host_root/.bootstrap"
 mkdir -p "$work"
 log="$work/pi-host.log"
 err="$work/pi-host.err"
@@ -157,8 +160,9 @@ if [ -f "$pidfile" ]; then
   # The pidfile is never removed, so a recycled PID could name an unrelated
   # process owned by the same user. Only signal it when it is still our
   # pi-host; anything else is left alone.
+  command_line=$(ps -p "$previous" -o command= 2>/dev/null || true)
   if [ -n "$previous" ] && kill -0 "$previous" 2>/dev/null && \\
-     ps -p "$previous" -o command= 2>/dev/null | grep -q 'pi-host.js'; then
+     case " $command_line " in *" $host_entry "*) true ;; *) false ;; esac; then
     kill "$previous" 2>/dev/null || true
     waited=0
     while kill -0 "$previous" 2>/dev/null && [ "$waited" -lt 10 ]; do
@@ -168,7 +172,8 @@ if [ -f "$pidfile" ]; then
   fi
 fi
 
-nohup node "$HOME/.pi-desktop/pi-host/current/pi-host.js" \\
+nohup node "$host_entry" \\
+  --data-dir "$data_root" \\
   --port "$PORT" \\
   --pair \\
   --pairing-lifetime-ms "$PAIRING_LIFETIME_MS" \\

@@ -4,12 +4,11 @@
 # Local builds without a certificate remain unsigned. This script injects a
 # real signing identity and requires notarization credentials:
 #
-#   MAC_SIGNING_IDENTITY   default: "XingYu Liu (DUV63RKYTW)" — bare common
-#                          name; electron-builder rejects the
-#                          "Developer ID Application:" prefix
+#   MAC_SIGNING_IDENTITY   required bare common name; electron-builder rejects
+#                          the "Developer ID Application:" prefix
 #   APPLE_ID               Apple ID email for notarization
 #   APPLE_APP_SPECIFIC_PASSWORD  app-specific password for the Apple ID
-#   APPLE_TEAM_ID          Apple Developer Team ID (must be DUV63RKYTW)
+#   APPLE_TEAM_ID          required Apple Developer Team ID
 #   MAC_ARCH               optional `arm64` or `x64`; must match the host
 #
 # Observability: the packaging command runs under
@@ -18,7 +17,7 @@
 # (DEBUG=electron-notarize*), prints a heartbeat while electron-builder is
 # silent, dumps diagnostics when the signing phase stalls, bounds the phase
 # with a hard timeout, and reports per-file codesign timings. The
-# `signing PI-Desktop.app` line electron-builder emits is otherwise the last
+# `signing Pi-Desktop-Plus.app` line electron-builder emits is otherwise the last
 # thing the log shows for minutes, because nested signing, silent full
 # retries, and Apple's notarization queue all happen without output.
 # See docs/spec/06-delivery/06-release-runbook.md for the full runbook.
@@ -55,18 +54,13 @@ if [[ "$MAC_ARCH" != "$DEFAULT_MAC_ARCH" ]]; then
   exit 1
 fi
 
-MAC_SIGNING_IDENTITY="${MAC_SIGNING_IDENTITY:-XingYu Liu (DUV63RKYTW)}"
+MAC_SIGNING_IDENTITY="${MAC_SIGNING_IDENTITY:-}"
 MAC_SIGNING_IDENTITY="${MAC_SIGNING_IDENTITY#Developer ID Application: }"
-APPLE_TEAM_ID="${APPLE_TEAM_ID:-DUV63RKYTW}"
+APPLE_TEAM_ID="${APPLE_TEAM_ID:-}"
 
-if [[ -z "${APPLE_ID:-}" || -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]]; then
-  echo "error: notarization credentials are required (APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD)." >&2
+if [[ -z "$MAC_SIGNING_IDENTITY" || -z "$APPLE_TEAM_ID" || -z "${APPLE_ID:-}" || -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]]; then
+  echo "error: MAC_SIGNING_IDENTITY / APPLE_TEAM_ID / APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD are required for signed releases." >&2
   echo "For an unsigned local build use: pnpm --filter @pi-desktop/desktop dist" >&2
-  exit 1
-fi
-
-if [[ "$APPLE_TEAM_ID" != "DUV63RKYTW" ]]; then
-  echo "error: APPLE_TEAM_ID must be DUV63RKYTW (got: $APPLE_TEAM_ID)." >&2
   exit 1
 fi
 

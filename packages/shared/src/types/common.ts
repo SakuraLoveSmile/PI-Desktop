@@ -9,3 +9,18 @@ export function normalizeMode(value: unknown, fallback: Mode = "agent"): Mode {
   if (value === "plan" || value === "chat") return "plan";
   return fallback;
 }
+
+export type ExecutionProfile = "standard" | "team";
+
+export function isExecutionProfile(value: unknown): value is ExecutionProfile {
+  return value === "standard" || value === "team";
+}
+
+export function normalizeExecutionProfile(
+  value: unknown,
+  fallback: ExecutionProfile = "standard",
+): ExecutionProfile {
+  if (value === "standard") return "standard";
+  if (value === "team") return "team";
+  return fallback;
+}

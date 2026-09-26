@@ -22,6 +22,7 @@ import { registerProviderIpc } from "./provider-ipc";
 import { registerPullsIpc } from "./pulls-ipc";
 import { registerScheduledIpc } from "./scheduled-ipc";
 import { registerSessionIpc } from "./session-ipc";
+import { registerTeamIpc } from "./team-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerConfigSyncIpc } from "./config-sync-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
@@ -250,6 +251,12 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     enrichSession,
     acquireSessionOperation,
     stripWinLongPrefix,
+  });
+  registerGoalReportIpc({ handle, getHost });
+  registerTeamIpc({
+    registrar,
+    getHost,
+    logger,
   });
   registerSettingsIpc({
     registrar,

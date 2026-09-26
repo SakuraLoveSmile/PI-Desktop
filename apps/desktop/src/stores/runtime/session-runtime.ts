@@ -41,7 +41,7 @@ export type SessionConfiguration = Pick<
   SessionSummary,
   "mode" | "providerId" | "modelId" | "thinkingLevel"
 > &
-  Partial<Pick<SessionSummary, "permissionMode">>;
+  Partial<Pick<SessionSummary, "permissionMode" | "executionProfile">>;
 
 export type SessionSelection = { id: string; intent: number };
 

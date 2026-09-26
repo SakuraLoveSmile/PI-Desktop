@@ -22,7 +22,7 @@ const ARTIFACT_NAME = `${BUNDLE_DIR}.tar.gz`;
 const ARTIFACT_URL = `https://github.com/vastsa/PI-Desktop/releases/download/v${VERSION}/${ARTIFACT_NAME}`;
 const DIGEST = "0123456789abcdef".repeat(4);
 /** The sandbox the script's `HOME`/`PATH` point at, outside the real user's. */
-const WORK_SUBDIR = ".pi-desktop/pi-host/.bootstrap";
+const WORK_SUBDIR = ".pi-desktop-plus/pi-host/.bootstrap";
 
 /** Inputs every scenario starts from; callers override the digest or version. */
 function scriptInput(overrides = {}) {
@@ -180,7 +180,12 @@ test("buildBootstrapScript interpolates every input as a quoted literal", () => 
   // shell expansion; anything else would be a JS placeholder that never
   // interpolated and would run as garbage on the remote machine.
   const interpolations = [...script.matchAll(/\$\{([^}]*)\}/g)].map((match) => match[1]);
-  assert.deepEqual(interpolations, ["HOME:-"]);
+  assert.deepEqual(interpolations, ["HOME:-", "PI_HOST_INSTALL_DIR:-$HOME/.pi-desktop-plus/pi-host", "PI_DESKTOP_DATA_DIR:-$HOME/.pi-desktop-plus"]);
+  assert.match(script, /--data-dir "\$data_root"/);
+  assert.match(script, /host_entry="\$host_root\/current\/pi-host\.js"/);
+  assert.match(script, /case " \$command_line " in \*" \$host_entry "\*\) true/);
+  assert.doesNotMatch(script, /grep -q 'pi-host\.js'/);
+  assert.doesNotMatch(script, /HOME\/\.pi-desktop\/pi-host/);
 });
 
 test("the generated script is valid POSIX shell, even with hostile inputs", async () => {
@@ -236,6 +241,29 @@ test("the generated script installs, starts, and prints the ready/pairing lines"
   const { dir, cleanup } = await tempDir("pi-host-script-run-");
   try {
     const sandbox = await prepareSandbox(dir);
+    const oldSentinel = join(sandbox.home, ".pi-desktop", "pi-host", "sentinel");
+    await mkdir(join(sandbox.home, ".pi-desktop", "pi-host"), { recursive: true });
+    await writeFile(oldSentinel, "old-product-data");
+    const installRoot = join(sandbox.home, "plus install");
+    const dataRoot = join(sandbox.home, "plus-data");
+    sandbox.env.PI_HOST_INSTALL_DIR = installRoot;
+    sandbox.env.PI_DESKTOP_DATA_DIR = dataRoot;
+    const oldHost = join(
+      sandbox.home,
+      ".pi-desktop",
+      "pi-host",
+      "current",
+      "pi-host.js",
+    );
+    await mkdir(join(sandbox.home, ".pi-desktop", "pi-host", "current"), { recursive: true });
+    await writeFile(oldHost, "#!/bin/sh\nsleep 30\n", { mode: 0o755 });
+    const oldPid = execFileSync(
+      "sh",
+      ["-c", 'sh "$1" >/dev/null 2>&1 & printf "%s" "$!"', "runner", oldHost],
+      { encoding: "utf8" },
+    ).trim();
+    await mkdir(join(installRoot, ".bootstrap"), { recursive: true });
+    await writeFile(join(installRoot, ".bootstrap", "pi-host.pid"), `${oldPid}\n`);
     const scriptPath = join(dir, "bootstrap.sh");
     await writeFile(scriptPath, buildBootstrapScript(scriptInput({ expectedSha256: sandbox.digest })));
 
@@ -251,9 +279,18 @@ test("the generated script installs, starts, and prints the ready/pairing lines"
     assert.deepEqual(parsed.pairing, { token: "ppt1.stub", expiresAt: 1_893_456_000_000 });
     assert.deepEqual(parsed.steps, ["download", "verify", "install", "start", "await-ready", "ok"]);
 
+    // A second Plus bootstrap recognizes and replaces its own host process.
+    const firstPlusPid = (await readFile(join(installRoot, ".bootstrap", "pi-host.pid"), "utf8")).trim();
+    const restarted = parseBootstrapOutput(runScript(scriptPath, sandbox.env));
+    assert.equal(restarted.failure, null);
+    assert.throws(() => execFileSync("kill", ["-0", firstPlusPid]));
+
     // The host was started under the sandbox HOME and left running there.
-    const pid = (await readFile(join(sandbox.home, WORK_SUBDIR, "pi-host.pid"), "utf8")).trim();
+    const pid = (await readFile(join(installRoot, ".bootstrap", "pi-host.pid"), "utf8")).trim();
     assert.match(pid, /^\d+$/);
+    assert.equal(await readFile(oldSentinel, "utf8"), "old-product-data");
+    assert.doesNotThrow(() => execFileSync("kill", ["-0", oldPid]));
+    execFileSync("kill", [oldPid]);
   } finally {
     await cleanup();
   }

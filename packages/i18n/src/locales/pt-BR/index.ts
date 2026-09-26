@@ -216,6 +216,18 @@ export const ptBR = {
     sessionMissing: "Essa sessão não existe mais"
   },
   chat: {
+    profileAgent: "Agente",
+    profileAgentDesc: "Execução padrão de agente único",
+    profileTeam: "Equipe de especialistas",
+    profileTeamDesc: "Equipe multiagente autônoma com quadro de tarefas compartilhado",
+    profileTeamNotice: "Pode disparar várias solicitações de modelo em paralelo",
+    profileBlockedByRunningTeammate: "Não é possível alternar para agente único enquanto os membros da equipe estiverem ativos",
+    contractNone: "Nenhum",
+    contractNoneDesc: "Execução conversacional direta sem aprovação de contrato",
+    contractPlanDesc: "Elabora e revisa um plano estruturado antes da execução",
+    contractGoalDesc: "Define o resultado pretendido e os critérios de aceitação",
+    contractMode: "Modo de contrato",
+    executionProfile: "Perfil de execução",
     tableActions: "Ações da tabela",
     copyTableMarkdown: "Copiar tabela como Markdown",
     exportTableCsv: "Baixar tabela como CSV",
@@ -1681,6 +1693,23 @@ export const ptBR = {
     minimize: "Minimizar",
     close: "Fechar widget"
   },
+  team: {
+    title: "Equipe de especialistas",
+    roster: "Lista da equipe",
+    board: "Quadro de tarefas",
+    warnings: "Avisos de sobreposição de escopo",
+    emptyRoster: "Nenhum membro da equipe criado ainda. O agente líder criará membros conforme necessário.",
+    emptyTasks: "Nenhuma tarefa criada no quadro compartilhado ainda.",
+    pausedBadge: "Pausado",
+    activeBadge: "Ativo",
+    resumeButton: "Retomar equipe",
+    openSession: "Abrir sessão",
+    unassigned: "Não atribuído",
+    launcherDesc: "Inspecionar membros da equipe, quadro de tarefas e coordenação compartilhada",
+    retry: "Tentar novamente",
+    refresh: "Atualizar",
+  },
+
   panel: {
     title: "Painel de trabalho",
     subagent: "Subagente",
@@ -1699,6 +1728,7 @@ export const ptBR = {
     },
     closeTab: "Fechar {{name}}",
     tabs: {
+      team: "Equipe",
       review: "Revisar",
       browser: "Navegador",
       file: "Arquivos",

@@ -62,8 +62,6 @@ test("a topology node opens a real subagent tab in the work panel", () => {
   // Retained runtime state must survive the session-switch sanitizer.
   assert.match(tabsSource, /export function subagentTabDisplayLabels\(/);
   assert.match(tabsSource, /tab\.kind === "subagent"/);
-  // Retained runtime state must survive the session-switch sanitizer.
-  assert.match(tabsSource, /export function subagentTabDisplayLabels\(/);
 });
 
 test("the work panel renders the delegation tab like every other resource", () => {

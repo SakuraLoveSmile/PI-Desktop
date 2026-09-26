@@ -317,6 +317,14 @@ to later refresh and inference; the vendor picker does not collect them.
   contains the latest matching Task tool-call projection from the same canonical
   transcript. It is capped separately and does not widen the window or alter its
   cursors. Ordinary and uncapped reads omit this navigation-only field.
+- `session.getTurn({ sessionId, turnId })` — read-only, additive to protocol
+  v11. Returns one persisted turn's state as
+  `{ sessionId, turnId, status, errorCode?, endedAt? }`, where `status` is the
+  durable domain `running | completed | error | aborted` and `endedAt` is the
+  RFC3339 instant of the terminal write (`session.endTurn`). The row is matched
+  on `turnId` **and** `sessionId`, so a turn id belonging to another session,
+  like an unknown one, returns `NOT_FOUND`; blank ids are `INVALID_PARAMS`. The
+  response never carries prompt, transcript, or credential material.
 - `session.delete`
 - `session.getScratchPath` — the session's scratch directory (D114), created
   on demand

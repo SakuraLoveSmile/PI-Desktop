@@ -1,10 +1,10 @@
 {
   "name": "@pi-desktop/desktop",
   "version": "0.15.6",
-  "desktopName": "pi-desktop.desktop",
+  "desktopName": "pi-desktop-plus.desktop",
   "private": true,
-  "description": "PI-Desktop Electron application",
-  "homepage": "https://github.com/vastsa/PI-Desktop",
+  "description": "Pi-Desktop-Plus Electron application",
+  "homepage": "https://github.com/SakuraLoveSmile/PI-Desktop",
   "author": {
     "name": "vastsa",
     "email": "hhxk666@gmail.com"
@@ -87,11 +87,12 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "vastsa",
+        "owner": "SakuraLoveSmile",
         "repo": "PI-Desktop"
       }
     ],
     "extraMetadata": {
+      "name": "pi-desktop-plus",
       "piDistribution": "installed"
     },
     "files": [
@@ -238,19 +239,19 @@
       "artifactName": "Pi-Desktop-Plus-Setup-${version}.${ext}"
     },
     "deb": {
-      "packageName": "pi-desktop",
-      "artifactName": "pi-desktop_${version}_${arch}.${ext}"
+      "packageName": "pi-desktop-plus",
+      "artifactName": "pi-desktop-plus_${version}_${arch}.${ext}"
     },
     "rpm": {
-      "packageName": "pi-desktop",
-      "artifactName": "pi-desktop-${version}-${arch}.${ext}",
+      "packageName": "pi-desktop-plus",
+      "artifactName": "pi-desktop-plus-${version}-${arch}.${ext}",
       "fpm": [
         "--rpm-rpmbuild-define",
         "_build_id_links none"
       ]
     },
     "linux": {
-      "executableName": "pi-desktop",
+      "executableName": "pi-desktop-plus",
       "syncDesktopName": true,
       "target": [
         {

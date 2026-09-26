@@ -1,8 +1,13 @@
 <div align="center">
 
-<img src="docs/image/readme/logo.png" alt="PI-Desktop" width="108" />
+> **Pi-Desktop-Plus fork:** independent application ID `cn.sakura.pi-desktop`,
+> isolated data under `~/.pi-desktop-plus`, and releases from
+> `SakuraLoveSmile/PI-Desktop`. Upstream PI-Desktop profiles are not imported.
+> Plus binaries have not yet passed release qualification.
 
-# PI-Desktop
+<img src="docs/image/readme/logo.png" alt="Pi-Desktop-Plus" width="108" />
+
+# Pi-Desktop-Plus
 
 ### A modular desktop workspace for AI agents
 
@@ -12,24 +17,22 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 <br />
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
-[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/SakuraLoveSmile/PI-Desktop?style=flat\&label=stars)](https://github.com/SakuraLoveSmile/PI-Desktop/stargazers)
+[![CI](https://github.com/SakuraLoveSmile/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/SakuraLoveSmile/PI-Desktop/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/SakuraLoveSmile/PI-Desktop)](LICENSE)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FAIUO-FF4500?logo=reddit\&logoColor=white)](https://www.reddit.com/r/AIUO/)
 
 <br />
 
-**[Download](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
+**[Build locally](#for-developers)** ·
+[Upstream documentation](https://pi-docs.aiuo.net/) ·
 [Build a Plugin](docs/plugin-development.md) ·
 [Screenshots](docs/guide/screenshots.md) ·
 [简体中文](README.zh-CN.md)
 
 <br />
 
-<img src="docs/image/readme/home.webp" alt="PI-Desktop" width="94%" />
+<img src="docs/image/readme/home.webp" alt="Pi-Desktop-Plus" width="94%" />
 
 <br />
 
@@ -41,11 +44,11 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 ---
 
-## Why PI-Desktop?
+## Why Pi-Desktop-Plus?
 
 Terminal agents are great at execution. IDE agents are great at living inside an editor.
 
-PI-Desktop goes one step further:
+Pi-Desktop-Plus goes one step further:
 
 > **Give AI agents a persistent, independent, and extensible desktop workspace of their own.**
 
@@ -107,7 +110,7 @@ Switch models without rebuilding your workflow.
 
 ## Plugins are part of the workspace, not an afterthought
 
-PI-Desktop keeps the Core focused.
+Pi-Desktop-Plus keeps the Core focused.
 
 **Your actual workflow is assembled through extensions.**
 
@@ -208,7 +211,7 @@ Plugins can be distributed as `.piplug` packages or installed through the market
 ## One foundation, many workflows
 
 ```text
-                         PI-Desktop
+                         Pi-Desktop-Plus
                              │
           ┌──────────────────┼──────────────────┐
           │                  │                  │
@@ -224,7 +227,7 @@ Plugins can be distributed as `.piplug` packages or installed through the market
                        Your Workflow
 ```
 
-PI-Desktop can simply be your coding agent.
+Pi-Desktop-Plus can simply be your coding agent.
 
 Or you can turn it into:
 
@@ -278,7 +281,7 @@ Best for complex and long-running tasks.
 </tr>
 </table>
 
-Privileged operations still pass through PI-Desktop's permission layer.
+Privileged operations still pass through Pi-Desktop-Plus's permission layer.
 
 ---
 
@@ -286,7 +289,7 @@ Privileged operations still pass through PI-Desktop's permission layer.
 
 Complex work should not be forced into one context window.
 
-PI-Desktop provides two levels of delegation.
+Pi-Desktop-Plus provides two levels of delegation.
 
 ### Subagents
 
@@ -316,7 +319,7 @@ Main Session
     └── Review
 ```
 
-Workers are full PI-Desktop sessions:
+Workers are full Pi-Desktop-Plus sessions:
 
 **Independent context · Independent execution · Directly inspectable · Reusable · Full transcript**
 
@@ -352,7 +355,7 @@ Workers are full PI-Desktop sessions:
 
 ## Built for work that lasts
 
-PI-Desktop is organized around:
+Pi-Desktop-Plus is organized around:
 
 <div align="center">
 
@@ -386,7 +389,7 @@ You can:
 
 <td width="50%">
 
-<img src="docs/image/readme/chat_en.png" alt="PI-Desktop Session" />
+<img src="docs/image/readme/chat_en.png" alt="Pi-Desktop-Plus Session" />
 
 <p align="center"><sub>Persistent Sessions instead of disposable chats</sub></p>
 
@@ -394,7 +397,7 @@ You can:
 
 <td width="50%">
 
-<img src="docs/image/readme/model_en.png" alt="PI-Desktop Model" />
+<img src="docs/image/readme/model_en.png" alt="Pi-Desktop-Plus Model" />
 
 <p align="center"><sub>Switch models and reasoning levels inside the Session</sub></p>
 
@@ -406,7 +409,7 @@ You can:
 
 <td width="50%">
 
-<img src="docs/image/readme/plugins_en.png" alt="PI-Desktop Plugins" />
+<img src="docs/image/readme/plugins_en.png" alt="Pi-Desktop-Plus Plugins" />
 
 <p align="center"><sub>A plugin marketplace that extends both the agent and the desktop</sub></p>
 
@@ -414,7 +417,7 @@ You can:
 
 <td width="50%">
 
-<img src="docs/image/readme/addmodel_en.png" alt="PI-Desktop Providers" />
+<img src="docs/image/readme/addmodel_en.png" alt="Pi-Desktop-Plus Providers" />
 
 <p align="center"><sub>Connect your own provider, gateway, or local model</sub></p>
 
@@ -433,7 +436,7 @@ You can:
 
 ## Swap the model, keep the workflow
 
-PI-Desktop does not tie your workflow to a single model vendor.
+Pi-Desktop-Plus does not tie your workflow to a single model vendor.
 
 Use:
 
@@ -462,7 +465,7 @@ Private Task → Local Model
 
 Keep your existing work.
 
-PI-Desktop can import local sessions from:
+Pi-Desktop-Plus can import local sessions from:
 
 **Claude Code · Codex · OpenCode · Pi**
 
@@ -470,7 +473,7 @@ PI-Desktop can import local sessions from:
 
 ## Local-first
 
-PI-Desktop does not require you to move your development environment into our cloud.
+Pi-Desktop-Plus does not require you to move your development environment into our cloud.
 
 | Data                 | Default behavior                          |
 | -------------------- | ----------------------------------------- |
@@ -479,12 +482,12 @@ PI-Desktop does not require you to move your development environment into our cl
 | Settings             | Local                                     |
 | Logs                 | Local                                     |
 | API credentials      | OS Keychain                               |
-| PI-Desktop telemetry | None                                      |
+| Pi-Desktop-Plus telemetry | None                                      |
 | Model requests       | Sent directly to your configured provider |
 
-**No mandatory PI-Desktop account.**
+**No mandatory Pi-Desktop-Plus account.**
 
-**No mandatory PI-Desktop relay.**
+**No mandatory Pi-Desktop-Plus relay.**
 
 When using a remote model, the context required for the request is sent directly to that provider.
 
@@ -523,7 +526,7 @@ Execution
 
 **Download**
 
-Install PI-Desktop
+Install Pi-Desktop-Plus
 
 </td>
 
@@ -562,7 +565,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [Download PI-Desktop →](https://github.com/vastsa/PI-Desktop/releases/latest)
+### [Build Pi-Desktop-Plus locally →](#for-developers)
 
 **macOS · Windows · Linux**
 
@@ -604,20 +607,20 @@ ldd --version
 
 ## Built on Pi
 
-PI-Desktop is built on the [pi](https://github.com/badlogic/pi-mono) ecosystem.
+Pi-Desktop-Plus is built on the [pi](https://github.com/badlogic/pi-mono) ecosystem.
 
 The Agent Runtime uses:
 
 * `pi-ai`
 * `pi-agent-core`
 
-> **Pi provides the Agent Engine. PI-Desktop builds the persistent desktop workspace, sessions, permissions, plugins, and agent orchestration around it.**
+> **Pi provides the Agent Engine. Pi-Desktop-Plus builds the persistent desktop workspace, sessions, permissions, plugins, and agent orchestration around it.**
 
 ---
 
 ## For Developers
 
-PI-Desktop can also serve as a host platform for building agent products.
+Pi-Desktop-Plus can also serve as a host platform for building agent products.
 
 You can build:
 
@@ -652,8 +655,8 @@ Plugins can be created and loaded directly as Development Plugins.
 #### Start
 
 ```bash
-git clone https://github.com/vastsa/PI-Desktop.git
-cd PI-Desktop
+git clone https://github.com/SakuraLoveSmile/PI-Desktop.git
+cd Pi-Desktop-Plus
 
 pnpm install
 
@@ -697,8 +700,8 @@ For standalone capabilities, consider one question first:
 
 Keep the Core focused. Let the ecosystem grow.
 
-**[Report an Issue](https://github.com/vastsa/PI-Desktop/issues/new/choose)** ·
-[Open Issues](https://github.com/vastsa/PI-Desktop/issues) ·
+**[Report an Issue](https://github.com/SakuraLoveSmile/PI-Desktop/issues/new/choose)** ·
+[Open Issues](https://github.com/SakuraLoveSmile/PI-Desktop/issues) ·
 [Build a Plugin](docs/plugin-development.md)
 
 ---
@@ -708,7 +711,7 @@ Keep the Core focused. Let the ecosystem grow.
 <div align="center">
 
 <a href="https://trendshift.io/repositories/178787?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-178787">
-<img src="https://trendshift.io/api/badge/repositories/178787" alt="PI-Desktop on Trendshift" width="230" height="51" />
+<img src="https://trendshift.io/api/badge/repositories/178787" alt="Pi-Desktop-Plus on Trendshift" width="230" height="51" />
 </a>
 
 </div>
@@ -725,7 +728,7 @@ Keep the Core focused. Let the ecosystem grow.
 
 > **Not by a lone genius, but by a token-powered construction crew.**
 
-PI-Desktop has been built with the help of models from multiple providers.
+Pi-Desktop-Plus has been built with the help of models from multiple providers.
 
 More than **27 billion tokens** have been used across development, refactoring, review, design, and debugging.
 
@@ -735,7 +738,7 @@ Thanks to every human contributor — and every model that helped us build it.
 
 ## License
 
-PI-Desktop is licensed under the **GNU Lesser General Public License v3.0**.
+Pi-Desktop-Plus is licensed under the **GNU Lesser General Public License v3.0**.
 
 See [LICENSE](LICENSE) for details.
 
@@ -743,9 +746,9 @@ See [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-<img src="docs/image/readme/logo.png" alt="PI-Desktop" width="72" />
+<img src="docs/image/readme/logo.png" alt="Pi-Desktop-Plus" width="72" />
 
-## PI-Desktop
+## Pi-Desktop-Plus
 
 ### Build your own Agent workspace.
 
@@ -753,7 +756,7 @@ See [LICENSE](LICENSE) for details.
 
 <br />
 
-**[Download](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
+**[Build locally](#for-developers)** ·
 [Documentation](https://pi-docs.aiuo.net/) ·
 [Build a Plugin](docs/plugin-development.md)
 

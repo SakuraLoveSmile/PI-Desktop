@@ -3587,7 +3587,11 @@ CLAUDE CODE              ~/code/pi                                  4
 - The kind switcher is a `tablist` of `tab` controls, each carrying
   `aria-selected` and `aria-controls` that names its panel. Every panel is a
   `tabpanel` labelled by its tab, and an inactive panel is `hidden` rather than
-  visually covered.
+  visually covered. Tab IDs are stable and independent of localized labels;
+  each target exists and its panel's `aria-labelledby` references the same tab.
+  Only the selected tab is in the tab order. ArrowLeft/ArrowRight move to and
+  select the previous/next tab, wrapping at either end; Home/End select the
+  first/last tab. The selected panel changes with the active tab.
 - Each disclosure button exposes `aria-expanded` and references its body with
   `aria-controls`.
 - Global and group checkboxes have localized accessible names and carry the

@@ -17,7 +17,7 @@ const inventoryScript = fileURLToPath(
   new URL("../../../scripts/macos-bundle-inventory.mjs", import.meta.url),
 );
 
-const SIGNING_IDENTITY_NAME = "XingYu Liu (DUV63RKYTW)";
+const SIGNING_IDENTITY_NAME = "Release Signer (TEAMPLUS1234)";
 const SIGNING_IDENTITY = `Developer ID Application: ${SIGNING_IDENTITY_NAME}`;
 const NO_IDENTITIES = "  0 valid identities found";
 const MATCHING_IDENTITY = `echo '  1) 0123456789ABCDEF "Developer ID Application: ${SIGNING_IDENTITY_NAME}"'
@@ -133,7 +133,7 @@ exit 0`,
 function runDiagnostics(bin, { args = [], env = {} } = {}) {
   return spawnSync("bash", [diagnosticsScript, ...args], {
     encoding: "utf8",
-    env: { ...BASE_ENV, PATH: `${bin}:${process.env.PATH}`, ...env },
+    env: { ...BASE_ENV, MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME, PATH: `${bin}:${process.env.PATH}`, ...env },
   });
 }
 
@@ -284,12 +284,12 @@ test("diagnostics treat a missing identity as a warning by default", async (t) =
   const bin = join(root, "bin");
   await writeDiagnosticsShims(bin, { identities: NO_IDENTITIES });
 
-  const result = runDiagnostics(bin);
+  const result = runDiagnostics(bin, { env: { MAC_SIGNING_IDENTITY: "" } });
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.ok(
     result.stdout.includes(
-      `warning: Developer ID Application: ${SIGNING_IDENTITY_NAME} is not available`,
+      "warning: MAC_SIGNING_IDENTITY is not set; signed release lanes must provide it.",
     ),
     result.stdout,
   );

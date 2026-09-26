@@ -122,7 +122,7 @@ fn v18_database_migrates_session_thinking_omit() {
     assert!(sql.contains("'omit'"), "{sql}");
 }
 #[test]
-fn v19_database_migrates_to_v20_with_goal_reports() {
+fn v19_database_migrates_to_v21_with_goal_reports() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("pi.sqlite");
     {
@@ -139,7 +139,7 @@ fn v19_database_migrates_to_v20_with_goal_reports() {
 }
 
 #[test]
-fn v19_database_migrates_plan_approvals_workspace_kind() {
+fn v19_database_migrates_plan_approvals_workspace_kind_to_v21() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("pi.sqlite");
     {
@@ -179,6 +179,90 @@ fn v19_database_migrates_plan_approvals_workspace_kind() {
         )
         .unwrap();
     assert_eq!(workspace_kind, "project");
+}
+
+#[test]
+fn v19_database_migrates_team_schema_and_execution_profile_to_v21() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        db.conn().pragma_update(None, "user_version", 19).unwrap();
+    }
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+    assert!(migration_backup_path(&path, 19).exists());
+    let sql: String = db
+        .conn()
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sessions'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(sql.contains("execution_profile"), "{sql}");
+
+    for table in &["teams", "team_members", "team_tasks"] {
+        let exists: bool = db
+            .conn()
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+                params![table],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(exists, "missing table {table}");
+    }
+}
+
+#[test]
+fn v20_database_migrates_to_v21_and_completes_goal_and_team_schema() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO sessions (id, created_at, updated_at) VALUES ('s1', 1, 1)",
+                [],
+            )
+            .unwrap();
+        db.conn()
+            .execute_batch(
+                "DROP TABLE goal_reports;
+                 ALTER TABLE plan_approvals DROP COLUMN artifact_workspace_kind;
+                 PRAGMA user_version = 20;",
+            )
+            .unwrap();
+    }
+
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), 21);
+    assert!(migration_backup_path(&path, 20).exists());
+    assert!(table_exists(db.conn(), "goal_reports"));
+
+    let has_workspace_kind: bool = db
+        .conn()
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'artifact_workspace_kind')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(has_workspace_kind);
+
+    let profile: String = db
+        .conn()
+        .query_row(
+            "SELECT execution_profile FROM sessions WHERE id = 's1'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(profile, "standard");
+    for table in &["teams", "team_members", "team_tasks"] {
+        assert!(table_exists(db.conn(), table), "missing table {table}");
+    }
 }
 
 fn schema_version(conn: &Connection) -> i64 {

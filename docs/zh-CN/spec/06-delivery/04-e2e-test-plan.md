@@ -7320,7 +7320,7 @@ eleven-tool-round desktop paths are verified by
 #### E2E-209：从本地智能体存储导入模型配置
 
 - **前提条件**：本机存在 Claude Code / Codex / OpenCode / Pi / CC Switch 的提供商配置。
-- **步骤**：1) 打开设置 → 导入 → 模型配置。2) 扫描并导入与现有行凭据不同的配置。3) 再次导入相同凭据。4) 确认 Composer 能选中新导入的提供商，密钥不进入渲染器。
+- **步骤**：1) 打开设置 → 导入，确认 Sessions、Models、Skills、MCP 位于同一个类型 `tablist` 中。每个 tab 都有稳定 ID、`aria-selected`，并通过 `aria-controls` 指向对应面板；每个面板由对应 tab 标记，且只有当前选择的面板可见。确认只有选中的 tab 位于 Tab 顺序中；左右箭头循环并选择相邻 tab，Home/End 选择首尾 tab，面板关联随选择更新且状态保留。2) 选择 Models 并扫描，确认每组默认折叠。3) 导入与已有配置端点相同但凭据不同的配置。4) 再次导入相同凭据。5) 确认 Composer 能选中新导入的提供商，密钥不进入渲染器。
 - **预期**：规范化端点、API 风格和凭据都相同才视为等价；不同密钥在同一端点创建独立行。重复导入幂等跳过。见 ADR 0179 / ADR 0188 / D342 / D351。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/08-component-spec.md`、ADR 0179、ADR 0188
 - **验收**：B、质量
@@ -7365,6 +7365,12 @@ eleven-tool-round desktop paths are verified by
 
 以下场景是 D387 / ADR 0214 与 `07-plugins/16-trusted-extensions.md` 的验收目标；无头
 runner 会在运行时的隔离临时目录中生成六个插件形态 fixture。
+
+- **持久终态扩展（2026-09-26）**：发现 `pi_turn_get`，按 prompt 返回的 session/turn 查询。
+  使用隔离 host 夹具覆盖 running/completed/error/aborted；跨会话与不存在为 NOT_FOUND，
+  空标识为 INVALID_PARAMS。重启隔离 host 后读取同一终态，不再次发送 prompt。
+  确认只读查询不修改会话、不泄露转录或凭据；运行时空闲不代表成功。真实模型验收
+  需明确费用授权，夹具通过不能标记真实调用已通过。
 
 #### E2E-241：发现列出受信任扩展，启用是显式的
 

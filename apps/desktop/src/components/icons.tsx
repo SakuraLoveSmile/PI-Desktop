@@ -90,6 +90,7 @@ import {
   Trash2,
   TriangleAlert,
   UserRound,
+  Users,
   Undo2,
   Video,
   Webhook,
@@ -215,6 +216,7 @@ export const IconMic = icon(Mic);
 export const IconPlug = icon(Plug);
 export const IconSlash = icon(Slash);
 export const IconUser = icon(UserRound);
+export const IconUsers = icon(Users);
 /** A signed-in vendor account, as opposed to a pasted key. */
 export const IconKey = icon(KeyRound);
 export const IconLogOut = icon(LogOut);

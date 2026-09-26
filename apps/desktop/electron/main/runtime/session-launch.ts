@@ -6,6 +6,8 @@ import {
   imageGenerationBindings,
   isImageGenerationModel,
   normalizeMode,
+  normalizeExecutionProfile,
+  type ExecutionProfile,
   resolveBindingContextWindow,
   trustedExtensionAgentKeyFromProviderId,
   type CommandShellCatalog,
@@ -267,6 +269,7 @@ export function createSessionLaunchRuntime({
       providerId?: string;
       modelId?: string;
       thinkingLevel?: SessionThinkingLevel;
+      executionProfile?: ExecutionProfile;
     } = {},
   ) {
     if (!runtimeState.host) throw new Error("host unavailable");
@@ -619,6 +622,9 @@ export function createSessionLaunchRuntime({
         sessionId,
         mode: normalizeMode(
           overrides.mode ?? session.mode ?? settings.defaultMode ?? "agent",
+        ),
+        executionProfile: normalizeExecutionProfile(
+          overrides.executionProfile ?? session.executionProfile ?? "standard",
         ),
         ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
         thinkingLevel,

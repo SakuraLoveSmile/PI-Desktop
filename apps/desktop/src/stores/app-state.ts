@@ -8,6 +8,7 @@ import type {
   AskToolResolution,
   ContextCompactionMark,
   GoalReportSummary,
+  ExecutionProfile,
   Mode,
   ModelInfo,
   OnboardingState,
@@ -99,6 +100,7 @@ export type DraftSessionConfiguration = {
   providerId?: string;
   modelId?: string;
   permissionMode?: PermissionMode;
+  executionProfile?: ExecutionProfile;
 };
 
 
@@ -206,6 +208,7 @@ export type AppState = {
     modelId?: string;
     thinkingLevel: SessionThinkingLevel;
     permissionMode?: PermissionMode;
+    executionProfile?: ExecutionProfile;
   }) => Promise<void>;
   /** Returns true once accepted unless concurrent smart Stop restores it. */
   sendPrompt: (
