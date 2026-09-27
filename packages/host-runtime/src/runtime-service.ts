@@ -509,7 +509,7 @@ export class RuntimeService implements RuntimePort {
   // Turn ownership
   // -------------------------------------------------------------------------
 
-  /** Serialize turn admission and abort per session. */
+  /** Serialize session operations that must not interleave with turn admission or abort. */
   async withSessionOperation<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
     const id = sessionId.trim();
     const previous = this.sessionOperations.get(id) ?? Promise.resolve();
