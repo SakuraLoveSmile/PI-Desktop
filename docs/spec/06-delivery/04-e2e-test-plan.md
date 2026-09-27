@@ -467,31 +467,19 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Opt-in debug lane; tag releases must satisfy E2E-196c.
 
-#### E2E-196b: Unsigned macOS packages expose first-launch guidance
+#### E2E-196b: macOS packages omit first-launch helper assets
 
-- **Preconditions**: A default unsigned macOS release has produced both DMG and
-  ZIP artifacts for at least one native architecture; a test macOS account can
-  copy an app into `/Applications` or `~/Applications`.
-- **Steps**: 1) Open the DMG and inspect its root and layout. 2) Confirm the
-  app and Applications link are the only items in the window. 3) Confirm the
-  DMG has no command helper and no `If app won't open, read this.txt`. 4) Inspect
-  the ZIP root without extracting the application contents and confirm it has
-  both `PI-Desktop-macOS-opening-help.txt` and the executable
-  `PI-Desktop-macOS-open.command`. 5) Read the note, move the app to
-  `/Applications`, and double-click the ZIP helper.
+- **Preconditions**: An unsigned macOS debug packaging run has produced DMG and
+  ZIP artifacts for at least one native architecture.
+- **Steps**: 1) Inspect the DMG and confirm the app and Applications link are
+  the only items in its window. 2) Inspect the ZIP root without extracting the
+  app and confirm neither `PI-Desktop-macOS-opening-help.txt` nor
+  `PI-Desktop-macOS-open.command` is present. 3) Confirm the app remains
+  installable from the ZIP.
 - **Expected**: The DMG contains the branded 720×440 background, the app, and
-  the Applications link only; it does not contain or expose the command helper
-  or the opening-help note. The ZIP contains the helper and the opening note at
-  its root. The note includes
-  `xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app`, explains
-  that the fallback is only for a trusted unsigned artifact when macOS reports
-  that the app is damaged or does not open, and says signed/notarized builds do
-  not need it. The ZIP helper searches only `/Applications/PI-Desktop.app` and
-  `~/Applications/PI-Desktop.app`, removes only `com.apple.quarantine` when
-  present, and opens the app without `sudo` or an arbitrary path argument. It
-  validates `CFBundleIdentifier=net.aiuo.pi-desktop` before changing attributes.
-  The guidance does not claim that an unsigned artifact has passed Gatekeeper
-  qualification.
+  the Applications link only. The ZIP contains the app but neither first-launch
+  guidance asset. The same omission applies to signed and unsigned macOS
+  artifacts; signing, notarization, and updater behavior are unchanged.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
   `05-security/01-security.md`
 - **Acceptance**: Quality, Security
