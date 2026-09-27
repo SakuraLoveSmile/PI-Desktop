@@ -139,6 +139,7 @@ export const zhCN = {
     checkForUpdates: "检查更新",
     buildUnknown: "版本未知",
     search: "搜索",
+    actionWithShortcut: "{{action}}（{{shortcut}}）",
     temporarySessions: "临时对话",
     newTemporarySession: "新建临时对话",
     noProjectSessions: "当前项目还没有对话",

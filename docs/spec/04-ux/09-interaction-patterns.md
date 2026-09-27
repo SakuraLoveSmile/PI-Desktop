@@ -1046,6 +1046,10 @@ Running turns and pending approvals continue to gate the controls.
 - Decorative icons remain `aria-hidden` and do not need a tooltip.
 - Tooltip text must describe the action, not the icon shape, and must come from
   the active i18n catalog.
+- The conversation-topbar New task and Search tooltips append the effective,
+  platform-formatted binding (user override or default). Explicitly unbound
+  shortcuts are omitted; their accessible names remain the localized action
+  labels.
 - Clicking an action dismisses its tooltip immediately and suppresses it until
   the pointer leaves or focus moves away; keyboard focus still reveals the
   tooltip before activation.
