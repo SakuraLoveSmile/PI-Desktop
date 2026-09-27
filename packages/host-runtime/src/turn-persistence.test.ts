@@ -65,5 +65,31 @@ describe("TurnPersistence", () => {
     await persistence.append({ sessionId: "s", message: row("bad") });
     expect(calls).toBe(2);
     expect(logs).toEqual(["transcript append failed"]);
+    await expect(persistence.flush("s")).resolves.toEqual({ pending: 0, failed: ["INVALID_ARGUMENT"] });
+  });
+
+  it("flushes all queued rows for one session before reporting the barrier", async () => {
+    const written: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const persistence = new TurnPersistence({
+      getHost: () => ({
+        async call(_method: string, params: { message: UiMessage }) {
+          if (params.message.id === "a") await gate;
+          written.push(params.message.id);
+        },
+      }),
+      log: () => undefined,
+    });
+    persistence.append({ sessionId: "s", message: row("a") });
+    const barrier = persistence.flush("s");
+    await Promise.resolve();
+    persistence.append({ sessionId: "s", message: row("b") });
+    expect(written).toEqual([]);
+    release();
+    await expect(barrier).resolves.toEqual({ pending: 0, failed: [] });
+    expect(written).toEqual(["a", "b"]);
   });
 });

@@ -16,6 +16,7 @@ import { TooltipButton, cx } from "./ui";
 /** Default number of most-recent sessions shown per project group before the rest fold. */
 const MAX_VISIBLE_SESSIONS = 10;
 import { portalToBody } from "../lib/portal-visibility";
+import { appendSessionToOpenProject } from "../lib/session-projects";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
@@ -725,8 +726,7 @@ export function Sidebar({
       if (!sessionPath) continue;
       // A closed project remains discoverable in Projects, but its historical
       // sessions must not recreate a sidebar tab that the user just closed.
-      const entry = byPath.get(sessionPath);
-      if (entry) entry.sessions.push(session);
+      if (!appendSessionToOpenProject(byPath, sessionPath, session)) continue;
     }
     const result = [...byPath.values()].filter(
       (entry) => showArchived || !entry.meta.archived,

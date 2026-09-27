@@ -2,6 +2,7 @@ import { readStoreSource, readStoreModule } from "./helpers/source-contracts.mjs
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { appendSessionToOpenProject } from "../src/lib/session-projects.ts";
 
 const storeSource = await readStoreSource();
 const projectSliceSource = await readStoreModule("slices/project-slice.ts");
@@ -51,8 +52,34 @@ test("sidebar hover refreshes the active project branch without activating a pro
 
 test("closed projects are not recreated from historical sidebar sessions", () => {
   assert.doesNotMatch(sidebarSource, /add\(session\.projectPath\)/);
-  assert.match(sidebarSource, /const entry = byPath\.get\(sessionPath\)/);
-  assert.match(sidebarSource, /if \(entry\) entry\.sessions\.push\(session\)/);
+  assert.match(sidebarSource, /appendSessionToOpenProject\(byPath, sessionPath, session\)/);
+
+  const openEntry = {
+    path: "/work/open",
+    name: "open",
+    meta: {},
+    sessions: [],
+  };
+  const byPath = new Map([[openEntry.path, openEntry]]);
+  const closedSession = {
+    projectPath: "/work/closed",
+    projectName: "Closed project",
+  };
+
+  assert.equal(
+    appendSessionToOpenProject(byPath, "/work/closed", closedSession),
+    false,
+  );
+  assert.deepEqual([...byPath.keys()], ["/work/open"]);
+  assert.deepEqual(openEntry.sessions, []);
+
+  const openSession = {
+    projectPath: "/work/open",
+    projectName: "Open project",
+  };
+  assert.equal(appendSessionToOpenProject(byPath, "/work/open", openSession), true);
+  assert.deepEqual(openEntry.sessions, [openSession]);
+  assert.equal(openEntry.name, "Open project");
 });
 
 test("project new-session creation uses one store-owned navigation transaction", () => {

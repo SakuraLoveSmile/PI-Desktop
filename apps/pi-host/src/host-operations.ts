@@ -12,8 +12,8 @@ import {
   type HostSessionRecord,
   type RuntimeService,
 } from "@pi-desktop/host-runtime";
-import type { RacpHostOperations, RacpProjectCatalog, RacpSessionCatalog, RacpWorkspaceAccess } from "@pi-desktop/racp";
-import type { RacpProjectSummary } from "@pi-desktop/shared";
+import type { RacpGoalReportAccess, RacpHostOperations, RacpProjectCatalog, RacpSessionCatalog, RacpWorkspaceAccess } from "@pi-desktop/racp";
+import { ErrorCodes, type GoalReport, type GoalReportSummary, type RacpProjectSummary } from "@pi-desktop/shared";
 
 /** A project row as host-core lists it. */
 type ProjectRow = { id: number; path: string; name: string; pinned?: boolean };
@@ -29,6 +29,7 @@ function hostError(error: unknown): never {
   if (code === "CONFLICT" || (code && code.startsWith("PLAN_"))) throw new RacpError("CONFLICT", message, { details: { code } });
   if (code === "INVALID_PARAMS" || code === "INVALID_ARGUMENT") throw new RacpError("INVALID_ARGUMENT", message);
   if (code === "HOST_UNAVAILABLE") throw new RacpError("AGENT_UNAVAILABLE", message, { retriable: true });
+  if (code === "PERMISSION_DENIED") throw new RacpError("FORBIDDEN", message);
   throw new RacpError("INTERNAL", message, { details: code ? { code } : undefined });
 }
 
@@ -38,7 +39,7 @@ function projectSummary(row: ProjectRow): RacpProjectSummary {
 
 export type HostOperationsDeps = {
   getHost: () => HostRpc | null;
-  runtime: Pick<RuntimeService, "compact" | "isBusy">;
+  runtime: Pick<RuntimeService, "compact" | "isBusy"> & Partial<Pick<RuntimeService, "flushPersistence">>;
   /** `pi-host` boots the sidecar's session cleanup on delete; the runtime link is optional at boot. */
   disposeSession?: (sessionId: string) => Promise<void>;
   revokeDevice?: (deviceId: string) => Promise<boolean>;
@@ -50,6 +51,35 @@ function requireHost(getHost: () => HostRpc | null): HostRpc {
   const host = getHost();
   if (!host) throw new RacpError("AGENT_UNAVAILABLE", "host-core is not running", { retriable: true });
   return host;
+}
+
+function createGoalReportAccess(deps: HostOperationsDeps): RacpGoalReportAccess {
+  return {
+    async get(input) {
+      const host = requireHost(deps.getHost);
+      return host.call<{ report: GoalReport }>("goalReports.get", input).catch(hostError);
+    },
+    async list(sessionId) {
+      const host = requireHost(deps.getHost);
+      return host.call<{ reports: GoalReportSummary[] }>("goalReports.list", { sessionId }).catch(hostError);
+    },
+    async retry(sessionId, executionId) {
+      const host = requireHost(deps.getHost);
+      if (deps.runtime.isBusy(sessionId)) throw new RacpError("CONFLICT", "the session has an active turn");
+      if (!deps.runtime.flushPersistence) throw new RacpError("CAPABILITY_UNAVAILABLE", "transcript persistence barrier is unavailable");
+      const barrier = await deps.runtime.flushPersistence(sessionId);
+      if (barrier.pending > 0 || barrier.failed.length > 0) {
+        await host
+          .call("goalReports.markFailed", { sessionId, executionId, errorCode: ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED })
+          .catch(hostError);
+        throw new RacpError(ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED, "transcript persistence barrier failed", {
+          retriable: true,
+          details: { pending: barrier.pending, failed: barrier.failed },
+        });
+      }
+      return host.call<{ report: GoalReportSummary }>("goalReports.retry", { sessionId, executionId }).catch(hostError);
+    },
+  };
 }
 
 /** Session catalog over host-core RPC. */
@@ -246,6 +276,7 @@ export function createHostOperations(deps: HostOperationsDeps): Omit<RacpHostOpe
     sessions: createSessionCatalog(deps),
     projects: createProjectCatalog(deps),
     workspace: createWorkspaceAccess(deps),
+    goalReports: createGoalReportAccess(deps),
     ...(deps.revokeDevice ? { revokeDevice: deps.revokeDevice } : {}),
   };
 }

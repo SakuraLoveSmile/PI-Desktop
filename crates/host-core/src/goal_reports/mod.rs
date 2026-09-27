@@ -18,6 +18,17 @@ use uuid::Uuid;
 
 use crate::db::{now_ms, Database};
 
+mod read;
+
+#[allow(unused_imports)]
+use read::sha256_hex;
+#[allow(unused_imports)]
+pub use read::{
+    list_reports, read_report, retry_report, state_stub, GoalReportRead, REPORT_STATE_CORRUPT,
+    REPORT_STATE_DRAFT, REPORT_STATE_FAILED, REPORT_STATE_NOT_FOUND, REPORT_STATE_PENDING,
+    REPORT_STATE_READY, REPORT_STATE_TRUNCATED,
+};
+
 #[cfg(test)]
 mod tests;
 
@@ -435,6 +446,7 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
 /// contacting a provider. This is idempotent and uses only durable Host facts.
 pub fn mark_failed(
     db: &Database,
+    session_id: &str,
     execution_id: &str,
     error_code: &str,
 ) -> Result<GoalReportSummary> {
@@ -445,12 +457,28 @@ pub fn mark_failed(
     if facts.kind != "goal" {
         return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
     }
-    let current_status: Option<String> = db
+    if facts.session_id != session_id {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: report belongs to another session"
+        ));
+    }
+    let current: Option<(String, String)> = db
         .conn()
-        .prepare_cached("SELECT status FROM goal_reports WHERE execution_id = ?1")?
-        .query_row(params![execution_id], |row| row.get(0))
+        .prepare_cached("SELECT status, session_id FROM goal_reports WHERE execution_id = ?1")?
+        .query_row(params![execution_id], |row| Ok((row.get(0)?, row.get(1)?)))
         .optional()?;
-    if current_status.as_deref() == Some("ready") {
+    if current
+        .as_ref()
+        .is_some_and(|(_, report_session_id)| report_session_id != session_id)
+    {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: report belongs to another session"
+        ));
+    }
+    if current
+        .as_ref()
+        .is_some_and(|(status, _)| status == "ready")
+    {
         return list_reports(db, &facts.session_id)?
             .into_iter()
             .find(|report| report.execution_id == execution_id)
@@ -466,7 +494,8 @@ pub fn mark_failed(
              ) VALUES (?1, ?2, ?3, ?4, NULL, 'failed', 'fallback', 'unknown', ?5, ?6, ?6)
              ON CONFLICT(execution_id) DO UPDATE SET
                 status = 'failed', integrity = 'fallback', verdict = 'unknown',
-                summary = excluded.summary, updated_at = excluded.updated_at",
+                summary = excluded.summary, updated_at = excluded.updated_at
+             WHERE goal_reports.session_id = excluded.session_id",
         )?
         .execute(params![
             execution_id,
@@ -686,9 +715,15 @@ pub fn finalize_report(
     let (file_hash, file_size) = match write_res {
         Ok(v) => v,
         Err(err) => {
-            mark_failed(db, execution_id, "REPORT_PERSISTENCE_BARRIER_FAILED").map_err(
-                |mark_error| anyhow!("{err}; failed to record report failure: {mark_error}"),
-            )?;
+            mark_failed(
+                db,
+                &facts.session_id,
+                execution_id,
+                "REPORT_PERSISTENCE_BARRIER_FAILED",
+            )
+            .map_err(|mark_error| {
+                anyhow!("{err}; failed to record report failure: {mark_error}")
+            })?;
             return Err(err);
         }
     };
@@ -754,149 +789,4 @@ pub fn finalize_report(
         created_at,
         updated_at: now,
     })
-}
-
-/// Reads a report for a given session, strictly verifying session boundary.
-pub fn get_report(
-    db: &Database,
-    session_id: &str,
-    report_id_or_execution_id: &str,
-) -> Result<Option<Value>> {
-    let row: Option<(String, String, String, String)> = db
-        .conn()
-        .prepare_cached(
-            "SELECT session_id, execution_id, file_path, status
-             FROM goal_reports
-             WHERE session_id = ?1 AND (report_id = ?2 OR execution_id = ?2)",
-        )?
-        .query_row(params![session_id, report_id_or_execution_id], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
-        })
-        .optional()?;
-
-    let Some((sess_id, exec_id, _file_path, status)) = row else {
-        return Ok(None);
-    };
-
-    if sess_id != session_id {
-        return Err(anyhow!(
-            "PERMISSION_DENIED: report belongs to another session"
-        ));
-    }
-
-    if status == "failed" {
-        return Err(anyhow!("REPORT_FAILED: goal report generation failed"));
-    }
-
-    if status != "ready" {
-        return Ok(Some(json!({
-            "status": status,
-            "sessionId": sess_id,
-            "executionId": exec_id,
-        })));
-    }
-
-    let full_path = report_file_path(db.data_dir(), &sess_id, &exec_id);
-    if !full_path.exists() {
-        return Err(anyhow!("REPORT_NOT_FOUND: report file missing on disk"));
-    }
-
-    let content = fs::read_to_string(&full_path)?;
-    let parsed: Value = serde_json::from_str(&content)?;
-    Ok(Some(parsed))
-}
-
-/// Lists all goal report summaries for a session.
-pub fn list_reports(db: &Database, session_id: &str) -> Result<Vec<GoalReportSummary>> {
-    let mut stmt = db.conn().prepare_cached(
-        "SELECT r.execution_id, r.report_id, r.session_id, r.proposal_id, r.turn_id,
-                r.status, r.integrity, r.verdict, r.summary, p.title as goal_title,
-                CASE WHEN p.execution_state IN ('completed', 'interrupted')
-                     THEN p.execution_state ELSE NULL END as execution_status,
-                r.file_path, r.file_hash, r.file_size, r.durable_seq,
-                r.created_at, r.updated_at
-         FROM goal_reports r
-         LEFT JOIN plan_approvals p ON p.execution_id = r.execution_id
-         WHERE r.session_id = ?1
-         ORDER BY r.created_at DESC",
-    )?;
-
-    let rows = stmt.query_map(params![session_id], row_to_summary)?;
-    let mut results = Vec::new();
-    for row in rows {
-        results.push(row?);
-    }
-    Ok(results)
-}
-
-/// Retries building a failed or pending report from local facts.
-pub fn retry_report(
-    db: &Database,
-    session_id: &str,
-    execution_id: &str,
-) -> Result<GoalReportSummary> {
-    let row: Option<(String, String, i64)> = db
-        .conn()
-        .prepare_cached(
-            "SELECT session_id, status, durable_seq FROM goal_reports WHERE execution_id = ?1",
-        )?
-        .query_row(params![execution_id], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
-        })
-        .optional()?;
-
-    let (sess_id, status, durable_seq) = match row {
-        Some(r) => r,
-        None => {
-            let facts = load_proposal_facts(db.conn(), execution_id)?;
-            (facts.session_id, "pending".to_string(), 0)
-        }
-    };
-
-    if sess_id != session_id {
-        return Err(anyhow!(
-            "PERMISSION_DENIED: report belongs to another session"
-        ));
-    }
-
-    if status == "ready" {
-        // If ready, query summary and return
-        let summary: Option<GoalReportSummary> = db
-            .conn()
-            .prepare_cached(
-                "SELECT r.execution_id, r.report_id, r.session_id, r.proposal_id, r.turn_id,
-                        r.status, r.integrity, r.verdict, r.summary, p.title as goal_title,
-                        CASE WHEN p.execution_state IN ('completed', 'interrupted')
-                             THEN p.execution_state ELSE NULL END as execution_status,
-                        r.file_path, r.file_hash, r.file_size, r.durable_seq,
-                        r.created_at, r.updated_at
-                 FROM goal_reports r
-                 LEFT JOIN plan_approvals p ON p.execution_id = r.execution_id
-                 WHERE r.execution_id = ?1",
-            )?
-            .query_row(params![execution_id], row_to_summary)
-            .optional()?;
-        if let Some(s) = summary {
-            return Ok(s);
-        }
-    }
-
-    // A failed publication must never be retried from an agent draft. Remove
-    // that stale input before rebuilding the report from durable Host facts.
-    if status == "failed" {
-        let facts = load_proposal_facts(db.conn(), execution_id)?;
-        let draft_path = draft_file_path(db.data_dir(), &facts.session_id, execution_id);
-        if draft_path.exists() {
-            fs::remove_file(draft_path).map_err(|err| {
-                anyhow!("REPORT_DRAFT_INVALIDATION_FAILED: could not remove stale draft: {err}")
-            })?;
-        }
-        db.conn().execute(
-            "UPDATE goal_reports SET status='pending', updated_at=?1
-             WHERE execution_id=?2 AND status='failed'",
-            params![now_ms(), execution_id],
-        )?;
-    }
-
-    finalize_report(db, execution_id, durable_seq, None, None)
 }

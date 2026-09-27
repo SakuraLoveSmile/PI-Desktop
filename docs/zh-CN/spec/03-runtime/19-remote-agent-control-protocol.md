@@ -206,6 +206,9 @@ owner，工作区读取都按会话持久根、Host 忽略规则和 `PATH_OUTSID
 | `session/rename` | controller | 重命名会话 |
 | `session/delete` | owner | 删除会话及其在 Host 上的 transcript |
 | `session/compact` | controller | 对活动会话执行手动上下文检查点 |
+| `goalReports/get` | viewer | 读取指定会话的报告或 Host 有界状态；其他会话的报告与不存在的报告不可区分 |
+| `goalReports/list` | viewer | 列出指定会话的持久报告摘要 |
+| `goalReports/retry` | controller | transcript 持久化成功后，依据 Host 持久事实重新完成失败报告；绝不重跑 Goal |
 | `workspace/list` | viewer | 有界列出会话根下的条目，遵守 Host 忽略规则 |
 | `workspace/read` | viewer | 读取会话根下的一个有界文件，图片以 data URL 返回 |
 | `workspace/diff` | viewer | 返回会话根的工作树 diff |
@@ -330,6 +333,7 @@ Plan/Goal 审批为带显式 `permissionMode` 的 `approve` 或 `reject`，且�
 | `NOT_FOUND` | no | Host、项目、会话、回合、审批、输入或附件不存在 |
 | `AGENT_UNAVAILABLE` | yes | Host 或 runtime 离线 |
 | `AGENT_BUSY` | no | 请求的准入模式下不能接受回合，或队列已满 |
+| `REPORT_PERSISTENCE_BARRIER_FAILED` | yes | transcript 尚未达到持久状态；报告保持失败，Retry 不会完成报告 |
 | `CONFLICT` | yes | revision 过期或回合已不在所需状态 |
 | `IDEMPOTENCY_CONFLICT` | no | 同一 key 使用了不同输入 |
 | `CURSOR_EXPIRED` | no | epoch 已变化或游标不在回放窗口内 |

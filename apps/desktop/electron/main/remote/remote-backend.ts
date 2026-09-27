@@ -314,7 +314,7 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
       case IPC.invoke.goalReportGet: {
         const req = args[0] as { sessionId: string; reportId?: string; executionId?: string };
         const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
-        return client.request("goalReports.get", {
+        return client.request("goalReports/get", {
           sessionId: hostSessionId,
           ...(req.reportId ? { reportId: req.reportId } : {}),
           ...(req.executionId ? { executionId: req.executionId } : {}),
@@ -323,14 +323,14 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
       case IPC.invoke.goalReportList: {
         const req = args[0] as { sessionId: string };
         const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
-        return client.request("goalReports.list", {
+        return client.request("goalReports/list", {
           sessionId: hostSessionId,
         });
       }
       case IPC.invoke.goalReportRetry: {
         const req = args[0] as { sessionId: string; executionId: string };
         const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
-        return client.request("goalReports.retry", {
+        return client.request("goalReports/retry", {
           sessionId: hostSessionId,
           executionId: req.executionId,
         });
