@@ -35,6 +35,13 @@ export type SessionSummary = {
   /** Number of messages in the current canonical transcript. */
   messageCount: number;
   projectPath?: string;
+  /**
+   * Durable display name for this session's workspace (`projects.name`),
+   * persisted by the Host when the session was created. Optional: older hosts
+   * and pathless sessions omit it, and clients then keep the directory
+   * basename. Display only — never used for identity or path decisions.
+   */
+  projectName?: string | null;
   modelId?: string;
   providerId?: string;
   mode: Mode;

@@ -165,6 +165,7 @@ fn spawn(db: &Database, input: &Value) -> Result<Value> {
                 .and_then(Value::as_str)
                 .map(str::to_owned),
             project_path: parent.summary.project_path,
+            project_name: parent.summary.project_name,
             thinking_level: Some(parent.summary.thinking_level),
             permission_mode: Some(parent.summary.permission_mode),
             execution_profile: None,

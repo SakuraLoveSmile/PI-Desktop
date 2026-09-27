@@ -8037,6 +8037,10 @@ Delegation rules:
         executionId: execution.id,
         sessionId: execution.sessionId,
         onDraftSubmitted: async (draft) => {
+          // No catch here: a swallowed failure would make the tool report
+          // success while the Host publishes a fallback report instead. The
+          // error propagates into the SubmitGoalReport tool result so the
+          // executing Agent can retry.
           await this.host.call("goalReports.submitDraft", {
             executionId: execution.id,
             draft,

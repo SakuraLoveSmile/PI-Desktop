@@ -556,6 +556,26 @@ fn provider_rpc_err(error: impl ToString) -> JsonRpcError {
     rpc_err(1000, message, "INTERNAL")
 }
 
+/// Map a session-creation naming failure to a deterministic protocol error.
+///
+/// Naming validation runs before the session row exists, so a rejection never
+/// leaves a half-named visible session, and the caller can tell a caller error
+/// (`INVALID_PARAMS`) from a conflicting existing display name (`CONFLICT`).
+fn session_naming_rpc_err(error: impl ToString) -> JsonRpcError {
+    let message = error.to_string();
+    let error_code = message
+        .split_once(':')
+        .map(|(code, _)| code.trim())
+        .unwrap_or("INTERNAL")
+        .to_string();
+    match error_code.as_str() {
+        "INVALID_PARAMS" | "INVALID_ARGUMENT" => rpc_err(1002, message, &error_code),
+        "CONFLICT" => rpc_err(1008, message, &error_code),
+        "NOT_FOUND" => rpc_err(1007, message, &error_code),
+        _ => rpc_err(1000, message, "INTERNAL"),
+    }
+}
+
 fn session_collaboration_rpc_err(error: impl ToString) -> JsonRpcError {
     let message = error.to_string();
     let code = message.split(':').next().unwrap_or("INTERNAL").trim();
@@ -2133,10 +2153,21 @@ async fn handle_request(
             "version": HOST_VERSION,
             "protocolVersion": PROTOCOL_VERSION
         })),
-
         "workspace.get" => {
             let st = state.lock().await;
-            Ok(json!({ "workspace": st.workspace.get() }))
+            let mut workspace = json!(st.workspace.get());
+            // Read the durable display name back from `projects.name` for an
+            // existing path, so a dispatched project shows its own name instead
+            // of the worktree directory basename.
+            if let (Some(object), Some(path)) = (
+                workspace.as_object_mut(),
+                st.workspace.get().map(|workspace| workspace.path),
+            ) {
+                if let Ok(Some(name)) = st.db.project_name_for_path(&path) {
+                    object.insert("name".into(), json!(name));
+                }
+            }
+            Ok(json!({ "workspace": workspace }))
         }
         "projects.list" => {
             let st = state.lock().await;
@@ -2413,7 +2444,7 @@ async fn handle_request(
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
             let mut st = state.lock().await;
             st.hashline.drop_all();
-            let ws = st.workspace.set(PathBuf::from(path));
+            let mut ws = st.workspace.set(PathBuf::from(path));
             let pid = st
                 .db
                 .ensure_project(&ws.path, true)
@@ -2421,6 +2452,11 @@ async fn handle_request(
             st.db
                 .kv_set("app", "currentProjectId", &json!(pid))
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            // Workspace identity stays keyed by canonical path; the display name
+            // is read back from `projects.name` instead of the directory basename.
+            if let Ok(Some(name)) = st.db.project_name_for_path(&ws.path) {
+                ws.name = name;
+            }
             Ok(json!({ "workspace": ws }))
         }
         "workspace.clear" => {
@@ -2732,6 +2768,17 @@ async fn handle_request(
                 }
                 None => None,
             };
+            let project_name = match params.get("projectName") {
+                None | Some(Value::Null) => None,
+                Some(Value::String(raw)) => Some(raw.clone()),
+                Some(_) => {
+                    return Err(rpc_err(
+                        1002,
+                        "projectName must be a string",
+                        "INVALID_PARAMS",
+                    ))
+                }
+            };
             let session = sessions::create_session_with_options(
                 &st.db,
                 sessions::SessionCreateOptions {
@@ -2755,12 +2802,13 @@ async fn handle_request(
                         .get("projectPath")
                         .and_then(|v| v.as_str())
                         .map(str::to_string),
+                    project_name,
                     thinking_level,
                     permission_mode,
                     execution_profile,
                 },
             )
-            .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            .map_err(|e| session_naming_rpc_err(e))?;
             Ok(json!({ "session": session }))
         }
         "session.fork" => {
@@ -4032,9 +4080,27 @@ async fn handle_request(
                     rpc_err(1002, "reportId or executionId required", "INVALID_PARAMS")
                 })?;
             let st = state.lock().await;
-            let report = crate::goal_reports::get_report(&st.db, session_id, report_id)
+            // Trusted read: recomputes the file hash/size from disk, validates
+            // schema and identity, and reports an explicit state instead of a
+            // stale DB hash or an unvalidated body.
+            let read = crate::goal_reports::read_report(&st.db, session_id, report_id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            Ok(json!({ "report": report }))
+            let is_ready = read.state == crate::goal_reports::REPORT_STATE_READY;
+            let body = if is_ready {
+                read.report.clone()
+            } else {
+                Some(crate::goal_reports::state_stub(&read))
+            };
+            Ok(json!({
+                "report": body,
+                "state": read.state,
+                "reportSha256": read.report_sha256,
+                "fileBytes": read.file_bytes,
+                "maxBytes": read.max_bytes,
+                "integrity": read.integrity,
+                "verdict": read.verdict,
+                "detail": read.detail,
+            }))
         }
         "goalReports.list" => {
             let session_id = params

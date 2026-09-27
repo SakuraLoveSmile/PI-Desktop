@@ -247,6 +247,20 @@ const CONTROL_OPERATION_SPECS: OperationSpec[] = [
   spec("toolResolvePermission", "tool/resolvePermission", "Resolve a pending tool permission request.", "dangerous", ["resolution"]),
   spec("askToolResolve", "agent/askTool/resolve", "Answer an Agent question.", "dangerous", ["resolution"]),
   spec("plansPending", "plans/pending", "List pending Plan or Goal approvals.", "read", ["input"]),
+  spec(
+    "goalReportList",
+    "goalReport/list",
+    "List Goal Completion Report summaries for a session (read-only).",
+    "read",
+    ["params"],
+  ),
+  spec(
+    "goalReportGet",
+    "goalReport/get",
+    "Read one Goal Completion Report with a trusted recomputed hash (read-only).",
+    "read",
+    ["params"],
+  ),
   spec("plansResolve", "plans/resolve", "Approve or reject a Plan or Goal checkpoint.", "dangerous", ["resolution"]),
   spec("pluginList", "plugin/list", "List installed plugins.", "read", []),
   spec("pluginSettingsGet", "plugin/settings/get", "Read plugin setting definitions.", "read", ["input"]),
@@ -288,6 +302,38 @@ const coreTool = (
   toArgs,
 });
 
+/**
+ * Shape a Host `goalReport/get` result for an external reader.
+ *
+ * The Host already recomputes the file hash from disk; this only renames it to
+ * the shared `report_sha256` field so a caller never has to guess between the
+ * trusted recomputed value and the stale `file_hash` DB column. A non-ready
+ * state returns no body at all.
+ */
+export function goalReportReadResult(value: unknown): unknown {
+  const payload = value as {
+    report?: unknown;
+    state?: unknown;
+    reportSha256?: unknown;
+    fileBytes?: unknown;
+    maxBytes?: unknown;
+    integrity?: unknown;
+    verdict?: unknown;
+    detail?: unknown;
+  } | null;
+  if (!payload || typeof payload !== "object") return value ?? null;
+  return {
+    state: payload.state ?? null,
+    report: payload.state === "ready" ? payload.report ?? null : null,
+    report_sha256: payload.reportSha256 ?? null,
+    file_bytes: payload.fileBytes ?? null,
+    max_bytes: payload.maxBytes ?? null,
+    integrity: payload.integrity ?? null,
+    verdict: payload.verdict ?? null,
+    detail: payload.detail ?? null,
+  };
+}
+
 const CORE_TOOL_SPECS = [
   coreTool("pi_app_info", "Read Pi-Desktop-Plus and host version information.", objectSchema({}), "app/getVersion", () => []),
   coreTool("pi_project_get", "Read the active project workspace.", objectSchema({}), "project/get", () => []),
@@ -303,10 +349,14 @@ const CORE_TOOL_SPECS = [
   coreTool("pi_session_list", "List durable sessions.", objectSchema({}), "session/list", () => []),
   coreTool(
     "pi_session_create",
-    "Create a durable session, optionally bound to a project and model.",
+    "Create a durable session, optionally bound to a project and model. `projectName` sets the " +
+      "persistent workspace display name (`projects.name`) in the same transaction as the session.",
     objectSchema({
       title: stringSchema(),
       projectPath: stringSchema(),
+      projectName: stringSchema(
+        "Persistent workspace display name; requires projectPath. Omit to keep the directory basename.",
+      ),
       mode: { type: "string", enum: ["agent", "plan", "goal"] },
       providerId: stringSchema(),
       modelId: stringSchema(),
@@ -459,6 +509,31 @@ const CORE_TOOL_SPECS = [
     objectSchema({ path: stringSchema("Workspace-relative path or allowed attachment ref."), mimeType: stringSchema() }, ["path"]),
     "fs/read",
     (input) => [input],
+  ),
+  // Read-only Goal report access. Deliberately no submitDraft/retry/finalize/
+  // invalidate/bindExecutionTurn: an external Agent must be able to judge a
+  // report, never to write or repair one.
+  coreTool(
+    "pi_goal_report_list",
+    "List Goal Completion Report summaries for one session. Read-only; never returns prompts, transcripts, or credentials.",
+    objectSchema({ sessionId: stringSchema("Target session id.") }, ["sessionId"]),
+    "goalReport/list",
+    (input) => [{ sessionId: input.sessionId }],
+  ),
+  coreTool(
+    "pi_goal_report_get",
+    "Read one Goal Completion Report body plus a trusted recomputed report_sha256. Read-only. States are distinct: pending, draft, failed, not_found, corrupt, truncated, or ready (ready with integrity.kind=fallback means no completed report exists).",
+    objectSchema({
+      sessionId: stringSchema("Target session id."),
+      executionId: stringSchema("Execution id accepted by the Host."),
+      reportId: stringSchema("Report id; an alternative to executionId."),
+    }, ["sessionId"]),
+    "goalReport/get",
+    (input) => [{
+      sessionId: input.sessionId,
+      ...(input.executionId === undefined ? {} : { executionId: input.executionId }),
+      ...(input.reportId === undefined ? {} : { reportId: input.reportId }),
+    }],
   ),
 ] as const;
 
