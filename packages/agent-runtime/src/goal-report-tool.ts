@@ -204,6 +204,8 @@ export class GoalReportDraftManager {
         try {
           await this.options.onDraftSubmitted?.(validation.value);
         } catch (error) {
+          this.currentDraft = null;
+          this.invalidated = true;
           await this.options.onDraftPersistenceFailure?.(error);
           return {
             content: [{ type: "text", text: "Goal report draft persistence failed." }],

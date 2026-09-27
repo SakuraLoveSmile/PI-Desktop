@@ -313,6 +313,24 @@ impl Database {
         Ok(rows.next()?.map(|r| r.get(0)).transpose()?)
     }
 
+    /// The durable display name for a project path, or None when the path has no
+    /// project row yet.
+    ///
+    /// The lookup canonicalizes the same way `ensure_project` stores, so a
+    /// symlinked or trailing-slash spelling still finds its row. Callers use this
+    /// to read the display name back for an already-known path without creating
+    /// or renaming anything.
+    pub fn project_name_for_path(&self, path: &str) -> Result<Option<String>> {
+        let Some(canonical) = canonical_project_path(path) else {
+            return Ok(None);
+        };
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT name FROM projects WHERE path = ?1")?;
+        let mut rows = stmt.query(params![canonical])?;
+        Ok(rows.next()?.map(|r| r.get(0)).transpose()?)
+    }
+
     pub fn get_project(&self, id: i64) -> Result<Option<ProjectRecord>> {
         let mut stmt = self.conn.prepare_cached(
             "SELECT id, path, name, pinned, created_at, last_opened_at

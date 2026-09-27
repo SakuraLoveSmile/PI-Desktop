@@ -1,5 +1,16 @@
 import type { SessionSummary } from "@pi-desktop/shared";
 
+
+/// Display name for a session's project, applying the frozen precedence:
+/// the Host-persisted `projectName` first, the directory basename otherwise.
+/// Never used for identity, dedup, permissions or path decisions.
+export function sessionProjectDisplayName(
+  session: Pick<SessionSummary, "projectPath" | "projectName">,
+): string {
+  const persisted = session.projectName?.trim();
+  if (persisted) return persisted;
+  return projectName(session.projectPath ?? "");
+}
 export type SessionProject = {
   path: string;
   name: string;
@@ -30,7 +41,11 @@ export function collectSessionProjects(sessions: SessionSummary[]): SessionProje
     if (!existing) {
       projects.set(normalizedPath, {
         path: session.projectPath,
-        name: projectName(session.projectPath),
+        // Frozen precedence (KaneoPilot protocol §5.23.10 T6): the Host
+        // persisted `projectName` outranks the directory basename. Workspace
+        // identity stays keyed by the canonical path, so two worktrees of the
+        // same project keep separate entries that merely share a display name.
+        name: sessionProjectDisplayName(session),
         updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
       });
       continue;
