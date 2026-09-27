@@ -444,7 +444,7 @@ export function Composer({
     submit,
   } = submitController;
 
-  const voiceEnabled = !!settings?.voice?.enabled;
+  const voiceEnabled = import.meta.env.DEV && !!settings?.voice?.enabled;
   const voice = useVoiceInput({
     enabled: voiceEnabled,
     onTranscriptionComplete: (text) => {
@@ -458,7 +458,6 @@ export function Composer({
       }
     },
   });
-
   const composerAc = useComposerAutocomplete({
     value,
     cursor,
@@ -601,7 +600,9 @@ export function Composer({
               persistDraft();
             }}
           />
-          <VoiceOverlay t={t} state={voice.state} onCancel={voice.cancel} />
+          {import.meta.env.DEV && (
+            <VoiceOverlay t={t} state={voice.state} onCancel={voice.cancel} />
+          )}
           <ComposerToolbar
             t={t}
             mode={mode}
