@@ -207,12 +207,9 @@ export class GoalReportDraftManager {
           this.currentDraft = null;
           this.invalidated = true;
           await this.options.onDraftPersistenceFailure?.(error);
-          return {
-            content: [{ type: "text", text: "Goal report draft persistence failed." }],
-            details: { ok: false, error: "REPORT_DRAFT_PERSIST_FAILED" },
-            isError: true,
-            terminate: true,
-          } as AgentToolResult<any>;
+          throw new Error(
+            "Goal report draft could not be persisted to the host. Retry SubmitGoalReport.",
+          );
         }
         this.currentDraft = validation.value;
         this.invalidated = false;
