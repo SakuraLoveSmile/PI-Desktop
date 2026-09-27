@@ -15257,6 +15257,66 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - **Command:** `node scripts/e2e-temporary-goal.mjs` after the desktop and Host
   builds. The script reports its isolated profile and screenshot directory.
 
+### E2E-GOAL-completion-report
+
+- **Preconditions:** Isolated Desktop profile and Host data directory, an
+  approved Goal session, and a loopback-only fake model. No live provider
+  credentials or user data.
+- **Steps:** Submit and approve a fixture Goal, let the real sidecar perform its
+  bounded work, then submit a structured `SubmitGoalReport`. Open the resulting
+  transcript card and the report in the session Work Panel.
+- **Expected:** Host returns one durable `ready` report for the same Goal and
+  execution. The transcript card opens the matching report; the report shows
+  its conclusion, execution status, evidence and limitations. A criterion is
+  presented as met only when the structured report and durable evidence support
+  it. A fallback report identifies unknown or missing evidence.
+- **Recovery and failure:** Ready reports remain readable after restart.
+  Invalid or failed draft persistence never publishes a stale or misleading
+  ready report. Failed outbox persistence remains failed; explicit Retry uses
+  only Host-owned durable facts and does not rerun the Goal or call the model.
+  The Work Panel shows localized generic failure text and only a safe error
+  code, with Retry disabled while the request is active.
+- **Specs:** 03-runtime/02-agent-runtime, 03-runtime/03-tools-and-permissions,
+  03-runtime/04-data-storage, 03-runtime/06-host-rpc-protocol,
+  04-ux/08-component-spec.
+- **Automation:** `node scripts/e2e-temporary-goal.mjs`,
+  `pnpm test:e2e:goal-report`, Goal Report runtime/Host tests, and the focused
+  Goal Report renderer tests. Electron uses the isolated local fake model.
+- **Milestone:** Maintenance.
+
+### E2E-TEAM-runtime-mailbox-and-panel
+
+- **Preconditions:** Isolated Desktop profile and Host data directory, a Team
+  Lead session, and a loopback-only fake model. No live provider credentials.
+- **Steps:** Prompt the Lead to create a fresh teammate with an initial task.
+  The teammate sends a result to Lead. Read both transcripts and the Host roster
+  and board. Pause the Team with a queued mailbox message, restart Desktop, verify
+  the message remains pending while paused, then Resume and verify one delivery.
+  Open the Team panel and navigate to the teammate's session from its roster row.
+- **Expected:** The Lead and teammate have distinct durable sessions and
+  Host-derived Team contexts. The peer message appears once in both the durable
+  mailbox and recipient transcript; delivery is acknowledged only after the
+  Host queue/turn receipt is durable. The Lead receives the teammate's reply.
+  The panel renders the Host roster and board and opens the real member session.
+  Pause holds Team queues; an unadmitted Team mailbox message remains queued
+  across restart. Resume releases the Team hold and delivers that message once.
+- **Recovery and authorization:** Agent Host tests prove that restart recovery
+  admits only the selected Team message while keeping ordinary restored turns
+  held; Host Core tests prove paused mailbox messages survive restart without a
+  queue receipt, while ordinary unclaimed collaboration messages are interrupted.
+  Host tests cover idempotency, inherited sender permission ceilings,
+  rejecting a target whose effective permission widens after enqueue, queue/turn
+  receipts, cross-Team access, task ownership, Lead-only operations, owner
+  reassignment/unassignment, CAS and dependencies. Stop/abort tests require
+  Team pause before exact-turn interruption.
+- **Specs:** ADR 0307; 03-runtime/02-agent-runtime, 03-tools-and-permissions,
+  04-data-storage, 06-host-rpc-protocol; 04-ux/08-component-spec.
+- **Automation:** `pnpm test:e2e:team`, `pnpm --filter @pi-desktop/agent-host
+  test`, `cargo test -p host-core --locked`, and the desktop Team interaction
+  tests. The Electron scenario uses only an isolated profile and a local fake
+  model.
+- **Milestone:** Maintenance.
+
 ### E2E-PLUS-independent-installation
 
 - Preconditions: isolated home/profile and native candidate; an old PI-Desktop

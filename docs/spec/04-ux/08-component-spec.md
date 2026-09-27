@@ -2652,6 +2652,66 @@ present the interrupted terminal snapshot after restart.
 
 ---
 
+## 10B. GoalReportCard and Goal Report Work Panel tab
+
+### 10B.1 Purpose
+
+Expose the durable Host report for an approved Goal execution in the
+conversation and the session-scoped Work Panel. Execution status and report
+verdict are separate: a completed turn does not imply that every Goal criterion
+was met.
+
+### 10B.2 Content and states
+
+The transcript card identifies the Goal and verdict and opens its report in the
+Work Panel. A ready report presents the Goal snapshot, execution status,
+structured or fallback integrity, supported criteria and checks, evidence,
+changed files, limitations, and next steps. Fallback reports identify missing
+or incomplete evidence and do not present unknown checks as passed.
+
+The Work Panel distinguishes loading, pending persistence, ready, failed,
+unavailable, and disconnected reads. Failures use localized generic text and
+may include a validated Host error code; raw exception messages are not shown.
+Retry is available for recoverable report failures and calls the Host report
+retry operation without rerunning the Goal or making another provider call.
+Report reads and retry remain scoped to the owning session.
+
+### 10B.3 Accessibility
+
+- The transcript card is a labeled region; its open action has a localized
+  accessible name.
+- The report tab exposes headings and evidence in reading order.
+- Retry uses the shared Button primitive, is disabled while the request is in
+  flight, and keeps readable foreground contrast in both themes.
+
+## 10C. Expert Team Work Panel
+
+### 10C.1 Purpose
+
+Show the Host-owned roster and revisioned task board for a Team Lead session.
+The Composer profile selector remains the entry point for choosing Expert
+Team; the panel does not change the surrounding chat layout.
+
+### 10C.2 Content and interactions
+
+The panel shows member identity, context kind, lifecycle phase, available model
+and diagnostic state, plus live non-deleted tasks with owner, status,
+dependencies, readiness, and advisory overlapping write scopes. Roster and board
+snapshots must describe the same Team revision. Refresh results from a prior
+Team or older request cannot replace a newer snapshot.
+
+A paused Team exposes Resume; successful resume releases held Team messages.
+Each member row can open that member's durable session. Loading, empty, refresh,
+and error states remain visible and localized. The panel does not claim a
+message was delivered based only on mailbox enqueue state.
+
+### 10C.3 Accessibility
+
+- The panel has a localized heading and labeled roster and board sections.
+- Resume and member navigation use shared Button primitives; refresh uses the
+  shared tooltip button.
+- Status, readiness, and overlap warnings use text as well as color.
+
 ## 11. Composer
 
 ### 11.1 Purpose

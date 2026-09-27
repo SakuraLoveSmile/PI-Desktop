@@ -7,6 +7,7 @@ use uuid::Uuid;
 use super::model::{
     TeamBoardProjection, TeamTask, TeamTaskReadiness, WriteScopeOverlap, MAX_TEAM_TASKS,
 };
+use super::roster::{get_team_member_by_name, validate_team_participant};
 use crate::db::{now_ms, Database};
 
 pub fn list_team_tasks(db: &Database, team_session_id: &str) -> Result<Vec<TeamTask>> {
@@ -85,6 +86,7 @@ pub fn get_team_task(
 
 pub struct CreateTaskParams<'a> {
     pub team_session_id: &'a str,
+    pub caller_session_id: &'a str,
     pub task_id: Option<&'a str>,
     pub subject: &'a str,
     pub description: Option<&'a str>,
@@ -97,6 +99,7 @@ pub struct CreateTaskParams<'a> {
 pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<TeamTask> {
     let CreateTaskParams {
         team_session_id,
+        caller_session_id,
         task_id,
         subject,
         description,
@@ -105,6 +108,38 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
         owner_session_id,
         owner_member_name,
     } = params;
+
+    let caller_name = validate_team_participant(db, team_session_id, caller_session_id)?;
+    let is_lead = caller_session_id == team_session_id;
+    let (owner_session_id, owner_member_name) = if let Some(owner_id) = owner_session_id {
+        let owner_name = validate_team_participant(db, team_session_id, owner_id)?;
+        if let Some(requested_name) = owner_member_name {
+            if !requested_name.eq_ignore_ascii_case(&owner_name) {
+                return Err(anyhow!(
+                    "TEAM_TASK_OWNER_MISMATCH: owner name does not match session"
+                ));
+            }
+        }
+        if !is_lead && owner_id != caller_session_id {
+            return Err(anyhow!(
+                "TEAM_UNAUTHORIZED: members can only create their own tasks"
+            ));
+        }
+        (Some(owner_id.to_string()), Some(owner_name))
+    } else if let Some(owner_name) = owner_member_name {
+        let owner = get_team_member_by_name(db, team_session_id, owner_name)?
+            .ok_or_else(|| anyhow!("TEAM_TARGET_NOT_FOUND: task owner is not a team member"))?;
+        if !is_lead && owner.member_session_id != caller_session_id {
+            return Err(anyhow!(
+                "TEAM_UNAUTHORIZED: members can only create their own tasks"
+            ));
+        }
+        (Some(owner.member_session_id), Some(owner.name))
+    } else if is_lead {
+        (None, None)
+    } else {
+        (Some(caller_session_id.to_string()), Some(caller_name))
+    };
 
     let subject = subject.trim();
     if subject.is_empty() {
@@ -193,8 +228,8 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
         subject: subject.to_string(),
         description: description.map(Into::into),
         status: "pending".to_string(),
-        owner_session_id: owner_session_id.map(Into::into),
-        owner_member_name: owner_member_name.map(Into::into),
+        owner_session_id,
+        owner_member_name,
         blocked_by,
         write_scopes,
         deleted: false,
@@ -205,6 +240,7 @@ pub fn create_team_task(db: &Database, params: CreateTaskParams<'_>) -> Result<T
 
 pub struct UpdateTaskParams<'a> {
     pub team_session_id: &'a str,
+    pub caller_session_id: &'a str,
     pub task_id: &'a str,
     pub expected_revision: i64,
     pub subject: Option<&'a str>,
@@ -220,6 +256,7 @@ pub struct UpdateTaskParams<'a> {
 pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<TeamTask> {
     let UpdateTaskParams {
         team_session_id,
+        caller_session_id,
         task_id,
         expected_revision,
         subject,
@@ -234,6 +271,13 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
 
     let current = get_team_task(db, team_session_id, task_id)?
         .ok_or_else(|| anyhow!("TEAM_TASK_NOT_FOUND: task '{task_id}' not found"))?;
+    let caller_name = validate_team_participant(db, team_session_id, caller_session_id)?;
+    let is_lead = caller_session_id == team_session_id;
+    if !is_lead && current.owner_session_id.as_deref() != Some(caller_session_id) {
+        return Err(anyhow!(
+            "TEAM_UNAUTHORIZED: members can only update their own tasks"
+        ));
+    }
 
     // CAS check
     if current.revision != expected_revision {
@@ -272,17 +316,50 @@ pub fn update_team_task(db: &Database, params: UpdateTaskParams<'_>) -> Result<T
         None => current.description.clone(),
     };
 
-    let final_owner_session_id = match owner_session_id {
-        Some(Some(s)) => Some(s.to_string()),
-        Some(None) => None,
-        None => current.owner_session_id.clone(),
+    let (requested_owner_id, requested_owner_name) = match (owner_session_id, owner_member_name) {
+        (Some(Some(id)), Some(Some(name))) => (Some(id.to_string()), Some(name.to_string())),
+        (Some(Some(id)), Some(None) | None) => (Some(id.to_string()), None),
+        (Some(None), Some(Some(_))) => {
+            return Err(anyhow!(
+                "TEAM_TASK_OWNER_MISMATCH: owner name requires a member session"
+            ));
+        }
+        (Some(None), Some(None) | None) => (None, None),
+        (None, Some(Some(name))) => {
+            let owner = get_team_member_by_name(db, team_session_id, name)?
+                .ok_or_else(|| anyhow!("TEAM_TARGET_NOT_FOUND: task owner is not a team member"))?;
+            (Some(owner.member_session_id), Some(owner.name))
+        }
+        (None, Some(None)) => (None, None),
+        (None, None) => (
+            current.owner_session_id.clone(),
+            current.owner_member_name.clone(),
+        ),
     };
-
-    let final_owner_member_name = match owner_member_name {
-        Some(Some(s)) => Some(s.to_string()),
-        Some(None) => None,
-        None => current.owner_member_name.clone(),
-    };
+    if !is_lead
+        && (requested_owner_id.as_deref() != Some(caller_session_id)
+            || requested_owner_name.as_deref() != Some(caller_name.as_str()))
+    {
+        return Err(anyhow!("TEAM_UNAUTHORIZED: members cannot reassign tasks"));
+    }
+    let (final_owner_session_id, final_owner_member_name) =
+        if let Some(owner_id) = requested_owner_id {
+            let owner_name = validate_team_participant(db, team_session_id, &owner_id)?;
+            if let Some(name) = requested_owner_name.as_deref() {
+                if !name.eq_ignore_ascii_case(&owner_name) {
+                    return Err(anyhow!(
+                        "TEAM_TASK_OWNER_MISMATCH: owner name does not match session"
+                    ));
+                }
+            }
+            (Some(owner_id), Some(owner_name))
+        } else if let Some(owner_name) = requested_owner_name {
+            let owner = get_team_member_by_name(db, team_session_id, &owner_name)?
+                .ok_or_else(|| anyhow!("TEAM_TARGET_NOT_FOUND: task owner is not a team member"))?;
+            (Some(owner.member_session_id), Some(owner.name))
+        } else {
+            (None, None)
+        };
 
     let final_blocked_by = blocked_by.unwrap_or(current.blocked_by.clone());
     let final_write_scopes = write_scopes.unwrap_or(current.write_scopes.clone());

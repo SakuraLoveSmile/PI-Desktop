@@ -1743,6 +1743,32 @@ sklm: {
     launcherDesc: "查看團隊成員、共享任務看板與協作狀態",
     retry: "重試",
     refresh: "重新整理",
+    snapshotChanged: "團隊資料載入期間發生變更，請重試以重新整理。",
+    overlapTask: "任務 {{tasks}} 在作用域 {{scope}} 上發生衝突",
+    blockedBy: "阻塞於：{{tasks}}",
+    scopes: "作用域：{{scopes}}",
+    readiness: {
+      ready: "就緒",
+      blocked: "阻塞",
+    },
+    context: {
+      fresh: "新建",
+      fork: "分叉",
+    },
+    phase: {
+      provisioning: "準備中",
+      idle: "閒置",
+      running: "執行中",
+      failed: "失敗",
+      completed: "已完成",
+    },
+    taskStatus: {
+      pending: "待處理",
+      in_progress: "進行中",
+      completed: "已完成",
+      failed: "失敗",
+      cancelled: "已取消",
+    },
   },
 
   panel: {

@@ -8967,6 +8967,49 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **状态：** `pnpm test:e2e:provider-api-style`、`official-native-search.test.ts`；
   共享路由测试覆盖伪装域名、不安全地址和未知中转站。未验证线上服务或 Host/SQLite 保存。
 
+### E2E-GOAL-completion-report
+
+- **前置条件：** 隔离的 Desktop 配置与 Host 数据目录、已批准的 Goal 会话，以及仅监听
+  loopback 的假模型。不使用真实提供商凭据或用户数据。
+- **步骤：** 提交并批准夹具 Goal，由真实 sidecar 完成有限工作，再提交结构化
+  `SubmitGoalReport`。打开转录中的报告卡片，并在该会话的工作面板中查看报告。
+- **预期：** Host 为同一 Goal 和 execution 返回唯一且持久的 `ready` 报告。转录卡片打开
+  对应报告；报告展示结论、执行状态、证据和限制。只有结构化报告与持久证据都支持时，
+  才能将验收条件显示为已达成。后备报告必须标明未知或缺失的证据。
+- **恢复与失败：** 重启后仍可读取就绪报告。无效草稿或持久化失败不得发布过期或误导性
+  的就绪报告。outbox 持久化失败时报告保持失败；显式 Retry 只使用 Host 持久事实，不重跑
+  Goal，也不调用模型。工作面板显示本地化的通用失败说明与安全格式错误码；请求期间禁用
+  Retry。
+- **规范：** 03-runtime/02-agent-runtime、03-runtime/03-tools-and-permissions、
+  03-runtime/04-data-storage、03-runtime/06-host-rpc-protocol、04-ux/08-component-spec。
+- **自动化：** `node scripts/e2e-temporary-goal.mjs`、`pnpm test:e2e:goal-report`、
+  Goal Report runtime/Host 测试和聚焦 renderer 测试。Electron 场景仅使用隔离配置与本地假模型。
+- **里程碑：** 维护。
+
+### E2E-TEAM-runtime-mailbox-and-panel
+
+- **前置条件：** 隔离的 Desktop 配置与 Host 数据目录、Team Lead 会话，以及仅监听
+  loopback 的假模型。不使用真实提供商凭据。
+- **步骤：** 提示 Lead 创建一个 fresh 队友并分派初始任务；队友通过消息把结果发回
+  Lead。读取双方转录与 Host 花名册/看板。在存在排队邮箱消息时暂停 Team 并重启 Desktop，
+  确认暂停期间消息仍待处理，再恢复 Team 并确认只投递一次。打开 Team 面板，再从花名册导航
+  到队友会话。
+- **预期：** Lead 和队友是不同的持久会话，Team 上下文由 Host 推导。同伴消息只出现一次；
+  Host 队列或 turn 回执持久化后才写入确认，队友回复能到达 Lead。面板显示 Host 花名册和
+  看板，并打开真实成员会话。暂停会 hold Team 队列；尚未入队的 Team 邮箱消息在重启后仍排队。
+  恢复会释放 Team hold，并且只投递该消息一次。
+- **恢复与授权：** Agent Host 测试验证重启时只准入选中的 Team 消息，同时保持普通恢复
+  turn 暂停；Host Core 测试验证暂停的邮箱消息在没有队列回执时仍可跨重启保留，普通未认领
+  的协作消息则会中断。Host 测试覆盖幂等、继承权限的发送者上限、入队后接收权限提高时拒绝启动、
+  队列/turn 回执、跨 Team 访问、任务所有权、Lead 专属操作、负责人重新分配/取消、CAS 与依赖。
+  Stop/Abort 测试要求先暂停 Team，再按精确 turn ID 中断。
+- **规范：** ADR 0307；03-runtime/02-agent-runtime、03-tools-and-permissions、
+  04-data-storage、06-host-rpc-protocol；04-ux/08-component-spec。
+- **自动化：** `pnpm test:e2e:team`、`pnpm --filter @pi-desktop/agent-host test`、
+  `cargo test -p host-core --locked` 和 desktop Team 交互测试。Electron 场景仅使用隔离配置
+  和本地假模型。
+- **里程碑：** 维护。
+
 ### E2E-PLUS-independent-installation
 
 - **先决条件**：隔离的 home/配置文件与原生候选包；旧 PI-Desktop 夹具带有哨兵数据。

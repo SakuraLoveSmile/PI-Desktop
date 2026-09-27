@@ -1,5 +1,6 @@
 import { app, BrowserWindow, crashReporter, Menu, safeStorage } from "electron";
 import { createScheduledRunner } from "../runtime/scheduled-runner";
+import { restoreAgentHostThenDrain } from "../runtime/team-startup";
 import {
   APP_NAME,
   APP_VERSION,
@@ -112,6 +113,7 @@ export type StartupDependencies = {
   getSidecar?: () => unknown;
   invokeSessionCollaboration?: (input: McpControlInvokeInput) => Promise<unknown>;
   onSessionQueueChange?: () => void;
+  onAgentHostReady?: () => Promise<void>;
 };
 
 /**
@@ -300,11 +302,16 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     if (!bootError && state.agentHostBridge) {
       // Restore the persisted turn queue now that host-core answers. Restored
       // entries stay held until a controller attaches (D375).
-      state.agentHostBridge.agentHost.start().catch((error) => {
-        logger.app("runtime", "warn", "agent host queue restore failed", {
+      try {
+        await restoreAgentHostThenDrain(
+          state.agentHostBridge.agentHost,
+          deps.onAgentHostReady ?? (async () => undefined),
+        );
+      } catch (error) {
+        logger.app("runtime", "warn", "agent host queue restore or Team recovery failed", {
           data: String(error),
         });
-      });
+      }
     }
     const host = getHost();
     if (host) {

@@ -16,12 +16,12 @@ export type GoalReportCardProps = {
 export function GoalReportCard({ report, onOpenReport }: GoalReportCardProps) {
   const { t } = useTranslation();
 
-  const isCompleted = report.status === "completed";
+  const executionStatus = report.executionStatus;
   const isFallback = report.integrity === "fallback";
 
   return (
     <section
-      className={`goal-report-card verdict-${report.verdict} status-${report.status}`}
+      className={`goal-report-card verdict-${report.verdict} status-${executionStatus ?? report.status}`}
       data-testid="goal-report-card"
       data-execution-id={report.executionId}
       role="region"
@@ -49,9 +49,13 @@ export function GoalReportCard({ report, onOpenReport }: GoalReportCardProps) {
           </div>
 
           <div className="goal-report-card-meta">
-            <span className={`goal-report-card-status-badge status-${report.status}`}>
-              {isCompleted ? t("goalReport.view.statusCompleted") : t("goalReport.view.statusInterrupted")}
-            </span>
+            {executionStatus ? (
+              <span className={`goal-report-card-status-badge status-${executionStatus}`}>
+                {executionStatus === "completed"
+                  ? t("goalReport.view.statusCompleted")
+                  : t("goalReport.view.statusInterrupted")}
+              </span>
+            ) : null}
             {isFallback && (
               <span className="goal-report-card-fallback-badge">
                 {t("goalReport.view.fallback")}

@@ -1708,6 +1708,14 @@ export const ptBR = {
     launcherDesc: "Inspecionar membros da equipe, quadro de tarefas e coordenação compartilhada",
     retry: "Tentar novamente",
     refresh: "Atualizar",
+    snapshotChanged: "Os dados da equipe mudaram durante o carregamento. Tente novamente para atualizar.",
+    overlapTask: "As tarefas {{tasks}} se sobrepõem no escopo: {{scope}}",
+    blockedBy: "Bloqueada por: {{tasks}}",
+    scopes: "Escopos: {{scopes}}",
+    readiness: { ready: "Pronta", blocked: "Bloqueada" },
+    context: { fresh: "Nova", fork: "Bifurcação" },
+    phase: { provisioning: "Preparando", idle: "Ociosa", running: "Em execução", failed: "Falhou", completed: "Concluída" },
+    taskStatus: { pending: "Pendente", in_progress: "Em andamento", completed: "Concluída", failed: "Falhou", cancelled: "Cancelada" },
   },
 
   panel: {

@@ -101,6 +101,11 @@ pub struct TeamMessage {
     pub target_session_id: String,
     pub target_member_name: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<String>,
+    /// Delivery state is derived from the durable message and completion
+    /// receipt records. `status` remains the underlying collaboration state.
+    pub delivery_status: String, // "queued" | "accepted" | "acknowledged" | "completed" | "failed"
     pub status: String,
     pub created_at: String,
     pub updated_at: String,

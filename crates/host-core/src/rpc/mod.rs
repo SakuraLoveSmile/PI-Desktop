@@ -1,6 +1,8 @@
 fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
     let msg = e.to_string();
-    let code_str = if msg.contains("TEAM_UNAUTHORIZED") {
+    let code_str = if msg.contains("TEAM_DELIVERY_PENDING") {
+        "TEAM_DELIVERY_PENDING"
+    } else if msg.contains("TEAM_UNAUTHORIZED") {
         "TEAM_UNAUTHORIZED"
     } else if msg.contains("TEAM_NOT_FOUND") {
         "TEAM_NOT_FOUND"
@@ -1553,7 +1555,7 @@ fn parse_capability_target(
                 1002,
                 format!("{key}.level must be 'global' or 'project'"),
                 "INVALID_PARAMS",
-            ))
+            ));
         }
     };
     let project_path = source
@@ -1591,11 +1593,55 @@ async fn handle_request(
         method if method.starts_with("team.") => {
             let st = state.lock().await;
             match method {
+                "team.getRuntimeContext" => {
+                    let session_id = params
+                        .get("sessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+                    if sessions::session_execution_profile(&st.db, session_id)
+                        .map_err(team_rpc_err)?
+                        .as_deref()
+                        != Some("team")
+                    {
+                        return Ok(Value::Null);
+                    }
+                    if let Some(member) =
+                        crate::team::get_team_member_by_session_id(&st.db, session_id)
+                            .map_err(team_rpc_err)?
+                    {
+                        let member_name = crate::team::validate_team_participant(
+                            &st.db,
+                            &member.team_session_id,
+                            session_id,
+                        )
+                        .map_err(team_rpc_err)?;
+                        return Ok(json!({
+                            "teamSessionId": member.team_session_id,
+                            "callerSessionId": session_id,
+                            "isLead": false,
+                            "memberName": member_name,
+                        }));
+                    }
+                    crate::team::validate_team_lead(&st.db, session_id).map_err(team_rpc_err)?;
+                    Ok(json!({
+                        "teamSessionId": session_id,
+                        "callerSessionId": session_id,
+                        "isLead": true,
+                    }))
+                }
                 "team.getRoster" => {
                     let team_id = params
                         .get("teamSessionId")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    crate::team::validate_team_participant(&st.db, team_id, caller_id)
+                        .map_err(team_rpc_err)?;
                     let members =
                         crate::team::list_team_members(&st.db, team_id).map_err(team_rpc_err)?;
                     let team = crate::team::get_team(&st.db, team_id).map_err(team_rpc_err)?;
@@ -1611,6 +1657,14 @@ async fn handle_request(
                         .get("teamSessionId")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    crate::team::validate_team_participant(&st.db, team_id, caller_id)
+                        .map_err(team_rpc_err)?;
                     let projection = crate::team::get_team_board_projection(&st.db, team_id)
                         .map_err(team_rpc_err)?;
                     Ok(json!(projection))
@@ -1654,6 +1708,12 @@ async fn handle_request(
                         .get("teamSessionId")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
                     let subject = params
                         .get("subject")
                         .and_then(|v| v.as_str())
@@ -1684,6 +1744,7 @@ async fn handle_request(
                         &st.db,
                         crate::team::CreateTaskParams {
                             team_session_id: team_id,
+                            caller_session_id: caller_id,
                             task_id,
                             subject,
                             description,
@@ -1701,6 +1762,12 @@ async fn handle_request(
                         .get("teamSessionId")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
                     let task_id = params
                         .get("taskId")
                         .and_then(|v| v.as_str())
@@ -1739,6 +1806,7 @@ async fn handle_request(
                         &st.db,
                         crate::team::UpdateTaskParams {
                             team_session_id: team_id,
+                            caller_session_id: caller_id,
                             task_id,
                             expected_revision,
                             subject,
@@ -1785,6 +1853,11 @@ async fn handle_request(
                         },
                     )
                     .map_err(team_rpc_err)?;
+                    send_notification(
+                        &tx,
+                        "team.messageQueued",
+                        json!({ "teamSessionId": team_id, "messageId": msg.id }),
+                    );
                     Ok(json!({ "message": msg }))
                 }
                 "team.listMessages" => {
@@ -1792,20 +1865,164 @@ async fn handle_request(
                         .get("teamSessionId")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
                     let session_id = params
                         .get("sessionId")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+                        .unwrap_or(caller_id);
+                    crate::team::validate_team_participant(&st.db, team_id, caller_id)
+                        .map_err(team_rpc_err)?;
+                    crate::team::validate_team_participant(&st.db, team_id, session_id)
+                        .map_err(team_rpc_err)?;
+                    if caller_id != team_id && session_id != caller_id {
+                        return Err(rpc_err(
+                            1001,
+                            "members can only read their own Team messages",
+                            "TEAM_UNAUTHORIZED",
+                        ));
+                    }
                     let msgs = crate::team::list_member_messages(&st.db, team_id, session_id)
                         .map_err(team_rpc_err)?;
                     Ok(json!({ "messages": msgs }))
+                }
+                "team.pendingMessages" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    crate::team::validate_team_lead(&st.db, team_id).map_err(team_rpc_err)?;
+                    if caller_id != team_id {
+                        return Err(rpc_err(
+                            1001,
+                            "only the team lead can list pending deliveries",
+                            "TEAM_UNAUTHORIZED",
+                        ));
+                    }
+                    let messages = crate::team::list_pending_team_messages(&st.db, team_id)
+                        .map_err(team_rpc_err)?;
+                    Ok(json!({ "messages": messages }))
+                }
+                "team.getMessage" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    let message_id = params
+                        .get("messageId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "messageId required", "INVALID_PARAMS"))?;
+                    let message =
+                        crate::team::get_team_message(&st.db, team_id, caller_id, message_id)
+                            .map_err(team_rpc_err)?;
+                    Ok(json!({ "message": message }))
+                }
+                "team.ackMessage" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let ack_session_id = params
+                        .get("ackSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "ackSessionId required", "INVALID_PARAMS"))?;
+                    let message_id = params
+                        .get("messageId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "messageId required", "INVALID_PARAMS"))?;
+                    let result = params.get("result").and_then(|v| v.as_str());
+                    let acknowledged = crate::team::ack_team_message(
+                        &st.db,
+                        team_id,
+                        ack_session_id,
+                        message_id,
+                        result,
+                    )
+                    .map_err(team_rpc_err)?;
+                    Ok(json!({ "acknowledged": acknowledged }))
+                }
+                "team.interruptMember" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    if caller_id != team_id {
+                        return Err(rpc_err(
+                            1001,
+                            "only the team lead can interrupt a member",
+                            "TEAM_UNAUTHORIZED",
+                        ));
+                    }
+                    crate::team::validate_team_lead(&st.db, team_id).map_err(team_rpc_err)?;
+                    let member_name = params
+                        .get("memberName")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "memberName required", "INVALID_PARAMS"))?;
+                    let member = crate::team::get_team_member_by_name(&st.db, team_id, member_name)
+                        .map_err(team_rpc_err)?
+                        .ok_or_else(|| {
+                            rpc_err(1002, "Team member not found", "TEAM_TARGET_NOT_FOUND")
+                        })?;
+                    let turn_id = sessions::running_turn_id(&st.db, &member.member_session_id)
+                        .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
+                    if let Some(turn_id) = turn_id {
+                        send_notification(
+                            &tx,
+                            "team.interruptRequested",
+                            json!({ "teamSessionId": team_id, "sessionId": member.member_session_id, "turnId": turn_id }),
+                        );
+                        Ok(json!({ "interrupted": true }))
+                    } else {
+                        Ok(json!({ "interrupted": false }))
+                    }
                 }
                 "team.pause" => {
                     let team_id = params
                         .get("teamSessionId")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    if caller_id != team_id {
+                        return Err(rpc_err(
+                            1001,
+                            "only the team lead can pause the Team",
+                            "TEAM_UNAUTHORIZED",
+                        ));
+                    }
+                    crate::team::validate_team_lead(&st.db, team_id).map_err(team_rpc_err)?;
                     let team = crate::team::pause_team(&st.db, team_id).map_err(team_rpc_err)?;
+                    send_notification(
+                        &tx,
+                        "team.queueChanged",
+                        json!({ "teamSessionId": team_id }),
+                    );
                     Ok(json!({ "team": team }))
                 }
                 "team.resume" => {
@@ -1813,7 +2030,26 @@ async fn handle_request(
                         .get("teamSessionId")
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    if caller_id != team_id {
+                        return Err(rpc_err(
+                            1001,
+                            "only the team lead can resume the Team",
+                            "TEAM_UNAUTHORIZED",
+                        ));
+                    }
+                    crate::team::validate_team_lead(&st.db, team_id).map_err(team_rpc_err)?;
                     let team = crate::team::resume_team(&st.db, team_id).map_err(team_rpc_err)?;
+                    send_notification(
+                        &tx,
+                        "team.queueChanged",
+                        json!({ "teamSessionId": team_id }),
+                    );
                     Ok(json!({ "team": team }))
                 }
                 _ => Err(rpc_err(
@@ -2541,10 +2777,10 @@ async fn handle_request(
                 {
                     sessions::ForkSessionResult::Created(session) => session,
                     sessions::ForkSessionResult::NotFound => {
-                        return Err(rpc_err(1007, "session not found", "NOT_FOUND"))
+                        return Err(rpc_err(1007, "session not found", "NOT_FOUND"));
                     }
                     sessions::ForkSessionResult::Busy => {
-                        return Err(rpc_err(1008, "session is running", "CONFLICT"))
+                        return Err(rpc_err(1008, "session is running", "CONFLICT"));
                     }
                 };
             Ok(json!({ "session": session }))
@@ -2568,10 +2804,10 @@ async fn handle_request(
             {
                 sessions::MoveSessionProjectResult::Moved(session) => session,
                 sessions::MoveSessionProjectResult::NotFound => {
-                    return Err(rpc_err(1007, "session not found", "NOT_FOUND"))
+                    return Err(rpc_err(1007, "session not found", "NOT_FOUND"));
                 }
                 sessions::MoveSessionProjectResult::Busy => {
-                    return Err(rpc_err(1008, "session is running", "CONFLICT"))
+                    return Err(rpc_err(1008, "session is running", "CONFLICT"));
                 }
             };
             Ok(json!({ "session": session }))
@@ -3192,7 +3428,7 @@ async fn handle_request(
                         1002,
                         format!("unknown direction: {other}"),
                         "INVALID_PARAMS",
-                    ))
+                    ));
                 }
             };
             let st = state.lock().await;
@@ -3684,6 +3920,38 @@ async fn handle_request(
             crate::goal_reports::bind_execution_turn(&st.db, execution_id, turn_id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": true }))
+        }
+        "goalReports.markFailed" => {
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let error_code = params
+                .get("errorCode")
+                .and_then(|v| v.as_str())
+                .filter(|code| !code.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "errorCode required", "INVALID_PARAMS"))?;
+            let summary = {
+                let st = state.lock().await;
+                crate::goal_reports::mark_failed(&st.db, execution_id, error_code)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            };
+            emit_notification(
+                &tx,
+                "goalReports.changed",
+                json!({
+                    "sessionId": summary.session_id,
+                    "reportId": summary.report_id,
+                    "executionId": summary.execution_id,
+                    "proposalId": summary.proposal_id,
+                    "status": summary.status,
+                    "integrity": summary.integrity,
+                    "verdict": summary.verdict,
+                }),
+            )
+            .await;
+            Ok(json!({ "report": summary }))
         }
         "goalReports.invalidateDraft" => {
             let execution_id = params
@@ -9860,7 +10128,7 @@ mod image_generation_settings_tests {
         let roster = handle_request(
             state.clone(),
             "team.getRoster",
-            json!({ "teamSessionId": team_id }),
+            json!({ "teamSessionId": team_id, "callerSessionId": team_id }),
             tx.clone(),
         )
         .await
@@ -9873,6 +10141,7 @@ mod image_generation_settings_tests {
             "team.createTask",
             json!({
                 "teamSessionId": team_id,
+                "callerSessionId": team_id,
                 "taskId": "task-1",
                 "subject": "Inspect repository structure",
                 "writeScopes": ["crates/host-core"]
@@ -9888,6 +10157,7 @@ mod image_generation_settings_tests {
             "team.updateTask",
             json!({
                 "teamSessionId": team_id,
+                "callerSessionId": team_id,
                 "taskId": "task-1",
                 "expectedRevision": 1,
                 "status": "in_progress",
@@ -9903,7 +10173,7 @@ mod image_generation_settings_tests {
         let board = handle_request(
             state.clone(),
             "team.getBoard",
-            json!({ "teamSessionId": team_id }),
+            json!({ "teamSessionId": team_id, "callerSessionId": team_id }),
             tx.clone(),
         )
         .await
@@ -9930,7 +10200,7 @@ mod image_generation_settings_tests {
         let pause_res = handle_request(
             state.clone(),
             "team.pause",
-            json!({ "teamSessionId": team_id }),
+            json!({ "teamSessionId": team_id, "callerSessionId": team_id }),
             tx.clone(),
         )
         .await
@@ -9940,7 +10210,7 @@ mod image_generation_settings_tests {
         let resume_res = handle_request(
             state.clone(),
             "team.resume",
-            json!({ "teamSessionId": team_id }),
+            json!({ "teamSessionId": team_id, "callerSessionId": team_id }),
             tx.clone(),
         )
         .await

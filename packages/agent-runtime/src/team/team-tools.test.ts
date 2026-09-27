@@ -96,8 +96,9 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
       "team.sendMessage": async (params) => ({
         message: {
           id: "msg-42",
-          target_member_name: params.target,
+          targetMemberName: params.target,
           status: "queued",
+          deliveryStatus: "queued",
         },
       }),
     });
@@ -116,7 +117,8 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     if (res.content[0].type === "text") {
       const data = JSON.parse(res.content[0].text);
       expect(data.messageId).toBe("msg-42");
-      expect(data.delivered).toBe(true);
+      expect(data.delivered).toBe(false);
+      expect(data.deliveryStatus).toBe("queued");
     }
     expect(host.call).toHaveBeenCalledWith("team.sendMessage", {
       teamSessionId: "team-1",
@@ -127,11 +129,18 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
   });
 
   it("interrupt_agent requires lead and invokes turn abort callback", async () => {
-    const abortMock = vi.fn(async () => true);
     const host = createMockHost({
       "team.getRoster": async () => ({
         members: [{ name: "worker-1", memberSessionId: "sess-worker-1" }],
       }),
+      "team.interruptMember": async (params) => {
+        expect(params).toEqual({
+          teamSessionId: "team-1",
+          callerSessionId: "team-1",
+          memberName: "worker-1",
+        });
+        return { interrupted: true };
+      },
     });
 
     const tools = createTeamTools({
@@ -139,7 +148,6 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
       callerSessionId: "team-1",
       isLead: true,
       host,
-      abortActiveTurn: abortMock,
     });
     const interruptTool = tools.find((t) => t.name === "interrupt_agent")!;
     const res = await interruptTool.execute("call-4", { memberName: "worker-1" });
@@ -148,7 +156,11 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
       expect(data.interrupted).toBe(true);
       expect(data.turnInterrupted).toBe(true);
     }
-    expect(abortMock).toHaveBeenCalledWith("sess-worker-1");
+    expect(host.call).toHaveBeenCalledWith("team.interruptMember", {
+      teamSessionId: "team-1",
+      callerSessionId: "team-1",
+      memberName: "worker-1",
+    });
   });
 
   it("task_create and task_update interact with host task board", async () => {
@@ -204,10 +216,11 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     ];
     const host = createMockHost({
       "team.getBoard": async () => ({
-        team: { revision: 3, teamSessionId: "team-1", paused: false },
-        roster: [],
+        revision: 3,
+        teamSessionId: "team-1",
         tasks: mockTasks,
-        warnings: [],
+        readiness: [],
+        scopeOverlaps: [],
       }),
     });
 

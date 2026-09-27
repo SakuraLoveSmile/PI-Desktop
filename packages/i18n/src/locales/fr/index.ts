@@ -1757,6 +1757,14 @@ sklm: {
     "launcherDesc": "Inspecter les membres de l'équipe, le tableau des tâches et la coordination partagée",
     "retry": "Réessayer",
     "refresh": "Actualiser",
+    "snapshotChanged": "Les données de l'équipe ont changé pendant le chargement. Réessayez pour actualiser.",
+    "overlapTask": "Les tâches {{tasks}} se chevauchent dans le périmètre : {{scope}}",
+    "blockedBy": "Bloquée par : {{tasks}}",
+    "scopes": "Périmètres : {{scopes}}",
+    "readiness": { "ready": "Prête", "blocked": "Bloquée" },
+    "context": { "fresh": "Nouvelle", "fork": "Fork" },
+    "phase": { "provisioning": "Préparation", "idle": "Inactive", "running": "En cours", "failed": "Échec", "completed": "Terminée" },
+    "taskStatus": { "pending": "En attente", "in_progress": "En cours", "completed": "Terminée", "failed": "Échec", "cancelled": "Annulée" },
   },
 
   "panel": {

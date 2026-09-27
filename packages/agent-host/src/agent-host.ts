@@ -439,7 +439,23 @@ export class AgentHost {
     return this.withAdmission(params.sessionId, () => this.startTurnAdmitted(principal, params));
   }
 
-  private async startTurnAdmitted(principal: Principal, params: StartTurnParams): Promise<StartTurnResult> {
+  async enqueueTeamMessage(principal: Principal, params: StartTurnParams): Promise<StartTurnResult> {
+    if (!principal.roles.includes("owner") || principal.pairedDevice !== true) {
+      throw racpError("FORBIDDEN", "only the paired desktop owner may enqueue a Team message");
+    }
+    const sessionMessageId = params.input.sessionMessageId;
+    const idempotencyKey = params.idempotencyKey ?? params.context.idempotencyKey;
+    if (!sessionMessageId || !idempotencyKey?.startsWith("team-message:")) {
+      throw racpError("INVALID_PARAMS", "Team messages require a session message id and team-message idempotency key");
+    }
+    return this.withAdmission(params.sessionId, () => this.startTurnAdmitted(principal, params, true));
+  }
+
+  private async startTurnAdmitted(
+    principal: Principal,
+    params: StartTurnParams,
+    forceQueue = false,
+  ): Promise<StartTurnResult> {
     const summary = await this.requireSession(params.sessionId);
     const state = this.state(summary.id);
     state.permissionMode = summary.permissionMode;
@@ -468,10 +484,10 @@ export class AgentHost {
       approverOverride: principal.approverOverride ?? false,
     });
     const admission: RacpTurnAdmission = params.admission ?? "reject_if_busy";
-    const busy = this.isBusy(state);
+    const busy = forceQueue || this.isBusy(state);
     let turn: TurnRecord;
     if (busy) {
-      if (admission === "reject_if_busy") {
+      if (admission === "reject_if_busy" && !forceQueue) {
         throw racpError("AGENT_BUSY", "the session already has an active turn");
       }
       const record: QueuedTurnRecord = {
@@ -567,6 +583,14 @@ export class AgentHost {
       await this.cancelQueued(state, this.ensureTurn(state, record.id));
       return true;
     });
+  }
+
+  /** Admit one restored Team delivery without releasing the session restore hold. */
+  async resumeTeamMessage(principal: Principal, sessionId: string, sessionMessageId: string): Promise<boolean> {
+    if (!principal.roles.includes("owner") || principal.pairedDevice !== true) {
+      throw racpError("FORBIDDEN", "only the paired desktop owner may resume a Team message");
+    }
+    return this.queue.admitRecovery(sessionId, sessionMessageId);
   }
 
   /** Promote a queued turn to the end of its session's priority block ("send now"). */
@@ -814,15 +838,20 @@ export class AgentHost {
   private async drainAdmitted(sessionId: string): Promise<void> {
       while (true) {
         const state = this.state(sessionId);
-        if (this.queue.isHeld(sessionId) || this.isOccupied(state)) return;
-        const head = this.queue.peek(sessionId);
+        const restored = this.queue.isHeld(sessionId);
+        const recovery = restored ? this.queue.peekEligible(sessionId) : undefined;
+        if (this.queue.isHeldByOtherThan(sessionId, "restore") || this.isOccupied(state)) return;
+        if (restored && !recovery) return;
+        const head = recovery ?? this.queue.peek(sessionId);
         const headTurn = head ? this.ensureTurn(state, head.id) : undefined;
         if (headTurn?.deliveryPending) return;
         if (headTurn?.deliveredIntoTurnId) {
           if (!(await this.removeDeliveredInput(state, headTurn.id))) return;
           continue;
         }
-        const record = await this.queue.shift(sessionId);
+        const record = recovery
+          ? await this.queue.shiftEligible(sessionId)
+          : await this.queue.shift(sessionId);
         if (!record) return;
         const turn = this.ensureTurn(state, record.id);
         try {

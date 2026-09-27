@@ -324,6 +324,15 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `TEAM_MESSAGE_TOO_LARGE` | 否 | 团队消息有效负载超过最大允许大小（64 KiB） |
 | `TEAM_PAUSED` | 是 | 团队协作当前已暂停；在恢复之前无法继续操作 |
 | `TEAM_PERMISSION_DENIED` | 否 | 成员角色或权限不允许执行该团队操作或跨成员操作 |
+| `TEAM_UNAUTHORIZED` | 否 | 调用会话不是经过 Host 验证的团队 Lead 或该团队成员 |
+| `TEAM_NOT_FOUND` | 否 | 指定会话不是仍然有效的团队 Lead |
+| `TEAM_TARGET_NOT_FOUND` | 否 | 指定的收件人或任务所有者不在团队花名册中 |
+| `TEAM_MEMBER_NAME_COLLISION` | 否 | 团队中已存在同名成员 |
+| `TEAM_TASK_REVISION_CONFLICT` | 是 | 任务在调用方读取预期版本后发生了变化 |
+| `TEAM_TASK_UNKNOWN_DEPENDENCY` | 否 | 声明的任务依赖在看板中不存在 |
+| `TEAM_MAILBOX_FULL` | 是 | 收件人的待处理团队消息已达到上限 |
+| `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | 否 | 团队消息超过 64 KiB 载荷上限 |
+| `TEAM_DELIVERY_PENDING` | 是 | Host 尚未持久化收件人的队列或 turn 回执 |
 
 ## 4. 映射规则
 

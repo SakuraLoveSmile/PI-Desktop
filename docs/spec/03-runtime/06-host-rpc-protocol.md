@@ -362,6 +362,38 @@ to later refresh and inference; the vendor picker does not collect them.
   (D327). Promotes leftover checkpoints whose final row never landed,
   including `completed` turns as `complete`. Boot recovery skips completed
   leftovers so the outbox can append first. Returns `{ ok, count }`.
+- `team.getRuntimeContext({ sessionId })` derives the Team and Lead/member
+  identity from Host-owned execution profile and roster state. It returns
+  `null` for non-Team sessions; callers cannot supply or override authority.
+- `team.getRoster({ teamSessionId, callerSessionId })` and
+  `team.getBoard({ teamSessionId, callerSessionId })` return separate roster
+  and revisioned task-board projections after Host membership validation.
+- `team.getMessage({ teamSessionId, callerSessionId, messageId })` reads one
+  durable Team mailbox row. The Lead can read every row; a member can read only
+  a row it sent or received. Unknown and cross-Team ids return `null`.
+- `team.pendingMessages({ teamSessionId, callerSessionId })` is Lead-only and
+  returns queued rows for an unpaused Team, including messages with a durable
+  Agent Host queue receipt that need restart recovery. A message bound to a turn
+  is never replayed. Queued Team mailbox messages without a queue receipt remain
+  queued across application restart, including while paused; Resume makes them
+  eligible for delivery.
+- `team.sendMessage({ teamSessionId, callerSessionId, target, content,
+  idempotencyKey? })` persists one Team-origin message and emits
+  `team.messageQueued`. Its response reports the mailbox state, not completed
+  delivery. Host resolves the sender's effective permission mode (including
+  `inherit` against the current default) and stores it as the message ceiling;
+  `session.beginTurn` enforces that ceiling before a recipient turn starts.
+- `team.ackMessage({ teamSessionId, ackSessionId, messageId })` accepts only
+  the target member and requires a durable Host queue or turn receipt. Repeated
+  acknowledgements are idempotent. It does not reject a durable receipt solely
+  because either session's permission setting changed after turn admission.
+- `team.pause/resume({ teamSessionId, callerSessionId })` are Lead-only
+  transitions. Electron Main holds or resumes the corresponding Agent Host
+  queues and drains pending mail after resume.
+- `team.createTask` and `team.updateTask` require `callerSessionId`; Host checks
+  membership, Lead-only reassignment, task ownership, CAS revision, and
+  dependency constraints before mutation. When supplied, the owner session and
+  member name resolve as one pair; a Lead may reassign or clear task ownership.
 - `session.appendCompaction` — sidecar-only append of the newest typed
   model-context checkpoint. It requires non-empty checkpoint/summary/boundary
   ids and non-negative `tokensBefore`; it does not insert a message/search row

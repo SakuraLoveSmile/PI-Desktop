@@ -17,6 +17,7 @@ export const GOAL_REPORT_MAX_FILES = 500;
 export const GOAL_REPORT_MAX_CHECKS = 200;
 
 export type GoalReportExecutionStatus = "completed" | "interrupted";
+export type GoalReportStatus = "draft" | "pending" | "ready" | "failed";
 export type GoalReportIntegrity = "structured" | "fallback";
 export type GoalReportVerdict = "met" | "partial" | "blocked" | "unknown";
 export type GoalReportCriterionVerdict = "met" | "unmet" | "partial" | "unknown";
@@ -134,7 +135,8 @@ export type GoalReportSummary = {
   executionId: string;
   proposalId: string;
   turnId?: string | null;
-  status: GoalReportExecutionStatus;
+  status: GoalReportStatus;
+  executionStatus: GoalReportExecutionStatus | null;
   verdict: GoalReportVerdict;
   integrity: GoalReportIntegrity;
   summary: string;

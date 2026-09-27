@@ -21,6 +21,7 @@ import {
   IconTerminal,
   IconTriangleAlert,
 } from "../icons";
+import { Button } from "../ui";
 import { WorkTabEmpty } from "./WorkTabEmpty";
 
 export type GoalReportTabProps = {
@@ -28,21 +29,37 @@ export type GoalReportTabProps = {
   sessionId?: string;
 };
 
+type ErrorCodeCarrier = {
+  code?: unknown;
+  errorCode?: unknown;
+  data?: { errorCode?: unknown };
+};
+
+function safeErrorCode(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as ErrorCodeCarrier;
+  const code = candidate.data?.errorCode ?? candidate.errorCode ?? candidate.code;
+  return typeof code === "string" && /^[A-Z][A-Z0-9_]{1,63}$/.test(code) ? code : null;
+}
+
 export function GoalReportTab({ executionId, sessionId }: GoalReportTabProps) {
   const { t } = useTranslation();
   const [report, setReport] = useState<GoalReport | null>(null);
   const [status, setStatus] = useState<"loading" | "saving" | "ready" | "failed" | "error" | "disconnected">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
 
   const loadReport = useCallback(async () => {
     if (!sessionId || !executionId) {
       setStatus("error");
-      setErrorMessage("Missing sessionId or executionId");
+      setErrorMessage(t("goalReport.view.loadFailed"));
+      setErrorCode(null);
       return;
     }
     setStatus("loading");
     setErrorMessage(null);
+    setErrorCode(null);
     try {
       const res = await api.getGoalReport({ sessionId, executionId });
       const raw = res?.report;
@@ -57,13 +74,16 @@ export function GoalReportTab({ executionId, sessionId }: GoalReportTabProps) {
       }
       if (raw.status === "failed") {
         setStatus("failed");
-        setErrorMessage(raw.error || t("goalReport.view.loadFailed"));
+        setErrorMessage(t("goalReport.view.loadFailed"));
+        setErrorCode(safeErrorCode(raw));
         return;
       }
       setReport(raw as GoalReport);
       setStatus("ready");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(t("goalReport.view.loadFailed"));
+      setErrorCode(safeErrorCode(err));
       if (msg.includes("network") || msg.includes("remote") || msg.includes("disconnected")) {
         setStatus("disconnected");
       } else if (msg.includes("missing") || msg.includes("corrupted") || msg.includes("not found")) {
@@ -71,7 +91,6 @@ export function GoalReportTab({ executionId, sessionId }: GoalReportTabProps) {
       } else {
         setStatus("failed");
       }
-      setErrorMessage(msg);
     }
   }, [sessionId, executionId, t]);
 
@@ -97,8 +116,8 @@ export function GoalReportTab({ executionId, sessionId }: GoalReportTabProps) {
       await api.retryGoalReport({ sessionId, executionId });
       await loadReport();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMessage(msg);
+      setErrorMessage(t("goalReport.view.loadFailed"));
+      setErrorCode(safeErrorCode(err));
       setStatus("failed");
     } finally {
       setRetrying(false);
@@ -131,17 +150,20 @@ export function GoalReportTab({ executionId, sessionId }: GoalReportTabProps) {
           </h3>
           <p className="goal-report-error-detail">
             {errorMessage || t("goalReport.view.loadFailed")}
+            {errorCode && <span className="goal-report-error-code"> ({errorCode})</span>}
           </p>
-          <button
+          <Button
             type="button"
-            className="goal-report-btn primary"
+            variant="primary"
+            size="sm"
+            className="goal-report-retry-button"
             onClick={handleRetry}
             disabled={retrying}
             data-testid="goal-report-retry-btn"
           >
             <IconRefresh size={14} className={retrying ? "is-spinning" : undefined} />
             <span>{t("goalReport.view.retryLoad")}</span>
-          </button>
+          </Button>
         </div>
       </div>
     );

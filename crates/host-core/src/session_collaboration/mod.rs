@@ -9,7 +9,7 @@ use crate::{
     db::{ms_to_ts, now_ms, Database},
     sessions,
 };
-mod permissions;
+pub(crate) mod permissions;
 mod projections;
 mod provenance;
 mod repository;

@@ -69,7 +69,9 @@
     "test:e2e:remote-host": "node scripts/e2e-remote-host.mjs",
     "test:e2e:shortcut-settings": "node scripts/test-shortcut-settings.mjs",
     "test:e2e:dialog-overflow": "node scripts/test-dialog-overflow.mjs",
-    "test:e2e:goal-report": "node scripts/e2e-goal-report.mjs"
+    "test:e2e:goal-report": "node scripts/e2e-goal-report.mjs",
+    "test:e2e:temporary-goal": "node scripts/e2e-temporary-goal.mjs",
+    "test:e2e:team": "node scripts/e2e-team.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",

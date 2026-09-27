@@ -5,6 +5,46 @@ use super::model::{TeamMember, MAX_TEAM_MEMBERS};
 use crate::db::{now_ms, Database};
 use crate::sessions::{self, ForkSessionResult, SessionCreateOptions};
 
+/// Validate that a session is the Host-authoritative Team lead.
+pub fn validate_team_lead(db: &Database, team_session_id: &str) -> Result<()> {
+    let profile = sessions::session_execution_profile(db, team_session_id)?
+        .ok_or_else(|| anyhow!("TEAM_NOT_FOUND: lead session not found"))?;
+    if profile != "team" {
+        return Err(anyhow!(
+            "TEAM_UNAUTHORIZED: session is not configured with the team execution profile"
+        ));
+    }
+    Ok(())
+}
+
+/// Validate a Team participant from durable Host state. The lead is represented
+/// by `team_session_id`; all other participants must be present in the roster.
+pub fn validate_team_participant(
+    db: &Database,
+    team_session_id: &str,
+    participant_session_id: &str,
+) -> Result<String> {
+    validate_team_lead(db, team_session_id)?;
+    if participant_session_id == team_session_id {
+        return Ok("Lead".to_string());
+    }
+    let member = get_team_member_by_session_id(db, participant_session_id)?
+        .ok_or_else(|| anyhow!("TEAM_UNAUTHORIZED: session is not a member of this team"))?;
+    if member.team_session_id != team_session_id {
+        return Err(anyhow!(
+            "TEAM_UNAUTHORIZED: session belongs to a different team"
+        ));
+    }
+    let profile = sessions::session_execution_profile(db, participant_session_id)?
+        .ok_or_else(|| anyhow!("TEAM_UNAUTHORIZED: member session not found"))?;
+    if profile != "team" {
+        return Err(anyhow!(
+            "TEAM_UNAUTHORIZED: member session is not configured with the team execution profile"
+        ));
+    }
+    Ok(member.name)
+}
+
 pub fn is_valid_member_name(name: &str) -> bool {
     let trimmed = name.trim();
     if trimmed.is_empty() || trimmed.len() > 64 {
@@ -134,12 +174,14 @@ pub fn create_team_member(db: &Database, params: CreateMemberParams<'_>) -> Resu
         provider_id,
     } = params;
 
-    // 1. Caller authority check: only Lead can create team members
+    // 1. Caller authority check: only the Host-authenticated Lead can create members.
     if caller_session_id != team_session_id {
         return Err(anyhow!(
             "TEAM_UNAUTHORIZED: only the team lead can spawn teammates"
         ));
     }
+
+    validate_team_lead(db, team_session_id)?;
 
     validate_member_name(name)?;
     let context_kind = context_kind.unwrap_or("fresh");
@@ -191,7 +233,7 @@ pub fn create_team_member(db: &Database, params: CreateMemberParams<'_>) -> Resu
             ForkSessionResult::Created(detail) => detail.summary.id,
             ForkSessionResult::Busy => return Err(anyhow!("TEAM_BUSY: lead session is busy")),
             ForkSessionResult::NotFound => {
-                return Err(anyhow!("TEAM_NOT_FOUND: lead session not found"))
+                return Err(anyhow!("TEAM_NOT_FOUND: lead session not found"));
             }
         }
     } else {

@@ -7,42 +7,51 @@ export interface RegisterTeamIpcDependencies {
   registrar: IpcRegistrar;
   getHost: () => HostProcess | null;
   logger: Logger;
+  teamDelivery: {
+    pauseTeam: (teamSessionId: string) => Promise<unknown>;
+    resumeTeam: (teamSessionId: string) => Promise<unknown>;
+  };
 }
 
 export function registerTeamIpc({
   registrar,
   getHost,
   logger,
+  teamDelivery,
 }: RegisterTeamIpcDependencies): void {
   const { handle } = registrar;
 
   handle(IPC.invoke.teamGetRoster, async (input: { teamSessionId: string }) => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
-    return host.call("team.getRoster", input);
+    return host.call("team.getRoster", {
+      ...input,
+      callerSessionId: input.teamSessionId,
+    });
   });
 
   handle(IPC.invoke.teamGetBoard, async (input: { teamSessionId: string }) => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
-    return host.call("team.getBoard", input);
+    return host.call("team.getBoard", {
+      ...input,
+      callerSessionId: input.teamSessionId,
+    });
   });
 
   handle(IPC.invoke.teamPause, async (input: { teamSessionId: string }) => {
-    const host = getHost();
-    if (!host) throw new Error("host unavailable");
+    if (!getHost()) throw new Error("host unavailable");
     logger.app("session", "info", "team pause requested", {
       sessionId: input.teamSessionId,
     });
-    return host.call("team.pause", input);
+    return teamDelivery.pauseTeam(input.teamSessionId);
   });
 
   handle(IPC.invoke.teamResume, async (input: { teamSessionId: string }) => {
-    const host = getHost();
-    if (!host) throw new Error("host unavailable");
+    if (!getHost()) throw new Error("host unavailable");
     logger.app("session", "info", "team resume requested", {
       sessionId: input.teamSessionId,
     });
-    return host.call("team.resume", input);
+    return teamDelivery.resumeTeam(input.teamSessionId);
   });
 }

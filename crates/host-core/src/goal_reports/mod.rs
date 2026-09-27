@@ -32,6 +32,12 @@ pub const MAX_STEPS: usize = 100;
 pub const MAX_FILES: usize = 500;
 pub const MAX_CHECKS: usize = 200;
 
+const REPORT_FAILURE_CODES: [&str; 3] = [
+    "REPORT_PERSISTENCE_BARRIER_FAILED",
+    "REPORT_DRAFT_PERSIST_FAILED",
+    "REPORT_DRAFT_INVALIDATION_FAILED",
+];
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalReportSummary {
@@ -41,6 +47,7 @@ pub struct GoalReportSummary {
     pub proposal_id: String,
     pub turn_id: Option<String>,
     pub status: String,
+    pub execution_status: Option<String>,
     pub verdict: String,
     pub integrity: String,
     pub summary: String,
@@ -61,6 +68,7 @@ fn row_to_summary(row: &Row<'_>) -> rusqlite::Result<GoalReportSummary> {
         proposal_id: row.get("proposal_id")?,
         turn_id: row.get("turn_id")?,
         status: row.get("status")?,
+        execution_status: row.get("execution_status")?,
         integrity: row.get("integrity")?,
         verdict: row.get("verdict")?,
         summary: row.get("summary")?,
@@ -171,14 +179,187 @@ pub fn invalidate_draft(db: &Database, execution_id: &str) -> Result<()> {
     }
     let draft_path = draft_file_path(db.data_dir(), &facts.session_id, execution_id);
     if draft_path.exists() {
-        let _ = fs::remove_file(draft_path);
+        fs::remove_file(&draft_path).map_err(|err| {
+            anyhow!("REPORT_DRAFT_INVALIDATION_FAILED: could not remove draft: {err}")
+        })?;
     }
     db.conn()
         .prepare_cached(
             "UPDATE goal_reports SET status = 'pending', integrity = 'fallback', updated_at = ?2
          WHERE execution_id = ?1 AND status = 'draft'",
         )?
-        .execute(params![execution_id, now_ms()])?;
+        .execute(params![execution_id, now_ms()])
+        .map_err(|err| anyhow!("REPORT_DRAFT_INVALIDATION_FAILED: {err}"))?;
+    Ok(())
+}
+
+fn validate_string_field<'a>(
+    object: &'a serde_json::Map<String, Value>,
+    field: &str,
+    context: &str,
+) -> Result<&'a str> {
+    object
+        .get(field)
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: {context}.{field} must be a non-empty string"))
+}
+
+fn validate_enum_field(
+    object: &serde_json::Map<String, Value>,
+    field: &str,
+    allowed: &[&str],
+    context: &str,
+) -> Result<()> {
+    let value = validate_string_field(object, field, context)?;
+    if allowed.contains(&value) {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "INVALID_ARGUMENT: {context}.{field} must be one of: {}",
+            allowed.join(", ")
+        ))
+    }
+}
+
+fn validate_array<'a>(draft: &'a Value, field: &str) -> Result<Option<&'a Vec<Value>>> {
+    let Some(value) = draft.get(field) else {
+        return Ok(None);
+    };
+    value
+        .as_array()
+        .map(Some)
+        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: {field} must be an array"))
+}
+
+fn validate_structured_draft(draft: &Value) -> Result<()> {
+    let object = draft
+        .as_object()
+        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: draft must be an object"))?;
+    let summary = validate_string_field(object, "summary", "draft")?;
+    if summary.len() > MAX_REPORT_JSON_BYTES {
+        return Err(anyhow!("REPORT_SIZE_EXCEEDED: summary too large"));
+    }
+    validate_enum_field(
+        object,
+        "verdict",
+        &["met", "partial", "blocked", "unknown"],
+        "draft",
+    )?;
+
+    for (field, limit) in [
+        ("metrics", MAX_METRICS),
+        ("criteria", MAX_CRITERIA),
+        ("steps", MAX_STEPS),
+        ("files", MAX_FILES),
+        ("checks", MAX_CHECKS),
+    ] {
+        if let Some(items) = validate_array(draft, field)? {
+            if items.len() > limit {
+                return Err(anyhow!("LIMIT_EXCEEDED: too many {field}"));
+            }
+        }
+    }
+
+    if let Some(items) = validate_array(draft, "metrics")? {
+        for (index, item) in items.iter().enumerate() {
+            let object = item
+                .as_object()
+                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: metrics[{index}] must be an object"))?;
+            let context = format!("metrics[{index}]");
+            validate_string_field(object, "label", &context)?;
+            validate_string_field(object, "value", &context)?;
+        }
+    }
+    if let Some(items) = validate_array(draft, "criteria")? {
+        for (index, item) in items.iter().enumerate() {
+            let object = item
+                .as_object()
+                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: criteria[{index}] must be an object"))?;
+            let context = format!("criteria[{index}]");
+            validate_string_field(object, "id", &context)?;
+            validate_string_field(object, "text", &context)?;
+            validate_enum_field(
+                object,
+                "verdict",
+                &["met", "unmet", "partial", "unknown"],
+                &context,
+            )?;
+        }
+    }
+    if let Some(items) = validate_array(draft, "steps")? {
+        for (index, item) in items.iter().enumerate() {
+            let object = item
+                .as_object()
+                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: steps[{index}] must be an object"))?;
+            let context = format!("steps[{index}]");
+            validate_string_field(object, "id", &context)?;
+            validate_string_field(object, "title", &context)?;
+            validate_enum_field(
+                object,
+                "status",
+                &["completed", "failed", "skipped"],
+                &context,
+            )?;
+        }
+    }
+    if let Some(items) = validate_array(draft, "files")? {
+        for (index, item) in items.iter().enumerate() {
+            let object = item
+                .as_object()
+                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: files[{index}] must be an object"))?;
+            let context = format!("files[{index}]");
+            validate_string_field(object, "path", &context)?;
+            validate_enum_field(
+                object,
+                "changeType",
+                &["created", "modified", "deleted", "referenced"],
+                &context,
+            )?;
+            validate_enum_field(
+                object,
+                "attribution",
+                &["direct", "subagent", "declared"],
+                &context,
+            )?;
+        }
+    }
+    if let Some(items) = validate_array(draft, "checks")? {
+        for (index, item) in items.iter().enumerate() {
+            let object = item
+                .as_object()
+                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: checks[{index}] must be an object"))?;
+            let context = format!("checks[{index}]");
+            validate_string_field(object, "id", &context)?;
+            validate_string_field(object, "command", &context)?;
+            validate_enum_field(
+                object,
+                "result",
+                &["passed", "failed", "inconclusive"],
+                &context,
+            )?;
+        }
+    }
+    if let Some(items) = validate_array(draft, "evidences")? {
+        for (index, item) in items.iter().enumerate() {
+            let object = item
+                .as_object()
+                .ok_or_else(|| anyhow!("INVALID_ARGUMENT: evidences[{index}] must be an object"))?;
+            let context = format!("evidences[{index}]");
+            validate_string_field(object, "id", &context)?;
+            validate_enum_field(
+                object,
+                "kind",
+                &["tool_call", "tool_result", "message", "file", "subagent"],
+                &context,
+            )?;
+            validate_string_field(object, "refId", &context)?;
+            let evidence_summary = validate_string_field(object, "summary", &context)?;
+            if evidence_summary.len() > MAX_EVIDENCE_SUMMARY_BYTES {
+                return Err(anyhow!("LIMIT_EXCEEDED: evidence summary too large"));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -191,58 +372,20 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
             MAX_REPORT_JSON_BYTES
         ));
     }
-
-    let summary = draft
+    validate_structured_draft(draft)?;
+    let object = draft
+        .as_object()
+        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: draft must be an object"))?;
+    let summary = object
         .get("summary")
         .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: summary required"))?;
-
-    let verdict = draft
+        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: draft.summary must be a non-empty string"))?
+        .trim();
+    let verdict = object
         .get("verdict")
         .and_then(Value::as_str)
-        .map(str::trim)
-        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: verdict required"))?;
-
-    if !matches!(verdict, "met" | "partial" | "blocked" | "unknown") {
-        return Err(anyhow!("INVALID_ARGUMENT: verdict invalid"));
-    }
-
-    if let Some(metrics) = draft.get("metrics").and_then(Value::as_array) {
-        if metrics.len() > MAX_METRICS {
-            return Err(anyhow!("LIMIT_EXCEEDED: too many metrics"));
-        }
-    }
-    if let Some(criteria) = draft.get("criteria").and_then(Value::as_array) {
-        if criteria.len() > MAX_CRITERIA {
-            return Err(anyhow!("LIMIT_EXCEEDED: too many criteria"));
-        }
-    }
-    if let Some(steps) = draft.get("steps").and_then(Value::as_array) {
-        if steps.len() > MAX_STEPS {
-            return Err(anyhow!("LIMIT_EXCEEDED: too many steps"));
-        }
-    }
-    if let Some(files) = draft.get("files").and_then(Value::as_array) {
-        if files.len() > MAX_FILES {
-            return Err(anyhow!("LIMIT_EXCEEDED: too many files"));
-        }
-    }
-    if let Some(checks) = draft.get("checks").and_then(Value::as_array) {
-        if checks.len() > MAX_CHECKS {
-            return Err(anyhow!("LIMIT_EXCEEDED: too many checks"));
-        }
-    }
-    if let Some(evidences) = draft.get("evidences").and_then(Value::as_array) {
-        for ev in evidences {
-            if let Some(s) = ev.get("summary").and_then(Value::as_str) {
-                if s.len() > MAX_EVIDENCE_SUMMARY_BYTES {
-                    return Err(anyhow!("LIMIT_EXCEEDED: evidence summary too large"));
-                }
-            }
-        }
-    }
+        .ok_or_else(|| anyhow!("INVALID_ARGUMENT: draft.verdict must be a non-empty string"))?
+        .trim();
 
     let facts = load_proposal_facts(db.conn(), execution_id)?;
     if facts.kind != "goal" {
@@ -250,9 +393,12 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
     }
 
     let dir = reports_dir(db.data_dir(), &facts.session_id);
-    fs::create_dir_all(&dir)?;
+    fs::create_dir_all(&dir).map_err(|err| {
+        anyhow!("REPORT_DRAFT_PERSIST_FAILED: could not create draft directory: {err}")
+    })?;
     let draft_path = draft_file_path(db.data_dir(), &facts.session_id, execution_id);
-    fs::write(&draft_path, raw)?;
+    fs::write(&draft_path, raw)
+        .map_err(|err| anyhow!("REPORT_DRAFT_PERSIST_FAILED: could not write draft: {err}"))?;
 
     let now = now_ms();
     let report_id = format!("rep-{}", Uuid::new_v4().simple());
@@ -277,9 +423,65 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
             verdict,
             summary,
             now
-        ])?;
+        ])
+        .map_err(|err| {
+            anyhow!("REPORT_DRAFT_PERSIST_FAILED: could not persist draft metadata: {err}")
+        })?;
 
     Ok(())
+}
+
+/// Records a terminal report publication failure without retrying the Goal or
+/// contacting a provider. This is idempotent and uses only durable Host facts.
+pub fn mark_failed(
+    db: &Database,
+    execution_id: &str,
+    error_code: &str,
+) -> Result<GoalReportSummary> {
+    if !REPORT_FAILURE_CODES.contains(&error_code) {
+        return Err(anyhow!("INVALID_ARGUMENT: unsupported report failure code"));
+    }
+    let facts = load_proposal_facts(db.conn(), execution_id)?;
+    if facts.kind != "goal" {
+        return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
+    }
+    let current_status: Option<String> = db
+        .conn()
+        .prepare_cached("SELECT status FROM goal_reports WHERE execution_id = ?1")?
+        .query_row(params![execution_id], |row| row.get(0))
+        .optional()?;
+    if current_status.as_deref() == Some("ready") {
+        return list_reports(db, &facts.session_id)?
+            .into_iter()
+            .find(|report| report.execution_id == execution_id)
+            .ok_or_else(|| anyhow!("REPORT_PERSISTENCE_FAILED: ready report summary is missing"));
+    }
+    let now = now_ms();
+    let report_id = format!("rep-{}", Uuid::new_v4().simple());
+    db.conn()
+        .prepare_cached(
+            "INSERT INTO goal_reports (
+                execution_id, report_id, session_id, proposal_id, turn_id,
+                status, integrity, verdict, summary, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, NULL, 'failed', 'fallback', 'unknown', ?5, ?6, ?6)
+             ON CONFLICT(execution_id) DO UPDATE SET
+                status = 'failed', integrity = 'fallback', verdict = 'unknown',
+                summary = excluded.summary, updated_at = excluded.updated_at",
+        )?
+        .execute(params![
+            execution_id,
+            report_id,
+            facts.session_id,
+            facts.request_id,
+            format!(
+                "Goal report publication failed ({error_code}); retry uses durable Host facts only."
+            ),
+            now,
+        ])?;
+    list_reports(db, &facts.session_id)?
+        .into_iter()
+        .find(|report| report.execution_id == execution_id)
+        .ok_or_else(|| anyhow!("REPORT_PERSISTENCE_FAILED: failed report summary is missing"))
 }
 
 fn write_atomic(target_path: &Path, content: &[u8]) -> Result<(String, u64)> {
@@ -327,18 +529,26 @@ pub fn finalize_report(
         return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
     }
 
-    let existing: Option<(String, Option<String>, i64)> = db
+    let existing: Option<(String, Option<String>, i64, String)> = db
         .conn()
         .prepare_cached(
-            "SELECT report_id, turn_id, created_at FROM goal_reports WHERE execution_id = ?1",
+            "SELECT report_id, turn_id, created_at, status
+             FROM goal_reports WHERE execution_id = ?1",
         )?
         .query_row(params![execution_id], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })
         .optional()?;
 
+    if existing.as_ref().is_some_and(|row| row.3 == "failed") {
+        return list_reports(db, &facts.session_id)?
+            .into_iter()
+            .find(|report| report.execution_id == execution_id)
+            .ok_or_else(|| anyhow!("REPORT_PERSISTENCE_FAILED: failed report summary is missing"));
+    }
+
     let (report_id, turn_id, created_at) = match existing {
-        Some((r_id, t_id, c_at)) => (r_id, t_id, c_at),
+        Some((r_id, t_id, c_at, _)) => (r_id, t_id, c_at),
         None => (
             format!("rep-{}", Uuid::new_v4().simple()),
             None,
@@ -352,6 +562,7 @@ pub fn finalize_report(
         fs::read_to_string(&draft_path)
             .ok()
             .and_then(|s| serde_json::from_str::<Value>(&s).ok())
+            .filter(|draft| validate_structured_draft(draft).is_ok())
     } else {
         None
     };
@@ -475,30 +686,9 @@ pub fn finalize_report(
     let (file_hash, file_size) = match write_res {
         Ok(v) => v,
         Err(err) => {
-            // Mark failed in DB so state is visible
-            let _ = db
-                .conn()
-                .prepare_cached(
-                    "INSERT INTO goal_reports (
-                    execution_id, report_id, session_id, proposal_id, turn_id,
-                    status, integrity, verdict, summary, created_at, updated_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, 'failed', ?6, ?7, ?8, ?9, ?10)
-                 ON CONFLICT(execution_id) DO UPDATE SET
-                    status = 'failed',
-                    updated_at = excluded.updated_at",
-                )?
-                .execute(params![
-                    execution_id,
-                    report_id,
-                    facts.session_id,
-                    facts.request_id,
-                    turn_id,
-                    integrity_kind,
-                    verdict,
-                    summary,
-                    created_at,
-                    now
-                ]);
+            mark_failed(db, execution_id, "REPORT_PERSISTENCE_BARRIER_FAILED").map_err(
+                |mark_error| anyhow!("{err}; failed to record report failure: {mark_error}"),
+            )?;
             return Err(err);
         }
     };
@@ -552,6 +742,7 @@ pub fn finalize_report(
         proposal_id: facts.request_id,
         turn_id,
         status: "ready".to_string(),
+        execution_status: Some(execution_status.to_string()),
         verdict,
         integrity: integrity_kind,
         summary,
@@ -620,6 +811,8 @@ pub fn list_reports(db: &Database, session_id: &str) -> Result<Vec<GoalReportSum
     let mut stmt = db.conn().prepare_cached(
         "SELECT r.execution_id, r.report_id, r.session_id, r.proposal_id, r.turn_id,
                 r.status, r.integrity, r.verdict, r.summary, p.title as goal_title,
+                CASE WHEN p.execution_state IN ('completed', 'interrupted')
+                     THEN p.execution_state ELSE NULL END as execution_status,
                 r.file_path, r.file_hash, r.file_size, r.durable_seq,
                 r.created_at, r.updated_at
          FROM goal_reports r
@@ -673,6 +866,8 @@ pub fn retry_report(
             .prepare_cached(
                 "SELECT r.execution_id, r.report_id, r.session_id, r.proposal_id, r.turn_id,
                         r.status, r.integrity, r.verdict, r.summary, p.title as goal_title,
+                        CASE WHEN p.execution_state IN ('completed', 'interrupted')
+                             THEN p.execution_state ELSE NULL END as execution_status,
                         r.file_path, r.file_hash, r.file_size, r.durable_seq,
                         r.created_at, r.updated_at
                  FROM goal_reports r
@@ -684,6 +879,23 @@ pub fn retry_report(
         if let Some(s) = summary {
             return Ok(s);
         }
+    }
+
+    // A failed publication must never be retried from an agent draft. Remove
+    // that stale input before rebuilding the report from durable Host facts.
+    if status == "failed" {
+        let facts = load_proposal_facts(db.conn(), execution_id)?;
+        let draft_path = draft_file_path(db.data_dir(), &facts.session_id, execution_id);
+        if draft_path.exists() {
+            fs::remove_file(draft_path).map_err(|err| {
+                anyhow!("REPORT_DRAFT_INVALIDATION_FAILED: could not remove stale draft: {err}")
+            })?;
+        }
+        db.conn().execute(
+            "UPDATE goal_reports SET status='pending', updated_at=?1
+             WHERE execution_id=?2 AND status='failed'",
+            params![now_ms(), execution_id],
+        )?;
     }
 
     finalize_report(db, execution_id, durable_seq, None, None)

@@ -1757,6 +1757,14 @@ sklm: {
     "launcherDesc": "Teammitglieder, Aufgabenboard und Koordination einsehen",
     "retry": "Erneut versuchen",
     "refresh": "Aktualisieren",
+    "snapshotChanged": "Die Teamdaten haben sich beim Laden geändert. Erneut versuchen.",
+    "overlapTask": "Aufgaben {{tasks}} überschneiden sich im Bereich {{scope}}",
+    "blockedBy": "Blockiert durch: {{tasks}}",
+    "scopes": "Bereiche: {{scopes}}",
+    "readiness": { "ready": "Bereit", "blocked": "Blockiert" },
+    "context": { "fresh": "Neu", "fork": "Fork" },
+    "phase": { "provisioning": "Wird vorbereitet", "idle": "Inaktiv", "running": "Läuft", "failed": "Fehlgeschlagen", "completed": "Abgeschlossen" },
+    "taskStatus": { "pending": "Ausstehend", "in_progress": "In Bearbeitung", "completed": "Abgeschlossen", "failed": "Fehlgeschlagen", "cancelled": "Abgebrochen" },
   },
 
   "panel": {

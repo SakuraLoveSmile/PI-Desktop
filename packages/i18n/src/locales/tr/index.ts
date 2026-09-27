@@ -1763,6 +1763,14 @@ sklm: {
     launcherDesc: "Ekip üyelerini, görev panosunu ve paylaşılan koordinasyonu inceleyin",
     retry: "Yeniden dene",
     refresh: "Yenile",
+    snapshotChanged: "Yükleme sırasında ekip verileri değişti. Yenilemek için tekrar deneyin.",
+    overlapTask: "{{tasks}} görevleri {{scope}} kapsamı üzerinde çakışıyor",
+    blockedBy: "Engelleyenler: {{tasks}}",
+    scopes: "Kapsamlar: {{scopes}}",
+    readiness: { ready: "Hazır", blocked: "Engellendi" },
+    context: { fresh: "Yeni", fork: "Çatal" },
+    phase: { provisioning: "Hazırlanıyor", idle: "Boşta", running: "Çalışıyor", failed: "Başarısız", completed: "Tamamlandı" },
+    taskStatus: { pending: "Bekliyor", in_progress: "Devam ediyor", completed: "Tamamlandı", failed: "Başarısız", cancelled: "İptal edildi" },
   },
 
   panel: {

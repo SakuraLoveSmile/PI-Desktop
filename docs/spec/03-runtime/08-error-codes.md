@@ -329,6 +329,15 @@ with teammates, shared task boards, and peer mailboxes.
 | `TEAM_MESSAGE_TOO_LARGE` | no | team message payload exceeds maximum permitted size (64 KiB) |
 | `TEAM_PAUSED` | yes | team coordination is currently paused; action cannot proceed until resumed |
 | `TEAM_PERMISSION_DENIED` | no | team operation or cross-member action is not permitted by member role or authority |
+| `TEAM_UNAUTHORIZED` | no | caller session is not the authenticated Team Lead or a member of the requested Team |
+| `TEAM_NOT_FOUND` | no | the session does not identify a live Team Lead |
+| `TEAM_TARGET_NOT_FOUND` | no | the requested Team recipient or task owner is not in the Team roster |
+| `TEAM_MEMBER_NAME_COLLISION` | no | the Team already has a member with the requested name |
+| `TEAM_TASK_REVISION_CONFLICT` | yes | the task changed since the caller's expected revision |
+| `TEAM_TASK_UNKNOWN_DEPENDENCY` | no | a declared task dependency does not exist on the board |
+| `TEAM_MAILBOX_FULL` | yes | the recipient has reached the queued Team message limit |
+| `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | no | the Team message exceeds the 64 KiB payload limit |
+| `TEAM_DELIVERY_PENDING` | yes | the Host has not yet persisted a durable recipient queue or turn receipt |
 
 ## 4. Mapping rules
 

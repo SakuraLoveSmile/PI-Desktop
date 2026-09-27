@@ -48,6 +48,8 @@ export type AgentIpcDependencies = {
   optionalWorkspaceRoot: () => Promise<string | null>;
   composerCommandService: Pick<ComposerCommandService, "buildComposerCommands">;
   loadComposerTemplatesCached: (root: string | null) => Promise<ComposerTemplate[]>;
+  beforeUserStop?: (sessionId: string) => Promise<void>;
+  beforeUserAbort?: (sessionId: string) => Promise<void>;
 };
 
 function rejectNativeAgentOperation(sessionId: string): void {
@@ -85,6 +87,8 @@ export function registerAgentIpc({
   optionalWorkspaceRoot,
   composerCommandService,
   loadComposerTemplatesCached,
+  beforeUserStop,
+  beforeUserAbort,
 }: AgentIpcDependencies): void {
   let host: HostProcess | null = null;
   let sidecar: AgentSidecar | null = null;
@@ -671,6 +675,7 @@ export function registerAgentIpc({
     try {
     const abortedTurnId = activeTurns.get(req.sessionId);
     if (req.turnId && abortedTurnId !== req.turnId) return { ok: false, aborted: false };
+    if (!req.turnId) await beforeUserAbort?.(req.sessionId);
     logger.app("session", "info", "prompt aborted", { sessionId: req.sessionId });
     agentHostBridge?.markAborting(req.sessionId);
     // Lock the abort reason before the first await: the cancel RPC can take a
@@ -712,6 +717,7 @@ export function registerAgentIpc({
 
   handle(IPC.invoke.agentStop, async (req: AgentStopRequest) => {
     if (!sidecar) throw new Error("sidecar unavailable");
+    await beforeUserStop?.(req.sessionId);
     logger.app("session", "info", "prompt graceful stop requested", {
       sessionId: req.sessionId,
     });
