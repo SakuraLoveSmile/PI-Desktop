@@ -215,17 +215,28 @@ export function FilesTab() {
     [dirs, loadDir],
   );
 
-  const openFile = useCallback(async (rel: string, mimeType?: string) => {
-    setSelected(rel);
-    setSelectedMimeType(mimeType);
-    setFile(null);
-    setFileError(false);
-    try {
-      setFile(await api.fsRead(rel, mimeType));
-    } catch {
-      setFileError(true);
-    }
-  }, []);
+  const openFile = useCallback(
+    async (rel: string, mimeType?: string, position?: { line?: number; column?: number }) => {
+      setSelected(rel);
+      setSelectedMimeType(mimeType);
+      setFile(null);
+      setFileError(false);
+      try {
+        setFile(await api.fsRead(rel, mimeType));
+        if (position?.line != null) {
+          requestAnimationFrame(() => {
+            const lineNode = document.querySelector(
+              `.work-files-preview [data-line="${position.line}"]`,
+            );
+            lineNode?.scrollIntoView({ block: "center" });
+          });
+        }
+      } catch {
+        setFileError(true);
+      }
+    },
+    [],
+  );
 
   const openMp4 = useCallback(async () => {
     if (!selected) return;
@@ -260,7 +271,10 @@ export function FilesTab() {
       setExpanded((prev) => new Set([...prev, ...ancestors]));
       for (const dir of ancestors) void loadDir(dir);
     }
-    void openFile(path, fileRequest.mimeType);
+    void openFile(path, fileRequest.mimeType, {
+      line: fileRequest.line,
+      column: fileRequest.column,
+    });
   }, [fileRequest, root, loadDir, openFile]);
 
   const renderDir = (rel: string, depth: number): React.ReactNode => {
