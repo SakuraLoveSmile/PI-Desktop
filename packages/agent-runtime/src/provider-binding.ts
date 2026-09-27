@@ -280,6 +280,11 @@ export function buildProviderModel(
     ...(copilotDefaults ?? {}),
     ...(catalogModel.headers ?? {}),
   };
+  const thinkingProtocolCompat = catalogModel.thinkingProtocol
+    ? { forceAdaptiveThinking: catalogModel.thinkingProtocol === "adaptive" }
+    : undefined;
+  const autoAdaptiveThinking =
+    catalogModel.thinkingProtocol === undefined && requiresAdaptiveThinking(catalogModel);
   // OpenAI-compatible gateways are not guaranteed to implement the newer
   // `developer` role, even when the selected model supports reasoning. Keep
   // the broadest Chat Completions wire shape as the default; a catalog/model
@@ -290,13 +295,21 @@ export function buildProviderModel(
     binding.api === "openai-completions"
       ? {
           ...(catalogModel.compat ?? {}),
+          ...(thinkingProtocolCompat ?? {}),
           ...(zhipuCompat ?? {}),
           ...(deepseekCompat ?? {}),
           supportsDeveloperRole: catalogModel.compat?.supportsDeveloperRole === true,
         }
-      : binding.api === "anthropic-messages" && requiresAdaptiveThinking(catalogModel)
-        ? { ...(catalogModel.compat ?? {}), forceAdaptiveThinking: true }
-        : catalogModel.compat;
+      : binding.api === "anthropic-messages" &&
+          (catalogModel.thinkingProtocol === "adaptive" || autoAdaptiveThinking)
+        ? {
+            ...(catalogModel.compat ?? {}),
+            ...(thinkingProtocolCompat ?? {}),
+            forceAdaptiveThinking: true,
+          }
+        : thinkingProtocolCompat
+          ? { ...(catalogModel.compat ?? {}), ...thinkingProtocolCompat }
+          : catalogModel.compat;
   return {
     ...catalogModel,
     id: provider.modelId,

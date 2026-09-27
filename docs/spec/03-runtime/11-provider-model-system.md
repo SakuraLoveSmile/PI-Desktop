@@ -384,6 +384,7 @@ type ModelBinding = {
   maxTokens: number
   thinkingLevels: ThinkingLevel[]
   defaultThinkingLevel: SessionThinkingLevel | null
+  thinkingProtocol?: "legacy" | "adaptive"
   availableForSubagents?: boolean // opt-in for AI-driven delegation
 }
 
