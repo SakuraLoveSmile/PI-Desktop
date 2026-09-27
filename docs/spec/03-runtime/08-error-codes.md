@@ -91,6 +91,7 @@ does not turn temporary thread pressure into a host process exit.
 | `TOOL_DENIED` | no | permission denied / mode forbidden |
 | `TOOL_TIMEOUT` | yes | tool execution timeout |
 | `TOOL_FAILED` | maybe | tool executed but failed |
+| `FILE_NOT_FOUND` | no | Read/Write/Edit target path does not exist (distinct from `TOOL_DENIED`) |
 | `MUTATION_RETRY_BUDGET_EXHAUSTED` | yes | the repeat guard ended the turn after same-path `Edit` or shell patch failures; carries `details.kind` (`edit` or `patch-command`) and the last tool error code |
 | `PROCESS_RESOURCE_EXHAUSTED` | yes | shell process could not start because the OS temporarily exhausted process resources |
 | `SHELL_NOT_FOUND` | no | no effective platform shell is available after catalog fallback; message carries guidance |
