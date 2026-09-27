@@ -249,12 +249,18 @@ async function scenarioSessionIsolation(binary, tempRoot) {
     const listB = await ctx.host.call("goalReports.list", { sessionId: sessionB.id });
     assert(listB.reports?.length === 1 && listB.reports[0].executionId === execB, shortJson(listB));
 
-    // Cross-session access attempt: querying session A's report using session B's id must return null
+    // Cross-session access must return only a not-found state, with no report identity.
     const crossAccessRes = await ctx.host.call("goalReports.get", {
       sessionId: sessionB.id,
       executionId: execA,
     });
-    assert(crossAccessRes.report === null, `cross-session access did not return null: ${shortJson(crossAccessRes)}`);
+    assert(crossAccessRes.state === "not_found", `cross-session state was not hidden: ${shortJson(crossAccessRes)}`);
+    assert(
+      crossAccessRes.report?.state === "not_found" &&
+        crossAccessRes.report.reportId == null &&
+        crossAccessRes.report.executionId == null,
+      `cross-session report identity leaked: ${shortJson(crossAccessRes)}`,
+    );
 
     // Cascade deletion check
     const dirA = join(ctx.dataDir, "goal_reports", sessionA.id);

@@ -305,6 +305,7 @@ try {
   await host.call('plans.claimExecution', { executionId: failedExecutionId });
   await host.call('plans.finishExecution', { executionId: failedExecutionId, status: 'completed' });
   const markedFailed = await host.call('goalReports.markFailed', {
+    sessionId: retrySession.id,
     executionId: failedExecutionId,
     errorCode: 'REPORT_PERSISTENCE_BARRIER_FAILED',
   });

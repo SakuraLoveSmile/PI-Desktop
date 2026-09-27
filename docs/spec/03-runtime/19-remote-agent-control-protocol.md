@@ -532,8 +532,9 @@ the principal has the path-disclosure scope.
 
 ### 6.1 v1 operations
 
-All operation names are lower-case, singular-resource paths. Every binding maps
-to this same catalog.
+The v1 operation names are lower-case, singular-resource paths. Every binding
+maps to this same catalog. The remote-host profile adds the exact
+`goalReports/*` operation identifiers listed in §6.2.
 
 | Operation | Role | Behavior |
 |---|---|---|
@@ -584,6 +585,9 @@ session root as working directory and stream through `terminal.output`.
 | `session/rename` | controller | Rename a session |
 | `session/delete` | owner | Delete a session and its transcript on the Host |
 | `session/compact` | controller | Run a manual context checkpoint on the active session |
+| `goalReports/get` | viewer | Read a report or its bounded Host state for the named session; another session's report is indistinguishable from a missing report |
+| `goalReports/list` | viewer | List durable report summaries for the named session |
+| `goalReports/retry` | controller | Re-finalize a failed report from Host-owned durable facts after transcript persistence succeeds; never reruns the Goal |
 | `workspace/list` | viewer | List entries under the session root, bounded, honoring the Host ignore rules |
 | `workspace/read` | viewer | Read one bounded file under the session root; images as data URLs |
 | `workspace/diff` | viewer | Return the working-tree diff of the session root |
@@ -1172,6 +1176,7 @@ Initial RACP codes are:
 | `NOT_FOUND` | no | Host, project, session, turn, approval, input, or attachment missing |
 | `AGENT_UNAVAILABLE` | yes | Host or runtime is offline |
 | `AGENT_BUSY` | no | Session cannot admit the turn under the requested admission mode, or the queue is full |
+| `REPORT_PERSISTENCE_BARRIER_FAILED` | yes | Transcript persistence has not reached a durable state; the report stays failed and Retry does not finalize it |
 | `CONFLICT` | yes | Expected revision is stale or the turn is no longer in the required state |
 | `IDEMPOTENCY_CONFLICT` | no | Same key was reused with different input |
 | `CURSOR_EXPIRED` | no | Epoch changed or the replay window no longer contains the cursor |
@@ -1281,4 +1286,3 @@ D375 (2026-09-10) re-sequenced the deployments and extended the catalog:
 - queued turns persisted by host-core and held after a restart, the
   30-minute default approval lifetime for remote subscribers, and the
   `applyCeilingToPairedDevices` policy.
-

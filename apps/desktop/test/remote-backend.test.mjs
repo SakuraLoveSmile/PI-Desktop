@@ -154,6 +154,30 @@ test("handles() covers exactly the channels the remote profile serves", () => {
   assert.equal(backend.handles("pi-desktop/anything/unknown"), false);
 });
 
+test("Goal Report channels use the RACP slash operation names", async () => {
+  const { backend, client } = makeBackend({
+    "goalReports/get": { report: { reportId: "report-1" } },
+    "goalReports/list": { reports: [] },
+    "goalReports/retry": { report: { reportId: "report-1", status: "ready" } },
+  });
+
+  await backend.invoke(IPC.invoke.goalReportGet, [
+    { sessionId: REMOTE_SESSION_ID, reportId: "report-1" },
+  ]);
+  await backend.invoke(IPC.invoke.goalReportList, [
+    { sessionId: REMOTE_SESSION_ID },
+  ]);
+  await backend.invoke(IPC.invoke.goalReportRetry, [
+    { sessionId: REMOTE_SESSION_ID, executionId: "execution-1" },
+  ]);
+
+  assert.deepEqual(client.calls, [
+    { method: "goalReports/get", params: { sessionId: HOST_SESSION_ID, reportId: "report-1" } },
+    { method: "goalReports/list", params: { sessionId: HOST_SESSION_ID } },
+    { method: "goalReports/retry", params: { sessionId: HOST_SESSION_ID, executionId: "execution-1" } },
+  ]);
+});
+
 test("agentPrompt starts a turn with reject_if_busy and returns the local response shape", async () => {
   const turn = makeRacpTurn({ id: "turn-42" });
   const { backend, client } = makeBackend({

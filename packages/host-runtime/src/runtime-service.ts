@@ -15,6 +15,7 @@ import {
 import type { LaunchResolver } from "./launch-resolver.js";
 import { resolveSessionMessageInput } from "./session-message-input.js";
 import { TurnEventPipeline } from "./turn-events.js";
+import type { PersistenceBarrier } from "./turn-persistence.js";
 
 /** host-core as the turn lifecycle drives it. `HostProcess` satisfies it. */
 export type RuntimeHostLink = {
@@ -235,6 +236,11 @@ export class RuntimeService implements RuntimePort {
   /** Transcript rows still waiting for host-core. */
   pendingWrites(): number {
     return this.events.pendingWrites();
+  }
+
+  /** Wait for transcript and outbox writes for a session before Host facts are finalized. */
+  flushPersistence(sessionId: string): Promise<PersistenceBarrier> {
+    return this.events.flushPersistence(sessionId);
   }
 
   async dispose(): Promise<void> {

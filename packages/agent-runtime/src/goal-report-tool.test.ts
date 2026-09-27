@@ -1,10 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   GoalReportDraftManager,
+  persistGoalReportFailure,
   SUBMIT_GOAL_REPORT_TOOL_NAME,
 } from "./goal-report-tool.js";
 
 describe("GoalReportDraftManager", () => {
+  it("marks draft persistence failures against their owning session", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const execution = { sessionId: "sess-1", executionId: "exec-1" };
+
+    await persistGoalReportFailure(host, execution, "REPORT_DRAFT_PERSIST_FAILED");
+    await persistGoalReportFailure(host, execution, "REPORT_DRAFT_INVALIDATION_FAILED");
+
+    expect(host.call).toHaveBeenNthCalledWith(1, "goalReports.markFailed", {
+      sessionId: "sess-1",
+      executionId: "exec-1",
+      errorCode: "REPORT_DRAFT_PERSIST_FAILED",
+    });
+    expect(host.call).toHaveBeenNthCalledWith(2, "goalReports.markFailed", {
+      sessionId: "sess-1",
+      executionId: "exec-1",
+      errorCode: "REPORT_DRAFT_INVALIDATION_FAILED",
+    });
+  });
+
   it("builds the SubmitGoalReport tool definition", () => {
     const manager = new GoalReportDraftManager({
       executionId: "exec-1",

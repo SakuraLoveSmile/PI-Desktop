@@ -1085,6 +1085,18 @@ fn plan_rpc_err(error: impl ToString) -> JsonRpcError {
     rpc_err(1015, message, &error_code)
 }
 
+fn goal_report_rpc_err(error: impl ToString) -> JsonRpcError {
+    let message = error.to_string();
+    if message.starts_with("PERMISSION_DENIED:") {
+        return rpc_err(
+            1007,
+            "goal report was not found for this session",
+            "NOT_FOUND",
+        );
+    }
+    rpc_err(1000, message, "INTERNAL")
+}
+
 fn resolve_persisted_project_workspace(
     state: &AppState,
     session_id: &str,
@@ -3970,6 +3982,11 @@ async fn handle_request(
             Ok(json!({ "ok": true }))
         }
         "goalReports.markFailed" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let execution_id = params
                 .get("executionId")
                 .and_then(|v| v.as_str())
@@ -3982,8 +3999,8 @@ async fn handle_request(
                 .ok_or_else(|| rpc_err(1002, "errorCode required", "INVALID_PARAMS"))?;
             let summary = {
                 let st = state.lock().await;
-                crate::goal_reports::mark_failed(&st.db, execution_id, error_code)
-                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                crate::goal_reports::mark_failed(&st.db, session_id, execution_id, error_code)
+                    .map_err(goal_report_rpc_err)?
             };
             emit_notification(
                 &tx,
@@ -4126,7 +4143,7 @@ async fn handle_request(
             let summary = {
                 let st = state.lock().await;
                 crate::goal_reports::retry_report(&st.db, session_id, execution_id)
-                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                    .map_err(goal_report_rpc_err)?
             };
             emit_notification(
                 &tx,

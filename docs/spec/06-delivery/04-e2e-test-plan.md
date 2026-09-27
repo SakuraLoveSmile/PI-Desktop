@@ -15264,7 +15264,9 @@ renderer's durable transcript reads. No real model or provider is contacted.
   credentials or user data.
 - **Steps:** Submit and approve a fixture Goal, let the real sidecar perform its
   bounded work, then submit a structured `SubmitGoalReport`. Open the resulting
-  transcript card and the report in the session Work Panel.
+  transcript card and the report in the session Work Panel. On a remote-host
+  fixture, read/list through a viewer connection, verify another session cannot
+  reveal the report, and call Retry through a controller connection.
 - **Expected:** Host returns one durable `ready` report for the same Goal and
   execution. The transcript card opens the matching report; the report shows
   its conclusion, execution status, evidence and limitations. A criterion is
@@ -15274,6 +15276,10 @@ renderer's durable transcript reads. No real model or provider is contacted.
   Invalid or failed draft persistence never publishes a stale or misleading
   ready report. Failed outbox persistence remains failed; explicit Retry uses
   only Host-owned durable facts and does not rerun the Goal or call the model.
+  RACP Retry waits for that session's pending transcript writes; an unsuccessful
+  barrier returns `REPORT_PERSISTENCE_BARRIER_FAILED` and leaves the report
+  failed. A viewer cannot Retry, and a failed or cross-session read is scoped to
+  the requested session.
   The Work Panel shows localized generic failure text and only a safe error
   code, with Retry disabled while the request is active.
 - **Specs:** 03-runtime/02-agent-runtime, 03-runtime/03-tools-and-permissions,
@@ -15281,7 +15287,9 @@ renderer's durable transcript reads. No real model or provider is contacted.
   04-ux/08-component-spec.
 - **Automation:** `node scripts/e2e-temporary-goal.mjs`,
   `pnpm test:e2e:goal-report`, Goal Report runtime/Host tests, and the focused
-  Goal Report renderer tests. Electron uses the isolated local fake model.
+  Goal Report renderer tests. Remote contract coverage includes the RACP role,
+  Host-operation barrier, persistence queue, and Electron remote-backend tests.
+  Electron uses the isolated local fake model.
 - **Milestone:** Maintenance.
 
 ### E2E-TEAM-runtime-mailbox-and-panel

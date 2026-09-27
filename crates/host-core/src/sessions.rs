@@ -1384,11 +1384,12 @@ pub fn create_session_with_options(
         Some(raw) => Some(normalize_project_name(raw)?),
         None => None,
     };
-    if requested_name.is_some() && project_path.as_deref().is_none_or(|path| path.trim().is_empty())
+    if requested_name.is_some()
+        && project_path
+            .as_deref()
+            .is_none_or(|path| path.trim().is_empty())
     {
-        return Err(anyhow!(
-            "INVALID_PARAMS: projectName requires projectPath"
-        ));
+        return Err(anyhow!("INVALID_PARAMS: projectName requires projectPath"));
     }
     let project_id = match project_path
         .as_deref()
@@ -4738,7 +4739,10 @@ mod tests {
         for (name, title) in [
             (Some("  ".to_string()), Some("Title".to_string())),
             (Some("Bad\u{7}Name".to_string()), Some("Title".to_string())),
-            (Some("x".repeat(MAX_PROJECT_NAME_CHARS + 1)), Some("Title".to_string())),
+            (
+                Some("x".repeat(MAX_PROJECT_NAME_CHARS + 1)),
+                Some("Title".to_string()),
+            ),
             (None, Some("   ".to_string())),
             (None, Some("Bad\u{7}Title".to_string())),
         ] {
@@ -4797,9 +4801,11 @@ mod tests {
         // The custom name survives and no session was created.
         let stored: String = db
             .conn()
-            .query_row("SELECT name FROM projects WHERE id = ?1", params![project_id], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT name FROM projects WHERE id = ?1",
+                params![project_id],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(stored, "Mine");
         let sessions: i64 = db
