@@ -1326,6 +1326,7 @@ sklm: {
     presetVolcengine: "火山方舟",
     presetMinimaxCn: "MiniMax",
     presetMinimaxCnOpenai: "MiniMax（OpenAI）",
+    presetStepfunPlan: "StepFun Plan（訂閱）",
     presetKimiCoding: "Kimi 程式設計",
     presetAntLing: "Ant Ling",
     presetBaseten: "Baseten",

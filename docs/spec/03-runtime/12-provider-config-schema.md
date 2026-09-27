@@ -424,6 +424,15 @@ Qwen Token Plan (`alibaba-token-plan`, aliases `qwen-token-plan` /
 (`alibaba-token-plan-cn`, alias `qwen-token-plan-cn`), Xiaomi Token Plan
 (`xiaomi-token-plan-cn` / `-ams` / `-sgp`).
 
+StepFun Plan uses the `stepfun-plan` preset with catalog vendor key
+`stepfun-step-plan`, Base URL `https://api.stepfun.com/step_plan/v1`, and
+`anthropic_messages`. The existing Anthropic adapter removes the trailing
+`/v1` before the SDK appends `/v1/messages`, preserving the subscription path.
+Step 5 Preview capabilities come from the bundled first-party models.dev
+record; no supplemental catalog or hard-coded limits are needed. The ordinary
+StepFun API and existing custom-provider rows retain their configuration.
+
+
 Zhipu / Z.AI Completions requests still receive `thinkingFormat: "zai"` and
 `zaiToolStream: true`. pi-ai `zai-coding-cn` remains an alias of
 `zhipuai-coding-plan`. DeepSeek-family Completions requests receive

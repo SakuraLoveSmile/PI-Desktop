@@ -1339,6 +1339,7 @@ sklm: {
     "presetVolcengine": "Volcengine Ark",
     "presetMinimaxCn": "MiniMax",
     "presetMinimaxCnOpenai": "MiniMax (OpenAI)",
+    presetStepfunPlan: "StepFun Plan",
     "presetKimiCoding": "Kimi pour le codage",
     "presetAntLing": "Ant Ling",
     "presetBaseten": "Baseten",
