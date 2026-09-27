@@ -19,7 +19,6 @@ import { WorkPanel } from "../../components/workpanel/WorkPanel";
 import { useCopyTex } from "../../hooks/use-copy-tex";
 import { api } from "../../lib/api";
 import { PortalVisibilityProvider } from "../../lib/portal-visibility";
-import { MidAutumnEggHost } from "../mid-autumn-egg/MidAutumnEggHost";
 import { CollapsedTitlebarActions, RoutePending } from "./chrome";
 import { useAppShellRuntime } from "./useAppShellRuntime";
 
@@ -112,7 +111,6 @@ export function AppShell() {
             className="app-chat-shell"
             hidden={page === "settings"}
             inert={page === "settings" ? true : undefined}
-            aria-hidden={page === "settings" ? true : undefined}
           >
             {!sidebarCollapsed || sidebarExiting ? (
               <Sidebar
@@ -305,7 +303,6 @@ export function AppShell() {
         ) : null}
         <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
         <ToastHost />
-        <MidAutumnEggHost ready={ready} showSplash={showSplash} />
         <ExtensionPromptHost />
         {page === "settings" ? <UpdateBanner /> : null}
       </>

@@ -3,7 +3,7 @@ import {
   SESSION_THINKING_LEVELS,
   defaultCommandShellForPlatform,
   isCommandShellId,
-  resolveBindingContextWindow,
+  resolveBindingLimits,
   validateNetworkProxy,
   validateSpeechSettings,
   type CommandShellId,
@@ -93,7 +93,7 @@ export function createProviderCatalogRuntime({
     modelId: string,
     catalogModelConfig: Parameters<typeof modelConfigWithBinding>[0],
   ) => {
-    const resolved = resolveBindingContextWindow(
+    const resolved = resolveBindingLimits(
       catalogModelConfig,
       bindingForModel(provider, modelId),
     );
@@ -124,7 +124,7 @@ export function createProviderCatalogRuntime({
       apiStyle: provider.apiStyle,
       modelId,
     });
-    const resolved = resolveBindingContextWindow(
+    const resolved = resolveBindingLimits(
       catalogModelConfig,
       storedModel,
     );
@@ -139,7 +139,7 @@ export function createProviderCatalogRuntime({
         apiStyle: provider.apiStyle,
         modelId: binding.id,
       });
-      const bindingResolved = resolveBindingContextWindow(
+      const bindingResolved = resolveBindingLimits(
         catalogModelConfig,
         binding,
       );
@@ -156,6 +156,9 @@ export function createProviderCatalogRuntime({
         // of its own.
         ...(bindingResolved.binding.contextWindowSource
           ? { contextWindowSource: bindingResolved.binding.contextWindowSource }
+          : {}),
+        ...(bindingResolved.binding.maxTokensSource
+          ? { maxTokensSource: bindingResolved.binding.maxTokensSource }
           : {}),
       };
     });
@@ -205,6 +208,8 @@ export function createProviderCatalogRuntime({
       defaultCommandShell?: unknown;
       infiniteProviderRetry?: unknown;
       keepAwakeWhileRunning?: unknown;
+      updatePreference?: unknown;
+      lastNotifiedUpdateVersion?: unknown;
       networkProxy?: unknown;
     };
     if (
@@ -228,6 +233,25 @@ export function createProviderCatalogRuntime({
       typeof value.keepAwakeWhileRunning !== "boolean"
     ) {
       throw Object.assign(new Error("keepAwakeWhileRunning is invalid"), {
+        errorCode: ErrorCodes.INVALID_PARAMS,
+      });
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "updatePreference") &&
+      value.updatePreference !== "automatic" &&
+      value.updatePreference !== "manual"
+    ) {
+      throw Object.assign(new Error("updatePreference is invalid"), {
+        errorCode: ErrorCodes.INVALID_PARAMS,
+      });
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(value, "lastNotifiedUpdateVersion") &&
+      (typeof value.lastNotifiedUpdateVersion !== "string" ||
+        value.lastNotifiedUpdateVersion.trim().length === 0 ||
+        value.lastNotifiedUpdateVersion.length > 128)
+    ) {
+      throw Object.assign(new Error("lastNotifiedUpdateVersion is invalid"), {
         errorCode: ErrorCodes.INVALID_PARAMS,
       });
     }
@@ -336,7 +360,7 @@ export function createProviderCatalogRuntime({
       };
     }
     const { provider, modelId } = target;
-    const resolved = resolveBindingContextWindow(
+    const resolved = resolveBindingLimits(
       catalogModelConfigFor(modelsDevCatalog, {
         vendorKey: provider.vendorKey,
         baseUrl: provider.baseUrl,

@@ -6,7 +6,7 @@ import {
   imageGenerationBindings,
   isImageGenerationModel,
   normalizeMode,
-  resolveBindingContextWindow,
+  resolveBindingLimits,
   trustedExtensionAgentKeyFromProviderId,
   type CommandShellCatalog,
   type McpServerRecord,
@@ -35,12 +35,12 @@ import {
   catalogModelConfigFor,
   type ModelsDevCatalog,
 } from "../models-dev-catalog";
-import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { PluginRuntime } from "../plugin-runtime";
 import type { UserMcpRuntime } from "../user-mcp";
 import type { RuntimeState } from "./context";
 import type { RuntimeProvider } from "./provider-catalog";
+import type { LoadedSkillDocument } from "../skill-document";
 
 const ErrorCodes = {
   ...SharedErrorCodes,
@@ -220,7 +220,7 @@ export function createSessionLaunchRuntime({
   async function loadUserSkillBody(
     id: string,
     projectPath: string | null,
-  ): Promise<{ id: string; name: string; body: string } | null> {
+  ): Promise<LoadedSkillDocument | null> {
     if (!runtimeState.host || id.includes("/")) return null;
     const result = await runtimeState.host!.call<{
       skill: UserSkillRecord | null;
@@ -231,7 +231,7 @@ export function createSessionLaunchRuntime({
     if (!isActiveInProject(skill, projectPath)) {
       throw new Error(`skill "${id}" is not enabled for this project`);
     }
-    return { id: skill.id, name: skill.name, body: result.body };
+    return { id: skill.id, name: skill.name, body: result.body, location: skill.path };
   }
 
   async function resolveEffectiveCommandShell(): Promise<CommandShellCatalog> {
@@ -355,7 +355,7 @@ export function createSessionLaunchRuntime({
         apiStyle,
         modelId,
       });
-    const resolvedLimits = resolveBindingContextWindow(catalogModelConfig, storedModel);
+    const resolvedLimits = resolveBindingLimits(catalogModelConfig, storedModel);
     const modelConfig = modelConfigWithBinding(
       resolvedLimits.catalogConfig,
       resolvedLimits.binding,

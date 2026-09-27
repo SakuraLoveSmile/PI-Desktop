@@ -76,7 +76,14 @@ conversation id (or a per-call UUID when the caller has no session),
 host is `opencode.ai` receives the same headers. pi-ai is not relied on to
 emit `x-opencode-session`. Each provider row (AI service or OAuth account)
 may set optional `headers`; empty keeps adapter defaults. A fetch wrapper is
-the last writer so Codex and Anthropic cannot overwrite them.
+the last writer so Codex and Anthropic cannot overwrite them. pi-ai's Google
+adapters (`google-generative-ai`, `google-vertex`) reject any `fetch` that is
+not `globalThis.fetch`, so a request bound for them carries none — the merged
+`headers` still reach the SDK client — and a caller-supplied `fetch` is cleared
+rather than wrapped (issue #1072). Because those adapters never see the wrapper and never call
+`onResponse`, such a row reports no captured HTTP status and no captured
+transport cause: `Retry-After` falls back to the bounded backoff ladder, and
+the issue-234 transport diagnostics and rebuild do not fire for it.
 
 When an OAuth vendor is rebuilt around a local provider-row id, runtime keeps
 the native pi-ai transport metadata instead of treating the row as a generic
@@ -86,6 +93,12 @@ headers, including `Editor-Version`, `Editor-Plugin-Version`, and
 `X-Initiator`, `Openai-Intent`, and image-request header. The local row id still
 owns auth binding and transcript identity, and user-supplied provider headers
 remain the final override.
+
+Copilot Anthropic Messages (Claude) requests carry the per-request OAuth token
+as `Authorization: Bearer` with `X-Api-Key` removed, because pi-ai
+only selects Copilot Bearer auth when `model.provider` is `github-copilot`.
+OpenAI-style Copilot wire APIs keep signing the token as the request key; all
+wires retain per-request auth resolution and the account-specific `baseUrl`.
 
 Zhipu / GLM and Z.AI are named OpenAI-compatible endpoint presets among a
 short models.dev-backed Service list of first-party vendors (including
@@ -112,8 +125,12 @@ models.dev record publishes a reasoning `effort` option and no
 `budget_tokens` option (for example Opus 4.7+, Opus 5.x, Fable). Those models
 reject `thinking.type=enabled` with HTTP 400, and models.dev carries no pi-ai
 compat record, so without the flag pi-ai would fall back to budget thinking.
-Models that still publish `budget_tokens` keep budget thinking, and an
-explicit catalog `compat` record is preserved.
+Models that still publish `budget_tokens`, including those that also publish
+`effort`, keep budget thinking by default. The catalog uses this same rule
+for the protocol displayed in model settings. An explicit
+`ModelBinding.thinkingProtocol` selection (`legacy` or `adaptive`) overrides
+the default; an absent field preserves the existing inference. An explicit
+catalog `compat` record is preserved.
 
 An Anthropic Messages row the catalog cannot identify (for example a custom
 gateway URL serving an id several publishers list) still falls back to the
@@ -215,8 +232,10 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
 7. User-edited `ModelBinding` values remain explicit provider configuration:
    they control selected request limits, enabled thinking levels, the default
    thinking level applied to a new home draft and newly persisted session
-   (clamped onto the enabled set; strongest-enabled only when the default is
-   unset), and the attachment capability overrides. `models.dev` supplies published metadata and seeds the initial
+   (clamped onto the enabled set; a known catalog match uses the
+   strongest-enabled level when the default is unset, while an unmatched
+   model starts at `off`), and the attachment capability overrides.
+   `models.dev` supplies published metadata and seeds the initial
    thinking selection for a newly added known model; it is not a runtime gate
    on a level the user explicitly enables for the endpoint. For compatibility,
    a binding that still contains the legacy generic `128,000` context seed
@@ -239,10 +258,10 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    input records the capability but does not change the encoding, since pi-ai
    0.87.1 has no PDF content block and PDFs stay bounded file references.
 10. The settings checkboxes show the effective answer against the published
-    baseline, and setting one back to the published value stores "follow the
-    catalog" rather than an equal-valued override. Agreeing with models.dev is
-    therefore the reset, and no separate reset control or per-capability
-    explanatory copy is required.
+    baseline. An untouched or `null` value follows the catalog; once the user
+    changes a checkbox, its selected boolean is explicit and remains pinned,
+    even if it equals the currently published value. Catalog refreshes therefore
+    cannot undo a deliberate choice.
 10a. `nativeWebSearch` is a two-state opt-in (absent means off; there is no
     catalog baseline because models.dev publishes no hosted-tool capability).
     When enabled and the model resolves to `anthropic-messages`,
@@ -375,6 +394,7 @@ type ModelBinding = {
   maxTokens: number
   thinkingLevels: ThinkingLevel[]
   defaultThinkingLevel: SessionThinkingLevel | null
+  thinkingProtocol?: "legacy" | "adaptive"
   availableForSubagents?: boolean // opt-in for AI-driven delegation
 }
 
@@ -398,7 +418,8 @@ surface for older clients. PI-Desktop no longer reads them as runtime model
 overrides. `ModelInfo` reasoning support and supported thinking levels describe
 the resolved models.dev record; effective provider/session capability comes from
 the exact `ModelBinding`. Unknown free-form ids start with the generic shape and
-no inferred reasoning capability, but an explicit binding may opt into levels.
+no inferred reasoning capability; an empty binding level array is the generic
+seed, while a non-empty explicit binding may opt into or disable levels.
 
 The provider dialog persists one `ModelBinding` for every selected model. The
 first binding is the effective model for current conversations and legacy

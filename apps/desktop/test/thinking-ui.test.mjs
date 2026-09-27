@@ -38,6 +38,13 @@ const sessionIpcSource = await readMainModule("ipc/session-ipc.ts");
 const sessionLaunchSource = await readMainModule("runtime/session-launch.ts");
 const storeSource = await readStoreSource();
 const sessionCoordinationSource = await readStoreModule("runtime/session-coordination.ts");
+const modelMenuSource = await readFile(
+  new URL(
+    "../src/features/chat/composer/hooks/useComposerModelMenu.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
 // Agent/Plan mode and model selection are owned by the Composer; the
 // conversation top bar only hosts the task title and window actions.
 const topbarSource = await readFile(
@@ -68,12 +75,13 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.match(composerSource, /supportsReasoning/);
   assert.match(composerSource, /thinkingLevelForProvider/);
   assert.match(composerSource, /thinkingLevel:\s*level/);
-  assert.match(composerSource, /composer-thinking-list/);
+  // The level is a drag on the slider: no reasoning list submenu to render.
+  assert.doesNotMatch(composerSource, /composer-thinking-list/);
   assert.doesNotMatch(stylesSource, /\.composer-thinking-levels/);
   assert.doesNotMatch(stylesSource, /\.composer-thinking-level\b/);
   assert.match(
     stylesSource,
-    /\.composer-model-thinking-menu\s*\{[\s\S]*?width:\s*min\(280px,\s*calc\(100vw - 24px\)\);/,
+    /\.composer-model-thinking-menu\s*\{[\s\S]*?width:\s*min\(280px,\s*calc\(100vw - 24px\)\);/
   );
   assert.match(composerSource, /availableThinkingLevels/);
   assert.match(composerSource, /thinkingMenuLevels/);
@@ -81,7 +89,8 @@ test("composer exposes the runtime thinking level order and provider filtering",
 
 test("thinking levels use their canonical English values without i18n", () => {
   assert.match(composerSource, /const thinkingLabel = thinkingLevel;/);
-  assert.match(composerSource, /<span className="flex-1">\s*\{level\}/);
+  // The slider's ticks print the canonical level values themselves.
+  assert.match(composerSource, /onClick=\{\(\) => select\(stop\)\}>\{candidate\}<\/button>/);
   assert.doesNotMatch(composerSource, /THINKING_LEVEL_(LABELS|I18N_KEYS)/);
   assert.doesNotMatch(composerSource, /chat\.effort(?:Off|Minimal|Low|Mid|High|Xhigh|Max)/);
   assert.doesNotMatch(transcriptSource, /thinkingLevel\./);
@@ -181,10 +190,20 @@ test("draft Composer thinking follows the exact model selected in its menu", () 
   );
   assert.match(
     composerSource,
-    /const nextThinkingLevel = activeSession[\s\S]*?thinkingLevelForProvider\(nextModelProvider, thinkingLevel\)[\s\S]*?initialThinkingLevelForBinding\(/,
+    /const selectedSameModel =\s*activeSessionId &&\s*candidate\.id === provider\?\.id &&\s*sameComposerModelId\(modelId \?\? "", nextModelId\);/,
+  );
+  assert.match(
+    composerSource,
+    /const nextThinkingLevel = selectedSameModel\s*\?\s*thinkingLevelForProvider\(nextModelProvider, thinkingLevel\)[\s\S]*?initialThinkingLevelForBinding\([\s\S]*?initialThinkingLevelForUnmatchedModel\(/,
   );
   assert.match(composerSource, /const selectedBinding = provider\?\.models\.find/);
-  assert.match(composerSource, /const draftThinkingLevel = initialThinkingLevelForBinding\(/);
+  assert.match(
+    composerSource,
+    /const draftThinkingLevel = selectedModelInfo\s*\?\s*initialThinkingLevelForBinding\(/,
+  );
+  assert.match(composerSource, /initialThinkingLevelForUnmatchedModel\(/);
+  assert.match(modelMenuSource, /initialThinkingLevelForUnmatchedModel\(/);
+  assert.match(sessionCoordinationSource, /initialThinkingLevelForUnmatchedModel\(/);
   assert.doesNotMatch(composerSource, /highestSupportedThinkingLevel/);
 });
 
