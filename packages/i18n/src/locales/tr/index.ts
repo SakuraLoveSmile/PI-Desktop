@@ -2445,7 +2445,7 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
     failedTitle: "{{sessionTitle}} ilgi bekliyor",
     failedBody: "Sohbet başarıyla bitmedi.",
     failedBodyWithCode: "Sohbet {{code}} hatasıyla durdu.",
-    askTitle: "{{sessionTitle}} yanıtınızı bekliyor",
+    askTitle: "Bir soruyu yanıtlamanız gerekiyor",
     askBody: "{{question}}",
     askBodyFallback: "Görevin devam etmesi için yanıtınız gerekiyor.",
     permissionTitle: "{{sessionTitle}} araç onayı bekliyor",

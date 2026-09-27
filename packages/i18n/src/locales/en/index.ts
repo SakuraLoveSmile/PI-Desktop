@@ -2460,7 +2460,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     failedTitle: "{{sessionTitle}} needs attention",
     failedBody: "The chat didn't finish successfully.",
     failedBodyWithCode: "The chat stopped with error {{code}}.",
-    askTitle: "{{sessionTitle}} needs your input",
+    askTitle: "A question needs your answer",
     askBody: "{{question}}",
     askBodyFallback: "The task requires your response to proceed.",
     permissionTitle: "{{sessionTitle}} needs tool approval",

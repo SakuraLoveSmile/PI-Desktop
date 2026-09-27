@@ -18,7 +18,9 @@ export function createInteractivePromptNotifier(
     let title = "";
     let body = "";
     if (kind === "ask") {
-      title = i18n.t("notifications.askTitle", { sessionTitle });
+      // Session titles can contain generated/tool-call text; keep the native
+      // banner title stable and let its body carry the actual question.
+      title = i18n.t("notifications.askTitle");
       body = payload?.question?.trim() || i18n.t("notifications.askBodyFallback");
     } else if (kind === "permission") {
       title = i18n.t("notifications.permissionTitle", { sessionTitle });

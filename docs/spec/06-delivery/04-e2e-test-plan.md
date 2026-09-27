@@ -9752,10 +9752,11 @@ This test plan spec is accepted when:
   between questions, and
   keeps `question：` for the skipped question, and selecting a rich option
   returns only its label. Decline all produces empty placeholders for every
-  question and still completes the tool call. A pending ask shows a localized
-  in-app toast with its session and first question, while background sessions
-  retain the existing native notification policy. Exactly one soft chime plays
-  for the ask; the toast and native banner do not double it.
+  question and still completes the tool call. A pending ask shows a stable
+  localized title and the first question in its toast; generated session-title
+  text never replaces that title. Background sessions retain the existing
+  native notification policy. Exactly one soft chime plays for the ask; the
+  toast and native banner do not double it.
 - **Specs linked**: `03-runtime/17-asktool-questions.md`,
   `04-ux/11-asktool-question-card.md`, ADR 0077
 - **Acceptance**: E (interactive tool output), C (inline card)

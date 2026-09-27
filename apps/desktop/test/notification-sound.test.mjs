@@ -14,6 +14,26 @@ const promptNotificationSource = await readFile(
   new URL("../src/stores/runtime/notification-runtime.ts", import.meta.url),
   "utf8",
 );
+const englishLocaleSource = await readFile(
+  new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url),
+  "utf8",
+);
+const chineseLocaleSource = await readFile(
+  new URL("../../../packages/i18n/src/locales/zh-CN/index.ts", import.meta.url),
+  "utf8",
+);
+const germanLocaleSource = await readFile(
+  new URL("../../../packages/i18n/src/locales/de/index.ts", import.meta.url),
+  "utf8",
+);
+const spanishLocaleSource = await readFile(
+  new URL("../../../packages/i18n/src/locales/es/index.ts", import.meta.url),
+  "utf8",
+);
+const frenchLocaleSource = await readFile(
+  new URL("../../../packages/i18n/src/locales/fr/index.ts", import.meta.url),
+  "utf8",
+);
 const shellNotificationSource = await readFile(
   new URL("../src/features/app/useAppShellRuntime.tsx", import.meta.url),
   "utf8",
@@ -102,6 +122,21 @@ test("toast chimes only for newly visible toasts that have not opted out", () =>
   assert.equal(shouldPlayToastSound({ id: 1 }, visible), true);
   assert.equal(shouldPlayToastSound({ id: 2 }, visible), false);
   assert.equal(shouldPlayToastSound({ id: 3, sound: false }, visible), false);
+});
+
+test("ask notifications use a stable title instead of the generated session title", () => {
+  const askBranch = promptNotificationSource.match(
+    /if \(kind === "ask"\) \{([\s\S]*?)\} else if \(kind === "permission"\)/,
+  )?.[1];
+  assert.ok(askBranch, "ask notification branch exists");
+  assert.match(askBranch, /i18n\.t\("notifications\.askTitle"\)/);
+  assert.doesNotMatch(askBranch, /sessionTitle/);
+  assert.match(askBranch, /payload\?\.question/);
+  assert.match(englishLocaleSource, /askTitle: "A question needs your answer"/);
+  assert.match(chineseLocaleSource, /askTitle: "有问题需要你回答"/);
+  assert.match(germanLocaleSource, /"askTitle": "Eine Frage braucht Ihre Antwort"/);
+  assert.match(spanishLocaleSource, /"askTitle": "Hay una pregunta que requiere su respuesta"/);
+  assert.match(frenchLocaleSource, /"askTitle": "Une question attend votre réponse"/);
 });
 
 test("app and plugin notification surfaces share one chime without native double-sounds", () => {

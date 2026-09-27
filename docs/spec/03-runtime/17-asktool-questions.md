@@ -34,10 +34,11 @@ There is no timer, countdown, or automatic expiration. The card remains pending
 until the user submits or the turn is stopped. If the turn is stopped while a
 card is open, the runtime resolves every remaining question as skipped.
 
-When an ask arrives, the app shows an in-app toast containing the session and
-first question, in addition to the existing native notification policy for
-background sessions. The ask event plays one soft in-app chime; its toast does
-not play a second one.
+When an ask arrives, the app shows an in-app toast with a stable localized
+prompt title and the first question; background sessions also follow the
+existing native notification policy. Ask titles deliberately do not interpolate
+the session title, because generated titles may contain tool-call text. The ask
+event plays one soft in-app chime; its toast does not play a second one.
 
 ## 4. Tool output
 
