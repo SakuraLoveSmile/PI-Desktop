@@ -194,6 +194,7 @@ impl PlanManager {
             title,
             markdown,
             question,
+            artifact_workspace_kind,
         } = params;
         if session_id.trim().is_empty()
             || turn_id.trim().is_empty()
@@ -205,6 +206,10 @@ impl PlanManager {
             return Err(plan_error("PLAN_INVALID_ARGUMENT"));
         }
         let Some(kind) = normalize_kind(kind) else {
+            return Err(plan_error("PLAN_INVALID_ARGUMENT"));
+        };
+        let Some(artifact_workspace_kind) = normalize_workspace_kind(artifact_workspace_kind)
+        else {
             return Err(plan_error("PLAN_INVALID_ARGUMENT"));
         };
         if markdown.len() > PLAN_MAX_MARKDOWN_BYTES {
@@ -233,7 +238,8 @@ impl PlanManager {
             return Err(plan_error("PLAN_ALREADY_PENDING"));
         }
 
-        let (artifact, path) = publish_artifact(workspace_root, kind, title, markdown)?;
+        let (mut artifact, path) = publish_artifact(workspace_root, kind, title, markdown)?;
+        artifact.workspace_kind = Some(artifact_workspace_kind.to_string());
         let id = Uuid::new_v4().to_string();
         let now = now_ms();
         let insert_result = (|| -> Result<()> {
@@ -243,9 +249,9 @@ impl PlanManager {
                  request_id, session_id, turn_id, tool_call_id, kind, plan_json,
                  title, question, status, created_at, updated_at, expires_at,
                  artifact_relative_path, artifact_sha256, artifact_size_bytes,
-                 version
+                 version, artifact_workspace_kind
              ) VALUES (?1, ?2, ?3, ?4, ?13, ?5, ?6, ?7, 'pending', ?8, ?8,
-                       ?9, ?10, ?11, ?12, 1)",
+                       ?9, ?10, ?11, ?12, 1, ?14)",
             )?
             .execute(params![
                 id,
@@ -261,6 +267,7 @@ impl PlanManager {
                 artifact.sha256,
                 artifact.size_bytes as i64,
                 kind,
+                artifact_workspace_kind,
             ])?;
             artifacts::record_tx(
                 &tx,

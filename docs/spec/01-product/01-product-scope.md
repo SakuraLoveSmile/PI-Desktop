@@ -130,10 +130,10 @@ the internal `page = "chat"` route value; that value is not an operating mode.
 
 ## 8. Naming
 
-- Product: `PI-Desktop`
-- Package: `pi-desktop`
-- Application ID: `net.aiuo.pi-desktop`
-- Window title: `PI-Desktop`
+- Product: `Pi-Desktop-Plus`
+- Package: `pi-desktop-plus`
+- Application ID: `cn.sakura.pi-desktop`
+- Window title: `Pi-Desktop-Plus`
 
 ## 9. Platform strategy
 
@@ -143,3 +143,11 @@ the internal `page = "chat"` route value; that value is not an operating mode.
 | macOS Intel | Published | Native x64 DMG/ZIP release lane; signing/notarization remains credential-gated |
 | Windows x64 | Published | NSIS installer, portable ZIP, and in-app update lane for NSIS; native qualification continues |
 | Linux x64 | Published | AppImage, deb, and rpm packages; AppImage update lane; glibc 2.35+ (Ubuntu 22.04, Debian 12, Fedora 36+); native qualification continues |
+
+## Independent Plus installation
+
+Pi-Desktop-Plus uses isolated Electron profiles and `~/.pi-desktop-plus`
+(`~/.pi-desktop-plus-dev` for desktop development). It does not import or
+modify PI-Desktop data. Explicit data-directory overrides remain available.
+Release and update artifacts come from `SakuraLoveSmile/PI-Desktop`.
+See [ADR 0308](../../adr/0308-independent-plus-application-identity.md).

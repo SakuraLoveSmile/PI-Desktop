@@ -147,7 +147,7 @@ does not turn temporary thread pressure into a host process exit.
 | `PLAN_REQUIRES_INTERACTIVE_SESSION` | no | unattended/scheduled Plan or Goal run cannot request approval |
 | `PLAN_NOT_FOUND` | no | no approval row matches the proposal id |
 | `PLAN_SESSION_NOT_FOUND` | no | the Plan/Goal RPC named a session the host does not have |
-| `PLAN_WORKSPACE_REQUIRED` | no | the session has no persisted project; temporary sessions cannot enter Plan or Goal |
+| `PLAN_WORKSPACE_REQUIRED` | no | Plan has no persisted project, or the required Goal workspace is unavailable; temporary Goals use their own session scratch directory |
 | `PLAN_ALREADY_ACTIVE` | no | the session already has a contract being negotiated |
 | `PLAN_ALREADY_PENDING` | no | a submit arrived while an approval for the same turn is still pending |
 | `PLAN_ALREADY_RESOLVED` | no | a second approve/reject reached an already-resolved approval |
@@ -306,6 +306,38 @@ codes surface through the same error object as any other call.
 | `PAIRING_FAILED` | no | `connection/pair` could not mint a device credential |
 | `PAIRING_TOKEN_EXPIRED` | no | the single-use pairing token expired before pairing completed |
 | `CAPABILITY_UNAVAILABLE` | no | an operation was requested for a capability the host advertised as unavailable (e.g. attachments, tool relay) |
+
+### 3.9 Expert Team collaboration (ADR 0307)
+
+Emitted by host-core and the agent runtime when coordinating an Expert Team session
+with teammates, shared task boards, and peer mailboxes.
+
+| code | retriable | meaning |
+|---|---|---|
+| `TEAM_UNAVAILABLE` | no | the session does not have team execution profile enabled or team runtime is unavailable |
+| `TEAM_UNSUPPORTED_AGENT` | no | the specified agent template or model cannot be provisioned as a teammate |
+| `TEAM_MEMBER_LIMIT_EXCEEDED` | no | the team roster has reached its maximum member limit (8 members) |
+| `TEAM_MEMBER_NOT_FOUND` | no | the specified team member does not exist in the active roster |
+| `TEAM_MEMBER_ALREADY_EXISTS` | no | a team member with the specified member id or name already exists |
+| `TEAM_MEMBER_DELETION_BLOCKED` | no | teammate session cannot be deleted while team tasks or execution are active |
+| `TEAM_TASK_NOT_FOUND` | no | the specified task id does not exist on the team task board |
+| `TEAM_TASK_LIMIT_EXCEEDED` | no | the team task board has reached its maximum capacity (256 tasks) |
+| `TEAM_TASK_REVISION_MISMATCH` | yes | optimistic concurrency control conflict; task revision does not match expected revision |
+| `TEAM_TASK_DEPENDENCY_CYCLE` | no | adding the specified dependency would introduce a cycle in the task DAG |
+| `TEAM_TASK_MISSING_DEPENDENCY` | no | one or more declared task dependencies do not exist on the board |
+| `TEAM_MAILBOX_LIMIT_EXCEEDED` | yes | teammate mailbox queue has reached its maximum backlog limit (64 messages) |
+| `TEAM_MESSAGE_TOO_LARGE` | no | team message payload exceeds maximum permitted size (64 KiB) |
+| `TEAM_PAUSED` | yes | team coordination is currently paused; action cannot proceed until resumed |
+| `TEAM_PERMISSION_DENIED` | no | team operation or cross-member action is not permitted by member role or authority |
+| `TEAM_UNAUTHORIZED` | no | caller session is not the authenticated Team Lead or a member of the requested Team |
+| `TEAM_NOT_FOUND` | no | the session does not identify a live Team Lead |
+| `TEAM_TARGET_NOT_FOUND` | no | the requested Team recipient or task owner is not in the Team roster |
+| `TEAM_MEMBER_NAME_COLLISION` | no | the Team already has a member with the requested name |
+| `TEAM_TASK_REVISION_CONFLICT` | yes | the task changed since the caller's expected revision |
+| `TEAM_TASK_UNKNOWN_DEPENDENCY` | no | a declared task dependency does not exist on the board |
+| `TEAM_MAILBOX_FULL` | yes | the recipient has reached the queued Team message limit |
+| `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | no | the Team message exceeds the 64 KiB payload limit |
+| `TEAM_DELIVERY_PENDING` | yes | the Host has not yet persisted a durable recipient queue or turn receipt |
 
 ## 4. Mapping rules
 

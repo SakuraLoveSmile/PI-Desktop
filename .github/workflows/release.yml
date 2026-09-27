@@ -224,6 +224,8 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_NAME: ${{ secrets.MAC_SIGNING_IDENTITY }}
+          MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
           missing=()
@@ -237,8 +239,9 @@ jobs:
             echo "::error::Add them under Settings → Secrets and variables → Actions. See docs/spec/06-delivery/06-release-runbook.md."
             exit 1
           fi
-          if [[ "${APPLE_TEAM_ID}" != "DUV63RKYTW" ]]; then
-            echo "::error::APPLE_TEAM_ID must be DUV63RKYTW (XingYu Liu Developer ID team)."
+          [[ -n "${CSC_NAME:-}" ]] || missing+=(CSC_NAME)
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing required macOS signing secrets: ${missing[*]}"
             exit 1
           fi
 
@@ -250,11 +253,11 @@ jobs:
           # electron-builder rejects the "Developer ID Application:" prefix on
           # identity names and resolves the certificate itself, so CSC_NAME
           # carries the bare common name only.
-          CSC_NAME: "XingYu Liu (DUV63RKYTW)"
+          CSC_NAME: ${{ secrets.MAC_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # electron-builder prints one "signing PI-Desktop.app" line and then
+          # electron-builder prints one "signing Pi-Desktop-Plus.app" line and then
           # goes quiet: @electron/osx-sign walks Contents and codesigns every
           # Mach-O serially, builder-util silently retries a failing pass up to
           # three times, and @electron/notarize zips, uploads, and waits for
@@ -315,6 +318,9 @@ jobs:
 
       - name: Verify signed and notarized macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
+        env:
+          MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: scripts/verify-macos-release.sh apps/desktop/release
 
       - name: Verify Linux host-core glibc floor
@@ -330,16 +336,16 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          expected_dmg=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}.dmg)
-          expected_dmg_blockmap=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}.dmg.blockmap)
-          expected_zip=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}-mac.zip)
-          expected_zip_blockmap=(apps/desktop/release/PI-Desktop-*-${{ matrix.arch }}-mac.zip.blockmap)
+          expected_dmg=(apps/desktop/release/Pi-Desktop-Plus-*-${{ matrix.arch }}.dmg)
+          expected_dmg_blockmap=(apps/desktop/release/Pi-Desktop-Plus-*-${{ matrix.arch }}.dmg.blockmap)
+          expected_zip=(apps/desktop/release/Pi-Desktop-Plus-*-${{ matrix.arch }}-mac.zip)
+          expected_zip_blockmap=(apps/desktop/release/Pi-Desktop-Plus-*-${{ matrix.arch }}-mac.zip.blockmap)
           if [[ "${#expected_dmg[@]}" -ne 1 || "${#expected_dmg_blockmap[@]}" -ne 1 || "${#expected_zip[@]}" -ne 1 || "${#expected_zip_blockmap[@]}" -ne 1 ]]; then
             echo "::error::Expected exactly one ${{ matrix.arch }} DMG, DMG blockmap, ZIP, and ZIP blockmap."
             printf '%s\n' apps/desktop/release/* || true
             exit 1
           fi
-          for artifact in apps/desktop/release/PI-Desktop-*; do
+          for artifact in apps/desktop/release/Pi-Desktop-Plus-*; do
             case "$artifact" in
               *-${{ matrix.arch }}.dmg|*-${{ matrix.arch }}.dmg.blockmap|*-${{ matrix.arch }}-mac.zip|*-${{ matrix.arch }}-mac.zip.blockmap) ;;
               *)

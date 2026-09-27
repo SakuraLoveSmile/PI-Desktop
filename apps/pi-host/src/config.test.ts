@@ -1,5 +1,6 @@
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -25,6 +26,17 @@ describe("config", () => {
     expect(() => resolveConfig({ port: "70000", "host-core": "/bin/hc", sidecar: "/s.js" }, {})).toThrow(/invalid port/);
     expect(() => resolveConfig({ "host-core": "/bin/hc", sidecar: "/s.js", port: "abc" }, {})).toThrow(/invalid port/);
     expect(resolveConfig({ "host-core": "/bin/hc", sidecar: "/s.js", "log-level": "warn" }, {}).logLevel).toBe("warn");
+  });
+
+  it("uses the Plus data root by default and preserves explicit overrides", () => {
+    const defaults = resolveConfig({ "host-core": "/bin/hc", sidecar: "/s.js" }, {});
+    expect(defaults.dataDir).toBe(join(homedir(), ".pi-desktop-plus"));
+    expect(resolveConfig({ "host-core": "/bin/hc", sidecar: "/s.js" }, {
+      PI_DESKTOP_DATA_DIR: "/explicit/data",
+    }).dataDir).toBe("/explicit/data");
+    expect(resolveConfig({ "data-dir": "/flag/data", "host-core": "/bin/hc", sidecar: "/s.js" }, {
+      PI_DESKTOP_DATA_DIR: "/explicit/data",
+    }).dataDir).toBe("/flag/data");
   });
 });
 

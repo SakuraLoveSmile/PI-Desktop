@@ -40,6 +40,7 @@ export type HostRuntimeDependencies = {
   claimedExecutionSessions: Map<string, string>;
   importLegacyScheduled: () => Promise<unknown>;
   superviseRestart: (kind: "host" | "sidecar") => Promise<void>;
+  onTeamNotification?: (method: string, params: unknown) => Promise<void>;
   isQuitting: () => boolean;
 };
 
@@ -65,6 +66,7 @@ export function createHostRuntime({
   claimedExecutionSessions,
   importLegacyScheduled,
   superviseRestart,
+  onTeamNotification,
   isQuitting,
 }: HostRuntimeDependencies): {
   wireHost: (host: HostProcess) => void;
@@ -304,6 +306,8 @@ export function createHostRuntime({
       );
     } else if (method === "plans.changed") {
       sendToRenderer(IPC.event.plansChanged, params);
+    } else if (method === "goalReports.changed") {
+      sendToRenderer(IPC.event.goalReportChanged, params);
     } else if (method === "configSync.changed") {
       sendToRenderer(IPC.event.configSyncChanged, params);
     } else if (method === "configSync.progress") {
@@ -311,6 +315,16 @@ export function createHostRuntime({
       // reports are the only thing the page has to show while it runs. The
       // request's own answer is still the outcome.
       sendToRenderer(IPC.event.configSyncProgress, params);
+    } else if (
+      method === "team.messageQueued" ||
+      method === "team.queueChanged" ||
+      method === "team.interruptRequested"
+    ) {
+      void onTeamNotification?.(method, params).catch((error: unknown) => {
+        logger.app("runtime", "warn", "Team host notification handling failed", {
+          data: String(error),
+        });
+      });
     }
   });
   h.onExit(({ code, signal, intentional }) => {

@@ -30,6 +30,7 @@ import { NATIVE_PI_SESSION_PREFIX, nativePiService } from "./native-pi-session.j
 import {
   isCommandShellOption,
   normalizeMode,
+  normalizeExecutionProfile,
   normalizeNetworkProxy,
   OAUTH_AUTH_KIND,
   readNdjsonLines,
@@ -89,6 +90,13 @@ function testRuntimeIdentity(sessionId: string) {
 type RuntimeParams = {
   sessionId: string;
   mode?: Mode;
+  executionProfile?: import("@pi-desktop/shared").ExecutionProfile;
+  teamContext?: {
+    teamSessionId: string;
+    callerSessionId: string;
+    isLead: boolean;
+    memberName?: string;
+  };
   /** Durable host turn ID for the prompt currently being executed. */
   turnId?: string;
   thinkingLevel?: SessionThinkingLevel;
@@ -160,6 +168,13 @@ async function runtimeFor(
 ): Promise<DesktopAgentRuntime> {
   const sessionId = String(params.sessionId);
   const mode = normalizeMode(params.mode);
+  const executionProfile = normalizeExecutionProfile(params.executionProfile);
+  if (executionProfile === "team" && !params.teamContext) {
+    throw Object.assign(new Error("Team runtime context unavailable"), {
+      rpcCode: -32000,
+      errorCode: "TEAM_CONTEXT_UNAVAILABLE",
+    });
+  }
   if (!isCommandShellOption(params.commandShell) || !params.commandShell.available) {
     throw Object.assign(new Error("active command shell is invalid or unavailable"), {
       rpcCode: -32000,
@@ -208,6 +223,8 @@ async function runtimeFor(
   }
   const reusable = existing?.matches({
     mode,
+    executionProfile,
+    teamContext: params.teamContext,
     provider,
     thinkingLevel,
     pluginTools,
@@ -269,6 +286,8 @@ async function runtimeFor(
     host: hostProxy,
     sessionId,
     mode,
+    executionProfile,
+    teamContext: params.teamContext,
     turnId: params.turnId,
     provider,
     commandShell: params.commandShell,

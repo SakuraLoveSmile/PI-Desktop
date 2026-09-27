@@ -1,4 +1,4 @@
-# 04. Data Storage (Schema v17)
+# 04. Data Storage (Schema v21)
 
 ## 0. Ownership decision
 
@@ -440,12 +440,14 @@ CREATE TABLE sessions (
   project_id  INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   provider_id TEXT,                            -- loose ref, see below
   model_id    TEXT,
-  mode        TEXT NOT NULL DEFAULT 'agent',   -- plan | agent
+  mode        TEXT NOT NULL DEFAULT 'agent',   -- plan | goal | agent
   thinking_level TEXT NOT NULL DEFAULT 'off'
                 CHECK (thinking_level IN ('off', 'minimal', 'low', 'medium',
                                           'high', 'xhigh', 'max', 'omit')),
   permission_mode TEXT NOT NULL DEFAULT 'inherit' -- D115: inherit follows settings
                 CHECK (permission_mode IN ('inherit', 'ask', 'accept-edits', 'auto')),
+  execution_profile TEXT NOT NULL DEFAULT 'standard'
+                CHECK (execution_profile IN ('standard', 'team')),
   source      TEXT,                            -- import origin: claude-code | codex | opencode | pi
   deleted_at  INTEGER,                         -- plugin trash marker; null means active
   pinned      INTEGER NOT NULL DEFAULT 0,
@@ -535,6 +537,9 @@ CREATE INDEX idx_session_import_origins_plugin
   returns live planning to editable state. The renderer may retain the latest
   proposal/execution snapshot per session only for its current lifetime from
   live Host events; `plans.pending` rehydrates only pending rows.
+- `execution_profile` is orthogonal to `mode`: `standard` is the default and
+  preserves the single-agent tool catalog; `team` makes this session the Lead
+  of a Host-owned Expert Team. Existing rows migrate to `standard`.
 - New sessions default to `agent`. Imported legacy `chat` values are normalized
   to `plan`; forked sessions copy the durable mode but never copy pending,
   queued, or running approval rows.
@@ -582,6 +587,12 @@ execution descriptor. The file path is relative to the session workspace and
 always has the form `.pi/<kind>/<unique-name>.md`. One table serves both kinds
 (D198), so the single-pending-approval invariant, the execution queue, and every
 index are shared rather than duplicated.
+
+For an unbound temporary Goal session, `workspaceRoot` is its Host-owned
+`<data_dir>/scratch/<sessionId>` directory. The artifact keeps the same relative
+path/hash/size contract. Live sessions with a Goal checkpoint retain their
+scratch workspace across age sweeps; deleting the session still removes it.
+No database migration or automatic project binding is introduced.
 
 ```sql
 CREATE TABLE plan_approvals (
@@ -770,6 +781,29 @@ CREATE UNIQUE INDEX idx_session_collaboration_receipt
   Host validation prevents forged, stripped, edited, or regenerated
   collaboration input from becoming ordinary human input. This metadata is
   additive and does not require a column in `messages`.
+
+### 4.6d Goal reports and Expert Team state (schema v20-v21)
+
+Goal report identity and lifecycle are Host-owned in `goal_reports`, keyed by
+`execution_id` and scoped to a session. A report body is atomically published
+under `goal_reports/<sessionId>/<executionId>.json`; the row records its path,
+hash, byte size, and durable transcript sequence. Status is `draft`, `pending`,
+`ready`, or `failed`; integrity is `structured` or `fallback`, and the verdict
+is `met`, `partial`, `blocked`, or `unknown`. Session deletion cascades the row
+and removes the corresponding report files. Report content is not inferred
+from transcript text.
+
+Expert Team state is stored in three Host-owned tables (ADR 0307):
+
+- `teams` is keyed by the Lead session and stores revision and pause state.
+- `team_members` binds durable member sessions to the Lead, with a unique name
+  per Team, fresh/fork context, lifecycle phase, model binding, and error.
+- `team_tasks` stores the revisioned shared task board, owner, dependencies,
+  advisory write scopes, status, and soft-delete marker.
+
+Deleting a member session while it belongs to a Team is rejected. Deleting the
+Lead atomically resets member sessions to `standard` and removes Team state;
+member sessions and their transcripts remain ordinary independent sessions.
 
 ### 4.7 messages — transcript index
 
@@ -1304,7 +1338,7 @@ truncating at a guessed position.
 - JSON columns are read blind on hot paths (shipped to the renderer as-is);
   anything filtered or summed is a promoted column by rule.
 
-## 7. Versioning, v7 reset, and v8-to-v15 migration
+## 7. Versioning, v7 reset, and v8-to-v21 migration
 
 - `PRAGMA user_version` stays the schema authority; future structural changes
   add ordered Rust migration fns again, each in one transaction, with a
@@ -1315,7 +1349,7 @@ truncating at a guessed position.
   Sessions, providers, and settings from the old file are not carried over;
   the archive remains for manual recovery. All pre-v7 migration code
   (v1 `settings.sqlite` import, v2→v6 chain) is deleted.
-- Fresh installs run the full v15 DDL directly.
+- Fresh installs run the full v21 DDL directly.
 - **Schema v7 first reaches v8, then uses the guarded path.** The v7→v8
   migration is followed by the same guarded v8→v15 migration; schema-v9 and
   schema-v10 databases take the same guarded path and receive an exact readable
@@ -1374,6 +1408,16 @@ truncating at a guessed position.
   active and have no origin rows. The migration runs in the same guarded
   transaction and leaves the pre-v14 backup until the new schema passes its
   integrity checks.
+- **Schema v18 to v19 is additive.** It adds the `omit` thinking level while
+  preserving stored session settings (ADR 0295).
+- **Schema v19 to v20 is additive.** It adds
+  `plan_approvals.artifact_workspace_kind` and `goal_reports` (Goal completion
+  reports); a `pi.sqlite.v19.bak` copy precedes the transaction.
+- **Schema v20 to v21 is additive.** It adds `sessions.execution_profile` and
+  the `teams`, `team_members`, and `team_tasks` tables (ADR 0307). The step
+  also idempotently completes Goal v20 objects so either unreleased v20 branch
+  upgrades without discarding data. A `pi.sqlite.v20.bak` copy precedes the
+  transaction.
 
 The `largePasteThreshold` app setting is additive JSON rather than a database
 schema field. Host settings reads normalize a missing, malformed, or

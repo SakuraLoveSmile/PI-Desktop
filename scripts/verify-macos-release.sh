@@ -5,12 +5,17 @@
 set -euo pipefail
 
 RELEASE_DIR="${1:-apps/desktop/release}"
-PRODUCT_NAME="PI-Desktop"
-# Accepts either the bare common name ("XingYu Liu (DUV63RKYTW)") or the full
-# certificate label ("Developer ID Application: XingYu Liu (DUV63RKYTW)").
-IDENTITY_NAME="${MAC_SIGNING_IDENTITY:-XingYu Liu (DUV63RKYTW)}"
+PRODUCT_NAME="Pi-Desktop-Plus"
+# Accepts either the bare common name or the full certificate label.
+IDENTITY_NAME="${MAC_SIGNING_IDENTITY:-}"
 IDENTITY_NAME="${IDENTITY_NAME#Developer ID Application: }"
 EXPECTED_IDENTITY="Developer ID Application: ${IDENTITY_NAME}"
+EXPECTED_TEAM_ID="${APPLE_TEAM_ID:-}"
+
+if [[ -z "$IDENTITY_NAME" || -z "$EXPECTED_TEAM_ID" ]]; then
+  echo "error: MAC_SIGNING_IDENTITY and APPLE_TEAM_ID are required." >&2
+  exit 1
+fi
 
 if [[ ! -d "$RELEASE_DIR" ]]; then
   echo "error: release directory does not exist: $RELEASE_DIR" >&2
@@ -40,6 +45,10 @@ SIGNATURE_INFO="$(codesign -dv --verbose=4 "$APP" 2>&1)"
 printf '%s\n' "$SIGNATURE_INFO"
 if [[ "$SIGNATURE_INFO" != *"Authority=${EXPECTED_IDENTITY}"* ]]; then
   echo "error: $APP is not signed with $EXPECTED_IDENTITY." >&2
+  exit 1
+fi
+if [[ "$SIGNATURE_INFO" != *"TeamIdentifier=${EXPECTED_TEAM_ID}"* ]]; then
+  echo "error: $APP is not signed for Apple team $EXPECTED_TEAM_ID." >&2
   exit 1
 fi
 if [[ "$SIGNATURE_INFO" != *"flags=0x10000(runtime)"* && "$SIGNATURE_INFO" != *"flags=runtime"* && "$SIGNATURE_INFO" != *"runtime"* ]]; then

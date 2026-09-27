@@ -41,7 +41,7 @@ export type EventsSliceDependencies = StoreAccess & {
     proposal: NonNullable<AppState["pendingPlans"][string]>,
     openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
     pluginViews: AppState["pluginViews"],
-  ) => void;
+  ) => Promise<void>;
   notifyInteractivePrompt: (
     sessionId: string,
     kind: "ask" | "permission" | "plan",
@@ -134,7 +134,7 @@ export function createEventsSlice({
       });
       const checkpoint = get().planCheckpoints[event.sessionId];
       if (event.state === "awaiting_approval" && isPendingPlan(checkpoint)) {
-        openPlanArtifact(
+        void openPlanArtifact(
           checkpoint,
           get().openWorkPanelTabForSession,
           get().pluginViews,
@@ -332,7 +332,7 @@ export function createEventsSlice({
         if (event.state === "awaiting_approval") {
           const checkpoint = get().planCheckpoints[envelope.sessionId];
           if (isPendingPlan(checkpoint)) {
-            openPlanArtifact(
+            void openPlanArtifact(
               checkpoint,
               get().openWorkPanelTabForSession,
               get().pluginViews,

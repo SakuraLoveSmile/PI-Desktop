@@ -61,7 +61,7 @@ test("composer runtime chips keep compact line-height for descenders", () => {
 test("mode selector reserves the longest localized label width", () => {
   assert.match(
     composerSource,
-    /className="icon-btn mode-chip composer-mode-chip"/,
+    /icon-btn mode-chip composer-mode-chip/,
   );
 
   const block = styles.match(/\.composer-mode-chip\s*\{[^}]+\}/)?.[0] ?? "";

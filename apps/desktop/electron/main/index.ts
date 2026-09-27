@@ -52,9 +52,7 @@ import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
 import { Logger, ignoreBrokenStdio } from "./logger";
 import { installMainProcessErrorHandlers } from "./main-process-errors";
-import {
-  isDbSchemaTooNewError,
-} from "./host-boot-diagnostics";
+import { isDbSchemaTooNewError } from "./host-boot-diagnostics";
 import {
   ModelsDevCatalog,
   modelConfigFromModelsDev,
@@ -96,7 +94,7 @@ import { readWindowState, writeWindowState } from "./window-preferences";
 import { applyDevelopmentUserData, desktopDataDir } from "./data-paths";
 import { createPlanUiProbe } from "./plan-ui-probe";
 import type { McpControlController, McpControlServer } from "./mcp-control";
-import type { AgentHostBridge } from "./agent-host-bridge";
+import { DESKTOP_PRINCIPAL, type AgentHostBridge } from "./agent-host-bridge";
 import { registerAppIpc } from "./ipc/app-ipc";
 import { registerNotificationIpc } from "./ipc/notification-ipc";
 import { registerSessionIpc } from "./ipc/session-ipc";
@@ -106,17 +104,13 @@ import {
   createComposerTemplateLoader,
   registerWorkspaceIpc,
 } from "./ipc/workspace-ipc";
-import {
-  registerComposerIpc,
-} from "./ipc/composer-ipc";
+import { registerComposerIpc } from "./ipc/composer-ipc";
 import { registerWindowIpc } from "./ipc/window-ipc";
 import { registerPullsIpc } from "./ipc/pulls-ipc";
 import { registerAgentIpc } from "./ipc/agent-ipc";
 import { registerIpcHandlers } from "./ipc/register";
 import { createVoiceService } from "./voice-service";
-import {
-  type WindowLifecycleState,
-} from "./bootstrap/window";
+import { type WindowLifecycleState } from "./bootstrap/window";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
 import type { RuntimeState } from "./runtime/context";
 import { createHostRuntime } from "./runtime/host";
@@ -124,16 +118,14 @@ import { createSidecarRuntime } from "./runtime/sidecar";
 import { createEventPersistence } from "./runtime/event-persistence";
 import { createPlanRuntime, type PlanRuntimeState } from "./runtime/plans";
 import { createRuntimeLifecycle } from "./runtime/lifecycle";
-import {
-  createProviderCatalogRuntime,
-} from "./runtime/provider-catalog";
+import { createProviderCatalogRuntime } from "./runtime/provider-catalog";
 import { createSessionLaunchRuntime } from "./runtime/session-launch";
 import { createSessionCoordination } from "./runtime/session-coordination";
 import { createScheduledRuntime } from "./runtime/scheduled";
 import { createDesktopServices } from "./services/desktop-services";
 import { createPluginServices } from "./services/plugin-services";
 import { wirePluginThemeRuntimeServices } from "./plugin-theme-services";
-import { createSessionCollaborationService } from "./services/session-collaboration";
+import { createCollaborationRuntime } from "./services/collaboration-runtime";
 import {
   createApplicationLifecycle,
   type ApplicationAppearanceState,
@@ -143,13 +135,13 @@ import {
   registerApplicationStartup,
   type StartupState,
 } from "./bootstrap/startup";
-import {
-  createLauncher,
-  type LauncherState,
-} from "./bootstrap/launcher";
+import { createLauncher, type LauncherState } from "./bootstrap/launcher";
 import { createWorkPanelRuntime } from "./bootstrap/work-panel";
 import { createCloseBehaviorRuntime } from "./bootstrap/close-behavior";
-import { registerShutdownHandlers, type ShutdownState } from "./bootstrap/shutdown";
+import {
+  registerShutdownHandlers,
+  type ShutdownState,
+} from "./bootstrap/shutdown";
 import { registerDiagnosticsIpc } from "./ipc/diagnostics-ipc";
 import { registerMarketIpc } from "./ipc/market-ipc";
 import { registerMcpIpc } from "./ipc/mcp-ipc";
@@ -521,12 +513,19 @@ process.env.PI_DESKTOP_DATA_DIR = dataDir;
 // prompts between the two.
 const agentExtensions = new AgentExtensionBridge({
   hasRenderer: () =>
-    !!mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed(),
-  onChanged: () => sendToRenderer(IPC.event.pluginChanged, { reason: "agentExtensions" }),
+    !!mainWindow &&
+    !mainWindow.isDestroyed() &&
+    !mainWindow.webContents.isDestroyed(),
+  onChanged: () =>
+    sendToRenderer(IPC.event.pluginChanged, { reason: "agentExtensions" }),
   onPrompt: (prompt) => {
     logger.app("plugin", "info", "extension prompt", {
       sessionId: prompt.sessionId,
-      data: { promptId: prompt.promptId, kind: prompt.request.kind, extensionId: prompt.extensionId },
+      data: {
+        promptId: prompt.promptId,
+        kind: prompt.request.kind,
+        extensionId: prompt.extensionId,
+      },
     });
     sendToRenderer(IPC.event.extensionsUiPrompt, prompt);
   },
@@ -534,11 +533,9 @@ const agentExtensions = new AgentExtensionBridge({
   onStatus: (event) => sendToRenderer(IPC.event.extensionsStatus, event),
 });
 
-const logger = new Logger(
-  dataDir,
-  isDevelopmentBuild ? "debug" : "info",
-  { mirrorConsole: isDevelopmentBuild },
-);
+const logger = new Logger(dataDir, isDevelopmentBuild ? "debug" : "info", {
+  mirrorConsole: isDevelopmentBuild,
+});
 installMainProcessErrorHandlers({
   emit: (record) => {
     logger.app("runtime", "error", record.message, {
@@ -548,9 +545,12 @@ installMainProcessErrorHandlers({
   },
 });
 
-const persistenceOutbox = new PersistenceOutbox(dataDir, (level, message, data) => {
-  logger.app("persistence", level, message, { data });
-});
+const persistenceOutbox = new PersistenceOutbox(
+  dataDir,
+  (level, message, data) => {
+    logger.app("persistence", level, message, { data });
+  },
+);
 const steeringReplies = new Set<string>();
 const scheduledRuntime = createScheduledRuntime({
   dataDir,
@@ -607,7 +607,7 @@ const modelsDevCatalog = new ModelsDevCatalog({
 });
 
 const vendorOAuth = new VendorOAuth({
-  call: <T,>(method: string, params?: unknown): Promise<T> => {
+  call: <T>(method: string, params?: unknown): Promise<T> => {
     if (!host) throw new Error("host unavailable");
     return host.call<T>(method, params);
   },
@@ -615,7 +615,8 @@ const vendorOAuth = new VendorOAuth({
   openExternal: async (url) => {
     await safeOpenExternal(url);
   },
-  log: (level, message, data) => logger.app("provider", level, message, { data }),
+  log: (level, message, data) =>
+    logger.app("provider", level, message, { data }),
   modelConfigFor: async ({ vendorKey, option }) => {
     await modelsDevCatalog.ensureLoaded();
     const model = modelsDevCatalog.findModel({
@@ -629,7 +630,8 @@ const vendorOAuth = new VendorOAuth({
   },
 });
 
-let sessionLaunchRuntime: ReturnType<typeof createSessionLaunchRuntime> | null = null;
+let sessionLaunchRuntime: ReturnType<typeof createSessionLaunchRuntime> | null =
+  null;
 const pluginServices = createPluginServices({
   dataDir,
   logger,
@@ -770,7 +772,8 @@ function broadcastPluginPanelEvent(event: string, payload: unknown): void {
 
 function setCurrentWorkspacePath(path: string | null): void {
   const previous = currentWorkspacePath();
-  (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath = path;
+  (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath =
+    path;
   if (previous === path) return;
   const payload = pluginWorkspaceInfo(path);
   broadcastPluginPanelEvent("workspace:changed", payload);
@@ -805,11 +808,7 @@ function sendToRenderer(channel: string, payload: unknown) {
   }
   if (!IPC_WHITELIST.has(channel)) return;
   const window = mainWindow;
-  if (
-    !window ||
-    window.isDestroyed() ||
-    window.webContents.isDestroyed()
-  ) {
+  if (!window || window.isDestroyed() || window.webContents.isDestroyed()) {
     return;
   }
   try {
@@ -821,7 +820,6 @@ function sendToRenderer(channel: string, payload: unknown) {
     // it. Notifying a gone frame is routine teardown, never an error:
     // supervision must keep running with no window attached.
   }
-
 }
 
 installInsecureEndpointNotice(sendToRenderer);
@@ -957,11 +955,8 @@ closeBehaviorRuntime = createCloseBehaviorRuntime({
   getLocale: () => updaterLocale,
   createTray,
 });
-const {
-  applyCloseBehavior,
-  askCloseBehavior,
-  confirmQuitDialog,
-} = closeBehaviorRuntime;
+const { applyCloseBehavior, askCloseBehavior, confirmQuitDialog } =
+  closeBehaviorRuntime;
 
 const createdLauncher = createLauncher({
   state: windowLifecycleState,
@@ -1051,9 +1046,9 @@ const {
   isStaleTerminalEvent,
 } = sessionCoordination;
 
-async function withGitBranch<T extends { path?: string; name?: string } | null | undefined>(
-  workspace: T,
-): Promise<T> {
+async function withGitBranch<
+  T extends { path?: string; name?: string } | null | undefined,
+>(workspace: T): Promise<T> {
   if (!workspace || !workspace.path) return workspace;
   try {
     const { readFile } = await import("node:fs/promises");
@@ -1090,20 +1085,20 @@ const planUiProbe = createPlanUiProbe({
 
 let emitAgentEvent: (envelope: AgentEventEnvelope) => void = () => undefined;
 
-const sessionCollaboration = createSessionCollaborationService({
+const collaborationRuntime = createCollaborationRuntime({
+  activeTurns,
+  principal: DESKTOP_PRINCIPAL,
   getHost: () => host,
   getSidecar: () => sidecar,
   getBridge: () => agentHostBridge,
-  getActiveTurn: (sessionId) => activeTurns.get(sessionId),
-  flushTranscript: async () => {
-    await persistenceOutbox.flush(() => host);
-    return persistenceOutbox.size() === 0;
-  },
-  isPluginLoaded: (pluginId) => plugins.listLoaded().some((plugin) => plugin.manifest.id === pluginId),
+  isPluginLoaded: (pluginId) =>
+    plugins.listLoaded().some((plugin) => plugin.manifest.id === pluginId),
   isQuitting: () => quitting,
-  onChanged: () => sendToRenderer(IPC.event.sessionsChanged, { reason: "session.collaboration" }),
-  log: (message, data) => logger.app("runtime", "warn", message, { data }),
+  logger,
+  persistenceOutbox,
+  sendToRenderer,
 });
+const { sessionCollaboration, teamDelivery } = collaborationRuntime;
 
 const planRuntime = createPlanRuntime({
   runtimeState,
@@ -1128,6 +1123,7 @@ const planRuntime = createPlanRuntime({
   resolveAgentRuntimeLaunch,
   isQuitting: () => quitting,
   onTurnSettled: sessionCollaboration.settle,
+  persistenceOutbox,
 });
 const {
   finishTurn,
@@ -1214,6 +1210,7 @@ const { wireHost, startHost } = createHostRuntime({
   importLegacyScheduled,
   superviseRestart,
   isQuitting: () => quitting,
+  onTeamNotification: collaborationRuntime.onTeamNotification,
 });
 
 runtimeLifecycle = createRuntimeLifecycle({
@@ -1229,12 +1226,16 @@ runtimeLifecycle = createRuntimeLifecycle({
   setCurrentWorkspacePath,
   rememberPluginScopes,
   refreshUserMcp,
+  onBackendsReady: collaborationRuntime.onBackendsReady,
   isQuitting: () => quitting,
   getDisplayLocale: () => applicationAppearanceState.updaterLocale,
 });
 const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
 
-const voiceService = createVoiceService(dataDir + "/voice-models", () => mainWindow);
+const voiceService = createVoiceService(
+  dataDir + "/voice-models",
+  () => mainWindow,
+);
 
 function registerIpc() {
   return registerIpcHandlers({
@@ -1330,6 +1331,7 @@ function registerIpc() {
     isDeveloperMode: () => developerMode,
     sendToRenderer,
     voiceService,
+    teamDelivery,
   });
 }
 
@@ -1409,11 +1411,8 @@ registerApplicationStartup({
   bootHostStatus,
   flushPendingApplicationMenuCommands,
   invokeSessionCollaboration: sessionCollaboration.invoke,
-  onSessionQueueChange: () => {
-    void sessionCollaboration.drain().catch((error: unknown) => {
-      logger.app("runtime", "warn", "session callback drain failed", { data: String(error) });
-    });
-  },
+  onSessionQueueChange: collaborationRuntime.onSessionQueueChange,
+  onAgentHostReady: collaborationRuntime.onAgentHostReady,
 });
 
 const shutdownState: ShutdownState = {

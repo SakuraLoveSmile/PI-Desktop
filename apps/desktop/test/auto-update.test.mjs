@@ -133,7 +133,7 @@ test("updater gates delivery mode by platform and delivery policy", () => {
   assert.match(updaterSource, /autoUpdater\.on\("error"/);
   assert.match(
     updaterSource,
-    /github\.com\/vastsa\/PI-Desktop\/releases/,
+    /github\.com\/SakuraLoveSmile\/PI-Desktop\/releases/,
     "releases fallback URL",
   );
   assert.match(
@@ -231,7 +231,7 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
   const pkg = JSON.parse(pkgSource);
   assert.ok(pkg.dependencies["electron-updater"], "electron-updater dependency");
   assert.equal(pkg.build.publish[0].provider, "github");
-  assert.equal(pkg.build.publish[0].owner, "vastsa");
+  assert.equal(pkg.build.publish[0].owner, "SakuraLoveSmile");
   assert.equal(pkg.build.publish[0].repo, "PI-Desktop");
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
   assert.ok(macTargets.includes("zip"), "mac zip target (Squirrel.Mac feed)");
@@ -245,7 +245,7 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
     );
   }
   assert.match(pkg.scripts.dist, /build-desktop-release\.mjs/);
-  assert.equal(pkg.build.linux.executableName, "pi-desktop");
+  assert.equal(pkg.build.linux.executableName, "pi-desktop-plus");
   const linuxTargets = pkg.build.linux.target.map((entry) => entry.target);
   assert.deepEqual(
     linuxTargets,
@@ -253,12 +253,12 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
     "Linux release targets",
   );
   // Scoped package name is not a valid deb/rpm package or file name.
-  assert.equal(pkg.build.deb.packageName, "pi-desktop");
-  assert.equal(pkg.build.rpm.packageName, "pi-desktop");
+  assert.equal(pkg.build.deb.packageName, "pi-desktop-plus");
+  assert.equal(pkg.build.rpm.packageName, "pi-desktop-plus");
   assert.ok(!pkg.build.deb.artifactName.includes("${name}"), "deb artifactName");
   assert.equal(
     pkg.build.rpm.artifactName,
-    "pi-desktop-${version}-${arch}.${ext}",
+    "pi-desktop-plus-${version}-${arch}.${ext}",
     "rpm artifactName",
   );
   assert.deepEqual(
@@ -267,15 +267,16 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
     "rpm build-id configuration",
   );
   // GitHub asset URLs mangle spaces; keep Windows artifact names space-free.
-  assert.equal(pkg.build.nsis.artifactName, "PI-Desktop-Setup-${version}.${ext}");
+  assert.equal(pkg.build.nsis.artifactName, "Pi-Desktop-Plus-Setup-${version}.${ext}");
   const winTargets = pkg.build.win.target.map((entry) => entry.target);
   assert.deepEqual(winTargets, ["nsis", "zip"], "Windows release targets");
   assert.equal(pkg.build.portable, undefined, "legacy self-extracting target removed");
   assert.equal(
     pkg.build.win.artifactName,
-    "PI-Desktop-Portable-${version}.${ext}",
+    "Pi-Desktop-Plus-Portable-${version}.${ext}",
   );
   assert.equal(pkg.build.extraMetadata.piDistribution, "installed");
+  assert.equal(pkg.build.extraMetadata.name, "pi-desktop-plus");
   assert.match(pkg.scripts["dist:win"], /build-desktop-release\.mjs win/);
   assert.match(buildReleaseSource, /"--win",\s*"nsis"/);
   assert.match(buildReleaseSource, /"--win",\s*"zip"/);

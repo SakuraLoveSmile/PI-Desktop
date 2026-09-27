@@ -47,7 +47,7 @@ for (const preloadPath of [
 const dataDir = createTempDataDir("pi-desktop-boot-");
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-const child = spawn(electronBin, ["."], {
+const child = spawn(electronBin, [".", `--user-data-dir=${join(dataDir, "electron-profile")}`], {
   cwd: appDir,
   env: {
     ...env,
@@ -122,7 +122,7 @@ child.on("close", (code) => {
   if (
     code === 0 &&
     probe?.ok &&
-    probe.appName === "PI-Desktop" &&
+    probe.appName === "Pi-Desktop-Plus" &&
     probe.platform === process.platform &&
     (process.platform === "darwin" || probe.maximized === true) &&
     menuContractOk &&

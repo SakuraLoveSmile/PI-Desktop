@@ -6,6 +6,8 @@ import {
   imageGenerationBindings,
   isImageGenerationModel,
   normalizeMode,
+  normalizeExecutionProfile,
+  type ExecutionProfile,
   resolveBindingContextWindow,
   trustedExtensionAgentKeyFromProviderId,
   type CommandShellCatalog,
@@ -49,6 +51,7 @@ const ErrorCodes = {
   SHELL_NOT_FOUND: "SHELL_NOT_FOUND",
   PLAN_EXECUTION_INTERRUPTED: "PLAN_EXECUTION_INTERRUPTED",
   PLAN_PERMISSION_MODE_REQUIRED: "PLAN_PERMISSION_MODE_REQUIRED",
+  TEAM_CONTEXT_UNAVAILABLE: "TEAM_CONTEXT_UNAVAILABLE",
 } as const;
 
 export type SessionLaunchRuntimeDependencies = {
@@ -267,6 +270,7 @@ export function createSessionLaunchRuntime({
       providerId?: string;
       modelId?: string;
       thinkingLevel?: SessionThinkingLevel;
+      executionProfile?: ExecutionProfile;
     } = {},
   ) {
     if (!runtimeState.host) throw new Error("host unavailable");
@@ -598,6 +602,23 @@ export function createSessionLaunchRuntime({
     // the session's own provider plus any row a pinned subagent resolved to. The
     // sidecar may then ask main for request auth, but only for a row named here,
     // and the set is rewritten on every launch.
+    const executionProfile = normalizeExecutionProfile(
+      overrides.executionProfile ?? session.executionProfile ?? "standard",
+    );
+    const teamContext = executionProfile === "team"
+      ? await runtimeState.host!.call<{
+          teamSessionId: string;
+          callerSessionId: string;
+          isLead: boolean;
+          memberName?: string;
+        } | null>("team.getRuntimeContext", { sessionId })
+      : undefined;
+    if (executionProfile === "team" && !teamContext) {
+      throw Object.assign(new Error("Team runtime context unavailable"), {
+        errorCode: ErrorCodes.TEAM_CONTEXT_UNAVAILABLE,
+      });
+    }
+
     runtimeState.sidecar?.setVendorAuthBindings(
       sessionId,
       [
@@ -620,6 +641,8 @@ export function createSessionLaunchRuntime({
         mode: normalizeMode(
           overrides.mode ?? session.mode ?? settings.defaultMode ?? "agent",
         ),
+        executionProfile,
+        ...(teamContext ? { teamContext } : {}),
         ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
         thinkingLevel,
         infiniteProviderRetry: settings.infiniteProviderRetry === true,

@@ -80,6 +80,9 @@ const HANDLED_CHANNELS: ReadonlySet<string> = new Set([
   IPC.invoke.askToolResolve,
   IPC.invoke.plansResolve,
   IPC.invoke.plansPending,
+  IPC.invoke.goalReportGet,
+  IPC.invoke.goalReportList,
+  IPC.invoke.goalReportRetry,
 ]);
 
 export function createRemoteBackend(options: RemoteBackendOptions): RemoteBackend {
@@ -307,6 +310,30 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
           context: context(),
         });
         return { ok: true };
+      }
+      case IPC.invoke.goalReportGet: {
+        const req = args[0] as { sessionId: string; reportId?: string; executionId?: string };
+        const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
+        return client.request("goalReports.get", {
+          sessionId: hostSessionId,
+          ...(req.reportId ? { reportId: req.reportId } : {}),
+          ...(req.executionId ? { executionId: req.executionId } : {}),
+        });
+      }
+      case IPC.invoke.goalReportList: {
+        const req = args[0] as { sessionId: string };
+        const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
+        return client.request("goalReports.list", {
+          sessionId: hostSessionId,
+        });
+      }
+      case IPC.invoke.goalReportRetry: {
+        const req = args[0] as { sessionId: string; executionId: string };
+        const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
+        return client.request("goalReports.retry", {
+          sessionId: hostSessionId,
+          executionId: req.executionId,
+        });
       }
       case IPC.invoke.plansResolve: {
         const resolution = args[0] as PlanResolveRequest;

@@ -1,5 +1,6 @@
 import { readMainSource, readMainModule } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   mkdir,
   mkdtemp,
@@ -52,8 +53,8 @@ test("Windows runtime registers the canonical native application identity", () =
 });
 
 test("Windows packages pin PI-Desktop executable and shortcut names", () => {
-  assert.equal(packageJson.build.win.executableName, "PI-Desktop");
-  assert.equal(packageJson.build.nsis.shortcutName, "PI-Desktop");
+  assert.equal(packageJson.build.win.executableName, "Pi-Desktop-Plus");
+  assert.equal(packageJson.build.nsis.shortcutName, "Pi-Desktop-Plus");
 });
 
 test("Windows packages and windows use the canonical PI-Desktop icon", () => {
@@ -76,7 +77,7 @@ test("Windows packages and windows use the canonical PI-Desktop icon", () => {
 });
 
 test("Linux packages align the desktop entry with the Wayland app identity", () => {
-  assert.equal(packageJson.desktopName, "pi-desktop.desktop");
+  assert.equal(packageJson.desktopName, "pi-desktop-plus.desktop");
   assert.equal(packageJson.build.linux.syncDesktopName, true);
 });
 
@@ -136,6 +137,12 @@ test(
   },
 );
 
+test("macOS development cache identity cannot reuse the old v3 bundle", () => {
+  assert.match(devScriptSource, /const BRANDING_SCHEMA = "v4"/);
+  assert.match(devScriptSource, /\$\{APP_NAME\}-\$\{DEV_BUNDLE_ID\}-\$\{BRANDING_SCHEMA\}/);
+  assert.match(devScriptSource, /const DEV_BUNDLE_ID = "cn\.sakura\.pi-desktop\.dev"/);
+});
+
 test(
   "macOS development bundle rewrites native identity and reuses its cache",
   { skip: process.platform !== "darwin" },
@@ -167,6 +174,26 @@ test(
 </dict></plist>`,
       );
 
+      // A populated cache from the old branding schema must remain untouched
+      // and must not satisfy the new Plus cache lookup.
+      const iconHash = createHash("sha256")
+        .update(await readFile(iconPath))
+        .digest("hex")
+        .slice(0, 12);
+      const oldCacheRoot = join(cacheRoot, `test-version-${iconHash}-v3`);
+      const oldExecutable = join(
+        oldCacheRoot,
+        "PI-Desktop.app",
+        "Contents",
+        "MacOS",
+        "PI-Desktop",
+      );
+      await mkdir(join(oldCacheRoot, "PI-Desktop.app", "Contents", "MacOS"), {
+        recursive: true,
+      });
+      await writeFile(oldExecutable, "old-cache-sentinel");
+      await writeFile(join(oldCacheRoot, "ready.json"), '{"electronVersion":"test-version"}\n');
+
       const { prepareMacDevelopmentBundle } = await import(devScriptUrl.href);
       const options = {
         electronExecutable: executable,
@@ -188,8 +215,9 @@ test(
         await readFile(join(brandedContents, "Resources", "icon.icns"), "utf8"),
         "canonical-icon",
       );
-      assert.match(plist, /<string>PI-Desktop<\/string>/);
-      assert.match(plist, /<string>net\.aiuo\.pi-desktop\.dev<\/string>/);
+      assert.match(plist, /<string>Pi-Desktop-Plus<\/string>/);
+      assert.match(plist, /<string>cn\.sakura\.pi-desktop\.dev<\/string>/);
+      assert.equal(await readFile(oldExecutable, "utf8"), "old-cache-sentinel");
       assert.equal(prepareMacDevelopmentBundle(options), brandedExecutable);
     } finally {
       await rm(root, { recursive: true, force: true });

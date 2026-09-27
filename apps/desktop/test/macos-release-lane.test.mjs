@@ -26,7 +26,7 @@ const LANE_SCRIPTS = [
   "macos-codesign-shim.sh",
   "macos-bundle-inventory.mjs",
 ];
-const SIGNING_IDENTITY = "Developer ID Application: XingYu Liu (DUV63RKYTW)";
+const SIGNING_IDENTITY = "Developer ID Application: Release Signer (TEAMPLUS1234)";
 const SUBMISSION_ID = "11111111-2222-3333-4444-555555555555";
 
 async function writeStubs(bin, log, repoRoot) {
@@ -42,11 +42,11 @@ exit 0
 printf 'pnpm %s\\n' "$*" >> "${log}"
 case "$*" in
   *electron-builder*)
-    app="${repoRoot}/apps/desktop/release/mac-arm64/PI-Desktop.app"
+    app="${repoRoot}/apps/desktop/release/mac-arm64/Pi-Desktop-Plus.app"
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/bin"
-    : > "$app/Contents/MacOS/PI-Desktop"
+    : > "$app/Contents/MacOS/Pi-Desktop-Plus"
     : > "$app/Contents/Resources/bin/pi-desktop-host-core"
-    : > "${repoRoot}/apps/desktop/release/PI-Desktop-0.0.0-arm64.dmg"
+    : > "${repoRoot}/apps/desktop/release/Pi-Desktop-Plus-0.0.0-arm64.dmg"
     ;;
 esac
 exit 0
@@ -55,6 +55,7 @@ exit 0
 printf 'codesign %s\\n' "$*" >> "${log}"
 if [[ "$*" == *"-dv"* ]]; then
   echo "Authority=${SIGNING_IDENTITY}" >&2
+  echo "TeamIdentifier=TEAMPLUS1234" >&2
   echo "flags=0x10000(runtime)" >&2
 fi
 exit 0
@@ -106,7 +107,8 @@ test(
         PATH: `${bin}:${process.env.PATH}`,
         APPLE_ID: "release@example.com",
         APPLE_APP_SPECIFIC_PASSWORD: "app-specific-password",
-        APPLE_TEAM_ID: "DUV63RKYTW",
+        APPLE_TEAM_ID: "TEAMPLUS1234",
+        MAC_SIGNING_IDENTITY: "Release Signer (TEAMPLUS1234)",
         STAPLE_DELAY_SECONDS: "1",
       },
     });
@@ -118,7 +120,7 @@ test(
     assert.ok(builderCall, "the lane invokes electron-builder");
     assert.match(builderCall, /--mac --(?:arm64|x64)/);
     assert.match(builderCall, /--publish never/);
-    assert.match(builderCall, /-c\.mac\.identity=XingYu Liu \(DUV63RKYTW\)/);
+    assert.match(builderCall, /-c\.mac\.identity=Release Signer \(TEAMPLUS1234\)/);
     assert.match(builderCall, /-c\.mac\.forceCodeSigning=true/);
     assert.match(builderCall, /-c\.mac\.notarize=true/);
     assert.doesNotMatch(

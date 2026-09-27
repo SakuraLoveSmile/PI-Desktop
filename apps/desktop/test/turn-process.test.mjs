@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { register } from "node:module";
 import test from "node:test";
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
@@ -190,5 +191,103 @@ test("settings writes validate the mode without changing other preferences", asy
   assert.throws(
     () => validateSettingsWrite({ ...settings, thinkingDisplayMode: "unknown" }),
     /thinkingDisplayMode is invalid/,
+  );
+});
+
+test("tool-first turn projects trailing answer into responses and tools into process", () => {
+  const entry = turn([
+    message("tool1", "tool", "content1", { toolName: "Read" }),
+    message("tool2", "tool", "content2", { toolName: "Bash" }),
+    message("answer", "assistant", "Final summary"),
+  ]);
+  const projected = projectTurnProcess(entry);
+  assert.deepEqual(
+    projected.responses.map((part) => part.message.id),
+    ["answer"],
+  );
+  assert.equal(projected.process.length, 1);
+  assert.equal(projected.process[0].kind, "activity");
+  assert.equal(projected.process[0].items.length, 2);
+});
+
+test("interleaved progress text and tools keep only the final message as response", () => {
+  const entry = turn([
+    message("intro", "assistant", "Looking up files..."),
+    message("tool1", "tool", "file list", { toolName: "Glob" }),
+    message("progress", "assistant", "Reading selected file..."),
+    message("tool2", "tool", "file content", { toolName: "Read" }),
+    message("answer", "assistant", "Here is what I found"),
+  ]);
+  const projected = projectTurnProcess(entry);
+  assert.deepEqual(
+    projected.responses.map((part) => part.message.id),
+    ["answer"],
+  );
+  const processMessageIds = projected.process
+    .filter((part) => part.kind === "message")
+    .map((part) => part.message.id);
+  assert.deepEqual(processMessageIds, ["intro", "progress"]);
+});
+
+test("thinking-only live turn projects zero responses and leaves process visible", () => {
+  const thinking = message("think", "assistant", "", {
+    thinking: "Deep thought...",
+    status: "streaming",
+  });
+  const entry = turn([thinking]);
+  const projected = projectTurnProcess(entry);
+  assert.equal(projected.responses.length, 0);
+  assert.equal(projected.process.length, 1);
+  assert.equal(visibleProcessSteps(projected.process, "detailed", true), 1);
+});
+
+test("failed tool turn preserves tool error in process and error message in responses", () => {
+  const toolError = message("tool1", "tool", "Permission denied", {
+    toolName: "Bash",
+    toolExitCode: 1,
+  });
+  const errMsg = message("err", "assistant", "", {
+    status: "error",
+    error: { code: "TOOL_FAILED", message: "Command failed" },
+  });
+  const entry = turn([toolError, errMsg]);
+  const projected = projectTurnProcess(entry);
+  assert.deepEqual(
+    projected.responses.map((part) => part.message.id),
+    ["err"],
+  );
+  assert.equal(projected.process.length, 1);
+  assert.equal(projected.process[0].items[0].message.id, "tool1");
+});
+
+test("assistant turn renders responses before secondary turn-process disclosure", async () => {
+  const assistantTurnSource = fs.readFileSync(
+    new URL("../src/features/chat/transcript/AssistantTurn.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    assistantTurnSource,
+    /\{responses\.map\(renderPart\)\}[\s\S]*?<TurnProcess[\s\S]*?hasAnswer=\{Boolean\(actionMessage \|\| content\)\}/,
+    "responses (the answer) must be rendered before TurnProcess in the turn hierarchy",
+  );
+  assert.match(
+    assistantTurnSource,
+    /selectTarget:[\s\S]*?\.message-bubble\[data-message-id/,
+    "selectTarget must target the answer message bubble specifically",
+  );
+});
+
+test("turn process styles establish secondary lower-contrast appearance after answer", async () => {
+  const stylesSource = fs.readFileSync(
+    new URL("../src/styles/messages.css", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    stylesSource,
+    /\.turn-process\.has-answer\s*\{[\s\S]*?margin:\s*4px 0 6px;/,
+  );
+  assert.match(
+    stylesSource,
+    /\.turn-process > \.tool-activity-header\s*\{[\s\S]*?font-size:\s*var\(--text-xs-plus\);[\s\S]*?color:\s*var\(--ds-text-muted\);/,
   );
 });

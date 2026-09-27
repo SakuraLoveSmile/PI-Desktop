@@ -4,6 +4,10 @@ import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import { imageGenerationDescription, imageGenerationParameters } from "./image-generation/tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
+import {
+  GoalReportDraftManager,
+  SUBMIT_GOAL_REPORT_TOOL_NAME,
+} from "./goal-report-tool.js";
 import { randomUUID } from "node:crypto";
 import {
   settledDelegationMessage,
@@ -110,6 +114,9 @@ import {
   resolveSubagentToolNames,
   subagentModelKey,
   subagentToolsLabel,
+  type ExecutionProfile,
+  normalizeExecutionProfile,
+  isTeamTool,
   type ProposalKind,
   type SubagentPermission,
 } from "@pi-desktop/shared";
@@ -128,6 +135,7 @@ import {
   usageToPi,
 } from "./agent-messages.js";
 import { withExplicitRequired } from "./tool-schema.js";
+import { createTeamTools, teamSystemPrompt } from "./team/index.js";
 import { buildSessionContext } from "./session-context.js";
 import {
   initialSystemTranscript,
@@ -954,9 +962,18 @@ export type AgentRuntimeOptions = {
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
   subagentModelKeys?: string[];
+  executionProfile?: ExecutionProfile;
+  teamContext?: {
+    teamSessionId: string;
+    callerSessionId: string;
+    isLead: boolean;
+    memberName?: string;
+    abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
+  };
 };
 
 export type RuntimeMatchConfig = {
+  executionProfile?: ExecutionProfile;
   mode: Mode;
   provider: RuntimeProviderConfig;
   thinkingLevel: SessionThinkingLevel;
@@ -972,6 +989,8 @@ export type RuntimeMatchConfig = {
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
   subagentModelKeys?: string[];
+  teamContext?: Pick<NonNullable<AgentRuntimeOptions["teamContext"]>,
+    "teamSessionId" | "callerSessionId" | "isLead" | "memberName">;
 };
 
 /** Tool calls ride in the assistant content array as `type: "toolCall"`. A
@@ -1567,6 +1586,8 @@ export class DesktopAgentRuntime {
   private disposed = false;
   readonly sessionId: string;
   private mode: Mode;
+  private executionProfile: ExecutionProfile;
+  private teamContext?: AgentRuntimeOptions["teamContext"];
   private provider: RuntimeProviderConfig;
   private thinkingLevel: SessionThinkingLevel;
   private host: RuntimeHost;
@@ -1739,6 +1760,15 @@ export class DesktopAgentRuntime {
     target: string;
     lastErrorCode?: string;
   };
+  /** Why a Plan or Goal submission ended the turn, pending finalization. */
+  private pendingSubmissionOutcome?: {
+    kind: "plan" | "goal";
+    toolCallId: string;
+    turnEpoch: number;
+    status: "success" | "error";
+    errorCode?: string;
+    message?: string;
+  };
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
@@ -1769,12 +1799,15 @@ export class DesktopAgentRuntime {
   private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
   private hostCloseUnsubscribe?: () => void;
   private turnSubagentUsage?: MessageUsage;
+  private goalReportDraftManager?: GoalReportDraftManager;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
     this.hostTurnId = opts.turnId;
     this.turnId = opts.turnId;
     this.mode = opts.mode;
+    this.executionProfile = normalizeExecutionProfile(opts.executionProfile);
+    this.teamContext = opts.teamContext;
     this.planningState = proposalKindForMode(this.mode) ? "planning" : "inactive";
     this.provider = opts.provider;
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
@@ -1837,7 +1870,15 @@ export class DesktopAgentRuntime {
       // proactive half of the Task tool's own description: models delegate
       // when the system prompt names the situations, and keep doing everything
       // inline when it only says "you may".
-      ...(this.subagents.length
+      ...(this.executionProfile === "team"
+        ? [
+            teamSystemPrompt({
+              isLead: this.teamContext?.isLead ?? false,
+              memberName: this.teamContext?.memberName,
+              teamSessionId: this.teamContext?.teamSessionId ?? "",
+            }),
+          ]
+        : this.subagents.length
         ? [
             `## Delegation
 Work splits into independent pieces — delegate, and keep your context for the synthesis. Subagents run in their own context and report back through TaskWait.
@@ -1870,7 +1911,7 @@ Delegation rules:
       "Editing workflow: use the built-in Edit or Write tool directly on the deliverable file whenever it is inside the advertised workspace. Use Edit for one small unique line-anchored change (path + tag + ops) and Write for a coherent whole-file rewrite. Do not invoke shell apply_patch, git apply, or patch commands; do not create or hand-edit unified-diff files in scratch or repeatedly repair their hunk headers. Treat an edit or shell patch failure as recoverable state: classify the error, perform the required fresh Read or use a complete reveal, regenerate the change, and retry with a corrected payload. A path may have three counted failures per prompt; stop after the third and report the exact mismatch instead of looping. Never issue concurrent Write/Edit calls for the same path. When a dedicated worktree is outside the advertised workspace, make one guarded, deterministic edit inside that worktree with Bash, then verify it with git diff or an equivalent check.",
       // Work panel browser preview (D100): workspace HTML files render
       // in the embedded browser with live reload on file changes.
-      `For user-visible HTML pages, call the BrowserPreview tool once after creating the page or making the first meaningful visual edit, using its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in PI-Desktop's built-in browser panel. Reuse that preview while iterating: it live-reloads as you edit, so no repeat call or manual refresh is needed. Skip generated, test-only, and non-visual HTML files. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
+      `For user-visible HTML pages, call the BrowserPreview tool once after creating the page or making the first meaningful visual edit, using its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in Pi-Desktop-Plus's built-in browser panel. Reuse that preview while iterating: it live-reloads as you edit, so no repeat call or manual refresh is needed. Skip generated, test-only, and non-visual HTML files. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
       // Shell dialect and scratch variable are selected by host-core.
       commandShellGuidance(this.commandShell, this.scratchDir),
       // Session scratch directory (D114): temp files must not dirty
@@ -2047,6 +2088,9 @@ Delegation rules:
       // queued renderer prompt ends a completed turn at the next boundary,
       // without treating an error or abort as a graceful stop.
       finishTurn: async ({ message }) => {
+        if (this.pendingSubmissionOutcome?.turnEpoch === this.turnEpoch) {
+          return { action: "end" };
+        }
         if (!this.gracefulStopRequested) return;
         if (message.stopReason === "error" || message.stopReason === "aborted") return;
         this.gracefulStopRequested = false;
@@ -2218,13 +2262,26 @@ Delegation rules:
     };
   }
 
+  private isSubmissionTool(name: string): boolean {
+    return name === "SubmitPlan" || name === "SubmitGoal";
+  }
+
   private async afterToolCall(
     context: AfterToolCallContext,
   ): Promise<AfterToolCallResult | undefined> {
     const own = this.resolveOwnToolOutcome(context);
     const fromExtensions = await this.extensionToolResult(context, own);
     if (!fromExtensions) return own;
-    return { ...(own ?? {}), ...fromExtensions };
+    const merged: AfterToolCallResult = { ...(own ?? {}), ...fromExtensions };
+    if (this.isSubmissionTool(context.toolCall.name)) {
+      if (own?.isError || context.isError) {
+        merged.isError = true;
+      }
+      if (own?.terminate) {
+        merged.terminate = true;
+      }
+    }
+    return merged;
   }
 
   /** `tool_call` hook: an extension may block a call with a reason (spec 16 §6). */
@@ -2409,6 +2466,7 @@ Delegation rules:
       !this.disposed &&
       providerMatches &&
       this.mode === config.mode &&
+      this.executionProfile === (config.executionProfile ?? "standard") &&
       this.thinkingLevel ===
         clampThinkingLevel(config.provider, config.thinkingLevel) &&
       current === next &&
@@ -2432,6 +2490,7 @@ Delegation rules:
       safeJson(this.subagentProviders) === safeJson(config.subagentProviders ?? {}) &&
       safeJson([...this.subagentModelKeys].sort()) ===
         safeJson([...new Set(config.subagentModelKeys ?? [])].sort()) &&
+      safeJson(this.teamContext ?? null) === safeJson(config.teamContext ?? null) &&
       // Enabling or disabling a trusted extension retires the runtime so the
       // next prompt reloads the set (spec 16 §4.3).
       trustedExtensionIds(this.trustedExtensionSpecs) ===
@@ -2892,7 +2951,7 @@ Delegation rules:
       if (scheduledToolDescriptions[toolName]) return scheduledToolDescriptions[toolName];
       switch (toolName) {
         case "BrowserPreview":
-          return "Open a workspace HTML file in PI-Desktop's built-in browser panel. `path` is workspace-relative (e.g. \"demo/index.html\"). The preview live-reloads on later edits to the file or its sibling assets, so call once per page.";
+          return "Open a workspace HTML file in Pi-Desktop-Plus's built-in browser panel. `path` is workspace-relative (e.g. \"demo/index.html\"). The preview live-reloads on later edits to the file or its sibling assets, so call once per page.";
         case "Read":
           return (
             "Read a bounded window from an existing regular text file, never a directory. " +
@@ -2929,13 +2988,13 @@ Delegation rules:
         case ASK_TOOL_NAME:
           return "Ask the user one or more questions. Each question has selectable options and the desktop card always provides a custom user-input option; unanswered questions are returned as empty answers.";
         case "PluginScaffold":
-          return "Create a PI-Desktop plugin from a template and load it for development. `directory` is workspace-relative and must be empty or new; `template` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.";
+          return "Create a Pi-Desktop-Plus plugin from a template and load it for development. `directory` is workspace-relative and must be empty or new; `template` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.";
         case "PluginCheck":
-          return "Validate a PI-Desktop plugin directory against every rule the installer enforces (manifest, entry file, panel, skills, permissions, package limits). `directory` is workspace-relative. Run this before packaging.";
+          return "Validate a Pi-Desktop-Plus plugin directory against every rule the installer enforces (manifest, entry file, panel, skills, permissions, package limits). `directory` is workspace-relative. Run this before packaging.";
         case "PluginPack":
-          return "Package a PI-Desktop plugin directory into an installable dist/<id>-<version>.piplug. `directory` is workspace-relative. Runs the same validation as PluginCheck first and refuses to package a plugin with errors. Never build a .piplug with shell tools — the installer only accepts uncompressed archives.";
+          return "Package a Pi-Desktop-Plus plugin directory into an installable dist/<id>-<version>.piplug. `directory` is workspace-relative. Runs the same validation as PluginCheck first and refuses to package a plugin with errors. Never build a .piplug with shell tools — the installer only accepts uncompressed archives.";
         default:
-          return `${toolName} tool via PI-Desktop host-core`;
+          return `${toolName} tool via Pi-Desktop-Plus host-core`;
       }
     };
     // One entry per tool: the shapes diverge enough that a chain of ternaries
@@ -3464,8 +3523,9 @@ Delegation rules:
     // contract negotiations, and a delegate with Bash or Edit would drive
     // straight through that (ADR 0062). The whole lifecycle rides together:
     // `Task` starts, `TaskWait`/`TaskList`/`TaskStop` converge (ADR 0089).
+    const isTeam = this.executionProfile === "team";
     const subagentTools =
-      this.mode === "agent" && this.subagents.length
+      !isTeam && this.mode === "agent" && this.subagents.length
         ? [
             this.buildSubagentTool(),
             this.buildSubagentWaitTool(),
@@ -3473,21 +3533,38 @@ Delegation rules:
             this.buildSubagentStopTool(),
           ]
         : [];
+    const teamTools = isTeam
+      ? createTeamTools({
+          teamSessionId: this.teamContext?.teamSessionId ?? "",
+          callerSessionId: this.teamContext?.callerSessionId ?? this.sessionId,
+          isLead: this.teamContext?.isLead ?? false,
+          host: this.host,
+          abortActiveTurn: this.teamContext?.abortActiveTurn,
+        })
+      : [];
+    const filteredPluginTools = isTeam
+      ? pluginTools.filter((t) => t.name !== "SessionTask")
+      : pluginTools;
     const contextTools = this.compactionEnabled
       ? [this.buildContextCompactionTool()]
       : [];
     // Trusted extension tools are non-core: the per-mode allowlist and
     // ToolSearch deferral treat them like plugin tools (spec 16 §7).
     const extensionTools = this.extensionRunner?.getAgentTools() ?? [];
+    const goalReportTools = this.goalReportDraftManager
+      ? [this.goalReportDraftManager.buildTool()]
+      : [];
     return [
       ...builtins,
       askTool,
-      ...pluginTools,
+      ...filteredPluginTools,
       ...skillTools,
       ...modeTools,
       ...subagentTools,
+      ...teamTools,
       ...contextTools,
       ...extensionTools,
+      ...goalReportTools,
     ];
   }
 
@@ -3576,6 +3653,8 @@ Delegation rules:
       name === SUBAGENT_WAIT_TOOL_NAME ||
       name === SUBAGENT_LIST_TOOL_NAME ||
       name === SUBAGENT_STOP_TOOL_NAME ||
+      name === SUBMIT_GOAL_REPORT_TOOL_NAME ||
+      isTeamTool(name) ||
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)
         : proposalKindForMode(this.mode)
@@ -5265,6 +5344,7 @@ Delegation rules:
             ? params.question.trim()
             : "";
         if (!title || !markdown.trim() || !question) {
+          this.failedHostToolCalls.add(toolCallId);
           return {
             content: [
               {
@@ -5293,6 +5373,16 @@ Delegation rules:
           const errorCode =
             (error as { data?: { errorCode?: string } })?.data?.errorCode ??
             "PLAN_SUBMIT_FAILED";
+          this.failedHostToolCalls.add(toolCallId);
+          this.terminatingToolCalls.add(toolCallId);
+          this.pendingSubmissionOutcome = {
+            kind,
+            toolCallId,
+            turnEpoch: this.turnEpoch,
+            status: "error",
+            errorCode,
+            message: `${modeLabel(kind)} submission failed: ${errorCode}`,
+          };
           return {
             content: [
               {
@@ -5316,6 +5406,16 @@ Delegation rules:
           typeof proposal.artifact.sha256 !== "string" ||
           typeof proposal.artifact.sizeBytes !== "number"
         ) {
+          this.failedHostToolCalls.add(toolCallId);
+          this.terminatingToolCalls.add(toolCallId);
+          this.pendingSubmissionOutcome = {
+            kind,
+            toolCallId,
+            turnEpoch: this.turnEpoch,
+            status: "error",
+            errorCode: "PLAN_SUBMIT_FAILED",
+            message: `${modeLabel(kind)} submission returned an invalid proposal.`,
+          };
           return {
             content: [
               {
@@ -5342,6 +5442,13 @@ Delegation rules:
           executionState: proposal.executionState,
           proposal,
         });
+        this.terminatingToolCalls.add(toolCallId);
+        this.pendingSubmissionOutcome = {
+          kind,
+          toolCallId,
+          turnEpoch: this.turnEpoch,
+          status: "success",
+        };
         return {
           content: [
             {
@@ -5731,6 +5838,7 @@ Delegation rules:
     this.mutationFailureCounts.clear();
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
+    this.pendingSubmissionOutcome = undefined;
     this.terminatingToolCalls.clear();
     this.turnHadError = false;
   }
@@ -7585,6 +7693,22 @@ Delegation rules:
         break;
       }
       case "tool_execution_start": {
+        if (event.toolName !== SUBMIT_GOAL_REPORT_TOOL_NAME) {
+          const reportDraft = this.goalReportDraftManager;
+          if (reportDraft) {
+            void reportDraft.invalidate().catch(() => {
+              const error = {
+                code: "REPORT_DRAFT_INVALIDATION_FAILED",
+                message: "Goal report evidence could not be invalidated safely; execution was stopped.",
+                retriable: true,
+                details: { errorCode: "REPORT_DRAFT_INVALIDATION_FAILED" },
+              };
+              this.terminateParentTurn();
+              this.finalizeCurrentAssistant("error", error);
+              this.emit({ type: "error", error });
+            });
+          }
+        }
         const startedAt = Date.now();
         this.clearAgentActivity();
         this.activeToolCalls.set(event.toolCallId, {
@@ -7676,7 +7800,23 @@ Delegation rules:
           ...(subagentUsage ? { subagentUsage } : {}),
         });
         break;
-      case "agent_end":
+      case "agent_end": {
+        if (this.pendingSubmissionOutcome?.turnEpoch === this.turnEpoch) {
+          const outcome = this.pendingSubmissionOutcome;
+          this.pendingSubmissionOutcome = undefined;
+          this.acceptingSteering = false;
+          this.retainPendingSteering();
+          this.autonomousExecution = false;
+          this.clearAgentActivity();
+          if (outcome.status === "error") {
+            this.reportSubmissionTermination(outcome);
+          }
+          this.emit({
+            type: "agent_end",
+            messageIds: [],
+          });
+          break;
+        }
         // Input admitted after pi's last queue poll still belongs to this turn.
         // Continue after the current run settles; never wake the follow-up FIFO.
         if (this.pendingSteering.size && this.acceptingSteering && !this.runCancelled && !this.turnHadError) break;
@@ -7691,6 +7831,10 @@ Delegation rules:
         this.acceptingSteering = false;
         this.retainPendingSteering();
         this.autonomousExecution = false;
+        if (this.goalReportDraftManager) {
+          this.goalReportDraftManager = undefined;
+          this.rebuildToolCatalog();
+        }
         this.clearAgentActivity();
         this.reportMutationTermination();
         this.emit({
@@ -7698,6 +7842,7 @@ Delegation rules:
           messageIds: [],
         });
         break;
+      }
       default:
         break;
     }
@@ -7710,6 +7855,33 @@ Delegation rules:
    * learns the agent stopped on purpose, and the UI keeps its continue
    * affordance (spec 18-line-anchored-edit-contract §9.3).
    */
+  private reportSubmissionTermination(outcome: {
+    kind: "plan" | "goal";
+    toolCallId: string;
+    errorCode?: string;
+    message?: string;
+  }): void {
+    const errorCode = outcome.errorCode || "PLAN_SUBMIT_FAILED";
+    const recovery = `${modeLabel(outcome.kind)} submission could not be completed.`;
+    const message =
+      outcome.message ||
+      `${modeLabel(outcome.kind)} submission failed: ${errorCode}. ${recovery}`;
+    const error = {
+      code: errorCode,
+      message,
+      retriable: true,
+      details: {
+        kind: outcome.kind,
+        toolCallId: outcome.toolCallId,
+        errorCode,
+        recovery,
+      },
+    };
+    this.terminateParentTurn();
+    this.finalizeCurrentAssistant("error", error);
+    this.emit({ type: "error", error });
+  }
+
   private reportMutationTermination(): void {
     const termination = this.pendingMutationTermination;
     if (!termination) return;
@@ -7860,6 +8032,41 @@ Delegation rules:
     this.autonomousExecution = true;
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
+    if (kind === "goal") {
+      this.goalReportDraftManager = new GoalReportDraftManager({
+        executionId: execution.id,
+        sessionId: execution.sessionId,
+        onDraftSubmitted: async (draft) => {
+          await this.host.call("goalReports.submitDraft", {
+            executionId: execution.id,
+            draft,
+          });
+        },
+        onDraftInvalidated: async () => {
+          await this.host.call("goalReports.invalidateDraft", {
+            executionId: execution.id,
+          });
+        },
+        onDraftPersistenceFailure: async () => {
+          await this.host.call("goalReports.markFailed", {
+            executionId: execution.id,
+            errorCode: "REPORT_DRAFT_PERSIST_FAILED",
+          });
+        },
+        onDraftInvalidationFailure: async () => {
+          await this.host.call("goalReports.markFailed", {
+            executionId: execution.id,
+            errorCode: "REPORT_DRAFT_INVALIDATION_FAILED",
+          });
+        },
+      });
+      this.rebuildToolCatalog();
+    } else {
+      if (this.goalReportDraftManager) {
+        this.goalReportDraftManager = undefined;
+        this.rebuildToolCatalog();
+      }
+    }
     const instruction =
       kind === "goal"
         ? [
@@ -7874,6 +8081,7 @@ Delegation rules:
             "Choose your own approach with the normal Agent tools. Then verify every acceptance criterion yourself, running the checks the contract names rather than assuming they pass.",
             "Keep working while a criterion is still unmet and you have an untried approach. Stop early only if a boundary in the contract blocks you or a criterion cannot be verified; say which one and why.",
             "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
+            "Call SubmitGoalReport with your final structured report (summary, verdict, metrics, criteria checklist, steps, and verification evidence) once your verification is complete.",
           ].join("\n")
         : [
             "Execute the approved implementation plan now.",
@@ -7967,6 +8175,10 @@ Delegation rules:
     this.pendingUserMessageId = userMessageId;
     this.resetRunRecoveryState();
     this.autonomousExecution = false;
+    if (this.goalReportDraftManager) {
+      this.goalReportDraftManager = undefined;
+      this.rebuildToolCatalog();
+    }
     // Main resolves this provenance from the Host ledger. Never infer it from
     // prompt text, model output, extension content, or restored history.
     const origin = typeof input === "string" ? undefined : input.sessionMessage;
@@ -8165,6 +8377,7 @@ Delegation rules:
   }
 
   steer(input: RuntimePrompt, expectedTurnId: string, message: UiMessage): { accepted: boolean; turnId: string } {
+    void this.goalReportDraftManager?.invalidate();
     this.steeringContext(expectedTurnId);
     const queued: AgentMessage = { role: "user", content: promptContent(input), timestamp: Date.now() };
     this.pendingSteering.set(queued, message.id);
@@ -8265,7 +8478,7 @@ Delegation rules:
     if (this.disposed) return;
     const runner = this.extensionRunner;
     this.extensionRunner = undefined;
-    const closingExtensions = runner?.dispose();
+    const closingExtensions = typeof runner?.dispose === "function" ? runner.dispose() : undefined;
     this.streamSink.dispose();
     this.disposed = true;
     this.acceptingSteering = false;
@@ -8279,6 +8492,7 @@ Delegation rules:
     this.mutationFailureCounts.clear();
     this.mutationRecoveryGraces.clear();
     this.pendingMutationTermination = undefined;
+    this.pendingSubmissionOutcome = undefined;
     this.terminatingToolCalls.clear();
     this.delegateToolCalls.clear();
     this.appendedDelegationRowIds.clear();

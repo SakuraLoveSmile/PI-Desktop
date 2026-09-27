@@ -2,7 +2,7 @@
 # Record a non-sensitive snapshot of the macOS code-signing environment before
 # electron-builder starts packaging.
 #
-# Why this exists: @electron/osx-sign walks the whole `PI-Desktop.app` and runs
+# Why this exists: @electron/osx-sign walks the whole `Pi-Desktop-Plus.app` and runs
 # one `codesign --sign <identity> --force --timestamp --entitlements ...` per
 # Mach-O file and per nested bundle, strictly serially. When a release signing
 # step stalls, every interesting question is environmental: is a usable
@@ -14,9 +14,7 @@
 # Usage: scripts/macos-signing-diagnostics.sh [--require-identity]
 #
 # Environment:
-#   MAC_SIGNING_IDENTITY   bare common name ("XingYu Liu (DUV63RKYTW)") or the
-#                          full certificate label
-#                          ("Developer ID Application: XingYu Liu (DUV63RKYTW)").
+#   MAC_SIGNING_IDENTITY   bare common name or full certificate label.
 #
 # Exit status:
 #   0  snapshot printed. A missing certificate is only a warning by default:
@@ -48,7 +46,7 @@ done
 
 # Accepts either the bare common name or the full certificate label, matching
 # scripts/verify-macos-release.sh.
-IDENTITY_NAME="${MAC_SIGNING_IDENTITY:-XingYu Liu (DUV63RKYTW)}"
+IDENTITY_NAME="${MAC_SIGNING_IDENTITY:-}"
 IDENTITY_NAME="${IDENTITY_NAME#Developer ID Application: }"
 EXPECTED_IDENTITY="Developer ID Application: ${IDENTITY_NAME}"
 
@@ -205,7 +203,13 @@ fi
 # ---------------------------------------------------------------------------
 
 echo "==> Signing identity"
-if [[ -n "$IDENTITY_OUTPUT" && "$IDENTITY_OUTPUT" == *"$EXPECTED_IDENTITY"* ]]; then
+if [[ -z "$IDENTITY_NAME" ]]; then
+  echo "warning: MAC_SIGNING_IDENTITY is not set; signed release lanes must provide it."
+  if [[ "$REQUIRE_IDENTITY" == "true" ]]; then
+    echo "error: MAC_SIGNING_IDENTITY is required with --require-identity." >&2
+    exit 1
+  fi
+elif [[ -n "$IDENTITY_OUTPUT" && "$IDENTITY_OUTPUT" == *"$EXPECTED_IDENTITY"* ]]; then
   echo "==> Developer ID identity available: ${EXPECTED_IDENTITY}"
   IDENTITY_LINE="$(printf '%s\n' "$IDENTITY_OUTPUT" | grep -F -- "$EXPECTED_IDENTITY" | head -n 1 || true)"
   echo_redacted "$IDENTITY_LINE"

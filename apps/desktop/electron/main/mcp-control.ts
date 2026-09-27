@@ -188,7 +188,7 @@ const spec = (
  * A future IPC channel is not automatically exposed until reviewed here.
  */
 const CONTROL_OPERATION_SPECS: OperationSpec[] = [
-  spec("appGetVersion", "app/getVersion", "Return PI-Desktop and host versions.", "read", []),
+  spec("appGetVersion", "app/getVersion", "Return Pi-Desktop-Plus and host versions.", "read", []),
   spec("appHealth", "app/health", "Return host health.", "read", []),
   spec("appGetOnboarding", "app/getOnboarding", "Read onboarding state.", "read", []),
   spec("appDismissOnboarding", "app/dismissOnboarding", "Dismiss onboarding.", "write", []),
@@ -210,6 +210,7 @@ const CONTROL_OPERATION_SPECS: OperationSpec[] = [
   spec("sessionCreate", "session/create", "Create a durable session.", "write", ["input"]),
   spec("sessionFork", "session/fork", "Fork a session.", "write", ["input"]),
   spec("sessionGet", "session/get", "Read a session and its transcript.", "read", ["input"]),
+  spec("turnGet", "turn/get", "Read one turn's persisted terminal state.", "read", ["input"]),
   spec("sessionOpen", "session/open", "Open a durable session in the desktop.", "write", ["sessionId"]),
   spec("sessionDelete", "session/delete", "Delete a session.", "dangerous", ["id"]),
   spec("sessionRename", "session/rename", "Rename a session.", "write", ["id", "title"]),
@@ -288,7 +289,7 @@ const coreTool = (
 });
 
 const CORE_TOOL_SPECS = [
-  coreTool("pi_app_info", "Read PI-Desktop and host version information.", objectSchema({}), "app/getVersion", () => []),
+  coreTool("pi_app_info", "Read Pi-Desktop-Plus and host version information.", objectSchema({}), "app/getVersion", () => []),
   coreTool("pi_project_get", "Read the active project workspace.", objectSchema({}), "project/get", () => []),
   coreTool("pi_project_list", "List durable projects.", objectSchema({}), "project/list", () => []),
   coreTool(
@@ -324,6 +325,19 @@ const CORE_TOOL_SPECS = [
       contentLimit: { type: "integer" },
     }, ["id"]),
     "session/get",
+    (input) => [input],
+  ),
+  coreTool(
+    "pi_turn_get",
+    "Read one turn's persisted terminal state (running, completed, error, aborted).",
+    objectSchema(
+      {
+        sessionId: stringSchema("Session id that owns the turn."),
+        turnId: stringSchema("Turn id returned by pi_agent_prompt."),
+      },
+      ["sessionId", "turnId"],
+    ),
+    "turn/get",
     (input) => [input],
   ),
   coreTool(
@@ -1083,7 +1097,7 @@ export class McpControlServer {
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: this.serverName, version: this.version },
           instructions:
-            "Local PI-Desktop control plane. Named tools cover project/session/Agent/workspace. Dangerous operations, including session/configure permissionMode, require confirm=true. confirm is an agent acknowledgement, not a desktop user prompt. Poll pi_session_get or pi_agent_status for turn progress; this server does not stream SSE.",
+            "Local Pi-Desktop-Plus control plane. Named tools cover project/session/Agent/workspace. Dangerous operations, including session/configure permissionMode, require confirm=true. confirm is an agent acknowledgement, not a desktop user prompt. Poll pi_session_get or pi_agent_status for live progress and pi_turn_get for a turn's durable terminal state; this server does not stream SSE.",
         }),
         sessionId,
       };
@@ -1143,7 +1157,7 @@ export class McpControlServer {
     });
     const generic: McpTool = {
       name: "pi_desktop_invoke",
-      description: "Invoke a reviewed PI-Desktop operation. Use pi_control_describe for ids and argument shapes. Dangerous operations require confirm=true. This is an agent acknowledgement, not a user prompt.",
+      description: "Invoke a reviewed Pi-Desktop-Plus operation. Use pi_control_describe for ids and argument shapes. Dangerous operations require confirm=true. This is an agent acknowledgement, not a user prompt.",
       inputSchema: objectSchema({
         operation: {
           type: "string",
@@ -1178,7 +1192,7 @@ export class McpControlServer {
     };
     const describe: McpTool = {
       name: "pi_control_describe",
-      description: "Return the reviewed PI-Desktop operation catalog.",
+      description: "Return the reviewed Pi-Desktop-Plus operation catalog.",
       inputSchema: objectSchema({}),
       execute: async () => this.operations.map((operation) => ({
         id: operation.id,

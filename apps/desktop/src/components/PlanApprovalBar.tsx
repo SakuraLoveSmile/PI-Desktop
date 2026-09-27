@@ -7,7 +7,11 @@ import type {
   ProposalKind,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
-import { preferredFileWorkPanelTab } from "../lib/work-panel-tabs";
+import { fileWorkPanelTab, preferredFileWorkPanelTab } from "../lib/work-panel-tabs";
+import {
+  PlanArtifactResolutionError,
+  resolvePlanArtifactPath,
+} from "../lib/plan-artifact";
 import { PLAN_APPROVAL_DEFAULT_MODE } from "../lib/plan-mode-state";
 import {
   readPlanApprovalMode,
@@ -126,12 +130,27 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
     }
   };
 
-  const openArtifact = () => {
+  const openArtifact = async () => {
     if (!artifactPath) return;
-    openWorkPanelTabForSession(
-      proposal.sessionId,
-      preferredFileWorkPanelTab(artifactPath, pluginViews),
-    );
+    try {
+      const resolved = await resolvePlanArtifactPath(proposal);
+      if (!resolved) return;
+      openWorkPanelTabForSession(
+        proposal.sessionId,
+        resolved.temporary
+          ? fileWorkPanelTab(resolved.path)
+          : preferredFileWorkPanelTab(resolved.path, pluginViews),
+      );
+    } catch (error) {
+      const key = error instanceof PlanArtifactResolutionError
+        ? error.code === "session-unavailable"
+          ? "artifactSessionUnavailable"
+          : "artifactScratchUnavailable"
+        : null;
+      showToast(key ? t(copyKey(kind, key)) : error instanceof Error ? error.message : String(error), {
+        variant: "error",
+      });
+    }
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -203,7 +222,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                 path: artifactPath,
               })}
               title={artifactPath}
-              onClick={openArtifact}
+              onClick={() => void openArtifact()}
             >
               <IconFileText size={14} aria-hidden />
               <span className="plan-approval-artifact-label">

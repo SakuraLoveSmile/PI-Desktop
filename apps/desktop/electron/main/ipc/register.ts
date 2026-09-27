@@ -1,3 +1,4 @@
+import { registerGoalReportIpc } from "./goal-report-ipc.js";
 import { join } from "node:path";
 import { dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
 import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";
@@ -21,6 +22,7 @@ import { registerProviderIpc } from "./provider-ipc";
 import { registerPullsIpc } from "./pulls-ipc";
 import { registerScheduledIpc } from "./scheduled-ipc";
 import { registerSessionIpc } from "./session-ipc";
+import { registerTeamIpc } from "./team-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
 import { registerConfigSyncIpc } from "./config-sync-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
@@ -157,6 +159,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     isDeveloperMode,
     sendToRenderer,
     voiceService,
+    teamDelivery,
   } = dependencies;
 
 
@@ -249,6 +252,13 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     enrichSession,
     acquireSessionOperation,
     stripWinLongPrefix,
+  });
+  registerGoalReportIpc({ handle, getHost });
+  registerTeamIpc({
+    registrar,
+    getHost,
+    logger,
+    teamDelivery,
   });
   registerSettingsIpc({
     registrar,
@@ -396,6 +406,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     optionalWorkspaceRoot,
     composerCommandService,
     loadComposerTemplatesCached,
+    beforeUserStop: teamDelivery.beforeUserStop,
+    beforeUserAbort: teamDelivery.beforeUserStop,
   });
 
   registerPluginIpc({

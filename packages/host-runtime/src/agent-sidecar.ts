@@ -61,6 +61,11 @@ const HOST_PROXY_ALLOWED = new Set([
   "plans.submit",
   "plans.pending",
   "plans.abort",
+  // Goal report draft writes are scoped by the Host-approved execution id
+  // captured in the runtime context; report reads/retry remain Main-only.
+  "goalReports.submitDraft",
+  "goalReports.invalidateDraft",
+  "goalReports.markFailed",
   "project.instructions.resolve",
   "provider.resolveAuth",
   "provider.resolveSubagentModel",
@@ -76,7 +81,20 @@ const HOST_PROXY_ALLOWED = new Set([
   "session.fork",
   "session.queuePush",
   "session.queuePrioritize",
+  // Team data is Host-authorized by the session context carried on each call.
+  "team.createMember",
+  "team.createTask",
+  "team.getBoard",
+  "team.getRoster",
+  "team.interruptMember",
+  "team.listMessages",
+  "team.sendMessage",
+  "team.updateTask",
 ]);
+
+export function isHostProxyAllowed(method: string): boolean {
+  return HOST_PROXY_ALLOWED.has(method);
+}
 
 /** Host-side answers for the `extensions.*` proxy methods. */
 export type TrustedExtensionSidecarBridge = {
@@ -460,7 +478,7 @@ export class AgentSidecar {
     if (msg.method === "host.proxy" && msg.id !== undefined) {
       try {
         const method = String(msg.params?.method || "");
-        if (!HOST_PROXY_ALLOWED.has(method)) {
+        if (!isHostProxyAllowed(method)) {
           throw Object.assign(
             new Error(`host method not allowed from sidecar: ${method}`),
             { code: -32601 },

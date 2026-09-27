@@ -317,6 +317,14 @@ to later refresh and inference; the vendor picker does not collect them.
   contains the latest matching Task tool-call projection from the same canonical
   transcript. It is capped separately and does not widen the window or alter its
   cursors. Ordinary and uncapped reads omit this navigation-only field.
+- `session.getTurn({ sessionId, turnId })` — read-only, additive to protocol
+  v11. Returns one persisted turn's state as
+  `{ sessionId, turnId, status, errorCode?, endedAt? }`, where `status` is the
+  durable domain `running | completed | error | aborted` and `endedAt` is the
+  RFC3339 instant of the terminal write (`session.endTurn`). The row is matched
+  on `turnId` **and** `sessionId`, so a turn id belonging to another session,
+  like an unknown one, returns `NOT_FOUND`; blank ids are `INVALID_PARAMS`. The
+  response never carries prompt, transcript, or credential material.
 - `session.delete`
 - `session.getScratchPath` — the session's scratch directory (D114), created
   on demand
@@ -354,6 +362,38 @@ to later refresh and inference; the vendor picker does not collect them.
   (D327). Promotes leftover checkpoints whose final row never landed,
   including `completed` turns as `complete`. Boot recovery skips completed
   leftovers so the outbox can append first. Returns `{ ok, count }`.
+- `team.getRuntimeContext({ sessionId })` derives the Team and Lead/member
+  identity from Host-owned execution profile and roster state. It returns
+  `null` for non-Team sessions; callers cannot supply or override authority.
+- `team.getRoster({ teamSessionId, callerSessionId })` and
+  `team.getBoard({ teamSessionId, callerSessionId })` return separate roster
+  and revisioned task-board projections after Host membership validation.
+- `team.getMessage({ teamSessionId, callerSessionId, messageId })` reads one
+  durable Team mailbox row. The Lead can read every row; a member can read only
+  a row it sent or received. Unknown and cross-Team ids return `null`.
+- `team.pendingMessages({ teamSessionId, callerSessionId })` is Lead-only and
+  returns queued rows for an unpaused Team, including messages with a durable
+  Agent Host queue receipt that need restart recovery. A message bound to a turn
+  is never replayed. Queued Team mailbox messages without a queue receipt remain
+  queued across application restart, including while paused; Resume makes them
+  eligible for delivery.
+- `team.sendMessage({ teamSessionId, callerSessionId, target, content,
+  idempotencyKey? })` persists one Team-origin message and emits
+  `team.messageQueued`. Its response reports the mailbox state, not completed
+  delivery. Host resolves the sender's effective permission mode (including
+  `inherit` against the current default) and stores it as the message ceiling;
+  `session.beginTurn` enforces that ceiling before a recipient turn starts.
+- `team.ackMessage({ teamSessionId, ackSessionId, messageId })` accepts only
+  the target member and requires a durable Host queue or turn receipt. Repeated
+  acknowledgements are idempotent. It does not reject a durable receipt solely
+  because either session's permission setting changed after turn admission.
+- `team.pause/resume({ teamSessionId, callerSessionId })` are Lead-only
+  transitions. Electron Main holds or resumes the corresponding Agent Host
+  queues and drains pending mail after resume.
+- `team.createTask` and `team.updateTask` require `callerSessionId`; Host checks
+  membership, Lead-only reassignment, task ownership, CAS revision, and
+  dependency constraints before mutation. When supplied, the owner session and
+  member name resolve as one pair; a Lead may reassign or clear task ownership.
 - `session.appendCompaction` — sidecar-only append of the newest typed
   model-context checkpoint. It requires non-empty checkpoint/summary/boundary
   ids and non-negative `tokensBefore`; it does not insert a message/search row
@@ -851,7 +891,11 @@ type ToolsExecuteResult = {
 
 `SubmitPlan` and `SubmitGoal` are handled as host transitions before generic
 tool execution. The host preserves the exact Markdown bytes in a new unique
-artifact under the kind's directory before publishing the proposal.
+artifact under the kind's directory before publishing the proposal. For a
+temporary Goal, the root is the owning session's scratch directory; for a
+project Goal it is the persisted project root. Approval resolves the root from
+the stored proposal kind, since approved sessions switch back to Agent mode.
+Plan still requires a persisted project. No global workspace fallback is used.
 
 ```ts
 // Identical shape for both kinds; the tool name selects the kind.

@@ -18,6 +18,17 @@ pub const EXECUTION_INTERRUPTED: &str = "interrupted";
 pub const KIND_PLAN: &str = "plan";
 pub const KIND_GOAL: &str = "goal";
 
+pub const WORKSPACE_KIND_PROJECT: &str = "project";
+pub const WORKSPACE_KIND_SCRATCH: &str = "scratch";
+
+pub fn normalize_workspace_kind(value: &str) -> Option<&'static str> {
+    match value {
+        WORKSPACE_KIND_PROJECT => Some(WORKSPACE_KIND_PROJECT),
+        WORKSPACE_KIND_SCRATCH => Some(WORKSPACE_KIND_SCRATCH),
+        _ => None,
+    }
+}
+
 /// Map a wire kind onto a `'static` literal so SQL and paths can never carry
 /// caller-controlled text.
 pub fn normalize_kind(value: &str) -> Option<&'static str> {
@@ -39,6 +50,8 @@ pub struct PlanArtifact {
     pub relative_path: String,
     pub sha256: String,
     pub size_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace_kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -116,6 +129,7 @@ pub struct PlanSubmitParams<'a> {
     pub title: &'a str,
     pub markdown: &'a str,
     pub question: &'a str,
+    pub artifact_workspace_kind: &'a str,
 }
 
 pub struct PlanResolveParams<'a> {

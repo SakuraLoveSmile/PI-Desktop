@@ -2,16 +2,16 @@ import type { EnglishCatalog } from "../en/index.js";
 
 export const de = {
   "app": {
-    "shellName": "PI-Desktop",
+    "shellName": "Pi-Desktop-Plus",
     "tagline": "Lokaler AI-Codierungspartner",
-    "starting": "PI-Desktop wird gestartet…",
+    "starting": "Pi-Desktop-Plus wird gestartet…",
     "loadingView": "Ansicht wird geladen…",
     "uiCrashed": "Mit der Schnittstelle ist ein Fehler aufgetreten"
   },
   "startup": {
     "slowTitle": "Startet noch…",
-    "slowBody": "PI-Desktop braucht länger als sonst, um Ihren lokalen Dienst zu erreichen. Der Start kann noch von selbst abschließen — Sie können warten oder zuerst die Protokolle sichern.",
-    "stalledTitle": "PI-Desktop konnte den Start nicht abschließen",
+    "slowBody": "Pi-Desktop-Plus braucht länger als sonst, um Ihren lokalen Dienst zu erreichen. Der Start kann noch von selbst abschließen — Sie können warten oder zuerst die Protokolle sichern.",
+    "stalledTitle": "Pi-Desktop-Plus konnte den Start nicht abschließen",
     "stalledBody": "Dieses Fenster hat Ihre Chats und Einstellungen nie erhalten, daher gibt es noch nichts anzuzeigen. Es wurde nichts gelöscht — Ihre Daten sind noch auf dem Datenträger.",
     "retrying": "Erneuter Versuch…",
     "copyDiagnostics": "Diagnosen kopieren",
@@ -36,12 +36,12 @@ export const de = {
     "unread": "Ungelesen",
     "pinned": "Angeheftet",
     "viewMore": "Mehr anzeigen…",
-    "open": "Öffnen Sie PI-Desktop",
-    "quit": "Beenden Sie PI-Desktop",
-    "askTitle": "Lassen Sie PI-Desktop im Hintergrund laufen?",
-    "askBody": "Wenn Sie das Fenster schließen, kann PI-Desktop in der Taskleiste weiterlaufen, sodass nichts verloren geht. Sie können dies jederzeit in den Einstellungen ändern.",
+    "open": "Öffnen Sie Pi-Desktop-Plus",
+    "quit": "Beenden Sie Pi-Desktop-Plus",
+    "askTitle": "Lassen Sie Pi-Desktop-Plus im Hintergrund laufen?",
+    "askBody": "Wenn Sie das Fenster schließen, kann Pi-Desktop-Plus in der Taskleiste weiterlaufen, sodass nichts verloren geht. Sie können dies jederzeit in den Einstellungen ändern.",
     "closeToTray": "In der Taskleiste",
-    "confirmQuitTitle": "PI-Desktop beenden?",
+    "confirmQuitTitle": "Pi-Desktop-Plus beenden?",
     "confirmQuitBody": "Sind Sie sicher, dass Sie beenden möchten? Alle laufenden Sitzungen werden gestoppt und nicht gespeicherte Änderungen gehen möglicherweise verloren.",
     "confirmQuit": "Beenden"
   },
@@ -92,7 +92,7 @@ export const de = {
     "zoomOut": "Verkleinern",
     "toggleFullScreen": "Vollbild umschalten",
     "toggleDevTools": "Entwicklertools",
-    "appHelp": "PI-Desktop-Hilfe",
+    "appHelp": "Pi-Desktop-Plus-Hilfe",
     "openLogs": "Protokolle öffnen",
     "checkForUpdates": "Nach Updates suchen…"
   },
@@ -217,6 +217,18 @@ export const de = {
     sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
+    "profileAgent": "Agent",
+    "profileAgentDesc": "Standardmäßige Einzelagent-Ausführung",
+    "profileTeam": "Expertenteam",
+    "profileTeamDesc": "Autonomes Multi-Agenten-Team mit geteiltem Aufgabenboard",
+    "profileTeamNotice": "Kann mehrere parallele Modellanfragen auslösen",
+    "profileBlockedByRunningTeammate": "Umschalten auf Einzelagent nicht möglich, solange Teammitglieder aktiv sind",
+    "contractNone": "Keiner",
+    "contractNoneDesc": "Direkte Unterhaltungsausführung ohne Vertragsprüfung",
+    "contractPlanDesc": "Erstellt und überprüft einen strukturierten Plan vor der Ausführung",
+    "contractGoalDesc": "Definiert das Zielergebnis und die Akzeptanzkriterien",
+    "contractMode": "Vertragsmodus",
+    "executionProfile": "Ausführungsprofil",
     "tableActions": "Tabellenaktionen",
     "copyTableMarkdown": "Tabelle als Markdown kopieren",
     "exportTableCsv": "Tabelle als CSV herunterladen",
@@ -238,7 +250,7 @@ export const de = {
     "emptyTitle": "Was kann ich Ihnen beim Aufbau helfen?",
     "emptyTitleInProject": "Was können wir in {{project}} bauen?",
     "emptyTitleTemporary": "Was würden Sie gerne vorübergehend erkunden?",
-    "placeholder": "Bitten Sie PI-Desktop um Hilfe bei allem",
+    "placeholder": "Bitten Sie Pi-Desktop-Plus um Hilfe bei allem",
     "placeholderHome": "Fragen Sie alles",
     "placeholderHint": "Geben Sie / für Befehle · @ für Dateien ein",
     "placeholderHomeHint": "Geben Sie / für Befehle · @ für Dateien ein",
@@ -346,6 +358,10 @@ export const de = {
     "usageThroughput": "{{count}} Tokens/s",
     "usageThroughputEstimated": "≈ {{count}} Tokens/s",
     "usageThroughputUnavailable": "–",
+    "usageThroughputUnavailableLabel": "Generierungsgeschwindigkeit nicht verfügbar",
+    "usageTurnTotalUnavailableLabel": "Turn-Token-Anzahl nicht verfügbar",
+    "usageCacheRateUnavailableLabel": "Cache-Trefferquote nicht verfügbar",
+    "usageFooterLabel": "Composer-Nutzungsstatistiken",
     "usageProviderUsage": "Anbieternutzung",
     "usageInput": "Eingabe",
     "usageOutput": "Ausgabe",
@@ -549,6 +565,8 @@ export const de = {
     "untitled": "Unbenannter Plan",
     "openArtifact": "Offener Plan",
     "openArtifactLabel": "Offenes Planartefakt {{path}}",
+    "artifactSessionUnavailable": "Die Sitzung, die diesen Plan besitzt, ist nicht mehr verfügbar.",
+    "artifactScratchUnavailable": "Das temporäre Sitzungsverzeichnis ist nicht verfügbar.",
   },
   "goal": {
     "planning": "Ziel definieren",
@@ -567,6 +585,8 @@ export const de = {
     "untitled": "Ziel ohne Titel",
     "openArtifact": "Ziel öffnen",
     "openArtifactLabel": "Zielartefakt öffnen {{path}}",
+    "artifactSessionUnavailable": "Die Sitzung, die dieses Ziel besitzt, ist nicht mehr verfügbar.",
+    "artifactScratchUnavailable": "Das temporäre Sitzungsverzeichnis ist nicht verfügbar.",
   },
   "onboarding": {
     "title": "Erste Schritte",
@@ -580,7 +600,7 @@ export const de = {
   "settings": {
     "power": "Energie",
     "keepAwakeWhileRunning": "Computer wach halten",
-    "keepAwakeWhileRunningDesc": "Verhindert den Ruhezustand bei Inaktivität, solange PI-Desktop läuft. Der Bildschirm kann sich ausschalten; manuelles Schlafen und Zuklappen bleiben möglich.",
+    "keepAwakeWhileRunningDesc": "Verhindert den Ruhezustand bei Inaktivität, solange Pi-Desktop-Plus läuft. Der Bildschirm kann sich ausschalten; manuelles Schlafen und Zuklappen bleiben möglich.",
     "imageModel": "Bildgenerierungsmodell",
     "imageModelUnset": "Nicht konfiguriert",
     "imageModelUnavailable": "Derzeit nicht verfügbar",
@@ -675,7 +695,7 @@ sklm: {
       "Dieser Anbieter stammt aus dem Plugin „{{plugin}}“, das Endpunkt und Modelle bereitstellt. Aktivieren oder deaktivieren Sie es auf der Seite „Erweiterungen“.",
     "pluginProviderKey": "API-Schlüssel",
     "pluginProviderKeyHint":
-      "Wird in PI-Desktop gespeichert und von der Laufzeitumgebung verwendet. Das Plugin erhält ihn niemals.",
+      "Wird in Pi-Desktop-Plus gespeichert und von der Laufzeitumgebung verwendet. Das Plugin erhält ihn niemals.",
     "pluginProviderKeyRemove": "Schlüssel entfernen",
     "pluginProviderKeySaved": "API-Schlüssel gespeichert",
     "pluginProviderKeyRemoved": "API-Schlüssel entfernt",
@@ -1191,6 +1211,8 @@ sklm: {
     "enterToSendDesc": "Aus: Zum Senden ⌘/Strg+Eingabe drücken.",
     "infiniteProviderRetry": "Bis zum Erfolg wiederholen",
     "infiniteProviderRetryDesc": "Netzwerk- und vorübergehende Anbieterfehler werden bis zum Erfolg wiederholt. Du kannst den Lauf weiterhin stoppen; der API-Verbrauch kann fortlaufen.",
+    "autoGenerateSessionTitles": "Automatische Sitzungstitel",
+    "autoGenerateSessionTitlesDesc": "Fasst das Gespräch nach der ersten Runde automatisch in einem kurzen Titel zusammen. Sendet einen begrenzten Auszug an das ausgewählte Modell; kann Guthaben verbrauchen.",
     "smoothStreaming": "Sanftes Streaming",
     "smoothStreamingDesc": "Gibt gestreamten Text zeichenweise aus, um einen Schreibmaschineneffekt zu erzeugen. Wird automatisch deaktiviert, wenn das System reduzierte Bewegung bevorzugt.",
     "preventScreenSleep": "Bildschirmsperre verhindern",
@@ -1622,7 +1644,7 @@ sklm: {
     "draft": "Entwurf"
   },
   "scheduled": {
-    "description": "Wiederkehrende Agent-Aufgaben ausführen, solange PI-Desktop geöffnet ist.",
+    "description": "Wiederkehrende Agent-Aufgaben ausführen, solange Pi-Desktop-Plus geöffnet ist.",
     "edit": "Aufgabe bearbeiten",
     "hourlyHint": "Läuft stündlich, erstmals eine Stunde nach dem Speichern oder Aktivieren. Ein App-Neustart startet das Intervall neu.",
     "morning": "Vormittag",
@@ -1636,7 +1658,7 @@ sklm: {
     "legacyHint": "Zeitplan bearbeiten und speichern, um automatische Ausführungen zu aktivieren.",
     "time": "Uhrzeit",
     "weekday": "Wochentag",
-    "localTimeHint": "Verwendet die lokale Zeitzone. PI-Desktop muss geöffnet bleiben; verpasste Ausführungen werden übersprungen.",
+    "localTimeHint": "Verwendet die lokale Zeitzone. Pi-Desktop-Plus muss geöffnet bleiben; verpasste Ausführungen werden übersprungen.",
     "projectHint": "Das aktuelle Projekt wird gespeichert. Ausführungen verwenden das Standardmodell.",
     "autoPermissionHint": "Auto kann eingeschränkte Aktionen ohne Nachfrage ausführen. Verwenden Sie es nur für vertrauenswürdige Aufgaben.",
     "unavailableModel": "{{provider}} / {{model}} (nicht verfügbar)",
@@ -1720,6 +1742,31 @@ sklm: {
     "minimize": "Minimieren",
     "close": "Widget schließen"
   },
+  "team": {
+    "title": "Expertenteam",
+    "roster": "Team-Dienstplan",
+    "board": "Aufgabenboard",
+    "warnings": "Bereichsüberlappungswarnungen",
+    "emptyRoster": "Noch keine Teammitglieder erstellt. Der leitende Agent erstellt bei Bedarf Mitglieder.",
+    "emptyTasks": "Noch keine Aufgaben auf dem geteilten Board erstellt.",
+    "pausedBadge": "Pausiert",
+    "activeBadge": "Aktiv",
+    "resumeButton": "Team fortsetzen",
+    "openSession": "Sitzung öffnen",
+    "unassigned": "Nicht zugewiesen",
+    "launcherDesc": "Teammitglieder, Aufgabenboard und Koordination einsehen",
+    "retry": "Erneut versuchen",
+    "refresh": "Aktualisieren",
+    "snapshotChanged": "Die Teamdaten haben sich beim Laden geändert. Erneut versuchen.",
+    "overlapTask": "Aufgaben {{tasks}} überschneiden sich im Bereich {{scope}}",
+    "blockedBy": "Blockiert durch: {{tasks}}",
+    "scopes": "Bereiche: {{scopes}}",
+    "readiness": { "ready": "Bereit", "blocked": "Blockiert" },
+    "context": { "fresh": "Neu", "fork": "Fork" },
+    "phase": { "provisioning": "Wird vorbereitet", "idle": "Inaktiv", "running": "Läuft", "failed": "Fehlgeschlagen", "completed": "Abgeschlossen" },
+    "taskStatus": { "pending": "Ausstehend", "in_progress": "In Bearbeitung", "completed": "Abgeschlossen", "failed": "Fehlgeschlagen", "cancelled": "Abgebrochen" },
+  },
+
   "panel": {
     "title": "Arbeitsfenster",
     "subagent": "Unteragent",
@@ -1738,11 +1785,13 @@ sklm: {
     },
     "closeTab": "Schließen {{name}}",
     "tabs": {
+      "team": "Team",
       "review": "Überprüfen",
       "browser": "Browser",
       "file": "Dateien",
       "plugin": "Plugin-Ansicht",
-      "subagent": "Subagent"
+      "subagent": "Subagent",
+      goalReport: "Zielbericht",
     },
     "pluginView": {
       "failed": "Diese Ansicht konnte nicht geladen werden. Laden Sie das Plugin neu und versuchen Sie es erneut."
@@ -2100,8 +2149,8 @@ sklm: {
       "agent.prompt.inject": "Kann Anweisungen ändern, die an den KI-Agenten gesendet werden.",
       "agent.complete": "Kann Ihr Modellkontingent für eine einmalige Fertigstellung ausgeben. Das Plugin erhält niemals Ihre API-Schlüssel.",
       "agent.extension": "Führt ExtensionAPI-Module im Agentenprozess mit denselben Rechten wie die Tools des Agenten aus. Aktiviere nur Code, dem du vertraust.",
-      "provider.register": "Fügt die Anbieter, die dieses Plugin definiert, zur Anbieterliste in den Einstellungen hinzu. Das Plugin liefert den Endpunkt und die Modelle; Ihr API-Schlüssel bleibt in PI-Desktop.",
-      "desktop.control": "Erlaubt den Aufruf des geprüften PI-Desktop-Katalogs; destruktive Vorgänge benötigen weiterhin confirm=true, und das MCP-Bearer-Token wird nicht offengelegt.",
+      "provider.register": "Fügt die Anbieter, die dieses Plugin definiert, zur Anbieterliste in den Einstellungen hinzu. Das Plugin liefert den Endpunkt und die Modelle; Ihr API-Schlüssel bleibt in Pi-Desktop-Plus.",
+      "desktop.control": "Erlaubt den Aufruf des geprüften Pi-Desktop-Plus-Katalogs; destruktive Vorgänge benötigen weiterhin confirm=true, und das MCP-Bearer-Token wird nicht offengelegt.",
       "models.list": "Kann sehen, für welche Modelle Sie sich angemeldet haben. Es erhält keine Schlüssel.",
       "session.read": "Kann die Konversation lesen, an der der aktuelle Tool-Aufruf arbeitet, einschließlich der Tool-Ergebnisse.",
       "net.fetch": "Kann ausgehende Netzwerkanfragen stellen.",
@@ -2114,7 +2163,7 @@ sklm: {
       "audio.capture.background": "Erfasst das Mikrofon, während das Plugin im Hintergrund läuft und kein Panel geöffnet ist.",
       "audio.playback.background": "Gibt Audio wieder, das das Plugin streamt, auch wenn kein Panel geöffnet ist.",
       "speech.adapter.register": "Kann ein Transkriptions- oder Sprachprotokoll hinzufügen, das vorhandene Anbieterschlüssel nutzt. Das Plugin sieht den Schlüssel nie.",
-      "keyboard.globalShortcut": "Registriert systemweite Tastaturkürzel, die die eigenen Befehle dieses Plugins auslösen, während PI-Desktop nicht fokussiert ist.",
+      "keyboard.globalShortcut": "Registriert systemweite Tastaturkürzel, die die eigenen Befehle dieses Plugins auslösen, während Pi-Desktop-Plus nicht fokussiert ist.",
       "net.websocket": "Öffnet bidirektionale Echtzeitverbindungen zu den Hosts, die das Plugin deklariert hat.",
       "bus.publish": "Kann Nachrichten zu den angegebenen Themen senden.",
       "bus.subscribe": "Kann Nachrichten zu den angegebenen Themen empfangen.",
@@ -2340,7 +2389,7 @@ sklm: {
     "unsupportedGlibc":
       "Diese Linux-Version benötigt glibc 2.35 oder neuer (Ubuntu 22.04, Debian 12, Fedora 36+).",
     "dbSchemaTooNew":
-      "Diese PI-Desktop-Version ist älter als Ihre lokalen Daten (Datenschema {{found}}, diese Version unterstützt {{supported}}). Installieren Sie die neuere PI-Desktop-Version, die diese Daten zuletzt geöffnet hat, oder eine spätere.",
+      "Diese Pi-Desktop-Plus-Version ist älter als Ihre lokalen Daten (Datenschema {{found}}, diese Version unterstützt {{supported}}). Installieren Sie die neuere Pi-Desktop-Plus-Version, die diese Daten zuletzt geöffnet hat, oder eine spätere.",
     "archMismatch":
       "Dies ist die {{buildArch}}-Version auf einem {{machineArch}}-Rechner; sie läuft übersetzt und daher langsamer. Installieren Sie stattdessen die {{machineArch}}-Version.",
     "dismissArchMismatch": "Ausblenden",
@@ -2421,7 +2470,36 @@ sklm: {
       "continue": "Weiter",
       "dismiss": "Verwerfen"
     }
-  }
+  },
+  goalReport: {
+    view: {
+        title: "Zielabschlussbericht",
+        openInWorkPanel: "Im Arbeitsbereich anzeigen",
+        summary: "Zusammenfassung",
+        metrics: "Metriken",
+        criteria: "Akzeptanzkriterien",
+        steps: "Ausführungsschritte",
+        files: "Geänderte Dateien",
+        checks: "Prüfungen",
+        limitations: "Einschränkungen",
+        nextSteps: "Nächste Schritte",
+        evidences: "Verifizierungsnachweise",
+        loading: "Bericht wird geladen…",
+        loadFailed: "Fehler beim Laden des Berichts",
+        retryLoad: "Wiederholen",
+        fallbackNotice: "Basislaufzeitbericht aus dem Ausführungsverlauf.",
+        verdictMet: "Erfüllt",
+        verdictPartial: "Teilweise erfüllt",
+        verdictBlocked: "Blockiert / Unvollständig",
+        verdictUnknown: "Unbekanntes Ergebnis",
+        statusCompleted: "Abgeschlossen",
+        statusInterrupted: "Unterbrochen",
+        remoteDisconnected: "Verbindung zum Remote-Host getrennt",
+        conclusion: "Fazit",
+        structured: "Strukturiert",
+        fallback: "Fallback"
+    }
+},
 } satisfies EnglishCatalog;
 
 export default de;

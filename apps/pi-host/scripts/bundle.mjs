@@ -8,7 +8,7 @@
  *     bin/pi-desktop-host-core   the platform host-core binary
  *     node_modules/node-pty      optional; terminals are disabled without it
  *     package.json               { type: module, version }
- *     install.sh                 copies the bundle under ~/.pi-desktop/pi-host/<version>
+ *     install.sh                 copies the bundle under ~/.pi-desktop-plus/pi-host/<version>
  *
  * Usage: node scripts/bundle.mjs [--host-core <path>] [--platform linux] [--arch x64|arm64] [--out <dir>]
  */
@@ -77,7 +77,7 @@ writeFileSync(
   `#!/bin/sh
 # Install this pi-host bundle under the user's home (D375 bootstrap).
 set -eu
-target="\${PI_HOST_INSTALL_DIR:-$HOME/.pi-desktop/pi-host}/${version}"
+target="\${PI_HOST_INSTALL_DIR:-$HOME/.pi-desktop-plus/pi-host}/${version}"
 mkdir -p "$target"
 cp -R "$(dirname "$0")"/. "$target"/
 chmod 755 "$target/bin/pi-desktop-host-core${exe}"

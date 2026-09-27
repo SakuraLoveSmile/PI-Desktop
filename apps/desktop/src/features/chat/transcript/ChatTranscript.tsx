@@ -6,6 +6,8 @@ import { ConversationMinimap } from "../../../components/ConversationMinimap";
 import { PermissionCard } from "../../../components/PermissionCard";
 import { TooltipButton } from "../../../components/ui";
 import { TurnOutcomeCard } from "../../../components/TurnOutcomeCard";
+import { GoalReportCard } from "../../../components/GoalReportCard";
+import { goalReportWorkPanelTab } from "../../../lib/work-panel-tabs";
 import { IconArrowDown } from "../../../components/icons";
 import { useAppStore } from "../../../stores/app-store";
 import type { PendingPermission } from "../../../lib/pending-permissions";
@@ -95,6 +97,12 @@ function TranscriptBody({
   const transcriptRunning = isRunning && !readingWindow;
   const latestTurnResult = useAppStore((state) =>
     sessionId ? state.latestTurnResults[sessionId] : undefined,
+  );
+  const goalReports = useAppStore((state) =>
+    sessionId ? state.goalReports[sessionId] : undefined,
+  );
+  const openWorkPanelTabForSession = useAppStore(
+    (state) => state.openWorkPanelTabForSession,
   );
   const approvalPending = useAppStore((state) =>
     Boolean(
@@ -287,10 +295,24 @@ function TranscriptBody({
             </button>
           ) : null}
           {!readingWindow ? (
-            <TurnOutcomeCard
-              messages={messages}
-              result={latestTurnResult}
-            />
+            <>
+              {goalReports?.map((report) => (
+                <GoalReportCard
+                  key={report.reportId}
+                  report={report}
+                  onOpenReport={() => {
+                    openWorkPanelTabForSession(
+                      report.sessionId,
+                      goalReportWorkPanelTab(report.executionId, report.goalTitle),
+                    );
+                  }}
+                />
+              ))}
+              <TurnOutcomeCard
+                messages={messages}
+                result={latestTurnResult}
+              />
+            </>
           ) : null}
           {pendingPermission ? (
             <PermissionCard

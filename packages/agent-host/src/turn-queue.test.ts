@@ -51,6 +51,32 @@ describe("TurnQueue", () => {
     expect(queue.find("other")?.sessionId).toBe("s2");
   });
 
+  it("keeps independent holds and admits only the requested restored Team message", async () => {
+    const store = new MemoryQueueStore();
+    await store.push({
+      ...record("ordinary", "s1", 1),
+      sessionMessageId: "ordinary-message",
+      idempotencyKey: "session-message:ordinary-message",
+    });
+    await store.push({
+      ...record("team", "s1", 2),
+      sessionMessageId: "team-message",
+      idempotencyKey: "team-message:team-message",
+    });
+    const queue = new TurnQueue(store, 8);
+    await queue.restore();
+    queue.hold("s1", "team:lead");
+    expect(queue.admitRecovery("s1", "ordinary-message")).toBe(false);
+    expect(queue.admitRecovery("s1", "team-message")).toBe(true);
+    expect(queue.peekEligible("s1")?.id).toBe("team");
+
+    queue.resume("s1", "team:lead");
+    expect(queue.isHeld("s1")).toBe(true);
+    expect(queue.isHeldByOtherThan("s1", "restore")).toBe(false);
+    expect((await queue.shiftEligible("s1"))?.id).toBe("team");
+    expect(queue.peek("s1")?.id).toBe("ordinary");
+  });
+
   it("raises RacpError instances", async () => {
     const queue = new TurnQueue(new MemoryQueueStore(), 0);
     await expect(queue.push(record("a"))).rejects.toBeInstanceOf(RacpError);
