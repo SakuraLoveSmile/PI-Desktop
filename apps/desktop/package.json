@@ -1,10 +1,10 @@
 {
   "name": "@pi-desktop/desktop",
   "version": "0.15.6",
-  "desktopName": "pi-desktop.desktop",
+  "desktopName": "pi-desktop-plus.desktop",
   "private": true,
-  "description": "PI-Desktop Electron application",
-  "homepage": "https://github.com/vastsa/PI-Desktop",
+  "description": "Pi-Desktop-Plus Electron application",
+  "homepage": "https://github.com/SakuraLoveSmile/PI-Desktop",
   "author": {
     "name": "vastsa",
     "email": "hhxk666@gmail.com"
@@ -79,19 +79,20 @@
     "zustand": "^5.0.15"
   },
   "build": {
-    "appId": "net.aiuo.pi-desktop",
-    "productName": "PI-Desktop",
+    "appId": "cn.sakura.pi-desktop",
+    "productName": "Pi-Desktop-Plus",
     "directories": {
       "output": "release"
     },
     "publish": [
       {
         "provider": "github",
-        "owner": "vastsa",
+        "owner": "SakuraLoveSmile",
         "repo": "PI-Desktop"
       }
     ],
     "extraMetadata": {
+      "name": "pi-desktop-plus",
       "piDistribution": "installed"
     },
     "files": [
@@ -141,7 +142,7 @@
       }
     ],
     "mac": {
-      "artifactName": "PI-Desktop-${version}-${arch}-mac.${ext}",
+      "artifactName": "Pi-Desktop-Plus-${version}-${arch}-mac.${ext}",
       "target": [
         {
           "target": "dmg"
@@ -157,8 +158,8 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "extendInfo": {
-        "NSLocalNetworkUsageDescription": "PI-Desktop needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / PI-Desktop 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
-        "NSMicrophoneUsageDescription": "PI-Desktop plugins may use the microphone after you grant them audio access. / 在你授权后，PI-Desktop 插件可以使用麦克风。",
+        "NSLocalNetworkUsageDescription": "Pi-Desktop-Plus needs local network access so agents can reach OpenAI-compatible providers, Ollama, and other AI endpoints running on your LAN. / Pi-Desktop-Plus 需要本地网络访问权限，以便助手请求同一局域网中的 OpenAI 兼容服务、Ollama 等本地 AI 端点。",
+        "NSMicrophoneUsageDescription": "Pi-Desktop-Plus plugins may use the microphone after you grant them audio access. / 在你授权后，Pi-Desktop-Plus 插件可以使用麦克风。",
         "NSBonjourServices": [
           "_http._tcp",
           "_https._tcp"
@@ -175,12 +176,12 @@
         }
       ],
       "extraDistFiles": [
-        "PI-Desktop-macOS-open.command",
-        "PI-Desktop-macOS-opening-help.txt"
+        "Pi-Desktop-Plus-macOS-open.command",
+        "Pi-Desktop-Plus-macOS-opening-help.txt"
       ]
     },
     "dmg": {
-      "artifactName": "PI-Desktop-${version}-${arch}.${ext}",
+      "artifactName": "Pi-Desktop-Plus-${version}-${arch}.${ext}",
       "background": "build/dmg-background.png",
       "icon": "build/icon.icns",
       "window": {
@@ -203,8 +204,8 @@
       ]
     },
     "win": {
-      "executableName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Portable-${version}.${ext}",
+      "executableName": "Pi-Desktop-Plus",
+      "artifactName": "Pi-Desktop-Plus-Portable-${version}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -234,23 +235,23 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Setup-${version}.${ext}"
+      "shortcutName": "Pi-Desktop-Plus",
+      "artifactName": "Pi-Desktop-Plus-Setup-${version}.${ext}"
     },
     "deb": {
-      "packageName": "pi-desktop",
-      "artifactName": "pi-desktop_${version}_${arch}.${ext}"
+      "packageName": "pi-desktop-plus",
+      "artifactName": "pi-desktop-plus_${version}_${arch}.${ext}"
     },
     "rpm": {
-      "packageName": "pi-desktop",
-      "artifactName": "pi-desktop-${version}-${arch}.${ext}",
+      "packageName": "pi-desktop-plus",
+      "artifactName": "pi-desktop-plus-${version}-${arch}.${ext}",
       "fpm": [
         "--rpm-rpmbuild-define",
         "_build_id_links none"
       ]
     },
     "linux": {
-      "executableName": "pi-desktop",
+      "executableName": "pi-desktop-plus",
       "syncDesktopName": true,
       "target": [
         {

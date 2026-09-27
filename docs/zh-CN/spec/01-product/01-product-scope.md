@@ -124,10 +124,10 @@ Plan 和 Goal 是合约模式，而不是严格的只读安全配置文件：Bas
 
 ## 8. 命名
 
-- 产品：`PI-Desktop`
-- 包装：`pi-desktop`
-- 应用程序 ID：`net.aiuo.pi-desktop`
-- 窗口标题：`PI-Desktop`
+- 产品：`Pi-Desktop-Plus`
+- 包装：`pi-desktop-plus`
+- 应用程序 ID：`cn.sakura.pi-desktop`
+- 窗口标题：`Pi-Desktop-Plus`
 
 ## 9. 平台策略
 
@@ -137,3 +137,8 @@ Plan 和 Goal 是合约模式，而不是严格的只读安全配置文件：Bas
 | macOS 英特尔 | 已发表 | 本机 x64 DMG/ZIP 发布通道；signing/notarization 仍受凭证控制 |
 | Windows x64 | 已发表 | NSIS 安装程序、免安装便携版 ZIP，以及仅适用于 NSIS 的应用内更新通道；本土资格继续 |
 | Linux x64 | 已发表 | AppImage、deb 和 rpm 包；AppImage 更新通道；glibc 2.35+（Ubuntu 22.04、Debian 12、Fedora 36+）；本土资格继续 |
+
+## Plus 独立安装
+
+Pi-Desktop-Plus 使用独立 Electron 配置和 `~/.pi-desktop-plus` 数据目录；开发数据使用 `~/.pi-desktop-plus-dev`。不会自动导入、移动或修改 PI-Desktop 数据。显式数据目录覆盖继续有效，更新来自 `SakuraLoveSmile/PI-Desktop`。
+参见 [ADR 0308](../../../adr/0308-independent-plus-application-identity.md)。

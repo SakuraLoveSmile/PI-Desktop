@@ -20,6 +20,7 @@ import {
   parsePluginViewRef,
   pluginWorkPanelTab,
   subagentTabDisplayLabels,
+  teamWorkPanelTab,
   toolWorkPanelTab,
 } from "../../lib/work-panel-tabs";
 import type { PluginViewMeta } from "@pi-desktop/shared";
@@ -31,6 +32,7 @@ import { TooltipButton } from "../ui";
 import type { IconProps } from "../icons";
 import {
   IconBot,
+  IconCheckCheck,
   IconClose,
   IconDiff,
   IconFileText,
@@ -38,11 +40,14 @@ import {
   IconPanelRestore,
   IconPlug,
   IconPlus,
+  IconUsers,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
 import { FilesTab } from "./FilesTab";
 import { PluginViewTab } from "./PluginViewTab";
 import { SubagentTranscriptTab } from "./SubagentTranscriptTab";
+import { GoalReportTab } from "./GoalReportTab";
+import { TeamPanel } from "./TeamPanel";
 import {
   MAIN_PANE_MIN_WIDTH,
   WORK_PANEL_COMPACT_MIN_WIDTH,
@@ -59,6 +64,8 @@ const TAB_ICONS = {
   file: IconFileText,
   plugin: IconPlug,
   subagent: IconBot,
+  goalReport: IconCheckCheck,
+  team: IconUsers,
 } as const;
 
 type WorkPanelResizeState = {
@@ -112,6 +119,7 @@ function tabLabel(
   }
   if (tab.kind === "new") return t("panel.new.title");
   if (tab.kind === "subagent") return tab.label ?? t("panel.tabs.subagent");
+  if (tab.kind === "goalReport") return tab.label ?? t("panel.tabs.goalReport");
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
   const path = tab.resource ?? "";
   return path.split("/").filter(Boolean).pop() || t("panel.tabs.file");
@@ -120,6 +128,8 @@ function tabLabel(
 function workPanelTools(
   t: (key: string) => string,
   pluginViews: PluginViewMeta[],
+  teamAvailable: boolean = false,
+  teamSessionId?: string,
 ): WorkPanelTool[] {
   // Review is the only host-owned launcher. Files, Browser, and every future
   // tool are plugin-contributed views, so their list stays data-driven.
@@ -130,6 +140,17 @@ function workPanelTools(
       label: t("panel.tabs.review"),
       icon: IconDiff,
     },
+    ...(teamAvailable && teamSessionId
+      ? [
+          {
+            id: "team",
+            tab: teamWorkPanelTab(teamSessionId),
+            label: t("team.title"),
+            icon: IconUsers,
+            description: t("team.launcherDesc"),
+          },
+        ]
+      : []),
     ...pluginViews.map((view) => {
       const Icon = pluginViewIcon(view.icon);
       return {
@@ -194,6 +215,8 @@ export function WorkPanel({
   const tabs = rawTabs.filter(isKnownWorkPanelTab);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const sessions = useAppStore((s) => s.sessions);
+  const selectSession = useAppStore((s) => s.selectSession);
   const pluginViews = useAppStore((s) => s.pluginViews);
   const width = useAppStore((s) => s.workPanelWidth);
   const activateTab = useAppStore((s) => s.activateWorkPanelTab);
@@ -204,7 +227,13 @@ export function WorkPanel({
   const replaceWorkPanelTab = useAppStore((s) => s.replaceWorkPanelTab);
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
-  const tools = workPanelTools(t, pluginViews);
+  const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const tools = workPanelTools(
+    t,
+    pluginViews,
+    activeSession?.executionProfile === "team",
+    activeSessionId ?? undefined,
+  );
   const tabSignature = JSON.stringify(
     tabs.map(({ id, kind, resource, location }) => [id, kind, resource, location]),
   );
@@ -911,6 +940,34 @@ export function WorkPanel({
               aria-labelledby={`work-panel-tab-${activeTab.id}`}
             >
               <SubagentTranscriptTab delegationId={activeTab.resource ?? ""} />
+            </div>
+          )}
+          {activeTab?.kind === "goalReport" && (
+            <div
+              key={activeTab.id}
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <GoalReportTab
+                executionId={activeTab.resource ?? ""}
+                sessionId={activeSessionId ?? undefined}
+              />
+            </div>
+          )}
+          {activeTab?.kind === "team" && (
+            <div
+              key={activeTab.id}
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <TeamPanel
+                teamSessionId={activeTab.resource ?? activeSessionId ?? ""}
+                onSelectSession={(sessionId: string) => void selectSession(sessionId)}
+              />
             </div>
           )}
           {activeTab?.kind === "review" && (

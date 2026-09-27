@@ -38,6 +38,7 @@ fn submit(manager: &PlanManager, db: &Database, root: &Path, call: &str) -> Plan
                 title: "Build API",
                 markdown: "# Plan\n- implement",
                 question: "Proceed?",
+                artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
             },
         )
         .unwrap()
@@ -139,6 +140,7 @@ fn publication_collides_without_overwriting() {
                 title: "Build API",
                 markdown: "second",
                 question: "Proceed?",
+                artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
             },
         )
         .unwrap();
@@ -171,6 +173,7 @@ fn oversized_markdown_is_rejected_before_artifact_creation() {
                 title: "Too large",
                 markdown: &"x".repeat(PLAN_MAX_MARKDOWN_BYTES + 1),
                 question: "Proceed?",
+                artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
             },
         )
         .unwrap_err();
@@ -202,6 +205,7 @@ fn existing_plan_symlink_is_rejected() {
                 title: "Plan",
                 markdown: "body",
                 question: "?",
+                artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
             },
         )
         .unwrap_err();
@@ -232,6 +236,7 @@ fn pending_rows_are_interrupted_during_database_restart() {
                     title: "Plan",
                     markdown: "body",
                     question: "?",
+                    artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
                 },
             )
             .unwrap()
@@ -305,6 +310,7 @@ fn reject_has_no_side_effects_and_allows_new_turn_submission() {
                 title: "Build API revised",
                 markdown: "# Plan\n- revise",
                 question: "Proceed with the revision?",
+                artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
             },
         )
         .unwrap();
@@ -731,6 +737,7 @@ fn goal_contract_round_trips_through_its_own_kind() {
                 title: "Ship checkout",
                 markdown: "# Goal\n## Acceptance criteria\n- tests pass",
                 question: "Approve this goal?",
+                artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
             },
         )
         .unwrap();
@@ -802,6 +809,7 @@ fn submitting_the_other_contract_kind_is_rejected() {
                     title: "Plan in a goal session",
                     markdown: "# Plan",
                     question: "Proceed?",
+                    artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
                 },
             )
             .unwrap_err()
@@ -824,6 +832,7 @@ fn submitting_the_other_contract_kind_is_rejected() {
                     title: "Goal in a plan session",
                     markdown: "# Goal",
                     question: "Approve?",
+                    artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
                 },
             )
             .unwrap_err()

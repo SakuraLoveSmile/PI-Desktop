@@ -839,3 +839,95 @@ pub(crate) fn migrate_v18_to_v19(conn: &Connection, path: &Path) -> Result<()> {
     let _ = conn.pragma_update(None, "foreign_keys", true);
     result
 }
+
+/// v20 adds `artifact_workspace_kind` to `plan_approvals` to durably distinguish
+/// between project-origin and scratch-origin contract checkpoints, and creates
+/// `goal_reports` storage for Goal completion reporting.
+pub(crate) fn migrate_v19_to_v20_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let has_workspace_kind: bool = tx.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'artifact_workspace_kind'
+         )",
+        [],
+        |row| row.get(0),
+    )?;
+    if !has_workspace_kind {
+        tx.execute_batch(
+            "ALTER TABLE plan_approvals ADD COLUMN artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch'));",
+        )?;
+    }
+    tx.execute_batch(crate::goal_reports::SCHEMA)?;
+    tx.pragma_update(None, "user_version", 20i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v19_to_v20(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 19)?;
+    conn.pragma_update(None, "foreign_keys", false)?;
+    let result = (|| {
+        let tx = conn.unchecked_transaction()?;
+        migrate_v19_to_v20_tx(&tx)?;
+        tx.commit().with_context(|| {
+            format!(
+                "commit schema v19 to v20 migration; backup {} remains",
+                backup.display()
+            )
+        })
+    })();
+    let _ = conn.pragma_update(None, "foreign_keys", true);
+    result
+}
+
+/// v21 adds execution profiles and Team tables, and completes Goal objects for
+/// databases created by either unreleased v20 branch.
+pub(crate) fn migrate_v20_to_v21_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let has_execution_profile: bool = tx.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM pragma_table_info('sessions') WHERE name = 'execution_profile'
+         )",
+        [],
+        |row| row.get(0),
+    )?;
+    if !has_execution_profile {
+        tx.execute_batch(
+            "ALTER TABLE sessions
+             ADD COLUMN execution_profile TEXT NOT NULL DEFAULT 'standard'
+             CHECK (execution_profile IN ('standard', 'team'));",
+        )?;
+    }
+
+    let has_workspace_kind: bool = tx.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'artifact_workspace_kind'
+         )",
+        [],
+        |row| row.get(0),
+    )?;
+    if !has_workspace_kind {
+        tx.execute_batch(
+            "ALTER TABLE plan_approvals ADD COLUMN artifact_workspace_kind TEXT NOT NULL DEFAULT 'project' CHECK (artifact_workspace_kind IN ('project', 'scratch'));",
+        )?;
+    }
+
+    tx.execute_batch(super::schema::TEAM_SCHEMA)?;
+    tx.execute_batch(crate::goal_reports::SCHEMA)?;
+    tx.pragma_update(None, "user_version", 21i64)?;
+    Ok(())
+}
+
+pub(crate) fn migrate_v20_to_v21(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 20)?;
+    conn.pragma_update(None, "foreign_keys", false)?;
+    let result = (|| {
+        let tx = conn.unchecked_transaction()?;
+        migrate_v20_to_v21_tx(&tx)?;
+        tx.commit().with_context(|| {
+            format!(
+                "commit schema v20 to v21 migration; backup {} remains",
+                backup.display()
+            )
+        })
+    })();
+    let _ = conn.pragma_update(None, "foreign_keys", true);
+    result
+}

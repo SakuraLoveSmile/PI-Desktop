@@ -48,6 +48,9 @@ export const RacpPermissionModeSchema = Type.Union([Type.Literal("ask"), Type.Li
 export const RACP_SESSION_MODES = ["agent", "plan", "goal"] as const;
 export type RacpSessionMode = (typeof RACP_SESSION_MODES)[number];
 export const RacpSessionModeSchema = Type.Union([Type.Literal("agent"), Type.Literal("plan"), Type.Literal("goal")]);
+export const RACP_EXECUTION_PROFILES = ["standard", "team"] as const;
+export type RacpExecutionProfile = (typeof RACP_EXECUTION_PROFILES)[number];
+export const RacpExecutionProfileSchema = Type.Union([Type.Literal("standard"), Type.Literal("team")]);
 
 export const RACP_SESSION_STATUSES = [
   "idle",
@@ -116,6 +119,7 @@ export const RacpSessionSchema = Type.Object({
   status: RacpSessionStatusSchema,
   planningState: RacpPlanningStateSchema,
   permissionMode: RacpPermissionModeSchema,
+  executionProfile: Type.Optional(RacpExecutionProfileSchema),
   activeTurnId: Type.Optional(Type.String()),
   queuedTurnIds: Type.Array(Type.String()),
   revision: Type.Integer({ minimum: 0 }),

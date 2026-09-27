@@ -30,6 +30,16 @@ test("shell status and crash copy stay user-facing", () => {
   assert.equal(chinese["status.hostOk"], "已连接");
 });
 
+test("all shipped catalogs use the independent product name", () => {
+  for (const [id, catalog] of Object.entries(catalogs)) {
+    const flat = flattenCatalog(catalog);
+    assert.equal(flat["app.shellName"], "Pi-Desktop-Plus", id);
+    for (const [key, value] of Object.entries(flat)) {
+      assert.doesNotMatch(value, /PI-Desktop/, `${id} ${key}`);
+    }
+  }
+});
+
 test("failed turns expose a localized continuation prompt", () => {
   assert.equal(
     english["chat.continueUnfinishedTaskPrompt"],

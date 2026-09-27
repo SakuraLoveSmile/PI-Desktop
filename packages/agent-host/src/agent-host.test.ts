@@ -482,6 +482,62 @@ describe("AgentHost turns", () => {
     expect(runtime.prompts.map((prompt) => prompt.content)).toEqual(["after reboot"]);
     expect(runtime.prompts[0]?.sessionMessageId).toBe("restored-message");
   });
+
+  it("durably queues Team messages while idle and requires paired desktop authority", async () => {
+    const { host, runtime } = build();
+    const request = {
+      sessionId: "s1",
+      input: { text: "team request", sessionMessageId: "team-message-1" },
+      context: { requestId: "team-request-1" },
+      idempotencyKey: "team-message:team-message-1",
+    };
+    await expect(host.enqueueTeamMessage(viewer, request)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(host.enqueueTeamMessage({ subject: "desktop", roles: ["owner"] }, request))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+
+    const queued = await host.enqueueTeamMessage(owner, request);
+    expect(queued.turn.status).toBe("queued");
+    expect(runtime.prompts).toHaveLength(0);
+    expect(host.queueEntries("s1").map((entry) => entry.sessionMessageId)).toEqual(["team-message-1"]);
+  });
+
+  it("recovers only the admitted Team message from a restored queue", async () => {
+    const store = new MemoryQueueStore();
+    await store.push({
+      id: "ordinary-turn",
+      sessionId: "s1",
+      principalSubject: "desktop",
+      content: "ordinary after reboot",
+      sessionMessageId: "ordinary-message",
+      idempotencyKey: "session-message:ordinary-message",
+      effectivePermissionMode: "ask",
+      inputHash: "ordinary",
+      createdAt: 1,
+    });
+    await store.push({
+      id: "team-turn",
+      sessionId: "s1",
+      principalSubject: "desktop",
+      content: "team after reboot",
+      sessionMessageId: "team-message",
+      idempotencyKey: "team-message:team-message",
+      effectivePermissionMode: "ask",
+      inputHash: "team",
+      createdAt: 2,
+    });
+    const { host, runtime } = build({ queueStore: store });
+    await host.start();
+    host.queue.hold("s1", "team:lead");
+    expect(await host.resumeTeamMessage(owner, "s1", "team-message")).toBe(true);
+    host.kick("s1");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(runtime.prompts).toHaveLength(0);
+
+    host.queue.resume("s1", "team:lead");
+    host.kick("s1");
+    await vi.waitFor(() => expect(runtime.prompts.map((prompt) => prompt.sessionMessageId)).toEqual(["team-message"]));
+    expect(host.queueEntries("s1").map((entry) => entry.sessionMessageId)).toEqual(["ordinary-message"]);
+  });
 });
 
 describe("AgentHost approvals and inputs", () => {

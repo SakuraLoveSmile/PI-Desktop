@@ -1,8 +1,12 @@
 <div align="center">
 
-<img src="docs/image/readme/logo.png" alt="PI-Desktop" width="108" />
+> **Pi-Desktop-Plus 分支：** 应用 ID 为 `cn.sakura.pi-desktop`，数据隔离在
+> `~/.pi-desktop-plus`，发布源为 `SakuraLoveSmile/PI-Desktop`。不会自动导入原版数据。
+> Plus 安装包尚未完成发布验收。
 
-# PI-Desktop
+<img src="docs/image/readme/logo.png" alt="Pi-Desktop-Plus" width="108" />
+
+# Pi-Desktop-Plus
 
 ### 可拆卸的 AI Agent 桌面工作台
 
@@ -12,24 +16,22 @@
 
 <br />
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
-[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/SakuraLoveSmile/PI-Desktop?style=flat\&label=stars)](https://github.com/SakuraLoveSmile/PI-Desktop/stargazers)
+[![CI](https://github.com/SakuraLoveSmile/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/SakuraLoveSmile/PI-Desktop/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/SakuraLoveSmile/PI-Desktop)](LICENSE)
 [![Reddit](https://img.shields.io/badge/Reddit-r%2FAIUO-FF4500?logo=reddit\&logoColor=white)](https://www.reddit.com/r/AIUO/)
 
 <br />
 
-**[立即下载](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[使用文档](https://pi-docs.aiuo.net/) ·
+**[本地构建](#开发者)** ·
+[上游文档](https://pi-docs.aiuo.net/) ·
 [插件开发](docs/plugin-development.md) ·
 [界面预览](docs/guide/screenshots.md) ·
 [English](README.md)
 
 <br />
 
-<img src="docs/image/readme/home.webp" alt="PI-Desktop" width="94%" />
+<img src="docs/image/readme/home.webp" alt="Pi-Desktop-Plus" width="94%" />
 
 <br />
 
@@ -39,11 +41,11 @@
 
 ---
 
-## 为什么是 PI-Desktop？
+## 为什么是 Pi-Desktop-Plus？
 
 终端 Agent 擅长执行，IDE Agent 擅长嵌入编辑器。
 
-PI-Desktop 想做得更进一步：
+Pi-Desktop-Plus 想做得更进一步：
 
 > **给 AI Agent 一个独立、长期、可扩展的桌面工作空间。**
 
@@ -102,7 +104,7 @@ Subagent 与 Worker Session 可以承担独立任务并行工作。
 </div>
 
 > [!NOTE]
-> **PI-Desktop 目前仍处于 Early Preview。** 已可用于真实开发工作流，部分 API、插件接口与桌面能力仍在持续演进。
+> **Pi-Desktop-Plus 目前仍处于 Early Preview。** 已可用于真实开发工作流，部分 API、插件接口与桌面能力仍在持续演进。
 
 > **当前发布线：0.15.x（Early Preview）。**
 
@@ -110,7 +112,7 @@ Subagent 与 Worker Session 可以承担独立任务并行工作。
 
 ## 插件不是附加功能，而是工作台的一部分
 
-PI-Desktop 的 Core 负责提供稳定底座。
+Pi-Desktop-Plus 的 Core 负责提供稳定底座。
 
 **真正属于你的工作流，由插件组合出来。**
 
@@ -211,7 +213,7 @@ Session Analytics
 ## 一个底座，组装不同的工作流
 
 ```text
-                         PI-Desktop
+                         Pi-Desktop-Plus
                              │
           ┌──────────────────┼──────────────────┐
           │                  │                  │
@@ -227,7 +229,7 @@ Session Analytics
                        Your Workflow
 ```
 
-PI-Desktop 可以只是一个 Coding Agent。
+Pi-Desktop-Plus 可以只是一个 Coding Agent。
 
 也可以被组装成：
 
@@ -281,7 +283,7 @@ PI-Desktop 可以只是一个 Coding Agent。
 </tr>
 </table>
 
-高权限操作始终经过 PI-Desktop 的 Permission Layer。
+高权限操作始终经过 Pi-Desktop-Plus 的 Permission Layer。
 
 ---
 
@@ -289,7 +291,7 @@ PI-Desktop 可以只是一个 Coding Agent。
 
 复杂任务不应该全部挤在一个 Context 里。
 
-PI-Desktop 提供两层任务拆分能力。
+Pi-Desktop-Plus 提供两层任务拆分能力。
 
 ### Subagents
 
@@ -319,7 +321,7 @@ Main Session
     └── Review
 ```
 
-Worker 是完整的 PI-Desktop Session：
+Worker 是完整的 Pi-Desktop-Plus Session：
 
 **独立 Context · 独立运行 · 可直接查看 · 可持续接受任务 · 保留完整 Transcript**
 
@@ -355,7 +357,7 @@ Worker 是完整的 PI-Desktop Session：
 
 ## 为持续工作而设计
 
-PI-Desktop 围绕：
+Pi-Desktop-Plus 围绕：
 
 <div align="center">
 
@@ -389,7 +391,7 @@ PI-Desktop 围绕：
 
 <td width="50%">
 
-<img src="docs/image/readme/chat_en.png" alt="PI-Desktop Session" />
+<img src="docs/image/readme/chat_en.png" alt="Pi-Desktop-Plus Session" />
 
 <p align="center"><sub>长期 Session，而不是一次性对话</sub></p>
 
@@ -397,7 +399,7 @@ PI-Desktop 围绕：
 
 <td width="50%">
 
-<img src="docs/image/readme/model_en.png" alt="PI-Desktop Model" />
+<img src="docs/image/readme/model_en.png" alt="Pi-Desktop-Plus Model" />
 
 <p align="center"><sub>在 Session 中直接切换模型与推理等级</sub></p>
 
@@ -409,7 +411,7 @@ PI-Desktop 围绕：
 
 <td width="50%">
 
-<img src="docs/image/readme/plugins_en.png" alt="PI-Desktop Plugins" />
+<img src="docs/image/readme/plugins_en.png" alt="Pi-Desktop-Plus Plugins" />
 
 <p align="center"><sub>插件市场：扩展 Agent，也扩展整个桌面</sub></p>
 
@@ -417,7 +419,7 @@ PI-Desktop 围绕：
 
 <td width="50%">
 
-<img src="docs/image/readme/addmodel_en.png" alt="PI-Desktop Providers" />
+<img src="docs/image/readme/addmodel_en.png" alt="Pi-Desktop-Plus Providers" />
 
 <p align="center"><sub>连接 Provider、Gateway 或本地模型</sub></p>
 
@@ -436,7 +438,7 @@ PI-Desktop 围绕：
 
 ## 模型可以换，工作流不用换
 
-PI-Desktop 不把 Agent 工作流绑定到某一家模型厂商。
+Pi-Desktop-Plus 不把 Agent 工作流绑定到某一家模型厂商。
 
 支持：
 
@@ -465,7 +467,7 @@ Private Task → Local Model
 
 已有工作不需要从零开始。
 
-PI-Desktop 可以导入本地 Session：
+Pi-Desktop-Plus 可以导入本地 Session：
 
 **Claude Code · Codex · OpenCode · Pi**
 
@@ -473,7 +475,7 @@ PI-Desktop 可以导入本地 Session：
 
 ## Local-first
 
-PI-Desktop 不要求你把开发环境搬到我们的云端。
+Pi-Desktop-Plus 不要求你把开发环境搬到我们的云端。
 
 | 数据                   | 默认行为               |
 | -------------------- | ------------------ |
@@ -482,12 +484,12 @@ PI-Desktop 不要求你把开发环境搬到我们的云端。
 | Settings             | 本地                 |
 | Logs                 | 本地                 |
 | API Credentials      | OS Keychain        |
-| PI-Desktop Telemetry | 无                  |
+| Pi-Desktop-Plus Telemetry | 无                  |
 | Model Request        | 直接发送到你配置的 Provider |
 
-**无需 PI-Desktop 账号。**
+**无需 Pi-Desktop-Plus 账号。**
 
-**无需经过 PI-Desktop 云端 Relay。**
+**无需经过 Pi-Desktop-Plus 云端 Relay。**
 
 使用远程模型时，请求所需 Context 会直接发送给对应 Provider。
 
@@ -526,7 +528,7 @@ Execution
 
 **下载**
 
-安装 PI-Desktop
+安装 Pi-Desktop-Plus
 
 </td>
 
@@ -565,7 +567,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [下载 PI-Desktop →](https://github.com/vastsa/PI-Desktop/releases/latest)
+### [本地构建 Pi-Desktop-Plus →](#开发者)
 
 **macOS · Windows · Linux**
 
@@ -607,20 +609,20 @@ ldd --version
 
 ## Built on Pi
 
-PI-Desktop 构建在 [pi](https://github.com/badlogic/pi-mono) 生态之上。
+Pi-Desktop-Plus 构建在 [pi](https://github.com/badlogic/pi-mono) 生态之上。
 
 Agent Runtime 使用：
 
 * `pi-ai`
 * `pi-agent-core`
 
-> **Pi 提供 Agent Engine，PI-Desktop 在其上构建 Desktop Workspace、Session、权限、插件与 Agent 编排。**
+> **Pi 提供 Agent Engine，Pi-Desktop-Plus 在其上构建 Desktop Workspace、Session、权限、插件与 Agent 编排。**
 
 ---
 
 ## 开发者
 
-PI-Desktop 也可以作为开发者构建 Agent 产品的宿主平台。
+Pi-Desktop-Plus 也可以作为开发者构建 Agent 产品的宿主平台。
 
 你可以开发：
 
@@ -655,8 +657,8 @@ PI-Desktop 也可以作为开发者构建 Agent 产品的宿主平台。
 #### Start
 
 ```bash
-git clone https://github.com/vastsa/PI-Desktop.git
-cd PI-Desktop
+git clone https://github.com/SakuraLoveSmile/PI-Desktop.git
+cd Pi-Desktop-Plus
 
 pnpm install
 
@@ -700,8 +702,8 @@ pnpm test
 
 让 Core 保持克制，让生态持续生长。
 
-**[提交 Issue](https://github.com/vastsa/PI-Desktop/issues/new/choose)** ·
-[查看 Issues](https://github.com/vastsa/PI-Desktop/issues) ·
+**[提交 Issue](https://github.com/SakuraLoveSmile/PI-Desktop/issues/new/choose)** ·
+[查看 Issues](https://github.com/SakuraLoveSmile/PI-Desktop/issues) ·
 [开发插件](docs/plugin-development.md)
 
 ---
@@ -711,7 +713,7 @@ pnpm test
 <div align="center">
 
 <a href="https://trendshift.io/repositories/178787?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-178787">
-<img src="https://trendshift.io/api/badge/repositories/178787" alt="PI-Desktop on Trendshift" width="230" height="51" />
+<img src="https://trendshift.io/api/badge/repositories/178787" alt="Pi-Desktop-Plus on Trendshift" width="230" height="51" />
 </a>
 
 </div>
@@ -728,17 +730,17 @@ pnpm test
 
 > **Not by a lone genius, but by a token-powered construction crew.**
 
-PI-Desktop 的开发过程中使用了来自多个 Provider 的模型。
+Pi-Desktop-Plus 的开发过程中使用了来自多个 Provider 的模型。
 
 累计模型使用量已超过 **27 Billion Tokens**。
 
-感谢参与构建 PI-Desktop 的每一位贡献者，以及陪我们一起写下这些代码的模型。
+感谢参与构建 Pi-Desktop-Plus 的每一位贡献者，以及陪我们一起写下这些代码的模型。
 
 ---
 
 ## License
 
-PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
+Pi-Desktop-Plus 使用 **GNU Lesser General Public License v3.0**。
 
 详见 [LICENSE](LICENSE)。
 
@@ -746,9 +748,9 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
 <div align="center">
 
-<img src="docs/image/readme/logo.png" alt="PI-Desktop" width="72" />
+<img src="docs/image/readme/logo.png" alt="Pi-Desktop-Plus" width="72" />
 
-## PI-Desktop
+## Pi-Desktop-Plus
 
 ### Build your own Agent workspace.
 
@@ -756,7 +758,7 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
 <br />
 
-**[立即下载](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
+**[本地构建](#开发者)** ·
 [Documentation](https://pi-docs.aiuo.net/) ·
 [Build a Plugin](docs/plugin-development.md)
 

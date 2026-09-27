@@ -122,6 +122,8 @@ import type {
   TrustedExtensionStatusEvent,
   TrustedExtensionUiPrompt,
   TrustedExtensionUiPromptResponse,
+  TeamMemberRecord,
+  TeamProjection,
 } from "@pi-desktop/shared";
 import {
   defaultCommandShellForPlatform,
@@ -129,6 +131,7 @@ import {
   isCommandShellId,
   normalizeLargePasteThreshold,
   normalizeMode,
+  normalizeExecutionProfile,
   normalizeNetworkProxy,
   normalizeNetworkPolicy,
   resolveFontScale,
@@ -326,6 +329,7 @@ function normalizeSession(session: SessionSummary): SessionSummary {
     ...session,
     source: session.source ?? "desktop",
     mode: normalizeMode((session as { mode?: unknown }).mode),
+    executionProfile: normalizeExecutionProfile((session as { executionProfile?: unknown }).executionProfile),
   };
 }
 
@@ -334,6 +338,7 @@ function normalizeSessionDetail(detail: SessionDetail | null): SessionDetail | n
     ? {
         ...detail,
         mode: normalizeMode((detail as { mode?: unknown }).mode),
+        executionProfile: normalizeExecutionProfile((detail as { executionProfile?: unknown }).executionProfile),
       }
     : null;
 }
@@ -390,6 +395,7 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     fontScale?: unknown;
     chatContentMaxWidth?: unknown;
     infiniteProviderRetry?: unknown;
+    autoGenerateSessionTitles?: unknown;
     smoothStreaming?: unknown;
     networkProxy?: unknown;
     networkPolicy?: unknown;
@@ -432,6 +438,14 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
     typeof value.infiniteProviderRetry !== "boolean"
   ) {
     throw Object.assign(new Error("infiniteProviderRetry is invalid"), {
+      errorCode: "INVALID_PARAMS",
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, "autoGenerateSessionTitles") &&
+    typeof value.autoGenerateSessionTitles !== "boolean"
+  ) {
+    throw Object.assign(new Error("autoGenerateSessionTitles is invalid"), {
       errorCode: "INVALID_PARAMS",
     });
   }
@@ -575,6 +589,25 @@ export const api = {
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
   getSessionScratchPath: (sessionId: string) =>
     invoke<{ path: string }>(IPC.invoke.sessionGetScratchPath, { sessionId }),
+  getTeamRoster: (teamSessionId: string) =>
+    invoke<{
+      teamSessionId: string;
+      revision: number;
+      paused: boolean;
+      members: TeamMemberRecord[];
+    }>(IPC.invoke.teamGetRoster, { teamSessionId }),
+  getTeamBoard: (teamSessionId: string) =>
+    invoke<TeamProjection>(IPC.invoke.teamGetBoard, { teamSessionId }),
+  teamPause: (teamSessionId: string) =>
+    invoke<{ team: { teamSessionId: string; paused: boolean } }>(
+      IPC.invoke.teamPause,
+      { teamSessionId },
+    ),
+  teamResume: (teamSessionId: string) =>
+    invoke<{ team: { teamSessionId: string; paused: boolean } }>(
+      IPC.invoke.teamResume,
+      { teamSessionId },
+    ),
   openSessionScratchPath: (sessionId: string) =>
     invoke<{ ok: boolean; path: string }>(IPC.invoke.sessionOpenScratchPath, {
       sessionId,
@@ -936,6 +969,12 @@ export const api = {
     ).then(normalizePendingPlans),
   resolvePlan: (resolution: PlanResolveRequest) =>
     invoke<PlanResolutionResult>(IPC.invoke.plansResolve, resolution),
+  getGoalReport: (params: { sessionId: string; reportId?: string; executionId?: string }) =>
+    invoke<{ report: any }>(IPC.invoke.goalReportGet, params),
+  listGoalReports: (params: { sessionId: string }) =>
+    invoke<{ reports: any[] }>(IPC.invoke.goalReportList, params),
+  retryGoalReport: (params: { sessionId: string; executionId: string }) =>
+    invoke<{ report: any }>(IPC.invoke.goalReportRetry, params),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   /**
@@ -1456,6 +1495,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.plansChanged, (payload) =>
       listener(normalizePlansChangedEvent(payload)),
+    );
+  },
+  onGoalReportChanged: (listener: (event: any) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.goalReportChanged, (payload) =>
+      listener(payload),
     );
   },
   onOauthLogin: (listener: (event: OAuthLoginEvent) => void) => {

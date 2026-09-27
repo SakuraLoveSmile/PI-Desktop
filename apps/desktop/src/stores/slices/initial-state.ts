@@ -72,6 +72,7 @@ export function createInitialState(): AppStateData {
     planningStates: {},
     pendingPlans: {},
     planCheckpoints: {},
+    goalReports: {},
     page: "chat",
     settingsTab: "general",
     settingsAnchor: null,

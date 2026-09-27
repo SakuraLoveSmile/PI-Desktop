@@ -3,7 +3,9 @@ export type WorkPanelTabKind =
   | "review"
   | "file"
   | "plugin"
-  | "subagent";
+  | "subagent"
+  | "goalReport"
+  | "team";
 
 export type WorkPanelTab = {
   id: string;
@@ -63,6 +65,11 @@ export function switchWorkPanelContextState(
   };
 }
 
+
+export function teamWorkPanelTab(teamSessionId: string): WorkPanelTab {
+  return { id: `team:${teamSessionId}`, kind: "team", resource: teamSessionId };
+}
+
 export function toolWorkPanelTab(
   kind: Exclude<WorkPanelTabKind, "new" | "file" | "plugin" | "subagent">,
 ): WorkPanelTab {
@@ -112,6 +119,18 @@ export function subagentWorkPanelTab(
     kind: "subagent",
     resource: delegationId,
     ...(agentName ? { label: agentName } : {}),
+  };
+}
+
+export function goalReportWorkPanelTab(
+  executionId: string,
+  label?: string,
+): WorkPanelTab {
+  return {
+    id: `goalReport:${executionId}`,
+    kind: "goalReport",
+    resource: executionId,
+    ...(label ? { label } : {}),
   };
 }
 
@@ -205,7 +224,8 @@ export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
     Boolean(tab) &&
     (tab.kind === "new" || tab.kind === "review" ||
       tab.kind === "file" || tab.kind === "plugin" ||
-      tab.kind === "subagent")
+      tab.kind === "subagent" || tab.kind === "goalReport" ||
+      tab.kind === "team")
   );
 }
 

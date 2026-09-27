@@ -1753,11 +1753,11 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **里程碑**：M5
 - **状态**：单位覆盖（`tools::shell::tests`）；场景已记录
 
-#### E2E-044：开发启动使用 PI-Desktop Dock 品牌
+#### E2E-044：开发启动使用 Pi-Desktop-Plus Dock 品牌
 
 - **先决条件**：macOS 开发与规范的 `build/icon_1024.png` 进行检验。
 - **步骤**：1) 运行 `pnpm dev`。 2) 检查正在运行的应用程序的 Dock 图标。
-- **预期**：Dock 显示 PI-Desktop 品牌图标，而不是 Electron 的默认图标；打包版本继续使用 `build/icon.icns`。
+- **预期**：Dock 显示 Pi-Desktop-Plus 品牌图标，而不是 Electron 的默认图标；打包版本继续使用 `build/icon.icns`。
 - **链接规格**：`06-delivery/06-release-runbook.md`
 - **验收**：质量（开发外壳与发布品牌相匹配）
 - **里程碑**：M5
@@ -1782,7 +1782,7 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 - **里程碑**：M5
 - **状态**：单位覆盖（`user-select.test.mjs`）；场景已记录
 
-#### E2E-046：PI-Desktop 渲染器品牌和输入框图标边界
+#### E2E-046：Pi-Desktop-Plus 渲染器品牌和输入框图标边界
 
 - **先决条件**：应用程序分别以英语、`zh-CN` 和 `zh-TW` 运行，并带有
   空首页和可用的停靠成绩单。
@@ -1793,7 +1793,7 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
   4）检查停靠输入框、页脚设置和插件
   图标，然后每个 project/Temporary 会话创建控件。 5）打开设置
   和输入框输入。
-- **预期**：可见 shell 标识为 `PI-Desktop`；空首页英雄渲染与主题和语言
+- **预期**：可见 shell 标识为 `Pi-Desktop-Plus`；空首页英雄渲染与主题和语言
   匹配的 100px `HomeMascotLogo` GIF。只有深色中文环境使用提供的 30 帧
   动画，其他组合保留原资源。指针悬停不改变节奏或几何形状，减少动态
   效果时显示对应静止首帧。
@@ -2716,7 +2716,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   `PI_DESKTOP_START_MAXIMIZED=1` 在启动之前，以便 Main 最大化隐藏
   渲染器安装之前的本机窗口。
 - **步骤**：1) 在 macOS 上，启动 `pnpm dev` 和打包版本。确认
-  应用程序菜单标题为 PI-Desktop，打开“关于 PI-Desktop”，然后检查
+  应用程序菜单标题为 Pi-Desktop-Plus，打开“关于 Pi-Desktop-Plus”，然后检查
   它的名称、版本和图标。然后打开每个系统菜单并调用“新建任务”、“打开”
   项目、设置、全局搜索、侧边栏切换、编辑、
   zoom/fullscreen、窗口、帮助、日志和检查更新操作。验证
@@ -2746,9 +2746,9 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   当窗口存在时以及窗口关闭后。 7) 在其基础上构建每个目标
   来自干净的发布主机目录的本机运行器。在 Windows 上检查已安装应用的
   任务栏按钮和“开始”菜单快捷方式图标。
-- **预期**：macOS 开发和打包发布显示 PI-Desktop 作为
+- **预期**：macOS 开发和打包发布显示 Pi-Desktop-Plus 作为
   本机应用程序标识，并且“关于”面板使用规范
-PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标。
+Pi-Desktop-Plus 图标；两个表面都不会暴露库存 Electron 名称或图标。
   macOS 遵循本机菜单约定和加速器。
   Windows/Linux 窗口内不显示应用程序菜单；导航和
   右侧控件不会与拖动区域、键盘快捷键发生冲突
@@ -2765,7 +2765,7 @@ PI-Desktop 图标；两个表面都不会暴露库存 Electron 名称或图标�
   有易于理解的名称；第一个用户或助理成绩单行从不
   在它们下面绘制，扩展页面标题操作或
   插件详细信息表关闭按钮。未知操作失败关闭。已安装 Windows 应用的任务栏按钮
-  和“开始”菜单快捷方式使用 PI-Desktop 图标，而不是 Electron 默认图标。每个包装
+  和“开始”菜单快捷方式使用 Pi-Desktop-Plus 图标，而不是 Electron 默认图标。每个包装
   包含目标本机主机二进制文件（`.exe` 仅在 Windows 上）。通过这个场景 Windows/Linux
   证明 shell 已准备就绪，而不是首次发布资格。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`，
@@ -3670,15 +3670,15 @@ IPC 请求无法关闭。
 - **步骤**：1) 打开 DMG 并检查根目录和布局。2) 确认窗口里只有应用与 Applications
   链接。3) 确认 DMG 不含 command 助手，也不含 `If app won't open, read this.txt`。
   4) 不解压应用内容，检查 ZIP 根目录，并确认其中同时存在
-  `PI-Desktop-macOS-opening-help.txt` 和可执行的 `PI-Desktop-macOS-open.command`。
+  `Pi-Desktop-Plus-macOS-opening-help.txt` 和可执行的 `Pi-Desktop-Plus-macOS-open.command`。
   5) 阅读说明，将应用移动到 `/Applications`，然后双击 ZIP 中的助手。
 - **预期**：DMG 使用带品牌的 720×440 背景，只包含应用和 Applications 链接，不包含或
   暴露 command 助手或打开说明。ZIP 根目录包含助手和同一份说明。说明包含
-  `xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app`，并说明兜底方式仅适用
+  `xattr -r -d com.apple.quarantine /Applications/Pi-Desktop-Plus.app`，并说明兜底方式仅适用
   于 macOS 对可信未签名工件提示应用已损坏或应用打不开的场景；已签名/公证版本无需
-  执行。ZIP 助手只查找 `/Applications/PI-Desktop.app` 和 `~/Applications/PI-Desktop.app`，
+  执行。ZIP 助手只查找 `/Applications/Pi-Desktop-Plus.app` 和 `~/Applications/Pi-Desktop-Plus.app`，
   在存在时只删除 `com.apple.quarantine` 属性，然后打开应用，不使用 `sudo`，也不接受
-  任意路径；助手会在修改属性前校验 `CFBundleIdentifier=net.aiuo.pi-desktop`。说明不会
+  任意路径；助手会在修改属性前校验 `CFBundleIdentifier=cn.sakura.pi-desktop`。说明不会
   声称未签名工件已通过 Gatekeeper 资质验证。
 - **关联规格**：`06-delivery/06-release-runbook.md`、`05-security/01-security.md`
 - **验收**：质量、安全
@@ -3731,9 +3731,9 @@ IPC 请求无法关闭。
      可执行文件和 `Resources/bin/pi-desktop-host-core`；确认 arm64 和
      x86_64 软件包只包含声明的架构，且 Rust 主机与 Electron 应用一致。
      确认共享的 `apps/desktop/package.json` macOS 配置生成 arm64 文件
-     `PI-Desktop-X.Y.Z-arm64.dmg` 和 `PI-Desktop-X.Y.Z-arm64-mac.zip`，
-     Intel 工件使用 `PI-Desktop-X.Y.Z-x64.dmg` 和
-     `PI-Desktop-X.Y.Z-x64-mac.zip`；确认发布目录包含 DMG、ZIP 和合并后的
+     `Pi-Desktop-Plus-X.Y.Z-arm64.dmg` 和 `Pi-Desktop-Plus-X.Y.Z-arm64-mac.zip`，
+     Intel 工件使用 `Pi-Desktop-Plus-X.Y.Z-x64.dmg` 和
+     `Pi-Desktop-Plus-X.Y.Z-x64-mac.zip`；确认发布目录包含 DMG、ZIP 和合并后的
      `latest-mac.yml` 更新源，且更新源中的 URL 和校验和与这些打包工件一致。
   4. 配置环回装置提供程序，禁用外部出口，然后
      从干净的配置文件启动。英文和简体切换
@@ -7210,16 +7210,16 @@ eleven-tool-round desktop paths are verified by
 #### E2E-211：Windows 便携版 ZIP 解压后即可启动（D603）
 
 - **前提条件**：Windows x64 标签或 `dist:win` 包已从共享 electron-builder 配置
-  产出 `PI-Desktop-Setup-<version>.exe` 和 `PI-Desktop-Portable-<version>.zip`；
+  产出 `Pi-Desktop-Plus-Setup-<version>.exe` 和 `Pi-Desktop-Plus-Portable-<version>.zip`；
   有干净用户配置；账户是无需管理员提升的标准用户。
 - **步骤**：1) 检查发布目录和 `latest.yml`。2) 将便携版 ZIP 解压到用户可写目录，
-  不运行 NSIS 安装程序。3) 启动解压后的 `PI-Desktop.exe`。4) 确认没有管理员提示，
-  且运行中的应用显示 PI-Desktop 图标和任务栏入口。5) 调用检查更新。6) 确认设置 → 信息
+  不运行 NSIS 安装程序。3) 启动解压后的 `Pi-Desktop-Plus.exe`。4) 确认没有管理员提示，
+  且运行中的应用显示 Pi-Desktop-Plus 图标和任务栏入口。5) 调用检查更新。6) 确认设置 → 信息
   提供发布页而不是“重启以更新”。7) 退出并再次启动解压后的可执行文件。
 - **预期**：两个 Windows 工件都无空格并已上传。`latest.yml` 只指向 NSIS 安装程序。
-  ZIP 解压后的应用无需安装向导或管理员提示即可启动，保持正常的 PI-Desktop 任务栏
+  ZIP 解压后的应用无需安装向导或管理员提示即可启动，保持正常的 Pi-Desktop-Plus 任务栏
   标识和图标，使用现有应用数据目录，并报告更新模式 `manual`。可用更新不会下载或运行
-  `PI-Desktop-Setup-<version>.exe`。再次启动从同一配置恢复会话。
+  `Pi-Desktop-Plus-Setup-<version>.exe`。再次启动从同一配置恢复会话。
 - **链接规格**：`01-product/01-product-scope.md`、
   `06-delivery/06-release-runbook.md`、`03-runtime/07-process-model.md`、
   ADR 0197 / D603
@@ -7320,7 +7320,7 @@ eleven-tool-round desktop paths are verified by
 #### E2E-209：从本地智能体存储导入模型配置
 
 - **前提条件**：本机存在 Claude Code / Codex / OpenCode / Pi / CC Switch 的提供商配置。
-- **步骤**：1) 打开设置 → 导入 → 模型配置。2) 扫描并导入与现有行凭据不同的配置。3) 再次导入相同凭据。4) 确认 Composer 能选中新导入的提供商，密钥不进入渲染器。
+- **步骤**：1) 打开设置 → 导入，确认 Sessions、Models、Skills、MCP 位于同一个类型 `tablist` 中。每个 tab 都有稳定 ID、`aria-selected`，并通过 `aria-controls` 指向对应面板；每个面板由对应 tab 标记，且只有当前选择的面板可见。确认只有选中的 tab 位于 Tab 顺序中；左右箭头循环并选择相邻 tab，Home/End 选择首尾 tab，面板关联随选择更新且状态保留。2) 选择 Models 并扫描，确认每组默认折叠。3) 导入与已有配置端点相同但凭据不同的配置。4) 再次导入相同凭据。5) 确认 Composer 能选中新导入的提供商，密钥不进入渲染器。
 - **预期**：规范化端点、API 风格和凭据都相同才视为等价；不同密钥在同一端点创建独立行。重复导入幂等跳过。见 ADR 0179 / ADR 0188 / D342 / D351。
 - **链接规格**：`04-ux/06-settings-ia.md`、`04-ux/08-component-spec.md`、ADR 0179、ADR 0188
 - **验收**：B、质量
@@ -7365,6 +7365,12 @@ eleven-tool-round desktop paths are verified by
 
 以下场景是 D387 / ADR 0214 与 `07-plugins/16-trusted-extensions.md` 的验收目标；无头
 runner 会在运行时的隔离临时目录中生成六个插件形态 fixture。
+
+- **持久终态扩展（2026-09-26）**：发现 `pi_turn_get`，按 prompt 返回的 session/turn 查询。
+  使用隔离 host 夹具覆盖 running/completed/error/aborted；跨会话与不存在为 NOT_FOUND，
+  空标识为 INVALID_PARAMS。重启隔离 host 后读取同一终态，不再次发送 prompt。
+  确认只读查询不修改会话、不泄露转录或凭据；运行时空闲不代表成功。真实模型验收
+  需明确费用授权，夹具通过不能标记真实调用已通过。
 
 #### E2E-241：发现列出受信任扩展，启用是显式的
 
@@ -8960,3 +8966,65 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **里程碑：** 提供商配置维护。
 - **状态：** `pnpm test:e2e:provider-api-style`、`official-native-search.test.ts`；
   共享路由测试覆盖伪装域名、不安全地址和未知中转站。未验证线上服务或 Host/SQLite 保存。
+
+### E2E-GOAL-completion-report
+
+- **前置条件：** 隔离的 Desktop 配置与 Host 数据目录、已批准的 Goal 会话，以及仅监听
+  loopback 的假模型。不使用真实提供商凭据或用户数据。
+- **步骤：** 提交并批准夹具 Goal，由真实 sidecar 完成有限工作，再提交结构化
+  `SubmitGoalReport`。打开转录中的报告卡片，并在该会话的工作面板中查看报告。
+- **预期：** Host 为同一 Goal 和 execution 返回唯一且持久的 `ready` 报告。转录卡片打开
+  对应报告；报告展示结论、执行状态、证据和限制。只有结构化报告与持久证据都支持时，
+  才能将验收条件显示为已达成。后备报告必须标明未知或缺失的证据。
+- **恢复与失败：** 重启后仍可读取就绪报告。无效草稿或持久化失败不得发布过期或误导性
+  的就绪报告。outbox 持久化失败时报告保持失败；显式 Retry 只使用 Host 持久事实，不重跑
+  Goal，也不调用模型。工作面板显示本地化的通用失败说明与安全格式错误码；请求期间禁用
+  Retry。
+- **规范：** 03-runtime/02-agent-runtime、03-runtime/03-tools-and-permissions、
+  03-runtime/04-data-storage、03-runtime/06-host-rpc-protocol、04-ux/08-component-spec。
+- **自动化：** `node scripts/e2e-temporary-goal.mjs`、`pnpm test:e2e:goal-report`、
+  Goal Report runtime/Host 测试和聚焦 renderer 测试。Electron 场景仅使用隔离配置与本地假模型。
+- **里程碑：** 维护。
+
+### E2E-TEAM-runtime-mailbox-and-panel
+
+- **前置条件：** 隔离的 Desktop 配置与 Host 数据目录、Team Lead 会话，以及仅监听
+  loopback 的假模型。不使用真实提供商凭据。
+- **步骤：** 提示 Lead 创建一个 fresh 队友并分派初始任务；队友通过消息把结果发回
+  Lead。读取双方转录与 Host 花名册/看板。在存在排队邮箱消息时暂停 Team 并重启 Desktop，
+  确认暂停期间消息仍待处理，再恢复 Team 并确认只投递一次。打开 Team 面板，再从花名册导航
+  到队友会话。
+- **预期：** Lead 和队友是不同的持久会话，Team 上下文由 Host 推导。同伴消息只出现一次；
+  Host 队列或 turn 回执持久化后才写入确认，队友回复能到达 Lead。面板显示 Host 花名册和
+  看板，并打开真实成员会话。暂停会 hold Team 队列；尚未入队的 Team 邮箱消息在重启后仍排队。
+  恢复会释放 Team hold，并且只投递该消息一次。
+- **恢复与授权：** Agent Host 测试验证重启时只准入选中的 Team 消息，同时保持普通恢复
+  turn 暂停；Host Core 测试验证暂停的邮箱消息在没有队列回执时仍可跨重启保留，普通未认领
+  的协作消息则会中断。Host 测试覆盖幂等、继承权限的发送者上限、入队后接收权限提高时拒绝启动、
+  队列/turn 回执、跨 Team 访问、任务所有权、Lead 专属操作、负责人重新分配/取消、CAS 与依赖。
+  Stop/Abort 测试要求先暂停 Team，再按精确 turn ID 中断。
+- **规范：** ADR 0307；03-runtime/02-agent-runtime、03-tools-and-permissions、
+  04-data-storage、06-host-rpc-protocol；04-ux/08-component-spec。
+- **自动化：** `pnpm test:e2e:team`、`pnpm --filter @pi-desktop/agent-host test`、
+  `cargo test -p host-core --locked` 和 desktop Team 交互测试。Electron 场景仅使用隔离配置
+  和本地假模型。
+- **里程碑：** 维护。
+
+### E2E-PLUS-independent-installation
+
+- **先决条件**：隔离的 home/配置文件与原生候选包；旧 PI-Desktop 夹具带有哨兵数据。
+  不使用真实提供商凭据或用户配置文件。
+- **步骤**：启动 Plus，检查其原生名称与 设置 > 信息，创建夹具项目/会话，重启，然后
+  检查两个产品的数据根目录。在存在旧品牌缓存时运行开发启动器。检查打包后的助手、
+  Linux desktop 入口、Windows 身份与生成的更新源。
+- **预期**：Plus 使用自己的应用 ID、锁和数据根目录；其会话持久化，旧哨兵数据保持
+  不变。开发缓存重建成功。助手在修改属性前拒绝旧 bundle。资源、blockmap 与更新源
+  URL 一致，且只指向 SakuraLoveSmile/PI-Desktop。
+- **智能体文本**：默认 Agent、Plan、Goal 与委派子智能体 prompt，以及展示给模型的
+  工具描述，均标识 Pi-Desktop-Plus，且不改变角色、工具调用、审批或取消行为。
+- **远程场景**：对带有旧主机哨兵的临时 SSH 夹具运行 bootstrap；Plus 使用自己的
+  安装、pid/日志与数据根目录，不停止旧主机。显式路径覆盖保留其文档化语义。
+- **发布场景**：缺少签名输入、证书或团队不匹配都会失败关闭；夹具签名不代表真实
+  公证或实时更新已合格。
+- **证据**：分别记录候选/基线、操作系统与架构、测试与原生场景。在声明 Windows/Linux
+  原生通道与已签名发布通道合格之前，必须先取得对应证据。

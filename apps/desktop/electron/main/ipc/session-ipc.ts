@@ -300,6 +300,22 @@ export function registerSessionIpc({
     }
     return readSessionCollaboration(host, sidecar, sessionId);
   });
+  /** Read durable terminal state while keeping session ownership in the host query. */
+  handle(
+    IPC.invoke.turnGet,
+    async (input?: { sessionId?: unknown; turnId?: unknown }) => {
+      if (!host) throw new Error("host unavailable");
+      const sessionId = typeof input?.sessionId === "string" ? input.sessionId.trim() : "";
+      const turnId = typeof input?.turnId === "string" ? input.turnId.trim() : "";
+      if (!sessionId) {
+        throw Object.assign(new Error("sessionId required"), { errorCode: "INVALID_PARAMS" });
+      }
+      if (!turnId) {
+        throw Object.assign(new Error("turnId required"), { errorCode: "INVALID_PARAMS" });
+      }
+      return host.call("session.getTurn", { sessionId, turnId });
+    },
+  );
   handle(IPC.invoke.sessionOpen, async (rawSessionId: string) => {
     if (!host) throw new Error("host unavailable");
     const sessionId = String(rawSessionId ?? "").trim();
@@ -324,7 +340,7 @@ export function registerSessionIpc({
   });
   handle(IPC.invoke.sessionDelete, async (id: string) => {
     if (id.startsWith("native-pi:")) {
-      throw Object.assign(new Error("Native Pi sessions cannot be deleted from PI-Desktop"), {
+      throw Object.assign(new Error("Native Pi sessions cannot be deleted from Pi-Desktop-Plus"), {
         errorCode: ErrorCodes.INVALID_ARGUMENT,
       });
     }

@@ -452,20 +452,20 @@ identify the platform validation still needed.
   app and Applications link are the only items in the window. 3) Confirm the
   DMG has no command helper and no `If app won't open, read this.txt`. 4) Inspect
   the ZIP root without extracting the application contents and confirm it has
-  both `PI-Desktop-macOS-opening-help.txt` and the executable
-  `PI-Desktop-macOS-open.command`. 5) Read the note, move the app to
+  both `Pi-Desktop-Plus-macOS-opening-help.txt` and the executable
+  `Pi-Desktop-Plus-macOS-open.command`. 5) Read the note, move the app to
   `/Applications`, and double-click the ZIP helper.
 - **Expected**: The DMG contains the branded 720×440 background, the app, and
   the Applications link only; it does not contain or expose the command helper
   or the opening-help note. The ZIP contains the helper and the opening note at
   its root. The note includes
-  `xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app`, explains
+  `xattr -r -d com.apple.quarantine /Applications/Pi-Desktop-Plus.app`, explains
   that the fallback is only for a trusted unsigned artifact when macOS reports
   that the app is damaged or does not open, and says signed/notarized builds do
-  not need it. The ZIP helper searches only `/Applications/PI-Desktop.app` and
-  `~/Applications/PI-Desktop.app`, removes only `com.apple.quarantine` when
+  not need it. The ZIP helper searches only `/Applications/Pi-Desktop-Plus.app` and
+  `~/Applications/Pi-Desktop-Plus.app`, removes only `com.apple.quarantine` when
   present, and opens the app without `sudo` or an arbitrary path argument. It
-  validates `CFBundleIdentifier=net.aiuo.pi-desktop` before changing attributes.
+  validates `CFBundleIdentifier=cn.sakura.pi-desktop` before changing attributes.
   The guidance does not claim that an unsigned artifact has passed Gatekeeper
   qualification.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
@@ -3109,11 +3109,11 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`tools::shell::tests`); scenario Documented
 
-#### E2E-044: Development launch uses PI-Desktop Dock branding
+#### E2E-044: Development launch uses Pi-Desktop-Plus Dock branding
 
 - **Preconditions**: macOS development checkout with canonical `build/icon_1024.png`.
 - **Steps**: 1) Run `pnpm dev`. 2) Inspect the running application's Dock icon.
-- **Expected**: The Dock shows the PI-Desktop brand icon, not Electron's default icon; packaged builds continue to use `build/icon.icns`.
+- **Expected**: The Dock shows the Pi-Desktop-Plus brand icon, not Electron's default icon; packaged builds continue to use `build/icon.icns`.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
 - **Acceptance**: Quality (development shell matches release branding)
 - **Milestone**: M5
@@ -3138,7 +3138,7 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (`user-select.test.mjs`); scenario Documented
 
-#### E2E-046: PI-Desktop renderer branding and composer icon boundary
+#### E2E-046: Pi-Desktop-Plus renderer branding and composer icon boundary
 
 - **Preconditions**: App running in English, zh-CN, and zh-TW locales, with
   an empty home and a docked transcript available.
@@ -3150,7 +3150,7 @@ identify the platform validation still needed.
   locale/theme combination shows its matching still first frame. 4) Inspect
   the docked composer, footer Settings and Plugins icons, and session-create
   controls. 5) Open Settings and the composer input.
-- **Expected**: Visible shell identity reads `PI-Desktop`; the empty-home hero
+- **Expected**: Visible shell identity reads `Pi-Desktop-Plus`; the empty-home hero
   renders the theme- and locale-matching 100px `HomeMascotLogo` GIF. Only dark
   Chinese locales use the supplied 30-frame artwork; other combinations keep
   their existing variants. Pointer hover does not alter cadence or geometry,
@@ -4322,7 +4322,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `PI_DESKTOP_START_MAXIMIZED=1` before launch so Main maximizes the hidden
   native window before renderer mount.
 - **Steps**: 1) On macOS, launch both `pnpm dev` and a packaged build. Confirm
-  the application-menu title is PI-Desktop, open About PI-Desktop, and inspect
+  the application-menu title is Pi-Desktop-Plus, open About Pi-Desktop-Plus, and inspect
   its name, version, and icon. Then open every system menu and invoke New Task, Open
   Project, Settings, global search, sidebar toggle, editing,
   zoom/fullscreen, Window, Help, Logs, and Check for Updates actions. Verify
@@ -4354,9 +4354,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   while a window exists and after it closes. 7) Build each target on its
   native runner from a clean release-host directory. On Windows, inspect the
   installed app's taskbar button and Start menu shortcut icon.
-- **Expected**: macOS development and packaged launches show PI-Desktop as the
+- **Expected**: macOS development and packaged launches show Pi-Desktop-Plus as the
   native application identity, and the About panel uses the canonical
-  PI-Desktop icon; neither surface exposes the stock Electron name or icon.
+  Pi-Desktop-Plus icon; neither surface exposes the stock Electron name or icon.
   macOS follows native menu conventions and accelerators.
   Windows/Linux show no application menu inside the window; navigation and
   right-side controls do not collide with drag regions, keyboard shortcuts
@@ -4381,7 +4381,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   share one continuous 1px `border-subtle` separator; the control band's
   leading divider uses the same token and its bottom edge does not disappear
   under the window buttons. Unknown actions fail closed. The installed Windows
-  taskbar button and Start menu shortcut use the PI-Desktop icon, never
+  taskbar button and Start menu shortcut use the Pi-Desktop-Plus icon, never
   Electron's default icon. Each package contains the target-native host binary
   (`.exe` only on Windows). Passing this scenario on Windows/Linux proves
   shell readiness, not first-release qualification.
@@ -5787,9 +5787,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
      x86_64 packages contain only their declared architecture and that the
      Rust host matches the Electron app. Confirm the shared
      `apps/desktop/package.json` macOS configuration produces arm64 assets named
-     `PI-Desktop-X.Y.Z-arm64.dmg` and `PI-Desktop-X.Y.Z-arm64-mac.zip`, while
-     the Intel assets use `PI-Desktop-X.Y.Z-x64.dmg` and
-     `PI-Desktop-X.Y.Z-x64-mac.zip`; confirm the release directory has both
+     `Pi-Desktop-Plus-X.Y.Z-arm64.dmg` and `Pi-Desktop-Plus-X.Y.Z-arm64-mac.zip`, while
+     the Intel assets use `Pi-Desktop-Plus-X.Y.Z-x64.dmg` and
+     `Pi-Desktop-Plus-X.Y.Z-x64-mac.zip`; confirm the release directory has both
      DMG and ZIP artifacts and one merged `latest-mac.yml` feed whose URLs and
      checksums match those generated assets.
   4. Inspect the renderer output for its size controls: emitted JS is minified,
@@ -11857,10 +11857,16 @@ are withdrawn with ADR 0165.
   endpoint and different keys, and optionally one OAuth-only vendor.
   PI-Desktop may already have an equivalent provider.
 - **Steps**:
-  1. Open Settings → Import. Confirm a Sessions card and a Model
-     configuration card, each with its own Scan.
-  2. Scan model configuration. Confirm groups start collapsed, rows show
-     name, model count, host, and an API key / No API key badge, and that
+  1. Open Settings → Import. Confirm one kind `tablist` contains Sessions,
+     Models, Skills, and MCP. Each tab has a stable ID, `aria-selected`, and
+     `aria-controls` for its panel; each panel is labelled by its tab, and only
+     the selected panel is visible. Confirm only the selected tab is in the
+     tab order; ArrowLeft/ArrowRight wrap and select adjacent tabs, and Home/End
+     select the first/last tab. Confirm the panel relationship follows selection
+     without clearing panel state.
+  2. Select Models and scan its configuration. Confirm groups start collapsed
+     and rows show name, model count, host, and an API key / No API key badge,
+     and that
      no secret value appears in the UI or in the scan IPC payload.
   3. Import the selected providers. Confirm both same-endpoint profiles appear
      as separate rows under Settings → Models and remain selectable in the
@@ -12106,22 +12112,22 @@ are withdrawn with ADR 0165.
 #### E2E-211: Windows portable ZIP launches after extraction (D603)
 
 - **Preconditions**: A Windows x64 tag or `dist:win` package has produced both
-  `PI-Desktop-Setup-<version>.exe` and `PI-Desktop-Portable-<version>.zip` from
+  `Pi-Desktop-Plus-Setup-<version>.exe` and `Pi-Desktop-Plus-Portable-<version>.zip` from
   the shared electron-builder config; a clean user profile is available; the
   account is a standard user without administrator elevation.
 - **Steps**: 1) Inspect the release directory and `latest.yml`. 2) Extract the
   portable ZIP to a user-writable directory without running the NSIS installer.
-  3) Launch the extracted `PI-Desktop.exe`. 4) Confirm there is no
-  administrator prompt and that the running app has the PI-Desktop icon and
+  3) Launch the extracted `Pi-Desktop-Plus.exe`. 4) Confirm there is no
+  administrator prompt and that the running app has the Pi-Desktop-Plus icon and
   taskbar entry. 5) Invoke Check for Updates. 6) Confirm Settings → Info offers
   the releases page rather than Restart to update. 7) Quit and relaunch the
   extracted executable.
 - **Expected**: Both Windows artifacts are space-free and uploaded. `latest.yml`
   points at the NSIS installer only. The extracted ZIP app starts without a
-  setup wizard or administrator prompt, keeps the normal PI-Desktop taskbar
+  setup wizard or administrator prompt, keeps the normal Pi-Desktop-Plus taskbar
   identity/icon, uses the existing application data directory, and reports
   update mode `manual`. An available update does not download or run
-  `PI-Desktop-Setup-<version>.exe`. Relaunch restores sessions from that same
+  `Pi-Desktop-Plus-Setup-<version>.exe`. Relaunch restores sessions from that same
   profile.
 - **Specs linked**: `01-product/01-product-scope.md`,
   `06-delivery/06-release-runbook.md`, `03-runtime/07-process-model.md`,
@@ -12374,6 +12380,15 @@ are withdrawn with ADR 0165.
 - **Status**: MCP protocol/unit-covered by `apps/desktop/test/mcp-control.test.mjs`;
   full Electron journey documented and remains deferred by the no-local-E2E
   policy
+
+- **Durable-turn extension (2026-09-26)**: Discover `pi_turn_get`; poll it
+  with the session/turn returned by prompt. Verify running, completed, error,
+  and aborted using isolated host fixtures; a cross-session or missing turn
+  is NOT_FOUND and empty identifiers are INVALID_PARAMS. Restart the isolated
+  host and read the same settled turn without sending another prompt. Confirm
+  this read does not mutate sessions or expose transcripts/secrets. Runtime
+  idle is not proof of success. Real-model execution requires explicit cost
+  authorization; do not mark it exercised from fixture tests alone.
 
 #### E2E-234: Workspace security denylist and ignore layers
 
@@ -13039,8 +13054,12 @@ browser milestones are scheduled.
   Info → Developer and confirm Remote Hosts appears on the rail between
   Projects and Info with an Experimental badge. 3) Open it and confirm the page
   title carries the same badge, with a host inventory and one Add form
-  (SSH / Pair) and no instructional copy. 4) Switch Add to Pair and back to
-  SSH; confirm both forms stay filled. 5) Disable developer mode while the
+  (SSH / Pair) and no instructional copy. 4) Confirm the SSH and Pair tab IDs
+  stay stable, each tab's `aria-controls` resolves to its form panel, and the
+  panel's `aria-labelledby` points back to that tab. Confirm ArrowLeft/Right
+  wrap between the two tabs and Home/End select the endpoints. Switch Add to
+  Pair and back to SSH; confirm both forms stay filled and the selected panel
+  follows the selected tab. 5) Disable developer mode while the
   destination is open and confirm the page returns to General and the rail row
   is gone.
 - **Expected**: The whole destination is marked Experimental and is reachable
@@ -15213,3 +15232,111 @@ renderer's durable transcript reads. No real model or provider is contacted.
   `official-native-search.test.ts`; shared route tests reject lookalike hosts,
   unsafe URLs and unknown gateways. The UI fixture does not prove Host/SQLite
   persistence or live provider availability.
+
+### E2E-GOAL-temporary-workspace
+
+- **Preconditions:** Isolated Desktop profile/data directory, unrelated visible
+  project, temporary Goal session, loopback-only fixture model; no live keys.
+- **Steps:** Submit a Goal through the real sidecar, wait for its approval card,
+  open the exact artifact, approve Auto, and let the sidecar write the agreed
+  marker using the normal Write tool.
+- **Expected:** Submission pauses for approval; the artifact is under the
+  session's scratch `.pi/goal` directory and renders in the work panel. Approved
+  execution writes only in that session's workspace, keeps `projectPath` absent,
+  and returns the session to Agent. No implicit project or extra execution is
+  created. Existing project Plan/Goal behavior remains covered by the Plan suite.
+- **Recovery/negative coverage:** Rust regressions cover age-sweep retention,
+  orphan deletion, submission/approval isolation and temporary Plan rejection.
+  Runtime regressions cover failed/invalid submissions through the actual tool
+  outcome hook. Renderer tests cover delayed resolution with session changes.
+- **Specs:** 03-runtime/02-agent-runtime, 03-tools-and-permissions,
+  04-data-storage, 06-host-rpc-protocol; ADR temporary-goal-scratch-workspace.
+- **Acceptance:** A temporary Goal can be approved and produce inspectable work
+  without inheriting an unrelated workspace.
+- **Milestone:** Maintenance.
+- **Command:** `node scripts/e2e-temporary-goal.mjs` after the desktop and Host
+  builds. The script reports its isolated profile and screenshot directory.
+
+### E2E-GOAL-completion-report
+
+- **Preconditions:** Isolated Desktop profile and Host data directory, an
+  approved Goal session, and a loopback-only fake model. No live provider
+  credentials or user data.
+- **Steps:** Submit and approve a fixture Goal, let the real sidecar perform its
+  bounded work, then submit a structured `SubmitGoalReport`. Open the resulting
+  transcript card and the report in the session Work Panel.
+- **Expected:** Host returns one durable `ready` report for the same Goal and
+  execution. The transcript card opens the matching report; the report shows
+  its conclusion, execution status, evidence and limitations. A criterion is
+  presented as met only when the structured report and durable evidence support
+  it. A fallback report identifies unknown or missing evidence.
+- **Recovery and failure:** Ready reports remain readable after restart.
+  Invalid or failed draft persistence never publishes a stale or misleading
+  ready report. Failed outbox persistence remains failed; explicit Retry uses
+  only Host-owned durable facts and does not rerun the Goal or call the model.
+  The Work Panel shows localized generic failure text and only a safe error
+  code, with Retry disabled while the request is active.
+- **Specs:** 03-runtime/02-agent-runtime, 03-runtime/03-tools-and-permissions,
+  03-runtime/04-data-storage, 03-runtime/06-host-rpc-protocol,
+  04-ux/08-component-spec.
+- **Automation:** `node scripts/e2e-temporary-goal.mjs`,
+  `pnpm test:e2e:goal-report`, Goal Report runtime/Host tests, and the focused
+  Goal Report renderer tests. Electron uses the isolated local fake model.
+- **Milestone:** Maintenance.
+
+### E2E-TEAM-runtime-mailbox-and-panel
+
+- **Preconditions:** Isolated Desktop profile and Host data directory, a Team
+  Lead session, and a loopback-only fake model. No live provider credentials.
+- **Steps:** Prompt the Lead to create a fresh teammate with an initial task.
+  The teammate sends a result to Lead. Read both transcripts and the Host roster
+  and board. Pause the Team with a queued mailbox message, restart Desktop, verify
+  the message remains pending while paused, then Resume and verify one delivery.
+  Open the Team panel and navigate to the teammate's session from its roster row.
+- **Expected:** The Lead and teammate have distinct durable sessions and
+  Host-derived Team contexts. The peer message appears once in both the durable
+  mailbox and recipient transcript; delivery is acknowledged only after the
+  Host queue/turn receipt is durable. The Lead receives the teammate's reply.
+  The panel renders the Host roster and board and opens the real member session.
+  Pause holds Team queues; an unadmitted Team mailbox message remains queued
+  across restart. Resume releases the Team hold and delivers that message once.
+- **Recovery and authorization:** Agent Host tests prove that restart recovery
+  admits only the selected Team message while keeping ordinary restored turns
+  held; Host Core tests prove paused mailbox messages survive restart without a
+  queue receipt, while ordinary unclaimed collaboration messages are interrupted.
+  Host tests cover idempotency, inherited sender permission ceilings,
+  rejecting a target whose effective permission widens after enqueue, queue/turn
+  receipts, cross-Team access, task ownership, Lead-only operations, owner
+  reassignment/unassignment, CAS and dependencies. Stop/abort tests require
+  Team pause before exact-turn interruption.
+- **Specs:** ADR 0307; 03-runtime/02-agent-runtime, 03-tools-and-permissions,
+  04-data-storage, 06-host-rpc-protocol; 04-ux/08-component-spec.
+- **Automation:** `pnpm test:e2e:team`, `pnpm --filter @pi-desktop/agent-host
+  test`, `cargo test -p host-core --locked`, and the desktop Team interaction
+  tests. The Electron scenario uses only an isolated profile and a local fake
+  model.
+- **Milestone:** Maintenance.
+
+### E2E-PLUS-independent-installation
+
+- Preconditions: isolated home/profile and native candidate; an old PI-Desktop
+  fixture has sentinel data. No real provider credentials or user profile.
+- Steps: launch Plus, inspect its native name and Settings > Info, create a
+  fixture project/session, restart, then inspect both product data roots. Run
+  the development launcher with an existing old branding cache. Inspect the
+  packaged helper, Linux desktop entry, Windows identity and generated feed.
+- Expected: Plus uses its own app ID, lock and data root; its session persists
+  and old sentinels stay unchanged. Development cache renewal succeeds. The
+  helper rejects the old bundle before changing attributes. Assets, blockmaps
+  and feed URLs agree and point only to SakuraLoveSmile/PI-Desktop.
+- Agent text: default Agent, Plan, Goal and delegated subagent prompts, plus
+  tool descriptions shown to the model, identify Pi-Desktop-Plus without
+  changing roles, tool calls, approval or cancellation behavior.
+- Remote case: run bootstrap against a disposable SSH fixture with old host
+  sentinels; Plus uses its own install, pid/log and data roots and does not
+  stop the old host. Explicit path overrides retain their documented meaning.
+- Release case: missing signing inputs and wrong certificate/team fail closed;
+  fixture signatures do not qualify actual notarization or live updates.
+- Evidence: record candidate/base, OS/architecture, tests and native scenarios
+  separately. Native Windows/Linux and signed release evidence are required
+  before claiming those distribution lanes qualified.

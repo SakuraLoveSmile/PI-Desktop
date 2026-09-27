@@ -122,6 +122,18 @@
           }
         ]
       },
+      "executionProfile": {
+        "anyOf": [
+          {
+            "type": "string",
+            "const": "standard"
+          },
+          {
+            "type": "string",
+            "const": "team"
+          }
+        ]
+      },
       "activeTurnId": {
         "type": "string"
       },
@@ -611,6 +623,18 @@
               {
                 "type": "string",
                 "const": "auto"
+              }
+            ]
+          },
+          "executionProfile": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "standard"
+              },
+              {
+                "type": "string",
+                "const": "team"
               }
             ]
           },

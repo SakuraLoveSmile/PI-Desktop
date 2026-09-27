@@ -312,11 +312,17 @@ export const AssistantTurn = memo(function AssistantTurn({
         t,
         answer: content,
         selectTarget:
+          (actionMessage
+            ? event.currentTarget.querySelector<HTMLElement>(
+                `.message-bubble[data-message-id="${actionMessage.id}"]`,
+              )
+            : null) ??
           [
             ...event.currentTarget.querySelectorAll<HTMLElement>(
               ".message-bubble",
             ),
-          ].at(-1) ?? null,
+          ].at(-1) ??
+          null,
         complete: complete && Boolean(actionMessage),
         actions: { copyText, selectText },
         onRegenerate: () => {
@@ -402,10 +408,17 @@ export const AssistantTurn = memo(function AssistantTurn({
       <div className="message-col">
         {groupProcess ? (
           <>
-            <TurnProcess turnId={entry.id} processParts={process} turnParts={entry.parts} isActive={isActive} delegationStatuses={turnDelegationStatuses}>
+            {responses.map(renderPart)}
+            <TurnProcess
+              turnId={entry.id}
+              processParts={process}
+              turnParts={entry.parts}
+              isActive={isActive}
+              hasAnswer={Boolean(actionMessage || content)}
+              delegationStatuses={turnDelegationStatuses}
+            >
               {process.map(renderPart)}
             </TurnProcess>
-            {responses.map(renderPart)}
           </>
         ) : (
           entry.parts.map(renderPart)

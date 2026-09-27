@@ -2,31 +2,30 @@ import assert from "node:assert/strict";
 import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
-const verifyScript = new URL(
-  "../../../scripts/verify-macos-release.sh",
-  import.meta.url,
+const verifyScript = fileURLToPath(
+  new URL("../../../scripts/verify-macos-release.sh", import.meta.url),
 );
-const notarizeScript = new URL(
-  "../../../scripts/notarize-and-staple-macos-release-dmg.sh",
-  import.meta.url,
+const notarizeScript = fileURLToPath(
+  new URL("../../../scripts/notarize-and-staple-macos-release-dmg.sh", import.meta.url),
 );
 
-const SIGNING_IDENTITY = "Developer ID Application: XingYu Liu (DUV63RKYTW)";
-const SIGNING_IDENTITY_NAME = "XingYu Liu (DUV63RKYTW)";
+const SIGNING_IDENTITY = "Developer ID Application: Release Signer (TEAMPLUS1234)";
+const SIGNING_IDENTITY_NAME = "Release Signer (TEAMPLUS1234)";
 const SUBMISSION_ID = "11111111-2222-3333-4444-555555555555";
 const NOTARY_ENV = {
   APPLE_ID: "release@example.com",
   APPLE_APP_SPECIFIC_PASSWORD: "app-specific-password",
-  APPLE_TEAM_ID: "DUV63RKYTW",
+  APPLE_TEAM_ID: "TEAMPLUS1234",
 };
 
 async function writeSignedAppFixture(release) {
-  const app = join(release, "mac-arm64", "PI-Desktop.app");
+  const app = join(release, "mac-arm64", "Pi-Desktop-Plus.app");
   const hostCore = join(app, "Contents", "Resources", "bin", "pi-desktop-host-core");
-  const dmg = join(release, "PI-Desktop-0.14.2-arm64.dmg");
+  const dmg = join(release, "Pi-Desktop-Plus-0.14.2-arm64.dmg");
   await mkdir(join(app, "Contents", "Resources", "bin"), { recursive: true });
   await writeFile(hostCore, "fixture");
   await writeFile(dmg, "fixture");
@@ -34,7 +33,7 @@ async function writeSignedAppFixture(release) {
 }
 
 async function writeDmgFixture(release) {
-  const dmg = join(release, "PI-Desktop-0.15.1-beta.3-arm64.dmg");
+  const dmg = join(release, "Pi-Desktop-Plus-0.15.1-beta.3-arm64.dmg");
   await mkdir(release, { recursive: true });
   await writeFile(dmg, "fixture");
   return dmg;
@@ -84,7 +83,7 @@ exit 0
 }
 
 function runNotarize(release, bin, log, extraEnv = {}) {
-  return spawnSync("bash", [notarizeScript.pathname, release], {
+  return spawnSync("bash", [notarizeScript, release], {
     encoding: "utf8",
     env: {
       ...process.env,
@@ -191,7 +190,7 @@ test("the notarization step fails closed without team-scoped credentials", async
   const missing = { ...process.env, ...NOTARY_ENV, NOTARY_LOG: log };
   delete missing.APPLE_ID;
   delete missing.APPLE_APP_SPECIFIC_PASSWORD;
-  const missingResult = spawnSync("bash", [notarizeScript.pathname, release], {
+  const missingResult = spawnSync("bash", [notarizeScript, release], {
     encoding: "utf8",
     env: missing,
   });
@@ -200,12 +199,6 @@ test("the notarization step fails closed without team-scoped credentials", async
     missingResult.stderr,
     /APPLE_ID \/ APPLE_APP_SPECIFIC_PASSWORD \/ APPLE_TEAM_ID/,
   );
-
-  const wrongTeam = runNotarize(release, bin, log, {
-    APPLE_TEAM_ID: "WRONGTEAMID",
-  });
-  assert.equal(wrongTeam.status, 1);
-  assert.match(wrongTeam.stderr, /APPLE_TEAM_ID must be DUV63RKYTW/);
 
   assert.equal(
     await readFile(log, "utf8").catch(() => ""),
@@ -225,7 +218,7 @@ test("macOS release verification requires a notarized Developer ID app and DMG",
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "codesign"),
-    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'flags=0x10000(runtime)' >&2; fi\nexit 0\n`,
+    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'TeamIdentifier=${NOTARY_ENV.APPLE_TEAM_ID}' >&2; echo 'flags=0x10000(runtime)' >&2; fi\nexit 0\n`,
   );
   await writeFile(
     join(bin, "spctl"),
@@ -241,11 +234,12 @@ test("macOS release verification requires a notarized Developer ID app and DMG",
 
   // The local lane passes the bare common name; the script must still match the
   // prefixed Authority line codesign prints.
-  const result = spawnSync("bash", [verifyScript.pathname, release], {
+  const result = spawnSync("bash", [verifyScript, release], {
     encoding: "utf8",
     env: {
       ...process.env,
       MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME,
+      APPLE_TEAM_ID: NOTARY_ENV.APPLE_TEAM_ID,
       PATH: `${bin}:${process.env.PATH}`,
       STAPLER_LOG: staplerLog,
     },
@@ -253,7 +247,7 @@ test("macOS release verification requires a notarized Developer ID app and DMG",
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /Notarized Developer ID/);
-  assert.match(result.stdout, /PI-Desktop-0\.14\.2-arm64\.dmg/);
+  assert.match(result.stdout, /Pi-Desktop-Plus-0\.14\.2-arm64\.dmg/);
   assert.match(result.stdout, /host-core sidecar/);
   assert.equal(
     await readFile(staplerLog, "utf8"),
@@ -271,7 +265,7 @@ test("macOS release verification rejects a Developer ID app without notarization
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "codesign"),
-    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; fi\n`,
+    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'TeamIdentifier=${NOTARY_ENV.APPLE_TEAM_ID}' >&2; fi\n`,
   );
   await writeFile(
     join(bin, "spctl"),
@@ -282,9 +276,9 @@ test("macOS release verification rejects a Developer ID app without notarization
     ["codesign", "spctl", "xcrun"].map((name) => chmod(join(bin, name), 0o755)),
   );
 
-  const result = spawnSync("bash", [verifyScript.pathname, release], {
+  const result = spawnSync("bash", [verifyScript, release], {
     encoding: "utf8",
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    env: { ...process.env, APPLE_TEAM_ID: NOTARY_ENV.APPLE_TEAM_ID, MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME, PATH: `${bin}:${process.env.PATH}` },
   });
 
   assert.equal(result.status, 1);
@@ -301,7 +295,7 @@ test("macOS release verification accepts the prefixed identity form", async (t) 
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "codesign"),
-    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'flags=0x10000(runtime)' >&2; fi\n`,
+    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'TeamIdentifier=${NOTARY_ENV.APPLE_TEAM_ID}' >&2; echo 'flags=0x10000(runtime)' >&2; fi\n`,
   );
   await writeFile(
     join(bin, "spctl"),
@@ -312,11 +306,12 @@ test("macOS release verification accepts the prefixed identity form", async (t) 
     ["codesign", "spctl", "xcrun"].map((name) => chmod(join(bin, name), 0o755)),
   );
 
-  const result = spawnSync("bash", [verifyScript.pathname, release], {
+  const result = spawnSync("bash", [verifyScript, release], {
     encoding: "utf8",
     env: {
       ...process.env,
       MAC_SIGNING_IDENTITY: SIGNING_IDENTITY,
+      APPLE_TEAM_ID: NOTARY_ENV.APPLE_TEAM_ID,
       PATH: `${bin}:${process.env.PATH}`,
     },
   });
@@ -345,15 +340,46 @@ test("macOS release verification rejects a different signing identity", async (t
     ["codesign", "spctl", "xcrun"].map((name) => chmod(join(bin, name), 0o755)),
   );
 
-  const result = spawnSync("bash", [verifyScript.pathname, release], {
+  const result = spawnSync("bash", [verifyScript, release], {
     encoding: "utf8",
     env: {
       ...process.env,
       MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME,
+      APPLE_TEAM_ID: NOTARY_ENV.APPLE_TEAM_ID,
       PATH: `${bin}:${process.env.PATH}`,
     },
   });
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /is not signed with/);
+});
+
+test("macOS release verification rejects a mismatched signing team", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-wrong-team-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const release = join(root, "release");
+  const bin = join(root, "bin");
+  await writeSignedAppFixture(release);
+  await mkdir(bin, { recursive: true });
+  await writeFile(
+    join(bin, "codesign"),
+    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'TeamIdentifier=OTHERTEAM123' >&2; fi\n`,
+  );
+  await writeFile(join(bin, "spctl"), "#!/usr/bin/env bash\necho 'source=Notarized Developer ID' >&2\n");
+  await writeFile(join(bin, "xcrun"), "#!/usr/bin/env bash\nexit 0\n");
+  await Promise.all(["codesign", "spctl", "xcrun"].map((name) => chmod(join(bin, name), 0o755)));
+
+  const result = spawnSync("bash", [verifyScript, release], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME,
+      APPLE_TEAM_ID: NOTARY_ENV.APPLE_TEAM_ID,
+      PATH: `${bin}:${process.env.PATH}`,
+    },
+  });
+
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /not signed for Apple team/);
 });

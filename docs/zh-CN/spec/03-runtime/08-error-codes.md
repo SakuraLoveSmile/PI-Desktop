@@ -303,6 +303,37 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `PAIRING_TOKEN_EXPIRED` | 否 | 一次性配对令牌在配对完成前已过期 |
 | `CAPABILITY_UNAVAILABLE` | 否 | 请求的操作对应主机声明为不可用的能力（如附件、工具中继） |
 
+### 3.9 专家团队协作（ADR 0307）
+
+在协调带有队友、共享任务看板和对等邮箱的专家团队会话时由 host-core 和代理运行时发出。
+
+| 代码 | 可重试 | 含义 |
+|---|---|---|
+| `TEAM_UNAVAILABLE` | 否 | 会话未启用团队执行配置，或团队运行时不可用 |
+| `TEAM_UNSUPPORTED_AGENT` | 否 | 指定的代理模板或模型无法配置为队友 |
+| `TEAM_MEMBER_LIMIT_EXCEEDED` | 否 | 团队花名册已达成员上限（8 名成员） |
+| `TEAM_MEMBER_NOT_FOUND` | 否 | 指定的团队成员在活跃花名册中不存在 |
+| `TEAM_MEMBER_ALREADY_EXISTS` | 否 | 具有指定成员 ID 或名称的团队成员已存在 |
+| `TEAM_MEMBER_DELETION_BLOCKED` | 否 | 在团队任务或执行处于活跃状态时无法删除队友会话 |
+| `TEAM_TASK_NOT_FOUND` | 否 | 指定的任务 ID 在团队任务看板中不存在 |
+| `TEAM_TASK_LIMIT_EXCEEDED` | 否 | 团队任务看板已达最大容量（256 个任务） |
+| `TEAM_TASK_REVISION_MISMATCH` | 是 | 乐观并发控制冲突；任务修订版本与预期版本不匹配 |
+| `TEAM_TASK_DEPENDENCY_CYCLE` | 否 | 添加指定的依赖项会在任务 DAG 中引入循环依赖 |
+| `TEAM_TASK_MISSING_DEPENDENCY` | 否 | 一个或多个声明的任务依赖项在看板中不存在 |
+| `TEAM_MAILBOX_LIMIT_EXCEEDED` | 是 | 队友邮箱队列已达最大积压限制（64 条消息） |
+| `TEAM_MESSAGE_TOO_LARGE` | 否 | 团队消息有效负载超过最大允许大小（64 KiB） |
+| `TEAM_PAUSED` | 是 | 团队协作当前已暂停；在恢复之前无法继续操作 |
+| `TEAM_PERMISSION_DENIED` | 否 | 成员角色或权限不允许执行该团队操作或跨成员操作 |
+| `TEAM_UNAUTHORIZED` | 否 | 调用会话不是经过 Host 验证的团队 Lead 或该团队成员 |
+| `TEAM_NOT_FOUND` | 否 | 指定会话不是仍然有效的团队 Lead |
+| `TEAM_TARGET_NOT_FOUND` | 否 | 指定的收件人或任务所有者不在团队花名册中 |
+| `TEAM_MEMBER_NAME_COLLISION` | 否 | 团队中已存在同名成员 |
+| `TEAM_TASK_REVISION_CONFLICT` | 是 | 任务在调用方读取预期版本后发生了变化 |
+| `TEAM_TASK_UNKNOWN_DEPENDENCY` | 否 | 声明的任务依赖在看板中不存在 |
+| `TEAM_MAILBOX_FULL` | 是 | 收件人的待处理团队消息已达到上限 |
+| `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | 否 | 团队消息超过 64 KiB 载荷上限 |
+| `TEAM_DELIVERY_PENDING` | 是 | Host 尚未持久化收件人的队列或 turn 回执 |
+
 ## 4. 映射规则
 
 ### 主机 RPC 数字 → AppError.code

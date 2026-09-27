@@ -70,6 +70,7 @@ const fixtureChannels = {
   appGetVersion: "pi-desktop/app/getVersion",
   projectSet: "pi-desktop/project/set",
   sessionGet: "pi-desktop/session/get",
+  turnGet: "pi-desktop/turn/get",
   sessionCreate: "pi-desktop/session/create",
   sessionDelete: "pi-desktop/session/delete",
   sessionConfigure: "pi-desktop/session/configure",
@@ -700,4 +701,133 @@ test("plugin-only session collaboration operations stay off the external MCP sur
     result: { ok: true, channel: "pi-desktop/app/getVersion" },
   });
   assert.deepEqual(calls.at(-1), { channel: "pi-desktop/app/getVersion", args: [] });
+});
+
+test("pi_turn_get reads a turn's durable state and never leaks a cross-session turn", async (t) => {
+  const dataDir = mkdtempSync(join(tmpdir(), "pi-mcp-turn-get-"));
+  const calls = [];
+  // Mirrors the host handler: `turns` rows are addressed by BOTH ids, so a
+  // turn owned by another session is indistinguishable from an unknown one.
+  const turns = new Map([
+    ["session-1/turn-done", {
+      sessionId: "session-1",
+      turnId: "turn-done",
+      status: "completed",
+      endedAt: "2026-09-21T10:00:00.000Z",
+    }],
+    ["session-1/turn-running", {
+      sessionId: "session-1",
+      turnId: "turn-running",
+      status: "running",
+    }],
+    ["session-2/turn-foreign", {
+      sessionId: "session-2",
+      turnId: "turn-foreign",
+      status: "error",
+      errorCode: "PROVIDER_ERROR",
+      endedAt: "2026-09-21T11:00:00.000Z",
+    }],
+  ]);
+  const server = new McpControlServer({
+    dataDir,
+    port: 0,
+    channels: fixtureChannels,
+    invoke: async (channel, args) => {
+      calls.push({ channel, args });
+      assert.equal(channel, "pi-desktop/turn/get");
+      const input = args[0] ?? {};
+      if (!input.sessionId) throw new Error("sessionId required");
+      if (!input.turnId) throw new Error("turnId required");
+      const turn = turns.get(`${input.sessionId}/${input.turnId}`);
+      if (!turn) {
+        throw Object.assign(new Error("turn not found"), { errorCode: "NOT_FOUND" });
+      }
+      return turn;
+    },
+  });
+  t.after(() => server.stop());
+
+  const info = await server.start();
+  assert.ok(info);
+  const initialized = await post(info.url, info.token, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: { protocolVersion: "2025-06-18" },
+  });
+  const sessionId = initialized.response.headers.get("mcp-session-id");
+  assert.ok(sessionId);
+
+  const listed = await post(
+    info.url,
+    info.token,
+    { jsonrpc: "2.0", id: 2, method: "tools/list" },
+    { "Mcp-Session-Id": sessionId },
+  );
+  const tool = listed.body.result.tools.find((candidate) => candidate.name === "pi_turn_get");
+  assert.ok(tool, "pi_turn_get is listed");
+  assert.deepEqual(tool.inputSchema.required, ["sessionId", "turnId"]);
+  assert.equal(tool.inputSchema.properties.sessionId.type, "string");
+  assert.equal(tool.inputSchema.properties.turnId.type, "string");
+  assert.equal(tool.inputSchema.additionalProperties, false);
+  const described = await post(
+    info.url,
+    info.token,
+    { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "pi_control_describe", arguments: {} } },
+    { "Mcp-Session-Id": sessionId },
+  );
+  const entry = described.body.result.structuredContent.find((item) => item.id === "turn/get");
+  assert.equal(entry.risk, "read");
+  assert.deepEqual(entry.argumentShape, ["input"]);
+
+  const call = (id, args) =>
+    post(
+      info.url,
+      info.token,
+      { jsonrpc: "2.0", id, method: "tools/call", params: { name: "pi_turn_get", arguments: args } },
+      { "Mcp-Session-Id": sessionId },
+    );
+
+  const terminal = await call(4, { sessionId: "session-1", turnId: "turn-done" });
+  assert.equal(terminal.body.result.isError, undefined);
+  assert.deepEqual(terminal.body.result.structuredContent, {
+    sessionId: "session-1",
+    turnId: "turn-done",
+    status: "completed",
+    endedAt: "2026-09-21T10:00:00.000Z",
+  });
+  assert.deepEqual(calls.at(-1), {
+    channel: "pi-desktop/turn/get",
+    args: [{ sessionId: "session-1", turnId: "turn-done" }],
+  });
+
+  const running = await call(5, { sessionId: "session-1", turnId: "turn-running" });
+  assert.equal(running.body.result.structuredContent.status, "running");
+  assert.equal(running.body.result.structuredContent.errorCode, undefined);
+  assert.equal(running.body.result.structuredContent.endedAt, undefined);
+
+  const own = await call(6, { sessionId: "session-2", turnId: "turn-foreign" });
+  assert.equal(own.body.result.structuredContent.status, "error");
+  assert.equal(own.body.result.structuredContent.errorCode, "PROVIDER_ERROR");
+
+  const refused = [
+    // A turn id from another session is not readable through this session.
+    { sessionId: "session-1", turnId: "turn-foreign" },
+    // Nor is the owner's session id guessable from an unrelated session.
+    { sessionId: "session-2", turnId: "turn-done" },
+    { sessionId: "session-1", turnId: "missing-turn" },
+    { sessionId: "missing-session", turnId: "turn-done" },
+  ];
+  for (const args of refused) {
+    const denied = await call(7, args);
+    assert.equal(denied.body.result.isError, true, JSON.stringify(args));
+    assert.equal(denied.body.result.structuredContent.ok, false);
+    assert.equal(denied.body.result.structuredContent.error.code, "NOT_FOUND");
+    assert.equal(denied.body.result.structuredContent.error.message, "turn not found");
+  }
+
+  const missingTurnId = await call(8, { sessionId: "session-1" });
+  assert.equal(missingTurnId.body.result.isError, true);
+  assert.equal(missingTurnId.body.result.structuredContent.error.code, "INVALID_PARAMS");
+  assert.equal(calls.some((entry) => !entry.args[0].turnId), false);
 });

@@ -506,6 +506,21 @@ export function SettingsPage() {
                   />
                 </SettingsRow>
                 <SettingsRow
+                  title={t("settings.autoGenerateSessionTitles")}
+                  description={t("settings.autoGenerateSessionTitlesDesc")}
+                >
+                  <SettingsToggle
+                    checked={settings.autoGenerateSessionTitles !== false}
+                    label={t("settings.autoGenerateSessionTitles")}
+                    onChange={() =>
+                      void saveSettings({
+                        autoGenerateSessionTitles:
+                          !(settings.autoGenerateSessionTitles !== false),
+                      })
+                    }
+                  />
+                </SettingsRow>
+                <SettingsRow
                   title={t("settings.smoothStreaming")}
                   description={t("settings.smoothStreamingDesc")}
                 >
@@ -570,7 +585,7 @@ export function SettingsPage() {
                 <SettingsRow title={t("settings.application")}>
                   <div className="settings-about-meta">
                     <div className="font-medium">
-                      {version?.name || "PI-Desktop"} {version?.version}
+                      {version?.name || "Pi-Desktop-Plus"} {version?.version}
                     </div>
                     <div className="font-mono text-xs-plus text-text-muted">
                       protocol {version?.protocolVersion} · host {version?.hostVersion}

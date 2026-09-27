@@ -6,6 +6,7 @@ import {
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type Ref,
   type SelectHTMLAttributes,
@@ -692,6 +693,8 @@ export function SegmentedControl<T extends string>({
   className,
   itemClassName,
   disabled,
+  tabIdPrefix,
+  panelIdPrefix,
 }: {
   value: T;
   onChange: (value: T) => void;
@@ -701,6 +704,10 @@ export function SegmentedControl<T extends string>({
   className?: string;
   itemClassName?: string;
   disabled?: boolean;
+  /** Stable prefix for tab ids when the label is localized or user supplied. */
+  tabIdPrefix?: string;
+  /** Optional matching panel-id prefix for tab/panel accessibility wiring. */
+  panelIdPrefix?: string;
 }) {
   const itemRole = role === "tablist" ? "tab" : role === "radiogroup" ? "radio" : undefined;
   return (
@@ -714,7 +721,15 @@ export function SegmentedControl<T extends string>({
           key={option.value}
           type="button"
           {...(itemRole === "tab"
-            ? { role: "tab", id: `${label}-tab-${option.value}`, "aria-selected": value === option.value }
+            ? {
+                role: "tab",
+                id: `${tabIdPrefix ?? label}-tab-${option.value}`,
+                "aria-controls": panelIdPrefix
+                  ? `${panelIdPrefix}-${option.value}`
+                  : undefined,
+                "aria-selected": value === option.value,
+                tabIndex: value === option.value ? 0 : -1,
+              }
             : itemRole === "radio"
               ? { role: "radio", "aria-checked": value === option.value }
               : { "aria-pressed": value === option.value })}
@@ -724,6 +739,39 @@ export function SegmentedControl<T extends string>({
             itemClassName,
           )}
           disabled={disabled}
+          onKeyDown={
+            itemRole === "tab"
+              ? (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+                  let nextIndex: number | undefined;
+                  const currentIndex = options.findIndex(
+                    (candidate) => candidate.value === option.value,
+                  );
+                  switch (event.key) {
+                    case "ArrowRight":
+                      nextIndex = (currentIndex + 1) % options.length;
+                      break;
+                    case "ArrowLeft":
+                      nextIndex = (currentIndex + options.length - 1) % options.length;
+                      break;
+                    case "Home":
+                      nextIndex = 0;
+                      break;
+                    case "End":
+                      nextIndex = options.length - 1;
+                      break;
+                    default:
+                      return;
+                  }
+
+                  event.preventDefault();
+                  onChange(options[nextIndex].value);
+                  const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                    '[role="tab"]',
+                  );
+                  Array.from(tabs ?? [])[nextIndex]?.focus();
+                }
+              : undefined
+          }
           onClick={() => onChange(option.value)}
         >
           {option.label}

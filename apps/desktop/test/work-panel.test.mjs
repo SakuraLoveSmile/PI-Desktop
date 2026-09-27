@@ -232,7 +232,7 @@ test("work panel header exposes a scrollable tab strip and direct new-page actio
   assert.match(panelSource, /aria-controls=\{`work-panel-surface-\$\{tab\.id\}`\}/);
   assert.match(panelSource, /className="work-panel-tab-close"/);
   assert.match(panelSource, /event\.button !== 1/);
-  assert.match(panelSource, /workPanelTools\(t, pluginViews\)/);
+  assert.match(panelSource, /workPanelTools\(\s*t,\s*pluginViews/);
   assert.match(panelSource, /toolWorkPanelTab\("review"\)/);
   assert.match(panelSource, /pluginViews\.map\(\(view\) =>/);
   assert.doesNotMatch(panelSource, /HEADER_TOOLS|headerToolTab|HeaderToolKind/);

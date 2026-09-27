@@ -1,7 +1,7 @@
 use crate::{db::Database, sessions};
 use anyhow::{anyhow, Result};
 
-pub(super) fn effective_mode(db: &Database, session_id: &str) -> Result<String> {
+pub(crate) fn effective_mode(db: &Database, session_id: &str) -> Result<String> {
     let mode = sessions::session_permission_mode(db, session_id)?
         .ok_or_else(|| anyhow!("NOT_FOUND: session {session_id}"))?;
     if mode != "inherit" {
@@ -19,7 +19,7 @@ pub(super) fn effective_mode(db: &Database, session_id: &str) -> Result<String> 
         .unwrap_or_else(|| "ask".into()))
 }
 
-pub(super) fn check_target(db: &Database, session_id: &str, ceiling: &str) -> Result<()> {
+pub(crate) fn check_target(db: &Database, session_id: &str, ceiling: &str) -> Result<()> {
     fn rank(mode: &str) -> u8 {
         match mode {
             "auto" => 2,

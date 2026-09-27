@@ -22,6 +22,7 @@ import { syncPluginDisplayLocale } from "../plugin-display-locale";
 import { RuntimeSupervisor } from "@pi-desktop/host-runtime";
 
 type RestartKind = "host" | "sidecar";
+
 export type RuntimeLifecycleDependencies = {
   runtimeState: RuntimeState;
   dataDir: string;
@@ -37,6 +38,7 @@ export type RuntimeLifecycleDependencies = {
     list: Array<{ id?: string; scope?: ActivationScope }>,
   ) => void;
   refreshUserMcp: () => Promise<unknown>;
+  onBackendsReady?: () => Promise<void>;
   isQuitting: () => boolean;
   /**
    * App language the plugin rows resolve their labels in. The host holds it,
@@ -59,6 +61,7 @@ export function createRuntimeLifecycle({
   setCurrentWorkspacePath,
   rememberPluginScopes,
   refreshUserMcp,
+  onBackendsReady,
   isQuitting,
   getDisplayLocale,
 }: RuntimeLifecycleDependencies): {
@@ -119,7 +122,10 @@ export function createRuntimeLifecycle({
       },
       sidecar: startSidecar,
     },
-    afterRestart: () => drainApprovedPlanExecutions(),
+    afterRestart: async () => {
+      await onBackendsReady?.();
+      await drainApprovedPlanExecutions();
+    },
     isUnrecoverable: (error) => Boolean(schemaTooNewOf(error)) || isGlibcUnsupportedError(error),
     isShuttingDown: isQuitting,
     onEvent: (event) => {

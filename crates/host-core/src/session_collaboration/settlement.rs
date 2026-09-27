@@ -197,10 +197,18 @@ pub(super) fn cancel(db: &Database, input: &Value) -> Result<Value> {
 
 /// The startup fence keeps received data but never replays an unclaimed or
 /// interrupted operation. Existing turn_queue rows are restored held by Agent Host.
+/// Team mailbox messages remain queued until Electron records their queue receipt.
 pub fn recover(db: &Database) -> Result<()> {
-    db.conn().execute("UPDATE session_collaboration_messages SET status='interrupted',
+    db.conn().execute(
+        "UPDATE session_collaboration_messages SET status='interrupted',
         error='Execution interrupted by application restart',updated_at=?1 WHERE status='running'
-        OR (status='queued' AND NOT EXISTS(SELECT 1 FROM turn_queue q WHERE q.session_message_id=session_collaboration_messages.id))",
-        params![now_ms()])?;
+        OR (status='queued'
+            AND NOT (kind='message' AND plugin_id LIKE 'team:%')
+            AND NOT EXISTS(
+                SELECT 1 FROM turn_queue q
+                WHERE q.session_message_id=session_collaboration_messages.id
+            ))",
+        params![now_ms()],
+    )?;
     Ok(())
 }

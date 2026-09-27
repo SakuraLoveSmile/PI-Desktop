@@ -240,6 +240,12 @@ type ToolBudgetHealth = {
   `CONFLICT`, normalized by Electron to `AGENT_BUSY`. The source turn continues
   without sharing runtime state with the child.
 - `session.get`
+- `session.getTurn({ sessionId, turnId })` — 只读，对协议 v11 为增量新增。返回单个
+  持久化回合的状态 `{ sessionId, turnId, status, errorCode?, endedAt? }`，其中
+  `status` 为持久域 `running | completed | error | aborted`，`endedAt` 为终态写入
+  （`session.endTurn`）的 RFC3339 时刻。该行按 `turnId` **和** `sessionId` 匹配，
+  因此属于其他会话的 turn id 与未知 id 一样返回 `NOT_FOUND`；空 id 为
+  `INVALID_PARAMS`。响应绝不包含提示词、转录或凭据材料。
 - `session.delete`
 - `session.getScratchPath` — 会话的 scratch 目录（D114），按需创建
 - `session.rename`
@@ -259,6 +265,30 @@ type ToolBudgetHealth = {
 - `session.recoverInflightMessages` — 仅供 Electron 主进程在 outbox 排空后调用的扫描
   （D327）。把最终行从未落盘的残留检查点提升写入转录，回合已 `completed` 的提升为
   `complete`。启动恢复会跳过已完成回合，以便 outbox 先追加。返回 `{ ok, count }`。
+- `team.getRuntimeContext({ sessionId })` 根据 Host 保存的执行配置和花名册推导 Team 与
+  Lead/成员身份。非 Team 会话返回 `null`；调用方不能提供或覆盖权限身份。
+- `team.getRoster({ teamSessionId, callerSessionId })` 和
+  `team.getBoard({ teamSessionId, callerSessionId })` 在 Host 验证成员身份后，返回独立的
+  花名册和带修订版本的任务看板投影。
+- `team.getMessage({ teamSessionId, callerSessionId, messageId })` 读取一条持久化 Team
+  邮箱消息。Lead 可读取全部消息；成员只能读取自己发送或接收的消息。未知 ID 和其他
+  Team 的 ID 返回 `null`。
+- `team.pendingMessages({ teamSessionId, callerSessionId })` 仅 Lead 可调用，返回未暂停 Team
+  的排队消息，包括已写入 Agent Host 队列、需要在重启后恢复的消息。已绑定 turn 的消息
+  不会重播。尚无队列回执的 Team 邮箱消息在应用重启后继续保持排队，即使 Team 仍处于暂停
+  状态也一样；恢复 Team 后才可投递。
+- `team.sendMessage({ teamSessionId, callerSessionId, target, content, idempotencyKey? })`
+  持久化一条 Team 来源的消息并发出 `team.messageQueued`。立即响应报告邮箱状态，不代表投递
+  已完成。Host 会解析发送者的有效权限模式（`inherit` 按当前默认权限解析）并保存为消息
+  上限；接收会话的 `session.beginTurn` 在启动回合前必须符合该上限。
+- `team.ackMessage({ teamSessionId, ackSessionId, messageId })` 仅接受目标成员的确认，并要求
+  Host 队列或 turn 回执已持久化。重复确认是幂等的；回合获准启动后，任一会话的权限设置
+  变化都不会单独否定已持久化的回执。
+- `team.pause/resume({ teamSessionId, callerSessionId })` 仅允许 Lead 操作。Electron Main 会
+  hold/resume 对应的 Agent Host 队列，并在恢复后排空待投递消息。
+- `team.createTask` 和 `team.updateTask` 必须携带 `callerSessionId`；Host 在修改前校验成员
+  身份、仅 Lead 可重新分配任务、任务所有权、CAS 修订版本和依赖约束。提供负责人时，成员
+  会话 ID 和成员名称作为一组解析；Lead 可以重新分配或清除任务负责人。
 - `session.appendCompaction` — 仅附加最新类型的 sidecar
   模型上下文检查点。它需要非空 checkpoint/summary/boundary
 ids 和非负 `tokensBefore`；它不会插入 message/search 行

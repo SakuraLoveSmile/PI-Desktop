@@ -73,7 +73,7 @@ export type SessionSliceDependencies = StoreAccess & {
     proposal: PlanProposal,
     openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
     pluginViews: AppState["pluginViews"],
-  ) => void;
+  ) => Promise<void>;
   rememberSessionCompactions: (
     sessionId: string,
     session:
@@ -111,6 +111,7 @@ export function createSessionSlice({
   | "refreshSessions"
   | "restorePendingPlan"
   | "refreshPlanCheckpoints"
+  | "refreshGoalReports"
   | "prefetchSession"
   | "selectSession"
   | "newSession"
@@ -201,7 +202,7 @@ export function createSessionSlice({
           ),
         }));
         if (checkpoint && activeProposal) {
-          openPlanArtifact(
+          void openPlanArtifact(
             checkpoint,
             get().openWorkPanelTabForSession,
             get().pluginViews,
@@ -218,6 +219,21 @@ export function createSessionSlice({
       await Promise.allSettled(
         sessionIds.map((sessionId) => get().restorePendingPlan(sessionId)),
       );
+    },
+
+    refreshGoalReports: async (sessionId: string) => {
+      if (!sessionId) return;
+      try {
+        const { reports } = await api.listGoalReports({ sessionId });
+        set((state) => ({
+          goalReports: {
+            ...state.goalReports,
+            [sessionId]: reports ?? [],
+          },
+        }));
+      } catch {
+        // Silently skip if host call fails or session is non-existent
+      }
     },
 
     prefetchSession: async (id) => {
@@ -421,6 +437,7 @@ export function createSessionSlice({
         }
         rememberSessionCompactions(id, detail.session);
         void get().restorePendingPlan(id);
+        void get().refreshGoalReports(id);
         void get().acknowledgeSessionOutcome(id);
         const selected = get().sessions.find((session) => session.id === id);
         if (
@@ -613,11 +630,35 @@ export function createSessionSlice({
             modelId: config.modelId ?? state.draftConfiguration?.modelId,
             permissionMode:
               config.permissionMode ?? state.draftConfiguration?.permissionMode,
+            executionProfile:
+              config.executionProfile ?? state.draftConfiguration?.executionProfile,
           },
         }));
         return;
       }
       if (get().pendingPlans[sessionId]?.status === "pending") return;
+      if (config.executionProfile === "standard") {
+        const active = get().sessions.find((s) => s.id === sessionId);
+        if (active?.executionProfile === "team") {
+          try {
+            const roster = await api.getTeamRoster(sessionId);
+            const activeMember = roster.members.find(
+              (m) =>
+                m.phase === "running" ||
+                m.phase === "provisioning" ||
+                get().runningSessions[m.memberSessionId],
+            );
+            if (activeMember) {
+              throw new Error(i18n.t("chat.profileBlockedByRunningTeammate"));
+            }
+            await api.teamPause(sessionId);
+          } catch (err) {
+            if ((err as Error)?.message === i18n.t("chat.profileBlockedByRunningTeammate")) {
+              throw err;
+            }
+          }
+        }
+      }
       if (
         get().runningSessions[sessionId] ||
         runtime.sessionConfigurationFlushes.has(sessionId)

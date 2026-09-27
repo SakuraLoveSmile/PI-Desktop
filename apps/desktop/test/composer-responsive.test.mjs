@@ -4,7 +4,7 @@ import test from "node:test";
 import { loadStyles } from "./helpers/styles.mjs";
 
 const styles = await loadStyles();
-const [toolbarSource, modelPickerSource] = await Promise.all([
+const [toolbarSource, modelPickerSource, footerSource] = await Promise.all([
   readFile(
     new URL("../src/features/chat/composer/ComposerToolbar.tsx", import.meta.url),
     "utf8",
@@ -13,8 +13,12 @@ const [toolbarSource, modelPickerSource] = await Promise.all([
     new URL("../src/features/chat/composer/ComposerModelPicker.tsx", import.meta.url),
     "utf8",
   ),
+  readFile(
+    new URL("../src/features/chat/composer/ComposerUsageFooter.tsx", import.meta.url),
+    "utf8",
+  ),
 ]);
-const composerSource = `${toolbarSource}\n${modelPickerSource}`;
+const composerSource = `${toolbarSource}\n${modelPickerSource}\n${footerSource}`;
 
 test("narrow composer containers progressively simplify the model controls", () => {
   assert.match(
