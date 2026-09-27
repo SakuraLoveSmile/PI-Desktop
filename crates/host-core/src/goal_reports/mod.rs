@@ -435,6 +435,7 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
 /// contacting a provider. This is idempotent and uses only durable Host facts.
 pub fn mark_failed(
     db: &Database,
+    session_id: &str,
     execution_id: &str,
     error_code: &str,
 ) -> Result<GoalReportSummary> {
@@ -445,12 +446,28 @@ pub fn mark_failed(
     if facts.kind != "goal" {
         return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
     }
-    let current_status: Option<String> = db
+    if facts.session_id != session_id {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: report belongs to another session"
+        ));
+    }
+    let current: Option<(String, String)> = db
         .conn()
-        .prepare_cached("SELECT status FROM goal_reports WHERE execution_id = ?1")?
-        .query_row(params![execution_id], |row| row.get(0))
+        .prepare_cached("SELECT status, session_id FROM goal_reports WHERE execution_id = ?1")?
+        .query_row(params![execution_id], |row| Ok((row.get(0)?, row.get(1)?)))
         .optional()?;
-    if current_status.as_deref() == Some("ready") {
+    if current
+        .as_ref()
+        .is_some_and(|(_, report_session_id)| report_session_id != session_id)
+    {
+        return Err(anyhow!(
+            "PERMISSION_DENIED: report belongs to another session"
+        ));
+    }
+    if current
+        .as_ref()
+        .is_some_and(|(status, _)| status == "ready")
+    {
         return list_reports(db, &facts.session_id)?
             .into_iter()
             .find(|report| report.execution_id == execution_id)
@@ -466,7 +483,8 @@ pub fn mark_failed(
              ) VALUES (?1, ?2, ?3, ?4, NULL, 'failed', 'fallback', 'unknown', ?5, ?6, ?6)
              ON CONFLICT(execution_id) DO UPDATE SET
                 status = 'failed', integrity = 'fallback', verdict = 'unknown',
-                summary = excluded.summary, updated_at = excluded.updated_at",
+                summary = excluded.summary, updated_at = excluded.updated_at
+             WHERE goal_reports.session_id = excluded.session_id",
         )?
         .execute(params![
             execution_id,
@@ -686,9 +704,15 @@ pub fn finalize_report(
     let (file_hash, file_size) = match write_res {
         Ok(v) => v,
         Err(err) => {
-            mark_failed(db, execution_id, "REPORT_PERSISTENCE_BARRIER_FAILED").map_err(
-                |mark_error| anyhow!("{err}; failed to record report failure: {mark_error}"),
-            )?;
+            mark_failed(
+                db,
+                &facts.session_id,
+                execution_id,
+                "REPORT_PERSISTENCE_BARRIER_FAILED",
+            )
+            .map_err(|mark_error| {
+                anyhow!("{err}; failed to record report failure: {mark_error}")
+            })?;
             return Err(err);
         }
     };
@@ -875,7 +899,10 @@ fn validate_report_snapshot(value: &Value) -> Result<(), String> {
         return Err("schema: integrity.kind invalid".to_string());
     }
     let verdict = object.get("verdict").and_then(Value::as_str);
-    if !matches!(verdict, Some("met") | Some("partial") | Some("blocked") | Some("unknown")) {
+    if !matches!(
+        verdict,
+        Some("met") | Some("partial") | Some("blocked") | Some("unknown")
+    ) {
         return Err("schema: verdict invalid".to_string());
     }
     if !object.get("summary").is_some_and(Value::is_string) {
@@ -1086,7 +1113,6 @@ pub fn read_report(
     read.report = Some(parsed);
     Ok(read)
 }
-
 
 /// Lists all goal report summaries for a session.
 pub fn list_reports(db: &Database, session_id: &str) -> Result<Vec<GoalReportSummary>> {

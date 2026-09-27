@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RacpError } from "@pi-desktop/agent-host";
+import { ErrorCodes } from "@pi-desktop/shared";
 
 import { createHostOperations } from "./host-operations.js";
 
@@ -41,6 +42,14 @@ function fakeHost(calls: Array<{ method: string; params: unknown }>, projectPath
           return { projects: [{ id: 7, path: projectPath, name: "proj" }] } as T;
         case "projects.create":
           return { project: { id: 8, path: params.path, name: "app" } } as T;
+        case "goalReports.markFailed":
+          return { report: {} } as T;
+        case "goalReports.get":
+          return { report: {} } as T;
+        case "goalReports.list":
+          return { reports: [] } as T;
+        case "goalReports.retry":
+          return { report: {} } as T;
         default:
           throw new Error(`unexpected ${method}`);
       }
@@ -56,7 +65,7 @@ describe("pi-host operations over host-core", () => {
     let busy = false;
     const operations = createHostOperations({
       getHost: () => fakeHost(calls, root),
-      runtime: { compact: async () => ({ accepted: true }), isBusy: () => busy },
+      runtime: { compact: async () => ({ accepted: true }), isBusy: () => busy, flushPersistence: async () => ({ pending: 0, failed: [] }) },
       browseRoot: root,
     });
     const listed = await operations.sessions.list();
@@ -77,7 +86,7 @@ describe("pi-host operations over host-core", () => {
     const { mkdir } = await import("node:fs/promises");
     await mkdir(join(root, "work", "app"), { recursive: true });
     await mkdir(join(root, ".hidden"), { recursive: true });
-    const operations = createHostOperations({ getHost: () => fakeHost([], root), runtime: { compact: async () => ({ accepted: true }), isBusy: () => false }, browseRoot: root });
+    const operations = createHostOperations({ getHost: () => fakeHost([], root), runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, flushPersistence: async () => ({ pending: 0, failed: [] }) }, browseRoot: root });
     const registered = await operations.projects.register(join(root, "work", "app"));
     expect(registered).toMatchObject({ id: "8", label: "app" });
     await expect(operations.projects.register(join(root, "missing"))).rejects.toMatchObject({ code: "REMOTE_PATH_NOT_FOUND" });
@@ -96,7 +105,7 @@ describe("pi-host operations over host-core", () => {
     dirs.push(root);
     const { writeFile } = await import("node:fs/promises");
     await writeFile(join(root, "README.md"), "hello", "utf8");
-    const operations = createHostOperations({ getHost: () => fakeHost([], root), runtime: { compact: async () => ({ accepted: true }), isBusy: () => false } });
+    const operations = createHostOperations({ getHost: () => fakeHost([], root), runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, flushPersistence: async () => ({ pending: 0, failed: [] }) } });
     expect((await operations.workspace.list("s1", "")).entries.map((entry) => entry.name)).toEqual(["README.md"]);
     expect(await operations.workspace.read("s1", "README.md")).toMatchObject({ kind: "text", content: "hello" });
     await expect(operations.workspace.read("s1", "../../etc/passwd")).rejects.toMatchObject({ code: "REMOTE_PATH_FORBIDDEN" });
@@ -104,5 +113,29 @@ describe("pi-host operations over host-core", () => {
     await expect(operations.workspace.list("s9", "")).rejects.toBeInstanceOf(RacpError);
     const diff = await operations.workspace.diff("s1");
     expect(diff.repo).toBe(false);
+  });
+
+  it("reads and retries reports only after the persistence barrier", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "pi-host-ops-")));
+    dirs.push(root);
+    const calls: Array<{ method: string; params: unknown }> = [];
+    let barrier = { pending: 0, failed: [] as string[] };
+    const operations = createHostOperations({
+      getHost: () => fakeHost(calls, root),
+      runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, flushPersistence: async () => barrier },
+    });
+    await operations.goalReports?.get({ sessionId: "s1", reportId: "report-1" });
+    await operations.goalReports?.list("s1");
+    barrier = { pending: 0, failed: ["HOST_UNAVAILABLE"] };
+    await expect(operations.goalReports?.retry("s1", "execution-1")).rejects.toMatchObject({ code: ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED });
+    expect(calls.map((call) => call.method)).toEqual(["goalReports.get", "goalReports.list", "goalReports.markFailed"]);
+    expect(calls.at(-1)?.params).toEqual({
+      sessionId: "s1",
+      executionId: "execution-1",
+      errorCode: ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED,
+    });
+    barrier = { pending: 0, failed: [] };
+    await operations.goalReports?.retry("s1", "execution-1");
+    expect(calls.at(-1)?.method).toBe("goalReports.retry");
   });
 });

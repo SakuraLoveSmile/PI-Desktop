@@ -245,6 +245,7 @@ pub fn create_team_member(db: &Database, params: CreateMemberParams<'_>) -> Resu
                 model_id: model_id.map(Into::into).or(lead_summary.model_id),
                 provider_id: provider_id.map(Into::into).or(lead_summary.provider_id),
                 project_path: lead_summary.project_path,
+                project_name: None,
                 thinking_level: Some(lead_summary.thinking_level),
                 permission_mode: Some(lead_summary.permission_mode),
                 execution_profile: Some("team".into()),

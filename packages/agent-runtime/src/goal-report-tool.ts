@@ -13,6 +13,22 @@ import {
 
 export const SUBMIT_GOAL_REPORT_TOOL_NAME = "SubmitGoalReport" as const;
 
+export type GoalReportFailureCode =
+  | "REPORT_DRAFT_PERSIST_FAILED"
+  | "REPORT_DRAFT_INVALIDATION_FAILED";
+
+export function persistGoalReportFailure(
+  host: { call(method: string, params: unknown): Promise<unknown> },
+  execution: { sessionId: string; executionId: string },
+  errorCode: GoalReportFailureCode,
+): Promise<unknown> {
+  return host.call("goalReports.markFailed", {
+    sessionId: execution.sessionId,
+    executionId: execution.executionId,
+    errorCode,
+  });
+}
+
 export type GoalReportDraftManagerOptions = {
   executionId: string;
   sessionId: string;

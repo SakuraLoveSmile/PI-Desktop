@@ -166,7 +166,10 @@ fn test_submit_draft_and_finalize_structured() {
     assert_eq!(read.verdict.as_deref(), Some("met"));
     // The hash is recomputed from the bytes on disk, not echoed from the row.
     let on_disk = fs::read(report_file_path(db.data_dir(), session_id, execution_id)).unwrap();
-    assert_eq!(read.report_sha256.as_deref(), Some(sha256_hex(&on_disk).as_str()));
+    assert_eq!(
+        read.report_sha256.as_deref(),
+        Some(sha256_hex(&on_disk).as_str())
+    );
     assert_eq!(read.file_bytes, Some(on_disk.len() as u64));
     let report_val = read.report.clone().expect("ready report body");
     assert_eq!(report_val["schemaVersion"], 1);
@@ -294,6 +297,12 @@ fn test_mark_failed_is_idempotent_and_retry_uses_host_facts() {
     let session_id = "sess-failed";
     let execution_id = "exec-failed-1";
     seed_goal_execution(&db, session_id, execution_id);
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
 
     submit_draft(
         &db,
@@ -301,8 +310,8 @@ fn test_mark_failed_is_idempotent_and_retry_uses_host_facts() {
         &json!({ "summary": "stale agent draft", "verdict": "met" }),
     )
     .unwrap();
-    mark_failed(&db, execution_id, "REPORT_DRAFT_PERSIST_FAILED").unwrap();
-    mark_failed(&db, execution_id, "REPORT_DRAFT_PERSIST_FAILED").unwrap();
+    mark_failed(&db, session_id, execution_id, "REPORT_DRAFT_PERSIST_FAILED").unwrap();
+    mark_failed(&db, session_id, execution_id, "REPORT_DRAFT_PERSIST_FAILED").unwrap();
     let status: String = db
         .conn()
         .query_row(
@@ -312,7 +321,7 @@ fn test_mark_failed_is_idempotent_and_retry_uses_host_facts() {
         )
         .unwrap();
     assert_eq!(status, "failed");
-    assert!(mark_failed(&db, execution_id, "UNKNOWN").is_err());
+    assert!(mark_failed(&db, session_id, execution_id, "UNKNOWN").is_err());
 
     let automatic_finalization =
         finalize_report(&db, execution_id, 1, Some("completed"), None).unwrap();
@@ -322,9 +331,32 @@ fn test_mark_failed_is_idempotent_and_retry_uses_host_facts() {
     assert_eq!(retry.status, "ready");
     assert_eq!(retry.integrity, "fallback");
     assert_eq!(retry.verdict, "unknown");
-    let report = get_report(&db, session_id, execution_id).unwrap().unwrap();
-    assert_eq!(report["integrity"]["kind"], "fallback");
-    assert_eq!(report["verdict"], "unknown");
+    let report = read_report(&db, session_id, execution_id).unwrap();
+    assert_eq!(report.state, REPORT_STATE_READY, "{:?}", report.detail);
+    assert_eq!(report.integrity.as_deref(), Some("fallback"));
+    assert_eq!(report.verdict.as_deref(), Some("unknown"));
+    let body = report.report.expect("retried fallback report body");
+    assert_eq!(body["integrity"]["kind"], "fallback");
+    assert_eq!(body["verdict"], "unknown");
+}
+
+#[test]
+fn test_mark_failed_rejects_cross_session_execution() {
+    let (_dir, db) = create_test_db();
+    let session_id = "sess-mark-failed-owner";
+    let execution_id = "exec-mark-failed-cross";
+    seed_goal_execution(&db, session_id, execution_id);
+    bind_execution_turn(&db, execution_id, "turn-mark-failed-cross").unwrap();
+
+    let error = mark_failed(
+        &db,
+        "sess-mark-failed-other",
+        execution_id,
+        "REPORT_PERSISTENCE_BARRIER_FAILED",
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("PERMISSION_DENIED"));
+    assert_eq!(list_reports(&db, session_id).unwrap()[0].status, "pending");
 }
 
 #[test]
@@ -423,7 +455,10 @@ fn read_report_states_are_distinct_and_never_conflated() {
     let ready = read_report(&db, session_id, execution_id).unwrap();
     assert_eq!(ready.state, REPORT_STATE_READY);
     assert_eq!(ready.integrity.as_deref(), Some("structured"));
-    assert!(ready.report_sha256.as_deref().is_some_and(|hash| hash.len() == 64));
+    assert!(ready
+        .report_sha256
+        .as_deref()
+        .is_some_and(|hash| hash.len() == 64));
     assert!(ready.report.is_some());
 }
 
@@ -442,7 +477,11 @@ fn read_report_rejects_corrupt_and_oversized_files_without_a_body() {
     let corrupt = read_report(&db, session_id, execution_id).unwrap();
     assert_eq!(corrupt.state, REPORT_STATE_CORRUPT);
     assert!(corrupt.report.is_none(), "corrupt must not return a body");
-    assert!(corrupt.detail.as_deref().unwrap_or_default().starts_with("REPORT_CORRUPT"));
+    assert!(corrupt
+        .detail
+        .as_deref()
+        .unwrap_or_default()
+        .starts_with("REPORT_CORRUPT"));
 
     // Unparseable bytes are also corrupt, not a fabricated empty report.
     fs::write(&path, b"not json at all").unwrap();

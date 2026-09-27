@@ -2,6 +2,8 @@ import type { Principal, SessionSummary } from "@pi-desktop/agent-host";
 import type {
   FsEntry,
   FsReadResult,
+  GoalReport,
+  GoalReportSummary,
   RacpProjectSummary,
   WorkspaceDiff,
 } from "@pi-desktop/shared";
@@ -57,6 +59,12 @@ export interface RacpWorkspaceAccess {
   diff(sessionId: string): Promise<WorkspaceDiff>;
 }
 
+export interface RacpGoalReportAccess {
+  get(input: { sessionId: string; reportId?: string; executionId?: string }): Promise<{ report: GoalReport }>;
+  list(sessionId: string): Promise<{ reports: GoalReportSummary[] }>;
+  retry(sessionId: string, executionId: string): Promise<{ report: GoalReportSummary }>;
+}
+
 export type TerminalOpenResult = {
   terminalId: string;
   /** Bounded replay ring, base64 (spec §6.2). */
@@ -83,6 +91,7 @@ export type RacpHostOperations = {
   sessions: RacpSessionCatalog;
   projects: RacpProjectCatalog;
   workspace: RacpWorkspaceAccess;
+  goalReports?: RacpGoalReportAccess;
   terminal?: RacpTerminalAccess;
   /** Owner-only: revoke a paired device (spec `session/revoke`). */
   revokeDevice?: (deviceId: string) => Promise<boolean>;

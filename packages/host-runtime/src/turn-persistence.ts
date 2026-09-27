@@ -14,6 +14,8 @@ export type MessageAppend = {
   turnId?: string;
 };
 
+export type PersistenceBarrier = { pending: number; failed: string[] };
+
 type HostAvailability = HostRpc & { isAvailable?(): boolean };
 
 /** Bounded wait between retries while host-core is restarting. */
@@ -37,6 +39,8 @@ function isDuplicateMessageIdError(error: unknown): boolean {
  */
 export class TurnPersistence {
   private readonly chains = new Map<string, Promise<void>>();
+  private readonly pendingBySession = new Map<string, number>();
+  private readonly failuresBySession = new Map<string, Set<string>>();
   private pendingCount = 0;
   private disposed = false;
 
@@ -49,28 +53,44 @@ export class TurnPersistence {
   ) {}
 
   /** Number of appends not yet acknowledged by host-core. */
-  size(): number {
-    return this.pendingCount;
+  size(sessionId?: string): number {
+    return sessionId ? this.pendingBySession.get(sessionId) ?? 0 : this.pendingCount;
   }
 
   /** Queue one append behind the session's earlier ones; resolves once it landed or was given up. */
   append(entry: MessageAppend): Promise<void> {
     if (this.disposed) return Promise.resolve();
     this.pendingCount += 1;
+    this.pendingBySession.set(entry.sessionId, this.size(entry.sessionId) + 1);
     const previous = this.chains.get(entry.sessionId) ?? Promise.resolve();
     const run = previous
       .then(() => this.write(entry))
       .finally(() => {
         this.pendingCount -= 1;
+        const pending = this.size(entry.sessionId) - 1;
+        if (pending > 0) this.pendingBySession.set(entry.sessionId, pending);
+        else this.pendingBySession.delete(entry.sessionId);
         if (this.chains.get(entry.sessionId) === run) this.chains.delete(entry.sessionId);
       });
     this.chains.set(entry.sessionId, run);
     return run;
   }
 
-  /** Wait until every queued append has been attempted. */
-  async flush(): Promise<void> {
-    await Promise.allSettled([...this.chains.values()]);
+  /** Wait until a session's queued appends have been attempted and report durability. */
+  async flush(sessionId?: string): Promise<{ pending: number; failed: string[] }> {
+    for (;;) {
+      const chains = sessionId
+        ? [this.chains.get(sessionId)].filter((chain): chain is Promise<void> => Boolean(chain))
+        : [...this.chains.values()];
+      if (chains.length === 0) break;
+      await Promise.allSettled(chains);
+    }
+    return {
+      pending: this.size(sessionId),
+      failed: sessionId
+        ? [...(this.failuresBySession.get(sessionId) ?? [])]
+        : [...this.failuresBySession.values()].flatMap((failures) => [...failures]),
+    };
   }
 
   dispose(): void {
@@ -97,6 +117,7 @@ export class TurnPersistence {
               messageId: entry.message.id,
               error: String(error),
             });
+            this.recordFailure(entry.sessionId, error);
             return;
           }
         }
@@ -107,10 +128,19 @@ export class TurnPersistence {
           sessionId: entry.sessionId,
           messageId: entry.message.id,
         });
+        this.recordFailure(entry.sessionId, Object.assign(new Error("host unavailable while persisting transcript"), { errorCode: "HOST_UNAVAILABLE" }));
         return;
       }
       await (this.deps.sleep ?? defaultSleep)(delay);
     }
+  }
+
+  private recordFailure(sessionId: string, error: unknown): void {
+    const code = (error as { errorCode?: unknown } | null)?.errorCode;
+    const failure = typeof code === "string" ? code : "TRANSCRIPT_PERSISTENCE_FAILED";
+    const failures = this.failuresBySession.get(sessionId) ?? new Set<string>();
+    failures.add(failure);
+    this.failuresBySession.set(sessionId, failures);
   }
 }
 

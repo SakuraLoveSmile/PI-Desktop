@@ -288,6 +288,50 @@ describe("RACP-WS reconnect", () => {
 });
 
 describe("RACP-WS remote-host profile", () => {
+  it("serves Goal Reports through viewer reads and controller-only Retry", async () => {
+    const calls: Array<{ operation: string; sessionId: string }> = [];
+    const h = await harness({
+      operations: {
+        goalReports: {
+          async get(input) {
+            calls.push({ operation: "get", sessionId: input.sessionId });
+            return { report: { state: "not_found", sessionId: input.sessionId }, state: "not_found" };
+          },
+          async list(sessionId) {
+            calls.push({ operation: "list", sessionId });
+            return { reports: [] };
+          },
+          async retry(sessionId) {
+            calls.push({ operation: "retry", sessionId });
+            return { report: { reportId: "report-1", sessionId, executionId: "execution-1", status: "ready" } };
+          },
+        },
+      },
+    });
+    const viewer = await h.connect(VIEWER_TOKEN);
+    const owner = await h.connect(OWNER_TOKEN);
+
+    const read = await viewer.client.request<{ state: string }>("goalReports/get", {
+      sessionId: "s1",
+      executionId: "execution-1",
+    });
+    expect(read.state).toBe("not_found");
+    await viewer.client.request("goalReports/list", { sessionId: "s1" });
+    await expect(viewer.client.request("goalReports/get", { sessionId: "s1" })).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
+    await expect(viewer.client.request("goalReports/retry", { sessionId: "s1", executionId: "execution-1" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(calls).toEqual([
+      { operation: "get", sessionId: "s1" },
+      { operation: "list", sessionId: "s1" },
+    ]);
+
+    const retried = await owner.client.request<{ report: { status: string } }>("goalReports/retry", {
+      sessionId: "s1",
+      executionId: "execution-1",
+    });
+    expect(retried.report.status).toBe("ready");
+    expect(calls.at(-1)).toEqual({ operation: "retry", sessionId: "s1" });
+  });
+
   it("creates, configures, forks, renames, and deletes sessions and publishes host events", async () => {
     const h = await harness();
     const { client, events } = await h.connect(OWNER_TOKEN);
