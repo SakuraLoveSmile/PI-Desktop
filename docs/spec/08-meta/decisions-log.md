@@ -7208,3 +7208,15 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   IDs, provider identity, or host capability ownership. See
   `03-runtime/13-model-catalog-and-selection.md` §11.3 and
   `04-ux/08-component-spec.md` §11.
+
+## 2026-09-27 — Agent workspace search is available from turn one (D631)
+
+- Amend D185 / D208 and ADR 0069's Agent activation boundary: `Glob` and
+  `Grep` are included with `Read`, `Bash`, `Edit`, and `Write` in the first
+  Agent request. Routine workspace discovery no longer needs a `ToolSearch`
+  round trip.
+- `BrowserPreview`, plugin tools, and plugin-development helpers remain
+  deferred; ToolSearch, successful-activation restoration, host permissions,
+  and the Plan/Goal tool sets are unchanged.
+- See the 2026-09-27 amendments to ADR 0048, ADR 0069, and ADR 0230, plus
+  `03-runtime/03-tools-and-permissions.md` and E2E-013/E2E-019e.

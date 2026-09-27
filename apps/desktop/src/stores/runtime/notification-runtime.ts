@@ -1,5 +1,6 @@
 import i18n from "i18next";
 import { api } from "../../lib/api";
+import { playNotificationChime } from "../../lib/notification-sound";
 import type { StoreGet } from "../slices/types";
 
 export type InteractivePromptNotifier = (
@@ -27,6 +28,14 @@ export function createInteractivePromptNotifier(
     } else {
       title = i18n.t("notifications.planApprovalTitle", { sessionTitle });
       body = i18n.t("notifications.planApprovalBody");
+    }
+    playNotificationChime();
+    if (kind === "ask") {
+      get().showToast(`${title}: ${body}`, {
+        variant: "info",
+        duration: 8_000,
+        sound: false,
+      });
     }
     void api
       .showNativeNotification({

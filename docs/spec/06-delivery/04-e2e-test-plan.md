@@ -2096,9 +2096,9 @@ identify the platform validation still needed.
 - **Preconditions**: Project directory open.
 - **Steps**: 1) Ask agent to read a file in the project. 2) Observe result.
 - **Expected**: `Read` returns immediately within project scope. In Agent mode,
-  the agent activates `Glob` or `Grep` through `ToolSearch` before using it;
-  Plan keeps its read/search core available from the first request. All results
-  remain within project scope.
+  `Glob` and `Grep` are available in the first Agent request without
+  `ToolSearch`; Plan keeps its read/search core available from the first
+  request. All results remain within project scope.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: E (Read/Glob/Grep work), D (tools based on project)
 - **Milestone**: M3
@@ -2188,7 +2188,8 @@ identify the platform validation still needed.
 
 - **Preconditions**: Agent or Plan mode; project open; the host tool catalog is
   available on macOS, Linux, or Windows.
-- **Steps**: 1) Activate `Glob`/`Grep` when deferred and inspect their schemas.
+- **Steps**: 1) In Agent mode, inspect `Glob`/`Grep` in the first request
+  without `ToolSearch`; confirm Plan also exposes both from its first request.
   2) Search with workspace-relative `path`, `include`, `headLimit`, and
   `outputMode: "filesWithMatches"` or `"count"`, first with a directory and
   then one explicit file. 3) Call `Read` with a directory and follow its
@@ -4348,8 +4349,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   outstanding task-native object, a repeated durable id produces no second
   banner or row, and a delayed pre-clear event cannot resurrect the cleared
   item; a genuinely new post-clear turn still produces exactly one row and
-  banner. On Windows, the taskbar overlay is a smooth black circular badge
-  with a centered white system-font numeral. Its visual weight matches common
+  banner. Each newly accepted task notification plays one soft in-app chime;
+  duplicate, delayed, and historical rows do not replay it. On Windows, the
+  taskbar overlay is a smooth black circular badge with a centered white system-font numeral. Its visual weight matches common
   Windows taskbar badges for both single- and two-digit counts. A success-only
   outcome increments the taskbar badge without adding a bell row or bell
   count; both toolbar actions remain enabled when relevant and clear the
@@ -4382,10 +4384,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Expected**: Focused-current A creates neither inbox row, terminal sidebar mark, nor native banner.
   Focused-background B creates an inbox row without a native banner. Unfocused
   current A and the minimized failure each create one durable row and one
-  localized native notification. Clicking restores, shows, and focuses the
-  main window before activating the matching session, including after the
-  notification has moved to Windows Action Center; no event opens the wrong
-  currently selected session. Abort shows neither surface. OS suppression does
+  localized, silent native notification plus one soft in-app chime. Clicking
+  restores, shows, and focuses the main window before activating the matching
+  session, including after the notification has moved to Windows Action Center;
+  no event opens the wrong currently selected session. Abort shows neither surface. OS suppression does
   not lose the durable row or surface a misleading app error. Every inspected
   Windows system surface identifies `PI-Desktop`; no stock Electron application
   name or identity is exposed. Duplicate delivery is idempotent: one durable
@@ -4398,6 +4400,24 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Milestone**: M5
 - **Status**: Source-contract covered (`notification-contract.test.mjs`); packaged
   Windows Action Center activation remains runner validation; full UI scenario Draft
+
+#### E2E-065A: App notifications use one soft chime
+
+- **Preconditions**: A running desktop app with audio output; a second session
+  for background notification delivery.
+- **Steps**: 1) Trigger info, success, warning, and error toasts. 2) Complete or
+  fail a background task. 3) Trigger an asktool request and a permission or plan
+  approval request. 4) Replay a durable notification id and refresh the inbox.
+- **Expected**: Each newly presented app toast, task notification, interactive
+  prompt, and successfully shown plugin-native notification plays one short,
+  low-volume chime. Rapid events coalesce; duplicate or historical notification
+  rows do not replay it. Asktool's toast does not add a second chime, and native
+  banners stay silent to prevent a second, platform-dependent sound. If Web
+  Audio is unavailable or blocked, visual notifications still work and no app
+  action fails.
+- **Specs linked**: `03-runtime/17-asktool-questions.md`
+- **Acceptance**: C (notification feedback), Accessibility
+- **Status**: Unit/source-contract covered; audible desktop check Draft
 
 #### E2E-066: Provider model catalog survives restart and offline refresh
 
@@ -9702,14 +9722,15 @@ This test plan spec is accepted when:
 - Focusing the textarea paints an inset 2px accent ring inside the plate;
   Escape or Cancel restores the bubble.
 
-#### E2E-123: asktool collects multiple answers and returns skipped placeholders
+#### E2E-123: asktool renders rich options, reminds the user, and returns answers
 
 - **Preconditions**: Agent, Plan, or Goal mode; a configured provider; a
   session with an active transcript.
 - **Steps**: 1) Ask the agent to call `asktool` with a single-select question,
-  a multi-select question, and an option list for each. 2) Confirm each card
-  shows the fixed custom-input choice. 3) Answer the first question, click
-  Next, and select two answers on the multi-select question. 4) Skip the final
+  a multi-select question, and option lists containing both strings and
+  `{ label, description }` objects. 2) Confirm each card shows the fixed
+  custom-input choice and rich option descriptions. 3) Answer the first question,
+  click Next, and select two answers on the multi-select question. 4) Skip the final
   question without entering text. 5) Inspect the completed tool row and the
   next model response.
 - **Expected**: One question is visible at a time; the small indicators show
@@ -9729,13 +9750,17 @@ This test plan spec is accepted when:
   action row. The tool output is ordered as
   `question：answer`, uses `、` between multiple answers and `\n---\n`
   between questions, and
-  keeps `question：` for the skipped question. Decline all produces empty
-  placeholders for every question and still completes the tool call.
+  keeps `question：` for the skipped question, and selecting a rich option
+  returns only its label. Decline all produces empty placeholders for every
+  question and still completes the tool call. A pending ask shows a localized
+  in-app toast with its session and first question, while background sessions
+  retain the existing native notification policy. Exactly one soft chime plays
+  for the ask; the toast and native banner do not double it.
 - **Specs linked**: `03-runtime/17-asktool-questions.md`,
   `04-ux/11-asktool-question-card.md`, ADR 0077
 - **Acceptance**: E (interactive tool output), C (inline card)
 - **Milestone**: M5
-- **Status**: Draft (unit coverage active; desktop journey pending)
+- **Status**: Draft (runtime/unit coverage active; desktop journey pending)
 
 - **Request transition regression**: Keep a one-question request pending in chat
   B. In chat A, advance a two-question request to question two, then select B.

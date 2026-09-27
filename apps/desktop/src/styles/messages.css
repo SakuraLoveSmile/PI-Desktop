@@ -179,7 +179,7 @@
 .asktool-option {
   display: flex;
   width: 100%;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-height: 30px;
   padding: 4px 8px;
@@ -191,6 +191,19 @@
   font-size: var(--text-md);
   text-align: start;
   transition: background-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.asktool-option-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.asktool-option-description {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
 }
 
 .asktool-option:hover,
@@ -210,6 +223,7 @@
   color: var(--ds-accent);
   font-size: var(--text-xs);
   line-height: var(--leading-none);
+  margin-top: 2px;
 }
 
 .asktool-option[role="radio"] .asktool-option-mark {

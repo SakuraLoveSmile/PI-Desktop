@@ -29,6 +29,14 @@ The card has no countdown or expiration copy. On narrow screens options remain
 full-width and actions may share the row; question text and custom input may
 wrap naturally without clipping.
 
+## Rich options
+
+A selectable option may remain a plain string or use `{ label, description? }`.
+The label keeps the existing option typography and selection behavior; the
+optional description appears beneath it in muted supporting text and wraps
+within the row. Clicking either line selects the same label, which is the only
+value returned to the model. The custom-answer option remains unchanged.
+
 ## Typography hierarchy
 
 The card uses a compact two-tier type scale — quiet labels, then content at
