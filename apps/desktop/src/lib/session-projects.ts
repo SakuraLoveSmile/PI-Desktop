@@ -1,6 +1,5 @@
 import type { SessionSummary } from "@pi-desktop/shared";
 
-
 /// Display name for a session's project, applying the frozen precedence:
 /// the Host-persisted `projectName` first, the directory basename otherwise.
 /// Never used for identity, dedup, permissions or path decisions.
@@ -27,6 +26,28 @@ function normalizedProjectKey(projectPath?: string | null): string | null {
   if (!value) return null;
   const normalized = value.replace(/\\/g, "/").replace(/\/+$/, "");
   return normalized || "/";
+}
+
+type OpenProjectSessionEntry = {
+  path: string;
+  name: string;
+  meta: { name?: string };
+  sessions: SessionSummary[];
+};
+
+export function appendSessionToOpenProject(
+  entries: ReadonlyMap<string, OpenProjectSessionEntry>,
+  normalizedPath: string,
+  session: SessionSummary,
+): boolean {
+  const entry = entries.get(normalizedPath);
+  if (!entry) return false;
+
+  if (!entry.meta.name && entry.name === projectName(entry.path)) {
+    entry.name = sessionProjectDisplayName(session);
+  }
+  entry.sessions.push(session);
+  return true;
 }
 
 export function collectSessionProjects(sessions: SessionSummary[]): SessionProject[] {
