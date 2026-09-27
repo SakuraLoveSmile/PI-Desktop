@@ -8973,17 +8973,21 @@ the latest destination. These assertions measure work counts, not device FPS.
   loopback 的假模型。不使用真实提供商凭据或用户数据。
 - **步骤：** 提交并批准夹具 Goal，由真实 sidecar 完成有限工作，再提交结构化
   `SubmitGoalReport`。打开转录中的报告卡片，并在该会话的工作面板中查看报告。
+  在远端 Host 夹具中，由 viewer 连接读取和列出报告，确认其他会话无法探测到报告，
+  再由 controller 连接调用 Retry。
 - **预期：** Host 为同一 Goal 和 execution 返回唯一且持久的 `ready` 报告。转录卡片打开
   对应报告；报告展示结论、执行状态、证据和限制。只有结构化报告与持久证据都支持时，
   才能将验收条件显示为已达成。后备报告必须标明未知或缺失的证据。
 - **恢复与失败：** 重启后仍可读取就绪报告。无效草稿或持久化失败不得发布过期或误导性
   的就绪报告。outbox 持久化失败时报告保持失败；显式 Retry 只使用 Host 持久事实，不重跑
   Goal，也不调用模型。工作面板显示本地化的通用失败说明与安全格式错误码；请求期间禁用
-  Retry。
+  Retry。RACP Retry 等待该 session 的待处理 transcript 写入；barrier 未成功时返回
+  `REPORT_PERSISTENCE_BARRIER_FAILED`，报告保持失败。viewer 不能 Retry；读取范围限定到请求的 session。
 - **规范：** 03-runtime/02-agent-runtime、03-runtime/03-tools-and-permissions、
   03-runtime/04-data-storage、03-runtime/06-host-rpc-protocol、04-ux/08-component-spec。
 - **自动化：** `node scripts/e2e-temporary-goal.mjs`、`pnpm test:e2e:goal-report`、
-  Goal Report runtime/Host 测试和聚焦 renderer 测试。Electron 场景仅使用隔离配置与本地假模型。
+  Goal Report runtime/Host 测试和聚焦 renderer 测试。远端契约还覆盖 RACP role、Host operation
+  barrier、persistence queue 和 Electron remote-backend tests。Electron 场景仅使用隔离配置与本地假模型。
 - **里程碑：** 维护。
 
 ### E2E-TEAM-runtime-mailbox-and-panel

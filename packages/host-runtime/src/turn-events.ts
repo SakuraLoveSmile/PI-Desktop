@@ -7,7 +7,7 @@ import {
 } from "@pi-desktop/shared";
 
 import { InflightCheckpointer } from "./inflight-checkpoint.js";
-import { TurnPersistence } from "./turn-persistence.js";
+import { TurnPersistence, type PersistenceBarrier } from "./turn-persistence.js";
 
 export type TurnEventLogger = (
   level: "info" | "warn" | "error",
@@ -138,6 +138,10 @@ export class TurnEventPipeline {
 
   pendingWrites(): number {
     return this.persistence.size();
+  }
+
+  flushPersistence(sessionId: string): Promise<PersistenceBarrier> {
+    return this.persistence.flush(sessionId);
   }
 
   async dispose(): Promise<void> {

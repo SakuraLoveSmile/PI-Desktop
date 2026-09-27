@@ -6,6 +6,7 @@ import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
 import {
   GoalReportDraftManager,
+  persistGoalReportFailure,
   SUBMIT_GOAL_REPORT_TOOL_NAME,
 } from "./goal-report-tool.js";
 import { randomUUID } from "node:crypto";
@@ -8037,6 +8038,10 @@ Delegation rules:
         executionId: execution.id,
         sessionId: execution.sessionId,
         onDraftSubmitted: async (draft) => {
+          // No catch here: a swallowed failure would make the tool report
+          // success while the Host publishes a fallback report instead. The
+          // error propagates into the SubmitGoalReport tool result so the
+          // executing Agent can retry.
           await this.host.call("goalReports.submitDraft", {
             executionId: execution.id,
             draft,
@@ -8048,16 +8053,18 @@ Delegation rules:
           });
         },
         onDraftPersistenceFailure: async () => {
-          await this.host.call("goalReports.markFailed", {
-            executionId: execution.id,
-            errorCode: "REPORT_DRAFT_PERSIST_FAILED",
-          });
+          await persistGoalReportFailure(
+            this.host,
+            { sessionId: execution.sessionId, executionId: execution.id },
+            "REPORT_DRAFT_PERSIST_FAILED",
+          );
         },
         onDraftInvalidationFailure: async () => {
-          await this.host.call("goalReports.markFailed", {
-            executionId: execution.id,
-            errorCode: "REPORT_DRAFT_INVALIDATION_FAILED",
-          });
+          await persistGoalReportFailure(
+            this.host,
+            { sessionId: execution.sessionId, executionId: execution.id },
+            "REPORT_DRAFT_INVALIDATION_FAILED",
+          );
         },
       });
       this.rebuildToolCatalog();

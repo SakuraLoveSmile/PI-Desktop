@@ -178,6 +178,8 @@ export const ErrorCodes = {
   APPROVAL_STALE: "APPROVAL_STALE",
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
   RATE_LIMITED: "RATE_LIMITED",
+  /** Goal Report Retry is blocked until transcript writes are durable. */
+  REPORT_PERSISTENCE_BARRIER_FAILED: "REPORT_PERSISTENCE_BARRIER_FAILED",
   /**
    * Remote Host connection codes (D448 / ADR 0284). The desktop adapter and
    * the `pi-host` bootstrap classify a remote failure by these, never by

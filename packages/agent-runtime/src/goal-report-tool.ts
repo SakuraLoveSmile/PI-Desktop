@@ -13,6 +13,22 @@ import {
 
 export const SUBMIT_GOAL_REPORT_TOOL_NAME = "SubmitGoalReport" as const;
 
+export type GoalReportFailureCode =
+  | "REPORT_DRAFT_PERSIST_FAILED"
+  | "REPORT_DRAFT_INVALIDATION_FAILED";
+
+export function persistGoalReportFailure(
+  host: { call(method: string, params: unknown): Promise<unknown> },
+  execution: { sessionId: string; executionId: string },
+  errorCode: GoalReportFailureCode,
+): Promise<unknown> {
+  return host.call("goalReports.markFailed", {
+    sessionId: execution.sessionId,
+    executionId: execution.executionId,
+    errorCode,
+  });
+}
+
 export type GoalReportDraftManagerOptions = {
   executionId: string;
   sessionId: string;
@@ -204,13 +220,12 @@ export class GoalReportDraftManager {
         try {
           await this.options.onDraftSubmitted?.(validation.value);
         } catch (error) {
+          this.currentDraft = null;
+          this.invalidated = true;
           await this.options.onDraftPersistenceFailure?.(error);
-          return {
-            content: [{ type: "text", text: "Goal report draft persistence failed." }],
-            details: { ok: false, error: "REPORT_DRAFT_PERSIST_FAILED" },
-            isError: true,
-            terminate: true,
-          } as AgentToolResult<any>;
+          throw new Error(
+            "Goal report draft could not be persisted to the host. Retry SubmitGoalReport.",
+          );
         }
         this.currentDraft = validation.value;
         this.invalidated = false;

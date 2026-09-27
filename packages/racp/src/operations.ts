@@ -84,6 +84,13 @@ const SessionConfigureParams = Type.Object({
   permissionMode: Type.Optional(Type.Union([Type.Literal("ask"), Type.Literal("accept-edits"), Type.Literal("auto")])),
 });
 const WorkspacePathParams = Type.Object({ sessionId: Type.String({ minLength: 1 }), path: Type.Optional(Type.String()) });
+const GoalReportGetParams = Type.Object({
+  sessionId: Type.String({ minLength: 1 }),
+  reportId: Type.Optional(Type.String({ minLength: 1 })),
+  executionId: Type.Optional(Type.String({ minLength: 1 })),
+});
+const GoalReportListParams = Type.Object({ sessionId: Type.String({ minLength: 1 }) });
+const GoalReportRetryParams = Type.Object({ sessionId: Type.String({ minLength: 1 }), executionId: Type.String({ minLength: 1 }) });
 const TerminalOpenParams = Type.Object({
   sessionId: Type.String({ minLength: 1 }),
   cols: Type.Optional(Type.Integer({ minimum: 1, maximum: 1000 })),
@@ -325,6 +332,26 @@ export function createOperations(): Map<RacpOperation, OperationHandler> {
   handlers.set("workspace/diff", async (context, params) => {
     const input = check(SessionIdParams, params);
     return context.operations.workspace.diff(input.sessionId);
+  });
+
+  handlers.set("goalReports/get", async (context, params) => {
+    const input = check(GoalReportGetParams, params);
+    if (!input.reportId && !input.executionId) throw new RacpError("INVALID_ARGUMENT", "reportId or executionId is required");
+    const access = context.operations.goalReports;
+    if (!access) throw new RacpError("CAPABILITY_UNAVAILABLE", "Goal Reports are not offered by this Host");
+    return access.get(input);
+  });
+  handlers.set("goalReports/list", async (context, params) => {
+    const input = check(GoalReportListParams, params);
+    const access = context.operations.goalReports;
+    if (!access) throw new RacpError("CAPABILITY_UNAVAILABLE", "Goal Reports are not offered by this Host");
+    return access.list(input.sessionId);
+  });
+  handlers.set("goalReports/retry", async (context, params) => {
+    const input = check(GoalReportRetryParams, params);
+    const access = context.operations.goalReports;
+    if (!access) throw new RacpError("CAPABILITY_UNAVAILABLE", "Goal Reports are not offered by this Host");
+    return access.retry(input.sessionId, input.executionId);
   });
 
   handlers.set("terminal/open", async (context, params) => {

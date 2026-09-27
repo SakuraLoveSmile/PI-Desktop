@@ -316,6 +316,27 @@ describe("catalog and roles", () => {
     expect(rolesAllowOperation([], "session/get")).toBe(false);
   });
 
+  it("limits Goal Report reads and Retry to their remote roles", () => {
+    expect(RACP_OPERATIONS["goalReports/get"]).toEqual({
+      role: "viewer",
+      profile: "remote-host",
+      mutation: false,
+    });
+    expect(RACP_OPERATIONS["goalReports/list"]).toEqual({
+      role: "viewer",
+      profile: "remote-host",
+      mutation: false,
+    });
+    expect(RACP_OPERATIONS["goalReports/retry"]).toEqual({
+      role: "controller",
+      profile: "remote-host",
+      mutation: true,
+    });
+    expect(rolesAllowOperation(["viewer"], "goalReports/get")).toBe(true);
+    expect(rolesAllowOperation(["viewer"], "goalReports/retry")).toBe(false);
+    expect(rolesAllowOperation(["controller"], "goalReports/retry")).toBe(true);
+  });
+
   it("maps every HTTP route to a catalog operation", () => {
     for (const operation of Object.keys(RACP_HTTP_ROUTES)) {
       expect(RACP_OPERATIONS).toHaveProperty(operation);

@@ -78,6 +78,58 @@ fn validate_permission_mode(mode: &str) -> Result<()> {
     }
 }
 
+/// Maximum code points accepted for a project display name.
+///
+/// Matches `MAX_PROJECT_GROUP_NAME_CHARS` and the renderer's name field so a
+/// name the caller can type is always a name the host accepts.
+pub const MAX_PROJECT_NAME_CHARS: usize = 80;
+
+/// Normalize a caller-supplied project display name.
+///
+/// Whitespace is collapsed, surrounding space is trimmed, and blank, overlong,
+/// or control-character names are rejected before any session row is written.
+/// Rejecting deterministically is required: silently substituting a directory
+/// basename or a UUID would persist a display name the caller never asked for.
+pub fn normalize_project_name(raw: &str) -> Result<String> {
+    if raw.chars().any(|ch| ch.is_control()) {
+        return Err(anyhow!(
+            "INVALID_PARAMS: projectName must not contain control characters"
+        ));
+    }
+    let collapsed = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() {
+        return Err(anyhow!("INVALID_PARAMS: projectName must not be blank"));
+    }
+    if collapsed.chars().count() > MAX_PROJECT_NAME_CHARS {
+        return Err(anyhow!(
+            "INVALID_PARAMS: projectName exceeds {MAX_PROJECT_NAME_CHARS} characters"
+        ));
+    }
+    Ok(collapsed)
+}
+
+/// Normalize a caller-supplied session title under the same rules.
+///
+/// A Goal dispatch names the session after the KaneoPilot plan-page title, so a
+/// missing or unusable title must fail here rather than become a default title.
+pub fn normalize_dispatch_title(raw: &str) -> Result<String> {
+    if raw.chars().any(|ch| ch.is_control()) {
+        return Err(anyhow!(
+            "INVALID_PARAMS: title must not contain control characters"
+        ));
+    }
+    let collapsed = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() {
+        return Err(anyhow!("INVALID_PARAMS: title must not be blank"));
+    }
+    if collapsed.chars().count() > MAX_PROJECT_NAME_CHARS {
+        return Err(anyhow!(
+            "INVALID_PARAMS: title exceeds {MAX_PROJECT_NAME_CHARS} characters"
+        ));
+    }
+    Ok(collapsed)
+}
+
 fn validate_thinking_level(level: &str) -> Result<()> {
     if is_valid_thinking_level(level) {
         Ok(())
@@ -128,6 +180,11 @@ pub fn validate_execution_profile(profile: &str) -> Result<()> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
+    /// Display name of the bound project (`projects.name`), when the session has
+    /// one. Optional on the wire: older hosts and pathless sessions omit it, and
+    /// clients then keep using the directory basename.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_name: Option<String>,
     pub id: String,
     pub title: String,
     /// Number of messages in the current canonical transcript. This is the
@@ -1143,9 +1200,12 @@ fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("session not found: {session_id}"))
 }
 
+/// Column order is shared with `summary_from_row`; `p.name` stays at index 12
+/// so the same mapper also serves `session_search`, which selects it there.
 const SUMMARY_SELECT: &str =
     "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
-            s.thinking_level, s.permission_mode, s.execution_profile, s.updated_at, s.created_at
+            s.thinking_level, s.permission_mode, s.execution_profile, s.updated_at, s.created_at,
+            p.name
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
      WHERE s.deleted_at IS NULL";
 
@@ -1165,6 +1225,7 @@ pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sess
             .unwrap_or_else(default_execution_profile),
         updated_at: ms_to_ts(row.get(10)?),
         created_at: ms_to_ts(row.get(11)?),
+        project_name: row.get(12)?,
     })
 }
 
@@ -1236,6 +1297,12 @@ pub struct SessionCreateOptions {
     pub provider_id: Option<String>,
     pub model_id: Option<String>,
     pub project_path: Option<String>,
+    /// Caller-supplied display name for the bound project (`projects.name`).
+    ///
+    /// Optional: absent preserves the historical directory-basename default.
+    /// Present it is validated, persisted, and returned in the same database
+    /// transaction as the session row.
+    pub project_name: Option<String>,
     pub thinking_level: Option<String>,
     pub permission_mode: Option<String>,
     pub execution_profile: Option<String>,
@@ -1258,6 +1325,7 @@ pub fn create_session_with_thinking(
             provider_id,
             model_id,
             project_path,
+            project_name: None,
             thinking_level,
             permission_mode: None,
             execution_profile: None,
@@ -1268,8 +1336,14 @@ pub fn create_session_with_thinking(
 /// Create a session with all optional configuration applied atomically.
 ///
 /// Omitting `permission_mode` preserves the historical `inherit` default. The
-/// extra input is used by trusted desktop orchestration so a new worker can be
-/// created with its parent's permission ceiling in the same host transaction.
+/// extra inputs are used by trusted desktop orchestration: a new worker can be
+/// created with its parent's permission ceiling, and a dispatched Goal can bind
+/// a project display name, in one host transaction.
+///
+/// `project_name` is written inside the same transaction as the session insert.
+/// A naming rejection therefore rolls back the insert: the host never leaves a
+/// half-named visible session behind, and never rewrites the requested name into
+/// a basename or a UUID.
 pub fn create_session_with_options(
     db: &Database,
     options: SessionCreateOptions,
@@ -1280,13 +1354,18 @@ pub fn create_session_with_options(
         provider_id,
         model_id,
         project_path,
+        project_name,
         thinking_level,
         permission_mode,
         execution_profile,
     } = options;
     let now = now_ms();
     let id = Uuid::new_v4().to_string();
-    let title = title.unwrap_or_else(|| "New task".into());
+    // A dispatch that names the session must not silently become "New task".
+    let title = match title {
+        Some(raw) => normalize_dispatch_title(&raw)?,
+        None => "New task".into(),
+    };
     let mode = normalize_mode(mode.as_deref());
     let thinking_level = thinking_level.unwrap_or_else(default_thinking_level);
     validate_thinking_level(&thinking_level)?;
@@ -1299,6 +1378,19 @@ pub fn create_session_with_options(
         }
         None => default_execution_profile(),
     };
+    // A present-but-blank `projectName` is a caller error, not "absent": folding
+    // it into None would silently fall back to the basename.
+    let requested_name = match project_name.as_deref() {
+        Some(raw) => Some(normalize_project_name(raw)?),
+        None => None,
+    };
+    if requested_name.is_some()
+        && project_path
+            .as_deref()
+            .is_none_or(|path| path.trim().is_empty())
+    {
+        return Err(anyhow!("INVALID_PARAMS: projectName requires projectPath"));
+    }
     let project_id = match project_path
         .as_deref()
         .filter(|path| !path.trim().is_empty())
@@ -1310,25 +1402,43 @@ pub fn create_session_with_options(
         Some(id) => db.project_path(id)?,
         None => None,
     };
-    db.conn()
-        .prepare_cached(
-            "INSERT INTO sessions (
-                id, title, project_id, provider_id, model_id, mode, thinking_level,
-                permission_mode, execution_profile, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
-        )?
-        .execute(params![
-            id,
-            title,
-            project_id,
-            provider_id,
-            model_id,
-            mode,
-            thinking_level,
-            permission_mode,
-            execution_profile,
-            now
-        ])?;
+    let canonical_path = project_path.clone();
+    // Without `projectName` the stored `projects.name` (the basename default) is
+    // returned, so the response always reflects the durable display name the
+    // Session/Host reads back later.
+    let effective_name = match project_id {
+        Some(project_id) => match requested_name {
+            Some(name) => Some(resolve_project_display_name(db, project_id, &name)?),
+            None => db.get_project(project_id)?.map(|project| project.name),
+        },
+        None => None,
+    };
+
+    let tx = db.conn().unchecked_transaction()?;
+    tx.prepare_cached(
+        "INSERT INTO sessions (
+            id, title, project_id, provider_id, model_id, mode, thinking_level,
+            permission_mode, execution_profile, created_at, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
+    )?
+    .execute(params![
+        id,
+        title,
+        project_id,
+        provider_id,
+        model_id,
+        mode,
+        thinking_level,
+        permission_mode,
+        execution_profile,
+        now
+    ])?;
+    if let (Some(name), Some(path)) = (effective_name.as_deref(), canonical_path.as_deref()) {
+        tx.prepare_cached("UPDATE projects SET name = ?1 WHERE path = ?2")?
+            .execute(params![name, path])?;
+    }
+    tx.commit()?;
+
     Ok(SessionSummary {
         id,
         title,
@@ -1340,9 +1450,33 @@ pub fn create_session_with_options(
         thinking_level,
         permission_mode,
         execution_profile,
+        project_name: effective_name,
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
     })
+}
+
+/// Decide the durable display name for a session-creation target.
+///
+/// The directory basename is only a derived default (`upsert_project_row`),
+/// so replacing it is safe. Any other stored name is a name a user or an earlier
+/// caller authored — a renamed project group persists into `projects.name` — and
+/// is never overwritten: requesting a different one returns `CONFLICT` before
+/// the session row is inserted. An unchanged request stays idempotent.
+fn resolve_project_display_name(db: &Database, project_id: i64, requested: &str) -> Result<String> {
+    let Some(existing) = db.get_project(project_id)? else {
+        return Err(anyhow!("NOT_FOUND: project row missing"));
+    };
+    if existing.name == requested {
+        return Ok(requested.to_string());
+    }
+    let basename = crate::db::project_display_name(&existing.path);
+    if existing.name != basename {
+        return Err(anyhow!(
+            "CONFLICT: project already has a different display name"
+        ));
+    }
+    Ok(requested.to_string())
 }
 
 /// The persisted per-session permission mode, or None for unknown sessions.
@@ -1722,6 +1856,7 @@ pub fn fork_session_through(
         thinking_level: source.summary.thinking_level,
         permission_mode: source.summary.permission_mode,
         execution_profile: source.summary.execution_profile,
+        project_name: source.summary.project_name,
         updated_at: created_at.clone(),
         created_at,
     };
@@ -4554,6 +4689,195 @@ mod tests {
     }
 
     #[test]
+    fn create_session_persists_the_project_name_atomically() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("Music");
+        std::fs::create_dir_all(&project).unwrap();
+        let db = Database::open(&dir.path().join("test.sqlite")).unwrap();
+
+        let session = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                title: Some("Add a shuffle button".into()),
+                mode: Some("goal".into()),
+                project_path: Some(project.to_string_lossy().to_string()),
+                project_name: Some("  Music   Library ".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // The returned names are exactly what the caller must echo back.
+        assert_eq!(session.title, "Add a shuffle button");
+        assert_eq!(session.project_name.as_deref(), Some("Music Library"));
+
+        // The name is durable in `projects.name`, not just on the summary.
+        let stored: String = db
+            .conn()
+            .query_row(
+                "SELECT name FROM projects WHERE path = ?1",
+                params![session.project_path.clone().unwrap()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "Music Library");
+
+        // A readable summary carries the name back after the fact.
+        let listed = list_sessions(&db).unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].project_name.as_deref(), Some("Music Library"));
+    }
+
+    #[test]
+    fn create_session_project_name_rejects_invalid_input_before_insert() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("Music");
+        std::fs::create_dir_all(&project).unwrap();
+        let db = Database::open(&dir.path().join("test.sqlite")).unwrap();
+        let path = project.to_string_lossy().to_string();
+
+        for (name, title) in [
+            (Some("  ".to_string()), Some("Title".to_string())),
+            (Some("Bad\u{7}Name".to_string()), Some("Title".to_string())),
+            (
+                Some("x".repeat(MAX_PROJECT_NAME_CHARS + 1)),
+                Some("Title".to_string()),
+            ),
+            (None, Some("   ".to_string())),
+            (None, Some("Bad\u{7}Title".to_string())),
+        ] {
+            let result = create_session_with_options(
+                &db,
+                SessionCreateOptions {
+                    title,
+                    project_path: Some(path.clone()),
+                    project_name: name,
+                    ..Default::default()
+                },
+            );
+            assert!(result.is_err(), "invalid naming input must be rejected");
+        }
+
+        // Validation runs before the insert, so nothing was persisted.
+        let sessions: i64 = db
+            .conn()
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(sessions, 0, "a rejected create must not leave a session");
+    }
+
+    #[test]
+    fn create_session_conflicts_with_an_existing_custom_display_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("Music");
+        std::fs::create_dir_all(&project).unwrap();
+        let db = Database::open(&dir.path().join("test.sqlite")).unwrap();
+        let path = project.to_string_lossy().to_string();
+        let project_id = db.ensure_project(&path, false).unwrap();
+
+        // A user-authored name is not the basename, so it must never be
+        // overwritten by a dispatch naming the same path.
+        db.conn()
+            .prepare_cached("UPDATE projects SET name = ?1 WHERE id = ?2")
+            .unwrap()
+            .execute(params!["Mine", project_id])
+            .unwrap();
+
+        let conflicting = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                title: Some("Title".into()),
+                project_path: Some(path.clone()),
+                project_name: Some("Music".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(
+            conflicting.to_string().starts_with("CONFLICT"),
+            "expected CONFLICT, got {conflicting}"
+        );
+
+        // The custom name survives and no session was created.
+        let stored: String = db
+            .conn()
+            .query_row(
+                "SELECT name FROM projects WHERE id = ?1",
+                params![project_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "Mine");
+        let sessions: i64 = db
+            .conn()
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(sessions, 0);
+
+        // Re-requesting the name already stored is idempotent, not a conflict.
+        let repeat = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                title: Some("Title".into()),
+                project_path: Some(path),
+                project_name: Some("Mine".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(repeat.project_name.as_deref(), Some("Mine"));
+    }
+
+    #[test]
+    fn omitting_project_name_keeps_the_basename_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("Legacy");
+        std::fs::create_dir_all(&project).unwrap();
+        let db = Database::open(&dir.path().join("test.sqlite")).unwrap();
+
+        // An older client that never sends `projectName` still gets the
+        // historical basename behavior and no naming error.
+        let session = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                project_path: Some(project.to_string_lossy().to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(session.project_name.as_deref(), Some("Legacy"));
+        assert_eq!(session.title, "New task");
+    }
+
+    #[test]
+    fn project_name_survives_a_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test.sqlite");
+        let project = dir.path().join("Music");
+        std::fs::create_dir_all(&project).unwrap();
+
+        let session_id = {
+            let db = Database::open(&db_path).unwrap();
+            create_session_with_options(
+                &db,
+                SessionCreateOptions {
+                    title: Some("Plan page title".into()),
+                    project_path: Some(project.to_string_lossy().to_string()),
+                    project_name: Some("Music".into()),
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+            .id
+        };
+
+        let reopened = Database::open(&db_path).unwrap();
+        let restored = get_session(&reopened, &session_id).unwrap().unwrap();
+        assert_eq!(restored.summary.project_name.as_deref(), Some("Music"));
+        assert_eq!(restored.summary.title, "Plan page title");
+    }
+
+    #[test]
     fn import_session_is_idempotent_and_preserves_timestamps() {
         let db = test_db();
         let summary = SessionSummary {
@@ -4567,6 +4891,7 @@ mod tests {
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
             execution_profile: "standard".into(),
+            project_name: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
         };
@@ -4618,6 +4943,7 @@ mod tests {
             thinking_level: "off".into(),
             permission_mode: "inherit".into(),
             execution_profile: "standard".into(),
+            project_name: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
@@ -5358,6 +5684,7 @@ mod tests {
             thinking_level: "medium".into(),
             permission_mode: "inherit".into(),
             execution_profile: "standard".into(),
+            project_name: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
