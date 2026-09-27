@@ -13,16 +13,16 @@ The tool accepts a non-empty `questions` array. Each question contains:
 
 - `question`: the prompt text, which may include Markdown;
 - `options`: one or more selectable answer labels, each either a Markdown
-  string or an object with a required Markdown `label` and optional Markdown
+  string or an object with a required Markdown `label` and optional plain-text
   `description`;
 - `multiSelect`: optional; when true, more than one selectable answer is allowed.
 
 Plain string options remain supported. The card renders CommonMark/GFM text
 formatting such as emphasis, inline code, paragraphs, and lists. Links render as
-non-interactive text, images as alt text, and raw HTML is ignored. An object's
-label and optional description use the same renderer. Rendering never rewrites
-the option value: selection and the model-facing answer use its normalized
-source label. The desktop card always adds one extra `Enter another answer`
+non-interactive text, images as alt text, and raw HTML is ignored. Question
+text and option labels use the same renderer; optional descriptions remain plain
+text. Rendering never rewrites the option value: selection and the model-facing
+answer use its normalized source label. The desktop card always adds one extra `Enter another answer`
 option with a text field. The model does not need to add a special free-text
 choice to the tool arguments.
 

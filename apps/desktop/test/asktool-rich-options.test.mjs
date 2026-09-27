@@ -43,7 +43,8 @@ test("asktool keeps legacy strings and normalizes rich labels and descriptions",
 test("asktool renders rich question and option content while keeping label answers intact", () => {
   assert.match(cardSource, /<AskToolRichText source=\{current\.question\} \/>/);
   assert.match(cardSource, /<AskToolRichText source=\{label\} \/>/);
-  assert.match(cardSource, /<AskToolRichText source=\{description\} \/>/);
+  assert.match(cardSource, /<span className="asktool-option-description">\{description\}<\/span>/);
+  assert.doesNotMatch(cardSource, /<AskToolRichText source=\{description\}/);
   assert.match(cardSource, /onClick=\{\(\) => selectOption\(label\)\}/);
   assert.match(richTextSource, /remarkPlugins: \[remarkGfm\]/);
   assert.match(styleSource, /\.asktool-rich-code\s*\{/);

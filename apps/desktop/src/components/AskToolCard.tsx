@@ -189,9 +189,7 @@ export function AskToolCard({ request, queued = 0 }: { request: PendingAsk; queu
                   <AskToolRichText source={label} />
                 </span>
                 {description ? (
-                  <span className="asktool-option-description">
-                    <AskToolRichText source={description} />
-                  </span>
+                  <span className="asktool-option-description">{description}</span>
                 ) : null}
               </span>
             </button>
