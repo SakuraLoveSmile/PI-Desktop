@@ -26,8 +26,8 @@ try {
     jsx: "automatic",
     loader: { ".woff": "file", ".woff2": "file", ".ttf": "file" },
     define: {
-      "process.env.NODE_ENV": '"production"',
       "import.meta.env.DEV": "false",
+      "process.env.NODE_ENV": '"production"',
     },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),

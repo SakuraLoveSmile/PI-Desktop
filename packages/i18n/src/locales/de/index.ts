@@ -1659,18 +1659,6 @@ sklm: {
     "notFound": "Projekt nicht gefunden",
     "noProjects": "Noch keine Projekte"
   },
-  "pulls": {
-    "title": "Pull-Anfragen",
-    "refresh": "Aktualisieren",
-    "emptyTitle": "Keine Pull-Anfragen",
-    "review": "Überprüfung mit Agent",
-    "filters": "Pull-Request-Filter",
-    "filterOpen": "Offen",
-    "filterDraft": "Entwurf",
-    "filterAll": "Alle",
-    "open": "Offen",
-    "draft": "Entwurf"
-  },
   "scheduled": {
     "description": "Wiederkehrende Agent-Aufgaben ausführen, solange PI-Desktop geöffnet ist.",
     "edit": "Aufgabe bearbeiten",

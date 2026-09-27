@@ -1614,18 +1614,6 @@ export const ptBR = {
     notFound: "Projeto não encontrado",
     noProjects: "Nenhum projeto ainda"
   },
-  pulls: {
-    title: "Pull requests",
-    refresh: "Atualizar",
-    emptyTitle: "Nenhum pull request",
-    review: "Revisar com o agente",
-    filters: "Filtros de pull request",
-    filterOpen: "Abertos",
-    filterDraft: "Rascunho",
-    filterAll: "Todos",
-    open: "Aberto",
-    draft: "Rascunho",
-  },
   scheduled: {
     description: "Executa tarefas recorrentes do agente enquanto o PI-Desktop estiver aberto.",
     edit: "Editar tarefa",
