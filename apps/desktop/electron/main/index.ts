@@ -125,8 +125,7 @@ import { createScheduledRuntime } from "./runtime/scheduled";
 import { createDesktopServices } from "./services/desktop-services";
 import { createPluginServices } from "./services/plugin-services";
 import { wirePluginThemeRuntimeServices } from "./plugin-theme-services";
-import { createSessionCollaborationService } from "./services/session-collaboration";
-import { createTeamDeliveryService } from "./services/team-delivery";
+import { createCollaborationRuntime } from "./services/collaboration-runtime";
 import {
   createApplicationLifecycle,
   type ApplicationAppearanceState,
@@ -443,11 +442,9 @@ const runtimeState: RuntimeState = {
   },
 };
 
-let applicationLifecycle: ReturnType<typeof createApplicationLifecycle> | null =
-  null;
+let applicationLifecycle: ReturnType<typeof createApplicationLifecycle> | null = null;
 let launcherRuntime: ReturnType<typeof createLauncher> | null = null;
-let closeBehaviorRuntime: ReturnType<typeof createCloseBehaviorRuntime> | null =
-  null;
+let closeBehaviorRuntime: ReturnType<typeof createCloseBehaviorRuntime> | null = null;
 const showPluginLauncherForLifecycle = (): Promise<void> => {
   if (!launcherRuntime) {
     return Promise.reject(new Error("launcher is not initialized"));
@@ -474,9 +471,7 @@ const askCloseBehaviorForLifecycle = (
   window: BrowserWindow,
 ): Promise<CloseBehavior | null> => {
   if (!closeBehaviorRuntime) {
-    return Promise.reject(
-      new Error("close behavior runtime is not initialized"),
-    );
+    return Promise.reject(new Error("close behavior runtime is not initialized"));
   }
   return closeBehaviorRuntime.askCloseBehavior(window);
 };
@@ -737,9 +732,7 @@ const {
  * Anything that changes a scope goes through host-core, so every read of the
  * list is also the moment to re-learn them.
  */
-function rememberPluginScopes(
-  list: Array<{ id?: string; scope?: ActivationScope }>,
-): void {
+function rememberPluginScopes(list: Array<{ id?: string; scope?: ActivationScope }>): void {
   pluginScopes.clear();
   for (const plugin of list) {
     if (typeof plugin?.id === "string" && plugin.scope) {
@@ -756,10 +749,7 @@ function rememberPluginScopes(
  * counts as global, which is what every plugin installed before scopes existed
  * was.
  */
-function pluginActiveInProject(
-  pluginId: string,
-  projectPath: string | null | undefined,
-): boolean {
+function pluginActiveInProject(pluginId: string, projectPath: string | null | undefined): boolean {
   const scope = pluginScopes.get(pluginId);
   if (!scope) return true;
   return isActiveInProject({ enabled: true, scope }, projectPath);
@@ -771,10 +761,7 @@ function pluginActiveInProject(
  * filtering runs inside IPC handlers that must not await the host.
  */
 function currentWorkspacePath(): string | null {
-  return (
-    (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath ??
-    null
-  );
+  return (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath ?? null;
 }
 
 /** Push a panel event to detached windows and docked views. */
@@ -1098,32 +1085,20 @@ const planUiProbe = createPlanUiProbe({
 
 let emitAgentEvent: (envelope: AgentEventEnvelope) => void = () => undefined;
 
-const sessionCollaboration = createSessionCollaborationService({
+const collaborationRuntime = createCollaborationRuntime({
+  activeTurns,
+  principal: DESKTOP_PRINCIPAL,
   getHost: () => host,
   getSidecar: () => sidecar,
   getBridge: () => agentHostBridge,
-  getActiveTurn: (sessionId) => activeTurns.get(sessionId),
-  flushTranscript: async () => {
-    await persistenceOutbox.flush(() => host);
-    return persistenceOutbox.size() === 0;
-  },
   isPluginLoaded: (pluginId) =>
     plugins.listLoaded().some((plugin) => plugin.manifest.id === pluginId),
   isQuitting: () => quitting,
-  onChanged: () =>
-    sendToRenderer(IPC.event.sessionsChanged, {
-      reason: "session.collaboration",
-    }),
-  log: (message, data) => logger.app("runtime", "warn", message, { data }),
+  logger,
+  persistenceOutbox,
+  sendToRenderer,
 });
-
-const teamDelivery = createTeamDeliveryService({
-  principal: DESKTOP_PRINCIPAL,
-  getHost: () => host,
-  getBridge: () => agentHostBridge,
-  activeTurns,
-  log: (message, data) => logger.app("runtime", "warn", message, { data }),
-});
+const { sessionCollaboration, teamDelivery } = collaborationRuntime;
 
 const planRuntime = createPlanRuntime({
   runtimeState,
@@ -1235,8 +1210,7 @@ const { wireHost, startHost } = createHostRuntime({
   importLegacyScheduled,
   superviseRestart,
   isQuitting: () => quitting,
-  onTeamNotification: (method, params) =>
-    teamDelivery.onNotification(method, params),
+  onTeamNotification: collaborationRuntime.onTeamNotification,
 });
 
 runtimeLifecycle = createRuntimeLifecycle({
@@ -1252,7 +1226,7 @@ runtimeLifecycle = createRuntimeLifecycle({
   setCurrentWorkspacePath,
   rememberPluginScopes,
   refreshUserMcp,
-  onBackendsReady: () => teamDelivery.drainPending(),
+  onBackendsReady: collaborationRuntime.onBackendsReady,
   isQuitting: () => quitting,
   getDisplayLocale: () => applicationAppearanceState.updaterLocale,
 });
@@ -1437,14 +1411,8 @@ registerApplicationStartup({
   bootHostStatus,
   flushPendingApplicationMenuCommands,
   invokeSessionCollaboration: sessionCollaboration.invoke,
-  onSessionQueueChange: () => {
-    void sessionCollaboration.drain().catch((error: unknown) => {
-      logger.app("runtime", "warn", "session callback drain failed", {
-        data: String(error),
-      });
-    });
-  },
-  onAgentHostReady: () => teamDelivery.drainPending(),
+  onSessionQueueChange: collaborationRuntime.onSessionQueueChange,
+  onAgentHostReady: collaborationRuntime.onAgentHostReady,
 });
 
 const shutdownState: ShutdownState = {
