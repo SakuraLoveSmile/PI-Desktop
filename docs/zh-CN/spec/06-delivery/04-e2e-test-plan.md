@@ -3703,23 +3703,15 @@ IPC 请求无法关闭。
 - **里程碑**：M6+
 - **状态**：可选调试通道；标签发布必须满足 E2E-196c。
 
-#### E2E-196b：未签名的 macOS 软件包展示首次启动指引
+#### E2E-196b：macOS 软件包不附带首次启动助手
 
-- **先决条件**：默认未签名的 macOS 发布已为至少一个本机架构生成 DMG 和 ZIP 工件；
-  测试 macOS 账户可以将应用复制到 `/Applications` 或 `~/Applications`。
-- **步骤**：1) 打开 DMG 并检查根目录和布局。2) 确认窗口里只有应用与 Applications
-  链接。3) 确认 DMG 不含 command 助手，也不含 `If app won't open, read this.txt`。
-  4) 不解压应用内容，检查 ZIP 根目录，并确认其中同时存在
-  `PI-Desktop-macOS-opening-help.txt` 和可执行的 `PI-Desktop-macOS-open.command`。
-  5) 阅读说明，将应用移动到 `/Applications`，然后双击 ZIP 中的助手。
-- **预期**：DMG 使用带品牌的 720×440 背景，只包含应用和 Applications 链接，不包含或
-  暴露 command 助手或打开说明。ZIP 根目录包含助手和同一份说明。说明包含
-  `xattr -r -d com.apple.quarantine /Applications/PI-Desktop.app`，并说明兜底方式仅适用
-  于 macOS 对可信未签名工件提示应用已损坏或应用打不开的场景；已签名/公证版本无需
-  执行。ZIP 助手只查找 `/Applications/PI-Desktop.app` 和 `~/Applications/PI-Desktop.app`，
-  在存在时只删除 `com.apple.quarantine` 属性，然后打开应用，不使用 `sudo`，也不接受
-  任意路径；助手会在修改属性前校验 `CFBundleIdentifier=net.aiuo.pi-desktop`。说明不会
-  声称未签名工件已通过 Gatekeeper 资质验证。
+- **先决条件**：未签名的 macOS 调试打包已为至少一个本机架构生成 DMG 和 ZIP 工件。
+- **步骤**：1) 检查 DMG，确认窗口里只有应用与 Applications 链接。2) 不解压应用内容，
+  检查 ZIP 根目录，确认既没有 `PI-Desktop-macOS-opening-help.txt`，也没有
+  `PI-Desktop-macOS-open.command`。3) 确认 ZIP 中的应用仍可正常安装。
+- **预期**：DMG 使用带品牌的 720×440 背景，只包含应用与 Applications 链接；ZIP 包含
+  应用，但两种首次启动指引文件都不存在。签名和未签名 macOS 工件均遵循此规则；签名、
+  公证和更新程序行为保持不变。
 - **关联规格**：`06-delivery/06-release-runbook.md`、`05-security/01-security.md`
 - **验收**：质量、安全
 - **里程碑**：M6+
