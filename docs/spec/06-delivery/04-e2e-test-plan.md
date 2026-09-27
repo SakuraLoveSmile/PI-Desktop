@@ -1776,10 +1776,11 @@ identify the platform validation still needed.
 - **Preconditions**: Provider configured; at least one session exists.
 - **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
   conversation area. 3) Confirm it shows the concise session/task title and the
-  New task / Search action buttons; confirm the
-  sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
-  the sidebar owns that control). 4) Switch to the Scheduled,
-  Plugins, or Settings routes and inspect the same top region.
+  New task / Search buttons; hover or focus each and inspect its tooltip. Confirm
+  the sidebar toggle appears **only when collapsed**. 4) Customize each shortcut
+  in Settings → Shortcuts and confirm the tooltip updates; disable each binding
+  and confirm its shortcut is omitted. 5) Switch to Scheduled, Plugins, or
+  Settings and inspect the same top region.
 - **Expected**: Every route-owned top region uses the same `--ds-toolbar-height`
   (46px), bg-primary surface, and bottom border; Windows/Linux reserve the
   same 120px native-control band at the right. On the chat route the
@@ -1791,12 +1792,14 @@ identify the platform validation still needed.
   with an ellipsis only on overflow. Check an English title longer than 10
   characters in wide and narrow layouts, with the sidebar expanded/collapsed
   and the work panel open/closed; titles must not overlap the action buttons.
-  The complete title and project scope remain available through its tooltip. The sidebar
-  toggle is present only in the collapsed state (no
-  duplicate of the sidebar's control). On every other route the frameless drag
-  band renders instead (no chat top-bar controls) while retaining the same
-  surface and alignment. The bar is draggable to move the window; interactive
-  controls do not start a window drag.
+  The complete title and project scope remain available through its tooltip.
+  New task and Search tooltips show their effective platform-formatted
+  shortcuts, including custom bindings; an explicitly unbound shortcut is
+  omitted, while the accessible name remains the localized action. The sidebar
+  toggle is present only when collapsed (no duplicate of the sidebar's control).
+  On every other route the frameless drag band renders instead (no chat top-bar
+  controls) while retaining the same surface and alignment. The bar is draggable
+  to move the window; interactive controls do not start a window drag.
   macOS leaves the left 88px clear for traffic lights only while the sidebar is
   collapsed (8px in fullscreen); Windows/Linux leave the right 120px clear for
   native window controls.
