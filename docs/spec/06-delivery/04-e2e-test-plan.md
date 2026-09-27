@@ -1488,6 +1488,35 @@ identify the platform validation still needed.
   `pnpm test:e2e:composer-paste`; real desktop recording uses isolated data and
   a local model with a controlled response delay.
 
+#### E2E-COMPOSER-input-history-recall
+
+- **Preconditions**: Isolated Electron test profile and the production Composer
+  input/draft/history/submit hooks mounted in the renderer fixture. The send
+  boundary is deterministic; no provider or network credentials are needed.
+- **Steps**: 1) In session A, send `alpha`, `beta`, and `beta` again through
+  Enter; press ArrowUp twice and ArrowDown twice. 2) Edit a recalled draft and
+  confirm arrows no longer replace it. 3) Send a prompt with a file reference,
+  recall it, and inspect the rendered chip. 4) Switch to B, verify A's history
+  is absent, send `beta`, and verify B recalls only its own entry. 5) Start the
+  first Home prompt with the send boundary held, switch to B before acceptance,
+  release it, then open the materialized session and recall the prompt. 6) Exit
+  Electron and launch a new process with the same isolated profile; recall A's
+  attachment entry and the Home-created session's prompt.
+- **Expected**: Duplicate consecutive `beta` is stored once; ArrowUp/ArrowDown
+  walk newest-to-oldest and back to an empty draft. Editing ends browsing.
+  Attachment text and its rendered file chip return together. Sessions A and B
+  remain isolated. The delayed Home send is recorded under the session ID
+  materialized by `sendPrompt`, not the session selected when the send finishes.
+  Both histories and the attachment survive a real Electron process restart.
+- **Specs linked**: `04-ux/09-interaction-patterns.md`,
+  `08-meta/decisions-log.md` (D632), `04-ux/08-component-spec.md`
+- **Acceptance**: C (composer input and session isolation)
+- **Milestone**: M2
+- **Status**: Automated by `pnpm test:e2e:composer-paste` (renderer keyboard
+  interactions, Home session switch, attachment recall, and second-process
+  persistence); store callback race regression is covered by
+  `apps/desktop/test/composer-input-history.test.mjs`.
+
 #### E2E-011d: New task creates an immediate durable empty slot
 
 - **Preconditions**: Provider configured; at least one real session exists so
