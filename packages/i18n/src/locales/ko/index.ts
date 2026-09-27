@@ -1674,18 +1674,6 @@ sklm: {
     notFound: "프로젝트를 찾을 수 없습니다",
     noProjects: "프로젝트가 아직 없음",
   },
-  pulls: {
-    title: "풀 리퀘스트",
-    refresh: "새로 고침",
-    emptyTitle: "풀 리퀘스트 없음",
-    review: "에이전트로 검토",
-    filters: "풀 리퀘스트 필터",
-    filterOpen: "열기",
-    filterDraft: "초안",
-    filterAll: "모두",
-    open: "열기",
-    draft: "초안",
-  },
   scheduled: {
     description: "PI-Desktop이 열려 있는 동안 반복 에이전트 작업을 실행합니다.",
     edit: "작업 편집",

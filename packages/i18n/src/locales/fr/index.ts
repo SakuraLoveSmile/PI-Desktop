@@ -1659,18 +1659,6 @@ sklm: {
     "notFound": "Projet introuvable",
     "noProjects": "Aucun projet pour l'instant"
   },
-  "pulls": {
-    "title": "Demandes d'extraction",
-    "refresh": "Actualiser",
-    "emptyTitle": "Aucune demande d'extraction",
-    "review": "Révision avec l'agent",
-    "filters": "Filtres de demande d'extraction",
-    "filterOpen": "Ouvrir",
-    "filterDraft": "Brouillon",
-    "filterAll": "Tous",
-    "open": "Ouvrir",
-    "draft": "Brouillon"
-  },
   "scheduled": {
     "description": "Exécutez des tâches récurrentes tant que PI-Desktop est ouvert.",
     "edit": "Modifier la tâche",

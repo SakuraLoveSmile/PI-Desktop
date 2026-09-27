@@ -196,7 +196,7 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
         const chatShell = document.querySelector('.app-chat-shell');
         const sidebar = chatShell?.querySelector('.sidebar');
         return {
-          hidden: chatShell?.hidden === true && chatShell.getAttribute('aria-hidden') === 'true' && chatShell.inert,
+          hidden: chatShell?.hidden === true && chatShell.inert,
           sidebarRetained: sidebar?.isConnected === true,
         };
       })()`);

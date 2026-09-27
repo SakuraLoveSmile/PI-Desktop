@@ -1645,18 +1645,6 @@ sklm: {
     notFound: "未找到项目",
     noProjects: "暂无项目",
   },
-  pulls: {
-    title: "拉取请求",
-    refresh: "刷新",
-    emptyTitle: "暂无拉取请求",
-    review: "让智能体审阅",
-    filters: "拉取请求筛选",
-    filterOpen: "打开",
-    filterDraft: "草稿",
-    filterAll: "全部",
-    open: "打开",
-    draft: "草稿",
-  },
   scheduled: {
     description: "应用运行时，按计划自动执行 Agent 任务。",
     edit: "编辑任务",

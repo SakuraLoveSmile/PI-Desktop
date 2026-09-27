@@ -3392,7 +3392,7 @@ D193, and D194.
   mount refresh had been replacing it), the marketplace search and detail
   calls are stubbed while seeded, and `pi-plugins-row-details` /
   `pi-plugins-sheet` scenes are added. No protocol, storage, or runtime
-  behavior changes. Refines the Installed-tab clause of D169 and §3.5 of the UI
+  behavior changes. Refines the Installed-tab clause of D169 and §3.4 of the UI
   IA.
 
 ## 2026-09-05 — Scrollbars show only on hover or while scrolling (D300)

@@ -1664,18 +1664,6 @@ sklm: {
     notFound: "Proje bulunamadı",
     noProjects: "Henüz proje yok",
   },
-  pulls: {
-    title: "Çekme istekleri",
-    refresh: "Yenile",
-    emptyTitle: "Çekme isteği yok",
-    review: "Ajanla incele",
-    filters: "Çekme isteği süzgeçleri",
-    filterOpen: "Açık",
-    filterDraft: "Taslak",
-    filterAll: "Tümü",
-    open: "Açık",
-    draft: "Taslak",
-  },
   scheduled: {
     description: "PI-Desktop açıkken yinelenen ajan görevlerini çalıştırın.",
     edit: "Görevi düzenle",
