@@ -892,20 +892,24 @@ identify the platform validation still needed.
   headers. 2) Send a follow-up after the assistant response and capture the
   next request. 3) Repeat with an image attachment when the selected model
   supports vision. 4) Set a saved custom header with the same name as one of
-  the Copilot defaults and send another turn.
+  the Copilot defaults and send another turn. 5) Select a Claude model on the
+  same account (Anthropic Messages) and send a turn, capturing its auth and
+  identity headers.
 - **Expected**: Every Copilot model request includes the pinned pi-ai
   transport identity headers `Editor-Version`, `Editor-Plugin-Version`, and
   `Copilot-Integration-Id`. `X-Initiator` is `user` for a user-led request and
   `agent` for a continuation; `Openai-Intent` is `conversation-edits`, and
   image requests include `Copilot-Vision-Request: true`. The OAuth row keeps
   its local provider id for account binding, and a saved custom header remains
-  the final override.
+  the final override. Claude requests carry `Authorization: Bearer <Copilot token>`
+  and no `X-Api-Key`, while retaining the same IDE identity and context headers.
 - **Specs linked**: `03-runtime/11-provider-model-system.md`,
   `03-runtime/12-provider-config-schema.md`, ADR 0095
 - **Acceptance**: B (model configuration), F (runtime provider requests)
 - **Milestone**: M2
 - **Status**: Unit-covered (row-scoped model headers and request-context
-  headers); live Copilot account journey pending
+  headers, Anthropic Messages Bearer auth and rotating tokens); live Copilot
+  account journey pending
 
 #### E2E-005H: Select every visible model from a long service list
 

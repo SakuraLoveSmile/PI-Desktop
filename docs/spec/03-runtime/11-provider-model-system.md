@@ -94,6 +94,12 @@ headers, including `Editor-Version`, `Editor-Plugin-Version`, and
 owns auth binding and transcript identity, and user-supplied provider headers
 remain the final override.
 
+Copilot Anthropic Messages (Claude) requests carry the per-request OAuth token
+as `Authorization: Bearer` with `X-Api-Key` removed, because pi-ai
+only selects Copilot Bearer auth when `model.provider` is `github-copilot`.
+OpenAI-style Copilot wire APIs keep signing the token as the request key; all
+wires retain per-request auth resolution and the account-specific `baseUrl`.
+
 Zhipu / GLM and Z.AI are named OpenAI-compatible endpoint presets among a
 short models.dev-backed Service list of first-party vendors (including
 Xiaomi). The add-provider Service picker persists the matching models.dev
