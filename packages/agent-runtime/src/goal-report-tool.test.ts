@@ -102,4 +102,42 @@ describe("GoalReportDraftManager", () => {
     expect(manager.isDraftValid()).toBe(true);
     expect(manager.draft?.summary).toBe("New Draft");
   });
+
+  it("returns a terminating tool error when draft persistence fails", async () => {
+    const onDraftSubmitted = vi.fn().mockRejectedValue(new Error("host unavailable"));
+    const manager = new GoalReportDraftManager({
+      executionId: "exec-1",
+      sessionId: "sess-1",
+      onDraftSubmitted,
+    });
+
+    const result = await manager.buildTool().execute("call-1", {
+      summary: "Draft",
+      verdict: "met",
+    });
+
+    expect(result).toMatchObject({
+      isError: true,
+      terminate: true,
+      details: { ok: false, error: "REPORT_DRAFT_PERSIST_FAILED" },
+    });
+    expect(manager.isDraftValid()).toBe(false);
+  });
+
+  it("clears the local draft and reports invalidation persistence failures", async () => {
+    const onDraftInvalidated = vi.fn().mockRejectedValue(new Error("host unavailable"));
+    const onDraftInvalidationFailure = vi.fn();
+    const manager = new GoalReportDraftManager({
+      executionId: "exec-1",
+      sessionId: "sess-1",
+      onDraftInvalidated,
+      onDraftInvalidationFailure,
+    });
+
+    await manager.buildTool().execute("call-1", { summary: "Draft", verdict: "met" });
+    await expect(manager.invalidate()).rejects.toThrow("host unavailable");
+    expect(manager.isDraftValid()).toBe(false);
+    expect(manager.draft).toBeNull();
+    expect(onDraftInvalidationFailure).toHaveBeenCalledOnce();
+  });
 });

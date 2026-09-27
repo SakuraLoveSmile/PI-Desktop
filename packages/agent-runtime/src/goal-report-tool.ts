@@ -18,6 +18,8 @@ export type GoalReportDraftManagerOptions = {
   sessionId: string;
   onDraftSubmitted?: (draft: SubmitGoalReportDraftInput) => Promise<void> | void;
   onDraftInvalidated?: () => Promise<void> | void;
+  onDraftPersistenceFailure?: (error: unknown) => Promise<void> | void;
+  onDraftInvalidationFailure?: (error: unknown) => Promise<void> | void;
 };
 
 export class GoalReportDraftManager {
@@ -46,7 +48,12 @@ export class GoalReportDraftManager {
       this.currentDraft = null;
       this.invalidated = true;
       if (this.options.onDraftInvalidated) {
-        await this.options.onDraftInvalidated();
+        try {
+          await this.options.onDraftInvalidated();
+        } catch (error) {
+          await this.options.onDraftInvalidationFailure?.(error);
+          throw error;
+        }
       }
     }
   }
@@ -194,12 +201,19 @@ export class GoalReportDraftManager {
           };
         }
 
+        try {
+          await this.options.onDraftSubmitted?.(validation.value);
+        } catch (error) {
+          await this.options.onDraftPersistenceFailure?.(error);
+          return {
+            content: [{ type: "text", text: "Goal report draft persistence failed." }],
+            details: { ok: false, error: "REPORT_DRAFT_PERSIST_FAILED" },
+            isError: true,
+            terminate: true,
+          } as AgentToolResult<any>;
+        }
         this.currentDraft = validation.value;
         this.invalidated = false;
-
-        if (this.options.onDraftSubmitted) {
-          await this.options.onDraftSubmitted(validation.value);
-        }
 
         return {
           content: [

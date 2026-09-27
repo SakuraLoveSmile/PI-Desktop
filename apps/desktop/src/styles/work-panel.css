@@ -933,20 +933,15 @@
   margin: 0;
 }
 
-.goal-report-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  border: none;
+.goal-report-retry-button {
+  align-self: center;
+  color: var(--ds-bg-primary);
 }
 
-.goal-report-btn.primary {
-  background: var(--ds-accent);
-  color: var(--ds-accent-contrast, #fff);
+.goal-report-error-code {
+  color: var(--ds-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--text-2xs);
 }
 
 .goal-report-section {

@@ -159,6 +159,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     isDeveloperMode,
     sendToRenderer,
     voiceService,
+    teamDelivery,
   } = dependencies;
 
 
@@ -257,6 +258,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     registrar,
     getHost,
     logger,
+    teamDelivery,
   });
   registerSettingsIpc({
     registrar,
@@ -404,6 +406,8 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     optionalWorkspaceRoot,
     composerCommandService,
     loadComposerTemplatesCached,
+    beforeUserStop: teamDelivery.beforeUserStop,
+    beforeUserAbort: teamDelivery.beforeUserStop,
   });
 
   registerPluginIpc({

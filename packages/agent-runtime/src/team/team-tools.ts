@@ -8,7 +8,8 @@ import type { RuntimeHost } from "../host-client.js";
 import {
   type TeamTaskRecord,
   type TeamMemberRecord,
-  type TeamProjection,
+  type TeamBoardProjection,
+  type TeamRosterProjection,
   type TeamTaskStatus,
   type TeamContextKind,
 } from "@pi-desktop/shared";
@@ -22,7 +23,7 @@ export interface TeamToolsOptions {
 }
 
 export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
-  const { teamSessionId, callerSessionId, isLead, host, abortActiveTurn } = opts;
+  const { teamSessionId, callerSessionId, isLead, host } = opts;
 
   const spawnTeammateTool: AgentTool = {
     name: "spawn_teammate",
@@ -144,7 +145,13 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
       try {
         const p = params as { targetMemberName: string; content: string };
         const result = await host.call<{
-          message: { id: string; target_member_name: string; status: string };
+          message: {
+            id: string;
+            targetMemberName?: string;
+            target_member_name?: string;
+            status: string;
+            deliveryStatus?: string;
+          };
         }>("team.sendMessage", {
           teamSessionId,
           callerSessionId,
@@ -158,9 +165,10 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               type: "text",
               text: JSON.stringify({
                 messageId: result.message.id,
-                target: result.message.target_member_name,
+                target: result.message.targetMemberName ?? result.message.target_member_name,
                 status: result.message.status,
-                delivered: true,
+                deliveryStatus: result.message.deliveryStatus ?? "queued",
+                delivered: false,
               }),
             },
           ],
@@ -205,16 +213,17 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         // Baseline state
         const [initBoard, initMsgs] = await Promise.all([
           host
-            .call<TeamProjection>("team.getBoard", { teamSessionId })
+            .call<TeamBoardProjection>("team.getBoard", { teamSessionId, callerSessionId })
             .catch(() => null),
           host
             .call<{ messages: unknown[] }>("team.listMessages", {
               teamSessionId,
+              callerSessionId,
               sessionId: callerSessionId,
             })
             .catch(() => null),
         ]);
-        const baselineRev = initBoard?.team?.revision ?? 0;
+        const baselineRev = initBoard?.revision ?? 0;
         const baselineMsgCount = initMsgs?.messages?.length ?? 0;
 
         while (Date.now() - start < timeoutMs) {
@@ -234,17 +243,18 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
 
           const [currBoard, currMsgs] = await Promise.all([
             host
-              .call<TeamProjection>("team.getBoard", { teamSessionId })
+              .call<TeamBoardProjection>("team.getBoard", { teamSessionId, callerSessionId })
               .catch(() => null),
             host
               .call<{ messages: unknown[] }>("team.listMessages", {
                 teamSessionId,
+                callerSessionId,
                 sessionId: callerSessionId,
               })
               .catch(() => null),
           ]);
 
-          if (currBoard && currBoard.team.revision !== baselineRev) {
+          if (currBoard && currBoard.revision !== baselineRev) {
             return {
               content: [
                 {
@@ -252,14 +262,14 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
                   text: JSON.stringify({
                     updated: true,
                     reason: "task_board_changed",
-                    revision: currBoard.team.revision,
+                    revision: currBoard.revision,
                   }),
                 },
               ],
               details: {
                 updated: true,
                 reason: "task_board_changed",
-                revision: currBoard.team.revision,
+                revision: currBoard.revision,
               },
             };
           }
@@ -335,7 +345,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
         const p = params as { memberName: string };
         const roster = await host.call<{ members: TeamMemberRecord[] }>(
           "team.getRoster",
-          { teamSessionId },
+          { teamSessionId, callerSessionId },
         );
         const member = roster.members.find((m) => m.name === p.memberName);
         if (!member) {
@@ -350,17 +360,18 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
           };
         }
 
-        let interrupted = false;
-        if (abortActiveTurn) {
-          interrupted = await abortActiveTurn(member.memberSessionId);
-        }
+        const interrupt = await host.call<{ interrupted?: boolean }>(
+          "team.interruptMember",
+          { teamSessionId, callerSessionId, memberName: p.memberName },
+        );
+        const interrupted = interrupt.interrupted === true;
 
         return {
           content: [
             {
               type: "text",
               text: JSON.stringify({
-                interrupted: true,
+                interrupted,
                 memberName: p.memberName,
                 turnInterrupted: interrupted,
               }),
@@ -428,6 +439,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
           "team.createTask",
           {
             teamSessionId,
+            callerSessionId,
             subject: p.subject,
             description: p.description,
             blockedBy: p.blockedBy,
@@ -504,6 +516,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
           "team.updateTask",
           {
             teamSessionId,
+            callerSessionId,
             taskId: p.taskId,
             expectedRevision: p.expectedRevision,
             subject: p.subject,
@@ -554,8 +567,9 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
       try {
         const p = params as { includeDeleted?: boolean };
-        const board = await host.call<TeamProjection>("team.getBoard", {
+        const board = await host.call<TeamBoardProjection>("team.getBoard", {
           teamSessionId,
+          callerSessionId,
         });
         const tasks = p.includeDeleted
           ? board.tasks
@@ -565,7 +579,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
           content: [
             {
               type: "text",
-              text: JSON.stringify({ tasks, revision: board.team.revision }),
+              text: JSON.stringify({ tasks, revision: board.revision }),
             },
           ],
           details: board,
@@ -595,8 +609,9 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     execute: async (_toolCallId, params): Promise<AgentToolResult> => {
       try {
         const p = params as { taskId: string };
-        const board = await host.call<TeamProjection>("team.getBoard", {
+        const board = await host.call<TeamBoardProjection>("team.getBoard", {
           teamSessionId,
+          callerSessionId,
         });
         const task = board.tasks.find((t) => t.taskId === p.taskId);
         if (!task) {
@@ -644,13 +659,14 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     execute: async (): Promise<AgentToolResult> => {
       try {
         const [roster, board] = await Promise.all([
-          host.call<{
-            teamSessionId: string;
-            revision: number;
-            paused: boolean;
-            members: TeamMemberRecord[];
-          }>("team.getRoster", { teamSessionId }),
-          host.call<TeamProjection>("team.getBoard", { teamSessionId }),
+          host.call<TeamRosterProjection>("team.getRoster", {
+            teamSessionId,
+            callerSessionId,
+          }),
+          host.call<TeamBoardProjection>("team.getBoard", {
+            teamSessionId,
+            callerSessionId,
+          }),
         ]);
 
         return {
@@ -660,10 +676,11 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               text: JSON.stringify({
                 teamSessionId: roster.teamSessionId,
                 paused: roster.paused,
-                revision: board.team.revision,
+                revision: board.revision,
                 members: roster.members,
                 tasks: board.tasks,
-                warnings: board.warnings,
+                readiness: board.readiness,
+                scopeOverlaps: board.scopeOverlaps,
               }),
             },
           ],

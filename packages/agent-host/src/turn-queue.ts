@@ -47,7 +47,8 @@ function adjacentIndex(
  */
 export class TurnQueue {
   private readonly bySession = new Map<string, QueuedTurnRecord[]>();
-  private readonly held = new Set<string>();
+  private readonly held = new Map<string, Set<string>>();
+  private readonly recoveryEligible = new Set<string>();
 
   constructor(
     private readonly store: QueueStore,
@@ -59,11 +60,12 @@ export class TurnQueue {
     const records = await this.store.listAll();
     this.bySession.clear();
     this.held.clear();
+    this.recoveryEligible.clear();
     for (const record of records) {
       const queue = this.bySession.get(record.sessionId) ?? [];
       queue.push(record);
       this.bySession.set(record.sessionId, queue);
-      this.held.add(record.sessionId);
+      this.hold(record.sessionId, "restore");
     }
     // A store that only preserves arrival order still restores the priority
     // block first.
@@ -75,12 +77,48 @@ export class TurnQueue {
   }
 
   isHeld(sessionId: string): boolean {
-    return this.held.has(sessionId);
+    return (this.held.get(sessionId)?.size ?? 0) > 0;
   }
 
-  /** A controller attached: the restored queue may drain again. */
-  resume(sessionId: string): void {
-    this.held.delete(sessionId);
+  isHeldByOtherThan(sessionId: string, reason: string): boolean {
+    const holds = this.held.get(sessionId);
+    return Boolean(holds && [...holds].some((hold) => hold !== reason));
+  }
+
+  hold(sessionId: string, reason: string): void {
+    const holds = this.held.get(sessionId) ?? new Set<string>();
+    holds.add(reason);
+    this.held.set(sessionId, holds);
+  }
+
+  /** Release one lifecycle hold without disturbing any other owner. */
+  resume(sessionId: string, reason = "restore"): void {
+    const holds = this.held.get(sessionId);
+    if (!holds) return;
+    holds.delete(reason);
+    if (holds.size === 0) this.held.delete(sessionId);
+  }
+
+  /** Admit one restored Team message without releasing the session restore hold. */
+  admitRecovery(sessionId: string, sessionMessageId: string): boolean {
+    const record = (this.bySession.get(sessionId) ?? []).find(
+      (candidate) => candidate.sessionMessageId === sessionMessageId
+        && candidate.idempotencyKey?.startsWith("team-message:"),
+    );
+    if (!record) return false;
+    this.recoveryEligible.add(record.id);
+    return true;
+  }
+
+  peekEligible(sessionId: string): QueuedTurnRecord | undefined {
+    return (this.bySession.get(sessionId) ?? []).find((record) => this.recoveryEligible.has(record.id));
+  }
+
+  async shiftEligible(sessionId: string): Promise<QueuedTurnRecord | undefined> {
+    const record = this.peekEligible(sessionId);
+    if (!record) return undefined;
+    this.recoveryEligible.delete(record.id);
+    return this.remove(sessionId, record.id);
   }
 
   list(sessionId: string): QueuedTurnRecord[] {
@@ -129,6 +167,7 @@ export class TurnQueue {
     if (index === -1) return undefined;
     await this.store.remove(id);
     const [record] = queue.splice(index, 1);
+    this.recoveryEligible.delete(id);
     if (queue.length === 0) this.bySession.delete(sessionId);
     return record;
   }

@@ -1773,6 +1773,14 @@ sklm: {
     launcherDesc: "팀원, 작업 보드 및 공유 조정을 검사합니다",
     retry: "다시 시도",
     refresh: "새로고침",
+    snapshotChanged: "로드하는 동안 팀 데이터가 변경되었습니다. 새로 고치려면 다시 시도하세요.",
+    overlapTask: "작업 {{tasks}}이(가) 범위 {{scope}}에서 겹칩니다",
+    blockedBy: "차단 원인: {{tasks}}",
+    scopes: "범위: {{scopes}}",
+    readiness: { ready: "준비됨", blocked: "차단됨" },
+    context: { fresh: "새로 생성", fork: "포크" },
+    phase: { provisioning: "준비 중", idle: "대기", running: "실행 중", failed: "실패", completed: "완료" },
+    taskStatus: { pending: "대기 중", in_progress: "진행 중", completed: "완료", failed: "실패", cancelled: "취소됨" },
   },
 
   panel: {

@@ -50,6 +50,29 @@ export type TeamMemberRecord = {
   updatedAt: string;
 };
 
+export type TeamDeliveryStatus =
+  | "queued"
+  | "accepted"
+  | "acknowledged"
+  | "completed"
+  | "failed";
+
+export type TeamMessageRecord = {
+  id: string;
+  teamSessionId: string;
+  sourceSessionId: string;
+  sourceMemberName: string;
+  targetSessionId: string;
+  targetMemberName: string;
+  content: string;
+  turnId?: string | null;
+  /** Underlying collaboration lifecycle retained for compatibility. */
+  status: string;
+  deliveryStatus: TeamDeliveryStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TeamTaskRecord = {
   teamSessionId: string;
   taskId: string;
@@ -72,12 +95,32 @@ export type TeamTaskWriteScopeOverlapWarning = {
   scope: string;
 };
 
-export type TeamProjection = {
-  team: TeamRecord;
-  roster: TeamMemberRecord[];
-  tasks: TeamTaskRecord[];
-  warnings: TeamTaskWriteScopeOverlapWarning[];
+/** Frozen Host DTO for team.getRoster. */
+export type TeamRosterProjection = {
+  teamSessionId: string;
+  revision: number;
+  paused: boolean;
+  members: TeamMemberRecord[];
 };
+
+/** Frozen Host DTO for team.getBoard. */
+export type TeamBoardProjection = {
+  teamSessionId: string;
+  revision: number;
+  tasks: TeamTaskRecord[];
+  readiness: Array<{
+    taskId: string;
+    isReady: boolean;
+    unresolvedBlockedBy: string[];
+  }>;
+  scopeOverlaps: Array<{
+    scope: string;
+    taskIds: string[];
+  }>;
+};
+
+/** @deprecated Use the separate frozen roster and board projections. */
+export type TeamProjection = TeamBoardProjection;
 
 // ---- DSH 9 Team Tools ----
 
@@ -186,7 +229,8 @@ export type TaskGetResult = {
 
 export type TeamStatusArgs = Record<string, never>;
 
-export type TeamStatusResult = TeamProjection;
+export type TeamStatusResult = TeamRosterProjection &
+  Pick<TeamBoardProjection, "tasks" | "readiness" | "scopeOverlaps">;
 
 // ---- Validation and Helpers ----
 

@@ -216,6 +216,16 @@
   text-decoration: line-through;
 }
 
+.team-task-readiness-ready {
+  color: var(--ds-emerald, #10b981);
+  background: color-mix(in oklab, #10b981 15%, transparent);
+}
+
+.team-task-readiness-blocked {
+  color: var(--ds-amber, #d97706);
+  background: color-mix(in oklab, var(--ds-amber, #f59e0b) 15%, transparent);
+}
+
 .team-card-desc {
   font-size: var(--text-xs);
   color: var(--ds-text-secondary);

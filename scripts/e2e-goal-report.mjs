@@ -80,20 +80,20 @@ async function scenarioStructuredReport(binary, tempRoot) {
       verdict: "met",
       summary: "All goal acceptance criteria implemented and verified cleanly.",
       metrics: [
-        { label: "Passed Tests", value: "655/655", unit: "tests" },
+        { label: "Passed Tests", value: "655/655" },
         { label: "Build Status", value: "clean" },
       ],
       criteria: [
-        { id: "crit-1", title: "Schema v20 migration", status: "satisfied" },
-        { id: "crit-2", title: "Report viewer", status: "satisfied" },
+        { id: "crit-1", text: "Schema v20 migration", verdict: "met", explanation: "Migration checks passed." },
+        { id: "crit-2", text: "Report viewer", verdict: "met", explanation: "The report viewer is wired." },
       ],
       steps: [
         { id: "step-1", title: "Define contracts and types", status: "completed" },
         { id: "step-2", title: "Implement host persistence", status: "completed" },
       ],
       files: [
-        { path: "crates/host-core/src/goal_reports/mod.rs", changeType: "created", attribution: "agent" },
-        { path: "packages/shared/src/goal-report.ts", changeType: "created", attribution: "agent" },
+        { path: "crates/host-core/src/goal_reports/mod.rs", changeType: "created", attribution: "direct" },
+        { path: "packages/shared/src/goal-report.ts", changeType: "created", attribution: "direct" },
       ],
       checks: [
         { id: "chk-1", command: "cargo test -p host-core --locked", result: "passed" },
@@ -101,7 +101,7 @@ async function scenarioStructuredReport(binary, tempRoot) {
       limitations: ["None noted in this release."],
       nextSteps: ["Deploy to production fleet."],
       evidences: [
-        { id: "ev-1", kind: "command_output", refId: "chk-1", summary: "655 passed cleanly" },
+        { id: "ev-1", kind: "tool_result", refId: "chk-1", summary: "655 passed cleanly" },
       ],
     };
 
@@ -284,7 +284,7 @@ async function scenarioRestartRecovery(binary, tempRoot) {
       verdict: "met",
       summary: "Testing durable persistence across host restarts.",
       metrics: [{ label: "Downtime", value: "0s" }],
-      criteria: [{ id: "crit-1", title: "Survives restart", status: "satisfied" }],
+      criteria: [{ id: "crit-1", text: "Survives restart", verdict: "met", explanation: "The report remains readable after restart." }],
       steps: [{ id: "step-1", title: "Commit", status: "completed" }],
       files: [],
       checks: [],
@@ -371,7 +371,7 @@ async function scenarioDraftBounds(binary, tempRoot) {
             steps: [],
             files: [],
             checks: [],
-            evidences: [{ id: "ev-1", kind: "log", refId: "test", summary: largeEvidence }],
+            evidences: [{ id: "ev-1", kind: "file", refId: "test", summary: largeEvidence }],
           },
         }),
       ["INVALID_ARGUMENT", "INTERNAL"],

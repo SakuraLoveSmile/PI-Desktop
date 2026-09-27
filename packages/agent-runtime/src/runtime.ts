@@ -989,6 +989,8 @@ export type RuntimeMatchConfig = {
   subagentProviders?: Record<string, RuntimeProviderConfig>;
   /** Resolved keys explicitly opted into Task.model selection; pins alone grant no override. */
   subagentModelKeys?: string[];
+  teamContext?: Pick<NonNullable<AgentRuntimeOptions["teamContext"]>,
+    "teamSessionId" | "callerSessionId" | "isLead" | "memberName">;
 };
 
 /** Tool calls ride in the assistant content array as `type: "toolCall"`. A
@@ -1871,9 +1873,9 @@ export class DesktopAgentRuntime {
       ...(this.executionProfile === "team"
         ? [
             teamSystemPrompt({
-              isLead: this.teamContext?.isLead ?? true,
+              isLead: this.teamContext?.isLead ?? false,
               memberName: this.teamContext?.memberName,
-              teamSessionId: this.teamContext?.teamSessionId ?? this.sessionId,
+              teamSessionId: this.teamContext?.teamSessionId ?? "",
             }),
           ]
         : this.subagents.length
@@ -2488,6 +2490,7 @@ Delegation rules:
       safeJson(this.subagentProviders) === safeJson(config.subagentProviders ?? {}) &&
       safeJson([...this.subagentModelKeys].sort()) ===
         safeJson([...new Set(config.subagentModelKeys ?? [])].sort()) &&
+      safeJson(this.teamContext ?? null) === safeJson(config.teamContext ?? null) &&
       // Enabling or disabling a trusted extension retires the runtime so the
       // next prompt reloads the set (spec 16 §4.3).
       trustedExtensionIds(this.trustedExtensionSpecs) ===
@@ -3532,9 +3535,9 @@ Delegation rules:
         : [];
     const teamTools = isTeam
       ? createTeamTools({
-          teamSessionId: this.teamContext?.teamSessionId ?? this.sessionId,
+          teamSessionId: this.teamContext?.teamSessionId ?? "",
           callerSessionId: this.teamContext?.callerSessionId ?? this.sessionId,
-          isLead: this.teamContext?.isLead ?? true,
+          isLead: this.teamContext?.isLead ?? false,
           host: this.host,
           abortActiveTurn: this.teamContext?.abortActiveTurn,
         })
@@ -7691,7 +7694,20 @@ Delegation rules:
       }
       case "tool_execution_start": {
         if (event.toolName !== SUBMIT_GOAL_REPORT_TOOL_NAME) {
-          void this.goalReportDraftManager?.invalidate();
+          const reportDraft = this.goalReportDraftManager;
+          if (reportDraft) {
+            void reportDraft.invalidate().catch(() => {
+              const error = {
+                code: "REPORT_DRAFT_INVALIDATION_FAILED",
+                message: "Goal report evidence could not be invalidated safely; execution was stopped.",
+                retriable: true,
+                details: { errorCode: "REPORT_DRAFT_INVALIDATION_FAILED" },
+              };
+              this.terminateParentTurn();
+              this.finalizeCurrentAssistant("error", error);
+              this.emit({ type: "error", error });
+            });
+          }
         }
         const startedAt = Date.now();
         this.clearAgentActivity();
@@ -8021,23 +8037,27 @@ Delegation rules:
         executionId: execution.id,
         sessionId: execution.sessionId,
         onDraftSubmitted: async (draft) => {
-          try {
-            await this.host.call("goalReports.submitDraft", {
-              executionId: execution.id,
-              draft,
-            });
-          } catch {
-            // Non-fatal draft persistence error
-          }
+          await this.host.call("goalReports.submitDraft", {
+            executionId: execution.id,
+            draft,
+          });
         },
         onDraftInvalidated: async () => {
-          try {
-            await this.host.call("goalReports.invalidateDraft", {
-              executionId: execution.id,
-            });
-          } catch {
-            // Non-fatal
-          }
+          await this.host.call("goalReports.invalidateDraft", {
+            executionId: execution.id,
+          });
+        },
+        onDraftPersistenceFailure: async () => {
+          await this.host.call("goalReports.markFailed", {
+            executionId: execution.id,
+            errorCode: "REPORT_DRAFT_PERSIST_FAILED",
+          });
+        },
+        onDraftInvalidationFailure: async () => {
+          await this.host.call("goalReports.markFailed", {
+            executionId: execution.id,
+            errorCode: "REPORT_DRAFT_INVALIDATION_FAILED",
+          });
         },
       });
       this.rebuildToolCatalog();

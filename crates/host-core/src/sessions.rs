@@ -1566,6 +1566,17 @@ pub fn session_has_running_turn(db: &Database, id: &str) -> Result<bool> {
     Ok(running)
 }
 
+/// Return the single Host-owned running turn for a session, if one exists.
+pub fn running_turn_id(db: &Database, id: &str) -> Result<Option<String>> {
+    Ok(db
+        .conn()
+        .prepare_cached(
+            "SELECT id FROM turns WHERE session_id = ?1 AND status = 'running' LIMIT 1",
+        )?
+        .query_row(params![id], |row| row.get(0))
+        .optional()?)
+}
+
 /// Create an independent session from the source transcript, optionally
 /// stopping after one message. Message-scoped forks use this to keep later
 /// turns out of the child while preserving the same cache/runtime isolation as

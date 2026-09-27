@@ -1776,6 +1776,32 @@ sklm: {
     launcherDesc: "Inspect team members, task board, and shared coordination",
     retry: "Retry",
     refresh: "Refresh",
+    snapshotChanged: "Team data changed while loading. Retry to refresh.",
+    overlapTask: "Tasks {{tasks}} overlap on scope: {{scope}}",
+    blockedBy: "Blocked by: {{tasks}}",
+    scopes: "Scopes: {{scopes}}",
+    readiness: {
+      ready: "Ready",
+      blocked: "Blocked",
+    },
+    context: {
+      fresh: "Fresh",
+      fork: "Fork",
+    },
+    phase: {
+      provisioning: "Provisioning",
+      idle: "Idle",
+      running: "Running",
+      failed: "Failed",
+      completed: "Completed",
+    },
+    taskStatus: {
+      pending: "Pending",
+      in_progress: "In progress",
+      completed: "Completed",
+      failed: "Failed",
+      cancelled: "Cancelled",
+    },
   },
 
   panel: {

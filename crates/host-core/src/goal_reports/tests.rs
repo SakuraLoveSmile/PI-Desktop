@@ -145,8 +145,15 @@ fn test_submit_draft_and_finalize_structured() {
     assert_eq!(status, "draft");
 
     // Finalize report
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'completed' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
     let summary = finalize_report(&db, execution_id, 42, Some("completed"), None).unwrap();
     assert_eq!(summary.status, "ready");
+    assert_eq!(summary.execution_status.as_deref(), Some("completed"));
     assert_eq!(summary.verdict, "met");
     assert_eq!(summary.integrity, "structured");
     assert_eq!(summary.proposal_id, proposal_id);
@@ -166,6 +173,8 @@ fn test_submit_draft_and_finalize_structured() {
     let list = list_reports(&db, session_id).unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].execution_id, execution_id);
+    assert_eq!(list[0].status, "ready");
+    assert_eq!(list[0].execution_status.as_deref(), Some("completed"));
 
     // Verify cross-session access is rejected
     let cross = get_report(&db, "another-session", execution_id).unwrap();
@@ -178,6 +187,12 @@ fn test_finalize_fallback_when_no_draft() {
     let session_id = "sess-fallback";
     let execution_id = "exec-fallback-1";
     seed_goal_execution(&db, session_id, execution_id);
+    db.conn()
+        .execute(
+            "UPDATE plan_approvals SET execution_state = 'interrupted' WHERE execution_id = ?1",
+            params![execution_id],
+        )
+        .unwrap();
     bind_execution_turn(&db, execution_id, "turn-fb").unwrap();
 
     let summary = finalize_report(
@@ -199,6 +214,9 @@ fn test_finalize_fallback_when_no_draft() {
     assert_eq!(report_val["integrity"]["kind"], "fallback");
     assert_eq!(report_val["execution"]["status"], "interrupted");
     assert_eq!(report_val["execution"]["errorCode"], "USER_ABORT");
+    let summary = list_reports(&db, session_id).unwrap().remove(0);
+    assert_eq!(summary.status, "ready");
+    assert_eq!(summary.execution_status.as_deref(), Some("interrupted"));
 }
 
 #[test]
@@ -226,6 +244,74 @@ fn test_submit_draft_bounds() {
         "metrics": metrics
     });
     assert!(submit_draft(&db, execution_id, &too_many_metrics).is_err());
+}
+
+#[test]
+fn test_submit_draft_uses_shared_structured_fields() {
+    let (_dir, db) = create_test_db();
+    let session_id = "sess-schema";
+    let execution_id = "exec-schema-1";
+    seed_goal_execution(&db, session_id, execution_id);
+
+    let legacy = json!({
+        "summary": "legacy",
+        "verdict": "met",
+        "criteria": [{ "id": "c1", "title": "old", "status": "satisfied" }],
+        "files": [{ "path": "a", "changeType": "created", "attribution": "agent" }],
+        "evidences": [{ "id": "e1", "kind": "command_output", "refId": "x", "summary": "old" }]
+    });
+    let error = submit_draft(&db, execution_id, &legacy)
+        .unwrap_err()
+        .to_string();
+    assert!(error.starts_with("INVALID_ARGUMENT:"), "{error}");
+
+    let valid = json!({
+        "summary": "valid",
+        "verdict": "met",
+        "criteria": [{ "id": "c1", "text": "criterion", "verdict": "met", "explanation": "ok" }],
+        "files": [{ "path": "a", "changeType": "created", "attribution": "declared" }],
+        "evidences": [{ "id": "e1", "kind": "tool_result", "refId": "x", "summary": "ok" }]
+    });
+    submit_draft(&db, execution_id, &valid).unwrap();
+}
+
+#[test]
+fn test_mark_failed_is_idempotent_and_retry_uses_host_facts() {
+    let (_dir, db) = create_test_db();
+    let session_id = "sess-failed";
+    let execution_id = "exec-failed-1";
+    seed_goal_execution(&db, session_id, execution_id);
+
+    submit_draft(
+        &db,
+        execution_id,
+        &json!({ "summary": "stale agent draft", "verdict": "met" }),
+    )
+    .unwrap();
+    mark_failed(&db, execution_id, "REPORT_DRAFT_PERSIST_FAILED").unwrap();
+    mark_failed(&db, execution_id, "REPORT_DRAFT_PERSIST_FAILED").unwrap();
+    let status: String = db
+        .conn()
+        .query_row(
+            "SELECT status FROM goal_reports WHERE execution_id = ?1",
+            params![execution_id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(status, "failed");
+    assert!(mark_failed(&db, execution_id, "UNKNOWN").is_err());
+
+    let automatic_finalization =
+        finalize_report(&db, execution_id, 1, Some("completed"), None).unwrap();
+    assert_eq!(automatic_finalization.status, "failed");
+
+    let retry = retry_report(&db, session_id, execution_id).unwrap();
+    assert_eq!(retry.status, "ready");
+    assert_eq!(retry.integrity, "fallback");
+    assert_eq!(retry.verdict, "unknown");
+    let report = get_report(&db, session_id, execution_id).unwrap().unwrap();
+    assert_eq!(report["integrity"]["kind"], "fallback");
+    assert_eq!(report["verdict"], "unknown");
 }
 
 #[test]
