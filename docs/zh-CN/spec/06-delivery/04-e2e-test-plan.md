@@ -2271,7 +2271,9 @@ MainChat 弥补了缺口。 Maximized/fullscreen 调用保留最新的
 #### E2E-059：嵌入式浏览器预览隔离和覆盖
 
 - **前提条件**：本地开发服务器正在运行；存在 URL 或 BrowserPreview 工件。
-- **步骤**： 1) 激活工件，输入 `localhost:<port>`（不带方案），然后提交。
+- **步骤**： 1) 激活工件，依次输入不带协议的 `localhost:<port>` 和
+  `localhost:<port>/index.html` 并提交；再输入带端口的点分主机名
+  （如 `example.com:8080`），验证显式 HTTP(S) 地址及被拒绝的 `javascript:` 地址。
   2) 导航站点链接；使用 back/forward/reload/stop。 3) 触发
   `window.open` 弹出窗口和权限请求页面（例如通知
   提示）。 4) 打开全局搜索，然后打开设置。返回聊天
