@@ -7358,8 +7358,9 @@ eleven-tool-round desktop paths are verified by
   `05-security/01-security.md`、ADR 0203、D370、D372
 - **验收**：A（应用控制）、C（会话）、安全、质量
 - **里程碑**：M6+
-- **状态**：由 `apps/desktop/test/mcp-control.test.mjs` 覆盖 MCP 协议/单元；完整 Electron
-  旅程已记录，仍按策略延后
+- **状态**：`apps/desktop/test/mcp-control.test.mjs` 覆盖 MCP 协议/单元；
+  `pnpm test:e2e:turn-get` 覆盖真实 Host/SQLite、已注册的 session IPC 和本地 MCP
+  路径，包括 Host 重启后的终态恢复。完整 Electron UI 旅程仍延后。
 
 ## 受信任扩展场景（R7 v1）
 
@@ -7371,6 +7372,7 @@ runner 会在运行时的隔离临时目录中生成六个插件形态 fixture�
   空标识为 INVALID_PARAMS。重启隔离 host 后读取同一终态，不再次发送 prompt。
   确认只读查询不修改会话、不泄露转录或凭据；运行时空闲不代表成功。真实模型验收
   需明确费用授权，夹具通过不能标记真实调用已通过。
+  自动化：`pnpm test:e2e:turn-get`（隔离 Host 与本地 MCP，不调用 provider）。
 
 #### E2E-241：发现列出受信任扩展，启用是显式的
 
