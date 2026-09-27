@@ -25,7 +25,7 @@ try {
     format: "iife",
     jsx: "automatic",
     loader: { ".woff": "file", ".woff2": "file", ".ttf": "file" },
-    define: { "process.env.NODE_ENV": '"production"' },
+    define: { "import.meta.env.DEV": "false", "process.env.NODE_ENV": '"production"' },
     alias: {
       "@pi-desktop/i18n": join(root, "packages/i18n/src/index.ts"),
       react: join(root, "apps/desktop/node_modules/react"),
