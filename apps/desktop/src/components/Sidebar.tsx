@@ -16,7 +16,7 @@ import { TooltipButton, cx } from "./ui";
 /** Default number of most-recent sessions shown per project group before the rest fold. */
 const MAX_VISIBLE_SESSIONS = 10;
 import { portalToBody } from "../lib/portal-visibility";
-import { sessionProjectDisplayName } from "../lib/session-projects";
+import { appendSessionToOpenProject } from "../lib/session-projects";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
@@ -726,16 +726,7 @@ export function Sidebar({
       if (!sessionPath) continue;
       // A closed project remains discoverable in Projects, but its historical
       // sessions must not recreate a sidebar tab that the user just closed.
-      const entry = byPath.get(sessionPath);
-      if (!entry) continue;
-      // Frozen precedence (protocol §5.23.10 T6): a manual alias wins, then the
-      // Host-persisted session display name, then the directory basename.
-      // Identity stays keyed by canonical path, so two worktrees of one project
-      // keep separate entries that merely share a display name.
-      if (!entry.meta.name && entry.name === projectName(entry.path)) {
-        entry.name = sessionProjectDisplayName(session);
-      }
-      entry.sessions.push(session);
+      if (!appendSessionToOpenProject(byPath, sessionPath, session)) continue;
     }
     const result = [...byPath.values()].filter(
       (entry) => showArchived || !entry.meta.archived,
