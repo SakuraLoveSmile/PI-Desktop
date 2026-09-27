@@ -101,27 +101,39 @@ describe("GoalReportDraftManager", () => {
     await tool.execute("call-2", { summary: "New Draft", verdict: "met" });
     expect(manager.isDraftValid()).toBe(true);
     expect(manager.draft?.summary).toBe("New Draft");
+    expect(manager.draft?.summary).toBe("New Draft");
   });
 
-  it("returns a terminating tool error when draft persistence fails", async () => {
-    const onDraftSubmitted = vi.fn().mockRejectedValue(new Error("host unavailable"));
+  it("surfaces a persistence failure instead of reporting a recorded draft", async () => {
+    // A swallowed failure would let the agent believe the Host received a
+    // structured report while it actually publishes a fallback, so the tool must
+    // fail loudly and drop the draft rather than look successful.
+    const onDraftPersistenceFailure = vi.fn();
     const manager = new GoalReportDraftManager({
       executionId: "exec-1",
       sessionId: "sess-1",
-      onDraftSubmitted,
+      onDraftSubmitted: () => {
+        throw new Error("private transport detail");
+      },
+      onDraftPersistenceFailure,
     });
+    const tool = manager.buildTool();
 
-    const result = await manager.buildTool().execute("call-1", {
-      summary: "Draft",
-      verdict: "met",
-    });
-
-    expect(result).toMatchObject({
-      isError: true,
-      terminate: true,
-      details: { ok: false, error: "REPORT_DRAFT_PERSIST_FAILED" },
-    });
+    await expect(
+      tool.execute("call-1", { summary: "Draft", verdict: "met" }),
+    ).rejects.toThrow(/could not be persisted to the host/);
     expect(manager.isDraftValid()).toBe(false);
+    expect(manager.draft).toBeNull();
+    expect(onDraftPersistenceFailure).toHaveBeenCalledOnce();
+
+    // A later successful submission restores validity.
+    const recovered = new GoalReportDraftManager({
+      executionId: "exec-1",
+      sessionId: "sess-1",
+      onDraftSubmitted: () => {},
+    });
+    await recovered.buildTool().execute("call-2", { summary: "Retry", verdict: "met" });
+    expect(recovered.isDraftValid()).toBe(true);
   });
 
   it("clears the local draft and reports invalidation persistence failures", async () => {
