@@ -12378,8 +12378,9 @@ are withdrawn with ADR 0165.
 - **Acceptance**: A (app control), C (sessions), Security, Quality
 - **Milestone**: M6+
 - **Status**: MCP protocol/unit-covered by `apps/desktop/test/mcp-control.test.mjs`;
-  full Electron journey documented and remains deferred by the no-local-E2E
-  policy
+  `pnpm test:e2e:turn-get` covers the real Host/SQLite, registered session IPC,
+  and local MCP path including terminal-state recovery after Host restart. The
+  full Electron UI journey remains deferred.
 
 - **Durable-turn extension (2026-09-26)**: Discover `pi_turn_get`; poll it
   with the session/turn returned by prompt. Verify running, completed, error,
@@ -12389,6 +12390,7 @@ are withdrawn with ADR 0165.
   this read does not mutate sessions or expose transcripts/secrets. Runtime
   idle is not proof of success. Real-model execution requires explicit cost
   authorization; do not mark it exercised from fixture tests alone.
+  Automation: `pnpm test:e2e:turn-get` (isolated Host and local MCP; no provider).
 
 #### E2E-234: Workspace security denylist and ignore layers
 
