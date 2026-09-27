@@ -1065,6 +1065,7 @@ entirely inside the plugin's isolated page:
   address or absolute path that does not resolve to an existing file inside
   the session workspace is rejected before loading and shows a specific
   workspace-boundary message in the browser chrome, including on a blank tab.
+  Existing files inside the workspace remain previewable by absolute path.
 
 - Opening an HTTP(S) link in the work panel creates an additional Browser
   resource tab instead of replacing the previous URL. Each tab owns a host-retained WebContents, address, title and navigation

@@ -43,17 +43,18 @@ for (const [locale, expected] of [
   ["en", "Only existing files inside this project's workspace can be opened."],
   ["zh-CN", "只能打开此项目工作区内已存在的文件。"],
 ]) {
-  test(`address bar explains denied local files in ${locale}`, async () => {
-    const view = render(locale);
-    await new Promise(setImmediate);
-    const url = "file:///tmp/demo.html";
-    view.element("url").value = url;
-    view.element("form").handlers.get("submit")({ preventDefault() {} });
-    assert.equal(view.calls.findLast((call) => call.name === "browser.navigate")?.payload.url, url);
-    view.callbacks.get("browser:state")({ url, loadError: "LOCAL_FILE_NOT_ALLOWED" });
-    assert.equal(view.element("empty").hidden, false);
-    assert.equal(view.element("empty-body").textContent, expected);
-    assert.equal(view.element("url").value, url);
-    assert.equal(view.calls.at(-1).payload.visible, false);
-  });
+  for (const url of ["file:///tmp/demo.html", "/tmp/demo.html"]) {
+    test(`address bar explains ${url} in ${locale}`, async () => {
+      const view = render(locale);
+      await new Promise(setImmediate);
+      view.element("url").value = url;
+      view.element("form").handlers.get("submit")({ preventDefault() {} });
+      assert.equal(view.calls.findLast((call) => call.name === "browser.navigate")?.payload.url, url);
+      view.callbacks.get("browser:state")({ url, loadError: "LOCAL_FILE_NOT_ALLOWED" });
+      assert.equal(view.element("empty").hidden, false);
+      assert.equal(view.element("empty-body").textContent, expected);
+      assert.equal(view.element("url").value, url);
+      assert.equal(view.calls.at(-1).payload.visible, false);
+    });
+  }
 }

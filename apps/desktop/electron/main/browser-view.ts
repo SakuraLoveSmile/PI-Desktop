@@ -172,12 +172,12 @@ export class BrowserPane {
   ): Promise<BrowserState | null> {
     if (fileRoot) this.fileRoot = fileRoot;
     const localPath = resolveLocalFile(raw, this.fileRoot);
+    const localInput = /^file:/i.test(raw.trim()) || isAbsolute(raw.trim());
     const target = localPath
       ? pathToFileURL(localPath).toString()
-      : normalizeUrl(raw);
+      : localInput ? null : normalizeUrl(raw);
     if (!target) {
       this.beginManagedNavigation();
-      const localInput = /^file:/i.test(raw.trim()) || isAbsolute(raw.trim());
       this.loadError = { url: raw, message: localInput ? "LOCAL_FILE_NOT_ALLOWED" : "INVALID_URL" };
       const state = this.getState();
       if (state) this.onState(state);

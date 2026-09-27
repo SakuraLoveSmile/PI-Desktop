@@ -94,7 +94,7 @@ test("an invalid target cannot mark the previous document ready", async (t) => {
   await settled();
 });
 
-test("an outside file URL explains the workspace boundary without loading it", async (t) => {
+test("outside file URLs and absolute paths explain the workspace boundary without loading", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "pi-browser-root-"));
   const outside = mkdtempSync(join(tmpdir(), "pi-browser-outside-"));
   t.after(() => { pane.dispose(); rmSync(root, { recursive: true }); rmSync(outside, { recursive: true }); });
@@ -113,12 +113,22 @@ test("an outside file URL explains the workspace boundary without loading it", a
   wc.pendingLoads.shift().resolve();
   await allowed;
 
+  const allowedAbsolute = pane.navigateAndWait(insideFile, root);
+  assert.equal(wc.pendingLoads.at(-1).url, pathToFileURL(realpathSync(insideFile)).href);
+  wc.pendingLoads.shift().resolve();
+  await allowedAbsolute;
+
   const deniedUrl = pathToFileURL(outsideFile).href;
   assert.equal(await pane.navigateAndWait(deniedUrl, root), null);
   assert.equal(wc.pendingLoads.length, 0, "outside file must never reach Electron");
   assert.equal(published.at(-1).url, deniedUrl);
   assert.equal(published.at(-1).loadError, "LOCAL_FILE_NOT_ALLOWED");
   assert.equal(published.at(-1).isLoading, false);
+
+  assert.equal(await pane.navigateAndWait(outsideFile, root, 10), null);
+  assert.equal(wc.pendingLoads.at(-1)?.url, undefined, "outside absolute path must never reach Electron");
+  assert.equal(published.at(-1).url, outsideFile);
+  assert.equal(published.at(-1).loadError, "LOCAL_FILE_NOT_ALLOWED");
 });
 
 test("a denied local file on a blank tab publishes an error without creating a guest", async () => {
@@ -129,6 +139,12 @@ test("a denied local file on a blank tab publishes an error without creating a g
   assert.equal(WebContentsView.instances.length, count);
   assert.deepEqual(published.at(-1), {
     url: "file:///tmp/demo.html", title: "", isLoading: false,
+    loadError: "LOCAL_FILE_NOT_ALLOWED", canGoBack: false, canGoForward: false,
+  });
+  assert.equal(await pane.navigateAndWait("/tmp/demo.html", "/projects/demo"), null);
+  assert.equal(WebContentsView.instances.length, count);
+  assert.deepEqual(published.at(-1), {
+    url: "/tmp/demo.html", title: "", isLoading: false,
     loadError: "LOCAL_FILE_NOT_ALLOWED", canGoBack: false, canGoForward: false,
   });
 });

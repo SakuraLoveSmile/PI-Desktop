@@ -3744,8 +3744,9 @@ identify the platform validation still needed.
   close it and open Settings. Return to chat
   and trigger an inline tool permission card. 5) Switch to another panel tab
   and back; close the panel. 6) Use open-external. 7) From both an existing page
-  and a blank Browser tab, enter an existing HTML file inside the workspace,
-  then `file:///tmp/demo.html` pointing to an existing file outside it.
+  and a blank Browser tab, enter an existing HTML file inside the workspace by
+  `file:` URL and absolute path. Then enter both `file:///tmp/demo.html` and
+  `/tmp/demo.html`, pointing to an existing file outside the workspace.
 - **Expected**: Scheme-less input normalizes to http; nav state (URL bar,
   back/forward enablement, load spinner) mirrors the page. Popups open in
   the default browser (never in-app) only when the URL parses as http(s) or
@@ -3760,9 +3761,10 @@ identify the platform validation still needed.
   its full surface rect and the plugin body does not shift down.
   Open-external launches an http(s) page in the default browser and an in-root
   file preview via `openPath`. The view uses an isolated persist partition
-  (no session bleed from the app shell). The in-root file opens; the outside
-  file never loads, the submitted address remains visible, and the browser
-  explains in the active locale that only existing workspace files can open.
+  (no session bleed from the app shell). Both in-root forms open; neither
+  outside form reaches the guest load, the submitted address remains visible,
+  and the browser explains in the active locale that only existing workspace
+  files can open.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, ADR 0019, ADR 0168
 - **Acceptance**: Quality, Security
 - **Milestone**: M5
