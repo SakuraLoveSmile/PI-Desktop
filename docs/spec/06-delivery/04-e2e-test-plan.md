@@ -5264,6 +5264,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   with a customized `summonWindow` binding; confirm each profile keeps that
   binding on the single toggle row after restart and that `Cmd/Ctrl + Shift +
   W` registers nothing.
+  15) With an unsent composer draft in the main window, press unmodified
+  `Ctrl + R`; confirm the renderer remains loaded and the draft remains intact.
+  On macOS, confirm `Cmd + R` and the explicit View → Reload menu action are
+  unchanged.
 - **Expected**: Actions are grouped as Navigation, Agent, and Window with
   platform-native key labels; recording has visible focus and `Escape` cancels;
   the custom Search chord takes effect immediately, replaces the old chord,
@@ -5275,6 +5279,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   individual reset rejects an occupied default without changing either action;
   conflict-free individual and global reset restore the shared defaults; Keyboard shortcuts is
   its own Settings destination. Modifier-only and IME keydowns dispatch nothing,
+  an unmodified `Ctrl + R` is consumed before Chromium reloads the main renderer,
+  preserving the unsent draft; macOS `Cmd + R` and View → Reload remain available.
   and a held history chord traverses only once per physical press. The
   window-visibility key is one toggle on `Alt + Shift + W` — a visible, focused
   window hides to the tray, anything else shows and focuses — and it never
@@ -5287,9 +5293,10 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: F (settings persistence), Quality (keyboard accessibility)
 - **Milestone**: M5
-- **Status**: Unit-covered (`keyboard-shortcuts.test.ts`,
-  `settings-keyboard-shortcuts.test.mjs`, `window-toggle-shortcut.test.mjs`,
-  host settings RPC test); rendered scenario Draft
+- **Status**: Shortcut unit-covered (`keyboard-shortcuts.test.ts`,
+  `settings-keyboard-shortcuts.test.mjs`, `window-menu.test.mjs`,
+  `window-toggle-shortcut.test.mjs`); `test:e2e:boot` verifies the main-window
+  Ctrl+R input is consumed. The full rendered settings journey remains Draft.
 
 #### E2E-073a: Developer mode gates the developer-tools console
 

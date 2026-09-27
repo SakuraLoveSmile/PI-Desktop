@@ -51,6 +51,9 @@
   application menubar; command-only shortcuts are discoverable via command
   palette search (keyword "shortcut" or "keybinding").
 - Shortcuts must not conflict with macOS system shortcuts or common browser shortcuts
+- The main application shell consumes unmodified `Ctrl + R` before Chromium
+  handles its browser reload shortcut; the macOS `Cmd + R` menu accelerator
+  and explicit **Reload** menu action remain unchanged.
 - Never override `Cmd/Ctrl + C`, `Cmd/Ctrl + V`, `Cmd/Ctrl + A`, `Cmd/Ctrl + S`
 - Shortcuts are consistent across macOS (Cmd) and Windows/Linux (Ctrl)
 - A missing shortcut override uses the shared platform default; a valid
