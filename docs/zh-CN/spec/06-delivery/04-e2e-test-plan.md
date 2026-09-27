@@ -394,12 +394,12 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 #### E2E-005J：GitHub Copilot OAuth 请求携带原生 IDE 标头
 
 - **前提条件**：已有一个登录的 GitHub Copilot OAuth 账户并选定模型；确定性的捕获代理会记录模型请求标头。
-- **步骤**：1）针对该账户发起 Agent 回合并记录请求标头。2）助手回复后发送后续回合并记录下一次请求。3）选定模型支持视觉时，用图像附件重复测试。4）设置一个与 Copilot 默认标头同名的已保存自定义 header，再发送一次回合。
-- **预期**：每次 Copilot 模型请求都包含固定 pin 的 pi-ai 传输身份标头 `Editor-Version`、`Editor-Plugin-Version` 与 `Copilot-Integration-Id`。用户发起的请求中 `X-Initiator` 为 `user`，延续请求中为 `agent`；`Openai-Intent` 为 `conversation-edits`，图像请求包含 `Copilot-Vision-Request: true`。OAuth 行继续使用本地 provider id 进行账户绑定，已保存的自定义 header 仍是最后的覆盖层。
+- **步骤**：1）针对该账户发起 Agent 回合并记录请求标头。2）助手回复后发送后续回合并记录下一次请求。3）选定模型支持视觉时，用图像附件重复测试。4）设置一个与 Copilot 默认标头同名的已保存自定义 header，再发送一次回合。5）在同一账户上选择 Claude 模型（Anthropic Messages）并发送回合，记录认证与身份标头。
+- **预期**：每次 Copilot 模型请求都包含固定 pin 的 pi-ai 传输身份标头 `Editor-Version`、`Editor-Plugin-Version` 与 `Copilot-Integration-Id`。用户发起的请求中 `X-Initiator` 为 `user`，延续请求中为 `agent`；`Openai-Intent` 为 `conversation-edits`，图像请求包含 `Copilot-Vision-Request: true`。OAuth 行继续使用本地 provider id 进行账户绑定，已保存的自定义 header 仍是最后的覆盖层。Claude 请求携带 `Authorization: Bearer <Copilot token>`，不携带 `X-Api-Key`，并保留相同的 IDE 身份与上下文标头。
 - **链接规格**：`03-runtime/11-provider-model-system.md`、`03-runtime/12-provider-config-schema.md`、ADR 0095
 - **验收**：B（模型配置）、F（运行时提供商请求）
 - **里程碑**：M2
-- **状态**：单元覆盖（行级模型标头与请求上下文标头）；真实 Copilot 账户旅程待验证
+- **状态**：单元覆盖（行级模型标头、请求上下文标头、Anthropic Messages Bearer 认证与令牌轮换）；真实 Copilot 账户旅程待验证
 
 #### E2E-006：密钥在重启后仍然存在
 

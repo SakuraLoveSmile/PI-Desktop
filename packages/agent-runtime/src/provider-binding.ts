@@ -233,6 +233,38 @@ export function copilotRequestHeaders(
 }
 
 /**
+ * Row-scoped models bypass pi-ai's native Copilot Bearer branch, so the token
+ * would leave as X-Api-Key. Send it as Bearer and null out X-Api-Key instead.
+ * Keep apiKey set so the Anthropic SDK skips its default credential chain.
+ * OpenAI-style adapters already sign an apiKey as Bearer.
+ */
+function copilotRequestAuth(
+  provider: Pick<RuntimeProviderConfig, "vendorKey">,
+  api: Api,
+  auth: ModelAuth,
+): ModelAuth {
+  if (
+    provider.vendorKey?.trim().toLowerCase() !== "github-copilot" ||
+    api !== "anthropic-messages" ||
+    !auth.apiKey
+  ) {
+    return auth;
+  }
+  const { apiKey, headers, ...rest } = auth;
+  const requestHeaders: NonNullable<ModelAuth["headers"]> = Object.fromEntries(
+    Object.entries(headers ?? {}).filter(([name]) => {
+      const lowerName = name.toLowerCase();
+      return lowerName !== "authorization" && lowerName !== "x-api-key";
+    }),
+  );
+  return {
+    ...rest,
+    apiKey,
+    headers: { ...requestHeaders, Authorization: `Bearer ${apiKey}`, "X-Api-Key": null },
+  };
+}
+
+/**
  * Claude models that publish an effort ladder without a `budget_tokens`
  * option (Opus 4.7+, Opus 5.x, Fable, ...) reject `thinking.type=enabled`
  * with a 400. pi-ai only sends adaptive thinking when
@@ -331,17 +363,21 @@ export function createProviderModels(
       auth: {
         apiKey: {
           name: `${provider.name} API key`,
-          // Plain apiKey semantics let each adapter emit its own auth header
+          // Stored apiKey semantics let each adapter emit its own auth header
           // (Bearer for OpenAI-style APIs, x-api-key for Anthropic, …).
           //
           // A vendor account resolves instead through Electron main, which
           // returns the whole `ModelAuth` — token, headers, and the
           // per-credential baseUrl GitHub Copilot hands out. pi-ai calls this
           // for every request and caches nothing, so a token that rotates
-          // mid-session is picked up on the next one.
+          // mid-session is picked up on the next one. Copilot's Anthropic wire
+          // needs explicit Bearer auth because the model uses a row id.
           resolve: async () =>
             resolveAuth
-              ? { auth: await resolveAuth(), source: "OAuth" }
+              ? {
+                  auth: copilotRequestAuth(provider, model.api, await resolveAuth()),
+                  source: "OAuth",
+                }
               : { auth: { apiKey: requestKey } },
         },
       },
