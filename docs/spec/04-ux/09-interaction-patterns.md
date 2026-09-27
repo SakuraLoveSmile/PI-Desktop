@@ -375,7 +375,7 @@ may be retained while exactly one workspace supplies the visible shell context.
   it, even if the user switches sessions while the request is in flight;
   deleted sessions cannot retain drafts.
 - The composer also recalls the accepted submissions of its own conversation,
-  newest-first, with ArrowUp/ArrowDown (D625). ArrowUp starts browsing only when
+  newest-first, with ArrowUp/ArrowDown (D632). ArrowUp starts browsing only when
   the draft is empty (no text and no references), and while browsing both keys
   keep walking history even through a multi-line entry; ArrowDown past the
   newest entry returns to the empty draft. A user edit, a submission, or a
@@ -387,7 +387,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   conversations, consecutive duplicates collapsed) and records only accepted
   submissions: a normal or steering prompt, or a dispatched slash, extension, or
   mode command. The empty home composer has no conversation, so it recalls
-  nothing.
+  nothing; its accepted prompt is stored under the session ID returned by the
+  submission flow, even if the user navigates elsewhere before acceptance.
 - Every tool call resolves `workspaceRoot` from the originating durable
   session, not from the currently selected project tab. Background completion
   refreshes the matching row without redirecting the active conversation.

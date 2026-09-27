@@ -1,4 +1,4 @@
-import { readComposerModule, readComposerSource } from "./helpers/source-contracts.mjs";
+import { readComposerModule, readComposerSource, readStoreModule } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -266,10 +266,12 @@ test("keydown order: IME guard < autocomplete < history < send (AC5)", async () 
   }
 });
 
-test("history is recorded only on accepted submissions of the submitting conversation (AC1)", async () => {
+test("accepted history uses sendPrompt's materialized session, not later global selection", async () => {
   const source = await readComposerModule("hooks/useComposerSubmit.ts");
-  assert.match(source, /const targetSessionId = activeSessionId \?\? useAppStore\.getState\(\)\.activeSessionId;/);
-  assert.match(source, /if \(targetSessionId\) recordHistory\?\.\(submittedDraft, targetSessionId\);/);
+  assert.match(source, /let acceptedSessionId = activeSessionId \?\? undefined;/);
+  assert.match(source, /const captureAcceptedSession = \(sessionId: string\) => \{\s*acceptedSessionId = sessionId;/);
+  assert.match(source, /activeSessionId \?\? undefined,\s*captureAcceptedSession/);
+  assert.match(source, /if \(acceptedSessionId\) recordHistory\?\.\(submittedDraft, acceptedSessionId\);/);
   assert.match(
     source,
     /if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);\s*else remember\(\);/,
@@ -279,6 +281,30 @@ test("history is recorded only on accepted submissions of the submitting convers
     source.indexOf('dispatch.action === "dispatch"'),
   );
   assert.ok(!blocked.includes("remember()"), "blocked slash commands are not recorded");
+});
+
+test("sendPrompt returns the accepted session for Home history recording", async () => {
+  const source = await readStoreModule("slices/queue-slice.ts");
+  const sendPrompt = source.slice(
+    source.indexOf("sendPrompt: async (content, draft, requestedSessionId, onAccepted)"),
+  );
+  assert.ok(sendPrompt.length > 0, "sendPrompt implementation not found");
+  assert.match(
+    sendPrompt,
+    /await api\.prompt\(\{[\s\S]*?\}\);[\s\S]*?onAccepted\?\.\(startedIn\);\s*return true/,
+  );
+  assert.match(
+    sendPrompt,
+    /const accepted = await get\(\)\.enqueuePrompt\(content, draft, sessionId\);\s*if \(accepted\) onAccepted\?\.\(sessionId\);\s*return accepted/,
+  );
+  const submit = await readComposerModule("hooks/useComposerSubmit.ts");
+  assert.match(submit, /captureAcceptedSession = \(sessionId: string\) => \{\s*acceptedSessionId = sessionId;/);
+  assert.match(submit, /activeSessionId \?\? undefined,\s*captureAcceptedSession/);
+  assert.doesNotMatch(submit, /activeSessionId \?\? useAppStore\.getState\(\)\.activeSessionId/);
+});
+
+test("history is recorded across the accepted composer paths", async () => {
+  const source = await readComposerModule("hooks/useComposerSubmit.ts");
   const recordCalls = source.match(/remember\(\);/g) ?? [];
   assert.equal(recordCalls.length, 4, "mode, extension, palette, and prompt paths record");
 });

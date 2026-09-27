@@ -1490,42 +1490,32 @@ identify the platform validation still needed.
 
 #### E2E-COMPOSER-input-history-recall
 
-- **Preconditions**: Provider configured; the composer history store
-  (`pi.desktop.composerInputHistory`) is empty or at a known state; sessions A
-  and B exist, with A docked and B available to select.
-- **Steps**: 1) In A send `alpha`, then `beta`, then `beta` again. 2) With the
-  composer empty, press ArrowUp three times, then ArrowDown three times.
-  3) Press ArrowUp once, type one character, and press ArrowUp again.
-  4) Press ArrowUp, then send once and confirm the next ArrowUp starts from the
-  newest entry again. 5) Reopen the app and press ArrowUp in the composer.
-  6) Type `@` to open the file menu and press ArrowUp/ArrowDown, then close it.
-  7) Recall a multi-line entry with ArrowUp and keep pressing ArrowUp/ArrowDown.
-  8) Send a prompt carrying a pasted image and a workspace `@` file, then recall
-  it in A. 9) Switch to B, press ArrowUp in B's empty composer, then send `beta`
-  in B and press ArrowUp there. 10) Return to A and press ArrowUp. 11) Select
-  all, delete, and press ArrowUp. 12) Open the empty home composer (New task
-  before any first prompt) and press ArrowUp.
-- **Expected**: History is newest-first within A and `beta` is recorded once.
-  ArrowUp loads `beta`, then `alpha`, then stays on `alpha`; ArrowDown returns to
-  `beta` and then leaves the composer empty. Typing a character ends browsing, so
-  the following ArrowUp moves the caret instead of replacing the text. After a
-  send, recall starts from the newest entry. History survives a restart. With the
-  autocomplete menu open the arrows still move its highlight and never touch
-  history. A recalled multi-line entry keeps working with the arrows. The entry
-  recalled in A shows its image chip and its file chip again. B's empty composer
-  recalls nothing from A; once B sends `beta`, ArrowUp in B loads B's own `beta`
-  and stops there, and A's history is unchanged on returning. An emptied composer
-  browses history again, and the empty home composer recalls nothing. IME
-  composition is unaffected.
+- **Preconditions**: Isolated Electron test profile and the production Composer
+  input/draft/history/submit hooks mounted in the renderer fixture. The send
+  boundary is deterministic; no provider or network credentials are needed.
+- **Steps**: 1) In session A, send `alpha`, `beta`, and `beta` again through
+  Enter; press ArrowUp twice and ArrowDown twice. 2) Edit a recalled draft and
+  confirm arrows no longer replace it. 3) Send a prompt with a file reference,
+  recall it, and inspect the rendered chip. 4) Switch to B, verify A's history
+  is absent, send `beta`, and verify B recalls only its own entry. 5) Start the
+  first Home prompt with the send boundary held, switch to B before acceptance,
+  release it, then open the materialized session and recall the prompt. 6) Exit
+  Electron and launch a new process with the same isolated profile; recall A's
+  attachment entry and the Home-created session's prompt.
+- **Expected**: Duplicate consecutive `beta` is stored once; ArrowUp/ArrowDown
+  walk newest-to-oldest and back to an empty draft. Editing ends browsing.
+  Attachment text and its rendered file chip return together. Sessions A and B
+  remain isolated. The delayed Home send is recorded under the session ID
+  materialized by `sendPrompt`, not the session selected when the send finishes.
+  Both histories and the attachment survive a real Electron process restart.
 - **Specs linked**: `04-ux/09-interaction-patterns.md`,
-  `08-meta/decisions-log.md` (D625), `04-ux/08-component-spec.md`
+  `08-meta/decisions-log.md` (D632), `04-ux/08-component-spec.md`
 - **Acceptance**: C (composer input and session isolation)
 - **Milestone**: M2
-- **Status**: Source-level regression covered
-  (`composer-input-history.test.mjs`: store rules, per-conversation isolation,
-  browse stepping, restored references, keydown branch order, record points).
-  Real recall loop in the desktop renderer, the reopened-app case, and the
-  rendered chips are Draft.
+- **Status**: Automated by `pnpm test:e2e:composer-paste` (renderer keyboard
+  interactions, Home session switch, attachment recall, and second-process
+  persistence); store callback race regression is covered by
+  `apps/desktop/test/composer-input-history.test.mjs`.
 
 #### E2E-011d: New task creates an immediate durable empty slot
 

@@ -18,6 +18,7 @@ import {
   resolveSlashDispatch,
 } from "../slash-dispatch";
 import { readEditorValue, setEditorCaret, type ComposerFileReference } from "../editor";
+import type { ComposerDraftSnapshot } from "../../../../lib/composer-smart-stop";
 import type { ComposerDraftController } from "./useComposerDraft";
 
 type UseComposerSubmitOptions = {
@@ -217,9 +218,12 @@ export function useComposerSubmit({
     // so re-submitting re-runs it; every other recorded path stores exactly the
     // accepted payload. A send from the empty home has no session yet, so the id
     // is resolved after the submission materialized it.
+    let acceptedSessionId = activeSessionId ?? undefined;
     const remember = () => {
-      const targetSessionId = activeSessionId ?? useAppStore.getState().activeSessionId;
-      if (targetSessionId) recordHistory?.(submittedDraft, targetSessionId);
+      if (acceptedSessionId) recordHistory?.(submittedDraft, acceptedSessionId);
+    };
+    const captureAcceptedSession = (sessionId: string) => {
+      acceptedSessionId = sessionId;
     };
     // Slash dispatch stays local for builtin and extension commands, while
     // templates, skills, and unknown aliases continue as normal prompt text. A
@@ -260,6 +264,8 @@ export function useComposerSubmit({
                 activeFileReferences,
               ),
               draft.draftSnapshot(visibleCommandBody),
+              activeSessionId ?? undefined,
+              captureAcceptedSession,
             );
             if (accepted) draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);
             if (accepted) remember();
@@ -304,7 +310,12 @@ export function useComposerSubmit({
     draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);
     const accepted = steering
       ? await steerPrompt(inlineContent, submittedDraft)
-      : await sendPrompt(inlineContent, submittedDraft);
+      : await sendPrompt(
+          inlineContent,
+          submittedDraft,
+          activeSessionId ?? undefined,
+          captureAcceptedSession,
+        );
     if (!accepted) draft.restoreDraftForKey(submittedDraftKey, submittedDraft);
     else remember();
   };
