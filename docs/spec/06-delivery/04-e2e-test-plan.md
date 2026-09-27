@@ -146,7 +146,7 @@
   to the persisted transcript, and automatic execution does not require a
   renderer prompt. Host tests additionally prove duplicate admission rejection,
   stale/missed occurrence handling, invalid input rejection and recovery.
-- **Specs:** 04-ux/01-ui-ia §3.4; 03-runtime/04-data-storage §4.11;
+- **Specs:** 04-ux/01-ui-ia §3.3; 03-runtime/04-data-storage §4.11;
   ADR scheduled-desktop-automations; ADR 0305.
 - **Acceptance:** Scheduled task execution and recoverable run history.
 - **Milestone:** Post-MVP desktop automations.
@@ -1749,7 +1749,7 @@ identify the platform validation still needed.
   conversation area. 3) Confirm it shows the concise session/task title and the
   New task / Search action buttons; confirm the
   sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
-  the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
+  the sidebar owns that control). 4) Switch to the Scheduled,
   Plugins, or Settings routes and inspect the same top region.
 - **Expected**: Every route-owned top region uses the same `--ds-toolbar-height`
   (46px), bg-primary surface, and bottom border; Windows/Linux reserve the
@@ -1782,14 +1782,14 @@ identify the platform validation still needed.
 - **Steps**: 1) Open the Plugins route with the window at its default size.
   2) Inspect the top of the page: the "Plugins" title row, its primary action,
   and the overflow menu button. 3) Scroll the page to the top and confirm no
-  page content is hidden behind the 46px band. 4) Repeat on the Scheduled and
-  Pull requests routes. 5) Open a plugin's detail sheet and inspect its head.
+  page content is hidden behind the 46px band. 4) Repeat on the Scheduled
+  route. 5) Open a plugin's detail sheet and inspect its head.
 - **Expected**: The page header renders fully below the frameless drag band on
   macOS as it already does on Windows/Linux: the title row is not clipped, and
   the Installed / Marketplace segmented control and search field sit at their
   intended offset instead of at the window's top edge. `.page-frame` reserves
   `--ds-toolbar-height` plus an 8px buffer on darwin, win32, and linux alike.
-  Scrolling Plugins, Scheduled, and Pull requests uses a destination-owned
+  Scrolling Plugins and Scheduled use a destination-owned
   scroller rather than the chat transcript scroller, so the bottom rows remain
   fully painted and reachable instead of inheriting the Composer occlusion mask.
   The plugin detail sheet mounts on the viewport overlay host, stays above the
@@ -1802,34 +1802,6 @@ identify the platform validation still needed.
   (`apps/desktop/test/plugins-page-style.test.mjs`,
   `apps/desktop/test/route-scroll.test.mjs`); full UI scenario Draft
 
-#### E2E-087b: Destination loading and Settings focus remain explicit
-
-- **Preconditions**: Isolated Electron profile, two local workspace fixtures,
-  and a controlled preload test double that serves fixture pull requests and
-  can hold each request until released. No live GitHub access is used.
-- **Steps**:
-  1. Mount the production Settings page and verify focus moves to its search
-     control.
-  2. Mount Pull requests for the first workspace and hold its list result.
-     Inspect the page while it is pending.
-  3. Switch to the second workspace and release its result. Start an explicit
-     refresh, hold that response, and verify its current rows remain visible.
-  4. Release the refresh response, then complete the first workspace request
-     last.
-- **Expected**: Settings search owns focus on mount. Pull requests shows a
-  localized loading status rather than the empty-result state while the first
-  request is pending. Explicit refresh keeps current rows visible while its
-  response is pending. After switching workspaces, the second workspace's rows
-  and filter counts remain visible when the older request completes; no row
-  from the first workspace replaces them. The shell contract keeps the hidden
-  chat inert without applying `aria-hidden` to a focused descendant.
-- **Specs linked**: `04-ux/01-ui-ia.md` (§3.3),
-  `04-ux/09-interaction-patterns.md` (§7.1)
-- **Acceptance**: C (UI), Quality
-- **Milestone**: M6+
-- **Status**: Production component E2E and source-contract checks automated;
-  covered by `pnpm test:e2e:settings-scroll` and
-  `pnpm test:e2e:destination-loading`; full shell navigation scenario Draft
 
 #### E2E-088: Composer Agent/Plan/Goal chip updates the session
 
@@ -3038,7 +3010,7 @@ identify the platform validation still needed.
 
 #### E2E-024X: Page copy stays concise in both locales
 
-- **Preconditions**: App running with English and Simplified Chinese available; project archive, Scheduled, Pull requests, Extensions, and Agent capability destinations are reachable.
+- **Preconditions**: App running with English and Simplified Chinese available; project archive, Scheduled, Extensions, and Agent capability destinations are reachable.
 - **Steps**: 1) Open each destination in English and inspect its header, toolbar, empty state, and primary action. 2) Switch to 简体中文 and repeat. 3) Trigger a permission, validation, destructive-action, or provider-error state.
 - **Expected**: Page headers do not repeat their title as explanatory subtitles; empty states use a concise title and action, with body text only when context or a required next step is necessary. Settings and capability pages omit prose that only explains obvious controls. Permission, security, validation, destructive-action, keyboard, scope, and error details remain visible in both locales.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`
@@ -7765,7 +7737,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §12a–§12d,
   `03-runtime/02-agent-runtime.md` §5f,
   `03-runtime/13-model-catalog-and-selection.md` §2 (Subagent editor),
-  `04-ux/01-ui-ia.md` §3.5–§3.6,
+  `04-ux/01-ui-ia.md` §3.4–§3.5,
   `04-ux/06-settings-ia.md` §2 (Agent capability destinations), §4.21–§4.25,
   `07-plugins/01-plugin-system.md` §12.2–§12.3,
   `08-meta/decisions-log.md` (D193, D194, D202, D257), ADR 0112, ADR 0126
@@ -8373,7 +8345,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Steps**: 1) Select the conversation, type an unsent draft, enter Plugins
   from the footer, and click the same button again. 2) Reopen Plugins, type a
   search in Installed, return and reopen. 3) In the navigation fixture, repeat
-  from `pulls`, `scheduled`, and Settings; test a history containing both
+  from `scheduled` and Settings; test a history containing both
   Scheduled and Settings before Plugins. 4) Exercise Forward then the Plugins
   button again. 5) Open Plugins with no previous history entry and click it.
 - **Expected**: The second click performs the existing Back action exactly once;
@@ -8840,7 +8812,7 @@ This test plan spec is accepted when:
 
 ### US-UI-03 Sidebar destinations
 - Expect the expanded home sidebar to show Sessions and Projects without
-  standalone Plugins, Pull requests, or Scheduled rows.
+  standalone Plugins or Scheduled rows.
 - Click the plug-shaped Plugins icon in the sidebar footer, immediately to the
   right of Settings, and expect it to replace the main pane with a dedicated
   page.
@@ -8855,7 +8827,7 @@ This test plan spec is accepted when:
 
 ### US-UI-05 Locale chrome
 - On a zh-CN system locale, sidebar labels render in Chinese (项目 / 临时会话),
-  without 拉取请求 or 已安排 entries. The footer plug-shaped Plugins icon
+  with no extra standalone destination rows. The footer plug-shaped Plugins icon
   exposes the localized accessible name 插件.
 - Empty-thread hero and supporting line are localized Chinese copy; project
   name remains a dotted-underline action when a workspace is open.
@@ -14038,7 +14010,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   4. Close the work panel and confirm the sidebar returns; repeat after
      manually collapsing the sidebar.
   5. Repeat divider changes with `ArrowLeft`, `ArrowRight`, `Home`, and `End`.
-  6. Navigate to the real Plugins, Pull requests, and Scheduled routes with the
+  6. Navigate to the real Plugins and Scheduled routes with the
      work panel closed, then collapse the sidebar. In light and dark themes,
      measure both titlebar actions and compare their rest/hover styling with the
      shared work-panel toggle. Reopen the sidebar, collapse it again, and use
@@ -14078,7 +14050,7 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   a pointer drag, one non-wrapping composer toolbar at that floor with the
   model chip collapsed to its 32px icon, sidebar
   yield/restore, the 460px reopen target, the panel action group's shared
-  control gap, preview mode, and ordinary Plugins/Pull requests/Scheduled titlebar
+  control gap, preview mode, and ordinary Plugins/Scheduled titlebar
   Source contracts in `chrome-control-geometry.test.mjs` also cover the shared
   disabled state and panel controls' transparent seat; the panel surface still
   needs the eyes-on pass above. DOM/CDP checks establish renderer behavior, not
@@ -15311,7 +15283,7 @@ the latest destination. These assertions measure work counts, not device FPS.
   one hour away. Prompt, paused state and saved configuration survive. Rename
   does not reset the interval. RPC tests also cover required Daily/Weekly times
   and retention of an existing custom schedule.
-- **Specs:** 04-ux/01-ui-ia §3.4.
+- **Specs:** 04-ux/01-ui-ia §3.3.
 - **Acceptance:** C / F — task configuration and persistence.
 - **Milestone:** Maintenance.
 - **Status:** `node scripts/e2e-scheduled-hourly-update.mjs` exercises the real
@@ -15327,7 +15299,7 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Expected:** Each result session and edited task retain the original binding,
   including no-project tasks. Legacy cadence-only tasks keep their previous
   fallback until explicitly configured (covered by host RPC tests).
-- **Specs:** 04-ux/01-ui-ia §3.4.
+- **Specs:** 04-ux/01-ui-ia §3.3.
 - **Acceptance:** Saved workspace binding across run, edit and restart.
 - **Milestone:** Maintenance.
 - **Status:** Automated by `node --experimental-strip-types

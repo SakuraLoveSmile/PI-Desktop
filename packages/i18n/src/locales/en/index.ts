@@ -1677,18 +1677,6 @@ sklm: {
     notFound: "Project not found",
     noProjects: "No projects yet",
   },
-  pulls: {
-    title: "Pull requests",
-    refresh: "Refresh",
-    emptyTitle: "No pull requests",
-    review: "Review with agent",
-    filters: "Pull request filters",
-    filterOpen: "Open",
-    filterDraft: "Draft",
-    filterAll: "All",
-    open: "Open",
-    draft: "Draft",
-  },
   scheduled: {
     description: "Run recurring agent tasks while PI-Desktop is open.",
     edit: "Edit task",

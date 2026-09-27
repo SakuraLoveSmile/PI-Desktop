@@ -1645,18 +1645,6 @@ sklm: {
     notFound: "找不到專案",
     noProjects: "暫無專案",
   },
-  pulls: {
-    title: "拉取請求",
-    refresh: "重新整理",
-    emptyTitle: "暫無拉取請求",
-    review: "讓智慧體審閱",
-    filters: "拉取請求篩選",
-    filterOpen: "開啟",
-    filterDraft: "草稿",
-    filterAll: "全部",
-    open: "開啟",
-    draft: "草稿",
-  },
   scheduled: {
     description: "應用程式執行時，按排程自動執行 Agent 任務。",
     edit: "編輯任務",

@@ -1623,17 +1623,11 @@ export async function createWindow({
             await setSettingsTab("projects");
             await new Promise((r) => setTimeout(r, 800));
             await shot("pi-dark-project-archive");
-            await setPage("pulls");
-            await new Promise((r) => setTimeout(r, 800));
-            await shot("pi-dark-pulls");
             await setPage("settings");
             await setSettingsTab("general");
             await new Promise((r) => setTimeout(r, 800));
             await shot("pi-dark-settings");
             await setTheme("light");
-            await setPage("pulls");
-            await new Promise((r) => setTimeout(r, 600));
-            await shot("pi-pulls-live");
             await setSettingsTab("projects");
             await new Promise((r) => setTimeout(r, 500));
             await shot("pi-project-archive-live");
