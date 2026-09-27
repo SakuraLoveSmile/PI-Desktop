@@ -7156,7 +7156,6 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   duplicating an id), plus the `scripts/e2e/provider-api-style.tsx` and
   `scripts/e2e/image-generation-ui.tsx` probes, which no longer click Manage
   models.
-
 ## 2026-09-26 — User-selectable application update behavior (D628)
 
 - Settings → Info now stores Automatic / Manual per installation. Supported
@@ -7172,3 +7171,40 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   migration or host protocol version change is required.
 - Covered by `apps/desktop/test/update-preference.test.mjs`, the updated
   `apps/desktop/test/auto-update.test.mjs`, and E2E-UPDATE-preference-and-once-only-reminder.
+
+## 2026-09-26 — Bound aggregate image history without an arbitrary message cutoff (D629)
+
+- Vision history restoration keeps the existing 10 MB per-image ceiling and adds
+  a 30 MB aggregate raw-byte budget per runtime rebuild. Eligible refs are
+  considered newest-first; every image remains a provider image block when the
+  history fits, and only older attachments beyond the budget fall back to a
+  safe `@path`. The current prompt row is excluded before hydration so it cannot
+  consume the history allowance.
+- The sidecar reads only files admitted by the budget and clears stale transient
+  base64 from restored attachment objects. Durable host messages remain
+  metadata/ref-only. See ADR 0101, `03-runtime/01-ipc-protocol.md` §5.1,
+  `03-runtime/02-agent-runtime.md` §5c, and E2E-102j.
+
+## 2026-09-27 — Routed model metadata uses conservative last-segment matching (D630, PR #1047)
+
+- Supersede D622's broad catalog aliases for runtime enrichment. Compare only
+  the case-insensitive final `/` segment, so a routed or gateway wire ID can
+  reach a catalog row without treating arbitrary thinking, release-date,
+  deployment-marker, or vendor-dash suffixes as model identity.
+- When a leaf has multiple catalog candidates, select a unique official/source
+  provider only when its provider family agrees with an explicit model source;
+  otherwise borrow metadata only when all candidates expose identical
+  capabilities and thinking metadata. If neither rule proves identity, leave
+  the row unmatched. A known provider may still borrow the exact ID from other
+  publishers; unknown providers do not use unanchored consensus or marker
+  fallback.
+- Composer keeps the complete configured wire ID on model rows. Unmatched
+  models expose the canonical thinking ladder for manual opt-in, but start a
+  new draft/session at `off` unless an explicit binding default exists. An
+  empty binding level array is the generic unknown-model seed, not an explicit
+  disable; a non-empty binding override remains authoritative. Known catalog
+  matches retain the D303 binding-default/highest-enabled behavior.
+- The change is metadata/UI projection only: it does not rewrite persisted wire
+  IDs, provider identity, or host capability ownership. See
+  `03-runtime/13-model-catalog-and-selection.md` §11.3 and
+  `04-ux/08-component-spec.md` §11.
