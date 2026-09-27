@@ -5,6 +5,7 @@ import {
   askToolOptionLabel,
   type AskToolQuestion,
 } from "@pi-desktop/shared";
+import { AskToolRichText } from "./AskToolRichText";
 import type { PendingAsk } from "../lib/pending-asks";
 import { useAppStore } from "../stores/app-store";
 import { Button } from "./ui";
@@ -164,7 +165,9 @@ export function AskToolCard({ request, queued = 0 }: { request: PendingAsk; queu
       <div className="asktool-question-number">
         {t("askTool.questionNumber", { number: index + 1 })}
       </div>
-      <h3 className="asktool-question">{current.question}</h3>
+      <h3 className="asktool-question">
+        <AskToolRichText source={current.question} />
+      </h3>
       <div className="asktool-options" role={current.multiSelect ? "group" : "radiogroup"}>
         {current.options.map((option, optionIndex) => {
           const label = askToolOptionLabel(option);
@@ -182,9 +185,13 @@ export function AskToolCard({ request, queued = 0 }: { request: PendingAsk; queu
             >
               <span className="asktool-option-mark" aria-hidden>{selected ? "✓" : ""}</span>
               <span className="asktool-option-copy">
-                <span>{label}</span>
+                <span className="asktool-option-rich-label">
+                  <AskToolRichText source={label} />
+                </span>
                 {description ? (
-                  <span className="asktool-option-description">{description}</span>
+                  <span className="asktool-option-description">
+                    <AskToolRichText source={description} />
+                  </span>
                 ) : null}
               </span>
             </button>

@@ -9727,9 +9727,9 @@ This test plan spec is accepted when:
 - **Preconditions**: Agent, Plan, or Goal mode; a configured provider; a
   session with an active transcript.
 - **Steps**: 1) Ask the agent to call `asktool` with a single-select question,
-  a multi-select question, and option lists containing both strings and
-  `{ label, description }` objects. 2) Confirm each card shows the fixed
-  custom-input choice and rich option descriptions. 3) Answer the first question,
+  a multi-select question, and question/option text with Markdown emphasis,
+  inline code, and a short list. 2) Confirm each card renders the formatting
+  while keeping choices keyboard/selectable. 3) Answer the first question,
   click Next, and select two answers on the multi-select question. 4) Skip the final
   question without entering text. 5) Inspect the completed tool row and the
   next model response.
@@ -9750,8 +9750,9 @@ This test plan spec is accepted when:
   action row. The tool output is ordered as
   `question：answer`, uses `、` between multiple answers and `\n---\n`
   between questions, and
-  keeps `question：` for the skipped question, and selecting a rich option
-  returns only its label. Decline all produces empty placeholders for every
+  keeps `question：` for the skipped question. Markdown renders as rich text
+  without activating embedded links or loading images. Selecting a formatted
+  option returns its original Markdown source label. Decline all produces empty placeholders for every
   question and still completes the tool call. A pending ask shows a stable
   localized title and the first question in its toast; generated session-title
   text never replaces that title. Background sessions retain the existing

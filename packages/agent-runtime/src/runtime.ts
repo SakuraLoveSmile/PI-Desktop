@@ -2919,7 +2919,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         case "Bash":
           return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.`;
         case ASK_TOOL_NAME:
-          return "Ask the user one or more questions. Options may be plain labels or objects with a `label` and optional `description`; the desktop card always provides a custom user-input option. Unanswered questions are returned as empty answers.";
+          return "Ask the user one or more questions. Use Markdown in question text and option labels when formatting helps (for example, emphasis, inline code, or lists); the desktop card renders it safely. Plain strings and existing `{ label, description? }` options are accepted, and answers return the selected source label. The card always provides a custom user-input option.";
         case "PluginScaffold":
           return "Create a PI-Desktop plugin from a template and load it for development. `directory` is workspace-relative and must be empty or new; `template` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.";
         case "PluginCheck":

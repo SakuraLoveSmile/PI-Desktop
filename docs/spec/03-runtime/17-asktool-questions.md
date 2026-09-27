@@ -11,14 +11,18 @@ deadline.
 
 The tool accepts a non-empty `questions` array. Each question contains:
 
-- `question`: the prompt text;
-- `options`: one or more selectable answer labels, each either a string or an
-  object with a required `label` and optional `description`;
+- `question`: the prompt text, which may include Markdown;
+- `options`: one or more selectable answer labels, each either a Markdown
+  string or an object with a required Markdown `label` and optional Markdown
+  `description`;
 - `multiSelect`: optional; when true, more than one selectable answer is allowed.
 
-Plain string options remain supported. The card shows an object's description
-as secondary text, while selection and the model-facing answer continue to use
-only its label. The desktop card always adds one extra `Enter another answer`
+Plain string options remain supported. The card renders CommonMark/GFM text
+formatting such as emphasis, inline code, paragraphs, and lists. Links render as
+non-interactive text, images as alt text, and raw HTML is ignored. An object's
+label and optional description use the same renderer. Rendering never rewrites
+the option value: selection and the model-facing answer use its normalized
+source label. The desktop card always adds one extra `Enter another answer`
 option with a text field. The model does not need to add a special free-text
 choice to the tool arguments.
 
@@ -43,7 +47,9 @@ event plays one soft in-app chime; its toast does not play a second one.
 ## 4. Tool output
 
 The response is the normal tool result returned to the model and persisted with
-the tool row. For each question, the content is serialized as:
+the tool row. Markdown source is retained in the serialized question and
+selected label; rendering is presentation-only. For each question, content is
+serialized as:
 
 ```text
 question text：answer label 1、answer label 2

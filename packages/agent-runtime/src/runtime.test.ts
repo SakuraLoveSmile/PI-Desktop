@@ -1986,9 +1986,9 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     const pending = askTool.execute("ask-call-1", {
       questions: [
         {
-          question: "Color?",
+          question: "**Color?**",
           options: [
-            { label: "Blue", description: "A calm, cool color." },
+            { label: "**Blue**", description: "A calm, cool color." },
             "Green",
           ],
         },
@@ -2005,9 +2005,9 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       toolCallId: "ask-call-1",
       questions: [
         {
-          question: "Color?",
+          question: "**Color?**",
           options: [
-            { label: "Blue", description: "A calm, cool color." },
+            { label: "**Blue**", description: "A calm, cool color." },
             "Green",
           ],
         },
@@ -2018,12 +2018,12 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       runtime.resolveAskTool({
         requestId: request.requestId,
         sessionId: "session-1",
-        answers: [["Blue"], null],
+        answers: [["**Blue**"], null],
       }),
     ).toEqual({ ok: true });
     await expect(pending).resolves.toMatchObject({
-      content: [{ text: "Color?：Blue\n---\nTargets?：" }],
-      details: { answers: [["Blue"], null] },
+      content: [{ text: "**Color?**：**Blue**\n---\nTargets?：" }],
+      details: { answers: [["**Blue**"], null] },
     });
     await runtime.dispose();
   });

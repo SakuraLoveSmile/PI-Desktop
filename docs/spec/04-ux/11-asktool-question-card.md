@@ -29,13 +29,17 @@ The card has no countdown or expiration copy. On narrow screens options remain
 full-width and actions may share the row; question text and custom input may
 wrap naturally without clipping.
 
-## Rich options
+## Rich-text content
 
-A selectable option may remain a plain string or use `{ label, description? }`.
-The label keeps the existing option typography and selection behavior; the
-optional description appears beneath it in muted supporting text and wraps
-within the row. Clicking either line selects the same label, which is the only
-value returned to the model. The custom-answer option remains unchanged.
+Question text and selectable option text may use CommonMark/GFM formatting,
+including emphasis, inline code, paragraphs, and lists. The card renders this
+content inline with its existing compact typography. In option buttons links are
+non-interactive text, images render as alt text, and raw HTML is ignored; this
+avoids nested interactive controls and external image loading. Plain strings
+remain supported, and `{ label, description? }` options render both text fields
+with the same Markdown rules. Selecting an option returns its normalized source
+label unchanged; formatting is display-only. The custom-answer option is not
+Markdown-interpreted.
 
 ## Typography hierarchy
 
