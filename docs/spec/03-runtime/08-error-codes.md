@@ -172,6 +172,7 @@ does not turn temporary thread pressure into a host process exit.
 | `PLAN_EXECUTION_STATUS_INVALID` | no | a status transition was not allowed from the current state |
 | `PLAN_EXECUTION_CONFLICT` | no | the execution row changed underneath a version-guarded update |
 | `PLAN_EXECUTION_FAILED` | maybe | the approved execution ended in an error |
+| `REPORT_PERSISTENCE_BARRIER_FAILED` | yes | RACP Goal Report Retry could not complete the session transcript persistence barrier; the report remains `failed`, is not finalized, and the Goal is not rerun |
 | `PLAN_INTERNAL` | maybe | a Plan/Goal host failure with no finer classification |
 | `WRITE_DISABLED_IN_CHAT` | no | historical (pre-D188 Chat profile); registered for stored transcripts, no longer emitted |
 | `BASH_DISABLED_IN_CHAT` | no | historical (pre-D188 Chat profile); registered for stored transcripts, no longer emitted |

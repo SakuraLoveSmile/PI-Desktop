@@ -174,6 +174,7 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `PLAN_EXECUTION_STATUS_INVALID` | 不 | 当前状态不允许该状态迁移 |
 | `PLAN_EXECUTION_CONFLICT` | 不 | 执行记录在版本守卫更新底下被改动 |
 | `PLAN_EXECUTION_FAILED` | 也许 | 已批准的执行以错误结束 |
+| `REPORT_PERSISTENCE_BARRIER_FAILED` | 是的 | RACP Goal Report Retry 未能完成会话转录持久化 barrier；报告保持 `failed`，不会 finalize，也不会重跑 Goal |
 | `PLAN_INTERNAL` | 也许 | 没有更细分类的 Plan/Goal 主机失败 |
 | `WRITE_DISABLED_IN_CHAT` | 不 | 历史遗留（D188 之前的 Chat profile）；为已存储的转录本保留注册，不再发出 |
 | `BASH_DISABLED_IN_CHAT` | 不 | 历史遗留（D188 之前的 Chat profile）；为已存储的转录本保留注册，不再发出 |
