@@ -39,7 +39,8 @@ function projectSummary(row: ProjectRow): RacpProjectSummary {
 
 export type HostOperationsDeps = {
   getHost: () => HostRpc | null;
-  runtime: Pick<RuntimeService, "compact" | "isBusy"> & Partial<Pick<RuntimeService, "flushPersistence">>;
+  runtime: Pick<RuntimeService, "compact" | "isBusy" | "withSessionOperation"> &
+    Partial<Pick<RuntimeService, "flushPersistence">>;
   /** `pi-host` boots the sidecar's session cleanup on delete; the runtime link is optional at boot. */
   disposeSession?: (sessionId: string) => Promise<void>;
   revokeDevice?: (deviceId: string) => Promise<boolean>;
@@ -64,20 +65,22 @@ function createGoalReportAccess(deps: HostOperationsDeps): RacpGoalReportAccess 
       return host.call<{ reports: GoalReportSummary[] }>("goalReports.list", { sessionId }).catch(hostError);
     },
     async retry(sessionId, executionId) {
-      const host = requireHost(deps.getHost);
-      if (deps.runtime.isBusy(sessionId)) throw new RacpError("CONFLICT", "the session has an active turn");
-      if (!deps.runtime.flushPersistence) throw new RacpError("CAPABILITY_UNAVAILABLE", "transcript persistence barrier is unavailable");
-      const barrier = await deps.runtime.flushPersistence(sessionId);
-      if (barrier.pending > 0 || barrier.failed.length > 0) {
-        await host
-          .call("goalReports.markFailed", { sessionId, executionId, errorCode: ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED })
-          .catch(hostError);
-        throw new RacpError(ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED, "transcript persistence barrier failed", {
-          retriable: true,
-          details: { pending: barrier.pending, failed: barrier.failed },
-        });
-      }
-      return host.call<{ report: GoalReportSummary }>("goalReports.retry", { sessionId, executionId }).catch(hostError);
+      return deps.runtime.withSessionOperation(sessionId, async () => {
+        const host = requireHost(deps.getHost);
+        if (deps.runtime.isBusy(sessionId)) throw new RacpError("CONFLICT", "the session has an active turn");
+        if (!deps.runtime.flushPersistence) throw new RacpError("CAPABILITY_UNAVAILABLE", "transcript persistence barrier is unavailable");
+        const barrier = await deps.runtime.flushPersistence(sessionId);
+        if (barrier.pending > 0 || barrier.failed.length > 0) {
+          await host
+            .call("goalReports.markFailed", { sessionId, executionId, errorCode: ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED })
+            .catch(hostError);
+          throw new RacpError(ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED, "transcript persistence barrier failed", {
+            retriable: true,
+            details: { pending: barrier.pending, failed: barrier.failed },
+          });
+        }
+        return host.call<{ report: GoalReportSummary }>("goalReports.retry", { sessionId, executionId }).catch(hostError);
+      });
     },
   };
 }

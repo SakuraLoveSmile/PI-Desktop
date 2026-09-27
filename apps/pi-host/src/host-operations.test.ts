@@ -4,21 +4,52 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RacpError } from "@pi-desktop/agent-host";
+import { RuntimeService, type LaunchResolver, type RuntimeHostLink, type RuntimeSidecarLink } from "@pi-desktop/host-runtime";
 import { ErrorCodes } from "@pi-desktop/shared";
 
 import { createHostOperations } from "./host-operations.js";
+
+class ObservedRuntimeService extends RuntimeService {
+  nextOperationLabel: "retry" | "turn" | null = null;
+  operationCalls: string[] = [];
+  operationStarts: string[] = [];
+
+  override withSessionOperation<T>(sessionId: string, operation: () => Promise<T>): Promise<T> {
+    const label = this.nextOperationLabel ?? "turn";
+    this.operationCalls.push(label);
+    return super.withSessionOperation(sessionId, async () => {
+      this.operationStarts.push(label);
+      return operation();
+    });
+  }
+}
 
 const dirs: string[] = [];
 afterEach(async () => {
   for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
 });
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+function runSessionOperation<T>(_sessionId: string, operation: () => Promise<T>): Promise<T> {
+  return operation();
+}
+
 function fakeHost(calls: Array<{ method: string; params: unknown }>, projectPath: string) {
   const sessions = new Map<string, Record<string, unknown>>([["s1", { id: "s1", title: "One", mode: "agent", permissionMode: "ask", projectPath }]]);
+  let turnCount = 0;
   return {
     async call<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
       calls.push({ method, params });
       switch (method) {
+        case "settings.get":
+          return {} as T;
         case "session.list":
           return { sessions: [...sessions.values()] } as T;
         case "session.get":
@@ -37,6 +68,11 @@ function fakeHost(calls: Array<{ method: string; params: unknown }>, projectPath
         }
         case "session.rename":
         case "session.delete":
+          return { ok: true } as T;
+        case "session.beginTurn":
+          turnCount += 1;
+          return { turnId: `turn-${turnCount}` } as T;
+        case "session.appendMessage":
           return { ok: true } as T;
         case "projects.list":
           return { projects: [{ id: 7, path: projectPath, name: "proj" }] } as T;
@@ -57,6 +93,71 @@ function fakeHost(calls: Array<{ method: string; params: unknown }>, projectPath
   };
 }
 
+function objectParams(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function runtimeFixture(
+  calls: Array<{ method: string; params: unknown }>,
+  projectPath: string,
+  options: {
+    beforeLaunch?: () => Promise<void>;
+    flushPersistence?: () => Promise<{ pending: number; failed: string[] }>;
+  } = {},
+) {
+  const host = fakeHost(calls, projectPath);
+  const runtimeHost: RuntimeHostLink = {
+    call: <T>(method: string, params?: unknown) => host.call<T>(method, objectParams(params)),
+    isAvailable: () => true,
+    onNotification: () => () => undefined,
+    onExit: () => () => undefined,
+  };
+  const sidecar: RuntimeSidecarLink = {
+    async call<T>(method: string, params?: unknown): Promise<T> {
+      calls.push({ method, params: objectParams(params) });
+      if (method === "agent.prompt") {
+        return { accepted: true, turnId: objectParams(params).turnId } as T;
+      }
+      throw new Error(`unexpected sidecar call ${method}`);
+    },
+    onNotification: () => () => undefined,
+    onExit: () => () => undefined,
+    setProjectInstructionRoot: () => undefined,
+    clearProjectInstructionRoot: () => undefined,
+    clearVendorAuthBindings: () => undefined,
+  };
+  const launch: LaunchResolver = {
+    async resolve(sessionId) {
+      await options.beforeLaunch?.();
+      return {
+        providerId: "p1",
+        modelId: "m1",
+        projectPath,
+        sidecarParams: {
+          sessionId,
+          mode: "agent",
+          provider: { id: "p1", name: "P1", modelId: "m1", apiKey: "", supportsReasoning: false, supportedThinkingLevels: ["off"] },
+        },
+      };
+    },
+  };
+  const service = new ObservedRuntimeService({
+    getHost: () => runtimeHost,
+    getSidecar: () => sidecar,
+    launch,
+    log: () => undefined,
+  });
+  const runtime = {
+    compact: service.compact.bind(service),
+    isBusy: service.isBusy.bind(service),
+    withSessionOperation: service.withSessionOperation.bind(service),
+    flushPersistence: options.flushPersistence ?? service.flushPersistence.bind(service),
+  };
+  return { host, runtime, service };
+}
+
 describe("pi-host operations over host-core", () => {
   it("maps sessions, creates under a project id, and refuses configuration while busy", async () => {
     const root = await realpath(await mkdtemp(join(tmpdir(), "pi-host-ops-")));
@@ -65,7 +166,7 @@ describe("pi-host operations over host-core", () => {
     let busy = false;
     const operations = createHostOperations({
       getHost: () => fakeHost(calls, root),
-      runtime: { compact: async () => ({ accepted: true }), isBusy: () => busy, flushPersistence: async () => ({ pending: 0, failed: [] }) },
+      runtime: { compact: async () => ({ accepted: true }), isBusy: () => busy, withSessionOperation: runSessionOperation, flushPersistence: async () => ({ pending: 0, failed: [] }) },
       browseRoot: root,
     });
     const listed = await operations.sessions.list();
@@ -86,7 +187,7 @@ describe("pi-host operations over host-core", () => {
     const { mkdir } = await import("node:fs/promises");
     await mkdir(join(root, "work", "app"), { recursive: true });
     await mkdir(join(root, ".hidden"), { recursive: true });
-    const operations = createHostOperations({ getHost: () => fakeHost([], root), runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, flushPersistence: async () => ({ pending: 0, failed: [] }) }, browseRoot: root });
+    const operations = createHostOperations({ getHost: () => fakeHost([], root), runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, withSessionOperation: runSessionOperation, flushPersistence: async () => ({ pending: 0, failed: [] }) }, browseRoot: root });
     const registered = await operations.projects.register(join(root, "work", "app"));
     expect(registered).toMatchObject({ id: "8", label: "app" });
     await expect(operations.projects.register(join(root, "missing"))).rejects.toMatchObject({ code: "REMOTE_PATH_NOT_FOUND" });
@@ -105,7 +206,7 @@ describe("pi-host operations over host-core", () => {
     dirs.push(root);
     const { writeFile } = await import("node:fs/promises");
     await writeFile(join(root, "README.md"), "hello", "utf8");
-    const operations = createHostOperations({ getHost: () => fakeHost([], root), runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, flushPersistence: async () => ({ pending: 0, failed: [] }) } });
+    const operations = createHostOperations({ getHost: () => fakeHost([], root), runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, withSessionOperation: runSessionOperation, flushPersistence: async () => ({ pending: 0, failed: [] }) } });
     expect((await operations.workspace.list("s1", "")).entries.map((entry) => entry.name)).toEqual(["README.md"]);
     expect(await operations.workspace.read("s1", "README.md")).toMatchObject({ kind: "text", content: "hello" });
     await expect(operations.workspace.read("s1", "../../etc/passwd")).rejects.toMatchObject({ code: "REMOTE_PATH_FORBIDDEN" });
@@ -122,7 +223,7 @@ describe("pi-host operations over host-core", () => {
     let barrier = { pending: 0, failed: [] as string[] };
     const operations = createHostOperations({
       getHost: () => fakeHost(calls, root),
-      runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, flushPersistence: async () => barrier },
+      runtime: { compact: async () => ({ accepted: true }), isBusy: () => false, withSessionOperation: runSessionOperation, flushPersistence: async () => barrier },
     });
     await operations.goalReports?.get({ sessionId: "s1", reportId: "report-1" });
     await operations.goalReports?.list("s1");
@@ -137,5 +238,84 @@ describe("pi-host operations over host-core", () => {
     barrier = { pending: 0, failed: [] };
     await operations.goalReports?.retry("s1", "execution-1");
     expect(calls.at(-1)?.method).toBe("goalReports.retry");
+  });
+
+  it("holds the session operation lock across the persistence barrier and report finalization", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "pi-host-ops-")));
+    dirs.push(root);
+    const calls: Array<{ method: string; params: unknown }> = [];
+    const barrierEntered = deferred();
+    const releaseBarrier = deferred();
+    const { host, runtime, service } = runtimeFixture(calls, root, {
+      flushPersistence: async () => {
+        barrierEntered.resolve();
+        await releaseBarrier.promise;
+        return { pending: 0, failed: [] };
+      },
+    });
+    const operations = createHostOperations({
+      getHost: () => host,
+      runtime,
+    });
+    const reports = operations.goalReports;
+    if (!reports) throw new Error("Goal Report operations unavailable");
+
+    service.nextOperationLabel = "retry";
+    const retry = reports.retry("s1", "execution-1");
+    service.nextOperationLabel = null;
+    await barrierEntered.promise;
+    expect(service.operationCalls).toEqual(["retry"]);
+    expect(service.operationStarts).toEqual(["retry"]);
+    const prompt = service.prompt({ sessionId: "s1", content: "next turn" });
+    await Promise.resolve();
+    expect(service.operationCalls).toEqual(["retry", "turn"]);
+    expect(service.operationStarts).toEqual(["retry"]);
+    releaseBarrier.resolve();
+
+    await expect(retry).resolves.toBeDefined();
+    await expect(prompt).resolves.toMatchObject({ turnId: "turn-1" });
+    expect(service.operationStarts).toEqual(["retry", "turn"]);
+    const finalized = calls.findIndex((call) => call.method === "goalReports.retry");
+    const admitted = calls.findIndex((call) => call.method === "session.beginTurn");
+    expect(finalized).toBeGreaterThanOrEqual(0);
+    expect(admitted).toBeGreaterThan(finalized);
+    await service.dispose();
+  });
+
+  it("rechecks busy state after a turn admission already owns the session lock", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "pi-host-ops-")));
+    dirs.push(root);
+    const calls: Array<{ method: string; params: unknown }> = [];
+    const launchEntered = deferred();
+    const releaseLaunch = deferred();
+    let barrierCalls = 0;
+    const { host, runtime, service } = runtimeFixture(calls, root, {
+      beforeLaunch: async () => {
+        launchEntered.resolve();
+        await releaseLaunch.promise;
+      },
+      flushPersistence: async () => {
+        barrierCalls += 1;
+        return { pending: 0, failed: [] };
+      },
+    });
+    const operations = createHostOperations({
+      getHost: () => host,
+      runtime,
+    });
+    const reports = operations.goalReports;
+    if (!reports) throw new Error("Goal Report operations unavailable");
+
+    const prompt = service.prompt({ sessionId: "s1", content: "first turn" });
+    await launchEntered.promise;
+    expect(service.isBusy("s1")).toBe(false);
+    const retry = reports.retry("s1", "execution-1");
+    releaseLaunch.resolve();
+
+    await expect(prompt).resolves.toMatchObject({ turnId: "turn-1" });
+    await expect(retry).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(barrierCalls).toBe(0);
+    expect(calls.some((call) => call.method === "goalReports.retry")).toBe(false);
+    await service.dispose();
   });
 });
