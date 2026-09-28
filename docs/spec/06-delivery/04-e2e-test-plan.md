@@ -15276,8 +15276,10 @@ renderer's durable transcript reads. No real model or provider is contacted.
   it. A fallback report identifies unknown or missing evidence.
 - **Recovery and failure:** Ready reports remain readable after restart.
   Invalid or failed draft persistence never publishes a stale or misleading
-  ready report. Failed outbox persistence remains failed; explicit Retry uses
-  only Host-owned durable facts and does not rerun the Goal or call the model.
+  ready report. A late draft submission after `ready` or `failed` is rejected
+  without changing the report file or row. Failed outbox persistence remains
+  failed; explicit Retry uses only Host-owned durable facts and does not rerun
+  the Goal or call the model.
   RACP Retry waits for that session's pending transcript writes; an unsuccessful
   barrier returns `REPORT_PERSISTENCE_BARRIER_FAILED` and leaves the report
   failed. A viewer cannot Retry, and a failed or cross-session read is scoped to

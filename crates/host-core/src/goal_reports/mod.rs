@@ -403,6 +403,19 @@ pub fn submit_draft(db: &Database, execution_id: &str, draft: &Value) -> Result<
         return Err(anyhow!("INVALID_ARGUMENT: execution is not a goal"));
     }
 
+    let status: Option<String> = db
+        .conn()
+        .prepare_cached("SELECT status FROM goal_reports WHERE execution_id = ?1")?
+        .query_row(params![execution_id], |row| row.get(0))
+        .optional()?;
+    if let Some(status) = status.as_deref() {
+        if matches!(status, "ready" | "failed") {
+            return Err(anyhow!(
+                "INVALID_ARGUMENT: cannot submit a draft for a {status} report"
+            ));
+        }
+    }
+
     let dir = reports_dir(db.data_dir(), &facts.session_id);
     fs::create_dir_all(&dir).map_err(|err| {
         anyhow!("REPORT_DRAFT_PERSIST_FAILED: could not create draft directory: {err}")

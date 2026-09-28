@@ -79,8 +79,10 @@ export class PersistenceOutbox {
     await this.persist();
   }
 
-  size(): number {
-    return this.entries.length;
+  size(sessionId?: string): number {
+    return sessionId
+      ? this.entries.filter((entry) => entry.sessionId === sessionId).length
+      : this.entries.length;
   }
 
   private async flushLoop(getHost: () => HostProcess | null): Promise<void> {
