@@ -695,7 +695,10 @@ Stop / 运行时销毁。主 Agent 用 `TaskStop` 判断要不要取消；运行
 回合打开，等委托完成后再把报告塞回父级。父级收工不会中止它们。
 
 致命的 provider/stream 错误（包括耗尽的 HTTP 429）、父级中止，仍分别保留它们既有的
-`failed` 和 `aborted` 结果。
+`failed` 和 `aborted` 结果。如果助手响应在提供程序输出 token 上限处结束（`stopReason: "length"`
+或 `"max_tokens"`），且已经产生报告文本，该委派会以 `failed`、
+`SUBAGENT_OUTPUT_TRUNCATED` 和 `outputTruncated: true` 结算；有界的部分报告会保留在失败说明
+下，供诊断截断原因。后续以正常原因结束的委派回合会清除该标记并可以成功完成。
 父级终态错误还会中止残留委托、跳过续跑提示，并把会话恢复为空闲，这样
 “继续”不会变成 `AGENT_BUSY`（D352）。
 

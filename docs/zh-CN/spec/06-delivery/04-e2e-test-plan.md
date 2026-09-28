@@ -4539,6 +4539,22 @@ eleven-tool-round desktop paths are verified by
 - **里程碑**：M6+
 - **状态**：草稿。必需套件：`test:e2e`、`test:e2e:subagents`。
 
+#### E2E-SUBAGENT-output-token-limit-is-a-visible-failure：输出 token 上限必须可见地失败
+
+- **先决条件**：Agent 会话使用确定性的本地提供程序；提供程序在产生非空的助手文本后，以
+  `stopReason: "length"` 或 `"max_tokens"` 结束。委派有有效报告且没有待处理的工具调用。
+- **步骤**：1）委派任务并让提供程序在输出 token 上限处结束。2）读取 Task 结果、生命周期
+  details 和委派卡片。3）用一次正常结束的提供程序响应恢复或重试同一工作。
+- **预期**：第一次运行以 `failed` 结算，而不是 `completed`，并带有
+  `SUBAGENT_OUTPUT_TRUNCATED` 和 `outputTruncated: true`。父级收到明确解释，且部分报告保留在
+  `Its last output was:` 下面。后续以 `stop` 正常结束的回合会清除标记并以 `completed` 结算；
+  部分报告的运行绝不会伪装成已完成报告。
+- **链接规格**：`03-runtime/02-agent-runtime.md` §5f、`03-runtime/08-error-codes.md` §3.2
+- **验收**：C（对话）、H（诊断）、品质
+- **里程碑**：M6+
+- **状态**：由 `packages/agent-runtime/src/subagent.test.ts` 单元覆盖；完整桌面旅程仍需运行：
+  `test:e2e`、`test:e2e:subagents`。
+
 #### E2E-SUBAGENT-context-overflow-reports-actionable-failure
 
 - **先决条件**：同一个注入的小窗口伪提供商，窗口小到连降级后的上下文也放不下。
