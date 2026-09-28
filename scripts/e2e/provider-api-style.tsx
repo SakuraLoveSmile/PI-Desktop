@@ -182,8 +182,13 @@ globalThis.providerApiStyleProbe = async () => {
       render();
       const beforeStepfunCreate = creates.length;
       const beforeStepfunDiscovery = discoveries.length;
-      click(document.querySelector('[data-service-id="stepfun-plan"]'));
+      const stepfunTile = document.querySelector<HTMLElement>('[data-service-id="stepfun-plan"]');
+      assert(stepfunTile?.textContent?.includes("api.stepfun.com/step_plan/v1"),
+        `${locale}: StepFun chooser hides the subscription path`);
+      click(stepfunTile);
       await frame();
+      assert(document.querySelector(".provider-service-chip-host")?.textContent === "api.stepfun.com/step_plan/v1",
+        `${locale}: StepFun connection summary hides the subscription path`);
       const keyInput = document.querySelector<HTMLInputElement>('input[type="password"]');
       assert(keyInput, `${locale}: StepFun key input missing`);
       flushSync(() => {

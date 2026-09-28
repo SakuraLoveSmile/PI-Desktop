@@ -8437,7 +8437,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   synthetic API key and a discovered `step-5-preview` model; no live provider.
 - **Steps**: Select StepFun Plan in Add AI service, enter the test key, wait for
   model discovery, explicitly select Step 5 Preview, then save.
-- **Expected**: Discovery receives `https://api.stepfun.com/step_plan/v1`,
+- **Expected**: The chooser and connection summary both visibly include
+  `api.stepfun.com/step_plan/v1`. Discovery receives `https://api.stepfun.com/step_plan/v1`,
   `anthropic_messages` and the entered key. Save retains that URL and format,
   the catalog vendor `stepfun-step-plan`, and the selected model. The ordinary
   StepFun `/v1` endpoint is not substituted for the subscription endpoint.

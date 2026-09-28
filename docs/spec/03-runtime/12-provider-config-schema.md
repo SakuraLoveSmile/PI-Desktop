@@ -394,7 +394,8 @@ Presets only prefill form defaults; they are not a closed world.
 
 These rows are created from the add-provider **Service** select, not from a
 new protocol. They remain `type: "openai_compatible"`. The common path is
-Service + API key; the published host is a summary, and the display name is
+Service + API key; the summary shows the endpoint host and path so subscription
+routes remain visible (wrapping when needed), and the display name is
 editable in Advanced. Custom endpoint shows Name beside Base URL, then API key
 beside API format. `vendorKey` is the models.dev provider key.
 
