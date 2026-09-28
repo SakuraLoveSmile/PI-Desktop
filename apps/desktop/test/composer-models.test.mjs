@@ -328,3 +328,33 @@ test("legacy unprefixed selection does not borrow a prefixed route's metadata", 
   assert.equal(composerModelBinding(provider, "model"), undefined);
   assert.equal(composerModelDisplayName(provider, "model"), "model");
 });
+
+test("discovery rows without a trusted match keep the full ladder after loading", () => {
+  const levels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+  for (const source of ["discovered", "user", "bundled"]) {
+    const row = { ...model("route/model"), source, reasoning: false, supportedThinkingLevels: [] };
+    for (const models of [[], [binding("route/model")]]) {
+      const provider = { id: "custom", models, supportsReasoning: false, supportedThinkingLevels: ["off"] };
+      const before = thinkingProviderForModel(provider, "route/model", undefined);
+      const after = thinkingProviderForModel(provider, "route/model", [row]);
+      assert.deepEqual(after, before);
+      assert.deepEqual(after.supportedThinkingLevels, levels);
+      assert.equal(after.supportsReasoning, true);
+    }
+    for (const thinkingLevels of [["off"], ["low", "high"]]) {
+      const provider = { id: "custom", models: [{ ...binding("route/model"), thinkingLevels }] };
+      const result = thinkingProviderForModel(provider, "route/model", [row]);
+      assert.deepEqual(result.supportedThinkingLevels, thinkingLevels);
+      assert.equal(result.supportsReasoning, thinkingLevels.includes("high"));
+    }
+  }
+});
+
+test("trusted matches retain published capabilities and explicit empty bindings", () => {
+  const row = { ...model("route/model"), catalogSource: "models.dev", reasoning: false, supportedThinkingLevels: [] };
+  const provider = { id: "custom", models: [] };
+  assert.equal(thinkingProviderForModel(provider, "route/model", [row]).supportsReasoning, false);
+  const reasoning = { ...row, reasoning: true, supportedThinkingLevels: ["low", "high"] };
+  assert.deepEqual(thinkingProviderForModel(provider, "route/model", [reasoning]).supportedThinkingLevels, ["low", "high"]);
+  assert.equal(thinkingProviderForModel({ ...provider, models: [binding("route/model")] }, "route/model", [reasoning]).supportsReasoning, false);
+});

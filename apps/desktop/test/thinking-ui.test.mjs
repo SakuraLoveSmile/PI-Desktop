@@ -200,11 +200,13 @@ test("draft Composer thinking follows the exact model selected in its menu", () 
   assert.match(composerSource, /const selectedBinding = provider\?\.models\.find/);
   assert.match(
     composerSource,
-    /const draftThinkingLevel = selectedModelInfo\s*\?\s*initialThinkingLevelForBinding\(/,
+    /const draftThinkingLevel = selectedModelInfo\?\.catalogSource === "models\.dev"\s*\?\s*initialThinkingLevelForBinding\(/,
   );
   assert.match(composerSource, /initialThinkingLevelForUnmatchedModel\(/);
   assert.match(modelMenuSource, /initialThinkingLevelForUnmatchedModel\(/);
   assert.match(sessionCoordinationSource, /initialThinkingLevelForUnmatchedModel\(/);
+  assert.match(modelMenuSource, /nextModel\?\.catalogSource === "models\.dev"/);
+  assert.match(sessionCoordinationSource, /catalogModel\?\.catalogSource === "models\.dev"/);
   assert.doesNotMatch(composerSource, /highestSupportedThinkingLevel/);
 });
 
