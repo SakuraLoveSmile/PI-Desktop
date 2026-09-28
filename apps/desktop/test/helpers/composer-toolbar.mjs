@@ -68,8 +68,10 @@ export const TOOLBAR_PROPS = {
 export async function composerToolbar(t, ssr) {
   const hadWindow = "window" in globalThis;
   const { window } = globalThis;
-  // The toolbar reads the shortcut platform off the preload bridge.
-  globalThis.window = { piDesktop: { platform: "darwin" } };
+  // The toolbar reads the shortcut platform off the preload bridge; the
+  // transcript renders in this same test read `matchMedia` for reduced
+  // motion, so the stand-in window answers it too.
+  globalThis.window = { piDesktop: { platform: "darwin" }, matchMedia: () => ({ matches: false }) };
   t.after(() => {
     if (hadWindow) globalThis.window = window;
     else delete globalThis.window;
