@@ -1,4 +1,4 @@
-import type { EnglishCatalog } from "../en/index.js";
+import { en, type EnglishCatalog } from "../en/index.js";
 
 export const de = {
   "app": {
@@ -2417,6 +2417,21 @@ sklm: {
     "planApprovalBody": "Ein vorgeschlagener Plan ist zur Überprüfung bereit.",
     "actionFailed": "Benachrichtigungen konnten nicht aktualisiert werden.",
     "justNow": "Gerade eben"
+  },
+  liveVoice: {
+    ...en.liveVoice,
+    title: "Live-Sprache",
+    description: "Sprich direkt mit einem eingerichteten Echtzeit-Sprachanbieter. Live-Sprache ist zunächst deaktiviert.",
+    enable: "Live-Sprache aktivieren",
+    enableDetail: "Mikrofon-Audio wird an den ausgewählten Anbieter gesendet. Agenten, Tools und MCP-Aktionen werden nicht ausgeführt.",
+    bindingStatus: "Anbieterstatus", ready: "Bereit", provider: "Anbieterkonto", chooseProvider: "Anbieterkonto auswählen",
+    providerUnavailable: "Ausgewählter Anbieter nicht verfügbar", providerDisabled: "deaktiviert", credentialsMissing: "Zugangsdaten fehlen",
+    model: "Modell-ID", voice: "Stimme", profile: "Protokollprofil", useForNextCall: "Für den nächsten Anruf verwenden",
+    bindingLocked: "Anruf läuft", bindingLockedDetail: "Beende den Anruf, um Änderungen an dieser Anbieterbindung anzuwenden.", saveFailed: "Live-Spracheinstellungen konnten nicht gespeichert werden.",
+    adapters: { "codex-live": { title: "Codex-Konto", description: "Verwendet das ausgewählte Codex-Konto und dessen bestehende Anmeldung." }, "gemini-live": { title: "Gemini Live", description: "Verwendet einen Google-Generative-AI-Anbieter mit API-Schlüssel." }, "openai-realtime": { title: "OpenAI-Realtime-kompatibel", description: "Verwendet einen API-Schlüssel-Anbieter mit explizitem Realtime-Protokollprofil." } },
+    readiness: { disabled: "Anbieter deaktiviert", "missing-provider": "Anbieter nicht verfügbar", "missing-credentials": "Zugangsdaten fehlen", "wrong-auth-kind": "Authentifizierung nicht unterstützt", "unsupported-adapter": "Adapter nicht unterstützt", "invalid-settings": "Ungültige Einstellungen" },
+    openPanel: "Live-Sprache öffnen", start: "Live-Sprache starten", end: "Anruf beenden", mute: "Mikrofon stummschalten", unmute: "Mikrofon aktivieren", resumePlayback: "Ton aktivieren", errorGeneric: "Live-Sprache wurde beendet. Prüfe den Anbieter und versuche es erneut.", microphoneDenied: "Erlaube den Mikrofonzugriff in Browser- und Systemeinstellungen und versuche es erneut.", microphoneUnavailable: "Kein verwendbares Mikrofon gefunden. Prüfe das ausgewählte Gerät und seine Verbindung.", microphoneBusy: "Das Mikrofon wird von einer anderen Aufnahme verwendet. Beende sie, bevor du Live-Sprache startest.", noProvider: "Wähle unter Einstellungen → Sprache einen unterstützten Anbieter.", enableInSettings: "Aktiviere Live-Sprache unter Einstellungen → Sprache.",
+    phase: { idle: "Aus", preparing: "Wird vorbereitet", "acquiring-mic": "Warte auf Mikrofon", negotiating: "Aushandlung", connecting: "Verbindung wird hergestellt", connected: "Verbunden", reconnecting: "Verbindung wird wiederhergestellt", closing: "Wird beendet", ended: "Beendet", failed: "Gestoppt" },
   },
   "errors": {
     "HOST_UNAVAILABLE": "Der lokale Dienst ist nicht verfügbar",

@@ -10,6 +10,7 @@ import { Button, Badge, CheckboxGroup, SettingsToggle } from "../../../component
 import { SettingsMenuSelect } from "../../../components/settings/SettingsMenuSelect";
 import { SettingsRow, SettingsCard } from "../primitives";
 import { voiceIpc } from "../../voice/voice-ipc";
+import { LiveVoiceSettings } from "./LiveVoiceSettings";
 
 interface AudioInputDevice {
   deviceId: string;
@@ -122,6 +123,7 @@ export function VoiceSettingsSection({
 
   return (
     <div className="settings-stack voice-settings">
+      <LiveVoiceSettings t={t} settings={settings} saveSettings={saveSettings} />
       {/* ---- Enable ---- */}
       <SettingsCard title={t("settings.voice")}>
         <SettingsRow title={t("settings.voiceEnable")}>

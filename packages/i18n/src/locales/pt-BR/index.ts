@@ -1,4 +1,4 @@
-import type { EnglishCatalog } from "../en/index.js";
+import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
   app: {
@@ -2372,6 +2372,16 @@ export const ptBR = {
     planApprovalBody: "Um plano proposto está pronto para sua revisão.",
     actionFailed: "Não foi possível atualizar as notificações.",
     justNow: "Agora mesmo",
+  },
+  liveVoice: {
+    ...en.liveVoice,
+    title: "Voz ao vivo", description: "Converse diretamente com um provedor de voz em tempo real configurado. A voz ao vivo fica desativada até você habilitá-la.",
+    enable: "Ativar voz ao vivo", enableDetail: "O áudio do microfone é enviado ao provedor escolhido. Agentes, ferramentas e ações MCP não são executados.",
+    bindingStatus: "Status do provedor", ready: "Pronto", provider: "Conta do provedor", chooseProvider: "Escolha uma conta", providerUnavailable: "O provedor selecionado está indisponível", providerDisabled: "desativado", credentialsMissing: "credenciais ausentes", model: "ID do modelo", voice: "Voz", profile: "Perfil do protocolo", useForNextCall: "Usar na próxima chamada", bindingLocked: "Chamada em andamento", bindingLockedDetail: "Encerre a chamada para aplicar as alterações desta conta.", saveFailed: "Não foi possível salvar as configurações de voz ao vivo.",
+    adapters: { "codex-live": { title: "Conta Codex", description: "Usa a conta Codex selecionada e o login existente." }, "gemini-live": { title: "Gemini Live", description: "Usa um provedor Google Generative AI com chave de API." }, "openai-realtime": { title: "Compatível com OpenAI Realtime", description: "Usa um provedor com chave de API e perfil Realtime explícito." } },
+    readiness: { disabled: "Provedor desativado", "missing-provider": "Provedor indisponível", "missing-credentials": "Credenciais ausentes", "wrong-auth-kind": "Autenticação incompatível", "unsupported-adapter": "Adaptador incompatível", "invalid-settings": "Configuração inválida" },
+    openPanel: "Abrir controles de voz", start: "Iniciar voz ao vivo", end: "Encerrar chamada", mute: "Silenciar microfone", unmute: "Ativar microfone", resumePlayback: "Ativar som", errorGeneric: "A voz ao vivo foi interrompida. Confira o provedor e tente novamente.", noProvider: "Escolha um provedor compatível em Configurações → Voz.", enableInSettings: "Ative a voz ao vivo em Configurações → Voz.",
+    phase: { idle: "Desativada", preparing: "Preparando", "acquiring-mic": "Aguardando microfone", negotiating: "Negociando", connecting: "Conectando", connected: "Conectado", reconnecting: "Reconectando", closing: "Encerrando", ended: "Encerrada", failed: "Interrompida" },
   },
   errors: {
     HOST_UNAVAILABLE: "O serviço local está indisponível",

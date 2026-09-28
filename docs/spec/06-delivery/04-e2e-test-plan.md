@@ -8,6 +8,31 @@
 
 ## 1. Goals
 
+### E2E-LIVE-VOICE-provider-call-lifecycle
+
+- **Preconditions:** Isolated desktop profile with Live Voice enabled and one
+  fixture provider binding. Use a deterministic local protocol fixture; do not
+  use a real provider account or paid endpoint for automation.
+- **Steps:** Open Voice settings, bind/select a fixture account for each
+  supported adapter profile, then open the Composer Live controls. Start,
+  cancel during permission/startup, connect, mute/unmute, interrupt playback,
+  inspect in-memory transcript, and end. Repeat with Dictation already holding
+  the microphone, a changed active binding, a provider credential removal,
+  renderer hide/reload, and a rejected playback gesture.
+- **Expected:** Live is off by default; old Dictation settings keep their
+  values; only the selected Provider ID is used; secrets do not enter Renderer;
+  no Agent, MCP, shell or file action runs; mute gates new input immediately;
+  cancellation stops late media; the transcript is not persisted; every end
+  path releases media and background-throttling leases or quarantines an
+  unconfirmed microphone lease. A new call starts only after explicit user
+  action.
+- **Specs:** [03-runtime/live-voice.md](../03-runtime/live-voice.md),
+  [03-runtime/20-speech.md](../03-runtime/20-speech.md).
+- **Acceptance:** Adapter setup and event parsing are local fixtures; Main
+  lifecycle, owner, lease and settings behavior are covered by targeted tests.
+  The full Electron flow and real-provider/device compatibility remain
+  unverified until their respective isolated acceptance environments are run.
+
 ### E2E-CHAT-fork-completed-reply-while-running
 
 - **Preconditions:** Isolated real desktop profile, configured model, two turns

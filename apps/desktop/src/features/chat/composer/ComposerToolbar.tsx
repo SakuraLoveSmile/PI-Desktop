@@ -20,6 +20,7 @@ import {
 } from "../../../components/icons";
 import { ModeIcon } from "./ComposerModeIcon";
 import { VoiceMicButton } from "../../voice/VoiceMicButton";
+import { LiveVoiceControls } from "../../voice/live/LiveVoiceControls";
 import { ComposerModelPicker } from "./ComposerModelPicker";
 import {
   MODE_LABEL_KEYS,
@@ -134,6 +135,7 @@ export function ComposerToolbar({
             onCancel={onVoiceCancel}
           />
         )}
+        <LiveVoiceControls t={t} />
         <TooltipButton
           type="button"
           className="icon-btn mode-chip composer-mode-chip"

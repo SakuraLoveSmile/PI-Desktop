@@ -113,4 +113,57 @@
   max-width: none;
 }
 
+.live-voice-control {
+  position: relative;
+}
+
+.live-voice-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  gap: 10px;
+  padding: 12px;
+}
+
+.live-voice-panel-heading,
+.live-voice-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.live-voice-provider,
+.live-voice-hint {
+  color: var(--color-text-secondary, #999);
+  font-size: var(--text-sm);
+}
+
+.live-voice-error {
+  color: var(--color-danger, #ef4444);
+  font-size: var(--text-sm);
+}
+
+.live-voice-transcripts {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface, #171717);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}
+
+.live-voice-transcripts p {
+  margin: 0;
+}
+
+.live-voice-transcripts p[data-role="user"] {
+  color: var(--color-text-secondary, #999);
+}
 

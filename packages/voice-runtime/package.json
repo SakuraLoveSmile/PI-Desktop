@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./dist/index.js"
+    },
+    "./live": {
+      "types": "./src/live/index.ts",
+      "import": "./dist/live/index.js"
     }
   },
   "scripts": {

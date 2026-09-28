@@ -2,6 +2,8 @@ import {
   app,
   BrowserWindow,
   ipcMain,
+  powerMonitor,
+  session,
 } from "electron";
 import { join } from "node:path";
 import {
@@ -45,6 +47,9 @@ import { applyDevelopmentUserData, desktopDataDir } from "./data-paths";
 import { createPlanUiProbe } from "./plan-ui-probe";
 import { registerIpcHandlers } from "./ipc/register";
 import { createVoiceService } from "./voice-service";
+import { MicrophoneLeaseRegistry } from "./live-voice/microphone-lease";
+import { createLiveCallService } from "./live-voice/runtime";
+import { installLiveMicrophonePermissionHandlers } from "./live-voice/microphone-permissions";
 import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
 import { createHostRuntime } from "./runtime/host";
@@ -817,7 +822,18 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, bootBackends } = runtimeLifecycle;
 
-const voiceService = createVoiceService(dataDir + "/voice-models", getMainWindow);
+let voiceServiceReference: ReturnType<typeof createVoiceService> | null = null;
+const microphoneLeases = new MicrophoneLeaseRegistry(() => {
+  const phase = voiceServiceReference?.getState().phase;
+  return phase === "preparing" || phase === "starting" || phase === "listening" || phase === "transcribing" || phase === "cancelling";
+});
+const voiceService = createVoiceService(
+  dataDir + "/voice-models",
+  getMainWindow,
+  (token) => microphoneLeases.acquire("dictation", token),
+);
+voiceServiceReference = voiceService;
+const liveCallService = createLiveCallService({ getHost, getMainWindow, vendorOAuth, microphoneLeases });
 
 function registerIpc() {
   return registerIpcHandlers({
@@ -914,6 +930,7 @@ function registerIpc() {
     isDeveloperMode: () => mainState.developerMode,
     sendToRenderer,
     voiceService,
+    liveCallService,
   });
 }
 
@@ -926,6 +943,36 @@ app.on("web-contents-created", (_event, contents) => {
   contents.on("will-attach-webview", (event) => {
     event.preventDefault();
   });
+});
+
+const liveLifecycleWindows = new WeakSet<BrowserWindow>();
+app.on("browser-window-created", (_event, window) => {
+  queueMicrotask(() => {
+    if (getMainWindow() !== window || liveLifecycleWindows.has(window)) return;
+    liveLifecycleWindows.add(window);
+    const contentsId = window.webContents.id;
+    window.on("hide", () => {
+      void liveCallService.endForWebContents(contentsId, "window-hidden");
+    });
+    window.webContents.on("did-start-navigation", (_event, _url, _inPlace, isMainFrame) => {
+      if (isMainFrame) void liveCallService.endForWebContents(contentsId, "window-navigated", true);
+    });
+    window.webContents.once("render-process-gone", () => {
+      void liveCallService.endForWebContents(contentsId, "renderer-gone", true);
+    });
+    window.webContents.once("destroyed", () => {
+      void liveCallService.endForWebContents(contentsId, "renderer-gone", true);
+    });
+  });
+});
+app.once("ready", () => {
+  installLiveMicrophonePermissionHandlers({
+    targetSession: session.defaultSession,
+    getMainWindow,
+    hasReservation: (owner) => liveCallService.hasMicrophoneReservation(owner),
+  });
+  powerMonitor.on("suspend", () => void liveCallService.endForLifecycle("app-suspended"));
+  powerMonitor.on("lock-screen", () => void liveCallService.endForLifecycle("app-suspended"));
 });
 
 registerApplicationStartup({
@@ -984,6 +1031,7 @@ registerShutdownHandlers({
   logger,
   confirmQuitDialog,
   disposePowerSaveBlockers,
+  liveCallService,
 });
 
 registerApplicationActivation({

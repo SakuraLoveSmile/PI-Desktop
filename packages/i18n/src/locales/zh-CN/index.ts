@@ -1,4 +1,4 @@
-import type { EnglishCatalog } from "../en/index.js";
+import { en, type EnglishCatalog } from "../en/index.js";
 
 export const zhCN = {
   app: {
@@ -2406,6 +2406,47 @@ sklm: {
     planApprovalBody: "已生成执行方案，等待您的确认。",
     actionFailed: "无法更新通知。",
     justNow: "刚刚",
+  },
+  liveVoice: {
+    ...en.liveVoice,
+    title: "实时语音",
+    description: "直接与已配置的实时语音服务交谈。启用前，实时语音处于关闭状态。",
+    enable: "启用实时语音",
+    enableDetail: "麦克风音频会发送给你选择的服务。此功能不会运行 Agent、工具或 MCP 操作。",
+    bindingStatus: "服务状态",
+    ready: "就绪",
+    provider: "服务账号",
+    chooseProvider: "选择服务账号",
+    providerUnavailable: "所选服务不可用",
+    providerDisabled: "已停用",
+    credentialsMissing: "缺少凭证",
+    model: "模型 ID",
+    voice: "音色",
+    profile: "协议配置",
+    profiles: { "realtime-ga": "OpenAI Realtime GA", "realtime-compat-v1": "Realtime 兼容版 v1" },
+    useForNextCall: "用于下次通话",
+    bindingLocked: "通话进行中",
+    bindingLockedDetail: "结束通话后才能应用此服务绑定的更改。",
+    saveFailed: "无法保存实时语音设置。",
+    adapters: {
+      "codex-live": { title: "Codex 账号", description: "使用所选 Codex 账号及其现有登录状态。" },
+      "gemini-live": { title: "Gemini Live", description: "使用带 API 密钥的 Google Generative AI 服务。" },
+      "openai-realtime": { title: "OpenAI Realtime 兼容服务", description: "使用带 API 密钥且明确选择 Realtime 协议配置的服务。" },
+    },
+    readiness: { disabled: "服务已停用", "missing-provider": "服务不可用", "missing-credentials": "缺少凭证", "wrong-auth-kind": "不支持此认证方式", "unsupported-adapter": "不支持此适配器", "invalid-settings": "设置无效" },
+    openPanel: "打开实时语音控制",
+    start: "开始实时语音",
+    end: "结束通话",
+    mute: "静音麦克风",
+    unmute: "取消静音",
+    resumePlayback: "启用声音",
+    errorGeneric: "实时语音已停止。请检查服务配置后重试。",
+    microphoneDenied: "请在浏览器和系统设置中允许麦克风访问，然后重试。",
+    microphoneUnavailable: "找不到可用的麦克风。请检查所选设备及其连接。",
+    microphoneBusy: "麦克风正被其他录音占用。请先停止录音，再启动实时语音。",
+    noProvider: "请在 设置 → 语音 中选择受支持的服务。",
+    enableInSettings: "请在 设置 → 语音 中启用实时语音。",
+    phase: { idle: "关闭", preparing: "正在准备", "acquiring-mic": "等待麦克风", negotiating: "正在协商", connecting: "正在连接", connected: "已连接", reconnecting: "正在重连", closing: "正在结束", ended: "已结束", failed: "已停止" },
   },
   errors: {
     HOST_UNAVAILABLE: "本地服务不可用",

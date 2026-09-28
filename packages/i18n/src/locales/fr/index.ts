@@ -1,4 +1,4 @@
-import type { EnglishCatalog } from "../en/index.js";
+import { en, type EnglishCatalog } from "../en/index.js";
 
 export const fr = {
   "app": {
@@ -2417,6 +2417,16 @@ sklm: {
     "planApprovalBody": "Le plan proposé est prêt pour examen.",
     "actionFailed": "Impossible de mettre à jour les notifications.",
     "justNow": "À l'instant"
+  },
+  liveVoice: {
+    ...en.liveVoice,
+    title: "Voix en direct", description: "Parlez directement avec un fournisseur vocal configuré en temps réel. La fonction reste désactivée tant que vous ne l’activez pas.",
+    enable: "Activer la voix en direct", enableDetail: "L’audio du microphone est envoyé au fournisseur choisi. Aucun agent, outil ou action MCP n’est exécuté.",
+    bindingStatus: "État du fournisseur", ready: "Prêt", provider: "Compte fournisseur", chooseProvider: "Choisir un compte fournisseur", providerUnavailable: "Le fournisseur sélectionné est indisponible", providerDisabled: "désactivé", credentialsMissing: "identifiants manquants", model: "ID du modèle", voice: "Voix", profile: "Profil du protocole", useForNextCall: "Utiliser au prochain appel", bindingLocked: "Appel en cours", bindingLockedDetail: "Terminez l’appel pour appliquer les changements de ce compte.", saveFailed: "Impossible d’enregistrer les paramètres de voix en direct.",
+    adapters: { "codex-live": { title: "Compte Codex", description: "Utilise le compte Codex sélectionné et sa connexion existante." }, "gemini-live": { title: "Gemini Live", description: "Utilise un fournisseur Google Generative AI avec une clé API." }, "openai-realtime": { title: "Compatible OpenAI Realtime", description: "Utilise un fournisseur avec clé API et un profil Realtime explicite." } },
+    readiness: { disabled: "Fournisseur désactivé", "missing-provider": "Fournisseur indisponible", "missing-credentials": "Identifiants manquants", "wrong-auth-kind": "Authentification non prise en charge", "unsupported-adapter": "Adaptateur non pris en charge", "invalid-settings": "Paramètres invalides" },
+    openPanel: "Ouvrir les commandes vocales", start: "Démarrer la voix en direct", end: "Terminer l’appel", mute: "Couper le microphone", unmute: "Activer le microphone", resumePlayback: "Activer le son", errorGeneric: "La voix en direct s’est arrêtée. Vérifiez le fournisseur et réessayez.", noProvider: "Choisissez un fournisseur compatible dans Réglages → Voix.", enableInSettings: "Activez la voix en direct dans Réglages → Voix.",
+    phase: { idle: "Désactivée", preparing: "Préparation", "acquiring-mic": "En attente du microphone", negotiating: "Négociation", connecting: "Connexion", connected: "Connectée", reconnecting: "Reconnexion", closing: "Arrêt", ended: "Terminée", failed: "Arrêtée" },
   },
   "errors": {
     "HOST_UNAVAILABLE": "Le service local n'est pas disponible",
