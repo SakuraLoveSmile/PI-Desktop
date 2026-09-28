@@ -6145,6 +6145,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `provider-retry.test.ts`, `runtime.test.ts`, `subagent.test.ts`.
   Other scenario variants remain Draft.
 
+#### E2E-1174: Return a paired tool denial in Plan/Goal
+
+- Seed earlier tool-call history, then switch an Agent session to Plan or Goal.
+  A loopback Responses gateway emits Edit, Write or Task only if that tool is
+  declared in the request; an undeclared name would cause a 502.
+- Verify all six mode/tool combinations reach the normal tool-result path:
+  the next request contains the original call id and a mode-denial error,
+  preserves old call/result pairs, and adds no synthetic user correction.
+- Assert that no host call occurs and no delegate starts. The tool event is an
+  error while the model can continue with a read-only answer.
+- A handler reference retained from Agent must refuse execution after Plan/Goal
+  is entered; switching back to Agent restores the normal permission path.
+- Automation: `mode-tool-access.test.ts` runs real runtime/SDK loops against a
+  loopback HTTP/SSE fixture; `runtime.test.ts` covers catalog/mode transitions.
+  Existing host permission tests keep Write/Edit denied regardless of grants or
+  permission mode. No paid provider or user Desktop profile is used.
+
 #### E2E-149: Recover provider rate limits (429) silently in place
 
 - **Preconditions**: A project-bound Agent session uses deterministic provider
@@ -15261,6 +15278,27 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Milestone**: Maintenance.
 - **Status**: Covered by the existing HTTP client integration fixture and a
   focused component-render validation; no live IDA process required.
+
+### E2E-MCP-HTTP-SSE-held-open — A streamable HTTP reply lands before the server ends the stream (issue #1188)
+
+- **Preconditions**: A local mock Streamable HTTP server writes its JSON-RPC
+  reply immediately and keeps the `text/event-stream` body open well past the
+  client's handshake budget — the shape `https://gitmcp.io/docs` shows, where
+  initialize is answered in about two seconds and the stream only ends about
+  twelve seconds later. No provider credentials needed.
+- **Steps**: Configure that server with the `http` transport and a handshake
+  budget shorter than the stream lifetime; connect, discover the tools, and call
+  one. Repeat with a server that keeps the stream open and never answers.
+- **Expected**: Handshake, discovery, and the call complete as soon as their
+  reply event arrives, so the connection reports `ready` with the discovered
+  tools instead of `mcp initialize timed out after <budget>ms`. A server that
+  never replies still fails with `TIMEOUT` inside the same budget, and a stream
+  left open past its request is aborted rather than kept open.
+- **Specs**: 07-plugins/01-plugin-system §12.2; ADR 0038.
+- **Acceptance**: HTTP transport integration and the main-process MCP handshake.
+- **Milestone**: Maintenance.
+- **Status**: Automated by `apps/desktop/test/plugin-mcp.test.mjs` (held-open
+  reply case); no live app process required.
 
 ### E2E-IMAGE-generation-and-editing
 
