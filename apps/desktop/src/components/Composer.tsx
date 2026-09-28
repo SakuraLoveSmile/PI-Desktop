@@ -387,7 +387,7 @@ export function Composer({
   );
   const thinkingLabel = thinkingLevel;
   const modelLabel = modelId
-    ? composerModelDisplayName(provider, modelId, selectedModelInfo?.displayName)
+    ? composerModelDisplayName(provider, modelId)
     : t("chat.model");
   const modelMenu = useComposerModelMenu({
     configureActiveSession,

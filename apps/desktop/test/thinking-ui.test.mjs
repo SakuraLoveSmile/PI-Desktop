@@ -117,7 +117,8 @@ test("Composer owns the mode and model controls", () => {
   // default thinking level instead of pinning the draft to its current value.
   assert.match(scheduledModelPickerSource, /activeSessionId: null/);
   assert.doesNotMatch(scheduledModelPickerSource, /useId\(/);
-  assert.match(
+  assert.match(scheduledModelPickerSource, /composerModelDisplayName\(provider, value\.modelId \?\? ""\)/);
+  assert.doesNotMatch(
     scheduledModelPickerSource,
     /composerModelDisplayName\(provider, value\.modelId \?\? "", selected\.displayName\)/,
   );

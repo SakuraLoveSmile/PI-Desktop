@@ -145,9 +145,19 @@ test("a configured alias labels its row while displayName shows the wire id", ()
 
   assert.equal(models[0].modelId, "deepseek-v4-pro");
   assert.equal(models[0].displayName, "deepseek-v4-pro");
-  assert.equal(composerModelDisplayName(provider, "deepseek-v4-pro", models[0].displayName), "pro");
+  assert.equal(composerModelDisplayName(provider, "deepseek-v4-pro"), "pro");
   assert.equal(composerModelMatchesQuery(models[0], "provider", "PRO", "pro"), true);
   assert.equal(composerModelMatchesQuery(models[0], "provider", "DeepSeek V4 Pro", "pro"), false);
+});
+
+test("a catalog friendly name never replaces the selected wire id without an alias", () => {
+  assert.equal(
+    composerModelDisplayName(
+      { id: "custom", models: [binding("ag/claude-sonnet-4-6")] },
+      "ag/claude-sonnet-4-6",
+    ),
+    "ag/claude-sonnet-4-6",
+  );
 });
 test("a configured alias is visible before discovery data is available", () => {
   const provider = {
@@ -158,7 +168,7 @@ test("a configured alias is visible before discovery data is available", () => {
 
   assert.equal(models[0].displayName, "gpt-5.3-codex-spark");
   assert.equal(
-    composerModelDisplayName(provider, models[0].modelId, models[0].displayName),
+    composerModelDisplayName(provider, models[0].modelId),
     "Spark",
   );
 });
@@ -169,7 +179,6 @@ test("the display name prefers a configured alias while preserving model identit
     composerModelDisplayName(
       { id: "openai", models: [{ ...binding("openai/gpt-5.3-codex-spark"), alias: "Spark" }] },
       "openai/gpt-5.3-codex-spark",
-      "GPT-5.3 Codex Spark",
     ),
     "Spark",
   );
@@ -186,7 +195,6 @@ test("an exact binding alias wins over a broader equivalent id match", () => {
         ],
       },
       "openai/gpt-5.3-codex-spark",
-      "GPT-5.3 Codex Spark",
     ),
     "Namespaced",
   );
@@ -205,7 +213,6 @@ test("a blank alias leaves the wire id as display name", () => {
   assert.equal(
     composerModelDisplayName(
       { id: "deepseek", models: [{ ...binding("deepseek-v4-pro"), alias: "   " }] },
-      "deepseek-v4-pro",
       "deepseek-v4-pro",
     ),
     "deepseek-v4-pro",
@@ -303,7 +310,7 @@ test("prefixed and unprefixed wire ids remain separate even with one catalog nam
     ["proxy/model", "proxy/model"],
     ["model", "model"],
   ]);
-  assert.equal(composerModelDisplayName(provider, "proxy/model", rows[0].displayName), "Short");
+  assert.equal(composerModelDisplayName(provider, "proxy/model"), "Short");
   assert.equal(composerModelMatchesQuery(rows[0], "relay", "Short", "Short"), true);
   assert.deepEqual(composerModelBadges(rows[0], provider), []);
   assert.deepEqual(composerModelBadges(rows[1], provider), ["reasoning", "vision"]);
