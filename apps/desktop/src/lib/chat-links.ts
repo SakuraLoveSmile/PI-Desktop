@@ -245,12 +245,43 @@ export type ChatTextSegment =
       target: ChatPreviewTarget;
     };
 
-// Unicode-aware scan (#235). Absolute paths are captured whole so a failed
-// lookup never turns a suffix into a different file reference. The extension tail
-// uses `(?![A-Za-z0-9_])` rather than `\b`: in unicode mode `\b` treats CJK
-// letters as word characters, which would stop `App.tsx文件` from linking.
-const SCAN_RE =
-  /@"[^"\n]+"|@[^\s]+|https?:\/\/(?=[^\s<>"'()[\]{}])|(?:[A-Za-z]:[\\/]|\/)(?:[\p{L}\p{N}_@+. -]+[\\/])*?[\p{L}\p{N}_@+. -]+?\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?)?(?![A-Za-z0-9_])|(?:[\p{L}\p{N}_@+.-]+[\\/])+(?:[\p{L}\p{N}_@+. -]+[\\/])*?[\p{L}\p{N}_@+. -]+?\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?)?(?![A-Za-z0-9_])|(?:~\/)?\/?\.{1,2}\/(?:[\p{L}\p{N}_@+.-]+\/)*[\p{L}\p{N}_@+.-]+(?::\d+(?::\d+)?)?|(?:~\/)?\/?(?:[\p{L}\p{N}_@+.-]+\/)+[\p{L}\p{N}_@+.-]+(?::\d+(?::\d+)?)?|[\p{L}\p{N}_@+-][\p{L}\p{N}_@+.-]*\.[A-Za-z0-9]{1,8}(?![A-Za-z0-9_])/gu;
+// Unicode-aware scan (#235). Keep absolute candidates whole, and do not stop
+// at an inner extension such as the `.v1` in `report.v1.md`. CJK prose after
+// the extension remains outside the link (Unicode `\b` cannot express that).
+const PATH_WORD = String.raw`[\p{L}\p{N}_@+.-]+`;
+const PATH_SEGMENT = String.raw`[\p{L}\p{N}_@+. -]+`;
+const FILE_END = String.raw`\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?)?(?![A-Za-z0-9_]|\.[A-Za-z0-9])`;
+const FILE_NAME = String.raw`${PATH_SEGMENT}?${FILE_END}`;
+const SPACED_START = String.raw`(?<![\p{L}\p{N}_@+.-])[A-Za-z][\p{L}\p{N}_+-]*(?: [\p{L}\p{N}_+-]+)+`;
+// Unmarked first-segment spaces cannot be distinguished from prose. Retry
+// after common introducers so ordinary bare file links still work.
+const PROSE_INTRODUCERS = new Set([
+  "a", "an", "the", "and", "or", "i", "is", "this", "please",
+  "see", "open", "read", "view", "check", "show", "find", "edit",
+  "update", "fix", "inspect", "compare", "review", "use", "add", "remove",
+  "write", "create", "created", "delete", "rename", "move", "copy",
+  "change", "saved", "generated",
+]);
+const SCAN_RE = new RegExp([
+  String.raw`@"[^"\n]+"`,
+  String.raw`@[^\s]+`,
+  String.raw`https?:\/\/(?=[^\s<>"'()[\]{}])`,
+  String.raw`(?:[A-Za-z]:[\\/]|\/)(?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
+  String.raw`${SPACED_START}[\\/](?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
+  String.raw`${SPACED_START}(?:\.[A-Za-z0-9_-]+)*${FILE_END}`,
+  String.raw`(?:${PATH_WORD}[\\/])+(?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
+  String.raw`(?:~\/)?\/?\.{1,2}\/(?:${PATH_WORD}\/)*${PATH_WORD}(?::\d+(?::\d+)?)?`,
+  String.raw`(?:~\/)?\/?(?:${PATH_WORD}\/)+${PATH_WORD}(?::\d+(?::\d+)?)?`,
+  String.raw`[\p{L}\p{N}_@+-][\p{L}\p{N}_@+.-]*${FILE_END}`,
+].join("|"), "gu");
+
+function spacedRefDisposition(raw: string): "accept" | "retry" | "skip" {
+  if (isAbsoluteFilePath(raw) || raw.startsWith("@") || isHttpUrl(raw)) return "accept";
+  const firstSegment = raw.split(/[\\/]/, 1)[0];
+  if (!firstSegment.includes(" ")) return "accept";
+  const firstWord = firstSegment.slice(0, firstSegment.indexOf(" ")).toLowerCase();
+  return PROSE_INTRODUCERS.has(firstWord) ? "retry" : "skip";
+}
 
 /** Scan once, keeping URL parentheses but stopping at a closing prose wrapper. */
 function scanUrl(text: string, start: number): string {
@@ -289,6 +320,12 @@ export function splitChatText(
       ? scanUrl(text, start)
       : match[0];
     scanner.lastIndex = start + raw.length;
+    const disposition = spacedRefDisposition(raw);
+    if (disposition === "skip") continue;
+    if (disposition === "retry") {
+      scanner.lastIndex = start + raw.indexOf(" ") + 1;
+      continue;
+    }
     const target = resolvePreviewTarget(raw, root, baseDir);
     if (!target) continue;
     if (start > last) segments.push({ kind: "text", text: text.slice(last, start) });

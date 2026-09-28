@@ -165,6 +165,133 @@ test("complete spaced and Windows paths are scanned without linking their suffix
   });
 });
 
+test("multi-dot absolute paths keep their final extension", () => {
+  for (const path of [
+    "C:/demo/report.v1.md",
+    "C:/demo project/a.test.ts",
+    "/Users/me/my project/report.v1.md",
+  ]) {
+    const segments = splitChatText(`Open ${path} now`, ROOT);
+    assert.deepEqual(
+      segments.filter((segment) => segment.kind === "target").map((segment) => segment.text),
+      [path],
+    );
+  }
+  assert.deepEqual(
+    splitChatText("Open C:/demo/report.v1.md. Next", ROOT)
+      .filter((segment) => segment.kind === "target")
+      .map((segment) => segment.text),
+    ["C:/demo/report.v1.md"],
+  );
+  assert.deepEqual(
+    splitChatText("see docs/report.v1.md and report.v2.md", ROOT)
+      .filter((segment) => segment.kind === "target")
+      .map((segment) => segment.text),
+    ["docs/report.v1.md", "report.v2.md"],
+  );
+});
+
+test("unmarked first-segment spaces stay plain; explicit refs stay whole", () => {
+  for (const path of ["my project/page.md", "my project/sub/page.md", "My Project/page.md", "my new project/page.md", "test project/page.md"]) {
+    const source = `Open ${path} now`;
+    assert.deepEqual(splitChatText(source, ROOT), [{ kind: "text", text: source }]);
+    assert.deepEqual(
+      splitChatText(`@"${path}"`, ROOT)
+        .filter((segment) => segment.kind === "target")
+        .map((segment) => segment.target),
+      [{ kind: "file", path }],
+    );
+  }
+  assert.deepEqual(
+    splitChatText("Open docs/my project/page.md and file.md", ROOT)
+      .filter((segment) => segment.kind === "target")
+      .map((segment) => segment.text),
+    ["docs/my project/page.md", "file.md"],
+  );
+  assert.deepEqual(
+    splitChatText("Open docs/page.md and file.md", ROOT)
+      .filter((segment) => segment.kind === "target")
+      .map((segment) => segment.text),
+    ["docs/page.md", "file.md"],
+  );
+  for (const prose of ["see docs/page.md", "and docs/page.md"]) {
+    assert.deepEqual(
+      splitChatText(prose, ROOT)
+        .filter((segment) => segment.kind === "target")
+        .map((segment) => segment.text),
+      ["docs/page.md"],
+    );
+  }
+  assert.deepEqual(splitChatText("打开 my project/page.md", ROOT), [
+    { kind: "text", text: "打开 my project/page.md" },
+  ]);
+  for (const source of [
+    "Open my project/a.md and my project/b.md",
+    'Open "my project/a.md" and "my project/b.md"',
+    "please open my project/a.md and my project/b.md",
+  ]) {
+    assert.deepEqual(
+      splitChatText(source, ROOT)
+        .filter((segment) => segment.kind === "target")
+        .map((segment) => segment.text),
+      [],
+      source,
+    );
+  }
+  assert.deepEqual(
+    splitChatText("Open a long directory name/page.md", ROOT),
+    [{ kind: "text", text: "Open a long directory name/page.md" }],
+  );
+  assert.deepEqual(
+    splitChatText('@"a long directory name/page.md"', ROOT)
+      .filter((segment) => segment.kind === "target")
+      .map((segment) => segment.target),
+    [{ kind: "file", path: "a long directory name/page.md" }],
+  );
+});
+
+test("ambiguous bare names stay plain while prose still links single tokens", () => {
+  assert.deepEqual(resolvePreviewTarget("my file.md", ROOT), { kind: "file", path: "my file.md" });
+  for (const source of [
+    "my file.md", "Open my file.md now", "Please test file.md",
+    "Test file.md before release", "My report.md is ready", "New report.md is ready",
+  ]) {
+    assert.deepEqual(splitChatText(source, ROOT), [{ kind: "text", text: source }]);
+  }
+  for (const [source, expected] of [
+    ["see App.tsx", "App.tsx"],
+    ["see file.md", "file.md"],
+    ["update package.json", "package.json"],
+    ["review docs/page.md", "docs/page.md"],
+    ["Created report.md", "report.md"],
+    ["I created report.md", "report.md"],
+    ["Saved report.md", "report.md"],
+    ["This is report.md and file.md", "report.md"],
+  ]) {
+    const segments = splitChatText(source, ROOT);
+    assert.deepEqual(
+      segments.filter((segment) => segment.kind === "target").map((segment) => segment.text),
+      source === "This is report.md and file.md" ? ["report.md", "file.md"] : [expected],
+      source,
+    );
+    assert.equal(segments.map((segment) => segment.text).join(""), source);
+  }
+  const tree = { type: "root", children: [{ type: "paragraph", children: [{ type: "text", value: 'Open @"my file.md" and see App.tsx' }] }] };
+  linkifyMdastTree(tree, ROOT);
+  assert.deepEqual(
+    tree.children[0].children.filter((node) => node.type === "link").map((node) => node.url),
+    ["my file.md", "App.tsx"],
+  );
+  const markup = renderToStaticMarkup(
+    React.createElement(ReactMarkdown, {
+      remarkPlugins: [remarkChatFileLinks(ROOT)],
+      children: 'Open @"my file.md" and see App.tsx',
+    }),
+  );
+  assert.match(markup, /href="my%20file\.md"/);
+  assert.match(markup, /href="App\.tsx"/);
+});
+
 test("splitChatText linkifies embedded refs and keeps literals", () => {
   const segments = splitChatText(
     "看看 apps/desktop/src/App.tsx 和 https://example.com 吧",
