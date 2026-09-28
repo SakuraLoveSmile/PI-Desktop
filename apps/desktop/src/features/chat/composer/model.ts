@@ -137,8 +137,8 @@ export function thinkingProviderForModel(
     ? THINKING_LEVELS.filter((level) => binding.thinkingLevels.includes(level))
     : undefined;
 
-  if (!model) {
-    // No catalog match: all thinking levels selectable, default off.
+  if (model?.catalogSource !== "models.dev") {
+    // Discovery/user rows are not trusted capability matches.
     // A binding override still takes precedence when present.
     // An empty binding is the generic seed for an unknown model, not an
     // explicit disable; `off` is the persisted opt-out for that case.
