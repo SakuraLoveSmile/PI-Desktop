@@ -3517,6 +3517,11 @@ IPC 请求无法关闭。
   8. 运行模型调用远低于硬预算的 `new_context` 的回合。
   9. 空闲时手动调用 `/compact`。
 - **预期**：
+  - 每个检查点的摘要请求都携带会话自己的对话身份：在 Responses 形状的提供商
+    （`openai-responses`、`openai-codex-responses`）上，出站载荷会像会话的普通
+    回合一样把会话 id 作为 `prompt_cache_key` 发出，因此对接 Codex 后端的网关会
+    接受该请求，而不是返回 400 `invalid_responses_request`。其他线协议的提供商
+    保持不变。
   - 每个 `turn_end` 在另一个提供商请求之前都会被评估，并且永远不会
     标记整体任务空闲； composer/config 控件保持阻塞状态，直到
     `agent_end`、`error` 或仅手动的 `compaction_end`。

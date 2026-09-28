@@ -5749,6 +5749,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   8. Run a turn where the model calls `new_context` well below the hard budget.
   9. Invoke `/compact` manually while idle.
 - **Expected**:
+  - The summary request of every checkpoint carries the session's own
+    conversation identity: on the Responses-shaped providers
+    (`openai-responses`, `openai-codex-responses`) the outgoing payload keeps
+    the session id as `prompt_cache_key`, exactly as the session's turns do, so
+    a gateway fronting a Codex backend accepts it instead of answering 400
+    `invalid_responses_request`. Providers on other wire APIs are unchanged.
   - Each `turn_end` is evaluated before another provider request and never
     marks the overall task idle; composer/config controls remain blocked until
     `agent_end`, `error`, or manual-only `compaction_end`. In-run follow-up
