@@ -76,7 +76,7 @@ test("settings overlays mount on a viewport-fixed host outside the app shell", a
 
   const pluginDialogs = await read("../src/features/plugins/PluginDialogs.tsx");
   assert.equal(
-    pluginDialogs.match(/pluginModalPortal\(/g)?.length,
+    pluginDialogs.match(/(?<!function )pluginModalPortal\(/g)?.length,
     3,
     "each route-owned plugin modal must mount through pluginModalPortal",
   );
