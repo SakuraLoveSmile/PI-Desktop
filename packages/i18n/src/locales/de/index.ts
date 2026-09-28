@@ -1016,6 +1016,8 @@ sklm: {
     importAgentScanTransportHttp: "HTTP",
     "imported": "Importiert",
     "skillImported": "Importiert {{name}}",
+    "skillBatchImported": "{{count}} Skill-Ordner importiert",
+    "skillBatchFailed": "{{count}} Ordner konnten nicht importiert werden. Erster Fehler: {{first}}",
     "skillsEmpty": "Keine Fähigkeiten in diesem Ordner",
     "subagentsEmpty": "Noch keine eigenen Subagenten",
     "addMcp": "Hinzufügen",

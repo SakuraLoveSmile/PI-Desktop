@@ -864,6 +864,8 @@ sklm: {
     importAgentScanTransportHttp: "HTTP",
     imported: "Imported",
     skillImported: "Imported {{name}}",
+    skillBatchImported: "Imported {{count}} skill folders",
+    skillBatchFailed: "Failed to import {{count}} folders. First: {{first}}",
     skillsEmpty: "No skills in this folder",
     subagentsEmpty: "No subagents of your own yet",
     addMcp: "Add",

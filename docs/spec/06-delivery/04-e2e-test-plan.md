@@ -7165,6 +7165,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Milestone**: M5
 - **Status**: Unit-covered (`apps/desktop/test/mcp-oauth.test.mjs`, `apps/desktop/test/user-mcp.test.mjs`); full UI journey Draft
 
+#### E2E-SKILL-import-multiple-folders
+
+- **Preconditions:** An isolated Desktop profile and three sibling folders:
+  `alpha/SKILL.md` and `beta/SKILL.md` are valid; `broken/` has no
+  `SKILL.md`. A project is selected in Settings > Agent > Skills.
+- **Steps:** Choose Import folder for that project, select all three folders,
+  and confirm. Check the project list and the result message. Reopen Import
+  folder and confirm it starts at the parent containing `alpha/`, `beta/`,
+  and `broken/`. Cancel, reopen it, and confirm the parent is unchanged.
+  Import a single Markdown file through Import file.
+- **Expected:** Both valid skills appear at project level with their sibling
+  resources, the invalid folder is reported without blocking the others, and
+  the picker remembers their shared parent across cancellation. The single-file
+  action still selects only one file.
+- **Coverage:** Folder import service, preference, and settings source contract
+  tests. Native multi-folder picker and remembered location remain desktop E2E.
+
 #### E2E-101: A user skill is written once and scoped per project
 
 - **Preconditions**: Two projects on disk. An Agent session in each.

@@ -838,6 +838,8 @@ export const ptBR = {
     importAgentScanTransportHttp: "HTTP",
     imported: "Importado",
     skillImported: "Importado {{name}}",
+    skillBatchImported: "{{count}} pastas de skills importadas",
+    skillBatchFailed: "Falha ao importar {{count}} pastas. Primeiro erro: {{first}}",
     skillsEmpty: "Nenhuma habilidade nesta pasta",
     subagentsEmpty: "Nenhum subagente próprio ainda",
     addMcp: "Adicionar",

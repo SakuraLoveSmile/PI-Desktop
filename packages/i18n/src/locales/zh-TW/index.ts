@@ -1001,6 +1001,8 @@ sklm: {
     importAgentScanTransportHttp: "HTTP",
     imported: "已匯入",
     skillImported: "已匯入 {{name}}",
+    skillBatchImported: "已匯入 {{count}} 個技能資料夾",
+    skillBatchFailed: "{{count}} 個資料夾匯入失敗。首個錯誤：{{first}}",
     skillsEmpty: "此目錄中沒有技能",
     subagentsEmpty: "還沒有你自己的子智慧體",
     addMcp: "新增",

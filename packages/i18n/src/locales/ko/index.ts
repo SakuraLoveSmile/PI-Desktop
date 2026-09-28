@@ -1024,6 +1024,8 @@ sklm: {
     importAgentScanTransportHttp: "HTTP",
     imported: "가져옴",
     skillImported: "{{name}} 가져옴",
+    skillBatchImported: "스킬 폴더 {{count}}개를 가져왔습니다",
+    skillBatchFailed: "폴더 {{count}}개를 가져오지 못했습니다. 첫 번째 오류: {{first}}",
     skillsEmpty: "이 폴더에 스킬 없음",
     subagentsEmpty: "내 서브에이전트가 아직 없음",
     addMcp: "추가",
