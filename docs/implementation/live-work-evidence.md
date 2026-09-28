@@ -10,12 +10,13 @@ specification remains the behavioral source.
 - Request branch: `codex/live-voice-v1`; dedicated worktree:
   `/Users/lan/.codex/worktrees/live-voice-v1/PI-Desktop`.
 - Phase-2 implementation base: `1ec74701f` (the v1 implementation commit).
-- Latest fetched `origin/main`: `6c9e9d4e38a62a72b59e4d3c40c7799c34b27a2d`;
+- Latest fetched `origin/main`: `8fcca3d25c98d66c46d0f9cddab76167b6ddb294`;
   it is included in the request candidate through merge commit
-  `7e601bd3c9cc4a2deb9416ca4c810885a8ea4c49`.
-- The phase-2 changes originated from `1ec74701f1c23219bc6c68fc723e77cc432419df`
-  and were integrated with the latest main before candidate validation. The
-  test-harness follow-up and this evidence refresh are based on that candidate.
+  `4afe31c4a3178c06024d3ebcac25a678ef98f9fd` and `pnpm check:pr-base` passes.
+- The phase-2 changes originated from `1ec74701f1c23219bc6c68fc723e77cc432419df`.
+  The provider integration fixture and W2 case-level audit are part of the
+  current candidate; the fixture does not instantiate the production Main
+  work-bridge or concrete provider transport adapters.
 - Existing pull request: [#1161](https://github.com/vastsa/PI-Desktop/pull/1161),
   open on `codex/live-voice-v1`. This task updates that PR and does not merge it.
 - The worktree has an untracked `PI-Desktop-Live-Voice-v1-Spec.md`; it is not a
@@ -113,22 +114,16 @@ specification remains the behavioral source.
 
 | Check | Result |
 |---|---|
-| `pnpm --filter @pi-desktop/shared build` | Passed after the additive playback-activity DTO. |
-| `pnpm --filter @pi-desktop/voice-runtime build` | Passed with the playback signal helper. |
-| `pnpm --filter @pi-desktop/host-runtime test` | 75 tests passed. |
-| `pnpm --filter @pi-desktop/voice-runtime test` | 51 tests passed. |
-| `pnpm --filter @pi-desktop/i18n test` | 27 tests passed. |
-| `pnpm --filter @pi-desktop/desktop typecheck` | Passed after rebuilding shared and voice-runtime. |
-| `pnpm -r --if-present test` | Passed all workspace suites: desktop 3,160; agent-runtime 1,091; shared 1,124; host-runtime 75; voice-runtime 51; agent-host 49; plugin-devkit 49; plugin-sdk 356; i18n 27; RACP 21; pi-host 6; docs 11. |
-| Targeted Live Voice `node --test` | 15 tests passed, covering Main service, selection scope/UI, controller path, and playback-activity IPC. |
-| `pnpm build:js` | Passed; docs, workspace packages, Electron main, preload, and renderer built. Existing chunk-size and VitePress highlighting warnings remain. |
+| `node --test test/live-work-provider-integration.test.mjs` (from `apps/desktop`) | 4 passed: Codex Live, Gemini Live, Realtime GA, and Realtime compat-v1. These use real protocol parsers/encoders, the coordinator, and AgentHost admission/terminal APIs; the work port, Runtime prompt, and provider transport are fixtures. |
+| `pnpm -r --if-present test` | Passed all workspace suites on the current candidate; desktop: 3,173 passed, 0 failed; docs: 11 passed, 0 failed. |
+| `pnpm --filter @pi-desktop/desktop typecheck` | Passed on the current candidate. |
+| `pnpm build:js` | Passed on the current candidate; docs, workspace packages, Electron main, preload, and renderer built. Existing VitePress highlighting and large-chunk warnings remain. |
 | `pnpm lint` | Passed, including style-token validation. |
-| `cargo fmt --check` | Passed on the latest-main integration candidate. |
-| `cargo test -p host-core --locked` | 666 tests passed on the latest-main integration candidate. |
-| `cargo clippy -p host-core --all-targets --locked` | Passed on the latest-main integration candidate. |
-| `pnpm docs:check` | Passed; 83 English/Chinese specification pairs and 527 documentation pages verified. Existing ADR format notes remain. |
-| `pnpm check:agent-policy`, `pnpm check:pr-base`, `node scripts/check-architecture.mjs`, and `git diff --check` | Passed on the latest-main integration candidate; `origin/main` at `6c9e9d4e38a6`. |
-| Composer plugin-slot integration tests | 11 tests passed after updating the SSR preload boundary and toolbar control expectation for Live Voice. |
+| `cargo fmt --check` | Passed on the current candidate. |
+| `cargo test -p host-core --locked` | 670 tests passed; the later `origin/main` merge changed Runtime/shared TypeScript and docs only. |
+| `cargo clippy -p host-core --all-targets --locked` | Passed; the later `origin/main` merge changed no Rust files. |
+| `pnpm docs:check` | Passed; 83 English/Chinese specification pairs and 530 documentation pages verified. Existing ADR format notes remain. |
+| `pnpm check:agent-policy`, `pnpm check:pr-base`, and `node scripts/check-architecture.mjs` | Passed. PR base check confirms `origin/main` at `8fcca3d25c98` is an ancestor of the candidate. |
 
 The directly exercised W2 behaviors are mapped below. A mapped test proves
 only the named seam and assertions, not a complete provider-to-device journey.
@@ -164,22 +159,26 @@ only the named seam and assertions, not a complete provider-to-device journey.
 - Codex local output signal threshold and strict playback-activity IPC:
   `packages/voice-runtime/src/live/playback-monitor.test.ts` and
   `apps/desktop/test/live-voice-ipc-media.test.mjs`.
+- Four-profile parser/encoder → `LiveWorkCoordinator` → actual
+  `AgentHost.startTurn` / terminal event → feedback encoder fixture:
+  `apps/desktop/test/live-work-provider-integration.test.mjs`. Its local
+  `LiveWorkPort` mirrors the production admission shape but is not the
+  production `createLiveWorkBridge` mapping.
 
-Direct or partial test mappings include W2-001, W2-005, W2-007, W2-009—016,
-W2-027, W2-041/042, W2-045, W2-049/050, W2-060/061, W2-063/064, W2-073—076,
-W2-081, W2-086—089, and W2-093. The mapping is **not complete**: the remaining
-W2-001—W2-096 cases still need an explicit case-level audit, and the current
-tests do not provide one normalized request → registered handler → terminal →
-provider-wire integration fixture per adapter profile.
+The full W2-001—W2-096 case-level mapping, with Direct / Partial / Gap status
+and evidence boundaries, is in
+`docs/implementation/live-work-w2-coverage.md`. The fixture is deterministic
+and crosses into AgentHost, but does not exercise the registered Main
+`createLiveWorkBridge` handler mapping or concrete socket/WebRTC adapters; it
+therefore remains partial evidence for W2-025 and W2-096.
 
 ## Remaining acceptance work
 
-- Cross-boundary integration currently uses deterministic seams and protocol
-  encoders; it does not exercise a full normalized request → registered Agent
-  handler → authoritative terminal event → provider wire path for each of
-  Codex, Gemini, Realtime GA, and Realtime compat.
-- W2-001—W2-096 still need a complete case-level mapping and uncovered-case
-  audit. This implementation does not claim all 96 behaviors pass.
+- Cross-boundary integration now covers four protocol profiles through the
+  shared coordinator and actual AgentHost admission/terminal events. The Main
+  bridge mapping and concrete socket/WebRTC adapter transport remain untested.
+- The W2 matrix has a row for every acceptance ID, but Partial and Gap rows
+  remain; this implementation does not claim all 96 behaviors pass.
 - M01—M16 and each Codex OAuth, Gemini Live, Realtime GA, and Realtime compat
   real-account/media journey are `NOT RUN`. No credentials, paid endpoints, or
   audio-device journey were used. Repository policy also reserves
