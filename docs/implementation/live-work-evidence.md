@@ -10,8 +10,12 @@ specification remains the behavioral source.
 - Request branch: `codex/live-voice-v1`; dedicated worktree:
   `/Users/lan/.codex/worktrees/live-voice-v1/PI-Desktop`.
 - Phase-2 implementation base: `1ec74701f` (the v1 implementation commit).
-- Latest fetched `origin/main`: `2387fa6d4d96be3ec67638f37255c23f4c52d367`;
-  it is an ancestor of the request head.
+- Latest fetched `origin/main`: `6c9e9d4e38a62a72b59e4d3c40c7799c34b27a2d`;
+  it is included in the request candidate through merge commit
+  `7e601bd3c9cc4a2deb9416ca4c810885a8ea4c49`.
+- The phase-2 changes originated from `1ec74701f1c23219bc6c68fc723e77cc432419df`
+  and were integrated with the latest main before candidate validation. The
+  test-harness follow-up and this evidence refresh are based on that candidate.
 - Existing pull request: [#1161](https://github.com/vastsa/PI-Desktop/pull/1161),
   open on `codex/live-voice-v1`. This task updates that PR and does not merge it.
 - The worktree has an untracked `PI-Desktop-Live-Voice-v1-Spec.md`; it is not a
@@ -115,13 +119,16 @@ specification remains the behavioral source.
 | `pnpm --filter @pi-desktop/voice-runtime test` | 51 tests passed. |
 | `pnpm --filter @pi-desktop/i18n test` | 27 tests passed. |
 | `pnpm --filter @pi-desktop/desktop typecheck` | Passed after rebuilding shared and voice-runtime. |
-| `pnpm --filter @pi-desktop/desktop test` | 3,038 tests passed across the full desktop suite. |
+| `pnpm -r --if-present test` | Passed all workspace suites: desktop 3,160; agent-runtime 1,091; shared 1,124; host-runtime 75; voice-runtime 51; agent-host 49; plugin-devkit 49; plugin-sdk 356; i18n 27; RACP 21; pi-host 6; docs 11. |
 | Targeted Live Voice `node --test` | 15 tests passed, covering Main service, selection scope/UI, controller path, and playback-activity IPC. |
 | `pnpm build:js` | Passed; docs, workspace packages, Electron main, preload, and renderer built. Existing chunk-size and VitePress highlighting warnings remain. |
 | `pnpm lint` | Passed, including style-token validation. |
-| `pnpm docs:check` | Passed; 83 English/Chinese specification pairs and 526 documentation pages verified. Existing ADR format notes remain. |
-| `pnpm check:agent-policy`, `pnpm check:pr-base`, `node scripts/check-architecture.mjs`, and `git diff --check` | Passed on the phase-2 candidate; `origin/main` at `2387fa6d4d96`. |
-| AgentHost, agent-runtime, and Rust regression suites | Passed on the v1 candidate; no files in those packages changed in phase 2. |
+| `cargo fmt --check` | Passed on the latest-main integration candidate. |
+| `cargo test -p host-core --locked` | 666 tests passed on the latest-main integration candidate. |
+| `cargo clippy -p host-core --all-targets --locked` | Passed on the latest-main integration candidate. |
+| `pnpm docs:check` | Passed; 83 English/Chinese specification pairs and 527 documentation pages verified. Existing ADR format notes remain. |
+| `pnpm check:agent-policy`, `pnpm check:pr-base`, `node scripts/check-architecture.mjs`, and `git diff --check` | Passed on the latest-main integration candidate; `origin/main` at `6c9e9d4e38a6`. |
+| Composer plugin-slot integration tests | 11 tests passed after updating the SSR preload boundary and toolbar control expectation for Live Voice. |
 
 The directly exercised W2 behaviors are mapped below. A mapped test proves
 only the named seam and assertions, not a complete provider-to-device journey.
