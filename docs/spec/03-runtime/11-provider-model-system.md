@@ -125,8 +125,12 @@ models.dev record publishes a reasoning `effort` option and no
 `budget_tokens` option (for example Opus 4.7+, Opus 5.x, Fable). Those models
 reject `thinking.type=enabled` with HTTP 400, and models.dev carries no pi-ai
 compat record, so without the flag pi-ai would fall back to budget thinking.
-Models that still publish `budget_tokens` keep budget thinking, and an
-explicit catalog `compat` record is preserved.
+Models that still publish `budget_tokens`, including those that also publish
+`effort`, keep budget thinking by default. The catalog uses this same rule
+for the protocol displayed in model settings. An explicit
+`ModelBinding.thinkingProtocol` selection (`legacy` or `adaptive`) overrides
+the default; an absent field preserves the existing inference. An explicit
+catalog `compat` record is preserved.
 
 An Anthropic Messages row the catalog cannot identify (for example a custom
 gateway URL serving an id several publishers list) still falls back to the
@@ -390,6 +394,7 @@ type ModelBinding = {
   maxTokens: number
   thinkingLevels: ThinkingLevel[]
   defaultThinkingLevel: SessionThinkingLevel | null
+  thinkingProtocol?: "legacy" | "adaptive"
   availableForSubagents?: boolean // opt-in for AI-driven delegation
 }
 

@@ -14,10 +14,11 @@ import {
   namedServiceOptions,
 } from "../src/components/settings/service-catalog.ts";
 
-// Stands in for i18next with two localized labels, so a label-only match is
+// Stands in for i18next with localized labels, so a label-only match is
 // distinguishable from a match on the canonical English name.
 const labels = {
   "settings.presetMoonshotCn": "月之暗面",
+  "settings.presetStepfunPlan": "阶跃星辰 Plan（订阅）",
   "settings.presetCustomEndpoint": "自定义端点",
 };
 const translate = (key) => labels[key] ?? key;
@@ -31,6 +32,16 @@ test("every named preset is offered once, in the shared table's order", () => {
   );
   const openai = namedServiceOptions(translate).find((option) => option.id === "openai");
   assert.equal(openai?.host, "api.openai.com");
+});
+
+test("StepFun Plan is offered once and searchable by its label, vendor and endpoint", () => {
+  const rows = namedServiceOptions(translate).filter((option) => option.id === "stepfun-plan");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].label, labels["settings.presetStepfunPlan"]);
+  assert.equal(rows[0].host, "api.stepfun.com");
+  for (const query of ["阶跃星辰", "StepFun Plan", "stepfun-step-plan", "api.stepfun.com/step_plan/v1"]) {
+    assert.ok(ids(query).includes("stepfun-plan"), query);
+  }
 });
 
 test("an empty or blank query keeps every option", () => {

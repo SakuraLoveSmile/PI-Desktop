@@ -1450,6 +1450,9 @@ sklm: {
     "maxOutput": "Sortie maximale",
     "supportedThinkingLevels": "Niveaux de réflexion",
     "defaultThinkingLevel": "Niveau de réflexion par défaut",
+    "thinkingProtocol": "Protocole de réflexion",
+    "thinkingProtocolLegacy": "Standard",
+    "thinkingProtocolAdaptive": "Adaptatif",
     "modelCapabilities": "Capacités",
     "imageInput": "Images",
     "documentInput": "PDF",
@@ -1656,18 +1659,6 @@ sklm: {
     "foldersLabel": "Dossiers du projet",
     "notFound": "Projet introuvable",
     "noProjects": "Aucun projet pour l'instant"
-  },
-  "pulls": {
-    "title": "Demandes d'extraction",
-    "refresh": "Actualiser",
-    "emptyTitle": "Aucune demande d'extraction",
-    "review": "Révision avec l'agent",
-    "filters": "Filtres de demande d'extraction",
-    "filterOpen": "Ouvrir",
-    "filterDraft": "Brouillon",
-    "filterAll": "Tous",
-    "open": "Ouvrir",
-    "draft": "Brouillon"
   },
   "scheduled": {
     "description": "Exécutez des tâches récurrentes tant que PI-Desktop est ouvert.",
@@ -2417,7 +2408,7 @@ sklm: {
     "failedTitle": "{{sessionTitle}} a besoin d'attention",
     "failedBody": "La conversation n'a pas abouti.",
     "failedBodyWithCode": "Le chat s'est arrêté avec l'erreur {{code}}.",
-    "askTitle": "{{sessionTitle}} a besoin de votre réponse",
+    "askTitle": "Une question attend votre réponse",
     "askBody": "{{question}}",
     "askBodyFallback": "La tâche nécessite votre réponse pour continuer.",
     "permissionTitle": "{{sessionTitle}} nécessite une autorisation d'outil",
