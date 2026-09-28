@@ -2,7 +2,7 @@ export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
 export const APP_ID = "net.aiuo.pi-desktop";
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.15.9";
+export const APP_VERSION = "0.15.10";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -229,6 +229,8 @@ export const IPC = {
     providersOauthCancel: "pi-desktop/providers/oauth/cancel",
     providersOauthDelete: "pi-desktop/providers/oauth/delete",
     pluginList: "pi-desktop/plugin/list",
+    /** A renderer slot component asking its own plugin for one JSON answer. */
+    pluginRendererCall: "pi-desktop/plugin/rendererCall",
     /** Plugin-contributed agent extensions (D387/D388, ADR 0214). */
     pluginImportExtension: "pi-desktop/plugin/importExtension",
     extensionsCommandRun: "pi-desktop/extensions/commands/run",

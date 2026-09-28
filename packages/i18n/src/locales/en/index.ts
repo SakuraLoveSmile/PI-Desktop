@@ -273,6 +273,8 @@ export const en = {
     sessionTranscriptEmpty: "This session's history could not be read. Reopen the session to try again.",
     fileMenu: "File references",
     removeFileReference: "Remove file reference {{name}}",
+    removePluginMark: "Remove {{name}}",
+    pluginTriggerMenu: "Plugin suggestions",
     messageAttachments: "Attachments in this message",
     fileEmpty: "No matching files",
     fileNoWorkspace: "Open a project to reference files",
@@ -331,6 +333,9 @@ export const en = {
     hideErrorDetails: "Hide details",
     dismissError: "Dismiss error message",
     copyErrorDetails: "Copy details",
+    entryExtraExpand: "Show full block",
+    entryExtraCollapse: "Collapse block",
+    actionSlotMore: "More actions",
     errorProvider: "AI provider",
     errorModel: "Model",
     previewFile: "Preview in the side panel",
@@ -1355,6 +1360,7 @@ sklm: {
     presetVolcengine: "Volcengine Ark",
     presetMinimaxCn: "MiniMax",
     presetMinimaxCnOpenai: "MiniMax (OpenAI)",
+    presetStepfunPlan: "StepFun Plan",
     presetKimiCoding: "Kimi For Coding",
     presetAntLing: "Ant Ling",
     presetBaseten: "Baseten",
@@ -2073,6 +2079,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       commands: "Commands",
       tools: "Agent tools",
       agentExtension: "Agent extension",
+      rendererUi: "Chat UI extension",
       skills: "Skills",
       themes: "Theme",
       mcp: "MCP server",
@@ -2112,6 +2119,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "agent.prompt.inject": "Adjust agent instructions",
       "agent.complete": "Run a one-shot completion with your models",
       "agent.extension": "Run code inside the agent",
+      "renderer.extension": "Draw UI in chat slots",
       "provider.register": "Add providers to the model list",
       "desktop.control": "Control the desktop",
       "models.list": "List authenticated models",
@@ -2157,6 +2165,8 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "agent.complete":
         "Can spend your model quota on a one-shot completion. The plugin never receives your API keys.",
       "agent.extension": "Runs ExtensionAPI modules inside the agent process with the same access as the agent's own tools. Enable only code you trust.",
+      "renderer.extension":
+        "Loads this plugin's renderer module into the app window to draw UI slot components (message action bars, entry extras, tool cards, code-block renderers, composer controls). The module runs in the same document as PI-Desktop. Enable only code you trust.",
       "provider.register":
         "Adds the providers this plugin defines to Settings' provider list. The plugin supplies the endpoint and models; your API key stays in PI-Desktop.",
       "desktop.control":

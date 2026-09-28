@@ -5749,6 +5749,12 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   8. Run a turn where the model calls `new_context` well below the hard budget.
   9. Invoke `/compact` manually while idle.
 - **Expected**:
+  - The summary request of every checkpoint carries the session's own
+    conversation identity: on the Responses-shaped providers
+    (`openai-responses`, `openai-codex-responses`) the outgoing payload keeps
+    the session id as `prompt_cache_key`, exactly as the session's turns do, so
+    a gateway fronting a Codex backend accepts it instead of answering 400
+    `invalid_responses_request`. Providers on other wire APIs are unchanged.
   - Each `turn_end` is evaluated before another provider request and never
     marks the overall task idle; composer/config controls remain blocked until
     `agent_end`, `error`, or manual-only `compaction_end`. In-run follow-up
@@ -6144,6 +6150,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   Existing classification coverage: `agent-errors.test.ts`,
   `provider-retry.test.ts`, `runtime.test.ts`, `subagent.test.ts`.
   Other scenario variants remain Draft.
+
+#### E2E-1174: Return a paired tool denial in Plan/Goal
+
+- Seed earlier tool-call history, then switch an Agent session to Plan or Goal.
+  A loopback Responses gateway emits Edit, Write or Task only if that tool is
+  declared in the request; an undeclared name would cause a 502.
+- Verify all six mode/tool combinations reach the normal tool-result path:
+  the next request contains the original call id and a mode-denial error,
+  preserves old call/result pairs, and adds no synthetic user correction.
+- Assert that no host call occurs and no delegate starts. The tool event is an
+  error while the model can continue with a read-only answer.
+- A handler reference retained from Agent must refuse execution after Plan/Goal
+  is entered; switching back to Agent restores the normal permission path.
+- Automation: `mode-tool-access.test.ts` runs real runtime/SDK loops against a
+  loopback HTTP/SSE fixture; `runtime.test.ts` covers catalog/mode transitions.
+  Existing host permission tests keep Write/Edit denied regardless of grants or
+  permission mode. No paid provider or user Desktop profile is used.
 
 #### E2E-149: Recover provider rate limits (429) silently in place
 
@@ -8430,6 +8453,25 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   the stubbed API; both locales also verify the Codex OAuth search opt-in save.
   Host persistence, live OAuth/model calls and visual layout were not exercised.
   Post-integration main E2E is NOT RUN.
+
+#### E2E-PROVIDER-stepfun-plan-setup: Save the StepFun subscription preset
+
+- **Preconditions**: Isolated Electron profile, English and Simplified Chinese,
+  synthetic API key and a discovered `step-5-preview` model; no live provider.
+- **Steps**: Select StepFun Plan in Add AI service, enter the test key, wait for
+  model discovery, explicitly select Step 5 Preview, then save.
+- **Expected**: The chooser and connection summary both visibly include
+  `api.stepfun.com/step_plan/v1`. Discovery receives `https://api.stepfun.com/step_plan/v1`,
+  `anthropic_messages` and the entered key. Save retains that URL and format,
+  the catalog vendor `stepfun-step-plan`, and the selected model. The ordinary
+  StepFun `/v1` endpoint is not substituted for the subscription endpoint.
+- **Automation**: `pnpm test:e2e:provider-api-style` uses real settings components
+  with only the API boundary stubbed. `provider-presets.test.ts` checks the
+  preset contract and ordinary-endpoint separation; `service-catalog.test.mjs`
+  checks discoverability by localized label, name, vendor key, and URL.
+- **Scope**: Save/discovery payloads are covered; host persistence, live model
+  calls, and visual layout are not asserted by this fixture.
+- **Specs linked**: `03-runtime/12-provider-config-schema.md`, `guide/stepfun.md`.
 
 #### E2E-PROVIDER-copy-config-without-credentials: Copy configuration into an independent provider
 
@@ -15261,6 +15303,27 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Milestone**: Maintenance.
 - **Status**: Covered by the existing HTTP client integration fixture and a
   focused component-render validation; no live IDA process required.
+
+### E2E-MCP-HTTP-SSE-held-open — A streamable HTTP reply lands before the server ends the stream (issue #1188)
+
+- **Preconditions**: A local mock Streamable HTTP server writes its JSON-RPC
+  reply immediately and keeps the `text/event-stream` body open well past the
+  client's handshake budget — the shape `https://gitmcp.io/docs` shows, where
+  initialize is answered in about two seconds and the stream only ends about
+  twelve seconds later. No provider credentials needed.
+- **Steps**: Configure that server with the `http` transport and a handshake
+  budget shorter than the stream lifetime; connect, discover the tools, and call
+  one. Repeat with a server that keeps the stream open and never answers.
+- **Expected**: Handshake, discovery, and the call complete as soon as their
+  reply event arrives, so the connection reports `ready` with the discovered
+  tools instead of `mcp initialize timed out after <budget>ms`. A server that
+  never replies still fails with `TIMEOUT` inside the same budget, and a stream
+  left open past its request is aborted rather than kept open.
+- **Specs**: 07-plugins/01-plugin-system §12.2; ADR 0038.
+- **Acceptance**: HTTP transport integration and the main-process MCP handshake.
+- **Milestone**: Maintenance.
+- **Status**: Automated by `apps/desktop/test/plugin-mcp.test.mjs` (held-open
+  reply case); no live app process required.
 
 ### E2E-IMAGE-generation-and-editing
 
