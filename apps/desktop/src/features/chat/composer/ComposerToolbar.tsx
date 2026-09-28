@@ -10,6 +10,7 @@ import {
 import type { AppState } from "../../../stores/app-store";
 import { ComposerPermissionPicker } from "./ComposerPermissionPicker";
 import { ContextUsageInspector } from "../../../components/ContextUsageInspector";
+import { ComposerControlSlots } from "./ComposerControlSlots";
 import { TooltipButton } from "../../../components/ui";
 import {
   IconArrowUp,
@@ -186,9 +187,11 @@ export function ComposerToolbar({
                   });
                 }
           }} />
+        <ComposerControlSlots side="left" />
       </div>
 
       <div className="composer-right">
+        <ComposerControlSlots side="right" />
         {contextUsage ? <ContextUsageInspector {...contextUsage} /> : null}
         <ComposerModelPicker
           t={t}
