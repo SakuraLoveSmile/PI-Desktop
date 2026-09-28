@@ -137,6 +137,7 @@ export const fr = {
     "checkForUpdates": "Vérifier les mises à jour",
     "buildUnknown": "Version inconnue",
     "search": "Recherche",
+    "actionWithShortcut": "{{action}} ({{shortcut}})",
     "temporarySessions": "Chats temporaires",
     "newTemporarySession": "Nouveau chat temporaire",
     "noProjectSessions": "Aucun chat dans ce domaine projet pour l'instant",

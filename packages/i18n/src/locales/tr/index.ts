@@ -146,6 +146,7 @@ export const tr = {
     checkForUpdates: "Güncellemeleri denetle",
     buildUnknown: "Sürüm bilinmiyor",
     search: "Ara",
+    "actionWithShortcut": "{{action}} ({{shortcut}})",
     temporarySessions: "Geçici sohbetler",
     newTemporarySession: "Yeni geçici sohbet",
     noProjectSessions: "Bu projede henüz sohbet yok",

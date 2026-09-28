@@ -136,6 +136,7 @@ export const ptBR = {
     checkForUpdates: "Verificar atualizações",
     buildUnknown: "Versão desconhecida",
     search: "Pesquisar",
+    actionWithShortcut: "{{action}} ({{shortcut}})",
     temporarySessions: "Conversas temporárias",
     newTemporarySession: "Nova conversa temporária",
     noProjectSessions: "Nenhuma conversa neste projeto ainda",

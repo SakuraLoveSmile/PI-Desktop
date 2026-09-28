@@ -146,6 +146,7 @@ export const ko = {
     checkForUpdates: "업데이트 확인",
     buildUnknown: "버전 알 수 없음",
     search: "검색",
+    actionWithShortcut: "{{action}} ({{shortcut}})",
     temporarySessions: "임시 대화",
     newTemporarySession: "새 임시 채팅",
     noProjectSessions: "이 프로젝트에 채팅이 아직 없습니다",
