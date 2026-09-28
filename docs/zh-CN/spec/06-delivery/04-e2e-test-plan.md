@@ -8981,7 +8981,8 @@ the latest destination. These assertions measure work counts, not device FPS.
   对应报告；报告展示结论、执行状态、证据和限制。只有结构化报告与持久证据都支持时，
   才能将验收条件显示为已达成。后备报告必须标明未知或缺失的证据。
 - **恢复与失败：** 重启后仍可读取就绪报告。无效草稿或持久化失败不得发布过期或误导性
-  的就绪报告。outbox 持久化失败时报告保持失败；显式 Retry 只使用 Host 持久事实，不重跑
+  的就绪报告。报告到达 `ready` 或 `failed` 后，迟到的草稿提交会被拒绝，报告文件与记录不变。
+  outbox 持久化失败时报告保持失败；显式 Retry 只使用 Host 持久事实，不重跑
   Goal，也不调用模型。工作面板显示本地化的通用失败说明与安全格式错误码；请求期间禁用
   Retry。RACP Retry 等待该 session 的待处理 transcript 写入；barrier 未成功时返回
   `REPORT_PERSISTENCE_BARRIER_FAILED`，报告保持失败。viewer 不能 Retry；读取范围限定到请求的 session。

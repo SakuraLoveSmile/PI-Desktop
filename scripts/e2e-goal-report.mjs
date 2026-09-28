@@ -166,6 +166,20 @@ async function scenarioStructuredReport(binary, tempRoot) {
     assert(parsedFile.executionId === executionId, "file JSON executionId mismatch");
     assert(parsedFile.schemaVersion === 1, "file JSON schemaVersion mismatch");
 
+    await expectRpcError(
+      () => ctx.host.call("goalReports.submitDraft", {
+        executionId,
+        draft: { ...draft, summary: "Late replacement" },
+      }),
+      ["INTERNAL"],
+    );
+    const afterLateDraft = await ctx.host.call("goalReports.get", {
+      sessionId: session.id,
+      executionId,
+    });
+    assert(afterLateDraft.report?.summary === draft.summary, shortJson(afterLateDraft));
+    assert(await readFile(reportFilePath, "utf8") === fileBytes, "late draft changed the report file");
+
     await endTurn(ctx.host, turnId);
     return `reportId=${report.reportId} integrity=structured verdict=met fileExists=true`;
   }, binary, tempRoot);

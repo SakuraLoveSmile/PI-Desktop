@@ -53,3 +53,7 @@
   sweeps for the lifetime of the session. Persisted origin markers preserve
   artifact resolution even after moving to a project. Failed submissions visibly
   terminate with structured errors rather than reporting false completions.
+
+- Goal Completion Reports stay failed when their session's final transcript
+  cannot be persisted. A late draft can no longer replace a ready or failed
+  report, and another session's pending transcript does not block publication.

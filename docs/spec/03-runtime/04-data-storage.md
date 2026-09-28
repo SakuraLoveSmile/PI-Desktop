@@ -792,6 +792,8 @@ hash, byte size, and durable transcript sequence. Status is `draft`, `pending`,
 is `met`, `partial`, `blocked`, or `unknown`. Session deletion cascades the row
 and removes the corresponding report files. Report content is not inferred
 from transcript text.
+Submitting a late draft cannot move a `ready` or `failed` report back to
+`draft`; the Host rejects it before changing either the report file or row.
 
 Expert Team state is stored in three Host-owned tables (ADR 0307):
 
