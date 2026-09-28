@@ -17,8 +17,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const APP_NAME = "PI-Desktop";
-const DEV_BUNDLE_ID = "com.pi-desktop.app.dev";
-const BRANDING_SCHEMA = "v2";
+const DEV_BUNDLE_ID = "net.aiuo.pi-desktop.dev";
+const BRANDING_SCHEMA = "v3";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DESKTOP_ROOT = join(ROOT, "apps", "desktop");
 
@@ -104,6 +104,8 @@ export function prepareMacDevelopmentBundle({
         "--force",
         "--sign",
         "-",
+        "--identifier",
+        DEV_BUNDLE_ID,
         stagingBundle,
       ]);
     }
@@ -127,8 +129,10 @@ export function prepareMacDevelopmentBundle({
 
 function run() {
   const env = { ...process.env, PI_DESKTOP_DEV: "1" };
+  // Electron 43+ downloads its platform binary when its package is resolved.
+  // electron-vite requires the resulting path.txt marker on every platform.
+  const electron = resolveElectronInstallation();
   if (process.platform === "darwin") {
-    const electron = resolveElectronInstallation();
     env.ELECTRON_EXEC_PATH = prepareMacDevelopmentBundle({
       electronExecutable: electron.executablePath,
       electronVersion: electron.version,

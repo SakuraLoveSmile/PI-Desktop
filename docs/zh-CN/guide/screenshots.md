@@ -40,7 +40,8 @@ Composer 的模型 × 推理芯片切换当前会话使用的模型。在输入�
 
 ## 工作面板
 
-当智能体产出工作产物时，工作面板在对话旁边打开。下面几张是尚未打开工作区时的面板
+成功的工作区 Write/Edit 永远不会打开工作面板。面板在用户主动打开时出现，或在文件、
+URL、浏览器预览或计划审批工件打开自己的选项卡时出现。下面几张是尚未打开工作区时的面板
 状态，也就是一次新对话的起点。
 
 ![审阅面板](../../public/screenshots/app/zh/panel-review.webp)
@@ -53,11 +54,7 @@ Composer 的模型 × 推理芯片切换当前会话使用的模型。在输入�
 
 ## 目的地页
 
-合并请求、项目归档和定时任务都是从侧边栏进入的整页目的地。
-
-![合并请求页](../../public/screenshots/app/zh/pulls-live.webp)
-
-![深色主题下的合并请求页](../../public/screenshots/app/zh/dark-pulls.webp)
+项目归档和定时任务是整页目的地；项目归档从设置进入。
 
 ![项目归档](../../public/screenshots/app/zh/project-archive-live.webp)
 

@@ -1,3 +1,4 @@
+import { readTranscriptSource, readMainSource } from "./helpers/source-contracts.mjs";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -5,11 +6,11 @@ import test from "node:test";
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 const [transcript, markdown, api, main, panel, protocol, hook] = await Promise.all([
-  read("../src/components/ChatTranscript.tsx"),
+  readTranscriptSource(),
   read("../src/components/Markdown.tsx"),
   read("../src/lib/api.ts"),
-  read("../electron/main/index.ts"),
-  read("../electron/main/fs-panel.ts"),
+  readMainSource(),
+  read("../../../packages/host-runtime/src/workspace-files.ts"),
   read("../../../packages/shared/src/protocol.ts"),
   read("../src/lib/use-referenced-image-data-url.ts"),
 ]);
@@ -31,9 +32,10 @@ test("renderer hook loads referenced image data URLs with a scoped bounded cache
   assert.match(hook, /dataUrlCache = new Map<string, string>\(\)/);
   assert.match(hook, /DATA_URL_CACHE_ENTRIES/);
   assert.match(hook, /DATA_URL_CACHE_MAX_BYTES/);
-  assert.match(hook, /fsReadImageDataUrl\(key, mimeType\)/);
+  assert.match(hook, /fsReadImageDataUrl\(normalizedRef, mimeType\)/);
+  assert.match(hook, /resolved\.key === requestedKey/);
   assert.match(hook, /result\.kind === "image" && result\.dataUrl/);
-  assert.match(hook, /\^https\?:/);
+  assert.match(hook, /https\?\|data\|blob/);
 });
 
 test("user message image attachments render as thumbnails", () => {

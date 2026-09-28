@@ -1,3 +1,9 @@
+import {
+  KEYBOARD_SHORTCUTS,
+  keybindingDisplayParts,
+  resolveKeybinding,
+  type ShortcutPlatform,
+} from "@pi-desktop/shared";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/app-store";
 import {
@@ -5,6 +11,7 @@ import {
   IconNewSession,
   IconSearch,
 } from "./icons";
+import { TooltipButton } from "./ui";
 
 function projectName(path?: string | null, name?: string | null) {
   if (name) return name;
@@ -17,15 +24,6 @@ function isDefaultSessionTitle(title?: string | null) {
   const trimmed = (title || "").trim().toLowerCase();
   if (!trimmed) return true;
   return ["new task", "new chat", "新建任务", "新对话"].includes(trimmed);
-}
-
-const TOPBAR_TITLE_MAX_LENGTH = 10;
-
-function truncateTopbarTitle(title: string) {
-  const characters = Array.from(title);
-  return characters.length > TOPBAR_TITLE_MAX_LENGTH
-    ? `${characters.slice(0, TOPBAR_TITLE_MAX_LENGTH).join("")}…`
-    : title;
 }
 
 export function ConversationTopbar({
@@ -45,13 +43,46 @@ export function ConversationTopbar({
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessions = useAppStore((s) => s.sessions);
   const workspace = useAppStore((s) => s.workspace);
+  const keybindings = useAppStore((s) => s.settings?.keybindings);
+  const platform = (
+    typeof window === "undefined" ? "darwin" : window.piDesktop?.platform ?? "darwin"
+  ) as ShortcutPlatform;
+  const newTaskShortcut = KEYBOARD_SHORTCUTS.find(
+    (shortcut) => shortcut.id === "newTask",
+  );
+  const searchShortcut = KEYBOARD_SHORTCUTS.find(
+    (shortcut) => shortcut.id === "openSearch",
+  );
+  const newTaskBinding = newTaskShortcut
+    ? resolveKeybinding(newTaskShortcut, keybindings, platform)
+    : null;
+  const searchBinding = searchShortcut
+    ? resolveKeybinding(searchShortcut, keybindings, platform)
+    : null;
+  const newTaskShortcutLabel = keybindingDisplayParts(newTaskBinding, platform).join(
+    platform === "darwin" ? "" : "+",
+  );
+  const searchShortcutLabel = keybindingDisplayParts(searchBinding, platform).join(
+    platform === "darwin" ? "" : "+",
+  );
+  const newTaskTooltip = newTaskShortcutLabel
+    ? t("nav.actionWithShortcut", {
+        action: t("nav.newTask"),
+        shortcut: newTaskShortcutLabel,
+      })
+    : t("nav.newTask");
+  const searchTooltip = searchShortcutLabel
+    ? t("nav.actionWithShortcut", {
+        action: t("nav.search"),
+        shortcut: searchShortcutLabel,
+      })
+    : t("nav.search");
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
 
   const fullTaskTitle = isDefaultSessionTitle(activeSession?.title)
     ? t("chat.untitledTask")
     : activeSession?.title || t("chat.untitledTask");
-  const taskTitle = truncateTopbarTitle(fullTaskTitle);
   const project = projectName(workspace?.path, workspace?.name);
 
   return (
@@ -69,45 +100,45 @@ export function ConversationTopbar({
           sidebar is open the slot is zero-width and hidden from AT.
         */}
         <div className="ct-lead" aria-hidden={!sidebarCollapsed}>
-          <button
+          <TooltipButton
             type="button"
             className="ct-icon-btn"
-            title={t("nav.toggleSidebar")}
-            aria-label={t("nav.toggleSidebar")}
+            tooltip={t("nav.toggleSidebar")}
+            ariaLabel={t("nav.toggleSidebar")}
             tabIndex={sidebarCollapsed ? undefined : -1}
             onClick={onToggleSidebar}
           >
             <IconSidebar size={15} />
-          </button>
+          </TooltipButton>
         </div>
         <div
           className="ct-title-wrap"
           title={project ? `${project} · ${fullTaskTitle}` : fullTaskTitle}
         >
-          <span className="ct-title">{taskTitle}</span>
+          <span className="ct-title">{fullTaskTitle}</span>
         </div>
       </div>
 
       <div className="ct-right">
         <div className="ct-actions">
-          <button
+          <TooltipButton
             type="button"
             className="ct-icon-btn"
-            title={t("nav.newTask")}
-            aria-label={t("nav.newTask")}
+            tooltip={newTaskTooltip}
+            ariaLabel={t("nav.newTask")}
             onClick={onNewTask}
           >
             <IconNewSession size={15} />
-          </button>
-          <button
+          </TooltipButton>
+          <TooltipButton
             type="button"
             className="ct-icon-btn"
-            title={t("nav.search")}
-            aria-label={t("nav.search")}
+            tooltip={searchTooltip}
+            ariaLabel={t("nav.search")}
             onClick={onOpenSearch}
           >
             <IconSearch size={15} />
-          </button>
+          </TooltipButton>
         </div>
       </div>
     </div>

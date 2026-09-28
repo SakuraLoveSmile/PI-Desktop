@@ -1,7 +1,6 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -9,9 +8,10 @@ import { useTranslation } from "react-i18next";
 import type { ProjectRecord } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
-import { Button, Select, cx } from "../ui";
+import { Button, SegmentedControl, SettingsToggle, TooltipButton, cx } from "../ui";
+import { AnchoredMenu } from "./AnchoredMenu";
+import { SettingsMenuSelect } from "./SettingsMenuSelect";
 import {
-  IconChevronDown,
   IconFolder,
   IconFolderOpen,
   IconMore,
@@ -26,9 +26,6 @@ export type AgentProjectOption = {
 
 /** Which level the workbench is currently showing. */
 export type CapabilityFilter = "all" | "global" | "project";
-
-/** How long an armed delete stays armed before it disarms itself. */
-const DELETE_CONFIRM_MS = 3200;
 
 export function projectDisplayName(path: string, fallback?: string): string {
   if (fallback?.trim()) return fallback.trim();
@@ -103,19 +100,11 @@ export function useAgentProjects() {
 }
 
 /**
- * A delete that needs two clicks. The first click arms the action and the
- * caller relabels it; the arm expires on its own so a row never stays one
- * stray click away from losing a file.
+ * The two-click delete every capability row uses. The arm-and-expire rule is
+ * shared with the session and project rows, so the settings pages re-export it
+ * from the layout they already share instead of keeping a second copy.
  */
-export function useArmedDelete() {
-  const [armed, setArmed] = useState<string | null>(null);
-  useEffect(() => {
-    if (!armed) return;
-    const timer = setTimeout(() => setArmed(null), DELETE_CONFIRM_MS);
-    return () => clearTimeout(timer);
-  }, [armed]);
-  return { armed, setArmed };
-}
+export { useArmedDelete } from "../../hooks/use-armed-delete";
 
 /** Case-insensitive substring match across whichever fields a row exposes. */
 export function matchesCapabilitySearch(
@@ -142,27 +131,24 @@ export function AgentProjectPicker({
 }) {
   const { t } = useTranslation();
   return (
-    <label className="agent-capability-project-picker">
-      <span className="sr-only">{label}</span>
+    <div className="agent-capability-project-picker">
       <IconFolder size={13} aria-hidden="true" />
-      <Select
+      <SettingsMenuSelect
+        className="agent-capability-project-select"
+        label={label}
         value={value ?? ""}
-        aria-label={label}
         disabled={disabled || options.length === 0}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.length === 0 ? (
-          <option value="">{t("settings.noProjects")}</option>
-        ) : (
-          options.map((project) => (
-            <option key={project.path} value={project.path}>
-              {project.name}
-            </option>
-          ))
-        )}
-      </Select>
-      <IconChevronDown size={12} aria-hidden="true" />
-    </label>
+        onChange={onChange}
+        options={
+          options.length === 0
+            ? [{ id: "", label: t("settings.noProjects"), disabled: true }]
+            : options.map((project) => ({
+                id: project.path,
+                label: project.name,
+              }))
+        }
+      />
+    </div>
   );
 }
 
@@ -180,34 +166,25 @@ export function CapabilityToggle({
   onChange: () => void;
 }) {
   return (
-    <button
-      type="button"
-      className={cx("settings-toggle", checked && "on", busy && "is-busy")}
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      aria-busy={busy || undefined}
-      disabled={disabled || busy}
-      onClick={onChange}
-    >
-      <span className="settings-toggle-thumb" />
-    </button>
+    <SettingsToggle
+      checked={checked}
+      label={label}
+      busy={busy}
+      disabled={disabled}
+      onChange={onChange}
+    />
   );
 }
 
 /**
  * Page shell. The heading is owned by SettingsPage, so this contributes the
- * description, the toolbar, and the single panel the rows live in.
+ * toolbar and the single panel the rows live in.
  */
 export function AgentCapabilityPage({
-  description: _description,
-  note: _note,
   toolbar,
   children,
   className,
 }: {
-  description: string;
-  note?: string;
   toolbar: ReactNode;
   children: ReactNode;
   className?: string;
@@ -265,29 +242,17 @@ export function CapabilityToolbar({
   return (
     <div className="agent-capability-toolbar">
       {filter && onFilterChange && segments.length > 0 ? (
-        <div
-          className="settings-segment agent-capability-segment"
-          role="radiogroup"
-          aria-label={t("settings.capabilityFilterLabel")}
-        >
-          {segments.map((segment) => (
-            <button
-              key={segment.id}
-              type="button"
-              role="radio"
-              aria-checked={filter === segment.id}
-              className={cx(
-                "settings-segment-item",
-                "agent-capability-segment-btn",
-                filter === segment.id && "active",
-              )}
-              onClick={() => onFilterChange(segment.id)}
-            >
-              {segment.label}
-              <span className="agent-capability-segment-count">{segment.count}</span>
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={filter}
+          onChange={(value) => onFilterChange(value)}
+          options={segments.map((segment) => ({
+            value: segment.id,
+            label: (<>{segment.label}<span className="agent-capability-segment-count">{segment.count}</span></>),
+          }))}
+          label={t("settings.capabilityFilterLabel")}
+          className="agent-capability-segment"
+          itemClassName="agent-capability-segment-btn"
+        />
       ) : null}
       <div className="agent-capability-search-wrap">
         <IconSearch size={13} aria-hidden="true" />
@@ -300,14 +265,15 @@ export function CapabilityToolbar({
           onChange={(event) => onSearchChange(event.target.value)}
         />
         {search ? (
-          <button
+          <TooltipButton
             type="button"
             className="agent-capability-search-clear"
-            aria-label={t("settings.clearSearch")}
+            tooltip={t("settings.clearSearch")}
+            ariaLabel={t("settings.clearSearch")}
             onClick={() => onSearchChange("")}
           >
             <IconX size={11} />
-          </button>
+          </TooltipButton>
         ) : null}
       </div>
       {projectPicker}
@@ -361,7 +327,8 @@ export function CapabilityGroupHeader({
   action,
 }: {
   label: string;
-  path: string;
+  /** Resolved `.agents` path; omit for shipped sources that have no file. */
+  path?: string;
   count: number;
   action?: ReactNode;
 }) {
@@ -369,9 +336,13 @@ export function CapabilityGroupHeader({
   return (
     <div className="agent-capability-group" role="presentation">
       <span className="agent-capability-group-label">{label}</span>
-      <code className="agent-capability-group-path" title={path}>
-        {path}
-      </code>
+      {path ? (
+        <code className="agent-capability-group-path" title={path}>
+          {path}
+        </code>
+      ) : (
+        <span className="agent-capability-group-path" aria-hidden="true" />
+      )}
       <span
         className="agent-capability-group-count"
         title={t("settings.capabilityCount", { count })}
@@ -458,54 +429,51 @@ export type CapabilityMenuItem = {
 /**
  * Overflow menu for one row. Open state is owned by the page so only one row's
  * menu can be open, and Escape or any outside press dismisses it.
+ *
+ * `restoreFocus` is false while the chosen item opens something that takes
+ * focus itself, such as a dialog, which the trigger would otherwise take back.
  */
 export function CapabilityRowMenu({
   label,
   items,
   open,
   disabled,
+  restoreFocus,
   onOpenChange,
 }: {
   label: string;
   items: readonly CapabilityMenuItem[];
   open: boolean;
   disabled?: boolean;
+  restoreFocus?: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!wrapRef.current?.contains(event.target as Node)) onOpenChange(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onOpenChange(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, onOpenChange]);
-
   return (
-    <div className="agent-capability-menu-wrap" ref={wrapRef}>
-      <button
-        type="button"
-        className="settings-icon-button"
-        aria-label={label}
-        title={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => onOpenChange(!open)}
-      >
-        <IconMore size={16} />
-      </button>
-      {open ? (
-        <div className="agent-capability-menu" role="menu">
+    <AnchoredMenu
+      className="agent-capability-menu-wrap"
+      open={open}
+      onClose={() => onOpenChange(false)}
+      menuClassName="agent-capability-menu"
+      label={label}
+      role="menu"
+      align="end"
+      restoreFocus={restoreFocus}
+      trigger={(ref) => (
+        <TooltipButton
+          ref={ref}
+          type="button"
+          className="settings-icon-button"
+          tooltip={label}
+          ariaLabel={label}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          disabled={disabled}
+          onClick={() => onOpenChange(!open)}
+        >
+          <IconMore size={16} />
+        </TooltipButton>
+      )}
+    >
           {items.map((item) => (
             <button
               key={item.key}
@@ -519,9 +487,7 @@ export function CapabilityRowMenu({
               {item.label}
             </button>
           ))}
-        </div>
-      ) : null}
-    </div>
+    </AnchoredMenu>
   );
 }
 
@@ -557,7 +523,9 @@ export function CapabilityEmpty({
 }) {
   return (
     <div className="agent-capability-empty" role="status">
-      {icon ?? <IconFolderOpen size={18} aria-hidden="true" />}
+      <span className="agent-capability-empty-icon" aria-hidden="true">
+        {icon ?? <IconFolderOpen size={18} />}
+      </span>
       <span className="agent-capability-empty-message">{message}</span>
       {hint ? <span className="agent-capability-empty-hint">{hint}</span> : null}
       {action ? <div className="agent-capability-empty-action">{action}</div> : null}
@@ -583,12 +551,28 @@ export function CapabilityButton({
   // No `size="sm"`: its utilities live in Tailwind's `utilities` layer while the
   // style partials are unlayered, so `.btn` wins regardless. Toolbar buttons get
   // their compact geometry from `.agent-capability-toolbar-actions > .btn`.
+  const className = cx(
+    "btn",
+    variant === "primary" ? "btn-primary" : "btn-secondary",
+  );
+  if (title) {
+    return (
+      <TooltipButton
+        tooltip={title}
+        className={className}
+        disabled={disabled || busy}
+        aria-busy={busy || undefined}
+        onClick={onClick}
+      >
+        {children}
+      </TooltipButton>
+    );
+  }
   return (
     <Button
       variant={variant}
       disabled={disabled || busy}
       aria-busy={busy || undefined}
-      title={title}
       onClick={onClick}
     >
       {children}

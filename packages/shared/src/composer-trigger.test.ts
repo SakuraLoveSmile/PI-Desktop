@@ -7,6 +7,7 @@ import {
   formatFileInsert,
   normalizeLargePasteThreshold,
   restoreInlineComposerFileReferenceTokens,
+  rewriteIdeographicCommaTrigger,
   serializeComposerFileReferences,
   serializeInlineComposerFileReferences,
   stripInlineComposerFileReferenceTokens,
@@ -43,9 +44,32 @@ describe("detectTrigger — slash mode", () => {
     });
   });
 
-  it("never triggers mid-draft or on later lines", () => {
-    expect(detectTrigger("hi /cmd", 7)).toBeNull();
-    expect(detectTrigger("hi\n/cmd", 7)).toBeNull();
+  it("targets later slash tokens independently", () => {
+    expect(detectTrigger("hi /cmd", 7)).toMatchObject({ tokenStart: 3, query: "cmd" });
+    expect(detectTrigger("hi\n/cmd", 7)).toMatchObject({ tokenStart: 3, query: "cmd" });
+    expect(detectTrigger("https://example.com", 8)).toBeNull();
+  });
+});
+
+describe("rewriteIdeographicCommaTrigger", () => {
+  it("turns a leading ideographic comma into the slash trigger", () => {
+    expect(rewriteIdeographicCommaTrigger("、")).toBe("/");
+    expect(rewriteIdeographicCommaTrigger("、rev")).toBe("/rev");
+  });
+
+  it("leaves the mark alone anywhere else in the draft", () => {
+    expect(rewriteIdeographicCommaTrigger("你好、世界")).toBe("你好、世界");
+    expect(rewriteIdeographicCommaTrigger("/cmd 、")).toBe("/cmd 、");
+    expect(rewriteIdeographicCommaTrigger("")).toBe("");
+  });
+
+  it("opens the menu through the ordinary detector once rewritten", () => {
+    const draft = rewriteIdeographicCommaTrigger("、rev");
+    expect(detectTrigger(draft, draft.length)).toMatchObject({
+      mode: "slash",
+      query: "rev",
+      tokenStart: 0,
+    });
   });
 });
 
@@ -201,6 +225,19 @@ describe("compact file references", () => {
     ).toBe(
       "before @/tmp/session/pasted/pasted-text.txt after\n@src/a.ts",
     );
+  });
+
+  it("resolves a plugin mark to the text it sends, never to a path", () => {
+    const references = [
+      { path: "", token: "\uE001", plugin: { send: "Issue #42: crash on start" } },
+      { path: "src/a.ts", token: "\uE002" },
+      { path: "", token: "\uE003", plugin: { send: "#7 #8" } },
+    ];
+    expect(
+      serializeInlineComposerFileReferences("see \uE001\uE002 and \uE003", references),
+    ).toBe("see Issue #42: crash on start @src/a.ts and #7 #8");
+    // A mark is inline only: once its chip is gone it sends nothing.
+    expect(serializeComposerFileReferences("gone", references.slice(0, 1))).toBe("gone");
   });
 
   it("does not serialize an inline reference after its token is removed", () => {

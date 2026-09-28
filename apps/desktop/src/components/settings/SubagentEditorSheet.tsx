@@ -3,26 +3,34 @@ import { useTranslation } from "react-i18next";
 import {
   DEFAULT_SUBAGENT_TOOLS,
   GLOBAL_SCOPE,
-  MAX_SUBAGENT_MAX_TURNS,
+  MAX_SUBAGENT_MAX_TOKENS,
   SUBAGENT_ASSIGNABLE_TOOLS,
+  SUBAGENT_INHERIT_TOKEN,
   SUBAGENT_PRESETS,
   SUBAGENT_THINKING_LEVELS,
+  findSubagentPreset,
+  isSubagentAssignableTool,
   isSubagentMutatingTool,
   resolveScope,
   type ActivationScope,
+  type SubagentDefinition,
   type SubagentPreset,
   type SubagentThinkingLevel,
   type UserSubagentRecord,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { Button, Field, Input, Select, Textarea, cx } from "../ui";
+import { Button, Field, HelpIcon, Input, SettingsToggle, Textarea, TooltipButton, cx, portalOverlay } from "../ui";
 import { IconChevronRight, IconFolderOpen, IconX } from "../icons";
 import {
   groupSubagentModelChoices,
   subagentModelChoices,
   subagentModelOrphanPin,
+  subagentModelPinParts,
   subagentModelSelectValue,
 } from "./subagent-models";
+import { SubagentModelPicker } from "./SubagentModelPicker";
+import { SubagentFallbackModels } from "./SubagentFallbackModels";
+import { SettingsMenuSelect } from "./SettingsMenuSelect";
 
 /** Hard cap host-core enforces on a definition document. */
 export const MAX_SUBAGENT_BYTES = 32 * 1024;
@@ -31,18 +39,48 @@ export type SubagentDraft = {
   id: string;
   name: string;
   description: string;
-  /** Tool grant; never empty, because a delegate with no tools cannot work. */
+  /** Assignable extras. May be empty when `inheritTools` is on. */
   tools: string[];
+  /** Frontmatter `tools: inherit` — union the parent session catalog. */
+  inheritTools: boolean;
   /** `<provider>/<model>`, or empty for "same model as this session". */
   model: string;
+  fallbackModels: string[];
   /** Empty means "whatever the session uses". */
   thinkingLevel: SubagentThinkingLevel | "";
-  /** `0` means no limit, which is what a definition without `maxTurns` gets. */
-  maxTurns: number;
+  /**
+   * Output-token cap for one delegate response. `0` means "follow the model's
+   * published limit", which is what a definition without `maxTokens` gets.
+   */
+  maxTokens: number;
   body: string;
   enabled: boolean;
   scope: ActivationScope;
 };
+
+/** Split a stored tools list into the inherit flag and assignable extras. */
+export function splitSubagentToolGrant(tools: readonly string[]): {
+  inheritTools: boolean;
+  tools: string[];
+} {
+  const inheritTools = tools.some((name) => name === SUBAGENT_INHERIT_TOKEN);
+  const assignable = tools.filter((name) => isSubagentAssignableTool(name));
+  return {
+    inheritTools,
+    tools:
+      assignable.length > 0 || inheritTools
+        ? assignable
+        : [...DEFAULT_SUBAGENT_TOOLS],
+  };
+}
+
+/** Frontmatter `tools` list written on save. */
+export function mergeSubagentToolGrant(
+  inheritTools: boolean,
+  tools: readonly string[],
+): string[] {
+  return inheritTools ? [SUBAGENT_INHERIT_TOKEN, ...tools] : [...tools];
+}
 
 /**
  * The starter document. A subagent's body is its whole system prompt, so the
@@ -79,6 +117,7 @@ export const SUBAGENT_PRESET_COPY = {
   "code-reviewer": { name: "presetReviewerName", desc: "presetReviewerDesc" },
   "test-runner": { name: "presetTestRunnerName", desc: "presetTestRunnerDesc" },
   fixer: { name: "presetFixerName", desc: "presetFixerDesc" },
+  "ui-designer": { name: "presetUiDesignerName", desc: "presetUiDesignerDesc" },
 } as const satisfies Record<SubagentPreset["id"], { name: string; desc: string }>;
 
 /** Full i18n path for a preset chip, or null when `id` is blank / unknown. */
@@ -97,9 +136,11 @@ export function emptySubagentDraft(): SubagentDraft {
     name: "",
     description: "",
     tools: [...DEFAULT_SUBAGENT_TOOLS],
+    inheritTools: false,
     model: "",
+    fallbackModels: [],
     thinkingLevel: "",
-    maxTurns: 0,
+    maxTokens: 0,
     body: "",
     enabled: true,
     scope: GLOBAL_SCOPE,
@@ -107,17 +148,44 @@ export function emptySubagentDraft(): SubagentDraft {
 }
 
 export function draftFromRecord(record: UserSubagentRecord, body: string): SubagentDraft {
+  const grant = splitSubagentToolGrant(record.tools);
   return {
     id: record.id,
     name: record.name,
     description: record.description ?? "",
-    tools: record.tools.length ? [...record.tools] : [...DEFAULT_SUBAGENT_TOOLS],
+    tools: grant.tools,
+    inheritTools: grant.inheritTools,
     model: record.model ?? "",
+    fallbackModels: [...(record.fallbackModels ?? [])],
     thinkingLevel: record.thinkingLevel ?? "",
-    maxTurns: record.maxTurns ?? 0,
+    maxTokens: record.maxTokens ?? 0,
     body,
     enabled: record.enabled,
     scope: resolveScope(record.scope),
+  };
+}
+
+/** Prefill the create sheet from a shipped definition (Copy as mine). */
+export function draftFromDefinition(definition: SubagentDefinition): SubagentDraft {
+  const preset = findSubagentPreset(definition.name);
+  const grant = splitSubagentToolGrant(
+    definition.inheritTools
+      ? [SUBAGENT_INHERIT_TOKEN, ...definition.tools]
+      : definition.tools,
+  );
+  return {
+    ...emptySubagentDraft(),
+    name: preset?.name ?? definition.name,
+    description: definition.description,
+    tools: grant.tools,
+    inheritTools: grant.inheritTools,
+    model: definition.model
+      ? `${definition.model.providerId}/${definition.model.modelId}`
+      : "",
+    fallbackModels: (definition.fallbackModels ?? []).map((pin) => `${pin.providerId}/${pin.modelId}`),
+    thinkingLevel: definition.thinkingLevel ?? "",
+    maxTokens: definition.maxTokens ?? 0,
+    body: definition.prompt,
   };
 }
 
@@ -139,9 +207,10 @@ export function subagentSlug(value: string): string {
 
 /**
  * Apply a built-in preset to a draft. Tool grants are replaced wholesale so a
- * preset that drops `Bash` truly drops it; `maxTurns` keeps its "0 means
- * unlimited" convention. Body and description are overwritten — these are the
- * values that make the preset worth picking.
+ * preset that drops `Bash` truly drops it. Body and description are
+ * overwritten — these are the values that make the preset worth picking.
+ * Inherit is cleared: presets are the built-in delegates, not parent-catalog
+ * workers.
  */
 export function applySubagentPreset(draft: SubagentDraft, preset: SubagentPreset): SubagentDraft {
   return {
@@ -149,7 +218,7 @@ export function applySubagentPreset(draft: SubagentDraft, preset: SubagentPreset
     name: preset.name,
     description: preset.description,
     tools: [...preset.tools],
-    maxTurns: preset.maxTurns,
+    inheritTools: false,
     body: preset.body,
   };
 }
@@ -161,7 +230,7 @@ export function resetSubagentTemplate(draft: SubagentDraft): SubagentDraft {
     name: "",
     description: "",
     tools: [...DEFAULT_SUBAGENT_TOOLS],
-    maxTurns: 0,
+    inheritTools: false,
     body: "",
   };
 }
@@ -171,20 +240,29 @@ export function subagentDraftError(draft: SubagentDraft): string | null {
   if (!draft.name.trim()) return "extensions.subagents.errorName";
   if (!subagentSlug(draft.name)) return "extensions.subagents.errorSlug";
   if (!draft.description.trim()) return "extensions.subagents.errorDescription";
-  if (draft.tools.length === 0) return "extensions.subagents.errorTools";
-  // `provider/model` is the only shape main can resolve; a bare model id has no
-  // provider to look up, so it would be dropped with a diagnostic nobody reads.
-  if (draft.model.trim() && !/^[^/\s]+\/.+$/.test(draft.model.trim())) {
+  if (!draft.inheritTools && draft.tools.length === 0) {
+    return "extensions.subagents.errorTools";
+  }
+  // `provider/model` is the only shape the runtime can resolve; a bare model id
+  // has no provider to look up, so it would be dropped with a diagnostic nobody
+  // reads. Only the slash is structural: the provider half is matched by a
+  // normalized alias, and a custom endpoint's display name may contain spaces —
+  // the picker offers those, so rejecting them here would make a selectable
+  // option impossible to save. This shares the picker's own splitter so the two
+  // can never disagree.
+  if ([draft.model, ...draft.fallbackModels].some((pin) => pin.trim() && !subagentModelPinParts(pin.trim()))) {
     return "extensions.subagents.errorModel";
   }
-  // 0 is the cleared state, not an invalid one: a definition may leave the turn
-  // limit out entirely, and Settings must be able to express that too.
+  // Cleared (`0`) is a valid state that means "no cap of our own", so only a
+  // value outside the accepted range is an error. The field only produces
+  // integers, so a fraction cannot reach here from the UI — the check keeps
+  // the draft honest anyway.
   if (
-    !Number.isInteger(draft.maxTurns) ||
-    draft.maxTurns < 0 ||
-    draft.maxTurns > MAX_SUBAGENT_MAX_TURNS
+    !Number.isInteger(draft.maxTokens) ||
+    draft.maxTokens < 0 ||
+    draft.maxTokens > MAX_SUBAGENT_MAX_TOKENS
   ) {
-    return "extensions.subagents.errorMaxTurns";
+    return "extensions.subagents.errorMaxTokens";
   }
   if (!draft.body.trim()) return "extensions.subagents.errorBody";
   if (new TextEncoder().encode(draft.body).length > MAX_SUBAGENT_BYTES) {
@@ -195,7 +273,7 @@ export function subagentDraftError(draft: SubagentDraft): string | null {
 
 /**
  * One subagent preset shown as a compact name chip. Selecting it replaces the
- * draft's name, description, tools, body and maxTurns; the model and scope
+ * draft's name, description, tools and body; the model and scope
  * are left alone so the user's other choices survive a reroll.
  */
 function PresetChip({
@@ -242,12 +320,16 @@ function PresetPicker({
         : null;
   return (
     <div className="ext-field-group">
-      <div className="ext-field-label">{t("extensions.subagents.presetLabel")}</div>
+      <div className="ext-field-label">
+        {t("extensions.subagents.presetLabel")}
+        {/* The chosen template's blurb explains what picking it does, and the
+            label is what the user is picking it for. */}
+        {descKey ? <HelpIcon label={t(descKey)} /> : null}
+      </div>
       <div
         className="ext-preset-pick"
         role="group"
         aria-label={t("extensions.subagents.presetLabel")}
-        aria-describedby={descKey ? "subagent-preset-desc" : undefined}
       >
         {SUBAGENT_PRESETS.map((preset) => {
           const nameKey = subagentPresetCopyKey(preset.id, "name");
@@ -266,11 +348,6 @@ function PresetPicker({
           nameLabel={t("extensions.subagents.presetBlank")}
         />
       </div>
-      {descKey ? (
-        <p id="subagent-preset-desc" className="ext-preset-desc">
-          {t(descKey)}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -290,26 +367,30 @@ function ManagementScope({
   return (
     <div className="agent-mcp-scope">
       <div className="agent-mcp-scope-copy">
-        <span className="agent-mcp-scope-label">{t("settings.globalScope")}</span>
-        <span className="agent-mcp-scope-hint">{t("settings.subagentsOnlyGlobal")}</span>
+        <span className="agent-mcp-scope-label">
+          {t("settings.globalScope")}
+          {/* Why there is no scope choice here: the answer belongs to the label
+              it applies to, not to a line under it. */}
+          <HelpIcon label={t("settings.subagentsOnlyGlobal")} />
+        </span>
       </div>
-      <button
-        type="button"
-        className={cx("settings-toggle", draft.enabled && "on")}
-        role="switch"
-        aria-checked={draft.enabled}
-        aria-label={t("settings.enableCapability", { name: draft.name || draft.id })}
-        onClick={() => setDraft({ ...draft, enabled: !draft.enabled })}
-      >
-        <span className="settings-toggle-thumb" />
-      </button>
+      <SettingsToggle
+        checked={draft.enabled}
+        label={t("settings.enableCapability", { name: draft.name || draft.id })}
+        onChange={() => setDraft({ ...draft, enabled: !draft.enabled })}
+      />
     </div>
   );
 }
 
-const CUSTOM_SUBAGENT_MODEL_VALUE = "__custom__";
-
-/** Model and thinking controls for a subagent definition. */
+/**
+ * Model and thinking controls for a subagent definition.
+ *
+ * The model list offers only models the user already configured, so the value
+ * saved is always resolvable in Settings; there is no free-text escape hatch.
+ * When no provider offers a runnable model the field explains that and links to
+ * Models instead of accepting a hand-typed id the runtime could not resolve.
+ */
 function ModelField({
   draft,
   setDraft,
@@ -324,10 +405,7 @@ function ModelField({
   orphanModel: string | null;
 }) {
   const { t } = useTranslation();
-  const [customModel, setCustomModel] = useState(false);
-  const modelValue = customModel
-    ? CUSTOM_SUBAGENT_MODEL_VALUE
-    : subagentModelSelectValue(draft.model, modelChoices);
+  const modelValue = subagentModelSelectValue(draft.model, modelChoices);
 
   return (
     <>
@@ -341,93 +419,62 @@ function ModelField({
           }
         >
           {modelChoices.length === 0 ? (
-            <Input
-              value={draft.model}
-              placeholder={t("extensions.subagents.modelPickPlaceholder")}
-              aria-label={t("extensions.subagents.model")}
-              onChange={(event) =>
-                setDraft({ ...draft, model: event.target.value })
-              }
-            />
+            <div className="ext-field-empty">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const store = useAppStore.getState();
+                  store.setSettingsTab("agent");
+                }}
+              >
+                {t("extensions.subagents.modelPickEmptyAction")}
+              </Button>
+            </div>
           ) : (
-            <Select
+            <SubagentModelPicker
               value={modelValue}
-              aria-label={t("extensions.subagents.model")}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value === CUSTOM_SUBAGENT_MODEL_VALUE) {
-                  setCustomModel(true);
-                  setDraft({ ...draft, model: "" });
-                } else {
-                  setCustomModel(false);
-                  setDraft({ ...draft, model: value });
-                }
-              }}
-            >
-              <option value="">{t("extensions.subagents.modelInherit")}</option>
-              {modelGroups.map((group) => (
-                <optgroup key={group.providerId} label={group.providerName}>
-                  {group.choices.map((choice) => (
-                    <option key={choice.value} value={choice.value}>
-                      {choice.modelId}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-              {orphanModel ? (
-                <option value={orphanModel}>{orphanModel}</option>
-              ) : null}
-              <option value={CUSTOM_SUBAGENT_MODEL_VALUE}>
-                {t("extensions.subagents.modelPickCustom")}
-              </option>
-            </Select>
+              groups={modelGroups}
+              orphanPin={orphanModel}
+              onChange={(next) => setDraft({ ...draft, model: next })}
+            />
           )}
         </Field>
         <Field
           label={t("extensions.subagents.thinking")}
           hint={t("extensions.subagents.thinkingHint")}
         >
-          <Select
+          <SettingsMenuSelect
+            fullWidth
+            label={t("extensions.subagents.thinking")}
             value={draft.thinkingLevel}
-            onChange={(event) =>
+            onChange={(id) =>
               setDraft({
                 ...draft,
-                thinkingLevel: event.target.value as SubagentThinkingLevel | "",
+                thinkingLevel: id as SubagentThinkingLevel | "",
               })
             }
-          >
-            <option value="">{t("extensions.subagents.thinkingInherit")}</option>
-            <option value="omit">{t("extensions.subagents.thinkingOmit")}</option>
-            {SUBAGENT_THINKING_LEVELS.filter((level) => level !== "omit").map(
-              (level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
+            options={[
+              { id: "", label: t("extensions.subagents.thinkingInherit") },
+              { id: "omit", label: t("extensions.subagents.thinkingOmit") },
+              ...SUBAGENT_THINKING_LEVELS.filter((level) => level !== "omit").map(
+                (level) => ({ id: level, label: level }),
               ),
-            )}
-          </Select>
-        </Field>
-      </div>
-      {modelChoices.length > 0 && customModel ? (
-        <Field
-          label={t("extensions.subagents.modelPickCustom")}
-          hint={t("extensions.subagents.modelPickCustomHint")}
-        >
-          <Input
-            value={draft.model}
-            placeholder={t("extensions.subagents.modelPickPlaceholder")}
-            aria-label={t("extensions.subagents.modelPickCustom")}
-            onChange={(event) =>
-              setDraft({ ...draft, model: event.target.value })
-            }
+            ]}
           />
         </Field>
-      ) : null}
+      </div>
+      <SubagentFallbackModels
+        primary={draft.model}
+        values={draft.fallbackModels}
+        choices={modelChoices}
+        onChange={(fallbackModels) => setDraft({ ...draft, fallbackModels })}
+      />
     </>
   );
 }
 
-/** Model, thinking, turn limit and scope — secondary on create, open on edit. */
+/** Model, thinking and scope — secondary on create, open on edit. */
 function AdvancedFields({
   open,
   onToggle,
@@ -467,19 +514,21 @@ function AdvancedFields({
           orphanModel={orphanModel}
         />
         <Field
-          label={t("extensions.subagents.maxTurns")}
-          hint={t("extensions.subagents.maxTurnsHint", { max: MAX_SUBAGENT_MAX_TURNS })}
+          label={t("extensions.subagents.maxTokens")}
+          hint={t("extensions.subagents.maxTokensHint", {
+            max: MAX_SUBAGENT_MAX_TOKENS.toLocaleString(),
+          })}
         >
           <Input
             type="number"
             min={1}
-            max={MAX_SUBAGENT_MAX_TURNS}
-            placeholder={t("extensions.subagents.maxTurnsUnlimited")}
-            value={draft.maxTurns > 0 ? String(draft.maxTurns) : ""}
+            max={MAX_SUBAGENT_MAX_TOKENS}
+            placeholder={t("extensions.subagents.maxTokensDefault")}
+            value={draft.maxTokens > 0 ? String(draft.maxTokens) : ""}
             onChange={(event) =>
               setDraft({
                 ...draft,
-                maxTurns: Number.parseInt(event.target.value, 10) || 0,
+                maxTokens: Number.parseInt(event.target.value, 10) || 0,
               })
             }
           />
@@ -507,6 +556,7 @@ export function SubagentEditorSheet({
   setDraft,
   editing,
   saving,
+  initialPresetId,
   onClose,
   onSave,
   onReveal,
@@ -515,14 +565,19 @@ export function SubagentEditorSheet({
   setDraft: (next: SubagentDraft) => void;
   editing: UserSubagentRecord | null;
   saving: boolean;
+  /** Template chip to select on create, e.g. after Copy as mine. */
+  initialPresetId?: string;
   onClose: () => void;
   onSave: () => void;
   onReveal?: () => void;
 }) {
   const { t } = useTranslation();
   const providers = useAppStore((state) => state.providers);
-  const [nameTouched, setNameTouched] = useState(!!editing);
-  const [presetId, setPresetId] = useState<string | null>(BLANK_SUBAGENT_PRESET_ID);
+  const copiedPreset = Boolean(initialPresetId && findSubagentPreset(initialPresetId));
+  const [nameTouched, setNameTouched] = useState(!!editing || copiedPreset);
+  const [presetId, setPresetId] = useState<string | null>(
+    copiedPreset && initialPresetId ? initialPresetId : BLANK_SUBAGENT_PRESET_ID,
+  );
   const [advancedOpen, setAdvancedOpen] = useState(!!editing);
   const errorKey = subagentDraftError(draft);
   const pristine = !editing && !draft.name.trim() && !draft.description.trim();
@@ -581,7 +636,7 @@ export function SubagentEditorSheet({
     setNameTouched(true);
   };
 
-  return (
+  return portalOverlay(
     <div
       className="overlay ext-sheet-overlay"
       role="presentation"
@@ -603,14 +658,15 @@ export function SubagentEditorSheet({
                 : t("extensions.subagents.addTitle")}
             </h3>
           </div>
-          <button
+          <TooltipButton
             type="button"
             className="ext-sheet-close"
-            aria-label={t("common.close")}
+            ariaLabel={t("common.close")}
+            tooltip={t("common.close")}
             onClick={onClose}
           >
             <IconX size={14} />
-          </button>
+          </TooltipButton>
         </div>
 
         <div className="ext-sheet-body">
@@ -643,12 +699,33 @@ export function SubagentEditorSheet({
           </Field>
 
           <div className="ext-field-group">
-            <div className="ext-field-label">{t("extensions.subagents.tools")}</div>
+            <div className="ext-field-label">
+              {t("extensions.subagents.tools")}
+              {/* One mark carries whichever grant note applies, so the row of
+                  chips never grows a sentence under it. */}
+              {draft.inheritTools ? (
+                <HelpIcon label={t("extensions.subagents.toolsInheritHint")} />
+              ) : draft.tools.some(isSubagentMutatingTool) ? (
+                <HelpIcon label={t("extensions.subagents.mutatingHint")} />
+              ) : (
+                <HelpIcon label={t("extensions.subagents.toolsHint")} />
+              )}
+            </div>
             <div
               className="ext-tool-pick"
               role="group"
               aria-label={t("extensions.subagents.tools")}
             >
+              <label
+                className={cx("ext-tool-opt", draft.inheritTools && "is-on")}
+              >
+                <input
+                  type="checkbox"
+                  checked={draft.inheritTools}
+                  onChange={(event) => set("inheritTools", event.target.checked)}
+                />
+                <span>{t("extensions.subagents.toolsInherit")}</span>
+              </label>
               {SUBAGENT_ASSIGNABLE_TOOLS.map((tool) => (
                 <label
                   key={tool}
@@ -667,11 +744,6 @@ export function SubagentEditorSheet({
                 </label>
               ))}
             </div>
-            {draft.tools.some(isSubagentMutatingTool) ? (
-              <p className="ext-field-hint">{t("extensions.subagents.mutatingHint")}</p>
-            ) : (
-              <p className="ext-field-hint">{t("extensions.subagents.toolsHint")}</p>
-            )}
           </div>
 
           <div className="ext-field-group">
@@ -714,7 +786,11 @@ export function SubagentEditorSheet({
           />
         </div>
 
-        {errorKey && !pristine ? <p className="ext-sheet-error">{t(errorKey)}</p> : null}
+        {errorKey && !pristine ? (
+          <p id="subagent-sheet-error" className="ext-sheet-error" role="alert">
+            {t(errorKey)}
+          </p>
+        ) : null}
         <div className="ext-sheet-actions">
           {editing && onReveal ? (
             <Button variant="ghost" onClick={onReveal}>

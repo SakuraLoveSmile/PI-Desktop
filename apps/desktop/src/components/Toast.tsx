@@ -8,6 +8,11 @@ import {
   IconInfo,
   IconTriangleAlert,
 } from "./icons";
+import { TooltipButton } from "./ui";
+import {
+  playNotificationChime,
+  shouldPlayToastSound,
+} from "../lib/notification-sound";
 
 const VARIANT_ICON: Record<ToastVariant, typeof IconInfo> = {
   info: IconInfo,
@@ -61,15 +66,16 @@ function ToastCard({ item }: { item: ToastItem }) {
       <span className="toast-icon" aria-hidden>
         <Icon size={16} />
       </span>
-      <span className="toast-message">{item.message}</span>
-      <button
+      <span className="toast-message selectable">{item.message}</span>
+      <TooltipButton
         type="button"
         className="toast-dismiss"
-        aria-label={t("toast.dismiss")}
+        tooltip={t("toast.dismiss")}
+        ariaLabel={t("toast.dismiss")}
         onClick={beginClose}
       >
         <IconClose size={13} />
-      </button>
+      </TooltipButton>
     </div>
   );
 }
@@ -77,6 +83,19 @@ function ToastCard({ item }: { item: ToastItem }) {
 /** Global toast stack — mount once per shell, above dialogs (z-toast). */
 export function ToastHost() {
   const toasts = useAppStore((s) => s.toasts);
+  const visibleToastIds = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    const nextVisibleIds = new Set<number>();
+    let shouldPlay = false;
+    for (const toast of toasts) {
+      nextVisibleIds.add(toast.id);
+      if (shouldPlayToastSound(toast, visibleToastIds.current)) shouldPlay = true;
+    }
+    visibleToastIds.current = nextVisibleIds;
+    if (shouldPlay) playNotificationChime();
+  }, [toasts]);
+
   return (
     <div className="toast-viewport" aria-live="polite">
       {toasts.map((item) => (

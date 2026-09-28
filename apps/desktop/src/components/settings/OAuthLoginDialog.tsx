@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { OAuthPromptRequest, OAuthVendor } from "@pi-desktop/shared";
 import type { OAuthLoginSession } from "../../lib/oauth-login-session";
 import { canSubmitOAuthPrompt } from "../../lib/oauth-login-prompt";
-import { Button, Input, cx } from "../ui";
+import { Button, Input, TooltipButton, cx, portalOverlay } from "../ui";
 import { IconCheck, IconCopy, IconExternal } from "../icons";
 
 type AuthUrlState = { url: string; instructions?: string; opened: boolean };
@@ -31,8 +31,8 @@ export function OAuthLoginDialog({
   vendor: OAuthVendor;
   /** The attempt this dialog reports on, already begun by the caller. */
   session: OAuthLoginSession;
-  /** The login succeeded; the provider row is ready to use. */
-  onDone: (accountLabel?: string) => void;
+  /** The login succeeded; the provider row it names is ready to use. */
+  onDone: (accountLabel?: string, providerId?: string) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -85,7 +85,7 @@ export function OAuthLoginDialog({
         case "done":
           if (settled.current) break;
           settled.current = true;
-          handlers.current.onDone(event.accountLabel);
+          handlers.current.onDone(event.accountLabel, event.providerId);
           break;
         case "error":
           setPrompt(null);
@@ -144,7 +144,7 @@ export function OAuthLoginDialog({
   };
   const canSubmitAnswer = canSubmitOAuthPrompt(prompt, answer);
 
-  return (
+  return portalOverlay(
     <div className="overlay provider-dialog-overlay" role="presentation">
       <div
         className="dialog oauth-dialog"
@@ -201,10 +201,11 @@ export function OAuthLoginDialog({
                 <div className="oauth-block-text">
                   {t("settings.vendorDeviceCodeHint")}
                 </div>
-                <button
+                <TooltipButton
                   type="button"
                   className="oauth-device-code font-mono"
-                  title={t("settings.vendorCopyCode")}
+                  tooltip={t("settings.vendorCopyCode")}
+                  ariaLabel={t("settings.vendorCopyCode")}
                   onClick={() => copy(deviceCode.userCode)}
                 >
                   <span>{deviceCode.userCode}</span>
@@ -213,7 +214,7 @@ export function OAuthLoginDialog({
                   ) : (
                     <IconCopy size={14} />
                   )}
-                </button>
+                </TooltipButton>
                 <a
                   className="oauth-link"
                   href={deviceCode.verificationUri}

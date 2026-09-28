@@ -1,4 +1,13 @@
-import type { ComposerDraftSnapshot } from "./composer-smart-stop";
+import type {
+  ComposerDraftFileReference,
+  ComposerDraftSnapshot,
+  ComposerPluginPart,
+} from "./composer-smart-stop";
+
+type CachedComposerDraft = ComposerDraftSnapshot & {
+  /** Workspace that owned relative file references when the draft was captured. */
+  workspacePath?: string;
+};
 
 /**
  * Renderer-memory composer drafts (D301).
@@ -18,9 +27,59 @@ export type ComposerDraftFileInput = {
   kind?: "image" | "file";
   mimeType?: string;
   token?: string;
+  plugin?: ComposerPluginPart;
 };
 
-const cache = new Map<string, ComposerDraftSnapshot>();
+/** The draft-snapshot form of a live reference: its fields without session or id. */
+export function draftFileReference({
+  path,
+  name,
+  kind,
+  mimeType,
+  token,
+  plugin,
+}: ComposerDraftFileInput): ComposerDraftFileReference {
+  return {
+    path,
+    name,
+    kind,
+    ...(mimeType ? { mimeType } : {}),
+    ...(token ? { token } : {}),
+    ...(plugin ? { plugin } : {}),
+  };
+}
+
+function samePluginPart(a?: ComposerPluginPart, b?: ComposerPluginPart): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.kind !== b.kind || a.pluginId !== b.pluginId) return false;
+  switch (a.kind) {
+    case "mark":
+      return a.send === (b as typeof a).send;
+    case "fold":
+      return a.send === (b as typeof a).send && a.count === (b as typeof a).count;
+    case "attachment":
+      return a.id === (b as typeof a).id && a.size === (b as typeof a).size;
+  }
+}
+
+/** Whether two references are the same draft content, whatever their session or id. */
+export function sameDraftFileReference(
+  a: ComposerDraftFileInput,
+  b: ComposerDraftFileInput,
+): boolean {
+  return (
+    a.path === b.path &&
+    a.name === b.name &&
+    a.kind === b.kind &&
+    a.mimeType === b.mimeType &&
+    a.token === b.token &&
+    samePluginPart(a.plugin, b.plugin)
+  );
+}
+
+const cache = new Map<string, CachedComposerDraft>();
+const revisions = new Map<string, number>();
+let revisionCounter = 0;
 
 export function draftKeyForSession(sessionId: string | null | undefined): string {
   return sessionId ?? HOME_DRAFT_KEY;
@@ -35,39 +94,65 @@ export function snapshotComposerDraft(
   text: string,
   fileReferences: readonly ComposerDraftFileInput[],
   key: string,
-): ComposerDraftSnapshot {
+  workspacePath?: string,
+): CachedComposerDraft {
   const owner = draftOwnerSessionId(key);
-  return {
+  const snapshot: CachedComposerDraft = {
     text,
     fileReferences: fileReferences
       .filter((fileReference) => (fileReference.sessionId ?? "") === owner)
-      .map(({ path, name, kind, mimeType, token }) => ({
-        path,
-        name,
-        kind,
-        ...(mimeType ? { mimeType } : {}),
-        ...(token ? { token } : {}),
-      })),
+      .map(draftFileReference),
   };
+  if (workspacePath !== undefined) snapshot.workspacePath = workspacePath;
+  return snapshot;
 }
 
-export function readComposerDraft(key: string): ComposerDraftSnapshot | undefined {
+export function readComposerDraft(key: string): CachedComposerDraft | undefined {
   return cache.get(key);
+}
+
+/** Read a stable per-key version, assigning a unique baseline when first seen. */
+export function readComposerDraftRevision(key: string): number {
+  let revision = revisions.get(key);
+  if (revision === undefined) {
+    revision = ++revisionCounter;
+    revisions.set(key, revision);
+  }
+  return revision;
+}
+
+/** Mark a real draft edit with a globally unique, monotonically increasing version. */
+export function markComposerDraftEdited(key: string): number {
+  const revision = ++revisionCounter;
+  revisions.set(key, revision);
+  return revision;
 }
 
 export function writeComposerDraft(
   key: string,
   snapshot: ComposerDraftSnapshot,
+  workspacePath?: string,
 ): void {
-  cache.set(key, snapshot);
+  const existing = cache.get(key);
+  const next: CachedComposerDraft = {
+    ...snapshot,
+    fileReferences: snapshot.fileReferences.map((reference) => ({ ...reference })),
+  };
+  if (workspacePath !== undefined) {
+    next.workspacePath = workspacePath;
+  } else if (existing?.workspacePath !== undefined && next.workspacePath === undefined) {
+    next.workspacePath = existing.workspacePath;
+  }
+  cache.set(key, next);
 }
 
 export function captureComposerDraft(
   key: string,
   text: string,
   fileReferences: readonly ComposerDraftFileInput[],
-): ComposerDraftSnapshot {
-  const snapshot = snapshotComposerDraft(text, fileReferences, key);
+  workspacePath?: string,
+): CachedComposerDraft {
+  const snapshot = snapshotComposerDraft(text, fileReferences, key, workspacePath);
   cache.set(key, snapshot);
   return snapshot;
 }
@@ -100,10 +185,7 @@ export function adoptHomeDraftForSession(sessionId: string): void {
   cache.delete(HOME_DRAFT_KEY);
   if (!home) return;
   if (!home.text && home.fileReferences.length === 0) return;
-  cache.set(sessionId, {
-    text: home.text,
-    fileReferences: home.fileReferences.map((reference) => ({ ...reference })),
-  });
+  writeComposerDraft(sessionId, home);
 }
 
 export function scheduleHomeDraftAdopt(sessionId: string): void {
@@ -123,10 +205,14 @@ export function pruneComposerDrafts(keep: Iterable<string>): void {
   for (const key of cache.keys()) {
     if (!retain.has(key)) cache.delete(key);
   }
+  for (const key of revisions.keys()) {
+    if (!retain.has(key)) revisions.delete(key);
+  }
 }
 
 /** Test-only: drop every slot so cases cannot leak into one another. */
 export function resetComposerDraftCache(): void {
   cache.clear();
+  revisions.clear();
   scheduledHomeAdoptSessionId = null;
 }

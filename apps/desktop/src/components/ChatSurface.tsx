@@ -1,10 +1,17 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  messageHasTranscriptContent,
+  vendorAccountOmitsSessionModel,
+} from "../lib/chat-launch-error";
 import { Composer } from "./Composer";
 import { HomeMascotLogo } from "./HomeMascotLogo";
+import { HomeProjectSwitcher } from "./HomeProjectSwitcher";
 import { IconX } from "./icons";
+import { TooltipButton } from "./ui";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { SessionPane } from "./SessionPane";
+import { ConversationWidthHandles } from "./ConversationWidthHandles";
 import { useAppStore } from "../stores/app-store";
 import { headPermission } from "../lib/pending-permissions";
 import { headAsk } from "../lib/pending-asks";
@@ -37,7 +44,11 @@ function projectName(path?: string | null, name?: string | null) {
  * per-session drafts already, and remounting it on every switch discarded its
  * measured metrics and focus.
  */
-export const ChatSurface = memo(function ChatSurface() {
+export const ChatSurface = memo(function ChatSurface({
+  visible = true,
+}: {
+  visible?: boolean;
+}) {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const selectingSessionId = useAppStore((state) => state.selectingSessionId);
@@ -47,10 +58,13 @@ export const ChatSurface = memo(function ChatSurface() {
   // reads its own session's flag.
   const isRunning = useAppStore((state) => state.isRunning);
   const workspace = useAppStore((state) => state.workspace);
-  const openProject = useAppStore((state) => state.openProject);
   const error = useAppStore((state) => state.error);
   const errorCode = useAppStore((state) => state.errorCode);
   const errorRetriable = useAppStore((state) => state.errorRetriable);
+  const [hiddenVendorModelKey, setHiddenVendorModelKey] = useState<string | null>(
+    null,
+  );
+  const providers = useAppStore((state) => state.providers);
   const activeSession = useAppStore((state) =>
     state.activeSessionId
       ? state.sessions.find((session) => session.id === state.activeSessionId)
@@ -105,19 +119,28 @@ export const ChatSurface = memo(function ChatSurface() {
   const hasTranscript =
     Boolean(activePermission) ||
     askPending ||
-    messages.some((message) => {
-      const hasContent = Boolean((message.content || "").trim());
-      const hasThinking =
-        typeof message.thinking === "string" &&
-        Boolean(message.thinking.trim());
-      if (message.role === "assistant") return hasContent || hasThinking;
-      return hasContent || message.role === "tool";
-    });
+    messages.some((message) => messageHasTranscriptContent(message));
   // The empty state belongs to the session on screen. While a cold switch is
   // still resolving, the visible pane keeps its own transcript, so the hero must
   // not take over just because the destination projection is still empty.
   const showEmptyState =
     !hasTranscript && (!visibleSessionId || visibleSessionId === activeSessionId);
+  const vendorModelMissing = vendorAccountOmitsSessionModel(
+    activeSession,
+    providers,
+  );
+  const vendorModelKey = vendorModelMissing
+    ? `${activeSession?.providerId ?? ""}:${activeSession?.modelId ?? ""}`
+    : null;
+  const showVendorModelError =
+    vendorModelKey !== null && hiddenVendorModelKey !== vendorModelKey;
+  const noticeError =
+    error ?? (showVendorModelError ? t("errors.MODEL_NOT_CONFIGURED") : null);
+  const noticeCode = error
+    ? errorCode
+    : showVendorModelError
+      ? "MODEL_NOT_CONFIGURED"
+      : null;
   return (
     <div
       className={`chat-surface route-surface${sessionSwitching ? " session-switching" : ""}`}
@@ -128,6 +151,7 @@ export const ChatSurface = memo(function ChatSurface() {
           <span />
         </div>
       ) : null}
+      <ConversationWidthHandles />
       {showEmptyState ? (
         <div
           className="home-main-content"
@@ -150,18 +174,7 @@ export const ChatSurface = memo(function ChatSurface() {
                   {heroProject ? (
                     <>
                       {emptyTitleParts.before}
-                      <button
-                        type="button"
-                        className="project-underline"
-                        onClick={() => void openProject()}
-                        title={
-                          workspace?.path ||
-                          activeSession?.projectPath ||
-                          t("project.open")
-                        }
-                      >
-                        {heroProject}
-                      </button>
+                      <HomeProjectSwitcher name={heroProject} path={workspace?.path || activeSession?.projectPath || null} />
                       {emptyTitleParts.after}
                     </>
                   ) : isTemporarySession ? (
@@ -185,7 +198,7 @@ export const ChatSurface = memo(function ChatSurface() {
               <SessionPane
                 key={id}
                 sessionId={id}
-                visible={id === visibleSessionId}
+                visible={visible && id === visibleSessionId}
               />
             ))}
           </div>
@@ -193,17 +206,23 @@ export const ChatSurface = memo(function ChatSurface() {
         </>
       )}
 
-      {error ? (
+      {noticeError ? (
         <div className="chat-error-layer">
           <div className="chat-error-notice">
-            <span title={error ?? undefined}>
-              {errorCode && i18nHasError(t, errorCode)
-                ? t(`errors.${errorCode}`)
-                : error}
+            <span title={noticeError}>
+              {noticeCode && i18nHasError(t, noticeCode)
+                ? t(`errors.${noticeCode}`)
+                : noticeError}
+              {showVendorModelError && !error && activeSession?.modelId ? (
+                <>
+                  {" "}
+                  <code>{activeSession.modelId}</code>
+                </>
+              ) : null}
             </span>
-            {(errorCode === "MODEL_NOT_CONFIGURED" ||
-              errorCode === "PROVIDER_SECRET_MISSING" ||
-              errorCode === "PROVIDER_UNAUTHORIZED") && (
+            {(noticeCode === "MODEL_NOT_CONFIGURED" ||
+              noticeCode === "PROVIDER_SECRET_MISSING" ||
+              noticeCode === "PROVIDER_UNAUTHORIZED") && (
               <button
                 type="button"
                 className="chat-error-action"
@@ -227,14 +246,21 @@ export const ChatSurface = memo(function ChatSurface() {
                 {t("errors.action.retry")}
               </button>
             ) : null}
-            <button
+            <TooltipButton
               type="button"
-              aria-label={t("errors.action.dismiss")}
+              tooltip={t("errors.action.dismiss")}
+              ariaLabel={t("errors.action.dismiss")}
               className="chat-error-dismiss"
-              onClick={() => useAppStore.getState().clearError()}
+              onClick={() => {
+                if (error) {
+                  useAppStore.getState().clearError();
+                  return;
+                }
+                if (vendorModelKey) setHiddenVendorModelKey(vendorModelKey);
+              }}
             >
               <IconX size={13} />
-            </button>
+            </TooltipButton>
           </div>
         </div>
       ) : null}

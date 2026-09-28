@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { createPortal } from "react-dom";
+import { useBlockingOverlay } from "../lib/blocking-overlay";
+import { portalToBody } from "../lib/portal-visibility";
 import { useTranslation } from "react-i18next";
 import { MAX_SESSION_TITLE_LENGTH } from "@pi-desktop/shared";
 import type { SessionSummary } from "@pi-desktop/shared";
-import { MAX_PROJECT_NAME_CHARS } from "../lib/sidebar-preferences";
+import { TooltipButton } from "./ui";
 import { Button } from "./ui";
 import { IconClose, IconPencil } from "./icons";
 
@@ -40,6 +41,10 @@ function RenameDialog({
   onSave,
   onError,
 }: RenameDialogProps) {
+  // Electron's native preview is composited above renderer DOM, including
+  // portals and the top layer. Hide it for the lifetime of this modal so the
+  // rename surface remains fully visible and clickable in three-column mode.
+  useBlockingOverlay();
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -120,7 +125,7 @@ function RenameDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="session-rename-dialog-head">
-          <div>
+          <div className="session-rename-dialog-heading">
             <h2 id={`${dialogId}-title`} className="session-rename-dialog-title">
               <IconPencil size={16} aria-hidden />
               {title}
@@ -129,16 +134,16 @@ function RenameDialog({
               {description}
             </p>
           </div>
-          <button
+          <TooltipButton
             type="button"
             className="session-rename-dialog-close"
-            aria-label={cancelLabel}
-            title={cancelLabel}
+            tooltip={cancelLabel}
+            ariaLabel={cancelLabel}
             disabled={saving}
             onClick={onClose}
           >
             <IconClose size={16} />
-          </button>
+          </TooltipButton>
         </div>
         <form onSubmit={(event) => void save(event)}>
           <label className="session-rename-dialog-label" htmlFor={inputId}>
@@ -179,7 +184,7 @@ function RenameDialog({
 
   return typeof document === "undefined"
     ? dialog
-    : createPortal(dialog, document.body);
+    : portalToBody(dialog);
 }
 
 export function SessionRenameDialog({
@@ -207,38 +212,6 @@ export function SessionRenameDialog({
       maxLength={MAX_SESSION_TITLE_LENGTH}
       inputId="session-rename-input"
       dialogId="session-rename-dialog"
-      onClose={onClose}
-      onSave={onSave}
-      onError={onError}
-    />
-  );
-}
-
-export function ProjectRenameDialog({
-  project,
-  onClose,
-  onSave,
-  onError,
-}: {
-  project: { path: string; name: string };
-  onClose: () => void;
-  onSave: (name: string) => Promise<void>;
-  onError: (error: unknown) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <RenameDialog
-      value={project.name}
-      title={t("project.renameTitle")}
-      description={t("project.renameDescription")}
-      label={t("project.renameLabel")}
-      hint={t("project.renameHint")}
-      cancelLabel={t("project.renameCancel")}
-      saveLabel={t("project.renameSave")}
-      savingLabel={t("project.renameSaving")}
-      maxLength={MAX_PROJECT_NAME_CHARS}
-      inputId="project-rename-input"
-      dialogId="project-rename-dialog"
       onClose={onClose}
       onSave={onSave}
       onError={onError}

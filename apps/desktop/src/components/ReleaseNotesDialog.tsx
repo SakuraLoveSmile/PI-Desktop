@@ -5,7 +5,7 @@ import {
   normalizeChangelogVersion,
   resolveChangelogLocale,
 } from "@pi-desktop/shared";
-import { Badge, cx } from "./ui";
+import { Badge, cx, portalOverlay, TooltipButton } from "./ui";
 import { IconClose } from "./icons";
 
 export function ReleaseNotesDialog({
@@ -75,7 +75,7 @@ export function ReleaseNotesDialog({
     };
   }, [onClose]);
 
-  return (
+  return portalOverlay(
     <div
       className="overlay release-notes-overlay"
       role="presentation"
@@ -98,16 +98,16 @@ export function ReleaseNotesDialog({
               {t("updates.releaseCount", { count: entries.length })}
             </p>
           </div>
-          <button
+          <TooltipButton
             ref={closeRef}
             type="button"
             className="icon-btn release-notes-close"
-            aria-label={t("updates.closeReleaseNotes")}
-            title={t("updates.closeReleaseNotes")}
+            tooltip={t("updates.closeReleaseNotes")}
+            ariaLabel={t("updates.closeReleaseNotes")}
             onClick={onClose}
           >
             <IconClose size={16} />
-          </button>
+          </TooltipButton>
         </header>
 
         <div className="release-notes-list selectable">
@@ -155,6 +155,6 @@ export function ReleaseNotesDialog({
           })}
         </div>
       </div>
-    </div>
+    </div>,
   );
 }

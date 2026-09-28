@@ -46,9 +46,10 @@ composer, `/` opens the command menu and `@` opens the file reference menu.
 
 ## Work panels
 
-The work panel opens beside the conversation when the agent produces an
-artifact. The frames below are the panels without an active workspace, which is
-the state a conversation starts in.
+An agent Write/Edit never opens the panel. The panel appears when the user opens
+it, or when a file, URL, browser-preview, or plan-approval artifact opens its
+tab. The frames below are the panels without an active workspace, which is the
+state a conversation starts in.
 
 ![The review panel](../public/screenshots/app/en/panel-review.webp)
 
@@ -60,12 +61,7 @@ the state a conversation starts in.
 
 ## Destinations
 
-Pull requests, the project archive, and scheduled tasks are full-page
-destinations reached from the sidebar.
-
-![The pull requests destination](../public/screenshots/app/en/pulls-live.webp)
-
-![The pull requests destination in the dark theme](../public/screenshots/app/en/dark-pulls.webp)
+The project archive and scheduled tasks are full-page destinations.
 
 ![The project archive](../public/screenshots/app/en/project-archive-live.webp)
 

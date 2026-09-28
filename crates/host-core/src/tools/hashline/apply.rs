@@ -1,13 +1,13 @@
 //! Apply parsed ops against a tagged snapshot (spec 18 §8–§9, phase 2).
 
 use super::parse::{
-    Locator, MAX_REGISTER_BYTES, MAX_REGISTER_LINES, ParseError, ParsedOp, ParsedOps, parse_ops,
+    parse_ops, Locator, ParseError, ParsedOp, ParsedOps, MAX_REGISTER_BYTES, MAX_REGISTER_LINES,
 };
 use super::store::HashlineStore;
 use super::tag::{
-    NormalizedFile, encode_bytes, join_lines, normalize_file, split_lines, tag_of_lf_text,
+    encode_bytes, join_lines, normalize_file, split_lines, tag_of_lf_text, NormalizedFile,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -51,7 +51,6 @@ impl From<ParseError> for ToolError {
 
 #[derive(Debug, Clone)]
 pub struct EditSuccess {
-    pub lf_text: String,
     pub tag: String,
     pub warnings: Vec<String>,
     pub ops_echo: Vec<String>,
@@ -273,16 +272,17 @@ fn claim_insert(occupied: &mut BTreeSet<usize>, at: usize) -> Result<(), ToolErr
 fn apply_plan(lines: &[String], plan: &Plan) -> Vec<String> {
     let n = lines.len();
     let mut out = Vec::with_capacity(n + plan.inserts.values().map(Vec::len).sum::<usize>());
-    for i in 0..=n {
+    for (i, line) in lines.iter().enumerate() {
         if let Some(inserted) = plan.inserts.get(&i) {
             out.extend(inserted.iter().cloned());
         }
-        if i < n {
-            let line_no = (i as u32) + 1;
-            if !plan.deletes.contains(&line_no) {
-                out.push(lines[i].clone());
-            }
+        let line_no = (i as u32) + 1;
+        if !plan.deletes.contains(&line_no) {
+            out.push(line.clone());
         }
+    }
+    if let Some(inserted) = plan.inserts.get(&n) {
+        out.extend(inserted.iter().cloned());
     }
     out
 }
@@ -304,10 +304,8 @@ fn expand_registers(
                 if *start as usize > lines.len() || *end as usize > lines.len() {
                     continue;
                 }
-                let captured: Vec<String> = lines[(*start as usize - 1)..=(*end as usize - 1)]
-                    .iter()
-                    .cloned()
-                    .collect();
+                let captured: Vec<String> =
+                    lines[(*start as usize - 1)..=(*end as usize - 1)].to_vec();
                 validate_capture(&captured)?;
                 if let Some(name) = register {
                     if let (Some(session), Some(store)) = (session_id, store) {
@@ -580,7 +578,6 @@ pub fn apply_edit(
         return Ok((
             live,
             EditSuccess {
-                lf_text: String::new(),
                 tag: expected,
                 warnings,
                 ops_echo: echo_ops(&parsed),
@@ -611,7 +608,6 @@ pub fn apply_edit(
     Ok((
         next_file,
         EditSuccess {
-            lf_text: next_text,
             tag: next_tag,
             warnings,
             ops_echo: echo_ops(&parsed),
@@ -650,19 +646,22 @@ pub fn canonical_key(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tools::hashline::tag::tag_of_bytes;
+
+    fn tag_of_bytes(bytes: &[u8]) -> String {
+        tag_of_lf_text(&normalize_file(bytes).text)
+    }
 
     fn edit(bytes: &[u8], ops: &str) -> Result<String, ToolError> {
         let tag = tag_of_bytes(bytes);
         apply_edit("f.txt", "/ws/f.txt", &tag, ops, bytes, None, None)
-            .map(|(_, success)| success.lf_text)
+            .map(|(file, _success)| file.text)
     }
 
     #[test]
     fn replaces_a_range_and_appends() {
         let bytes = b"one\ntwo\nthree\n";
         let tag = tag_of_bytes(bytes);
-        let out = apply_edit(
+        let (out, success) = apply_edit(
             "f.txt",
             "/ws/f.txt",
             &tag,
@@ -671,10 +670,9 @@ mod tests {
             None,
             None,
         )
-        .unwrap()
-        .1;
-        assert_eq!(out.lf_text, "one\nTWO\nthree\nfour\n");
-        assert_eq!(out.tag, tag_of_lf_text(&out.lf_text));
+        .unwrap();
+        assert_eq!(out.text, "one\nTWO\nthree\nfour\n");
+        assert_eq!(success.tag, tag_of_lf_text(&out.text));
     }
 
     #[test]
@@ -705,7 +703,7 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.code, "EDIT_TAG_MISMATCH");
-        let ok = apply_edit(
+        let (ok, success) = apply_edit(
             "f.txt",
             "/ws/f.txt",
             "0000",
@@ -714,10 +712,9 @@ mod tests {
             None,
             None,
         )
-        .unwrap()
-        .1;
-        assert_eq!(ok.lf_text, "a\nb\nc\n");
-        assert!(!ok.warnings.is_empty());
+        .unwrap();
+        assert_eq!(ok.text, "a\nb\nc\n");
+        assert!(!success.warnings.is_empty());
     }
 
     #[test]
@@ -753,7 +750,7 @@ mod tests {
         .unwrap_err();
         assert_eq!(err.code, "EDIT_LINES_UNSEEN");
         assert_eq!(err.extra["merged"], json!(true));
-        let ok = apply_edit(
+        let (ok, _success) = apply_edit(
             "f.txt",
             "/ws/f.txt",
             &tag,
@@ -762,8 +759,7 @@ mod tests {
             Some("s"),
             Some(&store),
         )
-        .unwrap()
-        .1;
-        assert_eq!(ok.lf_text, "a\nb\nC\nd\n");
+        .unwrap();
+        assert_eq!(ok.text, "a\nb\nC\nd\n");
     }
 }

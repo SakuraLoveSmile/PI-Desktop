@@ -1,7 +1,18 @@
 import { session, shell, WebContentsView, type BrowserWindow } from "electron";
-import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { parseAllowedExternalUrl } from "./safe-open-external";
+import { PanelSenders, pageGoneWithin } from "./plugin-panel-senders";
+import {
+  PLUGIN_VIEW_LOCATION_EVENT,
+  PLUGIN_VIEW_LOCATION_PARAM,
+  normalizeLocation,
+  planLocationDelivery,
+  viewEntryUrl,
+} from "./plugin-view-location";
+import {
+  scaleBoundsToDip,
+  type PluginViewBounds,
+} from "./plugin-view-bounds";
 import {
   applyPluginEgressPolicy,
   pluginSessionPartition,
@@ -12,6 +23,13 @@ import {
   PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX,
   type PluginPanelTheme,
 } from "../shared/plugin-panel-chrome";
+
+/**
+ * Re-exported so the location contract stays addressable through the module
+ * that owns the view lifecycle. The rules themselves live in
+ * `plugin-view-location.ts`, free of Electron, so they stay unit-testable.
+ */
+export { PLUGIN_VIEW_LOCATION_EVENT, PLUGIN_VIEW_LOCATION_PARAM, viewEntryUrl };
 
 /**
  * Plugin-contributed work panel views (ADR 0104).
@@ -41,21 +59,39 @@ export type PluginViewOpenRequest = {
   htmlPath: string;
   /** Egress allowlist from `manifest.net.domains`. */
   netDomains?: readonly string[];
+  /**
+   * What this view should show, when the opener knows (D320 follow-up).
+   *
+   * A work-panel view is opened either from the tool launcher, which has no
+   * specific subject, from a chat file reference, which does, or by a plan or
+   * goal approval artifact, whose host-chosen view receives the artifact path
+   * (D452). The value is
+   * opaque to the host: it travels as the entry URL's `piViewOpen` query
+   * parameter on creation and as the `view:open` event afterwards, and the
+   * plugin decides what it means. `pi.browser` uses its own chrome channel
+   * instead and never receives this.
+   */
+  location?: string;
 };
 
-export type PluginViewBounds = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
+export type { PluginViewBounds };
 
 type LiveView = {
   key: string;
   pluginId: string;
   view: WebContentsView;
+  /** Absolute path to this view's HTML entry; its URL is rebuilt from it. */
+  htmlPath: string;
   /** Monotonic counter; lowest value is the least recently shown. */
   usedAt: number;
+  /**
+   * What this view should show, or null when nothing specific was requested.
+   * The page reads it from its own URL, so this is also the value a later
+   * request is re-delivered against.
+   */
+  location: string | null;
+  /** False until the first document finished loading. */
+  loaded: boolean;
 };
 
 export function pluginViewKey(pluginId: string, viewId: string): string {
@@ -68,8 +104,17 @@ export class PluginViewHost {
   /** The one view currently attached to the window, if any. */
   private visibleKey: string | null = null;
   private bounds: PluginViewBounds = { x: 0, y: 0, width: 0, height: 0 };
+  /** Last CSS-pixel rect from the renderer, so zoom changes can rescale. */
+  private lastCssBounds: PluginViewBounds | null = null;
   private clock = 0;
   private onBlockedRequest?: PluginPanelBlockedRequest;
+  /**
+   * Identity of the pages allowed to use the bridge, keyed by web contents. A
+   * view keeps its plugin for as long as its page exists, not only while it is
+   * cached in `views`, so a call that arrives while the view is being dropped
+   * still belongs to its own plugin.
+   */
+  private senders = new PanelSenders();
 
   constructor(onBlockedRequest?: PluginPanelBlockedRequest) {
     this.onBlockedRequest = onBlockedRequest;
@@ -98,14 +143,52 @@ export class PluginViewHost {
     for (const entry of this.views.values()) {
       const wc = entry.view.webContents;
       if (wc.isDestroyed()) continue;
-      wc.send(channel, payload);
+      try {
+        wc.send(channel, payload);
+      } catch {
+        // One view that cannot receive must not starve the others.
+      }
     }
   }
 
   setWindow(window: BrowserWindow | null): void {
     if (this.window === window) return;
     this.detachVisible();
+    this.unbindZoom();
     this.window = window;
+    this.bindZoom();
+  }
+
+  private zoomListener: (() => void) | null = null;
+
+  private bindZoom(): void {
+    const contents = this.window && !this.window.isDestroyed() ? this.window.webContents : null;
+    if (!contents || contents.isDestroyed()) return;
+    const onChange = () => {
+      if (this.lastCssBounds) {
+        this.bounds = scaleBoundsToDip(this.lastCssBounds, this.currentZoomFactor());
+      }
+      const visible = this.visibleKey ? this.views.get(this.visibleKey) : null;
+      visible?.view.setBounds(this.bounds);
+      this.emitSurface();
+    };
+    try {
+      contents.on("zoom-changed", onChange);
+    } catch {
+      // Older Electron may not emit zoom-changed; resize remeasures.
+    }
+    this.zoomListener = () => {
+      try {
+        contents.removeListener("zoom-changed", onChange);
+      } catch {
+        // contents already destroyed
+      }
+    };
+  }
+
+  private unbindZoom(): void {
+    this.zoomListener?.();
+    this.zoomListener = null;
   }
 
   /** Whether a live web contents exists for this view. */
@@ -118,51 +201,105 @@ export class PluginViewHost {
    * calls from docked views on the same channel it serves panel windows.
    */
   pluginIdForSender(senderId: number): string | null {
-    for (const entry of this.views.values()) {
-      const wc = entry.view.webContents;
-      if (!wc.isDestroyed() && wc.id === senderId) return entry.pluginId;
-    }
-    return null;
+    return this.senders.pluginFor(senderId);
   }
 
   /**
    * Create the view if needed and mark it as the most recently used. Nothing is
    * attached here: the renderer follows with `setBounds` / `setVisible` once it
    * has measured the panel surface.
+   *
+   * Re-opening an already live view re-delivers its location — a second click
+   * on the same chat reference is a request to show that file, not a cache
+   * hit — and never tears the view down, so unsaved work inside a plugin is
+   * not discarded by navigation.
    */
   open(request: PluginViewOpenRequest): void {
     const key = pluginViewKey(request.pluginId, request.viewId);
+    const location = normalizeLocation(request.location);
     const existing = this.views.get(key);
     if (existing) {
       existing.usedAt = ++this.clock;
+      this.deliverLocation(existing, location);
       return;
     }
     const view = this.createView(request);
-    this.views.set(key, {
+    const entry: LiveView = {
       key,
       pluginId: request.pluginId,
       view,
+      htmlPath: request.htmlPath,
       usedAt: ++this.clock,
+      location,
+      loaded: false,
+    };
+    this.views.set(key, entry);
+    // A docked view can call the bridge from its first script, so its identity is
+    // registered before the document loads and released only when the page is
+    // gone — never when the host merely drops the cached surface around it.
+    const senderId = view.webContents.id;
+    this.senders.register(senderId, request.pluginId);
+    view.webContents.once("destroyed", () => this.senders.release(senderId));
+    view.webContents.once("did-finish-load", () => {
+      entry.loaded = true;
     });
-    void view.webContents
-      .loadURL(pathToFileURL(request.htmlPath).toString())
+    this.load(entry);
+    this.evictBeyondLimit();
+  }
+
+  /**
+   * Hand a view the subject it should show.
+   *
+   * A document that has not finished loading cannot have subscribed to the
+   * event yet, so the location is written into its URL and the load restarted;
+   * nothing has run, so nothing is lost. Once loaded, the view subscribes and
+   * is told through the same preload event channel as every other panel event.
+   */
+  private deliverLocation(entry: LiveView, location: string | null): void {
+    const delivery = planLocationDelivery(entry.location, location, entry.loaded);
+    if (delivery.kind === "none") return;
+    // The page reads its subject from the URL it was loaded with, so the
+    // remembered value has to follow every accepted request.
+    entry.location = delivery.location;
+    if (delivery.kind === "reload") {
+      this.load(entry);
+      return;
+    }
+    const wc = entry.view.webContents;
+    if (wc.isDestroyed()) return;
+    wc.send(`pi-plugin-panel-event:${PLUGIN_VIEW_LOCATION_EVENT}`, {
+      path: delivery.location,
+    });
+  }
+
+  private load(entry: LiveView): void {
+    void entry.view.webContents
+      .loadURL(viewEntryUrl(entry.htmlPath, entry.location))
       .catch(() => {
         // Load failures surface to the user as the tab's empty state; the view
         // stays cached so a plugin reload can retry into the same slot.
       });
-    this.evictBeyondLimit();
   }
 
   setBounds(bounds: PluginViewBounds): void {
-    this.bounds = {
-      x: Math.max(0, Math.round(Number(bounds.x) || 0)),
-      y: Math.max(0, Math.round(Number(bounds.y) || 0)),
-      width: Math.max(0, Math.round(Number(bounds.width) || 0)),
-      height: Math.max(0, Math.round(Number(bounds.height) || 0)),
+    // Renderer measures CSS pixels; WebContentsView.setBounds wants DIPs.
+    this.lastCssBounds = {
+      x: Number(bounds.x) || 0,
+      y: Number(bounds.y) || 0,
+      width: Number(bounds.width) || 0,
+      height: Number(bounds.height) || 0,
     };
+    this.bounds = scaleBoundsToDip(this.lastCssBounds, this.currentZoomFactor());
     const visible = this.visibleKey ? this.views.get(this.visibleKey) : null;
     visible?.view.setBounds(this.bounds);
     this.emitSurface();
+  }
+
+  private currentZoomFactor(): number {
+    const contents = this.window && !this.window.isDestroyed() ? this.window.webContents : null;
+    if (!contents || contents.isDestroyed()) return 1;
+    const zoom = Number(contents.getZoomFactor());
+    return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   }
 
   /**
@@ -203,8 +340,20 @@ export class PluginViewHost {
     }
   }
 
-  dispose(): void {
-    for (const key of [...this.views.keys()]) this.destroy(key);
+  /**
+   * Drop every view and wait, bounded, for the pages to be gone, so a caller
+   * that is about to stop the plugin runtime knows no view page can still call
+   * it. Shutdown sequences this before that stop.
+   */
+  async dispose(): Promise<void> {
+    await Promise.allSettled(
+      [...this.views.values()].map(async (entry) => {
+        // Captured while the view is alive; `destroy` closes the page below.
+        const page = entry.view.webContents;
+        this.destroy(entry.key);
+        await pageGoneWithin(page);
+      }),
+    );
   }
 
   private destroy(key: string): void {
@@ -283,7 +432,6 @@ export class PluginViewHost {
         ],
       },
     });
-
     const wc = view.webContents;
     // A docked view gets exactly one web contents. `window.open` would mint a
     // chromeless window outside the egress policy applied above.

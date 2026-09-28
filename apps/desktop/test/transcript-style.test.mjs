@@ -1,21 +1,20 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readComposerSource } from "./helpers/composer-source.mjs";
+import { readMainSource } from "./helpers/main-source.mjs";
 import { loadStyles } from "./helpers/styles.mjs";
+import { readStoreSource } from "./helpers/store-source.mjs";
+import { readTranscriptSource } from "./helpers/transcript-source.mjs";
+import { readSharedTypesSource } from "./helpers/shared-types-source.mjs";
 
 const stylesSource = await loadStyles();
-const transcriptSource = await readFile(
-  new URL("../src/components/ChatTranscript.tsx", import.meta.url),
-  "utf8",
-);
+const transcriptSource = await readTranscriptSource();
 const inspectorSource = await readFile(
   new URL("../src/components/ContextUsageInspector.tsx", import.meta.url),
   "utf8",
 );
-const composerSource = await readFile(
-  new URL("../src/components/Composer.tsx", import.meta.url),
-  "utf8",
-);
+const composerSource = await readComposerSource();
 const minimapSource = await readFile(
   new URL("../src/components/ConversationMinimap.tsx", import.meta.url),
   "utf8",
@@ -57,8 +56,9 @@ test("tool rows render structured blocks instead of dumping JSON", async () => {
   assert.doesNotMatch(transcriptSource, /getToolSections|hasToolSections/);
   assert.doesNotMatch(permissionSource, /JSON\.stringify|formatToolValue/);
   assert.match(transcriptSource, /buildToolPresentation\(message, \{\n\s+hideSummaryArg: true,/);
-  // Blocks stay behind the open guard so streaming ticks stay cheap.
-  assert.match(transcriptSource, /open && hasDetails\s*\?\s*buildToolPresentation/);
+  // Formatting remains lazy and the cached blocks are read only while visible.
+  assert.match(transcriptSource, /if \(variant !== "topology" && open && hasDetails && disclosure\.parentVisible/);
+  assert.match(transcriptSource, /const blocks = variant !== "topology" && open && hasDetails \? presentation\.current\?\.blocks : null/);
   assert.match(transcriptSource, /<ToolChips chips=\{chips\} \/>/);
   assert.match(transcriptSource, /<ToolDetailBlocks blocks=\{blocks\} plain=\{runHead\} \/>/);
   assert.match(permissionSource, /<ToolDetailBlocks blocks=\{argBlocks\} \/>/);
@@ -92,6 +92,11 @@ test("tool block bodies stay bounded and role-coded", () => {
   assert.ok(fileItem);
   assert.match(fileItem, /display:\s*block;/);
   assert.match(fileItem, /width:\s*100%;/);
+  // A column flex list with a height cap shrinks every row whose overflow
+  // is not visible: the automatic minimum size is zero, so a long result is
+  // pressed into a sliver and the paths are clipped away. Rows keep their
+  // content height and the list scrolls instead.
+  assert.match(fileItem, /flex:\s*none;/);
   // stderr and error notes carry the error hue, host notices stay neutral.
   assert.match(stylesSource, /\.tool-row-content\.is-error \{[\s\S]*?var\(--ds-error\)/);
   assert.match(stylesSource, /\.tool-chip\.is-error \{[\s\S]*?var\(--ds-error\)/);
@@ -105,6 +110,101 @@ test("tool block bodies stay bounded and role-coded", () => {
   assert.doesNotMatch(permissionArgs, /white-space|font-family/);
 });
 
+test("tool details do not add a second visual indent", () => {
+  const toolDetailStyles = stylesSource.match(
+    /\.tool-row:not\(\.thinking\):not\(\.subagent-topology-node\) > \.tool-row-body \{([^}]*)\}/
+  )?.[1];
+  assert.ok(toolDetailStyles);
+  assert.match(toolDetailStyles, /margin-left:\s*0;/);
+  assert.match(toolDetailStyles, /padding-left:\s*0;/);
+  // Thinking and topology have separate visual hierarchies and keep their
+  // dedicated layout rules rather than inheriting the flat tool detail rule.
+  assert.match(stylesSource, /\.subagent-topology-node > \.tool-row-body,[\s\S]*?margin-left:\s*38px;/);
+});
+
+/*
+ * The width regression this guards: a content-sized `inline-flex` disclosure
+ * header stopped at its own label, so a tool call never used the conversation
+ * width — it stayed narrower than the prose, ignored the dragged band width,
+ * and let a long label overrun the chip. The header row now claims the band at
+ * every level, the label ellipsizes, and the caret trails the row.
+ */
+test("tool-call disclosure headers span the conversation band", () => {
+  const header = stylesSource.match(/\n\.tool-activity-header \{([^}]*)\}/)?.[1];
+  assert.ok(header);
+  assert.match(header, /display:\s*flex;/);
+  assert.match(header, /width:\s*100%;/);
+  assert.match(header, /min-width:\s*0;/);
+  // A chip default (content width) or a max-width cap would freeze the row.
+  assert.doesNotMatch(header, /inline-flex|max-width/);
+
+  const label = stylesSource.match(/\n\.tool-activity-label \{([^}]*)\}/)?.[1];
+  assert.ok(label);
+  assert.match(label, /text-overflow:\s*ellipsis;/);
+  assert.match(label, /min-width:\s*0;/);
+  assert.match(label, /white-space:\s*nowrap;/);
+
+  const caret = stylesSource.match(/\n\.tool-activity-caret \{([^}]*)\}/)?.[1];
+  assert.ok(caret);
+  assert.match(caret, /margin-inline-start:\s*auto;/);
+
+  // No level keeps its own width or label override: every disclosure header
+  // resolves through the single base row.
+  assert.doesNotMatch(
+    stylesSource,
+    /\.(process-activity-group|turn-process) > \.tool-activity-header[^{]*\{[^}]*width:/,
+  );
+  assert.doesNotMatch(
+    stylesSource,
+    /\.tool-activity-group\.has-subagents \.tool-activity-header \{[^}]*width:/,
+  );
+
+  // A tool row itself owns the column so no parent display mode can shrink it.
+  const row = stylesSource.match(/\n\.tool-row \{([^}]*)\}/)?.[1];
+  assert.ok(row);
+  assert.match(row, /width:\s*100%;/);
+  assert.match(row, /min-width:\s*0;/);
+});
+
+test("delegation node copy wraps within the responsive card", () => {
+  const metrics = stylesSource.match(
+    /\.subagent-activity-metrics \{([^}]*)\}/,
+  )?.[1];
+  assert.ok(metrics);
+  assert.match(metrics, /overflow-wrap:\s*anywhere;/);
+  assert.match(metrics, /white-space:\s*normal;/);
+
+  const titleRow = stylesSource.match(
+    /\.subagent-topology-node-title-row \{([^}]*)\}/,
+  )?.[1];
+  assert.ok(titleRow);
+  assert.match(titleRow, /flex-wrap:\s*wrap;/);
+
+  const title = stylesSource.match(
+    /\.subagent-topology-node-title \{([^}]*)\}/,
+  )?.[1];
+  assert.ok(title);
+  assert.match(title, /-webkit-line-clamp:\s*2;/);
+  assert.match(title, /overflow-wrap:\s*anywhere;/);
+  assert.match(title, /white-space:\s*normal;/);
+  assert.doesNotMatch(title, /white-space:\s*nowrap;/);
+
+  const summary = stylesSource.match(
+    /\.subagent-topology-node-summary \{([^}]*)\}/,
+  )?.[1];
+  assert.ok(summary);
+  assert.match(summary, /-webkit-line-clamp:\s*2;/);
+  assert.match(summary, /overflow-wrap:\s*anywhere;/);
+  assert.match(summary, /white-space:\s*normal;/);
+
+  const steps = stylesSource.match(
+    /\.subagent-topology-node-steps \{([^}]*)\}/,
+  )?.[1];
+  assert.ok(steps);
+  assert.match(steps, /overflow-wrap:\s*anywhere;/);
+  assert.match(steps, /white-space:\s*normal;/);
+});
+
 test("assistant turns stay transparent full-width prose", () => {
   assert.match(
     stylesSource,
@@ -112,7 +212,7 @@ test("assistant turns stay transparent full-width prose", () => {
   );
   assert.match(
     stylesSource,
-    /\.message-row\.assistant[\s\S]*?\.message-col[\s\S]*?width:\s*min\(100%,\s*720px\);/,
+    /\.message-row\.assistant[\s\S]*?\.message-col[\s\S]*?width:\s*min\(100%,\s*var\(--chat-prose-max-width,\s*720px\)\);/,
   );
   // D323: the live parent turn stays transparent; no rail, no reserved
   // inset, no whole-turn tile. The tile belongs only to the delegation card.
@@ -132,6 +232,31 @@ test("assistant turns stay transparent full-width prose", () => {
     stylesSource,
     /\.tool-activity-group\.has-subagents\s*\{[^}]*background:\s*var\(--ds-tile\)/,
   );
+});
+test("assistant error cards follow the responsive transcript column", () => {
+  const errorCard = stylesSource.match(/\n\.message-error \{([^}]*)\}/)?.[1];
+  assert.ok(errorCard);
+  assert.match(errorCard, /width:\s*100%;/);
+  assert.doesNotMatch(errorCard, /max-width\s*:/);
+  assert.match(
+    stylesSource,
+    /\.message-row\.assistant \.message-col,\s*\.message-row\.system \.message-col,\s*\.message-row\.tool \.message-col \{\s*width:\s*min\(100%,\s*var\(--chat-prose-max-width,\s*720px\)\);/,
+  );
+});
+
+test("decision and outcome cards follow the responsive transcript band", () => {
+  const cardRules = [
+    stylesSource.match(/\n\.permission-card \{([^}]*)\}/)?.[1],
+    stylesSource.match(/\n\.asktool-card \{([^}]*)\}/)?.[1],
+    stylesSource.match(/\n\.turn-outcome-card \{([^}]*)\}/)?.[1],
+  ];
+  for (const rule of cardRules) {
+    assert.ok(rule);
+    assert.match(
+      rule,
+      /width:\s*min\(100%,\s*var\(--chat-prose-max-width,\s*720px\)\);/,
+    );
+  }
 });
 
 test("transcript density and hover actions are quiet", () => {
@@ -184,11 +309,8 @@ test("user-message file chips reuse the composer chip node", () => {
 });
 
 test("stopping a turn undoes an unanswered prompt or settles the partial reply", async () => {
-  const storeSource = await readFile(
-    new URL("../src/stores/app-store.ts", import.meta.url),
-    "utf8",
-  );
-  assert.match(storeSource, /const submittedDraft = submittedComposerDrafts\.get\(sessionId\)/);
+  const storeSource = await readStoreSource();
+  assert.match(storeSource, /const submittedDraft = runtime\.submittedComposerDrafts\.get\(sessionId\)/);
   assert.match(storeSource, /resolveComposerSmartStop\(state\.messages, submittedDraft\)/);
   assert.match(storeSource, /composerPrefill:\s*\{ \.\.\.fullStop\.draft, sessionId \}/);
   assert.match(storeSource, /submittedDraft\?\.resolveAbort\?\.\(true\)/);
@@ -215,23 +337,18 @@ test("stopping a turn undoes an unanswered prompt or settles the partial reply",
 });
 
 test("delete remains on user turns and is removed from assistant toolbar", async () => {
-  const storeSource = await readFile(
-    new URL("../src/stores/app-store.ts", import.meta.url),
-    "utf8",
-  );
+  const storeSource = await readStoreSource();
   assert.match(storeSource, /deleteMessage:\s*async \(messageId\)/);
   assert.match(storeSource, /replaceSessionMessages\(sessionId,\s*next\)/);
   assert.match(transcriptSource, /deleteMessage\(message\.id\)/);
   assert.match(transcriptSource, /chat\.deleteMessage/);
-  assert.match(transcriptSource, /\{isUser \? \(/);
+  assert.match(transcriptSource, /const editableUserMessage = isUser && !isSessionMessage;/);
+  assert.match(transcriptSource, /\{editableUserMessage \? \(/);
   assert.match(stylesSource, /\.copy-btn\.danger:hover/);
 });
 
 test("editing a user prompt regenerates it and keeps the old branch reachable", async () => {
-  const storeSource = await readFile(
-    new URL("../src/stores/app-store.ts", import.meta.url),
-    "utf8",
-  );
+  const storeSource = await readStoreSource();
   // Edit lives on the user turn (the prompt is what gets rewritten), not on
   // the assistant answer.
   assert.match(transcriptSource, /editUserMessage\(message\.id, next, message\.attachments\)/);
@@ -245,7 +362,7 @@ test("editing a user prompt regenerates it and keeps the old branch reachable", 
   assert.doesNotMatch(transcriptSource, /editAssistantMessage/);
   assert.doesNotMatch(storeSource, /editAssistantMessage/);
   // Slash prompts edit their typed form so the resend re-expands the template.
-  assert.match(transcriptSource, /const editSeed = \(isUser && message\.command\) \|\| message\.content/);
+  assert.match(transcriptSource, /const editSeed =\s*\(editableUserMessage && message\.command\) \|\| \(message\.content \|\| ""\);/);
   // Same branch mechanics as regenerate, so main archives the replaced turn
   // as a revision the pager can walk back to.
   assert.match(storeSource, /editUserMessage:\s*async \(messageId, content, attachments\)/);
@@ -266,52 +383,52 @@ test("editing a user prompt regenerates it and keeps the old branch reachable", 
     stylesSource,
     /\.message-row\.user \.message-col:has\(\.message-edit\)/,
   );
+  assert.match(
+    stylesSource,
+    /\.message-edit \{[\s\S]*?background:\s*var\(--ds-tile-deep\);[\s\S]*?box-shadow:\s*none;/,
+  );
+  assert.match(
+    stylesSource,
+    /\.message-edit:focus-within \{[\s\S]*?box-shadow:\s*inset/,
+  );
+  assert.match(transcriptSource, /className="icon-btn message-edit-cancel"/);
+  assert.match(transcriptSource, /className="send-btn message-edit-submit"/);
 });
 
 test("message toolbars are icon-only with hover tooltips", () => {
-  // No worded chips in the toolbar: labels ride on data-tip + aria-label.
+  // No worded chips in the toolbar: labels ride on tooltip + aria-label.
   assert.doesNotMatch(
     transcriptSource,
     /<span>\{(?:forkLabel|retryLabel|editLabel|copyLabel)\}<\/span>/,
   );
   for (const label of ["editLabel", "deleteLabel"]) {
     assert.ok(
-      transcriptSource.includes(`aria-label={${label}}`),
+      transcriptSource.includes(`ariaLabel={${label}}`),
       `${label} needs an aria-label`,
     );
     assert.ok(
-      transcriptSource.includes(`data-tip={${label}}`),
+      transcriptSource.includes(`tooltip={${label}}`),
       `${label} needs a hover tooltip`,
     );
   }
   for (const key of ["chat.forkResponse", "chat.retry"]) {
-    assert.match(transcriptSource, new RegExp(`aria-label=\\{t\\("${key}"\\)\\}`));
-    assert.match(transcriptSource, new RegExp(`data-tip=\\{t\\("${key}"\\)\\}`));
+    assert.match(transcriptSource, new RegExp(`ariaLabel=\\{t\\("${key}"\\)\\}`));
+    assert.match(transcriptSource, new RegExp(`tooltip=\\{t\\("${key}"\\)\\}`));
   }
   assert.ok(transcriptSource.includes("label={copyLabel}"));
   assert.match(transcriptSource, /className="copy-btn icon"/);
-  assert.match(transcriptSource, /data-tip=\{t\("chat\.forkResponse"\)\}/);
-  assert.match(stylesSource, /\.copy-btn\[data-tip\]::after \{[\s\S]*?content:\s*attr\(data-tip\);/);
-  assert.match(
-    stylesSource,
-    /\.copy-btn\[data-tip\]:hover::after,\s*\.copy-btn\[data-tip\]:focus-visible::after \{\s*opacity:\s*1;/,
-  );
-  // Tooltip floats 8px above the button with a compact raised shadow so the
-  // composer's 20px glow cannot wash the label into --ds-bg-hover (#74).
-  assert.match(
-    stylesSource,
-    /\.copy-btn\[data-tip\]::after \{[\s\S]*?bottom:\s*calc\(100%\s*\+\s*8px\)/,
-  );
-  assert.match(
-    stylesSource,
-    /\.copy-btn\[data-tip\]::after \{[\s\S]*?box-shadow:\s*var\(--ds-raised-shadow\)/,
-  );
+  assert.match(transcriptSource, /tooltip=\{t\("chat\.forkResponse"\)\}/);
+  assert.match(transcriptSource, /import \{ TooltipButton \} from "\.\.\/\.\.\/\.\.\/components\/ui"/);
+  assert.match(transcriptSource, /<TooltipButton/);
+  assert.match(stylesSource, /\.ui-tooltip\s*\{[\s\S]*?position:\s*fixed;/);
+  assert.match(stylesSource, /\.ui-tooltip\s*\{[\s\S]*?z-index:\s*1000;/);
+  assert.match(stylesSource, /\.ui-tooltip\s*\{[\s\S]*?transform:\s*translate\(-50%,\s*-100%\)/);
   // Worded surfaces (error details) keep their label.
   assert.match(transcriptSource, /withLabel/);
 });
 
 test("streaming assistant turns hide answer copy until idle", () => {
-  assert.ok(transcriptSource.includes("{complete ? ("));
+  assert.ok(transcriptSource.includes("{complete && actionMessage ? ("));
   assert.ok(
     transcriptSource.includes(
       '<CopyButton text={content} label={t("chat.copy")} />',
@@ -343,7 +460,7 @@ test("assistant context inspector keeps a compact summary and retry action wired
   assert.match(inspectorSource, /contextOccupancyTokens\(usage\)/);
   assert.match(inspectorSource, /usage\.cacheReadTokens/);
   assert.doesNotMatch(inspectorSource, /turnUsage\.cacheReadTokens/);
-  assert.match(inspectorSource, /createPortal\(popover, document\.body\)/);
+  assert.match(inspectorSource, /portalToBody\(popover\)/);
   assert.match(inspectorSource, /getBoundingClientRect\(\)/);
   assert.match(inspectorSource, /addEventListener\("scroll", handleViewportChange, true\)/);
   assert.match(inspectorSource, /ResizeObserver\(updatePopoverPosition\)/);
@@ -397,14 +514,8 @@ test("context inspector panel opens on click, not hover (D225)", () => {
 });
 
 test("regenerate rewrites the current turn instead of appending", async () => {
-  const storeSource = await readFile(
-    new URL("../src/stores/app-store.ts", import.meta.url),
-    "utf8",
-  );
-  const mainSource = await readFile(
-    new URL("../electron/main/index.ts", import.meta.url),
-    "utf8",
-  );
+  const storeSource = await readStoreSource();
+  const mainSource = await readMainSource();
   const protocolSource = await readFile(
     new URL("../../../packages/shared/src/protocol.ts", import.meta.url),
     "utf8",
@@ -422,12 +533,15 @@ test("regenerate rewrites the current turn instead of appending", async () => {
   assert.match(mainSource, /agent\.disposeSession/);
   assert.match(mainSource, /truncateFromMessageId/);
   // The host resolves the boundary against its own transcript, and an
-  // unresolvable boundary fails instead of truncating at a guessed position.
+  // unresolvable identity is rejected instead of truncating at a guessed position.
   assert.match(
     mainSource,
-    /resolveTranscriptTruncation\(allMessages,\s*req\)/,
+    /"session\.truncateFrom",\s*\{\s*sessionId:\s*req\.sessionId/,
   );
-  assert.match(mainSource, /truncation\.kind === "unknown-message"/);
+  assert.doesNotMatch(
+    mainSource,
+    /resolveTranscriptTruncation|truncation\.kind === "unknown-message"/,
+  );
   assert.match(protocolSource, /sessionReplaceMessages/);
 });
 
@@ -482,24 +596,15 @@ test("conversation minimap stays centered below titlebar at high density", () =>
 });
 
 test("regenerate history pager and stable revision family are wired", async () => {
-  const storeSource = await readFile(
-    new URL("../src/stores/app-store.ts", import.meta.url),
-    "utf8",
-  );
-  const mainSource = await readFile(
-    new URL("../electron/main/index.ts", import.meta.url),
-    "utf8",
-  );
-  const sharedSource = await readFile(
-    new URL("../../../packages/shared/src/types.ts", import.meta.url),
-    "utf8",
-  );
+  const storeSource = await readStoreSource();
+  const mainSource = await readMainSource();
+  const sharedSource = await readSharedTypesSource();
   assert.match(transcriptSource, /message-revision-pager/);
   assert.match(transcriptSource, /activateMessageRevision/);
   assert.match(transcriptSource, /chat\.revisionPager/);
   assert.match(
     transcriptSource,
-    /const showRevisionPager = isUser && revisionCount > 1;/,
+    /const showRevisionPager = editableUserMessage && revisionCount > 1;/,
   );
   assert.match(
     transcriptSource,
@@ -515,10 +620,10 @@ test("regenerate history pager and stable revision family are wired", async () =
   assert.match(storeSource, /activateSessionRevision/);
   assert.match(mainSource, /session\.saveRevision/);
   assert.match(mainSource, /revisionRootId/);
-  assert.match(mainSource, /revisionCount: count \+ 1/);
+  assert.match(mainSource, /revisionCount: revision\.revisionCount/);
   assert.match(
     mainSource,
-    /save regenerate revision failed[\s\S]*?throw error;[\s\S]*?session\.replaceMessages/,
+    /truncate regenerate transcript failed[\s\S]*?throw error;/,
   );
   assert.match(sharedSource, /revisionRootId\?: string/);
   assert.match(sharedSource, /MessageRevisionSummary/);

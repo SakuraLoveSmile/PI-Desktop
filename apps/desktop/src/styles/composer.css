@@ -9,13 +9,14 @@
   display: flex;
   justify-content: center;
   width: 100%;
-  container-type: inline-size;
-  container-name: composer-stack;
 }
 
-/* Thread mode: floating bottom dock. The transcript already reserves the
- * composer's measured height, so a full-width gradient veil is unnecessary
- * and makes the lower half of the conversation look hazy. */
+/* Thread mode: floating bottom dock. The transcript reserves the composer's
+ * measured height for scrolling and fades its own paint out across that
+ * reserve (see `.thread-scroll` in chat-shell.css), so the dock paints no
+ * backing at all. Painting an opaque `--ds-bg-primary` band here did clip that
+ * paint, but it also hid whatever a theme had drawn on the conversation pane
+ * behind it (issue #728, D603, revised by D624). */
 .composer-dock-docked {
   position: absolute;
   inset-inline: 0;
@@ -46,15 +47,21 @@
   flex-direction: column;
   align-items: stretch;
   gap: 0;
+  container-type: inline-size;
+  container-name: composer-stack;
   transition: width var(--chat-width-transition, var(--motion-duration-normal) var(--motion-ease-out));
 }
 
-/* Asktool uses the same decision surface as Plan and Goal approval. Its
- * transcript card width is intentionally widened here to align with the
- * composer stack instead of leaving an inset panel above the input. */
+/* Asktool uses the same decision surface as Plan and Goal approval: it is
+ * mounted in the transparent composer dock, so it paints the composer plate
+ * with its shadow rather than the in-flow `--ds-tile` wash (03-permission-ux
+ * §9). Its width is the composer stack's instead of an inset panel above the
+ * input. */
 .composer-stack > .asktool-card {
   width: 100%;
   margin: 0 0 8px;
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
 }
 
 .composer-queued-prompts {
@@ -125,6 +132,33 @@
   opacity: 0.65;
 }
 
+/* A promoted row ("Send now") starts next: it reads as the head of the queue
+   and locks its own actions until the Host delivers it. */
+.composer-queued-prompt[data-priority="true"] {
+  background: var(--ds-bg-elevated);
+  box-shadow:
+    var(--ds-shadow-composer),
+    inset 2px 0 0 0 var(--ds-accent);
+  color: var(--ds-text-primary);
+}
+
+.composer-queued-prompt[data-priority="true"] .composer-queued-prompt-send-now:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+/* A locked row action stays visible and explains the state instead of going
+   dim: the row is already queued as the next turn. */
+.composer-queued-prompt-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.composer-queued-prompt-action:disabled:hover {
+  background: transparent;
+  color: var(--ds-text-muted);
+}
+
 .composer-shell {
   /* Positioning context for the autocomplete panel (D123–D125, ADR 0024). */
   position: relative;
@@ -142,6 +176,12 @@
 /* Focus deepens the lift; the shell never gains a stroke (D297). */
 .composer-shell:focus-within {
   box-shadow: 0 7px 24px color-mix(in oklab, var(--ds-text-primary) 9%, transparent);
+}
+
+/* Native file-system drops get a target cue without changing shell geometry. */
+.composer-shell.is-drop-target {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 72%, transparent);
+  outline-offset: 3px;
 }
 
 .composer-input-wrap {
@@ -264,6 +304,21 @@
   -webkit-user-select: none;
 }
 
+.composer-chip[data-action="expand-text-reference"] {
+  cursor: pointer;
+}
+
+.composer-chip[data-action="expand-text-reference"]:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 72%, transparent);
+  outline-offset: 1px;
+}
+
+/* A plugin mark: text the plugin sends in its place, not a file. */
+.composer-chip[data-plugin-mark] {
+  background: color-mix(in oklab, var(--ds-accent) 14%, var(--ds-tile-deep));
+  color: var(--ds-text-primary);
+}
+
 .composer-chip-icon {
   display: inline-flex;
   flex: 0 0 auto;
@@ -310,6 +365,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
   padding: 4px 8px 8px;
 }
 
@@ -319,6 +376,11 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
+  flex: 0 1 auto;
+}
+
+.composer-right {
+  justify-content: flex-end;
 }
 
 .composer-right .context-inspector-trigger {
@@ -359,8 +421,8 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  background: var(--gray-0);
-  color: var(--gray-1000);
+  background: var(--ds-accent);
+  color: var(--ds-bg-primary);
   transition: opacity var(--motion-duration-fast) var(--motion-ease-out), transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
@@ -368,7 +430,11 @@
   min-width: 28px;
 }
 
-.composer-enhance-btn.is-loading {
+/* While enhancing, this control carries a label and leaves the square geometry
+   its idle state gets from `.icon-btn-square`. */
+.icon-btn.composer-enhance-btn.is-loading {
+  width: auto;
+  flex: 0 0 auto;
   cursor: wait;
   padding-inline: 8px;
 }
@@ -424,30 +490,14 @@
   color: var(--ds-text-primary);
 }
 
-:root[data-theme="light"] .send-btn {
-  background: var(--gray-1000);
-  color: var(--gray-0);
-}
-
 .send-btn:hover:not(:disabled) {
   opacity: 0.9;
 }
 
 .send-btn:disabled {
   opacity: 1;
-  background: color-mix(in oklab, var(--ds-text-primary) 18%, transparent);
-  color: color-mix(in oklab, var(--ds-bg-primary) 92%, transparent);
-}
-
-:root[data-theme="light"] .send-btn:disabled {
-  /* Gold empty-home disabled send ~#8e8e90 solid chip + white arrow */
-  background: #8e8e90;
-  color: #ffffff;
-}
-
-:root[data-theme="dark"] .send-btn:disabled {
-  background: color-mix(in oklab, var(--gray-0) 18%, transparent);
-  color: color-mix(in oklab, var(--gray-900) 70%, transparent);
+  background: var(--ds-send-disabled-bg);
+  color: var(--ds-send-disabled-fg);
 }
 
 .stop-btn {
@@ -503,7 +553,9 @@
 }
 
 /* Plan approval surface. Keep the gate in the composer layer so it remains
-   adjacent to the input and follows the same container width as the dock. */
+   adjacent to the input and follows the same container width as the dock.
+   The dock itself is transparent, so this plate uses the composer elevated
+   fill and shadow rather than the in-flow `--ds-tile` wash. */
 .plan-approval-bar {
   display: grid;
   width: 100%;
@@ -514,7 +566,8 @@
   margin-bottom: 8px;
   padding: 7px 9px;
   border-radius: var(--radius-md);
-  background: var(--ds-tile);
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
 }
 
 .plan-approval-copy {
@@ -695,4 +748,43 @@
     flex: 0 0 auto;
   }
 
+}
+
+/* A folder drop asks for an explicit choice instead of attaching contents. */
+.composer-directory-drop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: var(--ds-tile);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+}
+
+.composer-directory-drop-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-directory-drop-action {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.composer-directory-drop-action:nth-of-type(1) {
+  margin-left: auto;
+}
+
+.composer-directory-drop-action:hover {
+  background: var(--ds-tile-hover);
 }

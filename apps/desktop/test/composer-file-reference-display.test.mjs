@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readComposerSource } from "./helpers/composer-source.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -9,7 +10,7 @@ const [autocomplete, autocompleteHook, autocompleteStyles, composer, composerSty
     read("../src/components/ComposerAutocomplete.tsx"),
     read("../src/hooks/use-composer-autocomplete.ts"),
     read("../src/styles/composer-autocomplete.css"),
-    read("../src/components/Composer.tsx"),
+    readComposerSource(),
     read("../src/styles/composer.css"),
   ]);
 
@@ -51,12 +52,14 @@ test("accepted files become compact references while directories keep completion
   );
   assert.match(composer, /applyEditorDraft\(\s*nextText,/);
   // Workspace switches still drop relative `@` chips, not every token-backed
-  // chip — paste/scratch paths are absolute and must survive.
+  // chip — paste/scratch paths are absolute and plugin marks carry no path,
+  // so both must survive.
   assert.match(composer, /function isPersistedScratchReference\(path: string\)/);
   assert.match(
     composer,
-    /kept = current\.filter\(\(fileReference\) =>\s*isPersistedScratchReference\(fileReference\.path\)/,
+    /Boolean\(fileReference\.plugin\) \|\| isPersistedScratchReference\(fileReference\.path\)/,
   );
+  assert.match(composer, /kept = current\.filter\(survives\)/);
   assert.doesNotMatch(
     composer,
     /current\.filter\(\(fileReference\) => Boolean\(fileReference\.token\)\)/,
@@ -71,17 +74,46 @@ test("composer renders atomic inline chips and serializes paths on send", () => 
   assert.match(composer, /chip\.dataset\.token = token/);
   assert.match(composer, /composer-chip-name/);
   assert.match(composer, /nameSpan\.textContent = reference\.name/);
-  assert.match(composer, /chip\.title = reference\.path/);
+  // A file chip's title is its path; a plugin mark's is its plugin.
+  assert.match(composer, /isPluginMark\(reference\) \? \(reference\.plugin\?\.pluginId \?\? ""\) : reference\.path/);
+  assert.match(composer, /chip\.title = origin/);
   assert.match(
     composer,
     /serializeComposerFileReferences\(text, activeFileReferences\)/,
   );
-  assert.match(composer, /sendPrompt\(inlineContent, submittedDraft\)/);
+  assert.match(
+    composer,
+    /sendPrompt\(\s*inlineContent,\s*submittedDraft,\s*activeSessionId \?\? undefined,\s*captureAcceptedSession,\s*\)/,
+  );
   assert.match(composer, /serializeInlineComposerFileReferences\(/);
   assert.match(composer, /current\.filter\(/);
   assert.match(
     composerStyles,
     /\.composer-chip-name[\s\S]*?text-overflow: ellipsis/,
+  );
+});
+
+test("text file chips expand into editable draft text", () => {
+  assert.match(
+    composer,
+    /function isEditableTextReference\(reference: ComposerFileReference\)/,
+  );
+  assert.match(composer, /\? \(\) => onExpandText\(token\)/);
+  assert.match(composer, /event\.key !== "Enter" && event\.key !== " "/);
+  assert.match(composer, /const result = await api\.fsRead\(reference\.path, reference\.mimeType\)/);
+  assert.match(composer, /result\.kind !== "text" \|\| result\.content === undefined/);
+  assert.match(
+    composer,
+    /source\.slice\(0, index\) \+ result\.content \+ source\.slice\(index \+ token\.length\)/,
+  );
+  assert.match(
+    composer,
+    /fileReferencesRef\.current\.filter\([\s\S]*?fileReference\.token !== token/,
+  );
+  assert.match(composer, /applyEditorDraft\(nextText, nextReferences, index \+ result\.content\.length\)/);
+  assert.match(
+    composerStyles,
+    /composer-chip\[data-action="expand-text-reference"\]:focus-visible/,
   );
 });
 
@@ -91,7 +123,7 @@ test("unanswered stop restores compact references instead of serialized paths", 
   assert.match(composer, /composerPrefill\.sessionId !== activeSessionId/);
   assert.match(
     composer,
-    /createFileReference\(\s*fileReference\.path,\s*fileReference\.name,\s*composerPrefill\.sessionId/,
+    /createFileReferenceFromSnapshot\(fileReference,\s*composerPrefill\.sessionId\)/,
   );
   assert.doesNotMatch(composer, /setValue\(composerPrefill\);/);
 });
