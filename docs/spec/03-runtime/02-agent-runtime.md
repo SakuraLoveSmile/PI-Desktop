@@ -959,9 +959,14 @@ they can end the parent turn even if a delegate ignores its abort. Ending the
 parent loop does not otherwise abort delegates.
 
 Fatal provider/stream errors (including exhausted HTTP 429) and parent aborts
-retain their existing `failed` and `aborted` outcomes. A terminal parent error
-also aborts leftover delegates, skips the resume prompt, and returns the
-session to idle so Continue is not `AGENT_BUSY` (D352).
+retain their existing `failed` and `aborted` outcomes. If an assistant response
+ends at the provider's output-token limit (`stopReason: "length"` or
+`"max_tokens"`) after emitting report text, the delegate instead settles as
+`failed` with `SUBAGENT_OUTPUT_TRUNCATED` and `outputTruncated: true`; its
+bounded partial report remains under the failure explanation for diagnosis. A
+later delegate turn that ends normally clears the marker and can complete. A
+terminal parent error also aborts leftover delegates, skips the resume prompt,
+and returns the session to idle so Continue is not `AGENT_BUSY` (D352).
 
 **Resumable delegations (ADR 0279).** `Task` accepts an optional `resume`
 parameter carrying the `delegationId` of a settled delegation in the same
