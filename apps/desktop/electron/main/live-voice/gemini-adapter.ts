@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import type { LiveBinding } from "@pi-desktop/shared";
-import { geminiAudioEndMessage, geminiAudioMessage, geminiSetupMessage, MAX_LIVE_AUDIO_BYTES, MAX_LIVE_JSON_BYTES, parseGeminiMessage } from "@pi-desktop/voice-runtime/live";
+import { geminiAudioEndMessage, geminiAudioMessage, geminiSetupMessage, geminiToolResponseMessage, geminiWorkToolDeclaration, MAX_LIVE_AUDIO_BYTES, MAX_LIVE_JSON_BYTES, parseGeminiMessage, parseLiveWorkArguments, LIVE_WORK_TOOL_NAME } from "@pi-desktop/voice-runtime/live";
 import type { LiveAdapter, LiveAdapterContext } from "./types";
 import { openLiveWebSocket } from "./websocket-transport";
 import { sendJsonBounded, waitForReady, waitForSocketReady, websocketJson } from "./websocket-wire";
@@ -19,28 +20,59 @@ export function createGeminiAdapter(context: LiveAdapterContext): LiveAdapter {
   let muted = context.signal.aborted;
   let readyResolve: (() => void) | null = null;
   let readyReject: ((error: Error) => void) | null = null;
+  const completedFunctionCalls = new Set<string>();
   const ready = new Promise<void>((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
+
+  function sendFunctionReceipt(input: {
+    providerRequestId: string;
+    toolName: string;
+    receipt: { status: "received"; operationId: string; execution: "not_started" } | { status: "rejected"; code: string };
+  }): void {
+    if (!socket || socket.readyState !== WebSocket.OPEN) throw new Error("Gemini Live socket is not open");
+    sendJsonBounded(socket, geminiToolResponseMessage(input));
+  }
+
+  function handleToolCandidate(candidate: { providerRequestId: string; toolName: string; arguments: unknown }): void {
+    if (completedFunctionCalls.has(candidate.providerRequestId)) return;
+    if (completedFunctionCalls.size >= 256) throw new Error("tool call identity limit exceeded");
+    completedFunctionCalls.add(candidate.providerRequestId);
+    if (candidate.toolName !== LIVE_WORK_TOOL_NAME) {
+      sendFunctionReceipt({ ...candidate, receipt: { status: "rejected", code: "LIVE_WORK_TOOL_UNSUPPORTED" } });
+      return;
+    }
+    if (!context.workProfile) {
+      sendFunctionReceipt({ ...candidate, receipt: { status: "rejected", code: "LIVE_WORK_NOT_BOUND" } });
+      context.onEvent({ kind: "error", code: "LIVE_EXECUTION_NOT_CONNECTED" });
+      return;
+    }
+    const parsed = parseLiveWorkArguments(candidate.arguments);
+    if (!parsed) {
+      sendFunctionReceipt({ ...candidate, receipt: { status: "rejected", code: "LIVE_WORK_INVALID_REQUEST" } });
+      return;
+    }
+    if (!context.onWorkCandidate) {
+      sendFunctionReceipt({ ...candidate, receipt: { status: "rejected", code: "LIVE_WORK_CAPABILITY_UNAVAILABLE" } });
+      return;
+    }
+    void context.onWorkCandidate(
+      { ...candidate, arguments: parsed },
+      async (receipt) => {
+        const deliveryId = randomUUID();
+        try {
+          sendFunctionReceipt({ ...candidate, receipt });
+          return { status: "sent", deliveryId };
+        } catch {
+          return { status: "not-sent", deliveryId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" };
+        }
+      },
+    ).catch(() => context.onEvent({ kind: "error", code: "LIVE_WORK_INTENT_UNAVAILABLE" }));
+  }
 
   function onSocketMessage(data: unknown): void {
     try {
       const value = websocketJson(data, MAX_LIVE_JSON_BYTES);
       const root = value as Record<string, unknown>;
       const server = root.serverContent as Record<string, unknown> | undefined;
-      const toolCall = root.toolCall as Record<string, unknown> | undefined;
-      if (toolCall) {
-        const calls = Array.isArray(toolCall.functionCalls) ? toolCall.functionCalls : [];
-        if (calls.length > 16) throw new Error("tool call limit exceeded");
-        for (const call of calls) {
-          const item = call as Record<string, unknown>;
-          if (typeof item.id !== "string" || typeof item.name !== "string") throw new Error("tool call shape invalid");
-          sendJsonBounded(socket!, {
-            toolResponse: {
-              functionResponses: [{ id: item.id, name: item.name, response: { output: "Execution is not connected. No work was performed." } }],
-            },
-          });
-          context.onEvent({ kind: "error", code: "LIVE_EXECUTION_NOT_CONNECTED" });
-        }
-      }
       if (server?.modelTurn && typeof server.modelTurn === "object") {
         const parts = (server.modelTurn as { parts?: unknown[] }).parts;
         if (Array.isArray(parts)) {
@@ -57,7 +89,8 @@ export function createGeminiAdapter(context: LiveAdapterContext): LiveAdapter {
       }
       for (const event of parseGeminiMessage(value)) {
         if (event.kind === "ready") readyResolve?.();
-        context.onEvent(event);
+        if (event.kind === "tool-candidate") handleToolCandidate(event);
+        else context.onEvent(event);
       }
     } catch {
       context.onEvent({ kind: "error", code: "LIVE_PROTOCOL_ERROR" });
@@ -82,7 +115,7 @@ export function createGeminiAdapter(context: LiveAdapterContext): LiveAdapter {
         if (!closed) context.onEvent({ kind: "error", code: "LIVE_NETWORK_ERROR" });
       });
       await waitForSocketReady(liveSocket, context.signal);
-      sendJsonBounded(liveSocket, geminiSetupMessage({ modelId: binding.modelId, voice: binding.voice }));
+      sendJsonBounded(liveSocket, geminiSetupMessage({ modelId: binding.modelId, voice: binding.voice, ...(context.workProfile ? { workProfile: context.workProfile } : {}) }));
       await waitForReady(ready, context.signal, 12_000, "Gemini Live setup timed out");
       return {};
     },
@@ -102,6 +135,7 @@ export function createGeminiAdapter(context: LiveAdapterContext): LiveAdapter {
       closed = true;
       readyReject?.(new Error("Gemini Live call closed"));
       if (socket && socket.readyState !== WebSocket.CLOSED) socket.close(1000, "call ended");
+      completedFunctionCalls.clear();
       socket = null;
     },
   };

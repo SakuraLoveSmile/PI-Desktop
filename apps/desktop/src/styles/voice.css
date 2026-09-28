@@ -165,6 +165,37 @@
   overflow-wrap: anywhere;
 }
 
+.live-voice-work-setup,
+.live-voice-work-operations {
+  display: grid;
+  gap: 8px;
+}
+
+.live-voice-field-label {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.live-voice-work-operation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+}
+
+.live-voice-work-operation-content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.live-voice-work-summary {
+  color: var(--ds-text-secondary);
+  overflow-wrap: anywhere;
+}
+
 .live-voice-error {
   color: var(--ds-error);
   font-size: var(--text-sm);
@@ -190,4 +221,3 @@
 .live-voice-transcripts p[data-role="user"] {
   color: var(--ds-text-secondary);
 }
-

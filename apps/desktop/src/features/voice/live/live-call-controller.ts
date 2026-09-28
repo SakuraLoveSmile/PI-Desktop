@@ -44,6 +44,7 @@ type StartResources = {
   captureEpoch: number;
   releasePromise?: Promise<void>;
   abort: AbortController;
+  completedControlActions?: Set<string>;
 };
 
 /** Window-lifetime owner for Live media. React subscriptions never own it. */
@@ -96,7 +97,7 @@ export class LiveCallController {
     }
   }
 
-  async start(): Promise<void> {
+  async start(options: { workTarget?: { workSessionId: string; contextEnabled: boolean } } = {}): Promise<void> {
     if (this.snapshot.starting || isLive(this.snapshot.call?.phase)) return;
     const generation = ++this.generation;
     const cachedStatus = this.snapshot.status;
@@ -106,7 +107,7 @@ export class LiveCallController {
     if (!selected) throw liveError("LIVE_NOT_CONFIGURED");
 
     const requestId = crypto.randomUUID();
-    const resources: StartResources = { requestId, abort: new AbortController(), captureEpoch: 0 };
+    const resources: StartResources = { requestId, abort: new AbortController(), captureEpoch: 0, completedControlActions: new Set() };
     this.resources.set(requestId, resources);
     this.patch({ starting: true, errorCode: undefined, transcripts: [] });
 
@@ -121,6 +122,7 @@ export class LiveCallController {
         bindingId: selected.bindingId,
         expectedSettingsRevision: cachedStatus.settingsRevision,
         initialMuted: true,
+        ...(options.workTarget ? { workTarget: options.workTarget } : {}),
       });
       void prepareRequest.then((prepared) => {
         if (resources.abort.signal.aborted || generation !== this.generation) {
@@ -430,13 +432,35 @@ export class LiveCallController {
       resources.pcm?.resetPlayback(event.playbackEpoch);
       return;
     }
+    if (event.kind === "work-receipt") {
+      this.sendCodexControl(event.callId, event.actionId, event.delegationId, event.receipt, resources);
+      return;
+    }
+    if (event.kind !== "reject-delegation") return;
+    this.sendCodexControl(event.callId, event.actionId, event.delegationId, undefined, resources);
+  }
+
+  private sendCodexControl(
+    callId: string,
+    actionId: string,
+    delegationId: string,
+    receipt: { status: "received"; operationId: string; providerRequestId: string; execution: "not_started" } | { status: "rejected"; providerRequestId: string; code: string } | undefined,
+    resources: StartResources,
+  ): void {
+    const completed = resources.completedControlActions ?? (resources.completedControlActions = new Set());
+    if (completed.has(actionId)) {
+      void liveVoiceApi.reportControlApplied({ callId, actionId, applied: true });
+      return;
+    }
     const channel = resources.channel;
     try {
       if (!channel || channel.readyState !== "open") throw liveError("LIVE_NETWORK_ERROR");
-      channel.send(codexDelegationFeedback(event.delegationId));
-      void liveVoiceApi.reportControlApplied({ callId: event.callId, actionId: event.actionId, applied: true });
+      channel.send(codexDelegationFeedback(delegationId, receipt?.status === "received" ? { operationId: receipt.operationId, status: "received" } : undefined));
+      completed.add(actionId);
+      while (completed.size > 256) completed.delete(completed.values().next().value as string);
+      void liveVoiceApi.reportControlApplied({ callId, actionId, applied: true });
     } catch (error) {
-      void liveVoiceApi.reportControlApplied({ callId: event.callId, actionId: event.actionId, applied: false, errorCode: errorCode(error) });
+      void liveVoiceApi.reportControlApplied({ callId, actionId, applied: false, errorCode: errorCode(error) });
     }
   }
 

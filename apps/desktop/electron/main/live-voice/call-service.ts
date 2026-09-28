@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { Buffer } from "node:buffer";
 import {
   ErrorCodes,
   OAUTH_AUTH_KIND,
@@ -13,158 +12,44 @@ import {
   type LiveEndReason,
   type LiveEndRequest,
   type LiveMediaReport,
-  type LivePhase,
   type LivePlaybackCursor,
   type LivePrepareRequest,
   type LivePreparedCall,
   type LiveStatus,
-  type LiveTranscriptEvent,
-  type LiveVoiceSettings,
-  validateLiveVoiceSettings,
+  type LiveWorkOperationView,
 } from "@pi-desktop/shared";
-import type { LiveWireEvent } from "@pi-desktop/voice-runtime/live";
+import { LIVE_WORK_TOOL_NAME, parseLiveWorkArguments, type LiveWireEvent } from "@pi-desktop/voice-runtime/live";
 import { LiveAuthResolver } from "./auth-resolver";
 import type { LivePcmBridge } from "./audio-port";
 import type { LiveAdapter, LiveAdapterContext, LiveResolvedAuth } from "./types";
+import { createLiveWorkProfile } from "./work-profile";
+import {
+  AUTH_TIMEOUT_MS,
+  CONNECT_TIMEOUT_MS,
+  MAX_CALL_MS,
+  MAX_CALLS_PER_OWNER_REQUEST_CACHE,
+  OWNER_HEARTBEAT_MS,
+  OWNER_LEASE_MS,
+  PREPARE_DEADLINE_MS,
+  RESERVATION_TIMEOUT_MS,
+  TOTAL_CONNECT_TIMEOUT_MS,
+  errorCode,
+  fingerprint,
+  liveError,
+  liveVoiceFromSettings,
+  ownerKey,
+  transition,
+  validatePrepareRequest,
+  type LiveCallServiceDeps,
+  type LiveOwner,
+  type RequestEntry,
+  type SettingsSnapshot,
+  type Slot,
+} from "./call-service-internals";
+import { createLiveCallWorkHandlers } from "./call-service-work";
+import { pushLiveTranscript } from "./call-service-transcript";
 
-export type LiveOwner = {
-  webContentsId: number;
-  frameProcessId: number;
-  frameRoutingId: number;
-  url: string;
-};
-
-export type LiveCallServiceDeps = {
-  loadSettings: () => Promise<AppSettings>;
-  authResolver: LiveAuthResolver;
-  createAdapter: (context: LiveAdapterContext) => LiveAdapter;
-  createPcmBridge: (input: {
-    callId: string;
-    owner: LiveOwner;
-    inputSampleRate: 16000 | 24000;
-    outputSampleRate: 24000;
-    onInput: (bytes: Uint8Array, captureEpoch: number) => void;
-    onPlaybackPosition: (cursors: LivePlaybackCursor[]) => void;
-    onReleased: () => void;
-    onFailure: (code: string) => void;
-  }) => LivePcmBridge;
-  sendView: (owner: LiveOwner, view: LiveCallView) => void;
-  sendControl: (owner: LiveOwner, event: LiveControlEvent) => void;
-  sendTranscript: (owner: LiveOwner, event: LiveTranscriptEvent) => void;
-  ownerAlive: (owner: LiveOwner) => boolean;
-  acquireMicrophone: (callId: string) => () => void;
-  acquireBackgroundThrottlingLease?: (callId: string) => () => void;
-  now?: () => number;
-};
-
-type Slot = {
-  callId: string;
-  requestId: string;
-  requestedBindingId: string;
-  owner: LiveOwner;
-  binding: LiveBinding | null;
-  settingsRevision: number;
-  phase: LivePhase;
-  revision: number;
-  abort: AbortController;
-  desiredMuted: boolean;
-  muted: boolean;
-  captureEpoch: number;
-  playbackEpoch: number;
-  microphoneActive: boolean;
-  mediaRelease: "pending" | "confirmed" | "unconfirmed";
-  mediaReleased: Promise<void>;
-  resolveMediaReleased: (() => void) | null;
-  connectedAt?: string;
-  playbackBlocked?: boolean;
-  userSpeaking: boolean;
-  assistantSpeaking: boolean;
-  error?: { code: string; stage?: string; retriable: boolean };
-  notice?: { code: string; retriable: boolean };
-  adapter: LiveAdapter | null;
-  bridge: LivePcmBridge | null;
-  releaseMicrophone: (() => void) | null;
-  releaseBackgroundLease: (() => void) | null;
-  heartbeatAt: number;
-  maxDurationTimer?: ReturnType<typeof setTimeout>;
-  heartbeatTimer?: ReturnType<typeof setTimeout>;
-  reservationTimer?: ReturnType<typeof setTimeout>;
-  connectPromise?: Promise<{ answerSdp?: string; revision: number }>;
-  connectFingerprint?: string;
-  delegationInstructions: Map<string, string>;
-  pendingControls: Map<string, { timer: ReturnType<typeof setTimeout> }>;
-  transcriptLengths: Map<string, number>;
-};
-
-type RequestEntry = { fingerprint: string; promise: Promise<LivePreparedCall> };
-type SettingsSnapshot = { value: LiveVoiceSettings; fingerprint: string; revision: number; invalid: boolean };
-
-const MAX_CALLS_PER_OWNER_REQUEST_CACHE = 64;
-const MAX_DELEGATIONS_PER_CALL = 256;
-const MAX_TRANSCRIPT_SEGMENTS = 200;
-const MAX_TRANSCRIPT_BYTES = 64 * 1024;
-const MAX_INSTRUCTION_BYTES = 8 * 1024;
-const PREPARE_DEADLINE_MS = 5_000;
-const RESERVATION_TIMEOUT_MS = 60_000;
-const AUTH_TIMEOUT_MS = 15_000;
-const CONNECT_TIMEOUT_MS = 15_000;
-const TOTAL_CONNECT_TIMEOUT_MS = 40_000;
-const OWNER_LEASE_MS = 20_000;
-const OWNER_HEARTBEAT_MS = 5_000;
-const MAX_CALL_MS = 30 * 60_000;
-const REJECTION_ACK_TIMEOUT_MS = 1_000;
-
-function ownerKey(owner: LiveOwner): string {
-  return `${owner.webContentsId}:${owner.frameProcessId}:${owner.frameRoutingId}`;
-}
-
-function fingerprint(value: unknown): string {
-  return JSON.stringify(value);
-}
-
-function liveVoiceFromSettings(settings: unknown): { value: LiveVoiceSettings; invalid: boolean } {
-  if (!settings || typeof settings !== "object" || Array.isArray(settings)) return { value: { enabled: false, bindings: [] }, invalid: true };
-  const raw = (settings as { liveVoice?: unknown }).liveVoice;
-  if (raw === undefined) return { value: { enabled: false, bindings: [] }, invalid: false };
-  try {
-    return { value: validateLiveVoiceSettings(raw), invalid: false };
-  } catch {
-    return { value: { enabled: false, bindings: [] }, invalid: true };
-  }
-}
-
-function transition(slot: Slot, next: LivePhase): void {
-  const allowed: Record<LivePhase, readonly LivePhase[]> = {
-    idle: ["preparing"],
-    preparing: ["acquiring-mic", "closing", "failed"],
-    "acquiring-mic": ["negotiating", "connecting", "closing", "failed"],
-    negotiating: ["connecting", "closing", "failed"],
-    connecting: ["connected", "closing", "failed"],
-    connected: ["reconnecting", "closing", "failed"],
-    reconnecting: ["connected", "closing", "failed"],
-    closing: ["ended", "failed"],
-    ended: [],
-    failed: [],
-  };
-  if (slot.phase !== next && !allowed[slot.phase].includes(next)) {
-    throw Object.assign(new Error("Live call state transition is invalid"), { errorCode: "LIVE_PROTOCOL_ERROR" });
-  }
-  slot.phase = next;
-}
-
-function errorCode(error: unknown, fallback = "LIVE_NETWORK_ERROR"): { code: string; retriable: boolean } {
-  const value = error && typeof error === "object" ? error as { errorCode?: unknown; retriable?: unknown } : null;
-  const allowed = new Set<string>([
-    "LIVE_DISABLED", "LIVE_NOT_CONFIGURED", "LIVE_PROVIDER_NOT_FOUND", "LIVE_AUTH_KIND_UNSUPPORTED", "LIVE_AUTH_REQUIRED",
-    "LIVE_ACCOUNT_ID_MISSING", "LIVE_ACCESS_DENIED", "LIVE_RATE_LIMITED", "LIVE_PROTOCOL_UNSUPPORTED", "LIVE_PROTOCOL_ERROR",
-    "LIVE_ALREADY_ACTIVE", "LIVE_REQUEST_CONFLICT", "LIVE_SETTINGS_IN_USE", "LIVE_MEDIA_RELEASE_UNCONFIRMED", "LIVE_STALE_CALL",
-    "LIVE_INVALID_OWNER", "LIVE_MICROPHONE_BUSY", "LIVE_MICROPHONE_DENIED", "LIVE_MICROPHONE_UNAVAILABLE", "LIVE_MEDIA_UNSUPPORTED",
-    "LIVE_PLAYBACK_BLOCKED", "LIVE_TIMEOUT", "LIVE_NETWORK_ERROR", "LIVE_NETWORK_POLICY_UNSUPPORTED", "LIVE_AUDIO_BACKPRESSURE",
-    "LIVE_EXECUTION_NOT_CONNECTED",
-  ]);
-  const code = typeof value?.errorCode === "string" && allowed.has(value.errorCode) ? value.errorCode : fallback;
-  return { code, retriable: typeof value?.retriable === "boolean" ? value.retriable : ["LIVE_TIMEOUT", "LIVE_NETWORK_ERROR", "LIVE_RATE_LIMITED"].includes(code) };
-}
+export type { LiveCallServiceDeps, LiveOwner } from "./call-service-internals";
 
 export class LiveCallService {
   private current: Slot | null = null;
@@ -176,10 +61,19 @@ export class LiveCallService {
   private settingsWritePending = false;
   private readonly deps: LiveCallServiceDeps;
   private readonly now: () => number;
+  private readonly workHandlers: ReturnType<typeof createLiveCallWorkHandlers>;
 
   constructor(deps: LiveCallServiceDeps) {
     this.deps = deps;
     this.now = deps.now ?? Date.now;
+    this.workHandlers = createLiveCallWorkHandlers({
+      current: () => this.current,
+      ownerAlive: deps.ownerAlive,
+      sendControl: deps.sendControl,
+      receiveWorkCandidate: deps.receiveWorkCandidate,
+      publish: (slot) => this.publish(slot),
+      fail: (slot, error, stage) => this.failAndCleanup(slot, error, stage),
+    });
   }
 
   async status(): Promise<LiveStatus> {
@@ -349,43 +243,17 @@ export class LiveCallService {
 
   async reportDelegation(owner: LiveOwner, request: LiveDelegationRequest): Promise<{ accepted: boolean }> {
     const slot = this.requireCurrent(owner, request.callId);
-    if (slot.binding?.adapterId !== "codex-live" || typeof request.delegationId !== "string" || !request.delegationId.trim() || request.delegationId.length > 256 || typeof request.instruction !== "string" || Buffer.byteLength(request.instruction, "utf8") > MAX_INSTRUCTION_BYTES) {
-      throw liveError("LIVE_PROTOCOL_ERROR");
-    }
-    const id = request.delegationId.trim();
-    const prior = slot.delegationInstructions.get(id);
-    if (prior !== undefined) {
-      if (prior !== request.instruction) throw liveError("LIVE_PROTOCOL_ERROR");
-      return { accepted: true };
-    }
-    if (slot.delegationInstructions.size >= MAX_DELEGATIONS_PER_CALL) throw liveError("LIVE_PROTOCOL_ERROR");
-    slot.delegationInstructions.set(id, request.instruction);
-    const actionId = randomUUID();
-    const timer = setTimeout(() => {
-      const current = this.current;
-      if (current !== slot || !slot.pendingControls.has(actionId)) return;
-      slot.pendingControls.delete(actionId);
-      slot.notice = { code: "LIVE_EXECUTION_NOT_CONNECTED", retriable: false };
-      void this.failAndCleanup(slot, liveError("LIVE_PROTOCOL_ERROR"), "control");
-    }, REJECTION_ACK_TIMEOUT_MS);
-    slot.pendingControls.set(actionId, { timer });
-    this.deps.sendControl(owner, { callId: slot.callId, kind: "reject-delegation", actionId, delegationId: id, reason: "EXECUTION_NOT_CONNECTED" });
-    this.publish(slot);
-    return { accepted: true };
+    return this.workHandlers.reportDelegation(slot, owner, request);
   }
 
   reportControlApplied(owner: LiveOwner, input: { callId: string; actionId: string; applied: boolean; errorCode?: string }): void {
     const slot = this.requireCurrent(owner, input.callId);
     if (typeof input.actionId !== "string" || typeof input.applied !== "boolean") throw liveError("LIVE_PROTOCOL_ERROR");
-    const pending = slot.pendingControls.get(input.actionId);
-    if (!pending) return;
-    clearTimeout(pending.timer);
-    slot.pendingControls.delete(input.actionId);
-    if (!input.applied) {
-      slot.notice = { code: "LIVE_EXECUTION_NOT_CONNECTED", retriable: false };
-      this.publish(slot);
-      void this.failAndCleanup(slot, liveError("LIVE_PROTOCOL_ERROR"), "control");
-    }
+    this.workHandlers.reportControlApplied(slot, input);
+  }
+
+  notifyWorkOperation(callId: string, operation: LiveWorkOperationView): void {
+    this.workHandlers.notifyWorkOperation(callId, operation);
   }
 
   async end(owner: LiveOwner, request: LiveEndRequest): Promise<{ ok: true }> {
@@ -482,6 +350,22 @@ export class LiveCallService {
     const binding = snapshot.value.bindings.find((item) => item.id === request.bindingId);
     if (!binding) throw liveError("LIVE_NOT_CONFIGURED");
     if (snapshot.value.selectedBindingId && snapshot.value.selectedBindingId !== binding.id) throw liveError("LIVE_NOT_CONFIGURED");
+    if (request.workTarget) {
+      if (!this.deps.resolveWorkBinding) throw liveError("LIVE_WORK_CAPABILITY_UNAVAILABLE");
+      slot.workBinding = await this.withDeadline(
+        this.deps.resolveWorkBinding(request.workTarget),
+        PREPARE_DEADLINE_MS,
+        "work-binding",
+        slot.abort.signal,
+      );
+      if (
+        slot.workBinding.workSessionId !== request.workTarget.workSessionId ||
+        !Number.isSafeInteger(slot.workBinding.workBindingRevision) ||
+        slot.workBinding.workBindingRevision < 1 ||
+        typeof slot.workBinding.label !== "string" || slot.workBinding.label.length > 120 ||
+        slot.workBinding.contextEnabled !== request.workTarget.contextEnabled
+      ) throw liveError("LIVE_WORK_SESSION_UNAVAILABLE");
+    }
     const record = await this.withDeadline(this.deps.authResolver.provider(binding.providerId), PREPARE_DEADLINE_MS, "prepare");
     this.assertCurrent(slot);
     if (!record?.provider?.enabled) throw liveError("LIVE_PROVIDER_NOT_FOUND");
@@ -542,6 +426,13 @@ export class LiveCallService {
       this.assertCurrent(slot);
       await this.assertBindingStillConfigured(slot);
       this.assertCurrent(slot);
+      if (slot.workBinding) {
+        if (!this.deps.openWorkScope || !this.deps.receiveWorkCandidate) {
+          throw liveError("LIVE_WORK_CAPABILITY_UNAVAILABLE");
+        }
+        this.deps.openWorkScope(slot.callId, slot.workBinding);
+        slot.workScopeOpened = true;
+      }
       const context: LiveAdapterContext = {
         callId: slot.callId,
         binding: slot.binding,
@@ -549,6 +440,33 @@ export class LiveCallService {
         auth: result.auth as LiveResolvedAuth,
         signal: slot.abort.signal,
         onEvent: (event) => this.onAdapterEvent(slot, event),
+        ...(slot.workBinding ? { workProfile: createLiveWorkProfile(slot.workBinding) } : {}),
+        ...(slot.workBinding
+          ? {
+              onWorkCandidate: async (candidate, deliverReceipt) => {
+                const parsed = parseLiveWorkArguments(candidate.arguments);
+                const binding = slot.workBinding;
+                if (!binding || candidate.toolName !== LIVE_WORK_TOOL_NAME || !parsed || !this.deps.receiveWorkCandidate) {
+                  await deliverReceipt({
+                    status: "rejected",
+                    providerRequestId: candidate.providerRequestId,
+                    code: !binding ? "LIVE_WORK_NOT_BOUND" : "LIVE_WORK_INVALID_REQUEST",
+                  }).catch(() => undefined);
+                  return;
+                }
+                await this.deps.receiveWorkCandidate(
+                  {
+                    callId: slot.callId,
+                    workBindingRevision: binding.workBindingRevision,
+                    workSessionId: binding.workSessionId,
+                    providerRequestId: candidate.providerRequestId,
+                    instruction: parsed.instruction,
+                  },
+                  deliverReceipt,
+                );
+              },
+            }
+          : {}),
       };
       slot.adapter = this.deps.createAdapter(context);
       if (slot.bridge) {
@@ -613,7 +531,7 @@ export class LiveCallService {
         } catch (error) { void this.failAndCleanup(slot, error, "playback"); }
         return;
       case "transcript":
-        this.pushTranscript(slot, event);
+        pushLiveTranscript(slot, event, this.deps.sendTranscript, this.now);
         return;
       case "activity":
         if (event.userSpeaking !== undefined) slot.userSpeaking = event.userSpeaking;
@@ -639,9 +557,6 @@ export class LiveCallService {
         }
         return;
       case "tool-call-cancelled":
-        // Live providers have no local tool execution path in this release.
-        // The adapter validates cancellations so a later tool-capable profile
-        // cannot accidentally leave work running without adding a new parser.
         return;
       case "error":
         if (event.code === "LIVE_EXECUTION_NOT_CONNECTED") {
@@ -659,33 +574,16 @@ export class LiveCallService {
     }
   }
 
-  private pushTranscript(slot: Slot, event: Extract<LiveWireEvent, { kind: "transcript" }>): void {
-    const text = event.text.slice(0, 16_384);
-    if (!text) return;
-    const key = `${event.role}\u0000${event.id.slice(0, 256)}`;
-    const bytes = Buffer.byteLength(text, "utf8");
-    const priorBytes = slot.transcriptLengths.get(key) ?? 0;
-    while (
-      (!slot.transcriptLengths.has(key) && slot.transcriptLengths.size >= MAX_TRANSCRIPT_SEGMENTS) ||
-      [...slot.transcriptLengths.values()].reduce((sum, size) => sum + size, 0) - priorBytes + bytes > MAX_TRANSCRIPT_BYTES
-    ) {
-      const oldest = slot.transcriptLengths.keys().next().value;
-      if (oldest === undefined || oldest === key) break;
-      slot.transcriptLengths.delete(oldest);
-    }
-    slot.transcriptLengths.set(key, bytes);
-    this.deps.sendTranscript(slot.owner, {
-      callId: slot.callId,
-      segment: { id: event.id.slice(0, 256), role: event.role, text, final: event.final, timestamp: this.now() },
-    });
-  }
-
   private async endSlot(slot: Slot, reason: LiveEndReason, ownerGone = false): Promise<void> {
     if (slot.phase === "ended" || slot.phase === "failed") return;
     if (slot.phase !== "closing") transition(slot, "closing");
     slot.muted = true;
     slot.desiredMuted = true;
     this.publish(slot);
+    if (slot.workScopeOpened) {
+      this.deps.closeWorkScope?.(slot.callId);
+      slot.workScopeOpened = false;
+    }
     slot.abort.abort(new Error(reason));
     this.clearTimers(slot);
     if (!ownerGone && this.deps.ownerAlive(slot.owner)) {
@@ -699,7 +597,10 @@ export class LiveCallService {
     const adapterClose = slot.adapter?.close(reason) ?? Promise.resolve();
     slot.bridge?.close();
     await this.withDeadline(adapterClose, 1_000, "cleanup").catch(() => undefined);
-    for (const pending of slot.pendingControls.values()) clearTimeout(pending.timer);
+    for (const [actionId, pending] of slot.pendingControls) {
+      clearTimeout(pending.timer);
+      pending.resolve?.({ status: "unknown", deliveryId: actionId, code: "LIVE_STALE_CALL" });
+    }
     slot.pendingControls.clear();
     slot.releaseBackgroundLease?.();
     slot.releaseBackgroundLease = null;
@@ -821,6 +722,8 @@ export class LiveCallService {
       releaseBackgroundLease: null,
       heartbeatAt: this.now(),
       delegationInstructions: new Map(),
+      workScopeOpened: false,
+      workOperations: [],
       pendingControls: new Map(),
       transcriptLengths: new Map(),
     };
@@ -849,6 +752,8 @@ export class LiveCallService {
       microphoneActive: slot.microphoneActive,
       userSpeaking: slot.userSpeaking,
       assistantSpeaking: slot.assistantSpeaking,
+      ...(slot.workBinding ? { workBinding: slot.workBinding } : {}),
+      ...(slot.workOperations.length ? { workOperations: slot.workOperations } : {}),
       ...(slot.connectedAt ? { connectedAt: slot.connectedAt } : {}),
       ...(slot.playbackBlocked !== undefined ? { playbackBlocked: slot.playbackBlocked } : {}),
       mediaRelease: slot.mediaRelease,
@@ -886,14 +791,4 @@ export class LiveCallService {
       this.cancellationTombstones.delete(first);
     }
   }
-}
-
-function validatePrepareRequest(request: LivePrepareRequest): void {
-  if (!request || typeof request !== "object" || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(request.requestId) || typeof request.bindingId !== "string" || request.bindingId.length > 256 || !Number.isSafeInteger(request.expectedSettingsRevision) || typeof request.initialMuted !== "boolean") {
-    throw liveError("LIVE_PROTOCOL_ERROR");
-  }
-}
-
-function liveError(code: string): Error {
-  return Object.assign(new Error(code), { errorCode: code });
 }

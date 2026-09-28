@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   codexDelegationFeedback,
   geminiSetupMessage,
+  geminiToolResponseMessage,
+  LIVE_WORK_TOOL_NAME,
+  parseLiveWorkArguments,
   parseCodexMessage,
   parseGeminiMessage,
   parseRealtimeMessage,
   realtimeSessionMatches,
   realtimeSessionUpdateMessage,
   realtimeTruncateMessages,
+  realtimeToolReceiptMessage,
 } from "./protocol.js";
 
 describe("Live wire profiles", () => {
@@ -34,6 +38,12 @@ describe("Live wire profiles", () => {
     });
     const bytes = btoa(String.fromCharCode(0, 0, 1, 0));
     expect(parseGeminiMessage({ setupComplete: {} })).toEqual([{ kind: "ready" }]);
+    expect(geminiSetupMessage({ modelId: "gemini-live", voice: "Kore", workProfile: { instructions: "work instructions", startupContext: "work scope" } })).toMatchObject({
+      setup: {
+        systemInstruction: { parts: [{ text: "work instructions\n\nwork scope" }] },
+        tools: [{ functionDeclarations: [{ name: LIVE_WORK_TOOL_NAME, parameters: { additionalProperties: false } }] }],
+      },
+    });
     const events = parseGeminiMessage({ serverContent: { modelTurn: { parts: [
       { inlineData: { mimeType: "audio/pcm;rate=24000", data: bytes } },
       { inlineData: { mimeType: "audio/pcm;rate=24000", data: bytes } },
@@ -89,6 +99,17 @@ describe("Live wire profiles", () => {
     expect(realtimeSessionMatches({ session: ga, modelId: "gpt-realtime", voice: "marin", profile: "realtime-ga" })).toBe(true);
     expect(realtimeSessionMatches({ session: { ...ga, output_modalities: ["text"] }, modelId: "gpt-realtime", voice: "marin", profile: "realtime-ga" })).toBe(false);
 
+    const workGa = realtimeSessionUpdateMessage({
+      modelId: "gpt-realtime",
+      voice: "marin",
+      profile: "realtime-ga",
+      workProfile: { instructions: "work instructions", startupContext: "bound session" },
+    }).session as Record<string, unknown>;
+    expect(workGa.tools).toEqual([expect.objectContaining({ type: "function", name: LIVE_WORK_TOOL_NAME })]);
+    expect(realtimeSessionMatches({ session: workGa, modelId: "gpt-realtime", voice: "marin", profile: "realtime-ga", workEnabled: true })).toBe(true);
+    expect(realtimeSessionMatches({ session: ga, modelId: "gpt-realtime", voice: "marin", profile: "realtime-ga", workEnabled: true })).toBe(false);
+    expect(realtimeSessionMatches({ session: workGa, modelId: "gpt-realtime", voice: "marin", profile: "realtime-ga", workEnabled: false })).toBe(false);
+
     const compat = realtimeSessionUpdateMessage({ modelId: "gateway-realtime", voice: "cove", profile: "realtime-compat-v1" }).session as Record<string, unknown>;
     expect(compat).toMatchObject({ modalities: ["text", "audio"], input_audio_format: "pcm16", output_audio_format: "pcm16", voice: "cove" });
     expect(compat).not.toHaveProperty("type");
@@ -100,5 +121,24 @@ describe("Live wire profiles", () => {
     expect(parseRealtimeMessage({ type: "response.output_audio.delta", delta: audio, response_id: "ga-response", item_id: "ga-item", content_index: 0 }, "realtime-ga")[0]).toMatchObject({ kind: "audio", responseId: "ga-response", itemId: "ga-item" });
     expect(parseRealtimeMessage({ type: "response.audio.delta", delta: audio, response_id: "compat-response", item_id: "compat-item", content_index: 0 }, "realtime-compat-v1")[0]).toMatchObject({ kind: "audio", responseId: "compat-response", itemId: "compat-item" });
     expect(parseRealtimeMessage({ type: "response.audio.delta", delta: audio, response_id: "wrong-profile", item_id: "wrong-profile", content_index: 0 }, "realtime-ga")).toEqual([]);
+  });
+
+  it("parses only the declared work tool arguments and builds provider-native single receipts", () => {
+    expect(parseGeminiMessage({ toolCall: { functionCalls: [{ id: "g-call", name: LIVE_WORK_TOOL_NAME, args: { instruction: "  inspect login  " } }] } })).toEqual([
+      { kind: "tool-candidate", providerRequestId: "g-call", toolName: LIVE_WORK_TOOL_NAME, arguments: { instruction: "  inspect login  " } },
+    ]);
+    expect(parseLiveWorkArguments({ instruction: "  inspect login  " })).toEqual({ instruction: "inspect login" });
+    expect(parseLiveWorkArguments({ instruction: "inspect login", sessionId: "session-other" })).toBeNull();
+    expect(parseLiveWorkArguments({ instruction: " " })).toBeNull();
+    expect(geminiToolResponseMessage({ providerRequestId: "g-call", toolName: LIVE_WORK_TOOL_NAME, receipt: { status: "received", operationId: "op-1", execution: "not_started" } })).toEqual({
+      toolResponse: { functionResponses: [{ id: "g-call", name: LIVE_WORK_TOOL_NAME, response: { status: "received", operationId: "op-1", execution: "not_started" } }] },
+    });
+    expect(realtimeToolReceiptMessage({ providerRequestId: "r-call", receipt: { status: "rejected", code: "LIVE_WORK_INVALID_REQUEST" } })).toEqual({
+      type: "conversation.item.create",
+      item: { type: "function_call_output", call_id: "r-call", output: "{\"status\":\"rejected\",\"code\":\"LIVE_WORK_INVALID_REQUEST\"}" },
+    });
+    expect(parseRealtimeMessage({ type: "response.function_call_arguments.done", call_id: "r-call", name: LIVE_WORK_TOOL_NAME, arguments: JSON.stringify({ instruction: "inspect login" }) })).toEqual([
+      { kind: "tool-candidate", providerRequestId: "r-call", toolName: LIVE_WORK_TOOL_NAME, arguments: { instruction: "inspect login" } },
+    ]);
   });
 });

@@ -1,4 +1,4 @@
-import type { LiveBinding, LiveEndReason, LivePlaybackCursor, LiveRealtimeWireProfile } from "@pi-desktop/shared";
+import type { LiveBinding, LiveEndReason, LivePlaybackCursor, LiveProviderReceipt, LiveRealtimeWireProfile } from "@pi-desktop/shared";
 import type { ProviderPublic } from "@pi-desktop/shared";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import type { LiveWireEvent } from "@pi-desktop/voice-runtime/live";
@@ -12,6 +12,10 @@ export type LiveResolvedAuth =
   | { kind: "codex-oauth"; accessToken: string; accountId: string }
   | { kind: "api-key"; apiKey: string; baseUrl: string };
 
+export type LiveReceiptDelivery =
+  | { status: "sent"; deliveryId: string }
+  | { status: "not-sent" | "unknown"; deliveryId: string; code: string };
+
 export type LiveAdapterContext = {
   callId: string;
   binding: Readonly<LiveBinding>;
@@ -19,6 +23,11 @@ export type LiveAdapterContext = {
   auth: LiveResolvedAuth;
   signal: AbortSignal;
   onEvent: (event: LiveWireEvent) => void;
+  workProfile?: { version: 1; instructions: string; startupContext: string };
+  onWorkCandidate?: (
+    candidate: { providerRequestId: string; toolName: string; arguments: unknown },
+    deliverReceipt: (receipt: LiveProviderReceipt) => Promise<LiveReceiptDelivery>,
+  ) => Promise<void>;
 };
 
 export type { LivePlaybackCursor } from "@pi-desktop/shared";

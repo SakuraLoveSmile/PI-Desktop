@@ -61,6 +61,8 @@ export type ComposerToolbarProps = {
   hasDraftContent: boolean;
   abort: AppState["abort"];
   submit: () => Promise<void>;
+  workSessionId?: string;
+  workSessionLabel?: string;
 };
 
 /** Composer controls: mode, permission, model, enhancement, and send/stop. */
@@ -95,6 +97,8 @@ export function ComposerToolbar({
   hasDraftContent,
   abort,
   submit,
+  workSessionId,
+  workSessionLabel,
 }: ComposerToolbarProps) {
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
   const steeringShortcut = keybindingDisplayParts("Alt+Enter", platform).join("+");
@@ -116,7 +120,7 @@ export function ComposerToolbar({
             <IconPlus size={15} aria-hidden="true" />
           </TooltipButton>
         </div>
-        <LiveVoiceControls t={t} />
+        <LiveVoiceControls t={t} workSessionId={workSessionId} workSessionLabel={workSessionLabel} />
         <TooltipButton
           type="button"
           className="icon-btn mode-chip composer-mode-chip"

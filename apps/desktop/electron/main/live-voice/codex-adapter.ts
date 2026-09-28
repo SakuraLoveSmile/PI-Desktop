@@ -10,12 +10,14 @@ const MAX_SDP_BYTES = 256 * 1024;
 const MAX_SDP_RESPONSE_BYTES = 256 * 1024;
 const STARTUP_INSTRUCTIONS = "You are a voice assistant. Do not claim to execute actions. You have no access to project files, tools, or the coding agent. If asked to perform work, explain that execution is not connected.";
 
-export function buildCodexCallBody(input: { sdp: string; voice: string }): Record<string, unknown> {
+export function buildCodexCallBody(input: { sdp: string; voice: string; workProfile?: { instructions: string; startupContext: string } }): Record<string, unknown> {
   return {
     sdp: input.sdp,
     session: {
       model: CODEX_MODEL,
-      instructions: STARTUP_INSTRUCTIONS,
+      instructions: input.workProfile
+        ? `${input.workProfile.instructions}\n\n${input.workProfile.startupContext}`
+        : STARTUP_INSTRUCTIONS,
       audio: { output: { voice: input.voice } },
       delegation: { type: "client", ack_filler: false },
     },
@@ -62,7 +64,7 @@ export function createCodexAdapter(context: LiveAdapterContext, deps: {
         const response = await (deps.fetchImpl ?? fetch)(url, {
           method: "POST",
           headers,
-          body: JSON.stringify(buildCodexCallBody({ sdp: offerSdp, voice: binding.voice })),
+          body: JSON.stringify(buildCodexCallBody({ sdp: offerSdp, voice: binding.voice, ...(context.workProfile ? { workProfile: context.workProfile } : {}) })),
           signal: requestController.signal,
           redirect: "manual",
         });

@@ -3,6 +3,11 @@
 export const MAX_LIVE_JSON_BYTES = 2 * 1024 * 1024;
 export const MAX_LIVE_TEXT_BYTES = 64 * 1024;
 export const MAX_LIVE_AUDIO_BYTES = 512 * 1024;
+export const LIVE_WORK_TOOL_NAME = "delegate_to_work_session";
+
+export type LocalDeliveryReceipt =
+  | { status: "sent"; deliveryId: string }
+  | { status: "not-sent" | "unknown"; deliveryId: string; code: string };
 
 export type LiveWireEvent =
   | { kind: "ready" }
@@ -12,6 +17,7 @@ export type LiveWireEvent =
   | { kind: "interrupted" }
   | { kind: "turn-complete" }
   | { kind: "delegation"; delegationId: string; instruction: string }
+  | { kind: "tool-candidate"; providerRequestId: string; toolName: string; arguments: unknown }
   | { kind: "tool-call-cancelled"; ids: string[] }
   | { kind: "closed"; code?: number }
   | { kind: "error"; code: string };
@@ -54,14 +60,20 @@ export function parseCodexMessage(value: unknown): LiveWireEvent[] {
   return [];
 }
 
-export function codexDelegationFeedback(delegationId: string): string {
+export function codexDelegationFeedback(delegationId: string, receipt?: {
+  operationId: string;
+  status: "received";
+}): string {
+  const text = receipt
+    ? `Host received operation ${receipt.operationId} for intent review. Execution has not started. Wait for authoritative admission feedback.`
+    : "This request did not create a new task. Follow the Host context feedback; do not retry this delegation automatically.";
   return JSON.stringify({
     type: "delegation.context.append",
     delegation_item_id: delegationId,
     channel: "commentary",
     content: [{
       type: "input_text",
-      text: "This request did not create a new task. Follow the Host context feedback; do not retry this delegation automatically.",
+      text,
     }],
   });
 }
@@ -93,13 +105,18 @@ function decodeBase64(value: unknown): Uint8Array | null {
 export function geminiSetupMessage(input: {
   modelId: string;
   voice: string;
+  workProfile?: { instructions: string; startupContext: string };
 }): Record<string, unknown> {
+  const tools = input.workProfile ? [geminiWorkToolDeclaration()] : undefined;
   return {
     setup: {
       model: input.modelId.startsWith("models/") ? input.modelId : `models/${input.modelId}`,
       systemInstruction: {
-        parts: [{ text: "You are a voice assistant in a conversation. Do not claim to perform actions. You have no access to files, tools, or the coding agent." }],
+        parts: [{ text: input.workProfile
+          ? `${input.workProfile.instructions}\n\n${input.workProfile.startupContext}`
+          : "You are a voice assistant in a conversation. Do not claim to perform actions. You have no access to files, tools, or the coding agent." }],
       },
+      ...(tools ? { tools } : {}),
       generationConfig: {
         responseModalities: ["AUDIO"],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: input.voice } } },
@@ -136,6 +153,17 @@ export function parseGeminiMessage(value: unknown): LiveWireEvent[] {
   if (root.setupComplete !== undefined) return [{ kind: "ready" }];
   if (root.goAway !== undefined) return [{ kind: "error", code: "LIVE_TIMEOUT" }];
   const events: LiveWireEvent[] = [];
+  const toolCall = record(root.toolCall);
+  if (toolCall) {
+    if (!Array.isArray(toolCall.functionCalls) || toolCall.functionCalls.length > 16) {
+      return [{ kind: "error", code: "LIVE_PROTOCOL_ERROR" }];
+    }
+    for (const call of toolCall.functionCalls) {
+      const item = record(call);
+      if (!item || !text(item.id, 256) || !text(item.name, 128)) return [{ kind: "error", code: "LIVE_PROTOCOL_ERROR" }];
+      events.push({ kind: "tool-candidate", providerRequestId: item.id as string, toolName: item.name as string, arguments: item.args });
+    }
+  }
   const cancellation = record(root.toolCallCancellation);
   if (cancellation) {
     if (!Array.isArray(cancellation.ids) || cancellation.ids.length > 16 || cancellation.ids.some((id) => !text(id, 256))) {
@@ -168,7 +196,10 @@ export function parseGeminiMessage(value: unknown): LiveWireEvent[] {
       }
       const functionCall = record(partRecord?.functionCall);
       if (functionCall) {
-        events.push({ kind: "error", code: "LIVE_EXECUTION_NOT_CONNECTED" });
+        const id = text(functionCall.id, 256);
+        const name = text(functionCall.name, 128);
+        if (!id || !name) return [{ kind: "error", code: "LIVE_PROTOCOL_ERROR" }];
+        events.push({ kind: "tool-candidate", providerRequestId: id, toolName: name, arguments: functionCall.args });
       }
     }
     if (modelTurn && !interrupted) events.push({ kind: "activity", assistantSpeaking: true });
@@ -183,8 +214,12 @@ export function realtimeSessionUpdateMessage(input: {
   modelId: string;
   voice: string;
   profile: "realtime-ga" | "realtime-compat-v1";
+  workProfile?: { instructions: string; startupContext: string };
 }): Record<string, unknown> {
-  const instructions = "You are a voice assistant. Do not claim to execute actions. There is no access to project files, tools, or the coding agent.";
+  const instructions = input.workProfile
+    ? `${input.workProfile.instructions}\n\n${input.workProfile.startupContext}`
+    : "You are a voice assistant. Do not claim to execute actions. There is no access to project files, tools, or the coding agent.";
+  const tools = input.workProfile ? [liveWorkToolDeclaration()] : undefined;
   if (input.profile === "realtime-compat-v1") {
     return {
       type: "session.update",
@@ -197,6 +232,7 @@ export function realtimeSessionUpdateMessage(input: {
         output_audio_format: "pcm16",
         input_audio_transcription: { model: "whisper-1" },
         turn_detection: { type: "server_vad" },
+        ...(tools ? { tools, tool_choice: "auto" } : {}),
       },
     };
   }
@@ -211,6 +247,7 @@ export function realtimeSessionUpdateMessage(input: {
         input: { format: { type: "audio/pcm", rate: 24000 }, turn_detection: { type: "server_vad" }, transcription: { model: "gpt-4o-mini-transcribe" } },
         output: { format: { type: "audio/pcm", rate: 24000 }, voice: input.voice },
       },
+      ...(tools ? { tools, tool_choice: "auto" } : {}),
     },
   };
 }
@@ -220,9 +257,13 @@ export function realtimeSessionMatches(input: {
   modelId: string;
   voice: string;
   profile: "realtime-ga" | "realtime-compat-v1";
+  workEnabled?: boolean;
 }): boolean {
   const session = record(input.session);
   if (!session || session.model !== input.modelId) return false;
+  const tools = Array.isArray(session.tools) ? session.tools.map(record) : [];
+  const workTools = tools.filter((tool) => tool?.type === "function" && tool.name === LIVE_WORK_TOOL_NAME);
+  if (input.workEnabled ? workTools.length !== 1 : tools.length !== 0) return false;
   if (input.profile === "realtime-compat-v1") {
     const detection = record(session.turn_detection);
     return Array.isArray(session.modalities) && session.modalities.includes("audio") &&
@@ -304,12 +345,81 @@ export function parseRealtimeMessage(value: unknown, profile: "realtime-ga" | "r
       const code = typeof detail?.code === "string" && detail.code.length < 80 ? detail.code : "LIVE_PROTOCOL_ERROR";
       return [{ kind: "error", code: mapRealtimeError(code) }];
     }
-    case "response.function_call_arguments.done":
+    case "response.function_call_arguments.done": {
+      const callId = text(event.call_id, 256);
+      const name = text(event.name, 128);
+      if (!callId || !name || typeof event.arguments !== "string" || new TextEncoder().encode(event.arguments).byteLength > 8 * 1024) {
+        return [{ kind: "error", code: "LIVE_PROTOCOL_ERROR" }];
+      }
+      let args: unknown;
+      try { args = JSON.parse(event.arguments); } catch { return [{ kind: "tool-candidate", providerRequestId: callId, toolName: name, arguments: null }]; }
+      return [{ kind: "tool-candidate", providerRequestId: callId, toolName: name, arguments: args }];
+    }
     case "response.output_item.done":
       return [];
     default:
       return [];
   }
+}
+
+export function liveWorkToolDeclaration(): Record<string, unknown> {
+  return {
+    type: "function",
+    name: LIVE_WORK_TOOL_NAME,
+    description: "Submit an engineering request, ask about work status, or request a bounded work-session action. This is a candidate for Host review, not authorization to use tools. Leave greetings, ordinary preferences, and unfinished speech in Live.",
+    parameters: {
+      type: "object",
+      properties: {
+        instruction: {
+          type: "string",
+          description: "The user's complete request in their language. Preserve negations and uncertainty. This submits a candidate request; it does not authorize arbitrary tools.",
+        },
+      },
+      required: ["instruction"],
+      additionalProperties: false,
+    },
+  };
+}
+
+export function geminiWorkToolDeclaration(): Record<string, unknown> {
+  const declaration = liveWorkToolDeclaration();
+  return {
+    functionDeclarations: [{
+      name: declaration.name,
+      description: declaration.description,
+      parameters: declaration.parameters,
+    }],
+  };
+}
+
+export function parseLiveWorkArguments(value: unknown): { instruction: string } | null {
+  const input = record(value);
+  if (!input || Object.keys(input).length !== 1 || Object.keys(input)[0] !== "instruction") return null;
+  const instruction = input.instruction;
+  if (typeof instruction !== "string" || !instruction.trim() || new TextEncoder().encode(instruction).byteLength > 8 * 1024) return null;
+  return { instruction: instruction.trim() };
+}
+
+export function geminiToolResponseMessage(input: {
+  providerRequestId: string;
+  toolName: string;
+  receipt: { status: "received"; operationId: string; execution: "not_started" } | { status: "rejected"; code: string };
+}): Record<string, unknown> {
+  return { toolResponse: { functionResponses: [{ id: input.providerRequestId, name: input.toolName, response: input.receipt }] } };
+}
+
+export function realtimeToolReceiptMessage(input: {
+  providerRequestId: string;
+  receipt: { status: "received"; operationId: string; execution: "not_started" } | { status: "rejected"; code: string };
+}): Record<string, unknown> {
+  return {
+    type: "conversation.item.create",
+    item: {
+      type: "function_call_output",
+      call_id: input.providerRequestId,
+      output: JSON.stringify(input.receipt),
+    },
+  };
 }
 
 function mapRealtimeError(code: string): string {

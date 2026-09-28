@@ -9,6 +9,14 @@
 
 ---
 
+### E2E-LIVE-WORK-session-admission
+
+- **前提：** 使用隔离的 Live Provider fixture、本地 AgentHost 会话和确定性意图分类器；候选请求须从现有 Live adapter 回调进入，不使用真实账号或付费端点。
+- **步骤：** 验证纯通话没有工作作用域时会拒绝任务候选；再以明确选择的本地会话和关闭的上下文共享启动工作通话。提交一个已声明工具请求并检查回执、Host admission 和 `voiceOrigin`。覆盖忙时独立排队、过期 steer、精确回合 stop、submit 返回前到达的终态事件，以及基于已记录结果的只读查询；结束通话时确认已受理工作仍保留。
+- **预期：** 工作始终绑定到通话开始时选定的会话；关闭上下文共享时不读取历史；现有 AgentHost 执行 prompt、steer、queue 和 stop；重复 Provider ID 不重复派发；结果查询只投影准确操作摘要且不会创建新回合。结束 Live 不取消已受理任务。结果会显示在工作面板中，但自动语音反馈和模型驱动会话导航仍未实现。
+- **覆盖：** `apps/desktop/test/live-voice-service.test.mjs` 覆盖纯通话拒绝和显式工作作用域；`packages/host-runtime/src/live-work/coordinator.test.ts` 覆盖回执顺序、路由、过期 steer、去重、关闭通话和早到终态；`packages/host-runtime/src/live-work/context.test.ts` 覆盖上下文投影；`packages/host-runtime/src/live-work/result-summary.test.ts` 覆盖精确回合摘要和诚实回退；`packages/agent-host/src/agent-host.test.ts` 覆盖无历史快照、队列和语音来源；`packages/voice-runtime/src/live/protocol.test.ts` 覆盖 Provider 工具声明与回执。该自动化覆盖仍不等于 W2-001—W2-096 全矩阵，也不代表真实 Provider／设备验收。
+- **状态：** 部分完成；其余场景和实机矩阵见 `docs/implementation/live-work-evidence.md`。
+
 ### E2E-POWER-keep-awake-setting
 
 - **前提：** 设置值缺失的隔离桌面配置；无需真实模型服务。

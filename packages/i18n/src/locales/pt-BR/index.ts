@@ -2376,6 +2376,11 @@ export const ptBR = {
   liveVoice: {
     ...en.liveVoice,
     title: "Voz ao vivo", description: "Converse diretamente com um provedor de voz em tempo real configurado. A voz ao vivo fica desativada até você habilitá-la.",
+    openWorkSetup: "Escolher uma sessão para uma chamada de trabalho",
+    connectWorkSession: "Conectar a {{label}}",
+    untitledWorkSession: "Sessão sem título",
+    boundWorkSession: "Sessão de trabalho vinculada: {{label}}",
+    workSessionNoContext: "Esta chamada não compartilha o histórico recente do chat.",
     enable: "Ativar voz ao vivo", enableDetail: "O áudio do microfone é enviado ao provedor escolhido. Agentes, ferramentas e ações MCP não são executados.",
     bindingStatus: "Status do provedor", ready: "Pronto", provider: "Conta do provedor", chooseProvider: "Escolha uma conta", providerUnavailable: "O provedor selecionado está indisponível", providerDisabled: "desativado", credentialsMissing: "credenciais ausentes", model: "ID do modelo", voice: "Voz", profile: "Perfil do protocolo", useForNextCall: "Usar na próxima chamada", bindingLocked: "Chamada em andamento", bindingLockedDetail: "Encerre a chamada para aplicar as alterações desta conta.", saveFailed: "Não foi possível salvar as configurações de voz ao vivo.",
     adapters: { "codex-live": { title: "Conta Codex", description: "Usa a conta Codex selecionada e o login existente." }, "gemini-live": { title: "Gemini Live", description: "Usa um provedor Google Generative AI com chave de API." }, "openai-realtime": { title: "Compatível com OpenAI Realtime", description: "Usa um provedor com chave de API e perfil Realtime explícito." } },

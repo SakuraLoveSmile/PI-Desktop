@@ -2421,6 +2421,11 @@ sklm: {
   liveVoice: {
     ...en.liveVoice,
     title: "Live-Sprache",
+    openWorkSetup: "Sitzung für Live-Arbeitsanruf auswählen",
+    connectWorkSession: "Mit {{label}} verbinden",
+    untitledWorkSession: "Unbenannte Sitzung",
+    boundWorkSession: "An Arbeitssitzung gebunden: {{label}}",
+    workSessionNoContext: "Der aktuelle Chatverlauf wird für diesen Anruf nicht geteilt.",
     description: "Sprich direkt mit einem eingerichteten Echtzeit-Sprachanbieter. Live-Sprache ist zunächst deaktiviert.",
     enable: "Live-Sprache aktivieren",
     enableDetail: "Mikrofon-Audio wird an den ausgewählten Anbieter gesendet. Agenten, Tools und MCP-Aktionen werden nicht ausgeführt.",

@@ -9,6 +9,14 @@ export const LIVE_ADAPTER_IDS = [
 export type LiveAdapterId = (typeof LIVE_ADAPTER_IDS)[number];
 export type LiveRealtimeWireProfile = "realtime-ga" | "realtime-compat-v1";
 
+/** Main-owned, call-scoped work target. It carries no authority by itself. */
+export type LiveWorkBinding = {
+  workSessionId: string;
+  workBindingRevision: number;
+  label: string;
+  contextEnabled: boolean;
+};
+
 export type LiveBinding =
   | {
       id: string;
@@ -146,6 +154,17 @@ export type LiveCallView = {
   mediaRelease?: "pending" | "confirmed" | "unconfirmed";
   error?: LiveError;
   notice?: LiveError;
+  workBinding?: LiveWorkBinding;
+  workOperations?: LiveWorkOperationView[];
+};
+
+export type LiveWorkOperationView = {
+  operationId: string;
+  admission: "received" | "reviewing" | "dispatching" | "accepted" | "rejected" | "unknown" | "withdrawn";
+  execution: "not-started" | "queued" | "running" | "waiting-permission" | "waiting-input" | "completed" | "failed" | "interrupted" | "canceled";
+  summary?: string;
+  turnId?: string;
+  queueEntryId?: string;
 };
 
 export type LiveBindingReadiness = {
@@ -177,6 +196,8 @@ export type LivePrepareRequest = {
   bindingId: string;
   expectedSettingsRevision: number;
   initialMuted: boolean;
+  /** Set only by an explicit user action to bind this call to a session. */
+  workTarget?: { workSessionId: string; contextEnabled: boolean };
 };
 
 export type LivePreparedCall = {
@@ -221,6 +242,10 @@ export type LiveDelegationRequest = {
   instruction: string;
 };
 
+export type LiveProviderReceipt =
+  | { status: "received"; operationId: string; providerRequestId: string; execution: "not_started" }
+  | { status: "rejected"; providerRequestId: string; code: string };
+
 export type LivePortEvent = {
   callId: string;
   nonce: string;
@@ -236,6 +261,7 @@ export type LivePlaybackCursor = {
 export type LiveControlEvent =
   | { callId: string; kind: "release-media" }
   | { callId: string; kind: "reject-delegation"; actionId: string; delegationId: string; reason: "EXECUTION_NOT_CONNECTED" }
+  | { callId: string; kind: "work-receipt"; actionId: string; delegationId: string; receipt: LiveProviderReceipt }
   | { callId: string; kind: "playback-reset"; playbackEpoch: number };
 
 export type LiveTranscriptEvent = {

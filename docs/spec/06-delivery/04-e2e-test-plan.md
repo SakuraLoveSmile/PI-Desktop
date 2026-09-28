@@ -43,6 +43,45 @@
   The full Electron flow and real-provider/device compatibility remain
   unverified until their respective isolated acceptance environments are run.
 
+### E2E-LIVE-WORK-session-admission
+
+- **Preconditions:** Isolated Live provider fixture, a local AgentHost session,
+  and a deterministic fake intent resolver. The provider candidate must enter
+  through the existing Live adapter callback; do not use a real account or
+  paid endpoint.
+- **Steps:** Start a voice-only call and verify a work candidate is rejected
+  without a work scope. Start a second call with an explicitly selected local
+  session and context sharing disabled. Submit one declared work request,
+  deliver its receipt, route it through the classifier, and inspect the Host
+  admission and `voiceOrigin`. Exercise a busy independent request through the
+  Host queue, a stale steer, an exact-turn stop, and a terminal event arriving
+  before the submit promise resolves. Query a recorded terminal result and
+  verify the query does not create another Host turn. End the Live call after
+  Host admission.
+- **Expected:** Work remains bound to the originally selected local session;
+  no prior messages are read when context sharing is disabled; the existing
+  AgentHost performs prompt, steer, queue, and stop operations; duplicate
+  provider IDs do not dispatch twice; terminal state comes from Host events;
+  result queries project only the exact operation summary; ending Live does
+  not cancel accepted work. Results remain visible in the work panel, while
+  automatic provider terminal-result feedback and model-driven navigation
+  remain unavailable until their separate acceptance work is complete.
+- **Coverage:** `apps/desktop/test/live-voice-service.test.mjs` covers voice-only
+  rejection and explicit work-scope forwarding. `packages/host-runtime/src/live-work/coordinator.test.ts`
+  covers receipt ordering, routing, stale steer, replay, call close, and early
+  terminal correlation. `packages/host-runtime/src/live-work/context.test.ts`
+  covers bounded context projection. `packages/agent-host/src/agent-host.test.ts`
+  covers history-free state, queue insertion, and voice provenance.
+  `packages/voice-runtime/src/live/protocol.test.ts` covers provider-specific
+  tool declarations and receipts. `packages/host-runtime/src/live-work/result-summary.test.ts`
+  covers exact-turn summary projection and honest fallbacks. This is targeted
+  automated coverage, not the complete W2-001—W2-096 matrix or real-provider
+  E2E.
+- **Status:** Partial; remaining scenarios and the real-device matrix are
+  tracked in `docs/implementation/live-work-evidence.md`.
+- **Specs:** [live-work-session](../03-runtime/live-work-session.md),
+  [live-voice](../03-runtime/live-voice.md).
+
 ### E2E-CHAT-fork-completed-reply-while-running
 
 - **Preconditions:** Isolated real desktop profile, configured model, two turns

@@ -833,7 +833,20 @@ const voiceService = createVoiceService(
   (token) => microphoneLeases.acquire("dictation", token),
 );
 voiceServiceReference = voiceService;
-const liveCallService = createLiveCallService({ getHost, getMainWindow, vendorOAuth, microphoneLeases });
+const liveCallService = createLiveCallService({
+  getHost,
+  getMainWindow,
+  getAgentHostBridge: () => mainState.agentHostBridge,
+  vendorOAuth,
+  microphoneLeases,
+  resolveAgentRuntimeLaunch: (sessionId, session, settings, overrides) => {
+    if (!sessionLaunchRuntime) return Promise.reject(new Error("session launch runtime is not initialized"));
+    return sessionLaunchRuntime.resolveAgentRuntimeLaunch(sessionId, session, settings, {
+      ...overrides,
+      mode: "agent",
+    });
+  },
+});
 
 function registerIpc() {
   return registerIpcHandlers({

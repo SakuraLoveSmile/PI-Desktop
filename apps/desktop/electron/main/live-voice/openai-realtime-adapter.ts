@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import type { LiveBinding } from "@pi-desktop/shared";
-import { MAX_LIVE_AUDIO_BYTES, MAX_LIVE_JSON_BYTES, parseRealtimeMessage, RealtimeResponseTracker, realtimeAudioMessage, realtimeSessionMatches, realtimeSessionUpdateMessage, realtimeTruncateMessages } from "@pi-desktop/voice-runtime/live";
+import { LIVE_WORK_TOOL_NAME, MAX_LIVE_AUDIO_BYTES, MAX_LIVE_JSON_BYTES, parseLiveWorkArguments, parseRealtimeMessage, RealtimeResponseTracker, realtimeAudioMessage, realtimeSessionMatches, realtimeSessionUpdateMessage, realtimeToolReceiptMessage, realtimeTruncateMessages } from "@pi-desktop/voice-runtime/live";
 import type { LiveAdapter, LiveAdapterContext, LivePlaybackCursor } from "./types";
 import { openLiveWebSocket } from "./websocket-transport";
 import { sendJsonBounded, waitForReady, waitForSocketReady, websocketJson } from "./websocket-wire";
@@ -40,9 +41,60 @@ export function createOpenAIRealtimeAdapter(context: LiveAdapterContext): LiveAd
   let sessionUpdateSent = false;
   let configured = false;
   const responseTracker = new RealtimeResponseTracker();
-  const rejectedFunctionCalls = new Set<string>();
+  const settledFunctionCalls = new Set<string>();
   const created = new Promise<void>((resolve, reject) => { createdResolve = resolve; createdReject = reject; });
   const updated = new Promise<void>((resolve, reject) => { updatedResolve = resolve; updatedReject = reject; });
+
+  function sendToolReceipt(input: {
+    providerRequestId: string;
+    receipt: { status: "received"; operationId: string; execution: "not_started" } | { status: "rejected"; code: string };
+    resume: boolean;
+  }): void {
+    if (!socket || socket.readyState !== WebSocket.OPEN) throw new Error("Realtime socket is not open");
+    sendJsonBounded(socket, realtimeToolReceiptMessage(input));
+    if (input.resume) sendJsonBounded(socket, { type: "response.create" });
+  }
+
+  function handleToolCandidate(candidate: { providerRequestId: string; toolName: string; arguments: unknown }): void {
+    if (settledFunctionCalls.has(candidate.providerRequestId)) return;
+    if (settledFunctionCalls.size >= 256) throw Object.assign(new Error("Realtime function-call limit exceeded"), { errorCode: "LIVE_PROTOCOL_ERROR" });
+    settledFunctionCalls.add(candidate.providerRequestId);
+    const reject = (code: string, resume: boolean) => sendToolReceipt({
+      providerRequestId: candidate.providerRequestId,
+      receipt: { status: "rejected", code },
+      resume,
+    });
+    if (candidate.toolName !== LIVE_WORK_TOOL_NAME) {
+      reject("LIVE_WORK_TOOL_UNSUPPORTED", true);
+      return;
+    }
+    if (!context.workProfile) {
+      reject("LIVE_WORK_NOT_BOUND", true);
+      context.onEvent({ kind: "error", code: "LIVE_EXECUTION_NOT_CONNECTED" });
+      return;
+    }
+    const parsed = parseLiveWorkArguments(candidate.arguments);
+    if (!parsed) {
+      reject("LIVE_WORK_INVALID_REQUEST", false);
+      return;
+    }
+    if (!context.onWorkCandidate) {
+      reject("LIVE_WORK_CAPABILITY_UNAVAILABLE", false);
+      return;
+    }
+    void context.onWorkCandidate(
+      { ...candidate, arguments: parsed },
+      async (receipt) => {
+        const deliveryId = randomUUID();
+        try {
+          sendToolReceipt({ providerRequestId: candidate.providerRequestId, receipt, resume: false });
+          return { status: "sent", deliveryId };
+        } catch {
+          return { status: "not-sent", deliveryId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" };
+        }
+      },
+    ).catch(() => context.onEvent({ kind: "error", code: "LIVE_WORK_INTENT_UNAVAILABLE" }));
+  }
 
   function onSocketMessage(data: unknown): void {
     try {
@@ -53,11 +105,11 @@ export function createOpenAIRealtimeAdapter(context: LiveAdapterContext): LiveAd
         createdResolve?.();
         if (!sessionUpdateSent) {
           sessionUpdateSent = true;
-          sendJsonBounded(socket!, realtimeSessionUpdateMessage({ modelId: binding.modelId, voice: binding.voice, profile: binding.wireProfile }));
+          sendJsonBounded(socket!, realtimeSessionUpdateMessage({ modelId: binding.modelId, voice: binding.voice, profile: binding.wireProfile, ...(context.workProfile ? { workProfile: context.workProfile } : {}) }));
         }
       }
       if (event.type === "session.updated" && sessionUpdateSent) {
-        if (!realtimeSessionMatches({ session: event.session, modelId: binding.modelId, voice: binding.voice, profile: binding.wireProfile })) {
+        if (!realtimeSessionMatches({ session: event.session, modelId: binding.modelId, voice: binding.voice, profile: binding.wireProfile, workEnabled: Boolean(context.workProfile) })) {
           throw Object.assign(new Error("Realtime session confirmation does not match the selected audio profile"), { errorCode: "LIVE_PROTOCOL_ERROR" });
         }
         configured = true;
@@ -84,19 +136,21 @@ export function createOpenAIRealtimeAdapter(context: LiveAdapterContext): LiveAd
       }
       if (event.type === "response.output_item.done") {
         const item = event.item as Record<string, unknown> | undefined;
-        if (item?.type === "function_call" && typeof item.call_id === "string" && typeof item.name === "string" && !rejectedFunctionCalls.has(item.call_id)) {
-          if (rejectedFunctionCalls.size >= 256) throw Object.assign(new Error("Realtime function-call limit exceeded"), { errorCode: "LIVE_PROTOCOL_ERROR" });
-          rejectedFunctionCalls.add(item.call_id);
-          sendJsonBounded(socket!, { type: "conversation.item.create", item: { type: "function_call_output", call_id: item.call_id, output: "Execution is not connected. No work was performed." } });
-          sendJsonBounded(socket!, { type: "response.create" });
-          context.onEvent({ kind: "error", code: "LIVE_EXECUTION_NOT_CONNECTED" });
+        if (item?.type === "function_call") {
+          if (typeof item.call_id !== "string" || typeof item.name !== "string" || typeof item.arguments !== "string" || new TextEncoder().encode(item.arguments).byteLength > 8 * 1024) {
+            throw Object.assign(new Error("Realtime function call is invalid"), { errorCode: "LIVE_PROTOCOL_ERROR" });
+          }
+          let args: unknown;
+          try { args = JSON.parse(item.arguments); } catch { args = null; }
+          handleToolCandidate({ providerRequestId: item.call_id, toolName: item.name, arguments: args });
         }
       }
       const normalizedEvents = parseRealtimeMessage(value, binding.wireProfile);
       for (const normalized of normalizedEvents) {
         if (normalized.kind === "audio" && normalized.responseId && !responseTracker.shouldAcceptAudio(normalized.responseId)) continue;
         if (staleCompletion && (normalized.kind === "turn-complete" || (normalized.kind === "activity" && normalized.assistantSpeaking === false))) continue;
-        context.onEvent(normalized);
+        if (normalized.kind === "tool-candidate") handleToolCandidate(normalized);
+        else context.onEvent(normalized);
       }
     } catch {
       context.onEvent({ kind: "error", code: "LIVE_PROTOCOL_ERROR" });
@@ -147,7 +201,7 @@ export function createOpenAIRealtimeAdapter(context: LiveAdapterContext): LiveAd
       createdReject?.(new Error("Realtime call closed"));
       updatedReject?.(new Error("Realtime call closed"));
       responseTracker.clear();
-      rejectedFunctionCalls.clear();
+      settledFunctionCalls.clear();
       if (socket && socket.readyState !== WebSocket.CLOSED) socket.close(1000, "call ended");
       socket = null;
     },

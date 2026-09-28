@@ -120,6 +120,65 @@ test("Live call follows prepare, connect, mute, in-memory transcript, reject-onl
   assert.equal((await service.status()).call.phase, "ended");
 });
 
+test("an explicitly bound work call forwards only the declared tool candidate to its fixed work scope", async (t) => {
+  const { LiveCallService } = await loadModules(t);
+  const received = [];
+  const opened = [];
+  const closed = [];
+  const { deps, state } = dependencies({
+    resolveWorkBinding: async (target) => ({
+      workSessionId: target.workSessionId,
+      workBindingRevision: 7,
+      label: "Fixture / Login",
+      contextEnabled: target.contextEnabled,
+    }),
+    openWorkScope: (callId, workBinding) => opened.push({ callId, workBinding }),
+    closeWorkScope: (callId) => closed.push(callId),
+    receiveWorkCandidate: async (candidate, deliverReceipt) => {
+      received.push(candidate);
+      await deliverReceipt({ status: "received", operationId: "operation-1", providerRequestId: candidate.providerRequestId, execution: "not_started" });
+    },
+  });
+  const service = new LiveCallService(deps);
+  const status = await service.status();
+  const prepared = await service.prepare(owner, {
+    requestId,
+    bindingId: binding.id,
+    expectedSettingsRevision: status.settingsRevision,
+    initialMuted: true,
+    workTarget: { workSessionId: "session-a", contextEnabled: false },
+  });
+  t.after(async () => {
+    const ending = service.end(owner, { callId: prepared.callId, reason: "user-ended" }).catch(() => undefined);
+    try { service.reportMedia(owner, { callId: prepared.callId, kind: "released" }); } catch { /* the service may already have cleaned up */ }
+    await ending;
+  });
+  await service.connect(owner, { callId: prepared.callId, offerSdp: "v=0\r\n" });
+
+  const context = state.adapters[0];
+  assert.equal(context.workProfile.version, 1);
+  assert.match(context.workProfile.instructions, /work session/i);
+  await context.onWorkCandidate({
+    providerRequestId: "delegation-1",
+    toolName: "delegate_to_work_session",
+    arguments: { instruction: "Check the login flow" },
+  }, async (receipt) => ({ status: "sent", deliveryId: receipt.operationId }));
+
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0].workBinding.workSessionId, "session-a");
+  assert.deepEqual(received, [{
+    callId: prepared.callId,
+    workBindingRevision: 7,
+    workSessionId: "session-a",
+    providerRequestId: "delegation-1",
+    instruction: "Check the login flow",
+  }]);
+  const endPromise = service.end(owner, { callId: prepared.callId, reason: "user-ended" });
+  service.reportMedia(owner, { callId: prepared.callId, kind: "released" });
+  await endPromise;
+  assert.deepEqual(closed, [prepared.callId]);
+});
+
 test("PCM Live service waits for the port lease, gates capture, and forwards output without exposing auth", async (t) => {
   const { LiveCallService } = await loadModules(t);
   const pcmBinding = { id: "gemini-main", adapterId: "gemini-live", providerId: "google-key", modelId: "gemini-live-model", voice: "Kore" };

@@ -2421,6 +2421,11 @@ sklm: {
   liveVoice: {
     ...en.liveVoice,
     title: "Voix en direct", description: "Parlez directement avec un fournisseur vocal configuré en temps réel. La fonction reste désactivée tant que vous ne l’activez pas.",
+    openWorkSetup: "Choisir une session pour un appel de travail",
+    connectWorkSession: "Se connecter à {{label}}",
+    untitledWorkSession: "Session sans titre",
+    boundWorkSession: "Session de travail associée : {{label}}",
+    workSessionNoContext: "Cet appel ne partage pas l’historique récent de la conversation.",
     enable: "Activer la voix en direct", enableDetail: "L’audio du microphone est envoyé au fournisseur choisi. Aucun agent, outil ou action MCP n’est exécuté.",
     bindingStatus: "État du fournisseur", ready: "Prêt", provider: "Compte fournisseur", chooseProvider: "Choisir un compte fournisseur", providerUnavailable: "Le fournisseur sélectionné est indisponible", providerDisabled: "désactivé", credentialsMissing: "identifiants manquants", model: "ID du modèle", voice: "Voix", profile: "Profil du protocole", useForNextCall: "Utiliser au prochain appel", bindingLocked: "Appel en cours", bindingLockedDetail: "Terminez l’appel pour appliquer les changements de ce compte.", saveFailed: "Impossible d’enregistrer les paramètres de voix en direct.",
     adapters: { "codex-live": { title: "Compte Codex", description: "Utilise le compte Codex sélectionné et sa connexion existante." }, "gemini-live": { title: "Gemini Live", description: "Utilise un fournisseur Google Generative AI avec une clé API." }, "openai-realtime": { title: "Compatible OpenAI Realtime", description: "Utilise un fournisseur avec clé API et un profil Realtime explicite." } },

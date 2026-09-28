@@ -60,13 +60,21 @@ export function registerLiveVoiceIpc(input: {
 
 function parsePrepare(raw: unknown) {
   const input = record(raw);
-  exactKeys(input, ["requestId", "bindingId", "expectedSettingsRevision", "initialMuted"]);
+  exactKeys(input, ["requestId", "bindingId", "expectedSettingsRevision", "initialMuted", "workTarget"]);
   if (typeof input.requestId !== "string" || typeof input.bindingId !== "string" || !input.bindingId.trim() || input.bindingId.length > 256 || !Number.isSafeInteger(input.expectedSettingsRevision) || (input.expectedSettingsRevision as number) < 0 || typeof input.initialMuted !== "boolean") return invalid();
+  let workTarget: { workSessionId: string; contextEnabled: boolean } | undefined;
+  if (input.workTarget !== undefined) {
+    const target = record(input.workTarget);
+    exactKeys(target, ["workSessionId", "contextEnabled"]);
+    if (typeof target.workSessionId !== "string" || !target.workSessionId.trim() || target.workSessionId.length > 256 || typeof target.contextEnabled !== "boolean") return invalid();
+    workTarget = { workSessionId: target.workSessionId, contextEnabled: target.contextEnabled };
+  }
   return {
     requestId: input.requestId,
     bindingId: input.bindingId,
     expectedSettingsRevision: input.expectedSettingsRevision as number,
     initialMuted: input.initialMuted,
+    ...(workTarget ? { workTarget } : {}),
   };
 }
 
