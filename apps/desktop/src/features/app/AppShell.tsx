@@ -2,6 +2,7 @@ import { type CSSProperties, lazy, type ReactNode, Suspense } from "react";
 import { ChatSurface } from "../../components/ChatSurface";
 import { ConversationTopbar } from "../../components/ConversationTopbar";
 import { ExtensionPromptHost } from "../../components/ExtensionPromptDialog";
+import { PluginRendererHost } from "../../plugins/renderer-host/PluginRendererHost";
 import {
   IconNewSession,
   IconPanel,
@@ -25,11 +26,6 @@ import { useAppShellRuntime } from "./useAppShellRuntime";
 const SettingsPage = lazy(() =>
   import("../../pages/SettingsPage").then((module) => ({
     default: module.SettingsPage,
-  })),
-);
-const PullRequestsPage = lazy(() =>
-  import("../../pages/PullRequestsPage").then((module) => ({
-    default: module.PullRequestsPage,
   })),
 );
 const ScheduledPage = lazy(() =>
@@ -244,11 +240,7 @@ export function AppShell() {
                 )}
 
                 <Suspense fallback={<RoutePending />}>
-                  {page === "pulls" ? (
-                    <div className="route-surface route-page">
-                      <PullRequestsPage />
-                    </div>
-                  ) : page === "scheduled" ? (
+                  {page === "scheduled" ? (
                     <div className="route-surface route-page">
                       <ScheduledPage />
                     </div>
@@ -303,6 +295,7 @@ export function AppShell() {
         ) : null}
         <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
         <ToastHost />
+        <PluginRendererHost />
         <ExtensionPromptHost />
         {page === "settings" ? <UpdateBanner /> : null}
       </>

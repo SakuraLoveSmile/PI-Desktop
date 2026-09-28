@@ -8,12 +8,10 @@ import type {
   RefObject,
   SetStateAction,
 } from "react";
-import type { useComposerAutocomplete } from "../../../hooks/use-composer-autocomplete";
 import { editorSelectionRange, readEditorValue } from "./editor";
 import { ComposerImagePreview } from "./ComposerImagePreview";
+import type { CompletionController } from "./hooks/useComposerCompletions";
 import type { ComposerImagePreviewController } from "./hooks/useComposerImagePreview";
-
-type AutocompleteController = ReturnType<typeof useComposerAutocomplete>;
 
 export type ComposerInputProps = {
   imagePreview?: ComposerImagePreviewController;
@@ -25,12 +23,14 @@ export type ComposerInputProps = {
   pasting: boolean;
   enterToSend: boolean;
   runActive: boolean;
-  composerAc: AutocompleteController;
+  composerAc: CompletionController;
   onPaste: (event: ClipboardEvent<HTMLDivElement>) => void;
   onAcceptCompletion: (index: number) => void;
   onSubmit: (steering?: boolean) => void;
   onInsertNewline: () => void;
   onInput: (source: string, caret: number) => void;
+  /** Terminal-style recall; returns true when the arrow key was consumed. */
+  onHistoryNavigate: (direction: "older" | "newer") => boolean;
   onCompositionStart: () => void;
   onCompositionEnd: (event: FormEvent<HTMLDivElement>) => void;
   onFocus: () => void;
@@ -54,6 +54,7 @@ export function ComposerInput({
   onSubmit,
   onInsertNewline,
   onInput,
+  onHistoryNavigate,
   onCompositionStart,
   onCompositionEnd,
   onFocus,
@@ -135,6 +136,17 @@ export function ComposerInput({
                 onAcceptCompletion(composerAc.highlight);
                 return;
               }
+            }
+            if (
+              (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+              !event.shiftKey &&
+              !event.altKey &&
+              !event.metaKey &&
+              !event.ctrlKey &&
+              onHistoryNavigate(event.key === "ArrowUp" ? "older" : "newer")
+            ) {
+              event.preventDefault();
+              return;
             }
             if (
               event.key === "Enter" &&
