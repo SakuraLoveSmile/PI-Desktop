@@ -11761,7 +11761,9 @@ are withdrawn with ADR 0165.
   path containing a space on macOS or Linux.
 - **Steps**: 1) Click the full path in the Write row. 2) Click the same full
   path as inline code and as ordinary text in the assistant reply. 3) Click a
-  relative path containing a space. 4) Click the outside absolute path.
+  relative path whose middle directory contains a space, then a first-segment
+  spaced path using an explicit `@"..."` reference. 4) Click the outside
+  absolute path.
 - **Expected**: Every allowed reference opens the exact file in the existing
   side file view; no path is truncated to its suffix or redirected to the
   same-name file. The outside path opens nothing and reports the access limit,

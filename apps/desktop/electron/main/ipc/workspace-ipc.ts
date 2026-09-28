@@ -921,7 +921,7 @@ export function registerWorkspaceIpc({
         scratch: await sessionScratchRoot(input.sessionId),
         attachments: join(dataDir, "attachments"),
       };
-      if (isChatRefOutsideRoots(ref, roots)) {
+      if (await isChatRefOutsideRoots(ref, roots)) {
         return { match: null, reason: "outside-allowed-roots" };
       }
       return { match: await resolveChatFileRef(ref, roots) };

@@ -35,7 +35,7 @@ const KNOWN_BARE_NAMES = new Set([
 ]);
 
 const FILE_TOKEN_RE =
-  /^(?:(?:[A-Za-z]:[\\/]|~[\\/]|[\\/])|(?:\.{1,2}[\\/])?)[\p{L}\p{N}_@+. -]+(?:[\\/][\p{L}\p{N}_@+. -]+)*(?::\d+(?::\d+)?)?$/u;
+  /^(?:(?:[A-Za-z]:[\\/]|~[\\/]|\\\\|\/\/|[\\/])|(?:\.{1,2}[\\/])?)[\p{L}\p{N}_@+. -]+(?:[\\/][\p{L}\p{N}_@+. -]+)*(?::\d+(?::\d+)?)?$/u;
 
 const AT_QUOTED_RE = /^@"([^"\n]+)"$/;
 const AT_UNQUOTED_RE = /^@(\/?[^\s]+)$/;
@@ -252,6 +252,7 @@ const PATH_WORD = String.raw`[\p{L}\p{N}_@+.-]+`;
 const PATH_SEGMENT = String.raw`[\p{L}\p{N}_@+. -]+`;
 const FILE_END = String.raw`\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?)?(?![A-Za-z0-9_]|\.[A-Za-z0-9])`;
 const FILE_NAME = String.raw`${PATH_SEGMENT}?${FILE_END}`;
+const UNC_PREFIX = String.raw`(?:\\\\[^\\/\s]+[\\/]|\/\/[^/\s]+\/)`;
 const SPACED_START = String.raw`(?<![\p{L}\p{N}_@+.-])[A-Za-z][\p{L}\p{N}_+-]*(?: [\p{L}\p{N}_+-]+)+`;
 // Unmarked first-segment spaces cannot be distinguished from prose. Retry
 // after common introducers so ordinary bare file links still work.
@@ -266,7 +267,7 @@ const SCAN_RE = new RegExp([
   String.raw`@"[^"\n]+"`,
   String.raw`@[^\s]+`,
   String.raw`https?:\/\/(?=[^\s<>"'()[\]{}])`,
-  String.raw`(?:[A-Za-z]:[\\/]|\/)(?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
+  String.raw`(?:[A-Za-z]:[\\/]|${UNC_PREFIX}|\/)(?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
   String.raw`${SPACED_START}[\\/](?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
   String.raw`${SPACED_START}(?:\.[A-Za-z0-9_-]+)*${FILE_END}`,
   String.raw`(?:${PATH_WORD}[\\/])+(?:${PATH_SEGMENT}[\\/])*?${FILE_NAME}`,
@@ -320,6 +321,8 @@ export function splitChatText(
       ? scanUrl(text, start)
       : match[0];
     scanner.lastIndex = start + raw.length;
+    if ((text[start - 1] === "~" && /^[\\/]/u.test(raw)) ||
+        ["~/", "~\\"].includes(text.slice(start - 2, start))) continue;
     const disposition = spacedRefDisposition(raw);
     if (disposition === "skip") continue;
     if (disposition === "retry") {
@@ -389,7 +392,7 @@ export function linkifyMdastTree(
           const url =
             segment.target.kind === "url"
               ? segment.target.url
-              : /^[A-Za-z]:[\\/]/.test(segment.target.path)
+              : (/^[A-Za-z]:[\\/]/.test(segment.target.path) || segment.target.path.startsWith("\\\\"))
                 ? encodeURIComponent(segment.target.path)
                 : segment.target.path;
           next.push({

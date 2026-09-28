@@ -425,6 +425,22 @@ test("splitChatText keeps outside absolute paths whole and home paths plain", ()
   );
   assert.deepEqual(outside.filter((segment) => segment.kind === "target").map((segment) => segment.text), ["/elsewhere/a.ts"]);
   assert.equal(outside.map((segment) => segment.text).join(""), "see /elsewhere/a.ts and ~/Downloads/x.png here");
+  for (const source of ["~/my project/page.md", "see ~/my project/page.md here", "~\\my project\\page.md"]) {
+    assert.deepEqual(splitChatText(source, ROOT), [{ kind: "text", text: source }]);
+  }
+  const unc = "\\\\server\\my share\\page.md";
+  const segments = splitChatText(`Open ${unc} now`, ROOT);
+  assert.deepEqual(segments.filter((segment) => segment.kind === "target").map((segment) => segment.text), [unc]);
+  assert.deepEqual(segments.filter((segment) => segment.kind === "target").map((segment) => segment.target), [
+    { kind: "file", path: unc },
+  ]);
+  const forwardUnc = "//server/my share/page.md";
+  assert.deepEqual(
+    splitChatText(`Open ${forwardUnc} now`, ROOT)
+      .filter((segment) => segment.kind === "target")
+      .map((segment) => segment.text),
+    [forwardUnc],
+  );
 });
 
 test("markdown linkification encodes a Windows file path without losing its source text", () => {
@@ -441,6 +457,12 @@ test("markdown linkification encodes a Windows file path without losing its sour
     }),
   );
   assert.match(markup, /href="C%3A%5Cdemo%20project%5Creadme.md"/);
+  const unc = "\\\\server\\my share\\page.md";
+  const uncTree = { type: "root", children: [{ type: "paragraph", children: [{ type: "text", value: `Open ${unc}` }] }] };
+  linkifyMdastTree(uncTree, ROOT);
+  const uncLink = uncTree.children[0].children.find((node) => node.type === "link");
+  assert.equal(uncLink.url, encodeURIComponent(unc));
+  assert.equal(uncLink.children[0].value, unc);
 });
 
 test("splitChatText keeps unknown extensions literal", () => {

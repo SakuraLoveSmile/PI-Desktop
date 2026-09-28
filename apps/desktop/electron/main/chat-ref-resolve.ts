@@ -1,5 +1,5 @@
-import { readdir, stat } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { readdir, realpath, stat } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import type {
   FsChatRefMatch,
   FsChatRefMatchKind,
@@ -47,6 +47,8 @@ type ChatRefRootEntry = {
   path: string;
   projectRoot?: FsChatRefProjectRoot;
 };
+
+type CanonicalChatRefRoot = ChatRefRootEntry & { realPath: string | null };
 
 const MAX_REF_LENGTH = 512;
 const ATTACHMENT_HASH_PATTERN = /^[0-9a-f]{64}$/i;
@@ -162,13 +164,52 @@ function relativeInside(rootPath: string, absolute: string): string | null {
   return toPosix(rel);
 }
 
-export function isChatRefOutsideRoots(ref: string, roots: ChatRefRoots): boolean {
+async function canonicalRoots(roots: ChatRefRootEntry[]): Promise<CanonicalChatRefRoot[]> {
+  return Promise.all(roots.map(async (root) => {
+    try {
+      return { ...root, realPath: await realpath(root.path) };
+    } catch {
+      return { ...root, realPath: null };
+    }
+  }));
+}
+
+function couldShareVolume(target: string, roots: CanonicalChatRefRoot[]): boolean {
+  if (process.platform !== "win32") return true;
+  const volume = parse(target).root.toLowerCase();
+  return roots.some((root) => [root.path, root.realPath].some(
+    (path) => path && parse(path).root.toLowerCase() === volume,
+  ));
+}
+
+async function canonicalPathOrMissingTail(path: string): Promise<string | null> {
+  let ancestor = path;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      return resolve(await realpath(ancestor), ...tail);
+    } catch {
+      const parent = dirname(ancestor);
+      if (parent === ancestor) return null;
+      tail.unshift(basename(ancestor));
+      ancestor = parent;
+    }
+  }
+}
+
+export async function isChatRefOutsideRoots(ref: string, roots: ChatRefRoots): Promise<boolean> {
   const parsed = parseChatRef(ref);
   if (!parsed?.absolute) return false;
   const cleaned = cleanRef(ref);
   if (!isAbsolute(cleaned)) return true;
   const absolutePath = resolve(cleaned);
-  return !orderedRoots(roots).some((root) => relativeInside(root.path, absolutePath) !== null);
+  const rootList = await canonicalRoots(orderedRoots(roots));
+  if (!couldShareVolume(absolutePath, rootList)) return true;
+  const targetPath = await canonicalPathOrMissingTail(absolutePath);
+  if (!targetPath) return !rootList.some((root) => relativeInside(root.path, absolutePath) !== null);
+  return !rootList.some((root) =>
+    root.realPath && relativeInside(root.realPath, targetPath) !== null,
+  );
 }
 
 function segmentsOf(path: string): string[] {
@@ -291,18 +332,25 @@ export async function resolveChatFileRef(
     const cleaned = cleanRef(ref);
     if (!isAbsolute(cleaned)) return null;
     const absolutePath = resolve(cleaned);
-    for (const root of rootList) {
-      const relativePath = relativeInside(root.path, absolutePath);
+    const canonicalRootList = await canonicalRoots(rootList);
+    if (!couldShareVolume(absolutePath, canonicalRootList)) return null;
+    let targetPath: string;
+    try {
+      targetPath = await realpath(absolutePath);
+    } catch {
+      return null;
+    }
+    if (!(await isRegularFile(targetPath))) return null;
+    for (const root of canonicalRootList) {
+      const relativePath = root.realPath ? relativeInside(root.realPath, targetPath) : null;
       if (!relativePath) continue;
-      if (await isRegularFile(absolutePath)) {
-        return {
-          root: root.kind,
-          relativePath,
-          absolutePath,
-          matchedBy: "exact-absolute",
-          ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
-        };
-      }
+      return {
+        root: root.kind,
+        relativePath,
+        absolutePath,
+        matchedBy: "exact-absolute",
+        ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
+      };
     }
     return null;
   }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { register } from "node:module";
@@ -84,6 +84,10 @@ test("an absolute path outside the project cannot select a same-name file by tai
   const workspace = tempTree("ws", ["src/dir/openimage.js"]);
   const match = await resolve("/root/dir/openimage.js", { workspace });
   assert.equal(match, null);
+  const unc = "\\\\server\\my share\\openimage.js";
+  assert.equal(parseChatRef(unc)?.absolute, true);
+  assert.equal(await isChatRefOutsideRoots(unc, roots({ workspace })), true);
+  assert.equal(await resolve(unc, { workspace }), null);
 });
 
 test("an exact absolute path with spaces resolves only inside an allowed root", async () => {
@@ -93,8 +97,35 @@ test("an exact absolute path with spaces resolves only inside an allowed root", 
   assert.equal(match?.matchedBy, "exact-absolute");
   assert.equal(match?.absolutePath, absolute);
   assert.equal(await resolve(join(dirname(workspace), "page.md"), { workspace }), null);
-  assert.equal(isChatRefOutsideRoots(absolute, roots({ workspace })), false);
-  assert.equal(isChatRefOutsideRoots(join(dirname(workspace), "page.md"), roots({ workspace })), true);
+  assert.equal(await isChatRefOutsideRoots(absolute, roots({ workspace })), false);
+  assert.equal(await isChatRefOutsideRoots(join(dirname(workspace), "page.md"), roots({ workspace })), true);
+});
+
+test("an absolute realpath alias resolves under the same registered root", async () => {
+  const workspace = tempTree("alias-target", ["my project/page.md"]);
+  const aliasParent = mkdtempSync(join(tmpdir(), "pi-chat-ref-alias-"));
+  const alias = join(aliasParent, "linked-project");
+  symlinkSync(workspace, alias, process.platform === "win32" ? "junction" : "dir");
+  const target = join(workspace, "my project", "page.md");
+  const project = [folder(alias)];
+  assert.equal(await isChatRefOutsideRoots(target, { project }), false);
+  const match = await resolveChatFileRef(target, { project });
+  assert.equal(match?.matchedBy, "exact-absolute");
+  assert.equal(match?.relativePath, "my project/page.md");
+  assert.equal(match?.absolutePath, target);
+  const missing = join(workspace, "my project", "missing.md");
+  assert.equal(await isChatRefOutsideRoots(missing, { project }), false);
+  assert.equal(await resolveChatFileRef(missing, { project }), null);
+});
+
+test("an in-root symlink cannot resolve a file outside the registered root", async () => {
+  const workspace = tempTree("symlink-root", ["safe.md"]);
+  const outside = tempTree("symlink-outside", ["page.md"]);
+  symlinkSync(outside, join(workspace, "linked"), process.platform === "win32" ? "junction" : "dir");
+  const ref = join(workspace, "linked", "page.md");
+  assert.equal(await isChatRefOutsideRoots(ref, roots({ workspace })), true);
+  assert.equal(await resolve(ref, { workspace }), null);
+  assert.equal(await isChatRefOutsideRoots(join(workspace, "linked", "missing.md"), roots({ workspace })), true);
 });
 
 test("a longer matching tail beats a bare leaf name", async () => {
