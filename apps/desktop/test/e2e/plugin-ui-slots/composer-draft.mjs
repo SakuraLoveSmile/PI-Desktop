@@ -141,8 +141,20 @@ export async function driveComposerDraft({ renderer, check }) {
     JSON.stringify({ polished, afterPolish }),
   );
   await renderer.click(button(DRAFT, "draft-polish"));
-  const again = await outcome(DRAFT, "the second polish", (out) => out.status === "ok" && out.text !== polished.text);
-  check("polishing again keeps a single stamp", stamps(await view()) === 1, JSON.stringify(again));
+  // The accept predicate runs in the page, so the first answer travels in as
+  // a literal: a Node-side binding would be undefined there and the check
+  // would pass on an error instead of on the second rewrite.
+  const firstPolish = JSON.stringify(polished.text);
+  const again = await outcome(
+    DRAFT,
+    "the second polish",
+    `(out) => out.status === "ok" && out.text !== ${firstPolish}`,
+  );
+  check(
+    "polishing again keeps a single stamp",
+    again.status === "ok" && stamps(await view()) === 1,
+    JSON.stringify(again),
+  );
 
   const unchanged = (await view()).text;
   await renderer.click(button(DRAFT, "draft-polish-late"));
