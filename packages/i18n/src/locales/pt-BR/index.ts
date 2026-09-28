@@ -1309,6 +1309,7 @@ export const ptBR = {
     presetVolcengine: "Volcengine Ark",
     presetMinimaxCn: "MiniMax",
     presetMinimaxCnOpenai: "MiniMax (OpenAI)",
+    presetStepfunPlan: "StepFun Plan",
     presetKimiCoding: "Kimi Coding",
     presetAntLing: "Ant Ling",
     presetBaseten: "Baseten",
