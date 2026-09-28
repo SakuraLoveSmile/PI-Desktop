@@ -569,7 +569,7 @@ export function Composer({
             composerAc={completions.ac}
             onPaste={pasteClipboardFiles}
             onAcceptCompletion={completions.acceptCompletion}
-            onSubmit={(steering) => void submit(steering)}
+            onSubmit={(steering) => void submitFromComposer(steering)}
             onInsertNewline={insertNewlineInEditor}
             onInput={(source, caret) => {
               inputHistory.exitBrowsing();
