@@ -360,6 +360,70 @@ fn test_mark_failed_rejects_cross_session_execution() {
 }
 
 #[test]
+fn test_submit_draft_rejects_terminal_reports_without_mutation() {
+    let (_dir, db) = create_test_db();
+    let ready_session_id = "sess-terminal-ready";
+    let failed_session_id = "sess-terminal-failed";
+    let ready_execution_id = "exec-terminal-ready";
+    let failed_execution_id = "exec-terminal-failed";
+    seed_goal_execution(&db, ready_session_id, ready_execution_id);
+    seed_goal_execution(&db, failed_session_id, failed_execution_id);
+
+    let original_draft = json!({
+        "summary": "Original report",
+        "verdict": "met"
+    });
+    submit_draft(&db, ready_execution_id, &original_draft).unwrap();
+    finalize_report(&db, ready_execution_id, 1, Some("completed"), None).unwrap();
+    mark_failed(
+        &db,
+        failed_session_id,
+        failed_execution_id,
+        "REPORT_PERSISTENCE_BARRIER_FAILED",
+    )
+    .unwrap();
+
+    let replacement = json!({
+        "summary": "Replacement report",
+        "verdict": "blocked"
+    });
+    for (session_id, execution_id) in [
+        (ready_session_id, ready_execution_id),
+        (failed_session_id, failed_execution_id),
+    ] {
+        let before = list_reports(&db, session_id)
+            .unwrap()
+            .into_iter()
+            .find(|report| report.execution_id == execution_id)
+            .unwrap();
+        let before_read = read_report(&db, session_id, execution_id).unwrap();
+        let draft_path = draft_file_path(db.data_dir(), session_id, execution_id);
+        assert!(!draft_path.exists());
+
+        let error = submit_draft(&db, execution_id, &replacement)
+            .unwrap_err()
+            .to_string();
+        assert!(error.starts_with("INVALID_ARGUMENT:"), "{error}");
+
+        let after = list_reports(&db, session_id)
+            .unwrap()
+            .into_iter()
+            .find(|report| report.execution_id == execution_id)
+            .unwrap();
+        let after_read = read_report(&db, session_id, execution_id).unwrap();
+        assert_eq!(after.status, before.status);
+        assert_eq!(after.summary, before.summary);
+        assert_eq!(after.verdict, before.verdict);
+        assert_eq!(after.file_path, before.file_path);
+        assert_eq!(after.file_hash, before.file_hash);
+        assert_eq!(after.file_size, before.file_size);
+        assert_eq!(after_read.state, before_read.state);
+        assert_eq!(after_read.report, before_read.report);
+        assert!(!draft_path.exists());
+    }
+}
+
+#[test]
 fn test_invalidate_draft_triggers_fallback() {
     let (_dir, db) = create_test_db();
     let session_id = "sess-inv";

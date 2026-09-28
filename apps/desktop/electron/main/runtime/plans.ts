@@ -351,10 +351,21 @@ async function finishApprovedExecution(
       status,
       errorCode,
     };
+    const turn = approvedExecutionTurns.get(executionId);
+    const sessionId = turn?.sessionId ?? claimedExecutionSessions.get(executionId);
+    let persistenceBarrierFailed = false;
     if (persistenceOutbox && runtimeState.host) {
       try {
         await persistenceOutbox.flush(() => runtimeState.host);
+        const pendingWrites = persistenceOutbox.size(sessionId);
+        if (pendingWrites > 0) {
+          persistenceBarrierFailed = true;
+          logger.app("runtime", "warn", "outbox still has transcript writes before execution finalization", {
+            data: { executionId, sessionId, pendingWrites },
+          });
+        }
       } catch (flushErr) {
+        persistenceBarrierFailed = true;
         logger.app("runtime", "warn", "outbox flush before execution finalization failed", {
           data: { executionId, error: String(flushErr) },
         });
@@ -367,13 +378,31 @@ async function finishApprovedExecution(
     });
     const execKind = approvedExecutionKinds.get(executionId);
     approvedExecutionKinds.delete(executionId);
+    // The execution is terminal independently of whether its report can be published.
+    finishedApprovedExecutions.add(executionId);
+    startedApprovedExecutions.delete(executionId);
+    pendingExecutionFinishes.delete(executionId);
+    if (sessionId && approvedExecutionIdsBySession.get(sessionId) === executionId) {
+      approvedExecutionIdsBySession.delete(sessionId);
+    }
+    approvedExecutionTurns.delete(executionId);
+    claimedExecutionSessions.delete(executionId);
     if (execKind !== "plan") {
       try {
-        await runtimeState.host.call("goalReports.finalizeReport", {
-          executionId,
-          status: pending.status,
-          ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
-        });
+        if (persistenceBarrierFailed) {
+          if (!sessionId) throw new Error("Goal report session unavailable after persistence barrier failure");
+          await runtimeState.host.call("goalReports.markFailed", {
+            sessionId,
+            executionId,
+            errorCode: ErrorCodes.REPORT_PERSISTENCE_BARRIER_FAILED,
+          });
+        } else {
+          await runtimeState.host.call("goalReports.finalizeReport", {
+            executionId,
+            status: pending.status,
+            ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
+          });
+        }
       } catch (reportErr: any) {
         // INVALID_ARGUMENT is expected if the execution was not a goal; log other failures
         if (!String(reportErr?.message || reportErr).includes("not a goal")) {
@@ -383,16 +412,6 @@ async function finishApprovedExecution(
         }
       }
     }
-    finishedApprovedExecutions.add(executionId);
-    startedApprovedExecutions.delete(executionId);
-    pendingExecutionFinishes.delete(executionId);
-    const turn = approvedExecutionTurns.get(executionId);
-    const sessionId = turn?.sessionId ?? claimedExecutionSessions.get(executionId);
-    if (sessionId && approvedExecutionIdsBySession.get(sessionId) === executionId) {
-      approvedExecutionIdsBySession.delete(sessionId);
-    }
-    approvedExecutionTurns.delete(executionId);
-    claimedExecutionSessions.delete(executionId);
   } catch (error) {
     logger.app("runtime", "warn", "approved plan execution finalization failed", {
       data: { executionId, error: String(error) },
