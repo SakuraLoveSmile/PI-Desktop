@@ -124,6 +124,7 @@ specification remains the behavioral source.
 | `cargo clippy -p host-core --all-targets --locked` | Passed; the later `origin/main` merge changed no Rust files. |
 | `pnpm docs:check` | Passed; 83 English/Chinese specification pairs and 530 documentation pages verified. Existing ADR format notes remain. |
 | `pnpm check:agent-policy`, `pnpm check:pr-base`, and `node scripts/check-architecture.mjs` | Passed. PR base check confirms `origin/main` at `8fcca3d25c98` is an ancestor of the candidate. |
+| GitHub PR checks at code head `6b9ee4432581` | Passed: Docs, latest-base, JS build/typecheck/lint/architecture/tests, and Rust format/lint/tests. The later follow-up changes this evidence record only. |
 
 The directly exercised W2 behaviors are mapped below. A mapped test proves
 only the named seam and assertions, not a complete provider-to-device journey.
@@ -187,5 +188,6 @@ therefore remains partial evidence for W2-025 and W2-096.
   not physical output completion or human audibility. Real playback buffers,
   WebSocket/provider behavior, and race behavior must be confirmed by the
   isolated manual matrix.
-- PR integration validation is still pending the remote run for the updated
-  head. The PR is open and has not been merged.
+- GitHub PR checks at code head `6b9ee4432581` passed. The checks validate the
+  pushed code candidate with latest `main`; the manual provider/device journey
+  remains unrun. The PR is open and has not been merged.
