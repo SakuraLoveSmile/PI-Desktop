@@ -1,4 +1,5 @@
 import type { LiveBinding, LiveEndReason, LivePlaybackCursor, LiveProviderReceipt, LiveRealtimeWireProfile } from "@pi-desktop/shared";
+import type { LiveWorkFeedback } from "@pi-desktop/shared";
 import type { ProviderPublic } from "@pi-desktop/shared";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import type { LiveWireEvent } from "@pi-desktop/voice-runtime/live";
@@ -39,6 +40,7 @@ export type LiveAdapter = {
   sendInputPcm?(bytes: Uint8Array): void;
   setInputMuted?(muted: boolean): Promise<void>;
   interrupt?(cursors?: LivePlaybackCursor[]): Promise<void>;
+  appendWorkFeedback?(feedback: LiveWorkFeedback): Promise<LiveReceiptDelivery>;
   rejectDelegation?(input: { callId: string; delegationId: string }): Promise<void>;
   close(reason: LiveEndReason): Promise<void>;
 };

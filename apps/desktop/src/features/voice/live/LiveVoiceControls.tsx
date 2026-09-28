@@ -4,6 +4,7 @@ import { Badge, Button, Checkbox, Panel, Select, TooltipButton } from "../../../
 import { IconMic, IconSparkles } from "../../../components/icons";
 import { useAppStore } from "../../../stores/app-store";
 import { getLiveCallController } from "./live-call-controller";
+import { liveVoiceApi } from "./live-voice-api";
 import { LiveWorkOperations } from "./LiveWorkOperations";
 import "../../../styles/voice.css";
 
@@ -48,6 +49,22 @@ export function LiveVoiceControls({
   useEffect(() => {
     if (!isActive) setContextEnabled(false);
   }, [isActive]);
+
+  const openSelection = async (callId: string, selectionRef: string) => {
+    const target = await liveVoiceApi.resolveWorkSelection({ callId, selectionRef });
+    if (target.kind !== "session") throw new Error("The selected item is not a session");
+    await selectSession(target.sessionId);
+  };
+
+  const createSessionForProject = async (callId: string, selectionRef: string) => {
+    const target = await liveVoiceApi.resolveWorkSelection({ callId, selectionRef });
+    if (target.kind !== "project") throw new Error("The selected item is not a project");
+    await createSession({ projectPath: target.projectPath });
+    const createdSessionId = useAppStore.getState().activeSessionId;
+    if (!createdSessionId) throw new Error("Session creation did not select a session");
+    setSelectedWorkSessionId(createdSessionId);
+    setContextEnabled(false);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -144,11 +161,14 @@ export function LiveVoiceControls({
           {call?.workBinding?.workSessionId && call.workOperations?.length ? (
             <LiveWorkOperations
               sessionId={call.workBinding.workSessionId}
+              callId={call.callId}
               operations={call.workOperations}
               t={t}
               busyOperationId={busyOperationId}
               setBusyOperationId={setBusyOperationId}
               setMessage={setWorkActionMessage}
+              onOpenSelection={openSelection}
+              onCreateSession={createSessionForProject}
             />
           ) : null}
           {workActionMessage ? <div className="live-voice-hint" role="status">{workActionMessage}</div> : null}

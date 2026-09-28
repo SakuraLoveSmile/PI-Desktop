@@ -179,6 +179,132 @@ test("an explicitly bound work call forwards only the declared tool candidate to
   assert.deepEqual(closed, [prepared.callId]);
 });
 
+test("work feedback waits for a quiet window and reports local delivery separately from task execution", async (t) => {
+  const { LiveCallService } = await loadModules(t);
+  let now = 1_000;
+  const { deps, state } = dependencies({
+    now: () => now,
+    scheduleWorkFeedbackWake: (callback, delayMs) => {
+      assert.equal(delayMs, 700);
+      state.feedbackWake = callback;
+      state.feedbackTimer = setTimeout(() => {}, 60_000);
+      return state.feedbackTimer;
+    },
+    resolveWorkBinding: async (target) => ({
+      workSessionId: target.workSessionId,
+      workBindingRevision: 7,
+      label: "Fixture / Login",
+      contextEnabled: target.contextEnabled,
+    }),
+    openWorkScope: () => undefined,
+    receiveWorkCandidate: async () => undefined,
+  });
+  const service = new LiveCallService(deps);
+  const status = await service.status();
+  const prepared = await service.prepare(owner, {
+    requestId,
+    bindingId: binding.id,
+    expectedSettingsRevision: status.settingsRevision,
+    initialMuted: true,
+    workTarget: { workSessionId: "session-a", contextEnabled: false },
+  });
+  t.after(async () => {
+    const ending = service.end(owner, { callId: prepared.callId, reason: "user-ended" }).catch(() => undefined);
+    try { service.reportMedia(owner, { callId: prepared.callId, kind: "released" }); } catch { /* the service may already have cleaned up */ }
+    await ending;
+  });
+  await service.connect(owner, { callId: prepared.callId, offerSdp: "v=0\r\n" });
+  service.reportMedia(owner, { callId: prepared.callId, kind: "phase", phase: "connected" });
+
+  service.notifyWorkOperation(prepared.callId, {
+    operationId: "operation-queued",
+    admission: "accepted",
+    execution: "queued",
+    queueEntryId: "queue-1",
+  }, "delegation-1");
+  assert.equal(state.events.at(-1).workOperations.at(-1).feedbackStatus, "pending");
+  assert.equal(state.controls.some((control) => control.kind === "work-feedback"), false);
+
+  service.reportMedia(owner, { callId: prepared.callId, kind: "activity", assistantSpeaking: true });
+  service.reportMedia(owner, { callId: prepared.callId, kind: "playback-activity", active: true, ready: true });
+  service.reportMedia(owner, { callId: prepared.callId, kind: "activity", assistantSpeaking: false });
+  assert.equal(state.controls.some((control) => control.kind === "work-feedback"), false);
+
+  service.reportMedia(owner, { callId: prepared.callId, kind: "playback-activity", active: false, ready: true });
+  now += 700;
+  clearTimeout(state.feedbackTimer);
+  state.feedbackWake();
+  const feedback = state.controls.at(-1);
+  assert.equal(feedback.kind, "work-feedback");
+  assert.equal(feedback.delegationId, "delegation-1");
+  assert.equal(feedback.feedback.callId, prepared.callId);
+  assert.equal(feedback.feedback.delivery, "speak-when-idle");
+
+  service.reportControlApplied(owner, { callId: prepared.callId, actionId: feedback.actionId, applied: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  const operation = state.events.at(-1).workOperations.find((item) => item.operationId === "operation-queued");
+  assert.equal(operation.execution, "queued");
+  assert.equal(operation.feedbackStatus, "sent");
+});
+
+test("a shared terminal turn produces one feedback item and updates every linked operation", async (t) => {
+  const { LiveCallService } = await loadModules(t);
+  let now = 2_000;
+  const { deps, state } = dependencies({
+    now: () => now,
+    scheduleWorkFeedbackWake: (callback, delayMs) => {
+      assert.equal(delayMs, 700);
+      state.feedbackWake = callback;
+      state.feedbackTimer = setTimeout(() => {}, 60_000);
+      return state.feedbackTimer;
+    },
+    resolveWorkBinding: async (target) => ({
+      workSessionId: target.workSessionId,
+      workBindingRevision: 7,
+      label: "Fixture / Login",
+      contextEnabled: target.contextEnabled,
+    }),
+    openWorkScope: () => undefined,
+    receiveWorkCandidate: async () => undefined,
+  });
+  const service = new LiveCallService(deps);
+  const status = await service.status();
+  const prepared = await service.prepare(owner, {
+    requestId,
+    bindingId: binding.id,
+    expectedSettingsRevision: status.settingsRevision,
+    initialMuted: true,
+    workTarget: { workSessionId: "session-a", contextEnabled: false },
+  });
+  t.after(async () => {
+    const ending = service.end(owner, { callId: prepared.callId, reason: "user-ended" }).catch(() => undefined);
+    try { service.reportMedia(owner, { callId: prepared.callId, kind: "released" }); } catch { /* the service may already have cleaned up */ }
+    await ending;
+  });
+  await service.connect(owner, { callId: prepared.callId, offerSdp: "v=0\r\n" });
+  service.reportMedia(owner, { callId: prepared.callId, kind: "phase", phase: "connected" });
+
+  for (const operationId of ["operation-one", "operation-two"]) {
+    service.notifyWorkOperation(prepared.callId, {
+      operationId,
+      admission: "accepted",
+      execution: "completed",
+      turnId: "turn-shared",
+      summary: "The shared task completed.",
+    }, `delegation-${operationId}`, "The shared task completed.");
+  }
+  service.reportMedia(owner, { callId: prepared.callId, kind: "playback-activity", active: false, ready: true });
+  now += 700;
+  clearTimeout(state.feedbackTimer);
+  state.feedbackWake();
+
+  const feedbackControls = state.controls.filter((control) => control.kind === "work-feedback");
+  assert.equal(feedbackControls.length, 1);
+  service.reportControlApplied(owner, { callId: prepared.callId, actionId: feedbackControls[0].actionId, applied: true });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(state.events.at(-1).workOperations.map((operation) => operation.feedbackStatus), ["sent", "sent"]);
+});
+
 test("PCM Live service waits for the port lease, gates capture, and forwards output without exposing auth", async (t) => {
   const { LiveCallService } = await loadModules(t);
   const pcmBinding = { id: "gemini-main", adapterId: "gemini-live", providerId: "google-key", modelId: "gemini-live-model", voice: "Kore" };

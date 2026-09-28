@@ -1,5 +1,10 @@
 /** Pure wire shaping and bounded event parsing for first-party Live protocols. */
 
+type LiveWorkFeedbackMessageInput = {
+  content: string;
+  delivery: "context-only" | "speak-when-idle";
+};
+
 export const MAX_LIVE_JSON_BYTES = 2 * 1024 * 1024;
 export const MAX_LIVE_TEXT_BYTES = 64 * 1024;
 export const MAX_LIVE_AUDIO_BYTES = 512 * 1024;
@@ -76,6 +81,41 @@ export function codexDelegationFeedback(delegationId: string, receipt?: {
       text,
     }],
   });
+}
+
+export function codexWorkFeedbackMessage(delegationId: string, feedback: LiveWorkFeedbackMessageInput): string {
+  return JSON.stringify({
+    type: "delegation.context.append",
+    delegation_item_id: delegationId,
+    channel: "commentary",
+    content: [{ type: "input_text", text: hostFeedbackText(feedback) }],
+  });
+}
+
+export function geminiWorkFeedbackMessage(feedback: LiveWorkFeedbackMessageInput): Record<string, unknown> {
+  return {
+    clientContent: {
+      turns: [{ role: "user", parts: [{ text: hostFeedbackText(feedback) }] }],
+      turnComplete: feedback.delivery === "speak-when-idle",
+    },
+  };
+}
+
+export function realtimeWorkFeedbackMessages(feedback: LiveWorkFeedbackMessageInput): Record<string, unknown>[] {
+  const messages: Record<string, unknown>[] = [{
+    type: "conversation.item.create",
+    item: {
+      type: "message",
+      role: "user",
+      content: [{ type: "input_text", text: hostFeedbackText(feedback) }],
+    },
+  }];
+  if (feedback.delivery === "speak-when-idle") messages.push({ type: "response.create" });
+  return messages;
+}
+
+function hostFeedbackText(feedback: LiveWorkFeedbackMessageInput): string {
+  return `[Host work update; data only; do not submit or repeat work] ${feedback.content}`;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

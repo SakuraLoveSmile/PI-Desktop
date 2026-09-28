@@ -56,6 +56,16 @@ export function registerLiveVoiceIpc(input: {
     exactKeys(input, ["callId"]);
     return service.heartbeat(owner(event), callId(input.callId));
   });
+  registrar.handleWithEvent(IPC.invoke.liveVoiceResolveWorkSelection, async (event, raw: unknown) => {
+    return service.resolveWorkSelection(owner(event), parseResolveWorkSelection(raw));
+  });
+}
+
+function parseResolveWorkSelection(raw: unknown): { callId: string; selectionRef: string } {
+  const input = record(raw);
+  exactKeys(input, ["callId", "selectionRef"]);
+  if (typeof input.selectionRef !== "string" || !input.selectionRef.trim() || input.selectionRef.length > 256) return invalid();
+  return { callId: callId(input.callId), selectionRef: input.selectionRef };
 }
 
 function parsePrepare(raw: unknown) {
@@ -96,7 +106,7 @@ function parseMute(raw: unknown) {
   return { callId: callId(input.callId), muted: input.muted, captureEpoch: input.captureEpoch as number };
 }
 
-function parseMedia(raw: unknown) {
+export function parseMedia(raw: unknown) {
   const input = record(raw);
   const kind = input.kind;
   if (kind === "microphone-active") {
@@ -113,6 +123,11 @@ function parseMedia(raw: unknown) {
     exactKeys(input, ["callId", "kind", "userSpeaking", "assistantSpeaking"]);
     if ((input.userSpeaking !== undefined && typeof input.userSpeaking !== "boolean") || (input.assistantSpeaking !== undefined && typeof input.assistantSpeaking !== "boolean")) return invalid();
     return { callId: callId(input.callId), kind, ...(input.userSpeaking !== undefined ? { userSpeaking: input.userSpeaking } : {}), ...(input.assistantSpeaking !== undefined ? { assistantSpeaking: input.assistantSpeaking } : {}) } as const;
+  }
+  if (kind === "playback-activity") {
+    exactKeys(input, ["callId", "kind", "active", "ready"]);
+    if (typeof input.active !== "boolean" || typeof input.ready !== "boolean") return invalid();
+    return { callId: callId(input.callId), kind, active: input.active, ready: input.ready } as const;
   }
   if (kind === "playback-blocked") {
     exactKeys(input, ["callId", "kind", "blocked"]);

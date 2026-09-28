@@ -1,4 +1,4 @@
-import type { UiMessage } from "@pi-desktop/shared";
+import type { LiveWorkSelectionOption, UiMessage } from "@pi-desktop/shared";
 
 import type { LiveWorkCandidate, WorkSnapshot } from "./coordinator.js";
 import type { LiveWorkAdmission, LiveWorkExecution } from "./operation-ledger.js";
@@ -19,12 +19,14 @@ export function buildLiveWorkClassifierInput(input: {
     operationId: string;
     admission: LiveWorkAdmission;
     execution: LiveWorkExecution;
+    selections?: LiveWorkSelectionOption[];
   }>;
 }): string {
   const payload: {
     request: string;
     workState: { mode: WorkSnapshot["mode"]; state: WorkSnapshot["state"]; activeTurn: boolean; queuedCount: number };
     recentContext?: Array<{ role: "user" | "assistant"; text: string }>;
+    availableSelections?: LiveWorkSelectionOption[];
   } = {
     request: input.candidate.instruction,
     workState: {
@@ -43,6 +45,12 @@ export function buildLiveWorkClassifierInput(input: {
         }
       : {}),
   };
+
+  const latestSelectionOperation = [...(input.recentOperations ?? [])].reverse()
+    .find((operation) => operation.selections?.length);
+  if (latestSelectionOperation?.selections?.length) {
+    payload.availableSelections = latestSelectionOperation.selections.slice(0, 20);
+  }
 
   if (input.contextEnabled) {
     const messages = (input.recentMessages ?? [])
@@ -70,6 +78,17 @@ export function buildLiveWorkClassifierInput(input: {
   let serialized = JSON.stringify(payload);
   if (new TextEncoder().encode(serialized).byteLength > MAX_CLASSIFIER_CONTEXT_BYTES) {
     delete payload.recentContext;
+    serialized = JSON.stringify(payload);
+  }
+  if (new TextEncoder().encode(serialized).byteLength > MAX_CLASSIFIER_CONTEXT_BYTES && payload.availableSelections) {
+    payload.availableSelections = payload.availableSelections.slice(0, 5).map((selection) => ({
+      ...selection,
+      label: selection.label.slice(0, 48),
+    }));
+    serialized = JSON.stringify(payload);
+  }
+  if (new TextEncoder().encode(serialized).byteLength > MAX_CLASSIFIER_CONTEXT_BYTES) {
+    delete payload.availableSelections;
     serialized = JSON.stringify(payload);
   }
   return serialized;

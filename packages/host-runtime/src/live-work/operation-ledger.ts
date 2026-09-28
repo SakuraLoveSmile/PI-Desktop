@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import type { LiveWorkSelectionOption } from "@pi-desktop/shared";
+import type { LiveWorkIntent } from "./intent.js";
 
 export type LiveWorkAdmission =
   | "received"
@@ -31,9 +33,12 @@ export type LiveWorkOperation = {
   admission: LiveWorkAdmission;
   execution: LiveWorkExecution;
   summary?: string;
+  resultSummary?: string;
+  intent?: LiveWorkIntent;
   userMessageId?: string;
   queueEntryId?: string;
   turnId?: string;
+  selections?: LiveWorkSelectionOption[];
 };
 
 export type RegisterCandidateResult =

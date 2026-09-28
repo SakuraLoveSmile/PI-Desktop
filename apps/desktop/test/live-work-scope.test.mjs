@@ -74,3 +74,37 @@ test("a work session removed while Host metadata is being read cannot pass reval
   finishLookup({ sessions: [{ id: "session-a", source: "desktop" }] });
   await assert.rejects(validation, { errorCode: "LIVE_WORK_SESSION_UNAVAILABLE" });
 });
+
+test("selection references are opaque, call-scoped, short-lived, and removed with the call", async (t) => {
+  const server = await createServer({
+    root: fileURLToPath(new URL("..", import.meta.url)),
+    configFile: false,
+    server: { middlewareMode: true, hmr: false, ws: false },
+    appType: "custom",
+    optimizeDeps: { noDiscovery: true, include: [] },
+  });
+  t.after(() => server.close());
+  const { LiveWorkSelectionRegistry } = await server.ssrLoadModule("/electron/main/live-voice/work-selections.ts");
+  let now = 10;
+  let nextId = 0;
+  const registry = new LiveWorkSelectionRegistry(() => now, () => `ref-${++nextId}`);
+  const options = registry.issue("call-a", 3, [
+    { kind: "project", value: "/private/worktree/demo", label: "demo" },
+    { kind: "project", value: "/private/worktree/other", label: "demo" },
+  ], "create");
+
+  assert.deepEqual(options, [
+    { selectionRef: "ref-1", kind: "project", action: "create", label: "demo", duplicateLabel: true },
+    { selectionRef: "ref-2", kind: "project", action: "create", label: "demo", duplicateLabel: true },
+  ]);
+  assert.equal(JSON.stringify(options).includes("/private/worktree"), false);
+  assert.equal(registry.resolve({ callId: "call-b", workBindingRevision: 3, selectionRef: "ref-1" }), undefined);
+  assert.equal(registry.resolve({ callId: "call-a", workBindingRevision: 4, selectionRef: "ref-1" }), undefined);
+  assert.equal(registry.resolve({ callId: "call-a", workBindingRevision: 3, selectionRef: "ref-1" })?.value, "/private/worktree/demo");
+
+  now += 60_000;
+  assert.equal(registry.resolve({ callId: "call-a", workBindingRevision: 3, selectionRef: "ref-2" }), undefined);
+  const next = registry.issue("call-a", 3, [{ kind: "project", value: "/private/worktree/new", label: "new" }], "none")[0];
+  registry.removeCall("call-a");
+  assert.equal(registry.resolve({ callId: "call-a", workBindingRevision: 3, selectionRef: next.selectionRef }), undefined);
+});

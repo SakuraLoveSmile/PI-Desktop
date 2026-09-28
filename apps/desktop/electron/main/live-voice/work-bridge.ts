@@ -16,12 +16,14 @@ import {
 import {
   OAUTH_AUTH_KIND,
   type LiveWorkBinding,
+  type LiveWorkSelectionOption,
   type ThinkingLevel,
 } from "@pi-desktop/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import { DESKTOP_PRINCIPAL } from "../agent-host-bridge";
 import type { VendorOAuth } from "../oauth";
 import { requireSupportedWorkSession } from "./work-scope";
+import { LiveWorkSelectionRegistry, type LiveWorkSelectionEntry } from "./work-selections";
 
 type LaunchResult = {
   providerId: string;
@@ -42,6 +44,11 @@ type WorkSessionSummary = {
   permissionMode?: unknown;
 };
 
+type WorkProjectSummary = { name?: unknown; path?: unknown };
+export type LiveWorkSelectionTarget =
+  | { kind: "session"; sessionId: string }
+  | { kind: "project"; projectPath: string };
+
 type HostRpc = {
   call<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;
 };
@@ -52,6 +59,8 @@ const INTENT_SYSTEM_PROMPT = [
   "Return exactly one JSON object matching the supplied schema, without Markdown or explanation.",
   "Use conversation for greetings, ordinary discussion, preferences, and requests that are not work actions.",
   "Use query-status or query-result for questions about existing work; never classify a status question as a new task.",
+  "For project/session lookup, only use opaque selectionRef values in availableSelections; never invent a reference or infer a path/session ID. Ask the user to list items if no matching reference is available.",
+  "Opening an existing session is a UI navigation action and never changes the bound work session. Creating a session requires a project selection shown in the desktop panel.",
   "Use steer-current only when the user clearly adds a constraint or correction to the currently active task.",
   "Use new-task with relationToActive=independent only when a separate task is clearly requested while work is active.",
   "Use relationToActive=unspecified when it is unclear whether to add or separate the work.",
@@ -77,12 +86,14 @@ export type LiveWorkBridge = {
     candidate: LiveWorkCandidateInput,
     deliverReceipt: (receipt: ProviderReceipt) => Promise<LocalReceiptDelivery>,
   ): Promise<void>;
+  resolveSelection(input: { callId: string; workBindingRevision: number; selectionRef: string }): Promise<LiveWorkSelectionTarget>;
 };
 
 export function createLiveWorkBridge(input: {
   getHost: () => HostRpc | null;
   getAgentHostBridge: () => AgentHostBridge | null;
   vendorOAuth: Pick<VendorOAuth, "resolveAuth">;
+  navigateSession: (callId: string, sessionId: string) => Promise<void>;
   resolveAgentRuntimeLaunch: (
     sessionId: string,
     session: Record<string, unknown>,
@@ -90,8 +101,10 @@ export function createLiveWorkBridge(input: {
     overrides: { providerId?: string; modelId?: string; thinkingLevel?: ThinkingLevel },
   ) => Promise<LaunchResult>;
   onOperation: (callId: string, update: LiveWorkOperationUpdate) => void;
+  onAnnouncementPolicy?: (input: { callId: string; policy: "normal" | "silent" }) => void;
 }): LiveWorkBridge {
   const bindings = new Map<string, LiveWorkBinding>();
+  const selections = new LiveWorkSelectionRegistry();
   const sessionEventSubscriptions = new Map<string, () => void>();
   const host = (): HostRpc => {
     const current = input.getHost();
@@ -100,6 +113,46 @@ export function createLiveWorkBridge(input: {
   };
   const requireSupportedSession = async (sessionId: string, callId?: string): Promise<WorkSessionSummary> => {
     return requireSupportedWorkSession({ host: host(), bindings, sessionId, ...(callId ? { callId } : {}) });
+  };
+
+  const requireCallRevision = (callId: string, workBindingRevision: number) => {
+    const binding = bindings.get(callId);
+    if (!binding || binding.workBindingRevision !== workBindingRevision) {
+      throw Object.assign(new Error("The Live work selection is no longer available"), { errorCode: "LIVE_WORK_SELECTION_EXPIRED" });
+    }
+    return binding;
+  };
+
+  const issueSelections = (
+    callId: string,
+    workBindingRevision: number,
+    values: Array<{ kind: LiveWorkSelectionEntry["kind"]; value: string; label: string }>,
+    action: LiveWorkSelectionOption["action"],
+  ): LiveWorkSelectionOption[] => selections.issue(callId, workBindingRevision, values, action);
+
+  const resolveSelection = async (input: { callId: string; workBindingRevision: number; selectionRef: string }): Promise<LiveWorkSelectionTarget> => {
+    requireCallRevision(input.callId, input.workBindingRevision);
+    const entry = selections.resolve(input);
+    if (!entry) {
+      throw Object.assign(new Error("The Live work selection expired"), { errorCode: "LIVE_WORK_SELECTION_EXPIRED" });
+    }
+    const rpc = host();
+    if (entry.kind === "session") {
+      const listed = await rpc.call<{ sessions?: WorkSessionSummary[] }>("session.list");
+      requireCallRevision(input.callId, input.workBindingRevision);
+      const session = listed.sessions?.find((candidate) => candidate.id === entry.value && (candidate.source === undefined || candidate.source === "desktop"));
+      if (!session || typeof session.id !== "string") {
+        throw Object.assign(new Error("The selected session is no longer available"), { errorCode: "LIVE_WORK_SESSION_UNAVAILABLE" });
+      }
+      return { kind: "session", sessionId: session.id };
+    }
+    const listed = await rpc.call<{ projects?: WorkProjectSummary[] }>("projects.list");
+    requireCallRevision(input.callId, input.workBindingRevision);
+    const project = listed.projects?.find((candidate) => candidate.path === entry.value);
+    if (!project || typeof project.path !== "string") {
+      throw Object.assign(new Error("The selected project is no longer available"), { errorCode: "LIVE_WORK_SELECTION_EXPIRED" });
+    }
+    return { kind: "project", projectPath: project.path };
   };
 
   const workPort: LiveWorkPort = {
@@ -190,10 +243,54 @@ export function createLiveWorkBridge(input: {
         return { status: "unknown" };
       }
     },
+    async listProjects(request) {
+      requireCallRevision(request.callId, request.workBindingRevision);
+      const listed = await host().call<{ projects?: WorkProjectSummary[] }>("projects.list");
+      requireCallRevision(request.callId, request.workBindingRevision);
+      const query = request.query?.trim().toLocaleLowerCase();
+      const values = (listed.projects ?? []).flatMap((project) => {
+        if (typeof project.path !== "string" || !project.path.trim()) return [];
+        const name = typeof project.name === "string" && project.name.trim()
+          ? project.name.trim()
+          : project.path.split(/[\\/]/).filter(Boolean).at(-1) ?? "";
+        if (!name || (query && !name.toLocaleLowerCase().includes(query))) return [];
+        return [{ kind: "project" as const, value: project.path, label: name.slice(0, 120) }];
+      });
+      return issueSelections(request.callId, request.workBindingRevision, values, request.action);
+    },
+    async listSessions(request) {
+      requireCallRevision(request.callId, request.workBindingRevision);
+      const listed = await host().call<{ sessions?: WorkSessionSummary[] }>("session.list");
+      requireCallRevision(request.callId, request.workBindingRevision);
+      const query = request.query?.trim().toLocaleLowerCase();
+      const values = (listed.sessions ?? []).flatMap((session) => {
+        if (typeof session.id !== "string" || (session.source !== undefined && session.source !== "desktop")) return [];
+        const title = typeof session.title === "string" ? session.title.trim() : "";
+        const projectLabel = typeof session.projectPath === "string" ? session.projectPath.split(/[\\/]/).filter(Boolean).at(-1) : undefined;
+        const label = `${projectLabel && title ? `${projectLabel} / ` : ""}${title || projectLabel || ""}`.slice(0, 180);
+        if (query && !label.toLocaleLowerCase().includes(query)) return [];
+        return [{ kind: "session" as const, value: session.id, label }];
+      });
+      return issueSelections(request.callId, request.workBindingRevision, values, "open");
+    },
+    async openSelection(request) {
+      try {
+        const entry = selections.resolve(request);
+        if (!entry || entry.kind !== "session") return { status: "expired" };
+        if (entry.duplicateLabel) return { status: "ambiguous" };
+        const target = await resolveSelection(request);
+        if (target.kind !== "session") return { status: "unavailable" };
+        await input.navigateSession(request.callId, target.sessionId);
+        return { status: "opened" };
+      } catch {
+        return { status: "unavailable" };
+      }
+    },
   };
 
   const coordinator = new LiveWorkCoordinator({
     workPort,
+    ...(input.onAnnouncementPolicy ? { onAnnouncementPolicy: input.onAnnouncementPolicy } : {}),
     resolveIntent: async ({ candidate, snapshot, recentOperations }) => {
       const binding = bindings.get(candidate.callId);
       if (!binding || binding.workSessionId !== candidate.workSessionId) return null;
@@ -328,7 +425,9 @@ export function createLiveWorkBridge(input: {
       sessionEventSubscriptions.delete(callId);
       coordinator.closeCall(callId);
       bindings.delete(callId);
+      selections.removeCall(callId);
     },
+    resolveSelection,
     async receiveCandidate(candidate, deliverReceipt) {
       await coordinator.receiveCandidate(candidate, deliverReceipt);
     },

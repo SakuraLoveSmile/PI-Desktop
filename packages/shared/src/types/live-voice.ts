@@ -17,6 +17,24 @@ export type LiveWorkBinding = {
   contextEnabled: boolean;
 };
 
+export type LiveWorkSelectionOption = {
+  selectionRef: string;
+  kind: "project" | "session";
+  action: "none" | "open" | "create";
+  label: string;
+  duplicateLabel?: boolean;
+};
+
+export type LiveWorkFeedback = {
+  feedbackId: string;
+  callId: string;
+  workBindingRevision: number;
+  operationId?: string;
+  kind: "receipt" | "admission" | "clarification" | "status" | "result" | "interaction-required";
+  delivery: "context-only" | "speak-when-idle";
+  content: string;
+};
+
 export type LiveBinding =
   | {
       id: string;
@@ -165,6 +183,8 @@ export type LiveWorkOperationView = {
   summary?: string;
   turnId?: string;
   queueEntryId?: string;
+  selections?: LiveWorkSelectionOption[];
+  feedbackStatus?: "pending" | "sent" | "context-only" | "undelivered";
 };
 
 export type LiveBindingReadiness = {
@@ -229,6 +249,7 @@ export type LiveMediaReport =
   | { callId: string; kind: "microphone-active"; active: boolean }
   | { callId: string; kind: "phase"; phase: "connecting" | "connected" }
   | { callId: string; kind: "activity"; userSpeaking?: boolean; assistantSpeaking?: boolean }
+  | { callId: string; kind: "playback-activity"; active: boolean; ready: boolean }
   | { callId: string; kind: "playback-blocked"; blocked: boolean }
   | { callId: string; kind: "released" };
 
@@ -262,6 +283,8 @@ export type LiveControlEvent =
   | { callId: string; kind: "release-media" }
   | { callId: string; kind: "reject-delegation"; actionId: string; delegationId: string; reason: "EXECUTION_NOT_CONNECTED" }
   | { callId: string; kind: "work-receipt"; actionId: string; delegationId: string; receipt: LiveProviderReceipt }
+  | { callId: string; kind: "work-navigation"; actionId: string; sessionId: string }
+  | { callId: string; kind: "work-feedback"; actionId: string; delegationId: string; feedback: LiveWorkFeedback }
   | { callId: string; kind: "playback-reset"; playbackEpoch: number };
 
 export type LiveTranscriptEvent = {

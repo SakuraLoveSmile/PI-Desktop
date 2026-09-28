@@ -101,6 +101,7 @@ export const IPC = {
     liveVoiceReportControlApplied: "pi-desktop/voice/live/reportControlApplied",
     liveVoiceEnd: "pi-desktop/voice/live/end",
     liveVoiceHeartbeat: "pi-desktop/voice/live/heartbeat",
+    liveVoiceResolveWorkSelection: "pi-desktop/voice/live/work/resolveSelection",
     agentCompact: "pi-desktop/agent/compact",
     agentAbort: "pi-desktop/agent/abort",
     agentStop: "pi-desktop/agent/stop",

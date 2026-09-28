@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
   ErrorCodes,
   OAUTH_AUTH_KIND,
@@ -18,6 +17,7 @@ import {
   type LiveStatus,
   type LiveWorkOperationView,
 } from "@pi-desktop/shared";
+import { LiveWorkFeedbackScheduler, type LiveWorkIntent } from "@pi-desktop/host-runtime";
 import { LIVE_WORK_TOOL_NAME, parseLiveWorkArguments, type LiveWireEvent } from "@pi-desktop/voice-runtime/live";
 import { LiveAuthResolver } from "./auth-resolver";
 import type { LivePcmBridge } from "./audio-port";
@@ -47,6 +47,9 @@ import {
   type Slot,
 } from "./call-service-internals";
 import { createLiveCallWorkHandlers } from "./call-service-work";
+import { LiveWorkFeedbackManager } from "./call-service-feedback";
+import { createLiveCallSlot } from "./call-service-slot";
+import { toLiveCallView } from "./call-service-view";
 import { pushLiveTranscript } from "./call-service-transcript";
 
 export type { LiveCallServiceDeps, LiveOwner } from "./call-service-internals";
@@ -62,6 +65,7 @@ export class LiveCallService {
   private readonly deps: LiveCallServiceDeps;
   private readonly now: () => number;
   private readonly workHandlers: ReturnType<typeof createLiveCallWorkHandlers>;
+  private readonly feedback: LiveWorkFeedbackManager;
 
   constructor(deps: LiveCallServiceDeps) {
     this.deps = deps;
@@ -73,6 +77,13 @@ export class LiveCallService {
       receiveWorkCandidate: deps.receiveWorkCandidate,
       publish: (slot) => this.publish(slot),
       fail: (slot, error, stage) => this.failAndCleanup(slot, error, stage),
+    });
+    this.feedback = new LiveWorkFeedbackManager({
+      current: () => this.current,
+      now: this.now,
+      publish: (slot) => this.publish(slot),
+      scheduleWake: deps.scheduleWorkFeedbackWake,
+      sendCodexFeedback: (slot, delegationId, feedback) => this.workHandlers.sendWorkFeedback(slot, delegationId, feedback),
     });
   }
 
@@ -108,7 +119,7 @@ export class LiveCallService {
       settingsRevision: snapshot.revision,
       ...(snapshot.value.selectedBindingId ? { selectedBindingId: snapshot.value.selectedBindingId } : {}),
       bindings,
-      call: this.current ? this.toView(this.current) : this.terminal,
+      call: this.current ? toLiveCallView(this.current) : this.terminal,
     };
   }
 
@@ -136,7 +147,7 @@ export class LiveCallService {
     if (this.current || this.quarantine) return Promise.reject(liveError(this.quarantine ? "LIVE_MEDIA_RELEASE_UNCONFIRMED" : "LIVE_ALREADY_ACTIVE"));
     if (this.settingsWritePending) return Promise.reject(liveError("LIVE_SETTINGS_IN_USE"));
 
-    const slot = this.makeSlot(owner, request);
+    const slot = createLiveCallSlot(owner, request, this.now);
     try {
       // Reserve the process-wide capture lease synchronously with prepare so
       // Dictation cannot begin while the renderer is opening its permission UI.
@@ -187,7 +198,7 @@ export class LiveCallService {
       if (slot.bridge) await slot.bridge.setMuted(request.muted, request.captureEpoch);
       if (slot.adapter?.setInputMuted) await slot.adapter.setInputMuted(request.muted);
       this.assertCurrent(slot);
-      return this.toView(slot);
+      return toLiveCallView(slot);
     } catch (error) {
       if (!request.muted) {
         slot.muted = true;
@@ -220,6 +231,11 @@ export class LiveCallService {
         if (report.userSpeaking !== undefined) slot.userSpeaking = report.userSpeaking;
         if (report.assistantSpeaking !== undefined) slot.assistantSpeaking = report.assistantSpeaking;
         break;
+      case "playback-activity":
+        if (slot.binding?.adapterId !== "codex-live" || !slot.workBinding) throw liveError("LIVE_PROTOCOL_ERROR");
+        slot.assistantPlaybackActive = report.active;
+        slot.playbackMonitorReady = report.ready;
+        break;
       case "playback-blocked":
         slot.playbackBlocked = report.blocked;
         if (report.blocked) slot.notice = { code: "LIVE_PLAYBACK_BLOCKED", retriable: true };
@@ -232,13 +248,36 @@ export class LiveCallService {
         break;
     }
     this.publish(slot);
-    return this.toView(slot);
+    this.feedback.pump(slot);
+    return toLiveCallView(slot);
   }
 
   reportPlayback(owner: LiveOwner, input: { callId: string; cursors: LivePlaybackCursor[] }): void {
     const slot = this.requireCurrent(owner, input.callId);
     if (!Array.isArray(input.cursors) || input.cursors.length > 64) throw liveError("LIVE_PROTOCOL_ERROR");
     slot.bridge?.reportPlayback(input.cursors);
+  }
+
+  async resolveWorkSelection(owner: LiveOwner, input: { callId: string; selectionRef: string }): Promise<
+    | { kind: "session"; sessionId: string }
+    | { kind: "project"; projectPath: string }
+  > {
+    const slot = this.requireCurrent(owner, input.callId);
+    const binding = slot.workBinding;
+    if (!binding || !this.deps.resolveWorkSelection) throw liveError("LIVE_WORK_NOT_BOUND");
+    if (typeof input.selectionRef !== "string" || !input.selectionRef.trim() || input.selectionRef.length > 256) throw liveError("LIVE_PROTOCOL_ERROR");
+    return this.deps.resolveWorkSelection({
+      callId: slot.callId,
+      workBindingRevision: binding.workBindingRevision,
+      selectionRef: input.selectionRef,
+    });
+  }
+
+  async navigateWorkSession(callId: string, sessionId: string): Promise<void> {
+    const slot = this.current;
+    if (!slot || slot.callId !== callId || !slot.workBinding || slot.phase !== "connected") throw liveError("LIVE_STALE_CALL");
+    const result = await this.workHandlers.navigateSession(slot, sessionId);
+    if (result.status !== "sent") throw liveError(result.code ?? "LIVE_WORK_FEEDBACK_UNDELIVERED");
   }
 
   async reportDelegation(owner: LiveOwner, request: LiveDelegationRequest): Promise<{ accepted: boolean }> {
@@ -252,8 +291,15 @@ export class LiveCallService {
     this.workHandlers.reportControlApplied(slot, input);
   }
 
-  notifyWorkOperation(callId: string, operation: LiveWorkOperationView): void {
+  notifyWorkOperation(callId: string, operation: LiveWorkOperationView, delegationId?: string, resultSummary?: string, intent?: LiveWorkIntent): void {
     this.workHandlers.notifyWorkOperation(callId, operation);
+    const slot = this.current;
+    if (!slot || slot.callId !== callId || !slot.workBinding) return;
+    this.feedback.notifyOperation(slot, operation, delegationId, resultSummary, intent);
+  }
+
+  setWorkAnnouncementPolicy(callId: string, policy: "normal" | "silent"): void {
+    this.feedback.setPolicy(callId, policy);
   }
 
   async end(owner: LiveOwner, request: LiveEndRequest): Promise<{ ok: true }> {
@@ -365,6 +411,7 @@ export class LiveCallService {
         typeof slot.workBinding.label !== "string" || slot.workBinding.label.length > 120 ||
         slot.workBinding.contextEnabled !== request.workTarget.contextEnabled
       ) throw liveError("LIVE_WORK_SESSION_UNAVAILABLE");
+      slot.workFeedbackScheduler.bindRevision(slot.workBinding.workBindingRevision);
     }
     const record = await this.withDeadline(this.deps.authResolver.provider(binding.providerId), PREPARE_DEADLINE_MS, "prepare");
     this.assertCurrent(slot);
@@ -382,6 +429,7 @@ export class LiveCallService {
         outputSampleRate: 24000,
         onInput: (bytes, epoch) => this.onInput(slot, bytes, epoch),
         onPlaybackPosition: () => undefined,
+        onPlaybackStateChanged: () => this.feedback.pump(slot),
         onReleased: () => this.confirmMediaReleased(slot),
         onFailure: (code) => { void this.failAndCleanup(slot, liveError(code), "media"); },
       });
@@ -537,6 +585,7 @@ export class LiveCallService {
         if (event.userSpeaking !== undefined) slot.userSpeaking = event.userSpeaking;
         if (event.assistantSpeaking !== undefined) slot.assistantSpeaking = event.assistantSpeaking;
         this.publish(slot);
+        this.feedback.pump(slot);
         return;
       case "interrupted":
         slot.playbackEpoch += 1;
@@ -548,6 +597,7 @@ export class LiveCallService {
         }
         slot.assistantSpeaking = false;
         this.publish(slot);
+        this.feedback.pump(slot);
         return;
       case "delegation":
         if (slot.binding?.adapterId !== "codex-live") {
@@ -567,6 +617,7 @@ export class LiveCallService {
       case "turn-complete":
         slot.assistantSpeaking = false;
         this.publish(slot);
+        this.feedback.pump(slot);
         return;
       case "closed":
         if (slot.phase !== "closing") void this.failAndCleanup(slot, liveError("LIVE_NETWORK_ERROR"), "connection");
@@ -615,7 +666,7 @@ export class LiveCallService {
     }
     transition(slot, slot.error ? "failed" : "ended");
     this.publish(slot);
-    this.terminal = this.toView(slot);
+    this.terminal = toLiveCallView(slot);
     if (this.current === slot) this.current = null;
   }
 
@@ -693,42 +744,6 @@ export class LiveCallService {
     }
   }
 
-  private makeSlot(owner: LiveOwner, request: LivePrepareRequest): Slot {
-    let resolveMediaReleased: (() => void) | null = null;
-    const mediaReleased = new Promise<void>((resolve) => { resolveMediaReleased = resolve; });
-    return {
-      callId: randomUUID(),
-      requestId: request.requestId,
-      requestedBindingId: request.bindingId,
-      owner: { ...owner },
-      binding: null,
-      settingsRevision: request.expectedSettingsRevision,
-      phase: "preparing",
-      revision: 0,
-      abort: new AbortController(),
-      desiredMuted: request.initialMuted,
-      muted: true,
-      captureEpoch: 0,
-      playbackEpoch: 0,
-      microphoneActive: false,
-      mediaRelease: "confirmed",
-      mediaReleased,
-      resolveMediaReleased,
-      userSpeaking: false,
-      assistantSpeaking: false,
-      adapter: null,
-      bridge: null,
-      releaseMicrophone: null,
-      releaseBackgroundLease: null,
-      heartbeatAt: this.now(),
-      delegationInstructions: new Map(),
-      workScopeOpened: false,
-      workOperations: [],
-      pendingControls: new Map(),
-      transcriptLengths: new Map(),
-    };
-  }
-
   private requireCurrent(owner: LiveOwner, callId: string, allowClosing = false): Slot {
     const slot = this.current;
     if (!slot || slot.callId !== callId) throw liveError("LIVE_STALE_CALL");
@@ -741,36 +756,16 @@ export class LiveCallService {
     if (this.current !== slot || slot.abort.signal.aborted) throw liveError("LIVE_STALE_CALL");
   }
 
-  private toView(slot: Slot): LiveCallView {
-    return {
-      callId: slot.callId,
-      revision: slot.revision,
-      bindingId: slot.binding?.id ?? "",
-      adapterId: slot.binding?.adapterId ?? "codex-live",
-      phase: slot.phase,
-      muted: slot.muted,
-      microphoneActive: slot.microphoneActive,
-      userSpeaking: slot.userSpeaking,
-      assistantSpeaking: slot.assistantSpeaking,
-      ...(slot.workBinding ? { workBinding: slot.workBinding } : {}),
-      ...(slot.workOperations.length ? { workOperations: slot.workOperations } : {}),
-      ...(slot.connectedAt ? { connectedAt: slot.connectedAt } : {}),
-      ...(slot.playbackBlocked !== undefined ? { playbackBlocked: slot.playbackBlocked } : {}),
-      mediaRelease: slot.mediaRelease,
-      ...(slot.error ? { error: slot.error } : {}),
-      ...(slot.notice ? { notice: slot.notice } : {}),
-    };
-  }
-
   private publish(slot: Slot): void {
     slot.revision += 1;
     if (this.current === slot) {
-      try { this.deps.sendView(slot.owner, this.toView(slot)); } catch { /* The lifecycle watcher closes a disappeared owner. */ }
+      try { this.deps.sendView(slot.owner, toLiveCallView(slot)); } catch { /* The lifecycle watcher closes a disappeared owner. */ }
     }
   }
 
   private clearTimers(slot: Slot): void {
     for (const timer of [slot.reservationTimer, slot.heartbeatTimer, slot.maxDurationTimer]) if (timer) clearTimeout(timer);
+    this.feedback.clear(slot);
   }
 
   private trimRequests(): void {

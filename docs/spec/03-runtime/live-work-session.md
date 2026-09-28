@@ -45,6 +45,15 @@ queue. A result query reads the latest terminal operation recorded for the
 current call, or the explicitly referenced operation, and shows its bounded
 summary without starting another turn.
 
+Project and session lookup uses Host metadata and returns at most 20 labeled
+choices with opaque, call- and binding-revision-scoped `selectionRef` values.
+References expire after 60 seconds and do not expose project paths or session
+IDs. Opening a uniquely labeled session navigates through the existing
+renderer; duplicate labels require an explicit panel choice. Session creation
+is available only for a listed registered project and requires the user's
+panel action. Neither opening nor creating a session changes the active work
+binding.
+
 ## Existing Host and Agent ownership
 
 Work submission uses the existing AgentHost and registered Agent handlers. The
@@ -66,18 +75,32 @@ does not imply tests passed.
 ## UI and current capability boundary
 
 The existing Live panel displays the fixed work target, whether bounded context
-sharing is enabled, current operation admission/execution state, bounded route
-or rejection messages, and exact terminal summaries. It also provides actions
-to view the bound session, stop its observed running turn, or cancel its exact
-queued item. It uses the normal session picker/create flow for explicit desktop
-selection before a call.
+sharing is enabled, current operation admission/execution state, feedback
+delivery status, bounded route or rejection messages, exact terminal
+summaries, and short-lived project/session choices. It provides actions to view
+the bound session, open a listed session, create a session in a listed project,
+stop its observed running turn, or cancel its exact queued item. Creating a
+session uses the existing defaults and leaves the current Live binding alone.
 
-The current implementation does not expose model-driven project/session
-selection or create/open intents through `selectionRef`. It also does not yet
-deliver terminal-result summaries through each provider's safe feedback
-scheduler, so result summaries are currently visible in the Live work panel
-and are not automatically spoken. These remain acceptance gaps and must not be
-represented as completed behavior.
+### Work feedback and announcement policy
+
+Host feedback is queued separately from work execution, bounded to eight
+items, deduplicated, and coalesced on overflow. Received receipts stay
+context-only. Automatic status and result speech waits for provider generation
+to finish, user speech to stop, and local playback to be idle; it then applies
+a 700 ms quiet window and a three-second minimum speech gap. Feedback older
+than 15 seconds remains visible and is delivered as context-only. Silent mode
+suppresses automatic speech without stopping work; an explicit status or
+result query may still be spoken. Feedback delivery failure is shown
+separately and never repeats the work request.
+
+Gemini Live and Realtime use PCM output-credit drain as the local playback
+queue signal. Codex work calls route the remote audio element through a local
+Web Audio analyser and observe its output samples; if that monitor cannot be
+established or its AudioContext is not running, automatic feedback remains
+held. This observes renderer audio activity before the output device, not
+whether a person heard it. The full provider and device behavior still
+requires the manual matrix in the delivery plan.
 
 ## Privacy and resource limits
 

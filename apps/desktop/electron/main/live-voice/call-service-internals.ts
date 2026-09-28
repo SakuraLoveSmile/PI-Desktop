@@ -8,10 +8,12 @@ import type {
   LivePrepareRequest,
   LiveWorkBinding,
   LiveWorkOperationView,
+  LiveWorkFeedback,
   LiveProviderReceipt,
   LiveVoiceSettings,
 } from "@pi-desktop/shared";
 import { validateLiveVoiceSettings } from "@pi-desktop/shared";
+import type { LiveWorkFeedbackScheduler } from "@pi-desktop/host-runtime";
 import type { LivePcmBridge } from "./audio-port";
 import type { LiveAdapter, LiveAdapterContext, LiveReceiptDelivery } from "./types";
 
@@ -33,6 +35,7 @@ export type LiveCallServiceDeps = {
     outputSampleRate: 24000;
     onInput: (bytes: Uint8Array, captureEpoch: number) => void;
     onPlaybackPosition: (cursors: LivePlaybackCursor[]) => void;
+    onPlaybackStateChanged: () => void;
     onReleased: () => void;
     onFailure: (code: string) => void;
   }) => LivePcmBridge;
@@ -43,14 +46,19 @@ export type LiveCallServiceDeps = {
   acquireMicrophone: (callId: string) => () => void;
   acquireBackgroundThrottlingLease?: (callId: string) => () => void;
   now?: () => number;
+  scheduleWorkFeedbackWake?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   resolveWorkBinding?: (target: NonNullable<LivePrepareRequest["workTarget"]>) => Promise<LiveWorkBinding>;
   openWorkScope?: (callId: string, binding: LiveWorkBinding) => void;
   closeWorkScope?: (callId: string) => void;
+  resolveWorkSelection?: (input: { callId: string; workBindingRevision: number; selectionRef: string }) => Promise<
+    | { kind: "session"; sessionId: string }
+    | { kind: "project"; projectPath: string }
+  >;
   receiveWorkCandidate?: (
     candidate: { callId: string; workBindingRevision: number; workSessionId: string; providerRequestId: string; instruction: string },
     deliverReceipt: (receipt: LiveProviderReceipt) => Promise<LiveReceiptDelivery>,
   ) => Promise<void>;
-  onWorkOperation?: (callId: string, operation: LiveWorkOperationView) => void;
+  onWorkOperation?: (callId: string, operation: LiveWorkOperationView, delegationId?: string) => void;
 };
 
 export type Slot = {
@@ -75,11 +83,19 @@ export type Slot = {
   playbackBlocked?: boolean;
   userSpeaking: boolean;
   assistantSpeaking: boolean;
+  assistantPlaybackActive: boolean;
+  playbackMonitorReady: boolean;
   error?: { code: string; stage?: string; retriable: boolean };
   notice?: { code: string; retriable: boolean };
   workBinding?: LiveWorkBinding;
   workScopeOpened: boolean;
   workOperations: LiveWorkOperationView[];
+  workFeedbackScheduler: LiveWorkFeedbackScheduler;
+  workFeedbackTargets: Map<string, string>;
+  workFeedbackStatuses: Map<string, "pending" | "sent" | "context-only" | "undelivered">;
+  workFeedbackTerminalOperations: Map<string, Set<string>>;
+  workFeedbackTerminalStatuses: Map<string, "pending" | "sent" | "context-only" | "undelivered">;
+  workFeedbackTimer?: ReturnType<typeof setTimeout>;
   adapter: LiveAdapter | null;
   bridge: LivePcmBridge | null;
   releaseMicrophone: (() => void) | null;
@@ -93,7 +109,7 @@ export type Slot = {
   delegationInstructions: Map<string, string>;
   pendingControls: Map<string, {
     timer: ReturnType<typeof setTimeout>;
-    kind: "reject" | "work-receipt";
+    kind: "reject" | "work-receipt" | "work-navigation" | "work-feedback";
     resolve?: (delivery: LiveReceiptDelivery) => void;
   }>;
   transcriptLengths: Map<string, number>;

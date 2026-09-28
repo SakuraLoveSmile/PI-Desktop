@@ -35,6 +35,10 @@ export const liveVoiceApi = {
   reportControlApplied: (input: { callId: string; actionId: string; applied: boolean; errorCode?: string }) => invoke<{ ok: true }>(IPC.invoke.liveVoiceReportControlApplied, input),
   end: (request: LiveEndRequest) => invoke<{ ok: true }>(IPC.invoke.liveVoiceEnd, request),
   heartbeat: (callId: string) => invoke<{ ok: true }>(IPC.invoke.liveVoiceHeartbeat, { callId }),
+  resolveWorkSelection: (input: { callId: string; selectionRef: string }) => invoke<
+    | { kind: "session"; sessionId: string }
+    | { kind: "project"; projectPath: string }
+  >(IPC.invoke.liveVoiceResolveWorkSelection, input),
   onView: (listener: (view: LiveCallView) => void) => subscribe(IPC.event.liveVoiceChanged, listener),
   onControl: (listener: (event: LiveControlEvent) => void) => subscribe(IPC.event.liveVoiceControl, listener),
   onTranscript: (listener: (event: LiveTranscriptEvent) => void) => subscribe(IPC.event.liveVoiceTranscript, listener),

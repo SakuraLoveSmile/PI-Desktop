@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   codexDelegationFeedback,
+  codexWorkFeedbackMessage,
   geminiSetupMessage,
   geminiToolResponseMessage,
+  geminiWorkFeedbackMessage,
   LIVE_WORK_TOOL_NAME,
   parseLiveWorkArguments,
   parseCodexMessage,
@@ -12,9 +14,42 @@ import {
   realtimeSessionUpdateMessage,
   realtimeTruncateMessages,
   realtimeToolReceiptMessage,
+  realtimeWorkFeedbackMessages,
 } from "./protocol.js";
 
 describe("Live wire profiles", () => {
+  it("encodes bounded Host work feedback without reusing function receipts", () => {
+    const feedback = {
+      feedbackId: "feedback-1",
+      callId: "call-1",
+      workBindingRevision: 2,
+      operationId: "operation-1",
+      kind: "result" as const,
+      delivery: "speak-when-idle" as const,
+      content: "The task completed with a verified result.",
+    };
+    expect(JSON.parse(codexWorkFeedbackMessage("delegation-1", feedback))).toMatchObject({
+      type: "delegation.context.append",
+      delegation_item_id: "delegation-1",
+      channel: "commentary",
+      content: [{ type: "input_text", text: expect.stringContaining(feedback.content) }],
+    });
+    expect(geminiWorkFeedbackMessage(feedback)).toMatchObject({
+      clientContent: { turns: [{ role: "user" }], turnComplete: true },
+    });
+    expect(geminiWorkFeedbackMessage({ ...feedback, delivery: "context-only" })).toMatchObject({
+      clientContent: { turnComplete: false },
+    });
+    expect(realtimeWorkFeedbackMessages(feedback)).toEqual([
+      {
+        type: "conversation.item.create",
+        item: { type: "message", role: "user", content: [{ type: "input_text", text: expect.stringContaining(feedback.content) }] },
+      },
+      { type: "response.create" },
+    ]);
+    expect(realtimeWorkFeedbackMessages({ ...feedback, delivery: "context-only" })).toHaveLength(1);
+  });
+
   it("keeps Codex transcripts visible and answers client delegation without granting execution", () => {
     expect(parseCodexMessage({ type: "output_transcript.added", text: "Hello there." })).toEqual([
       { kind: "transcript", role: "assistant", text: "Hello there.", final: true, id: "codex-output" },

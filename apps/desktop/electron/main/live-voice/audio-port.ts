@@ -9,6 +9,7 @@ export type LivePcmBridge = {
   setMuted(muted: boolean, captureEpoch: number): Promise<void>;
   sendOutput(input: { bytes: Uint8Array; playbackEpoch: number; responseId?: string; itemId?: string; contentIndex?: number }): void;
   reportPlayback(cursors: LivePlaybackCursor[]): void;
+  isPlaybackIdle(): boolean;
   interrupt(): Promise<LivePlaybackCursor[]>;
   requestRelease(): Promise<void>;
   close(): void;
@@ -21,6 +22,7 @@ export type LivePcmBridgeOptions = {
   outputSampleRate: 24000;
   onInput: (bytes: Uint8Array, captureEpoch: number) => void;
   onPlaybackPosition: (cursors: LivePlaybackCursor[]) => void;
+  onPlaybackStateChanged?: () => void;
   onReleased: () => void;
   onFailure: (code: string) => void;
 };
@@ -143,6 +145,7 @@ export function createLivePcmBridge(options: LivePcmBridgeOptions): LivePcmBridg
         outstandingOutputCredits.delete(sequence as number);
         downlinkSamples = Math.max(0, downlinkSamples - creditedSamples);
         outputCredits = Math.min(MAX_OUTPUT_CREDITS, outputCredits + 1);
+        options.onPlaybackStateChanged?.();
         return;
       }
       case "playback-position": {
@@ -165,6 +168,7 @@ export function createLivePcmBridge(options: LivePcmBridgeOptions): LivePcmBridg
         outstandingOutputCredits.clear();
         outputCredits = MAX_OUTPUT_CREDITS;
         outputOffsets.clear();
+        options.onPlaybackStateChanged?.();
         post({ kind: "playback-reset", callId: options.callId, playbackEpoch });
         waiter.resolve(cursors);
         return;
@@ -234,6 +238,7 @@ export function createLivePcmBridge(options: LivePcmBridgeOptions): LivePcmBridg
       offset += data.byteLength / 2;
     }
     outputOffsets.set(key, offset);
+    options.onPlaybackStateChanged?.();
   }
 
   function reportPlayback(cursors: LivePlaybackCursor[]): void {
@@ -269,7 +274,17 @@ export function createLivePcmBridge(options: LivePcmBridgeOptions): LivePcmBridg
     });
   }
 
-  return { portNonce, ready, setMuted, sendOutput, reportPlayback, interrupt, requestRelease, close };
+  return {
+    portNonce,
+    ready,
+    setMuted,
+    sendOutput,
+    reportPlayback,
+    isPlaybackIdle: () => downlinkSamples === 0 && outstandingOutputCredits.size === 0,
+    interrupt,
+    requestRelease,
+    close,
+  };
 }
 
 function parseCursors(value: unknown): LivePlaybackCursor[] | null {

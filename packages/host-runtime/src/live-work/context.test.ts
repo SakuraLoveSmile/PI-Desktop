@@ -86,4 +86,22 @@ describe("buildLiveWorkClassifierInput", () => {
       execution: "completed",
     });
   });
+
+  it("passes bounded opaque selection references without project paths", () => {
+    const selections = Array.from({ length: 20 }, (_, index) => ({
+      selectionRef: `opaque-ref-${index}`,
+      kind: "project" as const,
+      action: "none" as const,
+      label: `Project ${index}`,
+    }));
+    const serialized = buildLiveWorkClassifierInput({
+      candidate: { instruction: "List projects" },
+      snapshot,
+      contextEnabled: false,
+      recentOperations: [{ operationId: "operation-list", admission: "accepted", execution: "not-started", selections }],
+    });
+    expect(new TextEncoder().encode(serialized).byteLength).toBeLessThanOrEqual(12 * 1024);
+    expect(JSON.parse(serialized).availableSelections).toEqual(selections);
+    expect(serialized).not.toContain("/Users/");
+  });
 });

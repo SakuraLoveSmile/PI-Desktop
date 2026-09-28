@@ -1,6 +1,8 @@
 import {
   parseCodexMessage,
   codexDelegationFeedback,
+  codexWorkFeedbackMessage,
+  isPlaybackSignalActive,
 } from "@pi-desktop/voice-runtime/live";
 import type {
   LiveCallView,
@@ -9,6 +11,7 @@ import type {
   LiveTranscriptSegment,
 } from "@pi-desktop/shared";
 import { api } from "../../../lib/api";
+import { useAppStore } from "../../../stores/app-store";
 import { liveVoiceApi, liveError } from "./live-voice-api";
 import { LivePcmSession } from "./live-pcm-session";
 import pcmWorkletUrl from "./pcm-worklet.js?url";
@@ -40,6 +43,11 @@ type StartResources = {
   peer?: RTCPeerConnection;
   channel?: RTCDataChannel;
   audio?: HTMLAudioElement;
+  playbackAnalyser?: AnalyserNode;
+  playbackSource?: MediaElementAudioSourceNode;
+  playbackGain?: GainNode;
+  playbackMonitorFrame?: number;
+  playbackActive?: boolean;
   heartbeat?: ReturnType<typeof setInterval>;
   captureEpoch: number;
   releasePromise?: Promise<void>;
@@ -133,7 +141,7 @@ export class LiveCallController {
       void micRequest.then((stream) => {
         if (resources.abort.signal.aborted || generation !== this.generation) stopStream(stream);
       }).catch(() => undefined);
-      if (selected.adapterId !== "codex-live") {
+      if (selected.adapterId !== "codex-live" || options.workTarget) {
         resources.context = new AudioContext({ sampleRate: 48_000 });
         void resources.context.resume().catch(() => undefined);
       }
@@ -243,6 +251,7 @@ export class LiveCallController {
     const resources = this.resources.get(call.callId);
     if (!resources) return;
     try {
+      await resources.context?.resume();
       await resources.pcm?.resumePlayback();
       await resources.audio?.play();
       await liveVoiceApi.reportMedia({ callId: call.callId, kind: "playback-blocked", blocked: false });
@@ -285,10 +294,12 @@ export class LiveCallController {
       audio.style.width = "1px";
       audio.style.height = "1px";
       audio.style.opacity = "0";
-      audio.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+      const remoteStream = event.streams[0] ?? new MediaStream([event.track]);
+      audio.srcObject = remoteStream;
       document.body.append(audio);
       resources.audio?.remove();
       resources.audio = audio;
+      if (resources.context) this.startPlaybackMonitor(callId, resources, audio);
       void audio.play().then(
         () => liveVoiceApi.reportMedia({ callId, kind: "playback-blocked", blocked: false }).catch(() => undefined),
         () => liveVoiceApi.reportMedia({ callId, kind: "playback-blocked", blocked: true }).catch(() => undefined),
@@ -337,6 +348,64 @@ export class LiveCallController {
     } catch (error) {
       void this.failActive(callId, liveError("LIVE_PROTOCOL_ERROR", String(error)));
     }
+  }
+
+  private startPlaybackMonitor(callId: string, resources: StartResources, audio: HTMLAudioElement): void {
+    this.stopPlaybackMonitor(resources);
+    const context = resources.context;
+    if (!context) return;
+    let source: MediaElementAudioSourceNode | undefined;
+    try {
+      source = context.createMediaElementSource(audio);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1_024;
+      const gain = context.createGain();
+      gain.gain.value = 1;
+      source.connect(analyser);
+      analyser.connect(gain);
+      gain.connect(context.destination);
+      resources.playbackSource = source;
+      resources.playbackAnalyser = analyser;
+      resources.playbackGain = gain;
+      const samples = new Float32Array(analyser.fftSize);
+      const report = (active: boolean) => {
+        if (resources.playbackActive === active) return;
+        resources.playbackActive = active;
+        void liveVoiceApi.reportMedia({ callId, kind: "playback-activity", active, ready: true }).catch(() => undefined);
+      };
+      const sample = () => {
+        if (resources.abort.signal.aborted) return;
+        if (context.state === "closed") {
+          report(true);
+          return;
+        }
+        if (context.state !== "running") report(true);
+        else {
+          analyser.getFloatTimeDomainData(samples);
+          report(isPlaybackSignalActive(samples));
+        }
+        resources.playbackMonitorFrame = requestAnimationFrame(sample);
+      };
+      report(context.state !== "running");
+      resources.playbackMonitorFrame = requestAnimationFrame(sample);
+    } catch {
+      // Preserve audio output, but keep Main fail-closed if monitoring fails.
+      try { source?.connect(context.destination); } catch { /* audio remains unavailable through this context */ }
+      resources.playbackActive = true;
+      void liveVoiceApi.reportMedia({ callId, kind: "playback-activity", active: true, ready: true }).catch(() => undefined);
+      this.stopPlaybackMonitor(resources);
+    }
+  }
+
+  private stopPlaybackMonitor(resources: StartResources): void {
+    if (resources.playbackMonitorFrame !== undefined) cancelAnimationFrame(resources.playbackMonitorFrame);
+    resources.playbackMonitorFrame = undefined;
+    resources.playbackSource?.disconnect();
+    resources.playbackAnalyser?.disconnect();
+    resources.playbackGain?.disconnect();
+    resources.playbackSource = undefined;
+    resources.playbackAnalyser = undefined;
+    resources.playbackGain = undefined;
   }
 
   private readonly handlePortMessage = (event: MessageEvent): void => {
@@ -436,8 +505,65 @@ export class LiveCallController {
       this.sendCodexControl(event.callId, event.actionId, event.delegationId, event.receipt, resources);
       return;
     }
+    if (event.kind === "work-navigation") {
+      const completed = resources.completedControlActions ?? (resources.completedControlActions = new Set());
+      if (completed.has(event.actionId)) {
+        void liveVoiceApi.reportControlApplied({ callId: event.callId, actionId: event.actionId, applied: true });
+        return;
+      }
+      void useAppStore.getState().selectSession(event.sessionId).then(() => {
+        completed.add(event.actionId);
+        while (completed.size > 256) completed.delete(completed.values().next().value as string);
+        return liveVoiceApi.reportControlApplied({ callId: event.callId, actionId: event.actionId, applied: true });
+      }).catch(() => liveVoiceApi.reportControlApplied({
+        callId: event.callId,
+        actionId: event.actionId,
+        applied: false,
+        errorCode: "LIVE_WORK_SESSION_UNAVAILABLE",
+      }));
+      return;
+    }
+    if (event.kind === "work-feedback") {
+      const call = this.snapshot.call;
+      const feedbackBytes = new TextEncoder().encode(event.feedback.content).byteLength;
+      if (
+        !call || call.callId !== event.callId ||
+        call.workBinding?.workBindingRevision !== event.feedback.workBindingRevision ||
+        event.feedback.callId !== event.callId || !event.feedback.feedbackId ||
+        feedbackBytes === 0 || feedbackBytes > 1_200 || !event.delegationId.trim()
+      ) {
+        void liveVoiceApi.reportControlApplied({ callId: event.callId, actionId: event.actionId, applied: false, errorCode: "LIVE_WORK_FEEDBACK_UNDELIVERED" });
+        return;
+      }
+      this.sendCodexWorkFeedback(event.callId, event.actionId, event.delegationId, event.feedback, resources);
+      return;
+    }
     if (event.kind !== "reject-delegation") return;
     this.sendCodexControl(event.callId, event.actionId, event.delegationId, undefined, resources);
+  }
+
+  private sendCodexWorkFeedback(
+    callId: string,
+    actionId: string,
+    delegationId: string,
+    feedback: Extract<LiveControlEvent, { kind: "work-feedback" }>['feedback'],
+    resources: StartResources,
+  ): void {
+    const completed = resources.completedControlActions ?? (resources.completedControlActions = new Set());
+    if (completed.has(actionId)) {
+      void liveVoiceApi.reportControlApplied({ callId, actionId, applied: true });
+      return;
+    }
+    try {
+      const channel = resources.channel;
+      if (!channel || channel.readyState !== "open") throw liveError("LIVE_NETWORK_ERROR");
+      channel.send(codexWorkFeedbackMessage(delegationId, feedback));
+      completed.add(actionId);
+      while (completed.size > 256) completed.delete(completed.values().next().value as string);
+      void liveVoiceApi.reportControlApplied({ callId, actionId, applied: true });
+    } catch (error) {
+      void liveVoiceApi.reportControlApplied({ callId, actionId, applied: false, errorCode: errorCode(error) });
+    }
   }
 
   private sendCodexControl(
@@ -491,6 +617,7 @@ export class LiveCallController {
   private async releaseResourcesOnce(resources: StartResources, notifyMain: boolean): Promise<void> {
     if (resources.heartbeat) clearInterval(resources.heartbeat);
     resources.abort.abort();
+    this.stopPlaybackMonitor(resources);
     resources.stream && stopStream(resources.stream);
     resources.channel?.close();
     resources.peer?.close();

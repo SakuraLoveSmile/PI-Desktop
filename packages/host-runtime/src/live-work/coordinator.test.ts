@@ -39,6 +39,9 @@ function build(input: {
       calls.push(`cancel:${request.queueEntryId}`);
       return { status: "canceled" };
     },
+    listProjects: async (request) => [{ selectionRef: "project-ref", kind: "project", action: request.action, label: "Demo" }],
+    listSessions: async () => [{ selectionRef: "session-ref", kind: "session", action: "open", label: "Demo / Chat" }],
+    openSelection: async () => ({ status: "opened" }),
   };
   let next = 0;
   const coordinator = new LiveWorkCoordinator({
@@ -203,6 +206,9 @@ describe("LiveWorkCoordinator", () => {
         enqueue: async () => ({ queueEntryId: "queue" }),
         stop: async () => ({ status: "unsupported" }),
         cancelQueued: async () => ({ status: "not-found" }),
+        listProjects: async () => [],
+        listSessions: async () => [],
+        openSelection: async () => ({ status: "expired" }),
       },
     });
     delayed.openCall({ callId: "call-1", workSessionId: "session-a", workBindingRevision: 2 });
@@ -214,5 +220,32 @@ describe("LiveWorkCoordinator", () => {
     expect(submitted).toBe(false);
     expect(delayed.listOperations("call-1")).toEqual([]);
     expect(delayed.findOperationByTurn({ sessionId: "session-a", turnId: "late-turn" })).toBeUndefined();
+  });
+
+  it("lists session choices and opens only a call-scoped selection reference", async () => {
+    let selectedRef = "";
+    const subject = build({
+      intent: (request: typeof candidate) => request.providerRequestId === "provider-list"
+        ? { kind: "list-sessions" }
+        : { kind: "open-session", selectionRef: selectedRef },
+    });
+    await subject.coordinator.receiveCandidate({ ...candidate, providerRequestId: "provider-list" }, async () => ({ status: "sent", deliveryId: "receipt-list" }));
+    const listing = subject.coordinator.listOperations("call-1")[0]!;
+    selectedRef = listing.selections?.[0]?.selectionRef ?? "";
+    expect(listing.selections).toEqual([{ selectionRef: "session-ref", kind: "session", action: "open", label: "Demo / Chat" }]);
+
+    await subject.coordinator.receiveCandidate({ ...candidate, providerRequestId: "provider-open" }, async () => ({ status: "sent", deliveryId: "receipt-open" }));
+    expect(subject.coordinator.listOperations("call-1")[1]).toMatchObject({ admission: "accepted", summary: expect.stringContaining("remains bound") });
+    expect(subject.calls.some((call) => call.startsWith("submit:"))).toBe(false);
+  });
+
+  it("creates only a project choice and keeps the active call's bound session unchanged", async () => {
+    const subject = build({ intent: { kind: "create-session" } });
+    await subject.coordinator.receiveCandidate({ ...candidate, providerRequestId: "provider-create" }, async () => ({ status: "sent", deliveryId: "receipt-create" }));
+    expect(subject.coordinator.listOperations("call-1")[0]).toMatchObject({
+      workSessionId: "session-a",
+      selections: [{ selectionRef: "project-ref", kind: "project", action: "create", label: "Demo" }],
+    });
+    expect(subject.calls.some((call) => call.startsWith("submit:"))).toBe(false);
   });
 });

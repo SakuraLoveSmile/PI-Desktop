@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
-import type { LiveDelegationRequest, LiveProviderReceipt, LiveWorkOperationView } from "@pi-desktop/shared";
+import type { LiveDelegationRequest, LiveProviderReceipt, LiveWorkFeedback, LiveWorkOperationView } from "@pi-desktop/shared";
 import { ErrorCodes } from "@pi-desktop/shared";
 import {
   MAX_DELEGATIONS_PER_CALL,
@@ -74,6 +74,18 @@ export function createLiveCallWorkHandlers(deps: Dependencies) {
         });
         return;
       }
+      if (pending.kind === "work-navigation") {
+        pending.resolve?.(input.applied
+          ? { status: "sent", deliveryId: input.actionId }
+          : { status: "not-sent", deliveryId: input.actionId, code: input.errorCode ?? "LIVE_WORK_FEEDBACK_UNDELIVERED" });
+        return;
+      }
+      if (pending.kind === "work-feedback") {
+        pending.resolve?.(input.applied
+          ? { status: "sent", deliveryId: input.actionId }
+          : { status: "not-sent", deliveryId: input.actionId, code: input.errorCode ?? "LIVE_WORK_FEEDBACK_UNDELIVERED" });
+        return;
+      }
       if (!input.applied) {
         slot.notice = { code: ErrorCodes.LIVE_EXECUTION_NOT_CONNECTED, retriable: false };
         deps.publish(slot);
@@ -89,6 +101,55 @@ export function createLiveCallWorkHandlers(deps: Dependencies) {
         ? [...slot.workOperations, operation].slice(-8)
         : slot.workOperations.map((item, index) => index === existing ? operation : item);
       deps.publish(slot);
+    },
+
+    navigateSession(slot: Slot, sessionId: string): Promise<import("./types").LiveReceiptDelivery> {
+      const actionId = randomUUID();
+      if (!sessionId.trim() || sessionId.length > 256 || deps.current() !== slot || !deps.ownerAlive(slot.owner)) {
+        return Promise.resolve({ status: "not-sent", deliveryId: actionId, code: "LIVE_OWNER_UNAVAILABLE" });
+      }
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          const current = deps.current();
+          if (current !== slot || !slot.pendingControls.delete(actionId)) return;
+          resolve({ status: "unknown", deliveryId: actionId, code: "LIVE_CONTROL_ACK_TIMEOUT" });
+        }, REJECTION_ACK_TIMEOUT_MS);
+        slot.pendingControls.set(actionId, { timer, kind: "work-navigation", resolve });
+        try {
+          deps.sendControl(slot.owner, { callId: slot.callId, kind: "work-navigation", actionId, sessionId });
+        } catch {
+          clearTimeout(timer);
+          slot.pendingControls.delete(actionId);
+          resolve({ status: "not-sent", deliveryId: actionId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" });
+        }
+      });
+    },
+
+    sendWorkFeedback(slot: Slot, delegationId: string, feedback: LiveWorkFeedback): Promise<import("./types").LiveReceiptDelivery> {
+      const actionId = randomUUID();
+      if (
+        !delegationId.trim() || delegationId.length > 256 || !slot.workBinding ||
+        feedback.callId !== slot.callId || feedback.workBindingRevision !== slot.workBinding.workBindingRevision ||
+        Buffer.byteLength(feedback.content, "utf8") === 0 || Buffer.byteLength(feedback.content, "utf8") > 1_200 ||
+        deps.current() !== slot || !deps.ownerAlive(slot.owner)
+      ) {
+        return Promise.resolve({ status: "not-sent", deliveryId: actionId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" });
+      }
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          const current = deps.current();
+          if (current !== slot || !slot.pendingControls.delete(actionId)) return;
+          resolve({ status: "unknown", deliveryId: actionId, code: "LIVE_CONTROL_ACK_TIMEOUT" });
+        }, REJECTION_ACK_TIMEOUT_MS);
+        slot.pendingControls.set(actionId, { timer, kind: "work-feedback", resolve });
+        try {
+          deps.sendControl(slot.owner, { callId: slot.callId, kind: "work-feedback", actionId, delegationId, feedback });
+        } catch {
+          clearTimeout(timer);
+          slot.pendingControls.delete(actionId);
+          resolve({ status: "not-sent", deliveryId: actionId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" });
+        }
+      });
     },
   };
 }

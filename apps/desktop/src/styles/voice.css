@@ -191,6 +191,20 @@
   min-width: 0;
 }
 
+.live-voice-work-selections {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.live-voice-work-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
 .live-voice-work-summary {
   color: var(--ds-text-secondary);
   overflow-wrap: anywhere;

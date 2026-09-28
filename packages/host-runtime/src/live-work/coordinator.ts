@@ -1,5 +1,6 @@
 import { LiveWorkOperationLedger, type LiveWorkOperation } from "./operation-ledger.js";
 import { parseLiveWorkIntent, type LiveWorkIntent } from "./intent.js";
+import type { LiveWorkSelectionOption } from "@pi-desktop/shared";
 
 export type WorkSnapshot = {
   sessionId: string;
@@ -22,6 +23,9 @@ export interface LiveWorkPort {
   enqueue(input: { sessionId: string; text: string; userMessageId: string; voiceOrigin: { callId: string; operationId: string }; idempotencyKey: string }): Promise<{ queueEntryId: string }>;
   stop(input: { callId: string; sessionId: string; expectedTurnId: string; urgency: "graceful" | "immediate" }): Promise<{ status: "requested" | "already-terminal" | "stale-target" | "unsupported" }>;
   cancelQueued(input: { callId: string; sessionId: string; queueEntryId: string }): Promise<{ status: "canceled" | "already-delivered" | "not-found" | "unknown" }>;
+  listProjects(input: { callId: string; workBindingRevision: number; query?: string; action: "none" | "create" }): Promise<LiveWorkSelectionOption[]>;
+  listSessions(input: { callId: string; workBindingRevision: number; query?: string }): Promise<LiveWorkSelectionOption[]>;
+  openSelection(input: { callId: string; workBindingRevision: number; selectionRef: string }): Promise<{ status: "opened" | "ambiguous" | "expired" | "unavailable" }>;
 }
 
 export type LiveWorkCandidate = {
@@ -51,10 +55,11 @@ export type LiveWorkCoordinatorOptions = {
   resolveIntent: (input: {
     candidate: LiveWorkCandidate;
     snapshot: WorkSnapshot;
-    recentOperations: Array<Pick<LiveWorkOperation, "operationId" | "instruction" | "admission" | "execution">>;
+    recentOperations: Array<Pick<LiveWorkOperation, "operationId" | "instruction" | "admission" | "execution" | "selections">>;
   }) => Promise<unknown>;
   workPort: LiveWorkPort;
   onOperation?: (update: LiveWorkOperationUpdate) => void;
+  onAnnouncementPolicy?: (input: { callId: string; policy: "normal" | "silent" }) => void;
   now?: () => number;
   classifyTimeoutMs?: number;
 };
@@ -186,7 +191,10 @@ export class LiveWorkCoordinator {
     const call = this.calls.get(input.callId);
     const operation = call?.ledger.getByOperationId(input.operationId);
     if (!call || !operation || operation.workSessionId !== call.workSessionId) return;
-    call.ledger.update(operation.providerRequestId, { summary: input.summary.slice(0, 480) });
+    call.ledger.update(operation.providerRequestId, {
+      summary: input.summary.slice(0, 480),
+      resultSummary: input.summary.slice(0, 480),
+    });
     this.publish(call, operation.providerRequestId, input.summary.slice(0, 480));
   }
 
@@ -258,17 +266,21 @@ export class LiveWorkCoordinator {
     const recentOperations = call.ledger.values()
       .filter((item) => item.providerRequestId !== candidate.providerRequestId)
       .slice(-8)
-      .map(({ operationId, instruction, admission, execution }) => ({ operationId, instruction, admission, execution }));
+      .map(({ operationId, instruction, admission, execution, selections }) => ({ operationId, instruction, admission, execution, ...(selections ? { selections } : {}) }));
     const rawIntent = await this.withTimeout(
       this.options.resolveIntent({ candidate, snapshot: initial, recentOperations }),
       this.classifyTimeoutMs,
     ).catch(() => null);
     const intent = parseLiveWorkIntent(rawIntent);
     if (!intent) {
+      call.ledger.update(candidate.providerRequestId, {
+        intent: { kind: "clarify", question: "I could not confirm what you want me to do. Please clarify." },
+      });
       this.reject(call, candidate.providerRequestId, "I could not confirm what you want me to do. Please clarify.");
       return;
     }
     if (call.closed) return;
+    call.ledger.update(candidate.providerRequestId, { intent });
     if (intent.kind === "conversation") {
       this.acceptWithoutExecution(call, candidate.providerRequestId, "This is a Live conversation; no work was started.");
       return;
@@ -278,6 +290,7 @@ export class LiveWorkCoordinator {
       return;
     }
     if (intent.kind === "speech-only") {
+      this.options.onAnnouncementPolicy?.({ callId: candidate.callId, policy: intent.automaticAnnouncements });
       this.acceptWithoutExecution(call, candidate.providerRequestId, "Announcement preference updated for this call.");
       return;
     }
@@ -335,8 +348,63 @@ export class LiveWorkCoordinator {
       } else this.reject(call, candidate.providerRequestId, "That queued operation has already been delivered or is unavailable.");
       return;
     }
-    if (intent.kind === "list-projects" || intent.kind === "list-sessions" || intent.kind === "open-session" || intent.kind === "create-session") {
-      this.reject(call, candidate.providerRequestId, "Session navigation requires an explicit desktop selection.");
+    if (intent.kind === "list-projects" || intent.kind === "list-sessions") {
+      const selections = intent.kind === "list-projects"
+        ? await this.options.workPort.listProjects({
+            callId: candidate.callId,
+            workBindingRevision: candidate.workBindingRevision,
+            ...(intent.query ? { query: intent.query } : {}),
+            action: "none",
+          })
+        : await this.options.workPort.listSessions({
+            callId: candidate.callId,
+            workBindingRevision: candidate.workBindingRevision,
+            ...(intent.query ? { query: intent.query } : {}),
+          });
+      call.ledger.update(candidate.providerRequestId, { selections });
+      this.acceptWithoutExecution(call, candidate.providerRequestId, selections.length
+        ? "I found matching projects or sessions. Choose an item in the Live panel to open or use it."
+        : "No matching projects or sessions were found.");
+      return;
+    }
+    if (intent.kind === "open-session") {
+      const selection = call.ledger.values().flatMap((item) => item.selections ?? [])
+        .find((item) => item.kind === "session" && item.selectionRef === intent.selectionRef);
+      if (!selection) {
+        this.reject(call, candidate.providerRequestId, "That session choice expired. Ask to list sessions again.");
+        return;
+      }
+      if (selection.duplicateLabel) {
+        this.reject(call, candidate.providerRequestId, "Several sessions have the same label. Choose the intended session in the Live panel.");
+        return;
+      }
+      const result = await this.options.workPort.openSelection({
+        callId: candidate.callId,
+        workBindingRevision: candidate.workBindingRevision,
+        selectionRef: intent.selectionRef,
+      });
+      if (result.status === "opened") this.acceptWithoutExecution(call, candidate.providerRequestId, "Opened the selected session. The work call remains bound to its original session.");
+      else if (result.status === "ambiguous") this.reject(call, candidate.providerRequestId, "Several sessions have the same label. Choose the intended session in the Live panel.");
+      else this.reject(call, candidate.providerRequestId, "That session choice expired or is no longer available. Ask to list sessions again.");
+      return;
+    }
+    if (intent.kind === "create-session") {
+      const availableProjects = call.ledger.values().flatMap((item) => item.selections ?? [])
+        .filter((item) => item.kind === "project");
+      const selectedProject = intent.projectRef
+        ? availableProjects.find((item) => item.selectionRef === intent.projectRef)
+        : undefined;
+      const selections = selectedProject
+        ? [{ ...selectedProject, action: "create" as const }]
+        : await this.options.workPort.listProjects({
+            callId: candidate.callId,
+            workBindingRevision: candidate.workBindingRevision,
+            action: "create",
+          });
+      call.ledger.update(candidate.providerRequestId, { selections });
+      this.acceptWithoutExecution(call, candidate.providerRequestId, selections.length
+        ? "Choose a registered project in the Live panel to create a session. This will not change the current work-call binding."
+        : "No registered projects are available for a new session.");
       return;
     }
 
@@ -445,7 +513,7 @@ export class LiveWorkCoordinator {
       call.ledger.update(providerRequestId, { summary: message.slice(0, 480) });
     }
     const operation = call.ledger.get(providerRequestId);
-    if (operation) this.options.onOperation?.({ operation, ...(message ? { message } : {}) });
+    if (operation) this.options.onOperation?.({ operation, ...(operation.intent ? { intent: operation.intent } : {}), ...(message ? { message } : {}) });
   }
 
   private updateMatchingTurn(

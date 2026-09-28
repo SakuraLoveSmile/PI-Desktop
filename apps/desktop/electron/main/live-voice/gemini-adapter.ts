@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { LiveBinding } from "@pi-desktop/shared";
-import { geminiAudioEndMessage, geminiAudioMessage, geminiSetupMessage, geminiToolResponseMessage, geminiWorkToolDeclaration, MAX_LIVE_AUDIO_BYTES, MAX_LIVE_JSON_BYTES, parseGeminiMessage, parseLiveWorkArguments, LIVE_WORK_TOOL_NAME } from "@pi-desktop/voice-runtime/live";
-import type { LiveAdapter, LiveAdapterContext } from "./types";
+import { geminiAudioEndMessage, geminiAudioMessage, geminiSetupMessage, geminiToolResponseMessage, geminiWorkFeedbackMessage, geminiWorkToolDeclaration, MAX_LIVE_AUDIO_BYTES, MAX_LIVE_JSON_BYTES, parseGeminiMessage, parseLiveWorkArguments, LIVE_WORK_TOOL_NAME } from "@pi-desktop/voice-runtime/live";
+import type { LiveAdapter, LiveAdapterContext, LiveReceiptDelivery } from "./types";
+import type { LiveWorkFeedback } from "@pi-desktop/shared";
 import { openLiveWebSocket } from "./websocket-transport";
 import { sendJsonBounded, waitForReady, waitForSocketReady, websocketJson } from "./websocket-wire";
 import { WebSocket } from "ws";
@@ -129,6 +130,18 @@ export function createGeminiAdapter(context: LiveAdapterContext): LiveAdapter {
     async setInputMuted(nextMuted) {
       muted = nextMuted;
       if (nextMuted && socket?.readyState === WebSocket.OPEN) sendJsonBounded(socket, geminiAudioEndMessage());
+    },
+    async appendWorkFeedback(feedback: LiveWorkFeedback): Promise<LiveReceiptDelivery> {
+      const deliveryId = randomUUID();
+      if (!context.workProfile || feedback.callId !== context.callId || !socket || socket.readyState !== WebSocket.OPEN) {
+        return { status: "not-sent", deliveryId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" };
+      }
+      try {
+        sendJsonBounded(socket, geminiWorkFeedbackMessage(feedback));
+        return { status: "sent", deliveryId };
+      } catch {
+        return { status: "not-sent", deliveryId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" };
+      }
     },
     async close() {
       if (closed) return;

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { LiveBinding } from "@pi-desktop/shared";
-import { LIVE_WORK_TOOL_NAME, MAX_LIVE_AUDIO_BYTES, MAX_LIVE_JSON_BYTES, parseLiveWorkArguments, parseRealtimeMessage, RealtimeResponseTracker, realtimeAudioMessage, realtimeSessionMatches, realtimeSessionUpdateMessage, realtimeToolReceiptMessage, realtimeTruncateMessages } from "@pi-desktop/voice-runtime/live";
-import type { LiveAdapter, LiveAdapterContext, LivePlaybackCursor } from "./types";
+import { LIVE_WORK_TOOL_NAME, MAX_LIVE_AUDIO_BYTES, MAX_LIVE_JSON_BYTES, parseLiveWorkArguments, parseRealtimeMessage, RealtimeResponseTracker, realtimeAudioMessage, realtimeSessionMatches, realtimeSessionUpdateMessage, realtimeToolReceiptMessage, realtimeTruncateMessages, realtimeWorkFeedbackMessages } from "@pi-desktop/voice-runtime/live";
+import type { LiveAdapter, LiveAdapterContext, LivePlaybackCursor, LiveReceiptDelivery } from "./types";
+import type { LiveWorkFeedback } from "@pi-desktop/shared";
 import { openLiveWebSocket } from "./websocket-transport";
 import { sendJsonBounded, waitForReady, waitForSocketReady, websocketJson } from "./websocket-wire";
 import { WebSocket } from "ws";
@@ -193,6 +194,18 @@ export function createOpenAIRealtimeAdapter(context: LiveAdapterContext): LiveAd
         const messages = realtimeTruncateMessages({ itemId: cursor.itemId, contentIndex: cursor.contentIndex, audioEndMs: cursor.playedSamples * 1000 / cursor.sampleRate });
         // Local playback is already stopped; send the measured interruption cursor upstream.
         sendJsonBounded(socket, messages[1]);
+      }
+    },
+    async appendWorkFeedback(feedback: LiveWorkFeedback): Promise<LiveReceiptDelivery> {
+      const deliveryId = randomUUID();
+      if (!context.workProfile || feedback.callId !== context.callId || !configured || !socket || socket.readyState !== WebSocket.OPEN) {
+        return { status: "not-sent", deliveryId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" };
+      }
+      try {
+        for (const message of realtimeWorkFeedbackMessages(feedback)) sendJsonBounded(socket, message);
+        return { status: "sent", deliveryId };
+      } catch {
+        return { status: "not-sent", deliveryId, code: "LIVE_WORK_FEEDBACK_UNDELIVERED" };
       }
     },
     async close() {

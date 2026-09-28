@@ -56,16 +56,25 @@
   admission and `voiceOrigin`. Exercise a busy independent request through the
   Host queue, a stale steer, an exact-turn stop, and a terminal event arriving
   before the submit promise resolves. Query a recorded terminal result and
-  verify the query does not create another Host turn. End the Live call after
-  Host admission.
+  verify the query does not create another Host turn. Request project/session
+  lists, verify they contain labels and opaque call-scoped references only,
+  open a listed session, and create a session from a listed project through
+  the panel action. Confirm both actions leave the active work binding fixed.
+  Queue a result while provider generation, user speech, and local playback are
+  active; verify it is sent only after all three are idle and the quiet window
+  passes. Exercise silent mode, an explicit query while silent, and stale
+  feedback downgrade. End the Live call after Host admission.
 - **Expected:** Work remains bound to the originally selected local session;
   no prior messages are read when context sharing is disabled; the existing
   AgentHost performs prompt, steer, queue, and stop operations; duplicate
   provider IDs do not dispatch twice; terminal state comes from Host events;
   result queries project only the exact operation summary; ending Live does
-  not cancel accepted work. Results remain visible in the work panel, while
-  automatic provider terminal-result feedback and model-driven navigation
-  remain unavailable until their separate acceptance work is complete.
+  not cancel accepted work. Project/session choices never expose raw paths or
+  IDs, selection references expire and remain call-scoped, opening is
+  navigation only, and creating requires a listed project plus a panel action.
+  Automatic feedback observes provider speaking state and local playback
+  activity, while task execution and feedback delivery remain separate. A
+  renderer signal is not evidence that a person heard the result.
 - **Coverage:** `apps/desktop/test/live-voice-service.test.mjs` covers voice-only
   rejection and explicit work-scope forwarding. `packages/host-runtime/src/live-work/coordinator.test.ts`
   covers receipt ordering, routing, stale steer, replay, call close, and early
@@ -74,9 +83,15 @@
   covers history-free state, queue insertion, and voice provenance.
   `packages/voice-runtime/src/live/protocol.test.ts` covers provider-specific
   tool declarations and receipts. `packages/host-runtime/src/live-work/result-summary.test.ts`
-  covers exact-turn summary projection and honest fallbacks. This is targeted
-  automated coverage, not the complete W2-001—W2-096 matrix or real-provider
-  E2E.
+  covers exact-turn summary projection and honest fallbacks. The
+  `LiveWorkFeedbackScheduler` tests cover debounce, speech spacing, silent
+  mode, stale downgrade, deduplication, and overflow; desktop service tests
+  cover provider/user/local playback gating and separate delivery status.
+  `apps/desktop/test/live-work-scope.test.mjs` covers selection reference
+  scope/expiry, and `live-work-operations.test.mjs` covers the panel actions.
+  `voice-runtime/src/live/playback-monitor.test.ts` covers local audio signal
+  detection. This is targeted automated coverage, not the complete
+  W2-001—W2-096 matrix or real-provider E2E.
 - **Status:** Partial; remaining scenarios and the real-device matrix are
   tracked in `docs/implementation/live-work-evidence.md`.
 - **Specs:** [live-work-session](../03-runtime/live-work-session.md),

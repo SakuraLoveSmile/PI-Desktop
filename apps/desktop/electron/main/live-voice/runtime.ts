@@ -49,6 +49,10 @@ export function createLiveCallService(input: {
     getHost: input.getHost,
     getAgentHostBridge: input.getAgentHostBridge,
     vendorOAuth: input.vendorOAuth,
+    navigateSession: (callId, sessionId) => {
+      if (!liveCallService) return Promise.reject(Object.assign(new Error("Live call service is unavailable"), { errorCode: "LIVE_WORK_NOT_READY" }));
+      return liveCallService.navigateWorkSession(callId, sessionId);
+    },
     resolveAgentRuntimeLaunch: input.resolveAgentRuntimeLaunch,
     onOperation: (callId, update) => {
       const operation = update.operation;
@@ -59,8 +63,10 @@ export function createLiveCallService(input: {
         ...(operation.turnId ? { turnId: operation.turnId } : {}),
         ...(operation.queueEntryId ? { queueEntryId: operation.queueEntryId } : {}),
         ...(operation.summary ? { summary: operation.summary } : {}),
-      });
+        ...(operation.selections ? { selections: operation.selections } : {}),
+      }, operation.providerRequestId, operation.resultSummary, update.intent);
     },
+    onAnnouncementPolicy: ({ callId, policy }) => liveCallService?.setWorkAnnouncementPolicy(callId, policy),
   });
 
   liveCallService = new LiveCallService({
@@ -95,6 +101,7 @@ export function createLiveCallService(input: {
     },
     openWorkScope: (callId, binding) => workBridge.openCall({ ...binding, callId }),
     closeWorkScope: workBridge.closeCall,
+    resolveWorkSelection: workBridge.resolveSelection,
     receiveWorkCandidate: workBridge.receiveCandidate,
     createAdapter: (context) => {
       switch (context.binding.adapterId) {
