@@ -357,7 +357,7 @@ export function Composer({
   );
   // A draft without a session starts at the selected model's stored default
   // thinking level, clamped onto that binding's enabled ladder.
-  const draftThinkingLevel = selectedModelInfo
+  const draftThinkingLevel = selectedModelInfo?.catalogSource === "models.dev"
     ? initialThinkingLevelForBinding(
         selectedBinding,
         thinkingProvider?.supportedThinkingLevels,
@@ -379,7 +379,7 @@ export function Composer({
   );
   const thinkingLabel = thinkingLevel;
   const modelLabel = modelId
-    ? composerModelDisplayName(provider, modelId, selectedModelInfo?.displayName)
+    ? composerModelDisplayName(provider, modelId)
     : t("chat.model");
   const modelMenu = useComposerModelMenu({
     configureActiveSession,
