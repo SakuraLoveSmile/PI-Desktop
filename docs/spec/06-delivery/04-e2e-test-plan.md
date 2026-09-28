@@ -15279,6 +15279,27 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Status**: Covered by the existing HTTP client integration fixture and a
   focused component-render validation; no live IDA process required.
 
+### E2E-MCP-HTTP-SSE-held-open — A streamable HTTP reply lands before the server ends the stream (issue #1188)
+
+- **Preconditions**: A local mock Streamable HTTP server writes its JSON-RPC
+  reply immediately and keeps the `text/event-stream` body open well past the
+  client's handshake budget — the shape `https://gitmcp.io/docs` shows, where
+  initialize is answered in about two seconds and the stream only ends about
+  twelve seconds later. No provider credentials needed.
+- **Steps**: Configure that server with the `http` transport and a handshake
+  budget shorter than the stream lifetime; connect, discover the tools, and call
+  one. Repeat with a server that keeps the stream open and never answers.
+- **Expected**: Handshake, discovery, and the call complete as soon as their
+  reply event arrives, so the connection reports `ready` with the discovered
+  tools instead of `mcp initialize timed out after <budget>ms`. A server that
+  never replies still fails with `TIMEOUT` inside the same budget, and a stream
+  left open past its request is aborted rather than kept open.
+- **Specs**: 07-plugins/01-plugin-system §12.2; ADR 0038.
+- **Acceptance**: HTTP transport integration and the main-process MCP handshake.
+- **Milestone**: Maintenance.
+- **Status**: Automated by `apps/desktop/test/plugin-mcp.test.mjs` (held-open
+  reply case); no live app process required.
+
 ### E2E-IMAGE-generation-and-editing
 
 - **Preconditions:** Built task candidate containing latest origin/main; isolated
