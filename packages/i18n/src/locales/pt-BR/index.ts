@@ -773,8 +773,8 @@ export const ptBR = {
       zoomIn: "Aumentar zoom",
       zoomOut: "Diminuir zoom",
       toggleFullScreen: "Alternar tela completa",
-      voiceToggle: "Alternar entrada de voz",
-      voiceCancel: "Cancelar entrada de voz"
+      voiceToggle: "Alternar Voz em Tempo Real",
+      voiceCancel: "Cancelar início da Voz em Tempo Real"
     },
     skills: "Habilidades",
     skillsGlobalPath: "Caminho global de habilidades",

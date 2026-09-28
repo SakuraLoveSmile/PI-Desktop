@@ -31,6 +31,10 @@ export function LiveVoiceControls({ t }: { t: TFunction }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
+  useEffect(() => {
+    if (snapshot.starting) setOpen(true);
+  }, [snapshot.starting]);
+
   const closePanel = () => {
     setOpen(false);
     triggerRef.current?.focus();

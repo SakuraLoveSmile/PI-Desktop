@@ -13,23 +13,33 @@
 - **Preconditions:** Isolated desktop profile with Live Voice enabled and one
   fixture provider binding. Use a deterministic local protocol fixture; do not
   use a real provider account or paid endpoint for automation.
-- **Steps:** Open Voice settings, bind/select a fixture account for each
-  supported adapter profile, then open the Composer Live controls. Start,
-  cancel during permission/startup, connect, mute/unmute, interrupt playback,
-  inspect in-memory transcript, and end. Repeat with Dictation already holding
-  the microphone, a changed active binding, a provider credential removal,
-  renderer hide/reload, and a rejected playback gesture.
-- **Expected:** Live is off by default; old Dictation settings keep their
-  values; only the selected Provider ID is used; secrets do not enter Renderer;
+- **Steps:** Open Voice settings and confirm only Live Voice controls are
+  visible; legacy Dictation toggles, microphone selection and transcription
+  model controls are absent. Confirm the Composer shows Live controls without
+  the old Dictation microphone button. Bind/select a fixture account for each
+  supported adapter profile. In Settings → Shortcuts, customize the Live Voice
+  toggle and use it to start then end a fixture call. Cancel a pending startup
+  with the `voiceCancel` binding (default `Escape`); pressing `Escape` during a
+  connected call must not end it. Restore the default, then start, cancel during
+  permission/startup, connect, mute/unmute, interrupt playback, inspect the
+  in-memory transcript, and end. Repeat with Dictation already holding the
+  microphone, a changed active binding, a provider credential removal, renderer
+  hide/reload, and a rejected playback gesture.
+- **Expected:** Live is off by default; persisted Dictation settings remain
+  unchanged but are not exposed in the UI; only the selected Provider ID is used;
+  secrets do not enter Renderer;
   no Agent, MCP, shell or file action runs; mute gates new input immediately;
   cancellation stops late media; the transcript is not persisted; every end
   path releases media and background-throttling leases or quarantines an
   unconfirmed microphone lease. A new call starts only after explicit user
   action.
 - **Specs:** [03-runtime/live-voice.md](../03-runtime/live-voice.md),
-  [03-runtime/20-speech.md](../03-runtime/20-speech.md).
+  [03-runtime/20-speech.md](../03-runtime/20-speech.md),
+  [04-ux/09-interaction-patterns.md](../04-ux/09-interaction-patterns.md).
 - **Acceptance:** Adapter setup and event parsing are local fixtures; Main
   lifecycle, owner, lease and settings behavior are covered by targeted tests.
+  `apps/desktop/test/live-voice-shortcuts.test.mjs` covers the configurable
+  toggle/cancel actions, including that Escape never ends a connected call.
   The full Electron flow and real-provider/device compatibility remain
   unverified until their respective isolated acceptance environments are run.
 

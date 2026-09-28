@@ -79,13 +79,15 @@ stops all local tracks, playback and ports before releasing the lease.
 
 ## Settings and compatibility
 
-The Voice settings page lets the user bind an existing compatible Provider,
-choose the next-call binding, and set model, voice and Realtime profile. A
-currently active binding cannot be rewritten while its call is running. Turning
-Live Voice off ends the call. Provider credentials stay in the existing
-Provider/secret or VendorOAuth systems. Old settings with no `liveVoice` value
-read as disabled with no bindings; Dictation settings are preserved on every
-write and read.
+The Voice settings destination exposes only Live Voice: users can bind an
+existing compatible Provider, choose the next-call binding, and set model, voice
+and Realtime profile. A currently active binding cannot be rewritten while its
+call is running. Turning Live Voice off ends the call. Provider credentials stay
+in the existing Provider/secret or VendorOAuth systems. Legacy local Dictation
+settings and its Composer entry are hidden; existing `voice` values and the
+underlying Dictation capability remain unchanged and are not deleted or rewritten
+by the UI. Old settings with no `liveVoice` value read as disabled with no
+bindings.
 
 Live DTOs and IPC contracts live in `packages/shared`. Pure wire parsing and
 PCM math are exported only from `@pi-desktop/voice-runtime/live`; they do not
