@@ -6145,6 +6145,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `provider-retry.test.ts`, `runtime.test.ts`, `subagent.test.ts`.
   Other scenario variants remain Draft.
 
+#### E2E-1174: Return a paired tool denial in Plan/Goal
+
+- Seed earlier tool-call history, then switch an Agent session to Plan or Goal.
+  A loopback Responses gateway emits Edit, Write or Task only if that tool is
+  declared in the request; an undeclared name would cause a 502.
+- Verify all six mode/tool combinations reach the normal tool-result path:
+  the next request contains the original call id and a mode-denial error,
+  preserves old call/result pairs, and adds no synthetic user correction.
+- Assert that no host call occurs and no delegate starts. The tool event is an
+  error while the model can continue with a read-only answer.
+- A handler reference retained from Agent must refuse execution after Plan/Goal
+  is entered; switching back to Agent restores the normal permission path.
+- Automation: `mode-tool-access.test.ts` runs real runtime/SDK loops against a
+  loopback HTTP/SSE fixture; `runtime.test.ts` covers catalog/mode transitions.
+  Existing host permission tests keep Write/Edit denied regardless of grants or
+  permission mode. No paid provider or user Desktop profile is used.
+
 #### E2E-149: Recover provider rate limits (429) silently in place
 
 - **Preconditions**: A project-bound Agent session uses deterministic provider
