@@ -1,13 +1,17 @@
+import type { Dispatch, SetStateAction } from "react";
+import type { TFunction } from "i18next";
 import {
   keybindingDisplayParts,
   type Mode,
   type PermissionMode,
-  type SessionThinkingLevel,
   type ShortcutPlatform,
+  type SessionThinkingLevel,
 } from "@pi-desktop/shared";
-import type { TFunction } from "i18next";
-import type { Dispatch, SetStateAction } from "react";
+import type { AppState } from "../../../stores/app-store";
+import { ComposerPermissionPicker } from "./ComposerPermissionPicker";
 import { ContextUsageInspector } from "../../../components/ContextUsageInspector";
+import { ComposerControlSlots } from "./ComposerControlSlots";
+import { TooltipButton } from "../../../components/ui";
 import {
   IconArrowUp,
   IconPlus,
@@ -15,17 +19,14 @@ import {
   IconStop,
   IconUndo2,
 } from "../../../components/icons";
-import { TooltipButton } from "../../../components/ui";
-import type { AppState } from "../../../stores/app-store";
-import { LiveVoiceControls } from "../../voice/live/LiveVoiceControls";
 import { ModeIcon } from "./ComposerModeIcon";
+import { LiveVoiceControls } from "../../voice/live/LiveVoiceControls";
 import { ComposerModelPicker } from "./ComposerModelPicker";
-import { ComposerPermissionPicker } from "./ComposerPermissionPicker";
-import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
 import {
   MODE_LABEL_KEYS,
   nextMode,
 } from "./model";
+import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
 
 type ModelMenuController = ReturnType<typeof useComposerModelMenu>;
 type ContextUsage = Parameters<typeof ContextUsageInspector>[0];
@@ -173,9 +174,11 @@ export function ComposerToolbar({
                   });
                 }
           }} />
+        <ComposerControlSlots side="left" />
       </div>
 
       <div className="composer-right">
+        <ComposerControlSlots side="right" />
         {contextUsage ? <ContextUsageInspector {...contextUsage} /> : null}
         <ComposerModelPicker
           t={t}
