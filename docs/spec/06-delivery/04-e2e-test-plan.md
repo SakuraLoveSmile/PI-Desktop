@@ -10876,6 +10876,29 @@ This test plan spec is accepted when:
 - **Milestone**: M6+
 - **Status**: Draft. Required suites: `test:e2e`, `test:e2e:subagents`.
 
+#### E2E-SUBAGENT-output-token-limit-is-a-visible-failure
+
+- **Preconditions**: An Agent session uses a deterministic local provider whose
+  response ends with `stopReason: "length"` or `"max_tokens"` after emitting
+  non-empty assistant text. The delegate has a valid report and no pending
+  tool call.
+- **Steps**: 1) Delegate the task and let the provider end at its output-token
+  limit. 2) Read the Task result, lifecycle details, and delegation card. 3)
+  Resume or retry the same work with a provider response that ends normally.
+- **Expected**: The first run settles as `failed`, not `completed`, with
+  `SUBAGENT_OUTPUT_TRUNCATED` and `outputTruncated: true`. The parent receives
+  an explicit explanation and the bounded partial report under `Its last
+  output was:`. A later turn that ends with `stop` clears the marker and
+  settles as `completed`; the partial run never masquerades as a finished
+  report.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f,
+  `03-runtime/08-error-codes.md` §3.2
+- **Acceptance**: C (conversation), H (diagnostics), Quality
+- **Milestone**: M6+
+- **Status**: Unit covered by `packages/agent-runtime/src/subagent.test.ts`;
+  the full desktop journey remains required: `test:e2e`,
+  `test:e2e:subagents`.
+
 #### E2E-SUBAGENT-context-overflow-reports-actionable-failure
 
 - **Preconditions**: The same injected small-window fake provider, sized so
