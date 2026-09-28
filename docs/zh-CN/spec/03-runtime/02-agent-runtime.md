@@ -888,6 +888,15 @@ agent 运行时的职责，与官方 Pi 编码 agent 的归属层保持一致；
 上。该请求携带会话自己的对话 id，而不是 harness 否则会生成的按次 id，这样摘要
 就与它所压缩的对话落在同一个网关后端。
 
+同一接缝也会补回对话标识本身：pi-agent-core 对摘要请求要求
+`cacheRetention: "none"`，而 Responses 形状的适配器据此不发送
+`prompt_cache_key`，于是只有摘要请求会丢掉其他回合都会携带的身份；对接 Codex
+后端的网关会以 400 `invalid_responses_request` 拒绝这种请求。因此对
+`openai-responses` 与 `openai-codex-responses`，摘要载荷会带上会话 id 作为
+`prompt_cache_key`（按适配器的 64 字符上限截断），除非适配器或调用方已设置过。
+其他线协议的载荷保持适配器构造的原样；该键添加在副本上，因此调用方的载荷钩子仍
+保留自己的对象，其返回值仍然生效。
+
 
 ## 7. 系统提示组成
 
