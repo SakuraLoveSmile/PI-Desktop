@@ -48,8 +48,11 @@ test("deleting a session drops its queued outbox entries (D318)", async () => {
     () => null,
   );
   assert.equal(outbox.size(), 2);
+  assert.equal(outbox.size("keep"), 1);
+  assert.equal(outbox.size("gone"), 1);
   await outbox.dropSession("gone");
   assert.equal(outbox.size(), 1);
+  assert.equal(outbox.size("gone"), 0);
   const stored = JSON.parse(await readFile(join(dir, "session-message-outbox.json"), "utf8"));
   assert.deepEqual(
     stored.map((entry) => entry.sessionId),
