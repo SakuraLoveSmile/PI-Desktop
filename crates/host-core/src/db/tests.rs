@@ -237,7 +237,7 @@ fn v20_database_migrates_to_v21_and_completes_goal_and_team_schema() {
     }
 
     let db = Database::open(&path).unwrap();
-    assert_eq!(schema_version(db.conn()), 21);
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
     assert!(migration_backup_path(&path, 20).exists());
     assert!(table_exists(db.conn(), "goal_reports"));
 
@@ -263,6 +263,57 @@ fn v20_database_migrates_to_v21_and_completes_goal_and_team_schema() {
     for table in &["teams", "team_members", "team_tasks"] {
         assert!(table_exists(db.conn(), table), "missing table {table}");
     }
+}
+
+#[test]
+fn v21_plan_proposal_survives_v22_migration() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO sessions (id, created_at, updated_at) VALUES ('s1', 1, 1)",
+                [],
+            )
+            .unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO plan_approvals (
+                    request_id, session_id, turn_id, tool_call_id, kind, plan_json,
+                    status, created_at, updated_at
+                 ) VALUES ('p1', 's1', 't1', 'c1', 'plan', '# Saved plan', 'rejected', 1, 1)",
+                [],
+            )
+            .unwrap();
+        db.conn()
+            .execute_batch(
+                "DROP TABLE plan_execution_schedules;
+                 ALTER TABLE plan_approvals DROP COLUMN execution_provider_id;
+                 ALTER TABLE plan_approvals DROP COLUMN execution_model_id;
+                 ALTER TABLE plan_approvals DROP COLUMN revision_intent_json;
+                 ALTER TABLE plan_approvals DROP COLUMN revision_state;
+                 ALTER TABLE plan_approvals DROP COLUMN revision_turn_id;
+                 ALTER TABLE plan_approvals DROP COLUMN revision_error_code;
+                 PRAGMA user_version = 21;",
+            )
+            .unwrap();
+    }
+
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+    assert!(migration_backup_path(&path, 21).exists());
+    assert!(table_exists(db.conn(), "plan_execution_schedules"));
+    let (saved, execution_provider): (String, Option<String>) = db
+        .conn()
+        .query_row(
+            "SELECT plan_json, execution_provider_id FROM plan_approvals WHERE request_id = 'p1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(saved, "# Saved plan");
+    assert!(execution_provider.is_none());
 }
 
 fn schema_version(conn: &Connection) -> i64 {

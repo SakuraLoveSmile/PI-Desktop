@@ -340,6 +340,7 @@ Each ADR includes:
 | 0306 | [Brazilian Portuguese (pt-BR) shell locale](0306-portuguese-brazil-shell-locale.md) | Accepted (amends ADR 0160 / 0183 / 0185) |
 | 0307 | [Expert Team collaboration architecture](0307-expert-team-collaboration.md) | Accepted for implementation |
 | 0308 | [Independent Pi-Desktop-Plus application identity](0308-independent-plus-application-identity.md) | Accepted; fork identity, isolated data and release sources |
+| 0309 | [Durable Plan/Goal revision and one-time execution lifecycle](0309-plan-goal-revision-and-one-time-execution-lifecycle.md) | Accepted for implementation |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |
 | provider-display-order | [Provider display order](provider-display-order.md) | Accepted |
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |

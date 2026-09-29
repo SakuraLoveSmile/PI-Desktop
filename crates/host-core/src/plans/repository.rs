@@ -5,7 +5,14 @@ pub(crate) const PROPOSAL_COLUMNS: &str = "request_id, session_id, turn_id, tool
     plan_json, title, question, status, created_at, updated_at, expires_at,
     resolved_at, action, target_permission_mode, feedback, error_code,
     artifact_relative_path, artifact_sha256, artifact_size_bytes, version,
-    execution_id, execution_state, kind, artifact_workspace_kind";
+    execution_id, execution_state, kind, artifact_workspace_kind,
+    (SELECT provider_id FROM turns WHERE id = plan_approvals.turn_id),
+    (SELECT model_id FROM turns WHERE id = plan_approvals.turn_id),
+    execution_provider_id, execution_model_id,
+    (SELECT scheduled_for FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
+    (SELECT timezone FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
+    (SELECT state FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
+    revision_intent_json, revision_state, revision_turn_id, revision_error_code";
 
 pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PlanProposal> {
     let artifact_path: Option<String> = row.get(16)?;
@@ -28,6 +35,30 @@ pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Pla
     // This legacy column remains in SQLite for migration/read safety but is
     // intentionally absent from the current approval contract.
     let _legacy_feedback: Option<String> = row.get(14)?;
+    let revision_json: Option<String> = row.get(31)?;
+    let revision_input = revision_json
+        .as_deref()
+        .map(serde_json::from_str::<PlanRevisionIntentInput>)
+        .transpose()
+        .map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                31,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })?;
+    let revision_intent = revision_input
+        .map(|input| -> rusqlite::Result<PlanRevisionIntent> {
+            Ok(PlanRevisionIntent {
+                input,
+                state: row
+                    .get::<_, Option<String>>(32)?
+                    .unwrap_or_else(|| "ready".to_string()),
+                turn_id: row.get(33)?,
+                error_code: row.get(34)?,
+            })
+        })
+        .transpose()?;
     Ok(PlanProposal {
         id: row.get(0)?,
         session_id: row.get(1)?,
@@ -52,6 +83,14 @@ pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Pla
         version: row.get(19)?,
         execution_id: row.get(20)?,
         execution_state: row.get(21)?,
+        planning_provider_id: row.get(24)?,
+        planning_model_id: row.get(25)?,
+        execution_provider_id: row.get(26)?,
+        execution_model_id: row.get(27)?,
+        scheduled_for: row.get::<_, Option<i64>>(28)?.map(ms_to_ts),
+        schedule_timezone: row.get(29)?,
+        schedule_state: row.get(30)?,
+        revision_intent,
     })
 }
 

@@ -232,6 +232,37 @@ globalThis.transcriptRenderProbe = async () => {
       "Task completion timing did not update to 4s",
     );
 
+    const answeredAsk = message("answered-ask", "tool", "resolved", {
+      toolName: "asktool",
+      toolCallId: "ask-call",
+      toolStatus: "success",
+      toolResult: {
+        details: {
+          questions: [
+            { question: "Which colors?", options: ["Red", "Blue"], multiSelect: true },
+            { question: "Any notes?", options: ["Yes", "No"] },
+          ],
+          answers: [["Red", "Blue"], null],
+          resolvedAt: createdAt,
+        },
+      },
+    });
+    const askMessages = [
+      message("ask-user", "user", "Choose colors"),
+      answeredAsk,
+      message("ask-answer", "assistant", "Thanks."),
+    ];
+    for (const persistedMessages of [askMessages, JSON.parse(JSON.stringify(askMessages)) as UiMessage[]]) {
+      render(persistedMessages);
+      const summary = container.querySelector(".asktool-completed-summary");
+      assert(summary?.textContent?.includes("Which colors?"), "completed AskTool question is missing");
+      assert(summary.textContent?.includes("Red") && summary.textContent?.includes("Blue"),
+        "completed AskTool selections are missing");
+      assert(summary.textContent?.includes("Any notes?") && summary.textContent?.includes("Skipped"),
+        "skipped AskTool answer is missing");
+      assert(!summary.textContent?.includes("、"), "English AskTool summary uses Chinese punctuation");
+    }
+
     const statusLifecycle = await transcriptStatusProbe();
     return {
       ok: statusLifecycle.ok,
@@ -242,6 +273,7 @@ globalThis.transcriptRenderProbe = async () => {
       changedToolRenders: 1,
       taskLifecycleUpdated: true,
       taskTimingUpdated: true,
+      askToolSummaryRestored: true,
       turnProcess: await turnProcessProbe(),
       messageEditing: await transcriptEditProbe(),
       textUpdateDurationMs,

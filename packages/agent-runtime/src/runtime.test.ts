@@ -1991,6 +1991,12 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       content: [{ text: "Color?：Blue\n---\nTargets?：" }],
       details: { answers: [["Blue"], null] },
     });
+    const result = await pending;
+    expect(result.details).toMatchObject({
+      questions: request.questions,
+      answers: [["Blue"], null],
+    });
+    expect((result.details as { resolvedAt?: unknown }).resolvedAt).toEqual(expect.any(String));
     await runtime.dispose();
   });
 
@@ -2758,6 +2764,11 @@ describe("DesktopAgentRuntime plan transitions", () => {
     agent.continue = vi.fn(async () => undefined);
     agent.waitForIdle = vi.fn(async () => undefined);
     runtime.setMode("plan");
+    (runtime as any).appendLiveEntry("planning-only", {
+      role: "user",
+      content: "Planning-only detail must not enter execution context",
+      timestamp: 1,
+    });
 
     const execution: PlanExecution = {
       id: "execution-1",
@@ -2787,6 +2798,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
     expect(internal.role).toBe("user");
     expect(internal.content).toContain(execution.artifact.relativePath);
     expect(internal.content).toContain(execution.plan);
+    expect(JSON.stringify(agent.state.messages)).not.toContain("Planning-only detail");
     expect(
       onEvent.mock.calls.some(
         ([envelope]) => (envelope as any).event?.message?.role === "user",

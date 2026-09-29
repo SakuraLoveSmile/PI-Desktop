@@ -288,10 +288,15 @@ export function useComposerSubmit({
       return;
     }
     draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);
-    const accepted = steering
-      ? await steerPrompt(inlineContent, submittedDraft)
-      : await sendPrompt(inlineContent, submittedDraft);
-    if (!accepted) draft.restoreDraftForKey(submittedDraftKey, submittedDraft);
+    try {
+      const accepted = steering
+        ? await steerPrompt(inlineContent, submittedDraft)
+        : await sendPrompt(inlineContent, submittedDraft);
+      if (!accepted) draft.restoreDraftForKey(submittedDraftKey, submittedDraft);
+    } catch (error) {
+      draft.restoreDraftForKey(submittedDraftKey, submittedDraft);
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    }
   };
 
   return {

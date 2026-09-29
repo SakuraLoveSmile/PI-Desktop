@@ -2620,7 +2620,7 @@ is rejected and resubmitted.
 
 | State | Actions | Contract |
 |---|---|---|
-| Pending | Approve, Reject | request is live and proposal/session/turn/tool-call/version scoped |
+| Pending | Approve, Reject, Request changes, Goal conversion, Schedule | request is live and proposal/session/turn/tool-call/version scoped; a nonempty revision draft gates execution actions |
 | Resolving | all actions disabled | retain the proposal until host result |
 | Approved | no actions | same Agent continues in Agent with selected permission mode |
 | Queued / Running | no actions | approved execution is active and tied to the same approval row |
@@ -2630,15 +2630,15 @@ is rejected and resubmitted.
 Approve opens the explicit Ask / Accept edits / Auto choice with the last selected
 mode remembered on this device. Reject carries no permission mode. The renderer keeps the latest proposal/execution snapshot per
 session only for the current renderer lifetime from live Host events, while only
-a pending snapshot has actions or gates the Composer. Renderer reload calls
+a pending snapshot has actions or gates execution. Renderer reload calls
 `plans.pending` and restores a still-pending row with its original deadline while
-the host remains alive. It does not rehydrate rejected, expired,
-approved/completed, or interrupted terminal cards; a terminal card may remain
-visible and non-actionable only until reload. Startup recovery interrupts
+the host remains alive, together with bounded proposal history. Rejected,
+expired, approved/completed, and interrupted terminal cards are rehydrated as
+read-only history. Startup recovery interrupts
 pending/queued/running fields before serving RPC, restores no actionable stale
 approval, and never replays execution. Pending unapproved work remains Plan and
-already-approved interrupted execution remains Agent; the UI is not required to
-present the interrupted terminal snapshot after restart.
+already-approved interrupted execution remains Agent; its terminal snapshot
+remains inspectable after restart.
 
 ### 10A.4 Accessibility
 
@@ -2844,7 +2844,7 @@ reasoning-level control.
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Same single-slot Stop/Send behavior as Running |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled; Stop remains active whenever the running empty-draft condition is met |
 | Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible; mode chip pulses while the live turn projects `planning` | inspect, send, or submit a contract |
-| Plan / Goal / awaiting approval | approval surface shows only the title and artifact opener for the exact `.pi/<kind>/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
+| Plan / Goal / awaiting approval | approval surface shows the title, immutable artifact opener, revision controls, Goal conversion, and one-time Schedule action for the exact `.pi/<kind>/*.md` approval; the Composer remains visible and editable below it | approve, reject, request changes, schedule, or clear/send revision draft |
 | Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | Stop; Send queues the next prompt; no replay control |
 | Plan / Goal / planning after rejected, expired, or interrupted proposal | contract chip remains visible and editable | send a later prompt; submit a new contract; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
@@ -2970,14 +2970,15 @@ reasoning-level control.
   the selected model's catalog/binding levels whenever the session snapshot has
   no usable thinking menu (`supportsReasoning: false`, a missing level list, or
   an empty list), so changing a level during a turn cannot collapse the submenu
-  to Off-only. An active pending Plan or Goal approval still disables these
-  controls. Approval actions are the exception while awaiting approval. The
+  to Off-only. An active pending Plan or Goal approval keeps the Composer's
+  input and planning-model controls available for revision. Execution actions
+  remain gated until the current proposal is resolved. Approval actions are the exception while awaiting approval, and the
   Composer-left Agent/Plan/Goal chip is the sole mode
   control and cycles Agent → Plan → Goal → Agent on click. The Composer-right
   model × reasoning chip owns both selections. Palette and Composer slash mode commands use the
-  same active-session configuration path; after host confirmation resolves an
-  approval, the approval surface is removed rather than remaining as a terminal
-  action card.
+same active-session configuration path; after host confirmation resolves an
+approval, the approval surface remains as a terminal read-only card in the
+transcript and Overview history.
 - New Task reveals the empty home on the first frame, so the previous
   conversation does not linger while the durable row is created. The home
   composer may briefly have no `activeSessionId` during that create. Its idle
@@ -4020,3 +4021,34 @@ Input, selection, submission and dismissal semantics remain unchanged.
 Project-delete descriptions and plugin dialog headings/outcomes also wrap long
 project or plugin names instead of overflowing their existing widths. Project
 instructions, memory and OAuth dialogs retain their existing bounded layouts.
+
+## 13. Plan workflow additions
+
+### 13.1 Session Overview tab
+
+The session-scoped Work Panel starts with an `Overview` tab when opened for a
+session. Its header reads the current `SessionSummary` (title, project, model,
+mode, timestamps, and message count). Collapsible `Progress`, `Artifacts`, and
+`References` sections use only current renderer/Host state: planning and run
+status, immutable Plan/Goal artifacts, and explicit message attachments or
+file references. Missing data uses a short empty state. Artifact rows open the
+existing trusted Markdown/file preview; the tab never invents progress,
+memory, terminal output, or historical facts.
+
+### 13.2 Resolved AskTool summary
+
+After a successful AskTool resolution, the transcript keeps the interactive
+card's tool position and renders a compact `Question clarification` summary.
+It reads structured `details.questions`, `details.answers`, and
+`details.resolvedAt` from the durable tool result, preserving ordered
+multi-select, custom text, and skipped answers across reload. Failed
+resolution keeps the interactive card and draft.
+
+### 13.3 Transcript display mode
+
+The transcript toolbar exposes the persisted `thinkingDisplayMode` setting as
+Detailed/Compact. Compact places the answer first and collapses completed
+thinking/process/tool rows to expandable summaries. Errors, approvals, AskTool
+summaries, Plan/Goal cards, search targets, copy, and expansion to full detail
+remain available. The control changes presentation only and retains detailed as
+the compatibility default when the setting is absent.

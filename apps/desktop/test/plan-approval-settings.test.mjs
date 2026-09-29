@@ -30,13 +30,13 @@ const [approvalBar, approvalPreferences, apiSource, storeSource, settingsPage, s
   ]);
 const interactionSource = readStoreModuleSync("slices/interaction-slice.ts");
 
-test("plan approval exposes only the artifact and remembers the selected mode", () => {
+test("plan approval summarizes the proposal and remembers the selected mode", () => {
   assert.match(approvalBar, /proposal\.title/);
   assert.match(
     approvalBar,
     /resolvePlanArtifactPath\(proposal\)/,
   );
-  assert.match(approvalBar, /preferredFileWorkPanelTab\(resolved\.path, pluginViews\)/);
+  assert.match(approvalBar, /fileWorkPanelTab\(resolved\.path\)/);
   assert.match(approvalBar, /openWorkPanelTabForSession/);
   assert.match(approvalBar, /const isPending = proposal\.status === "pending"/);
   assert.match(approvalBar, /PLAN_APPROVAL_DEFAULT_MODE/);
@@ -45,7 +45,8 @@ test("plan approval exposes only the artifact and remembers the selected mode", 
   assert.match(approvalPreferences, /PLAN_APPROVAL_MODE_STORAGE_KEY/);
   assert.match(approvalPreferences, /store\.setItem\(PLAN_APPROVAL_MODE_STORAGE_KEY, mode\)/);
   assert.match(approvalPreferences, /PLAN_APPROVAL_FALLBACK_MODE/);
-  assert.doesNotMatch(approvalBar, /proposal\.question|proposal\.expiresAt|autoWarning|expiresAt|statusText/);
+  assert.match(approvalBar, /proposal\.question/);
+  assert.doesNotMatch(approvalBar, /proposal\.expiresAt|autoWarning|expiresAt|statusText/);
   assert.doesNotMatch(approvalBar, /planApprovalPermissionMode|feedback|changes_requested/);
   assert.doesNotMatch(apiSource, /planApprovalPermissionMode/);
   assert.doesNotMatch(storeSource, /planApprovalPermissionMode/);
@@ -55,7 +56,6 @@ test("plan approval exposes only the artifact and remembers the selected mode", 
   assert.match(approvalBar, /const copy = \(name: string\) => t\(copyKey\(kind, name\)\)/);
   assert.doesNotMatch(approvalBar, /t\("plan\./);
   assert.match(approvalBar, /data-testid="plan-open-artifact"/);
-  assert.doesNotMatch(approvalBar, /request_changes|requestChanges/);
 });
 
 test("approval card omits validity details while the pending gate stays actionable", () => {
@@ -104,9 +104,8 @@ test("terminal execution snapshots are represented and do not gate a later promp
   assert.match(planStateSource, /status === "expired"/);
   assert.match(planStateSource, /return "interrupted"/);
   assert.match(composerSource, /const runActive = isRunning \|\| executionActive/);
-  assert.match(composerSource, /const sendBlocked = approvalPending \|\| pasting/);
-  assert.match(composerSource, /planCheckpoint\?\.status === "pending"[\s\S]*<PlanApprovalBar/);
-  assert.doesNotMatch(approvalBar, /request_changes|requestChanges/);
+  assert.match(composerSource, /const sendBlocked = pasting \|\| nativeInputBlocked/);
+  assert.doesNotMatch(composerSource, /<PlanApprovalBar/);
 });
 
 test("command-shell settings are catalog-driven and use the existing save flow", () => {

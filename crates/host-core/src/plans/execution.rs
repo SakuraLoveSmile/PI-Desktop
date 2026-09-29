@@ -19,6 +19,8 @@ pub(crate) fn execution_from_proposal(proposal: &PlanProposal) -> Result<Option<
         question: proposal.question.clone(),
         artifact,
         target_permission_mode,
+        execution_provider_id: proposal.execution_provider_id.clone(),
+        execution_model_id: proposal.execution_model_id.clone(),
         state,
     }))
 }

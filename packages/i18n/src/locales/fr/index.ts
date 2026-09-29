@@ -217,6 +217,21 @@ export const fr = {
     sessionMissing: "Cette session n'existe plus",
   },
   "chat": {
+    "goalMode": "Objectif",
+    "viewDetails": "Voir les détails",
+    "schedule": "Planifier",
+    "scheduleTime": "Exécuter à",
+    "confirmSchedule": "Confirmer la planification",
+    "runMissed": "Exécuter maintenant",
+    "cancelSchedule": "Annuler la planification",
+    "retryRevision": "Réessayer la révision",
+    "revisionState": { "ready": "Révision prête à réessayer", "started": "Révision en cours", "failed": "Révision échouée", "submitted": "Révisé" },
+    "planDraftPending": "Envoyez ou effacez le brouillon avant d'agir sur ce plan",
+    "executionProvider": "Fournisseur d'exécution",
+    "executionModel": "Modèle d'exécution",
+    "scheduleState": { "scheduled": "Planifié", "missed": "Manqué", "claimed": "Démarré", "cancelled": "Annulé" },
+    "scheduleExecutionState": { "queued": "En attente", "running": "En cours", "completed": "Terminé", "interrupted": "Interrompu" },
+    "planStatus": { "approved": "Approuvé", "changes_requested": "Révision demandée", "rejected": "Refusé", "expired": "Expiré", "interrupted": "Interrompu" },
     "profileAgent": "Agent",
     "profileAgentDesc": "Exécution standard à agent unique",
     "profileTeam": "Équipe d'experts",
@@ -1716,6 +1731,8 @@ sklm: {
     "queued_other": "{{count}} demande supplémentaire en attente"
   },
   "askTool": {
+    "completedTitle": "Questions clarifiées",
+    "completedSkipped": "Ignorée",
     "title": "Quelques questions",
     "progress": "Question {{current}} sur {{total}}",
     "questionNumber": "Question {{number}}",
@@ -1785,6 +1802,7 @@ sklm: {
     },
     "closeTab": "Fermer {{name}}",
     "tabs": {
+      "overview": "Vue d'ensemble",
       "team": "Équipe",
       "review": "Réviser",
       "browser": "Navigateur",
@@ -1793,6 +1811,7 @@ sklm: {
       "subagent": "Sous-agent",
       goalReport: "Rapport d’objectif",
     },
+    overview: { noSession: "Aucune session sélectionnée", untitled: "Session sans titre", project: "Projet", model: "Modèle", modeLabel: "Mode", messages: "Messages", notAvailable: "Indisponible", progress: "Progression", statusLabel: "État actuel", noPlans: "Aucune activité de plan dans cette session", artifacts: "Artefacts", noArtifacts: "Aucun artefact dans cette session", references: "Références", noReferences: "Aucune référence de fichier explicite", mode: { chat: "Chat", plan: "Plan", goal: "Objectif" }, status: { idle: "Inactif", running: "En cours", planning: "Planification", awaiting_approval: "En attente d'approbation", pending: "En attente", approved: "Approuvé", rejected: "Refusé", expired: "Expiré", interrupted: "Interrompu", queued: "En file", completed: "Terminé", failed: "Échec" } },
     "pluginView": {
       "failed": "Cette vue n'a pas pu être chargée. Rechargez le plugin et réessayez."
     },

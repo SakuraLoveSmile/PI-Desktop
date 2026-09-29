@@ -31,6 +31,8 @@ export type RuntimeLifecycleDependencies = {
   startHost: () => Promise<void>;
   startSidecar: () => Promise<void>;
   drainApprovedPlanExecutions: () => Promise<void>;
+  markMissedPlanSchedules: () => Promise<void>;
+  pollPlanSchedules: () => Promise<void>;
   applyNetworkProxyFromAppSettings: (settings: unknown) => Promise<unknown>;
   plugins: PluginRuntime;
   setCurrentWorkspacePath: (path: string | null) => void;
@@ -56,6 +58,8 @@ export function createRuntimeLifecycle({
   startHost,
   startSidecar,
   drainApprovedPlanExecutions,
+  markMissedPlanSchedules,
+  pollPlanSchedules,
   applyNetworkProxyFromAppSettings,
   plugins,
   setCurrentWorkspacePath,
@@ -69,8 +73,24 @@ export function createRuntimeLifecycle({
   bootHostStatus: (bootError: unknown) => HostStatusEvent;
   runtimeArch: () => ReturnType<typeof detectRuntimeArch>;
   bootBackends: () => Promise<void>;
+  stopPlanSchedulePoller: () => void;
 } {
   let runtimeArchCache: ReturnType<typeof detectRuntimeArch> | null = null;
+  let scheduleTimer: NodeJS.Timeout | null = null;
+  const startPlanSchedulePoller = () => {
+    if (scheduleTimer) return;
+    scheduleTimer = setInterval(() => {
+      if (isQuitting()) return;
+      void pollPlanSchedules().catch((error) =>
+        logger.app("runtime", "warn", "scheduled plan poll failed", { data: String(error) }),
+      );
+    }, 1_000);
+    scheduleTimer.unref();
+  };
+  const stopPlanSchedulePoller = () => {
+    if (scheduleTimer) clearInterval(scheduleTimer);
+    scheduleTimer = null;
+  };
 
   /**
    * Fatal boot refusals a restart can never fix (D380): the schema check comes
@@ -123,8 +143,11 @@ export function createRuntimeLifecycle({
       sidecar: startSidecar,
     },
     afterRestart: async () => {
+      stopPlanSchedulePoller();
       await onBackendsReady?.();
+      await markMissedPlanSchedules();
       await drainApprovedPlanExecutions();
+      startPlanSchedulePoller();
     },
     isUnrecoverable: (error) => Boolean(schemaTooNewOf(error)) || isGlibcUnsupportedError(error),
     isShuttingDown: isQuitting,
@@ -292,12 +315,22 @@ export function createRuntimeLifecycle({
     // The user's MCP servers are only registered here; each one connects the
     // first time a session that can see it is assembled.
     await refreshUserMcp();
+    let schedulesRecovered = false;
+    try {
+      await markMissedPlanSchedules();
+      schedulesRecovered = true;
+    } catch (error) {
+      logger.app("runtime", "warn", "missed plan schedule recovery failed", {
+        data: String(error),
+      });
+    }
     await drainApprovedPlanExecutions().catch((error) =>
       logger.app("runtime", "warn", "queued approved plan drain failed", {
         data: String(error),
       }),
     );
+    if (schedulesRecovered) startPlanSchedulePoller();
   };
 
-  return { superviseRestart, bootHostStatus, runtimeArch, bootBackends };
+  return { superviseRestart, bootHostStatus, runtimeArch, bootBackends, stopPlanSchedulePoller };
 }

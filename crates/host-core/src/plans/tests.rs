@@ -1,6 +1,9 @@
 use super::*;
 use crate::sessions;
 
+#[path = "revision_tests.rs"]
+mod revision_tests;
+
 fn test_db() -> (tempfile::TempDir, Database) {
     let dir = tempfile::tempdir().unwrap();
     let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
@@ -384,6 +387,65 @@ fn approval_switches_session_and_creates_outbox_atomically() {
     assert_eq!(session.permission_mode, "accept-edits");
     assert!(db.get_setting("app").unwrap().is_none());
     assert_eq!(manager.queued_executions(&db, None).unwrap().len(), 1);
+}
+
+#[test]
+fn request_changes_retires_only_the_named_proposal() {
+    let (dir, db) = test_db();
+    let root = dir.path().join("workspace");
+    fs::create_dir_all(&root).unwrap();
+    let manager = PlanManager;
+    let proposal = submit(&manager, &db, &root, "revise-call");
+    let resolution = manager
+        .resolve(
+            &db,
+            PlanResolveParams {
+                workspace_root: None,
+                proposal_id: &proposal.id,
+                session_id: &proposal.session_id,
+                turn_id: &proposal.turn_id,
+                tool_call_id: &proposal.tool_call_id,
+                version: Some(proposal.version),
+                action: "request_changes",
+                target_permission_mode: None,
+            },
+        )
+        .unwrap();
+    assert_eq!(resolution.status, STATUS_CHANGES_REQUESTED);
+    assert!(resolution.execution.is_none());
+    assert!(manager
+        .pending_for_session(&db, Some(&proposal.session_id))
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        manager
+            .history_for_session(&db, &proposal.session_id)
+            .unwrap()[0]
+            .id,
+        proposal.id
+    );
+    assert_eq!(
+        sessions::session_mode(&db, &proposal.session_id)
+            .unwrap()
+            .as_deref(),
+        Some("plan")
+    );
+    let stale = manager
+        .resolve(
+            &db,
+            PlanResolveParams {
+                workspace_root: Some(&root),
+                proposal_id: &proposal.id,
+                session_id: &proposal.session_id,
+                turn_id: &proposal.turn_id,
+                tool_call_id: &proposal.tool_call_id,
+                version: Some(proposal.version),
+                action: "approve",
+                target_permission_mode: Some("ask"),
+            },
+        )
+        .unwrap_err();
+    assert_eq!(stale.to_string(), "PLAN_APPROVAL_CONFLICT");
 }
 
 #[test]

@@ -1,5 +1,5 @@
 export const PROTOCOL_VERSION = 11 as const;
-export const SCHEMA_VERSION = 21 as const;
+export const SCHEMA_VERSION = 22 as const;
 export const APP_ID = "cn.sakura.pi-desktop";
 export const APP_NAME = "Pi-Desktop-Plus";
 export const APP_VERSION = "0.15.6";
@@ -184,6 +184,9 @@ export const IPC = {
     askToolResolve: "pi-desktop/agent/askTool/resolve",
     plansPending: "pi-desktop/plans/pending",
     plansResolve: "pi-desktop/plans/resolve",
+    plansRunMissed: "pi-desktop/plans/runMissed",
+    plansCancelSchedule: "pi-desktop/plans/cancelSchedule",
+    plansMarkRevisionFailed: "pi-desktop/plans/markRevisionFailed",
     goalReportGet: "pi-desktop/goalReport/get",
     goalReportList: "pi-desktop/goalReport/list",
     goalReportRetry: "pi-desktop/goalReport/retry",

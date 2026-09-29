@@ -15,6 +15,11 @@ export type PlanCheckpointStatus =
   | "running"
   | "completed"
   | "rejected"
+  | "changes_requested"
+  | "scheduled"
+  | "missed"
+  | "cancelled"
+  | "claimed"
   | "expired"
   | "interrupted";
 
@@ -40,6 +45,7 @@ export function planCheckpointStatus(
   if (resolving && proposal.status === "pending") return "resolving";
   if (proposal.status === "pending") return "pending";
   if (proposal.status === "approved") {
+    if (proposal.scheduleState && proposal.executionState === undefined) return proposal.scheduleState;
     if (proposal.executionState === "queued") return "queued";
     if (proposal.executionState === "running") return "running";
     if (proposal.executionState === "completed") return "completed";
@@ -47,6 +53,7 @@ export function planCheckpointStatus(
     return "approved";
   }
   if (proposal.status === "rejected") return "rejected";
+  if (proposal.status === "changes_requested") return "changes_requested";
   if (proposal.status === "expired") return "expired";
   return "interrupted";
 }
