@@ -195,7 +195,10 @@ renderer-facing status):
   raised: supervision and restart proceed with no window attached.
 - An unexpected sidecar exit is logged together with the sidecar's last stderr
   lines (ring-buffered in main), so a crash without a stack trace still leaves
-  its final output in the report.
+  its final output in the report. V8 heap exhaustion is classified from that
+  stderr tail and settles active turns with `AGENT_SIDECAR_OOM`; other
+  unexpected exits use `AGENT_SIDECAR_CRASHED`. Headless runtime cleanup uses
+  the generic crash code because it has no stderr tail.
 - Every rejection that only reports a gone transport — refused before it was
   sent, or in flight when the transport closed — carries
   `errorCode: HOST_UNAVAILABLE`, so a caller classifies routine teardown by code

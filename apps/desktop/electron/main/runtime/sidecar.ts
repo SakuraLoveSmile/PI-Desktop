@@ -1,10 +1,12 @@
 import { IPC, type AgentEventEnvelope, type UiMessage } from "@pi-desktop/shared";
 import {
   findSubagentProviderSource,
+  classifySidecarCrash,
   genericModelConfig,
   loadInstructionChain,
   modelConfigWithBinding,
   subagentProviderLookupError,
+  sidecarCrashErrorCode,
 } from "@pi-desktop/agent-runtime";
 import { loadBuiltinSkillBody } from "../builtin-skills";
 import { createImageGenerationTool } from "../services/image-generation-service";
@@ -119,8 +121,8 @@ export function createSidecarRuntime({
    * not be left behind. The finalizer refuses the settlement for a turn that no
    * longer owns the session and drops exactly those records.
    */
-  const releaseCrashedTurn = (sessionId: string, crashedTurnId: string) =>
-    finishTurn(sessionId, "aborted", "PLAN_APPROVAL_INTERRUPTED", {
+  const releaseCrashedTurn = (sessionId: string, crashedTurnId: string, errorCode: string) =>
+    finishTurn(sessionId, "aborted", errorCode, {
       turnId: crashedTurnId,
     });
 
@@ -132,6 +134,7 @@ export function createSidecarRuntime({
   const settleCrashedSession = async (
     sessionId: string,
     crashedTurnId: string,
+    errorCode: string,
   ): Promise<void> => {
     const executionId = approvedExecutionIdsBySession.get(sessionId);
     if (runtimeState.host) {
@@ -140,7 +143,7 @@ export function createSidecarRuntime({
     // A newer turn may own the session by now; this cleanup is the old one's.
     // It must still not leave the crashed turn's records behind.
     if (activeTurns.get(sessionId) !== crashedTurnId) {
-      await releaseCrashedTurn(sessionId, crashedTurnId);
+      await releaseCrashedTurn(sessionId, crashedTurnId, errorCode);
       return;
     }
     // No final row is coming from a dead sidecar: keep whatever the reply had
@@ -151,11 +154,11 @@ export function createSidecarRuntime({
     // so it is reached only for the turn that still owns the session, and it is
     // called synchronously right after this check: no await in between.
     if (activeTurns.get(sessionId) !== crashedTurnId) {
-      await releaseCrashedTurn(sessionId, crashedTurnId);
+      await releaseCrashedTurn(sessionId, crashedTurnId, errorCode);
       return;
     }
     inflightCheckpointer.settle(sessionId);
-    await finishTurn(sessionId, "aborted", "PLAN_APPROVAL_INTERRUPTED", {
+    await finishTurn(sessionId, "aborted", errorCode, {
       recoverInflight: true,
       turnId: crashedTurnId,
     });
@@ -246,6 +249,8 @@ export function createSidecarRuntime({
     runtimeState.sidecar = null;
     steeringReplies.clear();
     if (intentional || isQuitting()) return;
+    const crash = classifySidecarCrash(stderrTail);
+    const crashErrorCode = sidecarCrashErrorCode(crash.kind);
     for (const tool of interruptedToolCalls) {
       logger.app("tool", "error", "tool execution interrupted", {
         sessionId: tool.sessionId,
@@ -272,7 +277,7 @@ export function createSidecarRuntime({
       // late cleanup must not settle or abort that newer turn.
       const crashedTurnId = activeTurns.get(sessionId);
       if (!crashedTurnId) continue;
-      void settleCrashedSession(sessionId, crashedTurnId).catch((error: unknown) => {
+      void settleCrashedSession(sessionId, crashedTurnId, crashErrorCode).catch((error: unknown) => {
         // The crash handler cannot await this and the sidecar is already gone:
         // log the failure instead of leaving the rejection unhandled.
         logger.app("runtime", "warn", "crashed-turn settlement failed", {
@@ -289,7 +294,13 @@ export function createSidecarRuntime({
       );
     }
     logger.app("runtime", "error", "agent sidecar exited unexpectedly", {
-      data: { exitCode: code, signal, stderrTail },
+      data: {
+        exitCode: code,
+        signal,
+        stderrTail,
+        crashKind: crash.kind,
+        ...(crash.marker ? { crashMarker: crash.marker } : {}),
+      },
     });
     sendToRenderer(IPC.event.hostStatus, {
       ok: false,
