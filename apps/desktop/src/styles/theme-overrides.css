@@ -224,6 +224,13 @@
   justify-content: flex-start;
 }
 
+.composer-profile-chip {
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
+  flex: 0 0 120px;
+}
+
 .composer-mode-chip-label {
   min-width: 0;
   overflow: hidden;

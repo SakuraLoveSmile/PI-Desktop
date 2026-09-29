@@ -59,13 +59,23 @@ app.whenReady().then(async () => {
       throw new Error("Menu is not pointer-accessible: " + JSON.stringify({ selector, state }));
     }
   };
+  const checkProfileLabel = async (expected) => {
+    const label = await evaluate('(() => { const node = document.querySelector(".composer-profile-chip .composer-mode-chip-label"); return { text: node.textContent, visibleWidth: node.clientWidth, textWidth: node.scrollWidth }; })()');
+    if (label.text !== expected || label.textWidth > label.visibleWidth) {
+      throw new Error("Profile label is clipped: " + JSON.stringify(label));
+    }
+  };
   try {
     await win.loadFile(path.join(__dirname, "index.html"));
     await waitFor('!!document.querySelector(".composer-profile-chip")');
+    await checkProfileLabel("智能体");
     await click(".composer-profile-chip");
     await checkMenu(".composer-profile-menu.is-open");
     await click('.composer-profile-menu.is-open [aria-checked="false"]');
     await waitFor('document.querySelector(".composer-profile-chip")?.dataset.profile === "team"');
+    await checkProfileLabel("专家团队");
+    win.setContentSize(498, 720);
+    await checkProfileLabel("专家团队");
     await click(".composer-contract-chip");
     await checkMenu(".composer-contract-menu.is-open");
     await click('.composer-contract-menu.is-open [role="menuitemradio"]:last-child');

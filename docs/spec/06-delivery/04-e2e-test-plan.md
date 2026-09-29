@@ -1936,7 +1936,9 @@ identify the platform validation still needed.
   Mode and permission labels remain single-line and ellipsized, the context
   ring and action controls retain usable hit targets, and the single Send/Stop
   slot remains reachable. Both mode menus are visible and pointer-accessible,
-  and each selection updates its trigger. Home and thread-docked composers match.
+  and each selection updates its trigger. The execution-profile labels
+  `智能体` and `专家团队` remain fully visible at desktop and narrow composer widths.
+  Home and thread-docked composers match.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11)
 - **Acceptance**: C (send/UI), Quality
 - **Milestone**: M2
@@ -1944,8 +1946,9 @@ identify the platform validation still needed.
   (base `cea6e02c`): `pnpm test:e2e:layout` 167/167 including the 450px
   model-chip assertion; `pnpm test:e2e:composer-autocomplete` and
   `pnpm test:e2e:composer-paste` passed. Source-covered by
-  `composer-responsive.test.mjs`. The menu interaction is covered by the
-  isolated Electron `pnpm test:e2e:composer-mode-menus` check.
+  `composer-responsive.test.mjs`. Menu interaction and Chinese execution-profile
+  label fit are covered by the isolated Electron
+  `pnpm test:e2e:composer-mode-menus` check.
 
 #### E2E-COMPOSER-input-history: Accepted drafts can be recalled per conversation
 
