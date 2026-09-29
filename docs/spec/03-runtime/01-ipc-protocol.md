@@ -1805,7 +1805,8 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
 - event: `browser/event/state {url, title, isLoading, canGoBack, canGoForward}`
   (also pushed to plugin views as `browser:state`)
 - agent preview event: `browser/event/preview {sessionId, path?, url?}`.
-  Electron Main validates a workspace `path` inside that session's project,
+  Electron Main resolves a workspace `path` to its real file path inside that
+  session's project, rejecting symlink escapes and invalid absolute/file URLs,
   loads the guest when that conversation's plugin view is visible, and the
   renderer opens `plugin:pi.browser/browser` with `location` in the matching
   runtime panel context. Navigation of a background session does not steal the
@@ -1843,7 +1844,9 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   printed in chat, because the renderer cannot see the session's own scratch
   store: an absolute reference that already names a real file inside a known
   root wins outright, and an `attachments/<sha256>` blob resolves against the
-  attachment store directly; otherwise the roots are searched in priority order
+  attachment store directly only with a valid 64-character hex digest;
+  ordinary project paths such as `attachments/manual.pdf` still follow normal
+  workspace search. Otherwise the roots are searched in priority order
   — the open project first, the session's own scratch store
   (`<data_dir>/scratch/<sessionId>/`, ADR 0124) second, the attachment store
   last — and the first root that answers wins. The project is the folder group
