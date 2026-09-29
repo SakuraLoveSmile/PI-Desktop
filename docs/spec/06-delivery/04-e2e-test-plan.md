@@ -2185,14 +2185,14 @@ identify the platform validation still needed.
 - **Milestone**: M3
 - **Status**: Automated (protocol smoke: Read + Glob in sample project)
 
-### Permission Allow / Deny / Timeout
+### Permission Allow / Deny / Cancellation
 
 #### E2E-014: Write/Edit/Bash triggers permission card
 
 - **Preconditions**: Agent mode; project open.
 - **Steps**: 1) Ask agent to write a file. 2) Observe permission card.
 - **Expected**: Permission card appears inline in the originating transcript
-  with tool name, workspace, arguments preview, countdown, and allow/deny
+  with tool name, workspace, arguments preview, and allow/deny
   options. It creates no backdrop or modal and does not cover another session.
 - **Specs linked**: `04-ux/03-permission-ux.md`, `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: E (Write/Edit/Bash trigger confirmation)
@@ -2219,11 +2219,14 @@ identify the platform validation still needed.
 - **Milestone**: M3
 - **Status**: Draft
 
-#### E2E-017: Permission timeout defaults to deny
+#### E2E-017: Local permission approval has no automatic deadline
 
 - **Preconditions**: Permission card displayed; no user action.
-- **Steps**: 1) Wait 120 seconds without responding to permission card. 2) Observe outcome.
-- **Expected**: Permission auto-denied after timeout; tool not executed.
+- **Steps**: 1) Leave the permission card unanswered. 2) Confirm it remains
+  visible and the tool call remains pending. 3) Choose Deny and observe the
+  outcome.
+- **Expected**: No countdown or automatic denial appears; the request remains
+  pending until the explicit Deny action, and the tool is not executed.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: E (timeout → deny)
 - **Milestone**: M3
@@ -5418,7 +5421,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Expected**: B's background events update only B's row and retained state;
   they do not change A's active session/project/page, transcript, draft, scroll,
   or keyboard focus, and no global modal appears. Opening B reveals only B's
-  inline card with its original countdown. Both requests remain independently
+  inline card with no countdown. Both requests remain independently
   actionable, and resolving B does not clear A. The final rapid selection stays
   on B even when A's older load finishes later. Only explicit notification or
   session activation may navigate. A's post-approval review card is retained only in
@@ -5431,7 +5434,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Acceptance**: C (session isolation), E (permission isolation), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`permission-inline.test.mjs` for scoped state,
-  inline rendering contract, absolute countdown, and latest-selection guard;
+  inline rendering contract, no-countdown behavior, and latest-selection guard;
   `work-panel.test.mjs` and `browser-preview-tool.test.mjs` for session-scoped
   artifact retention and routing); full UI scenario Draft
 
@@ -9761,8 +9764,8 @@ This test plan spec is accepted when:
 - Expect no backdrop, modal, page/session switch, work-panel hide, transcript
   replacement, or composer-focus change in A. B retains its pending state.
 - Open B explicitly and expect one inline permission card after B's latest
-  activity, with readable risk, args, workspace, countdown, and wrapping action
-  controls. Switching away and back preserves the absolute deadline.
+  activity, with readable risk, args, workspace, and wrapping action controls.
+  Switching away and back preserves the pending request without a deadline.
 - Make A and B pending together, resolve each independently, and confirm neither
   action removes or changes the other card.
 - Resolve A's Write/Edit permission and switch to B before completion. Expect no

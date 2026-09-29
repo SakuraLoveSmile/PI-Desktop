@@ -1692,7 +1692,6 @@ export const ptBR = {
     },
     workspace: "Projeto: {{workspace}}",
     temporarySession: "Conversa temporária",
-    countdown: "Recusa automaticamente em {{seconds}}s se você não responder",
     fromSubagent: "Solicitado pelo subagente {{agent}}",
     queued_one: "Mais {{count}} solicitação aguardando",
     queued_other: "Mais {{count}} solicitações aguardando",

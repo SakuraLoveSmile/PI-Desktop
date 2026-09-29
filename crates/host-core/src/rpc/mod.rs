@@ -3510,7 +3510,6 @@ async fn handle_request(
                     if st.shutting_down {
                         return Err(rpc_err(1001, "host is shutting down", "HOST_SHUTTING_DOWN"));
                     }
-                    st.permissions.expire_stale();
                     // Effective permission mode (D115): per-session override
                     // unless it is `inherit`, then the global settings default,
                     // then `ask`. A subagent's tool call carries its own scope
@@ -3658,8 +3657,7 @@ async fn handle_request(
                             "toolName": req.tool_name,
                             "risk": req.risk,
                             "argsPreview": req.args_preview,
-                            "reason": req.reason,
-                            "timeoutMs": req.timeout_ms
+                            "reason": req.reason
                         });
                         if let Some(shell_id) = req.command_shell_id.as_deref() {
                             permission_params["commandShellId"] = json!(shell_id);
@@ -3685,14 +3683,9 @@ async fn handle_request(
                         d
                     }
                 } else if let Some(rx) = pending_rx {
-                    let permission_wait = tokio::time::timeout(
-                        std::time::Duration::from_millis(crate::permissions::PERMISSION_TIMEOUT_MS),
-                        rx,
-                    );
-                    tokio::pin!(permission_wait);
                     tokio::select! {
-                        outcome = &mut permission_wait => match outcome {
-                            Ok(Ok(d)) => d,
+                        outcome = rx => match outcome {
+                            Ok(d) => d,
                             _ => PermissionDecision::Deny,
                         },
                         _ = wait_for_bash_cancellation(&mut permission_cancellation) => {
@@ -7374,6 +7367,7 @@ mod tests {
             .unwrap();
         let permission: Value = serde_json::from_str(&permission).unwrap();
         assert_eq!(permission["method"], "permissions.request");
+        assert!(permission["params"].get("timeoutMs").is_none());
         let request_id = permission["params"]["requestId"]
             .as_str()
             .unwrap()
@@ -7392,11 +7386,9 @@ mod tests {
         assert_eq!(requests[0]["requestId"], request_id);
         assert_eq!(requests[0]["sessionId"], session.id);
         assert_eq!(requests[0]["toolName"], "Bash");
-        assert_eq!(requests[0]["timeoutMs"], 120000);
-        assert!(
-            requests[0]["expiresAt"].as_str().unwrap() > requests[0]["createdAt"].as_str().unwrap()
-        );
-        assert!(requests[0]["remainingMs"].as_u64().unwrap() <= 120000);
+        assert!(requests[0].get("timeoutMs").is_none());
+        assert!(requests[0].get("expiresAt").is_none());
+        assert!(requests[0].get("remainingMs").is_none());
 
         let other = handle_request(
             state.clone(),

@@ -1737,7 +1737,6 @@ sklm: {
     },
     "workspace": "Proyecto: {{workspace}}",
     "temporarySession": "Chat temporal",
-    "countdown": "Denegación automática en {{seconds}}s si no respondes",
     "fromSubagent": "Pregunta del {{agent}} subagente",
     "queued_one": "{{count}} solicitud más está esperando",
     "queued_other": "{{count}} más solicitudes están esperando"
