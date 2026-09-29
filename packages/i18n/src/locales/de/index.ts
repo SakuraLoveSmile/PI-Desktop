@@ -274,6 +274,15 @@ export const de = {
     "fileTruncated": "Das erste wird angezeigt 8000 passende Dateien",
     "acHint": "↑↓ auswählen · Eingabe bestätigen · Esc schließen",
     "send": "Senden",
+    "todo": {
+      "progress": "{{completed}}/{{total}} erledigt",
+      "current": "{{completed}}/{{total}} · Aktuell: {{content}}",
+      "completed": "{{completed}}/{{total}} erledigt",
+      "more": "{{count}} weitere Elemente",
+      "updated": "Checkliste aktualisiert",
+      "updating": "Checkliste wird aktualisiert",
+      "status": { "pending": "Offen", "in_progress": "In Bearbeitung", "completed": "Erledigt", "cancelled": "Abgebrochen" }
+    },
     "queuedPrompts": "Nachrichten in der Warteschlange",
     "queuedPromptEmpty": "Nachricht in der Warteschlange",
     "removeQueuedPrompt": "Nachricht in der Warteschlange entfernen",

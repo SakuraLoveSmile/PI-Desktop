@@ -274,6 +274,15 @@ export const fr = {
     "fileTruncated": "Afficher le premier 8000 fichiers correspondants",
     "acHint": "↑↓ sélectionner · Entrer confirmer · Esc fermer",
     "send": "Envoyer",
+    "todo": {
+      "progress": "{{completed}}/{{total}} terminées",
+      "current": "{{completed}}/{{total}} · Actuelle : {{content}}",
+      "completed": "{{completed}}/{{total}} terminées",
+      "more": "{{count}} éléments supplémentaires",
+      "updated": "Liste mise à jour",
+      "updating": "Mise à jour de la liste",
+      "status": { "pending": "En attente", "in_progress": "En cours", "completed": "Terminée", "cancelled": "Annulée" }
+    },
     "queuedPrompts": "Messages en file d'attente",
     "queuedPromptEmpty": "Message en file d'attente",
     "removeQueuedPrompt": "Supprimer le message en file d'attente",

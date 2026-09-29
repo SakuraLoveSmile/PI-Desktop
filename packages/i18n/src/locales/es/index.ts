@@ -274,6 +274,15 @@ export const es = {
     "fileTruncated": "Mostrando el primero 8000 archivos coincidentes",
     "acHint": "↑↓ seleccionar · Ingresar confirmar · Esc cerrar",
     "send": "Enviar",
+    "todo": {
+      "progress": "{{completed}}/{{total}} completadas",
+      "current": "{{completed}}/{{total}} · Actual: {{content}}",
+      "completed": "{{completed}}/{{total}} completadas",
+      "more": "{{count}} elementos más",
+      "updated": "Lista actualizada",
+      "updating": "Actualizando lista",
+      "status": { "pending": "Pendiente", "in_progress": "En curso", "completed": "Completada", "cancelled": "Cancelada" }
+    },
     "queuedPrompts": "Mensajes en cola",
     "queuedPromptEmpty": "Mensaje en cola",
     "removeQueuedPrompt": "Eliminar mensaje en cola",

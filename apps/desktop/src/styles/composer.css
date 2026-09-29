@@ -788,3 +788,77 @@
 .composer-directory-drop-action:hover {
   background: var(--ds-tile-hover);
 }
+
+.todo-dock {
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-dock-raised);
+  overflow: hidden;
+}
+
+.todo-dock-header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  padding: 7px 10px;
+  background: transparent;
+  color: var(--ds-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.todo-dock-header:hover,
+.todo-dock-header:focus-visible {
+  background: var(--ds-bg-hover);
+}
+
+.todo-dock-header-symbol,
+.todo-dock-row-symbol {
+  flex: 0 0 auto;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.todo-dock-header-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-dock-list {
+  display: grid;
+  gap: 2px;
+  padding: 0 10px 8px;
+}
+
+.todo-dock-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs);
+}
+
+.todo-dock-row-in_progress {
+  color: var(--ds-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.todo-dock-row-content {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-dock-more {
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+}
