@@ -11,6 +11,7 @@ import type {
   ModelModality,
   ModelProviderMetadata,
   ModelReasoningOption,
+  ThinkingProtocol,
   ThinkingLevel,
 } from "@pi-desktop/shared";
 import type { ModelConfig } from "@pi-desktop/agent-runtime";
@@ -70,6 +71,7 @@ export type ModelsDevModel = {
   reasoning: boolean;
   reasoningPublished: boolean;
   reasoningOptions?: ModelReasoningOption[];
+  thinkingProtocol?: ThinkingProtocol;
   thinkingLevels: ThinkingLevel[];
   modalities: ModelModalities;
   modalitiesPublished: boolean;
@@ -410,6 +412,13 @@ function modelFromRaw(
   const reasoningPublished = typeof raw.reasoning === "boolean";
   const reasoning = raw.reasoning === true;
   const reasoningOptions = parseReasoningOptions(raw.reasoning_options);
+  const thinkingProtocol: ThinkingProtocol | undefined =
+    providerKey === "anthropic" &&
+    reasoning &&
+    reasoningOptions?.some((option) => option.type === "effort") &&
+    !reasoningOptions.some((option) => option.type === "budget_tokens")
+      ? "adaptive"
+      : undefined;
   const limit = parseLimit(raw.limit);
   const experimental = publishedExperimental(raw.experimental);
   const providerMetadata = publishedMetadata(raw.provider);
@@ -436,6 +445,7 @@ function modelFromRaw(
     reasoning,
     reasoningPublished,
     ...(reasoningOptions ? { reasoningOptions } : {}),
+    ...(thinkingProtocol ? { thinkingProtocol } : {}),
     thinkingLevels: thinkingLevelsFromModelsDev(reasoning, raw.reasoning_options),
     modalities: modalityResult.modalities,
     modalitiesPublished: modalityResult.published,
@@ -675,6 +685,7 @@ export function modelInfoFromModelsDev(
     ...(model.attachment !== undefined ? { attachment: model.attachment } : {}),
     reasoning: model.reasoning,
     ...(model.reasoningOptions !== undefined ? { reasoningOptions: model.reasoningOptions } : {}),
+    ...(model.thinkingProtocol !== undefined ? { thinkingProtocol: model.thinkingProtocol } : {}),
     ...(thinkingLevelMap !== undefined ? { thinkingLevelMap } : {}),
     ...(model.toolCall !== undefined ? { toolCall: model.toolCall } : {}),
     ...(model.structuredOutput !== undefined ? { structuredOutput: model.structuredOutput } : {}),
@@ -741,6 +752,7 @@ export function modelConfigFromModelsDev(
   if (model.family !== undefined) config.family = model.family;
   if (model.attachment !== undefined) config.attachment = model.attachment;
   if (model.reasoningOptions !== undefined) config.reasoningOptions = model.reasoningOptions;
+  if (model.thinkingProtocol !== undefined) config.thinkingProtocol = model.thinkingProtocol;
   const thinkingLevelMap = thinkingLevelMapFromModelsDev(model.reasoningOptions, thinkingLevels);
   if (thinkingLevelMap) config.thinkingLevelMap = thinkingLevelMap;
   if (model.toolCall !== undefined) config.toolCall = model.toolCall;

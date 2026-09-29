@@ -9,6 +9,8 @@ export const THINKING_LEVELS = [
   "max",
 ] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+export const THINKING_PROTOCOLS = ["legacy", "adaptive"] as const;
+export type ThinkingProtocol = (typeof THINKING_PROTOCOLS)[number];
 /**
  * Session and subagent selector values. `omit` leaves the provider default
  * untouched and is not a catalog/binding capability.
@@ -198,6 +200,8 @@ export type ModelBinding = {
   thinkingLevels: ThinkingLevel[];
   /** Canonical enabled level, or `omit` when new sessions should send no override. */
   defaultThinkingLevel: SessionThinkingLevel | null;
+  /** Provider request protocol used when thinking is enabled. */
+  thinkingProtocol?: ThinkingProtocol;
   /**
    * User override for image input. `null` or absent follows the published
    * models.dev capability; `true` forces image transport on for an endpoint the
@@ -282,6 +286,7 @@ export type ModelInfo = {
   attachment?: boolean;
   reasoning?: boolean;
   reasoningOptions?: ModelReasoningOption[];
+  thinkingProtocol?: ThinkingProtocol;
   thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
   toolCall?: boolean;
   structuredOutput?: boolean;

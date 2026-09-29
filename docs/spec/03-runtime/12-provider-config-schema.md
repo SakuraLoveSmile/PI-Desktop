@@ -101,6 +101,7 @@ Tables (canonical DDL in [04-data-storage](04-data-storage.md) §4.3–4.4, §4.
             "type": ["string", "null"],
             "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max", "omit", null]
           },
+          "thinkingProtocol": { "enum": ["legacy", "adaptive"] },
           "supportsImages": { "type": ["boolean", "null"] },
           "supportsDocuments": { "type": ["boolean", "null"] },
           "availableForSubagents": { "type": "boolean", "default": false }
@@ -176,7 +177,11 @@ models, so the style follows the selected model and is rewritten on each model
 change. The vendor account editor uses the same multi-model binding controls as
 an AI service: authenticated catalog models and custom IDs can be selected,
 and each binding persists its context window, max output tokens, thinking levels,
-and default thinking level in `models`. `config_json.oauth.accountLabel` holds the non-secret display label for
+and default thinking level in `models`. Each model binding may also persist an
+optional `thinkingProtocol` (`legacy` or `adaptive`) override; old bindings
+without it continue to use the catalog or runtime default. This additive JSON
+field does not add a SQLite column or change the schema version.
+`config_json.oauth.accountLabel` holds the non-secret display label for
 the signed-in account.
 Each successful login creates a new row even when another row has the same
 `vendorKey`; the row id scopes the credential and runtime binding. The vendor
