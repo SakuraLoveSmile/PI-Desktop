@@ -263,20 +263,17 @@ test("a content-addressed attachment blob resolves against the attachment store"
   );
 });
 
-test("an attachment blob symlink cannot escape its store", async (t) => {
+test("an attachment link cannot escape its store", async () => {
   const digest = "c".repeat(64);
   const attachments = tempTree("attachment-link", []);
   const outside = tempTree("attachment-outside", ["page.md"]);
-  try {
+  if (process.platform === "win32") {
+    symlinkSync(outside, join(attachments, "linked"), "junction");
+    assert.equal(await resolve("linked/page.md", { attachments }), null);
+  } else {
     symlinkSync(join(outside, "page.md"), join(attachments, digest), "file");
-  } catch (error) {
-    if (process.platform === "win32" && error?.code === "EPERM") {
-      t.skip("file symlinks require Windows Developer Mode or elevated privileges");
-      return;
-    }
-    throw error;
+    assert.equal(await resolve(`attachments/${digest}`, { attachments }), null);
   }
-  assert.equal(await resolve(`attachments/${digest}`, { attachments }), null);
 });
 
 test("an attachment blob reference rejects invalid hash formats or non-hex characters", async () => {
