@@ -292,6 +292,7 @@ declare global {
     piDesktop?: {
       invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<Result<T>>;
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
+      onLiveVoicePort?: () => () => void;
       channels: typeof IPC;
       platform: NodeJS.Platform;
       /** Authoritative OS locale passed from the main process at window creation. */
@@ -924,8 +925,8 @@ export const api = {
     invoke<AgentCompactResponse>(IPC.invoke.agentCompact, req),
   abort: (sessionId: string) =>
     invoke(IPC.invoke.agentAbort, { sessionId }),
-  stop: (sessionId: string) =>
-    invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId }),
+  stop: (sessionId: string, turnId?: string) =>
+    invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId, ...(turnId ? { turnId } : {}) }),
   queuePrompt: (req: AgentQueuePushRequest) =>
     invoke<QueuedTurnSummary>(IPC.invoke.agentQueuePush, req),
   listQueuedPrompts: (sessionId: string) =>
@@ -966,6 +967,9 @@ export const api = {
     invoke<PlanResolutionResult>(IPC.invoke.plansResolve, resolution),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
+  /** One renderer slot component asking its own plugin for one JSON answer. */
+  pluginRendererCall: (pluginId: string, method: string, args?: unknown) =>
+    invoke(IPC.invoke.pluginRendererCall, pluginId, method, args),
   /**
    * Picking a folder only reports what it declares; the load happens in
    * `confirmLoadDevPlugin` once the user has seen that.
