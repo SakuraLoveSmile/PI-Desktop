@@ -108,6 +108,7 @@ test("resolvePreviewTarget classifies urls and workspace files", () => {
   assert.deepEqual(resolvePreviewTarget("src/a.ts:10", ROOT), {
     kind: "file",
     path: "src/a.ts",
+    line: 10,
   });
   assert.deepEqual(resolvePreviewTarget("./README.md", ROOT, "docs"), {
     kind: "file",

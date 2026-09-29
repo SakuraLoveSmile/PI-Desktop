@@ -175,7 +175,9 @@ export function useOpenChatFileRef() {
           return;
         }
         if (resolved.inProject && fileViewAvailable) {
-          openTab(fileManagerPluginTab(resolved.path));
+          // Thread path:line into the plugin tab so the bundled file view can
+          // scroll to the line (#681 / #1149 review). Host fallback uses openFile.
+          openTab(fileManagerPluginTab(resolved.path, { line, column }));
           return;
         }
         openFile(resolved.path, mimeType, { line, column });

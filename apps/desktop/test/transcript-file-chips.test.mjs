@@ -25,7 +25,7 @@ test("sent user-message file refs render as composer-like chips", () => {
   assert.match(transcript, /composer-chip-name/);
   assert.match(styles, /\.chat-file-chip[\s\S]*?appearance: none/);
   assert.match(transcript, /mimeType=\{attachment\.mimeType\}/);
-  assert.match(transcript, /onOpen\(path, undefined, mimeType\)/);
+  assert.match(transcript, /onOpen\(path, undefined, mimeType, \{ line, column \}\)/);
 });
 
 test("a file chip is routed by where the reference resolved, never optimistically", () => {
@@ -47,7 +47,7 @@ test("a file chip is routed by where the reference resolved, never optimisticall
   // A project file prefers the bundled file view; without that plugin the
   // host file tab is the same surface this hook used before.
   assert.match(hook, /FILE_MANAGER_PLUGIN_TAB/);
-  assert.match(hook, /fileManagerPluginTab\(resolved\.path\)/);
+  assert.match(hook, /fileManagerPluginTab\(resolved\.path, \{ line, column \}\)/);
   // Session scratch and attachment files live outside the plugin's project
   // roots, so completion hands them back as an absolute path.
   assert.match(hook, /inProject: false/);
