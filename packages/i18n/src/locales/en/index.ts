@@ -1753,7 +1753,6 @@ sklm: {
     },
     workspace: "Project: {{workspace}}",
     temporarySession: "Temporary chat",
-    countdown: "Auto-denies in {{seconds}}s if you don't respond",
     fromSubagent: "Asked by the {{agent}} subagent",
     queued_one: "{{count}} more request is waiting",
     queued_other: "{{count}} more requests are waiting",
