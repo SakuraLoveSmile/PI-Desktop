@@ -1,9 +1,87 @@
 # Live Voice Work Integration Evidence
 
-Status: **P0—P6 implementation is present; the full v2 Definition of Done is
-not met**. P7 behavior mapping and cross-boundary integration coverage remain
-partial, and the real-provider/device matrix has not run. The attached v2
-specification remains the behavioral source.
+Current status: **IN_PROGRESS** for Live Work v2.1. The task changes are
+uncommitted and based on current `origin/main` at
+`7f6c2cd97c54abe295c7ae363cbcf125dcfb143f`. No real provider account, paid
+endpoint, user project, or running Electron instance was used. The v2.1 case
+map is [`live-work-v21-coverage.md`](live-work-v21-coverage.md), and its manual
+device matrix is [`live-work-v21-device-matrix.md`](live-work-v21-device-matrix.md).
+
+## Current v2.1 candidate
+
+- Branch/worktree: `codex/live-voice-v21-reliability` at
+  `/Users/lan/.codex/worktrees/live-voice-v21-refresh/PI-Desktop`.
+- Base: `7f6c2cd97c54abe295c7ae363cbcf125dcfb143f`; no candidate commit SHA
+  exists because this work remains uncommitted.
+- R01: fixed by synchronously capturing the Host active-turn target at
+  candidate ingress; explicit null is preserved. Evidence:
+  `packages/host-runtime/src/live-work/coordinator.test.ts` — “keeps an
+  ingress-time empty turn target instead of stopping a later turn”.
+- R02: fixed by removing implicit queue from ordinary submit and retaining
+  explicit queue admission only. Production composition and Host queue tests
+  cover the mapping; lock-race integration remains partial.
+- R03: fixed for in-process operations with exact read-only Host lookup,
+  bounded reconciliation, no resubmission, and monotonic terminal evidence.
+  Evidence: coordinator unknown-dispatch/terminal cases and AgentHost exact
+  lookup cases in the v2.1 coverage table. Restart-time Live recovery remains
+  intentionally unsupported.
+- R04: fixed at the local scheduler boundary with a reserved validated control
+  classifier lane, cancellation signal, classifier deadline, write stop
+  barrier, and bounded Host dispatch. A provider SDK honoring physical stream
+  cancellation is not claimed.
+- R05: fixed by separating admission and result fields, limiting results to
+  exact-turn root assistant content, bounded re-reads, and keeping stop
+  acknowledgements separate from task results.
+- R06: fixed with a private workspace fingerprint checked again by AgentHost
+  before turn or queue admission. Changed workspace rejection is covered at
+  the Host boundary; a full classification-race composition remains partial.
+- R07: fixed by draining explicit idle enqueue through AgentHost while leaving
+  restored held queues held; both paths have AgentHost tests.
+- R08: improved but **partial**. The deterministic production composition now
+  instantiates `createLiveWorkBridge`, `createAgentHostBridge`, the registered
+  `agentPrompt` handler, and real `AgentHost`. Host-core RPC, sidecar/model
+  completion, and provider wire IO are fixtures. Concrete Gemini/Realtime
+  adapters, Codex DataChannel controller, Rust persistence, MCP/plugin
+  permissions, and real-device journeys remain unverified.
+- R09: current live-work behavior docs, E2E plan, v2.1 case mapping, W2 audit,
+  ADR, and NOT RUN device matrix are updated in this working tree.
+
+The baseline deterministic reproductions were recorded before the fixes on
+base `f9543be51a2eea4f5010dd059fed6d68dddb8745`: an explicit null turn target
+could resolve to a later task; terminal evidence could be lost behind a
+missing submit ACK; result queries could return admission wording; and idle
+enqueue had no tested self-drain guarantee. Current regression evidence and
+its exact limits are in the v2.1 case map.
+
+## Current task-candidate validation
+
+The refreshed task candidate is `origin/main` at
+`7f6c2cd97c54abe295c7ae363cbcf125dcfb143f` plus the uncommitted changes in
+the request worktree above. No commit, push, pull request, or PR integration
+candidate has been created.
+
+| Check | Result |
+|---|---|
+| `pnpm build:js` | Passed. VitePress reported its existing missing `gitignore` highlighter and large-chunk warnings. |
+| `pnpm -r --if-present test` | Passed: 6,097 tests across workspace suites; desktop 3,176, shared 1,126, agent-runtime 1,113, plugin SDK 374, and all remaining workspace suites passed. |
+| `pnpm --filter @pi-desktop/desktop typecheck` | Passed. |
+| `pnpm lint` | Passed, including Biome and desktop style-token validation. |
+| `pnpm docs:check` | Passed: 83 English/Chinese specification pairs and 533 documentation pages; existing ADR format notes remain advisory. |
+| `pnpm check:agent-policy` | Passed. |
+| `node scripts/check-architecture.mjs` | Passed. |
+| `git diff --check` | Passed after the final evidence-table update. |
+
+Rust checks were not run because this task changes no Rust files. The isolated
+fixture tests exercise the Live Work bridge, registered prompt handler, and
+AgentHost; the real-provider/device matrix, full Electron acceptance journey,
+and PR integration candidate remain `NOT RUN`. No real account, paid endpoint,
+user project, or running Desktop instance was used.
+
+## Historical v2 phase-2 candidate and CI evidence
+
+The following records describe the earlier v2 candidate only. They are not
+v2.1 test results and must not be used as the current candidate SHA or PR
+state.
 
 ## Candidate and base
 
