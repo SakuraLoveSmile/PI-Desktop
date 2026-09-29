@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import type {
   AgentActivity,
   ContextCompactionMark,
+  PlanProposal,
   UiMessage,
 } from "@pi-desktop/shared";
 import { formatCompactTokenCount } from "@pi-desktop/shared";
@@ -53,6 +54,10 @@ import {
 } from "./TranscriptMenu";
 import { useSmoothText } from "../../../hooks/useSmoothText";
 import { TurnProcess } from "./TurnProcess";
+import { PlanApprovalBar } from "../../../components/PlanApprovalBar";
+import { AskToolCompletedSummary } from "../../../components/AskToolCompletedSummary";
+
+const EMPTY_PROPOSALS: PlanProposal[] = [];
 
 type AssistantTurnProps = {
   entry: AssistantTurnEntry;
@@ -344,6 +349,16 @@ export const AssistantTurn = memo(function AssistantTurn({
       ),
     [entry.parts],
   );
+  const proposals = useAppStore((state) =>
+    state.activeSessionId ? state.planHistory[state.activeSessionId] ?? EMPTY_PROPOSALS : EMPTY_PROPOSALS,
+  );
+  const toolCalls = new Set(turnAllActivityItems
+    .filter((item) => item.kind === "tool")
+    .map((item) => item.message.toolCallId));
+  const turnProposals = proposals.filter((proposal) => toolCalls.has(proposal.toolCallId));
+  const completedAsks = turnAllActivityItems.filter(
+    (item) => item.kind === "tool" && item.message.toolName === "asktool" && item.message.toolStatus === "success",
+  );
   const rawDelegationStatuses = useMemo(
     () =>
       collectDelegationStatuses(turnAllActivityItems, { turnLive: isActive }),
@@ -408,6 +423,7 @@ export const AssistantTurn = memo(function AssistantTurn({
       <div className="message-col">
         {groupProcess ? (
           <>
+            {completedAsks.map((item) => <AskToolCompletedSummary key={item.message.id} message={item.message} />)}
             {responses.map(renderPart)}
             <TurnProcess
               turnId={entry.id}
@@ -421,8 +437,12 @@ export const AssistantTurn = memo(function AssistantTurn({
             </TurnProcess>
           </>
         ) : (
-          entry.parts.map(renderPart)
+          <>
+            {entry.parts.map(renderPart)}
+            {completedAsks.map((item) => <AskToolCompletedSummary key={item.message.id} message={item.message} />)}
+          </>
         )}
+        {turnProposals.map((proposal) => <PlanApprovalBar key={proposal.id} proposal={proposal} />)}
         {turnAllActivityItems.filter((item) => item.kind === "tool" && item.message.toolName === "GenerateImages").map((item) => (
           <GeneratedImages key={item.message.id} message={item.message} />
         ))}

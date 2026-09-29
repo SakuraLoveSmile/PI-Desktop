@@ -216,6 +216,21 @@ export const ptBR = {
     sessionMissing: "Essa sessão não existe mais"
   },
   chat: {
+    goalMode: "Meta",
+    viewDetails: "Ver detalhes",
+    schedule: "Agendar",
+    scheduleTime: "Executar em",
+    confirmSchedule: "Confirmar agendamento",
+    runMissed: "Executar agora",
+    cancelSchedule: "Cancelar agendamento",
+    retryRevision: "Tentar revisão novamente",
+    revisionState: { ready: "Revisão pronta para nova tentativa", started: "Revisando", failed: "Falha na revisão", submitted: "Revisado" },
+    planDraftPending: "Envie ou limpe o rascunho antes de agir neste plano",
+    executionProvider: "Provedor de execução",
+    executionModel: "Modelo de execução",
+    scheduleState: { scheduled: "Agendado", missed: "Perdido", claimed: "Iniciado", cancelled: "Cancelado" },
+    scheduleExecutionState: { queued: "Na fila", running: "Em execução", completed: "Concluído", interrupted: "Interrompido" },
+    planStatus: { approved: "Aprovado", changes_requested: "Revisão solicitada", rejected: "Rejeitado", expired: "Expirado", interrupted: "Interrompido" },
     profileAgent: "Agente",
     profileAgentDesc: "Execução padrão de agente único",
     profileTeam: "Equipe de especialistas",
@@ -1671,6 +1686,8 @@ export const ptBR = {
     queued_other: "Mais {{count}} solicitações aguardando",
   },
   askTool: {
+    completedTitle: "Perguntas esclarecidas",
+    completedSkipped: "Ignorada",
     title: "Algumas perguntas",
     progress: "Pergunta {{current}} de {{total}}",
     questionNumber: "Pergunta {{number}}",
@@ -1736,6 +1753,7 @@ export const ptBR = {
     },
     closeTab: "Fechar {{name}}",
     tabs: {
+      overview: "Visão geral",
       team: "Equipe",
       review: "Revisar",
       browser: "Navegador",
@@ -1744,6 +1762,7 @@ export const ptBR = {
       subagent: "Subagente",
       goalReport: "Relatório da meta",
     },
+    overview: { noSession: "Nenhuma sessão selecionada", untitled: "Sessão sem título", project: "Projeto", model: "Modelo", modeLabel: "Modo", messages: "Mensagens", notAvailable: "Indisponível", progress: "Progresso", statusLabel: "Status atual", noPlans: "Nenhuma atividade de plano nesta sessão", artifacts: "Artefatos", noArtifacts: "Nenhum artefato nesta sessão", references: "Referências", noReferences: "Nenhuma referência de arquivo explícita", mode: { chat: "Chat", plan: "Plano", goal: "Meta" }, status: { idle: "Inativo", running: "Em execução", planning: "Planejando", awaiting_approval: "Aguardando aprovação", pending: "Pendente", approved: "Aprovado", rejected: "Rejeitado", expired: "Expirado", interrupted: "Interrompido", queued: "Na fila", completed: "Concluído", failed: "Falhou" } },
     pluginView: {
       failed: "Não foi possível carregar esta visualização. Recarregue o plugin e tente novamente."
     },

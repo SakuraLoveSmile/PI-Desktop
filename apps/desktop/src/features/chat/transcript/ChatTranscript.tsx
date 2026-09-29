@@ -1,12 +1,13 @@
 import { memo, type MouseEvent as ReactMouseEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { PlanningState, UiMessage } from "@pi-desktop/shared";
+import type { PlanProposal, PlanningState, UiMessage } from "@pi-desktop/shared";
 import { proposalKindForMode } from "@pi-desktop/shared";
 import { ConversationMinimap } from "../../../components/ConversationMinimap";
 import { PermissionCard } from "../../../components/PermissionCard";
 import { TooltipButton } from "../../../components/ui";
 import { TurnOutcomeCard } from "../../../components/TurnOutcomeCard";
 import { GoalReportCard } from "../../../components/GoalReportCard";
+import { PlanApprovalBar } from "../../../components/PlanApprovalBar";
 import { goalReportWorkPanelTab } from "../../../lib/work-panel-tabs";
 import { IconArrowDown } from "../../../components/icons";
 import { useAppStore } from "../../../stores/app-store";
@@ -31,6 +32,9 @@ import {
   useTranscriptMenu,
 } from "./TranscriptMenu";
 import { conversationMenuItems } from "./menu-items";
+import { ThinkingDisplayControl } from "./ThinkingDisplayControl";
+
+const EMPTY_PLAN_PROPOSALS: PlanProposal[] = [];
 
 type ChatTranscriptProps = {
   sessionId: string | undefined;
@@ -94,6 +98,7 @@ function TranscriptBody({
   const openTranscriptMenu = useTranscriptMenu();
   const { copyText, selectText } = useChatTextActions();
   const showToast = useAppStore((state) => state.showToast);
+  const settings = useAppStore((state) => state.settings);
   const transcriptRunning = isRunning && !readingWindow;
   const latestTurnResult = useAppStore((state) =>
     sessionId ? state.latestTurnResults[sessionId] : undefined,
@@ -108,6 +113,28 @@ function TranscriptBody({
     Boolean(
       sessionId && state.pendingPlans[sessionId]?.status === "pending",
     ),
+  );
+  const sessionProposals = useAppStore((state) =>
+    sessionId ? state.planHistory[sessionId] ?? EMPTY_PLAN_PROPOSALS : EMPTY_PLAN_PROPOSALS,
+  );
+  const currentProposal = useAppStore((state) =>
+    sessionId ? state.pendingPlans[sessionId] : undefined,
+  );
+  const visibleToolCalls = new Set(messages.map((message) => message.toolCallId));
+  const orphanedProposals: PlanProposal[] = [];
+  const orphanedIds = new Set<string>();
+  for (const proposal of [...sessionProposals, currentProposal]) {
+    if (!proposal || visibleToolCalls.has(proposal.toolCallId) || orphanedIds.has(proposal.id)) continue;
+    orphanedIds.add(proposal.id);
+    orphanedProposals.push(proposal);
+  }
+  orphanedProposals.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+  const firstVisibleMessageAt = messages[0] ? Date.parse(messages[0].createdAt) : NaN;
+  const olderOrphanedProposals = orphanedProposals.filter(
+    (proposal) => Number.isFinite(firstVisibleMessageAt) && Date.parse(proposal.createdAt) < firstVisibleMessageAt,
+  );
+  const recentOrphanedProposals = orphanedProposals.filter(
+    (proposal) => !olderOrphanedProposals.includes(proposal),
   );
   // Plan and Goal both project `planning`; the durable mode names which
   // contract is being written, so the indicator can use that kind's copy.
@@ -234,6 +261,22 @@ function TranscriptBody({
       ref={wrapRef}
       data-transcript-settling={veilCovering ? "true" : undefined}
     >
+      {settings ? (
+        <div className="transcript-display-toolbar">
+          <ThinkingDisplayControl
+            mode={settings.thinkingDisplayMode}
+            onChange={async (thinkingDisplayMode) => {
+              const next = { ...settings, thinkingDisplayMode };
+              try {
+                await api.setSettings(next);
+                useAppStore.setState({ settings: next });
+              } catch (error) {
+                showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+              }
+            }}
+          />
+        </div>
+      ) : null}
       {/* The minimap measures row positions against a rendered scroller. A
         * hidden pane has none, so measuring there would cache junk offsets and
         * reuse them on reveal. It is out of flow and re-measures on mount, so
@@ -275,6 +318,9 @@ function TranscriptBody({
             // view, which is exactly the jitter this avoids.
             <div className="transcript-hydration-spacer" aria-hidden />
           ) : null}
+          {!readingWindow ? olderOrphanedProposals.map((proposal) => (
+            <PlanApprovalBar key={proposal.id} proposal={proposal} />
+          )) : null}
           <TranscriptHistory entries={historyEntries} isRunning={isRunning} />
           {tailEntry ? (
             <TranscriptTail
@@ -296,6 +342,9 @@ function TranscriptBody({
           ) : null}
           {!readingWindow ? (
             <>
+              {recentOrphanedProposals.map((proposal) => (
+                <PlanApprovalBar key={proposal.id} proposal={proposal} />
+              ))}
               {goalReports?.map((report) => (
                 <GoalReportCard
                   key={report.reportId}

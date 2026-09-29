@@ -217,6 +217,21 @@ export const de = {
     sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
+    "goalMode": "Ziel",
+    "viewDetails": "Details ansehen",
+    "schedule": "Planen",
+    "scheduleTime": "Ausführen um",
+    "confirmSchedule": "Termin bestätigen",
+    "runMissed": "Jetzt ausführen",
+    "cancelSchedule": "Termin absagen",
+    "retryRevision": "Überarbeitung wiederholen",
+    "revisionState": { "ready": "Überarbeitung erneut möglich", "started": "Wird überarbeitet", "failed": "Überarbeitung fehlgeschlagen", "submitted": "Überarbeitet" },
+    "planDraftPending": "Entwurf senden oder leeren, bevor dieser Plan ausgeführt wird",
+    "executionProvider": "Anbieter für Ausführung",
+    "executionModel": "Ausführungsmodell",
+    "scheduleState": { "scheduled": "Geplant", "missed": "Verpasst", "claimed": "Gestartet", "cancelled": "Abgesagt" },
+    "scheduleExecutionState": { "queued": "In Warteschlange", "running": "Läuft", "completed": "Abgeschlossen", "interrupted": "Unterbrochen" },
+    "planStatus": { "approved": "Genehmigt", "changes_requested": "Überarbeitung angefordert", "rejected": "Abgelehnt", "expired": "Abgelaufen", "interrupted": "Unterbrochen" },
     "profileAgent": "Agent",
     "profileAgentDesc": "Standardmäßige Einzelagent-Ausführung",
     "profileTeam": "Expertenteam",
@@ -1716,6 +1731,8 @@ sklm: {
     "queued_other": "{{count}} weitere Anfragen warten"
   },
   "askTool": {
+    "completedTitle": "Fragen geklärt",
+    "completedSkipped": "Übersprungen",
     "title": "Ein paar Fragen",
     "progress": "Frage {{current}} von {{total}}",
     "questionNumber": "Frage {{number}}",
@@ -1785,6 +1802,7 @@ sklm: {
     },
     "closeTab": "Schließen {{name}}",
     "tabs": {
+      "overview": "Übersicht",
       "team": "Team",
       "review": "Überprüfen",
       "browser": "Browser",
@@ -1793,6 +1811,7 @@ sklm: {
       "subagent": "Subagent",
       goalReport: "Zielbericht",
     },
+    overview: { noSession: "Keine Sitzung ausgewählt", untitled: "Unbenannte Sitzung", project: "Projekt", model: "Modell", modeLabel: "Modus", messages: "Nachrichten", notAvailable: "Nicht verfügbar", progress: "Fortschritt", statusLabel: "Aktueller Status", noPlans: "Keine Planaktivität in dieser Sitzung", artifacts: "Artefakte", noArtifacts: "Keine Artefakte in dieser Sitzung", references: "Referenzen", noReferences: "Keine expliziten Dateireferenzen", mode: { chat: "Chat", plan: "Plan", goal: "Ziel" }, status: { idle: "Inaktiv", running: "Läuft", planning: "Planung", awaiting_approval: "Wartet auf Genehmigung", pending: "Ausstehend", approved: "Genehmigt", rejected: "Abgelehnt", expired: "Abgelaufen", interrupted: "Unterbrochen", queued: "Warteschlange", completed: "Abgeschlossen", failed: "Fehlgeschlagen" } },
     "pluginView": {
       "failed": "Diese Ansicht konnte nicht geladen werden. Laden Sie das Plugin neu und versuchen Sie es erneut."
     },

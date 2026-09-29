@@ -1131,6 +1131,8 @@ const {
   dispatchApprovedPlan,
   drainApprovedPlanExecutions,
   dispatchExecutionForProposal,
+  markMissedPlanSchedules,
+  pollPlanSchedules,
 } = planRuntime;
 
 const eventPersistence = createEventPersistence({
@@ -1221,6 +1223,8 @@ runtimeLifecycle = createRuntimeLifecycle({
   startHost,
   startSidecar,
   drainApprovedPlanExecutions,
+  markMissedPlanSchedules,
+  pollPlanSchedules,
   applyNetworkProxyFromAppSettings,
   plugins,
   setCurrentWorkspacePath,
@@ -1230,7 +1234,7 @@ runtimeLifecycle = createRuntimeLifecycle({
   isQuitting: () => quitting,
   getDisplayLocale: () => applicationAppearanceState.updaterLocale,
 });
-const { bootHostStatus, runtimeArch, bootBackends } = runtimeLifecycle;
+const { bootHostStatus, runtimeArch, bootBackends, stopPlanSchedulePoller } = runtimeLifecycle;
 
 const voiceService = createVoiceService(
   dataDir + "/voice-models",
@@ -1257,6 +1261,7 @@ function registerIpc() {
     dataDir,
     activeTurns,
     isTurnDispatchable,
+    waitForTurnSettlement,
     sessionProjects,
     persistenceOutbox,
     logger,
@@ -1485,6 +1490,7 @@ registerShutdownHandlers({
   logger,
   confirmQuitDialog,
   disposePowerSaveBlockers,
+  stopPlanSchedulePoller,
 });
 
 registerApplicationActivation({

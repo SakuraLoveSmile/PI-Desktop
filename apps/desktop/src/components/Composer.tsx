@@ -33,7 +33,6 @@ import {
 } from "../hooks/use-composer-autocomplete";
 import { ComposerAutocomplete } from "./ComposerAutocomplete";
 import { AskToolCard } from "./AskToolCard";
-import { PlanApprovalBar } from "./PlanApprovalBar";
 import {
   COMPOSER_MAX_VISIBLE_ROWS,
   COMPOSER_MIN_HEIGHT_PX,
@@ -126,6 +125,7 @@ export function Composer({
     [liveMessages, providerModels, providers, sessionCompactions],
   );
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
+  const revisePlan = useAppStore((s) => s.revisePlan);
   const showToast = useAppStore((s) => s.showToast);
   const composerPrefill = useAppStore((s) => s.composerPrefill);
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
@@ -164,7 +164,7 @@ export function Composer({
     prefill,
     t,
     invalidatePromptEnhancement,
-    inputBlocked: planCheckpoint?.status === "pending" || nativeInputBlocked,
+    inputBlocked: nativeInputBlocked,
   });
   const {
     ref,
@@ -200,7 +200,7 @@ export function Composer({
     settings?.largePasteThreshold,
   );
   const attachments = useComposerAttachments({
-    inputBlocked: approvalPending || nativeSession,
+    inputBlocked: nativeSession,
     activeSessionId,
     draftKey,
     largePasteThreshold,
@@ -230,9 +230,16 @@ export function Composer({
   } = attachments;
   const executionActive = isActivePlanExecution(planCheckpoint);
   const runActive = isRunning || executionActive;
-  const inputBlocked = approvalPending || pasting || nativeInputBlocked;
-  const controlsBlocked = approvalPending || nativeSession;
-  const sendBlocked = approvalPending || pasting || nativeInputBlocked;
+  const inputBlocked = pasting || nativeInputBlocked;
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const dirty = Boolean(value.trim() || activeFileReferences.length);
+    useAppStore.setState((state) => ({
+      planDraftsDirty: { ...state.planDraftsDirty, [activeSessionId]: dirty },
+    }));
+  }, [activeSessionId, value, activeFileReferences.length]);
+  const controlsBlocked = nativeSession;
+  const sendBlocked = pasting || nativeInputBlocked;
   const enhancementDraft = stripInlineComposerFileReferenceTokens(
     value,
     activeFileReferences,
@@ -403,6 +410,23 @@ export function Composer({
       !!modelId &&
       !isImageGenerationModel(imageGenerationCandidates, provider.id, modelId) &&
       (provider.hasSecret || provider.authKind === "none");
+  const submitPrompt = async (
+    content: Parameters<typeof sendPrompt>[0],
+    snapshot: Parameters<typeof sendPrompt>[1],
+  ) => {
+    if (planCheckpoint?.status === "pending") {
+      if (!planCheckpoint || !revisePlan) return false;
+      return revisePlan({
+        proposal: planCheckpoint,
+        content,
+        draft: snapshot,
+        providerId: provider?.id,
+        modelId,
+        thinkingLevel,
+      });
+    }
+    return sendPrompt(content, snapshot);
+  };
   const enterToSend = settings?.enterToSend ?? true;
   const hasDraftContent = Boolean(value.trim() || activeFileReferences.length);
 
@@ -423,7 +447,7 @@ export function Composer({
     pasting,
     activeFileReferences,
     t,
-    sendPrompt,
+    sendPrompt: submitPrompt,
     steerPrompt,
     showToast,
     draft: {
@@ -533,9 +557,6 @@ export function Composer({
       data-composer-dock={variant}
     >
       <div className="composer-stack">
-        {planCheckpoint?.status === "pending" ? (
-          <PlanApprovalBar proposal={planCheckpoint} />
-        ) : null}
         {pendingAsk ? (
           <AskToolCard key={pendingAsk.requestId} request={pendingAsk} queued={queuedAsks} />
         ) : null}

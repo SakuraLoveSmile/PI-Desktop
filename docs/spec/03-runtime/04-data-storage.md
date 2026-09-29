@@ -1,4 +1,4 @@
-# 04. Data Storage (Schema v21)
+# 04. Data Storage (Schema v22)
 
 ## 0. Ownership decision
 
@@ -238,7 +238,7 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- Schema version lives in `PRAGMA user_version` (v15 = `15`). The v1 `meta`
+- Schema version lives in `PRAGMA user_version` (current v22 = `22`). The v1 `meta`
   table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
@@ -535,8 +535,8 @@ CREATE INDEX idx_session_import_origins_plugin
   the projected state is shared. Terminal approval rows are historical
   durable records, not renderer gates; reject, expiry, or pending interruption
   returns live planning to editable state. The renderer may retain the latest
-  proposal/execution snapshot per session only for its current lifetime from
-  live Host events; `plans.pending` rehydrates only pending rows.
+  proposal/execution snapshot per session from live Host events; `plans.pending`
+  rehydrates the pending row and bounded terminal history as read-only cards.
 - `execution_profile` is orthogonal to `mode`: `standard` is the default and
   preserves the single-agent tool catalog; `team` makes this session the Lead
   of a Host-owned Expert Team. Existing rows migrate to `standard`.
@@ -648,20 +648,31 @@ approval UI may simply open the relative path.
 
 Approval changes `status` to `approved`, sets `execution_id` and
 `execution_state = 'queued'`, updates `sessions.mode` to `agent`, and stores
-the explicit permission mode in one transaction. Reject/expiry leave the
-session in its contract mode — Plan stays Plan and Goal stays Goal — and close
-the active gate; a later prompt can create a new pending row. The new protocol
-has no request-changes action; compatibility columns remain for older records.
+the explicit permission mode in one transaction. `request_changes` instead
+stores a validated revision intent on the immutable approval row, marks it
+`changes_requested`, and leaves the original artifact available for retry;
+the intent also keeps the submitted draft's attachment references so a failed
+revision can retry with the same files. The subsequent revision turn creates a
+new proposal and artifact. Reject/expiry
+leave the session in its contract mode — Plan stays Plan and Goal stays Goal —
+and close the active gate; a later prompt can create a new pending row.
+
+An approved execution may be bound to an explicit provider/model pair.
+`schedule` uses the same approval transaction but creates one
+`plan_execution_schedules` snapshot with a UTC instant, display timezone, and
+state. The schedule is claimed at most once; an overdue unclaimed snapshot is
+`missed` and requires explicit Run now confirmation. Cancellation is allowed
+only before claim. This table is separate from recurring `scheduled_tasks`.
 
 At startup, before serving RPC, one transaction changes every `pending` row to
 `interrupted` and every `queued` or `running` execution state to `interrupted`.
 The associated running turn is aborted. There is no serialized process-epoch
 column and no replay. A pending interruption leaves the session in its contract
 mode, while an already-approved queued/running interruption leaves it Agent.
-Renderer reload
-within the same host can list the pending row and its original `expires_at`;
-`plans.pending` returns no terminal rows, so rejected, expired, approved,
-completed, and interrupted cards are not rehydrated.
+Renderer reload within the same host can list the pending row and its original
+`expires_at`; the renderer also restores bounded proposal history for the
+session so immutable terminal cards remain inspectable and read-only. Only the
+current pending row is actionable.
 
 Serves: mid-session model switches ("next turn only", spec 13 §4), the
 per-message cost chip's session rollup (benchmark §3.2), failed/aborted badges
@@ -1340,7 +1351,7 @@ truncating at a guessed position.
 - JSON columns are read blind on hot paths (shipped to the renderer as-is);
   anything filtered or summed is a promoted column by rule.
 
-## 7. Versioning, v7 reset, and v8-to-v21 migration
+## 7. Versioning, v7 reset, and v8-to-v22 migration
 
 - `PRAGMA user_version` stays the schema authority; future structural changes
   add ordered Rust migration fns again, each in one transaction, with a
@@ -1351,7 +1362,13 @@ truncating at a guessed position.
   Sessions, providers, and settings from the old file are not carried over;
   the archive remains for manual recovery. All pre-v7 migration code
   (v1 `settings.sqlite` import, v2→v6 chain) is deleted.
-- Fresh installs run the full v21 DDL directly.
+- Fresh installs run the full v22 DDL directly.
+- **Schema v21 to v22 is additive.** It adds approved execution provider/model
+  bindings and the durable `revision_intent_*` fields to `plan_approvals`,
+  creates `plan_execution_schedules`, and sets `PRAGMA user_version = 22`.
+  The migration creates a readable pre-change backup and preserves all existing
+  proposals, artifacts, transcripts, and recurring scheduled tasks. Legacy
+  proposals remain readable with absent optional bindings and schedule state.
 - **Schema v7 first reaches v8, then uses the guarded path.** The v7→v8
   migration is followed by the same guarded v8→v15 migration; schema-v9 and
   schema-v10 databases take the same guarded path and receive an exact readable
@@ -1532,7 +1549,8 @@ columns for anything the host filters, joins, sums, or indexes.
 17. SubmitPlan and SubmitGoal write exact Markdown bytes to a unique
     `.pi/plan/*.md` or `.pi/goal/*.md` file
     with SHA-256 and size; title/question stay structured and renderer reload
-    retains only the pending row and original absolute deadline
+    retains the pending row, original absolute deadline, and bounded immutable
+    proposal history
 18. Full process restart marks pending/queued/running approval rows interrupted,
     aborts associated turns, performs no replay, keeps pending sessions in their
     contract mode,

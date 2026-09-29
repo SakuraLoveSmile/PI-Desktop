@@ -93,7 +93,7 @@ fn a_new_database_carries_the_owner_column_at_the_current_schema_version() {
     let (_dir, db, _secrets) = test_context();
     // v17 added the owner column, v18 turn-queue priority, v19 session omit,
     // v20 Goal reports, and v21 Expert Team; a fresh database gets the latest.
-    assert_eq!(SCHEMA_VERSION, 21);
+    assert_eq!(SCHEMA_VERSION, 22);
     let version: i64 = db
         .conn()
         .query_row("PRAGMA user_version", [], |row| row.get(0))

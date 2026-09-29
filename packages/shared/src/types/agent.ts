@@ -14,6 +14,8 @@ export type AgentPromptRequest = {
   content: string;
   /** Host-owned collaboration delivery; its durable record supplies the input. */
   sessionMessageId?: string;
+  /** Retired proposal whose durable revision intent authorizes this turn. */
+  revisionProposalId?: string;
   /** Attachments are resolved by Electron main and never trusted by the sidecar. */
   attachments?: AgentPromptAttachment[];
   /**

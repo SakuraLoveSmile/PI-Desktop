@@ -15352,3 +15352,38 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - Evidence: record candidate/base, OS/architecture, tests and native scenarios
   separately. Native Windows/Linux and signed release evidence are required
   before claiming those distribution lanes qualified.
+
+### E2E-PLAN-review-revision-and-execution
+
+- **Preconditions:** Isolated desktop profile, deterministic fake provider,
+  project workspace, and a Plan proposal with a known artifact hash.
+- **Steps:** Submit a Plan; verify the inline card and editable Composer remain
+  together; change the planning model and send a revision; reload and inspect
+  both immutable cards; open View details and verify the Work Panel Markdown
+  preview opens only after the click; convert the current Plan to Goal and
+  approve the new Goal separately; schedule a future one-time execution.
+- **Expected:** A revision retires only the exact pending proposal and creates a
+  new approval. A stale or duplicate response fails closed. Goal conversion
+  never executes the Plan. Schedule captures proposal id/version, artifact
+  hash, permission, timezone, and execution provider/model; it claims once.
+  An overdue schedule is `missed` and requires explicit Run now; cancellation
+  prevents a claim. Reload preserves terminal cards as read-only history.
+- **Specs:** 03-runtime/01, 03-runtime/02, 03-runtime/04, 03-runtime/06,
+  04-ux/01, 04-ux/08, ADR 0309.
+- **Status:** Required for the Plan workflow implementation candidate.
+
+### E2E-CHAT-asktool-overview-and-compact
+
+- **Preconditions:** Isolated session with a deterministic AskTool result,
+  attachment reference, Plan artifact, and persisted transcript.
+- **Steps:** Answer multiple, custom, and skipped questions; reload the session;
+  open Work Panel Overview; switch sessions; toggle Detailed/Compact in the
+  transcript toolbar and reload.
+- **Expected:** The answered questions render as a durable clarification
+  summary at the original tool position. Overview shows only current session
+  Progress, Artifacts, and References, with truthful empty states and trusted
+  preview links. Compact puts the answer first and preserves expandable
+  errors, approvals, AskTool summaries, Plan cards, search, and copy. The
+  preference remains synchronized with Settings.
+- **Specs:** 03-runtime/02, 03-runtime/04, 04-ux/01, 04-ux/08.
+- **Status:** Required for the transcript/UI candidate.

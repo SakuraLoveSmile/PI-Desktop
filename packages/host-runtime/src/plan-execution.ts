@@ -64,6 +64,12 @@ export function planExecutionFromUnknown(value: unknown): PlanExecution | null {
     targetPermissionMode: normalizeGlobalPermissionMode(
       value.targetPermissionMode,
     ),
+    ...(typeof value.executionProviderId === "string"
+      ? { executionProviderId: value.executionProviderId }
+      : {}),
+    ...(typeof value.executionModelId === "string"
+      ? { executionModelId: value.executionModelId }
+      : {}),
     state,
   };
 }

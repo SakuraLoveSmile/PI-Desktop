@@ -43,6 +43,7 @@ export type AgentIpcDependencies = {
   finishApprovedExecution: (executionId: string, status: PlanExecutionFinishStatus, errorCode?: string) => Promise<void>;
   dispatchApprovedPlan: (execution: unknown) => Promise<void>;
   dispatchExecutionForProposal: (proposalId: string) => Promise<void>;
+  waitForTurnSettlement: (sessionId: string, turnId: string) => Promise<void>;
   emitAgentEvent: (envelope: AgentEventEnvelope) => void;
   setNotificationViewingSessionId: (sessionId: string | null) => void;
   optionalWorkspaceRoot: () => Promise<string | null>;
@@ -82,6 +83,7 @@ export function registerAgentIpc({
   finishApprovedExecution,
   dispatchApprovedPlan,
   dispatchExecutionForProposal,
+  waitForTurnSettlement,
   emitAgentEvent,
   setNotificationViewingSessionId,
   optionalWorkspaceRoot,
@@ -313,6 +315,11 @@ export function registerAgentIpc({
       });
     }
     if (!host) throw new Error("host unavailable");
+    if (req.revisionProposalId && (req.sessionMessageId || req.truncateFromMessageId || req.truncateBefore !== undefined)) {
+      throw Object.assign(new Error("Revision cannot be combined with message delivery or truncation"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
     const releaseSessionOperation = await acquireSessionOperation(req.sessionId);
     try {
     const sessionMessage = await resolveSessionMessageInput(host, req);
@@ -424,16 +431,20 @@ export function registerAgentIpc({
     sidecar.setProjectInstructionRoot(req.sessionId, launch.projectPath);
 
     // Open a durable turn row, then persist the user message under it.
-    const turn = await host.call<{ turnId?: string }>("session.beginTurn", {
+    const turn = await host.call<{ turnId?: string; alreadyStarted?: boolean }>("session.beginTurn", {
       sessionId: req.sessionId,
       providerId: launch.providerId,
       modelId: launch.modelId,
+      ...(req.revisionProposalId
+        ? { revisionProposalId: req.revisionProposalId, revisionContent: req.content }
+        : {}),
       ...(sessionMessage ? { sessionMessageId: sessionMessage.origin.messageId } : {}),
     });
     const durableTurnId = String(turn?.turnId ?? "").trim();
     if (!durableTurnId) {
       throw new Error("session.beginTurn returned no turn");
     }
+    if (turn.alreadyStarted) return { accepted: true, turnId: durableTurnId };
     activeTurns.set(req.sessionId, durableTurnId);
     activeTurnUsages.delete(req.sessionId);
 
@@ -817,11 +828,11 @@ export function registerAgentIpc({
     const toolCallId = String(resolution?.toolCallId ?? "").trim();
     if (!toolCallId) throw new Error("toolCallId required");
     const action = resolution?.action;
-    if (action !== "approve" && action !== "reject") {
+    if (action !== "approve" && action !== "reject" && action !== "request_changes" && action !== "schedule") {
       throw new Error("invalid plan approval action");
     }
     let targetPermissionMode: GlobalPermissionMode | undefined;
-    if (action === "approve") {
+    if (action === "approve" || action === "schedule") {
       if (!isGlobalPermissionMode(resolution?.targetPermissionMode)) {
         throw Object.assign(new Error("targetPermissionMode is required for approval"), {
           errorCode: ErrorCodes.PLAN_PERMISSION_MODE_REQUIRED,
@@ -843,11 +854,30 @@ export function registerAgentIpc({
       action,
       ...(version !== undefined ? { version } : {}),
       ...(targetPermissionMode ? { targetPermissionMode } : {}),
+      ...("executionProviderId" in resolution ? { executionProviderId: resolution.executionProviderId } : {}),
+      ...("executionModelId" in resolution ? { executionModelId: resolution.executionModelId } : {}),
+      ...("scheduledFor" in resolution ? { scheduledFor: resolution.scheduledFor } : {}),
+      ...("scheduleTimezone" in resolution ? { scheduleTimezone: resolution.scheduleTimezone } : {}),
+      ...("revisionIntent" in resolution ? { revisionIntent: resolution.revisionIntent } : {}),
     });
     agentHostBridge?.settleApproval(proposalId, {
-      decision: action,
+      decision: action === "approve" || action === "schedule" ? "approve" : "reject",
       ...(targetPermissionMode ? { permissionMode: targetPermissionMode } : {}),
     });
+    if (action === "request_changes") {
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        await Promise.race([
+          waitForTurnSettlement(sessionId, turnId),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("Planning turn did not settle before revision")), 30_000);
+            timer.unref();
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
     if (action === "approve") {
       const execution = executionFromResponse(result);
       if (execution) {
@@ -857,6 +887,40 @@ export function registerAgentIpc({
       }
     }
     return result;
+  });
+
+  handle(IPC.invoke.plansRunMissed, async (input: { proposalId: string; sessionId: string }) => {
+    if (!host) throw new Error("host unavailable");
+    const proposalId = String(input?.proposalId ?? "").trim();
+    const sessionId = String(input?.sessionId ?? "").trim();
+    if (!proposalId || !sessionId) throw new Error("schedule identity required");
+    const result = await host.call("plans.claimSchedule", {
+      proposalId,
+      sessionId,
+      allowMissed: true,
+    });
+    void dispatchExecutionForProposal(proposalId);
+    return result;
+  });
+
+  handle(IPC.invoke.plansCancelSchedule, async (input: { proposalId: string; sessionId: string }) => {
+    if (!host) throw new Error("host unavailable");
+    const proposalId = String(input?.proposalId ?? "").trim();
+    const sessionId = String(input?.sessionId ?? "").trim();
+    if (!proposalId || !sessionId) throw new Error("schedule identity required");
+    return host.call("plans.cancelSchedule", { proposalId, sessionId });
+  });
+
+  handle(IPC.invoke.plansMarkRevisionFailed, async (input: { proposalId: string; sessionId: string; errorCode?: string }) => {
+    if (!host) throw new Error("host unavailable");
+    const proposalId = String(input?.proposalId ?? "").trim();
+    const sessionId = String(input?.sessionId ?? "").trim();
+    if (!proposalId || !sessionId) throw new Error("revision identity required");
+    return host.call("plans.markRevisionFailed", {
+      proposalId,
+      sessionId,
+      errorCode: input.errorCode ?? "PLAN_REVISION_FAILED",
+    });
   });
 
 }

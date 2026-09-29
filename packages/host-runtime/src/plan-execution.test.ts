@@ -53,6 +53,18 @@ describe("planExecutionFromUnknown", () => {
     expect(result?.artifact.workspaceKind).toBe("project");
   });
 
+  it("retains the approved execution model binding", () => {
+    const result = planExecutionFromUnknown({
+      ...validRecord,
+      executionProviderId: "provider-two",
+      executionModelId: "model-two",
+    });
+    expect(result).toMatchObject({
+      executionProviderId: "provider-two",
+      executionModelId: "model-two",
+    });
+  });
+
   it("rejects explicitly invalid workspaceKind at the boundary", () => {
     expect(
       planExecutionFromUnknown({

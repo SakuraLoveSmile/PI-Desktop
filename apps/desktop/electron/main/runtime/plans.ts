@@ -100,10 +100,13 @@ export function createPlanRuntime({
   dispatchApprovedPlan: (rawExecution: unknown) => Promise<void>;
   drainApprovedPlanExecutions: () => Promise<void>;
   dispatchExecutionForProposal: (proposalId: string) => Promise<void>;
+  markMissedPlanSchedules: () => Promise<void>;
+  pollPlanSchedules: () => Promise<void>;
 } {
 // Read the shared turn state once, by the names the finalizer below uses. The
 // instance is owned by the coordination factory; this module only reads it.
 const approvedExecutionKinds = new Map<string, string>();
+let scheduledPoll: Promise<void> | null = null;
 const {
   activeTurns,
   activeTurnUsages,
@@ -494,8 +497,20 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
       execution.sessionId,
       sessionResult.session,
       settings,
-      { mode: "agent" },
+      {
+        mode: "agent",
+        ...(execution.executionProviderId ? { providerId: execution.executionProviderId } : {}),
+        ...(execution.executionModelId ? { modelId: execution.executionModelId } : {}),
+      },
     );
+    if (
+      (execution.executionProviderId && launch.providerId !== execution.executionProviderId) ||
+      (execution.executionModelId && launch.modelId !== execution.executionModelId)
+    ) {
+      throw Object.assign(new Error("Approved execution model is unavailable"), {
+        errorCode: "PLAN_EXECUTION_MODEL_UNAVAILABLE",
+      });
+    }
     const turn = await runtimeState.host.call<{ turnId: string }>("session.beginTurn", {
       sessionId: execution.sessionId,
       providerId: launch.providerId,
@@ -601,11 +616,54 @@ async function dispatchExecutionForProposal(proposalId: string): Promise<void> {
     });
   }
 }
+async function markMissedPlanSchedules(): Promise<void> {
+  if (!runtimeState.host) return;
+  await runtimeState.host.call("plans.markMissedSchedules");
+}
+
+async function pollPlanSchedules(): Promise<void> {
+  if (scheduledPoll) return scheduledPoll;
+  scheduledPoll = (async () => {
+    if (!runtimeState.host || !runtimeState.sidecar || isQuitting()) return;
+    const due = await runtimeState.host.call<{ schedules?: Array<{ proposalId: string; sessionId: string }> }>("plans.dueSchedules");
+    for (const { proposalId, sessionId } of due.schedules ?? []) {
+      if (isQuitting()) break;
+      try {
+        const claimed = await runtimeState.host.call("plans.claimSchedule", { proposalId, sessionId });
+        const execution = executionFromResponse(claimed);
+        if (execution) await dispatchApprovedPlan(execution);
+      } catch (error) {
+        const code = (error as { data?: { errorCode?: string }; errorCode?: string })?.data?.errorCode
+          ?? (error as { errorCode?: string })?.errorCode;
+        if (code === "PLAN_SCHEDULE_SESSION_BUSY") {
+          try {
+            await runtimeState.host.call("plans.markScheduleMissed", { proposalId, sessionId });
+          } catch (markError) {
+            logger.app("runtime", "warn", "busy scheduled plan could not be marked missed", {
+              data: { proposalId, error: String(markError) },
+            });
+          }
+          continue;
+        }
+        logger.app("runtime", "warn", "scheduled plan claim failed", {
+          data: { proposalId, error: String(error) },
+        });
+      }
+    }
+  })();
+  try {
+    await scheduledPoll;
+  } finally {
+    scheduledPoll = null;
+  }
+}
   return {
     finishTurn,
     finishApprovedExecution,
     dispatchApprovedPlan,
     drainApprovedPlanExecutions,
     dispatchExecutionForProposal,
+    markMissedPlanSchedules,
+    pollPlanSchedules,
   };
 }

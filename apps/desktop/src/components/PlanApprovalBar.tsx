@@ -7,7 +7,7 @@ import type {
   ProposalKind,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
-import { fileWorkPanelTab, preferredFileWorkPanelTab } from "../lib/work-panel-tabs";
+import { fileWorkPanelTab } from "../lib/work-panel-tabs";
 import {
   PlanArtifactResolutionError,
   resolvePlanArtifactPath,
@@ -22,7 +22,7 @@ import {
   IconChevronDown,
   IconFileText,
 } from "./icons";
-import { TooltipButton } from "./ui";
+import { Button, Input, Select, SettingsToggle, TooltipButton } from "./ui";
 import { AnchoredMenu } from "./settings/AnchoredMenu";
 
 const APPROVAL_MODES: readonly GlobalPermissionMode[] = [
@@ -59,8 +59,16 @@ function copyKey(kind: ProposalKind, name: string): string {
 export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const { t } = useTranslation();
   const resolvePlan = useAppStore((state) => state.resolvePlan);
+  const convertPlanToGoal = useAppStore((state) => state.convertPlanToGoal);
+  const runMissedPlan = useAppStore((state) => state.runMissedPlan);
+  const cancelScheduledPlan = useAppStore((state) => state.cancelScheduledPlan);
+  const retryPlanRevision = useAppStore((state) => state.retryPlanRevision);
+  const cancelPlanConversion = useAppStore((state) => state.cancelPlanConversion);
+  const draftDirty = useAppStore((state) => state.planDraftsDirty[proposal.sessionId] === true);
+  const providers = useAppStore((state) => state.providers);
+  const providerModels = useAppStore((state) => state.providerModels);
+  const session = useAppStore((state) => state.sessions.find((item) => item.id === proposal.sessionId));
   const showToast = useAppStore((state) => state.showToast);
-  const pluginViews = useAppStore((state) => state.pluginViews);
   const openWorkPanelTabForSession = useAppStore(
     (state) => state.openWorkPanelTabForSession,
   );
@@ -69,15 +77,61 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const [approvalMode, setApprovalMode] = useState<GlobalPermissionMode>(
     readPlanApprovalMode(),
   );
+  const [goalRequested, setGoalRequested] = useState(proposal.kind === "goal");
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState("");
+  const [executionProviderId, setExecutionProviderId] = useState(
+    proposal.executionProviderId ?? proposal.planningProviderId ?? session?.providerId ?? "",
+  );
+  const [executionModelId, setExecutionModelId] = useState(
+    proposal.executionModelId ?? proposal.planningModelId ?? session?.modelId ?? "",
+  );
   const kind: ProposalKind = proposal.kind === "goal" ? "goal" : "plan";
   const copy = (name: string) => t(copyKey(kind, name));
   const artifactPath = proposal.artifact?.relativePath?.trim() || null;
   const isPending = proposal.status === "pending";
   const busy = resolving;
+  const blockedByDraft = isPending && draftDirty;
+  const scheduleInstant = scheduledFor ? new Date(scheduledFor).getTime() : NaN;
+  const scheduleValid = Number.isFinite(scheduleInstant) && scheduleInstant > Date.now();
+  const selectedProvider = providers.find((item) => item.id === executionProviderId);
+  const configuredModels = selectedProvider?.models.map((item) => ({ id: item.id, label: item.id })) ?? [];
+  const discoveredModels = providerModels[executionProviderId]?.map((item) => ({
+    id: item.modelId,
+    label: item.displayName || item.modelId,
+  })) ?? [];
+  const modelOptions = discoveredModels.length > 0 ? discoveredModels : configuredModels;
+  const scheduleLabel = proposal.scheduledFor
+    ? (() => {
+        try {
+          return new Intl.DateTimeFormat(undefined, {
+            dateStyle: "medium",
+            timeStyle: "short",
+            timeZone: proposal.scheduleTimezone || undefined,
+          }).format(new Date(proposal.scheduledFor));
+        } catch {
+          return proposal.scheduledFor;
+        }
+      })()
+    : "";
+  const statusLabel = proposal.executionState
+    ? t(`chat.scheduleExecutionState.${proposal.executionState}`)
+    : proposal.scheduleState
+      ? t(`chat.scheduleState.${proposal.scheduleState}`)
+      : proposal.revisionIntent
+        ? t(`chat.revisionState.${proposal.revisionIntent.state}`)
+      : !isPending
+        ? t(`chat.planStatus.${proposal.status}`)
+        : null;
 
   useEffect(() => {
     setApprovalMode(readPlanApprovalMode());
     setMenuOpen(false);
+    setGoalRequested(proposal.kind === "goal");
+    setScheduleOpen(false);
+    setScheduledFor("");
+    setExecutionProviderId(proposal.executionProviderId ?? proposal.planningProviderId ?? session?.providerId ?? "");
+    setExecutionModelId(proposal.executionModelId ?? proposal.planningModelId ?? session?.modelId ?? "");
   }, [proposal.id]);
 
   useEffect(() => {
@@ -92,12 +146,13 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   };
 
   const resolve = async (
-    action: "approve" | "reject",
+    action: "approve" | "reject" | "request_changes" | "schedule",
     targetPermissionMode?: GlobalPermissionMode,
   ) => {
-    if (busy || !isPending) return;
+    if (busy || !isPending || (blockedByDraft && action !== "reject")) return;
+    if (action === "schedule" && (!scheduleValid || !executionProviderId || !executionModelId)) return;
     setMenuOpen(false);
-    if (action === "approve") {
+    if (action === "approve" || action === "schedule") {
       const selectedMode = targetPermissionMode ?? PLAN_APPROVAL_DEFAULT_MODE;
       setApprovalMode(selectedMode);
       rememberPlanApprovalMode(selectedMode);
@@ -118,8 +173,20 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
               action,
               targetPermissionMode:
                 targetPermissionMode ?? PLAN_APPROVAL_DEFAULT_MODE,
+              executionProviderId,
+              executionModelId,
             }
-          : { ...identity, action },
+          : action === "schedule"
+            ? {
+                ...identity,
+                action,
+                targetPermissionMode: targetPermissionMode ?? PLAN_APPROVAL_DEFAULT_MODE,
+                executionProviderId,
+                executionModelId,
+                scheduledFor: new Date(scheduleInstant).toISOString(),
+                scheduleTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              }
+            : { ...identity, action },
       );
       focusComposer();
     } catch (error) {
@@ -137,9 +204,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
       if (!resolved) return;
       openWorkPanelTabForSession(
         proposal.sessionId,
-        resolved.temporary
-          ? fileWorkPanelTab(resolved.path)
-          : preferredFileWorkPanelTab(resolved.path, pluginViews),
+        fileWorkPanelTab(resolved.path),
       );
     } catch (error) {
       const key = error instanceof PlanArtifactResolutionError
@@ -154,6 +219,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.target instanceof HTMLSelectElement) return;
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
@@ -210,8 +276,18 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
       </span>
       <div className="plan-approval-copy">
         <h2 className="plan-approval-title">
+          <IconFileText size={15} aria-hidden />
           {proposal.title.trim() || copy("untitled")}
         </h2>
+        <p className="plan-approval-summary">
+          {(proposal.question.trim().length > 20 ? proposal.question : proposal.title).trim()}
+        </p>
+        {statusLabel ? (
+          <p className="plan-approval-schedule-status" role="status">
+            {statusLabel}
+            {scheduleLabel ? ` · ${scheduleLabel} ${proposal.scheduleTimezone ?? ""}` : ""}
+          </p>
+        ) : null}
         <div className="plan-approval-details">
           {artifactPath ? (
             <button
@@ -226,7 +302,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
             >
               <IconFileText size={14} aria-hidden />
               <span className="plan-approval-artifact-label">
-                {copy("openArtifact")}
+                {t("chat.viewDetails")}
               </span>
               <span className="plan-approval-artifact-path">
                 {artifactPath}
@@ -235,8 +311,41 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
           ) : null}
         </div>
       </div>
+      {blockedByDraft ? <p className="plan-approval-draft-warning">{t("chat.planDraftPending")}</p> : null}
       {isPending ? (
         <div className="plan-approval-actions">
+          <span className="plan-approval-goal-toggle">
+            <span>{t("chat.goalMode", "Goal")}</span>
+            <SettingsToggle
+              checked={goalRequested}
+              disabled={blockedByDraft || kind === "goal"}
+              label={t("chat.goalMode")}
+              onChange={() => {
+                if (blockedByDraft || kind !== "plan") return;
+                if (goalRequested) {
+                  void cancelPlanConversion(proposal)
+                    .then((cancelled) => { if (cancelled) setGoalRequested(false); })
+                    .catch((error) => showToast(String(error), { variant: "error" }));
+                  return;
+                }
+                if (busy) return;
+                setGoalRequested(true);
+                setResolving(true);
+                void convertPlanToGoal(proposal)
+                  .then((accepted) => { if (!accepted) setGoalRequested(false); })
+                  .catch((error) => showToast(error instanceof Error ? error.message : String(error), { variant: "error" }))
+                  .finally(() => setResolving(false));
+              }}
+            />
+          </span>
+          <Button
+            type="button"
+            className="plan-approval-schedule"
+            disabled={busy || blockedByDraft}
+            onClick={() => setScheduleOpen((open) => !open)}
+          >
+            {t("chat.schedule", "Schedule")}
+          </Button>
           <button
             type="button"
             className="plan-approval-reject"
@@ -259,7 +368,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                 <button
                   type="button"
                   className="plan-approval-approve-main"
-                  disabled={busy}
+                  disabled={busy || blockedByDraft || !executionProviderId || !executionModelId}
                   aria-label={copy(APPROVE_LABELS[approvalMode])}
                   onClick={() => void resolve("approve", approvalMode)}
                 >
@@ -271,7 +380,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                   ref={ref}
                   type="button"
                   className="plan-approval-approve-menu"
-                  disabled={busy}
+                  disabled={busy || blockedByDraft}
                   ariaLabel={copy("chooseApprovalMode")}
                   tooltip={copy("chooseApprovalMode")}
                   aria-haspopup="menu"
@@ -303,7 +412,90 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                 ) : null}
               </button>
             ))}
+            <div className="plan-approval-execution-binding">
+              <label>
+                <span>{t("chat.executionProvider")}</span>
+                <Select
+                  value={executionProviderId}
+                  onChange={(event) => {
+                    const nextProvider = event.target.value;
+                    setExecutionProviderId(nextProvider);
+                    setExecutionModelId(providers.find((item) => item.id === nextProvider)?.models[0]?.id ?? "");
+                  }}
+                >
+                  {providers.filter((item) => item.enabled).map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </Select>
+              </label>
+              <label>
+                <span>{t("chat.executionModel")}</span>
+                <Select value={executionModelId} onChange={(event) => setExecutionModelId(event.target.value)}>
+                  {executionModelId && !modelOptions.some((item) => item.id === executionModelId)
+                    ? <option value={executionModelId}>{executionModelId}</option>
+                    : null}
+                  {modelOptions.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </Select>
+              </label>
+            </div>
           </AnchoredMenu>
+          {scheduleOpen ? (
+            <div className="plan-approval-schedule-popover">
+              <label>
+                <span>{t("chat.scheduleTime", "Run at")}</span>
+                <Input
+                  type="datetime-local"
+                  value={scheduledFor}
+                  onChange={(event) => setScheduledFor(event.target.value)}
+                />
+              </label>
+              <span>{Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+              <span>{selectedProvider?.name ?? executionProviderId} / {executionModelId} · {copy(APPROVAL_MODE_LABELS[approvalMode])}</span>
+              <Button
+                type="button"
+                disabled={!scheduleValid || busy || blockedByDraft || !executionProviderId || !executionModelId}
+                onClick={() => void resolve("schedule", approvalMode)}
+              >
+                {t("chat.confirmSchedule", "Confirm schedule")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : proposal.scheduleState === "missed" || proposal.scheduleState === "scheduled" ? (
+        <div className="plan-approval-actions">
+          {proposal.scheduleState === "missed" ? (
+            <Button type="button" disabled={busy} onClick={() => {
+              setResolving(true);
+              void runMissedPlan(proposal).catch((error) => showToast(String(error), { variant: "error" })).finally(() => setResolving(false));
+            }}>{t("chat.runMissed")}</Button>
+          ) : null}
+          <Button type="button" disabled={busy} onClick={() => {
+            setResolving(true);
+            void cancelScheduledPlan(proposal).catch((error) => showToast(String(error), { variant: "error" })).finally(() => setResolving(false));
+          }}>{t("chat.cancelSchedule")}</Button>
+        </div>
+      ) : proposal.revisionIntent?.targetKind === "goal" &&
+          (proposal.revisionIntent.state === "ready" || proposal.revisionIntent.state === "started") ? (
+        <div className="plan-approval-actions">
+          <span className="plan-approval-goal-toggle">
+            <span>{t("chat.goalMode")}</span>
+            <SettingsToggle checked label={t("chat.goalMode")} onChange={() => {
+              void cancelPlanConversion(proposal).catch((error) => showToast(String(error), { variant: "error" }));
+            }} />
+          </span>
+          {proposal.revisionIntent.state === "ready" ? (
+            <Button type="button" disabled={busy} onClick={() => {
+              setResolving(true);
+              void retryPlanRevision(proposal).catch((error) => showToast(String(error), { variant: "error" })).finally(() => setResolving(false));
+            }}>{t("chat.retryRevision")}</Button>
+          ) : null}
+        </div>
+      ) : proposal.revisionIntent?.state === "ready" || proposal.revisionIntent?.state === "failed" ? (
+        <div className="plan-approval-actions">
+          <Button type="button" disabled={busy} onClick={() => {
+            setResolving(true);
+            void retryPlanRevision(proposal).catch((error) => showToast(String(error), { variant: "error" })).finally(() => setResolving(false));
+          }}>{t("chat.retryRevision")}</Button>
         </div>
       ) : null}
     </section>

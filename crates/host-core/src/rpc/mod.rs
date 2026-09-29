@@ -3370,6 +3370,35 @@ async fn handle_request(
             let st = state.lock().await;
             let provider = params.get("providerId").and_then(Value::as_str);
             let model = params.get("modelId").and_then(Value::as_str);
+            if let Some(proposal_id) = params.get("revisionProposalId").and_then(Value::as_str) {
+                if params.get("sessionMessageId").is_some() {
+                    return Err(rpc_err(
+                        1002,
+                        "revision cannot bind a collaboration message",
+                        "INVALID_PARAMS",
+                    ));
+                }
+                let content = params
+                    .get("revisionContent")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| rpc_err(1002, "revisionContent required", "INVALID_PARAMS"))?;
+                let provider_id = provider
+                    .ok_or_else(|| rpc_err(1002, "providerId required", "INVALID_PARAMS"))?;
+                let model_id =
+                    model.ok_or_else(|| rpc_err(1002, "modelId required", "INVALID_PARAMS"))?;
+                let (turn_id, already_started) = st
+                    .plans
+                    .begin_revision_turn(
+                        &st.db,
+                        proposal_id,
+                        session_id,
+                        content,
+                        provider_id,
+                        model_id,
+                    )
+                    .map_err(plan_rpc_err)?;
+                return Ok(json!({ "turnId": turn_id, "alreadyStarted": already_started }));
+            }
             let turn_id = match params.get("sessionMessageId").and_then(Value::as_str) {
                 Some(message_id) => crate::session_collaboration::begin_turn(
                     &st.db, session_id, message_id, provider, model,
@@ -3388,23 +3417,66 @@ async fn handle_request(
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("completed");
-            let st = state.lock().await;
-            let result = sessions::end_turn_settling(
-                &st.db,
-                turn_id,
-                status,
-                params.get("errorCode").and_then(|v| v.as_str()),
-                params.get("usage"),
-                params
-                    .get("createNotification")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true),
-                params
-                    .get("recoverInflight")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
-            )
-            .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let (result, revision) = {
+                let st = state.lock().await;
+                let result = sessions::end_turn_settling(
+                    &st.db,
+                    turn_id,
+                    status,
+                    params.get("errorCode").and_then(|v| v.as_str()),
+                    params.get("usage"),
+                    params
+                        .get("createNotification")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true),
+                    params
+                        .get("recoverInflight")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                )
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                let revision = if result.updated {
+                    let code = match status {
+                        "error" => "PLAN_REVISION_TURN_FAILED",
+                        "aborted" => "PLAN_REVISION_ABORTED",
+                        _ => "PLAN_REVISION_NO_PROPOSAL",
+                    };
+                    st.plans
+                        .finish_revision_turn(&st.db, turn_id, code)
+                        .map_err(plan_rpc_err)?
+                } else {
+                    None
+                };
+                let revision = if let Some(proposal) = revision {
+                    let session_id = proposal.session_id.clone();
+                    let state = st
+                        .plans
+                        .state_for_session(&st.db, &session_id)
+                        .map_err(plan_rpc_err)?;
+                    let kind = st
+                        .plans
+                        .active_kind(&st.db, &session_id)
+                        .map_err(plan_rpc_err)?;
+                    Some((proposal, state, kind))
+                } else {
+                    None
+                };
+                (result, revision)
+            };
+            if let Some((proposal, planning_state, kind)) = revision {
+                emit_notification(
+                    &tx,
+                    "plans.changed",
+                    json!({
+                        "sessionId": proposal.session_id,
+                        "proposalId": proposal.id,
+                        "state": planning_state,
+                        "kind": kind,
+                        "proposal": proposal,
+                    }),
+                )
+                .await;
+            }
             let mut response = json!({ "ok": result.updated });
             if let Some(notification) = result.notification {
                 response["notification"] = json!(notification);
@@ -3623,10 +3695,14 @@ async fn handle_request(
         "plans.pending" => {
             let session_id = params.get("sessionId").and_then(|v| v.as_str());
             let st = state.lock().await;
-            let (pending, planning_state, kind) = {
+            let (pending, history, planning_state, kind) = {
                 let crate::state::AppState { db, plans, .. } = &*st;
                 let pending = plans
                     .pending_for_session(db, session_id)
+                    .map_err(plan_rpc_err)?;
+                let history = session_id
+                    .map(|id| plans.history_for_session(db, id))
+                    .transpose()
                     .map_err(plan_rpc_err)?;
                 let planning_state = session_id
                     .map(|id| plans.state_for_session(db, id))
@@ -3639,9 +3715,11 @@ async fn handle_request(
                     .transpose()
                     .map_err(plan_rpc_err)?
                     .flatten();
-                (pending, planning_state, kind)
+                (pending, history, planning_state, kind)
             };
-            Ok(json!({ "plans": pending, "state": planning_state, "kind": kind }))
+            Ok(
+                json!({ "plans": pending, "history": history, "state": planning_state, "kind": kind }),
+            )
         }
         "plans.enter" => {
             let session_id = params
@@ -3785,7 +3863,7 @@ async fn handle_request(
             let resolution = {
                 let guard = state.lock().await;
                 let st = &*guard;
-                let workspace = if action == "approve" {
+                let workspace = if action == "approve" || action == "schedule" {
                     let proposal = plans::get_proposal(&st.db, proposal_id)
                         .map_err(plan_rpc_err)?
                         .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))?;
@@ -3818,7 +3896,7 @@ async fn handle_request(
                     None
                 };
                 st.plans
-                    .resolve(
+                    .resolve_with_options(
                         &st.db,
                         crate::plans::PlanResolveParams {
                             workspace_root: workspace.as_deref(),
@@ -3829,6 +3907,19 @@ async fn handle_request(
                             version,
                             action,
                             target_permission_mode: target,
+                        },
+                        crate::plans::PlanResolveOptions {
+                            execution_provider_id: params
+                                .get("executionProviderId")
+                                .and_then(|v| v.as_str()),
+                            execution_model_id: params
+                                .get("executionModelId")
+                                .and_then(|v| v.as_str()),
+                            scheduled_for: params.get("scheduledFor").and_then(|v| v.as_str()),
+                            schedule_timezone: params
+                                .get("scheduleTimezone")
+                                .and_then(|v| v.as_str()),
+                            revision_intent: params.get("revisionIntent"),
                         },
                     )
                     .map_err(plan_rpc_err)?
@@ -3870,6 +3961,230 @@ async fn handle_request(
                 .queued_executions(&st.db, session_id)
                 .map_err(plan_rpc_err)?;
             Ok(json!({ "executions": executions }))
+        }
+        "plans.markMissedSchedules" => {
+            let now = params
+                .get("nowMs")
+                .and_then(|v| v.as_i64())
+                .unwrap_or_else(crate::db::now_ms);
+            let (proposal_ids, proposals) = {
+                let st = state.lock().await;
+                let proposal_ids = st
+                    .plans
+                    .mark_overdue_schedules_missed(&st.db, now)
+                    .map_err(plan_rpc_err)?;
+                let proposals = proposal_ids
+                    .iter()
+                    .map(|id| {
+                        plans::get_proposal(&st.db, id)
+                            .map_err(plan_rpc_err)?
+                            .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))
+                    })
+                    .collect::<std::result::Result<Vec<_>, JsonRpcError>>()?;
+                (proposal_ids, proposals)
+            };
+            for proposal in proposals {
+                emit_notification(
+                    &tx,
+                    "plans.changed",
+                    json!({
+                        "sessionId": proposal.session_id,
+                        "proposalId": proposal.id,
+                        "state": "inactive",
+                        "kind": proposal.kind,
+                        "proposal": proposal,
+                    }),
+                )
+                .await;
+            }
+            Ok(json!({ "proposalIds": proposal_ids }))
+        }
+        "plans.dueSchedules" => {
+            let now = params
+                .get("nowMs")
+                .and_then(|v| v.as_i64())
+                .unwrap_or_else(crate::db::now_ms);
+            let st = state.lock().await;
+            let proposal_ids = st.plans.due_schedules(&st.db, now).map_err(plan_rpc_err)?;
+            let schedules = proposal_ids
+                .iter()
+                .map(|id| {
+                    let proposal = plans::get_proposal(&st.db, id)
+                        .map_err(plan_rpc_err)?
+                        .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))?;
+                    Ok(json!({ "proposalId": id, "sessionId": proposal.session_id }))
+                })
+                .collect::<std::result::Result<Vec<_>, JsonRpcError>>()?;
+            Ok(json!({ "schedules": schedules }))
+        }
+        "plans.claimSchedule" => {
+            let proposal_id = params
+                .get("proposalId")
+                .and_then(|v| v.as_str())
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "proposalId required", "INVALID_PARAMS"))?;
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let now = params
+                .get("nowMs")
+                .and_then(|v| v.as_i64())
+                .unwrap_or_else(crate::db::now_ms);
+            let allow_missed = params
+                .get("allowMissed")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let execution = {
+                let st = state.lock().await;
+                let proposal = plans::get_proposal(&st.db, proposal_id)
+                    .map_err(plan_rpc_err)?
+                    .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))?;
+                if proposal.session_id != session_id {
+                    return Err(plan_rpc_err("PLAN_APPROVAL_STALE"));
+                }
+                st.plans
+                    .claim_schedule(&st.db, proposal_id, now, allow_missed)
+                    .map_err(plan_rpc_err)?
+            };
+            emit_notification(
+                &tx,
+                "plans.changed",
+                json!({
+                    "sessionId": execution.session_id,
+                    "proposalId": execution.proposal_id,
+                    "state": "inactive",
+                    "kind": execution.kind,
+                    "execution": execution,
+                }),
+            )
+            .await;
+            Ok(json!({ "execution": execution }))
+        }
+        "plans.cancelSchedule" => {
+            let proposal_id = params
+                .get("proposalId")
+                .and_then(|v| v.as_str())
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "proposalId required", "INVALID_PARAMS"))?;
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let (cancelled, proposal) = {
+                let st = state.lock().await;
+                let proposal = plans::get_proposal(&st.db, proposal_id)
+                    .map_err(plan_rpc_err)?
+                    .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))?;
+                if proposal.session_id != session_id {
+                    return Err(plan_rpc_err("PLAN_APPROVAL_STALE"));
+                }
+                let cancelled = st
+                    .plans
+                    .cancel_schedule(&st.db, proposal_id)
+                    .map_err(plan_rpc_err)?;
+                let proposal = plans::get_proposal(&st.db, proposal_id).map_err(plan_rpc_err)?;
+                (cancelled, proposal)
+            };
+            if cancelled {
+                if let Some(ref proposal) = proposal {
+                    emit_notification(
+                        &tx,
+                        "plans.changed",
+                        json!({
+                            "sessionId": proposal.session_id,
+                            "proposalId": proposal.id,
+                            "state": "inactive",
+                            "kind": proposal.kind,
+                            "proposal": proposal,
+                        }),
+                    )
+                    .await;
+                }
+            }
+            Ok(json!({ "cancelled": cancelled, "proposal": proposal }))
+        }
+        "plans.markScheduleMissed" => {
+            let proposal_id = params
+                .get("proposalId")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "proposalId required", "INVALID_PARAMS"))?;
+            let session_id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let (changed, proposal) = {
+                let st = state.lock().await;
+                let proposal = plans::get_proposal(&st.db, proposal_id)
+                    .map_err(plan_rpc_err)?
+                    .ok_or_else(|| plan_rpc_err("PLAN_NOT_FOUND"))?;
+                if proposal.session_id != session_id {
+                    return Err(plan_rpc_err("PLAN_APPROVAL_STALE"));
+                }
+                let changed = st
+                    .plans
+                    .miss_schedule(&st.db, proposal_id, crate::db::now_ms())
+                    .map_err(plan_rpc_err)?;
+                let updated = plans::get_proposal(&st.db, proposal_id).map_err(plan_rpc_err)?;
+                (changed, updated)
+            };
+            if changed {
+                if let Some(ref proposal) = proposal {
+                    emit_notification(
+                        &tx,
+                        "plans.changed",
+                        json!({
+                            "sessionId": session_id, "proposalId": proposal_id,
+                            "state": "inactive", "kind": proposal.kind, "proposal": proposal,
+                        }),
+                    )
+                    .await;
+                }
+            }
+            Ok(json!({ "changed": changed, "proposal": proposal }))
+        }
+        "plans.markRevisionFailed" => {
+            let proposal_id = params
+                .get("proposalId")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "proposalId required", "INVALID_PARAMS"))?;
+            let session_id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let error_code = params
+                .get("errorCode")
+                .and_then(Value::as_str)
+                .unwrap_or("PLAN_REVISION_FAILED");
+            let (changed, proposal) = {
+                let st = state.lock().await;
+                let changed = st
+                    .plans
+                    .mark_revision_failed(&st.db, proposal_id, session_id, error_code)
+                    .map_err(plan_rpc_err)?;
+                let proposal = plans::get_proposal(&st.db, proposal_id).map_err(plan_rpc_err)?;
+                (changed, proposal)
+            };
+            if changed {
+                if let Some(ref proposal) = proposal {
+                    emit_notification(
+                        &tx,
+                        "plans.changed",
+                        json!({
+                            "sessionId": session_id, "proposalId": proposal_id,
+                            "state": "planning", "kind": proposal.kind, "proposal": proposal,
+                        }),
+                    )
+                    .await;
+                }
+            }
+            Ok(json!({ "changed": changed, "proposal": proposal }))
         }
         "plans.claimExecution" => {
             let execution_id = params
@@ -9893,6 +10208,78 @@ mod tests {
         let messages = detail["session"]["messages"].as_array().unwrap();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0]["status"], json!("aborted"));
+    }
+
+    #[tokio::test]
+    async fn ending_unsubmitted_revision_turn_makes_it_retryable() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Goal conversion".into()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let original = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
+        sessions::end_turn(&app_state.db, &original, "completed", None, None, false).unwrap();
+        let revision = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
+        app_state
+            .db
+            .conn()
+            .execute(
+                "INSERT INTO plan_approvals (
+               request_id, session_id, turn_id, tool_call_id, kind, plan_json,
+               title, question, status, created_at, updated_at,
+               revision_intent_json, revision_state, revision_turn_id
+             ) VALUES ('revision-p1', ?1, ?2, 'submit-call', 'plan', '# Plan',
+               'Plan', 'Proceed?', 'changes_requested', 1, 1,
+               ?3, 'started', ?4)",
+                rusqlite::params![
+                    session.id,
+                    original,
+                    json!({
+                        "content": "Convert this plan",
+                        "providerId": "provider",
+                        "modelId": "model",
+                        "thinkingLevel": "off",
+                        "targetKind": "goal"
+                    })
+                    .to_string(),
+                    revision,
+                ],
+            )
+            .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        handle_request(
+            state.clone(),
+            "session.endTurn",
+            json!({ "turnId": revision, "status": "error", "errorCode": "MODEL_ERROR" }),
+            tx,
+        )
+        .await
+        .unwrap();
+        let st = state.lock().await;
+        let revision_state: String = st
+            .db
+            .conn()
+            .query_row(
+                "SELECT revision_state FROM plan_approvals WHERE request_id = 'revision-p1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(revision_state, "failed");
+        let changed: Value = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
+        assert_eq!(changed["method"], "plans.changed");
+        assert_eq!(
+            changed["params"]["proposal"]["revisionIntent"]["state"],
+            "failed"
+        );
     }
 
     #[tokio::test]

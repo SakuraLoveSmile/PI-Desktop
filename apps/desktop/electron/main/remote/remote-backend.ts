@@ -79,6 +79,9 @@ const HANDLED_CHANNELS: ReadonlySet<string> = new Set([
   IPC.invoke.toolResolvePermission,
   IPC.invoke.askToolResolve,
   IPC.invoke.plansResolve,
+  IPC.invoke.plansRunMissed,
+  IPC.invoke.plansCancelSchedule,
+  IPC.invoke.plansMarkRevisionFailed,
   IPC.invoke.plansPending,
   IPC.invoke.goalReportGet,
   IPC.invoke.goalReportList,
@@ -157,7 +160,13 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
   const invoke = async (channel: string, args: readonly unknown[]): Promise<unknown> => {
     switch (channel) {
       case IPC.invoke.agentPrompt: {
-        const { accepted, turn } = await startTurn(args[0] as AgentPromptRequest, "reject_if_busy");
+        const request = args[0] as AgentPromptRequest;
+        if (request.revisionProposalId) {
+          throw Object.assign(new Error("Remote Plan revision is unavailable"), {
+            errorCode: ErrorCodes.INVALID_ARGUMENT,
+          });
+        }
+        const { accepted, turn } = await startTurn(request, "reject_if_busy");
         return { accepted, turnId: turn.id } satisfies AgentPromptResponse;
       }
       case IPC.invoke.agentQueuePush: {
@@ -337,6 +346,11 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
       }
       case IPC.invoke.plansResolve: {
         const resolution = args[0] as PlanResolveRequest;
+        if (resolution.action !== "approve" && resolution.action !== "reject") {
+          throw Object.assign(new Error("Remote Plan revision and scheduling are unavailable"), {
+            errorCode: ErrorCodes.INVALID_ARGUMENT,
+          });
+        }
         const result = await client.request<RacpApprovalResult>("approval/respond", {
           approvalId: resolution.proposalId,
           // Contract decisions ("approve"/"reject") equal the plan actions.
@@ -381,6 +395,12 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
         // Pending plan cards are restored from the attach snapshot's approvals by
         // the event bridge, so this on-demand fetch stays empty for remote hosts.
         return { plans: [] };
+      case IPC.invoke.plansRunMissed:
+      case IPC.invoke.plansCancelSchedule:
+      case IPC.invoke.plansMarkRevisionFailed:
+        throw Object.assign(new Error("Remote Plan scheduling is unavailable"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
       default:
         throw Object.assign(new Error(`remote backend has no handler for ${channel}`), {
           errorCode: ErrorCodes.INTERNAL,

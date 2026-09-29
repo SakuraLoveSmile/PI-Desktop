@@ -37,11 +37,6 @@ export type EventsSliceDependencies = StoreAccess & {
     state: AppState["planningStates"][string],
     kind: PlanningStateEvent["kind"],
   ) => AppState["sessions"][number]["mode"];
-  openPlanArtifact: (
-    proposal: NonNullable<AppState["pendingPlans"][string]>,
-    openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
-    pluginViews: AppState["pluginViews"],
-  ) => Promise<void>;
   notifyInteractivePrompt: (
     sessionId: string,
     kind: "ask" | "permission" | "plan",
@@ -66,7 +61,6 @@ export function createEventsSlice({
   runtime,
   withoutRecordKey,
   sessionModeForPlanningState,
-  openPlanArtifact,
   notifyInteractivePrompt,
   triggerAutoTitleSummarization,
   flushPendingSessionConfiguration,
@@ -94,6 +88,23 @@ export function createEventsSlice({
       runtime.nextPlanSyncGeneration(event.sessionId);
       set((state) => {
         const previousCheckpoint = state.planCheckpoints[event.sessionId];
+        const incomingId = event.proposal?.id ?? event.proposalId;
+        if (
+          previousCheckpoint && incomingId && previousCheckpoint.id !== incomingId &&
+          event.state !== "awaiting_approval"
+        ) {
+          const existing = state.planHistory[event.sessionId] ?? [];
+          const previous = existing.find((item) => item.id === incomingId);
+          const historical = event.proposal ?? (previous && event.executionState
+            ? { ...previous, executionState: event.executionState }
+            : previous);
+          return historical ? {
+            planHistory: {
+              ...state.planHistory,
+              [event.sessionId]: [historical, ...existing.filter((item) => item.id !== incomingId)],
+            },
+          } : {};
+        }
         const checkpoint = mergePlanCheckpoint(previousCheckpoint, event);
         const activeProposal =
           event.state === "awaiting_approval" && isPendingPlan(checkpoint)
@@ -117,6 +128,9 @@ export function createEventsSlice({
           planCheckpoints: checkpoint
             ? { ...state.planCheckpoints, [event.sessionId]: checkpoint }
             : state.planCheckpoints,
+          planHistory: checkpoint
+            ? { ...state.planHistory, [event.sessionId]: [checkpoint, ...(state.planHistory[event.sessionId] ?? []).filter((item) => item.id !== checkpoint.id)] }
+            : state.planHistory,
           pendingPlans,
           runningSessions: planExecutionRunChanged
             ? { ...state.runningSessions, [event.sessionId]: executionActive }
@@ -133,13 +147,6 @@ export function createEventsSlice({
         };
       });
       const checkpoint = get().planCheckpoints[event.sessionId];
-      if (event.state === "awaiting_approval" && isPendingPlan(checkpoint)) {
-        void openPlanArtifact(
-          checkpoint,
-          get().openWorkPanelTabForSession,
-          get().pluginViews,
-        );
-      }
       if (event.state === "awaiting_approval" && !event.proposal) {
         void get().restorePendingPlan(event.sessionId);
       }
@@ -324,20 +331,15 @@ export function createEventsSlice({
             planCheckpoints: checkpoint
               ? { ...state.planCheckpoints, [envelope.sessionId]: checkpoint }
               : state.planCheckpoints,
+            planHistory: checkpoint
+              ? { ...state.planHistory, [envelope.sessionId]: [checkpoint, ...(state.planHistory[envelope.sessionId] ?? []).filter((item) => item.id !== checkpoint.id)] }
+              : state.planHistory,
             pendingPlans: activeProposal
               ? { ...state.pendingPlans, [envelope.sessionId]: activeProposal }
               : withoutRecordKey(state.pendingPlans, envelope.sessionId),
           };
         });
         if (event.state === "awaiting_approval") {
-          const checkpoint = get().planCheckpoints[envelope.sessionId];
-          if (isPendingPlan(checkpoint)) {
-            void openPlanArtifact(
-              checkpoint,
-              get().openWorkPanelTabForSession,
-              get().pluginViews,
-            );
-          }
           void get().restorePendingPlan(envelope.sessionId);
           notifyInteractivePrompt(envelope.sessionId, "plan");
         }
