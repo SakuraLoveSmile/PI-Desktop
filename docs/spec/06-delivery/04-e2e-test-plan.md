@@ -8925,7 +8925,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 | Post-baseline local automation | E2E-220 |
 | Post-MVP remote control | E2E-221, E2E-222, E2E-223, E2E-224, E2E-225, E2E-226, E2E-227, E2E-228, E2E-229, E2E-230, E2E-231, E2E-232 |
-| Trusted extensions (R7 v1) | E2E-DIALOG-long-text-boundaries, E2E-241, E2E-242, E2E-HOOKS-cancel-and-dispose, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
+| Trusted extensions (R7 v1) | E2E-DIALOG-long-text-boundaries, E2E-241, E2E-242, E2E-HOOKS-prompt-chain, E2E-HOOKS-cancel-and-dispose, E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding, E2E-243, E2E-244, E2E-245, E2E-PLUGIN-imported-pi-package-skills, E2E-PLUGIN-import-extension-installs-dependencies, E2E-PLUGIN-import-extension-reports-missing-dependency, E2E-PLUGIN-declared-provider-appears-in-the-native-provider-list |
 | Trusted extensions (R7 v1 npm recovery) | E2E-PLUGIN-import-extension-recovers-missing-npm |
 | Post-MVP regression coverage (plugin tool dispatch) | E2E-PLUGIN-slow-tool-is-not-cut-off-by-host-dispatch |
 | M6+ (Project delete) | E2E-PROJECT-delete-removes-project-and-owned-sessions |
@@ -13761,6 +13761,28 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Acceptance**: B (agent), Security, Quality
 - **Milestone**: Post-MVP (R7 v1)
 - **Status**: Partially automated (`pnpm test:e2e:trusted-extensions`); Agent-mode tool dispatch, ToolSearch deferral, hooks, blocking, and result replacement pass, while Plan-mode gating and core-tool collision remain additional validation.
+
+#### E2E-HOOKS-prompt-chain: Multiple extensions preserve prompt additions
+
+- **Preconditions**: Two or three enabled fixture extensions append different markers
+  using `event.systemPrompt` in `before_agent_start`; the provider is a local
+  deterministic HTTP/SSE service.
+- **Steps**: Run two turns through the real runtime and inspect both provider
+  requests. Exercise multiple handlers, explicit replacements (including an
+  empty string), missing/malformed returns, exceptions, timeout/late input
+  mutation, and Stop/disposal while a handler waits.
+- **Expected**: All markers reach the provider in extension/registration order,
+  once per turn. Identical inputs produce identical prompt bytes. Full string
+  replacements remain supported. Only timely returned strings enter the chain;
+  failed handlers do not discard earlier additions, cancelled turns send no
+  request, and the next turn can proceed. Other events retain existing folds.
+- **Specs linked**: `07-plugins/16-trusted-extensions.md` §6; ADR 0214; #1023.
+- **Acceptance**: B (agent), Quality
+- **Milestone**: Post-MVP (R7 v1)
+- **Status**: Automated by `extensions/prompt-chain.test.ts`,
+  `extensions/runner.test.ts`, and `extensions/runtime-lifecycle.test.ts`.
+  `pnpm test:e2e:trusted-extensions` additionally checks that two plugin-form
+  extensions reach the provider in the desktop's extension ID order.
 
 #### E2E-TRUSTED-EXTENSION-custom-agent-stream-and-binding: Plugin-owned agent streams and session binding
 
