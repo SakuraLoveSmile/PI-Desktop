@@ -13630,6 +13630,22 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   rendered desktop journey Draft
   (run only in a capable environment when this surface changes)
 
+#### E2E-254A: Multiple Skill mentions survive a session reload
+
+- **Preconditions**: Two Skills are active in the current project and a
+  deterministic provider fixture records the Agent prompt.
+- **Steps**: Type normal prompt text, select two Skills from later slash
+  tokens, send, then reopen the session.
+- **Expected**: Later slash menus offer Skills only. The model-facing prompt
+  requests each distinct validated Skill id in mention order. The transcript
+  shows the original text with both Skill chips before and after reopening;
+  inactive Skill ids remain literal text and do not bypass activation.
+- **Specs linked**: `04-ux/04-builtin-commands.md`, ADR 0219
+- **Acceptance**: C (conversation & stream), E (tools & permissions)
+- **Milestone**: M5
+- **Status**: Parser, IPC, Host transcript round-trip and rendered transcript
+  fixture covered; full composer-to-reopen desktop journey pending
+
 #### E2E-255: An ideographic comma opens the slash menu
 
 - **Preconditions**: A Chinese IME is available, the composer draft is empty,

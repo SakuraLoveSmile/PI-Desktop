@@ -24,12 +24,14 @@ the renderer, prompt, or host protocol.
    commands; the group is always last. The exact skill id is the slash name.
    Existing command names win collisions, so a Skill cannot shadow a template,
    builtin, plugin, or extension command.
-2. Selecting a Skill inserts `/<skill-id> `. Sending follows the ordinary
-   prompt path. Electron main resolves the command against the current session
-   project, revalidates its active scope and permissions at send time, and
-   keeps the typed slash form for the transcript chip.
+2. Selecting a Skill inserts `/<skill-id> `. Subsequent whitespace-delimited
+   slash tokens offer Skills only; app commands still require the first token.
+   Electron main resolves every Skill mention against the current session
+   project, revalidates active scope and permissions at send time, and
+   preserves the typed text and validated token offsets in the transcript.
 3. Main persists a model-facing instruction asking the model to call the local
-   `Skill` tool with the validated id, followed by any user body text. The Skill
+   `Skill` tool for each distinct validated id in order, followed by the user
+   body text with recognized Skill tokens removed. The Skill
    body is still loaded on demand by that tool; it is not sent to the renderer
    or injected directly into the prompt. `agent.prompt.inject` and existing
    user-Skill activation rules remain authoritative.
