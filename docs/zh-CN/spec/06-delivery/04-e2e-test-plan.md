@@ -9,6 +9,14 @@
 
 ---
 
+### E2E-LIVE-WORK-session-admission
+
+- **前提：** 使用隔离的 Live Provider fixture、本地 AgentHost 会话和确定性意图分类器；候选请求须从现有 Live adapter 回调进入，不使用真实账号或付费端点。
+- **步骤：** 验证纯通话没有工作作用域时会拒绝任务候选；再以明确选择的本地会话和关闭的上下文共享启动工作通话。提交一个已声明工具请求并检查回执、Host admission 和 `voiceOrigin`。覆盖忙时独立排队、过期 steer、精确回合 stop、submit 返回前到达的终态事件，以及基于已记录结果的只读查询。请求项目／会话列表，确认只返回标签和本次 call 的 opaque 引用；通过面板动作打开已列会话、在已列项目中新建会话，并确认工作绑定仍固定。分别保持 Provider 生成、用户讲话和本地播放活跃，确认反馈须待三者空闲和静默窗口结束后才发送。覆盖 silent、静默时的显式查询、过期反馈降级；结束通话时确认已受理工作仍保留。
+- **预期：** 工作始终绑定到通话开始时选定的会话；关闭上下文共享时不读取历史；现有 AgentHost 执行 prompt、steer、queue 和 stop；重复 Provider ID 不重复派发；结果查询只投影准确操作摘要且不会创建新回合。项目／会话选项不暴露原始路径或 ID，引用按 call 隔离并过期；打开只导航，创建必须先列出注册项目并由用户点击确认。自动反馈同时观察 Provider 生成状态和本地播放活动，任务执行与反馈投递状态分开。结束 Live 不取消已受理任务；Renderer 信号不代表用户已经听到结果。
+- **覆盖：** `apps/desktop/test/live-voice-service.test.mjs` 覆盖纯通话拒绝、显式工作作用域和 Provider／用户／本地播放的反馈门控及独立投递状态；`packages/host-runtime/src/live-work/coordinator.test.ts` 覆盖回执顺序、路由、过期 steer、去重、关闭通话、早到终态和选择流程；`packages/host-runtime/src/live-work/feedback-scheduler.test.ts` 覆盖防抖、播报间隔、silent、过期降级、去重与溢出；`packages/host-runtime/src/live-work/context.test.ts` 覆盖上下文投影与 opaque 引用；`packages/host-runtime/src/live-work/result-summary.test.ts` 覆盖精确回合摘要和诚实回退；`packages/agent-host/src/agent-host.test.ts` 覆盖无历史快照、队列和语音来源；`packages/voice-runtime/src/live/protocol.test.ts` 覆盖 Provider 工具及反馈编码；`apps/desktop/test/live-work-scope.test.mjs` 覆盖引用作用域／过期，`live-work-operations.test.mjs` 覆盖面板动作，`voice-runtime/src/live/playback-monitor.test.ts` 覆盖本地音频信号检测。该自动化覆盖仍不等于 W2-001—W2-096 全矩阵，也不代表真实 Provider／设备验收。
+- **状态：** 部分完成；其余场景和实机矩阵见 `docs/implementation/live-work-evidence.md`。
+
 ### E2E-POWER-keep-awake-setting
 
 - **前提：** 设置值缺失的隔离桌面配置；无需真实模型服务。
@@ -3517,6 +3525,11 @@ IPC 请求无法关闭。
   8. 运行模型调用远低于硬预算的 `new_context` 的回合。
   9. 空闲时手动调用 `/compact`。
 - **预期**：
+  - 每个检查点的摘要请求都携带会话自己的对话身份：在 Responses 形状的提供商
+    （`openai-responses`、`openai-codex-responses`）上，出站载荷会像会话的普通
+    回合一样把会话 id 作为 `prompt_cache_key` 发出，因此对接 Codex 后端的网关会
+    接受该请求，而不是返回 400 `invalid_responses_request`。其他线协议的提供商
+    保持不变。
   - 每个 `turn_end` 在另一个提供商请求之前都会被评估，并且永远不会
     标记整体任务空闲； composer/config 控件保持阻塞状态，直到
     `agent_end`、`error` 或仅手动的 `compaction_end`。
@@ -4533,6 +4546,22 @@ eleven-tool-round desktop paths are verified by
 - **验收**：C — 对话和直播；品质
 - **里程碑**：M6+
 - **状态**：草稿。必需套件：`test:e2e`、`test:e2e:subagents`。
+
+#### E2E-SUBAGENT-output-token-limit-is-a-visible-failure：输出 token 上限必须可见地失败
+
+- **先决条件**：Agent 会话使用确定性的本地提供程序；提供程序在产生非空的助手文本后，以
+  `stopReason: "length"` 或 `"max_tokens"` 结束。委派有有效报告且没有待处理的工具调用。
+- **步骤**：1）委派任务并让提供程序在输出 token 上限处结束。2）读取 Task 结果、生命周期
+  details 和委派卡片。3）用一次正常结束的提供程序响应恢复或重试同一工作。
+- **预期**：第一次运行以 `failed` 结算，而不是 `completed`，并带有
+  `SUBAGENT_OUTPUT_TRUNCATED` 和 `outputTruncated: true`。父级收到明确解释，且部分报告保留在
+  `Its last output was:` 下面。后续以 `stop` 正常结束的回合会清除标记并以 `completed` 结算；
+  部分报告的运行绝不会伪装成已完成报告。
+- **链接规格**：`03-runtime/02-agent-runtime.md` §5f、`03-runtime/08-error-codes.md` §3.2
+- **验收**：C（对话）、H（诊断）、品质
+- **里程碑**：M6+
+- **状态**：由 `packages/agent-runtime/src/subagent.test.ts` 单元覆盖；完整桌面旅程仍需运行：
+  `test:e2e`、`test:e2e:subagents`。
 
 #### E2E-SUBAGENT-context-overflow-reports-actionable-failure
 
@@ -8729,6 +8758,27 @@ the latest destination. These assertions measure work counts, not device FPS.
 - **Milestone**: Maintenance.
 - **Status**: Covered by the existing HTTP client integration fixture and a
   focused component-render validation; no live IDA process required.
+
+### E2E-MCP-HTTP-SSE-held-open — A streamable HTTP reply lands before the server ends the stream (issue #1188)
+
+- **Preconditions**: A local mock Streamable HTTP server writes its JSON-RPC
+  reply immediately and keeps the `text/event-stream` body open well past the
+  client's handshake budget — the shape `https://gitmcp.io/docs` shows, where
+  initialize is answered in about two seconds and the stream only ends about
+  twelve seconds later. No provider credentials needed.
+- **Steps**: Configure that server with the `http` transport and a handshake
+  budget shorter than the stream lifetime; connect, discover the tools, and call
+  one. Repeat with a server that keeps the stream open and never answers.
+- **Expected**: Handshake, discovery, and the call complete as soon as their
+  reply event arrives, so the connection reports `ready` with the discovered
+  tools instead of `mcp initialize timed out after <budget>ms`. A server that
+  never replies still fails with `TIMEOUT` inside the same budget, and a stream
+  left open past its request is aborted rather than kept open.
+- **Specs**: 07-plugins/01-plugin-system §12.2; ADR 0038.
+- **Acceptance**: HTTP transport integration and the main-process MCP handshake.
+- **Milestone**: Maintenance.
+- **Status**: Automated by `apps/desktop/test/plugin-mcp.test.mjs` (held-open
+  reply case); no live app process required.
 
 ### E2E-PLUGIN-crash-report-names-the-exit-code
 

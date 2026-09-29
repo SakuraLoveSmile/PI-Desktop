@@ -1,4 +1,4 @@
-import type { EnglishCatalog } from "../en/index.js";
+import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ptBR = {
   app: {
@@ -265,6 +265,8 @@ export const ptBR = {
     sessionTranscriptEmpty: "Não foi possível ler o histórico desta sessão. Reabra-a para tentar novamente.",
     fileMenu: "Referências a arquivos",
     removeFileReference: "Remover referência de arquivo {{name}}",
+    removePluginMark: "Remover {{name}}",
+    pluginTriggerMenu: "Sugestões de plugins",
     messageAttachments: "Anexos desta mensagem",
     fileEmpty: "Nenhum arquivo correspondente",
     fileNoWorkspace: "Abra um projeto para referenciar arquivos",
@@ -322,6 +324,9 @@ export const ptBR = {
     hideErrorDetails: "Ocultar detalhes",
     dismissError: "Dispensar mensagem de erro",
     copyErrorDetails: "Copiar detalhes",
+    entryExtraExpand: "Mostrar bloco completo",
+    entryExtraCollapse: "Recolher bloco",
+    actionSlotMore: "Mais ações",
     errorProvider: "Provedor de IA",
     errorModel: "Modelo",
     previewFile: "Pré-visualizar no painel lateral",
@@ -773,8 +778,8 @@ export const ptBR = {
       zoomIn: "Aumentar zoom",
       zoomOut: "Diminuir zoom",
       toggleFullScreen: "Alternar tela completa",
-      voiceToggle: "Alternar entrada de voz",
-      voiceCancel: "Cancelar entrada de voz"
+      voiceToggle: "Alternar Voz em Tempo Real",
+      voiceCancel: "Cancelar início da Voz em Tempo Real"
     },
     skills: "Habilidades",
     skillsGlobalPath: "Caminho global de habilidades",
@@ -838,6 +843,8 @@ export const ptBR = {
     importAgentScanTransportHttp: "HTTP",
     imported: "Importado",
     skillImported: "Importado {{name}}",
+    skillBatchImported: "{{count}} pastas de skills importadas",
+    skillBatchFailed: "Falha ao importar {{count}} pastas. Primeiro erro: {{first}}",
     skillsEmpty: "Nenhuma habilidade nesta pasta",
     subagentsEmpty: "Nenhum subagente próprio ainda",
     addMcp: "Adicionar",
@@ -1304,6 +1311,7 @@ export const ptBR = {
     presetVolcengine: "Volcengine Ark",
     presetMinimaxCn: "MiniMax",
     presetMinimaxCnOpenai: "MiniMax (OpenAI)",
+    presetStepfunPlan: "StepFun Plan",
     presetKimiCoding: "Kimi Coding",
     presetAntLing: "Ant Ling",
     presetBaseten: "Baseten",
@@ -2005,6 +2013,7 @@ export const ptBR = {
       commands: "Comandos",
       tools: "Ferramentas do agente",
       agentExtension: "Extensão do agente",
+      rendererUi: "Extensão da interface do chat",
       skills: "Habilidades",
       themes: "Tema",
       mcp: "Servidor MCP",
@@ -2044,6 +2053,7 @@ export const ptBR = {
       "agent.prompt.inject": "Alterar as instruções do agente",
       "agent.complete": "Executar uma conclusão avulsa com seus modelos",
       "agent.extension": "Executar código dentro do agente",
+      "renderer.extension": "Desenhar interface nos slots do chat",
       "provider.register": "Adicionar provedores à lista de modelos",
       "desktop.control": "Controlar a área de trabalho",
       "models.list": "Listar modelos autenticados",
@@ -2081,6 +2091,8 @@ export const ptBR = {
       "agent.prompt.inject": "Pode alterar as instruções enviadas ao agente de IA.",
       "agent.complete": "Pode consumir sua cota de modelo para uma conclusão avulsa. O plugin nunca recebe suas chaves de API.",
       "agent.extension": "Executa módulos da ExtensionAPI dentro do processo do agente, com o mesmo nível de acesso que as ferramentas do próprio agente. Ative somente código em que você confia.",
+      "renderer.extension":
+        "Carrega o módulo de renderização deste plugin na janela do aplicativo para desenhar componentes de slot (barras de ações de mensagens, extras de entrada, cartões de ferramentas, renderizadores de blocos de código, controles do compositor). O módulo é executado no mesmo documento do PI-Desktop. Ative somente código em que você confia.",
       "provider.register": "Adiciona os provedores que este plugin define à lista de provedores em Configurações. O plugin fornece o endpoint e os modelos; sua chave de API permanece no PI-Desktop.",
       "desktop.control": "Permite que o plugin invoque o catálogo de controle revisado do PI-Desktop. Operações destrutivas ainda exigem confirm=true; o token bearer do MCP nunca é exposto.",
       "models.list": "Pode ver em quais modelos você está conectado. Não recebe suas chaves de API.",
@@ -2372,6 +2384,21 @@ export const ptBR = {
     planApprovalBody: "Um plano proposto está pronto para sua revisão.",
     actionFailed: "Não foi possível atualizar as notificações.",
     justNow: "Agora mesmo",
+  },
+  liveVoice: {
+    ...en.liveVoice,
+    title: "Voz ao vivo", description: "Converse diretamente com um provedor de voz em tempo real configurado. A voz ao vivo fica desativada até você habilitá-la.",
+    openWorkSetup: "Escolher uma sessão para uma chamada de trabalho",
+    connectWorkSession: "Conectar a {{label}}",
+    untitledWorkSession: "Sessão sem título",
+    boundWorkSession: "Sessão de trabalho vinculada: {{label}}",
+    workSessionNoContext: "Esta chamada não compartilha o histórico recente do chat.",
+    enable: "Ativar voz ao vivo", enableDetail: "O áudio do microfone é enviado ao provedor escolhido. Agentes, ferramentas e ações MCP não são executados.",
+    bindingStatus: "Status do provedor", ready: "Pronto", provider: "Conta do provedor", chooseProvider: "Escolha uma conta", providerUnavailable: "O provedor selecionado está indisponível", providerDisabled: "desativado", credentialsMissing: "credenciais ausentes", model: "ID do modelo", voice: "Voz", profile: "Perfil do protocolo", useForNextCall: "Usar na próxima chamada", bindingLocked: "Chamada em andamento", bindingLockedDetail: "Encerre a chamada para aplicar as alterações desta conta.", saveFailed: "Não foi possível salvar as configurações de voz ao vivo.",
+    adapters: { "codex-live": { title: "Conta Codex", description: "Usa a conta Codex selecionada e o login existente." }, "gemini-live": { title: "Gemini Live", description: "Usa um provedor Google Generative AI com chave de API." }, "openai-realtime": { title: "Compatível com OpenAI Realtime", description: "Usa um provedor com chave de API e perfil Realtime explícito." } },
+    readiness: { disabled: "Provedor desativado", "missing-provider": "Provedor indisponível", "missing-credentials": "Credenciais ausentes", "wrong-auth-kind": "Autenticação incompatível", "unsupported-adapter": "Adaptador incompatível", "invalid-settings": "Configuração inválida" },
+    openPanel: "Abrir controles de voz", start: "Iniciar voz ao vivo", end: "Encerrar chamada", mute: "Silenciar microfone", unmute: "Ativar microfone", resumePlayback: "Ativar som", errorGeneric: "A voz ao vivo foi interrompida. Confira o provedor e tente novamente.", noProvider: "Escolha um provedor compatível em Configurações → Voz.", enableInSettings: "Ative a voz ao vivo em Configurações → Voz.",
+    phase: { idle: "Desativada", preparing: "Preparando", "acquiring-mic": "Aguardando microfone", negotiating: "Negociando", connecting: "Conectando", connected: "Conectado", reconnecting: "Reconectando", closing: "Encerrando", ended: "Encerrada", failed: "Interrompida" },
   },
   errors: {
     HOST_UNAVAILABLE: "O serviço local está indisponível",
