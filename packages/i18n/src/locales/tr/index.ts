@@ -1740,7 +1740,6 @@ sklm: {
     },
     workspace: "Proje: {{workspace}}",
     temporarySession: "Geçici sohbet",
-    countdown: "Yanıt vermezseniz {{seconds}} sn içinde otomatik reddedilir",
     fromSubagent: "{{agent}} alt ajanı sordu",
     queued_one: "{{count}} istek daha bekliyor",
     queued_other: "{{count}} istek daha bekliyor",

@@ -1721,7 +1721,6 @@ sklm: {
     },
     workspace: "專案：{{workspace}}",
     temporarySession: "臨時對話",
-    countdown: "若 {{seconds}} 秒內未響應將自動拒絕",
     fromSubagent: "由 {{agent}} 子智慧體發起",
     queued_one: "還有 {{count}} 個請求在排隊",
     queued_other: "還有 {{count}} 個請求在排隊",
