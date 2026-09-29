@@ -183,13 +183,24 @@ export function withProviderHeadersFetch(
 export function withProviderHeaders(
   options: SimpleStreamOptions | undefined,
   headers: Record<string, string> | undefined,
+  config: { allowCustomFetch?: boolean } = {},
 ): SimpleStreamOptions {
   const normalized = normalizeProviderHeaders(headers);
-  if (!normalized) return options ?? {};
-  const merged = mergeProviderHeaders(options?.headers, normalized);
-  const fetch = withProviderHeadersFetch(options?.fetch, normalized);
+  if (!normalized && config.allowCustomFetch !== false) return options ?? {};
+  const merged = normalized
+    ? mergeProviderHeaders(options?.headers, normalized)
+    : undefined;
+  const fetch = config.allowCustomFetch === false
+    ? undefined
+    : withProviderHeadersFetch(options?.fetch, normalized);
+  const withoutFetch = config.allowCustomFetch === false
+    ? (() => {
+        const { fetch: _fetch, ...rest } = options ?? {};
+        return rest;
+      })()
+    : options ?? {};
   return {
-    ...(options ?? {}),
+    ...withoutFetch,
     ...(merged ? { headers: merged } : {}),
     ...(fetch ? { fetch } : {}),
   };

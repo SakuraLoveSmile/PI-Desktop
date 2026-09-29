@@ -19,6 +19,7 @@ import {
   buildProviderModel,
   copilotRequestHeaders,
   createProviderModels,
+  providerAllowsCustomFetch,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
 import {
@@ -114,6 +115,7 @@ export async function completeOneShot(
       copilotRequestHeaders(provider, context),
       provider.headers,
     ),
+    { allowCustomFetch: providerAllowsCustomFetch(provider) },
   );
   const stream = createProviderRetryStream(
     model,

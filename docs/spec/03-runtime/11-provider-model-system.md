@@ -76,7 +76,10 @@ conversation id (or a per-call UUID when the caller has no session),
 host is `opencode.ai` receives the same headers. pi-ai is not relied on to
 emit `x-opencode-session`. Each provider row (AI service or OAuth account)
 may set optional `headers`; empty keeps adapter defaults. A fetch wrapper is
-the last writer so Codex and Anthropic cannot overwrite them.
+the last writer so Codex and Anthropic cannot overwrite them. Google Gemini
+and Vertex use SDK-owned transports that reject a request-scoped `fetch`;
+their provider headers are passed through the SDK-supported `headers` option
+without installing a fetch wrapper.
 
 When an OAuth vendor is rebuilt around a local provider-row id, runtime keeps
 the native pi-ai transport metadata instead of treating the row as a generic
@@ -85,7 +88,8 @@ headers, including `Editor-Version`, `Editor-Plugin-Version`, and
 `Copilot-Integration-Id`; agent-runtime adds the context-sensitive
 `X-Initiator`, `Openai-Intent`, and image-request header. The local row id still
 owns auth binding and transcript identity, and user-supplied provider headers
-remain the final override.
+remain the final override. Copilot models using the Anthropic Messages wire
+format send the OAuth token as `Authorization: Bearer` rather than `x-api-key`.
 
 Zhipu / GLM and Z.AI are named OpenAI-compatible endpoint presets among a
 short models.dev-backed Service list of first-party vendors (including
