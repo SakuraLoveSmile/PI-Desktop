@@ -1021,6 +1021,8 @@ sklm: {
     importAgentScanTransportHttp: "HTTP",
     "imported": "Importado",
     "skillImported": "Importado {{name}}",
+    "skillBatchImported": "Se importaron {{count}} carpetas de habilidades",
+    "skillBatchFailed": "No se pudieron importar {{count}} carpetas. Primer error: {{first}}",
     "skillsEmpty": "No hay habilidades en esta carpeta",
     "subagentsEmpty": "Aún no hay subagentes propios",
     "addMcp": "Agregar",
