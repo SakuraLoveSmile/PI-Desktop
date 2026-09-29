@@ -62,13 +62,14 @@ function isLikelyFilePath(path: string): boolean {
   const base = normalized.split("/").pop() ?? "";
   const dotIndex = base.lastIndexOf(".");
   const ext = dotIndex > 0 ? base.slice(dotIndex + 1).toLowerCase() : "";
+  const baseExt = ext.replace(/[+@-][\p{L}\p{N}_@+-]*$/u, "");
   if (normalized.includes("/")) {
-    if (ext && ext.length <= 8) return true;
+    if (baseExt && baseExt.length <= 8) return true;
     if (KNOWN_BARE_NAMES.has(base)) return true;
     return false;
   }
   if (KNOWN_BARE_NAMES.has(base)) return true;
-  return KNOWN_EXTS.has(ext);
+  return KNOWN_EXTS.has(baseExt);
 }
 
 function isAbsoluteFilePath(path: string): boolean {
@@ -250,14 +251,18 @@ export type ChatTextSegment =
 // the extension remains outside the link (Unicode `\b` cannot express that).
 const PATH_WORD = String.raw`[\p{L}\p{N}_@+.-]+`;
 const PATH_SEGMENT = String.raw`[\p{L}\p{N}_@+. -]+`;
-const FILE_END = String.raw`\.[A-Za-z0-9]{1,8}(?::\d+(?::\d+)?)?(?![A-Za-z0-9_]|\.[A-Za-z0-9])`;
-const FILE_NAME = String.raw`${PATH_SEGMENT}?${FILE_END}`;
+// Only adjacent characters can extend a dotted directory. Whitespace after an
+// extension is ambiguous with prose; quote such paths with @"...".
+const PATH_CONTINUATION = String.raw`[\p{L}\p{N}_@+.-]*[\\/]`;
+const FILE_END = String.raw`\.[A-Za-z0-9]{1,8}(?:[+@-][\p{L}\p{N}_@+-]*)?(?::\d+(?::\d+)?)?(?![A-Za-z0-9_@+-]|\.[A-Za-z0-9]|${PATH_CONTINUATION})`;
+const BARE_FILE_END = String.raw`(?:${[...KNOWN_BARE_NAMES].join("|")})(?![\p{L}\p{N}_@+.-]|${PATH_CONTINUATION})`;
+const FILE_NAME = String.raw`(?:${PATH_SEGMENT}?${FILE_END}|${BARE_FILE_END})`;
 const UNC_PREFIX = String.raw`(?:\\\\[^\\/\s]+[\\/]|\/\/[^/\s]+\/)`;
 const SPACED_START = String.raw`(?<![\p{L}\p{N}_@+.-])[A-Za-z][\p{L}\p{N}_+-]*(?: [\p{L}\p{N}_+-]+)+`;
 // Unmarked first-segment spaces cannot be distinguished from prose. Retry
 // after common introducers so ordinary bare file links still work.
 const PROSE_INTRODUCERS = new Set([
-  "a", "an", "the", "and", "or", "i", "is", "this", "please",
+  "a", "an", "the", "and", "or", "plus", "because", "with", "then", "against", "i", "is", "this", "please",
   "see", "open", "read", "view", "check", "show", "find", "edit",
   "update", "fix", "inspect", "compare", "review", "use", "add", "remove",
   "write", "create", "created", "delete", "rename", "move", "copy",
