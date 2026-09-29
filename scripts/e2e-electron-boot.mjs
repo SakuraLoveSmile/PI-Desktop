@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Electron boot smoke: launches the built desktop app with a throwaway
- * profile and asserts the sandboxed preload bridge, IPC round-trips, and
- * E2E-SESSION-list-refresh-keeps-desktop-responsive against 800 synthetic
- * sessions (BOOT_PROBE emitted by electron/main/bootstrap/startup.ts).
+ * profile and asserts the sandboxed preload bridge, Ctrl+R guard, IPC
+ * round-trips, and E2E-SESSION-list-refresh-keeps-desktop-responsive against
+ * 800 synthetic sessions (BOOT_PROBE emitted by electron/main/bootstrap/startup.ts).
  *
  * Prereqs: `pnpm --filter @pi-desktop/desktop build` and a host-core binary
  * (target/debug or target/release, or PI_DESKTOP_HOST_BIN).
@@ -33,11 +33,13 @@ for (const preloadPath of [
   join(appDir, "out/preload/index.cjs"),
   join(appDir, "out/preload/plugin-panel.js"),
 ]) {
-  if (!existsSync(preloadPath)) {
+  let source;
+  try {
+    source = readFileSync(preloadPath, "utf8");
+  } catch {
     console.error("preload output missing:", preloadPath);
     process.exit(1);
   }
-  const source = readFileSync(preloadPath, "utf8");
   if (/require\(["']\.\//.test(source)) {
     console.error("sandbox preload must not require a local runtime chunk:", preloadPath);
     process.exit(1);
@@ -122,6 +124,7 @@ child.on("close", (code) => {
   if (
     code === 0 &&
     probe?.ok &&
+    probe.ctrlRBlocked === true &&
     probe.appName === "Pi-Desktop-Plus" &&
     probe.platform === process.platform &&
     (process.platform === "darwin" || probe.maximized === true) &&
@@ -135,7 +138,7 @@ child.on("close", (code) => {
         : "menu-free frameless chrome";
     console.log(
       `PASS boot-probe — app v${probe.version}, host protocol ${probe.hostProtocol}, ` +
-        `${menuDetail} on ${probe.platform}`,
+        `${menuDetail}, Ctrl+R blocked on ${probe.platform}`,
     );
     console.log(
       "PASS E2E-SESSION-list-refresh-keeps-desktop-responsive — " + JSON.stringify(sessions),
