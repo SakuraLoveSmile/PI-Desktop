@@ -2878,6 +2878,14 @@ reasoning-level control.
   and re-entering a session cannot display a second copy of an existing user
   row.
 - Shift+Enter: newline in textarea. Cmd/Ctrl+Enter sends when Enter-to-send is off. IME composition and an open autocomplete menu still take precedence over send.
+- With an empty Composer draft, ArrowUp recalls the active conversation's most
+  recent accepted input. Repeated ArrowUp/ArrowDown traverses that conversation's
+  local history, and ArrowDown past the newest entry returns to an empty draft.
+  Recalled file references remain attached. Editing exits history navigation;
+  IME composition and open autocomplete keep their existing arrow-key priority.
+  Failed sends do not enter history, and a Home prompt is recorded under the
+  session that actually accepted it. History is bounded to 100 entries per
+  conversation and 20 conversations in renderer-local storage.
 - Placeholder guidance: the initially rendered context starts on its welcome copy and remains
   unchanged while the page/session context, draft, focus, and IME state change.
   Switching between home/session views or active conversations advances to the

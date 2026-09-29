@@ -98,6 +98,7 @@ function Fixture({ sessionId, t, workspacePath }: { sessionId: string; t: TFunct
         onSubmit={() => { submitted++; }}
         onInsertNewline={draft.insertNewlineInEditor}
         onInput={draft.handleInput}
+        onHistoryNavigate={() => false}
         onCompositionStart={noop}
         onCompositionEnd={noop}
         onFocus={noop}
