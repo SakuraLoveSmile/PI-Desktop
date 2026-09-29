@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
 import { visionFromModelConfig } from "./model-capabilities.js";
-import { hydrateAttachmentHistory } from "./attachment-history.js";
+import { excludeCurrentPrompt, hydrateAttachmentHistory } from "./attachment-history.js";
 import { classifyAgentError } from "./agent-errors.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import {
@@ -262,7 +262,14 @@ async function runtimeFor(
       } | null;
     }>("session.get", { id: sessionId });
     const supportsVision = visionFromModelConfig(params.provider.modelConfig);
-    history = await hydrateAttachmentHistory(detail?.session?.messages ?? [], {
+    // The current prompt is sent separately below. Exclude its persisted row
+    // before attachment hydration so it cannot consume the history byte budget.
+    const restoredMessages = excludeCurrentPrompt(
+      detail?.session?.messages ?? [],
+      currentPrompt,
+      params.userMessageId,
+    );
+    history = await hydrateAttachmentHistory(restoredMessages, {
       scratchDir: params.scratchDir,
       projectPath: params.projectPath,
       attachmentsDir: params.attachmentsDir,
@@ -271,16 +278,6 @@ async function runtimeFor(
     compaction = detail?.session?.compaction;
   } catch {
     // History restore is best-effort; a prompt can still start cleanly.
-  }
-  if (currentPrompt !== undefined) {
-    const last = history.at(-1);
-    if (
-      last?.role === "user" &&
-      ((params.userMessageId && last.id === params.userMessageId) ||
-        (!params.userMessageId && last.content === currentPrompt))
-    ) {
-      history = history.slice(0, -1);
-    }
   }
   const runtime = new DesktopAgentRuntime({
     host: hostProxy,

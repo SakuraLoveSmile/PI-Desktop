@@ -50,6 +50,8 @@ type AppError = {
 | `HOST_UNAVAILABLE` | 是的 | Rust 主机不是 running/reachable |
 | `HOST_OVERLOADED` | 是的 | 绑定主机 RPC/tool 容量已满；背压后重试 |
 | `AGENT_UNAVAILABLE` | 是的 | pi sidecar 不是 running/reachable |
+| `AGENT_SIDECAR_CRASHED` | 不 | Node pi sidecar 意外退出，且没有可识别的故障特征 |
+| `AGENT_SIDECAR_OOM` | 不 | Node pi sidecar 因 V8 报告 JavaScript 堆内存耗尽而退出 |
 | `APP_DEGRADED` | 是的 | 应用程序以有限的功能运行 |
 | `INTERNAL` | 也许 | 意外的内部故障 |
 | `INVALID_ARGUMENT` | 不 | 请求 schema/args 无效，包括错误 file/directory 类型的本机工具路径 |

@@ -1261,6 +1261,49 @@ identify the platform validation still needed.
 - **Milestone**: M2
 - **Status**: Draft
 
+#### E2E-172: Restored image history stays bounded and does not duplicate the prompt
+
+- **Preconditions**: A vision-capable session has persisted several image
+  attachments, including a final user row that is also supplied as the current
+  prompt by a legacy caller without `userMessageId`.
+- **Steps**: 1) Make the final image exceed the remaining restored-history
+  inline budget. 2) Recreate the runtime and send the same prompt. 3) Inspect
+  the provider request context and the restored transcript.
+- **Expected**: The current prompt's persisted row is removed before image
+  hydration, so its fallback path cannot make the prompt appear twice. Across
+  the remaining history, at most 50 MB of eligible image bytes are inlined;
+  the newest eligible attachments win, older ones use safe path fallbacks, and
+  a file that grows during the bounded read is not inlined. Durable transcript
+  rows retain refs and metadata only.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/04-data-storage.md`
+- **Acceptance**: C (conversation & stream), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`packages/agent-runtime/src/attachment-history.test.ts`);
+  full provider/Electron journey Draft
+
+#### E2E-173: Sidecar heap exhaustion reports a stable error code
+
+- **Preconditions**: App running with an active streamed turn and a test
+  sidecar that can exit with a V8 heap-limit stderr marker or an ordinary crash
+  marker.
+- **Steps**: 1) Trigger the heap-limit exit and inspect the settled turn and
+  supervisor log. 2) Repeat with an ordinary unexpected exit. 3) Confirm the
+  sidecar restart and send another prompt.
+- **Expected**: The first turn settles as aborted with
+  `AGENT_SIDECAR_OOM`; the ordinary exit settles with
+  `AGENT_SIDECAR_CRASHED`. Logs retain the stderr tail and classified kind,
+  active Plan/Goal approval cleanup remains intact, the sidecar restarts, and
+  the next prompt can run without replaying the interrupted execution.
+- **Specs linked**: `03-runtime/07-process-model.md`,
+  `03-runtime/08-error-codes.md`
+- **Acceptance**: C (conversation & stream), H (errors expose stable codes),
+  Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`packages/agent-runtime/src/sidecar-crash.test.ts`,
+  `packages/host-runtime/src/runtime-service.test.ts`); Electron crash
+  supervision journey Draft
+
 #### E2E-SESSION-outbox-duplicate-id-does-not-drop-history
 
 - **Preconditions**: Two sessions whose provider tool rows reuse the same
