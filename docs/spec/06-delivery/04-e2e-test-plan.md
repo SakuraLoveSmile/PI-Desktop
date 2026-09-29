@@ -1972,7 +1972,7 @@ identify the platform validation still needed.
   and inspect the command/file and keyboard hints. 5) Type `/` and inspect the
   slash menu. Include Skills with long English/CJK descriptions, short/no
   descriptions, a separate title/argument hint, and an exceptionally long slash
-  name; also inspect a long filename in `@` mode. Repeat at 1040px and 1680px
+  name; also inspect a long filename in `@` mode. Repeat at 800px and 1680px
   viewport widths with 320px and 640px composer widths. 6) Switch to zh-CN and
   repeat the context-switch checks.
 - **Expected**: The initially rendered context starts with its welcome copy and stays stable until
@@ -2563,7 +2563,7 @@ identify the platform validation still needed.
 #### E2E-043: Settings content follows window width
 
 - **Preconditions**: App running windowed on macOS with Settings open.
-- **Steps**: 1) Open Basics at the default window width and record the content-card width. 2) Expand the window to 1600px wide. 3) Open Model configuration, Import, and Project archive. 4) Shrink the window to the supported 1040px minimum.
+- **Steps**: 1) Open Basics at the default window width and record the content-card width. 2) Expand the window to 1600px wide. 3) Open Model configuration, Import, and Project archive. 4) Shrink the window to the supported 800px minimum.
 - **Expected**: The right-side content cards expand and contract with the available pane at every tested width; the 275px rail and pane gutters remain stable; controls remain visible without clipping or horizontal page scrolling.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality (key operations feel polished)
@@ -3208,7 +3208,7 @@ identify the platform validation still needed.
 #### E2E-033: Window bounds persist across restart
 
 - **Preconditions**: App running with default window size.
-- **Steps**: 1) Resize/move the window to distinct normal bounds A (≥1040×700), maximize before the 600ms save debounce ends, quit, and relaunch. 2) Restore, resize/move to distinct bounds B, quit before the debounce ends, and relaunch again.
+- **Steps**: 1) Resize/move the window to distinct normal bounds A (≥800×560), maximize before the 600ms save debounce ends, quit, and relaunch. 2) Restore, resize/move to distinct bounds B, quit before the debounce ends, and relaunch again.
 - **Expected**: Each relaunch restores the latest normal bounds (A, then B), including when quit occurs while maximized or with a pending save. Maximized/fullscreen geometry is never stored as normal bounds; invalid/tiny saved bounds fall back to the 1200×800 default.
 - **Specs linked**: `04-ux/09-interaction-patterns.md`
 - **Acceptance**: Quality (key operations feel polished)
@@ -7277,6 +7277,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Milestone**: M5
 - **Status**: Unit-covered (`apps/desktop/test/mcp-oauth.test.mjs`, `apps/desktop/test/user-mcp.test.mjs`); full UI journey Draft
 
+#### E2E-SKILL-import-multiple-folders
+
+- **Preconditions:** An isolated Desktop profile and three sibling folders:
+  `alpha/SKILL.md` and `beta/SKILL.md` are valid; `broken/` has no
+  `SKILL.md`. A project is selected in Settings > Agent > Skills.
+- **Steps:** Choose Import folder for that project, select all three folders,
+  and confirm. Check the project list and the result message. Reopen Import
+  folder and confirm it starts at the parent containing `alpha/`, `beta/`,
+  and `broken/`. Cancel, reopen it, and confirm the parent is unchanged.
+  Import a single Markdown file through Import file.
+- **Expected:** Both valid skills appear at project level with their sibling
+  resources, the invalid folder is reported without blocking the others, and
+  the picker remembers their shared parent across cancellation. The single-file
+  action still selects only one file.
+- **Coverage:** Folder import service, preference, and settings source contract
+  tests. Native multi-folder picker and remembered location remain desktop E2E.
+
 #### E2E-101: A user skill is written once and scoped per project
 
 - **Preconditions**: Two projects on disk. An Agent session in each.
@@ -9081,8 +9098,8 @@ This test plan spec is accepted when:
   submits/aborts the current turn.
 
 ### US-UI-19 Permanent Stage Manager bounds restore (macOS only)
-- On macOS with Stage Manager, shrink or unfocus the PI window until width < 1040 or height < 700.
-- Expect the shell to re-assert a Codex-like footprint (~1200×800, min 1040×700) and keep restoring while still collapsed (not only during the first 20s after launch).
+- On macOS with Stage Manager, shrink or unfocus the PI window until width < 800 or height < 560.
+- Expect the shell to re-assert a Codex-like footprint (~1200×800, min 800×560 capped to the display work area) and keep restoring while still collapsed (not only during the first 20s after launch).
 - The recovery watchdog is macOS-only (D447). On Windows/Linux it must not run at all: the app must never re-layer or re-raise its own window unprompted. Focus another window, then confirm PI-Desktop stays behind it instead of jumping back to the top of the stack, and that a stacking check (`xprop -root _NET_CLIENT_LIST_STACKING`) never shows it returning to the top periodically.
 
 ### US-UI-20 Dark floating composer box
@@ -9360,7 +9377,7 @@ This test plan spec is accepted when:
 - Expect the working theme selector without inert toggle or open-target rows.
 - Expect Permissions + Basics + Appearance elevated cards; Agent,
   Import, and Info remain the only other destinations.
-- Resize between 1040px, 1200px, and 1600px widths; the content cards fill the
+- Resize between 800px, 1200px, and 1600px widths; the content cards fill the
   available right pane at each size without changing the rail or introducing
   horizontal scrolling.
 
@@ -11295,8 +11312,9 @@ This test plan spec is accepted when:
   6. On Windows, inspect the default 4 DIP corner cutouts before and after
      resizing. Apply an authorized theme with `cornerRadius: 0`, then return to
      a built-in theme. Reject an out-of-range radius without changing the shape.
-- **Expected**: Edge and corner hit regions remain available in frameless
-  chrome, the minimum size remains 1040×700, and the recovery watchdog does not
+- **Expected**: Native edge and corner hit regions remain available in frameless
+  chrome, the minimum size remains 800×560 (capped to the display
+  work area), and the recovery watchdog does not
   compete with a slow resize stream. The renderer-owned divider updates the
   bounded panel target without changing native bounds; the last settled window
   bounds and the committed panel width reopen after relaunch. Windows uses
@@ -11315,7 +11333,7 @@ This test plan spec is accepted when:
 - **Status**: `test:e2e:window-controls` covers corner cutouts, theme radius
   changes, fullscreen, maximize, and controls in an isolated profile.
   `test:e2e:window-resize-native` adds physical Windows left/right/bottom/corner
-  drags and the 1040×700 minimum; run it on a dedicated interactive desktop,
+  drags and the 800×560 minimum; run it on a dedicated interactive desktop,
   since another app can take foreground or pointer input during the gesture.
   Relaunch persistence remains for native qualification; macOS/Linux native
   edge behavior is unchanged.

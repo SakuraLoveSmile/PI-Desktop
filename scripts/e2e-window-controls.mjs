@@ -175,9 +175,9 @@ async function checkNativeWindowResizes(edges) {
       assert.ok(Math.abs(bounds.afterX + bounds.afterWidth - bounds.beforeX - bounds.beforeWidth) <= 2, `corner right anchor: ${stdout}`);
       assert.equal(bounds.afterY, bounds.beforeY);
     } else if (edge === "left-min") {
-      assert.ok(bounds.afterWidth >= 1040 && bounds.afterWidth <= 1050, `minimum width: ${stdout}`);
+      assert.ok(bounds.afterWidth >= 800 && bounds.afterWidth <= 810, `minimum width: ${stdout}`);
     } else {
-      assert.ok(bounds.afterHeight >= 700 && bounds.afterHeight <= 710, `minimum height: ${stdout}`);
+      assert.ok(bounds.afterHeight >= 560 && bounds.afterHeight <= 570, `minimum height: ${stdout}`);
     }
     console.log(`PASS native ${edge} drag: ${stdout.trim()}`);
   }
