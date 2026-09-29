@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { register, registerHooks } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 // Electron is the external boundary; all navigation and timeout logic below
 // runs in the production BrowserPane, without opening a native window.
@@ -35,7 +39,7 @@ registerHooks({ resolve(specifier, context, next) {
   return specifier === "electron" ? { url: electron, shortCircuit: true } : next(specifier, context);
 } });
 register(new URL("./helpers/ts-import-hooks.mjs", import.meta.url));
-const { BrowserPane } = await import("../electron/main/browser-view.ts");
+const { BrowserPane, resolveLocalFile } = await import("../electron/main/browser-view.ts");
 const { WebContentsView } = await import("electron");
 const settled = () => new Promise(setImmediate);
 
@@ -77,6 +81,62 @@ test("an invalid target cannot mark the previous document ready", async (t) => {
   await request;
   assert.equal(await pane.navigateAndWait("javascript:alert(1)"), null);
   await settled();
+});
+
+test("a workspace symlink cannot expose a file outside the workspace", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-browser-root-"));
+  const outside = mkdtempSync(join(tmpdir(), "pi-browser-outside-"));
+  try {
+    const outsideFile = join(outside, "secret.html");
+    const link = join(root, "linked.html");
+    writeFileSync(outsideFile, "secret");
+    symlinkSync(outsideFile, link);
+    assert.equal(resolveLocalFile(link, root), null);
+    assert.equal(resolveLocalFile(outsideFile, root), null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("a dangling workspace symlink cannot authorize an external file URL", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-browser-root-"));
+  const outside = mkdtempSync(join(tmpdir(), "pi-browser-outside-"));
+  try {
+    const danglingTarget = join(outside, "missing.html");
+    const link = join(root, "dangling.html");
+    symlinkSync(danglingTarget, link);
+    const pane = new BrowserPane(() => {});
+    pane.fileRoot = root;
+    assert.equal(pane.isAllowedFileUrl(pathToFileURL(link).toString()), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("an outside absolute path is not normalized into an HTTP navigation", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const root = mkdtempSync(join(tmpdir(), "pi-browser-root-"));
+  const outside = mkdtempSync(join(tmpdir(), "pi-browser-outside-"));
+  const outsideFile = join(outside, "secret.html");
+  writeFileSync(outsideFile, "secret");
+  t.after(() => {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  });
+  const pane = new BrowserPane(() => {});
+  const request = pane.navigateAndWait("https://fixture.invalid/initial");
+  const wc = WebContentsView.instances.at(-1).webContents;
+  wc.url = "https://fixture.invalid/initial";
+  wc.pendingLoads.shift().resolve();
+  await request;
+  const before = wc.pendingLoads.length;
+  const denied = pane.navigateAndWait(outsideFile, root, 10);
+  t.mock.timers.tick(10);
+  assert.equal(await denied, null);
+  assert.equal(wc.pendingLoads.length, before);
+  assert.notEqual(realpathSync(outsideFile), realpathSync(root));
 });
 
 test("late native navigation events cannot publish after the session is invalidated", async () => {
