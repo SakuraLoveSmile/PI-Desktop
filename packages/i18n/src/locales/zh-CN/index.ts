@@ -2104,6 +2104,7 @@ sklm: {
       "speech.adapter.register": "注册语音适配器",
       "keyboard.globalShortcut": "注册系统级快捷键",
       "net.websocket": "建立实时双向连接",
+      "net.anyHost": "访问任意网络地址",
       "bus.publish": "向其他插件发送消息",
       "bus.subscribe": "接收其他插件的消息",
       "browser.cdp": "控制工作面板浏览器",
@@ -2144,6 +2145,7 @@ sklm: {
       "speech.adapter.register": "可以添加转写或朗读协议，复用你已有的服务密钥。插件拿不到密钥。",
       "keyboard.globalShortcut": "注册系统级快捷键，在 PI-Desktop 未聚焦时触发本插件自己的命令。",
       "net.websocket": "与插件声明的域名建立实时双向连接。",
+      "net.anyHost": "可访问任意服务器(HTTP(S)/WebSocket(S)),包括用户自行填写的自建服务地址。云元数据地址始终拒绝。",
       "bus.publish": "可在其声明的主题上发送消息。",
       "bus.subscribe": "可在其声明的主题上接收消息。",
       "browser.cdp":
