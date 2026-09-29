@@ -546,6 +546,9 @@ same model to the check mark, the toggle and the duplicate guard.
 - [ ] a new session defaults a reasoning-capable inherited model to that
       binding's stored default thinking level (clamped onto the enabled set;
       strongest-enabled only when unset) and otherwise defaults to `off`
+- [ ] a provider binding may explicitly select the legacy or adaptive thinking
+      protocol; absent an override, only Anthropic catalog rows with reasoning
+      effort options and no `budget_tokens` default to adaptive
 - [ ] the settings picker always exposes the canonical thinking ladder;
       published levels seed known models and explicit binding levels clamp the
       same way in Composer, Electron main, and the pi sidecar

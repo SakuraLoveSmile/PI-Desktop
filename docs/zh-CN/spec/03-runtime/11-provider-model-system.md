@@ -109,6 +109,11 @@ pi-ai 去发出 `x-opencode-session`。每个提供商行（AI 服务或 OAuth �
 pi-ai 会回落到 budget 思考。仍发布 `budget_tokens` 的模型保持 budget 思考，显式的
 目录 `compat` 记录会被保留。
 
+models.dev 可以为发布了 `reasoning` 和至少一个 `effort` 选项、但没有
+`budget_tokens` 的 Anthropic 模型标记 `thinkingProtocol: "adaptive"`。该协议会
+经过模型目录和已保存的 binding 进入提供商请求。已保存的 binding 覆盖优先；目录
+和 binding 都没有指定时，继续使用现有运行时能力推断。
+
 ## 5. 内置供应商矩阵（发货意图）
 
 > 确切的可用性取决于引脚版本的 pi-ai 支持；产品必须公开所有受支持的产品，并为其余产品保持与 OpenAI 兼容的路径开放。
