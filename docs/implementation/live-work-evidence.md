@@ -1,8 +1,8 @@
 # Live Voice Work Integration Evidence
 
-Current status: **IN_PROGRESS** for Live Work v2.1. The task changes are
-uncommitted and based on current `origin/main` at
-`7f6c2cd97c54abe295c7ae363cbcf125dcfb143f`. No real provider account, paid
+Current status: **READY_FOR_PR_INTEGRATION** for Live Work v2.1. The task
+candidate is based on current `origin/main` at
+`b360e04eb11edb8256b85ad314a8fdda7dc54e30`. No real provider account, paid
 endpoint, user project, or running Electron instance was used. The v2.1 case
 map is [`live-work-v21-coverage.md`](live-work-v21-coverage.md), and its manual
 device matrix is [`live-work-v21-device-matrix.md`](live-work-v21-device-matrix.md).
@@ -11,8 +11,9 @@ device matrix is [`live-work-v21-device-matrix.md`](live-work-v21-device-matrix.
 
 - Branch/worktree: `codex/live-voice-v21-reliability` at
   `/Users/lan/.codex/worktrees/live-voice-v21-refresh/PI-Desktop`.
-- Base: `7f6c2cd97c54abe295c7ae363cbcf125dcfb143f`; no candidate commit SHA
-  exists because this work remains uncommitted.
+- Candidate commit: `61aaa6eb64441c0534c0e3118f941a2ba33fc301`.
+- Base: `b360e04eb11edb8256b85ad314a8fdda7dc54e30`; `pnpm check:pr-base`
+  confirms the base is an ancestor of the candidate.
 - R01: fixed by synchronously capturing the Host active-turn target at
   candidate ingress; explicit null is preserved. Evidence:
   `packages/host-runtime/src/live-work/coordinator.test.ts` — “keeps an
@@ -44,7 +45,7 @@ device matrix is [`live-work-v21-device-matrix.md`](live-work-v21-device-matrix.
   adapters, Codex DataChannel controller, Rust persistence, MCP/plugin
   permissions, and real-device journeys remain unverified.
 - R09: current live-work behavior docs, E2E plan, v2.1 case mapping, W2 audit,
-  ADR, and NOT RUN device matrix are updated in this working tree.
+  ADR, and NOT RUN device matrix are committed in this candidate.
 
 The baseline deterministic reproductions were recorded before the fixes on
 base `f9543be51a2eea4f5010dd059fed6d68dddb8745`: an explicit null turn target
@@ -55,27 +56,32 @@ its exact limits are in the v2.1 case map.
 
 ## Current task-candidate validation
 
-The refreshed task candidate is `origin/main` at
-`7f6c2cd97c54abe295c7ae363cbcf125dcfb143f` plus the uncommitted changes in
-the request worktree above. No commit, push, pull request, or PR integration
-candidate has been created.
+The refreshed task candidate is commit
+`61aaa6eb64441c0534c0e3118f941a2ba33fc301` on `origin/main` at
+`b360e04eb11edb8256b85ad314a8fdda7dc54e30`. Task-candidate validation below
+was run after that base was incorporated.
 
 | Check | Result |
 |---|---|
 | `pnpm build:js` | Passed. VitePress reported its existing missing `gitignore` highlighter and large-chunk warnings. |
-| `pnpm -r --if-present test` | Passed: 6,097 tests across workspace suites; desktop 3,176, shared 1,126, agent-runtime 1,113, plugin SDK 374, and all remaining workspace suites passed. |
+| `pnpm -r --if-present test` | Passed all workspace suites; desktop 3,179, shared 1,124, agent-runtime 1,113, and plugin SDK 374 tests passed, as did the remaining suites. |
 | `pnpm --filter @pi-desktop/desktop typecheck` | Passed. |
 | `pnpm lint` | Passed, including Biome and desktop style-token validation. |
-| `pnpm docs:check` | Passed: 83 English/Chinese specification pairs and 533 documentation pages; existing ADR format notes remain advisory. |
+| `pnpm docs:check` | Passed: 83 English/Chinese specification pairs and 534 documentation pages; existing ADR format notes remain advisory. |
 | `pnpm check:agent-policy` | Passed. |
 | `node scripts/check-architecture.mjs` | Passed. |
-| `git diff --check` | Passed after the final evidence-table update. |
+| `cargo fmt --check` | Passed. |
+| Host Core build for E2E | Passed with one existing dead-code warning in `permissions.rs`. |
+| `pnpm test:e2e` | Passed: 23/23 local Host E2E cases; two optional live-model cases skipped because the API key was explicitly unset. |
+| `git diff --check` | Passed for the task candidate. |
 
-Rust checks were not run because this task changes no Rust files. The isolated
-fixture tests exercise the Live Work bridge, registered prompt handler, and
-AgentHost; the real-provider/device matrix, full Electron acceptance journey,
-and PR integration candidate remain `NOT RUN`. No real account, paid endpoint,
-user project, or running Desktop instance was used.
+The isolated composition tests exercise the Live Work bridge, registered
+prompt handler, and AgentHost; Host-core RPC, sidecar/model completion, and
+provider wire IO are fixtures. `cargo test` and `cargo clippy` were not run
+because the task changes no Rust source; `cargo fmt --check` and the locally
+built Host Core E2E were run. The real-provider/device matrix, full Electron
+acceptance journey, and PR integration candidate remain `NOT RUN`. No real
+account, paid endpoint, user project, or running Desktop instance was used.
 
 ## Historical v2 phase-2 candidate and CI evidence
 
