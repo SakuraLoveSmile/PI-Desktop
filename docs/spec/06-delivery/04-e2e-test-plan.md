@@ -3552,6 +3552,25 @@ identify the platform validation still needed.
 - **Milestone**: M5
 - **Status**: Unit-covered (agent-runtime prompt/clamp tests); integration scenario Draft
 
+#### E2E-052A: Adaptive thinking protocol override survives provider editing
+
+- **Preconditions**: A reasoning-capable Anthropic model whose published
+  options use effort rather than a token budget, plus a deterministic request
+  capture fixture.
+- **Steps**: 1) Open the model's advanced settings and confirm Adaptive is
+  selected. 2) Choose Legacy, save, close and reopen the provider. 3) Send a
+  reasoning turn, then switch back to Adaptive and send another turn.
+- **Expected**: The selected protocol survives reopening. Explicit Legacy
+  disables adaptive request compatibility even when the catalog suggests it;
+  Adaptive enables it. Older saved bindings without this field continue using
+  their previous inferred behavior.
+- **Specs linked**: `03-runtime/11-provider-model-system.md`,
+  `03-runtime/12-provider-config-schema.md`, `03-runtime/13-model-catalog-and-selection.md`
+- **Acceptance**: B (model config), C (chat and stream)
+- **Milestone**: M5
+- **Status**: Rendered Settings selection/save/reopen and unit request mapping
+  covered; live provider request pending
+
 #### E2E-053: Thinking streams separately from the answer
 
 - **Preconditions**: Provider emits thinking deltas before and between answer

@@ -424,6 +424,7 @@ test("models.dev records retain all published model parameters and modalities", 
     type: "effort",
     values: ["low", "medium", "high", "xhigh", "max"],
   }]);
+  assert.equal(model.thinkingProtocol, "adaptive");
   assert.deepEqual(model.modalities, {
     input: ["text", "image", "pdf"],
     output: ["text"],
@@ -473,6 +474,7 @@ test("models.dev records retain all published model parameters and modalities", 
   assert.ok(info.capabilities.includes("attachments"));
   assert.equal(info.capabilities.includes("temperature"), false);
   assert.equal(info.catalogSource, "models.dev");
+  assert.equal(info.thinkingProtocol, "adaptive");
   assert.deepEqual(info.thinkingLevelMap, {
     low: "low",
     medium: "medium",
@@ -510,6 +512,7 @@ test("models.dev records retain all published model parameters and modalities", 
   assert.deepEqual(config.input, ["text", "image"]);
   assert.deepEqual(config.modalities, info.modalities);
   assert.deepEqual(config.supportedThinkingLevels, ["low", "medium", "high", "xhigh", "max"]);
+  assert.equal(config.thinkingProtocol, "adaptive");
   assert.deepEqual(config.thinkingLevelMap, {
     low: "low",
     medium: "medium",

@@ -98,6 +98,7 @@
             "type": ["string", "null"],
             "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max", "omit", null]
           },
+          "thinkingProtocol": { "enum": ["legacy", "adaptive"] },
           "supportsImages": { "type": ["boolean", "null"] },
           "supportsDocuments": { "type": ["boolean", "null"] },
           "availableForSubagents": { "type": "boolean", "default": false }
@@ -177,7 +178,8 @@ Messages 和 Google Generative AI；OpenCode Go 仍通过具名服务配置。
 格式；先切换为自定义服务，才能选择普通 API 格式。OAuth 账户行不提供此操作。
 
 草稿按明确的字段白名单构建：来源名称、`baseUrl`、`apiStyle` 以及 `models`
-中已声明的绑定字段。模型对象及嵌套的 `thinkingLevels` 数组独立复制，编辑
+中已声明的绑定字段。模型对象及嵌套的 `thinkingLevels` 数组、可选的
+`thinkingProtocol`（`legacy` 或 `adaptive`）独立复制，编辑
 草稿不能修改来源对象。建议名称可带复制标记，用户可以在保存前修改。
 不复制来源 `id`、凭据或凭据引用、`hasSecret` 状态、OAuth 元数据、自定义
 `headers` 或未知字段。允许使用的自定义请求头也可能包含 token，因此全部
