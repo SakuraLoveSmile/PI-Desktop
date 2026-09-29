@@ -1750,7 +1750,6 @@ sklm: {
     },
     workspace: "프로젝트: {{workspace}}",
     temporarySession: "임시 채팅",
-    countdown: "응답하지 않으면 {{seconds}}초 후 자동 거부",
     fromSubagent: "{{agent}} 서브에이전트가 요청함",
     queued_one: "요청 {{count}}개가 더 대기 중",
     queued_other: "요청 {{count}}개가 더 대기 중",

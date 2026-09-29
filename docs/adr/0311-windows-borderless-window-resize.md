@@ -1,9 +1,9 @@
-# ADR 0310: Preserve Windows resizing without the native frameless rim
+# ADR 0311: Preserve Windows resizing without the native frameless rim
 
 - Status: Accepted
 - Date: 2026-09-29
 - Deciders: PI-Desktop maintainers
-- Related: D635, D636, E2E-167, ADR 0025, ADR 0248
+- Related: D635, D637, E2E-167, ADR 0025, ADR 0248
 
 ## Context
 

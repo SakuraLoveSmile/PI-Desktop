@@ -1735,7 +1735,6 @@ sklm: {
     },
     "workspace": "Projekt: {{workspace}}",
     "temporarySession": "Temporärer Chat",
-    "countdown": "Automatische Ablehnung in {{seconds}}s, wenn Sie nicht antworten",
     "fromSubagent": "Gefragt vom {{agent}}-Subagenten",
     "queued_one": "{{count}} weitere Anfragen warten",
     "queued_other": "{{count}} weitere Anfragen warten"
