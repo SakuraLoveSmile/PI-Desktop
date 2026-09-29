@@ -7948,7 +7948,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   4. Drag the inner panel divider and resize the conversation area. Confirm
      the page tracks the panel rect without lag or tearing, then drag the outer
      right window edge and confirm the panel width changes while the base chat
-     width stays fixed.
+     width stays fixed. Zoom the window in and out, confirming the native page
+     continues to align with the renderer's panel placeholder.
   5. Open global search, then Settings. Confirm the page is hidden while each
      overlay is up and returns when it closes.
   6. Click `+` again, then choose the same view from the new launcher. Confirm
@@ -7974,6 +7975,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Status**: Unit coverage in
   `apps/desktop/test/plugin-work-panel-views.test.mjs` (addressing, launcher
   grouping, isolation parity, scope filtering, lifecycle teardown),
+  `plugin-view-zoom-bounds.test.mjs` and `plugin-view-host-zoom.test.mjs`,
   `packages/plugin-sdk` and host-core manifest validation; the desktop journey
   is Draft (run only in a capable environment when this surface changes)
 
