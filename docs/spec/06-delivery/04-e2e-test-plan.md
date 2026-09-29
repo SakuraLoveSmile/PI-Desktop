@@ -11962,6 +11962,29 @@ are withdrawn with ADR 0165.
   (`apps/desktop/test/chat-ref-resolve.test.mjs`); full UI journey Draft (run
   only in a capable environment when this surface changes)
 
+#### E2E-CHAT-spaced-absolute-file-paths
+
+- **Preconditions**: On Windows, open a project rooted at a directory whose
+  name contains a space. Create `readme.md` there through a chat Write tool
+  call; keep a same-name file in another project directory and one file outside
+  every allowed root. Repeat the path-recognition checks with a POSIX project
+  path containing a space on macOS or Linux.
+- **Steps**: 1) Click the full path in the Write row. 2) Click the same full
+  path as inline code and as ordinary text in the assistant reply. 3) Click a
+  relative path whose middle directory contains a space, then a first-segment
+  spaced path using an explicit `@"..."` reference. 4) Click the outside
+  absolute path.
+- **Expected**: Every allowed reference opens the exact file in the existing
+  side file view; no path is truncated to its suffix or redirected to the
+  same-name file. The outside path opens nothing and reports the access limit,
+  while a missing in-root file reports that no file matches.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` § fs,
+  `04-ux/08-component-spec.md` §8.3.
+- **Acceptance**: C (conversation & stream), D (workspace), Quality
+- **Milestone**: M5
+- **Status**: Unit/component-covered (`chat-links.test.mjs`,
+  `chat-ref-resolve.test.mjs`, `tool-row-file-refs.test.mjs`); full UI journey Draft.
+
 #### E2E-CHAT-file-ref-opens-the-surface-that-owns-it
 
 - **Preconditions**: The bundled File Manager plugin is loaded and enabled and
@@ -12099,7 +12122,10 @@ are withdrawn with ADR 0165.
   and a `~/` path in chat; confirm only the under-root path becomes a target.
   6) Send a user message `使用llama.cpp，给我迁移步骤，只读。`, then a user
   message that names the real `apps/desktop/src/App.tsx` as a bare path and as
-  `@apps/desktop/src/App.tsx`.
+  `@apps/desktop/src/App.tsx`. 7) Add a workspace directory link to an
+  outside `page.md`, a second in-root `page.md`, and a link to an in-root file;
+  check the exact linked path and a shorthand `page.md`. Repeat with a session
+  scratch directory link, and check a dangling link.
 - **Expected**:
   - Opening the session paints the transcript without throwing.
   - Each chat path opens `apps/desktop/src/App.tsx` in the File Manager
@@ -12116,6 +12142,10 @@ are withdrawn with ADR 0165.
     a file chip, when that path does not exist.
   - A user-message bare path becomes a chip only after `fs/resolveRef` confirms
     a real file; an explicit `@path` chips immediately.
+  - Escaping and dangling exact links do not become file targets or redirect to
+    the same-name in-root file. A shorthand selects the first currently valid
+    in-root file, while an in-root link still opens its target. Scratch links
+    follow the same containment rule.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3,
   `08-meta/decisions-log.md` (D322)
 - **Acceptance**: C (conversation & stream), D (workspace), Quality
