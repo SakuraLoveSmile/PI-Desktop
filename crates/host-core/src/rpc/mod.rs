@@ -503,9 +503,18 @@ const RPC_REQUEST_BUDGET_MS: u64 = 135_000;
 /// the grace covers host-side bookkeeping around the actual execution.
 const RPC_TOOL_BUDGET_GRACE_MS: u64 = 90_000;
 
+/// Cap added to the `tools.execute` budget for the permission prompt. Before
+/// the tool runs, the handler may legitimately wait for the user to answer an
+/// ask prompt for tens of seconds — that wait must not eat the tool's own
+/// execution budget, or "slow approval + full-length Bash" would be killed
+/// mid-execution. Unattended callers reject at their own ask budget (~120s),
+/// so the cap matches that order.
+const RPC_PERMISSION_WAIT_CAP_MS: u64 = 120_000;
+
 /// Budget for one request. `tools.execute` follows its own effective tool
-/// timeout (plus grace); a tool without an effective timeout keeps the old
-/// unbounded behavior. Every other method gets the fixed budget.
+/// timeout (plus permission cap and grace); a tool without an effective
+/// timeout keeps the old unbounded behavior. Every other method gets the
+/// fixed budget.
 fn request_budget_ms(method: &str, params: &Value) -> Option<u64> {
     if method != "tools.execute" {
         return Some(RPC_REQUEST_BUDGET_MS);
@@ -525,8 +534,11 @@ fn request_budget_ms(method: &str, params: &Value) -> Option<u64> {
         .get("timeoutMs")
         .or_else(|| params.get("timeout_ms"))
         .and_then(|v| v.as_u64());
-    crate::tools::effective_timeout_ms(tool_name, timeout_ms)
-        .map(|timeout| timeout.saturating_add(RPC_TOOL_BUDGET_GRACE_MS))
+    crate::tools::effective_timeout_ms(tool_name, timeout_ms).map(|timeout| {
+        timeout
+            .saturating_add(RPC_PERMISSION_WAIT_CAP_MS)
+            .saturating_add(RPC_TOOL_BUDGET_GRACE_MS)
+    })
 }
 
 /// Wrap one request's handler future in its wall-clock budget (issue #1071).
@@ -4951,13 +4963,13 @@ mod tests {
         let bash = json!({"toolName": "Bash", "timeoutMs": 60000});
         assert_eq!(
             request_budget_ms("tools.execute", &bash),
-            Some(60_000 + 90_000)
+            Some(60_000 + 120_000 + 90_000)
         );
         // Bash without an explicit timeout falls back to the Bash default.
         let bash_default = json!({"toolName": "Bash"});
         assert_eq!(
             request_budget_ms("tools.execute", &bash_default),
-            Some(60_000 + 90_000)
+            Some(60_000 + 120_000 + 90_000)
         );
         // A tool with no effective timeout keeps the old unbounded behavior.
         let read = json!({"toolName": "Read"});
@@ -4973,13 +4985,13 @@ mod tests {
         let six_hours = json!({"toolName": "Bash", "timeoutMs": 21600000});
         assert_eq!(
             request_budget_ms("tools.execute", &six_hours),
-            Some(21_600_000 + 90_000)
+            Some(21_600_000 + 120_000 + 90_000)
         );
         // The snake_case fallback keeps hand-rolled callers honest.
         let snake = json!({"tool_name": "Bash", "timeout_ms": 60000});
         assert_eq!(
             request_budget_ms("tools.execute", &snake),
-            Some(60_000 + 90_000)
+            Some(60_000 + 120_000 + 90_000)
         );
     }
 
@@ -5120,7 +5132,7 @@ mod tests {
         let six_hours = json!({"toolName": "Bash", "timeoutMs": 21600000});
         assert_eq!(
             request_budget_ms("tools.execute", &six_hours),
-            Some(21_600_000 + 90_000)
+            Some(21_600_000 + 120_000 + 90_000)
         );
         // A tool without an effective timeout stays unbounded (None), exactly
         // like before this change.
