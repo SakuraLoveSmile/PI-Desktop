@@ -11912,7 +11912,10 @@ are withdrawn with ADR 0165.
   and a `~/` path in chat; confirm only the under-root path becomes a target.
   6) Send a user message `使用llama.cpp，给我迁移步骤，只读。`, then a user
   message that names the real `apps/desktop/src/App.tsx` as a bare path and as
-  `@apps/desktop/src/App.tsx`.
+  `@apps/desktop/src/App.tsx`. 7) Add a workspace directory link to an
+  outside `page.md`, a second in-root `page.md`, and a link to an in-root file;
+  check the exact linked path and a shorthand `page.md`. Repeat with a session
+  scratch directory link, and check a dangling link.
 - **Expected**:
   - Opening the session paints the transcript without throwing.
   - Each chat path opens `apps/desktop/src/App.tsx` in the File Manager
@@ -11929,6 +11932,10 @@ are withdrawn with ADR 0165.
     a file chip, when that path does not exist.
   - A user-message bare path becomes a chip only after `fs/resolveRef` confirms
     a real file; an explicit `@path` chips immediately.
+  - Escaping and dangling exact links do not become file targets or redirect to
+    the same-name in-root file. A shorthand selects the first currently valid
+    in-root file, while an in-root link still opens its target. Scratch links
+    follow the same containment rule.
 - **Specs linked**: `04-ux/08-component-spec.md` §8.3,
   `08-meta/decisions-log.md` (D322)
 - **Acceptance**: C (conversation & stream), D (workspace), Quality

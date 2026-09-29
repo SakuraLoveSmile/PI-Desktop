@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { register } from "node:module";
@@ -116,6 +116,7 @@ test("an absolute realpath alias resolves under the same registered root", async
   const missing = join(workspace, "my project", "missing.md");
   assert.equal(await isChatRefOutsideRoots(missing, { project }), false);
   assert.equal(await resolveChatFileRef(missing, { project }), null);
+  assert.equal((await resolveChatFileRef("my project/page.md", { project }))?.relativePath, "my project/page.md");
 });
 
 test("an in-root symlink cannot resolve a file outside the registered root", async () => {
@@ -126,6 +127,41 @@ test("an in-root symlink cannot resolve a file outside the registered root", asy
   assert.equal(await isChatRefOutsideRoots(ref, roots({ workspace })), true);
   assert.equal(await resolve(ref, { workspace }), null);
   assert.equal(await isChatRefOutsideRoots(join(workspace, "linked", "missing.md"), roots({ workspace })), true);
+});
+
+test("an exact relative symlink escape does not fall back to a same-name file", async () => {
+  const workspace = tempTree("relative-escape", ["other/linked/page.md"]);
+  const outside = tempTree("relative-outside", ["page.md"]);
+  symlinkSync(outside, join(workspace, "linked"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal(await resolve("linked/page.md", { workspace }), null);
+
+  const scratch = tempTree("scratch-escape", []);
+  symlinkSync(outside, join(scratch, "linked"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal(await resolve("linked/page.md", { scratch }), null);
+});
+
+test("an exact relative link within its root remains resolvable", async () => {
+  const workspace = tempTree("relative-inside", ["docs/page.md"]);
+  symlinkSync(join(workspace, "docs"), join(workspace, "linked"), process.platform === "win32" ? "junction" : "dir");
+  const match = await resolve("linked/page.md", { workspace });
+  assert.equal(match?.matchedBy, "exact-relative");
+  assert.equal(match?.relativePath, "linked/page.md");
+});
+
+test("a stale fuzzy index skips escaped and missing candidates in priority order", async () => {
+  const workspace = tempTree("stale-index", ["a/page.md", "b/page.md", "c/page.md"]);
+  assert.equal((await resolve("page.md", { workspace }))?.relativePath, "a/page.md");
+  renameSync(join(workspace, "a"), join(workspace, "old-a"));
+  renameSync(join(workspace, "b"), join(workspace, "old-b"));
+  const outside = tempTree("stale-outside", ["page.md"]);
+  symlinkSync(outside, join(workspace, "a"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal((await resolve("page.md", { workspace }))?.relativePath, "c/page.md");
+});
+
+test("a dangling relative link does not report a match", async () => {
+  const workspace = tempTree("dangling-link", ["other/linked"]);
+  symlinkSync(join(workspace, "missing"), join(workspace, "linked"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal(await resolve("linked", { workspace }), null);
 });
 
 test("a longer matching tail beats a bare leaf name", async () => {
@@ -217,6 +253,22 @@ test("a content-addressed attachment blob resolves against the attachment store"
     await resolve(`attachments/${"b".repeat(64)}`, { attachments }),
     null,
   );
+});
+
+test("an attachment blob symlink cannot escape its store", async (t) => {
+  const digest = "c".repeat(64);
+  const attachments = tempTree("attachment-link", []);
+  const outside = tempTree("attachment-outside", ["page.md"]);
+  try {
+    symlinkSync(join(outside, "page.md"), join(attachments, digest), "file");
+  } catch (error) {
+    if (process.platform === "win32" && error?.code === "EPERM") {
+      t.skip("file symlinks require Windows Developer Mode or elevated privileges");
+      return;
+    }
+    throw error;
+  }
+  assert.equal(await resolve(`attachments/${digest}`, { attachments }), null);
 });
 
 test("an attachment blob reference rejects invalid hash formats or non-hex characters", async () => {

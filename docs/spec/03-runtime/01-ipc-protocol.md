@@ -1809,7 +1809,10 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   so a shorthand resolves in a sibling folder as readily as in the primary one,
   and the match names the folder that answered. Inside one root an exact path
   beats a shorthand; among shorthands the longest matching tail wins, then the
-  shallowest path. The files-panel ignore set applies. A reference that matches
+  shallowest path. Relative and indexed candidates must resolve to regular files
+  whose real paths remain inside their answering root; an exact path through an
+  escaping or dangling link cannot fall back to a same-name indexed file. The
+  files-panel ignore set applies. A reference that matches
   nothing returns `match: null`; an absolute path outside every allowed root
   also returns `reason: "outside-allowed-roots"`, without trying a same-name
   file inside a root. Resolving never opens anything (ADR 0262).

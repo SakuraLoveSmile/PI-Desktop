@@ -1,4 +1,4 @@
-import { readdir, realpath, stat } from "node:fs/promises";
+import { lstat, readdir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import type {
   FsChatRefMatch,
@@ -6,7 +6,7 @@ import type {
   FsChatRefProjectRoot,
   FsChatRefRoot,
 } from "@pi-desktop/shared";
-import { isAttachmentBlobRef, isIgnoredName } from "@pi-desktop/host-runtime";
+import { isAttachmentBlobRef, isIgnoredName, resolveRealPathWithinRoot } from "@pi-desktop/host-runtime";
 import { getWorkspaceFileIndex } from "./fs-index.js";
 
 /**
@@ -155,6 +155,14 @@ async function isRegularFile(target: string): Promise<boolean> {
   }
 }
 
+async function isSymbolicLink(target: string): Promise<boolean> {
+  try {
+    return (await lstat(target)).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 /** Root-relative POSIX path, or null when `absolute` is outside `rootPath`. */
 function relativeInside(rootPath: string, absolute: string): string | null {
   const rel = relative(rootPath, absolute);
@@ -238,30 +246,36 @@ type FuzzyCandidate = { relativePath: string; matchedBy: FsChatRefMatchKind };
  * Longest tail first, so a two-segment shorthand beats a bare leaf name.
  * Within one tail the shallowest file wins.
  */
-function bestFuzzyCandidate(
+function fuzzyCandidates(
   files: readonly string[],
   tails: readonly string[][],
-): FuzzyCandidate | null {
+): FuzzyCandidate[] {
   const parsedFiles = files.map((file) => ({
     file,
     segments: segmentsOf(file),
   }));
+  const candidates: FuzzyCandidate[] = [];
+  const seen = new Set<string>();
   for (const tail of tails) {
-    let best: string | null = null;
-    for (const entry of parsedFiles) {
-      if (!endsWithTail(entry.segments, tail)) continue;
-      if (best === null || compareCandidates(entry.file, best) < 0) {
-        best = entry.file;
-      }
-    }
-    if (best !== null) {
-      return {
-        relativePath: best,
+    const matches = parsedFiles
+      .filter((entry) => endsWithTail(entry.segments, tail))
+      .map((entry) => entry.file)
+      .sort(compareCandidates);
+    for (const file of matches) {
+      if (seen.has(file)) continue;
+      seen.add(file);
+      candidates.push({
+        relativePath: file,
         matchedBy: tail.length === 1 ? "basename" : "path-suffix",
-      };
+      });
     }
   }
-  return null;
+  return candidates;
+}
+
+async function isContainedRegularFile(root: string, relativePath: string): Promise<boolean> {
+  const realPath = await resolveRealPathWithinRoot(root, relativePath);
+  return realPath !== null && isRegularFile(realPath);
 }
 
 /** Bounded walk for trees with no git index (session scratch, attachments). */
@@ -370,7 +384,7 @@ export async function resolveChatFileRef(
     if (!absolutePath.startsWith(resolvedRoot + sep) && absolutePath !== resolvedRoot) {
       return null;
     }
-    if (!(await isRegularFile(absolutePath))) return null;
+    if (!(await isContainedRegularFile(resolvedRoot, blobHash.toLowerCase()))) return null;
     return {
       root: "attachments",
       relativePath: blobHash.toLowerCase(),
@@ -391,6 +405,7 @@ export async function resolveChatFileRef(
   for (const root of rootList) {
     const absolutePath = join(root.path, ...parsed.segments);
     if (await isRegularFile(absolutePath)) {
+      if (!(await isContainedRegularFile(root.path, parsed.segments.join("/")))) return null;
       return {
         root: root.kind,
         relativePath: parsed.segments.join("/"),
@@ -399,18 +414,21 @@ export async function resolveChatFileRef(
         ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
       };
     }
-    const candidate = bestFuzzyCandidate(
+    if (await isSymbolicLink(absolutePath)) return null;
+    const candidates = fuzzyCandidates(
       await listRootFiles(root.kind, root.path),
       tails,
     );
-    if (!candidate) continue;
-    return {
-      root: root.kind,
-      relativePath: candidate.relativePath,
-      absolutePath: join(root.path, ...segmentsOf(candidate.relativePath)),
-      matchedBy: candidate.matchedBy,
-      ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
-    };
+    for (const candidate of candidates) {
+      if (!(await isContainedRegularFile(root.path, candidate.relativePath))) continue;
+      return {
+        root: root.kind,
+        relativePath: candidate.relativePath,
+        absolutePath: join(root.path, ...segmentsOf(candidate.relativePath)),
+        matchedBy: candidate.matchedBy,
+        ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
+      };
+    }
   }
 
   return null;
