@@ -2121,11 +2121,14 @@ export {
 } from "./mcp-config.js";
 export {
   isLocalNetDomain,
+  isMetadataNetHost,
   isNetHostAllowed,
+  isNetSocketUrlAllowedWithGrant,
   isNetUrlAllowed,
-  isNetSocketUrlAllowed,
+  isNetUrlAllowedWithGrant,
   parseNetDomains,
   type PluginNetDomain,
+  type PluginNetEgressGrant,
 } from "./net-policy.js";
 export {
   fsGlobIgnoresCase,
