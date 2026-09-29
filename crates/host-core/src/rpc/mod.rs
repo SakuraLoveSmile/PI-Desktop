@@ -510,11 +510,21 @@ fn request_budget_ms(method: &str, params: &Value) -> Option<u64> {
     if method != "tools.execute" {
         return Some(RPC_REQUEST_BUDGET_MS);
     }
+    // `ToolsExecuteParams` is `#[serde(rename_all = "camelCase")]`, so the wire
+    // carries `toolName` / `timeoutMs`. Reading the snake_case spellings here
+    // would see an empty tool name and no timeout on every real request,
+    // leaving tools.execute unbounded again (review on #1208). Accept the
+    // snake_case spelling as a fallback so the helper stays honest about both
+    // shapes.
     let tool_name = params
-        .get("tool_name")
+        .get("toolName")
+        .or_else(|| params.get("tool_name"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let timeout_ms = params.get("timeout_ms").and_then(|v| v.as_u64());
+    let timeout_ms = params
+        .get("timeoutMs")
+        .or_else(|| params.get("timeout_ms"))
+        .and_then(|v| v.as_u64());
     crate::tools::effective_timeout_ms(tool_name, timeout_ms)
         .map(|timeout| timeout.saturating_add(RPC_TOOL_BUDGET_GRACE_MS))
 }
@@ -4942,21 +4952,42 @@ mod tests {
 
     #[test]
     fn request_budget_for_tools_execute_follows_tool_timeout() {
-        // Bash with an explicit timeout: budget = tool timeout + grace.
-        let bash = json!({"tool_name": "Bash", "timeout_ms": 60000u64});
+        // The real wire shape: ToolsExecuteParams is serde-renamed to
+        // camelCase, so the runtime sends toolName / timeoutMs (review on
+        // #1208 — the snake_case spellings are never on the wire).
+        let bash = json!({"toolName": "Bash", "timeoutMs": 60000});
         assert_eq!(
             request_budget_ms("tools.execute", &bash),
             Some(60_000 + 90_000)
         );
         // Bash without an explicit timeout falls back to the Bash default.
-        let bash_default = json!({"tool_name": "Bash"});
+        let bash_default = json!({"toolName": "Bash"});
         assert_eq!(
             request_budget_ms("tools.execute", &bash_default),
             Some(60_000 + 90_000)
         );
         // A tool with no effective timeout keeps the old unbounded behavior.
-        let read = json!({"tool_name": "Read"});
+        let read = json!({"toolName": "Read"});
         assert_eq!(request_budget_ms("tools.execute", &read), None);
+    }
+
+    #[test]
+    fn request_budget_reads_the_camel_case_wire_shape_regression_1208() {
+        // Regression for the #1208 review: the runtime's real Bash payload —
+        // `toolName` / `timeoutMs` — must produce the tool-timeout budget,
+        // not an unbounded one. A 6h Bash must never be clipped to the fixed
+        // budget, and an unknown snake/camel mixture must still resolve.
+        let six_hours = json!({"toolName": "Bash", "timeoutMs": 21600000});
+        assert_eq!(
+            request_budget_ms("tools.execute", &six_hours),
+            Some(21_600_000 + 90_000)
+        );
+        // The snake_case fallback keeps hand-rolled callers honest.
+        let snake = json!({"tool_name": "Bash", "timeout_ms": 60000});
+        assert_eq!(
+            request_budget_ms("tools.execute", &snake),
+            Some(60_000 + 90_000)
+        );
     }
 
     #[tokio::test]
@@ -5091,15 +5122,16 @@ mod tests {
     #[test]
     fn tools_execute_budget_covers_bash_max_and_unbounded_tools() {
         // Bash may legally run up to 6h: the budget must never clip it to the
-        // fixed 135s, only pad the tool's own timeout with grace.
-        let six_hours = json!({"tool_name": "Bash", "timeout_ms": 21600000});
+        // fixed 135s, only pad the tool's own timeout with grace. Wire shape
+        // is camelCase (see the #1208 regression test).
+        let six_hours = json!({"toolName": "Bash", "timeoutMs": 21600000});
         assert_eq!(
             request_budget_ms("tools.execute", &six_hours),
             Some(21_600_000 + 90_000)
         );
         // A tool without an effective timeout stays unbounded (None), exactly
         // like before this change.
-        let unbounded = json!({"tool_name": "Glob"});
+        let unbounded = json!({"toolName": "Glob"});
         assert_eq!(request_budget_ms("tools.execute", &unbounded), None);
     }
 
