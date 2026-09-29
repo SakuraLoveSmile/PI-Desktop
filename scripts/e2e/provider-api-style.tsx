@@ -185,6 +185,36 @@ globalThis.providerApiStyleProbe = async () => {
       await closeApiStyleMenu();
       results.push(`${locale}:new-custom-options`);
 
+      const adaptiveProvider = {
+        ...fixture("anthropic_messages"),
+        models: [{
+          ...fixture("anthropic_messages").models[0]!,
+          thinkingLevels: ["off", "low"],
+          defaultThinkingLevel: "low" as const,
+          thinkingProtocol: "adaptive" as const,
+        }],
+      } satisfies ProviderPublic;
+      render({ provider: adaptiveProvider });
+      const protocolTrigger = document.querySelector<HTMLButtonElement>(
+        ".provider-chosen-thinking-protocol .settings-menu-select-trigger",
+      );
+      assert(protocolTrigger?.textContent?.includes(i18n.t("settings.thinkingProtocolAdaptive")),
+        `${locale}: adaptive protocol is not displayed`);
+      click(protocolTrigger);
+      await until(() => Boolean(document.querySelector(".settings-menu-select-option")), "thinking protocol menu");
+      const legacyOption = [...document.querySelectorAll<HTMLButtonElement>(".settings-menu-select-option")]
+        .find((option) => option.textContent?.includes(i18n.t("settings.thinkingProtocolLegacy")));
+      click(legacyOption);
+      assert(protocolTrigger?.textContent?.includes(i18n.t("settings.thinkingProtocolLegacy")),
+        `${locale}: legacy protocol selection is not displayed`);
+      click(control("settings.saveProvider"));
+      await until(() => updates.at(-1)?.models?.[0]?.thinkingProtocol === "legacy", "legacy protocol save");
+      render({ provider: { ...adaptiveProvider, ...updates.at(-1)! } });
+      assert(document.querySelector(".provider-chosen-thinking-protocol .settings-menu-select-trigger")
+        ?.textContent?.includes(i18n.t("settings.thinkingProtocolLegacy")),
+        `${locale}: legacy protocol did not survive reopening`);
+      results.push(`${locale}:adaptive-thinking-override-save-reopen`);
+
       for (const style of ACCOUNT_ONLY_STYLES) {
         const original = fixture(style);
         const before = JSON.stringify(original);
