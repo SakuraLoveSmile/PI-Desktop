@@ -17,6 +17,15 @@
 - **覆盖：** `apps/desktop/test/live-voice-service.test.mjs` 覆盖纯通话拒绝、显式工作作用域和 Provider／用户／本地播放的反馈门控及独立投递状态；`packages/host-runtime/src/live-work/coordinator.test.ts` 覆盖回执顺序、路由、过期 steer、去重、关闭通话、早到终态和选择流程；`packages/host-runtime/src/live-work/feedback-scheduler.test.ts` 覆盖防抖、播报间隔、silent、过期降级、去重与溢出；`packages/host-runtime/src/live-work/context.test.ts` 覆盖上下文投影与 opaque 引用；`packages/host-runtime/src/live-work/result-summary.test.ts` 覆盖精确回合摘要和诚实回退；`packages/agent-host/src/agent-host.test.ts` 覆盖无历史快照、队列和语音来源；`packages/voice-runtime/src/live/protocol.test.ts` 覆盖 Provider 工具及反馈编码；`apps/desktop/test/live-work-scope.test.mjs` 覆盖引用作用域／过期，`live-work-operations.test.mjs` 覆盖面板动作，`voice-runtime/src/live/playback-monitor.test.ts` 覆盖本地音频信号检测。该自动化覆盖仍不等于 W2-001—W2-096 全矩阵，也不代表真实 Provider／设备验收。
 - **状态：** 部分完成；其余场景和实机矩阵见 `docs/implementation/live-work-evidence.md`。
 
+### E2E-LIVE-WORK-v2.1-reliability
+
+- **前提：** 隔离的本地 Host 会话、fixture 分类器和 fake runtime/provider I/O。不使用真实账号、用户项目或正在运行的 Desktop 实例。
+- **步骤：** 在 Provider 候选入口捕获 null/活动回合目标并延迟分类；让通过校验的 stop 与普通分类竞争；让 Host 派发保持未决，随后返回精确的只读准入证据；先到达终态事件再返回写操作 ACK；在派发期间关闭 Live；在 AgentHost 准入前更改已授权的工作区；提交独立工作队列项；延迟最终助手消息持久化；在 stop 控制操作后查询任务结果。
+- **预期：** 过期/null 目标不会变成之后的回合。stop 屏障会撤回尚未跨过准入边界的较早写操作。忙碌时的普通提交不会悄悄进入队列。Host 状态不确定时显示 unknown，并且只核对、不再次写入。终态证据不会被迟到 ACK 复活或覆盖。工作区不匹配不会创建回合或队列项。空闲时的显式队列项由 AgentHost 排空，恢复后挂起的条目保持挂起。结果查询只返回准确的任务结果，不返回准入或 stop 确认。
+- **覆盖：** `packages/host-runtime/src/live-work/coordinator.test.ts`、`packages/host-runtime/src/live-work/operation-ledger.test.ts`、`packages/agent-host/src/agent-host.test.ts`、`apps/desktop/test/live-work-production-composition.test.mjs` 和 `apps/desktop/test/agent-host-bridge-work-ack.test.mjs`。生产组合 fixture 实例化 Live Work bridge、AgentHost bridge、已注册的 `agentPrompt` handler 和真实 AgentHost；Host Core 持久化、具体 Provider adapter/transport 和真实设备旅程不在该测试边界内。
+- **状态：** 自动化覆盖为部分完成，逐项记录于 `docs/implementation/live-work-v21-coverage.md`。实机验收未运行。
+- **规格：** [live-work-session](../03-runtime/live-work-session.md)、[live-voice](../03-runtime/live-voice.md)。
+
 ### E2E-POWER-keep-awake-setting
 
 - **前提：** 设置值缺失的隔离桌面配置；无需真实模型服务。

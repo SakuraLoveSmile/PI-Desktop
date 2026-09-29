@@ -97,6 +97,41 @@
 - **Specs:** [live-work-session](../03-runtime/live-work-session.md),
   [live-voice](../03-runtime/live-voice.md).
 
+### E2E-LIVE-WORK-v2.1-reliability
+
+- **Preconditions:** An isolated local Host session, fixture classifier
+  completion, and fake runtime/provider I/O. No real account, user project, or
+  running Desktop instance is used.
+- **Steps:** Capture a null/active target at provider ingress and delay
+  classification; race a validated stop against ordinary classification; make
+  Host dispatch stay unresolved, then return exact read-only admission
+  evidence; deliver terminal before the write acknowledgement; close Live
+  during dispatch; change the authorized workspace before AgentHost admission;
+  enqueue independent work; delay final assistant persistence; query the task
+  result after a stop control operation.
+- **Expected:** Stale/null targets never become later turns. A stop barrier
+  withdraws earlier writes that have not crossed admission. Explicitly busy
+  ordinary submits do not silently enter the queue. Host uncertainty is shown
+  as unknown and reconciled without a second write. Terminal evidence cannot
+  revive or be overwritten by a late acknowledgement. Workspace mismatch
+  creates no turn or queue item. Idle explicit queue entries drain through
+  AgentHost; restored held entries remain held. A result query returns only an
+  exact task result, not an admission or stop acknowledgement.
+- **Coverage:** `packages/host-runtime/src/live-work/coordinator.test.ts`,
+  `packages/host-runtime/src/live-work/operation-ledger.test.ts`,
+  `packages/agent-host/src/agent-host.test.ts`,
+  `apps/desktop/test/live-work-production-composition.test.mjs`, and
+  `apps/desktop/test/agent-host-bridge-work-ack.test.mjs`. The production
+  composition fixture instantiates the Live Work bridge, AgentHost bridge,
+  registered `agentPrompt` handler, and real AgentHost; Host-core persistence,
+  concrete provider adapters/transports, and real device journeys remain
+  outside that test boundary.
+- **Status:** Automated coverage is partial and is recorded per case in
+  `docs/implementation/live-work-v21-coverage.md`. Real device acceptance is
+  not run.
+- **Specs:** [live-work-session](../03-runtime/live-work-session.md),
+  [live-voice](../03-runtime/live-voice.md).
+
 ### E2E-CHAT-fork-completed-reply-while-running
 
 - **Preconditions:** Isolated real desktop profile, configured model, two turns
