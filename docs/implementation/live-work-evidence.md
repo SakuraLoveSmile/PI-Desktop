@@ -1,6 +1,6 @@
 # Live Voice Work Integration Evidence
 
-Current status: **READY_FOR_PR_INTEGRATION** for Live Work v2.1. The task
+Current status: **PR_VALIDATION_IN_PROGRESS** for Live Work v2.1. The task
 candidate is based on current `origin/main` at
 `b360e04eb11edb8256b85ad314a8fdda7dc54e30`. No real provider account, paid
 endpoint, user project, or running Electron instance was used. The v2.1 case
@@ -75,13 +75,29 @@ was run after that base was incorporated.
 | `pnpm test:e2e` | Passed: 23/23 local Host E2E cases; two optional live-model cases skipped because the API key was explicitly unset. |
 | `git diff --check` | Passed for the task candidate. |
 
+## PR integration candidate validation
+
+- PR: [#1220](https://github.com/vastsa/PI-Desktop/pull/1220).
+- Candidate: GitHub merge ref `a28ffc3b5ea9944cb20fa92a43748a050883da83`,
+  with base `b360e04eb11edb8256b85ad314a8fdda7dc54e30` and head
+  `75efaa0bbbe7294168a8f4e8908cef47266c4e37`.
+- Host Core was built from that candidate using the shared Cargo target.
+- `pnpm test:e2e`: 23/23 local Host E2E cases passed; two optional live-model
+  cases skipped because provider credentials were explicitly unset.
+- All GitHub checks passed on PR head
+  `75efaa0bbbe7294168a8f4e8908cef47266c4e37`: JS build/typecheck/lint/
+  architecture/unit tests, docs, Rust format/lint/tests, and latest-base.
+  GitHub reported the PR clean and mergeable.
+- This evidence update is documentation-only and will trigger the repository
+  checks again on the updated PR head before merge.
+
 The isolated composition tests exercise the Live Work bridge, registered
 prompt handler, and AgentHost; Host-core RPC, sidecar/model completion, and
 provider wire IO are fixtures. `cargo test` and `cargo clippy` were not run
 because the task changes no Rust source; `cargo fmt --check` and the locally
-built Host Core E2E were run. The real-provider/device matrix, full Electron
-acceptance journey, and PR integration candidate remain `NOT RUN`. No real
-account, paid endpoint, user project, or running Desktop instance was used.
+built Host Core E2E were run. The real-provider/device matrix and full Electron
+acceptance journey remain `NOT RUN`. No real account, paid endpoint, user
+project, or running Desktop instance was used.
 
 ## Historical v2 phase-2 candidate and CI evidence
 
