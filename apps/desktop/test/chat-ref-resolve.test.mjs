@@ -181,6 +181,26 @@ test("a content-addressed attachment blob resolves against the attachment store"
   );
 });
 
+test("a normal attachment-prefixed workspace path remains resolvable", async () => {
+  const workspace = tempTree("ws", ["attachments/manual.pdf"]);
+  const match = await resolve("attachments/manual.pdf", { workspace });
+  assert.equal(match?.root, "workspace");
+  assert.equal(match?.relativePath, "attachments/manual.pdf");
+  assert.equal(match?.matchedBy, "exact-relative");
+});
+
+test("an attachment blob reference rejects invalid hash formats or non-hex characters", async () => {
+  const attachments = tempTree("attachments", ["not-a-valid-sha256"]);
+  assert.equal(
+    await resolve("attachments/not-a-valid-sha256", { attachments }),
+    null,
+  );
+  assert.equal(
+    await resolve(`attachments/${"z".repeat(64)}`, { attachments }),
+    null,
+  );
+});
+
 test("line and column references are stripped before matching", async () => {
   const workspace = tempTree("ws", ["src/a.ts"]);
   const match = await resolve("src/a.ts:12:4", { workspace });
