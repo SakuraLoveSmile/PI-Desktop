@@ -8862,10 +8862,39 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `pnpm test:e2e:settings-scroll`; full renderer-driven password persistence
   assertions and checkpoint-level local recovery fault injection remain.
 
+**E2E-CHAT-session-todo-checklist: TodoWrite to session-aware TodoDock**
+
+- **Preconditions**: An isolated local Electron profile with a deterministic
+  Agent/host fixture, two Desktop sessions, and no real provider or paid API.
+- **Steps**: Start a multi-step Agent turn that calls `TodoWrite` with ordered
+  pending and `in_progress` items. Observe the TodoDock above the Composer,
+  expand it, switch sessions, and confirm the checklist stays session-scoped.
+  Complete and cancel items, confirm the bounded eight-row display and the
+  all-cancelled label, then clear the checklist and reload/restart the host.
+  Deliver an out-of-order older `todos.changed` event and confirm it cannot
+  replace the newer snapshot. Exercise invalid payload, Plan/Goal, delegated,
+  and remote-session paths.
+- **Expected**: Host SQLite is authoritative; each successful full replacement
+  advances revision, including clear, and emits one committed `todos.changed`
+  snapshot. Invalid or unauthorized writes do not mutate or emit. TodoDock
+  renders plain text, does not take focus, resets expansion on session changes,
+  rejects stale events, and skips local recovery for `remote:` sessions because
+  RACP v1 has no Todo snapshot operation.
+- **Specs**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/04-data-storage.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `04-ux/08-component-spec.md`, ADR 0310.
+- **Acceptance**: C / E / F / Quality / Security.
+- **Milestone**: M6+.
+- **Status**: Targeted automated coverage is present in host-core and
+  `apps/desktop/test/todo-dock-rendering.test.mjs` plus
+  `todo-events.test.mjs`. Full Electron process/restart journey remains a
+  candidate validation gate.
+
 ## 8. Traceability Matrix
 
 | Acceptance | Scenarios |
 |---|---|
+| C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |
