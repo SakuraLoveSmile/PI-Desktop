@@ -7313,7 +7313,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`, ADR 0283, ADR 0142
 - **Acceptance**: E (tools & permissions), Security
 - **Milestone**: M5
-- **Status**: Unit-covered (`apps/desktop/test/mcp-oauth.test.mjs`, `apps/desktop/test/user-mcp.test.mjs`); full UI journey Draft
+- **Discovery regression (#1221):** Local HTTP authorization flow covers root and path issuers, ordered OAuth/OIDC fallbacks, challenge-scope precedence, all protected-resource scopes, and omitted scope when absent. It checks the real callback, PKCE token exchange and storage handoff using synthetic tokens; no external account is contacted.
+- **Status**: Unit-covered (`apps/desktop/test/mcp-oauth.test.mjs`, `apps/desktop/test/user-mcp.test.mjs`); local HTTP flow covered by `apps/desktop/test/mcp-oauth-discovery.test.mjs`; full UI journey Draft
 
 #### E2E-SKILL-import-multiple-folders
 
