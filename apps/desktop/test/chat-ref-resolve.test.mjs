@@ -158,10 +158,18 @@ test("a stale fuzzy index skips escaped and missing candidates in priority order
   assert.equal((await resolve("page.md", { workspace }))?.relativePath, "c/page.md");
 });
 
-test("a dangling relative link does not report a match", async () => {
-  const workspace = tempTree("dangling-link", ["other/linked"]);
+test("a dangling relative link, including a middle directory, does not fall back", async () => {
+  const workspace = tempTree("dangling-link", ["other/linked/page.md"]);
   symlinkSync(join(workspace, "missing"), join(workspace, "linked"), process.platform === "win32" ? "junction" : "dir");
-  assert.equal(await resolve("linked", { workspace }), null);
+  assert.equal(await resolve("linked/page.md", { workspace }), null);
+
+  const terminal = tempTree("dangling-terminal", ["other/linked"]);
+  symlinkSync(join(terminal, "missing"), join(terminal, "linked"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal(await resolve("linked", { workspace: terminal }), null);
+
+  const scratch = tempTree("dangling-scratch", ["other/linked/page.md"]);
+  symlinkSync(join(scratch, "missing"), join(scratch, "linked"), process.platform === "win32" ? "junction" : "dir");
+  assert.equal(await resolve("linked/page.md", { scratch }), null);
 });
 
 test("a longer matching tail beats a bare leaf name", async () => {

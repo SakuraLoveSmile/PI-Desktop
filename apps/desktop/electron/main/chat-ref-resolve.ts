@@ -155,14 +155,6 @@ async function isRegularFile(target: string): Promise<boolean> {
   }
 }
 
-async function isSymbolicLink(target: string): Promise<boolean> {
-  try {
-    return (await lstat(target)).isSymbolicLink();
-  } catch {
-    return false;
-  }
-}
-
 /** Root-relative POSIX path, or null when `absolute` is outside `rootPath`. */
 function relativeInside(rootPath: string, absolute: string): string | null {
   const rel = relative(rootPath, absolute);
@@ -276,6 +268,21 @@ function fuzzyCandidates(
 async function isContainedRegularFile(root: string, relativePath: string): Promise<boolean> {
   const realPath = await resolveRealPathWithinRoot(root, relativePath);
   return realPath !== null && isRegularFile(realPath);
+}
+
+async function hasInvalidLinkAncestor(root: string, segments: readonly string[]): Promise<boolean> {
+  for (let length = 1; length <= segments.length; length += 1) {
+    const prefixSegments = segments.slice(0, length);
+    try {
+      if ((await lstat(join(root, ...prefixSegments))).isSymbolicLink()
+        && !(await resolveRealPathWithinRoot(root, prefixSegments.join("/")))) return true;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      // Only ordinary missing paths can fall back to an indexed suffix match.
+      if (code !== "ENOENT" && code !== "ENOTDIR") return true;
+    }
+  }
+  return false;
 }
 
 /** Bounded walk for trees with no git index (session scratch, attachments). */
@@ -414,7 +421,7 @@ export async function resolveChatFileRef(
         ...(root.projectRoot ? { projectRoot: root.projectRoot } : {}),
       };
     }
-    if (await isSymbolicLink(absolutePath)) return null;
+    if (await hasInvalidLinkAncestor(root.path, parsed.segments)) return null;
     const candidates = fuzzyCandidates(
       await listRootFiles(root.kind, root.path),
       tails,
