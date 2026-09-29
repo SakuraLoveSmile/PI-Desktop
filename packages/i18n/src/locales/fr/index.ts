@@ -1021,6 +1021,8 @@ sklm: {
     importAgentScanTransportHttp: "HTTP",
     "imported": "Importé",
     "skillImported": "Importé {{name}}",
+    "skillBatchImported": "{{count}} dossiers de compétences importés",
+    "skillBatchFailed": "Échec de l'import de {{count}} dossiers. Premier échec : {{first}}",
     "skillsEmpty": "Aucune compétence dans ce dossier",
     "subagentsEmpty": "Aucun sous-agent pour l'instant",
     "addMcp": "Ajouter",
