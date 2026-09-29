@@ -1,0 +1,35 @@
+/* The chat mirror uses the same segmented primitive as Settings, with a
+   tighter footprint for the transcript action row. */
+.thinking-display-control {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.transcript-display-toolbar {
+  display: flex;
+  flex: 0 0 32px;
+  justify-content: flex-end;
+  min-height: 32px;
+  margin-top: var(--ds-toolbar-height);
+  padding: 2px 12px 2px 0;
+}
+
+:root .thread-wrap .transcript-display-toolbar + .thread-scroll .thread-content {
+  padding-top: 12px;
+}
+
+.thinking-display-control .settings-segment {
+  max-width: 100%;
+}
+
+.thinking-display-control .settings-segment-item {
+  min-height: 28px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .thinking-display-control .settings-segment-item {
+    padding-inline: 7px;
+  }
+}

@@ -99,6 +99,7 @@ import type {
   NotificationListResult,
   ReviewRollbackResult,
   PlanProposal,
+  PlanExecution,
   PlanResolveRequest,
   PlanResolutionResult,
   PlanningStateEvent,
@@ -927,8 +928,11 @@ export const api = {
     invoke<SpeechSynthesizeResult>(IPC.invoke.speechSynthesize, req),
   compact: (req: AgentCompactRequest) =>
     invoke<AgentCompactResponse>(IPC.invoke.agentCompact, req),
-  abort: (sessionId: string) =>
-    invoke(IPC.invoke.agentAbort, { sessionId }),
+  abort: (sessionId: string, turnId?: string) =>
+    invoke<{ ok: boolean; aborted?: boolean }>(IPC.invoke.agentAbort, {
+      sessionId,
+      ...(turnId ? { turnId } : {}),
+    }),
   stop: (sessionId: string) =>
     invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId }),
   queuePrompt: (req: AgentQueuePushRequest) =>
@@ -969,6 +973,12 @@ export const api = {
     ).then(normalizePendingPlans),
   resolvePlan: (resolution: PlanResolveRequest) =>
     invoke<PlanResolutionResult>(IPC.invoke.plansResolve, resolution),
+  runMissedPlan: (proposalId: string, sessionId: string) =>
+    invoke<{ execution: PlanExecution }>(IPC.invoke.plansRunMissed, { proposalId, sessionId }),
+  cancelScheduledPlan: (proposalId: string, sessionId: string) =>
+    invoke<{ cancelled: boolean; proposal?: PlanProposal }>(IPC.invoke.plansCancelSchedule, { proposalId, sessionId }),
+  markRevisionFailed: (proposalId: string, sessionId: string, errorCode?: string) =>
+    invoke<{ changed: boolean; proposal?: PlanProposal }>(IPC.invoke.plansMarkRevisionFailed, { proposalId, sessionId, errorCode }),
   getGoalReport: (params: { sessionId: string; reportId?: string; executionId?: string }) =>
     invoke<{ report: any }>(IPC.invoke.goalReportGet, params),
   listGoalReports: (params: { sessionId: string }) =>

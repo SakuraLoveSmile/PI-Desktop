@@ -17,7 +17,7 @@ Principles:
 |---|---|
 | `app` | App info, health checks |
 | `agent` | Conversation, queued-send stop/abort, status, and interactive asktool resolution |
-| `plan` | Plan proposal listing, resolution, and change events |
+| `plan` | Plan/Goal proposal listing, revision, one-time scheduling, resolution, and change events |
 | `session` | Session CRUD / history / title metadata and summarization |
 | `session collaboration` | Read-only bounded collaboration status for sidebar projections; mutation stays in the reviewed plugin gateway |
 | `settings` | Config read/write |
@@ -128,6 +128,8 @@ type AgentPromptRequest = {
  truncateBefore?: number;
  /** Renderer snapshot used to close the prompt-to-completion notification race. */
  viewingSessionId?: string | null;
+ /** Retryable Plan/Goal revision admission; Host validates the proposal identity. */
+ revisionProposalId?: string;
 };
 
 type AgentPromptAttachment = {
@@ -352,14 +354,16 @@ type ProposalKind = "plan" | "goal";
 
 type GlobalPermissionMode = "ask" | "accept-edits" | "auto";
 
-type PlanApprovalAction = "approve" | "reject";
+type PlanApprovalAction = "approve" | "reject" | "request_changes" | "schedule";
 
 type PlanProposalStatus =
-  | "pending" | "approved" | "rejected"
+  | "pending" | "approved" | "changes_requested" | "rejected"
   | "expired" | "interrupted";
 
 type PlanExecutionState =
   | "queued" | "running" | "completed" | "interrupted";
+
+type PlanScheduleState = "scheduled" | "missed" | "claimed" | "cancelled";
 
 // Same shape for SubmitPlan and SubmitGoal; the tool name selects the kind.
 type SubmitPlanInput = {
@@ -397,6 +401,27 @@ type PlanProposal = {
   version: number;
   executionId?: string;
   executionState?: PlanExecutionState;
+  planningProviderId?: string;
+  planningModelId?: string;
+  executionProviderId?: string;
+  executionModelId?: string;
+  scheduledFor?: string;
+  scheduleTimezone?: string;
+  scheduleState?: PlanScheduleState;
+  revisionIntent?: {
+    content: string;
+    draft?: { text: string; fileReferences: Array<{
+      path: string; name: string; kind?: "image" | "file";
+      mimeType?: string; token?: string;
+    }> };
+    providerId?: string;
+    modelId?: string;
+    thinkingLevel: ThinkingLevel | "omit";
+    targetKind: ProposalKind;
+    state: "ready" | "started" | "failed" | "submitted";
+    turnId?: string;
+    errorCode?: string;
+  };
 };
 
 type PlanExecution = {
@@ -409,6 +434,8 @@ type PlanExecution = {
   question: string;
   artifact: PlanArtifact;
   targetPermissionMode: GlobalPermissionMode;
+  executionProviderId?: string;
+  executionModelId?: string;
   state: PlanExecutionState;
 };
 
@@ -450,8 +477,32 @@ type PlanResolveRequest =
   | (PlanResolveIdentity & {
       action: "approve";
       targetPermissionMode: GlobalPermissionMode;
+      executionProviderId?: string;
+      executionModelId?: string;
     })
-  | (PlanResolveIdentity & { action: "reject" });
+  | (PlanResolveIdentity & {
+      action: "schedule";
+      targetPermissionMode: GlobalPermissionMode;
+      executionProviderId: string;
+      executionModelId: string;
+      scheduledFor: string;
+      scheduleTimezone: string;
+    })
+  | (PlanResolveIdentity & { action: "reject" })
+  | (PlanResolveIdentity & {
+      action: "request_changes";
+      revisionIntent?: {
+        content: string;
+        draft?: { text: string; fileReferences: Array<{
+          path: string; name: string; kind?: "image" | "file";
+          mimeType?: string; token?: string;
+        }> };
+        providerId?: string;
+        modelId?: string;
+        thinkingLevel: ThinkingLevel | "omit";
+        targetKind: ProposalKind;
+      };
+    });
 
 type PlanResolutionResult = {
   ok: boolean;
@@ -467,25 +518,37 @@ Preload methods:
 
 - `pi-desktop/plans/pending({ sessionId? }) -> PlansPendingResult`
 - `pi-desktop/plans/resolve(PlanResolveRequest) -> PlanResolutionResult`
+- `pi-desktop/plans/runMissed({ proposalId, sessionId })` — explicitly claim a
+  missed one-time schedule for execution
+- `pi-desktop/plans/cancelSchedule({ proposalId, sessionId })` — cancel a
+  scheduled or missed snapshot before claim
+- `pi-desktop/plans/markRevisionFailed({ proposalId, sessionId, errorCode? })`
+  — retain a failed revision intent for retry
 
 Electron forwards each host `plans.changed` notification unchanged to the
 renderer through the stable shared `IPC.event.plansChanged` channel
 (`pi-desktop/plans/event/changed`). This is the Plan/Goal change event surface;
 the
 renderer does not receive contract approval transitions as AgentEvent variants.
-`plans.pending` returns only currently pending approval rows. Terminal
-`plan_approvals` rows remain durable Host records, but are not renderer
-hydration data; the renderer retains its latest contract snapshot only for the
-current renderer lifetime while live `plans.changed` events arrive.
+`plans.pending` returns current pending rows plus bounded session history.
+Terminal `plan_approvals` rows remain durable Host records and are renderer
+hydration data as read-only transcript cards.
 
 For `approve`, host-core and Electron require an explicit
 `targetPermissionMode`; Electron never fills it from stored settings. The
 renderer initializes each approval to Ask, which remains the product default,
 and the host does not persist the selection as the next approval default.
-`reject` carries no permission mode.
+`reject` and `request_changes` carry no permission mode. `request_changes`
+stores the exact revision intent and its selected planning model; the next
+prompt carries `revisionProposalId` and must match that intent. The optional
+draft snapshot retains attachment references across a failed revision and retry;
+image bytes remain in the session attachment store. `schedule`
+requires a future RFC3339 instant, timezone, explicit execution provider/model,
+and the same identity/version checks.
 Responses with a wrong proposal, session, turn, tool-call, version, or expired
-host-owned deadline fail with a stable Plan/Goal approval error. There is no
-request-changes action.
+host-owned deadline fail with a stable Plan/Goal approval error. Duplicate
+resolution with the same identity and binding is idempotent; a different
+binding is stale.
 
 ### 5.5 getStatus
 
@@ -1109,7 +1172,7 @@ new session id and therefore cannot reuse or mutate the source pi runtime or
 its provider cache.
 
 Protocol version 9 adds the checkpoint Plan contract: `SubmitPlan`, unique
-`.pi/plan/*.md` artifact metadata, approve/reject-only responses, absolute
+`.pi/plan/*.md` artifact metadata, identity-scoped approval responses, absolute
 expiry, `plan_approvals` execution fields, shell catalog/identity fields, and
 streamed stdout/stderr events. A v7 or older host, and any incompatible v8
 peer, must fail the handshake so a desktop cannot display Plan while silently
@@ -1406,7 +1469,8 @@ above.
   channels. A v5 peer is rejected because silently omitting a checkpoint can
   make the next provider request unsafe (ADR 0030).
 - Protocol v9 supersedes the earlier v7 Plan contract. It adds `SubmitPlan`,
-  exact unique artifact metadata, approve/reject-only resolution, 30-minute
+  exact unique artifact metadata, identity-scoped resolution with revision and
+  one-time scheduling, 30-minute
   absolute expiry, `plan_approvals` execution states, shell selection and
   pinned ID/dialect, and streamed command output. A v7/v8 peer is rejected
   before the UI becomes interactive because it cannot enforce or represent this

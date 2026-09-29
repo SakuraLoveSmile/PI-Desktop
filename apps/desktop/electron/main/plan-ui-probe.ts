@@ -271,8 +271,8 @@ export function createPlanUiProbe(deps: PlanUiProbeDeps) {
 
       const sessionId = planUiProbeString(input.sessionId, "sessionId").trim();
       const revision = input.revision;
-      if (revision !== "first" && revision !== "second") {
-        throw new Error("revision must be first or second");
+      if (revision !== "first" && revision !== "second" && revision !== "scheduled" && revision !== "goalSource" && revision !== "revisionSource") {
+        throw new Error("unsupported Plan UI probe revision");
       }
       const title = planUiProbeString(input.title, "title");
       const markdown = planUiProbeString(input.markdown, "markdown");

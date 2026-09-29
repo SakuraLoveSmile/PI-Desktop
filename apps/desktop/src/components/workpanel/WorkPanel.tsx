@@ -19,6 +19,7 @@ import {
   isKnownWorkPanelTab,
   parsePluginViewRef,
   pluginWorkPanelTab,
+  overviewWorkPanelTab,
   subagentTabDisplayLabels,
   teamWorkPanelTab,
   toolWorkPanelTab,
@@ -36,6 +37,7 @@ import {
   IconClose,
   IconDiff,
   IconFileText,
+  IconInfo,
   IconPanelMaximize,
   IconPanelRestore,
   IconPlug,
@@ -48,6 +50,7 @@ import { PluginViewTab } from "./PluginViewTab";
 import { SubagentTranscriptTab } from "./SubagentTranscriptTab";
 import { GoalReportTab } from "./GoalReportTab";
 import { TeamPanel } from "./TeamPanel";
+import { OverviewTab } from "./OverviewTab";
 import {
   MAIN_PANE_MIN_WIDTH,
   WORK_PANEL_COMPACT_MIN_WIDTH,
@@ -59,6 +62,7 @@ import {
 } from "../../lib/work-panel-resize";
 
 const TAB_ICONS = {
+  overview: IconInfo,
   new: IconPlus,
   review: IconDiff,
   file: IconFileText,
@@ -215,6 +219,11 @@ export function WorkPanel({
   const tabs = rawTabs.filter(isKnownWorkPanelTab);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  // Overview is a fixed session surface. Keeping it in the rendered list
+  // avoids mutating persisted tab state while making it first for every session.
+  const displayTabs = activeSessionId
+    ? [overviewWorkPanelTab(), ...tabs.filter((tab) => tab.kind !== "overview")]
+    : tabs;
   const sessions = useAppStore((s) => s.sessions);
   const selectSession = useAppStore((s) => s.selectSession);
   const pluginViews = useAppStore((s) => s.pluginViews);
@@ -226,7 +235,9 @@ export function WorkPanel({
   const openNewWorkPanelTab = useAppStore((s) => s.openNewWorkPanelTab);
   const replaceWorkPanelTab = useAppStore((s) => s.replaceWorkPanelTab);
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
-  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
+  const activeTab =
+    displayTabs.find((tab) => tab.id === activeTabId) ??
+    (activeSessionId ? displayTabs[0] ?? null : null);
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const tools = workPanelTools(
     t,
@@ -606,8 +617,13 @@ export function WorkPanel({
   );
   const onTabKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLButtonElement>, tabId: string) => {
-      const index = tabs.findIndex((tab) => tab.id === tabId);
+      const navigationTabs = tabId === "overview" ? displayTabs : tabs;
+      const index = navigationTabs.findIndex((tab) => tab.id === tabId);
       if (index < 0) return;
+      if (tabId === "overview" && (event.key === "Delete" || event.key === "Backspace")) {
+        event.preventDefault();
+        return;
+      }
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
         closeTabAndFocus(tabId);
@@ -615,9 +631,9 @@ export function WorkPanel({
       }
       if (event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
         event.preventDefault();
-        const target = tabs[index + (event.key === "ArrowLeft" ? -1 : 1)];
+        const target = navigationTabs[index + (event.key === "ArrowLeft" ? -1 : 1)];
         if (!target) return;
-        reorderTab(tabId, target.id, event.key === "ArrowRight");
+        if (tabId !== "overview") reorderTab(tabId, target.id, event.key === "ArrowRight");
         return;
       }
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -626,16 +642,17 @@ export function WorkPanel({
         event.key === "Home"
           ? 0
           : event.key === "End"
-            ? tabs.length - 1
+            ? navigationTabs.length - 1
             : event.key === "ArrowLeft"
-              ? (index - 1 + tabs.length) % tabs.length
-              : (index + 1) % tabs.length;
-      const nextTab = tabs[nextIndex];
+              ? (index - 1 + navigationTabs.length) % navigationTabs.length
+              : (index + 1) % navigationTabs.length;
+      const nextTab = navigationTabs[nextIndex];
       if (!nextTab) return;
-      activateTab(nextTab.id);
+      if (nextTab.kind === "overview") openWorkPanelTab(overviewWorkPanelTab());
+      else activateTab(nextTab.id);
       requestAnimationFrame(() => tabButtonRefs.current[nextTab.id]?.focus());
     },
-    [activateTab, closeTabAndFocus, reorderTab, tabs],
+    [activateTab, closeTabAndFocus, displayTabs, openWorkPanelTab, reorderTab, tabs],
   );
 
   const onTabStripWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -837,7 +854,7 @@ export function WorkPanel({
                 aria-label={t("panel.tabsLabel")}
                 onWheel={onTabStripWheel}
               >
-                {tabs.map((tab) => {
+                {displayTabs.map((tab) => {
                   const label =
                     tab.kind === "subagent"
                       ? (subagentLabelById.get(tab.id) ?? t("panel.tabs.subagent"))
@@ -875,11 +892,18 @@ export function WorkPanel({
                         aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
                         className="work-panel-tab-button"
                         title={tab.kind === "subagent" ? label : tab.resource ?? label}
-                        onPointerDown={(event) => beginTabReorder(event, tab.id)}
+                        onPointerDown={(event) => {
+                          if (tab.kind !== "overview") beginTabReorder(event, tab.id);
+                        }}
                         onDragStart={(event) => event.preventDefault()}
-                        onClick={() => activateTab(tab.id)}
+                        onClick={() =>
+                          tab.kind === "overview"
+                            ? openWorkPanelTab(overviewWorkPanelTab())
+                            : activateTab(tab.id)
+                        }
                         onAuxClick={(event) => {
                           if (event.button !== 1) return;
+                          if (tab.kind === "overview") return;
                           event.preventDefault();
                           closeTabAndFocus(tab.id);
                         }}
@@ -888,7 +912,7 @@ export function WorkPanel({
                         <Icon size={14} />
                         <span className="work-panel-tab-label">{label}</span>
                       </button>
-                      <button
+                      {tab.kind !== "overview" && <button
                         type="button"
                         className="work-panel-tab-close"
                         aria-label={t("panel.closeTab", { name: label })}
@@ -897,7 +921,7 @@ export function WorkPanel({
                         onClick={() => closeTabAndFocus(tab.id)}
                       >
                         <IconClose size={12} />
-                      </button>
+                      </button>}
                     </div>
                   );
                 })}
@@ -931,6 +955,17 @@ export function WorkPanel({
           </div>
         </header>
         <div className="work-panel-body">
+          {activeTab?.kind === "overview" && (
+            <div
+              key={activeTab.id}
+              id={`work-panel-surface-${activeTab.id}`}
+              className="work-panel-tabpane"
+              role="tabpanel"
+              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+            >
+              <OverviewTab />
+            </div>
+          )}
           {activeTab?.kind === "subagent" && (
             <div
               key={activeTab.id}

@@ -217,6 +217,21 @@ export const es = {
     sessionMissing: "Esa sesión ya no existe",
   },
   "chat": {
+    "goalMode": "Objetivo",
+    "viewDetails": "Ver detalles",
+    "schedule": "Programar",
+    "scheduleTime": "Ejecutar a las",
+    "confirmSchedule": "Confirmar programación",
+    "runMissed": "Ejecutar ahora",
+    "cancelSchedule": "Cancelar programación",
+    "retryRevision": "Reintentar revisión",
+    "revisionState": { "ready": "Revisión lista para reintentar", "started": "Revisando", "failed": "Error al revisar", "submitted": "Revisado" },
+    "planDraftPending": "Envía o borra el borrador antes de actuar sobre este plan",
+    "executionProvider": "Proveedor de ejecución",
+    "executionModel": "Modelo de ejecución",
+    "scheduleState": { "scheduled": "Programado", "missed": "Omitido", "claimed": "Iniciado", "cancelled": "Cancelado" },
+    "scheduleExecutionState": { "queued": "En cola", "running": "En curso", "completed": "Completado", "interrupted": "Interrumpido" },
+    "planStatus": { "approved": "Aprobado", "changes_requested": "Revisión solicitada", "rejected": "Rechazado", "expired": "Caducado", "interrupted": "Interrumpido" },
     "profileAgent": "Agente",
     "profileAgentDesc": "Ejecución estándar de un solo agente",
     "profileTeam": "Equipo de expertos",
@@ -1716,6 +1731,8 @@ sklm: {
     "queued_other": "{{count}} más solicitudes están esperando"
   },
   "askTool": {
+    "completedTitle": "Preguntas aclaradas",
+    "completedSkipped": "Omitida",
     "title": "Algunas preguntas",
     "progress": "Pregunta {{current}} de {{total}}",
     "questionNumber": "Pregunta {{number}}",
@@ -1785,6 +1802,7 @@ sklm: {
     },
     "closeTab": "Cerrar {{name}}",
     "tabs": {
+      "overview": "Resumen",
       "team": "Equipo",
       "review": "Revisar",
       "browser": "Navegador",
@@ -1793,6 +1811,7 @@ sklm: {
       "subagent": "Subagente",
       goalReport: "Informe de meta",
     },
+    overview: { noSession: "No hay sesión seleccionada", untitled: "Sesión sin título", project: "Proyecto", model: "Modelo", modeLabel: "Modo", messages: "Mensajes", notAvailable: "No disponible", progress: "Progreso", statusLabel: "Estado actual", noPlans: "No hay actividad de planes en esta sesión", artifacts: "Artefactos", noArtifacts: "No hay artefactos en esta sesión", references: "Referencias", noReferences: "No hay referencias de archivos explícitas", mode: { chat: "Chat", plan: "Plan", goal: "Objetivo" }, status: { idle: "Inactivo", running: "En ejecución", planning: "Planificando", awaiting_approval: "Esperando aprobación", pending: "Pendiente", approved: "Aprobado", rejected: "Rechazado", expired: "Caducado", interrupted: "Interrumpido", queued: "En cola", completed: "Completado", failed: "Fallido" } },
     "pluginView": {
       "failed": "Esta vista no se pudo cargar. Vuelva a cargar el complemento e inténtelo de nuevo."
     },

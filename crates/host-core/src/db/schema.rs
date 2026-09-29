@@ -272,6 +272,12 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   artifact_size_bytes   INTEGER,
   version               INTEGER NOT NULL DEFAULT 1,
   execution_id          TEXT UNIQUE,
+  execution_provider_id TEXT,
+  execution_model_id    TEXT,
+  revision_intent_json  TEXT,
+  revision_state        TEXT CHECK (revision_state IN ('ready', 'started', 'failed', 'submitted')),
+  revision_turn_id      TEXT,
+  revision_error_code   TEXT,
   execution_state       TEXT CHECK (execution_state IN (
     'queued', 'running', 'completed', 'interrupted'
   ))
@@ -287,6 +293,16 @@ CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_queue
   WHERE execution_state IN ('queued', 'running');
 CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_id
   ON plan_approvals(execution_id) WHERE execution_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS plan_execution_schedules (
+  proposal_id   TEXT PRIMARY KEY REFERENCES plan_approvals(request_id) ON DELETE CASCADE,
+  scheduled_for INTEGER NOT NULL,
+  timezone      TEXT NOT NULL,
+  state         TEXT NOT NULL CHECK (state IN ('scheduled', 'missed', 'claimed', 'cancelled')),
+  updated_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_plan_execution_schedules_due
+  ON plan_execution_schedules(state, scheduled_for);
 "#;
 
 /// Canonical Team tables (ADR 0307). Kept in one batch so fresh databases and

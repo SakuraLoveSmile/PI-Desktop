@@ -650,10 +650,16 @@ submitted Markdown bytes in a new immutable
 structured title/question in `plan_approvals`, and moves the live state to
 `awaiting_approval`.
 
-Approval has only `approve` and `reject`. Approval commits `mode = agent`, the
-explicit permission mode, an execution ID, and `execution_state = queued` on
-the same `plan_approvals` row in one host transaction. The
-same Agent then receives a fresh model turn with the Agent tool set. Reject,
+Approval accepts `approve`, `reject`, `request_changes`, and `schedule`.
+`approve` commits `mode = agent`, the explicit permission mode, an execution
+ID, and `execution_state = queued` on the same `plan_approvals` row in one host
+transaction. `schedule` commits the same approved snapshot plus a one-time
+UTC schedule and explicit execution provider/model binding. The same Agent
+then receives a fresh model turn with the Agent tool set. `request_changes`
+persists the revision intent and waits for a new planning turn; the old
+artifact remains immutable and read-only. If that turn ends without a new
+SubmitPlan/SubmitGoal, Host marks the intent failed and retryable. Cancelling
+Goal conversion interrupts only its recorded turn ID. Reject,
 absolute expiry, a pending interruption, stale response, or persistence
 failure closes the approval row and returns the live state to editable
 `Plan / planning` without granting execution tools. A later accepted Plan prompt
@@ -1607,3 +1613,17 @@ cause survives adapter message flattening, remains on the final error row,
 and never triggers a provider transport rebuild. Protocol errors such as
 `EPROTO` keep their existing retry behavior. See
 [certificate trust ADR](../../adr/provider-system-certificates.md).
+
+### Plan/Goal execution context and durable interaction results
+
+When Host claims an approved Plan or Goal execution, the runtime starts the
+autonomous execution context at the approved contract. Planning and revision
+turns remain in the transcript for provenance but are excluded from the
+execution model context; the execution provider/model and permission binding
+come from the approved snapshot.
+
+AskTool resolution returns structured `details.questions`, ordered
+`details.answers`, and `details.resolvedAt` in addition to its localized text
+result. The structured result is persisted with the canonical tool message so
+the renderer can restore a completed clarification summary without parsing
+localized output. Unresolved or failed requests remain interactive.

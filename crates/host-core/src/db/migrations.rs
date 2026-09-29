@@ -66,6 +66,13 @@ impl Database {
          WHERE status = 'pending' OR execution_state IN ('queued', 'running')",
             params![now],
         )?;
+        tx.execute(
+            "UPDATE plan_approvals
+             SET revision_state = 'failed', revision_error_code = 'PLAN_REVISION_INTERRUPTED',
+                 updated_at = ?1, version = version + 1
+             WHERE revision_state = 'started'",
+            params![now],
+        )?;
         for PlanWorkRow {
             proposal_id,
             session_id,
@@ -930,4 +937,51 @@ pub(crate) fn migrate_v20_to_v21(conn: &Connection, path: &Path) -> Result<()> {
     })();
     let _ = conn.pragma_update(None, "foreign_keys", true);
     result
+}
+
+/// v22 binds approved execution models and stores one-time Plan/Goal schedules.
+pub(crate) fn migrate_v21_to_v22(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 21)?;
+    let tx = conn.unchecked_transaction()?;
+    for (name, definition) in [
+        ("execution_provider_id", "TEXT"),
+        ("execution_model_id", "TEXT"),
+        ("revision_intent_json", "TEXT"),
+        (
+            "revision_state",
+            "TEXT CHECK (revision_state IN ('ready', 'started', 'failed', 'submitted'))",
+        ),
+        ("revision_turn_id", "TEXT"),
+        ("revision_error_code", "TEXT"),
+    ] {
+        let exists: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = ?1)",
+            params![name],
+            |row| row.get(0),
+        )?;
+        if !exists {
+            tx.execute_batch(&format!(
+                "ALTER TABLE plan_approvals ADD COLUMN {name} {definition};"
+            ))?;
+        }
+    }
+    tx.execute_batch(
+        "CREATE TABLE IF NOT EXISTS plan_execution_schedules (
+           proposal_id TEXT PRIMARY KEY REFERENCES plan_approvals(request_id) ON DELETE CASCADE,
+           scheduled_for INTEGER NOT NULL,
+           timezone TEXT NOT NULL,
+           state TEXT NOT NULL CHECK (state IN ('scheduled', 'missed', 'claimed', 'cancelled')),
+           updated_at INTEGER NOT NULL
+         );
+         CREATE INDEX IF NOT EXISTS idx_plan_execution_schedules_due
+           ON plan_execution_schedules(state, scheduled_for);",
+    )?;
+    tx.pragma_update(None, "user_version", 22i64)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v21 to v22 migration; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
 }
