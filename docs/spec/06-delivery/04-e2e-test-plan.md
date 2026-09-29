@@ -1862,7 +1862,8 @@ identify the platform validation still needed.
   model × reasoning trigger. 2) Set it to 480px, then 450px. 3) At each width,
   inspect the mode, permission, context, enhancement, and Send/Stop controls;
   open the model menu from the narrow trigger; repeat the visual check in the
-  other Composer variant.
+  other Composer variant. 4) Open the Agent execution profile menu, choose
+  Expert Team, then open the contract menu and choose Goal.
 - **Expected**: The toolbar remains one non-wrapping row and does not overflow
   its container. At 560px the reasoning label and separator yield first; at
   480px the model label is further capped; at the 450px floor the combined
@@ -1870,7 +1871,8 @@ identify the platform validation still needed.
   still available through the trigger's menu, tooltip, and accessible name.
   Mode and permission labels remain single-line and ellipsized, the context
   ring and action controls retain usable hit targets, and the single Send/Stop
-  slot remains reachable. Home and thread-docked composers match.
+  slot remains reachable. Both mode menus are visible and pointer-accessible,
+  and each selection updates its trigger. Home and thread-docked composers match.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11)
 - **Acceptance**: C (send/UI), Quality
 - **Milestone**: M2
@@ -1878,7 +1880,8 @@ identify the platform validation still needed.
   (base `cea6e02c`): `pnpm test:e2e:layout` 167/167 including the 450px
   model-chip assertion; `pnpm test:e2e:composer-autocomplete` and
   `pnpm test:e2e:composer-paste` passed. Source-covered by
-  `composer-responsive.test.mjs`.
+  `composer-responsive.test.mjs`. The menu interaction is covered by the
+  isolated Electron `pnpm test:e2e:composer-mode-menus` check.
 
 #### E2E-090: Transcript bottom reserve tracks the docked composer height
 
