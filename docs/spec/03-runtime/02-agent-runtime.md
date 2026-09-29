@@ -746,8 +746,14 @@ criterion-by-criterion report of what was met and the evidence observed.
   attachment, scratch, and project roots. Images within the 10 MB inline
   safety bound become transient pi-ai image blocks; oversized or unavailable
   images become safe `@path` fallbacks. Oversized history hydration copies
-  files without first loading their contents into memory. Base64 is never
-  restored into durable UI messages or transcript records.
+  files without first loading their contents into memory. Restored history has
+  a 50 MB aggregate inline-image budget; the newest eligible attachments win,
+  and a file is read only when its size is unchanged before and after the
+  bounded read. Base64 is never restored into durable UI messages or
+  transcript records. The prompt currently being sent is removed from the
+  persisted tail before hydration, matched by `userMessageId` when available
+  and by its original user content for legacy callers without that id, so a
+  fallback path cannot cause the prompt to be sent twice.
 - Failed assistant messages remain durable diagnostic transcript entries but
   are never restored into pi model context on a later turn.
 - A tool-call id is unique in every request. The transcript is an append-only
