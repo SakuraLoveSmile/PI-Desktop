@@ -7299,3 +7299,16 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   covers native DMG and ZIP archive inspection.
 - D634 amends D457 / ADR 0296 and supersedes the macOS distribution provisions
   of ADR 0232 / ADR 0204. See ADR 0309.
+
+## 2026-09-28 — Remove the Windows frameless resize rim (D635)
+
+- The Windows main window disables Electron's thick frame, removing the native
+  left, bottom, and right rim. Electron 43.6 retains its frameless native edge
+  and corner hit test, so no renderer resize path or geometry IPC is added.
+  macOS/Linux window behavior and work-panel resize ownership remain unchanged.
+  The Windows main window defaults to a native
+  4 DIP shape whose corner pixels and hit targets are absent; an authorized
+  plugin theme may choose an integer radius from 0 to 24 DIP, reverting to 4
+  when the theme is withdrawn. The removed thick frame leaves no native shadow
+  control for themes; external shadow needs a separate window-geometry decision.
+  See ADR 0310 and E2E-167.
