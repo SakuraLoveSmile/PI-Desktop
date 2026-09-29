@@ -250,7 +250,7 @@ test("send clears the composer before the round trip and restores a rejected dra
   // Optimistic clear, restore on rejection. The clear must precede the await.
   const regularSendAt = submit.indexOf("if (!steering && !modelReady)");
   const clearAt = submit.indexOf("draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);", regularSendAt);
-  const promptAt = submit.indexOf("await sendPrompt(inlineContent, submittedDraft)", regularSendAt);
+  const promptAt = submit.indexOf("await sendPrompt(inlineContent, submittedDraft, activeSessionId ?? undefined", regularSendAt);
   assert.ok(regularSendAt > 0 && clearAt > regularSendAt && promptAt > clearAt,
     "draft must be cleared before awaiting sendPrompt");
   assert.match(submit, /if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/);
@@ -284,7 +284,7 @@ test("mode slash prefixes send the trailing prompt and retain failed drafts", ()
   );
   assert.match(
     submit,
-    /const submittedDraftRevision = draft\.draftRevision\(submittedDraftKey\);\s*const submittedDraft = draft\.draftSnapshot\(text\);[\s\S]*?draft\.clearDraftForKey\(submittedDraftKey, submittedDraftRevision, submittedDraft\);\s*try \{\s*const accepted = steering[\s\S]*?await steerPrompt\(inlineContent, submittedDraft\)[\s\S]*?await sendPrompt\(inlineContent, submittedDraft\);\s*if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/,
+    /const submittedDraftRevision = draft\.draftRevision\(submittedDraftKey\);\s*const submittedDraft = draft\.draftSnapshot\(text\);[\s\S]*?draft\.clearDraftForKey\(submittedDraftKey, submittedDraftRevision, submittedDraft\);\s*try \{\s*const accepted = steering[\s\S]*?await steerPrompt\(inlineContent, submittedDraft\)[\s\S]*?await sendPrompt\(inlineContent, submittedDraft, activeSessionId \?\? undefined, \{[\s\S]*?onAccepted: captureAcceptedSession[\s\S]*?\}\);\s*if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/,
   );
   assert.match(store, /draft\?: ComposerDraftSnapshot/);
   const sendPrompt = queueSlice.slice(
