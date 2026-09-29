@@ -31,6 +31,10 @@ export const ErrorCodes = {
   HOST_UNAVAILABLE: "HOST_UNAVAILABLE",
   HOST_OVERLOADED: "HOST_OVERLOADED",
   AGENT_UNAVAILABLE: "AGENT_UNAVAILABLE",
+  /** The Node agent sidecar exited without a recognized failure signature. */
+  AGENT_SIDECAR_CRASHED: "AGENT_SIDECAR_CRASHED",
+  /** The Node agent sidecar hit its JavaScript heap limit. */
+  AGENT_SIDECAR_OOM: "AGENT_SIDECAR_OOM",
   APP_DEGRADED: "APP_DEGRADED",
   INTERNAL: "INTERNAL",
   INVALID_ARGUMENT: "INVALID_ARGUMENT",

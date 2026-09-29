@@ -287,7 +287,7 @@ test("sidecar crash reports carry the last stderr lines", () => {
   );
   assert.match(mainSource, /agent sidecar exited unexpectedly/);
   assert.ok(
-    mainSource.includes("data: { exitCode: code, signal, stderrTail }"),
-    "crash log carries the tail",
+    /data:\s*\{\s*exitCode: code,\s*signal,\s*stderrTail,\s*crashKind: crash\.kind/.test(mainSource),
+    "crash log carries the tail and classification",
   );
 });
