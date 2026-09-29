@@ -7,9 +7,9 @@ import { ComposerContractPicker } from "../../apps/desktop/src/features/chat/com
 
 const labels: Record<string, string> = {
   "chat.executionProfile": "Execution profile",
-  "chat.profileAgent": "Agent",
+  "chat.profileAgent": "智能体",
   "chat.profileAgentDesc": "Single agent",
-  "chat.profileTeam": "Expert Team",
+  "chat.profileTeam": "专家团队",
   "chat.profileTeamDesc": "Work with teammates",
   "chat.contractMode": "Contract mode",
   "chat.contractNone": "Normal",
