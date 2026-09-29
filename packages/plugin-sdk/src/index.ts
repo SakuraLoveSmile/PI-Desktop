@@ -1317,6 +1317,7 @@ export const PLUGIN_PERMISSIONS = [
   // Install-time escape hatch from the net.domains allowlist (issue #1201):
   // user-typed endpoints, e.g. a self-hosted server, that no manifest written
   // ahead of time can name. Enforced by net-policy's grant-aware checks.
+  "net.fetch",
   "net.anyHost",
   "shell.openExternal",
   "mcp.server.local",

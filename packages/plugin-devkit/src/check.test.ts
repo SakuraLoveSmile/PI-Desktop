@@ -76,7 +76,6 @@ describe("check", () => {
       m.net = { domains: ["api.example.com", "localhost", "169.254.169.254"] };
     });
     const result = await check(dir);
-    console.log("DEBUG-ERRORS", JSON.stringify(result.errors), JSON.stringify(result.warnings));
     expect(result.ok).toBe(true);
     const warning = result.warnings.find((w) => w.code === "net.local-domain");
     expect(warning?.message).toContain("localhost");
