@@ -218,7 +218,7 @@ export type AppState = {
     content: string,
     draft?: ComposerDraftSnapshot,
     targetSessionId?: string,
-    options?: { revisionProposalId?: string },
+    options?: { revisionProposalId?: string; onAccepted?: (sessionId: string) => void },
   ) => Promise<boolean>;
   steerPrompt: (content: string, draft?: ComposerDraftSnapshot) => Promise<boolean>;
   enqueuePrompt: (
