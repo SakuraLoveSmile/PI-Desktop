@@ -200,6 +200,20 @@ describe("Anthropic adaptive thinking from models.dev reasoning options", () => 
       forceAdaptiveThinking: true,
     });
   });
+
+  it("lets an explicit legacy protocol disable adaptive inference", () => {
+    const provider = anthropicProvider("claude-opus-4-6", [
+      { type: "effort", values: ["low", "medium", "high", "max"] },
+    ]);
+    provider.modelConfig = {
+      ...provider.modelConfig!,
+      thinkingProtocol: "legacy",
+    };
+
+    expect(buildProviderModel(provider).compat).toMatchObject({
+      forceAdaptiveThinking: false,
+    });
+  });
 });
 
 describe("buildProviderModel OpenAI-compatible role compatibility", () => {

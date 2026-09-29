@@ -1112,7 +1112,23 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-left: 0;
+}
+
+.provider-chosen-thinking-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  min-width: 0;
   margin-left: auto;
+}
+
+.provider-chosen-thinking-protocol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* The row body keeps its own compact field metric (28px inputs and selects), so

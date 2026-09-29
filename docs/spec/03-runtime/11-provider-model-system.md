@@ -119,6 +119,13 @@ compat record, so without the flag pi-ai would fall back to budget thinking.
 Models that still publish `budget_tokens` keep budget thinking, and an
 explicit catalog `compat` record is preserved.
 
+The published models.dev record may carry `thinkingProtocol: "adaptive"` for
+Anthropic models that publish `reasoning` and at least one `effort` option but
+no `budget_tokens` option. This protocol flows through the model catalog and
+saved binding to the provider request. A saved binding override wins; when
+neither catalog nor binding specifies a protocol, the existing runtime
+capability inference remains the fallback.
+
 ## 5. Built-in vendor matrix (ship intent)
 
 > Model metadata follows the bundled/in-memory models.dev catalog. Provider adapters remain

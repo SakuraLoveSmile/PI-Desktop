@@ -233,3 +233,27 @@ describe("binding attachment capability overrides", () => {
     expect(config.supportedThinkingLevels).toEqual(["off", "medium"]);
   });
 });
+
+describe("thinking protocol binding", () => {
+  it("preserves an explicit adaptive protocol in the model config", () => {
+    const config = modelConfigWithBinding(knownModel(), {
+      contextWindow: 200_000,
+      maxTokens: 16_000,
+      thinkingLevels: ["off", "medium"],
+      thinkingProtocol: "adaptive",
+    });
+    expect(config.thinkingProtocol).toBe("adaptive");
+    expect(config.compat).toMatchObject({ forceAdaptiveThinking: true });
+  });
+
+  it("preserves an explicit legacy protocol", () => {
+    const config = modelConfigWithBinding(knownModel(), {
+      contextWindow: 200_000,
+      maxTokens: 16_000,
+      thinkingLevels: ["off", "medium"],
+      thinkingProtocol: "legacy",
+    });
+    expect(config.thinkingProtocol).toBe("legacy");
+    expect(config.compat).toMatchObject({ forceAdaptiveThinking: false });
+  });
+});
