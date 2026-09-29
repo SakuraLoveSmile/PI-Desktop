@@ -11,6 +11,7 @@ import {
   serializeComposerFileReferences,
   serializeInlineComposerFileReferences,
   stripInlineComposerFileReferenceTokens,
+  findSkillMentions,
 } from "./composer-trigger.js";
 
 describe("detectTrigger — slash mode", () => {
@@ -44,9 +45,22 @@ describe("detectTrigger — slash mode", () => {
     });
   });
 
-  it("never triggers mid-draft or on later lines", () => {
-    expect(detectTrigger("hi /cmd", 7)).toBeNull();
-    expect(detectTrigger("hi\n/cmd", 7)).toBeNull();
+  it("targets later slash tokens independently", () => {
+    expect(detectTrigger("hi /cmd", 7)).toMatchObject({ tokenStart: 3, query: "cmd" });
+    expect(detectTrigger("hi\n/cmd", 7)).toMatchObject({ tokenStart: 3, query: "cmd" });
+    expect(detectTrigger("https://example.com", 8)).toBeNull();
+  });
+});
+
+describe("findSkillMentions", () => {
+  it("returns validated slash tokens in UTF-16 offsets", () => {
+    expect(findSkillMentions("😀 /one text /two", new Map([
+      ["one", "skill.one"],
+      ["two", "skill.two"],
+    ]))).toEqual([
+      { start: 3, end: 7, id: "skill.one" },
+      { start: 13, end: 17, id: "skill.two" },
+    ]);
   });
 });
 
