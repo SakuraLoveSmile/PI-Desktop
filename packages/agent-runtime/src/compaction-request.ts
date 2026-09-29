@@ -24,6 +24,7 @@ import {
 } from "./opencode-session-headers.js";
 import {
   copilotRequestHeaders,
+  providerAllowsCustomFetch,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
 import { mergeProviderHeaders, withProviderHeaders } from "./provider-headers.js";
@@ -52,6 +53,7 @@ export function compactionRequestOptions(input: {
       copilotRequestHeaders(provider, context),
       provider.headers,
     ),
+    { allowCustomFetch: providerAllowsCustomFetch(provider) },
   );
 }
 

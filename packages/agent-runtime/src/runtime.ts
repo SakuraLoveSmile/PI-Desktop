@@ -155,6 +155,7 @@ import {
   copilotRequestHeaders,
   createExtensionAgentModels,
   createProviderModels,
+  providerAllowsCustomFetch,
   DEFAULT_CONTEXT_WINDOW,
   providerRequestKey,
   type RuntimeProviderConfig,
@@ -1999,6 +2000,7 @@ Delegation rules:
             copilotRequestHeaders(this.provider, context),
             this.provider.headers,
           ),
+          { allowCustomFetch: providerAllowsCustomFetch(this.provider) },
         );
         const hookedOptions = this.withExtensionProviderHooks(requestOptions, m);
         // The watchdog must be able to *stop* what it abandons. It wraps the

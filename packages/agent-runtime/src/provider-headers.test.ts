@@ -137,6 +137,29 @@ describe("withProviderHeaders", () => {
     });
     expect(base).toHaveBeenCalledOnce();
   });
+
+  it("can keep SDK-owned transports free of a request-scoped fetch", () => {
+    const base = vi.fn();
+    const result = withProviderHeaders(
+      { fetch: base },
+      { "X-Gateway": "1" },
+      { allowCustomFetch: false },
+    );
+    expect(result.fetch).toBeUndefined();
+    expect(result.headers).toEqual({ "X-Gateway": "1" });
+    expect(base).not.toHaveBeenCalled();
+  });
+
+  it("removes SDK-incompatible fetch even without custom headers", () => {
+    const base = vi.fn();
+    const result = withProviderHeaders(
+      { fetch: base, headers: { Accept: "application/json" } },
+      undefined,
+      { allowCustomFetch: false },
+    );
+    expect(result.fetch).toBeUndefined();
+    expect(result.headers).toEqual({ Accept: "application/json" });
+  });
 });
 
 describe("runWithProviderHeaders", () => {

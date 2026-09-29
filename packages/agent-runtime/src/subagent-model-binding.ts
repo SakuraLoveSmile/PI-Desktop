@@ -3,6 +3,7 @@ import {
   copilotRequestHeaders,
   createProviderModels,
   providerRequestKey,
+  providerAllowsCustomFetch,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
 import {
@@ -90,6 +91,7 @@ export function subagentModelBinding(opts: {
           copilotRequestHeaders(opts.provider, context),
           opts.provider.headers,
         ),
+        { allowCustomFetch: providerAllowsCustomFetch(opts.provider) },
       );
       return createProviderRetryStream(
         m,
