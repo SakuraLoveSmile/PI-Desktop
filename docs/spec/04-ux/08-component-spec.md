@@ -2759,6 +2759,9 @@ reasoning-level control.
   second status row parked above the composer; a staged mode choice still
   updates the chip immediately and does not start that pulse until the
   in-flight turn actually projects `planning`.
+- The adjacent execution-profile chip reserves 120px, or 112px with tighter
+  horizontal padding below a 480px composer, so its localized Agent and Expert
+  Team labels remain fully visible without moving neighboring controls.
 - The permission chip remains visible in Agent, Plan, and Goal for a stable
   toolbar rhythm. Agent and Plan expose the effective selectable permission;
   Goal displays the localized Auto label as a disabled, non-opening chip while
