@@ -523,6 +523,9 @@ function delegationSummary(record: DelegationRecord): Record<string, unknown> {
     ...(record.result?.contextDegraded
       ? { contextDegraded: record.result.contextDegraded }
       : {}),
+    ...(record.result?.scratchReportPath
+      ? { scratchReportPath: record.result.scratchReportPath }
+      : {}),
     ...(record.resumedFrom ? { resumedFrom: record.resumedFrom } : {}),
     ...(record.modelChangedFrom
       ? { modelChangedFrom: record.modelChangedFrom }
@@ -4390,6 +4393,8 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
             sessionId: this.sessionId,
             turnId: this.turnId,
             parentToolCallId: toolCallId,
+            delegationId: record.delegationId,
+            scratchDir: this.scratchDir,
             task,
             provider,
             infiniteProviderRetry: this.infiniteProviderRetry,
