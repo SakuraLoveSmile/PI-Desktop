@@ -738,6 +738,13 @@
   visibility: hidden;
 }
 
+.composer-profile-menu.is-open,
+.composer-contract-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
 .composer-item-icon {
   display: inline-flex;
   align-items: center;
