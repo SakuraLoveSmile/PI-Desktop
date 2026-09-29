@@ -2125,6 +2125,7 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "speech.adapter.register": "Bir konuşma bağdaştırıcısı kaydet",
       "keyboard.globalShortcut": "Sistem geneli klavye kısayolları kaydet",
       "net.websocket": "Gerçek zamanlı bağlantılar aç",
+      "net.anyHost": "Herhangi bir ağ adresine eriş",
       "bus.publish": "Diğer eklentilere ileti gönder",
       "bus.subscribe": "Diğer eklentilerden ileti al",
       "browser.cdp": "Çalışma paneli tarayıcısını kontrol et",
@@ -2174,6 +2175,7 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "speech.adapter.register": "Mevcut sağlayıcı anahtarlarınızı kullanan bir yazıya dökme veya konuşma protokolü ekleyebilir. Eklenti anahtarı asla görmez.",
       "keyboard.globalShortcut": "PI-Desktop odakta değilken bu eklentinin kendi komutlarını tetikleyen sistem geneli klavye kısayollarını kaydeder.",
       "net.websocket": "Eklentinin bildirdiği ana makinelere gerçek zamanlı iki yönlü bağlantılar açar.",
+      "net.anyHost": "Kullanıcının girdiği kendi sunucuları dahil HTTP(S) veya WebSocket(S) üzerinden herhangi bir sunucuya bağlanabilir. Bulut meta veri uç noktaları her zaman engellenir.",
       "bus.publish": "Bildirdiği konularda ileti gönderebilir.",
       "bus.subscribe": "Bildirdiği konularda ileti alabilir.",
       "browser.cdp":
