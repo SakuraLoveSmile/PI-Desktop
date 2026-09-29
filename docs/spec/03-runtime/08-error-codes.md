@@ -48,6 +48,8 @@ registered; reserved codes in §3.7 remain intentionally absent from
 | `HOST_UNAVAILABLE` | yes | Rust host not running/reachable |
 | `HOST_OVERLOADED` | yes | bounded host RPC/tool capacity is full; retry after backpressure |
 | `AGENT_UNAVAILABLE` | yes | pi sidecar not running/reachable |
+| `AGENT_SIDECAR_CRASHED` | no | Node pi sidecar exited unexpectedly without a recognized failure signature |
+| `AGENT_SIDECAR_OOM` | no | Node pi sidecar exited after V8 reported a JavaScript heap limit failure |
 | `APP_DEGRADED` | yes | app running with limited capabilities |
 | `INTERNAL` | maybe | unexpected internal failure |
 | `INVALID_ARGUMENT` | no | request schema/args invalid, including a native-tool path of the wrong file/directory kind |
