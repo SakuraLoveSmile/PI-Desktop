@@ -1,4 +1,4 @@
-import type { EnglishCatalog } from "../en/index.js";
+import { en, type EnglishCatalog } from "../en/index.js";
 
 export const es = {
   "app": {
@@ -2426,6 +2426,21 @@ sklm: {
     "planApprovalBody": "El plan propuesto está listo para su revisión.",
     "actionFailed": "No se pudieron actualizar las notificaciones.",
     "justNow": "Justo ahora"
+  },
+  liveVoice: {
+    ...en.liveVoice,
+    title: "Voz en tiempo real", description: "Habla directamente con un proveedor de voz en tiempo real configurado. La función está desactivada hasta que la habilites.",
+    openWorkSetup: "Elegir una sesión para una llamada de trabajo",
+    connectWorkSession: "Conectar con {{label}}",
+    untitledWorkSession: "Sesión sin título",
+    boundWorkSession: "Sesión de trabajo vinculada: {{label}}",
+    workSessionNoContext: "Esta llamada no comparte el historial reciente del chat.",
+    enable: "Activar voz en tiempo real", enableDetail: "El audio del micrófono se envía al proveedor seleccionado. No ejecuta agentes, herramientas ni acciones MCP.",
+    bindingStatus: "Estado del proveedor", ready: "Listo", provider: "Cuenta del proveedor", chooseProvider: "Elige una cuenta", providerUnavailable: "El proveedor seleccionado no está disponible", providerDisabled: "desactivado", credentialsMissing: "faltan credenciales", model: "ID del modelo", voice: "Voz", profile: "Perfil del protocolo", useForNextCall: "Usar en la próxima llamada", bindingLocked: "Llamada en curso", bindingLockedDetail: "Termina la llamada para aplicar cambios a esta cuenta.", saveFailed: "No se pudo guardar la configuración de voz en tiempo real.",
+    adapters: { "codex-live": { title: "Cuenta de Codex", description: "Usa la cuenta de Codex seleccionada y su inicio de sesión existente." }, "gemini-live": { title: "Gemini Live", description: "Usa un proveedor de Google Generative AI con una clave API." }, "openai-realtime": { title: "Compatible con OpenAI Realtime", description: "Usa un proveedor con clave API y un perfil Realtime explícito." } },
+    readiness: { disabled: "Proveedor desactivado", "missing-provider": "Proveedor no disponible", "missing-credentials": "Faltan credenciales", "wrong-auth-kind": "Autenticación no compatible", "unsupported-adapter": "Adaptador no compatible", "invalid-settings": "Configuración no válida" },
+    openPanel: "Abrir controles de voz", start: "Iniciar voz en tiempo real", end: "Finalizar llamada", mute: "Silenciar micrófono", unmute: "Activar micrófono", resumePlayback: "Activar sonido", errorGeneric: "La voz en tiempo real se detuvo. Revisa el proveedor e inténtalo de nuevo.", noProvider: "Elige un proveedor compatible en Ajustes → Voz.", enableInSettings: "Activa la voz en tiempo real en Ajustes → Voz.",
+    phase: { idle: "Desactivado", preparing: "Preparando", "acquiring-mic": "Esperando el micrófono", negotiating: "Negociando", connecting: "Conectando", connected: "Conectado", reconnecting: "Reconectando", closing: "Finalizando", ended: "Finalizado", failed: "Detenido" },
   },
   "errors": {
     "HOST_UNAVAILABLE": "El servicio local no está disponible",

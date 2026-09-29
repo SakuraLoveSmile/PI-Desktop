@@ -1,4 +1,4 @@
-import type { EnglishCatalog } from "../en/index.js";
+import { en, type EnglishCatalog } from "../en/index.js";
 
 export const tr = {
   app: {
@@ -950,8 +950,8 @@ sklm: {
       zoomIn: "Yakınlaştır",
       zoomOut: "Uzaklaştır",
       toggleFullScreen: "Tam ekranı aç/kapat",
-      voiceToggle: "Sesli girişi aç/kapat",
-      voiceCancel: "Sesli girişi iptal et",
+      voiceToggle: "Canlı Sesi Aç/Kapat",
+      voiceCancel: "Canlı Ses başlatmasını iptal et",
     },
     skills: "Beceriler",
     skillsGlobalPath: "Genel beceriler yolu",
@@ -2452,6 +2452,21 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
     planApprovalBody: "Önerilen plan incelemeniz için hazır.",
     actionFailed: "Bildirimler güncellenemedi.",
     justNow: "Az önce",
+  },
+  liveVoice: {
+    ...en.liveVoice,
+    title: "Canlı ses", description: "Yapılandırılmış bir gerçek zamanlı ses sağlayıcısıyla doğrudan konuşun. Etkinleştirene kadar canlı ses kapalıdır.",
+    openWorkSetup: "Canlı çalışma araması için oturum seçin",
+    connectWorkSession: "{{label}} oturumuna bağlan",
+    untitledWorkSession: "Başlıksız oturum",
+    boundWorkSession: "Çalışma oturumuna bağlı: {{label}}",
+    workSessionNoContext: "Bu aramada son sohbet geçmişi paylaşılmaz.",
+    enable: "Canlı sesi etkinleştir", enableDetail: "Mikrofon sesi seçtiğiniz sağlayıcıya gönderilir. Agent, araç veya MCP işlemleri çalıştırılmaz.",
+    bindingStatus: "Sağlayıcı durumu", ready: "Hazır", provider: "Sağlayıcı hesabı", chooseProvider: "Sağlayıcı hesabı seçin", providerUnavailable: "Seçilen sağlayıcı kullanılamıyor", providerDisabled: "devre dışı", credentialsMissing: "kimlik bilgileri eksik", model: "Model kimliği", voice: "Ses", profile: "Protokol profili", useForNextCall: "Sonraki aramada kullan", bindingLocked: "Arama sürüyor", bindingLockedDetail: "Bu sağlayıcı bağlantısındaki değişiklikleri uygulamak için aramayı bitirin.", saveFailed: "Canlı ses ayarları kaydedilemedi.",
+    adapters: { "codex-live": { title: "Codex hesabı", description: "Seçilen Codex hesabını ve mevcut oturum açma bilgisini kullanır." }, "gemini-live": { title: "Gemini Live", description: "API anahtarı olan bir Google Generative AI sağlayıcısı kullanır." }, "openai-realtime": { title: "OpenAI Realtime uyumlu", description: "API anahtarı sağlayıcısını ve açıkça seçilmiş Realtime protokol profilini kullanır." } },
+    readiness: { disabled: "Sağlayıcı devre dışı", "missing-provider": "Sağlayıcı kullanılamıyor", "missing-credentials": "Kimlik bilgileri eksik", "wrong-auth-kind": "Kimlik doğrulama desteklenmiyor", "unsupported-adapter": "Adaptör desteklenmiyor", "invalid-settings": "Ayarlar geçersiz" },
+    openPanel: "Canlı ses denetimlerini aç", start: "Canlı sesi başlat", end: "Aramayı bitir", mute: "Mikrofonu sessize al", unmute: "Mikrofonun sesini aç", resumePlayback: "Sesi etkinleştir", errorGeneric: "Canlı ses durdu. Sağlayıcıyı kontrol edip tekrar deneyin.", noProvider: "Ayarlar → Ses bölümünden desteklenen bir sağlayıcı seçin.", enableInSettings: "Canlı sesi Ayarlar → Ses bölümünden etkinleştirin.",
+    phase: { idle: "Kapalı", preparing: "Hazırlanıyor", "acquiring-mic": "Mikrofon bekleniyor", negotiating: "Anlaşılıyor", connecting: "Bağlanıyor", connected: "Bağlandı", reconnecting: "Yeniden bağlanıyor", closing: "Sonlandırılıyor", ended: "Sonlandı", failed: "Durduruldu" },
   },
   errors: {
     HOST_UNAVAILABLE: "Yerel servis kullanılamıyor",

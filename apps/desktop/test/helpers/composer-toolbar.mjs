@@ -8,6 +8,10 @@ import { createElement } from "react";
 const USAGE = { inputTokens: 1_000, outputTokens: 200, totalTokens: 1_200 };
 const noop = () => {};
 const idle = async () => {};
+const unavailable = async () => ({
+  ok: false,
+  error: { code: "TEST_BRIDGE_UNAVAILABLE", message: "The test bridge is unavailable" },
+});
 
 export const TOOLBAR_PROPS = {
   t: (key) => key,
@@ -71,7 +75,12 @@ export async function composerToolbar(t, ssr) {
   // The toolbar reads the shortcut platform off the preload bridge; the
   // transcript renders in this same test read `matchMedia` for reduced
   // motion, so the stand-in window answers it too.
-  globalThis.window = { piDesktop: { platform: "darwin" }, matchMedia: () => ({ matches: false }) };
+  globalThis.window = {
+    piDesktop: { platform: "darwin", invoke: unavailable, on: () => noop },
+    matchMedia: () => ({ matches: false }),
+    addEventListener: noop,
+    removeEventListener: noop,
+  };
   t.after(() => {
     if (hadWindow) globalThis.window = window;
     else delete globalThis.window;

@@ -8,6 +8,95 @@
 
 ## 1. Goals
 
+### E2E-LIVE-VOICE-provider-call-lifecycle
+
+- **Preconditions:** Isolated desktop profile with Live Voice enabled and one
+  fixture provider binding. Use a deterministic local protocol fixture; do not
+  use a real provider account or paid endpoint for automation.
+- **Steps:** Open Voice settings and confirm only Live Voice controls are
+  visible; legacy Dictation toggles, microphone selection and transcription
+  model controls are absent. Confirm the Composer shows Live controls without
+  the old Dictation microphone button. Bind/select a fixture account for each
+  supported adapter profile. In Settings → Shortcuts, customize the Live Voice
+  toggle and use it to start then end a fixture call. Cancel a pending startup
+  with the `voiceCancel` binding (default `Escape`); pressing `Escape` during a
+  connected call must not end it. Restore the default, then start, cancel during
+  permission/startup, connect, mute/unmute, interrupt playback, inspect the
+  in-memory transcript, and end. Repeat with Dictation already holding the
+  microphone, a changed active binding, a provider credential removal, renderer
+  hide/reload, and a rejected playback gesture.
+- **Expected:** Live is off by default; persisted Dictation settings remain
+  unchanged but are not exposed in the UI; only the selected Provider ID is used;
+  secrets do not enter Renderer;
+  no Agent, MCP, shell or file action runs; mute gates new input immediately;
+  cancellation stops late media; the transcript is not persisted; every end
+  path releases media and background-throttling leases or quarantines an
+  unconfirmed microphone lease. A new call starts only after explicit user
+  action.
+- **Specs:** [03-runtime/live-voice.md](../03-runtime/live-voice.md),
+  [03-runtime/20-speech.md](../03-runtime/20-speech.md),
+  [04-ux/09-interaction-patterns.md](../04-ux/09-interaction-patterns.md).
+- **Acceptance:** Adapter setup and event parsing are local fixtures; Main
+  lifecycle, owner, lease and settings behavior are covered by targeted tests.
+  `apps/desktop/test/live-voice-shortcuts.test.mjs` covers the configurable
+  toggle/cancel actions, including that Escape never ends a connected call.
+  The full Electron flow and real-provider/device compatibility remain
+  unverified until their respective isolated acceptance environments are run.
+
+### E2E-LIVE-WORK-session-admission
+
+- **Preconditions:** Isolated Live provider fixture, a local AgentHost session,
+  and a deterministic fake intent resolver. The provider candidate must enter
+  through the existing Live adapter callback; do not use a real account or
+  paid endpoint.
+- **Steps:** Start a voice-only call and verify a work candidate is rejected
+  without a work scope. Start a second call with an explicitly selected local
+  session and context sharing disabled. Submit one declared work request,
+  deliver its receipt, route it through the classifier, and inspect the Host
+  admission and `voiceOrigin`. Exercise a busy independent request through the
+  Host queue, a stale steer, an exact-turn stop, and a terminal event arriving
+  before the submit promise resolves. Query a recorded terminal result and
+  verify the query does not create another Host turn. Request project/session
+  lists, verify they contain labels and opaque call-scoped references only,
+  open a listed session, and create a session from a listed project through
+  the panel action. Confirm both actions leave the active work binding fixed.
+  Queue a result while provider generation, user speech, and local playback are
+  active; verify it is sent only after all three are idle and the quiet window
+  passes. Exercise silent mode, an explicit query while silent, and stale
+  feedback downgrade. End the Live call after Host admission.
+- **Expected:** Work remains bound to the originally selected local session;
+  no prior messages are read when context sharing is disabled; the existing
+  AgentHost performs prompt, steer, queue, and stop operations; duplicate
+  provider IDs do not dispatch twice; terminal state comes from Host events;
+  result queries project only the exact operation summary; ending Live does
+  not cancel accepted work. Project/session choices never expose raw paths or
+  IDs, selection references expire and remain call-scoped, opening is
+  navigation only, and creating requires a listed project plus a panel action.
+  Automatic feedback observes provider speaking state and local playback
+  activity, while task execution and feedback delivery remain separate. A
+  renderer signal is not evidence that a person heard the result.
+- **Coverage:** `apps/desktop/test/live-voice-service.test.mjs` covers voice-only
+  rejection and explicit work-scope forwarding. `packages/host-runtime/src/live-work/coordinator.test.ts`
+  covers receipt ordering, routing, stale steer, replay, call close, and early
+  terminal correlation. `packages/host-runtime/src/live-work/context.test.ts`
+  covers bounded context projection. `packages/agent-host/src/agent-host.test.ts`
+  covers history-free state, queue insertion, and voice provenance.
+  `packages/voice-runtime/src/live/protocol.test.ts` covers provider-specific
+  tool declarations and receipts. `packages/host-runtime/src/live-work/result-summary.test.ts`
+  covers exact-turn summary projection and honest fallbacks. The
+  `LiveWorkFeedbackScheduler` tests cover debounce, speech spacing, silent
+  mode, stale downgrade, deduplication, and overflow; desktop service tests
+  cover provider/user/local playback gating and separate delivery status.
+  `apps/desktop/test/live-work-scope.test.mjs` covers selection reference
+  scope/expiry, and `live-work-operations.test.mjs` covers the panel actions.
+  `voice-runtime/src/live/playback-monitor.test.ts` covers local audio signal
+  detection. This is targeted automated coverage, not the complete
+  W2-001—W2-096 matrix or real-provider E2E.
+- **Status:** Partial; remaining scenarios and the real-device matrix are
+  tracked in `docs/implementation/live-work-evidence.md`.
+- **Specs:** [live-work-session](../03-runtime/live-work-session.md),
+  [live-voice](../03-runtime/live-voice.md).
+
 ### E2E-CHAT-fork-completed-reply-while-running
 
 - **Preconditions:** Isolated real desktop profile, configured model, two turns

@@ -292,6 +292,7 @@ declare global {
     piDesktop?: {
       invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<Result<T>>;
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
+      onLiveVoicePort?: () => () => void;
       channels: typeof IPC;
       platform: NodeJS.Platform;
       /** Authoritative OS locale passed from the main process at window creation. */
@@ -924,8 +925,8 @@ export const api = {
     invoke<AgentCompactResponse>(IPC.invoke.agentCompact, req),
   abort: (sessionId: string) =>
     invoke(IPC.invoke.agentAbort, { sessionId }),
-  stop: (sessionId: string) =>
-    invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId }),
+  stop: (sessionId: string, turnId?: string) =>
+    invoke<AgentStopResponse>(IPC.invoke.agentStop, { sessionId, ...(turnId ? { turnId } : {}) }),
   queuePrompt: (req: AgentQueuePushRequest) =>
     invoke<QueuedTurnSummary>(IPC.invoke.agentQueuePush, req),
   listQueuedPrompts: (sessionId: string) =>

@@ -1,4 +1,4 @@
-import type { EnglishCatalog } from "../en/index.js";
+import { en, type EnglishCatalog } from "../en/index.js";
 
 export const ko = {
   app: {
@@ -960,8 +960,8 @@ sklm: {
       zoomIn: "확대",
       zoomOut: "축소",
       toggleFullScreen: "전체 화면 전환",
-      voiceToggle: "음성 입력 전환",
-      voiceCancel: "음성 입력 취소",
+      voiceToggle: "실시간 음성 켜기/끄기",
+      voiceCancel: "실시간 음성 시작 취소",
     },
     skills: "스킬",
     skillsGlobalPath: "전역 스킬 경로",
@@ -2462,6 +2462,21 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
     planApprovalBody: "검토할 계획이 준비되었습니다.",
     actionFailed: "알림을 업데이트할 수 없습니다.",
     justNow: "방금",
+  },
+  liveVoice: {
+    ...en.liveVoice,
+    title: "실시간 음성", description: "설정된 실시간 음성 제공자와 직접 대화합니다. 활성화하기 전까지 꺼져 있습니다.",
+    openWorkSetup: "실시간 작업 통화에 사용할 세션 선택",
+    connectWorkSession: "{{label}}에 연결",
+    untitledWorkSession: "제목 없는 세션",
+    boundWorkSession: "작업 세션 연결됨: {{label}}",
+    workSessionNoContext: "이 통화에서는 최근 채팅 기록을 공유하지 않습니다.",
+    enable: "실시간 음성 사용", enableDetail: "마이크 오디오가 선택한 제공자에게 전송됩니다. 에이전트, 도구 또는 MCP 작업은 실행되지 않습니다.",
+    bindingStatus: "제공자 상태", ready: "준비됨", provider: "제공자 계정", chooseProvider: "제공자 계정 선택", providerUnavailable: "선택한 제공자를 사용할 수 없습니다", providerDisabled: "비활성화됨", credentialsMissing: "인증 정보 없음", model: "모델 ID", voice: "음성", profile: "프로토콜 프로필", useForNextCall: "다음 통화에 사용", bindingLocked: "통화 중", bindingLockedDetail: "이 제공자 연결의 변경 사항을 적용하려면 통화를 종료하세요.", saveFailed: "실시간 음성 설정을 저장하지 못했습니다.",
+    adapters: { "codex-live": { title: "Codex 계정", description: "선택한 Codex 계정과 기존 로그인을 사용합니다." }, "gemini-live": { title: "Gemini Live", description: "API 키가 있는 Google Generative AI 제공자를 사용합니다." }, "openai-realtime": { title: "OpenAI Realtime 호환", description: "API 키 제공자와 명시적인 Realtime 프로토콜 프로필을 사용합니다." } },
+    readiness: { disabled: "제공자 비활성화됨", "missing-provider": "제공자를 사용할 수 없음", "missing-credentials": "인증 정보 없음", "wrong-auth-kind": "지원되지 않는 인증 방식", "unsupported-adapter": "지원되지 않는 어댑터", "invalid-settings": "잘못된 설정" },
+    openPanel: "실시간 음성 제어 열기", start: "실시간 음성 시작", end: "통화 종료", mute: "마이크 음소거", unmute: "마이크 음소거 해제", resumePlayback: "소리 사용", errorGeneric: "실시간 음성이 중지되었습니다. 제공자 설정을 확인하고 다시 시도하세요.", noProvider: "설정 → 음성에서 지원되는 제공자를 선택하세요.", enableInSettings: "설정 → 음성에서 실시간 음성을 활성화하세요.",
+    phase: { idle: "꺼짐", preparing: "준비 중", "acquiring-mic": "마이크 대기 중", negotiating: "협상 중", connecting: "연결 중", connected: "연결됨", reconnecting: "재연결 중", closing: "종료 중", ended: "종료됨", failed: "중지됨" },
   },
   errors: {
     HOST_UNAVAILABLE: "로컬 서비스를 사용할 수 없습니다",
