@@ -407,6 +407,7 @@ export function createQueueSlice({
             return false;
           }
           const accepted = await get().enqueuePrompt(content, draft, sessionId);
+          if (accepted) options?.onAccepted?.(sessionId);
           return accepted;
         }
         const startedIn = sessionId;
@@ -482,6 +483,7 @@ export function createQueueSlice({
           if (submitted?.abortResolution && (await submitted.abortResolution)) {
             return false;
           }
+          options?.onAccepted?.(startedIn);
           return true;
         } catch (error) {
           runtime.submittedComposerDrafts.delete(startedIn);
