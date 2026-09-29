@@ -9,6 +9,7 @@ import {
   buildProviderModel,
   copilotRequestHeaders,
   createProviderModels,
+  providerAllowsCustomFetch,
   runtimeBaseUrlForApi,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
@@ -44,6 +45,24 @@ describe("apiBindingForStyle", () => {
   it("keeps unknown styles on chat completions", () => {
     expect(apiBindingForStyle("not-a-style").api).toBe("openai-completions");
     expect(apiBindingForStyle(undefined).api).toBe("openai-completions");
+  });
+});
+
+describe("provider transport compatibility", () => {
+  it("does not pass request-scoped fetch into Google SDK adapters", () => {
+    expect(
+      providerAllowsCustomFetch({
+        ...keyedProvider,
+        apiStyle: "google_generative_ai",
+      }),
+    ).toBe(false);
+    expect(
+      providerAllowsCustomFetch({
+        ...keyedProvider,
+        apiStyle: "google-vertex",
+      }),
+    ).toBe(false);
+    expect(providerAllowsCustomFetch(keyedProvider)).toBe(true);
   });
 });
 
@@ -794,6 +813,31 @@ describe("GitHub Copilot transport identity", () => {
     expect(request?.headers.get("Copilot-Integration-Id")).toBe("vscode-chat");
     expect(request?.headers.get("X-Initiator")).toBe("user");
     expect(request?.headers.get("Openai-Intent")).toBe("conversation-edits");
+  });
+
+  it("uses Bearer auth for an Anthropic wire row", async () => {
+    const anthropicProvider: RuntimeProviderConfig = {
+      ...provider,
+      apiStyle: "anthropic_messages",
+      baseUrl: "https://api.githubcopilot.com",
+    };
+    const model = buildProviderModel(anthropicProvider);
+    let request: Request | undefined;
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      request = new Request(input, init);
+      return new Response("unauthorized", { status: 401 });
+    });
+
+    await createProviderModels(anthropicProvider, model)
+      .streamSimple(model, {
+        systemPrompt: "system",
+        messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
+        tools: [],
+      }, { fetch, maxRetries: 0 })
+      .result();
+
+    expect(request?.headers.get("authorization")).toBe("Bearer copilot-token");
+    expect(request?.headers.get("x-api-key")).toBeNull();
   });
 });
 
