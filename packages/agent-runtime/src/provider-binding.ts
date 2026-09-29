@@ -26,6 +26,7 @@ import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.l
 import { openAICodexResponsesApi } from "@earendil-works/pi-ai/api/openai-codex-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
+import { googleVertexApi } from "@earendil-works/pi-ai/api/google-vertex.lazy";
 import { piMessagesApi } from "@earendil-works/pi-ai/api/pi-messages.lazy";
 import { GITHUB_COPILOT_MODELS } from "@earendil-works/pi-ai/providers/github-copilot.models";
 import {
@@ -137,6 +138,13 @@ export function apiBindingForStyle(apiStyle?: string): ApiBinding {
         adapter: googleGenerativeAIApi,
         defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
       };
+    case "google_vertex":
+    case "google-vertex":
+      return {
+        api: "google-vertex",
+        adapter: googleVertexApi,
+        defaultBaseUrl: "https://us-central1-aiplatform.googleapis.com",
+      };
     default:
       return {
         api: "openai-completions",
@@ -162,6 +170,16 @@ export function providerRequestKey(provider: RuntimeProviderConfig): string {
  */
 export function apiBindingForProviderModel(provider: RuntimeProviderConfig): ApiBinding {
   return apiBindingForStyle(providerRequestTransport(provider).apiStyle);
+}
+
+/**
+ * The Google GenAI SDK owns its transport and rejects a request-scoped fetch
+ * override. Keep the wrapper out of Gemini and Vertex requests; their model
+ * headers still flow through the SDK's supported options.headers path.
+ */
+export function providerAllowsCustomFetch(provider: RuntimeProviderConfig): boolean {
+  const api = apiBindingForProviderModel(provider).api;
+  return api !== "google-generative-ai" && api !== "google-vertex";
 }
 
 function providerRequestTransport(provider: RuntimeProviderConfig) {
@@ -295,6 +313,9 @@ export function createProviderModels(
 ): Models {
   const requestKey = providerRequestKey(provider);
   const resolveAuth = provider.resolveAuth;
+  const copilotAnthropicBearer =
+    provider.vendorKey?.trim().toLowerCase() === "github-copilot" &&
+    model.api === "anthropic-messages";
   const models = createModels();
   models.setProvider(
     createProvider({
@@ -312,10 +333,23 @@ export function createProviderModels(
           // per-credential baseUrl GitHub Copilot hands out. pi-ai calls this
           // for every request and caches nothing, so a token that rotates
           // mid-session is picked up on the next one.
-          resolve: async () =>
-            resolveAuth
-              ? { auth: await resolveAuth(), source: "OAuth" }
-              : { auth: { apiKey: requestKey } },
+          resolve: async () => {
+            const auth = resolveAuth ? await resolveAuth() : { apiKey: requestKey };
+            if (!copilotAnthropicBearer || !auth.apiKey) {
+              return { auth, ...(resolveAuth ? { source: "OAuth" } : {}) };
+            }
+            return {
+              auth: {
+                ...auth,
+                apiKey: undefined,
+                headers: {
+                  ...(auth.headers ?? {}),
+                  Authorization: `Bearer ${auth.apiKey}`,
+                },
+              },
+              ...(resolveAuth ? { source: "OAuth" } : {}),
+            };
+          },
         },
       },
       models: [model],

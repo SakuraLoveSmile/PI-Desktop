@@ -889,6 +889,25 @@ identify the platform validation still needed.
 - **Status**: Unit-covered (row-scoped model headers and request-context
   headers); live Copilot account journey pending
 
+#### E2E-005K: Google SDK transport and Copilot Anthropic authentication
+
+- **Preconditions**: Configured Gemini and Vertex provider rows, a signed-in
+  Copilot account with an Anthropic-wire model, and deterministic request
+  capture at the provider boundary.
+- **Steps**: 1) Send a turn and a one-shot request through each Google row,
+  including a row with custom headers. 2) Send a turn with the Copilot
+  Anthropic-wire model.
+- **Expected**: Gemini and Vertex requests retain the configured headers and
+  cancellation while the SDK owns transport selection; no request-scoped
+  `fetch` override is supplied. The Copilot Anthropic request uses
+  `Authorization: Bearer` and does not send `x-api-key`.
+- **Specs linked**: `03-runtime/11-provider-model-system.md`,
+  `03-runtime/12-provider-config-schema.md`
+- **Acceptance**: F (runtime provider requests)
+- **Milestone**: M2
+- **Status**: Unit-covered (one-shot Google options and Copilot wire request);
+  live provider journeys pending
+
 #### E2E-005H: Select every visible model from a long service list
 
 - **Preconditions**: App running; the add-provider or edit-provider dialog is

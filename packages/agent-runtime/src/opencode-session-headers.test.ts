@@ -249,6 +249,37 @@ describe("completeOneShot OpenCode headers", () => {
     });
   });
 
+  it.each([
+    ["Gemini", "google_generative_ai"],
+    ["Vertex", "google-vertex"],
+  ])("keeps %s SDK transports free of wrapped fetch", async (_label, apiStyle) => {
+    let captured: SimpleStreamOptions | undefined;
+    const controller = new AbortController();
+    const result = await completeOneShot(
+      {
+        ...provider,
+        apiStyle,
+        vendorKey: "google",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        headers: { "X-Gateway": "1" },
+      },
+      { systemPrompt: "s", messages: [] },
+      "off",
+      {
+        signal: controller.signal,
+        stream: (_model, _context, options) => {
+          captured = options;
+          return streamFor(assistantOk());
+        },
+      },
+    );
+    expect(result.text).toBe("ok");
+    expect(captured?.fetch).toBeUndefined();
+    expect(captured?.signal).toBe(controller.signal);
+    expect(captured?.maxTokens).toBeGreaterThan(0);
+    expect(captured?.headers).toMatchObject({ "X-Gateway": "1" });
+  });
+
   it("does not attach OpenCode headers to a generic Completions provider", async () => {
     let captured: SimpleStreamOptions | undefined;
     await completeOneShot(
