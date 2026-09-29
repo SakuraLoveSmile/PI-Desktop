@@ -9,6 +9,7 @@ import { en } from "@pi-desktop/i18n";
 import type { AgentActivity, UiMessage } from "@pi-desktop/shared";
 import { AssistantTurn } from "../../apps/desktop/src/features/chat/transcript/AssistantTurn";
 import { ChatTranscript } from "../../apps/desktop/src/features/chat/transcript/ChatTranscript";
+import { MessageRow } from "../../apps/desktop/src/features/chat/transcript/MessageRow";
 import { buildTranscriptEntries } from "../../apps/desktop/src/lib/assistant-turns";
 import { useAppStore } from "../../apps/desktop/src/stores/app-store";
 
@@ -263,6 +264,27 @@ globalThis.transcriptRenderProbe = async () => {
       assert(!summary.textContent?.includes("、"), "English AskTool summary uses Chinese punctuation");
     }
 
+    const typed = "/skill-a compare /skill-b options";
+    const skillMessage = message("skills", "user", "expanded prompt", {
+      command: typed,
+      skillMentions: [
+        { start: 0, end: 8, id: "skill-a-id" },
+        { start: 17, end: 25, id: "skill-b-id" },
+      ],
+    });
+    for (const restored of [skillMessage, JSON.parse(JSON.stringify(skillMessage)) as UiMessage]) {
+      flushSync(() => root.render(
+        <I18nextProvider i18n={i18n}>
+          <MessageRow message={restored} isRunning={false} />
+        </I18nextProvider>,
+      ));
+      const chips = [...container.querySelectorAll(".chat-command-chip")];
+      assert(chips.length === 2, "both Skill chips must render after session restore");
+      assert(chips[0].textContent === "/skill-a" && chips[1].textContent === "/skill-b", "Skill chips lost their typed names");
+      assert(container.textContent?.includes("compare") && container.textContent?.includes("options"), "text around Skill mentions is missing");
+      assert(renderErrors.length === 0, "Skill message raised a React render error");
+    }
+
     const statusLifecycle = await transcriptStatusProbe();
     return {
       ok: statusLifecycle.ok,
@@ -274,6 +296,7 @@ globalThis.transcriptRenderProbe = async () => {
       taskLifecycleUpdated: true,
       taskTimingUpdated: true,
       askToolSummaryRestored: true,
+      skillMentionsRestored: true,
       turnProcess: await turnProcessProbe(),
       messageEditing: await transcriptEditProbe(),
       textUpdateDurationMs,

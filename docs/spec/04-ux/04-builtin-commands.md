@@ -112,9 +112,12 @@ name and description, and form a separate **Skills** group after extension
 commands. This group is always last; a Skill never shadows a command or
 template with the same name.
 
-Selecting a Skill inserts `/<skill-id> `. Sending `/<skill-id>` with optional
-prompt text keeps that typed form as the visible transcript chip and asks the
-model to call the existing `Skill` tool with the validated id before answering.
+Selecting a Skill inserts `/<skill-id> `. Later whitespace-delimited slash
+tokens offer Skills only; app commands remain first-token commands. A prompt
+may mention multiple Skills. Sending keeps the original typed text and Skill
+chips in the transcript, including after reopening the session, and asks the
+model to call the existing `Skill` tool for each distinct validated id in
+mention order before answering.
 Only Skills active for the current project are listed or accepted, so project
 scope and plugin activation remain enforced at send time. If the Skill is no
 longer active, the text follows the normal unknown-slash prompt path.
