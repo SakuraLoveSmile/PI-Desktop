@@ -3,7 +3,7 @@ import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { register } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -278,6 +278,10 @@ test("the generated script installs, starts, and prints the ready/pairing lines"
     });
     assert.deepEqual(parsed.pairing, { token: "ppt1.stub", expiresAt: 1_893_456_000_000 });
     assert.deepEqual(parsed.steps, ["download", "verify", "install", "start", "await-ready", "ok"]);
+    const workMode = (await stat(join(installRoot, ".bootstrap"))).mode & 0o777;
+    const tarballMode = (await stat(join(installRoot, ".bootstrap", ARTIFACT_NAME))).mode & 0o777;
+    assert.equal(workMode, 0o700);
+    assert.equal(tarballMode, 0o600);
 
     // A second Plus bootstrap recognizes and replaces its own host process.
     const firstPlusPid = (await readFile(join(installRoot, ".bootstrap", "pi-host.pid"), "utf8")).trim();

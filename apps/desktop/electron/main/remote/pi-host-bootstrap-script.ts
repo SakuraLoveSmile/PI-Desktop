@@ -96,6 +96,7 @@ need() {
 }
 
 [ -n "\${HOME:-}" ] || die "no-home"
+umask 077
 
 need node
 need tar
@@ -108,6 +109,7 @@ data_root="\${PI_DESKTOP_DATA_DIR:-$HOME/.pi-desktop-plus}"
 host_entry="$host_root/current/pi-host.js"
 work="$host_root/.bootstrap"
 mkdir -p "$work"
+chmod 700 "$work"
 log="$work/pi-host.log"
 err="$work/pi-host.err"
 pidfile="$work/pi-host.pid"
@@ -129,6 +131,7 @@ http_get() {
 tarball="$work/$ARTIFACT_NAME"
 rm -f "$tarball"
 http_get "$ARTIFACT_URL" "$tarball" || die "download-failed"
+chmod 600 "$tarball"
 
 # --- verify the published digest ------------------------------------------
 step "verify"
