@@ -176,6 +176,11 @@ creates neither A2A tables nor unowned plugin-session rows. The schema version i
 internal persistence invariant, not an additional JSON-RPC field; the
 checkpoint architecture remains host-owned.
 
+The current host-core storage schema is v22. The v21-to-v22 additive migration
+adds approved execution provider/model bindings, durable revision intent fields,
+and the `plan_execution_schedules` table. Protocol v11 remains the wire
+version; this persistence increment does not add a JSON-RPC version field.
+
 ## 4. Method catalog (MVP)
 
 ### App
@@ -553,13 +558,25 @@ contract is being negotiated.
   carrying the `kind`. An unrecognized `kind` fails with `INVALID_PARAMS`
 - `plans.submit` — writes the host-owned artifact under the kind's directory and
   creates a pending proposal whose `kind` is persisted on the row
-- `plans.pending` — returns only pending approval rows, the session planning
+- `plans.pending` — returns pending approval rows plus bounded proposal history,
+  the session planning
   state, and the `kind` of the contract being negotiated (the pending row's kind,
   falling back to the session's own contract mode); renderer reload does not
-  extend the absolute deadline while the host remains alive and does not restore
-  terminal cards
-- `plans.resolve` — validates one matching approve/reject response and, for
-  approval, commits the selected permission mode and `execution_state = queued`
+  extend the absolute deadline while the host remains alive and also returns
+  bounded proposal history so terminal cards can be restored read-only
+- `plans.resolve` — validates one matching approve, reject, request_changes, or
+  schedule response. `request_changes` stores a durable revision intent and
+  `schedule` commits an approved one-time snapshot; approval commits the
+  selected permission mode and `execution_state = queued`
+- `plans.claimSchedule` / `plans.cancelSchedule` — atomically claim a due
+  schedule (including an explicitly confirmed missed schedule) or cancel a
+  scheduled/missed snapshot. A claim is single-use and returns the bound
+  execution descriptor
+- `plans.markRevisionFailed` — records a failed revision admission while
+  retaining the saved revision intent for retry
+- `session.endTurn` — marks a still-started revision intent failed when its
+  exact revision turn ends without submitting a replacement proposal, and
+  emits `plans.changed` so the retry card refreshes
 - `plans.queuedExecutions` / `plans.claimExecution` /
   `plans.finishExecution` — consume and transition execution fields on the
   same approval row; the claimed execution reports its `kind` so the sidecar can
@@ -911,14 +928,24 @@ type PlanningState = "inactive" | "planning" | "awaiting_approval";
 
 type GlobalPermissionMode = "ask" | "accept-edits" | "auto";
 
-type PlanApprovalAction = "approve" | "reject";
+type PlanApprovalAction = "approve" | "reject" | "request_changes" | "schedule";
 
 type PlanProposalStatus =
-  | "pending" | "approved" | "rejected"
+  | "pending" | "approved" | "changes_requested" | "rejected"
   | "expired" | "interrupted";
 
 type PlanExecutionState =
   | "queued" | "running" | "completed" | "interrupted";
+
+type PlanScheduleState = "scheduled" | "missed" | "claimed" | "cancelled";
+
+type PlanRevisionIntentInput = {
+  content: string;
+  providerId?: string;
+  modelId?: string;
+  thinkingLevel: ThinkingLevel | "omit";
+  targetKind: ProposalKind;
+};
 
 type PlanArtifact = {
   relativePath: string; // `.pi/plan/<unique-name>.md` or `.pi/goal/<unique-name>.md`
@@ -950,6 +977,18 @@ type PlanProposal = {
   version: number;
   executionId?: string;
   executionState?: PlanExecutionState;
+  planningProviderId?: string;
+  planningModelId?: string;
+  executionProviderId?: string;
+  executionModelId?: string;
+  scheduledFor?: string;
+  scheduleTimezone?: string;
+  scheduleState?: PlanScheduleState;
+  revisionIntent?: PlanRevisionIntentInput & {
+    state: "ready" | "started" | "failed" | "submitted";
+    turnId?: string;
+    errorCode?: string;
+  };
 };
 
 type PlanExecution = {
@@ -963,6 +1002,8 @@ type PlanExecution = {
   question: string;
   artifact: PlanArtifact;
   targetPermissionMode: GlobalPermissionMode;
+  executionProviderId?: string;
+  executionModelId?: string;
   state: PlanExecutionState;
 };
 
@@ -986,8 +1027,22 @@ type PlanResolveRequest =
   | (PlanResolveIdentity & {
       action: "approve";
       targetPermissionMode: GlobalPermissionMode;
+      executionProviderId?: string;
+      executionModelId?: string;
     })
-  | (PlanResolveIdentity & { action: "reject" });
+  | (PlanResolveIdentity & {
+      action: "schedule";
+      targetPermissionMode: GlobalPermissionMode;
+      executionProviderId: string;
+      executionModelId: string;
+      scheduledFor: string;
+      scheduleTimezone: string;
+    })
+  | (PlanResolveIdentity & { action: "reject" })
+  | (PlanResolveIdentity & {
+      action: "request_changes";
+      revisionIntent?: PlanRevisionIntentInput;
+    });
 
 type PlanResolutionResult = {
   ok: boolean;
@@ -1236,11 +1291,13 @@ Tool outcomes (`TOOL_DENIED`, `TOOL_TIMEOUT`, `PATH_OUTSIDE_WORKSPACE`,
 11. SubmitPlan and SubmitGoal write exact Markdown bytes to a unique
     `.pi/plan/*.md` or `.pi/goal/*.md` file with
     hash/size and structured title/question fields; only matching
-    approve/reject responses can resolve the live `plan_approvals` row, and a
+    approve/reject/request_changes/schedule responses can resolve the live
+    `plan_approvals` row, and a
     submit tool run against the other kind fails with `PLAN_KIND_MISMATCH`
     without writing an artifact
-12. Plan and Goal expiry, abort, crash, scheduled rejection, and stale responses
-    produce the documented durable statuses and events
+12. Plan and Goal revision, expiry, abort, crash, one-time schedule
+    claim/miss/cancel, and stale responses produce the documented durable
+    statuses and events; an approved snapshot cannot execute twice
 13. Bash validates the pinned shell ID/dialect, streams stdout/stderr, enforces
     the 60s default/bounded override, and shuts down the complete process tree
 

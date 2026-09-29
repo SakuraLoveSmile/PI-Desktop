@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -10,6 +11,7 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { desktopPaths, repositoryRoot, resolveElectronBinary } from "./e2e/boot.mjs";
 import { resolveHostBinary } from "./e2e/host.mjs";
+import { planModelFixture } from "./e2e/plan-model.mjs";
 
 const root = repositoryRoot();
 const { appDir } = desktopPaths(root);
@@ -20,6 +22,10 @@ const REQUIRED_CASE_IDS = [
   "E2E-117-en",
   "E2E-117-zh-CN",
   "E2E-117-responsive",
+  "E2E-PLAN-WORKFLOW-UI",
+  "E2E-PLAN-ONE-TIME-SCHEDULE",
+  "E2E-PLAN-GOAL-CONVERSION",
+  "E2E-PLAN-REVISION",
 ];
 const LIVE_CASE_ID = "E2E-106-live-agent";
 const LIVE_ENV_AVAILABLE = [
@@ -49,6 +55,21 @@ const CHECKPOINTS = {
     question: "\nApprove second checkpoint?\n",
     markdown:
       "\n# Plan UI second checkpoint\n\n- Refresh the pending proposal from SQLite.\n- Preserve the second artifact bytes exactly.\n\n",
+  },
+  scheduled: {
+    title: "Plan UI scheduled",
+    question: "Run this approved plan once?",
+    markdown: "# Plan UI scheduled\n\n- Run once with the approved model.",
+  },
+  goalSource: {
+    title: "Plan UI Goal source",
+    question: "Convert this Plan into a Goal?",
+    markdown: "# Plan UI Goal source\n\n- Use this Plan as source material only.",
+  },
+  revisionSource: {
+    title: "Plan UI revision source",
+    question: "Refine this Plan?",
+    markdown: "# Plan UI revision source\n\n- Add verification details later.",
   },
 };
 
@@ -618,13 +639,12 @@ async function inspectUi(state) {
     };
     const text = (node) => (node?.innerText || node?.textContent || "").replace(/\\s+/g, " ").trim();
     const label = (node) => (node?.getAttribute("aria-label") || text(node)).trim();
-    const modeButtons = [...document.querySelectorAll(".composer-shell button.mode-chip")]
+    const modeButtons = [...document.querySelectorAll(".composer-shell button.composer-contract-chip")]
       .filter(visible)
-      .map((node) => ({ label: text(node), disabled: Boolean(node.disabled) }));
-    const operatingModes = modeButtons.filter((item) =>
-      ["Agent", "Plan", "智能体", "规划"].includes(item.label),
-    );
-    const bar = document.querySelector('[data-testid="plan-approval-bar"]');
+      .map((node) => ({ label: text(node), disabled: Boolean(node.disabled), mode: node.dataset.mode }));
+    const operatingModes = modeButtons;
+    const visiblePane = document.querySelector('.session-pane[data-visible="true"]');
+    const bar = [...(visiblePane?.querySelectorAll('[data-testid="plan-approval-bar"]') ?? [])].at(-1);
     const approvalMain = bar?.querySelector(".plan-approval-approve-main");
     const approvalMenu = document.querySelector(".plan-approval-menu.is-open");
     const reject = bar?.querySelector(".plan-approval-reject");
@@ -649,6 +669,7 @@ async function inspectUi(state) {
       bodyText,
       activeSessionId: activeRow?.getAttribute("data-sidebar-session-row") || null,
       modeLabels: operatingModes.map((item) => item.label),
+      modeValue: mode?.mode,
       modeControlCount: operatingModes.length,
       modeDisabled: mode ? mode.disabled : null,
       topbarModeControlCount: document.querySelectorAll(".conversation-topbar button.mode-chip").length,
@@ -667,11 +688,11 @@ async function inspectUi(state) {
             executionState: bar.getAttribute("data-execution-state") || "",
             text: barText,
             title: text(bar.querySelector(".plan-approval-title")),
-            question: text(bar.querySelector(".plan-approval-question")),
+            question: text(bar.querySelector(".plan-approval-summary")),
             artifactLabel: label(bar.querySelector("[data-testid=plan-open-artifact]")),
             artifactVisible: visible(bar.querySelector("[data-testid=plan-open-artifact]")),
             expiry: text(bar.querySelector(".plan-approval-expiry")),
-            statusText: text(bar.querySelector(".plan-approval-status")),
+            statusText: text(bar.querySelector(".plan-approval-schedule-status")),
             actionText: text(bar.querySelector(".plan-approval-actions")),
             rejectLabel: reject && visible(reject) ? label(reject) : null,
             approveLabel: approvalMain && visible(approvalMain) ? label(approvalMain) : null,
@@ -776,7 +797,7 @@ async function selectSession(state, sessionId) {
   );
 }
 
-async function submitComposerPrompt(state, prompt) {
+async function submitComposerPrompt(state, prompt, { image = false } = {}) {
   const result = await state.cdp.evaluate(`(() => {
     const input = document.querySelector(".composer-input");
     if (!(input instanceof HTMLElement)) return { submitted: false, reason: "composer editor missing" };
@@ -792,6 +813,21 @@ async function submitComposerPrompt(state, prompt) {
     return { submitted: true };
   })()`);
   assert(result?.submitted === true, `real Composer fill failed: ${jsonText(result)}`);
+  if (image) {
+    const pasted = await state.cdp.evaluate(`(() => {
+      const input = document.querySelector(".composer-input");
+      if (!(input instanceof HTMLElement)) return false;
+      const bytes = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lXcAAAAASUVORK5CYII="), (char) => char.charCodeAt(0));
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([bytes], "revision-image.png", { type: "image/png" }));
+      return input.dispatchEvent(new ClipboardEvent("paste", {
+        bubbles: true, cancelable: true, clipboardData: transfer,
+      }));
+    })()`);
+    assert(pasted === false, "Composer did not accept the pasted revision image");
+    await waitFor(async () => state.cdp.evaluate(`Boolean(document.querySelector(".composer-image-attachment"))`),
+      "revision image attachment chip", state);
+  }
   await waitFor(
     async () => (await inspectUi(state)).sendDisabled === false,
     "filled live Composer Send enabled",
@@ -1117,7 +1153,7 @@ function assertShellStructure(snapshot, expectedMode, locale) {
 function assertPendingUi(snapshot, locale, revision) {
   assert(snapshot.bar?.status === "pending", `expected pending Plan card, got ${jsonText(snapshot.bar)}`);
   assert(snapshot.bar.title === `Plan UI ${revision}`, `pending title mismatch: ${jsonText(snapshot.bar)}`);
-  assert(snapshot.bar.question === "", `pending card rendered the submitted question: ${jsonText(snapshot.bar)}`);
+  assert(snapshot.bar.question.length > 0, `pending card omitted the proposal summary: ${jsonText(snapshot.bar)}`);
   assert(snapshot.bar.artifactVisible, "pending Plan artifact opener is not visible");
   assert(snapshot.bar.artifactLabel.includes(locale === "zh-CN" ? "打开规划文件" : "Open plan artifact"), `localized artifact opener missing: ${snapshot.bar.artifactLabel}`);
   assert(snapshot.bar.expiry === "", `pending card rendered the approval deadline: ${jsonText(snapshot.bar)}`);
@@ -1127,17 +1163,16 @@ function assertPendingUi(snapshot, locale, revision) {
     snapshot.bar.approveLabel?.includes(locale === "zh-CN" ? "每次询问" : "Ask"),
     `Ask is not the default approval action: ${snapshot.bar.approveLabel}`,
   );
-  assert(snapshot.bar.actionButtonCount === 3, `unexpected pending approval actions: ${snapshot.bar.actionButtonCount}`);
-  assert(snapshot.promptReadOnly === true && snapshot.promptAriaReadOnly === "true", "pending Plan prompt is not read-only");
-  assert(snapshot.modelDisabled === true, "pending Plan model control is not gated");
-  assert(snapshot.modeDisabled === true, "pending Plan mode control is not gated");
-  assert(snapshot.permissionDisabled === true, "pending Plan permission control is not gated");
-  assert(snapshot.sendDisabled === true, "pending Plan send control is not gated");
+  assert(snapshot.bar.actionButtonCount >= 4, `pending Plan actions are missing: ${snapshot.bar.actionButtonCount}`);
+  assert(snapshot.promptReadOnly === false, "pending Plan prompt is not editable");
+  assert(snapshot.modelDisabled === false, "pending Plan model control is gated");
+  assert(snapshot.modeDisabled === false, "pending Plan mode control is gated");
+  assert(snapshot.permissionDisabled === false, "pending Plan permission control is gated");
   assertNoLegacyUi(snapshot, `pending ${locale}`);
 }
 
 function assertRejectedEditable(snapshot, locale) {
-  assert(snapshot.bar === null, `rejected Plan approval surface remains visible: ${jsonText(snapshot.bar)}`);
+  assert(snapshot.bar?.status === "rejected", `rejected Plan history card is missing: ${jsonText(snapshot.bar)}`);
   assert(snapshot.promptReadOnly === false && snapshot.promptAriaReadOnly !== "true", "rejected Plan prompt remains read-only");
   assert(snapshot.modelDisabled === false, "rejected Plan model control remains gated");
   assert(snapshot.modeDisabled === false, "rejected Plan mode control remains gated");
@@ -1146,9 +1181,9 @@ function assertRejectedEditable(snapshot, locale) {
 }
 
 function assertApprovedTerminal(snapshot, locale) {
-  assert(snapshot.bar === null, `approved Plan approval surface remains visible: ${jsonText(snapshot.bar)}`);
+  assert(snapshot.bar?.status === "approved", `approved Plan history card is missing: ${jsonText(snapshot.bar)}`);
   assert(snapshot.promptReadOnly === false && snapshot.promptAriaReadOnly !== "true", "approved session input is still read-only");
-  assert(snapshot.modeLabels[0] === (locale === "zh-CN" ? "智能体" : "Agent"), `approved session did not switch to Agent: ${jsonText(snapshot.modeLabels)}`);
+  assert(snapshot.modeValue === "agent", `approved session did not switch to Agent: ${jsonText(snapshot.modeLabels)}`);
   assert(snapshot.modeDisabled === false, "approved session mode control remains gated");
   assert(snapshot.modelDisabled === false, "approved session model control remains gated");
   assert(snapshot.permissionDisabled === false, "approved session permission control remains gated");
@@ -1157,8 +1192,8 @@ function assertApprovedTerminal(snapshot, locale) {
 
 function assertReloadedTerminalAbsent(snapshot, locale, expectedStatus, modeLabel) {
   assert(
-    snapshot.bar === null,
-    `renderer reload rehydrated a terminal ${expectedStatus} checkpoint: ${jsonText(snapshot.bar)}`,
+    snapshot.bar?.status === (expectedStatus === "approved/completed" ? "approved" : expectedStatus),
+    `renderer reload lost a terminal ${expectedStatus} checkpoint: ${jsonText(snapshot.bar)}`,
   );
   assert(snapshot.promptReadOnly === false, `reloaded ${expectedStatus} session input is read-only`);
   assert(snapshot.modelDisabled === false, `reloaded ${expectedStatus} model control remains gated`);
@@ -1183,7 +1218,7 @@ async function responsiveSnapshot(state) {
     const outside = [];
     const clipped = [];
     const textNodes = document.querySelectorAll(
-      ".plan-approval-title, .plan-approval-question, .plan-approval-artifact-label, .plan-approval-artifact-path, .plan-approval-expiry, .plan-approval-status, .plan-approval-actions button, .composer-shell button",
+      ".plan-approval-title, .plan-approval-summary, .plan-approval-artifact-label, .plan-approval-artifact-path, .plan-approval-schedule-status, .plan-approval-actions button, .thinking-display-control button, .composer-shell button",
     );
     for (const node of textNodes) {
       if (!visible(node)) continue;
@@ -1249,7 +1284,7 @@ async function approveAndWait(state) {
     async () => {
       const session = await getSession(state, state.sessionId);
       const snapshot = await inspectUi(state);
-      return session?.mode === "agent" && snapshot.bar === null ? snapshot : null;
+      return session?.mode === "agent" && snapshot.bar?.status === "approved" ? snapshot : null;
     },
     "approved Plan Agent mode and cleared approval surface",
     state,
@@ -1308,7 +1343,7 @@ async function runLiveAcceptance(state) {
     LIVE_TIMEOUT_MS,
   );
   assert(pending.snapshot.bar.title === LIVE_CHECKPOINT.title, `live title mismatch: ${jsonText(pending.snapshot.bar)}`);
-  assert(pending.snapshot.bar.question === "", `live approval surface rendered the submitted question: ${jsonText(pending.snapshot.bar)}`);
+  assert(pending.snapshot.bar.question.length > 0, `live approval surface omitted the submitted summary: ${jsonText(pending.snapshot.bar)}`);
   const submittedMarkdown = pending.proposal.markdown;
   const comparableMarkdown = extractLiveMarkdown(submittedMarkdown);
   assert(
@@ -1361,9 +1396,9 @@ async function runLiveAcceptance(state) {
     async () => {
       const session = await getSession(state, state.liveSessionId);
       const snapshot = await inspectUi(state);
-      return snapshot.bar === null &&
+      return snapshot.bar?.status === "approved" &&
         session?.mode === "agent" &&
-        ["Agent", "智能体"].includes(snapshot.modeLabels[0])
+        snapshot.modeValue === "agent"
         ? snapshot
         : null;
     },
@@ -1470,6 +1505,22 @@ async function runAcceptance(state) {
     `no independent Agent session was available: ${jsonText(defaultAgent ?? sessions)}`,
   );
   state.otherSessionId = defaultAgent.id;
+  const fixture = planModelFixture();
+  state.modelServer = createHttpServer(fixture.handler);
+  await new Promise((resolveServer) => state.modelServer.listen(0, "127.0.0.1", resolveServer));
+  const { provider } = await getPreloadResult(state, "providersCreate", [{
+    name: "Plan UI fixture",
+    vendorKey: "custom",
+    type: "openai_compatible",
+    protocol: "openai_compatible",
+    baseUrl: `http://127.0.0.1:${state.modelServer.address().port}/v1`,
+    authKind: "none",
+    defaultModelId: "fixture",
+    apiStyle: "chat_completions",
+  }]);
+  await getPreloadResult(state, "sessionConfigure", [state.sessionId, {
+    mode: "plan", providerId: provider.id, modelId: "fixture", thinkingLevel: "off",
+  }]);
   const seededSession = await getSession(state, state.sessionId);
   assert(seededSession?.mode === "plan", `seeded session is not Plan: ${jsonText(seededSession)}`);
 
@@ -1509,7 +1560,7 @@ async function runAcceptance(state) {
   await waitFor(
     async () => {
       const current = await inspectUi(state);
-      return current.bar === null && current.promptReadOnly === false ? current : null;
+      return current.bar?.status === "rejected" && current.promptReadOnly === false ? current : null;
     },
     "rejected Plan approval surface cleared and composer editable",
     state,
@@ -1530,7 +1581,7 @@ async function runAcceptance(state) {
   record(
     "E2E-111-renderer",
     true,
-    "Agent default, sole Composer mode control, pending gate, and session-scoped rejection verified",
+    "Agent default, sole contract control, editable pending Composer, and session-scoped rejection verified",
   );
 
   await setLanguage(state, "zh-CN");
@@ -1562,7 +1613,7 @@ async function runAcceptance(state) {
   record(
     "E2E-117-en",
     true,
-    "English Plan shell, immutable approval metadata, Ask default, gated controls, and rejected editable state verified",
+    "English Plan shell, immutable approval metadata, Ask default, editable review, and rejected history verified",
   );
   await captureScreenshot(state, "e2e-117-zh-CN-pending");
 
@@ -1572,12 +1623,12 @@ async function runAcceptance(state) {
   await setViewport(state, 1280, 800);
   record("E2E-117-responsive", true, `1280x800 and 900x700 passed; narrow regions=${narrow.regions.length}`);
 
-  await approveAndWait(state);
   await settlePlanProbe(state, state.sessionId, second.turnId, "completed");
+  await approveAndWait(state);
   await waitFor(
     async () => {
       const current = await inspectUi(state);
-      return current.bar === null ? current : null;
+      return current.bar?.status === "approved" ? current : null;
     },
     "post-approval renderer approval surface cleared",
     state,
@@ -1590,9 +1641,60 @@ async function runAcceptance(state) {
   await reloadRenderer(state);
   await assertPlanProbeIdentityAt(state, "identity after approved terminal renderer reload");
   await selectSession(state, state.sessionId);
-  snapshot = await inspectUi(state);
-  assertReloadedTerminalAbsent(snapshot, "zh-CN", "approved/completed", "智能体");
+  snapshot = await waitFor(
+    async () => {
+      const current = await inspectUi(state);
+      return current.bar?.status === "approved" ? current : null;
+    },
+    "approved Plan history after renderer reload",
+    state,
+  );
+  assertReloadedTerminalAbsent(snapshot, "zh-CN", "approved/completed", "常规");
   await assertPlanProbeIdentityAt(state, "identity during final assertions");
+  assert(
+    !(await state.cdp.evaluate(`Boolean(document.querySelector('[data-testid="work-panel"]'))`)),
+    "renderer reload opened plan details without a user action",
+  );
+  const openedDetails = await state.cdp.evaluate(`(() => {
+    const button = [...document.querySelectorAll('[data-testid="plan-open-artifact"]')].at(-1);
+    button?.click();
+    return Boolean(button);
+  })()`);
+  assert(openedDetails, "approved Plan history has no View details action");
+  await waitFor(
+    () => state.cdp.evaluate(`Boolean(document.querySelector('.file-viewer-markdown')?.textContent?.includes('Plan UI second checkpoint'))`),
+    "approved Plan Markdown preview",
+    state,
+  );
+  await clickSelector(state, '[data-work-panel-tab-id="overview"] .work-panel-tab-button', "Overview tab");
+  const overviewLabel = await state.cdp.evaluate(`document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-label')?.textContent?.trim()`);
+  assert(overviewLabel === "概要", `Overview tab label is not localized: ${overviewLabel}`);
+  const overviewText = await waitFor(
+    () => state.cdp.evaluate(`document.querySelector('[data-testid="overview-tab"]')?.textContent ?? null`),
+    "session Overview",
+    state,
+  );
+  assert(overviewText.includes("Plan UI second"), `Overview omitted the current Plan: ${shortText(overviewText)}`);
+  assert(overviewText.includes("Plan UI fixture"), "Overview omitted the configured provider name");
+  await captureScreenshot(state, "e2e-plan-overview");
+  const compactHit = await state.cdp.evaluate(`(() => {
+    const button = document.querySelector('.thinking-display-control button:last-of-type');
+    if (!button) return { visible: false };
+    const box = button.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return { visible: x >= 0 && x < innerWidth && y >= 0 && y < innerHeight &&
+      Boolean(hit?.closest('.thinking-display-control')), box: { x, y, width: box.width, height: box.height },
+      hit: hit?.className ?? null };
+  })()`);
+  assert(compactHit.visible, `Compact control is obscured: ${jsonText(compactHit)}`);
+  await clickSelector(state, '.thinking-display-control button:last-of-type', "Compact display");
+  await waitFor(async () => (await getSettings(state)).thinkingDisplayMode === "compact", "persisted Compact display", state);
+  await captureScreenshot(state, "e2e-plan-compact");
+  await clickSelector(state, '.thinking-display-control button:first-of-type', "Detailed display");
+  await waitFor(async () => (await getSettings(state)).thinkingDisplayMode === "detailed", "restored Detailed display", state);
+  record("E2E-PLAN-WORKFLOW-UI", true, "details stay closed until click, Markdown preview and Overview open, Compact setting persists");
 
   record(
     "E2E-106-renderer",
@@ -1604,6 +1706,138 @@ async function runAcceptance(state) {
     true,
     "zh-CN labels, Ask default, terminal Agent state, pending-only reload hydration, and no stale actions verified",
   );
+
+  const scheduledSession = (await getPreloadResult(state, "sessionCreate", [{
+    title: "One-time scheduled Plan",
+    mode: "plan",
+    projectPath: state.workspace,
+    providerId: provider.id,
+    modelId: "fixture",
+    permissionMode: "ask",
+  }])).session;
+  assert(scheduledSession?.id, "could not create the isolated schedule session");
+  await reloadRenderer(state);
+  await selectSession(state, scheduledSession.id);
+  const scheduled = await submitPlan(state, scheduledSession.id, "scheduled");
+  await settlePlanProbe(state, scheduledSession.id, scheduled.turnId, "completed");
+  await waitFor(async () => (await inspectUi(state)).bar?.status === "pending", "schedule Plan card", state);
+  await clickSelector(state, '[data-testid="plan-approval-bar"] .plan-approval-schedule', "Schedule Plan");
+  const localScheduleTime = await state.cdp.evaluate(`(() => {
+    const target = new Date(Date.now() + 12_000);
+    const local = new Date(target.getTime() - target.getTimezoneOffset() * 60_000)
+      .toISOString().slice(0, 19);
+    const input = document.querySelector('.plan-approval-schedule-popover input[type="datetime-local"]');
+    if (!input) return null;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, local);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return local;
+  })()`);
+  assert(localScheduleTime, "one-time date/time input is missing");
+  await waitFor(
+    () => state.cdp.evaluate(`document.querySelector('.plan-approval-schedule-popover button')?.disabled === false`),
+    "valid schedule confirmation",
+    state,
+  );
+  await clickSelector(state, '.plan-approval-schedule-popover button', "Confirm one-time schedule");
+  const scheduledHistory = await waitFor(async () => {
+    const result = await getPreloadResult(state, "plansPending", [{ sessionId: scheduledSession.id }]);
+    return result.history?.find((item) => item.id === scheduled.proposalId && item.scheduleState === "scheduled");
+  }, "durable one-time schedule", state);
+  assert(!scheduledHistory.executionState, "scheduled Plan started before the due time");
+  const completedSchedule = await waitFor(async () => {
+    const result = await getPreloadResult(state, "plansPending", [{ sessionId: scheduledSession.id }]);
+    return result.history?.find((item) => item.id === scheduled.proposalId && item.executionState === "completed");
+  }, "one-time Plan execution", state, 45_000);
+  const scheduledTranscript = await getSession(state, scheduledSession.id);
+  assert(
+    scheduledTranscript.messages.filter((item) => item.role === "assistant" && String(item.content).includes("Scheduled review complete.")).length === 1,
+    "one-time Plan did not produce exactly one completed response",
+  );
+  record("E2E-PLAN-ONE-TIME-SCHEDULE", true, `schedule=${localScheduleTime} state=${completedSchedule.executionState}`);
+
+  const goalSession = (await getPreloadResult(state, "sessionCreate", [{
+    title: "Plan to Goal conversion",
+    mode: "plan",
+    projectPath: state.workspace,
+    providerId: provider.id,
+    modelId: "fixture",
+    permissionMode: "ask",
+  }])).session;
+  assert(goalSession?.id, "could not create the Goal conversion session");
+  await reloadRenderer(state);
+  await selectSession(state, goalSession.id);
+  const sourcePlan = await submitPlan(state, goalSession.id, "goalSource");
+  await settlePlanProbe(state, goalSession.id, sourcePlan.turnId, "completed");
+  await waitFor(async () => (await inspectUi(state)).bar?.status === "pending", "source Plan card", state);
+  fixture.setScenario("goal");
+  await clickSelector(state, '[data-testid="plan-approval-bar"] .plan-approval-goal-toggle [role="switch"]', "Convert Plan to Goal");
+  const convertedGoal = await waitFor(async () => {
+    const result = await getPreloadResult(state, "plansPending", [{ sessionId: goalSession.id }]);
+    return result.plans?.find((item) => item.kind === "goal" && item.status === "pending");
+  }, "separately approved Goal contract", state, 45_000);
+  assert(convertedGoal.id !== sourcePlan.proposalId, "Goal reused the Plan approval identity");
+  assert(convertedGoal.artifact?.relativePath?.startsWith(".pi/goal/"), "Goal artifact is not separate from the Plan");
+  const conversionHistory = await getPreloadResult(state, "plansPending", [{ sessionId: goalSession.id }]);
+  assert(conversionHistory.history?.some((item) => item.id === sourcePlan.proposalId && item.status === "changes_requested"),
+    "source Plan disappeared after Goal conversion");
+  await waitFor(async () => {
+    const current = await inspectUi(state);
+    return current.bar?.status === "pending" && current.bar.title === "Converted Goal";
+  }, "Goal approval card", state);
+  record("E2E-PLAN-GOAL-CONVERSION", true, `plan=${sourcePlan.proposalId} goal=${convertedGoal.id}`);
+  await captureScreenshot(state, "e2e-plan-goal-conversion");
+
+  const alternate = (await getPreloadResult(state, "providersCreate", [{
+    name: "Plan UI alternate model",
+    vendorKey: "custom",
+    type: "openai_compatible",
+    protocol: "openai_compatible",
+    baseUrl: `http://127.0.0.1:${state.modelServer.address().port}/v1`,
+    authKind: "none",
+    defaultModelId: "fixture-alt",
+    models: [{ id: "fixture-alt", contextWindow: 128000, maxTokens: 8192 }],
+    apiStyle: "chat_completions",
+  }])).provider;
+  const revisionSession = (await getPreloadResult(state, "sessionCreate", [{
+    title: "Plan revision with model switch",
+    mode: "plan",
+    projectPath: state.workspace,
+    providerId: provider.id,
+    modelId: "fixture",
+    permissionMode: "ask",
+  }])).session;
+  assert(revisionSession?.id && alternate?.id, "could not create the alternate-model revision fixture");
+  await reloadRenderer(state);
+  await selectSession(state, revisionSession.id);
+  const originalPlan = await submitPlan(state, revisionSession.id, "revisionSource");
+  await settlePlanProbe(state, revisionSession.id, originalPlan.turnId, "completed");
+  await waitFor(async () => (await inspectUi(state)).bar?.status === "pending", "revision source card", state);
+  await getPreloadResult(state, "sessionConfigure", [revisionSession.id, {
+    mode: "plan", providerId: alternate.id, modelId: "fixture-alt", thinkingLevel: "off",
+  }]);
+  await reloadRenderer(state);
+  await selectSession(state, revisionSession.id);
+  await waitFor(async () => (await inspectUi(state)).bar?.status === "pending", "revision card after model switch", state);
+  fixture.setScenario("plan");
+  await submitComposerPrompt(state, "Please add concrete verification to this Plan.", { image: true });
+  const revisedPlan = await waitFor(async () => {
+    const result = await getPreloadResult(state, "plansPending", [{ sessionId: revisionSession.id }]);
+    return result.plans?.find((item) => item.title === "Revised Plan" && item.status === "pending");
+  }, "revised Plan approval", state, 45_000);
+  assert(revisedPlan.id !== originalPlan.proposalId, "revision reused the original approval identity");
+  assert(revisedPlan.planningModelId === "fixture-alt", "revision did not use the selected planning model");
+  const revisedSession = await getSession(state, revisionSession.id);
+  assert(revisedSession?.messages?.some((message) =>
+    message.role === "user" && message.attachments?.some((attachment) =>
+      attachment.kind === "image" && attachment.name === "revision-image.png")),
+  "revision image was missing from the durable user turn");
+  const revisionHistory = await getPreloadResult(state, "plansPending", [{ sessionId: revisionSession.id }]);
+  assert(revisionHistory.history?.some((item) => item.id === originalPlan.proposalId && item.status === "changes_requested"),
+    "original Plan was not retained as read-only history");
+  await waitFor(async () => (await inspectUi(state)).bar?.title === "Revised Plan", "revised Plan card", state);
+  await captureScreenshot(state, "e2e-plan-revision");
+  record("E2E-PLAN-REVISION", true, `old=${originalPlan.proposalId} new=${revisedPlan.id} model=fixture-alt`);
 
   if (!LIVE_ENV_AVAILABLE) {
     console.log(
@@ -1625,6 +1859,7 @@ async function cleanup(state) {
   if (state.cdp) await state.cdp.close();
   if (state.mainCdp) await state.mainCdp.close();
   await terminateChildTree(state.electron);
+  if (state.modelServer) await new Promise((resolveServer) => state.modelServer.close(resolveServer));
   if (state.tempRoot) {
     await rm(state.tempRoot, {
       recursive: true,
@@ -1654,6 +1889,7 @@ async function main() {
     cdpPort: await allocatePort(),
     inspectorPort: await allocatePort(),
     electron: null,
+    modelServer: null,
     cdp: null,
     mainCdp: null,
     sessionId: null,

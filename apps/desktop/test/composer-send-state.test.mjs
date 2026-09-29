@@ -89,8 +89,8 @@ test("composer send/stop button follows draft content and the visible session's 
     /className="stop-btn"[\s\S]*?\) : null\}[\s\S]*?className="send-btn"/,
     "Stop must not render beside an always-present Send button",
   );
-  assert.match(composer, /const inputBlocked = approvalPending \|\| pasting \|\| nativeInputBlocked;/);
-  assert.match(composer, /const controlsBlocked = approvalPending \|\| nativeSession;/);
+  assert.match(composer, /const inputBlocked = pasting \|\| nativeInputBlocked;/);
+  assert.match(composer, /const controlsBlocked = nativeSession;/);
   assert.match(composer, /contentEditable=\{!inputBlocked\}/);
   assert.match(composer, /disabled=\{controlsBlocked\}/);
   assert.match(composer, /sendBlocked[\s\S]*\(!modelReady/);
@@ -248,8 +248,11 @@ test("send clears the composer before the round trip and restores a rejected dra
     /if \(!steering && !modelReady\) \{\s*showToast\(t\("errors\.MODEL_NOT_CONFIGURED"\), \{ variant: "error" \}\);\s*return;\s*\}/,
   );
   // Optimistic clear, restore on rejection. The clear must precede the await.
-  const clearAt = submit.indexOf("draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);\n    const accepted = steering");
-  assert.ok(clearAt > 0, "draft must be cleared before awaiting sendPrompt");
+  const regularSendAt = submit.indexOf("if (!steering && !modelReady)");
+  const clearAt = submit.indexOf("draft.clearDraftForKey(submittedDraftKey, submittedDraftRevision, submittedDraft);", regularSendAt);
+  const promptAt = submit.indexOf("await sendPrompt(inlineContent, submittedDraft)", regularSendAt);
+  assert.ok(regularSendAt > 0 && clearAt > regularSendAt && promptAt > clearAt,
+    "draft must be cleared before awaiting sendPrompt");
   assert.match(submit, /if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/);
   assert.doesNotMatch(submit, /if \(accepted\) draft\.clearDraftForKey\(submittedDraftKey, submittedDraftRevision, submittedDraft\);\s*\};/);
   const restore = draftHook.match(
@@ -281,11 +284,11 @@ test("mode slash prefixes send the trailing prompt and retain failed drafts", ()
   );
   assert.match(
     submit,
-    /const submittedDraftRevision = draft\.draftRevision\(submittedDraftKey\);\s*const submittedDraft = draft\.draftSnapshot\(text\);[\s\S]*?draft\.clearDraftForKey\(submittedDraftKey, submittedDraftRevision, submittedDraft\);\s*const accepted = steering[\s\S]*?await steerPrompt\(inlineContent, submittedDraft\)[\s\S]*?await sendPrompt\(inlineContent, submittedDraft\);\s*if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/,
+    /const submittedDraftRevision = draft\.draftRevision\(submittedDraftKey\);\s*const submittedDraft = draft\.draftSnapshot\(text\);[\s\S]*?draft\.clearDraftForKey\(submittedDraftKey, submittedDraftRevision, submittedDraft\);\s*try \{\s*const accepted = steering[\s\S]*?await steerPrompt\(inlineContent, submittedDraft\)[\s\S]*?await sendPrompt\(inlineContent, submittedDraft\);\s*if \(!accepted\) draft\.restoreDraftForKey\(submittedDraftKey, submittedDraft\);/,
   );
   assert.match(store, /draft\?: ComposerDraftSnapshot/);
   const sendPrompt = queueSlice.slice(
-    queueSlice.indexOf("sendPrompt: async (content, draft, requestedSessionId)"),
+    queueSlice.indexOf("sendPrompt: async (content, draft, requestedSessionId, options)"),
   );
   assert.match(sendPrompt, /return false;/);
   assert.match(
@@ -346,7 +349,7 @@ test("draft attachment routing keeps image chips structured and file chips textu
 
 test("the user row is inserted before the host round trip and echoed under the same id (D288)", () => {
   const sendPrompt = queueSlice.slice(
-    queueSlice.indexOf("sendPrompt: async (content, draft, requestedSessionId)"),
+    queueSlice.indexOf("sendPrompt: async (content, draft, requestedSessionId, options)"),
   );
   assert.ok(sendPrompt.length > 0, "sendPrompt not found");
   const insertAt = sendPrompt.indexOf("insertOptimisticUserMessage(startedIn, optimisticMessage)");
@@ -355,7 +358,7 @@ test("the user row is inserted before the host round trip and echoed under the s
   assert.ok(promptAt > insertAt, "the row must be on screen before api.prompt is awaited");
   assert.match(
     sendPrompt.slice(promptAt),
-    /await api\.prompt\(\{[^}]*messageId: optimisticMessage\.id/,
+    /await api\.prompt\(\{[\s\S]*?messageId: optimisticMessage\.id/,
     "the renderer id travels with the prompt so the host echo lands on the same row",
   );
   // The row is withdrawn when the send never reached the host, but only the

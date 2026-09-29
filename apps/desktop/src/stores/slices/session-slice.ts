@@ -1,7 +1,6 @@
 import i18n from "i18next";
 import type {
   Mode,
-  PlanProposal,
   ProposalKind,
   SessionDetail,
   SessionSummary,
@@ -69,11 +68,6 @@ export type SessionSliceDependencies = StoreAccess & {
     state: AppState["planningStates"][string],
     kind: ProposalKind | undefined,
   ) => Mode;
-  openPlanArtifact: (
-    proposal: PlanProposal,
-    openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
-    pluginViews: AppState["pluginViews"],
-  ) => Promise<void>;
   rememberSessionCompactions: (
     sessionId: string,
     session:
@@ -102,7 +96,6 @@ export function createSessionSlice({
   decorateSessions,
   withoutRecordKey,
   sessionModeForPlanningState,
-  openPlanArtifact,
   rememberSessionCompactions,
   commitForkedSession,
   persistSessionAndSelect,
@@ -182,6 +175,9 @@ export function createSessionSlice({
           planCheckpoints: checkpoint
             ? { ...state.planCheckpoints, [sessionId]: checkpoint }
             : state.planCheckpoints,
+          planHistory: result.history
+            ? { ...state.planHistory, [sessionId]: result.history }
+            : state.planHistory,
           pendingPlans: activeProposal
             ? { ...state.pendingPlans, [sessionId]: activeProposal }
             : withoutRecordKey(state.pendingPlans, sessionId),
@@ -201,13 +197,6 @@ export function createSessionSlice({
               : session,
           ),
         }));
-        if (checkpoint && activeProposal) {
-          void openPlanArtifact(
-            checkpoint,
-            get().openWorkPanelTabForSession,
-            get().pluginViews,
-          );
-        }
         return activeProposal ? "pending" : "terminal";
       } catch {
         return "unavailable";
@@ -636,7 +625,6 @@ export function createSessionSlice({
         }));
         return;
       }
-      if (get().pendingPlans[sessionId]?.status === "pending") return;
       if (config.executionProfile === "standard") {
         const active = get().sessions.find((s) => s.id === sessionId);
         if (active?.executionProfile === "team") {
@@ -697,7 +685,11 @@ export function createSessionSlice({
         ),
         planningStates: {
           ...state.planningStates,
-          [sessionId]: result.session.mode === "plan" ? "planning" : "inactive",
+          [sessionId]: state.pendingPlans[sessionId]?.status === "pending"
+            ? "awaiting_approval"
+            : result.session.mode === "plan" || result.session.mode === "goal"
+              ? "planning"
+              : "inactive",
         },
       }));
     },

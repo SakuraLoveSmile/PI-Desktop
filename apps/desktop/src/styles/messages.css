@@ -249,6 +249,43 @@
   font-size: var(--text-sm);
 }
 
+.asktool-completed-summary {
+  width: min(100%, var(--chat-prose-max-width, 720px));
+  margin: 10px 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--ds-tile);
+}
+
+.asktool-completed-summary-title {
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.asktool-completed-summary-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.asktool-completed-summary-item {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.asktool-completed-summary-item dt {
+  color: var(--ds-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.asktool-completed-summary-item dd {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 560px) {
   .asktool-card-header {
     align-items: flex-start;

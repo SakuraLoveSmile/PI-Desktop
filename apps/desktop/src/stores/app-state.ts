@@ -171,6 +171,9 @@ export type AppState = {
   pendingPlans: Record<string, PlanProposal>;
   /** Latest immutable Plan checkpoint/execution snapshot per session. */
   planCheckpoints: Record<string, PlanProposal>;
+  /** Durable proposal history used by transcript cards. */
+  planHistory: Record<string, PlanProposal[]>;
+  planDraftsDirty: Record<string, boolean>;
   /** Goal completion report summaries per session. */
   goalReports: Record<string, GoalReportSummary[]>;
   toasts: ToastItem[];
@@ -215,6 +218,7 @@ export type AppState = {
     content: string,
     draft?: ComposerDraftSnapshot,
     targetSessionId?: string,
+    options?: { revisionProposalId?: string },
   ) => Promise<boolean>;
   steerPrompt: (content: string, draft?: ComposerDraftSnapshot) => Promise<boolean>;
   enqueuePrompt: (
@@ -352,6 +356,19 @@ export type AppState = {
     resolution: AskToolResolution,
   ) => Promise<void>;
   resolvePlan: (resolution: PlanResolveRequest) => Promise<PlanResolutionResult>;
+  revisePlan: (input: {
+    proposal: PlanProposal;
+    content: string;
+    draft?: ComposerDraftSnapshot;
+    providerId?: string;
+    modelId?: string;
+    thinkingLevel: SessionThinkingLevel;
+  }) => Promise<boolean>;
+  convertPlanToGoal: (proposal: PlanProposal) => Promise<boolean>;
+  retryPlanRevision: (proposal: PlanProposal) => Promise<boolean>;
+  cancelPlanConversion: (proposal: PlanProposal) => Promise<boolean>;
+  runMissedPlan: (proposal: PlanProposal) => Promise<boolean>;
+  cancelScheduledPlan: (proposal: PlanProposal) => Promise<boolean>;
   showToast: (message: string, options?: ToastOptions) => void;
   dismissToast: (id: number) => void;
   composerPrefill: ComposerPrefill | null;

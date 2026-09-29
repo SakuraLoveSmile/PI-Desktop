@@ -20,6 +20,7 @@ const [store, planState, approvalBar, composer, packageJson] =
     readDesktop("package.json"),
   ]);
 const eventsSource = readStoreModuleSync("slices/events-slice.ts");
+const assistantTurn = await readDesktop("src/features/chat/transcript/AssistantTurn.tsx");
 
 test("rejection clears only the live gate and a later proposal replaces the checkpoint", () => {
   const hostPlanBlock = eventsSource.slice(eventsSource.indexOf("handlePlansChanged: (event) =>"));
@@ -37,9 +38,10 @@ test("terminal proposals and execution states stay session-scoped and readable",
     assert.match(planState, new RegExp(`"${status}"`));
   }
   assert.match(store, /planCheckpoints: Record<string, PlanProposal>/);
-  assert.match(composer, /planCheckpoint\?\.status === "pending"[\s\S]*<PlanApprovalBar proposal=\{planCheckpoint\} \/>/);
+  assert.match(store, /planHistory: Record<string, PlanProposal\[\]>/);
+  assert.match(assistantTurn, /turnProposals\.map\(\(proposal\) => <PlanApprovalBar/);
   assert.match(approvalBar, /data-execution-state=\{proposal\.executionState \|\| ""\}/);
-  assert.doesNotMatch(approvalBar, /changes_requested|request_changes|requestChanges|feedback/);
+  assert.match(approvalBar, /scheduleState/);
   assert.doesNotMatch(store, /planApprovalPermissionMode/);
 });
 
@@ -51,15 +53,24 @@ test("each pending proposal restores the remembered approval choice", () => {
   assert.doesNotMatch(approvalBar, /state\.settings|planApprovalPermissionMode/);
 });
 
-test("pending input is retained but every composer/model mutation control is gated", () => {
+test("pending review retains editable input and routes send to revision", () => {
   assert.match(composer, /contentEditable=\{!inputBlocked\}/);
   assert.match(composer, /aria-readonly=\{inputBlocked\}/);
   assert.match(composer, /enabled: !inputBlocked/);
   assert.match(composer, /disabled=\{controlsBlocked\}/);
-  assert.match(composer, /const controlsBlocked = approvalPending \|\| nativeSession;/);
-  assert.match(composer, /const sendBlocked = approvalPending \|\| pasting \|\| nativeInputBlocked;/);
-  assert.match(store, /pendingPlans\[sessionId\]\?\.status === "pending"/);
+  assert.match(composer, /const controlsBlocked = nativeSession;/);
+  assert.match(composer, /const sendBlocked = pasting \|\| nativeInputBlocked;/);
+  assert.match(composer, /return revisePlan\(/);
+  assert.match(store, /planDraftsDirty: Record<string, boolean>/);
   assert.match(store, /pendingPlans\[resolution\.sessionId\]/);
+});
+
+test("plan revision keeps uploaded files on first send and retry", async () => {
+  const interaction = await readDesktop("src/stores/slices/interaction-slice.ts");
+  assert.match(composer, /return revisePlan\(\{[\s\S]*?draft: snapshot,/);
+  assert.match(interaction, /revisePlan: \(input\)[\s\S]*?draft: input\.draft/);
+  assert.match(interaction, /get\(\)\.sendPrompt\(intent\.content, intent\.draft, sessionId/);
+  assert.match(interaction, /retryPlanRevision: \(proposal\)[\s\S]*?startRevision\(proposal\.id, proposal\.sessionId, intent\)/);
 });
 
 test("the normal desktop test command includes source-level renderer contracts", () => {

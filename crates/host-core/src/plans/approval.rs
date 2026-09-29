@@ -8,6 +8,29 @@ fn valid_permission_mode(value: &str) -> bool {
     matches!(value, "ask" | "accept-edits" | "auto")
 }
 
+fn valid_revision_draft(draft: &PlanRevisionDraft) -> bool {
+    draft.text.len() <= PLAN_REVISION_DRAFT_MAX_TEXT_BYTES
+        && draft.file_references.len() <= PLAN_REVISION_DRAFT_MAX_REFERENCES
+        && draft.file_references.iter().all(|reference| {
+            !reference.path.trim().is_empty()
+                && reference.path.len() <= PLAN_REVISION_DRAFT_MAX_PATH_BYTES
+                && !reference.name.trim().is_empty()
+                && reference.name.len() <= PLAN_REVISION_DRAFT_MAX_NAME_BYTES
+                && reference
+                    .kind
+                    .as_deref()
+                    .is_none_or(|kind| matches!(kind, "image" | "file"))
+                && reference
+                    .mime_type
+                    .as_deref()
+                    .is_none_or(|mime| mime.len() <= PLAN_REVISION_DRAFT_MAX_MIME_TYPE_BYTES)
+                && reference
+                    .token
+                    .as_deref()
+                    .is_none_or(|token| token.len() <= PLAN_REVISION_DRAFT_MAX_TOKEN_BYTES)
+        })
+}
+
 /// Expire approvals at the first read or mutation boundary that observes
 /// them. The state transition and audit record share one transaction so a
 /// timed-out approval can never remain actionable after its error is visible.
@@ -108,7 +131,7 @@ pub fn gate_session_configure(
     let blocked: bool = db.conn().query_row(
         "SELECT EXISTS(
              SELECT 1 FROM plan_approvals
-             WHERE session_id = ?1 AND status = 'pending'
+             WHERE session_id = ?1 AND status = 'pending' AND ?2
           ) OR EXISTS(
               SELECT 1 FROM plan_approvals
               WHERE session_id = ?1 AND execution_state IN ('queued', 'running')
@@ -116,7 +139,7 @@ pub fn gate_session_configure(
               SELECT 1 FROM turns
               WHERE session_id = ?1 AND status = 'running'
           )",
-        params![session_id],
+        params![session_id, mode_changes || permission_changes],
         |row| row.get(0),
     )?;
     if blocked {
@@ -269,6 +292,12 @@ impl PlanManager {
                 kind,
                 artifact_workspace_kind,
             ])?;
+            tx.execute(
+                "UPDATE plan_approvals SET revision_state = 'submitted',
+                 updated_at = ?1, version = version + 1
+                 WHERE session_id = ?2 AND revision_turn_id = ?3 AND revision_state = 'started'",
+                params![now, session_id, turn_id],
+            )?;
             artifacts::record_tx(
                 &tx,
                 session_id,
@@ -319,6 +348,21 @@ impl PlanManager {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    pub fn history_for_session(
+        &self,
+        db: &Database,
+        session_id: &str,
+    ) -> Result<Vec<PlanProposal>> {
+        expire_pending_approvals(db)?;
+        let sql = format!(
+            "SELECT {PROPOSAL_COLUMNS} FROM plan_approvals
+             WHERE session_id = ?1 ORDER BY created_at DESC LIMIT 100"
+        );
+        let mut stmt = db.conn().prepare_cached(&sql)?;
+        let rows = stmt.query_map(params![session_id], proposal_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     pub fn state_for_session(&self, db: &Database, session_id: &str) -> Result<String> {
         expire_pending_approvals(db)?;
         let Some(mode) = sessions::session_mode(db, session_id)? else {
@@ -356,6 +400,15 @@ impl PlanManager {
     }
 
     pub fn resolve(&self, db: &Database, params: PlanResolveParams<'_>) -> Result<PlanResolution> {
+        self.resolve_with_options(db, params, PlanResolveOptions::default())
+    }
+
+    pub fn resolve_with_options(
+        &self,
+        db: &Database,
+        params: PlanResolveParams<'_>,
+        options: PlanResolveOptions<'_>,
+    ) -> Result<PlanResolution> {
         let PlanResolveParams {
             workspace_root,
             proposal_id,
@@ -379,13 +432,17 @@ impl PlanManager {
         {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
-        if !matches!(action, "approve" | "reject") {
+        if !matches!(
+            action,
+            "approve" | "reject" | "request_changes" | "schedule"
+        ) {
             return Err(plan_error("PLAN_INVALID_ACTION"));
         }
         if current.status == STATUS_EXPIRED {
             return Err(plan_error("PLAN_APPROVAL_TIMEOUT"));
         }
-        let selected = if action == "approve" {
+        let approving = matches!(action, "approve" | "schedule");
+        let selected = if approving {
             let Some(selected) = target_permission_mode else {
                 return Err(plan_error("PLAN_PERMISSION_MODE_REQUIRED"));
             };
@@ -397,8 +454,44 @@ impl PlanManager {
             None
         };
         if current.status != STATUS_PENDING {
-            let same_resolution = current.action.as_deref() == Some(action)
-                && (action != "approve" || current.target_permission_mode.as_deref() == selected);
+            let stored_action = if action == "schedule" {
+                "approve"
+            } else {
+                action
+            };
+            let same_binding = (!approving
+                || options
+                    .execution_provider_id
+                    .is_none_or(|value| current.execution_provider_id.as_deref() == Some(value)))
+                && (!approving
+                    || options
+                        .execution_model_id
+                        .is_none_or(|value| current.execution_model_id.as_deref() == Some(value)));
+            let same_schedule = action != "schedule"
+                || (current.schedule_state.is_some()
+                    && current.schedule_timezone.as_deref() == options.schedule_timezone
+                    && options
+                        .scheduled_for
+                        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+                        .map(|value| value.timestamp_millis())
+                        == current
+                            .scheduled_for
+                            .as_deref()
+                            .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+                            .map(|value| value.timestamp_millis()));
+            let same_revision = action != "request_changes"
+                || options.revision_intent.is_none_or(|value| {
+                    serde_json::from_value::<PlanRevisionIntentInput>(value.clone()).ok()
+                        == current
+                            .revision_intent
+                            .as_ref()
+                            .map(|intent| intent.input.clone())
+                });
+            let same_resolution = current.action.as_deref() == Some(stored_action)
+                && (!approving || current.target_permission_mode.as_deref() == selected)
+                && same_binding
+                && same_schedule
+                && same_revision;
             if same_resolution {
                 return resolution_from_proposal(current);
             }
@@ -408,7 +501,7 @@ impl PlanManager {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
 
-        if action == "approve" {
+        if approving {
             let workspace_root =
                 workspace_root.ok_or_else(|| plan_error("PLAN_WORKSPACE_REQUIRED"))?;
             let artifact = current
@@ -417,14 +510,101 @@ impl PlanManager {
                 .ok_or_else(|| plan_error("PLAN_ARTIFACT_NOT_READY"))?;
             verify_artifact(workspace_root, kind, &artifact)?;
         }
+        let scheduled_at = if action == "schedule" {
+            let instant = options
+                .scheduled_for
+                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+                .ok_or_else(|| plan_error("PLAN_SCHEDULE_TIME_INVALID"))?
+                .timestamp_millis();
+            if instant <= now_ms() {
+                return Err(plan_error("PLAN_SCHEDULE_TIME_PAST"));
+            }
+            let timezone = options.schedule_timezone.unwrap_or("").trim();
+            if timezone.is_empty()
+                || timezone.len() > 128
+                || !timezone
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"_+-./".contains(&byte))
+            {
+                return Err(plan_error("PLAN_SCHEDULE_TIMEZONE_INVALID"));
+            }
+            Some((instant, timezone))
+        } else {
+            None
+        };
+        let execution_provider_id = if approving {
+            options
+                .execution_provider_id
+                .or(current.planning_provider_id.as_deref())
+                .filter(|value| !value.trim().is_empty())
+        } else {
+            None
+        };
+        let execution_model_id = if approving {
+            options
+                .execution_model_id
+                .or(current.planning_model_id.as_deref())
+                .filter(|value| !value.trim().is_empty())
+        } else {
+            None
+        };
+        if action == "schedule" && (execution_provider_id.is_none() || execution_model_id.is_none())
+        {
+            return Err(plan_error("PLAN_EXECUTION_MODEL_REQUIRED"));
+        }
+        let revision_intent_json = if action == "request_changes" {
+            options
+                .revision_intent
+                .map(|value| -> Result<String> {
+                    let intent: PlanRevisionIntentInput = serde_json::from_value(value.clone())
+                        .map_err(|_| plan_error("PLAN_REVISION_INVALID"))?;
+                    if intent.content.trim().is_empty()
+                        || intent.content.len() > PLAN_MAX_MARKDOWN_BYTES
+                        || !matches!(
+                            intent.thinking_level.as_str(),
+                            "off"
+                                | "minimal"
+                                | "low"
+                                | "medium"
+                                | "high"
+                                | "xhigh"
+                                | "max"
+                                | "omit"
+                        )
+                        || normalize_kind(&intent.target_kind).is_none()
+                        || (kind == KIND_GOAL && intent.target_kind != KIND_GOAL)
+                        || intent.provider_id.as_deref().unwrap_or("").is_empty()
+                        || intent.model_id.as_deref().unwrap_or("").is_empty()
+                        || intent
+                            .draft
+                            .as_ref()
+                            .is_some_and(|draft| !valid_revision_draft(draft))
+                    {
+                        return Err(plan_error("PLAN_REVISION_INVALID"));
+                    }
+                    serde_json::to_string(&intent).map_err(Into::into)
+                })
+                .transpose()?
+        } else {
+            if options.revision_intent.is_some() {
+                return Err(plan_error("PLAN_REVISION_INVALID"));
+            }
+            None
+        };
         let now = now_ms();
         let status = match action {
-            "approve" => STATUS_APPROVED,
+            "approve" | "schedule" => STATUS_APPROVED,
+            "request_changes" => STATUS_CHANGES_REQUESTED,
             _ => STATUS_REJECTED,
+        };
+        let stored_action = if action == "schedule" {
+            "approve"
+        } else {
+            action
         };
         let execution_id = (action == "approve").then(|| Uuid::new_v4().to_string());
         let tx = db.conn().unchecked_transaction()?;
-        if action == "approve" {
+        if approving {
             let active_execution: bool = tx.query_row(
                 "SELECT EXISTS(
                  SELECT 1 FROM plan_approvals
@@ -453,14 +633,16 @@ impl PlanManager {
               SET status = ?1, action = ?2, target_permission_mode = ?3,
                   resolved_at = ?4, updated_at = ?4,
                   error_code = NULL, version = version + 1,
-                  execution_id = ?5, execution_state = ?6
+                  execution_id = ?5, execution_state = ?6,
+                  execution_provider_id = ?13, execution_model_id = ?14,
+                  revision_intent_json = ?15, revision_state = ?16
               WHERE request_id = ?7 AND session_id = ?8 AND turn_id = ?9
                 AND tool_call_id = ?10 AND status = 'pending' AND version = ?11
                  AND expires_at > ?12",
             )?
             .execute(params![
                 status,
-                action,
+                stored_action,
                 selected,
                 now,
                 execution_id,
@@ -471,9 +653,21 @@ impl PlanManager {
                 tool_call_id,
                 current.version,
                 now,
+                execution_provider_id,
+                execution_model_id,
+                revision_intent_json,
+                revision_intent_json.as_ref().map(|_| "ready"),
             ])?;
         if changed != 1 {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
+        }
+        if let Some((scheduled_for, timezone)) = scheduled_at {
+            tx.execute(
+                "INSERT INTO plan_execution_schedules
+                 (proposal_id, scheduled_for, timezone, state, updated_at)
+                 VALUES (?1, ?2, ?3, 'scheduled', ?4)",
+                params![proposal_id, scheduled_for, timezone, now],
+            )?;
         }
         audit::append_tx(
             &tx,
@@ -490,12 +684,116 @@ impl PlanManager {
                 "targetPermissionMode": selected,
                 "executionId": execution_id,
                 "executionState": (action == "approve").then_some(EXECUTION_QUEUED),
+                "scheduledFor": scheduled_at.map(|(instant, _)| ms_to_ts(instant)),
+                "revisionIntentStored": revision_intent_json.is_some(),
             }),
         )?;
         tx.commit()?;
         let proposal =
             get_proposal(db, proposal_id)?.ok_or_else(|| plan_error("PLAN_NOT_FOUND"))?;
-        resolution_from_proposal(proposal)
+        let mut resolution = resolution_from_proposal(proposal)?;
+        if action == "schedule" {
+            resolution.action = Some("schedule".to_string());
+        }
+        Ok(resolution)
+    }
+
+    pub fn begin_revision_turn(
+        &self,
+        db: &Database,
+        proposal_id: &str,
+        session_id: &str,
+        content: &str,
+        provider_id: &str,
+        model_id: &str,
+    ) -> Result<(String, bool)> {
+        let tx = db.conn().unchecked_transaction()?;
+        let proposal =
+            get_proposal(db, proposal_id)?.ok_or_else(|| plan_error("PLAN_NOT_FOUND"))?;
+        if proposal.session_id != session_id || proposal.status != STATUS_CHANGES_REQUESTED {
+            return Err(plan_error("PLAN_REVISION_STALE"));
+        }
+        let intent = proposal
+            .revision_intent
+            .ok_or_else(|| plan_error("PLAN_REVISION_NOT_FOUND"))?;
+        if intent.input.content != content
+            || intent.input.provider_id.as_deref() != Some(provider_id)
+            || intent.input.model_id.as_deref() != Some(model_id)
+            || sessions::session_mode(db, session_id)?.as_deref()
+                != Some(intent.input.target_kind.as_str())
+        {
+            return Err(plan_error("PLAN_REVISION_STALE"));
+        }
+        if intent.state == "started" || intent.state == "submitted" {
+            let turn_id = intent
+                .turn_id
+                .ok_or_else(|| plan_error("PLAN_REVISION_STALE"))?;
+            tx.commit()?;
+            return Ok((turn_id, true));
+        }
+        if intent.state != "ready" && intent.state != "failed" {
+            return Err(plan_error("PLAN_REVISION_STALE"));
+        }
+        let turn_id = sessions::begin_turn(db, session_id, Some(provider_id), Some(model_id))?;
+        let updated = tx.execute(
+            "UPDATE plan_approvals SET revision_state = 'started', revision_turn_id = ?1,
+             revision_error_code = NULL, updated_at = ?2, version = version + 1
+             WHERE request_id = ?3 AND revision_state IN ('ready', 'failed')",
+            params![turn_id, now_ms(), proposal_id],
+        )?;
+        if updated != 1 {
+            return Err(plan_error("PLAN_REVISION_STALE"));
+        }
+        tx.commit()?;
+        Ok((turn_id, false))
+    }
+
+    pub fn mark_revision_failed(
+        &self,
+        db: &Database,
+        proposal_id: &str,
+        session_id: &str,
+        error_code: &str,
+    ) -> Result<bool> {
+        let error_code = error_code.trim();
+        if error_code.is_empty() || error_code.len() > 128 {
+            return Err(plan_error("PLAN_REVISION_INVALID"));
+        }
+        let changed = db.conn().execute(
+            "UPDATE plan_approvals SET revision_state = 'failed', revision_error_code = ?1,
+             updated_at = ?2, version = version + 1
+             WHERE request_id = ?3 AND session_id = ?4
+               AND revision_state IN ('ready', 'started')
+               AND NOT EXISTS (SELECT 1 FROM turns
+                 WHERE id = plan_approvals.revision_turn_id AND status = 'running')",
+            params![error_code, now_ms(), proposal_id, session_id],
+        )?;
+        Ok(changed == 1)
+    }
+
+    pub fn finish_revision_turn(
+        &self,
+        db: &Database,
+        turn_id: &str,
+        error_code: &str,
+    ) -> Result<Option<PlanProposal>> {
+        let proposal_id: Option<String> = db
+            .conn()
+            .query_row(
+                "UPDATE plan_approvals
+             SET revision_state = 'failed', revision_error_code = ?1,
+                 updated_at = ?2, version = version + 1
+             WHERE revision_turn_id = ?3 AND revision_state = 'started'
+               AND EXISTS (SELECT 1 FROM turns WHERE id = ?3 AND status != 'running')
+             RETURNING request_id",
+                params![error_code, now_ms(), turn_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        proposal_id
+            .map(|id| get_proposal(db, &id))
+            .transpose()
+            .map(Option::flatten)
     }
 
     pub fn abort_session(&self, db: &Database, session_id: &str) -> Result<bool> {

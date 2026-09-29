@@ -1,6 +1,7 @@
 /** Shared public types grouped by the owning application domain. */
 import type { Mode } from "./common.js";
 import type { GlobalPermissionMode } from "./permissions.js";
+import type { SessionThinkingLevel } from "./models.js";
 
 /** Approval-proposal discriminator (D198). Plan and Goal share one host
  * approval pipeline; `kind` selects prompts, artifact directory and copy. */
@@ -26,10 +27,11 @@ export function modeForProposalKind(kind: ProposalKind): Mode {
 }
 
 export type PlanningState = "inactive" | "planning" | "awaiting_approval";
-export type PlanApprovalAction = "approve" | "reject";
+export type PlanApprovalAction = "approve" | "reject" | "request_changes" | "schedule";
 export type PlanApprovalStatus =
   | "pending"
   | "approved"
+  | "changes_requested"
   | "rejected"
   | "expired"
   | "interrupted";
@@ -52,6 +54,34 @@ export type PlanExecutionState =
   | "running"
   | "completed"
   | "interrupted";
+
+export type PlanScheduleState = "scheduled" | "missed" | "claimed" | "cancelled";
+export type PlanRevisionDraftFileReference = {
+  path: string;
+  name: string;
+  kind?: "image" | "file";
+  mimeType?: string;
+  token?: string;
+};
+
+export type PlanRevisionDraft = {
+  text: string;
+  fileReferences: PlanRevisionDraftFileReference[];
+};
+
+export type PlanRevisionIntentInput = {
+  content: string;
+  providerId?: string;
+  modelId?: string;
+  thinkingLevel: SessionThinkingLevel;
+  targetKind: ProposalKind;
+  draft?: PlanRevisionDraft;
+};
+export type PlanRevisionIntent = PlanRevisionIntentInput & {
+  state: "ready" | "started" | "failed" | "submitted";
+  turnId?: string;
+  errorCode?: string;
+};
 
 export type PlanExecutionFinishStatus = Extract<
   PlanExecutionState,
@@ -85,6 +115,14 @@ export type PlanProposal = {
   errorCode?: string;
   executionId?: string;
   executionState?: PlanExecutionState;
+  planningProviderId?: string;
+  planningModelId?: string;
+  executionProviderId?: string;
+  executionModelId?: string;
+  scheduledFor?: string;
+  scheduleTimezone?: string;
+  scheduleState?: PlanScheduleState;
+  revisionIntent?: PlanRevisionIntent;
   /** Persisted snapshot alias retained by the host for compatibility. */
   plan: string;
 };
@@ -102,6 +140,8 @@ export type PlanExecution = {
   question: string;
   artifact: PlanArtifact;
   targetPermissionMode: GlobalPermissionMode;
+  executionProviderId?: string;
+  executionModelId?: string;
   state: PlanExecutionState;
 };
 
@@ -129,6 +169,8 @@ export type PlanningStateEvent = {
 
 export type PlansPendingResult = {
   plans: PlanProposal[];
+  /** Recent immutable checkpoints for transcript restoration. */
+  history?: PlanProposal[];
   state?: PlanningState;
   /** Contract kind the session is currently negotiating, when any (D198). */
   kind?: ProposalKind;
@@ -151,10 +193,25 @@ export type PlanResolveRequest =
   | (PlanResolveIdentity & {
       action: "approve";
       targetPermissionMode: GlobalPermissionMode;
+      executionProviderId?: string;
+      executionModelId?: string;
+    })
+  | (PlanResolveIdentity & {
+      action: "schedule";
+      targetPermissionMode: GlobalPermissionMode;
+      executionProviderId: string;
+      executionModelId: string;
+      scheduledFor: string;
+      scheduleTimezone: string;
     })
   | (PlanResolveIdentity & {
       action: "reject";
       targetPermissionMode?: never;
+    })
+  | (PlanResolveIdentity & {
+      action: "request_changes";
+      targetPermissionMode?: never;
+      revisionIntent?: PlanRevisionIntentInput;
     });
 
 export type PlanResolutionResult = {

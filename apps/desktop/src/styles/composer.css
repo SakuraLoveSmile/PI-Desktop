@@ -588,12 +588,35 @@
 
 .plan-approval-title {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
   color: var(--ds-text-primary);
   font-size: var(--text-md-plus);
   font-weight: var(--font-weight-strong);
   line-height: var(--leading-compact);
   overflow-wrap: anywhere;
+}
+
+.plan-approval-summary {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-schedule-status,
+.plan-approval-draft-warning {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-draft-warning {
+  grid-column: 1 / -1;
 }
 
 .plan-approval-details {
@@ -648,6 +671,7 @@
 }
 
 .plan-approval-actions {
+  position: relative;
   display: flex;
   min-width: 0;
   flex: 0 1 auto;
@@ -656,6 +680,86 @@
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.plan-approval-goal-toggle,
+.plan-approval-schedule {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  white-space: nowrap;
+}
+
+.plan-approval-goal-toggle:hover,
+.plan-approval-goal-toggle:focus-within,
+.plan-approval-schedule:hover:not(:disabled),
+.plan-approval-schedule:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.plan-approval-schedule-popover {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  bottom: calc(100% + 6px);
+  display: grid;
+  gap: 8px;
+  min-width: 230px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: var(--ds-bg-elevated);
+  box-shadow: var(--ds-shadow-composer);
+}
+
+.plan-approval-schedule-popover label {
+  display: grid;
+  gap: 4px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+}
+
+.plan-approval-execution-binding {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--ds-border-default);
+}
+
+.plan-approval-execution-binding label {
+  display: grid;
+  gap: 4px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+}
+
+.plan-approval-execution-binding select {
+  min-width: 0;
+  width: 100%;
+}
+
+.plan-approval-schedule-popover input,
+.plan-approval-schedule-popover button {
+  min-height: 30px;
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+}
+
+.plan-approval-schedule-popover input {
+  border: 1px solid var(--ds-border-default);
+  background: var(--ds-bg-primary);
+  color: var(--ds-text-primary);
+}
+
+.plan-approval-schedule-popover button {
+  background: var(--ds-accent);
+  color: var(--ds-bg-primary);
 }
 
 .plan-approval-reject,
@@ -720,6 +824,10 @@
 @container composer-stack (max-width: 520px) {
   .plan-approval-bar {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plan-approval-title {
+    align-items: flex-start;
   }
 
   .plan-approval-actions {

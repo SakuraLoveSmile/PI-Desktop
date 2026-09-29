@@ -158,8 +158,10 @@ destination, chat as the home surface, tools and permissions inline.
   Its left-of-input operating-mode chip is the sole active-session control for
   **Agent**, **Plan**, and **Goal**. Plan shows the same Agent's planning state;
   Goal shows the same approval boundary for an outcome contract. Both keep the
-  permission-mode chip and expose their host-written immutable `.pi/plan/*.md`
-  or `.pi/goal/*.md` artifact opener after submission. The conversation top bar
+  permission-mode chip and offer an explicit opener for their host-written
+  immutable `.pi/plan/*.md` or `.pi/goal/*.md` artifact after submission. The
+  Work Panel opens only when the user selects View details; receiving a
+  proposal does not navigate away from the conversation. The conversation top bar
   retains only the task title and window actions; the Composer owns model and
   reasoning selection as well as mode control.
 - **Backend status capsule**: appears under the titlebar while the backend
@@ -447,13 +449,18 @@ shared capability contract:
   proposal/execution snapshot per session only for the current renderer
   lifetime, updated by live Host events; only a live `pending` row forms the
   approval gate. Reload through `plans.pending` while the same Host remains
-  alive restores a still-pending row with its original deadline. Rejected,
-  expired, approved/completed, and interrupted terminal cards are not
-  rehydrated; a terminal card may remain visible and non-actionable only until
-  renderer reload. Reject, expiry, or interruption clears the approval gate,
-  leaves the session in its contract state and editable, and requires a later turn to
-  create a new artifact. While pending, the draft remains visible but
-  read-only and only Approve or Reject actions are enabled. Host/app restart
+  alive restores a still-pending row with its original deadline and returns
+  bounded proposal history. Rejected, expired, approved/completed, and
+  interrupted terminal cards are rehydrated as read-only history; only the
+  current pending proposal has actions. Reject, expiry, or interruption clears
+  the approval gate, leaves the session in its contract state and editable,
+  and requires a later turn to create a new artifact. While pending, the
+  Composer remains visible and editable so the user can revise the plan or
+  change the planning model for the next revision. Sending a revision retires
+  the exact pending proposal and creates a new approval; a nonempty unsent
+  draft disables Execute, Schedule, and Goal conversion until it is sent or
+  cleared. The active approval actions are Approve, Reject, Request changes,
+  and Schedule. Host/app restart
   interrupts prior work before RPC with no replay or stale action; pending
   unapproved work remains Plan, while already-approved interrupted execution
   remains Agent. The UI is not required to present that interrupted terminal

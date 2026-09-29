@@ -6,7 +6,7 @@
  */
 
 export const GOAL_REPORT_SCHEMA_VERSION = 1 as const;
-export const HOST_DB_SCHEMA_VERSION = 21 as const;
+export const HOST_DB_SCHEMA_VERSION = 22 as const;
 
 export const GOAL_REPORT_MAX_JSON_BYTES = 256 * 1024; // 256 KiB
 export const GOAL_REPORT_MAX_EVIDENCE_SUMMARY_BYTES = 2 * 1024; // 2 KiB

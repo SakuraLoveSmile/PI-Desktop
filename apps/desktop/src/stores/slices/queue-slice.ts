@@ -372,7 +372,7 @@ export function createQueueSlice({
       }
     },
 
-    sendPrompt: async (content, draft, requestedSessionId) => {
+    sendPrompt: async (content, draft, requestedSessionId, options) => {
       let sessionId = requestedSessionId ?? get().activeSessionId;
       const submissionKey = sessionId ? `session:${sessionId}` : "draft";
       if (pendingSubmissions.has(submissionKey)) return false;
@@ -395,6 +395,7 @@ export function createQueueSlice({
         if (!sessionId) throw new Error(i18n.t("errors.noActiveSession"));
         if (get().pendingPlans[sessionId]?.status === "pending") return false;
         if (get().runningSessions[sessionId]) {
+          if (options?.revisionProposalId) return false;
           // Native Pi children have no Desktop prompt queue. Reject the send
           // here so the caller restores the draft instead of round-tripping a
           // queue item the backend refuses.
@@ -472,6 +473,7 @@ export function createQueueSlice({
           await api.prompt({
             sessionId,
             content,
+            ...(options?.revisionProposalId ? { revisionProposalId: options.revisionProposalId } : {}),
             messageId: optimisticMessage.id,
             viewingSessionId: viewingSessionIdForPrompt(get(), sessionId),
             attachments: draft ? promptAttachmentsFromDraft(draft.fileReferences) : [],

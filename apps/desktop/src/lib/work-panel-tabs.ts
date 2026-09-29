@@ -1,4 +1,5 @@
 export type WorkPanelTabKind =
+  | "overview"
   | "new"
   | "review"
   | "file"
@@ -33,6 +34,11 @@ let newWorkPanelTabSequence = 0;
 
 export function emptyWorkPanelContext(): WorkPanelContext {
   return { open: false, tabs: [], activeTabId: null, fileRequest: null };
+}
+
+/** The session-scoped summary shown before resource and tool tabs. */
+export function overviewWorkPanelTab(): WorkPanelTab {
+  return { id: "overview", kind: "overview" };
 }
 
 export function switchWorkPanelContextState(
@@ -222,7 +228,7 @@ export function parsePluginViewRef(
 export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
   return (
     Boolean(tab) &&
-    (tab.kind === "new" || tab.kind === "review" ||
+    (tab.kind === "overview" || tab.kind === "new" || tab.kind === "review" ||
       tab.kind === "file" || tab.kind === "plugin" ||
       tab.kind === "subagent" || tab.kind === "goalReport" ||
       tab.kind === "team")

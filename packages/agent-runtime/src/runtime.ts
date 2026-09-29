@@ -1772,6 +1772,7 @@ export class DesktopAgentRuntime {
   };
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
+  private executionContextStartIndex: number | null = null;
   private activeCompaction?: ContextCompactionRecord;
   private compactionEnabled: boolean;
   private readonly compactionStrategy: CompactionStrategy;
@@ -2893,7 +2894,9 @@ Delegation rules:
   private entriesWithCompaction(
     checkpoint: ContextCompactionRecord | undefined = this.activeCompaction,
   ): Entry[] {
-    const entries: Entry[] = [...this.fullEntries];
+    const entries: Entry[] = this.executionContextStartIndex === null
+      ? [...this.fullEntries]
+      : this.fullEntries.slice(this.executionContextStartIndex);
     if (!checkpoint) return entries;
     const throughIndex = entries.findIndex(
       (entry) => entry.id === checkpoint.throughMessageId,
@@ -3438,7 +3441,7 @@ Delegation rules:
         const text = formatAskToolOutput(questions, answers);
         return {
           content: [{ type: "text", text }],
-          details: { questions, answers },
+          details: { questions, answers, resolvedAt: new Date().toISOString() },
         };
       },
     };
@@ -8031,6 +8034,9 @@ Delegation rules:
     this.requestStartedAt = Date.now();
     this.setMode("agent");
     this.autonomousExecution = true;
+    // The transcript stays complete, but execution sees only its approved
+    // contract and subsequent work, never planning turns from another model.
+    this.executionContextStartIndex = this.fullEntries.length;
 
     const kind = execution.kind === "goal" ? "goal" : "plan";
     if (kind === "goal") {

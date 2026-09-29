@@ -85,6 +85,10 @@ export const ChatSurface = memo(function ChatSurface({
         headAsk(state.pendingAsks, state.activeSessionId),
     ),
   );
+  const hasPlanCard = useAppStore((state) => {
+    const id = state.activeSessionId;
+    return Boolean(id && (state.pendingPlans[id] || state.planHistory[id]?.length));
+  });
 
   const heroProject = useMemo(
     () =>
@@ -119,6 +123,7 @@ export const ChatSurface = memo(function ChatSurface({
   const hasTranscript =
     Boolean(activePermission) ||
     askPending ||
+    hasPlanCard ||
     messages.some((message) => messageHasTranscriptContent(message));
   // The empty state belongs to the session on screen. While a cold switch is
   // still resolving, the visible pane keeps its own transcript, so the hero must

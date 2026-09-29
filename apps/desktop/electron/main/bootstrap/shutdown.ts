@@ -47,6 +47,7 @@ export type ShutdownDependencies = {
   logger: Pick<Logger, "app">;
   confirmQuitDialog: () => Promise<boolean>;
   disposePowerSaveBlockers: () => void;
+  stopPlanSchedulePoller: () => void;
 };
 
 /** Register the last-window and before-quit resource lifecycle handlers. */
@@ -69,6 +70,7 @@ export function registerShutdownHandlers({
   logger,
   confirmQuitDialog,
   disposePowerSaveBlockers,
+  stopPlanSchedulePoller,
 }: ShutdownDependencies): void {
   app.on("window-all-closed", () => {
     // The D216 tray is resident on every platform, so its presence says nothing
@@ -118,6 +120,7 @@ export function registerShutdownHandlers({
     }
 
     state.quitting = true;
+    stopPlanSchedulePoller();
     disposePowerSaveBlockers();
     state.tray?.destroy();
     state.tray = null;

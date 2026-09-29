@@ -34,6 +34,7 @@ const interactionSource = readStoreModuleSync("slices/interaction-slice.ts");
 const sessionSource = readStoreModuleSync("slices/session-slice.ts");
 const transcriptSliceSource = readStoreModuleSync("slices/transcript-slice.ts");
 const queueSource = readStoreModuleSync("slices/queue-slice.ts");
+const assistantTurnSource = await read("../src/features/chat/transcript/AssistantTurn.tsx");
 const legacyModeKey = ["mode", "Chat"].join("");
 const legacyModeCommand = ["builtin.mode", "chat"].join(".");
 const legacyModeLiteral = ["mode:", '"chat"'].join(" ");
@@ -149,25 +150,25 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.match(barSource, /turnId: proposal\.turnId/);
   assert.match(barSource, /toolCallId: proposal\.toolCallId/);
   assert.match(barSource, /version: proposal\.version/);
-  assert.match(
-    barSource,
-    /action === "approve"\s*\?\s*\{[\s\S]*targetPermissionMode:[\s\S]*\}\s*:\s*\{[\s\S]*\.\.\.identity,\s*action\s*\}/,
-  );
-  assert.doesNotMatch(barSource, /request_changes/);
+  assert.match(barSource, /action === "approve"/);
+  assert.match(barSource, /action === "schedule"/);
+  assert.match(barSource, /executionProviderId/);
   assert.match(barSource, /data-testid="plan-approval-bar"/);
   assert.match(barSource, /role="menuitemradio"/);
   assert.match(barSource, /aria-checked=\{approvalMode === candidate\}/);
   assert.match(barSource, /PLAN_APPROVAL_DEFAULT_MODE/);
-  assert.doesNotMatch(barSource, /planApprovalPermissionMode|feedback|changes_requested/);
+  assert.doesNotMatch(barSource, /planApprovalPermissionMode|feedback/);
   assert.match(barSource, /ArrowDown.*ArrowUp.*Home.*End/s);
   assert.match(transcriptSource, /const approvalPending = useAppStore/);
   assert.match(transcriptSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.doesNotMatch(transcriptSource, /PlanApprovalCard|plan-approval-card/);
   assert.doesNotMatch(transcriptSource, /\bpendingPlan\b/);
-  assert.match(storeSource, /openPlanArtifact/);
-  assert.match(storeSource, /resolvePlanArtifactPath\(proposal\)/);
+  assert.doesNotMatch(storeSource, /openPlanArtifact/);
   assert.match(barSource, /const isPending = proposal\.status === "pending"/);
-  const resolveBlock = interactionSource.slice(interactionSource.indexOf("resolvePlan: async"));
+  const resolveBlock = interactionSource.slice(
+    interactionSource.indexOf("resolvePlan: async"),
+    interactionSource.indexOf("revisePlan:", interactionSource.indexOf("resolvePlan: async")),
+  );
   assert.match(resolveBlock, /await api\.resolvePlan\(resolution\)/);
   assert.match(resolveBlock, /get\(\)\.handlePlansChanged/);
   assert.doesNotMatch(resolveBlock, /planApprovalPermissionMode/);
@@ -175,35 +176,15 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.doesNotMatch(resolveBlock, /finally[\s\S]*pendingPlans/);
 });
 
-test("the startup artifact restore resolves launchable views first", () => {
-  // The artifact's surface comes from the launchable plugin views, and the
-  // renderer only reads that list after `ready`. Opening the artifact before
-  // that read used the host file tab and then took a second tab when
-  // `selectSession` restored the same approval.
+test("artifact preview waits for a user action and opens Markdown in FilesTab", () => {
   const bootstrapStart = storeSource.indexOf("bootstrap: async");
   assert.ok(bootstrapStart > -1, "bootstrap is declared in the store source");
   const bootstrap = storeSource.slice(bootstrapStart);
   const resolvedViews = bootstrap.indexOf("await get().refreshPluginViews();");
-  // The same loop shape also runs once before the restore, so search from the
-  // refresh rather than from the top of `bootstrap`.
-  const restoreLoop = bootstrap.indexOf(
-    "for (const proposal of activePendingPlans)",
-    resolvedViews,
-  );
-
   assert.ok(resolvedViews > -1, "bootstrap resolves the launchable views");
-  assert.ok(
-    restoreLoop > resolvedViews,
-    "the view list resolves before the pending-plan restore loop",
-  );
-  assert.ok(
-    bootstrap.indexOf("openPlanArtifact(", resolvedViews) > restoreLoop,
-    "no artifact opens before that loop",
-  );
-  // Every slice call site forwards the live list, so a stub list cannot hide
-  // the wrong surface behind a green run.
+  assert.match(barSource, /fileWorkPanelTab\(resolved\.path\)/);
   for (const slice of [eventsSource, sessionSource]) {
-    assert.match(slice, /void openPlanArtifact\([\s\S]{0,120}?get\(\)\.pluginViews/);
+    assert.doesNotMatch(slice, /void openPlanArtifact\(/);
   }
 });
 
@@ -214,16 +195,14 @@ test("plan approval bar paints the composer plate over the transparent dock", ()
   assert.doesNotMatch(barRule, /--ds-tile\b/);
 });
 
-test("terminal Plan checkpoints stop rendering the approval bar", () => {
+test("terminal Plan checkpoints remain as read-only transcript cards", () => {
   for (const status of ["rejected", "expired", "interrupted", "approved", "queued", "running"]) {
     assert.match(planStateSource, new RegExp(`"${status}"`));
   }
-  assert.doesNotMatch(barSource, /planCheckpointStatus|plan-approval-status|plan-approval-expiry/);
-  assert.match(
-    composerSource,
-    /planCheckpoint\?\.status === "pending"[\s\S]*<PlanApprovalBar proposal=\{planCheckpoint\} \/>/,
-  );
-  assert.doesNotMatch(barSource, /feedback|changes_requested|request_changes|requestChanges/);
+  assert.match(assistantTurnSource, /turnProposals\.map\(\(proposal\) => <PlanApprovalBar/);
+  assert.match(barSource, /\{isPending \? \(/);
+  assert.match(barSource, /proposal\.revisionIntent/);
+  assert.doesNotMatch(composerSource, /<PlanApprovalBar proposal=/);
 });
 
 test("mode commands configure the active session instead of only changing defaults", () => {
@@ -235,14 +214,15 @@ test("mode commands configure the active session instead of only changing defaul
   assert.match(modeCommandBlock, /else if \(store\.settings\)/);
 });
 
-test("pending approval keeps the draft while gating every composer control", () => {
+test("pending approval keeps the draft editable and sends a revision", () => {
   assert.match(composerSource, /contentEditable=\{!inputBlocked\}/);
   assert.match(composerSource, /aria-readonly=\{inputBlocked\}/);
   assert.match(composerSource, /enabled: !inputBlocked/);
   assert.match(composerSource, /disabled=\{controlsBlocked\}/);
-  assert.match(composerSource, /const controlsBlocked = approvalPending \|\| nativeSession;/);
-  assert.match(composerSource, /const sendBlocked = approvalPending \|\| pasting \|\| nativeInputBlocked;/);
-  assert.match(storeSource, /if \(get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"\) return/);
+  assert.match(composerSource, /const controlsBlocked = nativeSession;/);
+  assert.match(composerSource, /const sendBlocked = pasting \|\| nativeInputBlocked;/);
+  assert.match(composerSource, /return revisePlan\(/);
+  assert.match(interactionSource, /revisionIntent: intent/);
 });
 
 test("composer configuration is retained on the draft when no session is active", () => {

@@ -5,6 +5,7 @@ pub(crate) use chrono::{DateTime, Local};
 pub(crate) use rusqlite::{params, OptionalExtension};
 pub(crate) use serde::{Deserialize, Serialize};
 pub(crate) use serde_json::json;
+pub(crate) use serde_json::Value;
 pub(crate) use sha2::{Digest, Sha256};
 pub(crate) use std::fs::{self, OpenOptions};
 pub(crate) use std::io::Write;
@@ -21,14 +22,20 @@ mod artifact;
 mod execution;
 mod model;
 mod repository;
+mod schedule;
 
 pub use approval::{expire_pending_approvals, gate_session_configure};
 pub use model::{
     kind_for_mode, normalize_kind, normalize_workspace_kind, PlanArtifact, PlanExecution,
-    PlanManager, PlanProposal, PlanResolution, PlanResolveParams, PlanSubmitParams,
-    EXECUTION_COMPLETED, EXECUTION_INTERRUPTED, EXECUTION_QUEUED, EXECUTION_RUNNING, KIND_GOAL,
-    KIND_PLAN, PLAN_MAX_MARKDOWN_BYTES, STATUS_APPROVED, STATUS_EXPIRED, STATUS_INTERRUPTED,
-    STATUS_PENDING, STATUS_REJECTED, WORKSPACE_KIND_PROJECT, WORKSPACE_KIND_SCRATCH,
+    PlanManager, PlanProposal, PlanResolution, PlanResolveOptions, PlanResolveParams,
+    PlanRevisionDraft, PlanRevisionDraftFileReference, PlanRevisionIntent, PlanRevisionIntentInput,
+    PlanSubmitParams, EXECUTION_COMPLETED, EXECUTION_INTERRUPTED, EXECUTION_QUEUED,
+    EXECUTION_RUNNING, KIND_GOAL, KIND_PLAN, PLAN_MAX_MARKDOWN_BYTES,
+    PLAN_REVISION_DRAFT_MAX_MIME_TYPE_BYTES, PLAN_REVISION_DRAFT_MAX_NAME_BYTES,
+    PLAN_REVISION_DRAFT_MAX_PATH_BYTES, PLAN_REVISION_DRAFT_MAX_REFERENCES,
+    PLAN_REVISION_DRAFT_MAX_TEXT_BYTES, PLAN_REVISION_DRAFT_MAX_TOKEN_BYTES, STATUS_APPROVED,
+    STATUS_CHANGES_REQUESTED, STATUS_EXPIRED, STATUS_INTERRUPTED, STATUS_PENDING, STATUS_REJECTED,
+    WORKSPACE_KIND_PROJECT, WORKSPACE_KIND_SCRATCH,
 };
 
 pub(crate) use approval::plan_error;
