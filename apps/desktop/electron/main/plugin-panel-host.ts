@@ -538,8 +538,17 @@ export class PluginPanelHost {
     // registered before the document loads and released only when the page is
     // gone (see the `closed` handler above).
     this.senders.register(webContentsId, request.pluginId);
-    await win.loadURL(pathToFileURL(request.htmlPath).toString());
-    win.show();
+    try {
+      await win.loadURL(pathToFileURL(request.htmlPath).toString());
+      if (!win.isDestroyed()) {
+        win.show();
+      }
+    } catch (error) {
+      if (!win.isDestroyed()) {
+        win.destroy();
+      }
+      throw error;
+    }
   }
 
   /**

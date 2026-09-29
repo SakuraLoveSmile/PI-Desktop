@@ -463,6 +463,7 @@ export function createPluginServices({
       });
       // Views were loaded from the previous revision of the plugin's files.
       pluginViews.closePlugin(pluginId);
+      void pluginPanels.close(pluginId);
       if (pluginId === BROWSER_PLUGIN_ID) browserHost.disposeGuest();
       sendToRenderer(IPC.event.pluginChanged,{ reason: "reload", pluginId });
     },

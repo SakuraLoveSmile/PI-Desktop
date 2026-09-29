@@ -136,5 +136,6 @@ test("watchers are released on teardown and reloads reach the renderer", () => {
   );
   assert.match(reported, /IPC\.event\.toast/);
   assert.match(reported, /IPC\.event\.pluginChanged,\s*\{ reason: "reload", pluginId \}/);
+  assert.match(reported, /pluginPanels\.close\(pluginId\)/);
   assert.match(reported, /Reload failed/);
 });
