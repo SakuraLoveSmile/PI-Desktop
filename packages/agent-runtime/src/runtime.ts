@@ -4989,6 +4989,9 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
           startedAt: record.startedAt,
           ...(record.completedAt ? { completedAt: record.completedAt } : {}),
           ...(record.result?.error ? { error: record.result.error } : {}),
+          ...(record.result?.scratchReportPath
+            ? { scratchReportPath: record.result.scratchReportPath }
+            : {}),
           report:
             record.status === "running"
               ? formatDelegationHeartbeat(record)

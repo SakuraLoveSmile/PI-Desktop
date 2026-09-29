@@ -125,7 +125,9 @@ details.
 
 When a delegate's completed report exceeds `MAX_SUBAGENT_REPORT_CHARS`, the
 runtime preserves the full, unclipped report in the session scratch directory
-(`<data_dir>/scratch/<sessionId>/delegations/<parentToolCallId>/report.md`)
+(`<data_dir>/scratch/<sessionId>/delegations/<parentToolCallId>/report.md`; an
+opaque ID containing path separators is encoded before it is used as a path
+component)
 and returns a compact pointer notice (`Complete subagent report (N characters) was saved to: <path>`)
 alongside `scratchReportPath` in the structured result. If scratch persistence fails,
 it degrades gracefully to bounded head/tail clipping with a truncation marker.

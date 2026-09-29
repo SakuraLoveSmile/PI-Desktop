@@ -466,6 +466,37 @@ describe("SubagentRun reporting", () => {
     }
   });
 
+  it("keeps an opaque tool-call id inside the scratch directory", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "pi-subagent-scratch-"));
+    try {
+      const { run } = createRun({
+        scratchDir: tmp,
+        parentToolCallId: "../../outside",
+      });
+      run.handleEvent({
+        type: "message_end",
+        message: assistantMessage({
+          content: [{ type: "text", text: "A".repeat(MAX_SUBAGENT_REPORT_CHARS + 1) }],
+          stopReason: "stop",
+        }),
+      });
+      run.agent = {
+        prompt: vi.fn().mockResolvedValue(undefined),
+        waitForIdle: vi.fn().mockResolvedValue(undefined),
+        abort: vi.fn(),
+      };
+
+      const result = await (run as unknown as SubagentRun).run();
+
+      expect(result.scratchReportPath?.startsWith(join(tmp, "delegations"))).toBe(true);
+      expect(readFileSync(result.scratchReportPath!, "utf8")).toHaveLength(
+        MAX_SUBAGENT_REPORT_CHARS + 1,
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("falls back to bounded clipping when scratch write is unavailable or fails", async () => {
     const { run } = createRun({
       scratchDir: undefined,

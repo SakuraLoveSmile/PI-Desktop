@@ -223,6 +223,14 @@ function boundedReport(value: string): string {
   return `${text.slice(0, head)}${marker}${text.slice(-tail)}`;
 }
 
+/** Keep opaque provider/tool-call ids inside the session scratch directory. */
+function scratchPathSegment(value: string): string {
+  if (/^[A-Za-z0-9._-]+$/.test(value) && value !== "." && value !== "..") {
+    return value;
+  }
+  return `id-${encodeURIComponent(value)}`;
+}
+
 export { addUsage };
 
 /** One delegate execution. A resumed run is still a new instance; it is
@@ -649,7 +657,7 @@ export class SubagentRun {
       const dir = join(
         this.opts.scratchDir,
         "delegations",
-        this.opts.parentToolCallId,
+        scratchPathSegment(this.opts.parentToolCallId),
       );
       mkdirSync(dir, { recursive: true });
       const target = join(dir, "report.md");
