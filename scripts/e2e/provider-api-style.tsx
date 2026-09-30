@@ -49,9 +49,25 @@ globalThis.providerApiStyleProbe = async () => {
     updates.push(structuredClone(input));
     return { provider: { ...fixture(input.apiStyle!), ...input } };
   };
+  /* The manual Fetch list action is the only request that carries `intent`, so
+     every request is recorded and inspected. The LAN answer is armed by the
+     manual scenario below and stays empty for every other caller. */
+  let answerWithLanFixture = false;
   api.listProviderModels = async (input) => {
     discoveries.push(structuredClone(input));
-    return { models: [], source: "remote" };
+    if (input.intent !== "manual-fetch-list" || !answerWithLanFixture) {
+      return { models: [], source: "remote" };
+    }
+    return {
+      models: [{
+        modelId: "lan-fixture", displayName: "lan-fixture", providerId: "lan-gateway",
+        limit: { context: 32000, output: 4000 },
+        modalities: { input: ["text"], output: ["text"] },
+        reasoning: false, capabilities: [], supportedThinkingLevels: [],
+        source: "discovered",
+      }],
+      source: "remote",
+    };
   };
   /* The root container only mounts React; every production surface under test
      renders itself through a portal, so all queries below are document-rooted. */
@@ -323,6 +339,60 @@ globalThis.providerApiStyleProbe = async () => {
       assert(updates.at(-1)?.vendorKey === manual.vendorKey,
         "a stored format differing from the preset dropped the row's vendor identity");
       results.push(`${locale}:saved-protocol-wins-over-preset`);
+
+      /*
+        Only the Fetch list control is the user's explicit manual action, and
+        only its request may carry the transient `intent`. The endpoint is a
+        private LAN address so the recorded answer renders as the LAN fixture.
+
+        This fixture proves the renderer request/response wiring: an automatic
+        (edit debounce) discovery omits the intent, the automatic refresh omits
+        it, clicking Fetch list sends it exactly once, and the LAN answer's rows
+        reach the list. It cannot prove a macOS Local Network authorization or
+        the main-process trigger order — that needs a real operator Allow on a
+        clean machine and the isolated IPC smoke, per the E2E plan scenario
+        E2E-MAC-local-network-manual-discovery.
+      */
+      const lanProvider = {
+        ...fixture("chat_completions"),
+        id: "lan-gateway",
+        name: "LAN gateway",
+        baseUrl: "http://192.168.1.20:8000/v1",
+      };
+      const automaticBefore = discoveries.length;
+      render({ provider: lanProvider });
+      await until(() => discoveries.length > automaticBefore, "saved-provider refresh request");
+      // The debounce window and the live refresh must both stay automatic.
+      await pause(650);
+      const automaticRequests = discoveries.slice(automaticBefore);
+      assert(automaticRequests.length > 0, `${locale}: the saved provider never refreshed`);
+      for (const request of automaticRequests) {
+        assert(!("intent" in request), `${locale}: an automatic request carried the manual intent`);
+      }
+      const fetchList = document.querySelector<HTMLButtonElement>(".provider-models-reload");
+      assert(fetchList, `${locale}: Fetch list control missing`);
+      assert(fetchList!.textContent?.trim().includes(i18n.t("settings.fetchModelList")),
+        `${locale}: Fetch list control is not labelled`);
+      assert(!fetchList!.disabled, `${locale}: Fetch list is unavailable for a LAN endpoint`);
+      answerWithLanFixture = true;
+      const manualBefore = discoveries.length;
+      click(fetchList);
+      await until(() => discoveries.length > manualBefore, "manual discovery request");
+      const manualRequest = discoveries.at(-1)!;
+      assert(manualRequest.intent === "manual-fetch-list",
+        `${locale}: the Fetch list request did not carry the manual intent`);
+      assert(manualRequest.baseUrl === lanProvider.baseUrl,
+        `${locale}: the manual request changed the endpoint`);
+      assert(!("source" in manualRequest) || manualRequest.source === undefined,
+        `${locale}: the manual request must stay on the live branch`);
+      const manualCount = discoveries.slice(manualBefore).filter((request) => "intent" in request).length;
+      assert(manualCount === 1, `${locale}: the manual intent was sent ${manualCount} times`);
+      await until(
+        () => [...document.querySelectorAll(".provider-models-row-id")]
+          .some((row) => row.textContent?.trim() === "lan-fixture"),
+        "LAN fixture rows",
+      );
+      results.push(`${locale}:fetch-list-manual-intent-lan-fixture`);
 
       const legacyUnknown = { ...fixture("future_api_format"),
         baseUrl: "https://relay.example/v1/chat/completions" };
