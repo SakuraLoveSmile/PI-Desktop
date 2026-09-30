@@ -2820,7 +2820,7 @@ pub fn builtin_tool_defs() -> Value {
                         "items": {
                             "type": "object",
                             "properties": {
-                                "content": { "type": "string", "minLength": 1, "maxLength": 500 },
+                                "content": { "type": "string", "minLength": 1 },
                                 "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "cancelled"] },
                                 "priority": { "type": "string", "enum": ["high", "medium", "low"], "description": "Defaults to medium" }
                             },

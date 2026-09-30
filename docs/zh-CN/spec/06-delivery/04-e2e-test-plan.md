@@ -5405,10 +5405,11 @@ eleven-tool-round desktop paths are verified by
 - **前提：** 隔离的本地 Electron 配置、确定性的 Agent/Host fixture、两个 Desktop 会话，不使用真实 Provider 或付费 API。
 - **步骤：** 启动调用 `TodoWrite` 的多步骤 Agent 回合，观察 Composer 上方的 TodoDock，展开后切换会话并确认清单隔离。完成和取消条目，确认最多显示八条以及全部取消状态；清空清单后重载/重启 Host。发送乱序旧 `todos.changed` 事件，确认它不能覆盖新快照；再覆盖非法参数、Plan/Goal、委托和远程会话路径。
 - **预期：** Host SQLite 是权威状态；每次成功全量替换（包括清空）都会推进 revision 并只发出一次已提交的 `todos.changed`。非法或未授权写入既不修改也不发事件。TodoDock 渲染纯文本、不抢焦点、切换会话时收起、拒绝旧事件，并对 `remote:` 会话跳过本地恢复，因为 RACP v1 没有 Todo 快照操作。
-- **链接规格：** `03-runtime/03-tools-and-permissions.md`、`03-runtime/04-data-storage.md`、`03-runtime/06-host-rpc-protocol.md`、`04-ux/08-component-spec.md`、ADR 0310。
+- **链接规格：** `03-runtime/03-tools-and-permissions.md`、`03-runtime/04-data-storage.md`、`03-runtime/06-host-rpc-protocol.md`、`04-ux/08-component-spec.md`、ADR 0312。
 - **验收：** C / E / F / Quality / Security。
 - **里程碑：** M6+。
-- **状态：** Host-core、`apps/desktop/test/todo-dock-rendering.test.mjs` 和 `todo-events.test.mjs` 已有定向自动化覆盖；完整 Electron 进程/重启旅程仍是候选验证门。
+- **自动化：** `pnpm test:e2e:todos` 从生产 Agent 的 ToolSearch/TodoWrite 路径进入，使用生产渲染器、真实 Host/SQLite 和隔离 Electron 配置验证清单旅程；仅替换外部模型流和 preload 传输，不使用真实 Provider 或用户配置。覆盖 Unicode 截断及警告重放、单一活动项归一化、首次读取失败后不切换会话的主机恢复、已缓存快照重新同步及旧事件拒绝。运行时 `runtime-todos.test.ts` 使用确定性 Provider 验证 Agent 工具校验、超长内容归一化和续跑。
+- **状态：** 构建 Desktop 和 Host 后，在确切的请求候选中执行。Host-core 和渲染器定向测试是辅助检查，不能替代 Electron 用户旅程。
 
 ## 8. 可追溯性矩阵
 | 验收 | 应用场景 |

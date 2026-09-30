@@ -8882,13 +8882,22 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   RACP v1 has no Todo snapshot operation.
 - **Specs**: `03-runtime/03-tools-and-permissions.md`,
   `03-runtime/04-data-storage.md`, `03-runtime/06-host-rpc-protocol.md`,
-  `04-ux/08-component-spec.md`, ADR 0310.
+  `04-ux/08-component-spec.md`, ADR 0312.
 - **Acceptance**: C / E / F / Quality / Security.
 - **Milestone**: M6+.
-- **Status**: Targeted automated coverage is present in host-core and
-  `apps/desktop/test/todo-dock-rendering.test.mjs` plus
-  `todo-events.test.mjs`. Full Electron process/restart journey remains a
-  candidate validation gate.
+- **Automation**: `pnpm test:e2e:todos` exercises the isolated Electron
+  checklist journey through the production Agent's ToolSearch/TodoWrite path,
+  the production renderer, and a real host/SQLite profile. Only the external
+  model stream and preload transport are fixtures; no live provider or user
+  profile is used. The scenario includes Unicode truncation with warning replay,
+  single-active-item normalization, a
+  failed initial read followed by host recovery without changing sessions,
+  cached-snapshot reconciliation, and stale-event rejection. Runtime
+  `runtime-todos.test.ts` exercises Agent tool validation, overlong content
+  normalization, and continuation through a deterministic provider.
+- **Status**: Run against the exact request candidate after building the
+  desktop and host. Host-core and targeted renderer tests are companion checks,
+  not substitutes for the Electron journey.
 
 ## 8. Traceability Matrix
 

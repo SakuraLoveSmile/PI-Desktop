@@ -3,6 +3,7 @@ import { restoreHostedSearchReplay } from "./hosted-search-replay.js";
 import { requestExtensionUi } from "./extensions/ui-request.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import { imageGenerationDescription, imageGenerationParameters } from "./image-generation/tool.js";
+import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
 import { randomUUID } from "node:crypto";
@@ -2928,7 +2929,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         case "Bash":
           return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.`;
         case "TodoWrite":
-          return "Write the task checklist for the current session so the user can see progress on multi-step work. Use for work that needs 3+ distinct steps or spans multiple files/subsystems; do not use for a single-step action, a question, a read, or a review. Every call replaces the full list in display order. States are pending, in_progress, completed, and cancelled; only one item may be in_progress. Keep items short and concrete, update the list as work starts and finishes, and never leave pending items when the task is done.";
+          return todoWriteDescription;
         case ASK_TOOL_NAME:
           return "Ask the user one or more questions. Use Markdown in question text and option labels when formatting helps (for example, emphasis, inline code, or lists); the desktop card renders it safely. Plain strings and existing `{ label, description? }` options are accepted; descriptions remain plain text and answers return the selected source label. The card always provides a custom user-input option.";
         case "PluginScaffold":
@@ -2945,22 +2946,7 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     // stopped being readable.
     const parameters: Record<string, Parameters<typeof Type.Object>[0]> = {
       GenerateImages: imageGenerationParameters,
-      TodoWrite: {
-        todos: Type.Array(
-          Type.Object({
-            content: Type.String({ minLength: 1, maxLength: 500 }),
-            status: Type.Union([
-              Type.Literal("pending"),
-              Type.Literal("in_progress"),
-              Type.Literal("completed"),
-              Type.Literal("cancelled"),
-            ]),
-            priority: Type.Optional(
-              Type.Union([Type.Literal("high"), Type.Literal("medium"), Type.Literal("low")]),
-            ),
-          }),
-        ),
-      },
+      TodoWrite: todoWriteParameters,
       Read: {
         path: pathParam(
           "Existing regular file only, never a directory; workspace-relative or explicitly approved.",
