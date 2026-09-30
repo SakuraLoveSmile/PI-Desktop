@@ -37,8 +37,8 @@ export function emptyWorkPanelContext(): WorkPanelContext {
 }
 
 /** The session-scoped summary shown before resource and tool tabs. */
-export function overviewWorkPanelTab(): WorkPanelTab {
-  return { id: "overview", kind: "overview" };
+export function overviewWorkPanelTab(resource?: string): WorkPanelTab {
+  return { id: "overview", kind: "overview", ...(resource ? { resource } : {}) };
 }
 
 export function switchWorkPanelContextState(

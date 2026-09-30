@@ -1,6 +1,6 @@
 # Plan Card, Goal Indicator, Composer Density, and Agent Panorama
 
-Status: T1 completed and verified; T2-T4 awaiting prerequisite `feat/composer-team-plan-goal-sidebar` landing on `origin/main`. The conversation
+Status: T1–T4 completed and verified on `codex/plan-card-subagent-panorama`. Ready for PR candidate delivery. The conversation
 and final delivery to the user remain in Chinese; this repository's root
 `AGENTS.md` section 0 requires repository documents and code to be in English.
 
