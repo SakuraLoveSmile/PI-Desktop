@@ -57,10 +57,7 @@
 
 @container composer-stack (max-width: 480px) {
   .composer-profile-chip {
-    width: 112px;
-    min-width: 112px;
-    max-width: 112px;
-    flex: 0 0 112px;
+    max-width: 104px;
     padding-inline: 4px !important;
   }
 
