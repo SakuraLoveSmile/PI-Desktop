@@ -208,25 +208,15 @@ test("release matrix packages both native macOS architectures", () => {
   assert.match(releaseWorkflowSource, /Merge macOS updater metadata[\s\S]*?ruby/);
 });
 
-test("macOS release signing is opt-in and workflow_dispatch still honours sign_macos", () => {
+test("macOS release signing is required on tag pushes", () => {
   assert.match(
     releaseWorkflowSource,
     /workflow_dispatch:\s+inputs:\s+sign_macos:[\s\S]*?default:\s*true[\s\S]*?type:\s*boolean/,
   );
-  // A tag push must not force signing: a fork owns no Apple Developer
-  // secrets, and the guard below pins APPLE_TEAM_ID to the upstream
-  // maintainer's team, so no locally obtained certificate can satisfy it.
-  // Signing is opted into with the repository variable, and the manual
-  // dispatch lane keeps its own sign_macos input.
   assert.ok(
     releaseWorkflowSource.includes(
-      "MACOS_SIGN_RELEASE: ${{ (github.event_name == 'workflow_dispatch' && inputs.sign_macos == true) || vars.MACOS_SIGN_RELEASE == 'true' }}",
+      "MACOS_SIGN_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.sign_macos == true }}",
     ),
-  );
-  assert.doesNotMatch(
-    releaseWorkflowSource,
-    /MACOS_SIGN_RELEASE: \$\{\{ github\.event_name != 'workflow_dispatch'/,
-    "a tag push no longer forces macOS signing",
   );
 
   const unsignedBlock = releaseWorkflowSource.match(

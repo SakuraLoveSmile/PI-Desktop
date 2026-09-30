@@ -86,16 +86,8 @@ jobs:
     name: Build ${{ matrix.name }}
     needs: verify
     env:
-      # Signing is opt-in on a fork. A tag push must not force signing: this
-      # repository owns no Apple Developer secrets, and the assertion in
-      # "Require macOS signing and notarization secrets" additionally pins
-      # APPLE_TEAM_ID to the upstream maintainer's team, so no locally obtained
-      # certificate can satisfy it. An unsigned tag build still publishes every
-      # installer; only the Developer ID seal and the notarization ticket are
-      # absent. Set the repository variable MACOS_SIGN_RELEASE=true to restore
-      # upstream's sign-always behaviour once this repository owns a
-      # Developer ID certificate.
-      MACOS_SIGN_RELEASE: ${{ (github.event_name == 'workflow_dispatch' && inputs.sign_macos == true) || vars.MACOS_SIGN_RELEASE == 'true' }}
+      # Tag pushes always sign. workflow_dispatch signs unless explicitly disabled.
+      MACOS_SIGN_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.sign_macos == true }}
     strategy:
       fail-fast: false
       matrix:

@@ -80,6 +80,7 @@ function Fixture() {
         inputRef={draft.ref}
         value={draft.value}
         placeholderText=""
+        placeholderKey="fixture"
         inputBlocked={false}
         pasting={false}
         enterToSend={false}
@@ -89,6 +90,7 @@ function Fixture() {
         onAcceptCompletion={completions.acceptCompletion}
         onSubmit={noop}
         onInsertNewline={noop}
+        onHistoryNavigate={() => false}
         onInput={(source, caret) => completions.handleInput(source, caret)}
         onCompositionStart={() => draft.setComposing(true)}
         onCompositionEnd={() => draft.setComposing(false)}
