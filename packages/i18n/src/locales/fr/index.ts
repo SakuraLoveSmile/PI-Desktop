@@ -915,7 +915,6 @@ sklm: {
     "shortcutDisable": "Désactiver le raccourci pour {{action}}",
     "voice": "Voix",
     "voiceEnable": "Activer la saisie vocale",
-    "voiceExperimental": "Expérimental",
     "voiceMicrophone": "Microphone",
     "voiceSystemDefault": "Par défaut du système",
     "voiceLanguages": "Langues",

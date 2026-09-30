@@ -70,10 +70,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   lines are rendered. These are visual landmarks only, not a second navigation
   level.
   When search filters the directory, empty clusters and their headings disappear.
-- **Voice** is an Experimental Preferences destination between AI and
-  Shortcuts, present only in development builds while developer mode is on.
-  Its existing build/developer gate applies to the rail, page, search hits,
-  and idle Composer entry; this interaction redesign does not widen access.
+- **Voice** is a regular Preferences destination between AI and Shortcuts,
+  present in every build with no Experimental badge and no developer-mode
+  requirement. Its rail row, page, search hits, and idle Composer entry are
+  available to all users.
   It is the only place to enable Live Voice. See the Voice section below.
 - **Cloud sync / 云同步** is a developer-only, Experimental destination: its
   rail row, page, and settings-search hits exist only while
@@ -299,17 +299,22 @@ The user-facing dashboard is marketplace plugin `pi.token-insights`, opened from
 the command palette (`usage`, `tokens`, `用量`). Settings search does not index
 a usage tab.
 
-### Voice (experimental)
+### Voice
 
-- This development-build and developer-mode gated destination owns Live Voice
-  enablement and provider bindings. Disabled Live Voice has no Composer voice
-  or work icon; enabling it reveals one preparation entry, never auto-starts a
-  call, and never grants work access.
+- This destination owns Live Voice enablement and provider bindings, and is
+  reachable in every build without developer mode. Its enable card keeps the
+  explanation behind the heading's help mark and the Model configuration link
+  on the card's heading line, so no control floats between the rows. Disabled
+  Live Voice has no Composer voice or work icon; enabling it reveals one
+  preparation entry, never auto-starts a call, and never grants work access.
 - Bind an existing compatible provider account, choose the exact next-call
   binding, and configure its model, voice, and explicit Realtime profile where
-  applicable. Readiness describes that selected binding, not whether any other
-  configured provider is ready. Credentials remain in the existing Host/Main
-  systems and are not shown or copied into the renderer.
+  applicable. An account card with nothing bound shows only its picker: the
+  next-call, model, voice, and profile rows appear with the binding instead of
+  rendering as empty disabled controls. Readiness describes that selected
+  binding, not whether any other configured provider is ready. Credentials
+  remain in the existing Host/Main systems and are not shown or copied into the
+  renderer.
 - Provider-binding edits remain locked while that binding is active. Turning
   Live Voice off ends the call, but the global compact call bar remains visible
   through Main termination and renderer media cleanup, including while Settings

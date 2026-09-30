@@ -915,7 +915,6 @@ sklm: {
     "shortcutDisable": "Verknüpfung für {{action}} deaktivieren",
     "voice": "Sprache",
     "voiceEnable": "Spracheingabe aktivieren",
-    "voiceExperimental": "Experimentell",
     "voiceMicrophone": "Mikrofon",
     "voiceSystemDefault": "Systemstandard",
     "voiceLanguages": "Sprachen",

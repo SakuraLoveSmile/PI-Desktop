@@ -72,13 +72,16 @@
 ### E2E-LIVE-VOICE-four-stage-ui
 
 - **Title:** Disabled, preparation, compact call, and deliberate details.
-- **Preconditions:** Isolated development-build Electron profile with developer
-  mode on, Live Voice initially disabled, deterministic local provider/media
-  fixtures, and local work-session fixtures. No real account, microphone,
-  speaker, paid endpoint, or user's running Desktop instance is used.
+- **Preconditions:** Isolated Electron profile with Live Voice initially
+  disabled, deterministic local provider/media fixtures, and local work-session
+  fixtures. No real account, microphone, speaker, paid endpoint, or user's
+  running Desktop instance is used.
 - **Steps:**
-  1. Confirm neither Live nor Work Composer icon exists while disabled. Enable
-     Live Voice only from Settings → Voice; verify exactly one idle voice icon.
+  1. Confirm neither Live nor Work Composer icon exists while disabled. Every
+     account card shows only its provider picker until that account is bound.
+     Enable Live Voice only from Settings → Voice; verify exactly one idle
+     voice icon and that the card keeps its Model configuration link on the
+     heading line beside the help mark.
   2. Open preparation and expand/collapse work options without starting. Verify
      no prepare request, microphone acquisition, media initialization, provider
      connection, or work dispatch occurs. Make the selected binding unavailable
@@ -114,7 +117,7 @@
 - **Specs:** [Live Voice](../03-runtime/live-voice.md),
   [Live Work](../03-runtime/live-work-session.md),
   [Component spec](../04-ux/08-component-spec.md#1171-live-voice-preparation-compact-call-bar-and-details),
-  [Settings IA](../04-ux/06-settings-ia.md#voice-experimental).
+  [Settings IA](../04-ux/06-settings-ia.md#voice).
 - **Acceptance:** C / E / Security / Quality.
 - **Milestone:** Post-MVP experimental interaction maintenance.
 - **Coverage:** Targeted controller/presentation regression tests and

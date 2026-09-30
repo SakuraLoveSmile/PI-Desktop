@@ -130,9 +130,9 @@ stops all local tracks, playback and ports before releasing the lease.
 
 ## Settings and compatibility
 
-Voice is available in both development and packaged builds without developer
-mode. Its Experimental badge remains an availability caveat, not an access
-restriction. Live Voice remains off by default, and enabling the setting does
+Voice is a regular Preferences destination in both development and packaged
+builds: no Experimental badge, no developer mode, no build gate. Live Voice
+remains off by default, and enabling the setting does
 not start microphone capture. Composer offers an Open settings action when
 setup or account recovery is needed. Cloud sync and Remote Hosts retain their
 separate development-only gates.
@@ -140,15 +140,19 @@ separate development-only gates.
 Account-list loading, failure with explicit retry, and an empty compatible
 account list are distinct states. A loading failure never clears saved bindings.
 The settings page links to the existing Model configuration destination for
-account login and management. Call errors distinguish missing authentication,
+account login and management, from the enable card's heading line rather than
+from a control among its rows. Call errors distinguish missing authentication,
 account access denial, unsupported protocol, network/rate limits and microphone
 failures without displaying provider response content or credentials.
 
 The Voice settings destination exposes only Live Voice: users can bind an
 existing compatible Provider, choose the next-call binding, and set model, voice
-and Realtime profile. A currently active binding cannot be rewritten while its
-call is running. Turning Live Voice off ends the call. Provider credentials stay
-in the existing Provider/secret or VendorOAuth systems. Legacy local Dictation
+and Realtime profile. An account card with no bound provider shows only its
+picker; the next-call, model, voice and profile rows appear with the binding
+rather than as empty disabled controls. A currently active binding cannot be
+rewritten while its call is running. Turning Live Voice off ends the call.
+Provider credentials stay in the existing Provider/secret or VendorOAuth
+systems. Legacy local Dictation
 settings and its Composer entry are hidden; existing `voice` values and the
 underlying Dictation capability remain unchanged and are not deleted or rewritten
 by the UI. Old settings with no `liveVoice` value read as disabled with no

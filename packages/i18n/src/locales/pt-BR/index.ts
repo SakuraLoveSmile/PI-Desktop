@@ -741,7 +741,6 @@ export const ptBR = {
     shortcutDisable: "Desativar atalho para {{action}}",
     voice: "Voz",
     voiceEnable: "Ativar entrada de voz",
-    voiceExperimental: "Experimental",
     voiceMicrophone: "Microfone",
     voiceSystemDefault: "Padrão do sistema",
     voiceLanguages: "Idiomas",

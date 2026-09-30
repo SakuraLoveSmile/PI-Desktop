@@ -915,7 +915,6 @@ sklm: {
     "shortcutDisable": "Deshabilitar el acceso directo para {{action}}",
     "voice": "Voz",
     "voiceEnable": "Habilitar entrada de voz",
-    "voiceExperimental": "Experimental",
     "voiceMicrophone": "Micrófono",
     "voiceSystemDefault": "Predeterminado del sistema",
     "voiceLanguages": "Idiomas",
