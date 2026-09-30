@@ -727,14 +727,26 @@ Authority boundary — what the trigger may and may not do:
 - The operation is bounded by a 1,500 ms total budget covering the route query,
   the lookup and the connect. Concurrent operations for one endpoint coalesce,
   nothing is memoized as granted, and the socket, timer and listeners are removed
-  on success, failure, deadline and disposal. IPv6 link-local addresses without a
-  scope identifier skip with their own reason instead of being connected.
+  on success, failure, deadline and disposal. The budget starts with the probe
+  itself, after the synchronous gates, so a coalesced caller shares the in-flight
+  probe instead of opening a second one and a refused endpoint leaves no timer.
+- An IPv6 zone identifier is stripped before classification and kept for the
+  connect, because a link-local neighbour is reachable only through the interface
+  the zone names. A scope-qualified `fe80::/10` literal is therefore eligible and
+  dialled exactly as the resolver or the user wrote it, while the scope-less form
+  — which cannot be connected safely — skips with its own reason. A scope-less
+  answer is named that way only when it explains every candidate that failed; a
+  mixed ineligible answer is the general `no-local-address`.
 - Verdicts are `skipped`, `attempted` or `failed`. **None of them means
   permission was granted**: a UDP callback is trigger evidence only, and macOS
   exposes no API that reads, forces or resets one application's choice. A
   diagnostic carries the stage, the reason and a node error code only — never a
-  URL, a header, a query or a credential.
-- The trigger changes nothing else about discovery: the existing 10-second HTTP
+  URL, a header, a query or a credential. A code travels only when it is a short
+  upper-case token (the same rule `public-https-fetch.ts` applies), so no arbitrary
+  resolver or socket text can ride along. A socket that cannot be created or a
+  synchronous `connect()` throw reports `failed` at the connect stage, because the
+  vocabulary has no separate reason for "no socket could be made"; an unexpected
+  throw always settles the caller rather than leaving it waiting.
   timeout, the response and error handling, the cache write and the models.dev
   catalog fallback all stay as they are. A failed or unfruitful trigger never
   replaces the discovery result.
