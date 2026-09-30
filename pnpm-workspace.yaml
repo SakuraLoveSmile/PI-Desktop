@@ -58,3 +58,7 @@ patchedDependencies:
 # every range to its floor — silently downgrading dependencies instead of
 # refreshing them. Pin the intent: `pnpm update` means "newest within range".
 resolutionMode: highest
+# shamefully-hoist also lives in .npmrc, but pnpm 12 applies it only from
+# here; without it public hoisting is empty and examples/ plugins cannot
+# resolve root-level react in tests.
+shamefullyHoist: true
