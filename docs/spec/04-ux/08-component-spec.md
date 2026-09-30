@@ -3155,7 +3155,55 @@ reasoning-level control.
   unknown/custom models without an explicit override, disabled image input, and
   oversized images use the existing canonical `@<path>` file-tool fallback.
   There are no visual previews in MVP.
-- No voice input
+- No voice-to-draft input. The opt-in Live Voice path below is separate from
+  the Composer draft and does not restore the hidden Dictation entry.
+
+### 11.7.1 Live Voice preparation, compact call bar, and details
+
+Subject to the existing developer-mode and development-build gate, Live Voice
+has four presentation states:
+
+| State | Surface and allowed interaction |
+|---|---|
+| Disabled | No Live Voice or Live Work Composer icons. Enable only in Settings → Voice. |
+| Enabled, idle | One Live Voice icon opens preparation, not a call. Show the exact selected provider and readiness cause, an explicit Start action, and initially collapsed optional work controls. |
+| Call in progress | One global compact bar: Connecting with Cancel; connected with mute/unmute, End, and Details; Ending until Main and renderer cleanup both settle. |
+| Details open | Deliberately opened transcript/provider/work inspection surface; dismissing it does not end the call. |
+
+- The preparation popup uses shared controls and a localized accessible title.
+  Opening or dismissing it must not prepare a call, request microphone access,
+  initialize media, or contact a voice provider. Start is unavailable when the
+  exact selected binding is not ready, even if another binding is ready; show
+  the actual readiness cause and a Settings action instead of silently falling
+  back to another account.
+- Start defaults to muted. The work disclosure contains an independent,
+  unchecked **Allow work requests** opt-in, a valid local-session target, and
+  separate unchecked context consent. Expanding the section or selecting a
+  target is not authorization. A missing target offers choose/create guidance.
+  Context consent is next-call-only and resets on preparation dismissal,
+  reopening, target change/create, work opt-out, and call completion/cancel.
+- The compact bar is persistent AppShell chrome outside the visibility-gated
+  chat and Composer subtree. It stays available across Settings, Plugins, and
+  project/session navigation. Feature disable hides the idle icon but not the
+  stopping bar. Late Main terminal events and renderer media release cannot
+  briefly expose a second Start. Unconfirmed media release remains visible as
+  an error, suppresses another Start until restart, and cannot be cleared into a
+  reusable call slot by dismissing the presentation.
+- Playback paused state, Resume sound, playback-resume failure and call errors
+  are visible directly in the bar. Status is announced accessibly; icon-only
+  controls have localized names and tooltips, and muted state is explicit.
+- Details never opens automatically during startup or connection. It owns the
+  bounded transient transcript (including an empty state), provider identity,
+  fixed work binding, work actions and results. Close, outside press and Escape
+  dismiss the surface only and restore focus to an available trigger. The bar
+  remains usable, and dismissing Details never submits or stops work.
+- The configurable toggle shortcut retains deliberate direct voice-only start
+  from idle and end during a call. The startup-cancel shortcut only acts when
+  no popup has consumed the key; Escape never ends a connected call.
+
+See [Live Voice](../03-runtime/live-voice.md) and
+[Live Work](../03-runtime/live-work-session.md) for the unchanged ownership,
+permission, and call-scoped work contracts.
 
 ### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, D262, D362, D397, ADR 0024, ADR 0059, ADR 0070, ADR 0131, ADR 0221, ADR 0222)
 

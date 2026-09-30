@@ -9,6 +9,7 @@ import {
   ArrowUpDown,
   ArrowUpRight,
   AtSign,
+  AudioLines,
   Bell,
   BookOpen,
   Bot,
@@ -51,6 +52,7 @@ import {
   ListChecks,
   LogOut,
   Mic,
+  MicOff,
   Minus,
   MessageSquare,
   MessageSquarePlus,
@@ -65,6 +67,7 @@ import {
   Maximize2,
   Minimize2,
   PawPrint,
+  PhoneOff,
   PencilLine,
   Pin,
   Play,
@@ -93,6 +96,7 @@ import {
   UserRound,
   Undo2,
   Video,
+  Volume2,
   Webhook,
   Workflow,
   Wrench,
@@ -214,6 +218,10 @@ export const IconVideo = icon(Video);
 export const IconReview = icon(RefreshCw);
 export const IconKeyboard = icon(Keyboard);
 export const IconMic = icon(Mic);
+export const IconMicOff = icon(MicOff);
+export const IconWaveform = icon(AudioLines);
+export const IconPhoneOff = icon(PhoneOff);
+export const IconVolume = icon(Volume2);
 export const IconPlug = icon(Plug);
 export const IconSlash = icon(Slash);
 export const IconUser = icon(UserRound);
