@@ -324,6 +324,12 @@ export function Composer({
   const mode: Mode = activeSession
     ? activeSession.mode
     : (draftConfiguration?.mode ?? settings?.defaultMode ?? "agent");
+  const displayMode: Mode =
+    planCheckpoint &&
+    planCheckpoint.sessionId === activeSessionId &&
+    isActivePlanExecution(planCheckpoint)
+      ? (planCheckpoint.executionKind ?? planCheckpoint.kind)
+      : mode;
   const executionProfile: ExecutionProfile =
     activeSession?.executionProfile ??
     draftConfiguration?.executionProfile ??
@@ -683,6 +689,7 @@ export function Composer({
           <ComposerToolbar
             t={t}
             mode={mode}
+            displayMode={displayMode}
             executionProfile={executionProfile}
             planningLive={planningLive}
             providerId={provider?.id}

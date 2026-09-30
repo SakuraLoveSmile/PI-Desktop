@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlanProposal, TeamMemberRecord, TeamTaskRecord, UiMessage } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { IconBot, IconFileText, IconInfo, IconUsers } from "../icons";
+import { IconBot, IconFileText, IconInfo, IconUsers, IconWorkflow } from "../icons";
+import { AgentPanorama, type PanoramaNode, type PanoramaNodeStatus } from "./AgentPanorama";
 import { fileWorkPanelTab, teamWorkPanelTab } from "../../lib/work-panel-tabs";
 import { resolvePlanArtifactPath } from "../../lib/plan-artifact";
 import { isDelegationStartTool } from "../../lib/tool-display";
@@ -67,7 +68,16 @@ export function OverviewTab() {
   const openSubagentTab = useAppStore((state) => state.openSubagentTab);
   const openWorkPanelTabForSession = useAppStore((state) => state.openWorkPanelTabForSession);
   const showToast = useAppStore((state) => state.showToast);
+  const activeTabId = useAppStore((state) => state.activeWorkPanelTabId);
+  const tabs = useAppStore((state) => state.workPanelTabs);
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const [viewMode, setViewMode] = useState<"overview" | "panorama">("overview");
 
+  useEffect(() => {
+    if (activeTab?.resource === "panorama") {
+      setViewMode("panorama");
+    }
+  }, [activeTab?.resource]);
   const session = sessions.find((candidate) => candidate.id === activeSessionId);
   const proposals = useMemo(() => {
     if (!activeSessionId) return [];
@@ -199,6 +209,46 @@ export function OverviewTab() {
     return list;
   }, [messages, running, t]);
 
+  if (viewMode === "panorama" && session) {
+    const rootNode: PanoramaNode = {
+      id: session.id,
+      name: session.title || t("chat.subagentCoordinator", { defaultValue: "Main agent" }),
+      task: t("chat.subagentCoordinating", { count: subagents.length }),
+      status: running ? "running" : "completed",
+      avatarIcon: "target",
+      isRoot: true,
+    };
+
+    const childNodes: PanoramaNode[] = subagents.map((sub) => ({
+      id: sub.delegationId,
+      name: sub.agentName,
+      task: sub.task || undefined,
+      status: (sub.status === "completed"
+        ? "completed"
+        : sub.status === "running"
+          ? "running"
+          : sub.status === "timed_out" || sub.status === "aborted" || sub.status === "stopped"
+            ? "paused"
+            : "failed") as PanoramaNodeStatus,
+      avatarIcon: "bot",
+    }));
+
+    return (
+      <AgentPanorama
+        title={session.title ? `${session.title} - ${t("team.panoramaTitle", { defaultValue: "Agent Panorama" })}` : t("team.panoramaTitle", { defaultValue: "Agent Panorama" })}
+        rootNode={rootNode}
+        childNodes={childNodes}
+        onBack={() => setViewMode("overview")}
+        onSelectNode={(id) => {
+          const sub = subagents.find((s) => s.delegationId === id);
+          if (sub) {
+            openSubagentTab(sub.delegationId, sub.agentName);
+          }
+        }}
+        emptyMessage={t("panel.overview.noSubagents")}
+      />
+    );
+  }
   if (!session) {
     return (
       <div className="work-panel-overview work-panel-overview-empty" data-testid="overview-tab">
@@ -281,7 +331,25 @@ export function OverviewTab() {
         )}
 
         <details className="work-panel-overview-section" open>
-          <summary>{t("panel.overview.subagents")}</summary>
+          <summary className="work-panel-overview-subagents-summary">
+            <span>{t("panel.overview.subagents")}</span>
+            {subagents.length > 0 && (
+              <button
+                type="button"
+                className="work-panel-overview-panorama-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setViewMode("panorama");
+                }}
+                title={t("team.viewPanorama", { defaultValue: "View panorama" })}
+                aria-label={t("team.viewPanorama", { defaultValue: "View panorama" })}
+              >
+                <IconWorkflow size={13} aria-hidden />
+                <span>{t("team.viewPanorama", { defaultValue: "View panorama" })}</span>
+              </button>
+            )}
+          </summary>
           <div className="work-panel-overview-section-body">
             {subagents.length > 0 ? (
               subagents.map((sub) => (
