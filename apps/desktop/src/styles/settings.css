@@ -526,8 +526,7 @@
   overflow-wrap: anywhere;
 }
 
-.settings-config-sync-message.error,
-.settings-config-sync-error {
+.settings-config-sync-message.error {
   color: var(--ds-danger);
 }
 
@@ -791,13 +790,6 @@
   color: var(--ds-text-muted);
   font-size: var(--text-md);
   line-height: var(--leading-compact);
-}
-
-.settings-remote-host-empty-detail {
-  flex: 1 1 100%;
-  color: var(--ds-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs-plus);
 }
 
 .settings-remote-host-pulse {

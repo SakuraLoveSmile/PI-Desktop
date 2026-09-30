@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
+
+// The bar owns the call chrome; the failure text and its code are asserted
+// through the source, because the toast itself is the store's surface.
+const callBarSource = readFileSync(
+  new URL("../src/features/voice/live/LiveVoiceCallBar.tsx", import.meta.url),
+  "utf8",
+);
 
 const binding = { bindingId: "voice-a", adapterId: "codex-live", configured: true, credentialsPresent: true, selectable: true, providerLabel: "Fixture voice" };
 const status = { enabled: true, settingsRevision: 1, selectedBindingId: binding.bindingId, bindings: [binding], call: null };
@@ -125,12 +133,22 @@ test("Live Voice separates idle entry and compact call presentation", async (t) 
     assert.equal(liveVoiceIssue({ ...snapshot, call: { ...call, playbackBlocked: false, notice: { code: "LIVE_PLAYBACK_BLOCKED", retriable: true } } }), null);
     assert.equal(liveVoiceIssue({ ...snapshot, call: { ...call, notice: { code: "LIVE_EXECUTION_NOT_CONNECTED", retriable: false } } }).message, "liveVoice.workNotConnected");
   });
-  await t.test("a stopped call names its real cause and shows the verbatim error code", () => {
+  await t.test("a stopped call names its real cause and carries its code to the toast", () => {
     const failed = { ...snapshot, call: { ...call, phase: "failed", error: { code: "LIVE_NETWORK_ERROR", retriable: true } } };
     assert.equal(liveVoiceIssue(failed).message, "errors.NETWORK_ERROR");
+    // A transport failure is a one-shot result, so the bar reports it through
+    // the global toast together with the verbatim, allow-listed code.
     const html = renderBar(failed);
-    assert.match(html, /errors\.NETWORK_ERROR/);
-    assert.match(html, /<code class="live-voice-error-code">LIVE_NETWORK_ERROR<\/code>/);
+    assert.doesNotMatch(html, /errors\.NETWORK_ERROR/);
+    assert.doesNotMatch(html, /role="alert"/);
+    assert.match(
+      callBarSource,
+      /showToast\(`\$\{t\(issue\.message\)\} \(\$\{issue\.code\}\)`, \{ variant: "error" \}\)/,
+    );
+    // A retry that fails the same way is a new failure: starting an action drops
+    // the mark, because the call is preserved and the key alone cannot say so.
+    assert.match(callBarSource, /actionPending !== null && previousActionPending\.current === null/);
+    assert.match(callBarSource, /if \(startedAttempt\) reportedIssue\.current = null;/);
     // account failures read as account failures, not as generic configuration advice
     const auth = liveVoiceIssue({ ...snapshot, call: { ...call, phase: "failed", error: { code: "LIVE_AUTH_REQUIRED", retriable: false } } });
     assert.equal(auth.message, "liveVoice.authRequired");
