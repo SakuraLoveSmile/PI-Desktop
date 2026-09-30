@@ -463,7 +463,10 @@ export class LiveCallController {
   }
 
   private readonly handlePortMessage = (event: MessageEvent): void => {
-    if (event.source !== window || event.origin !== window.location.origin || !event.data || typeof event.data !== "object") return;
+    // Electron serializes file:// as the opaque "null" origin on window.postMessage.
+    // The source-window check and per-call nonce still bind this transfer to our renderer.
+    const trustedFileOrigin = window.location.protocol === "file:" && event.origin === "null";
+    if (event.source !== window || (!trustedFileOrigin && event.origin !== window.location.origin) || !event.data || typeof event.data !== "object") return;
     const data = event.data as { kind?: unknown; callId?: unknown; nonce?: unknown };
     const port = event.ports[0];
     if (data.kind !== "pi-desktop-live-voice-port" || typeof data.callId !== "string" || typeof data.nonce !== "string" || !/^[0-9a-f-]{36}$/i.test(data.nonce) || !port || event.ports.length !== 1) return;

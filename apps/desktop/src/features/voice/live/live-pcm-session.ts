@@ -283,7 +283,7 @@ export class LivePcmSession {
       const buffer = pcm16.buffer.slice(pcm16.byteOffset, pcm16.byteOffset + pcm16.byteLength) as ArrayBuffer;
       const sequence = this.nextInputSequence++;
       this.inputCredits -= 1;
-      this.port.postMessage({ kind: "input-pcm", callId: this.callId, sequence, captureEpoch, pcm16: buffer }, [buffer]);
+      this.port.postMessage({ kind: "input-pcm", callId: this.callId, sequence, captureEpoch, pcm16: buffer });
     }
   }
 }
