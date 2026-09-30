@@ -6260,7 +6260,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-CHAT-opaque-floating-decision-and-retry-surfaces: Dock, Plan approval, and retry surfaces occlude transcript text
 
-- **Status**: Automated (`pnpm test:e2e:composer-occlusion`, `pnpm test:e2e:theme-surfaces`, `apps/desktop/test/plan-mode-source-contract.test.mjs`, `apps/desktop/test/active-turn-surface.test.mjs`)
+- **Status**: Automated (`pnpm test:e2e:composer-occlusion`, `pnpm test:e2e:theme-surfaces`, `apps/desktop/test/plan-mode-source-contract.test.mjs`, `apps/desktop/test/active-turn-surface.test.mjs`, `apps/desktop/test/plan-approval-card-layout.test.mjs`)
 - **Priority**: P2
 - **Covers**: C, Quality / floating composer and retry surfaces
 - **Preconditions**: Renderer CSS is the production source under `apps/desktop/src/styles`.
