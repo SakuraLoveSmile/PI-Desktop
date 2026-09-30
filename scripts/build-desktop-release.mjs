@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
+import { dirname, join } from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
+const scriptDir = dirname(fileURLToPath(import.meta.url));
 const forwardedArgs = process.argv.slice(2);
 
 const hostTarget =
@@ -46,6 +49,38 @@ function runBuilder(args) {
   });
 }
 
+/**
+ * macOS packaging goes through the identity-aware entry point, which assembles an
+ * independently linked Electron distribution and installs the pre-sign identity
+ * gate. Routing it here keeps `pnpm dist` on the same path as `pnpm dist:mac`
+ * instead of leaving one macOS lane that would silently package the stock
+ * distribution (whose main executable UUID collides with the official app).
+ */
+function runMacIdentityLane() {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        join(scriptDir, "package-macos-identity.mjs"),
+        "--mac",
+        "--publish",
+        "never",
+        ...forwardedArgs,
+      ],
+      { stdio: "inherit" },
+    );
+
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`electron-builder mac target failed with exit code ${code}`));
+    });
+  });
+}
+
 if (target === "win") {
   await runBuilder([
     "--win",
@@ -63,6 +98,8 @@ if (target === "win") {
     ...forwardedArgs,
     "-c.extraMetadata.piDistribution=zip",
   ]);
+} else if (target === "mac") {
+  await runMacIdentityLane();
 } else {
   await runBuilder([
     `--${target}`,

@@ -99,6 +99,10 @@ test(
     }
     await chmod(join(repoRoot, "scripts", "release-macos.sh"), 0o755);
     await writeStubs(bin, log, repoRoot);
+    // The signed lane requires an independent Electron distribution (ADR 0308),
+    // so point it at one instead of letting it reach electron-builder with the
+    // stock distribution.
+    await mkdir(join(root, "electron-dist-identity", "Electron.app"), { recursive: true });
 
     const result = spawnSync("bash", [join(repoRoot, "scripts", "release-macos.sh")], {
       encoding: "utf8",
@@ -110,6 +114,7 @@ test(
         APPLE_TEAM_ID: "TEAMPLUS1234",
         MAC_SIGNING_IDENTITY: "Release Signer (TEAMPLUS1234)",
         STAPLE_DELAY_SECONDS: "1",
+        PI_ELECTRON_DIST: join(root, "electron-dist-identity"),
       },
     });
 
@@ -123,6 +128,8 @@ test(
     assert.match(builderCall, /-c\.mac\.identity=Release Signer \(TEAMPLUS1234\)/);
     assert.match(builderCall, /-c\.mac\.forceCodeSigning=true/);
     assert.match(builderCall, /-c\.mac\.notarize=true/);
+    assert.match(builderCall, /-c\.electronDist=\S*electron-dist-identity/);
+    assert.match(builderCall, /-c\.afterPack=\S*scripts\/macos-identity-gate\.mjs/);
     assert.doesNotMatch(
       builderCall,
       /notarize-and-staple-macos-release-dmg\.sh/,

@@ -85,12 +85,56 @@ libraries are informational: only the main executable's UUID decides the
 collision verdict. The verifier never writes, signs or patches anything, and it
 reports a signature category rather than a signing-authority string.
 
-Consuming an independently linked distribution requires an `electronDist` entry
-that this fork does not declare yet, so that route is blocked on the build host
-until an Electron source tree and the GN/Ninja toolchain exist; obtaining either
-needs network access and explicit operator authorization. A read-only feasibility
-probe recorded the exact blocker and the observed values. Until a candidate
-passes the gate, the macOS Local Network repair stays **in progress**: the manual
-intent, the supplemental trigger and their automated coverage are in place, while
-the native alert, the independent System Settings entry and a real LAN HTTP
-response remain unverified.
+The pinned Electron release is consumed from an independently assembled
+distribution rather than from `node_modules` directly:
+`scripts/assemble-electron-dist.mjs` links
+`apps/desktop/build/electron-main-stub.c` against the official framework, and
+`scripts/package-macos-identity.mjs` installs that distribution together with the
+pre-sign gate `scripts/macos-identity-gate.mjs` into every macOS package lane. The
+read-only feasibility probe had recorded why a full source build was unavailable
+on the build host (no checkout, no GN/Ninja); the relink route needs neither.
+
+## Relinked main executable and pre-sign gate (2026-10-01)
+
+The route described above was replaced by a cheaper one that satisfies the same
+decision, after measurement showed why the obvious shortcuts cannot work:
+
+- electron-builder renames Electron's prebuilt main executable and never relinks
+  it (`app-builder-lib/out/electron/electronMac.js` -> `doRename(...)`).
+- Chromium links with LLD, whose `LC_UUID` is derived from the linked content, so
+  rebuilding the same stub would reproduce the same UUID. The installed official
+  application and the stock Electron distribution both report the main executable
+  UUID `4C4C44B6-5555-3144-A187-35A40BAD7A39`, and nine library UUIDs match too.
+- Patching `LC_UUID` in a signed bundle, an `afterSign` hook that rewrites bytes,
+  and an Electron version change to obtain a different UUID all remain excluded.
+
+`apps/desktop/build/electron-main-stub.c` therefore reproduces the upstream
+`main()` for the macOS browser process at tag `v43.6.0` and is compiled here
+against the pinned framework; Apple's `ld` gives the result a fresh UUID.
+`Electron Framework`, the helper applications, the resources and the `version`
+file are reused verbatim, so no Electron version changes. Two deliberate
+deviations from upstream are recorded in that file: the helper-executable
+seatbelt branch is not reproduced, and the `ELECTRON_RUN_AS_NODE` fuse gate is
+replaced by honouring the variable whenever it is set (the fuse is enabled in
+official builds and this repository does not flip it).
+
+Measured before and after on one machine, with the same unsigned packaging lane,
+so the main executable UUID is the only changed variable:
+
+| Observation | Shared UUID | Relinked UUID |
+| --- | --- | --- |
+| Local Network prompt | never shown | shown |
+| System Settings -> Local Network entries | `PI-Desktop` only | `Pi-Desktop-Plus` appears |
+| LAN request to the local gateway | 29 of 29 failed `net::ERR_ADDRESS_UNREACHABLE` | real HTTP response (`401`) |
+
+That is direct evidence that the shared main executable UUID caused the failure,
+and it confirms Apple TN3179's model for this case. It does not depend on a
+pristine privacy state, because a new identity has no recorded choice.
+
+Consequences: the framework and helper UUIDs stay shared with the official
+application (only the main executable is relinked; whether those other UUIDs
+matter is unverified), the stub must be revisited when Electron's `main()` or its
+fuses change, and a macOS build now needs a working `clang` toolchain in addition
+to the packaged sidecar. The pre-sign gate also fails a candidate whose host
+sidecar is missing, because electron-builder only warns when an `extraResources`
+source does not exist and otherwise ships a `host unavailable` application.

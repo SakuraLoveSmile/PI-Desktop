@@ -27,6 +27,37 @@ requires an injected Developer ID identity (local) or `CSC_LINK` certificate
 (CI), and fails before publication if signing or notarization verification does
 not pass.
 
+### 1.1 macOS packages use an independently identified Electron
+
+Every macOS lane above except `pnpm dev` packages an independently assembled
+Electron distribution instead of the stock one.
+`scripts/package-macos-identity.mjs` runs `scripts/assemble-electron-dist.mjs`,
+which compiles `apps/desktop/build/electron-main-stub.c` against the pinned
+official framework and swaps the linked main executable into a copy of that
+distribution. It then invokes electron-builder with
+`-c.electronDist=<that copy>` and
+`-c.afterPack=scripts/macos-identity-gate.mjs`. The gate fails the build when the
+main executable's `LC_UUID` collides with the official Electron distribution or a
+supplied reference (`PI_IDENTITY_REFERENCE`), when the declared application id or
+the Local Network usage description is wrong, or when the host sidecar is missing
+from the bundle. No macOS lane can reach electron-builder without those flags, so
+there is no silent fallback to the stock distribution.
+
+Why this exists: electron-builder renames Electron's prebuilt main executable
+rather than relinking it, and Chromium's LLD linker derives `LC_UUID` from the
+linked content, so every fork of one Electron release keeps the same UUID as the
+official application. macOS attributes Local Network privacy to the code signature
+together with that UUID, so sharing it costs this application its own permission —
+measured here as no prompt, no privacy-pane entry, and dropped LAN requests
+(ADR 0308).
+
+Consequences: a macOS package now needs a working `clang` toolchain, the assembler
+runs offline (it uses the `node_modules/electron/dist` the pinned dependency
+already provides and never downloads a source tree), and the Rust sidecar must be
+built first (`pnpm run build:host-release`) or the gate stops the build. Windows
+and Linux lanes are untouched: the wrapper forwards their arguments straight to
+electron-builder.
+
 On macOS, `pnpm dev` creates and reuses a fingerprinted branded Electron host
 bundle under `.cache/electron-dev/`. Its bundle name, executable, identifier,
 and ICNS resource are development-only Pi-Desktop-Plus values, so AppKit shows
