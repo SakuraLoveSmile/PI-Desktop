@@ -75,6 +75,7 @@ async function handleInvoke(channel, request) {
         ...(request.workTarget ? { workBinding: {
           ...request.workTarget, workBindingRevision: 1,
           label: sessions.find((session) => session.id === request.workTarget.workSessionId)?.title ?? "Fixture session",
+          contextEnabled: request.shareSelectedSessionContext === true,
         } } : {}),
       };
       updateCall({});

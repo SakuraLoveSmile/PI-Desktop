@@ -131,41 +131,50 @@
 
 ### E2E-LIVE-WORK-session-admission
 
-- **Preconditions:** Isolated Live provider fixture, a local AgentHost session,
-  and a deterministic fake intent resolver. The provider candidate must enter
-  through the existing Live adapter callback; do not use a real account or
-  paid endpoint.
-- **Steps:** Start a voice-only call and verify a work candidate is rejected
-  without a work scope. Start a second call after opting into work requests and
-  explicitly selecting a local session, with context sharing disabled. Submit
-  one declared work request, deliver its receipt, route it through the
-  classifier, and inspect the Host
-  admission and `voiceOrigin`. Exercise a busy independent request through the
-  Host queue, a stale steer, an exact-turn stop, and a terminal event arriving
-  before the submit promise resolves. Query a recorded terminal result and
-  verify the query does not create another Host turn. Request project/session
-  lists, verify they contain labels and opaque call-scoped references only,
-  open a listed session, and create a session from a listed project through
-  the panel action. Confirm both actions leave the active work binding fixed.
-  Queue a result while provider generation, user speech, and local playback are
-  active; verify it is sent only after all three are idle and the quiet window
-  passes. Exercise silent mode, an explicit query while silent, and stale
-  feedback downgrade. End the Live call after Host admission.
-- **Expected:** Work remains bound to the originally selected local session;
-  no prior messages are read when context sharing is disabled; the existing
-  AgentHost performs prompt, steer, queue, and stop operations; duplicate
-  provider IDs do not dispatch twice; terminal state comes from Host events;
-  result queries project only the exact operation summary; ending Live does
-  not cancel accepted work. Project/session choices never expose raw paths or
-  IDs, selection references expire and remain call-scoped, opening is
-  navigation only, and creating requires a listed project plus a panel action.
-  Automatic feedback observes provider speaking state and local playback
-  activity, while task execution and feedback delivery remain separate. A
-  renderer signal is not evidence that a person heard the result.
-- **Coverage:** `apps/desktop/test/live-voice-service.test.mjs` covers voice-only
-  rejection and explicit work-scope forwarding. `packages/host-runtime/src/live-work/coordinator.test.ts`
-  covers receipt ordering, routing, stale steer, replay, call close, and early
-  terminal correlation. `packages/host-runtime/src/live-work/context.test.ts`
+- **Preconditions:** Isolated Live provider fixture, Desktop/Native Pi/Remote
+  session catalog fixtures, and a deterministic fake intent resolver. Provider
+  candidates enter through the existing Live adapter callback; do not use a
+  real account or paid endpoint.
+- **Steps:** Start a call from a Composer with an active Desktop session and
+  verify that session is the default target without a work-access checkbox or
+  pre-call voice selection. Repeat with Native Pi and Remote Composer sessions.
+  Start with no current session and verify the call remains unbound until the
+  user lists sessions and chooses one by voice. Reject missing and duplicate
+  session identities. With context sharing disabled, submit one work request
+  and verify no history read; then test the separate bounded-context consent.
+  Switch targets by voice during a call, submit before and after the switch, and
+  verify the two operations remain associated with their respective sessions.
+  Deliver each receipt, route through the classifier, and inspect backend
+  admission and `voiceOrigin`. Exercise backend-specific queue/steer/stop
+  capabilities, approval denial, stale turn, offline Remote Host, and a
+  terminal event arriving before submit resolves. Query an exact terminal
+  result without creating another Host turn. Request project/session lists,
+  verify labels and opaque call-scoped references, then test opening and
+  creating only through their existing panel actions. Exercise feedback while
+  generation, user speech, and playback are active; finish by ending Live after
+  Host admission.
+- **Expected:** The initial target is the current Composer session when present;
+  voice switching affects subsequent requests only. Main validates each target
+  against a fresh multi-backend catalog, and ambiguity/unavailability fails
+  closed. Context reads occur only after independent consent and remain bounded
+  to the current target. Each backend retains its own admission, permission,
+  approval, and capability rules; unsupported operations and offline targets
+  are reported honestly. Duplicate provider IDs do not dispatch twice,
+  terminal state comes from authoritative backend events, result queries project
+  only the exact operation summary, and ending Live does not cancel accepted
+  work. Selection references expose no raw paths or IDs and remain call-scoped.
+  Automatic feedback and task execution remain separate; a renderer signal is
+  not evidence that a person heard the result.
+- **Coverage:** `apps/desktop/test/live-work-scope.test.mjs` covers the fresh
+  Desktop/Native Pi/Remote catalog, source-specific prompt/stop/queue routing,
+  offline Remote failure, initial Native/Remote event subscriptions without a
+  local AgentHost bridge, project/workspace identity, opaque refs, and
+  ambiguous-target rejection. `apps/desktop/test/live-voice-ipc-media.test.mjs`
+  covers separate target/context consent and rejects raw operation/session/turn
+  IDs. `apps/desktop/test/live-voice-service.test.mjs` covers owner-scoped
+  stop/cancel routing by call and operation IDs. `packages/host-runtime/src/live-work/coordinator.test.ts`
+  covers receipt ordering, routing, stale steer, replay, call close, target
+  switching, exact-turn stop and old-session queue cancellation. `packages/host-runtime/src/live-work/context.test.ts`
   covers bounded context projection. `packages/agent-host/src/agent-host.test.ts`
   covers history-free state, queue insertion, and voice provenance.
   `packages/voice-runtime/src/live/protocol.test.ts` covers provider-specific
