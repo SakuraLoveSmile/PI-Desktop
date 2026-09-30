@@ -130,18 +130,24 @@ export class LivePcmSession {
       this.source.disconnect();
       this.node.port.postMessage({ kind: "release" });
       this.node.disconnect();
+      this.acknowledgeRelease();
       try {
         if (this.context.state !== "closed") await this.context.close();
       } catch {
         // The microphone track is stopped by the owning call controller before this closes the context.
-      } finally {
-        if (!this.releaseSent) {
-          this.releaseSent = true;
-          this.port.postMessage({ kind: "released", callId: this.callId });
-        }
       }
     })();
     return this.releasePromise;
+  }
+
+  private acknowledgeRelease(): void {
+    if (this.releaseSent) return;
+    this.releaseSent = true;
+    try {
+      this.port.postMessage({ kind: "released", callId: this.callId });
+    } catch {
+      // The main side may have closed the port after confirming capture stopped.
+    }
   }
 
   private waitForReady(signal: AbortSignal): Promise<void> {

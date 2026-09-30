@@ -38,7 +38,10 @@ const ICE_GATHER_TIMEOUT_MS = 10_000;
 type StartResources = {
   requestId: string;
   callId?: string;
+  microphoneRequest?: Promise<MediaStream>;
+  microphoneRequestSettled?: boolean;
   stream?: MediaStream;
+  streamStopped?: boolean;
   context?: AudioContext;
   port?: MessagePort;
   pcm?: LivePcmSession;
@@ -149,9 +152,14 @@ export class LiveCallController {
         }
       }).catch(() => undefined);
       micRequest = requestMicrophone(this.microphoneDeviceId);
+      resources.microphoneRequest = micRequest;
       void micRequest.then((stream) => {
-        if (resources.abort.signal.aborted || generation !== this.generation) stopStream(stream);
-      }).catch(() => undefined);
+        resources.microphoneRequestSettled = true;
+        resources.stream = stream;
+        if (resources.abort.signal.aborted || generation !== this.generation) this.stopCapture(resources);
+      }, () => {
+        resources.microphoneRequestSettled = true;
+      });
       if (selected.adapterId !== "codex-live" || options.workTarget) {
         resources.context = new AudioContext({ sampleRate: 48_000 });
         void resources.context.resume().catch(() => undefined);
@@ -683,24 +691,42 @@ export class LiveCallController {
       });
     }
     if (notifyMain && resources.callId && !resources.releaseReportPromise) {
-      resources.releaseReportPromise = resources.releasePromise.then(async (released) => {
-        if (!released) {
-          resources.releaseAckSettled = true;
-          this.completeResourceLifecycle(resources);
-          return;
-        }
-        try {
+      const released = resources.pcm
+        ? resources.releasePromise.then((ok) => {
+          if (!ok) throw liveError("LIVE_MEDIA_RELEASE_UNCONFIRMED");
+        })
+        : this.reportMicrophoneReleased(resources).then(async () => {
           await liveVoiceApi.reportMedia({ callId: resources.callId!, kind: "released" });
-        } catch {
-          resources.releaseFailed = true;
-          this.patch({ errorCode: "LIVE_MEDIA_RELEASE_UNCONFIRMED" });
-        } finally {
-          resources.releaseAckSettled = true;
-          this.completeResourceLifecycle(resources);
-        }
+        });
+      resources.releaseReportPromise = released.catch(() => {
+        resources.releaseFailed = true;
+        this.patch({ errorCode: "LIVE_MEDIA_RELEASE_UNCONFIRMED" });
+      }).finally(() => {
+        resources.releaseAckSettled = true;
+        this.completeResourceLifecycle(resources);
       });
     }
     return resources.releaseReportPromise ?? resources.releasePromise.then(() => undefined);
+  }
+
+  private async reportMicrophoneReleased(resources: StartResources): Promise<void> {
+    if (resources.microphoneRequest && !resources.microphoneRequestSettled) {
+      await resources.microphoneRequest.then(() => undefined, () => undefined);
+    }
+    if (!this.stopCapture(resources)) {
+      throw liveError("LIVE_MEDIA_RELEASE_UNCONFIRMED");
+    }
+  }
+
+  private stopCapture(resources: StartResources): boolean {
+    if (resources.streamStopped || !resources.stream) return true;
+    try {
+      stopStream(resources.stream);
+      resources.streamStopped = true;
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async releaseResourcesOnce(resources: StartResources): Promise<boolean> {
@@ -714,13 +740,13 @@ export class LiveCallController {
     if (resources.heartbeat) clearInterval(resources.heartbeat);
     resources.abort.abort();
     cleanup(() => this.stopPlaybackMonitor(resources));
-    if (resources.stream) cleanup(() => stopStream(resources.stream!));
-    if (resources.channel) cleanup(() => resources.channel!.close());
-    if (resources.peer) cleanup(() => resources.peer!.close());
-    if (resources.audio) cleanup(() => {
-      resources.audio!.pause();
-      resources.audio!.srcObject = null;
-      resources.audio!.remove();
+    if (!this.stopCapture(resources)) released = false;
+    cleanup(() => resources.channel?.close());
+    cleanup(() => resources.peer?.close());
+    cleanup(() => {
+      resources.audio?.pause();
+      if (resources.audio) resources.audio.srcObject = null;
+      resources.audio?.remove();
     });
     if (resources.pcm) await cleanupAsync(() => resources.pcm?.release());
     if (!resources.pcm && resources.context && resources.context.state !== "closed") {

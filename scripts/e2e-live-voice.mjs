@@ -34,8 +34,10 @@ const settings = () => desktop.invoke("settingsGet");
 const status = () => desktop.invoke("liveVoiceStatus");
 const waitIdle = () => waitFor(async () => {
   const call = (await status()).call;
-  return !call || (["ended", "failed"].includes(call.phase) && !call.microphoneActive);
-}, 12_000, "Live call media released");
+  const mediaReleased = !call || (["ended", "failed"].includes(call.phase) && !call.microphoneActive);
+  if (!mediaReleased) return false;
+  return desktop.evaluate("!document.querySelector('.live-voice-call-bar[data-state=\"connecting\"], .live-voice-call-bar[data-state=\"connected\"], .live-voice-call-bar[data-state=\"reconnecting\"], .live-voice-call-bar[data-state=\"stopping\"]') && !!document.querySelector('.live-voice-control button')");
+}, 12_000, "Live call media and Composer controls released");
 const navVoice = () => desktop.clickText("Live voice", ".settings-nav-label");
 const openSettings = async () => {
   await desktop.clickSelector('[data-nav="settings"]');
@@ -45,12 +47,17 @@ const openSettings = async () => {
 };
 const backToChat = () => desktop.clickSelector('[data-nav="back-to-app"]');
 const startCall = async () => {
-  await desktop.clickSelector('.live-voice-control button[aria-label="Start Live voice"]');
+  const previousCallId = (await status()).call?.callId;
+  await desktop.clickSelector(".live-voice-control button");
+  await waitFor(() => desktop.evaluate("!!document.querySelector('.live-voice-preparation .live-voice-start')"),
+    5_000, "Live Voice preparation menu");
+  await desktop.clickSelector(".live-voice-preparation .live-voice-start");
   await waitFor(async () => {
     const [live, error] = await Promise.all([
-      status(), desktop.evaluate("!!document.querySelector('.live-voice-error[role=\"alert\"]')"),
+      status(), desktop.evaluate("!!document.querySelector('.live-voice-feedback[role=\"alert\"]')"),
     ]);
-    return live.call?.phase === "connected" || (error && ["ended", "failed"].includes(live.call?.phase));
+    const newCall = Boolean(live.call && live.call.callId !== previousCallId);
+    return newCall && (live.call?.phase === "connected" || (error && ["ended", "failed"].includes(live.call?.phase)));
   }, 30_000, "local Realtime connected or startup failed");
   assert.equal((await status()).call?.phase, "connected", "local Realtime call connected");
 };
@@ -84,12 +91,10 @@ try {
   assert.equal(initial.liveVoice?.enabled ?? false, false);
   assert.equal((await status()).enabled, false);
   assert.equal(fixture.stats.connections, 0);
-  await desktop.clickSelector('.live-voice-control button[aria-label="Start Live voice"]');
-  await desktop.clickText("Open settings", ".live-voice-panel button");
-  await waitFor(() => desktop.evaluate("!!document.querySelector('.live-voice-settings')"), 10_000, "Composer setup navigation");
+  await openSettings();
   assert.equal(fixture.stats.connections, 0);
   await desktop.screenshot("live-voice-disabled.png");
-  pass("ordinary-user Composer setup opens Voice without starting capture");
+  pass("ordinary users can reach Voice settings without starting capture");
 
   await desktop.input(".settings-search", "Live voice");
   await waitFor(() => desktop.evaluate("[...document.querySelectorAll('.settings-nav-label')].some(el => el.textContent.trim() === 'Live voice')"), 5_000, "Voice search match");
@@ -124,29 +129,32 @@ try {
   await startCall();
   assert.equal((await status()).call.muted, true);
   assert.equal((await status()).call.workBinding, undefined);
-  await desktop.clickText("Unmute microphone", ".live-voice-panel button");
+  await desktop.clickSelector('.live-voice-call-bar button[aria-label="Unmute microphone"]');
   await waitFor(() => fixture.stats.inputFrames > 0, 10_000, "synthetic microphone reaches the real WSS transport");
   await waitFor(async () => (await status()).call?.phase === "connected" && fixture.active() === 1,
     2_000, "uplink credit keeps the call and provider socket connected");
   fixture.reply();
+  await desktop.clickSelector('.live-voice-call-bar button[aria-label="Call details"]');
   await waitFor(() => desktop.evaluate("document.querySelector('.live-voice-transcripts')?.textContent.includes('Local voice fixture reply.')"), 8_000, "provider transcript reaches Renderer");
   await desktop.screenshot("live-voice-connected.png");
-  await desktop.clickText("Mute microphone", ".live-voice-panel button");
+  await desktop.clickSelector('.live-voice-details-popup button[aria-label="Close"]');
+  await desktop.clickSelector('.live-voice-call-bar button[aria-label="Mute microphone"]');
   await waitFor(async () => (await status()).call?.muted === true, 5_000, "microphone muted");
   await delay(200);
   const mutedFrames = fixture.stats.inputFrames;
   await delay(300);
   assert.equal(fixture.stats.inputFrames, mutedFrames, "muting stops new provider audio frames");
-  await desktop.clickText("End call", ".live-voice-panel button");
+  await desktop.clickSelector('.live-voice-call-bar button[aria-label="End call"]');
   await waitIdle();
   await waitFor(() => fixture.active() === 0, 5_000, "provider socket closes after hangup");
   assert.deepEqual((await desktop.invoke("sessionList")).sessions, [], "voice-only call creates no Agent session");
   pass("real Realtime socket, synthetic capture, playback/transcript, mute and hangup");
 
   fixture.holdNextSession();
-  await desktop.clickSelector('.live-voice-control button[aria-label="Start Live voice"]');
+  await desktop.clickSelector(".live-voice-control button");
+  await desktop.clickSelector(".live-voice-preparation .live-voice-start");
   await waitFor(async () => (await status()).call?.phase === "connecting", 15_000, "delayed provider startup");
-  await desktop.clickText("Cancel", ".live-voice-panel button");
+  await desktop.clickSelector('.live-voice-call-bar button[aria-label="Cancel"]');
   await waitIdle();
   await waitFor(() => fixture.active() === 0, 5_000, "cancelled provider socket closes");
   await startCall();
@@ -156,7 +164,7 @@ try {
   await delay(500);
   assert.equal(fixture.stats.connections, disconnectedConnections, "provider failure never auto-reconnects");
   await startCall();
-  await desktop.clickText("End call", ".live-voice-panel button");
+  await desktop.clickSelector('.live-voice-call-bar button[aria-label="End call"]');
   await waitIdle();
   pass("cancelled startup and provider failure release resources for explicit reconnect");
 
@@ -187,8 +195,12 @@ try {
 } catch (error) {
   await desktop?.screenshot("live-voice-failure.png").catch(() => undefined);
   const current = await desktop?.invoke("liveVoiceStatus").catch(() => null);
-  const callFailure = current?.call?.error
-    ? { code: current.call.error.code, stage: current.call.error.stage }
+  const callFailure = current?.call
+    ? {
+      code: current.call.error?.code,
+      stage: current.call.error?.stage,
+      mediaRelease: current.call.mediaRelease,
+    }
     : null;
   console.error(`Live Voice E2E failed: ${error.message}; phase=${current?.call?.phase ?? "none"}; callFailure=${JSON.stringify(callFailure)}; fixture=${JSON.stringify({ ...fixture.stats, active: fixture.active(), errors: fixture.errors })}`);
   throw error;
