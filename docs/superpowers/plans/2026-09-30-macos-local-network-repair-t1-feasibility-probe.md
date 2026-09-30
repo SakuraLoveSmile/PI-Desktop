@@ -85,10 +85,13 @@ Findings:
   `app-builder-lib` resolves the version from the installed package:
   `out/electron/electronVersion.js:52 computeElectronVersion()` reads
   `node_modules/electron/package.json` → `43.6.0`.
-- Inside this task worktree, `node_modules/electron/` contains no `dist/` and no
-  `path.txt`, so the worktree has no extracted Electron distribution of its own;
-  the extracted distribution used by packaging lives in the primary checkout.
-  This was read-only information, not a defect to fix here.
+- When this probe ran, this task worktree's `node_modules/electron/` held no
+  `dist/` and no `path.txt`, so it had no extracted Electron distribution of its
+  own; the extracted distribution used by packaging lives in the primary
+  checkout. That was environment information, not a defect. The later E2E step of
+  the same task extracted `dist/` in the worktree from the existing local cache
+  (`electron-v43.6.0-darwin-arm64.zip`), which changes nothing about the verdict
+  below: the block is the missing source checkout and toolchain, not the binary.
 
 ## 4. Source checkout and build toolchain on this host
 
