@@ -2847,9 +2847,12 @@ reasoning-level control.
   and cancelled rows are muted; each status symbol has a localized accessible
   name and each row renders plain text.
 - Renderer snapshots are keyed by session id. A `todos.changed` event with an
-  older or equal revision is ignored. The initial `todos.get` recovery is
-  skipped for `remote:` sessions because remote Todo parity is deferred until an
-  additive RACP contract exists.
+  older or equal revision is ignored. Session activation and host recovery
+  re-read the authoritative snapshot, including already cached checklists; a
+  failed initial read cannot permanently hide the dock after host recovery.
+  Recovery is skipped for `remote:` and `native-pi:` sessions, which do not own
+  a local Desktop checklist. Remote Todo parity requires an additive RACP
+  contract.
 
 ### 11.4 States
 

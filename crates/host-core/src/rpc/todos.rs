@@ -754,5 +754,9 @@ mod tests {
             todo["parameters"]["properties"]["todos"]["maxItems"],
             json!(50)
         );
+        // Model-side validation must allow the host's truncation path.
+        let content = &todo["parameters"]["properties"]["todos"]["items"]["properties"]["content"];
+        assert_eq!(content["minLength"], json!(1));
+        assert!(content.get("maxLength").is_none());
     }
 }
