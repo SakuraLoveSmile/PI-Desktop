@@ -89,3 +89,20 @@ cross-version rollback were not tested. No UI verification command was run becau
 it was not requested. These checks are release qualification, not evidence supplied
 by local offline regression. Remaining release work is in
 [pi-0991-gaps.md](pi-0991-gaps.md).
+
+## Main integration validation
+
+The integration candidate `4dd33805f` combines the migration commit
+`b72ff6759` with target main `e93295ad9`. The only conflict was the macOS
+microphone permission description; the latest Live Voice description is retained.
+
+The executable candidate passed the JS workspace build, Desktop typecheck,
+3,303 Desktop tests, 1,150 runtime tests, 57 agent-host tests, 109 host-runtime
+tests, 705 Host Rust tests, lint, documentation checks and release preflight.
+All seven production sidecar hosted-search scenarios passed, with SHA-256
+`6192678b203bd04dbcb75e24ca229a808eef8bfdd01af4e19e3894945c3eb38e`.
+The shared package and Pi patches have the same tested executable contents as
+the scoped review candidate above. This record adds documentation only.
+
+Installed artifacts, real accounts and cross-version rollback retain the same
+qualification limits. Local main landing does not qualify or deploy a release.
