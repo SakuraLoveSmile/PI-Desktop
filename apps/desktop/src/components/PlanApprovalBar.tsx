@@ -288,6 +288,9 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
             {scheduleLabel ? ` · ${scheduleLabel} ${proposal.scheduleTimezone ?? ""}` : ""}
           </p>
         ) : null}
+      </div>
+      {blockedByDraft ? <p className="plan-approval-draft-warning">{t("chat.planDraftPending")}</p> : null}
+      <div className="plan-approval-footer">
         <div className="plan-approval-details">
           {artifactPath ? (
             <button
@@ -310,9 +313,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
             </button>
           ) : null}
         </div>
-      </div>
-      {blockedByDraft ? <p className="plan-approval-draft-warning">{t("chat.planDraftPending")}</p> : null}
-      {isPending ? (
+        {isPending ? (
         <div className="plan-approval-actions">
           <span className="plan-approval-goal-toggle">
             <span>{t("chat.goalMode", "Goal")}</span>
@@ -498,6 +499,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
           }}>{t("chat.retryRevision")}</Button>
         </div>
       ) : null}
+      </div>
     </section>
   );
 }
