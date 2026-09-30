@@ -464,7 +464,11 @@ thinking ladder for explicit manual opt-in.
 The Pi adapter preserves the configured wire ID. Unknown endpoints may attach
 metadata from an exact, case-insensitive final `/` segment. A unique official
 publisher compatible with the ID family wins; conflicting capability/thinking
-candidates remain unknown. No thinking/date/deployment suffix is stripped.
+candidates remain unknown. Exact served IDs are checked first. Only a narrow
+whitelist of deployment-added environment/context labels (for example `-test`
+and `-1m`) may be removed as a fallback to a published base ID. Thinking,
+preview, and dated-release suffixes are not stripped, and spelling is never
+fuzzy-corrected.
 
 Known provider lookup and aliases stay authoritative. An ambiguous known
 same-endpoint miss does not borrow from arbitrary publishers. There is no
