@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  CODEX_MODELS_CLIENT_VERSION,
   parseVendorModelIds,
   pinnedSiblingId,
   vendorModelListRequest,
@@ -20,7 +21,11 @@ test("ChatGPT accounts list models from the Codex endpoint, not /models", () => 
     vendorId: "openai-codex",
     apiKey: codexToken(),
   });
-  assert.equal(request?.url, "https://chatgpt.com/backend-api/codex/models");
+  const url = new URL(request?.url ?? "");
+  assert.equal(`${url.origin}${url.pathname}`, "https://chatgpt.com/backend-api/codex/models");
+  // The endpoint answers 400 "client_version Field required" without it.
+  assert.equal(url.searchParams.get("client_version"), CODEX_MODELS_CLIENT_VERSION);
+  assert.match(CODEX_MODELS_CLIENT_VERSION, /^\d+\.\d+\.\d+$/);
   assert.equal(request?.headers["chatgpt-account-id"], "acct_123");
   assert.equal(parseVendorModelIds("openai-codex", {
     models: [
@@ -108,3 +113,4 @@ test("Copilot only keeps a new id when its family has one wire API", () => {
     "openai-codex-responses",
   );
 });
+

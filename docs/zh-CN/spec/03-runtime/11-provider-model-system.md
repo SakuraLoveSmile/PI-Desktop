@@ -406,9 +406,11 @@ sidecar 请求
 这类行的模型发现读取已登录账户自己的模型列表；连接测试仍通过解析认证来证明
 账户。请求失败，或返回的不是模型列表时，才回退到 pi-ai（`models.getAvailable`，
 含厂商自己的 `filterModels`）。各厂商打自己的接口：ChatGPT Plus/Pro
-（`openai-codex`）是 `GET {base}/codex/models`，因此 `gpt-6-luna` 这类账户
-已经提供、pin 里还没有的 id 也能出现；普通 `{ data: [...] }` 不当成 Codex
-列表。Copilot 是带 IDE 身份头和 `X-GitHub-Api-Version` 的 `GET {base}/models`，
+（`openai-codex`）是 `GET {base}/codex/models?client_version=…`，因此
+`gpt-6-luna` 这类账户已经提供、pin 里还没有的 id 也能出现；该接口要求
+`client_version`，并隐藏最低 Codex 客户端版本更高的模型，所以取值是固定的
+Codex CLI 版本（`CODEX_MODELS_CLIENT_VERSION`），账户模型缺失时调高；普通
+`{ data: [...] }` 不当成 Codex 列表。Copilot 是带 IDE 身份头和 `X-GitHub-Api-Version` 的 `GET {base}/models`，
 只保留 `model_picker_enabled === true` 且未被策略禁用的 id，pin 不认识的 id
 只有在其家族已经对应唯一线路 API 时才加入。Anthropic 用 OAuth 身份头请求
 `GET {base}/v1/models`。Kimi、Meta、xAI、OpenRouter 请求 `GET {base}/models`

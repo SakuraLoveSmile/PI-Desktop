@@ -9,6 +9,20 @@
 const LIVE_MODELS_TIMEOUT_MS = 8_000;
 const MAX_RETRY_DELAY_MS = 1_000;
 
+/**
+ * `client_version` sent to ChatGPT's `GET /codex/models`.
+ *
+ * The endpoint rejects a request without it (HTTP 400, "client_version Field
+ * required"). The value may also affect which models the list includes, so
+ * keep it at a current Codex CLI release.
+ * pi-ai does not call this endpoint and exposes no Codex client version, so
+ * this is the version of the official Codex CLI (github.com/openai/codex)
+ * that was verified to list the current ChatGPT models (0.159.2 lists
+ * `gpt-6.1-sol`, 2026-09-30). Bump it to a newer Codex CLI release when a
+ * model the account can use is missing from this list.
+ */
+export const CODEX_MODELS_CLIENT_VERSION = "0.159.2";
+
 const NON_CONVERSATION_MODEL =
   /(?:^|[-_/])(?:imagine|image|video|tts|stt|speech|embed(?:ding)?|whisper|aurora|flux|realtime|moderation)(?:$|[-_/])/i;
 
@@ -118,7 +132,7 @@ export function vendorModelListRequest(input: {
     const accountId = chatgptAccountId(apiKey);
     if (!accountId) return undefined;
     return {
-      url: `${base}/codex/models`,
+      url: `${base}/codex/models?client_version=${encodeURIComponent(CODEX_MODELS_CLIENT_VERSION)}`,
       accountBaseUrl: base,
       allowPolicyFallback: false,
       headers: {

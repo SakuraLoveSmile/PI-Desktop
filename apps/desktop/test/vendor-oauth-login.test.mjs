@@ -769,3 +769,68 @@ test("a new Grok inherits grok-4.6 even when an older Grok is first in the pin",
   assert.equal(binding.modelConfig.maxTokens, 500_000);
   assert.deepEqual(binding.supportedThinkingLevels, ["low", "medium", "high", "xhigh"]);
 });
+
+function codexProvider() {
+  return {
+    id: "openai-codex",
+    name: "ChatGPT",
+    baseUrl: "https://chatgpt.com/backend-api",
+    auth: { oauth: { name: "ChatGPT Plus/Pro", isSubscription: true, loginLabel: "Sign in" } },
+  };
+}
+
+function codexModel(id) {
+  return {
+    id,
+    name: id,
+    api: "openai-codex-responses",
+    provider: "openai-codex",
+    baseUrl: "https://chatgpt.com/backend-api",
+    input: ["text"],
+    reasoning: true,
+    thinkingLevelMap: { off: null, low: "low", medium: "medium", high: "high" },
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 272_000,
+    maxTokens: 128_000,
+  };
+}
+
+/** A pasted code that makes `access-for-<code>` a ChatGPT-shaped JWT. */
+function codexLoginCode() {
+  const payload = Buffer.from(JSON.stringify({
+    "https://api.openai.com/auth": { chatgpt_account_id: "acct_123" },
+  })).toString("base64url");
+  return `h.${payload}.sig`;
+}
+
+test("a ChatGPT account lists the models /codex/models returns for its client version", async () => {
+  const seen = [];
+  // The live endpoint rejects a request without client_version.
+  const fetchModels = async (input) => {
+    const url = new URL(String(input));
+    seen.push(url);
+    if (!url.searchParams.get("client_version")) {
+      return new Response(JSON.stringify({
+        detail: [{ loc: ["query", "client_version"], msg: "Field required" }],
+      }), { status: 400 });
+    }
+    return new Response(JSON.stringify({
+      models: [{ slug: "gpt-6-luna", visibility: "list" }, { slug: "gpt-6.1-sol", visibility: "list" }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const { host, events, oauth } = harness({
+    fetch: fetchModels,
+    provider: codexProvider(),
+    models: [codexModel("gpt-6-luna")],
+  });
+  const { loginId } = await oauth.start("openai-codex");
+  const prompt = await waitFor(events, "prompt");
+  oauth.respond({ loginId, promptId: prompt.request.promptId, value: codexLoginCode() });
+  const done = await waitFor(events, "done");
+  const row = host.providers.get(done.providerId);
+  assert.deepEqual(row.models.map((model) => model.id), ["gpt-6-luna", "gpt-6.1-sol"]);
+  assert.equal(seen[0].pathname, "/backend-api/codex/models");
+  const binding = await oauth.bindingFor(done.providerId, "gpt-6.1-sol");
+  assert.equal(binding.baseUrl, "https://chatgpt.com/backend-api");
+});
+
