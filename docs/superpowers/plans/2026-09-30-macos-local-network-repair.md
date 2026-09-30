@@ -5,7 +5,7 @@ Repository policy requires English repository documents; the user-facing summary
 
 ## Outcome and execution boundary
 
-T1 gives Plus a qualified, independent macOS executable identity. T2 adds a contextual Local Network trigger to the existing **Fetch list** action. T3 proves the signed candidate's native prompt, independent settings entry, and HTTP connectivity. Status after the 2026-09-30 implementation turn: T1 **实现中** (identity gate and read-only feasibility probe delivered; the `electronDist` route is blocked on this host), T2 **实现中** (implemented and green on every automated gate; its user-visible effect depends on T1's candidate and T3's native validation), T3 **实现中** (automated layer green; every native observation is explicitly not run). The repair as a whole is **实现中**: **待体验** needs the applicable validation including native checks, and **已验收** needs explicit user confirmation. See the implementation execution record at the end of this document.
+T1 gives Plus a qualified, independent macOS executable identity. T2 adds a contextual Local Network trigger to the existing **Fetch list** action. T3 proves the signed candidate's native prompt, independent settings entry, and HTTP connectivity. Status after the 2026-10-01 implementation turn: T1 **实现中 → 身份目标已达成** (the relinked main executable is packaged and the pre-sign gate passes; the full source-build route remains unavailable on this host), T2 **实现中** (implemented, green, and its native effect now observed), T3 **原生证据已取得** (prompt shown, `Pi-Desktop-Plus` listed in Local Network settings, LAN request reached the gateway), with the signed Developer-ID lane still outside this host's reach. The repair as a whole is **待体验**: the applicable validation ran and passed, and **已验收** needs explicit user confirmation. See the two implementation execution records at the end of this document.
 
 This request authorizes saving this plan only. A later implementation instruction authorizes the source changes and isolated local verification described below. It does not automatically authorize committing, pushing, publishing, notarization submissions, replacing `/Applications` apps, creating OS users, changing system privacy settings, using the user's running instance, or accessing a real provider. Obtain only the missing authorization for a concrete dependent operation; continue independent authorized work.
 
@@ -270,3 +270,71 @@ implementation. Observable path → test: the renderer Fetch list control → th
 hook; trigger order, cleanup and disposal → the Electron IPC smoke and the controller
 test; address/proxy/budget/coalescing policy → the controller test; identity
 qualification → the verifier test; the native alert and real LAN HTTP → not run.
+
+## Implementation execution record (2026-10-01: T1 completed by relinking the main executable)
+
+Status: T1 **实现中 → 已达成身份目标** (the identity gate passes on a built candidate), T2 **实现中** unchanged, T3 native evidence **obtained**. The repair moves to **待体验**: the applicable validation ran and passed on this machine. **已验收** still needs the operator's explicit confirmation.
+
+### What changed since the 2026-09-30 record
+
+The source-build route stayed blocked here (no Electron checkout; the Chromium infrastructure
+measured about 2 B/s from this host), so the operator authorized the offline route: link the main
+executable ourselves and reuse everything else from the pinned official distribution.
+
+- `apps/desktop/build/electron-main-stub.c` reproduces upstream `main()` for the macOS browser
+  process at tag `v43.6.0` (`ElectronMain`, the `ELECTRON_RUN_AS_NODE` path, `FixStdioStreams`) and
+  documents its two deliberate deviations from upstream.
+- `scripts/assemble-electron-dist.mjs` compiles that stub against the pinned official framework,
+  refuses to continue when the linked UUID still equals the official one, and assembles a
+  distribution whose every other file stays verbatim (`version` still 43.6.0).
+- `scripts/macos-identity-gate.mjs` is the `afterPack` gate: it fails the build on a shared main
+  executable UUID, on a wrong application id or usage description, and on a missing host sidecar.
+- `scripts/package-macos-identity.mjs` is the macOS lanes' packaging entry: it assembles (or takes
+  `PI_ELECTRON_DIST`), passes `-c.electronDist` and `-c.afterPack`, drops the `--` separator pnpm
+  forwards, and re-verifies the packaged bundles afterwards.
+- Wired into `pack`, `dist:mac`, the macOS branch of `build-desktop-release.mjs` (so `dist` is
+  covered) and `release-macos.sh` (which now requires a distribution). Windows and Linux lanes are
+  untouched; `window-menu.test.mjs` recognizes the new packaging entry.
+- ADR 0308 and `docs/spec/06-delivery/06-release-runbook.md` record the decision, the measurements
+  and the packaging instructions.
+
+### Measured evidence
+
+Controlled comparison on one machine with the same unsigned packaging lane, so the main executable
+UUID is the only changed variable:
+
+| Observation | Shared UUID (before) | Relinked UUID (after) |
+| --- | --- | --- |
+| Local Network prompt | never shown | shown, and the operator granted it |
+| System Settings → Local Network | `PI-Desktop` only | `Pi-Desktop-Plus` present |
+| LAN request to the local gateway | 29 of 29 `net::ERR_ADDRESS_UNREACHABLE` | real HTTP response (`401`: reachable, not discovery success) |
+
+Two packaging hazards were found here and are now guarded:
+
+1. electron-builder only warns when an `extraResources` source does not exist and still finishes,
+   which shipped a `host unavailable` build. The gate fails such a build.
+2. A bare `--` forwarded by `pnpm run <script> -- <args>` made electron-builder ignore every flag
+   after it, silently packaging the stock distribution. The wrapper drops it and re-verifies the
+   packaged UUIDs.
+
+### Validation run in this turn
+
+```text
+node --test apps/desktop/test/window-menu.test.mjs        -> 10 pass, 0 fail
+node --test test/*.test.mjs (whole desktop suite)         -> 2959 tests, 2958 pass, 1 skipped, 0 fail
+node --test <the 10 required files>                       -> 115 pass, 0 fail
+pnpm lint                                                  -> passed
+node docs/scripts/check-docs.mjs                           -> 528 pages verified
+CSC_IDENTITY_AUTO_DISCOVERY=false pnpm --filter @pi-desktop/desktop dist:mac -- --arm64
+  -> exit 0; "using custom unpacked Electron distribution";
+     [identity-gate] candidate main executable UUID independent of input; host sidecar present;
+     [package-macos] verified 2 packaged bundle(s) carry an independent main executable UUID
+```
+
+Not run: the Developer ID + notarized release lane (no certificate on this host, and
+`verify-macos-release.sh` requires Developer ID and stapling) and the x64 slice (arm64 host). The
+Apple Development lane is intermittently unusable here: three of four attempts failed inside code
+signing with `A timestamp was expected but was not found` at a different nested file each time,
+while signing that same file in isolation succeeds and carries a timestamp — a timestamp-authority
+throttling condition of this machine, not of the change. One signed build did complete, and it is
+the one that exposed the silent `--` fallback; the corrected lane was therefore validated unsigned.
