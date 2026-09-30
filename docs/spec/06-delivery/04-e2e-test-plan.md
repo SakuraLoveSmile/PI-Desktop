@@ -8,6 +8,30 @@
 
 ## 1. Goals
 
+### E2E-LIVE-VOICE-public-settings-and-reconnect
+
+- **Preconditions:** A built production Renderer and real Electron/Main/Host,
+  isolated data/profile/project, developer mode off, a local TLS Realtime
+  fixture and synthetic microphone. Trust only the fixture CA in the child
+  process; do not disable TLS, sender, sandbox or microphone checks.
+- **Steps:** Open Live from Composer while disabled and follow Open settings.
+  Find Voice through settings search, bind the fixture account, enable Live,
+  connect, unmute, receive audio/captions, mute and hang up. Cancel a delayed
+  startup, disconnect the provider and explicitly reconnect. Restart with the
+  same isolated profile, inspect persisted settings and disable Live.
+- **Expected:** Voice is reachable without developer mode. Enabling settings
+  does not capture audio; the real built Renderer passes the exact main-frame
+  owner check. Only the chosen account is used. Mute stops input, every end
+  closes media/socket resources, and failures never trigger an automatic new
+  call. Settings survive restart without reconnecting. Legacy Dictation
+  settings are unchanged; a voice-only call creates no Agent session.
+- **Coverage:** `pnpm test:e2e:live-voice` drives the built app and its concrete
+  Realtime GA adapter against local WSS; `live-voice-owner.test.mjs` bundles
+  the production owner module and rejects other files/frames. Fixture audio
+  is not physical-device or real-provider acceptance. Commands and results
+  are recorded in `docs/implementation/live-voice-public-readiness.md`.
+- **Specs:** [Live Voice](../03-runtime/live-voice.md).
+
 ### E2E-LIVE-VOICE-provider-call-lifecycle
 
 - **Preconditions:** Isolated desktop profile with Live Voice enabled and one
