@@ -30,7 +30,11 @@ async function wait(name, predicate) {
         const s = window.liveVoiceFixture?.inspect();
         const ui = window.voiceTest;
         if (${predicate}) return resolve(true);
-        if (performance.now() > deadline) return reject(new Error(${JSON.stringify(name)} + ': ' + JSON.stringify(s)));
+        if (performance.now() > deadline) return reject(new Error(${JSON.stringify(name)} + ': ' + JSON.stringify({
+          snapshot: s,
+          dialogs: [...document.querySelectorAll('[role="dialog"]')].map(element => ({ label: element.getAttribute('aria-label'), visible: ui?.visible(element) })),
+          triggers: [...document.querySelectorAll('button[aria-label="Live voice"]')].map(element => ({ expanded: element.getAttribute('aria-expanded'), visible: ui?.visible(element) })),
+        })));
         requestAnimationFrame(poll);
       } catch (error) { reject(error); }
     }
@@ -42,7 +46,14 @@ async function check(name, predicate) {
   results.push({ name, ok: true });
   console.log(`PASS ${name}`);
 }
+async function capture(name) {
+  if (process.env.PI_LIVE_VOICE_CAPTURE_UI !== "1") return;
+  await frame();
+  writeFileSync(artifact(`${name}.png`), (await win.webContents.capturePage()).toPNG());
+}
 async function click(expression) {
+  win.focus();
+  win.webContents.focus();
   const point = await evaluate(`(() => {
     const ui = window.voiceTest;
     const element = ${expression};
@@ -62,8 +73,26 @@ async function key(keyCode, modifiers = []) {
   win.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
   await frame();
 }
+async function selectOption(expression, value) {
+  const result = await evaluate(`(() => {
+    try {
+      const ui = window.voiceTest;
+      const element = ${expression};
+      if (!element || element.disabled) throw new Error('Missing or disabled select: ' + ${JSON.stringify(expression)});
+      element.focus();
+      element.value = ${JSON.stringify(value)};
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      return { ok: true };
+    } catch (error) { return { ok: false, error: String(error) }; }
+  })()`);
+  if (!result.ok) throw new Error(result.error);
+  await frame();
+}
 async function fresh(enabled = true) {
   await win.loadURL(process.env.PI_LIVE_VOICE_FIXTURE_URL);
+  if (!win.isVisible()) win.show();
+  win.focus();
+  win.webContents.focus();
   await wait("fixture loaded", "s?.snapshot.status && document.querySelector('[aria-label=\"Fixture shell navigation\"]')");
   await evaluate(`window.voiceTest = {
     visible(element) {
@@ -88,11 +117,12 @@ async function fresh(enabled = true) {
     },
     state(value) { return this.visible(document.querySelector('.live-voice-call-bar[data-state="' + value + '"]')); },
     dialog(selector) { return this.visible(document.querySelector(selector)); },
-  };`);
+  }; true`);
   if (enabled) {
     await evaluate("window.liveVoiceFixture.configure({ enabled: true })");
     await wait("Live Voice enabled", `s.snapshot.status.enabled && ${button("Live voice")}`);
   }
+  await frame();
 }
 const noMedia = "['prepare','connect','getUserMedia','audioContext'].every(name => s.counts[name] === 0)";
 const noDialog = "document.querySelectorAll('[role=dialog]').length === 0";
@@ -140,6 +170,7 @@ async function preparationScenario() {
   await openPreparation();
   await check("unavailable exact selection explains failure despite another ready account",
     `${button("Start Live voice", prep)}?.disabled && document.querySelector(${JSON.stringify(prep)})?.textContent.includes('Credentials missing') && s.snapshot.status.bindings[1].selectable && ${noMedia}`);
+  await capture("preparation-unavailable");
   await key("Escape");
   await clean();
 }
@@ -153,6 +184,7 @@ async function cancellationScenario() {
   await click(button("Cancel", bar));
   await check("Cancel enters stopping while deferred release remains pending",
     `ui.state('stopping') && s.snapshot.stopping && s.counts.released === 1 && s.tracks.every(track => track.readyState === 'ended') && !${button("Live voice")}`);
+  await capture("call-stopping");
   await evaluate("window.liveVoiceFixture.release('connect'); window.liveVoiceFixture.release('end')");
   await check("terminal host result cannot hide pending renderer release",
     `s.snapshot.call?.phase === 'ended' && s.snapshot.stopping && ui.state('stopping')`);
@@ -167,6 +199,7 @@ async function connectedScenario() {
   await start();
   await connected();
   await check("connected call starts muted with no details dialog", `${button("Unmute microphone", bar)} && s.snapshot.call.muted && ${noDialog}`);
+  await capture("call-connected");
   await evaluate("window.liveVoiceFixture.setPhase('reconnecting')");
   await check("reconnecting keeps an explicit End action", `ui.state('reconnecting') && ${button("End call", bar)} && !${button("Cancel", bar)} && !${button("Unmute microphone", bar)}`);
   await evaluate("window.liveVoiceFixture.setPhase('connected')");
@@ -179,6 +212,7 @@ async function connectedScenario() {
   for (const method of ["Close", "Escape", "outside"]) {
     await click(button("Call details", bar));
     await wait("details show actual transcript", `ui.dialog(${JSON.stringify(details)}) && document.querySelector(${JSON.stringify(details)})?.textContent.includes('Fixture provider transcript')`);
+    if (method === "Close") await capture("call-details");
     if (method === "Close") await click(button("Close", details));
     else if (method === "Escape") await key("Escape");
     else await click(button("Fixture chat route"));
@@ -221,9 +255,7 @@ async function workScenario() {
   await enableWork();
   await check("work and context require separate opt-ins", `${checkbox("Allow work requests")}?.checked && ${checkbox("Share limited recent conversation context")}?.checked === false && ${noMedia}`);
   await click(checkbox("Share limited recent conversation context"));
-  await click(`ui.named('select', 'Work session for the next call', ${JSON.stringify(prep)})`);
-  await key("End");
-  await key("Enter");
+  await selectOption(`ui.named('select', 'Work session for the next call', ${JSON.stringify(prep)})`, "fixture-session-2");
   await check("changing selected work session clears context consent",
     `ui.named('select', 'Work session for the next call', ${JSON.stringify(prep)})?.value === 'fixture-session-2' && ${checkbox("Share limited recent conversation context")}?.checked === false && ${noMedia}`);
   await click(checkbox("Share limited recent conversation context"));
@@ -257,7 +289,8 @@ async function unconfirmedReleaseScenario() {
     "s.snapshot.stopping && s.counts.released === 1 && s.contexts[0].state === 'closed' && ui.state('stopping')");
   await evaluate("window.liveVoiceFixture.terminalUnconfirmed()");
   await check("unconfirmed release stays visible and suppresses another Start",
-    `!s.snapshot.stopping && s.snapshot.call?.error?.code === 'LIVE_MEDIA_RELEASE_UNCONFIRMED' && ui.visible(document.querySelector('.live-voice-status-host')) && !${button("Live voice")} && !${button("Dismiss", bar)}`);
+    `!s.snapshot.stopping && s.snapshot.call?.error?.code === 'LIVE_MEDIA_RELEASE_UNCONFIRMED' && ui.visible(document.querySelector('.live-voice-status-host')) && ui.all('[role="alert"]').some(element => element.textContent.includes('Microphone release could not be confirmed')) && !${button("Live voice")} && !${button("Dismiss", bar)}`);
+  await capture("call-release-quarantined");
   const attempt = await evaluate("window.liveVoiceFixture.attemptStart()");
   assert.equal(attempt, "LIVE_MEDIA_RELEASE_UNCONFIRMED");
   await check("Main quarantine cannot be cleared by retrying from the controller",

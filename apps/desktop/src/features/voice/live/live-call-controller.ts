@@ -288,6 +288,9 @@ export class LiveCallController {
       await resources.pcm?.resumePlayback();
       await resources.audio?.play();
       await liveVoiceApi.reportMedia({ callId: call.callId, kind: "playback-blocked", blocked: false });
+      if (this.snapshot.errorCode === "LIVE_PLAYBACK_FAILED" || this.snapshot.errorCode === "LIVE_PLAYBACK_BLOCKED") {
+        this.patch({ errorCode: undefined });
+      }
     } catch (error) {
       this.patch({ errorCode: errorCode(error) });
     }

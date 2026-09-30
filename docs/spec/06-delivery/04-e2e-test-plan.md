@@ -93,11 +93,14 @@
   [Settings IA](../04-ux/06-settings-ia.md#voice-experimental).
 - **Acceptance:** C / E / Security / Quality.
 - **Milestone:** Post-MVP experimental interaction maintenance.
-- **Coverage:** Planned targeted component/controller regression coverage and an
-  isolated Electron fixture journey. Existing lifecycle and shortcut tests do
-  not by themselves prove the new four-stage UI or navigation/cleanup races.
-- **Status:** Planned; task-candidate fixture execution is pending. No green E2E
-  or real-provider/device result is claimed for this scenario.
+- **Coverage:** Targeted controller/presentation regression tests and
+  `pnpm test:e2e:live-voice-interaction` cover the mounted production controls,
+  controller, store, shortcuts, i18n, cleanup ordering, work consent, and error
+  recovery with simulated shell navigation and fake external edges. This does
+  not mount full AppShell/settings/plugin routes or exercise a real provider,
+  device, permission prompt, or audio output.
+- **Status:** Task-candidate fixture passed 48/48 interaction checks. Full
+  AppShell, real-provider, and device compatibility remain unverified.
 
 ### E2E-LIVE-WORK-session-admission
 
