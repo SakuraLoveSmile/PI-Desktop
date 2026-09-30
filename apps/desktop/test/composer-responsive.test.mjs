@@ -69,4 +69,12 @@ test("composer toolbar applies dense control row with tight left cluster and rig
     styles,
     /\.composer-right\s*\{[\s\S]*?display:\s*flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*4px;[\s\S]*?flex:\s*0 0 auto;[\s\S]*?margin-left:\s*auto;/,
   );
+  assert.match(
+    styles,
+    /\.composer-profile-chip\s*\{[\s\S]*?width:\s*auto !important;[\s\S]*?max-width:\s*130px;[\s\S]*?padding:\s*0 8px !important;[\s\S]*?gap:\s*4px !important;/,
+  );
+  assert.match(
+    styles,
+    /\.composer-contract-chip\s*\{[\s\S]*?width:\s*auto !important;[\s\S]*?max-width:\s*110px;[\s\S]*?padding:\s*0 8px !important;[\s\S]*?gap:\s*4px !important;/,
+  );
 });
