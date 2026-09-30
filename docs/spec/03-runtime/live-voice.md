@@ -61,8 +61,11 @@ persisted settings:
    access, creates media resources, or contacts a voice provider. It identifies
    the exact selected binding and its readiness reason; another ready binding
    does not make an unavailable selected binding usable. Start is explicit and
-   starts muted. Optional work access is collapsed initially and requires its
-   own opt-in plus a valid local target; expanding it is not authorization.
+   starts muted. The current Composer session is the default work target when
+   present; there is no per-call work-access checkbox or mandatory target
+   preselection. The user may switch targets by voice after the call starts.
+   Optional bounded session-context sharing remains a separate, default-off
+   consent and grants no work permission.
 3. **Call in progress:** a stable global compact bar shows startup with Cancel,
    connected state with mute/unmute, End and Details, and stopping with an
    explicit Ending state. It is mounted in persistent AppShell chrome outside
@@ -91,9 +94,10 @@ Turning the feature off removes idle entry points, not pending cleanup
 visibility. In-app page/session navigation is distinct from renderer
 navigation or loss, which keeps its existing termination policy.
 
-The configurable Live Voice toggle shortcut deliberately starts a voice-only
-call directly from idle and ends an active call, preserving the existing
-shortcut contract. It does not inherit a preparation surface's work choice.
+The configurable Live Voice toggle shortcut deliberately starts a call
+directly from idle and ends an active call, preserving the existing shortcut
+contract. Its initial work target is the current Composer session, when
+present; it does not inherit a preparation surface's context consent.
 The startup-cancel shortcut (Escape by default) cancels startup only if an open
 popup has not consumed that key. Escape never ends a connected call.
 
