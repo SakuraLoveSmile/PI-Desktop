@@ -8,6 +8,7 @@
 
 const LIVE_MODELS_TIMEOUT_MS = 8_000;
 const MAX_RETRY_DELAY_MS = 1_000;
+const MAX_ERROR_EXCERPT_CHARS = 300;
 
 /**
  * `client_version` sent to ChatGPT's `GET /codex/models`.
@@ -369,6 +370,67 @@ function retryDelayMs(response: Response): number {
   return Math.min(delay, MAX_RETRY_DELAY_MS);
 }
 
+/** A non-2xx model-list response. `responseExcerpt` is safe to log. */
+export class VendorModelListError extends Error {
+  readonly status: number;
+  readonly responseExcerpt: string | undefined;
+
+  constructor(status: number, responseExcerpt: string | undefined) {
+    super(`model list request failed (${status})`);
+    this.name = "VendorModelListError";
+    this.status = status;
+    this.responseExcerpt = responseExcerpt;
+  }
+}
+
+const CREDENTIAL_HEADER = /^(?:authorization|x-api-key)$/i;
+const BEARER_VALUE = /\b(?:bearer|basic)\s+[A-Za-z0-9+/_=.~-]+/gi;
+const JWT_VALUE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g;
+const REDACTED = "***REDACTED***";
+
+function requestCredentials(headers: Record<string, string>): string[] {
+  return Object.entries(headers).flatMap(([name, value]) => {
+    if (!CREDENTIAL_HEADER.test(name)) return [];
+    const secret = value.replace(/^(?:bearer|basic)\s+/i, "").trim();
+    return secret.length >= 8 ? [secret] : [];
+  });
+}
+
+/**
+ * Short, single-line excerpt of an error body with the request's own
+ * credentials and anything token-shaped removed, so a failure can be
+ * diagnosed from the log without leaking the account token.
+ */
+export function summarizeErrorBody(
+  body: string,
+  headers: Record<string, string>,
+): string | undefined {
+  let text = body;
+  for (const secret of requestCredentials(headers)) {
+    text = text.split(secret).join(REDACTED);
+  }
+  text = text
+    .replace(BEARER_VALUE, (match) => `${match.split(/\s+/, 1)[0]} ${REDACTED}`)
+    .replace(JWT_VALUE, REDACTED)
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) return undefined;
+  return text.length > MAX_ERROR_EXCERPT_CHARS
+    ? `${text.slice(0, MAX_ERROR_EXCERPT_CHARS)}…`
+    : text;
+}
+
+async function errorExcerpt(
+  response: Response,
+  headers: Record<string, string>,
+): Promise<string | undefined> {
+  try {
+    return summarizeErrorBody(await response.text(), headers);
+  } catch {
+    return undefined;
+  }
+}
+
 /** GET the vendor model list. Retries one HTTP 429, then throws. */
 export async function readVendorModelList(
   request: VendorModelListRequest,
@@ -392,7 +454,10 @@ export async function readVendorModelList(
         continue;
       }
       if (!response.ok) {
-        throw new Error(`model list request failed (${response.status})`);
+        throw new VendorModelListError(
+          response.status,
+          await errorExcerpt(response, request.headers),
+        );
       }
       return await response.json();
     } finally {

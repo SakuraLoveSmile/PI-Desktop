@@ -46,6 +46,7 @@ import {
   parseVendorModelIds,
   pinnedSiblingId,
   readVendorModelList,
+  VendorModelListError,
   vendorModelListRequest,
   wireForLiveModel,
 } from "./vendor-live-models.ts";
@@ -534,6 +535,9 @@ export class VendorOAuth {
       this.log("warn", "vendor account model list failed", {
         vendorId: account.vendorId,
         message: error instanceof Error ? error.message : String(error),
+        ...(error instanceof VendorModelListError
+          ? { status: error.status, responseExcerpt: error.responseExcerpt }
+          : {}),
       });
       return this.rememberLiveModels(account.providerId, null);
     }

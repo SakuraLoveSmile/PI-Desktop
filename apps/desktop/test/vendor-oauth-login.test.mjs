@@ -170,6 +170,7 @@ function harness(options = {}) {
       return fakeModels(store, options);
     },
     modelConfigFor: options.modelConfigFor,
+    log: options.log,
     newId: () => `id-${++counter}`,
     fetch:
       options.fetch ??
@@ -834,3 +835,32 @@ test("a ChatGPT account lists the models /codex/models returns for its client ve
   assert.equal(binding.baseUrl, "https://chatgpt.com/backend-api");
 });
 
+test("a failed ChatGPT model list logs the status and a token-free response excerpt", async () => {
+  const logs = [];
+  const code = codexLoginCode();
+  const fetchModels = async () => new Response(JSON.stringify({
+    detail: [{ loc: ["query", "client_version"], msg: "Field required" }],
+    echoed: `access-for-${code}`,
+  }), { status: 400 });
+  const { host, events, oauth } = harness({
+    fetch: fetchModels,
+    log: (level, message, data) => logs.push({ level, message, data }),
+    provider: codexProvider(),
+    models: [codexModel("gpt-6-luna")],
+  });
+  const { loginId } = await oauth.start("openai-codex");
+  const prompt = await waitFor(events, "prompt");
+  oauth.respond({ loginId, promptId: prompt.request.promptId, value: code });
+  const done = await waitFor(events, "done");
+  // pi-ai's pinned list is still the fallback.
+  assert.deepEqual(host.providers.get(done.providerId).models.map((model) => model.id), ["gpt-6-luna"]);
+  const failed = logs.find((entry) => entry.message === "vendor account model list failed");
+  assert.ok(failed, `no model list failure log; saw ${logs.map((entry) => entry.message).join(", ")}`);
+  assert.equal(failed.level, "warn");
+  assert.equal(failed.data.vendorId, "openai-codex");
+  assert.equal(failed.data.status, 400);
+  assert.match(failed.data.responseExcerpt, /client_version/);
+  const logged = JSON.stringify(logs);
+  assert.equal(logged.includes(code), false);
+  assert.equal(logged.includes(code.split(".")[1]), false);
+});

@@ -415,6 +415,8 @@ Codex CLI 版本（`CODEX_MODELS_CLIENT_VERSION`），账户模型缺失时调�
 只有在其家族已经对应唯一线路 API 时才加入。Anthropic 用 OAuth 身份头请求
 `GET {base}/v1/models`。Kimi、Meta、xAI、OpenRouter 请求 `GET {base}/models`
 （Kimi 走 Anthropic 风格的 `/v1`）。Radius 继续用网关目录刷新，不再另打一遍。
+账户请求失败时，日志记录 HTTP 状态码和一小段单行的响应内容摘要，其中去掉了
+请求自身的凭据和任何形似令牌的值，便于从提供商日志诊断上游契约变化。
 图像、视频、语音和嵌入模型会被丢掉。models.dev 不认识的 id 只从同档位的 pin
 兄弟继承限额，xAI 按 `grok-4.7`、`grok-4.6`、`grok-4.5`、`grok-4.3` 的固定新到旧顺序，
 不按 pin 顺序。models.dev 不能把账户列表里没有的 id 加进去。一个厂商可以

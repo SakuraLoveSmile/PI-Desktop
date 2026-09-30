@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   CODEX_MODELS_CLIENT_VERSION,
+  VendorModelListError,
   parseVendorModelIds,
   pinnedSiblingId,
+  readVendorModelList,
   vendorModelListRequest,
   wireForLiveModel,
 } from "../electron/main/vendor-live-models.ts";
@@ -114,3 +116,34 @@ test("Copilot only keeps a new id when its family has one wire API", () => {
   );
 });
 
+test("a failed model list keeps a token-free excerpt of the response body", async () => {
+  const token = codexToken();
+  const request = vendorModelListRequest({ vendorId: "openai-codex", apiKey: token });
+  const body = JSON.stringify({
+    detail: [{ loc: ["query", "client_version"], msg: "Field required" }],
+    echoed: `Bearer ${token}`,
+    raw: token,
+    other: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.c2ln",
+    padding: "x".repeat(2_000),
+  });
+  const fetchImpl = async () => new Response(body, { status: 400 });
+  const error = await readVendorModelList(request, fetchImpl).catch((caught) => caught);
+  assert.ok(error instanceof VendorModelListError);
+  assert.equal(error.status, 400);
+  assert.equal(error.message, "model list request failed (400)");
+  assert.match(error.responseExcerpt, /client_version/);
+  assert.match(error.responseExcerpt, /Field required/);
+  assert.equal(error.responseExcerpt.includes(token), false);
+  assert.equal(error.responseExcerpt.includes(token.split(".")[1]), false);
+  assert.equal(error.responseExcerpt.includes("eyJhbGciOiJIUzI1NiJ9"), false);
+  assert.ok(error.responseExcerpt.length <= 301);
+});
+
+test("a failed model list with an empty body has no excerpt", async () => {
+  const request = vendorModelListRequest({ vendorId: "xai", apiKey: "xai-token-123456" });
+  const fetchImpl = async () => new Response("", { status: 503 });
+  const error = await readVendorModelList(request, fetchImpl).catch((caught) => caught);
+  assert.ok(error instanceof VendorModelListError);
+  assert.equal(error.status, 503);
+  assert.equal(error.responseExcerpt, undefined);
+});

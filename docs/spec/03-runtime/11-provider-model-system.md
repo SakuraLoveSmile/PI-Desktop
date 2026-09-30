@@ -514,6 +514,11 @@ is the endpoint that vendor actually publishes:
   for Kimi). xAI still drops image and video generators.
 - Radius keeps its gateway catalog refresh and is not probed again.
 
+A failed account request logs the HTTP status and a short, single-line
+excerpt of the response body with the request's credentials and any
+token-shaped value removed, so an upstream contract change is diagnosable
+from the provider log.
+
 Image, video, speech and embedding ids are dropped. A model models.dev does
 not know yet inherits limits from a pinned sibling of the same tier; xAI uses
 an explicit newest-first sibling (`grok-4.7`, then `grok-4.6`, then
