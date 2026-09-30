@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CircleAlert,
   CircleCheck,
   CircleHelp,
@@ -197,9 +198,10 @@ export const IconSquare = icon(Square);
 export const IconSliders = icon(SlidersHorizontal);
 export const IconConfig = icon(RefreshCcw);
 export const IconChevronLeft = icon(ChevronLeft);
-export const IconChevronRight = icon(ChevronRight);
 export const IconExternal = icon(ExternalLink);
 export const IconArrowUpRight = icon(ArrowUpRight);
+export const IconChevronRight = icon(ChevronRight);
+export const IconChevronUp = icon(ChevronUp);
 export const IconUndo2 = icon(Undo2);
 export const IconCloudDown = icon(CloudDownload);
 export const IconDownload = icon(Download);

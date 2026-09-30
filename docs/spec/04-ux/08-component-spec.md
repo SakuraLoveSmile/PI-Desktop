@@ -1641,10 +1641,20 @@ storage but compose into one assistant turn until the next user message.
   to the first contentful fragment. Tool-only rows do not create markers or
   split an AI response, and a one-page transcript never shows the rail.
 - Marker previews are capped at 280 source characters and are display-only
-- Derived visible rows, minimap rows, and activity grouping are memoized by the
-  `messages` snapshot. Completed message rows, composed assistant turns, and
-  activity groups keep stable render boundaries while only the current stream
-  fragment changes.
+- Derived visible rows, minimap rows, and activity grouping share the immutable
+  `messages` projection with the Composer context inspector. After warm-up, an
+  ordinary same-shape delta updates indexed changed rows without rereading
+  unchanged message bodies or rebuilding completed groups. This applies to the
+  normal 100-row page and deliberately loaded full histories, and to foreground
+  and background session caches. Shallow array copies
+  remain permitted; cold loads and structural changes may rebuild the projection.
+- Completed rows and unchanged parts within a large active turn/activity group
+  retain their render boundaries. Deferred presentation consumes one immutable
+  projection snapshot. Older-row and child updates, terminal re-keying, Copy,
+  disclosure state, minimap previews, session switching, and reader-owned scroll
+  positions must remain fresh; performance reuse must not hide these changes.
+  Event-to-DOM latency, long tasks, and heap samples are diagnostics, not a
+  hardware-independent timing guarantee.
 
 ---
 
@@ -1718,10 +1728,11 @@ Single message render — either user (plaintext) or assistant (markdown streami
   Confirmation is scoped to the message text, workspace path, and session; changing
   any of these discards old results and cancels queued work. Newly created
   files are reconsidered when the message remounts or its scope changes, not
-  by polling. Non-ASCII filenames remain supported. Absolute and `~/` tokens are matched whole,
-  and one outside the workspace (or any home path) stays plain text rather
-  than rendering a chip that could never open — containment is unchanged
-  (D322). Clicking a chip
+  by polling. Non-ASCII filenames, spaces, and Windows drive/backslash paths
+  remain whole candidates. User-message paths outside the allowed roots stay
+  plain after verification, while assistant references and tool paths remain
+  clickable so the opener can explain the access limit. Home paths stay plain.
+  Clicking a chip
    completes the reference through `pi-desktop/fs/resolveRef` — the whole open
    project is searched, its group's folders primary first (ADR 0263) — and opens
    where it resolved: a project file in the bundled `pi.file-manager` work-panel
@@ -1731,7 +1742,8 @@ Single message render — either user (plaintext) or assistant (markdown streami
    view as a project-relative path and a sibling-folder file as an absolute one,
    which is also how scratch and attachment files are addressed. A resolved
    image thumbnail resolves and opens the same way. A chip whose reference
-   matches nothing opens nothing and reports itself; the OS default application
+   matches nothing opens nothing and reports itself; an absolute path outside
+   every allowed root reports the access limit separately. The OS default application
    is no longer what this click does.
   HTTP(S) URLs remain inline text links. Bare URLs preserve balanced parentheses
   in paths, queries, and fragments; an unmatched closing parenthesis wrapping
@@ -1745,7 +1757,10 @@ Single message render — either user (plaintext) or assistant (markdown streami
   link address. Modifier clicks (Ctrl/Cmd/Shift/Alt) continue to open
   externally. Long URL links wrap
   within the plate and keep logical-start alignment instead of inheriting the
-  browser's centered button text.
+  browser's centered button text. They stay part of the selectable message
+  text: a drag across the plate selects the URL with its surrounding prose,
+  and copying that selection keeps the URL, even though the link is a button
+  and chrome buttons are otherwise unselectable.
 - Assistant: transparent surface, left-aligned, markdown rendered at full
   content width. Workspace file paths in that markdown are previewable:
   inline code, markdown links, and bare path tokens (with a known
@@ -2816,6 +2831,27 @@ reasoning-level control.
   renderer-owned FIFO list above the shell. Rows show the visible prompt (or
   file-reference names), expose independent Remove and Send now actions, and
   increase the dock height measured by `--composer-dock-height`.
+
+### 11.3a Session TodoDock
+
+- The Composer stack places TodoDock above Plan/Goal approval surfaces when the
+  active session has a non-empty host-owned checklist. An empty checklist does
+  not reserve layout space.
+- The collapsed header shows completed/active progress and the current
+  `in_progress` content. A checklist whose items are all cancelled has a clear
+  cancelled label instead of a misleading `0/0 completed` count.
+- The disclosure is keyboard accessible, does not take focus on updates, resets
+  closed when the active session changes, and shows at most eight ordered rows.
+  The list stays mounted while collapsed so opening and closing can animate with
+  a bounded height/opacity transition; collapsed content is `aria-hidden` and
+  reduced-motion users receive an immediate state change. Completed rows use a
+  success-tinted tile with a check icon, in-progress rows use the accent tint,
+  and cancelled rows are muted; each status symbol has a localized accessible
+  name and each row renders plain text.
+- Renderer snapshots are keyed by session id. A `todos.changed` event with an
+  older or equal revision is ignored. The initial `todos.get` recovery is
+  skipped for `remote:` sessions because remote Todo parity is deferred until an
+  additive RACP contract exists.
 
 ### 11.4 States
 

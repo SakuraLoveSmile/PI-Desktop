@@ -1634,6 +1634,12 @@ Desktop-only MCP market channels (not host RPC) live on Electron IPC:
 
 Browser-based OAuth 2.1 authentication for HTTP MCP servers is handled in the Electron main process via non-blocking IPC invocations and an event stream:
 
+Discovery preserves authorization-server issuer paths, trying OAuth path insertion,
+OIDC path insertion, then OIDC path appending (root issuers use the two root URLs).
+The authorization request uses the initial 401 Bearer challenge's `scope`, otherwise
+all valid protected-resource `scopes_supported` entries, otherwise omits `scope`.
+Authorization-server scope catalogs do not add or select requested permissions.
+
 - `pi-desktop/mcp/oauth/start({ id, level?, projectPath? }) -> { ok: true, loginId }`
   Initiates OAuth metadata discovery and PKCE authorization code flow. Returns immediately; user browser navigation and callback exchange proceed asynchronously in the background.
 - `pi-desktop/mcp/oauth/cancel({ loginId?, id? }) -> { ok: boolean }`
@@ -1802,7 +1808,7 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   `.mp4` symlink inside its private app-data directory before the OS handoff,
   so the extensionless blob has a media association without copying its bytes.
 - `fs/resolveRef({ref, sessionId?})` → `FsChatRefResolveResult`
-  (`{ match: FsChatRefMatch | null }`, the match naming the answering `root`
+  (`{ match: FsChatRefMatch | null, reason?: "outside-allowed-roots" }`, the match naming the answering `root`
   (`workspace` / `scratch` / `attachments`), the `relativePath` relative to that
   root, the absolute `absolutePath`, `matchedBy` (`exact-relative` /
   `exact-absolute` / `path-suffix` / `basename`), and — for a `workspace` match
@@ -1810,8 +1816,8 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   that answered); `sessionId` selects the
   session whose scratch store is searched. Completes a file reference the agent
   printed in chat, because the renderer cannot see the session's own scratch
-  store: an absolute reference that already names a real file inside a known
-  root wins outright, and an `attachments/<sha256>` blob resolves against the
+  store: an absolute reference only matches that exact file inside a known
+  root, and an `attachments/<sha256>` blob resolves against the
   attachment store directly; otherwise the roots are searched in priority order
   — the open project first, the session's own scratch store
   (`<data_dir>/scratch/<sessionId>/`, ADR 0124) second, the attachment store
@@ -1821,8 +1827,13 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   so a shorthand resolves in a sibling folder as readily as in the primary one,
   and the match names the folder that answered. Inside one root an exact path
   beats a shorthand; among shorthands the longest matching tail wins, then the
-  shallowest path. The files-panel ignore set applies. A reference that matches
-  nothing returns `match: null`; resolving never opens anything (ADR 0262).
+  shallowest path. Relative and indexed candidates must resolve to regular files
+  whose real paths remain inside their answering root; an exact path through an
+  escaping or dangling link cannot fall back to a same-name indexed file. The
+  files-panel ignore set applies. A reference that matches
+  nothing returns `match: null`; an absolute path outside every allowed root
+  also returns `reason: "outside-allowed-roots"`, without trying a same-name
+  file inside a root. Resolving never opens anything (ADR 0262).
 - `fs/list` stays workspace-only; traversal outside is rejected
   (`INVALID_ARGUMENT`).
 

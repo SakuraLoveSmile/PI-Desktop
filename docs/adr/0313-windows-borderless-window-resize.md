@@ -1,4 +1,4 @@
-# ADR 0312: Preserve Windows resizing without the native frameless rim
+# ADR 0313: Preserve Windows resizing without the native frameless rim
 
 - Status: Accepted
 - Date: 2026-09-29

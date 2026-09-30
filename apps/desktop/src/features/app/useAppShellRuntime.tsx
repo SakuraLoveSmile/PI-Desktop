@@ -577,6 +577,9 @@ export function useAppShellRuntime() {
       useAppStore.getState().applyQueueChanged(event),
     );
     const offPlansChanged = api.onPlansChanged(handlePlansChanged);
+    const offTodosChanged = api.onTodosChanged((snapshot) =>
+      useAppStore.getState().applyTodosChanged(snapshot),
+    );
     // Host-pushed toasts (plugin runtime etc.) are informational.
     const offToast = api.onToast((message) => showToast(message));
     const offNotificationSound = api.onNotificationSound(playNotificationChime);
@@ -810,6 +813,7 @@ export function useAppShellRuntime() {
       offEvent();
       offQueueChanged();
       offPlansChanged();
+      offTodosChanged();
       offToast();
       offNotificationSound();
       offInsecureEndpoint();

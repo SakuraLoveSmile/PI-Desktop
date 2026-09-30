@@ -419,7 +419,7 @@ export type PluginHostServices = {
     name: string;
     ok: boolean;
     message?: string;
-  }) => void;
+  }) => Promise<void> | void;
   /** Work-panel guest + CDP, gated by `browser.cdp` in the runtime. */
   browser?: {
     navigate: (
@@ -2052,7 +2052,7 @@ export class PluginRuntime {
         ok: true,
         ts: Date.now(),
       });
-      this.services.onPluginReloaded?.({ pluginId, name: manifest.name, ok: true });
+      await this.services.onPluginReloaded?.({ pluginId, name: manifest.name, ok: true });
     } catch (error) {
       const message = (error as Error).message;
       this.services.audit?.({
@@ -2062,7 +2062,7 @@ export class PluginRuntime {
         message,
         ts: Date.now(),
       });
-      this.services.onPluginReloaded?.({ pluginId, name, ok: false, message });
+      await this.services.onPluginReloaded?.({ pluginId, name, ok: false, message });
     } finally {
       this.reloading.delete(pluginId);
     }
