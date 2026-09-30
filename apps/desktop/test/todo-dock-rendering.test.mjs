@@ -50,9 +50,11 @@ test("TodoDock renders bounded session progress and cancelled state", async () =
       },
     });
     const html = render();
-    assert.match(html, /1\/12 · Current: second/);
-    assert.doesNotMatch(html, /extra-0/);
     assert.match(html, /aria-expanded="false"/);
+    assert.match(html, /class="todo-dock-content" aria-hidden="true"/);
+    assert.match(html, /extra-0/);
+    assert.match(html, /4 more items/);
+    assert.match(html, /lucide-check/);
 
     Object.assign(useAppStore.getInitialState(), {
       sessionTodos: {
@@ -71,4 +73,14 @@ test("TodoDock renders bounded session progress and cancelled state", async () =
   } finally {
     await server.close();
   }
+});
+
+test("TodoDock uses a quiet disclosure animation and state surfaces", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const css = await readFile(new URL("../src/styles/composer.css", import.meta.url), "utf8");
+  assert.match(css, /\.todo-dock-header:active:not\(:disabled\)\s*\{[\s\S]*?transform:\s*none;/);
+  assert.match(css, /\.todo-dock-content\s*\{[\s\S]*?grid-template-rows:\s*0fr;[\s\S]*?opacity:\s*0;/);
+  assert.match(css, /\.todo-dock\.is-expanded \.todo-dock-content\s*\{[\s\S]*?grid-template-rows:\s*1fr;/);
+  assert.match(css, /\.todo-dock-row-completed\s*\{[\s\S]*?var\(--ds-success\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.todo-dock-content/);
 });

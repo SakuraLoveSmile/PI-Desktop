@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SessionTodo, TodoStatus } from "@pi-desktop/shared";
 import { Button } from "./ui";
-import { IconChevronDown, IconChevronUp } from "./icons";
+import { IconCheck, IconChevronDown, IconChevronUp } from "./icons";
 import { api } from "../lib/api";
 import { useAppStore } from "../stores/app-store";
 
@@ -10,8 +10,6 @@ const VISIBLE_LIMIT = 8;
 
 function statusSymbol(status: TodoStatus): string {
   switch (status) {
-    case "completed":
-      return "✓";
     case "in_progress":
       return "◐";
     case "cancelled":
@@ -44,7 +42,7 @@ export function TodoDock({ sessionId }: { sessionId: string }) {
   const finished = snapshot.todos.every(
     (todo) => todo.status === "completed" || todo.status === "cancelled",
   );
-  const visible = expanded ? snapshot.todos.slice(0, VISIBLE_LIMIT) : [];
+  const visible = snapshot.todos.slice(0, VISIBLE_LIMIT);
   const remaining = Math.max(0, snapshot.todos.length - VISIBLE_LIMIT);
   const statusLabel = allCancelled
     ? t("chat.todo.status.cancelled")
@@ -69,7 +67,7 @@ export function TodoDock({ sessionId }: { sessionId: string }) {
         <span className="todo-dock-header-text">{statusLabel}</span>
         {expanded ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
       </Button>
-      {expanded ? (
+      <div className="todo-dock-content" aria-hidden={!expanded}>
         <div className="todo-dock-list" role="list">
           {visible.map((todo, index) => (
             <TodoRow key={`${index}:${todo.content}`} todo={todo} />
@@ -80,7 +78,7 @@ export function TodoDock({ sessionId }: { sessionId: string }) {
             </div>
           ) : null}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -88,10 +86,11 @@ export function TodoDock({ sessionId }: { sessionId: string }) {
 function TodoRow({ todo }: { todo: SessionTodo }) {
   const { t } = useTranslation();
   const label = t(`chat.todo.status.${todo.status}`);
+  const completed = todo.status === "completed";
   return (
     <div className={`todo-dock-row todo-dock-row-${todo.status}`} role="listitem">
       <span className="todo-dock-row-symbol" role="img" aria-label={label} title={label}>
-        {statusSymbol(todo.status)}
+        {completed ? <IconCheck size={13} aria-hidden /> : statusSymbol(todo.status)}
       </span>
       <span className="todo-dock-row-content" title={todo.content}>
         {todo.content}

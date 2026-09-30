@@ -2840,8 +2840,12 @@ reasoning-level control.
   cancelled label instead of a misleading `0/0 completed` count.
 - The disclosure is keyboard accessible, does not take focus on updates, resets
   closed when the active session changes, and shows at most eight ordered rows.
-  Each status symbol has a localized accessible name and each row renders plain
-  text content.
+  The list stays mounted while collapsed so opening and closing can animate with
+  a bounded height/opacity transition; collapsed content is `aria-hidden` and
+  reduced-motion users receive an immediate state change. Completed rows use a
+  success-tinted tile with a check icon, in-progress rows use the accent tint,
+  and cancelled rows are muted; each status symbol has a localized accessible
+  name and each row renders plain text.
 - Renderer snapshots are keyed by session id. A `todos.changed` event with an
   older or equal revision is ignored. The initial `todos.get` recovery is
   skipped for `remote:` sessions because remote Todo parity is deferred until an
