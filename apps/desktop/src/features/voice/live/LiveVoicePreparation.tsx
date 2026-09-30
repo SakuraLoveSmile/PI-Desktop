@@ -21,12 +21,12 @@ export function LiveVoicePreparation({
 }) {
   const sessions = useAppStore((state) => state.sessions);
   const createSession = useAppStore((state) => state.newSession);
+  const showToast = useAppStore((state) => state.showToast);
   const [workExpanded, setWorkExpanded] = useState(false);
   const [allowWork, setAllowWork] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState(workSessionId ?? "");
   const [contextEnabled, setContextEnabled] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [createFailed, setCreateFailed] = useState(false);
   useEffect(() => {
     setSelectedSessionId(workSessionId ?? "");
     setContextEnabled(false);
@@ -41,15 +41,14 @@ export function LiveVoicePreparation({
 
   const createWorkSession = async () => {
     setCreating(true);
-    setCreateFailed(false);
     try {
       await createSession();
       const id = useAppStore.getState().activeSessionId;
       if (id) setSelectedSessionId(id);
-      else setCreateFailed(true);
+      else showToast(t("liveVoice.sessionCreateFailed"), { variant: "error" });
       setContextEnabled(false);
     } catch {
-      setCreateFailed(true);
+      showToast(t("liveVoice.sessionCreateFailed"), { variant: "error" });
     } finally {
       setCreating(false);
     }
@@ -125,7 +124,6 @@ export function LiveVoicePreparation({
         </div>
       ) : null}
       {workUnavailable ? <p className="live-voice-hint" role="status">{t("liveVoice.noWorkSession")}</p> : null}
-      {createFailed ? <p className="live-voice-error" role="alert">{t("liveVoice.sessionCreateFailed")}</p> : null}
       <Button
         type="button"
         variant="primary"

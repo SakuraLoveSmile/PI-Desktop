@@ -473,8 +473,11 @@ a usage tab.
     `/messages`, `/chat/completions`, or `/responses` when the field loses
     focus. The placeholder is enough — no helper paragraph under the URL.
     Invalid URLs show an inline error and block discovery and save. A failed
-    model-list probe shows a compact classified error in the empty pane, or a
-    one-line banner above a cached list; raw HTTP/JSON dumps are not shown.
+    model-list probe reports one classified sentence through the app toast and
+    leaves a one-line “no list” label in the empty pane, or the rows in place
+    above it; raw HTTP/JSON dumps are shown in neither. A settled probe —
+    connected, catalog, or refused — is announced once instead of holding a
+    status row under the key.
     Named display names and optional custom headers stay behind Advanced settings.
     The dialog header's upper-right actions include an explicit Advanced settings
     button that opens a separate compact modal, keeping the main form focused on
