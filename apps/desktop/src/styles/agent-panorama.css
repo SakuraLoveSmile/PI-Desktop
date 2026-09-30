@@ -1,0 +1,272 @@
+/*
+  Agent Panorama: canvas, nodes, connectors, and zoom/pan toolbar.
+*/
+.agent-panorama {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--ds-bg-primary);
+  background-image: radial-gradient(var(--ds-border-strong) 1px, transparent 1px);
+  background-size: 32px 32px;
+  user-select: none;
+  touch-action: none;
+}
+
+.agent-panorama.is-panning {
+  cursor: grabbing;
+}
+
+.agent-panorama:not(.is-panning) {
+  cursor: grab;
+}
+
+.agent-panorama-toolbar {
+  position: absolute;
+  z-index: 10;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-xs);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-dialog);
+  user-select: none;
+}
+
+.agent-panorama-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-panorama-zoom-label {
+  min-width: 44px;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--ds-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-panorama-text-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+  color: var(--ds-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.agent-panorama-text-btn:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.agent-panorama-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  transition: transform 50ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-panorama-stage {
+    transition: none;
+  }
+}
+
+.agent-panorama-edges-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.agent-panorama-edge {
+  fill: none;
+  stroke: var(--ds-border-strong);
+  stroke-width: 1.5px;
+}
+
+.agent-panorama-node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 260px;
+  min-height: 88px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-xs);
+  background: var(--ds-bg-secondary);
+  color: var(--ds-text-primary);
+  box-shadow: var(--ds-shadow-composer);
+  cursor: default;
+  user-select: text;
+  transition: border-color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.agent-panorama-node.is-clickable {
+  cursor: pointer;
+}
+
+.agent-panorama-node.is-clickable:hover {
+  border-color: var(--ds-accent);
+  box-shadow: var(--ds-shadow-dialog);
+}
+
+.agent-panorama-node.is-clickable:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 2px;
+}
+
+.agent-panorama-root-node {
+  border-color: var(--ds-border-strong);
+  background: var(--ds-bg-tertiary);
+}
+
+.agent-panorama-node-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px 8px;
+}
+
+.agent-panorama-node-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-primary);
+}
+
+.agent-panorama-node-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.agent-panorama-node-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--ds-text-primary);
+}
+
+.agent-panorama-node-task {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ds-text-secondary);
+}
+
+.agent-panorama-node-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--ds-border-subtle);
+  padding: 6px 12px;
+  font-size: var(--text-xs);
+  color: var(--ds-text-secondary);
+}
+
+.agent-panorama-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.agent-panorama-status-badge.status-running {
+  color: var(--ds-accent);
+}
+
+.agent-panorama-status-badge.status-completed {
+  color: var(--ds-success);
+}
+
+.agent-panorama-status-badge.status-failed {
+  color: var(--ds-error);
+}
+
+.agent-panorama-status-badge.status-paused {
+  color: var(--ds-warning);
+}
+
+.agent-panorama-status-badge.status-idle,
+.agent-panorama-status-badge.status-todo,
+.agent-panorama-status-badge.status-blocked {
+  color: var(--ds-text-muted);
+}
+
+.agent-panorama-node-context {
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-deep);
+  font-size: var(--text-3xs);
+  color: var(--ds-text-muted);
+}
+
+.agent-panorama-empty-note {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 12px;
+  border-radius: var(--radius-xs);
+  border: 1px dashed var(--ds-border-default);
+  text-align: center;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+}
+
+.agent-panorama-loading,
+.agent-panorama-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-panorama-state-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--ds-text-secondary);
+}
+
+.agent-panorama-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-accent);
+  color: var(--ds-bg-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}

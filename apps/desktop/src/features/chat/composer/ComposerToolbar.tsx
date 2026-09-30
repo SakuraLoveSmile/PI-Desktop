@@ -30,6 +30,7 @@ type ModelMenuController = ReturnType<typeof useComposerModelMenu>;
 export type ComposerToolbarProps = {
   t: TFunction;
   mode: Mode;
+  displayMode?: Mode;
   executionProfile?: ExecutionProfile;
   planningLive: boolean;
   providerId?: string;
@@ -74,6 +75,7 @@ export type ComposerToolbarProps = {
 export function ComposerToolbar({
   t,
   mode,
+  displayMode,
   executionProfile = "standard",
   planningLive,
   providerId,
@@ -224,6 +226,7 @@ export function ComposerToolbar({
         <ComposerContractPicker
           t={t}
           mode={mode}
+          displayMode={displayMode}
           planningLive={planningLive}
           disabled={controlsBlocked}
           controlsBlocked={controlsBlocked}

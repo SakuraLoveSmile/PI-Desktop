@@ -8,6 +8,7 @@ import {
   IconRefresh,
   IconTriangleAlert,
   IconUsers,
+  IconWorkflow,
 } from "../icons";
 import { Button, TooltipButton } from "../ui";
 import { TranscriptDisclosureProvider } from "../../features/chat/transcript/disclosure";
@@ -16,6 +17,7 @@ import { Markdown } from "../Markdown";
 import { AssistantErrorMessage } from "../../features/chat/transcript/shared";
 import { ReviewChangeCard } from "../ReviewChangeCard";
 import "../../styles/team-panel.css";
+import { AgentPanorama, type PanoramaNode, type PanoramaNodeStatus } from "./AgentPanorama";
 
 type TeamRosterSnapshot = {
   teamSessionId: string;
@@ -45,7 +47,8 @@ type TeamPanelSnapshot = { roster: TeamRosterSnapshot; board: TeamBoardSnapshot 
 type TeamDetailView =
   | { kind: "aggregate" }
   | { kind: "member"; memberSessionId: string }
-  | { kind: "task"; taskId: string };
+  | { kind: "task"; taskId: string }
+  | { kind: "panorama" };
 
 export type TeamPanelProps = {
   teamSessionId: string;
@@ -147,6 +150,56 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
   const overlaps = snapshot?.board.scopeOverlaps ?? [];
   const isPaused = snapshot?.roster.paused ?? false;
 
+  if (view.kind === "panorama" && snapshot) {
+    const rootNode: PanoramaNode = {
+      id: snapshot.roster.teamSessionId,
+      name: t("team.lead", { defaultValue: "Team Lead" }),
+      task: t("team.membersCount", { count: roster.length }),
+      status: isPaused ? "paused" : "running",
+      avatarIcon: "users",
+      isRoot: true,
+    };
+
+    const childNodes: PanoramaNode[] = roster.map((member) => {
+      const memberTasks = tasks.filter((t) => t.ownerSessionId === member.memberSessionId);
+      const activeTask = memberTasks.find((t) => t.status === "in_progress") ?? memberTasks[0];
+      const taskLabel = activeTask ? activeTask.subject : (member.description || undefined);
+
+      let status: PanoramaNodeStatus = "idle";
+      if (member.phase === "running" || activeTask?.status === "in_progress") {
+        status = "running";
+      } else if (member.phase === "completed" || (memberTasks.length > 0 && memberTasks.every((t) => t.status === "completed"))) {
+        status = "completed";
+      } else if (member.phase === "failed" || activeTask?.status === "failed") {
+        status = "failed";
+      } else if (isPaused) {
+        status = "paused";
+      }
+
+      return {
+        id: member.memberSessionId,
+        name: member.name,
+        task: taskLabel,
+        status,
+        contextKind: member.contextKind,
+        avatarIcon: "bot",
+      };
+    });
+
+    return (
+      <AgentPanorama
+        title={t("team.panoramaTitle", { defaultValue: "Agent Panorama" })}
+        rootNode={rootNode}
+        childNodes={childNodes}
+        onBack={() => setView({ kind: "aggregate" })}
+        onSelectNode={(memberSessionId) => setView({ kind: "member", memberSessionId })}
+        emptyMessage={t("team.emptyRoster")}
+        loading={loading}
+        error={error}
+        onRetry={() => void loadData()}
+      />
+    );
+  }
   if (view.kind === "member") {
     const selectedMember = roster.find((m) => m.memberSessionId === view.memberSessionId);
     if (selectedMember) {
@@ -200,6 +253,15 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
               {resuming ? t("common.saving") : t("team.resumeButton")}
             </Button>
           )}
+          <TooltipButton
+            type="button"
+            className="icon-btn icon-btn-square"
+            tooltip={t("team.viewPanorama", { defaultValue: "View panorama" })}
+            ariaLabel={t("team.viewPanorama", { defaultValue: "View panorama" })}
+            onClick={() => setView({ kind: "panorama" })}
+          >
+            <IconWorkflow size={14} />
+          </TooltipButton>
           <TooltipButton
             type="button"
             className="icon-btn icon-btn-square"

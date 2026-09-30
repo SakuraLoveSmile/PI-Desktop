@@ -2199,6 +2199,158 @@
 
 /* Nodes are raised tiles on the group's tile; connectors are tinted 2px bars
    rather than hairlines, and the dotted canvas is gone (D297). */
+/* Compact Subagent Task progress card (ADR 0062 / 2026-09-30 plan image 7) */
+.subagent-tasks-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 6px 0;
+  padding: 10px 12px;
+  background: var(--ds-bg-secondary);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+}
+
+.subagent-tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.subagent-tasks-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.subagent-tasks-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-text-secondary);
+  flex-shrink: 0;
+}
+
+.subagent-tasks-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--ds-text-primary);
+  white-space: nowrap;
+}
+
+.subagent-tasks-metrics {
+  font-size: var(--text-xs);
+  color: var(--ds-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subagent-tasks-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: var(--text-xs);
+  color: var(--ds-text-secondary);
+  background: var(--ds-bg-elevated);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.subagent-tasks-action-btn:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+  border-color: var(--ds-border-default);
+}
+
+.subagent-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subagent-tasks-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--ds-bg-primary);
+  border: 1px solid var(--ds-border-subtle);
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+    border-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.subagent-tasks-row:hover {
+  background: var(--ds-bg-hover);
+  border-color: var(--ds-border-default);
+}
+
+.subagent-tasks-row:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: 1px;
+}
+
+.subagent-tasks-row-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.subagent-tasks-status-icon.is-running {
+  color: var(--ds-accent);
+}
+
+.subagent-tasks-status-icon.is-completed {
+  color: var(--ds-success);
+}
+
+.subagent-tasks-status-icon.is-failed {
+  color: var(--ds-error);
+}
+
+.subagent-tasks-status-icon.is-stopped {
+  color: var(--ds-warning);
+}
+
+.subagent-tasks-status-icon.is-idle {
+  color: var(--ds-text-muted);
+}
+
+.subagent-tasks-row-task {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--ds-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subagent-tasks-row-agent {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-full);
+  background: var(--ds-tile-deep);
+  color: var(--ds-text-secondary);
+}
+
 .subagent-topology {
   display: grid;
   min-width: 0;
