@@ -58,6 +58,7 @@ import {
   MoreHorizontal,
   Music,
   Palette,
+  Paperclip,
   PanelLeft,
   PanelRight,
   PanelRightOpen,
@@ -214,6 +215,7 @@ export const IconReview = icon(RefreshCw);
 export const IconKeyboard = icon(Keyboard);
 export const IconMic = icon(Mic);
 export const IconPlug = icon(Plug);
+export const IconPaperclip = icon(Paperclip);
 export const IconSlash = icon(Slash);
 export const IconUser = icon(UserRound);
 export const IconUsers = icon(Users);

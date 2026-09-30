@@ -297,3 +297,110 @@
 .team-error-state {
   color: var(--ds-danger, #ef4444);
 }
+
+.team-clickable-card {
+  cursor: pointer;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-out),
+              border-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.team-clickable-card:hover {
+  background: var(--ds-bg-hover);
+  border-color: var(--ds-border-hover);
+}
+
+.team-detail-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.team-detail-back-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.team-detail-title-tag {
+  font-size: var(--text-xs);
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.team-detail-name {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--ds-text-primary);
+}
+
+.team-member-profile,
+.team-task-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--ds-bg-sunken);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.team-detail-desc {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ds-text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.team-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ds-border-subtle);
+}
+
+.team-detail-field:last-child {
+  border-bottom: none;
+}
+
+.team-detail-field-label {
+  font-size: var(--text-xs);
+  color: var(--ds-text-muted);
+  font-weight: var(--font-medium);
+}
+
+.team-detail-field-value {
+  font-size: var(--text-sm);
+  color: var(--ds-text-primary);
+}
+
+.team-owner-btn {
+  align-self: flex-start;
+}
+
+.team-transcript-section {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+
+.team-transcript-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.team-transcript-tool-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

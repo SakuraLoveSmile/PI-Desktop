@@ -3920,6 +3920,7 @@ async fn handle_request(
                                 .get("scheduleTimezone")
                                 .and_then(|v| v.as_str()),
                             revision_intent: params.get("revisionIntent"),
+                            execution_kind: params.get("executionKind").and_then(|v| v.as_str()),
                         },
                     )
                     .map_err(plan_rpc_err)?

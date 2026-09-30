@@ -109,6 +109,7 @@ pub struct PlanProposal {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schedule_state: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_kind: Option<String>,
     pub revision_intent: Option<PlanRevisionIntent>,
 }
 
@@ -163,7 +164,10 @@ pub struct PlanExecution {
     pub proposal_id: String,
     pub session_id: String,
     /// `plan` or `goal`; selects the execution instruction in the sidecar.
+    /// `plan` or `goal`; selects the execution instruction in the sidecar.
     pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_kind: Option<String>,
     pub plan: String,
     pub title: String,
     pub question: String,
@@ -221,4 +225,5 @@ pub struct PlanResolveOptions<'a> {
     pub scheduled_for: Option<&'a str>,
     pub schedule_timezone: Option<&'a str>,
     pub revision_intent: Option<&'a Value>,
+    pub execution_kind: Option<&'a str>,
 }

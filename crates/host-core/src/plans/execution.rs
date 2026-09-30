@@ -13,7 +13,11 @@ pub(crate) fn execution_from_proposal(proposal: &PlanProposal) -> Result<Option<
         id,
         proposal_id: proposal.id.clone(),
         session_id: proposal.session_id.clone(),
-        kind: proposal.kind.clone(),
+        kind: proposal
+            .execution_kind
+            .clone()
+            .unwrap_or_else(|| proposal.kind.clone()),
+        execution_kind: proposal.execution_kind.clone(),
         plan: proposal.plan.clone(),
         title: proposal.title.clone(),
         question: proposal.question.clone(),

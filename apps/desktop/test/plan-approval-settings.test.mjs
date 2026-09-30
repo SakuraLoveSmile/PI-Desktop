@@ -53,7 +53,7 @@ test("plan approval summarizes the proposal and remembers the selected mode", ()
   // Every label resolves under the proposal kind's namespace, so one bar serves
   // both `plan.*` and `goal.*` copy (D198).
   assert.match(approvalBar, /return `\$\{kind\}\.\$\{name\}`/);
-  assert.match(approvalBar, /const copy = \(name: string\) => t\(copyKey\(kind, name\)\)/);
+  assert.match(approvalBar, /const copy = \(name: string\) => t\(copyKey\((kind|effectiveKind), name\)\)/);
   assert.doesNotMatch(approvalBar, /t\("plan\./);
   assert.match(approvalBar, /data-testid="plan-open-artifact"/);
 });

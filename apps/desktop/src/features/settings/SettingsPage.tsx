@@ -88,6 +88,10 @@ export function SettingsPage() {
   const settings = useAppStore((s) => s.settings);
   const version = useAppStore((s) => s.version);
   const refreshProviders = useAppStore((s) => s.refreshProviders);
+  const activeSession = useAppStore((s) =>
+    s.sessions.find((item) => item.id === s.activeSessionId),
+  );
+  const configureActiveSession = useAppStore((s) => s.configureActiveSession);
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
 
   // Developer-only destinations (Cloud sync and Remote Hosts) exist only
@@ -462,6 +466,65 @@ export function SettingsPage() {
                     ]}
                   />
                 </SettingsRow>
+                {activeSession ? (
+                  <SettingsRow
+                    title={t("settings.activeSessionPermission", "Active session override")}
+                    description={
+                      activeSession.permissionMode && activeSession.permissionMode !== "inherit"
+                        ? t(
+                            "settings.activeSessionOverrideDesc",
+                            "Current session has an explicit override. Reset to use the global default.",
+                          )
+                        : t(
+                            "settings.activeSessionInheritDesc",
+                            "Current session inherits the global default.",
+                          )
+                    }
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className="text-sm text-secondary">
+                        {t(
+                          `settings.permissionMode${
+                            activeSession.permissionMode === "auto"
+                              ? "Auto"
+                              : activeSession.permissionMode === "accept-edits"
+                                ? "AcceptEdits"
+                                : activeSession.permissionMode === "ask"
+                                  ? "Ask"
+                                  : (settings.defaultPermissionMode === "auto"
+                                      ? "Auto"
+                                      : settings.defaultPermissionMode === "accept-edits"
+                                        ? "AcceptEdits"
+                                        : "Ask")
+                          }`,
+                        )}
+                        {(!activeSession.permissionMode || activeSession.permissionMode === "inherit") && (
+                          <span className="text-xs text-muted" style={{ marginLeft: 4 }}>
+                            ({t("chat.permissionInherit", "Default")})
+                          </span>
+                        )}
+                      </span>
+                      {activeSession.permissionMode && activeSession.permissionMode !== "inherit" && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            void configureActiveSession({
+                              mode: activeSession.mode,
+                              providerId: activeSession.providerId,
+                              modelId: activeSession.modelId,
+                              thinkingLevel: activeSession.thinkingLevel,
+                              permissionMode: "inherit",
+                              executionProfile: activeSession.executionProfile,
+                            });
+                          }}
+                        >
+                          {t("settings.resetToInherit", "Reset to default")}
+                        </Button>
+                      )}
+                    </div>
+                  </SettingsRow>
+                ) : null}
               </SettingsCard>
 
               <SettingsCard title={t("settings.defaultsTitle")}>
