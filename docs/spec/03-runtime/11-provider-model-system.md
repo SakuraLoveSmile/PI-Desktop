@@ -499,10 +499,13 @@ and the connection test still proves the account by resolving auth. pi-ai
 when the account request fails or the payload is not a model list. The probe
 is the endpoint that vendor actually publishes:
 
-- ChatGPT Plus/Pro (`openai-codex`): `GET {base}/codex/models`, with the
-  account id taken from the access token. A `{ data: [...] }` payload is not
-  accepted. A newly published id such as `gpt-6-luna` is selectable without a
-  client update when that response includes it.
+- ChatGPT Plus/Pro (`openai-codex`): `GET {base}/codex/models?client_version=…`,
+  with the account id taken from the access token. The endpoint requires
+  `client_version` and hides models whose minimum Codex client is newer, so
+  the value is a pinned Codex CLI version (`CODEX_MODELS_CLIENT_VERSION`) that
+  is bumped when an account model goes missing. A `{ data: [...] }` payload is
+  not accepted. A newly published id such as `gpt-6-luna` is selectable
+  without a client update when that response includes it.
 - GitHub Copilot: `GET {base}/models` with the pinned IDE identity headers and
   `X-GitHub-Api-Version`. Only ids with `model_picker_enabled === true` (and
   not policy-disabled) are kept. An id the pin does not know is added only when
@@ -512,6 +515,11 @@ is the endpoint that vendor actually publishes:
 - Kimi, Meta, xAI and OpenRouter: `GET {base}/models` (Anthropic-style `/v1`
   for Kimi). xAI still drops image and video generators.
 - Radius keeps its gateway catalog refresh and is not probed again.
+
+A failed account request logs the HTTP status and a short, single-line
+excerpt of the response body with the request's credentials and any
+token-shaped value removed, so an upstream contract change is diagnosable
+from the provider log.
 
 Image, video, speech and embedding ids are dropped. A model models.dev does
 not know yet inherits limits, reasoning, adapter compatibility, and the wire
