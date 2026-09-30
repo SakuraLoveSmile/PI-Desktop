@@ -119,13 +119,50 @@ test("command-shell settings are catalog-driven and use the existing save flow",
   assert.match(settingsSearch, /"settings\.commandShell"/);
 });
 
+test("plan approval card uses a full-width column layout with footer actions", () => {
+  const barRule = styles.match(/\.plan-approval-bar\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(barRule, /display:\s*flex;/);
+  assert.match(barRule, /flex-direction:\s*column;/);
+  assert.match(barRule, /width:\s*100%;/);
+  assert.match(barRule, /padding:\s*12px 14px;/);
+  assert.match(barRule, /border:\s*1px solid var\(--ds-border-subtle\);/);
+  assert.doesNotMatch(barRule, /grid-template-columns/);
+
+  const titleRule = styles.match(/\.plan-approval-title\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(titleRule, /overflow-wrap:\s*break-word;/);
+  assert.doesNotMatch(titleRule, /overflow-wrap:\s*anywhere;/);
+
+  const summaryRule = styles.match(/\.plan-approval-summary\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(summaryRule, /width:\s*100%;/);
+  assert.match(summaryRule, /overflow-wrap:\s*break-word;/);
+
+  const footerRule = styles.match(/\.plan-approval-footer\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(footerRule, /display:\s*flex;/);
+  assert.match(footerRule, /align-items:\s*flex-end;/);
+  assert.match(footerRule, /flex-wrap:\s*wrap;/);
+
+  const detailsRule = styles.match(/\.plan-approval-details\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(detailsRule, /flex:\s*1 1 180px;/);
+
+  const actionsRule = styles.match(/\.plan-approval-actions\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(actionsRule, /margin-left:\s*auto;/);
+  assert.match(actionsRule, /justify-content:\s*flex-end;/);
+
+  const splitRule = styles.match(/\.plan-approval-split\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.match(splitRule, /min-width:\s*132px;/);
+  assert.match(splitRule, /width:\s*auto;/);
+
+  assert.doesNotMatch(styles, /@container composer-stack[^}]*\.plan-approval/);
+  assert.match(approvalBar, /<div className="plan-approval-footer">\s*<div className="plan-approval-details">/);
+});
+
 test("approval and shell surfaces have locale-backed responsive copy", () => {
   for (const source of [english, chinese]) {
     assert.match(source, /openArtifact:/);
     assert.match(source, /commandShell:/);
     assert.match(source, /commandShellUnavailable:/);
   }
-  assert.match(styles, /grid-template-columns: minmax\(0, 1fr\) auto/);
+  assert.match(styles, /\.plan-approval-bar\s*\{[\s\S]*?flex-direction:\s*column;/);
   assert.match(styles, /container-name: composer-stack/);
   assert.doesNotMatch(styles, /\.plan-approval-warning|\.plan-approval-expiry|\.plan-approval-status/);
   assert.match(styles, /@media \(max-width: 820px\)\s*\{[\s\S]*\.settings-row/);
