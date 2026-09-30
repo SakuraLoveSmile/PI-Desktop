@@ -18,7 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { InMemoryModelsStore } from "@earendil-works/pi-ai";
+import { getSupportedThinkingLevels, InMemoryModelsStore } from "@earendil-works/pi-ai";
 import type {
   Api,
   AuthEvent,
@@ -58,7 +58,6 @@ import {
   type OAuthStartResult,
   type OAuthVendor,
   type ModelBinding,
-  type ThinkingLevel,
 } from "@pi-desktop/shared";
 
 export { OAUTH_AUTH_KIND };
@@ -101,30 +100,10 @@ export function protocolForApiStyle(apiStyle: string): string {
 
 const LIVE_MODELS_TTL_MS = 30_000;
 const LIVE_MODELS_NEGATIVE_TTL_MS = 15_000;
-const THINKING_LEVEL_ORDER = [
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-] as const satisfies readonly ThinkingLevel[];
 
 /** xAI and the other account lists also publish generators. Those are not conversation models. */
 export function isXaiConversationModel(modelId: string): boolean {
   return isConversationModelId(modelId);
-}
-
-function thinkingLevelsFromPiModel(model: Model<Api>): ThinkingLevel[] {
-  const map = model.thinkingLevelMap as Partial<Record<string, string | null>> | undefined;
-  if (!map) return model.reasoning ? ["low", "medium", "high"] : ["off"];
-  const levels = THINKING_LEVEL_ORDER.filter((level) => typeof map[level] === "string");
-  return levels.length > 0
-    ? [...levels]
-    : model.reasoning
-      ? ["low", "medium", "high"]
-      : ["off"];
 }
 
 export type HostCall = <T = unknown>(
@@ -562,10 +541,9 @@ export class VendorOAuth {
   }
 
   /**
-   * models.dev is the metadata source when it already knows the id. A model
-   * that exists only on the live list otherwise inherits limits and thinking
-   * levels from a pinned sibling of the same tier. xAI uses an explicit
-   * newest-first order so pin order cannot pick an older Grok.
+   * models.dev is authoritative for known ids. Live-only models inherit limits,
+   * thinking levels, and adapter compatibility from a pinned same-tier sibling.
+   * xAI uses an explicit newest-first order so pin order cannot pick an older Grok.
    */
   private async withPinnedSiblingFallback(
     account: AccountModels,
@@ -586,9 +564,14 @@ export class VendorOAuth {
     const input = (sibling.input ?? []).filter(
       (modality): modality is "text" | "image" => modality === "text" || modality === "image",
     );
+    const thinkingLevelMap = config.thinkingLevelMap ?? sibling.thinkingLevelMap;
+    const supportedThinkingLevels = getSupportedThinkingLevels({ ...sibling, thinkingLevelMap });
     return {
       ...config,
-      reasoning: sibling.reasoning,
+      // Keep the protocol and wire effort mapping paired with borrowed reasoning.
+      compat: { ...sibling.compat, ...config.compat },
+      thinkingLevelMap,
+      reasoning: supportedThinkingLevels.some((level) => level !== "off"),
       input: input.length > 0 ? input : config.input,
       contextWindow: sibling.contextWindow,
       maxTokens: sibling.maxTokens,
@@ -597,7 +580,7 @@ export class VendorOAuth {
         input: sibling.contextWindow,
         output: sibling.maxTokens,
       },
-      supportedThinkingLevels: thinkingLevelsFromPiModel(sibling),
+      supportedThinkingLevels,
     };
   }
 
