@@ -559,9 +559,11 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
   not have
 
 ### `providers.listModels`
-- renderer IPC in: `{ providerId, source?: "cache"|"refresh" }`; `cache`
+- renderer IPC in: `{ providerId, baseUrl?, apiKey?, apiStyle?, headers?,
+  source?: "cache"|"refresh", intent?: "manual-fetch-list" }`; `cache`
   returns the durable catalog without provider network access, while `refresh`
-  reads the local models.dev snapshot and runs provider endpoint discovery only for IDs absent from it
+  reads the local models.dev snapshot and runs provider endpoint discovery only for IDs absent from it.
+  `intent` marks the one explicit manual action and is transient; see §12.
 - host RPC in: `{ providerId?: string }`; reads only the Rust-owned `models`
   table
 - for an `authKind: "oauth"` row Electron main reads the signed-in account's
@@ -676,3 +678,68 @@ OpenCode Go normalizes `/chat/completions`, not `/responses`. Saved explicit
 formats take precedence over hostname presets; service names survive edits.
 Cancel does not persist draft changes. Full probing and automatic error-driven
 fallback from #907 remain separate work.
+
+## 12. Manual model-list intent and the macOS Local Network trigger
+
+The settings form's **Fetch list** control is the one explicit manual model-list
+action. Its request — and only its request — carries
+`intent: "manual-fetch-list"` on `api.listProviderModels` and on the
+`pi-desktop/providers/listModels` handler. The field is transient: it never
+reaches the durable provider record, the host RPC (`providers.list`,
+`providers.getSecret`, `providers.cacheModels`), the Plugin SDK or the database.
+The channel name and the `{ models, source, error? }` response shape are exactly
+what they were before the field existed.
+
+Who sets it: `useProviderModels.reload()` (the Fetch list control) and nothing
+else. The edit debounce (600 ms), the saved-provider refresh on open, cache
+hydration, vendor-account discovery and every other caller omit it, and omission
+is exactly the previous behavior. `source: "refresh"` is not a manual-action
+proxy.
+
+Why the field exists: macOS attributes Local Network privacy to an application
+identity, and Apple documents a UDP `connect()` as an implicit alert trigger that
+sends no traffic. On a manual request only, and only on macOS, Electron main runs
+one supplemental trigger immediately before the HTTP discovery request, so the
+user can answer the alert while that request is in flight. The controller lives in
+`apps/desktop/electron/main/local-network-permission.ts`, is created once in
+`ipc/register.ts`, and is disposed on application shutdown.
+
+Authority boundary — what the trigger may and may not do:
+
+- It runs only for `intent === "manual-fetch-list"`, only on macOS, only on the
+  live discovery branch, and only for a provider that is not a vendor account.
+  Cache hydration and vendor-account discovery never run it, and no other intent
+  value enables it.
+- The endpoint must be a valid `http:`/`https:` URL without credentials. The probe
+  uses its effective port and nothing else: no headers, no payload, no
+  credentials, no broadcast, no multicast, no Bonjour browse.
+- Address classification reuses `classifyIpLiteral` from
+  `packages/shared/src/public-network.ts`. A target is eligible only as a
+  `private`, `link-local`, `ula` or `site-local` unicast address; loopback,
+  public, unspecified, multicast, documentation, benchmark (proxy fake-IP),
+  reserved, CGNAT and invalid addresses are never eligible, and `localhost` with
+  its subdomains is refused before any DNS. A direct hostname is resolved once
+  (`all: true`) and the first eligible address in resolver order is used.
+- Only a direct route is eligible. The controller asks the same Electron default
+  session that carries discovery fetch for its route; a proxied or unreadable
+  route skips the probe without touching transport configuration, and no direct
+  LAN bypass is ever created for proxied discovery.
+- The operation is bounded by a 1,500 ms total budget covering the route query,
+  the lookup and the connect. Concurrent operations for one endpoint coalesce,
+  nothing is memoized as granted, and the socket, timer and listeners are removed
+  on success, failure, deadline and disposal. IPv6 link-local addresses without a
+  scope identifier skip with their own reason instead of being connected.
+- Verdicts are `skipped`, `attempted` or `failed`. **None of them means
+  permission was granted**: a UDP callback is trigger evidence only, and macOS
+  exposes no API that reads, forces or resets one application's choice. A
+  diagnostic carries the stage, the reason and a node error code only — never a
+  URL, a header, a query or a credential.
+- The trigger changes nothing else about discovery: the existing 10-second HTTP
+  timeout, the response and error handling, the cache write and the models.dev
+  catalog fallback all stay as they are. A failed or unfruitful trigger never
+  replaces the discovery result.
+
+If macOS refuses, the app does not re-prompt in a loop; the user enables
+Pi-Desktop-Plus in System Settings → Privacy & Security → Local Network and uses
+the same Fetch list control again. ADR 0308 records the identity half of this
+repair.
