@@ -1,6 +1,7 @@
 mod config_sync_rpc;
 mod scheduled_rpc;
 mod scheduled_tools;
+mod todos;
 
 use std::io::{self, BufRead, BufReader as StdBufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -2515,6 +2516,15 @@ async fn handle_request(
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "session": session }))
         }
+        "todos.get" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_ARGUMENT"))?;
+            let st = state.lock().await;
+            todos::get_from(&st, session_id)
+        }
+
         "session.configure" => {
             let id = params
                 .get("id")
@@ -3976,7 +3986,11 @@ async fn handle_request(
                     });
                 }
 
-                let mut result = if tools::is_desktop_dispatched(&p.tool_name) {
+                let mut result = if p.tool_name == "TodoWrite" {
+                    // The checklist body owns its own trusted-transport checks,
+                    // the atomic write, and the after-commit notification.
+                    todos::execute_write(&state, &tx, &p, call_started).await?
+                } else if tools::is_desktop_dispatched(&p.tool_name) {
                     // Plugin and MCP dispatch has its own bounded default, sized
                     // to outlast Electron's budgets; command-shell timeout
                     // semantics apply only to Bash.
