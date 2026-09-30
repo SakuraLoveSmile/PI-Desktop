@@ -2611,6 +2611,13 @@ bytes. The submitted question/description, status, validity/deadline, inline
 Markdown, SHA-256, byte size, and revision/feedback controls are not rendered
 card content.
 
+The card implements a full-width column layout in the composer dock: title and
+summary text span the complete width and wrap naturally across phrase and
+character boundaries (`overflow-wrap: break-word`). A responsive footer separates
+artifact details on the left from execution controls on the right, wrapping
+actions to their own line on narrow widths without clipping or horizontal
+compression.
+
 Because the bundled file view can edit and save the file it opened (ADR 0241),
 an artifact changed before Approve no longer matches the recorded hash: the host
 fails that approval closed with `PLAN_ARTIFACT_HASH_MISMATCH` until the proposal
