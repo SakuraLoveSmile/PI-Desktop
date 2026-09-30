@@ -581,6 +581,8 @@ export function Composer({
               setComposing(false);
               draft.updateCursor(editorSelectionRange(event.currentTarget).start);
             }}
+            // A dropped compositionend must not freeze the menu forever (#929).
+            onSettledInput={() => draft.setComposing(false)}
             onFocus={() => setInputFocused(true)}
             onBlur={() => {
               setInputFocused(false);
