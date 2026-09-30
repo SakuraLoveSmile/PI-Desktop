@@ -47,22 +47,20 @@ test("ComposerExecutionProfilePicker renders two distinct options with notice", 
   assert.match(profilePickerSource, /IconBot/);
 });
 
-test("ComposerContractPicker renders None, Plan, Goal contracts", () => {
-  assert.match(contractPickerSource, /chat\.contractNone/);
-  assert.match(contractPickerSource, /chat\.contractNoneDesc/);
+test("ComposerContractPicker renders compact indicator for active mode", () => {
   assert.match(contractPickerSource, /settings\.modePlan/);
-  assert.match(contractPickerSource, /chat\.contractPlanDesc/);
   assert.match(contractPickerSource, /settings\.modeGoal/);
-  assert.match(contractPickerSource, /chat\.contractGoalDesc/);
-  assert.match(contractPickerSource, /role="menuitemradio"/);
   assert.match(contractPickerSource, /ModeIcon/);
+  assert.match(contractPickerSource, /mode === ["']agent["']/);
 });
 
-test("ComposerToolbar mounts both pickers and manages menu coordination", () => {
+test("ComposerToolbar mounts profile, model, mode indicator, and plus menu", () => {
+  assert.match(toolbarSource, /<ComposerPlusMenu/);
   assert.match(toolbarSource, /<ComposerExecutionProfilePicker/);
+  assert.match(toolbarSource, /<ComposerModelPicker/);
   assert.match(toolbarSource, /<ComposerContractPicker/);
   assert.match(toolbarSource, /profileOpen/);
-  assert.match(toolbarSource, /contractOpen/);
+  assert.match(toolbarSource, /plusOpen/);
   assert.match(toolbarSource, /executionProfile/);
 });
 

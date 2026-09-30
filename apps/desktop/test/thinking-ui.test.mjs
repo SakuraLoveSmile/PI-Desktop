@@ -93,14 +93,19 @@ test("Composer owns the mode and model controls", () => {
     composerToolbarSource.indexOf('<div className="composer-left">'),
     composerToolbarSource.indexOf('<div className="composer-right">'),
   );
+  const plusControl = leftToolbar.indexOf("<ComposerPlusMenu");
+  const profileControl = leftToolbar.indexOf("<ComposerExecutionProfilePicker");
+  const modelControl = leftToolbar.indexOf("<ComposerModelPicker");
   const modeControl = leftToolbar.indexOf("<ComposerContractPicker");
-  const permissionControl = leftToolbar.indexOf("<ComposerPermissionPicker");
   const rightToolbar = composerToolbarSource.slice(
     composerToolbarSource.indexOf('<div className="composer-right">'),
   );
 
-  assert.ok(modeControl >= 0);
-  assert.ok(permissionControl > modeControl);
+  assert.ok(plusControl >= 0);
+  assert.ok(profileControl > plusControl);
+  assert.ok(modelControl > profileControl);
+  assert.ok(modeControl > modelControl);
+  assert.doesNotMatch(leftToolbar, /<ComposerPermissionPicker/);
   // The task draft has no session, so its picker must not claim one: with
   // `activeSessionId` unset the menu resolves the selected model's binding
   // default thinking level instead of pinning the draft to its current value.

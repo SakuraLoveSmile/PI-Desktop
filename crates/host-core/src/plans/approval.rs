@@ -399,6 +399,7 @@ impl PlanManager {
         Ok(Some(resolution_from_proposal(proposal)?))
     }
 
+    #[allow(dead_code)]
     pub fn resolve(&self, db: &Database, params: PlanResolveParams<'_>) -> Result<PlanResolution> {
         self.resolve_with_options(db, params, PlanResolveOptions::default())
     }
@@ -453,6 +454,22 @@ impl PlanManager {
         } else {
             None
         };
+        let effective_execution_kind = if approving {
+            let req_kind = options
+                .execution_kind
+                .map(|k| normalize_kind(k).ok_or_else(|| plan_error("PLAN_INVALID_EXECUTION_KIND")))
+                .transpose()?
+                .unwrap_or(kind);
+            if kind == KIND_GOAL && req_kind != KIND_GOAL {
+                return Err(plan_error("PLAN_INVALID_EXECUTION_KIND"));
+            }
+            Some(req_kind)
+        } else {
+            if options.execution_kind.is_some() {
+                return Err(plan_error("PLAN_INVALID_EXECUTION_KIND"));
+            }
+            None
+        };
         if current.status != STATUS_PENDING {
             let stored_action = if action == "schedule" {
                 "approve"
@@ -487,11 +504,15 @@ impl PlanManager {
                             .as_ref()
                             .map(|intent| intent.input.clone())
                 });
+            let same_execution_kind = !approving
+                || current.execution_kind.as_deref().unwrap_or(&current.kind)
+                    == effective_execution_kind.unwrap_or(&current.kind);
             let same_resolution = current.action.as_deref() == Some(stored_action)
                 && (!approving || current.target_permission_mode.as_deref() == selected)
                 && same_binding
                 && same_schedule
-                && same_revision;
+                && same_revision
+                && same_execution_kind;
             if same_resolution {
                 return resolution_from_proposal(current);
             }
@@ -635,7 +656,8 @@ impl PlanManager {
                   error_code = NULL, version = version + 1,
                   execution_id = ?5, execution_state = ?6,
                   execution_provider_id = ?13, execution_model_id = ?14,
-                  revision_intent_json = ?15, revision_state = ?16
+                  revision_intent_json = ?15, revision_state = ?16,
+                  execution_kind = ?17
               WHERE request_id = ?7 AND session_id = ?8 AND turn_id = ?9
                 AND tool_call_id = ?10 AND status = 'pending' AND version = ?11
                  AND expires_at > ?12",
@@ -657,6 +679,7 @@ impl PlanManager {
                 execution_model_id,
                 revision_intent_json,
                 revision_intent_json.as_ref().map(|_| "ready"),
+                effective_execution_kind,
             ])?;
         if changed != 1 {
             return Err(plan_error("PLAN_APPROVAL_STALE"));

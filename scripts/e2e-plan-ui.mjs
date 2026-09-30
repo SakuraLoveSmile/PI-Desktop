@@ -669,9 +669,9 @@ async function inspectUi(state) {
       bodyText,
       activeSessionId: activeRow?.getAttribute("data-sidebar-session-row") || null,
       modeLabels: operatingModes.map((item) => item.label),
-      modeValue: mode?.mode,
+      modeValue: mode?.mode || (operatingModes.length === 0 ? "agent" : null),
       modeControlCount: operatingModes.length,
-      modeDisabled: mode ? mode.disabled : null,
+      modeDisabled: mode ? mode.disabled : false,
       topbarModeControlCount: document.querySelectorAll(".conversation-topbar button.mode-chip").length,
       permissionVisible: visible(permission),
       permissionDisabled: permission ? Boolean(permission.disabled) : null,
@@ -1143,7 +1143,7 @@ function assertShellStructure(snapshot, expectedMode, locale) {
   assert(snapshot.modeControlCount === 1, `expected one active-session mode control, got ${snapshot.modeControlCount}`);
   assert(snapshot.modeLabels[0] === expectedLabel, `expected Composer ${expectedLabel}, got ${jsonText(snapshot.modeLabels)}`);
   assert(snapshot.topbarModeControlCount === 0, "conversation topbar contains a duplicate operating-mode control");
-  assert(snapshot.permissionVisible, "Composer permission control is missing");
+  assert(snapshot.permissionVisible === false, "Composer permission control should not be in toolbar");
   assert(snapshot.activeSessionId, "no active rendered session row");
   if (expectedMode === "plan") {
     assert(snapshot.modeLabels.includes(expectedLabel), `Plan shell label missing for ${locale}`);
@@ -1167,7 +1167,6 @@ function assertPendingUi(snapshot, locale, revision) {
   assert(snapshot.promptReadOnly === false, "pending Plan prompt is not editable");
   assert(snapshot.modelDisabled === false, "pending Plan model control is gated");
   assert(snapshot.modeDisabled === false, "pending Plan mode control is gated");
-  assert(snapshot.permissionDisabled === false, "pending Plan permission control is gated");
   assertNoLegacyUi(snapshot, `pending ${locale}`);
 }
 
@@ -1176,7 +1175,6 @@ function assertRejectedEditable(snapshot, locale) {
   assert(snapshot.promptReadOnly === false && snapshot.promptAriaReadOnly !== "true", "rejected Plan prompt remains read-only");
   assert(snapshot.modelDisabled === false, "rejected Plan model control remains gated");
   assert(snapshot.modeDisabled === false, "rejected Plan mode control remains gated");
-  assert(snapshot.permissionDisabled === false, "rejected Plan permission control remains gated");
   assertNoLegacyUi(snapshot, `rejected ${locale}`);
 }
 
@@ -1186,7 +1184,6 @@ function assertApprovedTerminal(snapshot, locale) {
   assert(snapshot.modeValue === "agent", `approved session did not switch to Agent: ${jsonText(snapshot.modeLabels)}`);
   assert(snapshot.modeDisabled === false, "approved session mode control remains gated");
   assert(snapshot.modelDisabled === false, "approved session model control remains gated");
-  assert(snapshot.permissionDisabled === false, "approved session permission control remains gated");
   assertNoLegacyUi(snapshot, `approved ${locale}`);
 }
 
@@ -1198,8 +1195,11 @@ function assertReloadedTerminalAbsent(snapshot, locale, expectedStatus, modeLabe
   assert(snapshot.promptReadOnly === false, `reloaded ${expectedStatus} session input is read-only`);
   assert(snapshot.modelDisabled === false, `reloaded ${expectedStatus} model control remains gated`);
   assert(snapshot.modeDisabled === false, `reloaded ${expectedStatus} mode control remains gated`);
-  assert(snapshot.permissionDisabled === false, `reloaded ${expectedStatus} permission control remains gated`);
-  assert(snapshot.modeLabels[0] === modeLabel, `reloaded ${expectedStatus} session mode mismatch: ${jsonText(snapshot.modeLabels)}`);
+  if (expectedStatus === "approved/completed") {
+    assert(snapshot.modeValue === "agent", `reloaded ${expectedStatus} session mode mismatch: ${jsonText(snapshot.modeValue)}`);
+  } else {
+    assert(snapshot.modeLabels[0] === modeLabel, `reloaded ${expectedStatus} session mode mismatch: ${jsonText(snapshot.modeLabels)}`);
+  }
   assertNoLegacyUi(snapshot, `reloaded ${locale} ${expectedStatus}`);
 }
 
@@ -1771,21 +1771,15 @@ async function runAcceptance(state) {
   await settlePlanProbe(state, goalSession.id, sourcePlan.turnId, "completed");
   await waitFor(async () => (await inspectUi(state)).bar?.status === "pending", "source Plan card", state);
   fixture.setScenario("goal");
+  fixture.setScenario("goal");
   await clickSelector(state, '[data-testid="plan-approval-bar"] .plan-approval-goal-toggle [role="switch"]', "Convert Plan to Goal");
-  const convertedGoal = await waitFor(async () => {
+  await clickSelector(state, '[data-testid="plan-approval-bar"] .plan-approval-approve-main', "Approve Plan as Goal");
+  const approvedGoal = await waitFor(async () => {
     const result = await getPreloadResult(state, "plansPending", [{ sessionId: goalSession.id }]);
-    return result.plans?.find((item) => item.kind === "goal" && item.status === "pending");
-  }, "separately approved Goal contract", state, 45_000);
-  assert(convertedGoal.id !== sourcePlan.proposalId, "Goal reused the Plan approval identity");
-  assert(convertedGoal.artifact?.relativePath?.startsWith(".pi/goal/"), "Goal artifact is not separate from the Plan");
-  const conversionHistory = await getPreloadResult(state, "plansPending", [{ sessionId: goalSession.id }]);
-  assert(conversionHistory.history?.some((item) => item.id === sourcePlan.proposalId && item.status === "changes_requested"),
-    "source Plan disappeared after Goal conversion");
-  await waitFor(async () => {
-    const current = await inspectUi(state);
-    return current.bar?.status === "pending" && current.bar.title === "Converted Goal";
-  }, "Goal approval card", state);
-  record("E2E-PLAN-GOAL-CONVERSION", true, `plan=${sourcePlan.proposalId} goal=${convertedGoal.id}`);
+    return result.history?.find((item) => item.id === sourcePlan.proposalId && item.status === "approved" && item.executionKind === "goal");
+  }, "Plan approved with executionKind goal", state, 45_000);
+  assert(approvedGoal, "Approved execution did not have executionKind = goal");
+  record("E2E-PLAN-GOAL-CONVERSION", true, `plan=${sourcePlan.proposalId} executionKind=${approvedGoal.executionKind}`);
   await captureScreenshot(state, "e2e-plan-goal-conversion");
 
   const alternate = (await getPreloadResult(state, "providersCreate", [{

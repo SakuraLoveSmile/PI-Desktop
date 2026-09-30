@@ -27,6 +27,7 @@ fn schedule_approval_does_not_queue_execution_before_due_time() {
                 scheduled_for: Some(&future),
                 schedule_timezone: Some("Asia/Taipei"),
                 revision_intent: None,
+                ..Default::default()
             },
         )
         .unwrap();
