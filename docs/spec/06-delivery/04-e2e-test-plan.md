@@ -15,12 +15,14 @@
   use a real provider account or paid endpoint for automation.
 - **Steps:** Open Voice settings and confirm only Live Voice controls are
   visible; legacy Dictation toggles, microphone selection and transcription
-  model controls are absent. Confirm the Composer shows Live controls without
-  the old Dictation microphone button. Bind/select a fixture account for each
-  supported adapter profile. In Settings → Shortcuts, customize the Live Voice
-  toggle and use it to start then end a fixture call. Cancel a pending startup
-  with the `voiceCancel` binding (default `Escape`); pressing `Escape` during a
-  connected call must not end it. Restore the default, then start, cancel during
+  model controls are absent. Confirm the enabled Composer shows one Live
+  preparation entry without a separate Work or old Dictation microphone button.
+  Bind/select a fixture account for each supported adapter profile. In Settings
+  → Shortcuts, customize the Live Voice toggle and use it to start then end a
+  fixture call. Cancel a pending startup
+  with the `voiceCancel` binding (default `Escape`) when no popup consumes the
+  key; pressing `Escape` during a connected call must not end it. Restore the
+  default, then explicitly Start from preparation, cancel during
   permission/startup, connect, mute/unmute, interrupt playback, inspect the
   in-memory transcript, and end. Repeat with Dictation already holding the
   microphone, a changed active binding, a provider credential removal, renderer
@@ -43,6 +45,60 @@
   The full Electron flow and real-provider/device compatibility remain
   unverified until their respective isolated acceptance environments are run.
 
+### E2E-LIVE-VOICE-four-stage-ui
+
+- **Title:** Disabled, preparation, compact call, and deliberate details.
+- **Preconditions:** Isolated development-build Electron profile with developer
+  mode on, Live Voice initially disabled, deterministic local provider/media
+  fixtures, and local work-session fixtures. No real account, microphone,
+  speaker, paid endpoint, or user's running Desktop instance is used.
+- **Steps:**
+  1. Confirm neither Live nor Work Composer icon exists while disabled. Enable
+     Live Voice only from Settings → Voice; verify exactly one idle voice icon.
+  2. Open preparation and expand/collapse work options without starting. Verify
+     no prepare request, microphone acquisition, media initialization, provider
+     connection, or work dispatch occurs. Make the selected binding unavailable
+     while another is ready: show the exact selected identity/reason, disable
+     Start, and do not switch providers implicitly.
+  3. With a ready binding, explicitly Start and observe Connecting plus Cancel
+     in the compact bar, without automatically opening Details. Cancel while
+     prepare or media acquisition is pending and deliver the late completion.
+     Repeat Start to connect muted, then unmute/mute and inspect status.
+  4. Open Details, inspect transcript/provider/work state, and dismiss it with
+     Close, outside press, and Escape. Keep the call connected; use the bar to
+     resume blocked sound, observe a rejected resume, and recover explicitly.
+  5. Navigate between chat, Settings, Plugins, and sessions. End or disable the
+     feature with delayed Main termination and renderer cleanup, in either
+     completion order. Keep Ending visible and prevent another Start until both
+     settle. Exercise unconfirmed release and verify visible blocked recovery.
+  6. Reopen preparation: work access and context consent are unchecked. Merely
+     expanding the section or selecting a session never starts a call; Start
+     without the work opt-in is voice-only. Opt into work explicitly, select a
+     valid local target, and Start; inspect the fixed binding and work results
+     in Details. End and reopen preparation, then change/create the target,
+     opt out, or cancel and verify context consent resets. Ending Live does not
+     stop already accepted work.
+  7. Use the configured toggle to start a voice-only call directly and end it.
+     During startup, a popup consumes Escape to dismiss itself without
+     cancellation; without a consuming popup, the startup-cancel shortcut works.
+     Escape never ends a connected call. Repeat visible controls in English and
+     Simplified Chinese and check catalog coverage for all shipped locales.
+- **Expected:** Four distinct UI states, deliberate startup and work consent,
+  exact-binding readiness, default mute, global cleanup visibility, accessible
+  controls and focus return, and no changed IPC, persistence or permission
+  boundary. Playback and error recovery do not require opening Details.
+- **Specs:** [Live Voice](../03-runtime/live-voice.md),
+  [Live Work](../03-runtime/live-work-session.md),
+  [Component spec](../04-ux/08-component-spec.md#1171-live-voice-preparation-compact-call-bar-and-details),
+  [Settings IA](../04-ux/06-settings-ia.md#voice-experimental).
+- **Acceptance:** C / E / Security / Quality.
+- **Milestone:** Post-MVP experimental interaction maintenance.
+- **Coverage:** Planned targeted component/controller regression coverage and an
+  isolated Electron fixture journey. Existing lifecycle and shortcut tests do
+  not by themselves prove the new four-stage UI or navigation/cleanup races.
+- **Status:** Planned; task-candidate fixture execution is pending. No green E2E
+  or real-provider/device result is claimed for this scenario.
+
 ### E2E-LIVE-WORK-session-admission
 
 - **Preconditions:** Isolated Live provider fixture, a local AgentHost session,
@@ -50,9 +106,10 @@
   through the existing Live adapter callback; do not use a real account or
   paid endpoint.
 - **Steps:** Start a voice-only call and verify a work candidate is rejected
-  without a work scope. Start a second call with an explicitly selected local
-  session and context sharing disabled. Submit one declared work request,
-  deliver its receipt, route it through the classifier, and inspect the Host
+  without a work scope. Start a second call after opting into work requests and
+  explicitly selecting a local session, with context sharing disabled. Submit
+  one declared work request, deliver its receipt, route it through the
+  classifier, and inspect the Host
   admission and `voiceOrigin`. Exercise a busy independent request through the
   Host queue, a stale steer, an exact-turn stop, and a terminal event arriving
   before the submit promise resolves. Query a recorded terminal result and
@@ -8904,6 +8961,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | Acceptance | Scenarios |
 |---|---|
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
+| C / E / Security / Quality — Live Voice four-stage interaction | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — Desktop automations | E2E-SCHEDULED-desktop-automation-lifecycle |
@@ -8973,6 +9031,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 | Milestone | Scenarios |
 |---|---|
+| Post-MVP experimental interaction maintenance | E2E-LIVE-VOICE-four-stage-ui |
 | M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-008d, E2E-008e, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-011g, E2E-020, E2E-021, E2E-021a, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-COMPOSER-narrow-controls, E2E-144, E2E-005J, E2E-201, E2E-202, E2E-207, E2E-206 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
