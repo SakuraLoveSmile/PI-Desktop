@@ -2830,6 +2830,27 @@ reasoning-level control.
   file-reference names), expose independent Remove and Send now actions, and
   increase the dock height measured by `--composer-dock-height`.
 
+### 11.3a Session TodoDock
+
+- The Composer stack places TodoDock above Plan/Goal approval surfaces when the
+  active session has a non-empty host-owned checklist. An empty checklist does
+  not reserve layout space.
+- The collapsed header shows completed/active progress and the current
+  `in_progress` content. A checklist whose items are all cancelled has a clear
+  cancelled label instead of a misleading `0/0 completed` count.
+- The disclosure is keyboard accessible, does not take focus on updates, resets
+  closed when the active session changes, and shows at most eight ordered rows.
+  The list stays mounted while collapsed so opening and closing can animate with
+  a bounded height/opacity transition; collapsed content is `aria-hidden` and
+  reduced-motion users receive an immediate state change. Completed rows use a
+  success-tinted tile with a check icon, in-progress rows use the accent tint,
+  and cancelled rows are muted; each status symbol has a localized accessible
+  name and each row renders plain text.
+- Renderer snapshots are keyed by session id. A `todos.changed` event with an
+  older or equal revision is ignored. The initial `todos.get` recovery is
+  skipped for `remote:` sessions because remote Todo parity is deferred until an
+  additive RACP contract exists.
+
 ### 11.4 States
 
 | State | Appearance | Actions |

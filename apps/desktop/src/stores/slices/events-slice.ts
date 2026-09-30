@@ -13,6 +13,7 @@ import {
 import type {
   AgentEventEnvelope,
   PlanningStateEvent,
+  SessionTodoSnapshot,
   UiMessage,
 } from "@pi-desktop/shared";
 import {
@@ -69,6 +70,29 @@ export type EventsSliceDependencies = StoreAccess & {
     mark: NonNullable<AppState["sessionCompactions"][string]>[number],
   ) => NonNullable<AppState["sessionCompactions"][string]>;
 };
+function isSessionTodoSnapshot(value: unknown): value is SessionTodoSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const snapshot = value as SessionTodoSnapshot;
+  if (
+    typeof snapshot.sessionId !== "string" ||
+    !Number.isInteger(snapshot.revision) ||
+    snapshot.revision < 0 ||
+    typeof snapshot.updatedAt !== "number" ||
+    !Number.isFinite(snapshot.updatedAt) ||
+    !Array.isArray(snapshot.todos)
+  ) {
+    return false;
+  }
+  return snapshot.todos.every((todo) => {
+    if (!todo || typeof todo !== "object") return false;
+    const item = todo as SessionTodoSnapshot["todos"][number];
+    return (
+      typeof item.content === "string" &&
+      ["pending", "in_progress", "completed", "cancelled"].includes(item.status) &&
+      ["high", "medium", "low"].includes(item.priority)
+    );
+  });
+}
 
 export function createEventsSlice({
   get,
@@ -84,7 +108,7 @@ export function createEventsSlice({
   withCompactionMark,
 }: EventsSliceDependencies): Pick<
   AppState,
-  "handlePlansChanged" | "handleAgentEvent"
+  "handlePlansChanged" | "handleAgentEvent" | "applyTodosChanged"
 > {
   let flushingStreamUpdates = false;
   const streamUpdates = createFrameBatcher<AgentEventEnvelope>((envelopes) => {
@@ -99,6 +123,14 @@ export function createEventsSlice({
   });
 
   return {
+    applyTodosChanged: (snapshot: SessionTodoSnapshot) => {
+      if (!isSessionTodoSnapshot(snapshot)) return;
+      set((state) => {
+        const current = state.sessionTodos[snapshot.sessionId];
+        if (current && current.revision >= snapshot.revision) return state;
+        return { sessionTodos: { ...state.sessionTodos, [snapshot.sessionId]: snapshot } };
+      });
+    },
     handlePlansChanged: (event) => {
       if (!event?.sessionId) return;
       runtime.nextPlanSyncGeneration(event.sessionId);

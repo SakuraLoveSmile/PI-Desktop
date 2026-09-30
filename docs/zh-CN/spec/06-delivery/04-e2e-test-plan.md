@@ -5400,15 +5400,20 @@ eleven-tool-round desktop paths are verified by
   确认来源仍为 Responses 和原别名，副本保存了 Anthropic Messages 与新
   别名。未测试携带凭据的网络发现、外部模型请求及 OpenCode Go UI 分支。
 
+**E2E-CHAT-session-todo-checklist：TodoWrite 到按会话显示的 TodoDock**
+
+- **前提：** 隔离的本地 Electron 配置、确定性的 Agent/Host fixture、两个 Desktop 会话，不使用真实 Provider 或付费 API。
+- **步骤：** 启动调用 `TodoWrite` 的多步骤 Agent 回合，观察 Composer 上方的 TodoDock，展开后切换会话并确认清单隔离。完成和取消条目，确认最多显示八条以及全部取消状态；清空清单后重载/重启 Host。发送乱序旧 `todos.changed` 事件，确认它不能覆盖新快照；再覆盖非法参数、Plan/Goal、委托和远程会话路径。
+- **预期：** Host SQLite 是权威状态；每次成功全量替换（包括清空）都会推进 revision 并只发出一次已提交的 `todos.changed`。非法或未授权写入既不修改也不发事件。TodoDock 渲染纯文本、不抢焦点、切换会话时收起、拒绝旧事件，并对 `remote:` 会话跳过本地恢复，因为 RACP v1 没有 Todo 快照操作。
+- **链接规格：** `03-runtime/03-tools-and-permissions.md`、`03-runtime/04-data-storage.md`、`03-runtime/06-host-rpc-protocol.md`、`04-ux/08-component-spec.md`、ADR 0310。
+- **验收：** C / E / F / Quality / Security。
+- **里程碑：** M6+。
+- **状态：** Host-core、`apps/desktop/test/todo-dock-rendering.test.mjs` 和 `todo-events.test.mjs` 已有定向自动化覆盖；完整 Electron 进程/重启旅程仍是候选验证门。
+
 ## 8. 可追溯性矩阵
-
-
-
-
-
-
 | 验收 | 应用场景 |
 |---|---|
+| C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — 桌面定时任务 | E2E-SCHEDULED-desktop-automation-lifecycle |
