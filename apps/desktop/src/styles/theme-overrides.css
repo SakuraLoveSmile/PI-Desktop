@@ -225,10 +225,31 @@
 }
 
 .composer-profile-chip {
-  width: 120px;
-  min-width: 120px;
-  max-width: 120px;
-  flex: 0 0 120px;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 130px;
+  flex: 0 0 auto !important;
+  padding: 0 8px !important;
+  gap: 4px !important;
+  justify-content: center !important;
+}
+
+.composer-profile-chip .composer-mode-chip-face {
+  gap: 4px;
+}
+
+.composer-contract-chip {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 110px;
+  flex: 0 0 auto !important;
+  padding: 0 8px !important;
+  gap: 4px !important;
+  justify-content: center !important;
+}
+
+.composer-contract-chip .composer-mode-chip-face {
+  gap: 4px;
 }
 
 .composer-mode-chip-label {
