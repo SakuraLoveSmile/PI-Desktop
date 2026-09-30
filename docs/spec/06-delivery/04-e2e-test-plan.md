@@ -755,14 +755,17 @@ identify the platform validation still needed.
   development lane, workspace package build outputs are absent or older than
   their TypeScript sources.
 - **Steps**: 1) Launch PI-Desktop. In the development lane, use `pnpm dev`.
-  2) Observe main window appears.
+  2) Observe main window appears. In the macOS development lane, confirm the
+  menu-bar tray icon appears.
 - **Expected**: Development launch rebuilds all workspace dependencies before
   host-core and Electron startup. Window first shows the branded startup splash
   while bootstrap runs, then reveals the main shell in English with the current
   locale catalog; no compile error, missing-menu runtime error, or crash;
-  version info visible. Key lifecycle and error records are written to the
-  categorized logs. GitHub auto-update is not started until after `ensureWindow`, and a hung
-  feed cannot keep updater status on `checking` for Chromium's ~60s timeout.
+  version info visible. The macOS development bundle contains both tray icon
+  resources, and the tray starts without a missing-icon warning. Key lifecycle
+  and error records are written to the categorized logs. GitHub auto-update is
+  not started until after `ensureWindow`, and a hung feed cannot keep updater
+  status on `checking` for Chromium's ~60s timeout.
 - **Specs linked**: `03-runtime/07-process-model.md`, `04-ux/01-ui-ia.md`,
   `03-runtime/09-logging-and-observability.md`
 - **Acceptance**: A (app startup)
