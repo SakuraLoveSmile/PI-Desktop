@@ -69,7 +69,7 @@
 }
 
 @container composer-stack (max-width: 450px) {
-  .composer-right .composer-model-thinking-chip {
+  .composer-model-thinking-chip {
     width: 32px;
     max-width: 32px;
     flex: 0 0 32px;
@@ -83,6 +83,9 @@
     display: none;
   }
 
+  .composer-mode-indicator-label {
+    display: none;
+  }
   .composer-right .context-inspector-trigger {
     gap: 0;
     padding-inline: 3px;

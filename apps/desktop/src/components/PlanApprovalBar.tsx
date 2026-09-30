@@ -77,7 +77,9 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const [approvalMode, setApprovalMode] = useState<GlobalPermissionMode>(
     readPlanApprovalMode(),
   );
-  const [goalRequested, setGoalRequested] = useState(proposal.kind === "goal");
+  const [goalRequested, setGoalRequested] = useState(
+    proposal.executionKind === "goal" || proposal.kind === "goal",
+  );
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduledFor, setScheduledFor] = useState("");
   const [executionProviderId, setExecutionProviderId] = useState(
@@ -86,10 +88,16 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const [executionModelId, setExecutionModelId] = useState(
     proposal.executionModelId ?? proposal.planningModelId ?? session?.modelId ?? "",
   );
-  const kind: ProposalKind = proposal.kind === "goal" ? "goal" : "plan";
-  const copy = (name: string) => t(copyKey(kind, name));
-  const artifactPath = proposal.artifact?.relativePath?.trim() || null;
   const isPending = proposal.status === "pending";
+  const kind: ProposalKind = proposal.kind === "goal" ? "goal" : "plan";
+  const effectiveKind: ProposalKind =
+    proposal.executionKind === "goal"
+      ? "goal"
+      : isPending && goalRequested
+        ? "goal"
+        : kind;
+  const copy = (name: string) => t(copyKey(effectiveKind, name));
+  const artifactPath = proposal.artifact?.relativePath?.trim() || null;
   const busy = resolving;
   const blockedByDraft = isPending && draftDirty;
   const scheduleInstant = scheduledFor ? new Date(scheduledFor).getTime() : NaN;
@@ -127,12 +135,12 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   useEffect(() => {
     setApprovalMode(readPlanApprovalMode());
     setMenuOpen(false);
-    setGoalRequested(proposal.kind === "goal");
+    setGoalRequested(proposal.executionKind === "goal" || proposal.kind === "goal");
     setScheduleOpen(false);
     setScheduledFor("");
     setExecutionProviderId(proposal.executionProviderId ?? proposal.planningProviderId ?? session?.providerId ?? "");
     setExecutionModelId(proposal.executionModelId ?? proposal.planningModelId ?? session?.modelId ?? "");
-  }, [proposal.id]);
+  }, [proposal.id, proposal.executionKind, proposal.kind]);
 
   useEffect(() => {
     setResolving(false);
@@ -175,6 +183,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                 targetPermissionMode ?? PLAN_APPROVAL_DEFAULT_MODE,
               executionProviderId,
               executionModelId,
+              executionKind: kind === "goal" || goalRequested ? "goal" : "plan",
             }
           : action === "schedule"
             ? {
@@ -185,6 +194,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                 executionModelId,
                 scheduledFor: new Date(scheduleInstant).toISOString(),
                 scheduleTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                executionKind: kind === "goal" || goalRequested ? "goal" : "plan",
               }
             : { ...identity, action },
       );
@@ -266,7 +276,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
       role="region"
       aria-label={copy("approvalRegion")}
       aria-busy={busy}
-      data-kind={kind}
+      data-kind={effectiveKind}
       data-status={proposal.status}
       data-execution-state={proposal.executionState || ""}
       data-testid="plan-approval-bar"
@@ -323,19 +333,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
               label={t("chat.goalMode")}
               onChange={() => {
                 if (blockedByDraft || kind !== "plan") return;
-                if (goalRequested) {
-                  void cancelPlanConversion(proposal)
-                    .then((cancelled) => { if (cancelled) setGoalRequested(false); })
-                    .catch((error) => showToast(String(error), { variant: "error" }));
-                  return;
-                }
-                if (busy) return;
-                setGoalRequested(true);
-                setResolving(true);
-                void convertPlanToGoal(proposal)
-                  .then((accepted) => { if (!accepted) setGoalRequested(false); })
-                  .catch((error) => showToast(error instanceof Error ? error.message : String(error), { variant: "error" }))
-                  .finally(() => setResolving(false));
+                setGoalRequested((prev) => !prev);
               }}
             />
           </span>

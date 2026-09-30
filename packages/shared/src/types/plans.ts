@@ -122,6 +122,7 @@ export type PlanProposal = {
   scheduledFor?: string;
   scheduleTimezone?: string;
   scheduleState?: PlanScheduleState;
+  executionKind?: ProposalKind;
   revisionIntent?: PlanRevisionIntent;
   /** Persisted snapshot alias retained by the host for compatibility. */
   plan: string;
@@ -134,6 +135,8 @@ export type PlanExecution = {
   sessionId: string;
   /** Which contract was approved; drives the execution instruction. */
   kind: ProposalKind;
+  /** Effective execution kind bound on approval: 'plan' | 'goal'. */
+  executionKind?: ProposalKind;
   /** Exact approved Markdown snapshot. */
   plan: string;
   title: string;
@@ -164,6 +167,7 @@ export type PlanningStateEvent = {
   targetPermissionMode?: GlobalPermissionMode;
   executionId?: string;
   executionState?: PlanExecutionState;
+  executionKind?: ProposalKind;
   proposal?: PlanProposal;
 };
 
@@ -195,6 +199,7 @@ export type PlanResolveRequest =
       targetPermissionMode: GlobalPermissionMode;
       executionProviderId?: string;
       executionModelId?: string;
+      executionKind?: ProposalKind;
     })
   | (PlanResolveIdentity & {
       action: "schedule";
@@ -203,6 +208,7 @@ export type PlanResolveRequest =
       executionModelId: string;
       scheduledFor: string;
       scheduleTimezone: string;
+      executionKind?: ProposalKind;
     })
   | (PlanResolveIdentity & {
       action: "reject";

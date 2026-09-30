@@ -261,6 +261,8 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     expect(leadPrompt).toContain("Lead of an Expert Team");
     expect(leadPrompt).toContain("spawn_teammate");
     expect(leadPrompt).toContain("Subagent `Task*` delegation is disabled");
+    expect(leadPrompt).toContain("separable work");
+    expect(leadPrompt).toContain("indivisible task");
 
     const memberPrompt = teamSystemPrompt({ isLead: false, memberName: "Coder" });
     expect(memberPrompt).toContain('teammate "Coder"');

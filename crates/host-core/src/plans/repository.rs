@@ -12,7 +12,7 @@ pub(crate) const PROPOSAL_COLUMNS: &str = "request_id, session_id, turn_id, tool
     (SELECT scheduled_for FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
     (SELECT timezone FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
     (SELECT state FROM plan_execution_schedules WHERE proposal_id = plan_approvals.request_id),
-    revision_intent_json, revision_state, revision_turn_id, revision_error_code";
+    revision_intent_json, revision_state, revision_turn_id, revision_error_code, execution_kind";
 
 pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PlanProposal> {
     let artifact_path: Option<String> = row.get(16)?;
@@ -90,6 +90,7 @@ pub(crate) fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Pla
         scheduled_for: row.get::<_, Option<i64>>(28)?.map(ms_to_ts),
         schedule_timezone: row.get(29)?,
         schedule_state: row.get(30)?,
+        execution_kind: row.get(35)?,
         revision_intent,
     })
 }
