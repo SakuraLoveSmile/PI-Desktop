@@ -8551,19 +8551,30 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
      the provider's configured base URL/API style. 3. Force a Settings catalog
      refresh and confirm it refetches models.dev without changing the bundled
      release file or writing a user cache. 4. Add an ID absent from models.dev
-     and inspect its generic fallback card.
+     and inspect its generic fallback card. 5. In the OAuth protocol fixture,
+     sign in to an account that offers a new Claude ID absent from models.dev
+     but with a pinned same-tier sibling. Resolve its runtime binding, apply
+     runtime model configuration without a saved model binding, and send `high`,
+     `xhigh`, and `max` through the real Anthropic adapter to an intercepted HTTP
+     boundary. Repeat with null-disabled levels, an all-disabled map, a
+     non-reasoning sibling, and an ID with no same-tier sibling.
 - **Expected**: models.dev fields prefill known model bindings and remain the
-  sole metadata source. Provider keys are never included in the fixed
-  models.dev request. Provider discovery remains available only to supply
-  custom/account-specific IDs; those IDs receive the generic text-only,
-  non-reasoning defaults. pi-ai supplies the selected transport and OAuth/account
-  availability, not model metadata.
-- **Specs linked**: `03-runtime/11-provider-model-system.md` §6.2,
+  published metadata source. Provider keys are never included in the fixed
+  models.dev request. Custom IDs without metadata retain generic defaults.
+  An OAuth live-only ID may use the existing same-tier fallback: protocol
+  compatibility and effort mappings travel with borrowed reasoning. Requests
+  use adaptive thinking and the requested effort, without legacy token budgets;
+  sparse mappings retain defaults and explicit nulls remain unsupported. A
+  non-reasoning sibling remains off-only, and no same-tier sibling means no
+  inferred reasoning. Published metadata and explicit mapping/compatibility
+  values take precedence. Copilot Bearer authentication remains unchanged.
+- **Specs linked**: `03-runtime/11-provider-model-system.md` §6.2 and §8a,
   `03-runtime/13-model-catalog-and-selection.md` §11.1–§12, ADR 0134
 - **Acceptance**: B (model config), C (conversation & stream), Security
 - **Milestone**: M6+
-- **Status**: Unit/source-contract covered; full provider-dialog journey Draft
-  (run only in a capable environment when this surface changes)
+- **Status**: OAuth-to-runtime-binding-to-adapter HTTP contract automated in
+  `apps/desktop/test/vendor-oauth-login.test.mjs`. Full provider-dialog journey
+  Draft. No live account or paid provider request is required for this fixture.
 
 #### E2E-NAV-plugins-button-goes-back: Plugins footer reuses navigation history
 
