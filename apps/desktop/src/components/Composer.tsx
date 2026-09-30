@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+  ComposerCommand,
   ExecutionProfile,
   Mode,
   PermissionMode,
@@ -145,7 +146,6 @@ export function Composer({
       : EMPTY_QUEUED_PROMPTS,
   );
 
-  const [permissionOpen, setPermissionOpen] = useState(false);
   const enhancementInvalidateRef = useRef<() => void>(() => {});
   const composerShellRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -439,10 +439,6 @@ export function Composer({
   const enterToSend = settings?.enterToSend ?? true;
   const hasDraftContent = Boolean(value.trim() || activeFileReferences.length);
 
-  useEffect(() => {
-    if (!controlsBlocked) return;
-    setPermissionOpen(false);
-  }, [controlsBlocked]);
 
   const submitController = useComposerSubmit({
     value,
@@ -538,6 +534,46 @@ export function Composer({
       ],
       result.cursor + token.length,
     );
+  };
+
+  const handleInsertReferenceFromPlus = (item: {
+    path: string;
+    name: string;
+    isDir: boolean;
+  }) => {
+    invalidatePromptEnhancement();
+    if (item.isDir) {
+      const insert = `@${item.path}/`;
+      const nextText = value.slice(0, cursor) + insert + value.slice(cursor);
+      applyEditorDraft(nextText, fileReferencesRef.current, cursor + insert.length);
+    } else {
+      const token = nextChipToken();
+      const nextText = value.slice(0, cursor) + token + value.slice(cursor);
+      applyEditorDraft(
+        nextText,
+        [
+          ...fileReferencesRef.current,
+          createFileReference(item.path, item.name, referenceSessionId, {
+            kind: isImageFilePath(item.path) ? "image" : "file",
+            token,
+          }),
+        ],
+        cursor + token.length,
+      );
+    }
+    requestAnimationFrame(() => {
+      draft.ref.current?.focus();
+    });
+  };
+
+  const handleInsertCommandFromPlus = (command: ComposerCommand) => {
+    invalidatePromptEnhancement();
+    const insert = `/${command.name} `;
+    const nextText = value.slice(0, cursor) + insert + value.slice(cursor);
+    applyEditorDraft(nextText, fileReferencesRef.current, cursor + insert.length);
+    requestAnimationFrame(() => {
+      draft.ref.current?.focus();
+    });
   };
 
   // Keep the transcript's bottom reserve in sync with the composer's real
@@ -652,9 +688,9 @@ export function Composer({
             providerId={provider?.id}
             modelId={modelId}
             thinkingLevel={thinkingLevel}
-            composerPermissionMode={composerPermissionMode}
-            permissionOpen={permissionOpen}
-            setPermissionOpen={setPermissionOpen}
+            sessionPermissionMode={sessionPermissionMode}
+            onInsertReference={handleInsertReferenceFromPlus}
+            onInsertCommand={handleInsertCommandFromPlus}
             controlsBlocked={controlsBlocked}
             pasting={pasting}
             pickAndAttach={pickAndAttach}

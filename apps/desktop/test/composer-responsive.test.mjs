@@ -37,7 +37,7 @@ test("narrow composer containers progressively simplify the model controls", () 
   );
   assert.match(
     styles,
-    /@container composer-stack \(max-width: 450px\)[\s\S]*?\.composer-right \.composer-model-thinking-chip[\s\S]*?width:\s*32px;/,
+    /@container composer-stack \(max-width: 450px\)[\s\S]*?\.composer-model-thinking-chip[\s\S]*?width:\s*32px;/,
   );
   assert.match(
     styles,

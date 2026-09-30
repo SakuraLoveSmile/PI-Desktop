@@ -957,3 +957,142 @@ fn entering_goal_mode_writes_the_goal_mode_and_kind() {
         "PLAN_INVALID_ARGUMENT"
     );
 }
+
+#[test]
+fn plan_to_goal_approval_binds_execution_kind_and_creates_goal_execution() {
+    let (dir, db) = test_db();
+    let root = dir.path().join("workspace");
+    fs::create_dir_all(&root).unwrap();
+    let manager = PlanManager;
+    let proposal = submit(&manager, &db, &root, "call-p2g");
+    let resolved = manager
+        .resolve_with_options(
+            &db,
+            PlanResolveParams {
+                workspace_root: Some(&root),
+                proposal_id: &proposal.id,
+                session_id: &proposal.session_id,
+                turn_id: &proposal.turn_id,
+                tool_call_id: &proposal.tool_call_id,
+                version: Some(proposal.version),
+                action: "approve",
+                target_permission_mode: Some("auto"),
+            },
+            PlanResolveOptions {
+                execution_kind: Some("goal"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(resolved.status, STATUS_APPROVED);
+    assert_eq!(resolved.proposal.kind, KIND_PLAN);
+    assert_eq!(resolved.proposal.execution_kind.as_deref(), Some("goal"));
+    let execution = resolved.execution.unwrap();
+    assert_eq!(execution.kind, KIND_GOAL);
+
+    let queued = manager
+        .queued_executions(&db, Some(&proposal.session_id))
+        .unwrap();
+    assert_eq!(queued.len(), 1);
+    assert_eq!(queued[0].kind, KIND_GOAL);
+
+    // Duplicate resolution with same executionKind succeeds idempotently
+    let duplicate = manager
+        .resolve_with_options(
+            &db,
+            PlanResolveParams {
+                workspace_root: Some(&root),
+                proposal_id: &proposal.id,
+                session_id: &proposal.session_id,
+                turn_id: &proposal.turn_id,
+                tool_call_id: &proposal.tool_call_id,
+                version: Some(proposal.version),
+                action: "approve",
+                target_permission_mode: Some("auto"),
+            },
+            PlanResolveOptions {
+                execution_kind: Some("goal"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(duplicate.proposal.execution_kind.as_deref(), Some("goal"));
+
+    // Duplicate resolution with different executionKind is rejected as conflict
+    let conflict = manager
+        .resolve_with_options(
+            &db,
+            PlanResolveParams {
+                workspace_root: Some(&root),
+                proposal_id: &proposal.id,
+                session_id: &proposal.session_id,
+                turn_id: &proposal.turn_id,
+                tool_call_id: &proposal.tool_call_id,
+                version: Some(proposal.version),
+                action: "approve",
+                target_permission_mode: Some("auto"),
+            },
+            PlanResolveOptions {
+                execution_kind: Some("plan"),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+    assert_eq!(conflict.to_string(), "PLAN_APPROVAL_CONFLICT");
+}
+
+#[test]
+fn goal_approval_rejects_plan_execution_kind() {
+    let (dir, db) = test_db();
+    let root = dir.path().join("workspace");
+    fs::create_dir_all(&root).unwrap();
+    let manager = PlanManager;
+    let session = sessions::create_session(
+        &db,
+        Some("Goal".into()),
+        Some("goal".into()),
+        None,
+        None,
+        Some(root.to_string_lossy().into_owned()),
+    )
+    .unwrap();
+    let turn = live_turn(&db, &session.id);
+    let proposal = manager
+        .submit(
+            &db,
+            PlanSubmitParams {
+                workspace_root: &root,
+                session_id: &session.id,
+                turn_id: &turn,
+                tool_call_id: "call-goal",
+                kind: KIND_GOAL,
+                title: "Build Goal",
+                markdown: "# Goal spec\n\n- step 1",
+                question: "Approve goal?",
+                artifact_workspace_kind: WORKSPACE_KIND_PROJECT,
+            },
+        )
+        .unwrap();
+
+    let err = manager
+        .resolve_with_options(
+            &db,
+            PlanResolveParams {
+                workspace_root: Some(&root),
+                proposal_id: &proposal.id,
+                session_id: &proposal.session_id,
+                turn_id: &proposal.turn_id,
+                tool_call_id: &proposal.tool_call_id,
+                version: Some(proposal.version),
+                action: "approve",
+                target_permission_mode: Some("auto"),
+            },
+            PlanResolveOptions {
+                execution_kind: Some("plan"),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+    assert_eq!(err.to_string(), "PLAN_INVALID_EXECUTION_KIND");
+}

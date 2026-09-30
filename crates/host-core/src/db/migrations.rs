@@ -985,3 +985,29 @@ pub(crate) fn migrate_v21_to_v22(conn: &Connection, path: &Path) -> Result<()> {
     })?;
     Ok(())
 }
+
+/// v23 binds additive effective execution_kind ('plan' | 'goal') to plan_approvals.
+pub(crate) fn migrate_v22_to_v23(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 22)?;
+    verify_migration_backup(&backup, 22)?;
+    let tx = conn.unchecked_transaction()?;
+    let exists: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'execution_kind')",
+        [],
+        |row| row.get(0),
+    )?;
+    if !exists {
+        tx.execute_batch(
+            "ALTER TABLE plan_approvals ADD COLUMN execution_kind TEXT CHECK (execution_kind IN ('plan', 'goal'));
+             UPDATE plan_approvals SET execution_kind = kind WHERE (execution_id IS NOT NULL OR status = 'approved') AND execution_kind IS NULL;"
+        )?;
+    }
+    tx.pragma_update(None, "user_version", 23i64)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v22 to v23 migration; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}

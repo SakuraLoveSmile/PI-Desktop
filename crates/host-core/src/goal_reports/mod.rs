@@ -131,14 +131,17 @@ fn load_proposal_facts(conn: &Connection, execution_id: &str) -> Result<Proposal
     conn.prepare_cached(
         "SELECT request_id, session_id, kind, title, plan_json,
                 artifact_relative_path, artifact_sha256, created_at,
-                execution_state, error_code
+                execution_state, error_code, execution_kind
          FROM plan_approvals WHERE execution_id = ?1",
     )?
     .query_row(params![execution_id], |row| {
+        let stored_kind: String = row.get(2)?;
+        let execution_kind: Option<String> = row.get(10)?;
+        let kind = execution_kind.unwrap_or(stored_kind);
         Ok(ProposalFacts {
             request_id: row.get(0)?,
             session_id: row.get(1)?,
-            kind: row.get(2)?,
+            kind,
             title: row.get(3)?,
             plan_json: row.get(4)?,
             artifact_relative_path: row.get(5)?,

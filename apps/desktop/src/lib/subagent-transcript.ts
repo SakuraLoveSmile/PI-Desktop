@@ -20,7 +20,7 @@ export type SubagentTranscript = {
   turns: SubagentTranscriptTurn[];
 };
 
-function delegateTaskDescription(call: UiMessage): string {
+export function delegateTaskDescription(call: UiMessage): string {
   const args = call.toolArgs;
   if (!args || typeof args !== "object" || Array.isArray(args)) return "";
   const task = (args as { task?: unknown }).task;

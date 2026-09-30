@@ -693,14 +693,18 @@ failures must reach the tool error channel rather than appear as successful
 submissions, and must not publish an approval or launch execution.
 
 Goal approval commits exactly what Plan approval commits: `mode = agent`, the
-explicit permission mode, an execution ID, and `execution_state = queued` on the
-same row. The queued execution instruction differs by kind. An approved plan is
-replayed as steps to follow; an approved goal instructs the Agent to choose its
-own approach, verify every acceptance criterion by running the checks the
-contract names, keep working while a criterion is unmet and an untried approach
-remains, stop early only when a boundary blocks it, and close with a
-criterion-by-criterion report of what was met and the evidence observed.
-
+explicit permission mode, an execution ID, `execution_kind` (recording whether
+the approved execution runs as a structured Plan or autonomous Goal), and
+`execution_state = queued` on the same row. A Plan proposal may be approved
+directly with `execution_kind = plan` or approved with `execution_kind = goal`
+via the local pre-execution toggle without a model rewrite turn. The queued
+execution instruction follows the effective `execution_kind`: an execution
+approved as `plan` is replayed as steps to follow; an execution approved as
+`goal` instructs the Agent to choose its own approach, verify every
+acceptance criterion by running the checks the contract names, keep working
+while a criterion is unmet and an untried approach remains, stop early only
+when a boundary blocks it, and close with a criterion-by-criterion report of
+what was met and the evidence observed.
 ## 5c. Thinking capability and stream contract
 
 - Canonical levels are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`,

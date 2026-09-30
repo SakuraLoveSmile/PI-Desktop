@@ -274,6 +274,7 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   execution_id          TEXT UNIQUE,
   execution_provider_id TEXT,
   execution_model_id    TEXT,
+  execution_kind        TEXT CHECK (execution_kind IN ('plan', 'goal')),
   revision_intent_json  TEXT,
   revision_state        TEXT CHECK (revision_state IN ('ready', 'started', 'failed', 'submitted')),
   revision_turn_id      TEXT,

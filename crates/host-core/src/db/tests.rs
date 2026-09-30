@@ -316,6 +316,61 @@ fn v21_plan_proposal_survives_v22_migration() {
     assert!(execution_provider.is_none());
 }
 
+#[test]
+fn v22_plan_proposal_survives_v23_migration() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    {
+        let db = Database::open(&path).unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO sessions (id, created_at, updated_at) VALUES ('s1', 1, 1)",
+                [],
+            )
+            .unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO plan_approvals (
+                    request_id, session_id, turn_id, tool_call_id, kind, plan_json,
+                    status, created_at, updated_at, execution_id, execution_kind
+                 ) VALUES ('p1', 's1', 't1', 'c1', 'plan', '# Saved plan', 'approved', 1, 1, 'e1', 'plan')",
+                [],
+            )
+            .unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO plan_approvals (
+                    request_id, session_id, turn_id, tool_call_id, kind, plan_json,
+                    status, created_at, updated_at, execution_id, execution_kind
+                 ) VALUES ('p2', 's1', 't2', 'c2', 'goal', '# Saved goal', 'approved', 2, 2, 'e2', 'goal')",
+                [],
+            )
+            .unwrap();
+        db.conn()
+            .execute_batch(
+                "ALTER TABLE plan_approvals DROP COLUMN execution_kind;
+                 PRAGMA user_version = 22;",
+            )
+            .unwrap();
+    }
+
+    let db = Database::open(&path).unwrap();
+    assert_eq!(schema_version(db.conn()), SCHEMA_VERSION);
+    assert!(migration_backup_path(&path, 22).exists());
+    let (k1, k2): (Option<String>, Option<String>) = db
+        .conn()
+        .query_row(
+            "SELECT 
+                (SELECT execution_kind FROM plan_approvals WHERE request_id = 'p1'),
+                (SELECT execution_kind FROM plan_approvals WHERE request_id = 'p2')",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(k1.as_deref(), Some("plan"));
+    assert_eq!(k2.as_deref(), Some("goal"));
+}
+
 fn schema_version(conn: &Connection) -> i64 {
     conn.query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap()

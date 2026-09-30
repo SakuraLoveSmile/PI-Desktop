@@ -1,10 +1,20 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { PlanProposal, UiMessage } from "@pi-desktop/shared";
+import type { PlanProposal, TeamMemberRecord, TeamTaskRecord, UiMessage } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { IconFileText, IconInfo } from "../icons";
-import { fileWorkPanelTab } from "../../lib/work-panel-tabs";
+import { IconBot, IconFileText, IconInfo, IconUsers } from "../icons";
+import { fileWorkPanelTab, teamWorkPanelTab } from "../../lib/work-panel-tabs";
 import { resolvePlanArtifactPath } from "../../lib/plan-artifact";
+import { isDelegationStartTool } from "../../lib/tool-display";
+import { delegationIdForMessage } from "../../lib/subagent-panel";
+import {
+  collectDelegationStatuses,
+  subagentOutcome,
+  type SubagentOutcome,
+} from "../../lib/subagent-topology";
+import { delegateAgentName } from "../../features/chat/transcript/model";
+import { delegateTaskDescription } from "../../lib/subagent-transcript";
+import { api } from "../../lib/api";
 
 type OverviewItem = {
   id: string;
@@ -12,6 +22,12 @@ type OverviewItem = {
   path?: string;
   detail?: string;
   proposal?: PlanProposal;
+};
+
+type TeamOverviewData = {
+  members: TeamMemberRecord[];
+  tasks: TeamTaskRecord[];
+  paused: boolean;
 };
 
 function proposalLabel(proposal: PlanProposal): string {
@@ -48,6 +64,7 @@ export function OverviewTab() {
   const runningSessions = useAppStore((state) => state.runningSessions);
   const sessionOutcomes = useAppStore((state) => state.sessionOutcomes);
   const openFileInWorkPanel = useAppStore((state) => state.openFileInWorkPanel);
+  const openSubagentTab = useAppStore((state) => state.openSubagentTab);
   const openWorkPanelTabForSession = useAppStore((state) => state.openWorkPanelTabForSession);
   const showToast = useAppStore((state) => state.showToast);
 
@@ -109,6 +126,79 @@ export function OverviewTab() {
   const outcome = activeSessionId ? sessionOutcomes[activeSessionId] : undefined;
   const running = activeSessionId ? runningSessions[activeSessionId] === true : false;
 
+  const isTeam = session?.executionProfile === "team";
+  const [teamData, setTeamData] = useState<TeamOverviewData | null>(null);
+
+  useEffect(() => {
+    if (!isTeam || !activeSessionId) {
+      setTeamData(null);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      api.getTeamRoster(activeSessionId) as Promise<{
+        teamSessionId: string;
+        paused: boolean;
+        members: TeamMemberRecord[];
+      }>,
+      api.getTeamBoard(activeSessionId) as Promise<{
+        teamSessionId: string;
+        tasks: TeamTaskRecord[];
+      }>,
+    ])
+      .then(([roster, board]) => {
+        if (!cancelled && roster.teamSessionId === activeSessionId) {
+          setTeamData({
+            members: roster.members,
+            tasks: board.tasks.filter((t) => !t.deleted),
+            paused: roster.paused,
+          });
+        }
+      })
+      .catch(() => {
+        // Silently tolerate overview team polling errors
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isTeam, activeSessionId]);
+
+  const subagents = useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+    const seen = new Set<string>();
+    const list: {
+      delegationId: string;
+      agentName: string;
+      task: string;
+      status: SubagentOutcome;
+    }[] = [];
+
+    const statuses = collectDelegationStatuses(
+      messages
+        .filter((m) => m.role === "tool")
+        .map((m) => ({ kind: "tool" as const, message: m })),
+      { turnLive: running },
+    );
+
+    for (const m of messages) {
+      if (m.role === "tool" && isDelegationStartTool(m.toolName)) {
+        const delegationId = delegationIdForMessage(m);
+        if (seen.has(delegationId)) continue;
+        seen.add(delegationId);
+        const agent = delegateAgentName(m);
+        const task = delegateTaskDescription(m);
+        const status = subagentOutcome(m, statuses);
+        list.push({
+          delegationId,
+          agentName: agent || t("chat.subagentUnnamed"),
+          task,
+          status,
+        });
+      }
+    }
+    return list;
+  }, [messages, running, t]);
+
   if (!session) {
     return (
       <div className="work-panel-overview work-panel-overview-empty" data-testid="overview-tab">
@@ -145,6 +235,79 @@ export function OverviewTab() {
       </header>
 
       <div className="work-panel-overview-scroll">
+        {isTeam && (
+          <details className="work-panel-overview-section" open>
+            <summary>{t("panel.overview.teamSection")}</summary>
+            <div className="work-panel-overview-section-body">
+              <div className="work-panel-overview-team-card">
+                <div className="work-panel-overview-row">
+                  <span className="work-panel-overview-row-label">
+                    <IconUsers size={14} aria-hidden />
+                    <span>{t("team.lead")}</span>
+                  </span>
+                  <span className={`team-status-badge ${teamData?.paused ? "team-status-paused" : "team-status-active"}`}>
+                    {teamData?.paused ? t("team.pausedBadge") : t("team.activeBadge")}
+                  </span>
+                </div>
+                {teamData ? (
+                  <>
+                    <div className="work-panel-overview-row">
+                      <span className="work-panel-overview-row-label">
+                        {t("team.membersCount", { count: teamData.members.length })}
+                      </span>
+                      <span className="work-panel-overview-row-detail">
+                        {t("team.tasksProgress", {
+                          completed: teamData.tasks.filter((task) => task.status === "completed").length,
+                          total: teamData.tasks.length,
+                        })}
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+                <div className="work-panel-overview-team-action">
+                  <button
+                    type="button"
+                    className="work-panel-overview-action-btn"
+                    onClick={() =>
+                      openWorkPanelTabForSession(session.id, teamWorkPanelTab(session.id))
+                    }
+                  >
+                    {t("team.viewTeam")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </details>
+        )}
+
+        <details className="work-panel-overview-section" open>
+          <summary>{t("panel.overview.subagents")}</summary>
+          <div className="work-panel-overview-section-body">
+            {subagents.length > 0 ? (
+              subagents.map((sub) => (
+                <button
+                  className="work-panel-overview-file work-panel-overview-subagent-row"
+                  key={sub.delegationId}
+                  type="button"
+                  title={sub.task || sub.agentName}
+                  onClick={() => openSubagentTab(sub.delegationId, sub.agentName)}
+                >
+                  <IconBot size={15} aria-hidden />
+                  <span className="work-panel-overview-file-copy">
+                    <span className="work-panel-overview-file-label">{sub.agentName}</span>
+                    {sub.task && <span className="work-panel-overview-file-detail">{sub.task}</span>}
+                  </span>
+                  <span className={`team-badge team-phase-${sub.status === "completed" ? "completed" : sub.status === "running" ? "running" : "failed"}`}>
+                    {sub.status}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="work-panel-overview-empty-copy">{t("panel.overview.noSubagents")}</p>
+            )}
+          </div>
+        </details>
+
         <details className="work-panel-overview-section" open>
           <summary>{t("panel.overview.progress")}</summary>
           <div className="work-panel-overview-section-body">
