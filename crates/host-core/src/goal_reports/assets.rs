@@ -75,43 +75,72 @@ fn detect_image_type(bytes: &[u8]) -> Option<(&'static str, &'static str)> {
 
 fn find_candidate_file(data_dir: &Path, session_id: &str, ref_id: &str) -> Option<PathBuf> {
     let trimmed = ref_id.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_empty() || Path::new(trimmed).is_absolute() {
         return None;
     }
 
+    let is_safe_relative = |value: &str| {
+        let path = Path::new(value);
+        path.components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
+    };
+    let canonical_data_dir = fs::canonicalize(data_dir).ok()?;
+    let canonical_file_under = |root: &Path, relative: &str| {
+        if !is_safe_relative(relative) {
+            return None;
+        }
+        let canonical_root = fs::canonicalize(root).ok()?;
+        if !canonical_root.starts_with(&canonical_data_dir) {
+            return None;
+        }
+        let candidate = fs::canonicalize(root.join(relative)).ok()?;
+        candidate.starts_with(&canonical_root).then_some(candidate)
+    };
+    let attachment_ref = trimmed
+        .strip_prefix("attachments/")
+        .map(|_| trimmed.to_string());
+    let session_owns_attachment = attachment_ref.as_deref().is_some_and(|wanted| {
+        crate::transcripts::read_transcript(data_dir, session_id)
+            .ok()
+            .into_iter()
+            .flatten()
+            .flat_map(|record| record.blocks.as_array().cloned().unwrap_or_default())
+            .any(|block| {
+                block.get("type").and_then(Value::as_str) == Some("attachment")
+                    && block.get("ref").and_then(Value::as_str) == Some(wanted)
+            })
+    });
+
     // 1. Check direct attachments folder: data_dir/attachments/<hash>
-    let att_dir = data_dir.join("attachments");
-    let candidate = att_dir.join(trimmed);
-    if candidate.is_file() {
-        return Some(candidate);
-    }
-    // Check if refId has prefix "attachments/"
-    if let Some(stripped) = trimmed.strip_prefix("attachments/") {
-        let candidate = att_dir.join(stripped);
-        if candidate.is_file() {
+    if session_owns_attachment {
+        let att_dir = data_dir.join("attachments");
+        if let Some(candidate) = canonical_file_under(&att_dir, trimmed).filter(|p| p.is_file()) {
             return Some(candidate);
+        }
+        // Check if refId has prefix "attachments/"
+        if let Some(stripped) = trimmed.strip_prefix("attachments/") {
+            if let Some(candidate) =
+                canonical_file_under(&att_dir, stripped).filter(|p| p.is_file())
+            {
+                return Some(candidate);
+            }
         }
     }
 
     // 2. Check session scratch directory: data_dir/scratch/<session_id>/...
     if let Some(scratch_dir) = crate::scratch::session_dir(data_dir, session_id) {
-        let candidate = scratch_dir.join(trimmed);
-        if candidate.is_file() {
+        if let Some(candidate) = canonical_file_under(&scratch_dir, trimmed).filter(|p| p.is_file())
+        {
             return Some(candidate);
         }
     }
 
     // 3. Check goal_reports staging/assets
     let session_reports_dir = data_dir.join("goal_reports").join(session_id);
-    let candidate = session_reports_dir.join(trimmed);
-    if candidate.is_file() {
+    if let Some(candidate) =
+        canonical_file_under(&session_reports_dir, trimmed).filter(|p| p.is_file())
+    {
         return Some(candidate);
-    }
-
-    // 4. Check if refId is an absolute path (defensive, only if regular file and inside data_dir or temp)
-    let p = Path::new(trimmed);
-    if p.is_absolute() && p.is_file() {
-        return Some(p.to_path_buf());
     }
 
     None
@@ -170,7 +199,19 @@ pub fn resolve_and_save_assets(
             continue;
         };
 
-        let file_bytes = match fs::read(&source_file) {
+        let file_bytes = match File::open(&source_file).and_then(|file| {
+            let size = file.metadata()?.len();
+            if size > MAX_ASSET_BYTES as u64 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::FileTooLarge,
+                    format!("asset is {size} bytes"),
+                ));
+            }
+            let mut bytes = Vec::with_capacity(size as usize);
+            file.take((MAX_ASSET_BYTES + 1) as u64)
+                .read_to_end(&mut bytes)?;
+            Ok(bytes)
+        }) {
             Ok(b) => b,
             Err(e) => {
                 warnings.push(format!("Screenshot '{sc_id}' could not be read: {e}"));
@@ -245,6 +286,27 @@ pub fn read_asset_chunk(
     offset: u64,
     length: Option<usize>,
 ) -> GoalReportAssetChunk {
+    let safe_component = |value: &str| {
+        !value.is_empty()
+            && Path::new(value)
+                .components()
+                .all(|component| matches!(component, std::path::Component::Normal(_)))
+    };
+    if !safe_component(session_id) || !safe_component(execution_id) {
+        return GoalReportAssetChunk {
+            state: "unavailable".to_string(),
+            asset_id: None,
+            mime_type: None,
+            total_bytes: None,
+            offset: Some(offset),
+            length: None,
+            sha256: None,
+            data_base64: None,
+            eof: None,
+            session_id: Some(session_id.to_string()),
+            detail: Some("ASSET_NOT_FOUND: invalid report identity".to_string()),
+        };
+    }
     let report_path = data_dir
         .join("goal_reports")
         .join(session_id)
@@ -350,22 +412,66 @@ pub fn read_asset_chunk(
         .unwrap_or("")
         .to_string();
 
+    let asset_root = data_dir
+        .join("goal_reports")
+        .join(session_id)
+        .join("assets")
+        .join(execution_id);
+    let canonical_data_dir = match fs::canonicalize(data_dir) {
+        Ok(path) => path,
+        Err(_) => {
+            return GoalReportAssetChunk {
+                state: "unavailable".to_string(),
+                asset_id: Some(asset_id),
+                mime_type: Some(mime_type),
+                total_bytes: None,
+                offset: Some(offset),
+                length: None,
+                sha256: Some(expected_sha256),
+                data_base64: None,
+                eof: None,
+                session_id: Some(session_id.to_string()),
+                detail: Some("ASSET_FILE_MISSING: data directory is missing".to_string()),
+            };
+        }
+    };
+    let canonical_root = match fs::canonicalize(&asset_root) {
+        Ok(path) if path.starts_with(&canonical_data_dir) => path,
+        _ => {
+            return GoalReportAssetChunk {
+                state: "unavailable".to_string(),
+                asset_id: Some(asset_id),
+                mime_type: Some(mime_type),
+                total_bytes: None,
+                offset: Some(offset),
+                length: None,
+                sha256: Some(expected_sha256),
+                data_base64: None,
+                eof: None,
+                session_id: Some(session_id.to_string()),
+                detail: Some("ASSET_FILE_MISSING: asset directory on disk is missing".to_string()),
+            };
+        }
+    };
     let full_asset_path = data_dir.join(rel_path);
-    if !full_asset_path.exists() {
-        return GoalReportAssetChunk {
-            state: "unavailable".to_string(),
-            asset_id: Some(asset_id),
-            mime_type: Some(mime_type),
-            total_bytes: None,
-            offset: Some(offset),
-            length: None,
-            sha256: Some(expected_sha256),
-            data_base64: None,
-            eof: None,
-            session_id: Some(session_id.to_string()),
-            detail: Some("ASSET_FILE_MISSING: asset file on disk is missing".to_string()),
-        };
-    }
+    let full_asset_path = match fs::canonicalize(&full_asset_path) {
+        Ok(path) if path.starts_with(&canonical_root) && path.is_file() => path,
+        _ => {
+            return GoalReportAssetChunk {
+                state: "unavailable".to_string(),
+                asset_id: Some(asset_id),
+                mime_type: Some(mime_type),
+                total_bytes: None,
+                offset: Some(offset),
+                length: None,
+                sha256: Some(expected_sha256),
+                data_base64: None,
+                eof: None,
+                session_id: Some(session_id.to_string()),
+                detail: Some("ASSET_FILE_MISSING: asset file on disk is missing".to_string()),
+            };
+        }
+    };
 
     let mut file = match File::open(&full_asset_path) {
         Ok(f) => f,

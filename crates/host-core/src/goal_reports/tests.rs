@@ -628,6 +628,26 @@ fn test_assets_save_and_chunk_read() {
     png_bytes.extend_from_slice(b"TEST_IMAGE_DATA_1234567890");
     let test_img_path = att_dir.join("test-img-hash.png");
     fs::write(&test_img_path, &png_bytes).unwrap();
+    crate::transcripts::append_message(
+        db.data_dir(),
+        session_id,
+        "2025-01-01T00:00:00Z",
+        &crate::transcripts::MessageRecord {
+            id: "attachment-message".to_string(),
+            role: "user".to_string(),
+            tool_name: None,
+            is_error: false,
+            blocks: json!([{
+                "type": "attachment",
+                "kind": "image",
+                "name": "test-img-hash.png",
+                "ref": "attachments/test-img-hash.png"
+            }]),
+            meta: None,
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+        },
+    )
+    .unwrap();
 
     let draft = json!({
         "summary": "Report with screenshot asset",
@@ -643,7 +663,7 @@ fn test_assets_save_and_chunk_read() {
             {
                 "id": "ev-1",
                 "kind": "file",
-                "refId": "test-img-hash.png",
+                "refId": "attachments/test-img-hash.png",
                 "summary": "Screenshot evidence"
             }
         ]
@@ -693,6 +713,29 @@ fn test_assets_save_and_chunk_read() {
         None,
     );
     assert_eq!(missing_chunk.state, "unavailable");
+
+    let outside = dir.path().join("outside.png");
+    fs::write(&outside, &png_bytes).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&outside, att_dir.join("escape.png")).unwrap();
+    let unsafe_draft = json!({
+        "screenshots": [
+            { "id": "sc-escape", "evidenceRef": "ev-escape" },
+            { "id": "sc-absolute", "evidenceRef": "ev-absolute" }
+        ],
+        "evidences": [
+            { "id": "ev-escape", "kind": "file", "refId": "attachments/escape.png" },
+            { "id": "ev-absolute", "kind": "file", "refId": outside.to_string_lossy() }
+        ]
+    });
+    let (unsafe_assets, warnings) = assets::resolve_and_save_assets(
+        db.data_dir(),
+        session_id,
+        "exec-unsafe-assets",
+        &unsafe_draft,
+    );
+    assert!(unsafe_assets.is_empty());
+    assert_eq!(warnings.len(), 2);
 }
 
 #[test]
@@ -707,6 +750,43 @@ fn test_evidence_resolution_and_check_observations() {
         .execute(
             "INSERT INTO messages (id, session_id, seq, role, text, created_at)
          VALUES ('msg-recorded-1', 'sess-ev', 5, 'assistant', 'output evidence text', 1000)",
+            params![],
+        )
+        .unwrap();
+    let tool_record = crate::transcripts::MessageRecord {
+        id: "tool-recorded-1".to_string(),
+        role: "tool".to_string(),
+        tool_name: Some("Bash".to_string()),
+        is_error: false,
+        blocks: json!([{
+            "type": "tool_call",
+            "callId": "tc-recorded",
+            "name": "Bash",
+            "args": { "command": "cargo check" },
+            "result": { "exitCode": 0 },
+            "status": "success"
+        }]),
+        meta: None,
+        created_at: "2025-01-01T00:00:00Z".to_string(),
+    };
+    crate::transcripts::append_message(
+        db.data_dir(),
+        session_id,
+        "2025-01-01T00:00:00Z",
+        &tool_record,
+    )
+    .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO messages (id, session_id, seq, role, tool_name, created_at)
+             VALUES ('tool-recorded-1', 'sess-ev', 6, 'tool', 'Bash', 1001)",
+            params![],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO messages (id, session_id, seq, role, text, created_at)
+             VALUES ('future-message', 'sess-ev', 11, 'assistant', 'future-message', 1002)",
             params![],
         )
         .unwrap();
@@ -726,13 +806,32 @@ fn test_evidence_resolution_and_check_observations() {
                 "kind": "tool_call",
                 "refId": "tc-not-found",
                 "summary": "Missing ref"
+            },
+            {
+                "id": "ev-tool",
+                "kind": "tool_result",
+                "refId": "tc-recorded",
+                "summary": "Recorded command result"
+            },
+            {
+                "id": "ev-wildcard",
+                "kind": "message",
+                "refId": "%",
+                "summary": "Must not match text"
+            },
+            {
+                "id": "ev-future",
+                "kind": "message",
+                "refId": "future-message",
+                "summary": "Outside durable boundary"
             }
         ],
         "checks": [
             {
                 "id": "chk-passed",
                 "command": "cargo check",
-                "exitCode": 0,
+                "exitCode": 17,
+                "evidenceRefs": ["ev-tool"],
                 "result": "passed"
             },
             {
@@ -758,16 +857,28 @@ fn test_evidence_resolution_and_check_observations() {
     let rep = read.report.unwrap();
 
     let ev_res = rep
-        .get("evidenceResolutions")
+        .get("evidenceResolution")
         .and_then(Value::as_array)
         .unwrap();
-    assert_eq!(ev_res.len(), 2);
+    assert_eq!(ev_res.len(), 5);
     assert_eq!(
         ev_res[0].get("state").and_then(Value::as_str),
         Some("recorded")
     );
     assert_eq!(
         ev_res[1].get("state").and_then(Value::as_str),
+        Some("unresolved")
+    );
+    assert_eq!(
+        ev_res[2].get("state").and_then(Value::as_str),
+        Some("unresolved")
+    );
+    assert_eq!(
+        ev_res[3].get("state").and_then(Value::as_str),
+        Some("unresolved")
+    );
+    assert_eq!(
+        ev_res[4].get("state").and_then(Value::as_str),
         Some("unresolved")
     );
 
@@ -782,10 +893,15 @@ fn test_evidence_resolution_and_check_observations() {
     );
     assert_eq!(
         chk_obs[1].get("result").and_then(Value::as_str),
-        Some("failed")
+        Some("inconclusive")
     );
     assert_eq!(
         chk_obs[2].get("result").and_then(Value::as_str),
         Some("inconclusive")
     );
+    assert_eq!(
+        chk_obs[0].get("result").and_then(Value::as_str),
+        Some("passed")
+    );
+    assert_eq!(chk_obs[0].get("exitCode").and_then(Value::as_i64), Some(0));
 }
