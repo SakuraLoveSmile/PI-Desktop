@@ -262,6 +262,23 @@
   session IPC contract tests, and real-model desktop acceptance. A local model
   fixture or mocked component result is not real-model acceptance evidence.
 
+### E2E-CONVERSATION-minimap-jump-leaves-follow
+
+- **Preconditions:** One Desktop conversation long enough that the transcript
+  overflows its viewport, opened at the bottom so follow mode is pinned, with
+  the conversation outline (minimap) visible on the transcript's left edge.
+- **Steps:** Click the outline dash of an earlier turn without scrolling the
+  transcript first.
+- **Expected:** The transcript scrolls to that turn and stays there: the turn
+  lands just below the scroller's top edge and the jump-to-latest control
+  appears, because the jump leaves follow mode before it scrolls. A pinned
+  follow must never re-bottom the view one frame after the click. The outline's
+  earlier-history control keeps its existing reveal behavior.
+- **Status:** Automated in `pnpm test:e2e:transcript-minimap-jump`, which mounts
+  the production `ChatTranscript` in a real Chromium page with a synthetic
+  session, clicks an outline dash while follow is pinned, and asserts the
+  scroller's distance from the bottom once the exchange has settled.
+
 ### E2E-POWER-keep-awake-setting
 
 - **Preconditions:** An isolated desktop profile with the setting absent; no
