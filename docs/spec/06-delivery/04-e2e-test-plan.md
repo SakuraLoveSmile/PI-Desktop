@@ -502,7 +502,7 @@ levels does not waive the relevant E2E gate.
 
 | Requirement | Detail |
 |---|---|
-| Platform | macOS arm64 and Intel x64, Windows x64, and Linux x64 release targets (D126/D285) |
+| Platform | macOS arm64 and Intel x64, Windows x64, and Linux x64 and arm64 release targets (D126/D285, D638 / ADR 0318) |
 | Profile | Clean `~/.pi-desktop` profile (no prior config) |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |
@@ -653,7 +653,7 @@ identify the platform validation still needed.
 
 - **Preconditions**: A `vX.Y.Z` tag matches `apps/desktop/package.json`; the
   Linux x64 release runner can complete `dist:linux` and has a system Electron
-  available for repackaging validation.
+  available for repackaging validation. The arm64 lane is E2E-192a.
 - **Steps**: 1) Run the tag release workflow. 2) Inspect the published GitHub
   Release assets. 3) Confirm the versioned
   `PI-Desktop-X.Y.Z-linux-x64.asar` asset is present. 4) Place that archive in
@@ -668,6 +668,31 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Documented; artifact export is unit-covered, native system-Electron
   repackaging remains runner validation
+
+#### E2E-192a: Linux arm64 release lane publishes native arm64 packages
+
+- **Preconditions**: A `vX.Y.Z` tag matches `apps/desktop/package.json`; GitHub's
+  arm64 `ubuntu-22.04-arm` runner is available to the repository.
+- **Steps**: 1) Run the tag release workflow. 2) Confirm the arm64 lane ran on
+  an `aarch64` runner and that the packaged
+  `target/release/pi-desktop-host-core` is an AArch64 binary. 3) Inspect the
+  published Release assets for `PI-Desktop-X.Y.Z-linux-arm64.AppImage`,
+  `pi-desktop_X.Y.Z_arm64.deb`, `pi-desktop-X.Y.Z-aarch64.rpm`,
+  `PI-Desktop-X.Y.Z-linux-arm64.asar`, and
+  `pi-host-X.Y.Z-linux-arm64.tar.gz` with its `.sha256`. 4) Confirm
+  `latest-linux.yml` still lists the x64 AppImage while
+  `latest-linux-arm64.yml` lists the arm64 one. 5) Install the arm64 AppImage,
+  deb, or rpm on an arm64 Linux machine and launch it.
+- **Expected**: Both feeds describe exactly one architecture-labelled AppImage
+  each, the arm64 packages carry an arm64 host-core, the app starts on arm64
+  Linux, and merging the lanes never replaces the x64 feed with the arm64 one.
+- **Specs linked**: `06-delivery/06-release-runbook.md`, `01-product/01-product-scope.md`
+- **Acceptance**: Quality (release artifact and packaging compatibility)
+- **Milestone**: M6+
+- **Status**: The matrix, feed naming, artifact naming, and the ASAR export are
+  unit/source-contract covered (`ci-workflow.test.mjs`, `release-asar.test.mjs`);
+  native arm64 installation remains runner validation. Microphone capture stays
+  Raspberry Pi only on arm64 Linux (D638 / ADR 0318).
 
 #### E2E-200: Linux RPM preserves the Wayland desktop identity
 
@@ -3445,7 +3470,7 @@ identify the platform validation still needed.
 
 #### E2E-195: Linux glibc below 2.35 names supported distros
 
-- **Preconditions**: Linux x64 packaged app; the machine glibc is older than
+- **Preconditions**: Linux x64 or arm64 packaged app; the machine glibc is older than
   2.35 (for example Ubuntu 20.04 / Debian 11 / Fedora 35), or a test doubles
   `process.report` to `2.31`.
 - **Steps**: 1) Launch the AppImage, deb, or rpm. 2) Observe the main window and
@@ -9186,9 +9211,8 @@ The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
 rather than the A–H criteria; their gold source is the capture suite.
 
-The release artifact paths are covered by E2E-192, E2E-196a, E2E-196b, E2E-196c,
-and E2E-200
-(Quality, M6+).
+The release artifact paths are covered by E2E-192, E2E-192a, E2E-196a,
+E2E-196b, E2E-196c, and E2E-200 (Quality, M6+).
 
 ---
 
