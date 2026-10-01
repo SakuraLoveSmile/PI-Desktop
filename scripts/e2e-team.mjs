@@ -332,6 +332,14 @@ try {
   await waitFor(async () => { const result = await invoke("agentGetStatus", lead.id); assert.equal(typeof result.status?.isRunning, "boolean"); return result.status.isRunning === false; }, "Lead settled before confirmation");
   await openTeamPanel(sendCdp, evaluate);
   await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-launch-review"]')`), "launch review UI");
+  assert.equal(await evaluate(`(() => {
+    const card = document.querySelector('[data-testid="launch-review-member-researcher"]');
+    const bounds = card.getBoundingClientRect();
+    return Array.from(card.querySelectorAll('select')).every(select => {
+      const rect = select.getBoundingClientRect();
+      return rect.left >= bounds.left && rect.right <= bounds.right;
+    }) && card.scrollWidth <= card.clientWidth;
+  })()`), true, "review controls must fit the narrow Team panel");
   const pendingImage = await sendCdp("Page.captureScreenshot", {format: "png"});
   await writeFile(join(tempRoot, "team-launch-review-pending.png"), Buffer.from(pendingImage.data, "base64"));
   await evaluate(`(() => {const selects=document.querySelectorAll('[data-testid="launch-review-member-researcher"] select'); const model=selects[1]; model.value='team-approved'; model.dispatchEvent(new Event('change',{bubbles:true}));})()`);

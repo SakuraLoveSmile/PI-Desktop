@@ -531,8 +531,8 @@
 
 .team-launch-review-member-card {
   display: flex;
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
@@ -578,17 +578,17 @@
 }
 
 .team-launch-review-member-controls {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
   gap: 8px;
-  flex-wrap: wrap;
-  flex-shrink: 0;
+  min-width: 0;
 }
 
 .team-review-field {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .team-review-field-label {
@@ -601,8 +601,9 @@
 .team-review-select {
   font-size: var(--text-xs);
   padding: 4px 8px;
-  min-width: 110px;
-  max-width: 160px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 @media (max-width: 480px) {
