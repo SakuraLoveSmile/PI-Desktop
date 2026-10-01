@@ -34,6 +34,8 @@ fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
         "TEAM_MODEL_SELECTION_INVALID"
     } else if msg.contains("TEAM_MEMBER_MODEL_CHANGE_BLOCKED") {
         "TEAM_MEMBER_MODEL_CHANGE_BLOCKED"
+    } else if msg.contains("TEAM_LEAD_CONFIGURATION_BLOCKED") {
+        "TEAM_LEAD_CONFIGURATION_BLOCKED"
     } else if msg.contains("INVALID_PARAMS") {
         "INVALID_PARAMS"
     } else {
@@ -52,6 +54,7 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
@@ -1257,6 +1260,71 @@ fn send_notification(tx: &mpsc::UnboundedSender<String>, method: &str, params: V
     }
 }
 
+fn send_team_changed(
+    db: &crate::db::Database,
+    tx: &mpsc::UnboundedSender<String>,
+    team_session_id: &str,
+    reason: &str,
+) -> Result<(), JsonRpcError> {
+    let Some(team) = crate::team::get_team(db, team_session_id).map_err(team_rpc_err)? else {
+        return Ok(());
+    };
+    send_notification(
+        tx,
+        "team.changed",
+        json!({
+            "teamSessionId": team_session_id,
+            "revision": team.revision,
+            "reason": reason,
+        }),
+    );
+    Ok(())
+}
+
+fn team_revision(
+    db: &crate::db::Database,
+    team_session_id: &str,
+) -> Result<Option<i64>, JsonRpcError> {
+    Ok(crate::team::get_team(db, team_session_id)
+        .map_err(team_rpc_err)?
+        .map(|team| team.revision))
+}
+
+fn send_team_changed_if_revision_changed(
+    db: &crate::db::Database,
+    tx: &mpsc::UnboundedSender<String>,
+    team_session_id: &str,
+    previous_revision: Option<i64>,
+    reason: &str,
+) -> Result<(), JsonRpcError> {
+    if team_revision(db, team_session_id)? != previous_revision {
+        send_team_changed(db, tx, team_session_id, reason)?;
+    }
+    Ok(())
+}
+
+fn team_id_for_participant(
+    db: &crate::db::Database,
+    session_id: &str,
+) -> Result<Option<String>, JsonRpcError> {
+    if let Some(member) =
+        crate::team::get_team_member_by_session_id(db, session_id).map_err(team_rpc_err)?
+    {
+        return Ok(Some(member.team_session_id));
+    }
+    if sessions::session_execution_profile(db, session_id)
+        .map_err(team_rpc_err)?
+        .as_deref()
+        == Some("team")
+        && crate::team::get_team(db, session_id)
+            .map_err(team_rpc_err)?
+            .is_some()
+    {
+        return Ok(Some(session_id.to_string()));
+    }
+    Ok(None)
+}
+
 async fn emit_notification(tx: &mpsc::UnboundedSender<String>, method: &str, params: Value) {
     send_notification(tx, method, params);
 }
@@ -1692,6 +1760,23 @@ async fn handle_request(
                         "members": members,
                     }))
                 }
+                "team.getSnapshot" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    crate::team::validate_team_participant(&st.db, team_id, caller_id)
+                        .map_err(team_rpc_err)?;
+                    let snapshot =
+                        crate::team::get_team_snapshot(&st.db, team_id).map_err(team_rpc_err)?;
+                    Ok(json!(snapshot))
+                }
                 "team.getBoard" => {
                     let team_id = params
                         .get("teamSessionId")
@@ -1795,6 +1880,7 @@ async fn handle_request(
                         },
                     )
                     .map_err(team_rpc_err)?;
+                    send_team_changed(&st.db, &tx, team_id, "task")?;
                     Ok(json!({ "task": task }))
                 }
                 "team.updateTask" => {
@@ -1860,6 +1946,7 @@ async fn handle_request(
                         },
                     )
                     .map_err(team_rpc_err)?;
+                    send_team_changed(&st.db, &tx, team_id, "task")?;
                     Ok(json!({ "task": task }))
                 }
                 "team.sendMessage" => {
@@ -1882,6 +1969,7 @@ async fn handle_request(
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "content required", "INVALID_PARAMS"))?;
                     let idempotency_key = params.get("idempotencyKey").and_then(|v| v.as_str());
+                    let previous_revision = team_revision(&st.db, team_id)?;
                     let msg = crate::team::send_team_message(
                         &st.db,
                         crate::team::SendMessageParams {
@@ -1898,6 +1986,13 @@ async fn handle_request(
                         "team.messageQueued",
                         json!({ "teamSessionId": team_id, "messageId": msg.id }),
                     );
+                    send_team_changed_if_revision_changed(
+                        &st.db,
+                        &tx,
+                        team_id,
+                        previous_revision,
+                        "mailbox",
+                    )?;
                     Ok(json!({ "message": msg }))
                 }
                 "team.listMessages" => {
@@ -1987,6 +2082,7 @@ async fn handle_request(
                         .and_then(|v| v.as_str())
                         .ok_or_else(|| rpc_err(1002, "messageId required", "INVALID_PARAMS"))?;
                     let result = params.get("result").and_then(|v| v.as_str());
+                    let previous_revision = team_revision(&st.db, team_id)?;
                     let acknowledged = crate::team::ack_team_message(
                         &st.db,
                         team_id,
@@ -1995,6 +2091,13 @@ async fn handle_request(
                         result,
                     )
                     .map_err(team_rpc_err)?;
+                    send_team_changed_if_revision_changed(
+                        &st.db,
+                        &tx,
+                        team_id,
+                        previous_revision,
+                        "mailbox",
+                    )?;
                     Ok(json!({ "acknowledged": acknowledged }))
                 }
                 "team.interruptMember" => {
@@ -2058,6 +2161,7 @@ async fn handle_request(
                     }
                     crate::team::validate_team_lead(&st.db, team_id).map_err(team_rpc_err)?;
                     let team = crate::team::pause_team(&st.db, team_id).map_err(team_rpc_err)?;
+                    send_team_changed(&st.db, &tx, team_id, "pause")?;
                     send_notification(
                         &tx,
                         "team.queueChanged",
@@ -2090,6 +2194,7 @@ async fn handle_request(
                         "team.queueChanged",
                         json!({ "teamSessionId": team_id }),
                     );
+                    send_team_changed(&st.db, &tx, team_id, "resume")?;
                     Ok(json!({ "team": team }))
                 }
                 "team.declareStrategy" => {
@@ -2117,6 +2222,9 @@ async fn handle_request(
                         .map(|value| serde_json::from_value(value.clone()))
                         .transpose()
                         .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+                    let previous_decision =
+                        crate::team::get_execution_decision(&st.db, team_id, lead_turn_id)
+                            .map_err(team_rpc_err)?;
 
                     let (decision, review) = crate::team::declare_team_strategy(
                         &st.db,
@@ -2137,6 +2245,9 @@ async fn handle_request(
                             "team.launchReviewChanged",
                             json!({ "teamSessionId": team_id, "reviewId": r.review_id }),
                         );
+                    }
+                    if previous_decision.as_ref() != Some(&decision) {
+                        send_team_changed(&st.db, &tx, team_id, "member")?;
                     }
 
                     Ok(json!({ "decision": decision, "review": review }))
@@ -2202,6 +2313,7 @@ async fn handle_request(
                         "team.launchReviewChanged",
                         json!({ "teamSessionId": team_id, "reviewId": review_id }),
                     );
+                    send_team_changed(&st.db, &tx, team_id, "member")?;
 
                     Ok(json!({ "review": review }))
                 }
@@ -2244,6 +2356,7 @@ async fn handle_request(
                         "team.queueChanged",
                         json!({ "teamSessionId": team_id }),
                     );
+                    send_team_changed(&st.db, &tx, team_id, "member")?;
 
                     Ok(json!({ "review": review, "decision": decision }))
                 }
@@ -2276,6 +2389,7 @@ async fn handle_request(
                         "team.launchReviewChanged",
                         json!({ "teamSessionId": team_id, "reviewId": review_id }),
                     );
+                    send_team_changed(&st.db, &tx, team_id, "member")?;
 
                     Ok(json!({ "review": review }))
                 }
@@ -2554,6 +2668,39 @@ async fn handle_request(
                     "CONFLICT",
                 ));
             }
+            let session_ids = st
+                .db
+                .project_session_ids(&path)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            // A running turn still owns its session's tools and working
+            // directory and is still writing to that session's transcript, so
+            // the bulk delete waits until every attached session is idle.
+            for id in &session_ids {
+                if sessions::session_has_running_turn(&st.db, id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    return Err(rpc_err(1008, "project has running sessions", "CONFLICT"));
+                }
+                if plans::has_live_scratch_goal(&st.db, id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    return Err(plan_rpc_err("PLAN_CONFIGURATION_BLOCKED"));
+                }
+                if let Some(member) =
+                    crate::team::get_team_member_by_session_id(&st.db, id).map_err(team_rpc_err)?
+                {
+                    if !session_ids.contains(&member.team_session_id) {
+                        crate::team::can_delete_session(&st.db, id).map_err(|error| {
+                            let message = error.to_string();
+                            if message.starts_with("TEAM_MEMBER_DELETION_BLOCKED:") {
+                                rpc_err(1002, message, "TEAM_MEMBER_DELETION_BLOCKED")
+                            } else {
+                                rpc_err(1000, message, "INTERNAL")
+                            }
+                        })?;
+                    }
+                }
+            }
             // A path that belongs to a multi-folder project group must stay put:
             // deleting one root would orphan the rest of the group, so callers
             // remove the folder from the group first. A single-folder stored
@@ -2575,29 +2722,41 @@ async fn handle_request(
                     .delete_project_group_record(&group.id)
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             }
-            let session_ids = st
-                .db
-                .project_session_ids(&path)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            // A running turn still owns its session's tools and working
-            // directory and is still writing to that session's transcript, so
-            // the bulk delete waits until every attached session is idle.
+            let mut lead_ids = Vec::new();
             for id in &session_ids {
-                if sessions::session_has_running_turn(&st.db, id)
-                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                if crate::team::get_team(&st.db, id)
+                    .map_err(team_rpc_err)?
+                    .is_some()
                 {
-                    return Err(rpc_err(1008, "project has running sessions", "CONFLICT"));
+                    lead_ids.push(id.clone());
                 }
             }
+            let mut ordered_session_ids = lead_ids.clone();
+            ordered_session_ids.extend(
+                session_ids
+                    .iter()
+                    .filter(|id| !lead_ids.contains(id))
+                    .cloned(),
+            );
             crate::scheduled::project::pause(&st.db, &path)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             let mut sessions_removed = 0;
-            for id in &session_ids {
-                if sessions::delete_session(&st.db, id)
-                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
-                {
+            for id in &ordered_session_ids {
+                let team_before_delete = crate::team::get_team(&st.db, id).map_err(team_rpc_err)?;
+                if sessions::delete_session_with_team_cleanup(&st.db, id).map_err(plan_rpc_err)? {
                     drop_session_side_data(&st, id);
                     sessions_removed += 1;
+                    if let Some(team) = team_before_delete {
+                        send_notification(
+                            &tx,
+                            "team.changed",
+                            json!({
+                                "teamSessionId": id,
+                                "revision": team.revision.saturating_add(1),
+                                "reason": "dissolved",
+                            }),
+                        );
+                    }
                 }
             }
             let removed = st
@@ -2986,36 +3145,39 @@ async fn handle_request(
                     ))
                 }
             };
-            let session = sessions::create_session_with_options(
-                &st.db,
-                sessions::SessionCreateOptions {
-                    title: params
-                        .get("title")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string),
-                    mode: params
-                        .get("mode")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string),
-                    provider_id: params
-                        .get("providerId")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string),
-                    model_id: params
-                        .get("modelId")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string),
-                    project_path: params
-                        .get("projectPath")
-                        .and_then(|v| v.as_str())
-                        .map(str::to_string),
-                    project_name,
-                    thinking_level,
-                    permission_mode,
-                    execution_profile,
-                },
-            )
-            .map_err(|e| session_naming_rpc_err(e))?;
+            let create_team_record = execution_profile.as_deref() == Some("team");
+            let options = sessions::SessionCreateOptions {
+                title: params
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                mode: params
+                    .get("mode")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                provider_id: params
+                    .get("providerId")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                model_id: params
+                    .get("modelId")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                project_path: params
+                    .get("projectPath")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                project_name,
+                thinking_level,
+                permission_mode,
+                execution_profile,
+            };
+            let session = if create_team_record {
+                sessions::create_team_lead_session_with_options(&st.db, options)
+            } else {
+                sessions::create_session_with_options(&st.db, options)
+            }
+            .map_err(session_naming_rpc_err)?;
             Ok(json!({ "session": session }))
         }
         "session.fork" => {
@@ -3192,6 +3354,7 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
+            let team_before_delete = crate::team::get_team(&st.db, id).map_err(team_rpc_err)?;
             crate::team::can_delete_session(&st.db, id).map_err(|error| {
                 let message = error.to_string();
                 if message.starts_with("TEAM_MEMBER_DELETION_BLOCKED:") {
@@ -3200,11 +3363,21 @@ async fn handle_request(
                     rpc_err(1000, message, "INTERNAL")
                 }
             })?;
-            crate::team::cleanup_team_on_lead_delete(&st.db, id)
-                .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
-            let ok = sessions::delete_session(&st.db, id).map_err(plan_rpc_err)?;
+            let ok =
+                sessions::delete_session_with_team_cleanup(&st.db, id).map_err(plan_rpc_err)?;
             if ok {
                 drop_session_side_data(&st, id);
+                if let Some(team) = team_before_delete {
+                    send_notification(
+                        &tx,
+                        "team.changed",
+                        json!({
+                            "teamSessionId": id,
+                            "revision": team.revision.saturating_add(1),
+                            "reason": "dissolved",
+                        }),
+                    );
+                }
             }
             Ok(json!({ "ok": ok }))
         }
@@ -3220,8 +3393,54 @@ async fn handle_request(
             let title = sessions::normalize_session_title(title)
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
             let st = state.lock().await;
-            let ok = sessions::rename_session(&st.db, id, &title)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let expected_title = match params.get("expectedTitle") {
+                Some(Value::String(value)) => Some(value.as_str()),
+                Some(_) => {
+                    return Err(rpc_err(
+                        1002,
+                        "expectedTitle must be a string",
+                        "INVALID_PARAMS",
+                    ))
+                }
+                None => None,
+            };
+            let expected_execution_id = match params.get("expectedExecutionId") {
+                Some(Value::Null) => Some(None),
+                Some(Value::String(value)) => Some(Some(value.as_str())),
+                Some(_) => {
+                    return Err(rpc_err(
+                        1002,
+                        "expectedExecutionId must be a string or null",
+                        "INVALID_PARAMS",
+                    ))
+                }
+                None => None,
+            };
+            let ok = if let Some(expected_title) = expected_title {
+                sessions::rename_session_guarded(
+                    &st.db,
+                    id,
+                    &title,
+                    expected_title,
+                    expected_execution_id,
+                )
+                .map_err(|error| {
+                    if error.to_string().starts_with("CONFLICT:") {
+                        rpc_err(1003, error.to_string(), "CONFLICT")
+                    } else {
+                        rpc_err(1000, error.to_string(), "INTERNAL")
+                    }
+                })?
+            } else if expected_execution_id.is_some() {
+                return Err(rpc_err(
+                    1002,
+                    "expectedTitle required with expectedExecutionId",
+                    "INVALID_PARAMS",
+                ));
+            } else {
+                sessions::rename_session(&st.db, id, &title)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            };
             Ok(json!({ "ok": ok }))
         }
         "session.appendMessage" => {
@@ -3596,6 +3815,9 @@ async fn handle_request(
                         model_id,
                     )
                     .map_err(plan_rpc_err)?;
+                if let Some(team_id) = team_id_for_participant(&st.db, session_id)? {
+                    send_team_changed(&st.db, &tx, &team_id, "activity")?;
+                }
                 return Ok(json!({ "turnId": turn_id, "alreadyStarted": already_started }));
             }
             let turn_id = match params.get("sessionMessageId").and_then(Value::as_str) {
@@ -3611,6 +3833,9 @@ async fn handle_request(
                     session_collaboration_rpc_err(error)
                 }
             })?;
+            if let Some(team_id) = team_id_for_participant(&st.db, session_id)? {
+                send_team_changed(&st.db, &tx, &team_id, "activity")?;
+            }
             Ok(json!({ "turnId": turn_id }))
         }
         "session.endTurn" => {
@@ -3640,6 +3865,23 @@ async fn handle_request(
                         .unwrap_or(false),
                 )
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                if result.updated {
+                    let turn_session_id: Option<String> = st
+                        .db
+                        .conn()
+                        .query_row(
+                            "SELECT session_id FROM turns WHERE id=?1",
+                            [turn_id],
+                            |row| row.get(0),
+                        )
+                        .optional()
+                        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                    if let Some(session_id) = turn_session_id {
+                        if let Some(team_id) = team_id_for_participant(&st.db, &session_id)? {
+                            send_team_changed(&st.db, &tx, &team_id, "activity")?;
+                        }
+                    }
+                }
                 let revision = if result.updated {
                     let code = match status {
                         "error" => "PLAN_REVISION_TURN_FAILED",
@@ -6592,6 +6834,138 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn projects_remove_deletes_team_lead_before_same_project_member() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project_dir = data_dir.path().join("team-project");
+        fs::create_dir_all(&project_dir).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let project_path = project_dir.to_string_lossy().to_string();
+        let lead = sessions::create_session_with_options(
+            &app_state.db,
+            sessions::SessionCreateOptions {
+                title: Some("Lead".into()),
+                project_path: Some(project_path.clone()),
+                execution_profile: Some("team".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        crate::team::ensure_team(&app_state.db, &lead.id).unwrap();
+        let member = sessions::create_session_with_options(
+            &app_state.db,
+            sessions::SessionCreateOptions {
+                title: Some("Member".into()),
+                project_path: Some(project_path.clone()),
+                execution_profile: Some("team".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        app_state
+            .db
+            .conn()
+            .execute(
+                "INSERT INTO team_members (
+                team_session_id, member_session_id, name, context_kind, phase,
+                created_at, updated_at
+             ) VALUES (?1, ?2, 'worker', 'fresh', 'idle', 1, 1)",
+                rusqlite::params![lead.id, member.id],
+            )
+            .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+
+        let result = handle_request(
+            state.clone(),
+            "projects.remove",
+            json!({ "path": project_path }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["sessionsRemoved"], json!(2));
+        let state = state.lock().await;
+        assert!(sessions::get_session(&state.db, &lead.id)
+            .unwrap()
+            .is_none());
+        assert!(sessions::get_session(&state.db, &member.id)
+            .unwrap()
+            .is_none());
+        assert!(crate::team::get_team(&state.db, &lead.id)
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn projects_remove_refuses_team_member_when_lead_is_outside_project() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let removed_dir = data_dir.path().join("removed-project");
+        let kept_dir = data_dir.path().join("kept-project");
+        fs::create_dir_all(&removed_dir).unwrap();
+        fs::create_dir_all(&kept_dir).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let lead = sessions::create_session_with_options(
+            &app_state.db,
+            sessions::SessionCreateOptions {
+                title: Some("Lead".into()),
+                project_path: Some(kept_dir.to_string_lossy().to_string()),
+                execution_profile: Some("team".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        crate::team::ensure_team(&app_state.db, &lead.id).unwrap();
+        let member = sessions::create_session_with_options(
+            &app_state.db,
+            sessions::SessionCreateOptions {
+                title: Some("Member".into()),
+                project_path: Some(removed_dir.to_string_lossy().to_string()),
+                execution_profile: Some("team".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        app_state
+            .db
+            .conn()
+            .execute(
+                "INSERT INTO team_members (
+                team_session_id, member_session_id, name, context_kind, phase,
+                created_at, updated_at
+             ) VALUES (?1, ?2, 'worker', 'fresh', 'idle', 1, 1)",
+                rusqlite::params![lead.id, member.id],
+            )
+            .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+
+        let error = handle_request(
+            state.clone(),
+            "projects.remove",
+            json!({ "path": removed_dir.to_string_lossy() }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error.data.as_ref().unwrap()["errorCode"],
+            "TEAM_MEMBER_DELETION_BLOCKED"
+        );
+        let state = state.lock().await;
+        assert!(sessions::get_session(&state.db, &lead.id)
+            .unwrap()
+            .is_some());
+        assert!(sessions::get_session(&state.db, &member.id)
+            .unwrap()
+            .is_some());
+        assert!(
+            crate::team::get_team_member_by_session_id(&state.db, &member.id)
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
     async fn projects_remove_keeps_sessions_of_other_projects() {
         let data_dir = tempfile::tempdir().unwrap();
         let removed_dir = data_dir.path().join("removed-project");
@@ -7774,6 +8148,7 @@ mod tests {
             None,
         )
         .unwrap();
+        crate::team::ensure_team(&state.db, &goal.id).unwrap();
         let turn = sessions::begin_turn(&state.db, &goal.id, None, None).unwrap();
         let workspace = resolve_plan_workspace(&state, &goal.id, plans::KIND_GOAL).unwrap();
         let proposal = state
@@ -7801,8 +8176,12 @@ mod tests {
                 .unwrap_err();
         assert_eq!(move_err.to_string(), "PLAN_CONFIGURATION_BLOCKED");
 
-        let delete_err = sessions::delete_session(&state.db, &goal.id).unwrap_err();
+        let delete_err =
+            sessions::delete_session_with_team_cleanup(&state.db, &goal.id).unwrap_err();
         assert_eq!(delete_err.to_string(), "PLAN_CONFIGURATION_BLOCKED");
+        assert!(crate::team::get_team(&state.db, &goal.id)
+            .unwrap()
+            .is_some());
 
         // Reject the proposal
         state
@@ -7832,7 +8211,10 @@ mod tests {
         ));
 
         // Delete succeeds
-        assert!(sessions::delete_session(&state.db, &goal.id).unwrap());
+        assert!(sessions::delete_session_with_team_cleanup(&state.db, &goal.id).unwrap());
+        assert!(crate::team::get_team(&state.db, &goal.id)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -10908,7 +11290,7 @@ mod image_generation_settings_tests {
         let mut app_state = AppState::open(data_dir.path()).unwrap();
         app_state.handshook = true;
         let state = Arc::new(Mutex::new(app_state));
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, mut rx) = mpsc::unbounded_channel();
 
         let configured_provider = handle_request(
             state.clone(), "providers.create",
@@ -10970,6 +11352,32 @@ mod image_generation_settings_tests {
         .await
         .unwrap();
         assert!(pending_roster["members"].as_array().unwrap().is_empty());
+        let pending_snapshot = handle_request(
+            state.clone(),
+            "team.getSnapshot",
+            json!({"teamSessionId": team_id, "callerSessionId": team_id}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(pending_snapshot["teamSessionId"], team_id);
+        assert_eq!(pending_snapshot["review"]["status"], "pending");
+        assert_eq!(pending_snapshot["members"].as_array().unwrap().len(), 0);
+        let mut matching_change = None;
+        while let Ok(raw) = rx.try_recv() {
+            let note: Value = serde_json::from_str(&raw).unwrap();
+            if note["method"] == "team.changed"
+                && note["params"]["teamSessionId"] == team_id
+                && note["params"]["revision"] == pending_snapshot["revision"]
+                && note["params"]["reason"] == "member"
+            {
+                matching_change = Some(note);
+            }
+        }
+        assert!(
+            matching_change.is_some(),
+            "pending review change is published"
+        );
         let malformed = handle_request(
             state.clone(),
             "team.declareStrategy",

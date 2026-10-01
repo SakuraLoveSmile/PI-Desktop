@@ -66,7 +66,52 @@
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  margin: 0;
+}
+
+.composer-queue-disclosure {
+  width: 100%;
   margin: 0 0 8px;
+}
+
+.composer-queue-heading.btn {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
+  color: var(--ds-text-secondary);
+  text-align: left;
+  font-size: var(--text-sm-plus);
+}
+
+.composer-queue-count {
+  flex: 0 0 auto;
+}
+
+.composer-queue-next {
+  min-width: 0;
+  max-width: 55%;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-queue-body {
+  max-height: 168px;
+  overflow-x: clip;
+  overflow-y: auto;
+  padding-top: 6px;
+}
+
+.composer-queue-body[hidden] {
+  display: none;
 }
 
 .composer-queued-prompt {

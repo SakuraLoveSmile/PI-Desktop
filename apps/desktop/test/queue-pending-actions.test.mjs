@@ -50,16 +50,16 @@ test("pending queue actions stay locked until admission succeeds", async (t) => 
         const draft = { text: "Please review this file", fileReferences: [{ path: "/test/example.ts", name: "example.ts" }] };
         const saving = slice.enqueuePrompt(draft.text, draft);
         const pending = state.queuedPrompts["session-a"][0];
-        const renderButtons = () => renderToStaticMarkup(createElement(ComposerStatus, {
-          t: (key) => key, queuedPrompts: state.queuedPrompts["session-a"] ?? [],
+        const renderButtons = () => (renderToStaticMarkup(createElement(ComposerStatus, {
+          t: (key) => key, queueScopeKey: "session-a", queuedPrompts: state.queuedPrompts["session-a"] ?? [],
           ...slice, approvalPending: false, enhancementError: null, droppedDirectories: [],
-        })).match(/<button\b[^>]*>/g) ?? [];
+        })).match(/<button\b[^>]*>/g) ?? []).filter((button) => !button.includes("composer-queue-heading"));
         const pendingButtons = renderButtons();
         assert.equal(pendingButtons.length, 5);
         assert.ok(pendingButtons.every((button) => / disabled=""/.test(button)), "all pending row actions must be disabled");
         assert.ok(pendingButtons.every((button) => /aria-label="[^"]*common.saving/.test(button)), "every pending action must explain that admission is still saving");
         const pendingMarkup = renderToStaticMarkup(createElement(ComposerStatus, {
-          t: (key) => key, queuedPrompts: [pending], ...slice,
+          t: (key) => key, queueScopeKey: "session-a", queuedPrompts: [pending], ...slice,
           approvalPending: false, enhancementError: null, droppedDirectories: [],
         }));
         assert.match(pendingMarkup, /class="composer-queued-prompt-send-now"[^>]*>common.saving<\/button>/);

@@ -47,9 +47,15 @@ export type TeamMemberRecord = {
   phase: TeamMemberPhase;
   modelId?: string;
   providerId?: string;
+  presentation?: TeamMemberPresentation;
   error?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type TeamMemberPresentation = {
+  role: "researcher" | "executor" | "reviewer" | "planner" | "collaborator";
+  displayName: string;
 };
 
 export type TeamDeliveryStatus =
@@ -119,6 +125,37 @@ export type TeamBoardProjection = {
     scope: string;
     taskIds: string[];
   }>;
+};
+
+/** Atomic Host-owned view used by Team overview, board, and panorama. */
+export type TeamSnapshot = {
+  teamSessionId: string;
+  revision: number;
+  paused: boolean;
+  members: TeamMemberRecord[];
+  tasks: TeamTaskRecord[];
+  readiness: TeamBoardProjection["readiness"];
+  scopeOverlaps: TeamBoardProjection["scopeOverlaps"];
+  leadPhase: TeamMemberPhase;
+  queuedMessageCount: number;
+  review: TeamLaunchReview | null;
+  decision: TeamExecutionDecision | null;
+};
+
+export type TeamChangedReason =
+  | "member"
+  | "presentation"
+  | "task"
+  | "activity"
+  | "mailbox"
+  | "pause"
+  | "resume"
+  | "dissolved";
+
+export type TeamChangedEvent = {
+  teamSessionId: string;
+  revision: number;
+  reason: TeamChangedReason;
 };
 
 /** @deprecated Use the separate frozen roster and board projections. */
@@ -384,6 +421,7 @@ export type TeamProposedMember = {
   contextKind?: TeamContextKind;
   /** Reuse an existing durable member of the same team, validated by the Host. */
   memberSessionId?: string;
+  presentation?: TeamMemberPresentation;
   selection?: Partial<TeamMemberSelection>;
 };
 

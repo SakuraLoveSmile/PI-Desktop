@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useBlockingOverlayActive } from "../../lib/blocking-overlay";
+import { localTeamSessionId } from "../../lib/team-presentation";
 import {
   workPanelTabReorderScrollDelta,
   workPanelTabReorderInsertAfter,
@@ -239,11 +240,12 @@ export function WorkPanel({
     displayTabs.find((tab) => tab.id === activeTabId) ??
     (activeSessionId ? displayTabs[0] ?? null : null);
   const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const activeTeamId = localTeamSessionId(activeSession);
   const tools = workPanelTools(
     t,
     pluginViews,
-    activeSession?.executionProfile === "team",
-    activeSessionId ?? undefined,
+    Boolean(activeTeamId),
+    activeTeamId,
   );
   const tabSignature = JSON.stringify(
     tabs.map(({ id, kind, resource, location }) => [id, kind, resource, location]),
@@ -1001,6 +1003,9 @@ export function WorkPanel({
             >
               <TeamPanel
                 teamSessionId={activeTab.resource ?? activeSessionId ?? ""}
+                initialView={activeTab.teamTarget?.kind}
+                initialTaskId={activeTab.teamTarget?.taskId}
+                navigationSeq={activeTab.teamNavigationSeq}
                 onSelectSession={(sessionId: string) => void selectSession(sessionId)}
               />
             </div>

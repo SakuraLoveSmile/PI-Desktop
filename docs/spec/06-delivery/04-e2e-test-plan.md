@@ -15622,3 +15622,27 @@ renderer's durable transcript reads. No real model or provider is contacted.
   and fake provider); `node scripts/e2e-team-review-ui.mjs` (component interaction
   at the API boundary); `cargo test -p host-core --locked team` and the
   `team_rpc_full_journey` contract test. Real-model quality is outside this gate.
+
+### E2E-TEAM-live-overview-board-panorama-and-coexistence
+
+- **Status**: Automated and passed on the isolated macOS ARM64 task candidate; see the UX repair plan for commit/base and evidence. Remote PR integration and user acceptance are separate gates.
+- **Preconditions**: Isolated Desktop profile, temporary Host data directory, local fake provider that records title-summary calls, controlled Team turns/task revisions, and no user profile, production service, or paid model.
+- **Steps**:
+  1. Create a local Team Lead and propose researcher/executor members through `declare_team_strategy` with optional `{ role, displayName }`. Inspect the review before confirmation; verify no member session, assignment, or mailbox work is created yet. Edit a model selection, then confirm once.
+  2. Verify confirmed members keep their routing handles and receive the proposed display identities. Start controlled member turns and update task state independently. Let the Lead become idle while a member remains running; verify the Lead stays idle with a waiting label and the member shows its Host phase.
+  3. Start one approved Plan/Goal execution and capture the fake title-summary request. Replay the same execution event and reload the renderer. Verify one request total, no member title request, and that a manual rename or newer execution wins over a delayed title result.
+  4. Queue eight ordinary Composer prompts. Fold and expand the queue, then execute an existing row action. Verify the mailbox and Composer queue remain separate and disclosure does not send or remove work by itself.
+  5. From Overview, open a progress row and its owner detail; return without changing the selected Lead. Open the compact board, filter and search, enter task detail, then return with filter/query/scroll preserved. Confirm cancelled tasks remain reachable through All and completed tasks never display as blocked.
+  6. Open the panorama, zoom to 80%, pan, and deliver a controlled Team revision with new member objects/status. Verify the transform and subsequent drag remain continuous. Explicit Fit and Reset still work.
+  7. Expand the Lead sidebar group, select a member, collapse/reopen and reload. Verify one visible Lead group plus the real member sessions, stable identities, individual actions, and unchanged session IDs/transcripts.
+  8. Open a standard Agent session and run its ordinary Task delegate path. Compare its history/counts with the Team sessions and board. Switch back, pause, queue Team mail, reload, and Resume; verify held mail is delivered once and standard delegates remain separate.
+- **Expected**: Local Desktop surfaces render the same current Team revision, including review/decision. Only confirmed strategy data dispatches. Member activity comes from Host turns, not task status. Navigation and display identity remain stable without selecting another main session. Standard subagents, Team members, Composer prompts and Team mail remain distinct. Title or UI failure does not change execution success.
+- **Automation**: `node scripts/e2e-team.mjs` covers approved title, review, queue, snapshot, board, five members, ordinary Task coexistence, controlled refresh/drag, narrow/font-scaled layout and Chinese reload; `node scripts/e2e-team-review-ui.mjs` covers proposal edit/confirm/cancel; run `pnpm test:e2e:subagent-models` and `pnpm test:e2e:subagents` for profile isolation. Run native Electron at supported panel widths and record fixture/profile identity. The HTML preview and source-regex checks do not substitute for this user path.
+
+### E2E-TEAM-horizontal-overflow
+
+- **Status**: Planned for the current repair; the actual overflow offender has not been identified in the integrated app.
+- **Preconditions**: Isolated Desktop candidate, long task subject and unbroken scope/path fixtures, existing minimum chat width, and no user data.
+- **Steps**: Inspect Overview, Team aggregate, board, member/task detail and the three-column shell at 320/450/620px panel widths and 100%/150% font scale in light/dark and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, then verify a bounded local fix while exercising Work Panel tab-strip scrolling, Markdown table/code scrolling and panorama world panning.
+- **Expected**: No page-level horizontal scrollbar or displaced shell content; long content remains accessible in detail, and intentional local scroll/pan surfaces still work.
+- **Automation**: Extend the isolated Team/three-column Electron harness after confirming it measures the production shell. Record the tested commit, panel dimensions, font scale, theme, locale and offender evidence.

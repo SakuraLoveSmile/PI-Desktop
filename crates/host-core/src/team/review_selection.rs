@@ -170,9 +170,11 @@ pub(super) fn validate_reused_member_for_confirmation(
             "TEAM_MODEL_SELECTION_INVALID: selected member is not in the proposed team slot"
         ));
     }
-    if member.phase != "idle" || sessions::session_has_running_turn(db, member_session_id)? {
+    if matches!(member.phase.as_str(), "running" | "provisioning")
+        || sessions::session_has_running_turn(db, member_session_id)?
+    {
         return Err(anyhow!(
-            "TEAM_MEMBER_MODEL_CHANGE_BLOCKED: selected member is running"
+            "TEAM_MEMBER_MODEL_CHANGE_BLOCKED: selected member is not available"
         ));
     }
 

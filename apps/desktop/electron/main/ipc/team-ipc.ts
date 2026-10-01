@@ -38,6 +38,14 @@ export function registerTeamIpc({
       callerSessionId: input.teamSessionId,
     });
   });
+  handle(IPC.invoke.teamGetSnapshot, async (input: { teamSessionId: string }) => {
+    const host = getHost();
+    if (!host) throw new Error("host unavailable");
+    return host.call("team.getSnapshot", {
+      teamSessionId: input?.teamSessionId,
+      callerSessionId: input?.teamSessionId,
+    });
+  });
 
   handle(IPC.invoke.teamPause, async (input: { teamSessionId: string }) => {
     if (!getHost()) throw new Error("host unavailable");

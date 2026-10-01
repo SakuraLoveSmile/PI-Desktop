@@ -283,4 +283,6 @@ export const ErrorCodes = {
   TEAM_MODEL_SELECTION_INVALID: "TEAM_MODEL_SELECTION_INVALID",
   /** The member holds a running turn or reserved queued work on its route. */
   TEAM_MEMBER_MODEL_CHANGE_BLOCKED: "TEAM_MEMBER_MODEL_CHANGE_BLOCKED",
+  /** A Lead with durable Team work cannot become a standard session. */
+  TEAM_LEAD_CONFIGURATION_BLOCKED: "TEAM_LEAD_CONFIGURATION_BLOCKED",
 } as const;

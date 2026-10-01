@@ -83,10 +83,16 @@ pub fn search(db: &Database, query: &str, offset: i64) -> Result<SearchPage> {
          )
          SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
                 s.thinking_level, s.permission_mode, s.execution_profile, s.updated_at, s.created_at,
-                p.name, COALESCE(matched.count, 0),
+                p.name,
+                CASE WHEN lead.team_session_id IS NOT NULL THEN 'lead'
+                     WHEN member.team_session_id IS NOT NULL THEN 'member' END,
+                COALESCE(member.team_session_id, lead.team_session_id), member.name,
+                COALESCE(matched.count, 0),
                 (pi_search_contains(s.title, ?1) OR pi_search_contains(p.name, ?1)
                  OR pi_search_contains(p.path, ?1)) AS metadata_match
          FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
+         LEFT JOIN teams lead ON lead.team_session_id = s.id
+         LEFT JOIN team_members member ON member.member_session_id = s.id
          LEFT JOIN matched ON matched.session_id = s.id
          WHERE s.deleted_at IS NULL AND (matched.count > 0 OR metadata_match)
          ORDER BY s.updated_at DESC, s.id ASC LIMIT 31 OFFSET ?3"
@@ -98,8 +104,8 @@ pub fn search(db: &Database, query: &str, offset: i64) -> Result<SearchPage> {
             Ok(SessionMatch {
                 session: sessions::summary_from_row(row)?,
                 project_name: row.get(12)?,
-                message_count: row.get(13)?,
-                metadata_match: row.get(14)?,
+                message_count: row.get(16)?,
+                metadata_match: row.get(17)?,
                 matches: vec![],
             })
         })?

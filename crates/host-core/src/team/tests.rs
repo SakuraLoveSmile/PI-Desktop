@@ -117,6 +117,7 @@ pub(super) fn create_team_member(
                 description: description.map(str::to_string),
                 context_kind: context_kind.map(str::to_string),
                 member_session_id: None,
+                presentation: None,
                 selection: Some(TeamMemberSelectionPartial {
                     provider_id: Some(provider_id.to_string()),
                     model_id: Some(model_id.to_string()),
@@ -499,6 +500,7 @@ fn test_team_mailbox_and_pause() {
     )
     .unwrap();
 
+    let before_send = get_team(&db, &lead_id).unwrap().unwrap().revision;
     // 1. Alice can send Bob a message
     let msg = send_team_message(
         &db,
@@ -514,6 +516,10 @@ fn test_team_mailbox_and_pause() {
     assert_eq!(msg.status, "queued");
     assert_eq!(msg.source_member_name, "alice");
     assert_eq!(msg.target_member_name, "bob");
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        before_send + 1
+    );
 
     // Replaying the same Host idempotency tuple returns the durable message.
     let replay = send_team_message(
@@ -528,6 +534,10 @@ fn test_team_mailbox_and_pause() {
     )
     .unwrap();
     assert_eq!(replay.id, msg.id);
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        before_send + 1
+    );
     let conflict = send_team_message(
         &db,
         SendMessageParams {
@@ -579,6 +589,7 @@ fn test_team_mailbox_and_pause() {
             ],
         )
         .unwrap();
+    let before_ack = get_team(&db, &lead_id).unwrap().unwrap().revision;
     assert!(ack_team_message(
         &db,
         &lead_id,
@@ -587,6 +598,22 @@ fn test_team_mailbox_and_pause() {
         Some("received"),
     )
     .unwrap());
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        before_ack + 1
+    );
+    assert!(ack_team_message(
+        &db,
+        &lead_id,
+        &m2.member_session_id,
+        &msg.id,
+        Some("received"),
+    )
+    .unwrap());
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        before_ack + 1
+    );
     let acknowledged = list_member_messages(&db, &lead_id, &m1.member_session_id).unwrap();
     assert_eq!(
         acknowledged

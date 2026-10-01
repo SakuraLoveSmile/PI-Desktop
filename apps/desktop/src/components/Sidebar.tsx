@@ -20,15 +20,22 @@ import { appendSessionToOpenProject } from "../lib/session-projects";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { SessionHoverCard } from "../features/sessions/SessionHoverCard";
+import { TeamSessionGroup } from "../features/sessions/TeamSessionGroup";
 import { useSessionHoverCard } from "../features/sessions/useSessionHoverCard";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import {
   getGlobalPinnedSessions,
-  groupSidebarSessionsByTime,
+  groupSidebarSessionGroupsByTime,
+  groupTeamSessions,
   nextVisibleSessionId,
   normalizeProjectPath,
+  partitionPinnedSidebarSessionGroups,
   sessionArchived,
   sessionPinned,
+  sidebarSessionGroupIds,
+  sortSidebarSessionGroups,
+  teamMemberRowTitle,
+  visibleSidebarSessionGroups,
 } from "../lib/sidebar-session-groups";
 import {
   composerDropItems,
@@ -46,6 +53,7 @@ import {
 } from "../lib/sidebar-session-status";
 import { ErrorCodes } from "@pi-desktop/shared";
 import type { SessionSummary } from "@pi-desktop/shared";
+import type { MemberView } from "../lib/team-presentation";
 import type {
   ProjectMeta,
   ProjectSort,
@@ -255,6 +263,7 @@ export function Sidebar({
   const closeProjectAction = useAppStore((s) => s.closeProject);
   const renameProject = useAppStore((s) => s.renameProject);
   const toggleSessionPinned = useAppStore((s) => s.toggleSessionPinned);
+  const setTeamExpanded = useAppStore((s) => s.setTeamExpanded);
   const archiveSessionAction = useAppStore((s) => s.archiveSession);
   const restoreSession = useAppStore((s) => s.restoreSession);
   const renameSession = useAppStore((s) => s.renameSession);
@@ -299,6 +308,7 @@ export function Sidebar({
     keepVisible: keepSessionHoverCardVisible,
   } = useSessionHoverCard();
   const [expandedProjectSessions, setExpandedProjectSessions] = useState<Record<string, boolean>>({});
+  const lastRevealedTeamChildRef = useRef<string | null>(null);
   const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
   const [dropProjectKey, setDropProjectKey] = useState<string | null>(null);
   const [projectsDropActive, setProjectsDropActive] = useState(false);
@@ -477,6 +487,30 @@ export function Sidebar({
   const displayProjectSort: ProjectSort = projectSort;
   const activeProjectPath = normalizeProjectPath(activeProjectPathState ?? workspace?.path);
   const selectedSessionId = selectingSessionId ?? activeSessionId;
+
+  useEffect(() => {
+    const selected = sessions.find((session) => session.id === selectedSessionId);
+    if (selected?.team?.role !== "member") {
+      lastRevealedTeamChildRef.current = selectedSessionId ?? null;
+      return;
+    }
+    if (lastRevealedTeamChildRef.current === selected.id) return;
+    lastRevealedTeamChildRef.current = selected.id;
+    const leadId = selected.team.teamSessionId;
+    const lead = sessions.find((session) => session.id === leadId && session.team?.role === "lead");
+    if (lead && useAppStore.getState().sessionMeta[leadId]?.teamExpanded !== true) {
+      setTeamExpanded(leadId, true);
+    }
+    const projectPath = normalizeProjectPath(selected.projectPath);
+    if (lead && projectPath) {
+      setExpandedProjectSessions((current) => ({ ...current, [projectPath]: true }));
+    }
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-sidebar-session-row="${CSS.escape(selected.id)}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedSessionId, sessions, setTeamExpanded]);
   const openProjectPaths = useMemo(
     () =>
       openProjectPathsState
@@ -686,7 +720,27 @@ export function Sidebar({
       .sort(compareSessions),
     [filtered, sessionMeta, projectMeta, showArchived, compareSessions],
   );
+  const groupedSessions = useMemo(() => groupTeamSessions(filtered), [filtered]);
+  const pinnedTeamPartition = useMemo(
+    () => partitionPinnedSidebarSessionGroups(
+      groupedSessions,
+      new Set(pinnedSessions.map((session) => session.id)),
+    ),
+    [groupedSessions, pinnedSessions],
+  );
+  const pinnedSessionGroups = useMemo(
+    () => sortSidebarSessionGroups(
+      pinnedTeamPartition.pinned,
+      compareSessions,
+      displaySessionSort === "recent",
+    ),
+    [pinnedTeamPartition, compareSessions, displaySessionSort],
+  );
   const pinnedSessionIds = useMemo(
+    () => pinnedTeamPartition.pinnedSessionIds,
+    [pinnedTeamPartition],
+  );
+  const directPinnedSessionIds = useMemo(
     () => new Set(pinnedSessions.map((session) => session.id)),
     [pinnedSessions],
   );
@@ -987,7 +1041,7 @@ export function Sidebar({
   const flatSessionOrder = useMemo(() => {
     const ids: string[] = [];
     // Pinned first (same order as rendered)
-    for (const s of pinnedSessions) ids.push(s.id);
+    for (const group of pinnedSessionGroups) ids.push(...sidebarSessionGroupIds(group));
     // Then project sessions
     for (const entry of projectEntries) {
       for (const s of entry.sessions) {
@@ -997,7 +1051,7 @@ export function Sidebar({
     // Then temporary (standalone) sessions
     for (const s of temporarySessionHistory) ids.push(s.id);
     return ids;
-  }, [pinnedSessions, projectEntries, pinnedSessionIds, temporarySessionHistory]);
+  }, [pinnedSessionGroups, projectEntries, pinnedSessionIds, temporarySessionHistory]);
 
   /** Handle multi-select click on a session row. Returns true if the click was consumed by multi-select. */
   const handleMultiSelectClick = (event: React.MouseEvent, sessionId: string): boolean => {
@@ -1765,7 +1819,7 @@ export function Sidebar({
 
   const renderSessionRows = (
     items: SessionSummary[],
-    options?: { temporary?: boolean; projectPath?: string; global?: boolean },
+    options?: { temporary?: boolean; projectPath?: string; global?: boolean; teamChild?: boolean; teamIdentity?: string },
   ) => items.map((session) => {
     const meta = sessionMeta[session.id] ?? {};
     const normalizedProjectPath = normalizeProjectPath(session.projectPath);
@@ -1778,6 +1832,11 @@ export function Sidebar({
     const archived = sessionArchived(session, meta);
     const running = Boolean(runningSessions[session.id]);
     const hasPendingPermission = (pendingPermissions[session.id]?.length ?? 0) > 0;
+    const parentContext = !options?.teamChild && session.team?.role === "member"
+      ? sessions.find((candidate) => candidate.id === session.team?.teamSessionId)
+      : undefined;
+    const rowTitle = options?.teamChild
+      ? teamMemberRowTitle(session, options.teamIdentity) : session.title;
     const status = sidebarSessionStatus({
       running,
       selected: active,
@@ -1857,10 +1916,20 @@ export function Sidebar({
           {session.source === "pi-native" ? (
             <span className="thread-item-source" title="Native Pi session">Pi</span>
           ) : null}
-          <span className="thread-item-title">{taskTitle(session.title)}</span>
+          <span className="thread-item-title">{taskTitle(rowTitle)}</span>
           {options?.global ? (
             <span className="thread-item-project">
               {owningProject}
+            </span>
+          ) : null}
+          {options?.teamIdentity && rowTitle !== options.teamIdentity ? (
+            <span className="thread-item-context">{options.teamIdentity}</span>
+          ) : session.team?.role === "member" && !options?.teamChild ? (
+            <span className="thread-item-context">
+              {t("nav.teamParentContext", {
+                parent: parentContext ? taskTitle(parentContext.title) : session.team.teamSessionId,
+                defaultValue: "Team · {{parent}}",
+              })}
             </span>
           ) : null}
         </button>
@@ -1904,22 +1973,71 @@ export function Sidebar({
     );
   });
 
+  const renderSidebarSessionGroup = (
+    group: ReturnType<typeof groupTeamSessions>[number],
+    options?: { temporary?: boolean; projectPath?: string; global?: boolean; hidePinnedMembers?: boolean },
+  ) => {
+    const { hidePinnedMembers, ...rowOptions } = options ?? {};
+    if (group.kind === "session") {
+      return renderSessionRows([group.session], rowOptions);
+    }
+    const expanded = sessionMeta[group.lead.id]?.teamExpanded ?? false;
+    const members = hidePinnedMembers
+      ? group.members.filter((member) => !directPinnedSessionIds.has(member.id))
+      : group.members;
+    const label = expanded
+      ? t("nav.collapseTeamSessions", { defaultValue: "Collapse team sessions" })
+      : t("nav.expandTeamSessions", { defaultValue: "Expand team sessions" });
+    return (
+      <TeamSessionGroup
+        key={`team-${group.lead.id}`}
+        sessionId={group.lead.id}
+        expanded={expanded}
+        toggleLabel={label}
+        members={group.members}
+          visibleMembers={members}
+          leadRow={renderSessionRows([group.lead], rowOptions)}
+          renderMember={(member, identity: MemberView | undefined) => {
+            const roleLabel = identity
+            ? t(`team.roles.${identity.role}`)
+            : "";
+          const teamIdentity = identity
+            ? `${roleLabel} ${identity.displayName}`
+            : member.team?.memberName;
+          return renderSessionRows([member], {
+            ...rowOptions,
+            teamChild: true,
+            teamIdentity,
+          })[0];
+        }}
+        onToggle={() => setTeamExpanded(group.lead.id, !expanded)}
+      />
+    );
+  };
+
   const renderProjectGroup = (entry: ProjectEntry) => {
     const collapsedProject = entry.meta.collapsed ?? projectCollapsed[entry.key] ?? false;
     const projectId = projectDomId(entry.key);
     const isMenuOpen = projectMenu === entry.key;
 
-    // Show the most recent MAX_VISIBLE_SESSIONS rows by default; the remaining
-    // sessions stay folded behind the same load-more affordance used for the
-    // time-grouped overflow and expand on click.
     const sessionsExpanded = expandedProjectSessions[entry.key] ?? false;
-    const history = entry.sessions.filter((session) => !pinnedSessionIds.has(session.id));
-    const visibleSessions = sessionsExpanded ? history : history.slice(0, MAX_VISIBLE_SESSIONS);
-    const hiddenCount = history.length - visibleSessions.length;
+    const historyGroups = sortSidebarSessionGroups(
+      partitionPinnedSidebarSessionGroups(
+        groupTeamSessions(entry.sessions),
+        directPinnedSessionIds,
+      ).history,
+      compareSessions,
+      displaySessionSort === "recent",
+    );
+    const { visible: visibleGroups, hiddenCount } = visibleSidebarSessionGroups(
+      historyGroups,
+      sessionsExpanded,
+      MAX_VISIBLE_SESSIONS,
+    );
 
-    const renderTimeGroupedSessions = (sessions: SessionSummary[]) => {
+    const renderTimeGroupedSessions = (groups: typeof visibleGroups) => {
       const result: React.ReactNode[] = [];
-      for (const { group, sessions: groupSessions } of groupSidebarSessionsByTime(sessions)) {
+      for (const { group, sessions: grouped } of groupSidebarSessionGroupsByTime(groups)) {
         // For today, don't show header (as per requirement)
         if (group !== "today") {
           const i18nKey =
@@ -1933,7 +2051,12 @@ export function Sidebar({
             </div>
           );
         }
-        result.push(...renderSessionRows(groupSessions, { projectPath: entry.path }));
+        for (const item of grouped) {
+          result.push(renderSidebarSessionGroup(item, {
+            projectPath: entry.path,
+            hidePinnedMembers: true,
+          }));
+        }
       }
       // Add "load more" button if there are hidden sessions
       if (hiddenCount > 0) {
@@ -2092,7 +2215,7 @@ export function Sidebar({
         >
           <div className="sidebar-session-group-clip">
             <div className="sidebar-session-group-list">
-              {entry.sessions.length > 0 ? renderTimeGroupedSessions(visibleSessions) : (
+              {entry.sessions.length > 0 ? renderTimeGroupedSessions(visibleGroups) : (
                 <div className="sidebar-session-empty">{t("nav.noProjectSessions")}</div>
               )}
             </div>
@@ -2447,7 +2570,7 @@ export function Sidebar({
               </span>
             </div>
             <div className="sidebar-session-group-body pinned" onScroll={() => closeMenus(false)}>
-              {renderSessionRows(pinnedSessions, { global: true })}
+              {pinnedSessionGroups.map((group) => renderSidebarSessionGroup(group, { global: true }))}
             </div>
           </section>
         ) : null}
@@ -2524,7 +2647,14 @@ export function Sidebar({
             }}
           >
             {temporarySessionHistory.length > 0 ? (
-              renderSessionRows(temporarySessionHistory, { temporary: true })
+              sortSidebarSessionGroups(
+                partitionPinnedSidebarSessionGroups(
+                  groupTeamSessions(temporarySessions),
+                  directPinnedSessionIds,
+                ).history,
+                compareSessions,
+                displaySessionSort === "recent",
+              ).map((group) => renderSidebarSessionGroup(group, { temporary: true, hidePinnedMembers: true }))
             ) : temporarySessions.length === 0 ? (
               <div className="sidebar-session-empty">{t("nav.noTemporarySessions")}</div>
             ) : null}

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { PlanProposal, TeamMemberRecord, TeamTaskRecord, UiMessage } from "@pi-desktop/shared";
+import type { PlanProposal, UiMessage } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
-import { IconBot, IconFileText, IconInfo, IconUsers, IconWorkflow } from "../icons";
+import { IconBot, IconFileText, IconInfo, IconWorkflow } from "../icons";
 import { AgentPanorama, type PanoramaNode, type PanoramaNodeStatus } from "./AgentPanorama";
 import { fileWorkPanelTab, teamWorkPanelTab } from "../../lib/work-panel-tabs";
 import { resolvePlanArtifactPath } from "../../lib/plan-artifact";
@@ -15,7 +15,13 @@ import {
 } from "../../lib/subagent-topology";
 import { delegateAgentName } from "../../features/chat/transcript/model";
 import { delegateTaskDescription } from "../../lib/subagent-transcript";
-import { api } from "../../lib/api";
+import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
+import { useOverviewMetadata } from "../../hooks/useOverviewMetadata";
+import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
+import { buildTeamTaskRows, localTeamSessionId, selectOverviewTaskRows } from "../../lib/team-presentation";
+import { TeamTaskProgress } from "./team/TeamTaskProgress";
+import { Button } from "../ui";
+import { isActivePlanExecution } from "../../lib/plan-mode-state";
 
 type OverviewItem = {
   id: string;
@@ -25,11 +31,6 @@ type OverviewItem = {
   proposal?: PlanProposal;
 };
 
-type TeamOverviewData = {
-  members: TeamMemberRecord[];
-  tasks: TeamTaskRecord[];
-  paused: boolean;
-};
 
 function proposalLabel(proposal: PlanProposal): string {
   return proposal.title.trim() || proposal.question.trim() || proposal.kind;
@@ -137,41 +138,18 @@ export function OverviewTab() {
   const running = activeSessionId ? runningSessions[activeSessionId] === true : false;
 
   const isTeam = session?.executionProfile === "team";
-  const [teamData, setTeamData] = useState<TeamOverviewData | null>(null);
-
-  useEffect(() => {
-    if (!isTeam || !activeSessionId) {
-      setTeamData(null);
-      return;
+  const teamSessionId = localTeamSessionId(session);
+  const { snapshot: teamData, loading: teamLoading, error: teamError, refresh: refreshTeam } = useTeamSnapshot(teamSessionId);
+  const { error: metadataError } = useOverviewMetadata(activeSessionId);
+  const [teamExpanded, setTeamExpanded] = useState<Record<string, boolean>>({});
+  const teamRows = useMemo(() => teamData
+    ? buildTeamTaskRows(teamData.tasks, teamData.members, teamData.readiness)
+    : [], [teamData]);
+  const openTeamTarget = (target: { kind: "aggregate" | "board" | "panorama" | "task"; taskId?: string }) => {
+    if (activeSessionId && teamSessionId) {
+      openWorkPanelTabForSession(activeSessionId, teamWorkPanelTab(teamSessionId, target));
     }
-    let cancelled = false;
-    Promise.all([
-      api.getTeamRoster(activeSessionId) as Promise<{
-        teamSessionId: string;
-        paused: boolean;
-        members: TeamMemberRecord[];
-      }>,
-      api.getTeamBoard(activeSessionId) as Promise<{
-        teamSessionId: string;
-        tasks: TeamTaskRecord[];
-      }>,
-    ])
-      .then(([roster, board]) => {
-        if (!cancelled && roster.teamSessionId === activeSessionId) {
-          setTeamData({
-            members: roster.members,
-            tasks: board.tasks.filter((t) => !t.deleted),
-            paused: roster.paused,
-          });
-        }
-      })
-      .catch(() => {
-        // Silently tolerate overview team polling errors
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isTeam, activeSessionId]);
+  };
 
   const subagents = useMemo(() => {
     if (!messages || messages.length === 0) return [];
@@ -209,12 +187,12 @@ export function OverviewTab() {
     return list;
   }, [messages, running, t]);
 
-  if (viewMode === "panorama" && session) {
+  if (viewMode === "panorama" && session && !isTeam) {
     const rootNode: PanoramaNode = {
       id: session.id,
-      name: session.title || t("chat.subagentCoordinator", { defaultValue: "Main agent" }),
+      name: session.title || t("chat.subagentCoordinator"),
       task: t("chat.subagentCoordinating", { count: subagents.length }),
-      status: running ? "running" : "completed",
+      status: running ? "running" : outcome ?? "idle",
       avatarIcon: "target",
       isRoot: true,
     };
@@ -235,9 +213,12 @@ export function OverviewTab() {
 
     return (
       <AgentPanorama
-        title={session.title ? `${session.title} - ${t("team.panoramaTitle", { defaultValue: "Agent Panorama" })}` : t("team.panoramaTitle", { defaultValue: "Agent Panorama" })}
+        title={session.title ? `${session.title} - ${t("team.panoramaTitle")}` : t("team.panoramaTitle")}
         rootNode={rootNode}
         childNodes={childNodes}
+        viewportScopeKey={`subagents:${session.source ?? "desktop"}:${session.id}`}
+        savedViewport={getPanoramaViewport(`subagents:${session.source ?? "desktop"}:${session.id}`)}
+        onViewportSave={savePanoramaViewport}
         onBack={() => setViewMode("overview")}
         onSelectNode={(id) => {
           const sub = subagents.find((s) => s.delegationId === id);
@@ -260,7 +241,10 @@ export function OverviewTab() {
 
   const providerName = providers.find((provider) => provider.id === session.providerId)?.name ?? session.providerId;
   const model = [providerName, session.modelId].filter(Boolean).join(" / ");
-  const mode = t(`panel.overview.mode.${session.mode}`, { defaultValue: session.mode });
+  const checkpoint = activeSessionId ? planCheckpoints[activeSessionId] : undefined;
+  const displayedMode = checkpoint && checkpoint.sessionId === activeSessionId && isActivePlanExecution(checkpoint)
+    ? checkpoint.executionKind ?? checkpoint.kind : session.mode;
+  const mode = t(`panel.overview.mode.${displayedMode}`, { defaultValue: displayedMode });
   const status = running
     ? "running"
     : planningState && planningState !== "inactive"
@@ -269,6 +253,7 @@ export function OverviewTab() {
 
   return (
     <div className="work-panel-overview" data-testid="overview-tab">
+      {metadataError && <p className="work-panel-overview-empty-copy" role="status">{t("team.staleData")}: {metadataError}</p>}
       <header className="work-panel-overview-header">
         <div className="work-panel-overview-icon" aria-hidden>
           <IconInfo size={18} />
@@ -285,55 +270,30 @@ export function OverviewTab() {
       </header>
 
       <div className="work-panel-overview-scroll">
-        {isTeam && (
-          <details className="work-panel-overview-section" open>
-            <summary>{t("panel.overview.teamSection")}</summary>
-            <div className="work-panel-overview-section-body">
-              <div className="work-panel-overview-team-card">
-                <div className="work-panel-overview-row">
-                  <span className="work-panel-overview-row-label">
-                    <IconUsers size={14} aria-hidden />
-                    <span>{t("team.lead")}</span>
-                  </span>
-                  <span className={`team-status-badge ${teamData?.paused ? "team-status-paused" : "team-status-active"}`}>
-                    {teamData?.paused ? t("team.pausedBadge") : t("team.activeBadge")}
-                  </span>
-                </div>
-                {teamData ? (
-                  <>
-                    <div className="work-panel-overview-row">
-                      <span className="work-panel-overview-row-label">
-                        {t("team.membersCount", { count: teamData.members.length })}
-                      </span>
-                      <span className="work-panel-overview-row-detail">
-                        {t("team.tasksProgress", {
-                          completed: teamData.tasks.filter((task) => task.status === "completed").length,
-                          total: teamData.tasks.length,
-                        })}
-                      </span>
-                    </div>
-                  </>
-                ) : null}
-                <div className="work-panel-overview-team-action">
-                  <button
-                    type="button"
-                    className="work-panel-overview-action-btn"
-                    onClick={() =>
-                      openWorkPanelTabForSession(session.id, teamWorkPanelTab(session.id))
-                    }
-                  >
-                    {t("team.viewTeam")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </details>
+        {isTeam && teamSessionId && (
+          <section className="work-panel-overview-section work-panel-overview-team-progress" data-testid="overview-team-progress">
+            {teamError && <div className="team-error-banner" role="status">
+              <span>{t("team.staleData")}: {["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(teamError) ? t(`team.snapshotErrors.${teamError}`) : teamError}</span>
+              <Button size="sm" onClick={() => void refreshTeam()}>{t("team.retry")}</Button>
+            </div>}
+            {teamData ? <TeamTaskProgress
+              rows={selectOverviewTaskRows(teamRows)}
+              completed={teamData.tasks.filter((task) => !task.deleted && task.status === "completed").length}
+              total={teamData.tasks.filter((task) => !task.deleted).length}
+              expanded={teamExpanded[teamSessionId] ?? true}
+              onToggle={() => setTeamExpanded((state) => ({ ...state, [teamSessionId]: !(state[teamSessionId] ?? true) }))}
+              onOpenTask={(taskId) => openTeamTarget({ kind: "task", taskId })}
+              onOpenPanorama={() => openTeamTarget({ kind: "panorama" })}
+              onOpenBoard={() => openTeamTarget({ kind: "board" })}
+            /> : !teamError && teamLoading ? <p className="work-panel-overview-empty-copy" role="status">{t("common.loading")}</p> : null}
+          </section>
         )}
 
+        {(!isTeam || subagents.length > 0) && (
         <details className="work-panel-overview-section" open>
           <summary className="work-panel-overview-subagents-summary">
-            <span>{t("panel.overview.subagents")}</span>
-            {subagents.length > 0 && (
+            <span>{t(isTeam ? "team.previousSubagents" : "panel.overview.subagents")}</span>
+            {subagents.length > 0 && !isTeam && (
               <button
                 type="button"
                 className="work-panel-overview-panorama-btn"
@@ -342,11 +302,11 @@ export function OverviewTab() {
                   e.stopPropagation();
                   setViewMode("panorama");
                 }}
-                title={t("team.viewPanorama", { defaultValue: "View panorama" })}
-                aria-label={t("team.viewPanorama", { defaultValue: "View panorama" })}
+                title={t("team.viewPanorama")}
+                aria-label={t("team.viewPanorama")}
               >
                 <IconWorkflow size={13} aria-hidden />
-                <span>{t("team.viewPanorama", { defaultValue: "View panorama" })}</span>
+                <span>{t("team.viewPanorama")}</span>
               </button>
             )}
           </summary>
@@ -375,6 +335,8 @@ export function OverviewTab() {
             )}
           </div>
         </details>
+
+        )}
 
         <details className="work-panel-overview-section" open>
           <summary>{t("panel.overview.progress")}</summary>

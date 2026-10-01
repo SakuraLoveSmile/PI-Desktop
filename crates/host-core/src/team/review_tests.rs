@@ -122,6 +122,7 @@ fn review_cannot_alias_an_existing_member_session_under_a_different_name() {
                 description: None,
                 context_kind: Some("fresh".to_string()),
                 member_session_id: Some(existing.member_session_id.clone()),
+                presentation: None,
                 selection: None,
             }]),
         },
@@ -306,6 +307,7 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
                     description: Some("System architecture".to_string()),
                     context_kind: Some("fresh".to_string()),
                     member_session_id: None,
+                    presentation: None,
                     selection: Some(TeamMemberSelectionPartial {
                         provider_id: Some("prov-1".to_string()),
                         model_id: Some("model-1".to_string()),
@@ -317,6 +319,7 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
                     description: Some("Testing suites".to_string()),
                     context_kind: Some("fresh".to_string()),
                     member_session_id: None,
+                    presentation: None,
                     selection: None,
                 },
             ]),
@@ -439,6 +442,7 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
                 description: None,
                 context_kind: None,
                 member_session_id: None,
+                presentation: None,
                 selection: None,
             }]),
         },
@@ -446,11 +450,116 @@ fn test_team_strategy_declaration_and_launch_review_lifecycle() {
     .unwrap();
     finish_test_turn(&db, "turn-3");
     let p_id = pending_rev.unwrap().review_id;
+    let revision_before_restart = get_team(&db, &lead_id).unwrap().unwrap().revision;
     interrupt_pending_reviews_on_boot(&db).unwrap();
     let interrupted_rev = get_launch_review(&db, &lead_id, Some(&p_id))
         .unwrap()
         .unwrap();
     assert_eq!(interrupted_rev.status, "interrupted");
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        revision_before_restart + 1
+    );
+}
+
+#[test]
+fn member_presentation_survives_review_confirmation_and_snapshot_hydration() {
+    let db = test_db();
+    let lead_id = create_test_lead(&db);
+    ensure_test_route(&db, "prov-presentation", "model-presentation");
+    start_test_turn(&db, &lead_id, "presentation-turn");
+    let (_, review) = declare_team_strategy(
+        &db,
+        DeclareStrategyParams {
+            team_session_id: &lead_id,
+            caller_session_id: &lead_id,
+            lead_turn_id: "presentation-turn",
+            strategy: "delegate",
+            reason: "Delegate a research task",
+            members: Some(vec![TeamProposedMember {
+                name: "research-alex".to_string(),
+                description: Some("Research specialist".to_string()),
+                context_kind: None,
+                member_session_id: None,
+                presentation: Some(TeamMemberPresentation {
+                    role: "researcher".to_string(),
+                    display_name: "Alex".to_string(),
+                }),
+                selection: None,
+            }]),
+        },
+    )
+    .unwrap();
+    finish_test_turn(&db, "presentation-turn");
+    let review = review.unwrap();
+    assert_eq!(
+        review.members[0]
+            .presentation
+            .as_ref()
+            .unwrap()
+            .display_name,
+        "Alex"
+    );
+    assert!(list_team_members(&db, &lead_id).unwrap().is_empty());
+
+    confirm_launch_review(&db, &lead_id, &review.review_id, review.revision).unwrap();
+    send_team_message(
+        &db,
+        SendMessageParams {
+            team_session_id: &lead_id,
+            caller_session_id: &lead_id,
+            target_identifier: "research-alex",
+            content: "Start the research when ready.",
+            idempotency_key: Some("presentation-waiting-message"),
+        },
+    )
+    .unwrap();
+    let snapshot = get_team_snapshot(&db, &lead_id).unwrap();
+    assert_eq!(snapshot.members.len(), 1);
+    assert_eq!(
+        snapshot.members[0].presentation.as_ref().unwrap().role,
+        "researcher"
+    );
+    assert_eq!(
+        snapshot.members[0]
+            .presentation
+            .as_ref()
+            .unwrap()
+            .display_name,
+        "Alex"
+    );
+    assert_eq!(snapshot.members[0].phase, "idle");
+    assert_eq!(snapshot.queued_message_count, 2);
+    let waiting_messages: i64 = db
+        .conn()
+        .query_row(
+            "SELECT COUNT(*) FROM session_collaboration_messages
+             WHERE target_session_id=?1 AND status='queued'",
+            [&snapshot.members[0].member_session_id],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(waiting_messages, 1);
+    assert_eq!(snapshot.lead_phase, "completed");
+    assert_eq!(
+        snapshot.revision,
+        get_team(&db, &lead_id).unwrap().unwrap().revision
+    );
+
+    start_test_turn(&db, &lead_id, "lead-error-turn");
+    sessions::end_turn(
+        &db,
+        "lead-error-turn",
+        "error",
+        Some("MODEL_ERROR"),
+        None,
+        false,
+    )
+    .unwrap();
+    assert_eq!(
+        get_team_snapshot(&db, &lead_id).unwrap().lead_phase,
+        "failed"
+    );
 }
 
 #[test]
@@ -471,6 +580,7 @@ fn failed_confirmation_rolls_back_session_roster_message_and_review_state() {
                 description: None,
                 context_kind: Some("fresh".to_string()),
                 member_session_id: None,
+                presentation: None,
                 selection: None,
             }]),
         },
@@ -684,6 +794,7 @@ fn team_member_configure_updates_session_and_roster_atomically_and_expires_route
                 description: None,
                 context_kind: Some("fresh".to_string()),
                 member_session_id: Some(member.member_session_id.clone()),
+                presentation: None,
                 selection: Some(TeamMemberSelectionPartial {
                     provider_id: Some("new-provider".to_string()),
                     model_id: Some("new-model".to_string()),
