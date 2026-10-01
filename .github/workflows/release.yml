@@ -121,6 +121,7 @@ jobs:
             runner_arch: x86_64
             artifact: linux-x64
             platform: linux
+            feed: latest-linux.yml
             dist: dist:linux
           - name: Linux arm64
             # GitHub's native arm64 runner packages the Electron app and the
@@ -132,6 +133,7 @@ jobs:
             runner_arch: aarch64
             artifact: linux-arm64
             platform: linux
+            feed: latest-linux-arm64.yml
             dist: dist:linux
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
@@ -341,13 +343,21 @@ jobs:
         if: matrix.platform == 'linux'
         run: node scripts/export-linux-asar.mjs --arch ${{ matrix.arch }}
 
-      - name: Disambiguate the arm64 Linux update feed
-        # electron-updater requests `latest-linux.yml` on x64 but
-        # `latest-linux-<arch>.yml` on every other Linux architecture, so the
-        # arm64 lane renames its feed instead of overwriting the x64 feed when
-        # the publish job merges both lanes' artifacts.
-        if: matrix.platform == 'linux' && matrix.arch != 'x64'
-        run: mv apps/desktop/release/latest-linux.yml apps/desktop/release/latest-linux-${{ matrix.arch }}.yml
+      - name: Verify the Linux update feed
+        # electron-builder names the Linux feed `latest-linux.yml` for x64 and
+        # `latest-linux-<arch>.yml` for every other Linux architecture — the
+        # same names electron-updater requests on those architectures — so the
+        # two lanes cannot overwrite each other's feed when the publish job
+        # merges their artifacts.
+        if: matrix.platform == 'linux'
+        run: |
+          set -euo pipefail
+          feed="apps/desktop/release/${{ matrix.feed }}"
+          if [[ ! -f "$feed" ]]; then
+            echo "::error::Expected the Linux updater feed at $feed"
+            ls apps/desktop/release || true
+            exit 1
+          fi
 
       - name: Verify macOS artifact names
         if: matrix.platform == 'macos'

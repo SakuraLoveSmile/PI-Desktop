@@ -175,13 +175,17 @@ test("the release matrix ships native Linux x64 and arm64 lanes", () => {
     releaseWorkflowSource,
     /name: Verify native runner architecture[\s\S]*?if: matrix\.runner_arch/,
   );
-  // electron-updater resolves `latest-linux.yml` on x64 but
-  // `latest-linux-<arch>.yml` elsewhere, so the arm64 lane must rename its feed
-  // instead of overwriting the x64 one during the publish merge.
+  // electron-builder already names each Linux lane's feed after its own
+  // architecture (`latest-linux.yml` on x64, `latest-linux-arm64.yml` on
+  // arm64) — the names electron-updater requests — so the lanes cannot
+  // overwrite each other's feed during the publish merge, and the lane
+  // verifies the name it will publish instead of renaming it.
   assert.match(
     releaseWorkflowSource,
-    /name: Disambiguate the arm64 Linux update feed[\s\S]*?mv apps\/desktop\/release\/latest-linux\.yml apps\/desktop\/release\/latest-linux-\$\{\{ matrix\.arch \}\}\.yml/,
+    /name: Verify the Linux update feed[\s\S]*?feed="apps\/desktop\/release\/\$\{\{ matrix\.feed \}\}"/,
   );
+  assert.match(releaseWorkflowSource, /feed: latest-linux\.yml/);
+  assert.match(releaseWorkflowSource, /feed: latest-linux-arm64\.yml/);
   // The pi-host bundles the SSH bootstrap installs track the desktop's Linux
   // lanes one for one.
   assert.match(

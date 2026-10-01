@@ -223,6 +223,10 @@ DMG、ZIP、NSIS、AppImage、deb、rpm、块图和更新程序提要输出已
 `PI-Desktop-<version>-linux-<arch>.asar` 资产。这保留了 Linux 安装器用于
 以系统 Electron 下游重新打包时使用的那份确切归档。
 
+Linux 更新源带上它们所构建的架构：x64 为 `latest-linux.yml`，arm64 为
+`latest-linux-arm64.yml`。这正是 `electron-updater` 在对应架构上请求的通道文件，
+因此某条通道若缺少自己的更新源，会在上传前就失败。
+
 ### 4.4 CNB 镜像触发
 
 `softprops/action-gh-release` 发布或更新 GitHub Release 之后，

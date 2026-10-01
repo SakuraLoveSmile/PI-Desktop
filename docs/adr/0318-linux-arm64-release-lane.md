@@ -22,11 +22,10 @@ than a new flag on one job:
    electron-builder prefers a target's configured arch list over the CLI
    `--x64` / `--arm64` flag. Pinning both architectures would make each Linux
    lane build the other architecture around its own native sidecar.
-3. The AppImage target's default artifact name carries no architecture, and
-   electron-builder writes one Linux updater feed per build. Two Linux lanes
-   would therefore publish the same `PI-Desktop-<version>.AppImage` file name
-   and the same `latest-linux.yml` feed, and the publish job's merged download
-   would keep only whichever arrived last.
+3. The AppImage target's default artifact name carries no architecture, so two
+   Linux lanes would publish the same `PI-Desktop-<version>.AppImage` file name
+   and the publish job's merged download would keep only whichever lane arrived
+   last.
 
 `electron-updater` resolves its Linux feed by architecture: `latest-linux.yml`
 on x64 and `latest-linux-<arch>.yml` on every other architecture
@@ -48,10 +47,11 @@ on x64 and `latest-linux-<arch>.yml` on every other architecture
    `PI-Desktop-<version>-linux-arm64.AppImage`. The deb and rpm targets keep
    their own patterns and expand `${arch}` through FPM's arch names
    (`amd64`/`arm64` and `x86_64`/`aarch64`).
-4. Each Linux job disambiguates its generated updater feed before upload: the
-   arm64 lane renames `latest-linux.yml` to `latest-linux-arm64.yml`, and the
-   x64 lane keeps `latest-linux.yml`. The publish job then merges both lanes'
-   artifacts without one feed overwriting the other.
+4. Each Linux job verifies the updater feed it is about to publish —
+   `latest-linux.yml` on x64, `latest-linux-arm64.yml` on arm64. electron-builder
+   already writes that architecture-suffixed name
+   (`getArchPrefixForUpdateFile`), so no rename is needed and the publish job
+   merges both lanes' artifacts without one feed overwriting the other.
 5. `scripts/export-linux-asar.mjs` takes the lane architecture, reads the
    archive from electron-builder's own unpacked directory
    (`linux-unpacked` for x64, `linux-arm64-unpacked` for arm64), and publishes

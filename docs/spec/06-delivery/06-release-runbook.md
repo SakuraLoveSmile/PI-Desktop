@@ -267,6 +267,11 @@ to the versioned `PI-Desktop-<version>-linux-<arch>.asar` asset before upload.
 This preserves the exact archive used by the Linux installers for downstream
 repackaging with a system Electron.
 
+The Linux updater feeds carry the architecture they were built for:
+`latest-linux.yml` for x64 and `latest-linux-arm64.yml` for arm64. Those are the
+channel files `electron-updater` requests on the matching architecture, so a
+lane fails before upload if its own feed is missing.
+
 ### 4.4 Documentation site deployment
 
 The release workflow does not deploy the documentation site. Vercel Git
