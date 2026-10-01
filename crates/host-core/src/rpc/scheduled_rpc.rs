@@ -288,6 +288,90 @@ fn validate_execution_input(params: &Value) -> Result<(), JsonRpcError> {
 mod tests {
     use super::*;
 
+    /// A run's transcript reports its automation ownership, the reader the
+    /// Scheduled page uses sees the same flag, search carries it through the
+    /// query that builds its own column list, and deleting the task releases the
+    /// transcript back into the ordinary lists (issue #1291).
+    #[tokio::test]
+    async fn automation_sessions_are_marked_and_released_with_their_task() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut st = AppState::open(dir.path()).unwrap();
+        st.handshook = true;
+        let id = handle(
+            &st,
+            "scheduled.create",
+            json!({"title":"Nightly","prompt":"Summarize the dependencies",
+                   "cadence":"manual","schedule":null}),
+        )
+        .unwrap()["task"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let run = handle(&st, "scheduled.run", json!({"id":id})).unwrap();
+        let run_session = run["sessionId"].as_str().unwrap().to_string();
+        let ordinary = sessions::create_session(
+            &st.db,
+            Some("Hand written".into()),
+            Some("agent".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        let flag = |session_id: &str| {
+            sessions::list_sessions(&st.db)
+                .unwrap()
+                .into_iter()
+                .find(|session| session.id == session_id)
+                .map(|session| session.scheduled_run)
+        };
+        assert_eq!(
+            flag(&run_session),
+            Some(true),
+            "a run's transcript is marked as automation output"
+        );
+        assert_eq!(
+            flag(&ordinary.id),
+            Some(false),
+            "an ordinary conversation is never marked"
+        );
+        let detail = sessions::get_session(&st.db, &run_session)
+            .unwrap()
+            .expect("the run's session exists");
+        assert!(detail.summary.scheduled_run);
+
+        let page = crate::session_search::search(&st.db, "Nightly", 0).unwrap();
+        let hit = page
+            .hits
+            .iter()
+            .find(|hit| hit.session.id == run_session)
+            .expect("search finds the run's transcript");
+        assert!(
+            hit.session.scheduled_run,
+            "search reports the same ownership as the list"
+        );
+
+        // A task with a run still in flight cannot be deleted yet.
+        let settled = handle(
+            &st,
+            "scheduled.finishRun",
+            json!({"runId": run["runId"].as_str().unwrap(), "status": "completed"}),
+        )
+        .unwrap();
+        assert_eq!(settled["ok"], json!(true));
+        handle(&st, "scheduled.delete", json!({"id":id})).unwrap();
+        assert_eq!(
+            flag(&run_session),
+            Some(false),
+            "deleting the task releases its transcripts"
+        );
+        assert!(
+            flag(&ordinary.id).is_some(),
+            "the conversation itself survives the task deletion"
+        );
+    }
+
     #[tokio::test]
     async fn review_deleted_project_is_not_recreated_by_automatic_task() {
         use std::sync::Arc;

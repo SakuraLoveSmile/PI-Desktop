@@ -18,11 +18,25 @@ export function registerScheduledIpc({
   invoke,
   isQuitting,
 }: ScheduledIpcDependencies): void {
-  registrar.handle(IPC.invoke.scheduledListRuns, async () => {
-    const host = getHost();
-    if (!host) throw new Error("host unavailable");
-    return host.call("scheduled.listRuns", { limit: 100 });
-  });
+  // The Scheduled workspace renders one task's own history, so the caller may
+  // scope the read to a single task. The host owns the 1..200 bound and the
+  // default, so the request only forwards a validated scope and limit.
+  registrar.handle(
+    IPC.invoke.scheduledListRuns,
+    async (options: { taskId?: unknown; limit?: unknown } = {}) => {
+      const host = getHost();
+      if (!host) throw new Error("host unavailable");
+      const taskId = typeof options?.taskId === "string" ? options.taskId.trim() : "";
+      const limit = options?.limit === undefined ? undefined : options.limit;
+      if (limit !== undefined && (typeof limit !== "number" || !Number.isFinite(limit))) {
+        throw new Error("invalid scheduled run limit");
+      }
+      return host.call("scheduled.listRuns", {
+        ...(taskId ? { taskId } : {}),
+        ...(limit === undefined ? {} : { limit: Math.trunc(limit) }),
+      });
+    },
+  );
   registrar.handle(IPC.invoke.scheduledExecute, async (id: string, automatic = false) => {
     if (typeof id !== "string" || typeof automatic !== "boolean") throw new Error("invalid task request");
     const host = getHost();

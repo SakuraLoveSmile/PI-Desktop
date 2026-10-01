@@ -244,7 +244,7 @@ destination, chat as the home surface, tools and permissions inline.
   focus.
 
 ### 3.3 Scheduled
-Tasks and Run history views, with an explicit create/edit form, a cadence dropdown, time,
+A task column beside the selected task's page, with an explicit create/edit form, a cadence dropdown, time,
 next occurrence, saved project, per-task permission/model selection, pause/resume and delete confirmation. Hourly
 schedules repeat at one-hour intervals without a time selector. Daily schedules
 use a themed time-period dropdown: Morning 09:00, Afternoon 14:00, Evening
@@ -254,10 +254,17 @@ and survives other form edits until the user explicitly selects a preset. Weekly
 separate dropdown listing Monday through Sunday with selection markers.
 Each day toggles independently; there are no preset combinations. An empty
 selection disables saving. The menu supports arrows, Home/End, Enter/Space,
-Escape/outside dismissal, and exposes selected states. The footer clock and global search open
-this route. Run now dispatches in the background and selects Run history; a
-conversation link opens the real transcript. The latest 100 runs show running,
-completed, failed or interrupted status. Automatic runs never steal foreground
+Escape/outside dismissal, and exposes selected states. The column reports each
+task's cadence and clock, the outcome of its newest run with its duration, and
+whether it is paused or running. The task page shows that task's last run, next
+occurrence, project, permission and model, its instruction behind a disclosure,
+its own run history newest first (status, start time, duration, stable error
+code), and the transcript of the selected run read in the page through a bounded
+read. A run's transcript belongs to this route: the SessionList and global
+session search never list it, and Open conversation is the explicit action that
+carries it into the chat route. The footer clock and global search open
+this route. Run now dispatches in the background, selects the run it admitted,
+and leaves the reader on this page. Automatic runs never steal foreground
 focus. See [desktop automations](../../adr/scheduled-desktop-automations.md).
 
 The application must remain running. The host polls every 30 seconds and skips

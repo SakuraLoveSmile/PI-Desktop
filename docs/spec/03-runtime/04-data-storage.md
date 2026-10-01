@@ -1127,6 +1127,12 @@ CREATE INDEX idx_task_runs ON task_runs(task_id, started_at DESC);
 ```
 
 A run that spawns a session gets its transcript for free via `session_id`.
+That transcript is identified as automation output by an `EXISTS` check against
+`task_runs` that every session summary and search hit carries as `scheduledRun`.
+The ownership is derived on read and never stored on the session row, so the
+SessionList and session search hide the transcript while it has a run, and
+deleting the task returns it to the ordinary lists instead of leaving it
+unreachable (issue #1291).
 The existing JSON extension stores `schedule: {hour, minute, weekday}`,
 `nextRunAt` (epoch milliseconds) and `workspacePath` for desktop automations.
 Optional `weekdays` stores 1–7 unique integers in 0–6, overriding legacy

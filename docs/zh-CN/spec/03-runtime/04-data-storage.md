@@ -913,6 +913,7 @@ CREATE INDEX idx_task_runs ON task_runs(task_id, started_at DESC);
 ```
 
 生成会话的运行通过 `session_id` 免费获取其转录本。
+该转录本通过针对 `task_runs` 的 `EXISTS` 判断被识别为自动化产出，每个会话摘要与搜索命中都以 `scheduledRun` 返回这一归属。归属在读取时派生、不写入会话行：因此在该会话仍属于某次运行时，会话列表与会话搜索会隐藏它；删除任务后它会回到普通列表，而不会变得无法访问（issue #1291）。
 `config_json` 保存 `schedule: {hour, minute, weekday}`、毫秒时间戳 `nextRunAt`、
 `workspacePath`，以及可选的任务级 `permissionMode` 与成对的 `providerId`／`modelId`。
 这些新增字段无需物理表迁移。缺少模型字段时仍在运行时读取应用默认值；缺少权限字段时，
