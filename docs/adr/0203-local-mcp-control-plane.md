@@ -110,8 +110,9 @@ settings surface over the existing preload invoke bridge and the shared
 whitelist. They return `{enabled, running, source, connectionFile, error}` and
 never the token or the manifest, they drive the same single `McpControlServer`
 the environment drives (serialized start/stop, preference saved only after the
-listener is confirmed), and they stay outside the reviewed MCP operation
-catalog so an external client cannot switch off the plane that serves it.
+listener is confirmed). Environment overrides never rewrite the saved
+preference; removing the override restores that preference. These channels
+stay outside the reviewed MCP operation catalog so an external client cannot switch off the plane that serves it.
 Enabling or disabling never stops, aborts, or cancels an Agent turn, and the
 loopback bind, authentication, discovery, and shutdown behavior of the server
 are unchanged.
