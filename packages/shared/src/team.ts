@@ -6,6 +6,8 @@
  * task board, and mailbox delivery ledger.
  */
 
+import type { SessionThinkingLevel } from "./types.js";
+
 export const MAX_TEAM_MEMBERS = 8;
 export const MAX_TEAM_TASKS = 256;
 export const MAX_TEAM_MAILBOX_MESSAGES = 64;
@@ -122,8 +124,14 @@ export type TeamBoardProjection = {
 /** @deprecated Use the separate frozen roster and board projections. */
 export type TeamProjection = TeamBoardProjection;
 
-// ---- DSH 9 Team Tools ----
+// ---- Team tools ----
 
+/**
+ * The nine dispatch tools a Team profile builds.
+ *
+ * The Lead-only `declare_team_strategy` tool is not built here, so it stays out
+ * of this list and out of `isTeamTool`; see `TEAM_LEAD_TOOL_NAMES`.
+ */
 export const TEAM_TOOL_NAMES = [
   "spawn_teammate",
   "send_message",
@@ -331,3 +339,121 @@ export function detectWriteScopeOverlaps(
 
   return warnings;
 }
+
+// ---- Lead strategy declaration and expert launch review ----
+
+/**
+ * The coordination decision a Lead records for one of its turns.
+ *
+ * `lead_only` means the work really is indivisible; `delegate` means experts
+ * are needed, and the user must confirm the proposed roster and routes before
+ * any expert session, model call or dispatch starts.
+ */
+export type TeamStrategyKind = "lead_only" | "delegate";
+
+export const DECLARE_TEAM_STRATEGY_TOOL_NAME = "declare_team_strategy";
+
+/**
+ * Agent-mode Lead tools: the nine team tools plus the Lead-only declaration.
+ *
+ * `declare_team_strategy` stays out of `TEAM_TOOL_NAMES` on purpose: that list
+ * names the tools a Team profile actually builds and that `isTeamTool` gates.
+ */
+export const TEAM_LEAD_TOOL_NAMES = [...TEAM_TOOL_NAMES, DECLARE_TEAM_STRATEGY_TOOL_NAME] as const;
+
+export type TeamLeadToolName = (typeof TEAM_LEAD_TOOL_NAMES)[number];
+
+export const MAX_TEAM_STRATEGY_REASON_CHARS = 1000;
+
+/** One provider/model/thinking route. Provider UUID and model id stay a pair. */
+export type TeamMemberSelection = {
+  providerId: string;
+  modelId: string;
+  thinkingLevel: SessionThinkingLevel;
+};
+
+/**
+ * One expert the Lead proposes. This is a proposal, not a roster member: an
+ * omitted selection snapshots the Lead's effective launch binding for the
+ * turn, it is not a live link to later Composer changes.
+ */
+export type TeamProposedMember = {
+  name: string;
+  description?: string;
+  /** Defaults to `fresh` when omitted. */
+  contextKind?: TeamContextKind;
+  /** Reuse an existing durable member of the same team, validated by the Host. */
+  memberSessionId?: string;
+  selection?: Partial<TeamMemberSelection>;
+};
+
+export const TEAM_LAUNCH_REVIEW_SCHEMA_VERSION = 1;
+
+export type TeamLaunchReviewStatus = "pending" | "confirmed" | "cancelled" | "interrupted";
+
+export type TeamLaunchReviewMember = Omit<TeamProposedMember, "contextKind" | "selection"> & {
+  contextKind: TeamContextKind;
+  selection: TeamMemberSelection;
+};
+
+/**
+ * Host-owned editable draft of one proposed dispatch batch.
+ *
+ * The user edits model selections and confirms it; only then may members be
+ * created and work be enqueued. Persisted per Lead turn, never as a member.
+ */
+export type TeamLaunchReview = {
+  schemaVersion: typeof TEAM_LAUNCH_REVIEW_SCHEMA_VERSION;
+  reviewId: string;
+  teamSessionId: string;
+  leadTurnId: string;
+  revision: number;
+  status: TeamLaunchReviewStatus;
+  members: TeamLaunchReviewMember[];
+};
+
+/** One edited row, identified by its proposed name. */
+export type TeamLaunchReviewSelectionUpdate = {
+  name: string;
+  providerId: string;
+  modelId: string;
+  thinkingLevel: SessionThinkingLevel;
+};
+
+export type TeamCoordinationStage = "member_creation" | "task_creation" | "enqueue" | "delivery";
+
+/** Bounded, redacted Host diagnostic for a coordination operation that failed. */
+export type TeamCoordinationError = {
+  stage: TeamCoordinationStage;
+  code: string;
+  message: string;
+};
+
+export const TEAM_EXECUTION_DECISION_SCHEMA_VERSION = 1;
+
+/**
+ * Versioned per-turn record of the Lead's coordination decision plus the ids
+ * the Host actually produced for that turn.
+ *
+ * A declared record always carries a strategy and reason. An evidence-only
+ * record (a historical turn that never declared) keeps both null: it must not
+ * be read as a model decision, and "not recorded" is not `lead_only`.
+ */
+export type TeamExecutionDecision = {
+  schemaVersion: typeof TEAM_EXECUTION_DECISION_SCHEMA_VERSION;
+  teamSessionId: string;
+  leadTurnId: string;
+  strategy: TeamStrategyKind | null;
+  reason: string | null;
+  updatedAt: string;
+  taskIds: string[];
+  memberSessionIds: string[];
+  messageIds: string[];
+  reviewIds?: string[];
+  coordinationError?: TeamCoordinationError;
+};
+
+/** Tool input for the Lead-only declaration; the runtime binds identity. */
+export type DeclareTeamStrategyArgs =
+  | { strategy: "lead_only"; reason: string }
+  | { strategy: "delegate"; reason: string; members: TeamProposedMember[] };

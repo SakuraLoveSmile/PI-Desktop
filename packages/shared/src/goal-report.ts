@@ -15,6 +15,8 @@ export const GOAL_REPORT_MAX_CRITERIA = 100;
 export const GOAL_REPORT_MAX_STEPS = 100;
 export const GOAL_REPORT_MAX_FILES = 500;
 export const GOAL_REPORT_MAX_CHECKS = 200;
+export const GOAL_REPORT_MAX_SCREENSHOTS = 12;
+export const GOAL_REPORT_MAX_CHECK_OBSERVATIONS = 200;
 
 export type GoalReportExecutionStatus = "completed" | "interrupted";
 export type GoalReportStatus = "draft" | "pending" | "ready" | "failed";
@@ -27,10 +29,16 @@ export type GoalReportFileAttribution = "direct" | "subagent" | "declared";
 export type GoalReportCheckResult = "passed" | "failed" | "inconclusive";
 export type GoalReportEvidenceKind = "tool_call" | "tool_result" | "message" | "file" | "subagent";
 
+export type GoalReportCheckDisposition = "executed" | "not_run" | "blocked";
+/** Timing provenance of the reported duration; absent means legacy stamps. */
+export type GoalReportTimingSource = "turn" | "unavailable";
+
 export type GoalReportMetric = {
   label: string;
   value: string;
   source?: string;
+  /** Evidence ids that support the value, when any were recorded. */
+  evidenceRefs?: string[];
 };
 
 export type GoalReportCriterion = {
@@ -55,6 +63,8 @@ export type GoalReportFile = {
   changeType: GoalReportFileChangeType;
   attribution: GoalReportFileAttribution;
   detail?: string;
+  /** Optional display grouping, for example a module or layer name. */
+  group?: string;
 };
 
 export type GoalReportCheck = {
@@ -64,6 +74,13 @@ export type GoalReportCheck = {
   result: GoalReportCheckResult;
   detail?: string;
   evidenceRefs?: string[];
+  /** Human label for the check row; falls back to the command. */
+  label?: string;
+  /**
+   * Whether the check ran at all. `not_run` and `blocked` pair with an
+   * `inconclusive` result and an explanation.
+   */
+  disposition?: GoalReportCheckDisposition;
 };
 
 export type GoalReportEvidence = {
@@ -72,6 +89,43 @@ export type GoalReportEvidence = {
   refId: string;
   summary: string;
   detail?: string;
+};
+
+/**
+ * What the Host could observe for one referenced evidence id.
+ *
+ * `recorded` means the record exists in the owning execution. It is not a
+ * semantic acceptance of whatever claimed it.
+ */
+export type GoalReportEvidenceResolution = {
+  evidenceId: string;
+  state: "recorded" | "unresolved";
+  detail?: string;
+};
+
+/** Host-observed facts for one check, rendered beside the model's claim. */
+export type GoalReportCheckObservation = {
+  checkId: string;
+  result: "passed" | "failed" | "inconclusive";
+  command?: string;
+  exitCode?: number | null;
+  evidenceIds: string[];
+  detail?: string;
+};
+
+/** Optional context line for the report header. */
+export type GoalReportDeliveryContext = {
+  sourceLabel?: string;
+  targetVersion?: string;
+  revisionLabel?: string;
+  evidenceRefs?: string[];
+};
+
+/** One image the report shows; the bytes come from the referenced evidence. */
+export type GoalReportScreenshot = {
+  id: string;
+  evidenceRef: string;
+  caption: string;
 };
 
 /**
@@ -100,6 +154,8 @@ export type GoalReport = {
     status: GoalReportExecutionStatus;
     errorCode?: string | null;
     durableSeq?: number;
+    /** Timing provenance; absent means legacy proposal/publication stamps. */
+    timingSource?: GoalReportTimingSource;
   };
 
   /** Integrity status of the report. */
@@ -124,6 +180,17 @@ export type GoalReport = {
 
   /** Evidences referenced by criteria, steps, and checks. */
   evidences: GoalReportEvidence[];
+
+  /** Optional model-authored presentation fields. */
+  deliveryContext?: GoalReportDeliveryContext;
+  conclusion?: string;
+  /** Gallery entries; each one points at an existing evidence id. */
+  screenshots?: GoalReportScreenshot[];
+
+  /** Host-owned: what could be resolved for each referenced evidence id. */
+  evidenceResolution?: GoalReportEvidenceResolution[];
+  /** Host-owned: what the recorded results say about each check. */
+  checkObservations?: GoalReportCheckObservation[];
 };
 
 /**
@@ -159,6 +226,13 @@ export type SubmitGoalReportDraftInput = {
   limitations?: string[];
   nextSteps?: string[];
   evidences?: GoalReportEvidence[];
+  /**
+   * Optional presentation fields. Host-owned resolution, hashes and assets are
+   * not part of a draft and are rejected by the validator.
+   */
+  deliveryContext?: GoalReportDeliveryContext;
+  conclusion?: string;
+  screenshots?: GoalReportScreenshot[];
 };
 
 /**
@@ -191,9 +265,21 @@ export type ValidationResult<T> =
  */
 export function validateGoalReportDraft(
   input: unknown,
+  options: { hostOwned?: "reject" | "accept" } = {},
 ): ValidationResult<SubmitGoalReportDraftInput> {
   if (!isRecord(input)) {
     return { ok: false, error: "Draft payload must be a JSON object" };
+  }
+
+  // Host-owned facts are never a model input. A draft that tries to submit
+  // resolution, hashes or assets is rejected rather than silently ignored, so
+  // a model cannot claim host verification.
+  if (options.hostOwned !== "accept") {
+    for (const reserved of ["evidenceResolution", "checkObservations", "verificationSource", "assets", "reportSha256"]) {
+      if (input[reserved] !== undefined) {
+        return { ok: false, error: `${reserved} is host-owned and cannot be submitted in a draft` };
+      }
+    }
   }
 
   const rawJson = JSON.stringify(input);
@@ -239,6 +325,7 @@ export function validateGoalReportDraft(
         label: item.label.trim(),
         value: item.value.trim(),
         ...(typeof item.source === "string" ? { source: item.source.trim() } : {}),
+        ...(Array.isArray(item.evidenceRefs) ? { evidenceRefs: item.evidenceRefs.filter((s): s is string => typeof s === "string") } : {}),
       });
     }
   }
@@ -333,6 +420,7 @@ export function validateGoalReportDraft(
         changeType,
         attribution,
         ...(typeof item.detail === "string" ? { detail: item.detail.trim() } : {}),
+        ...(typeof item.group === "string" && item.group.trim() ? { group: item.group.trim() } : {}),
       });
     }
   }
@@ -357,13 +445,26 @@ export function validateGoalReportDraft(
       const result = typeof item.result === "string" && validResults.includes(item.result as GoalReportCheckResult)
         ? (item.result as GoalReportCheckResult)
         : "inconclusive";
+      const detail = typeof item.detail === "string" ? item.detail.trim() : undefined;
+      const disposition = item.disposition === "executed" || item.disposition === "not_run" || item.disposition === "blocked"
+        ? (item.disposition as GoalReportCheckDisposition)
+        : undefined;
+      // A check that never ran cannot claim a passing result.
+      if ((disposition === "not_run" || disposition === "blocked") && (result !== "inconclusive" || !detail)) {
+        return {
+          ok: false,
+          error: `checks[${i}] with disposition ${disposition} must use an inconclusive result and explain why`,
+        };
+      }
       checks.push({
         id: item.id.trim(),
         command: item.command.trim(),
         result,
         exitCode: typeof item.exitCode === "number" ? item.exitCode : null,
-        ...(typeof item.detail === "string" ? { detail: item.detail.trim() } : {}),
+        ...(detail ? { detail } : {}),
         ...(Array.isArray(item.evidenceRefs) ? { evidenceRefs: item.evidenceRefs.filter((s): s is string => typeof s === "string") } : {}),
+        ...(typeof item.label === "string" && item.label.trim() ? { label: item.label.trim() } : {}),
+        ...(disposition ? { disposition } : {}),
       });
     }
   }
@@ -422,6 +523,41 @@ export function validateGoalReportDraft(
     }
   }
 
+  const screenshots: GoalReportScreenshot[] = [];
+  if (input.screenshots !== undefined) {
+    if (!Array.isArray(input.screenshots)) {
+      return { ok: false, error: "screenshots must be an array" };
+    }
+    if (input.screenshots.length > GOAL_REPORT_MAX_SCREENSHOTS) {
+      return {
+        ok: false,
+        error: `screenshots count (${input.screenshots.length}) exceeds maximum of ${GOAL_REPORT_MAX_SCREENSHOTS}`,
+      };
+    }
+    const seenIds = new Set<string>();
+    for (let i = 0; i < input.screenshots.length; i++) {
+      const item = input.screenshots[i];
+      if (!isRecord(item) || typeof item.id !== "string" || typeof item.evidenceRef !== "string") {
+        return { ok: false, error: `screenshots[${i}] must have id and evidenceRef strings` };
+      }
+      const id = item.id.trim();
+      if (seenIds.has(id)) {
+        return { ok: false, error: `screenshots[${i}] repeats id ${id}` };
+      }
+      seenIds.add(id);
+      screenshots.push({
+        id,
+        evidenceRef: item.evidenceRef.trim(),
+        caption: typeof item.caption === "string" ? item.caption.trim() : "",
+      });
+    }
+  }
+
+  const deliveryContext = parseDeliveryContext(input.deliveryContext);
+  const conclusion = typeof input.conclusion === "string" && input.conclusion.trim()
+    ? input.conclusion.trim()
+    : undefined;
+
   return {
     ok: true,
     value: {
@@ -435,10 +571,71 @@ export function validateGoalReportDraft(
       limitations,
       nextSteps,
       evidences,
+      ...(deliveryContext ? { deliveryContext } : {}),
+      ...(conclusion ? { conclusion } : {}),
+      ...(screenshots.length > 0 ? { screenshots } : {}),
     },
   };
 }
 
+
+/**
+ * Reads Host-owned fields back from a finalized snapshot.
+ *
+ * They are preserved on read so a re-validated report never loses recorded
+ * facts, and they travel through the same shape the writer produced.
+ */
+function parseEvidenceResolution(value: unknown): GoalReportEvidenceResolution[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: GoalReportEvidenceResolution[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    if (typeof item.evidenceId !== "string" || !item.evidenceId.trim()) continue;
+    if (item.state !== "recorded" && item.state !== "unresolved") continue;
+    out.push({
+      evidenceId: item.evidenceId.trim(),
+      state: item.state,
+      ...(typeof item.detail === "string" ? { detail: item.detail } : {}),
+    });
+  }
+  return out;
+}
+
+function parseCheckObservations(value: unknown): GoalReportCheckObservation[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: GoalReportCheckObservation[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    if (typeof item.checkId !== "string" || !item.checkId.trim()) continue;
+    if (item.result !== "passed" && item.result !== "failed" && item.result !== "inconclusive") continue;
+    out.push({
+      checkId: item.checkId.trim(),
+      result: item.result,
+      ...(typeof item.command === "string" ? { command: item.command } : {}),
+      ...(typeof item.exitCode === "number" ? { exitCode: item.exitCode } : {}),
+      evidenceIds: Array.isArray(item.evidenceIds)
+        ? item.evidenceIds.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+        : [],
+      ...(typeof item.detail === "string" ? { detail: item.detail } : {}),
+    });
+  }
+  return out;
+}
+
+/** A header context line; dropped entirely when it carries nothing. */
+function parseDeliveryContext(value: unknown): GoalReportDeliveryContext | undefined {
+  if (!isRecord(value)) return undefined;
+  const context: GoalReportDeliveryContext = {};
+  for (const key of ["sourceLabel", "targetVersion", "revisionLabel"] as const) {
+    const raw = value[key];
+    if (typeof raw === "string" && raw.trim()) context[key] = raw.trim();
+  }
+  if (Array.isArray(value.evidenceRefs)) {
+    const refs = value.evidenceRefs.filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0);
+    if (refs.length > 0) context.evidenceRefs = refs;
+  }
+  return Object.keys(context).length > 0 ? context : undefined;
+}
 /**
  * Validates a complete GoalReport snapshot.
  */
@@ -477,7 +674,7 @@ export function validateGoalReport(input: unknown): ValidationResult<GoalReport>
     return { ok: false, error: "Report integrity kind must be 'structured' or 'fallback'" };
   }
 
-  const draftResult = validateGoalReportDraft(input);
+  const draftResult = validateGoalReportDraft(input, { hostOwned: "accept" });
   if (!draftResult.ok) {
     return draftResult;
   }
@@ -504,6 +701,9 @@ export function validateGoalReport(input: unknown): ValidationResult<GoalReport>
         status: input.execution.status as GoalReportExecutionStatus,
         errorCode: typeof input.execution.errorCode === "string" ? input.execution.errorCode : null,
         durableSeq: typeof input.execution.durableSeq === "number" ? input.execution.durableSeq : undefined,
+        ...(input.execution.timingSource === "turn" || input.execution.timingSource === "unavailable"
+          ? { timingSource: input.execution.timingSource }
+          : {}),
       },
       integrity: {
         kind: input.integrity.kind as GoalReportIntegrity,
@@ -524,6 +724,11 @@ export function validateGoalReport(input: unknown): ValidationResult<GoalReport>
       limitations: validated.limitations ?? [],
       nextSteps: validated.nextSteps ?? [],
       evidences: validated.evidences ?? [],
+      ...(validated.deliveryContext ? { deliveryContext: validated.deliveryContext } : {}),
+      ...(validated.conclusion ? { conclusion: validated.conclusion } : {}),
+      ...(validated.screenshots ? { screenshots: validated.screenshots } : {}),
+      evidenceResolution: parseEvidenceResolution(input.evidenceResolution),
+      checkObservations: parseCheckObservations(input.checkObservations),
     },
   };
 }

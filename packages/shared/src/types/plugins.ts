@@ -9,8 +9,12 @@ import type { TrustedExtensionDiagnostic } from "../trusted-extensions.js";
  * plugin center, so a settings row written before the center existed keeps
  * meaning what its author picked instead of needing a migration. `github` and
  * `mirror` are the two backup channels, and `custom` is a URL the user typed.
+ * `plus` is the curated channel: a maintainer review admits an exact
+ * `(pluginId, version, shasum)` before it can appear in that channel's
+ * catalog. The label describes that review — never who published the plugin,
+ * and never a guarantee that its code is safe.
  */
-export type PluginMarketSource = "official" | "github" | "mirror" | "custom";
+export type PluginMarketSource = "official" | "github" | "mirror" | "custom" | "plus";
 
 export type PluginUpdateInfo = {
   version: string;
@@ -50,6 +54,13 @@ export type MarketProvenance = {
 };
 
 /** Publish verdict issued by the center's policy evaluator. */
+export type ExpectedMarketplace = {
+  source: string;
+  catalogUrl: string;
+  version: string;
+  shasum: string;
+};
+
 export type MarketReview = {
   decision?: string;
   risk?: string;
@@ -71,6 +82,12 @@ export type PluginMarketplaceMeta = {
   trust?: MarketTrust;
   /** Source pin of the installed version, when the catalog carried one. */
   provenance?: MarketProvenance;
+  /**
+   * Maintainer review that admitted this exact version, when the channel
+   * carries one. Absent on records written before a curated channel existed;
+   * its absence means "no review assertion", not "reviewed".
+   */
+  review?: MarketReview;
 };
 
 export type PluginUiMeta = {

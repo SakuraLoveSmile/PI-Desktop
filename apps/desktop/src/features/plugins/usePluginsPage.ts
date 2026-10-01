@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { usePluginBrowseState } from "./browse-state";
 import type {
   ActivationScope,
+  ExpectedMarketplace,
   MarketPluginDetail,
   MarketPluginSummary,
   PluginPermissionReview,
@@ -70,6 +71,7 @@ export function usePluginsPage() {
     permissions: string[];
     newPermissions: string[];
     version?: string;
+    expectedMarketplace?: ExpectedMarketplace;
   } | null>(null);
   /**
    * A development plugin whose folder was chosen but not yet granted. Loading a
@@ -527,6 +529,7 @@ export function usePluginsPage() {
     permissions: readonly string[];
     newPermissions?: readonly string[];
     version?: string;
+    expectedMarketplace?: ExpectedMarketplace;
   }) => {
     const newPermissions = orderPermissions(input.newPermissions);
     setPendingInstall({
@@ -535,6 +538,7 @@ export function usePluginsPage() {
       version: input.version,
       permissions: orderPermissions([...input.permissions, ...newPermissions]),
       newPermissions,
+      expectedMarketplace: input.expectedMarketplace,
     });
     setAutoUpdate(true);
     setRowMenu(null);
@@ -558,6 +562,7 @@ export function usePluginsPage() {
         enable: true,
         autoUpdate: request.autoUpdate,
         grantedPermissions: request.grantedPermissions,
+        expectedMarketplace: request.expectedMarketplace,
       });
       await refreshPlugins();
       await refreshMarket();
@@ -601,6 +606,7 @@ export function usePluginsPage() {
       version: pendingInstall.version,
       autoUpdate,
       grantedPermissions: pendingInstall.permissions,
+      expectedMarketplace: pendingInstall.expectedMarketplace,
     };
     // The review is answered, so it steps aside for the install it approved.
     setPendingInstall(null);

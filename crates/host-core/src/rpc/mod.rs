@@ -5390,6 +5390,9 @@ async fn handle_request(
                         enable,
                         marketplace: None,
                         expected_shasum: None,
+                        expected_plugin_id: None,
+                        expected_version: None,
+                        expected_marketplace: None,
                         auto_update: false,
                         granted_permissions: granted,
                     },
@@ -5424,6 +5427,9 @@ async fn handle_request(
                         enable,
                         marketplace: None,
                         expected_shasum,
+                        expected_plugin_id: None,
+                        expected_version: None,
+                        expected_marketplace: None,
                         auto_update: false,
                         granted_permissions: granted,
                     },
@@ -5797,6 +5803,9 @@ async fn handle_request(
                 .get("grantedPermissions")
                 .cloned()
                 .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok());
+            let expected_marketplace = params.get("expectedMarketplace").cloned().and_then(|v| {
+                serde_json::from_value::<crate::plugins::ExpectedMarketplace>(v).ok()
+            });
             // An install outlives one request from the interface's point of
             // view: it resolves where the package is, downloads it from one
             // mirror after another, verifies it and registers it. Every one of
@@ -5820,6 +5829,7 @@ async fn handle_request(
                 enable,
                 auto_update,
                 granted,
+                expected_marketplace.as_ref(),
                 &mut observer,
             );
             // Whatever happened, nothing is cancellable any more: a token left

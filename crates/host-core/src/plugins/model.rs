@@ -204,6 +204,17 @@ pub struct PluginMarketplaceMeta {
     /// Source pin of the installed version (catalog v2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provenance: Option<MarketProvenance>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<MarketReview>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpectedMarketplace {
+    pub source: String,
+    pub catalog_url: String,
+    pub version: String,
+    pub shasum: String,
 }
 
 /// Distribution-side withdrawal of the exact version a user has installed.
@@ -262,6 +273,8 @@ pub struct MarketPluginSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon_url: Option<String>,
     pub latest_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_shasum: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub downloads: Option<u64>,
     pub updated_at: String,
@@ -409,6 +422,8 @@ pub struct MarketDownloadInfo {
     pub trust: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub publisher_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<MarketReview>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -488,6 +503,9 @@ pub struct InstallOptions {
     pub enable: bool,
     pub marketplace: Option<PluginMarketplaceMeta>,
     pub expected_shasum: Option<String>,
+    pub expected_plugin_id: Option<String>,
+    pub expected_version: Option<String>,
+    pub expected_marketplace: Option<ExpectedMarketplace>,
     pub auto_update: bool,
     pub granted_permissions: Option<Vec<String>>,
 }
@@ -499,6 +517,9 @@ impl Default for InstallOptions {
             enable: true,
             marketplace: None,
             expected_shasum: None,
+            expected_plugin_id: None,
+            expected_version: None,
+            expected_marketplace: None,
             auto_update: false,
             granted_permissions: None,
         }
