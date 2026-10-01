@@ -1848,6 +1848,7 @@ sklm: {
     openInMain: "Open in main window",
     taskOwner: "Owner",
     taskReadiness: "Readiness",
+    taskScopes: "쓰기 범위",
     teamOverview: "Team Overview",
     lead: "Lead",
     membersCount: "{{count}} members",

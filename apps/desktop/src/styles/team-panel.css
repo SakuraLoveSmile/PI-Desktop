@@ -394,6 +394,14 @@
   color: var(--ds-text-primary);
 }
 
+.team-card-desc,
+.team-detail-field-value,
+.team-card-error,
+.team-card-details > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .team-owner-btn {
   align-self: flex-start;
 }

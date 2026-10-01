@@ -829,7 +829,7 @@ function TeamTaskDetail({
 
         {task.writeScopes.length > 0 ? (
           <div className="team-detail-field">
-            <span className="team-detail-field-label">Scopes</span>
+            <span className="team-detail-field-label">{t("team.taskScopes")}</span>
             <span className="team-detail-field-value">
               {t("team.scopes", { scopes: task.writeScopes.join(", ") })}
             </span>

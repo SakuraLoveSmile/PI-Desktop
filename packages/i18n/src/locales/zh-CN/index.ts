@@ -1837,6 +1837,7 @@ sklm: {
     openInMain: "在主窗口打开",
     taskOwner: "执行人",
     taskReadiness: "就绪状态",
+    taskScopes: "写入范围",
     teamOverview: "团队概览",
     lead: "主导",
     membersCount: "{{count}} 位成员",
