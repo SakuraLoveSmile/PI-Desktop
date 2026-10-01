@@ -130,7 +130,7 @@ pub fn normalize_dispatch_title(raw: &str) -> Result<String> {
     Ok(collapsed)
 }
 
-fn validate_thinking_level(level: &str) -> Result<()> {
+pub(crate) fn validate_thinking_level(level: &str) -> Result<()> {
     if is_valid_thinking_level(level) {
         Ok(())
     } else {
@@ -1971,6 +1971,15 @@ pub fn configure_session_with_profile(
         model_id,
         thinking_level,
         permission_mode,
+    )?;
+    crate::team::gate_session_configure(
+        db,
+        id,
+        &mode,
+        provider_id,
+        model_id,
+        thinking_level,
+        execution_profile,
     )?;
     let changed = db
         .conn()

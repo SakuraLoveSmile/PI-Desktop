@@ -91,6 +91,7 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
     for (const theme of ["dark", "light"]) {
       await cdp.evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
       const id = seed.alphaSessionIds[0];
+      await waitFor(() => cdp.evaluate(`!!document.querySelector(${JSON.stringify(row(id))})`), "seed session rendered");
       await select(id);
       const selectedRest = await paint(row(id));
       const groupRest = await paint(header(seed.paths.alpha));
@@ -120,6 +121,38 @@ export async function checkSidebarRowStates({ cdp, check, waitFor, seed }) {
         selectedHover.hovered && selectedHover.background === selectedRest.background,
         `${theme} selected fill wins over hover without a second background`,
         JSON.stringify({ selectedRest, selectedHover }),
+      );
+
+      // Check quick-archive control reveal and geometry
+      await hover(`${row(seed.alphaSessionIds[1])} .thread-item-main`);
+      const quickArchiveState = await cdp.evaluate(`(() => {
+        const rowEl = document.querySelector(${JSON.stringify(row(seed.alphaSessionIds[1]))});
+        const quick = rowEl?.querySelector('[data-action="quick-session-archive"]');
+        const menu = rowEl?.querySelector('[data-action="session-menu"]');
+        if (!quick || !menu) return null;
+        const quickBox = quick.getBoundingClientRect();
+        const menuBox = menu.getBoundingClientRect();
+        return {
+          quickVisible: getComputedStyle(quick).opacity !== "0",
+          menuVisible: getComputedStyle(menu).opacity !== "0",
+          quickWidth: Math.round(quickBox.width),
+          quickHeight: Math.round(quickBox.height),
+          menuWidth: Math.round(menuBox.width),
+          menuHeight: Math.round(menuBox.height),
+          gap: Math.round(menuBox.left - quickBox.right),
+        };
+      })()`);
+      check(
+        quickArchiveState &&
+          quickArchiveState.quickVisible &&
+          quickArchiveState.menuVisible &&
+          quickArchiveState.quickWidth === 24 &&
+          quickArchiveState.quickHeight === 24 &&
+          quickArchiveState.menuWidth === 24 &&
+          quickArchiveState.menuHeight === 24 &&
+          quickArchiveState.gap === 2,
+        `${theme} session row reveals 24px quick-archive and menu controls with 2px gap on hover`,
+        JSON.stringify(quickArchiveState),
       );
 
       await hover(title(seed.paths.alpha));

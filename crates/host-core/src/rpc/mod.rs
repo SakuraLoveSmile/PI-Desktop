@@ -26,6 +26,14 @@ fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
         "TEAM_MAILBOX_FULL"
     } else if msg.contains("TEAM_MESSAGE_PAYLOAD_TOO_LARGE") {
         "TEAM_MESSAGE_PAYLOAD_TOO_LARGE"
+    } else if msg.contains("TEAM_APPROVAL_REQUIRED") {
+        "TEAM_APPROVAL_REQUIRED"
+    } else if msg.contains("TEAM_REVIEW_REVISION_CONFLICT") {
+        "TEAM_REVIEW_REVISION_CONFLICT"
+    } else if msg.contains("TEAM_MODEL_SELECTION_INVALID") {
+        "TEAM_MODEL_SELECTION_INVALID"
+    } else if msg.contains("TEAM_MEMBER_MODEL_CHANGE_BLOCKED") {
+        "TEAM_MEMBER_MODEL_CHANGE_BLOCKED"
     } else if msg.contains("INVALID_PARAMS") {
         "INVALID_PARAMS"
     } else {
@@ -2083,6 +2091,188 @@ async fn handle_request(
                         json!({ "teamSessionId": team_id }),
                     );
                     Ok(json!({ "team": team }))
+                }
+                "team.declareStrategy" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(team_id);
+                    let lead_turn_id = params
+                        .get("leadTurnId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "leadTurnId required", "INVALID_PARAMS"))?;
+                    let strategy = params
+                        .get("strategy")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "strategy required", "INVALID_PARAMS"))?;
+                    let reason = params.get("reason").and_then(|v| v.as_str()).unwrap_or("");
+                    let members: Option<Vec<crate::team::TeamProposedMember>> = params
+                        .get("members")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok());
+
+                    let (decision, review) = crate::team::declare_team_strategy(
+                        &st.db,
+                        crate::team::DeclareStrategyParams {
+                            team_session_id: team_id,
+                            caller_session_id: caller_id,
+                            lead_turn_id,
+                            strategy,
+                            reason,
+                            members,
+                        },
+                    )
+                    .map_err(team_rpc_err)?;
+
+                    if let Some(ref r) = review {
+                        send_notification(
+                            &tx,
+                            "team.launchReviewChanged",
+                            json!({ "teamSessionId": team_id, "reviewId": r.review_id }),
+                        );
+                    }
+
+                    Ok(json!({ "decision": decision, "review": review }))
+                }
+                "team.getExecutionDecision" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let lead_turn_id = params
+                        .get("leadTurnId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "leadTurnId required", "INVALID_PARAMS"))?;
+
+                    let decision =
+                        crate::team::get_execution_decision(&st.db, team_id, lead_turn_id)
+                            .map_err(team_rpc_err)?;
+                    Ok(json!({ "decision": decision }))
+                }
+                "team.getLaunchReview" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let review_id = params.get("reviewId").and_then(|v| v.as_str());
+
+                    let review = crate::team::get_launch_review(&st.db, team_id, review_id)
+                        .map_err(team_rpc_err)?;
+                    Ok(json!({ "review": review }))
+                }
+                "team.updateLaunchReview" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let review_id = params
+                        .get("reviewId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "reviewId required", "INVALID_PARAMS"))?;
+                    let expected_revision = params
+                        .get("expectedRevision")
+                        .and_then(|v| v.as_i64())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "expectedRevision required", "INVALID_PARAMS")
+                        })?;
+                    let selections: Vec<crate::team::TeamLaunchReviewSelectionUpdate> = params
+                        .get("selections")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok())
+                        .unwrap_or_default();
+
+                    let review = crate::team::update_launch_review(
+                        &st.db,
+                        team_id,
+                        review_id,
+                        expected_revision,
+                        selections,
+                    )
+                    .map_err(team_rpc_err)?;
+
+                    send_notification(
+                        &tx,
+                        "team.launchReviewChanged",
+                        json!({ "teamSessionId": team_id, "reviewId": review_id }),
+                    );
+
+                    Ok(json!({ "review": review }))
+                }
+                "team.confirmLaunchReview" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let review_id = params
+                        .get("reviewId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "reviewId required", "INVALID_PARAMS"))?;
+                    let expected_revision = params
+                        .get("expectedRevision")
+                        .and_then(|v| v.as_i64())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "expectedRevision required", "INVALID_PARAMS")
+                        })?;
+
+                    let (review, decision) = crate::team::confirm_launch_review(
+                        &st.db,
+                        team_id,
+                        review_id,
+                        expected_revision,
+                    )
+                    .map_err(team_rpc_err)?;
+
+                    send_notification(
+                        &tx,
+                        "team.launchReviewChanged",
+                        json!({ "teamSessionId": team_id, "reviewId": review_id }),
+                    );
+                    send_notification(
+                        &tx,
+                        "team.rosterChanged",
+                        json!({ "teamSessionId": team_id }),
+                    );
+                    send_notification(
+                        &tx,
+                        "team.queueChanged",
+                        json!({ "teamSessionId": team_id }),
+                    );
+
+                    Ok(json!({ "review": review, "decision": decision }))
+                }
+                "team.cancelLaunchReview" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let review_id = params
+                        .get("reviewId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "reviewId required", "INVALID_PARAMS"))?;
+                    let expected_revision = params
+                        .get("expectedRevision")
+                        .and_then(|v| v.as_i64())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "expectedRevision required", "INVALID_PARAMS")
+                        })?;
+
+                    let review = crate::team::cancel_launch_review(
+                        &st.db,
+                        team_id,
+                        review_id,
+                        expected_revision,
+                    )
+                    .map_err(team_rpc_err)?;
+
+                    send_notification(
+                        &tx,
+                        "team.launchReviewChanged",
+                        json!({ "teamSessionId": team_id, "reviewId": review_id }),
+                    );
+
+                    Ok(json!({ "review": review }))
                 }
                 _ => Err(rpc_err(
                     1004,
@@ -4477,6 +4667,38 @@ async fn handle_request(
             .await;
             Ok(json!({ "report": summary }))
         }
+        "goalReports.getAsset" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let screenshot_id = params
+                .get("screenshotId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "screenshotId required", "INVALID_PARAMS"))?;
+            let offset = params.get("offset").and_then(|v| v.as_u64()).unwrap_or(0);
+            let length = params
+                .get("length")
+                .and_then(|v| v.as_u64())
+                .map(|n| n as usize);
+            let st = state.lock().await;
+            let chunk = crate::goal_reports::assets::read_asset_chunk(
+                st.db.data_dir(),
+                session_id,
+                execution_id,
+                screenshot_id,
+                offset,
+                length,
+            );
+            Ok(json!(chunk))
+        }
 
         method if method.starts_with("scheduled.") => {
             let st = state.lock().await;
@@ -5390,6 +5612,9 @@ async fn handle_request(
                         enable,
                         marketplace: None,
                         expected_shasum: None,
+                        expected_plugin_id: None,
+                        expected_version: None,
+                        expected_marketplace: None,
                         auto_update: false,
                         granted_permissions: granted,
                     },
@@ -5424,6 +5649,9 @@ async fn handle_request(
                         enable,
                         marketplace: None,
                         expected_shasum,
+                        expected_plugin_id: None,
+                        expected_version: None,
+                        expected_marketplace: None,
                         auto_update: false,
                         granted_permissions: granted,
                     },
@@ -5797,6 +6025,9 @@ async fn handle_request(
                 .get("grantedPermissions")
                 .cloned()
                 .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok());
+            let expected_marketplace = params.get("expectedMarketplace").cloned().and_then(|v| {
+                serde_json::from_value::<crate::plugins::ExpectedMarketplace>(v).ok()
+            });
             // An install outlives one request from the interface's point of
             // view: it resolves where the package is, downloads it from one
             // mirror after another, verifies it and registers it. Every one of
@@ -5820,6 +6051,7 @@ async fn handle_request(
                 enable,
                 auto_update,
                 granted,
+                expected_marketplace.as_ref(),
                 &mut observer,
             );
             // Whatever happened, nothing is cancellable any more: a token left

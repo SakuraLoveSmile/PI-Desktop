@@ -1628,7 +1628,7 @@ async function runAcceptance(state) {
   await waitFor(
     async () => {
       const current = await inspectUi(state);
-      return current.bar?.status === "approved" ? current : null;
+      return current.bar?.status === "approved" && current.modeValue === "agent" ? current : null;
     },
     "post-approval renderer approval surface cleared",
     state,
@@ -1666,6 +1666,61 @@ async function runAcceptance(state) {
     "approved Plan Markdown preview",
     state,
   );
+
+  // T1: verify file viewer geometry under container queries (400, 480, 481, >=960px)
+  const checkWidth = async (width) => {
+    return state.cdp.evaluate(`(() => {
+      const body = document.querySelector(".file-viewer-body");
+      const md = document.querySelector(".file-viewer-markdown");
+      if (!body || !md) return { found: false };
+      const originalWidth = body.style.width;
+      body.style.width = "${width}px";
+      const style = getComputedStyle(md);
+      const paddingTop = parseFloat(style.paddingTop);
+      const paddingLeft = parseFloat(style.paddingLeft);
+      const paddingRight = parseFloat(style.paddingRight);
+      const paddingBottom = parseFloat(style.paddingBottom);
+      const child = md.querySelector("h1, h2, p, ul, ol, table") || md.firstElementChild;
+      const childStyle = child ? getComputedStyle(child) : null;
+      const childMaxWidth = childStyle ? childStyle.maxWidth : null;
+      body.style.width = originalWidth;
+      return {
+        found: true,
+        paddingTop,
+        paddingLeft,
+        paddingRight,
+        paddingBottom,
+        childMaxWidth,
+      };
+    })()`);
+  };
+
+  const w400 = await checkWidth(400);
+  assert(w400.found, "file-viewer-markdown not found for 400px geometry");
+  assert(w400.paddingTop === 12 && w400.paddingLeft === 14 && w400.paddingBottom === 20,
+    `w400 padding mismatch: ${JSON.stringify(w400)}`);
+  assert(w400.childMaxWidth === "880px", `w400 max-width mismatch: ${w400.childMaxWidth}`);
+
+  const w480 = await checkWidth(480);
+  assert(w480.paddingTop === 12 && w480.paddingLeft === 14 && w480.paddingBottom === 20,
+    `w480 padding mismatch: ${JSON.stringify(w480)}`);
+
+  const w481 = await checkWidth(481);
+  assert(w481.paddingTop === 16 && w481.paddingLeft === 20 && w481.paddingBottom === 24,
+    `w481 padding mismatch: ${JSON.stringify(w481)}`);
+
+  const w1000 = await checkWidth(1000);
+  assert(w1000.paddingTop === 16 && w1000.paddingLeft === 20 && w1000.paddingBottom === 24,
+    `w1000 padding mismatch: ${JSON.stringify(w1000)}`);
+  assert(w1000.childMaxWidth === "880px", `w1000 max-width mismatch: ${w1000.childMaxWidth}`);
+
+  // Capture light and dark screenshots of the file preview
+  await captureScreenshot(state, "e2e-plan-markdown-preview-dark");
+  await state.cdp.evaluate(`document.documentElement.dataset.theme = "light"`);
+  await delay(150);
+  await captureScreenshot(state, "e2e-plan-markdown-preview-light");
+  await state.cdp.evaluate(`document.documentElement.dataset.theme = "dark"`);
+  await delay(150);
   await clickSelector(state, '[data-work-panel-tab-id="overview"] .work-panel-tab-button', "Overview tab");
   const overviewLabel = await state.cdp.evaluate(`document.querySelector('[data-work-panel-tab-id="overview"] .work-panel-tab-label')?.textContent?.trim()`);
   assert(overviewLabel === "概要", `Overview tab label is not localized: ${overviewLabel}`);

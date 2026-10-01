@@ -114,3 +114,24 @@ export function groupSidebarSessionsByTime(sessions: SessionSummary[], now = new
     return rows?.length ? [{ group, sessions: rows }] : [];
   });
 }
+
+/**
+ * The row a quick archive/restore should hand focus to.
+ *
+ * `renderedIds` is the rendered order with hidden rows already removed, so the
+ * result can never name a row that is no longer in the document. The acted-on
+ * row is skipped, and the walk only considers the given direction.
+ */
+export function nextVisibleSessionId(
+  renderedIds: readonly string[],
+  actedId: string,
+  direction: 1 | -1,
+): string | null {
+  const index = renderedIds.indexOf(actedId);
+  if (index === -1) return null;
+  for (let step = index + direction; step >= 0 && step < renderedIds.length; step += direction) {
+    const candidate = renderedIds[step];
+    if (candidate && candidate !== actedId) return candidate;
+  }
+  return null;
+}

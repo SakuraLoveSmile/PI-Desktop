@@ -75,6 +75,7 @@ export function MarketplaceSourceSettings({
               })
             }
             options={[
+              { id: "plus", label: t("settings.marketProviderPlus") },
               { id: "official", label: t("settings.marketProviderOfficial") },
               { id: "github", label: t("settings.marketProviderGithub") },
               { id: "mirror", label: t("settings.marketProviderMirror") },

@@ -41,7 +41,7 @@ fn install_market_package_and_check_update_metadata() {
         let search = mgr.market_search(Some("hello"), None).unwrap();
         assert!(!search.is_empty());
         let installed = mgr
-            .install_from_market("demo.hello", None, true, true, None)
+            .install_from_market("demo.hello", None, true, true, None, None)
             .unwrap();
         assert_eq!(installed.plugin.id, "demo.hello");
         assert!(installed.plugin.path.unwrap().contains("installed"));
@@ -144,7 +144,7 @@ fn marketplace_install_refreshes_catalog_before_checksum_verification() {
         }
 
         let installed = mgr
-            .install_from_market("demo.hello", None, true, false, None)
+            .install_from_market("demo.hello", None, true, false, None, None)
             .expect("install should use the refreshed checksum");
         assert_eq!(installed.plugin.id, "demo.hello");
         assert_eq!(installed.plugin.version, "0.2.0");
@@ -284,7 +284,7 @@ fn announced_version_without_a_package_is_visible_but_not_installable() {
             std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
         }
         let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        mgr.install_from_market("demo.hello", None, true, true, None)
+        mgr.install_from_market("demo.hello", None, true, true, None, None)
             .unwrap();
 
         // The publisher announced 0.9.0 but has not uploaded its package.
@@ -321,7 +321,7 @@ fn announced_version_without_a_package_is_visible_but_not_installable() {
         // The install seam refuses it, and a batch update skips it instead
         // of failing the whole run.
         let err = mgr
-            .market_download_info("demo.hello", Some("0.9.0"))
+            .market_download_info("demo.hello", Some("0.9.0"), None)
             .unwrap_err()
             .to_string();
         assert!(err.contains("PLUGIN_MARKET_INVALID"), "{err}");
@@ -341,7 +341,7 @@ fn silent_update_check_uses_cached_catalog_without_refreshing_remote() {
             std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
         }
         let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        mgr.install_from_market("demo.hello", None, true, false, None)
+        mgr.install_from_market("demo.hello", None, true, false, None, None)
             .unwrap();
 
         let mut cached = built_in_catalog_at(dir.path());
@@ -403,6 +403,9 @@ fn package_path_traversal_rejected() {
                 enable: true,
                 marketplace: None,
                 expected_shasum: None,
+                expected_plugin_id: None,
+                expected_version: None,
+                expected_marketplace: None,
                 auto_update: false,
                 granted_permissions: None,
             },
@@ -429,7 +432,7 @@ fn high_risk_permissions_roundtrip_on_notes_plugin() {
         }
         let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
         let installed = mgr
-            .install_from_market("demo.workspace-notes", None, true, false, None)
+            .install_from_market("demo.workspace-notes", None, true, false, None, None)
             .unwrap();
         assert!(installed
             .plugin
@@ -1067,6 +1070,9 @@ fn install_from_package_accepts_a_package_relative_theme_asset() {
                     enable: true,
                     marketplace: None,
                     expected_shasum: None,
+                    expected_plugin_id: None,
+                    expected_version: None,
+                    expected_marketplace: None,
                     auto_update: false,
                     granted_permissions: None,
                 },
@@ -1796,7 +1802,7 @@ fn a_yanked_version_is_never_offered_or_installed() {
         // An explicit pick of the withdrawn version is refused with its reason.
         let catalog = v2_catalog(entry);
         let err = mgr
-            .market_download_info_from_catalog(&catalog, "acme.todo", Some("1.1.0"))
+            .market_download_info_from_catalog(&catalog, "acme.todo", Some("1.1.0"), None)
             .unwrap_err()
             .to_string();
         assert!(err.contains("PLUGIN_MARKET_YANKED"), "{err}");
@@ -1804,7 +1810,7 @@ fn a_yanked_version_is_never_offered_or_installed() {
 
         // The live version still resolves, carrying its source pin.
         let info = mgr
-            .market_download_info_from_catalog(&catalog, "acme.todo", None)
+            .market_download_info_from_catalog(&catalog, "acme.todo", None, None)
             .unwrap();
         assert_eq!(info.version, "1.0.0");
         assert_eq!(info.publisher_id.as_deref(), Some("acme"));
@@ -1823,7 +1829,7 @@ fn a_version_requiring_a_newer_host_is_not_installable() {
         assert!(!mgr.to_market_summary(&entry).installable);
         let catalog = v2_catalog(entry.clone());
         let err = mgr
-            .market_download_info_from_catalog(&catalog, "acme.todo", None)
+            .market_download_info_from_catalog(&catalog, "acme.todo", None, None)
             .unwrap_err()
             .to_string();
         assert!(err.contains("PLUGIN_HOST_TOO_OLD"), "{err}");
@@ -2293,7 +2299,15 @@ fn an_install_reports_progress_and_honours_a_cancel() {
 
         let mut log = InstallLog::default();
         let installed = mgr
-            .install_from_market_observed("demo.workspace-notes", None, true, false, None, &mut log)
+            .install_from_market_observed(
+                "demo.workspace-notes",
+                None,
+                true,
+                false,
+                None,
+                None,
+                &mut log,
+            )
             .expect("the fixture package installs");
         assert_eq!(installed.plugin.id, "demo.workspace-notes");
         // The fixture catalog serves a local package, so resolution is skipped
@@ -2318,7 +2332,15 @@ fn an_install_reports_progress_and_honours_a_cancel() {
         // it is verified, written or registered.
         let mut cancelling = CancelAfterFirstReport { seen: 0 };
         let error = mgr
-            .install_from_market_observed("demo.hello", None, true, false, None, &mut cancelling)
+            .install_from_market_observed(
+                "demo.hello",
+                None,
+                true,
+                false,
+                None,
+                None,
+                &mut cancelling,
+            )
             .unwrap_err()
             .to_string();
         assert!(error.contains("PLUGIN_CANCELLED"), "{error}");
@@ -2347,4 +2369,137 @@ fn plugin_ui_meta_parses_the_floating_widget_placement() {
     assert!(panel.shape.is_none());
     assert!(panel.always_on_top.is_none());
     assert!(panel.resizable.is_none());
+}
+
+#[test]
+fn curated_channel_is_a_first_class_source_without_a_trust_tier() {
+    let _guard = lock_market_env();
+    // The curated URL must be the one under test, not an override.
+    unsafe {
+        std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
+    }
+
+    assert_eq!(
+        market_channel_from_settings(Some(&json!({"pluginMarketSource": "plus"}))).0,
+        MarketChannel::Plus
+    );
+    assert_eq!(MarketChannel::Plus.as_str(), "plus");
+    assert_eq!(
+        MarketChannel::Plus.catalog_url(),
+        Some(PLUS_CURATED_CHANNEL_CATALOG_URL)
+    );
+    assert!(PLUS_CURATED_CHANNEL_CATALOG_URL.starts_with("https://"));
+
+    let dir = tempdir().unwrap();
+    let mut mgr = offline_manager(dir.path());
+    mgr.set_market_channel(MarketChannel::Plus, None);
+    assert_eq!(mgr.market_source_url(), PLUS_CURATED_CHANNEL_CATALOG_URL);
+    // A curated catalog may describe its own review; it cannot promote itself.
+    assert_eq!(mgr.resolve_trust(&v2_entry()), "community");
+}
+
+#[test]
+fn curated_channel_pins_updates_to_its_own_reviewed_source() {
+    with_local_market(|| {
+        let dir = tempdir().unwrap();
+        unsafe {
+            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+        }
+
+        // A row installed from the curated channel is updated by that channel.
+        let mut init_catalog = built_in_catalog_at(dir.path());
+        init_catalog.plugins[0].versions[0].review = Some(MarketReview {
+            decision: Some("approved".into()),
+            policy_version: Some("plus-curated-v1".into()),
+            reviewed_at: Some("2026-10-01T00:00:00Z".into()),
+            risk: Some("low".into()),
+        });
+        let mut curated = PluginManager::new(dir.path(), MarketChannel::Plus, None);
+        fs::create_dir_all(curated.catalog_path().parent().unwrap()).unwrap();
+        fs::write(
+            curated.catalog_path(),
+            serde_json::to_string_pretty(&init_catalog).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            curated.market_cache_meta_path(),
+            serde_json::to_string(&json!({
+                "sourceUrl": curated.market_source_url(),
+                "fetchedAt": Utc::now().to_rfc3339()
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let pin = ExpectedMarketplace {
+            source: "plus".into(),
+            catalog_url: curated.market_source_url(),
+            version: init_catalog.plugins[0].versions[0].version.clone(),
+            shasum: init_catalog.plugins[0].versions[0].shasum.clone(),
+        };
+        curated
+            .install_from_market("demo.hello", None, true, false, None, Some(&pin))
+            .unwrap();
+        assert_eq!(
+            curated
+                .get("demo.hello")
+                .unwrap()
+                .marketplace
+                .as_ref()
+                .unwrap()
+                .provider_id,
+            "plus"
+        );
+        let mut catalog = built_in_catalog_at(dir.path());
+        catalog.plugins[0].versions[0].version = "0.9.0".into();
+        catalog.plugins[0].versions[0].review = Some(MarketReview {
+            decision: Some("approved".into()),
+            policy_version: Some("plus-curated-v1".into()),
+            reviewed_at: Some("2026-10-01T00:00:00Z".into()),
+            risk: Some("low".into()),
+        });
+        fs::write(
+            curated.catalog_path(),
+            serde_json::to_string_pretty(&catalog).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(curated.check_updates(false).unwrap().len(), 1);
+
+        // Switching source must not offer another source's bytes for it.
+        curated.set_market_channel(MarketChannel::Mirror, None);
+        assert!(curated.check_updates(false).unwrap().is_empty());
+        assert!(curated
+            .get("demo.hello")
+            .unwrap()
+            .update_available
+            .is_none());
+
+        // The curated catalog does not adopt a row installed elsewhere either.
+        let other = tempdir().unwrap();
+        unsafe {
+            std::env::set_var("PI_DESKTOP_DATA_DIR", other.path());
+        }
+        let mut upstream = PluginManager::new(other.path(), MarketChannel::Official, None);
+        upstream
+            .install_from_market("demo.hello", None, true, false, None, None)
+            .unwrap();
+        upstream.set_market_channel(MarketChannel::Plus, None);
+        fs::create_dir_all(upstream.catalog_path().parent().unwrap()).unwrap();
+        let mut plus_catalog = built_in_catalog_at(other.path());
+        plus_catalog.plugins[0].versions[0].version = "0.9.0".into();
+        fs::write(
+            upstream.catalog_path(),
+            serde_json::to_string_pretty(&plus_catalog).unwrap(),
+        )
+        .unwrap();
+        assert!(upstream.check_updates(false).unwrap().is_empty());
+        assert!(upstream
+            .get("demo.hello")
+            .unwrap()
+            .update_available
+            .is_none());
+
+        unsafe {
+            std::env::remove_var("PI_DESKTOP_DATA_DIR");
+        }
+    });
 }
