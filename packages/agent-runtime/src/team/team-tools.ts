@@ -59,6 +59,18 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
               }),
             ),
             memberSessionId: Type.Optional(Type.String({ description: "Existing member session ID to reuse." })),
+            presentation: Type.Optional(
+              Type.Object({
+                role: Type.Union([
+                  Type.Literal("researcher"),
+                  Type.Literal("executor"),
+                  Type.Literal("reviewer"),
+                  Type.Literal("planner"),
+                  Type.Literal("collaborator"),
+                ]),
+                displayName: Type.String({ minLength: 1, maxLength: 64 }),
+              }),
+            ),
             selection: Type.Optional(
               Type.Object({
                 providerId: Type.Optional(Type.String()),

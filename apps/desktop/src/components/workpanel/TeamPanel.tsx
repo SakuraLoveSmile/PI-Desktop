@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
-  TeamExecutionDecision,
-  TeamLaunchReview,
   TeamMemberRecord,
+  TeamSnapshot,
   TeamTaskRecord,
   UiMessage,
 } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
+import { getPanoramaViewport, savePanoramaViewport } from "../../lib/panorama-memory";
+import type { PanoramaViewport } from "./agent-panorama-viewport";
+import { useTeamSnapshot } from "../../hooks/useTeamSnapshot";
+import {
+  buildTeamTaskRows,
+  deriveTeamLeadVisualState,
+  projectMemberIdentities,
+  selectOverviewTaskRows,
+  type BoardFilter,
+  type MemberView,
+} from "../../lib/team-presentation";
 import { TeamLaunchReviewPanel } from "./TeamLaunchReviewPanel";
 import {
   IconChevronLeft,
@@ -23,126 +33,110 @@ import { ToolRow } from "../../features/chat/transcript/ToolRow";
 import { Markdown } from "../Markdown";
 import { AssistantErrorMessage } from "../../features/chat/transcript/shared";
 import { ReviewChangeCard } from "../ReviewChangeCard";
+import { CompactTeamBoard } from "./team/CompactTeamBoard";
+import { TeamStatusBadge } from "./team/TeamStatusBadge";
+import { MemberIdentity, TeamTaskProgress } from "./team/TeamTaskProgress";
 import "../../styles/team-panel.css";
-import { AgentPanorama, type PanoramaNode, type PanoramaNodeStatus } from "./AgentPanorama";
+import { AgentPanorama, type PanoramaNode } from "./AgentPanorama";
 
-type TeamRosterSnapshot = {
-  teamSessionId: string;
-  revision: number;
-  paused: boolean;
-  members: TeamMemberRecord[];
-};
-
-type TeamTaskReadiness = {
-  taskId: string;
-  isReady: boolean;
-  unresolvedBlockedBy: string[];
-};
-
-type TeamScopeOverlap = { scope: string; taskIds: string[] };
-
-type TeamBoardSnapshot = {
-  teamSessionId: string;
-  revision: number;
-  tasks: TeamTaskRecord[];
-  readiness: TeamTaskReadiness[];
-  scopeOverlaps: TeamScopeOverlap[];
-};
-
-type TeamPanelSnapshot = {
-  roster: TeamRosterSnapshot;
-  board: TeamBoardSnapshot;
-  review?: TeamLaunchReview | null;
-  decision?: TeamExecutionDecision | null;
-};
 type TeamDetailView =
   | { kind: "aggregate" }
+  | { kind: "board" }
   | { kind: "member"; memberSessionId: string }
   | { kind: "task"; taskId: string }
   | { kind: "panorama" };
+type TeamTaskReadiness = TeamSnapshot["readiness"][number];
+
+function requestedView(initialTaskId?: string, initialView: TeamPanelProps["initialView"] = "aggregate"): TeamDetailView {
+  if (initialTaskId) return { kind: "task", taskId: initialTaskId };
+  if (initialView === "task") return { kind: "aggregate" };
+  return { kind: initialView ?? "aggregate" };
+}
 
 export type TeamPanelProps = {
   teamSessionId: string;
   onSelectSession?: (sessionId: string) => void;
+  initialTaskId?: string;
+  navigationSeq?: number;
+  initialView?: "aggregate" | "board" | "task" | "panorama";
 };
 
-export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
+export function TeamPanel({
+  teamSessionId,
+  onSelectSession,
+  initialTaskId,
+  navigationSeq,
+  initialView = "aggregate",
+}: TeamPanelProps) {
   const { t } = useTranslation();
-  const [snapshot, setSnapshot] = useState<TeamPanelSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { snapshot, loading, error: snapshotError, refresh, lastSuccessAt } = useTeamSnapshot(teamSessionId);
+  const error = snapshotError && ["TEAM_DISSOLVED", "TEAM_SCOPE_MISMATCH"].includes(snapshotError)
+    ? t(`team.snapshotErrors.${snapshotError}`) : snapshotError;
   const [resuming, setResuming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<TeamDetailView>({ kind: "aggregate" });
-  const requestSequenceRef = useRef(0);
+  const [view, setView] = useState<TeamDetailView>(() => requestedView(initialTaskId, initialView));
+  const [viewStack, setViewStack] = useState<TeamDetailView[]>([]);
+  const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
+  const [boardQuery, setBoardQuery] = useState("");
+  const [progressExpanded, setProgressExpanded] = useState(true);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+  const boardScrollTopRef = useRef(0);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const panoramaScopeKey = `team:desktop:${teamSessionId}`;
+  const [savedViewport, setSavedViewport] = useState<PanoramaViewport | undefined>(() =>
+    getPanoramaViewport(panoramaScopeKey),
+  );
 
-  const loadData = useCallback(async () => {
-    if (!teamSessionId) return;
-    const requestId = ++requestSequenceRef.current;
-    try {
-      const [roster, board, reviewRes] = await Promise.all([
-        api.getTeamRoster(teamSessionId) as unknown as Promise<TeamRosterSnapshot>,
-        api.getTeamBoard(teamSessionId) as unknown as Promise<TeamBoardSnapshot>,
-        api.getTeamLaunchReview(teamSessionId),
-      ]);
-      const review = reviewRes?.review ?? null;
-      const decRes = await api.getTeamExecutionDecision(teamSessionId);
-      const decision: TeamExecutionDecision | null = decRes?.decision ?? null;
-      // complete pair from the current team and revision.
-      if (
-        requestId !== requestSequenceRef.current ||
-        roster.teamSessionId !== teamSessionId ||
-        board.teamSessionId !== teamSessionId
-      ) return;
-      if (roster.revision !== board.revision) {
-        throw new Error(t("team.snapshotChanged"));
-      }
-      setError(null);
-      setSnapshot({ roster, board, review, decision });
-    } catch (err) {
-      if (requestId === requestSequenceRef.current) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      if (requestId === requestSequenceRef.current) setLoading(false);
-    }
-  }, [t, teamSessionId]);
+  const loadData = useCallback(() => refresh(), [refresh]);
+  const handleViewportSave = useCallback((scopeKey: string, viewport: PanoramaViewport) => {
+    savePanoramaViewport(scopeKey, viewport);
+    if (scopeKey === panoramaScopeKey) setSavedViewport(viewport);
+  }, [panoramaScopeKey]);
+  const navigate = useCallback((next: TeamDetailView) => {
+    setViewStack((stack) => [...stack, view]);
+    setView(next);
+  }, [view]);
+  const goBack = useCallback(() => {
+    const next = viewStack.at(-1);
+    setViewStack(viewStack.slice(0, -1));
+    setView(next ?? { kind: "aggregate" });
+  }, [viewStack]);
 
   useEffect(() => {
-    setLoading(true);
     setResuming(false);
-    setSnapshot(null);
-    setError(null);
-    setView({ kind: "aggregate" });
-    void loadData();
-    const timer = setInterval(() => void loadData(), 3000);
-    return () => {
-      requestSequenceRef.current += 1;
-      clearInterval(timer);
-    };
-  }, [loadData]);
+    setViewStack([]);
+    setBoardFilter("all");
+    setBoardQuery("");
+    setProgressExpanded(true);
+    setActionError(null);
+    boardScrollTopRef.current = 0;
+    setView(requestedView(initialTaskId, initialView));
+  }, [initialTaskId, initialView, teamSessionId, navigationSeq]);
+
+  useEffect(() => {
+    setSavedViewport(getPanoramaViewport(panoramaScopeKey));
+  }, [panoramaScopeKey]);
+
+  useEffect(() => {
+    if (view.kind === "board" && boardScrollRef.current) {
+      boardScrollRef.current.scrollTop = boardScrollTopRef.current;
+    }
+  }, [view]);
 
   const handleResume = async () => {
     if (!teamSessionId || resuming) return;
-    const requestId = ++requestSequenceRef.current;
-    let resumed = false;
     setResuming(true);
     try {
       await api.teamResume(teamSessionId);
-      if (requestId === requestSequenceRef.current) {
-        resumed = true;
-        setResuming(false);
-        await loadData();
-      }
+      setActionError(null);
+      await loadData();
     } catch (err) {
-      if (requestId === requestSequenceRef.current) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
+      setActionError(err instanceof Error ? err.message : String(err));
     } finally {
-      if (!resumed && requestId === requestSequenceRef.current) setResuming(false);
+      setResuming(false);
     }
   };
 
-  if (snapshot && snapshot.roster.teamSessionId !== teamSessionId) {
+  if (snapshot && snapshot.teamSessionId !== teamSessionId) {
     return (
       <div className="team-panel">
         <div className="team-loading-state">
@@ -176,42 +170,50 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
     );
   }
 
-  const roster = snapshot?.roster.members ?? [];
-  const tasks = snapshot?.board.tasks.filter((task) => !task.deleted) ?? [];
-  const readiness = new Map((snapshot?.board.readiness ?? []).map((item) => [item.taskId, item]));
-  const overlaps = snapshot?.board.scopeOverlaps ?? [];
-  const isPaused = snapshot?.roster.paused ?? false;
+  const roster = snapshot?.members ?? [];
+  const tasks = snapshot?.tasks.filter((task) => !task.deleted) ?? [];
+  const readiness = new Map((snapshot?.readiness ?? []).map((item) => [item.taskId, item]));
+  const overlaps = snapshot?.scopeOverlaps ?? [];
+  const isPaused = snapshot?.paused ?? false;
+  const memberIdentities = projectMemberIdentities(roster, isPaused);
+  const identityBySession = new Map(memberIdentities.map((identity) => [identity.sessionId, identity]));
+  const taskRows = buildTeamTaskRows(tasks, roster, snapshot?.readiness ?? [], isPaused);
+  const overviewRows = selectOverviewTaskRows(taskRows);
+  const completedCount = tasks.filter((task) => task.status === "completed").length;
 
   if (view.kind === "panorama" && snapshot) {
+    const leadState = deriveTeamLeadVisualState(
+      snapshot.leadPhase,
+      isPaused,
+      roster,
+      tasks,
+      snapshot.queuedMessageCount,
+    );
     const rootNode: PanoramaNode = {
-      id: snapshot.roster.teamSessionId,
+      id: snapshot.teamSessionId,
       name: t("team.lead"),
-      task: t("team.membersCount", { count: roster.length }),
-      status: isPaused ? "paused" : "running",
+      task: t("team.coordinatingExperts"),
+      status: leadState.status,
+      statusLabel: leadState.waitingForMembers ? t("team.waitingForMembers") : undefined,
+      avatarSeed: snapshot.teamSessionId,
+      isLead: true,
       avatarIcon: "users",
       isRoot: true,
     };
 
-    const childNodes: PanoramaNode[] = roster.map((member) => {
+    const identities = projectMemberIdentities(roster, isPaused);
+    const childNodes: PanoramaNode[] = roster.map((member, index) => {
       const memberTasks = tasks.filter((t) => t.ownerSessionId === member.memberSessionId);
       const activeTask = memberTasks.find((t) => t.status === "in_progress") ?? memberTasks[0];
-      const taskLabel = activeTask ? activeTask.subject : (member.description || undefined);
-
-      let status: PanoramaNodeStatus = "idle";
-      if (member.phase === "running" || activeTask?.status === "in_progress") {
-        status = "running";
-      } else if (member.phase === "completed" || (memberTasks.length > 0 && memberTasks.every((t) => t.status === "completed"))) {
-        status = "completed";
-      } else if (member.phase === "failed" || activeTask?.status === "failed") {
-        status = "failed";
-      } else if (isPaused) {
-        status = "paused";
-      }
+      const identity = identities[index];
+      const status = isPaused ? "paused" : member.phase === "provisioning" ? "idle" : member.phase;
 
       return {
         id: member.memberSessionId,
-        name: member.name,
-        task: taskLabel,
+        name: identity.displayName,
+        roleLabel: t(`team.roles.${identity.role}`),
+        avatarSeed: member.memberSessionId,
+        task: activeTask?.subject ?? member.description ?? t("team.noCurrentTask"),
         status,
         contextKind: member.contextKind,
         avatarIcon: "bot",
@@ -223,12 +225,16 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
         title={t("team.panoramaTitle")}
         rootNode={rootNode}
         childNodes={childNodes}
-        onBack={() => setView({ kind: "aggregate" })}
-        onSelectNode={(memberSessionId) => setView({ kind: "member", memberSessionId })}
+        onBack={goBack}
+        onSelectNode={(memberSessionId) => navigate({ kind: "member", memberSessionId })}
         emptyMessage={t("team.emptyRoster")}
-        loading={loading}
-        error={error}
+        loading={loading && !snapshot}
+        error={snapshot ? null : error}
+        staleError={snapshot ? error : null}
         onRetry={() => void loadData()}
+        viewportScopeKey={panoramaScopeKey}
+        savedViewport={savedViewport}
+        onViewportSave={handleViewportSave}
       />
     );
   }
@@ -238,11 +244,12 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
       return (
         <TeamMemberDetail
           member={selectedMember}
+          identity={identityBySession.get(selectedMember.memberSessionId)!}
           tasks={tasks}
           readiness={readiness}
-          onBack={() => setView({ kind: "aggregate" })}
+          onBack={goBack}
           onSelectSession={onSelectSession}
-          onSelectTask={(taskId) => setView({ kind: "task", taskId })}
+          onSelectTask={(taskId) => navigate({ kind: "task", taskId })}
         />
       );
     }
@@ -256,22 +263,89 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
           task={selectedTask}
           taskReadiness={readiness.get(selectedTask.taskId)}
           members={roster}
-          onBack={() => setView({ kind: "aggregate" })}
-          onSelectMember={(memberSessionId) => setView({ kind: "member", memberSessionId })}
+          identities={identityBySession}
+          overlaps={overlaps}
+          onBack={goBack}
+          onSelectMember={(memberSessionId) => navigate({ kind: "member", memberSessionId })}
         />
       );
     }
   }
 
+  if (view.kind === "board") {
+    return (
+      <div className="team-panel team-board-view" data-testid="team-task-board">
+        <header className="team-panel-header">
+          <div className="team-detail-back-row">
+            <Button type="button" size="sm" variant="ghost" onClick={goBack} className="team-back-btn">
+              <IconChevronLeft size={16} />
+              <span>{t("team.back")}</span>
+            </Button>
+            <span className="team-detail-title-tag">{t("team.board")}</span>
+            <span className="team-section-count">{tasks.length}</span>
+          </div>
+          <div className="team-panel-actions">
+            <TooltipButton
+              type="button"
+              className="icon-btn icon-btn-square"
+              tooltip={t("team.refresh")}
+              ariaLabel={t("team.refresh")}
+              onClick={() => void loadData()}
+            >
+              <IconRefresh size={14} />
+            </TooltipButton>
+          </div>
+        </header>
+        {error ? (
+          <div className="team-error-state" role="alert">
+            <IconCircleAlert size={18} />
+            <span>{t("team.staleData")}</span>
+            <Button type="button" size="sm" onClick={() => void loadData()}>{t("team.retry")}</Button>
+          </div>
+        ) : null}
+        {overlaps.length > 0 ? (
+          <aside className="team-warning-box" aria-label={t("team.warnings")}>
+            <div className="team-warning-title">
+              <IconTriangleAlert size={14} />
+              <span>{t("team.scopeOverlapCount", { count: overlaps.length })}</span>
+            </div>
+            {overlaps[0]?.taskIds[0] ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => navigate({ kind: "task", taskId: overlaps[0]!.taskIds[0]! })}
+              >
+                {t("team.openOverlapTask")}
+              </Button>
+            ) : null}
+          </aside>
+        ) : null}
+        <div
+          ref={boardScrollRef}
+          className="team-board-scroll"
+          onScroll={(event) => { boardScrollTopRef.current = event.currentTarget.scrollTop; }}
+        >
+          <CompactTeamBoard
+            rows={taskRows}
+            filter={boardFilter}
+            query={boardQuery}
+            onFilter={setBoardFilter}
+            onQuery={setBoardQuery}
+            onOpenTask={(taskId) => navigate({ kind: "task", taskId })}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="team-panel" data-testid="team-panel">
+    <div className="team-panel" data-testid="team-panel" data-last-success-at={lastSuccessAt ?? undefined}>
       <header className="team-panel-header">
         <div className="team-panel-title">
           <IconUsers size={18} />
           <span>{t("team.title")}</span>
-          <span className={`team-status-badge ${isPaused ? "team-status-paused" : "team-status-active"}`}>
-            {isPaused ? t("team.pausedBadge") : t("team.activeBadge")}
-          </span>
+          <TeamStatusBadge snapshot={snapshot} />
         </div>
         <div className="team-panel-actions">
           {isPaused && (
@@ -290,7 +364,7 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
             className="icon-btn icon-btn-square"
             tooltip={t("team.viewPanorama")}
             ariaLabel={t("team.viewPanorama")}
-            onClick={() => setView({ kind: "panorama" })}
+            onClick={() => navigate({ kind: "panorama" })}
           >
             <IconWorkflow size={14} />
           </TooltipButton>
@@ -310,16 +384,18 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
         <aside className="team-warning-box" aria-label={t("team.warnings")}>
           <div className="team-warning-title">
             <IconTriangleAlert size={14} />
-            <span>{t("team.warnings")}</span>
+            <span>{t("team.scopeOverlapCount", { count: overlaps.length })}</span>
           </div>
-          {overlaps.map((overlap) => (
-            <div key={`${overlap.scope}-${overlap.taskIds.join("-")}`} className="team-warning-item">
-              {t("team.overlapTask", {
-                tasks: overlap.taskIds.map((id) => `#${id}`).join(", "),
-                scope: overlap.scope,
-              })}
-            </div>
-          ))}
+          {overlaps[0]?.taskIds[0] ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => navigate({ kind: "task", taskId: overlaps[0]!.taskIds[0]! })}
+            >
+              {t("team.openOverlapTask")}
+            </Button>
+          ) : null}
         </aside>
       )}
       {snapshot?.review && (
@@ -344,12 +420,18 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
       {error && (
         <div className="team-error-state" role="alert">
           <IconCircleAlert size={18} />
-          <span>{error}</span>
+          <span>{snapshot ? t("team.staleData") : error}</span>
           <Button type="button" size="sm" onClick={() => void loadData()}>
             {t("team.retry")}
           </Button>
         </div>
       )}
+      {actionError ? (
+        <div className="team-error-state" role="alert">
+          <IconCircleAlert size={18} />
+          <span>{actionError}</span>
+        </div>
+      ) : null}
 
       <section className="team-section">
         <div className="team-section-header">
@@ -363,19 +445,17 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
             {roster.map((member) => (
               <div
                 key={member.memberSessionId}
-                className="team-member-card team-clickable-card"
-                onClick={() => setView({ kind: "member", memberSessionId: member.memberSessionId })}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setView({ kind: "member", memberSessionId: member.memberSessionId });
-                  }
-                }}
+                className="team-member-card"
               >
                 <div className="team-card-top">
-                  <span className="team-card-title">{member.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="team-member-open-detail"
+                    onClick={() => navigate({ kind: "member", memberSessionId: member.memberSessionId })}
+                  >
+                    <MemberIdentity member={identityBySession.get(member.memberSessionId)!} />
+                  </Button>
                   <div className="team-card-meta">
                     <span className="team-badge team-badge-context">
                       {t(`team.context.${member.contextKind}`)}
@@ -385,7 +465,6 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
                     </span>
                   </div>
                 </div>
-                {member.description ? <div className="team-card-desc">{member.description}</div> : null}
                 {member.error ? <div className="team-card-error">{member.error}</div> : null}
                 <div className="team-card-footer">
                   <div className="team-card-details">
@@ -395,10 +474,7 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
                     <Button
                       type="button"
                       size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectSession(member.memberSessionId);
-                      }}
+                      onClick={() => onSelectSession(member.memberSessionId)}
                     >
                       {t("team.openSession")}
                     </Button>
@@ -410,77 +486,23 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
         )}
       </section>
 
-      <section className="team-section">
-        <div className="team-section-header">
-          <span>{t("team.board")}</span>
-          <span className="team-section-count">{tasks.length}</span>
-        </div>
-        {tasks.length === 0 ? (
-          <div className="team-empty-state">{t("team.emptyTasks")}</div>
-        ) : (
-          <div className="team-card-list">
-            {tasks.map((task) => {
-              const taskReadiness = readiness.get(task.taskId);
-              return (
-                <div
-                  key={task.taskId}
-                  className="team-task-card team-clickable-card"
-                  onClick={() => setView({ kind: "task", taskId: task.taskId })}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setView({ kind: "task", taskId: task.taskId });
-                    }
-                  }}
-                >
-                  <div className="team-card-top">
-                    <span className="team-card-title">{task.subject}</span>
-                    <div className="team-card-meta">
-                      <span className={`team-badge team-task-status-${task.status}`}>
-                        {t(`team.taskStatus.${task.status}`)}
-                      </span>
-                      {taskReadiness ? (
-                        <span
-                          className={`team-badge team-task-readiness-${taskReadiness.isReady ? "ready" : "blocked"}`}
-                          data-readiness={taskReadiness.isReady ? "ready" : "blocked"}
-                        >
-                          {t(`team.readiness.${taskReadiness.isReady ? "ready" : "blocked"}`)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  {task.description ? <div className="team-card-desc">{task.description}</div> : null}
-                  <div className="team-card-footer">
-                    <div className="team-card-details">
-                      <span>{task.ownerMemberName ?? t("team.unassigned")}</span>
-                      {task.blockedBy.length > 0 ? (
-                        <span>
-                          {t("team.blockedBy", {
-                            tasks: task.blockedBy.map((id) => `#${id}`).join(", "),
-                          })}
-                        </span>
-                      ) : null}
-                      {task.writeScopes.length > 0 ? (
-                        <span>
-                          {t("team.scopes", { scopes: task.writeScopes.join(", ") })}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+      <TeamTaskProgress
+        rows={overviewRows}
+        completed={completedCount}
+        total={tasks.length}
+        expanded={progressExpanded}
+        onToggle={() => setProgressExpanded((expanded) => !expanded)}
+        onOpenTask={(taskId) => navigate({ kind: "task", taskId })}
+        onOpenPanorama={() => navigate({ kind: "panorama" })}
+        onOpenBoard={() => navigate({ kind: "board" })}
+      />
     </div>
   );
 }
 
 function TeamMemberDetail({
   member,
+  identity,
   tasks,
   readiness,
   onBack,
@@ -488,6 +510,7 @@ function TeamMemberDetail({
   onSelectTask,
 }: {
   member: TeamMemberRecord;
+  identity: MemberView;
   tasks: TeamTaskRecord[];
   readiness: Map<string, TeamTaskReadiness>;
   onBack: () => void;
@@ -554,7 +577,10 @@ function TeamMemberDetail({
 
       <section className="team-member-profile">
         <div className="team-card-top">
-          <span className="team-card-title team-detail-name">{member.name}</span>
+          <span className="team-card-title team-detail-name">
+            <MemberIdentity member={identity} />
+            <code className="team-member-handle">{member.name}</code>
+          </span>
           <div className="team-card-meta">
             <span className="team-badge team-badge-context">
               {t(`team.context.${member.contextKind}`)}
@@ -589,18 +615,12 @@ function TeamMemberDetail({
             {assignedTasks.map((task) => {
               const taskReadiness = readiness.get(task.taskId);
               return (
-                <div
+                <Button
+                  type="button"
+                  variant="ghost"
                   key={task.taskId}
                   className="team-task-card team-clickable-card"
                   onClick={() => onSelectTask(task.taskId)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectTask(task.taskId);
-                    }
-                  }}
                 >
                   <div className="team-card-top">
                     <span className="team-card-title">{task.subject}</span>
@@ -608,17 +628,17 @@ function TeamMemberDetail({
                       <span className={`team-badge team-task-status-${task.status}`}>
                         {t(`team.taskStatus.${task.status}`)}
                       </span>
-                      {taskReadiness ? (
+                      {task.status === "pending" && taskReadiness ? (
                         <span
-                          className={`team-badge team-task-readiness-${taskReadiness.isReady ? "ready" : "blocked"}`}
-                          data-readiness={taskReadiness.isReady ? "ready" : "blocked"}
+                          className={`team-badge team-task-readiness-${taskReadiness.unresolvedBlockedBy.length > 0 ? "blocked" : "ready"}`}
+                          data-readiness={taskReadiness.unresolvedBlockedBy.length > 0 ? "blocked" : "ready"}
                         >
-                          {t(`team.readiness.${taskReadiness.isReady ? "ready" : "blocked"}`)}
+                          {t(`team.readiness.${taskReadiness.unresolvedBlockedBy.length > 0 ? "blocked" : "ready"}`)}
                         </span>
                       ) : null}
                     </div>
                   </div>
-                </div>
+                </Button>
               );
             })}
           </div>
@@ -713,12 +733,16 @@ function TeamTaskDetail({
   task,
   taskReadiness,
   members,
+  identities,
+  overlaps,
   onBack,
   onSelectMember,
 }: {
   task: TeamTaskRecord;
   taskReadiness?: TeamTaskReadiness;
   members: TeamMemberRecord[];
+  identities: Map<string, MemberView>;
+  overlaps: TeamSnapshot["scopeOverlaps"];
   onBack: () => void;
   onSelectMember: (memberSessionId: string) => void;
 }) {
@@ -728,6 +752,7 @@ function TeamTaskDetail({
       (task.ownerSessionId && m.memberSessionId === task.ownerSessionId) ||
       (task.ownerMemberName && m.name === task.ownerMemberName),
   );
+  const taskOverlaps = overlaps.filter((overlap) => overlap.taskIds.includes(task.taskId));
 
   return (
     <div className="team-panel team-detail-view" data-testid="team-task-detail">
@@ -754,12 +779,12 @@ function TeamTaskDetail({
             <span className={`team-badge team-task-status-${task.status}`}>
               {t(`team.taskStatus.${task.status}`)}
             </span>
-            {taskReadiness ? (
+            {task.status === "pending" && taskReadiness ? (
               <span
-                className={`team-badge team-task-readiness-${taskReadiness.isReady ? "ready" : "blocked"}`}
-                data-readiness={taskReadiness.isReady ? "ready" : "blocked"}
+                className={`team-badge team-task-readiness-${taskReadiness.unresolvedBlockedBy.length > 0 ? "blocked" : "ready"}`}
+                data-readiness={taskReadiness.unresolvedBlockedBy.length > 0 ? "blocked" : "ready"}
               >
-                {t(`team.readiness.${taskReadiness.isReady ? "ready" : "blocked"}`)}
+                {t(`team.readiness.${taskReadiness.unresolvedBlockedBy.length > 0 ? "blocked" : "ready"}`)}
               </span>
             ) : null}
           </div>
@@ -780,7 +805,9 @@ function TeamTaskDetail({
               onClick={() => onSelectMember(ownerMember.memberSessionId)}
               className="team-owner-btn"
             >
-              {ownerMember.name}
+              {identities.get(ownerMember.memberSessionId) ? (
+                <MemberIdentity member={identities.get(ownerMember.memberSessionId)!} />
+              ) : ownerMember.name}
             </Button>
           ) : (
             <span className="team-detail-field-value">
@@ -808,6 +835,17 @@ function TeamTaskDetail({
             </span>
           </div>
         ) : null}
+        {taskOverlaps.map((overlap) => (
+          <div key={`${overlap.scope}-${overlap.taskIds.join("-")}`} className="team-detail-field">
+            <span className="team-detail-field-label">{t("team.warnings")}</span>
+            <span className="team-detail-field-value">
+              {t("team.overlapTask", {
+                tasks: overlap.taskIds.map((id) => `#${id}`).join(", "),
+                scope: overlap.scope,
+              })}
+            </span>
+          </div>
+        ))}
       </section>
     </div>
   );

@@ -86,8 +86,9 @@ ledger to team peers:
 
 8. **Tool Catalog Isolation**:
    In Team turns, standard `Task*` subagent tools and plugin `SessionTask` are
-   hidden. Instead, nine specialized team tools (`spawn_teammate`, `send_message`,
-   `task_create`, `task_update`, `task_list`, etc.) are provided.
+   hidden. The dispatch tools are defined by `TEAM_TOOL_NAMES`; the Lead-only
+   `declare_team_strategy` is defined separately in `TEAM_LEAD_TOOL_NAMES`.
+   These catalogs, not a numeric count, define which Team tools are available.
 
 ## Consequences
 
@@ -107,8 +108,11 @@ The Team Lead declares a strategy using its current Host-owned turn identity.
 A delegation proposal creates a pending review only. Trusted Desktop review
 operations select provider/model/thinking bindings and atomically confirm the
 batch before new expert sessions, execution assignments or work messages can
-be admitted. The nine existing Team tools remain available, but their Host
-entry points reject unapproved work with `TEAM_APPROVAL_REQUIRED`.
+be admitted. The dispatch catalog remains `TEAM_TOOL_NAMES`, while the
+Lead-only `declare_team_strategy` is represented separately in
+`TEAM_LEAD_TOOL_NAMES`. These symbols, rather than a numeric tool count, define
+the current boundary. Host mutation entry points reject unapproved work with
+`TEAM_APPROVAL_REQUIRED`.
 
 Review revision checks apply on the Host, including retries. Confirmation
 persists the selected effective bindings, approved member identities and one
@@ -117,3 +121,74 @@ pre-upgrade durable mailbox entries keep their original recovery semantics.
 The sidecar proxy exposes declaration and reads, never the trusted UI's review
 update/confirm/cancel operations. No process ownership, database schema or
 Plugin SDK contract changes are introduced.
+
+## Presentation and live-snapshot amendment (2026-10-02)
+
+This amendment records the additive contracts used by the Expert Team UX
+repair. Implementation and integrated acceptance remain in progress; this
+entry does not claim that the current worktree has passed its required gates.
+
+### Presentation metadata follows review-before-dispatch
+
+The immutable `TeamMember.name` remains the Host routing and messaging handle.
+Optional `{ role, displayName }` presentation belongs to a proposed member on
+`declare_team_strategy`, then to the serialized `TeamLaunchReviewMember`. It is
+plain display data and grants no execution capability. The review screen keeps
+it while provider/model/thinking choices are edited. No member session, task
+assignment, or mailbox work is created before confirmation. Confirmation
+persists presentation in the existing KV namespace
+`team-member-presentation-v1`, keyed by member session ID, in the same Host
+transaction as approved creation/review state. Missing presentation on an old
+review remains valid. This adds no SQLite schema migration and does not add a
+presentation argument to `spawn_teammate`.
+
+Legacy handles remain immutable and receive a deterministic renderer display
+projection. Unknown handles use the collaborator role; recognized historical
+scout handles use stable roster-order aliases. Portrait selection hashes the
+durable member Session ID, so refreshes do not change identity.
+
+### Shared read view and notification
+
+The additive `team.getSnapshot` read returns one flat `TeamSnapshot`: Team ID
+and revision, pause state, members with optional presentation, tasks,
+readiness, scope overlaps, real Lead phase, queued Team-mail count, current
+launch review, and latest execution decision. Keeping review and decision in
+this response lets Overview, the Team panel, and the approval surface share one
+revisioned reader without removing the existing review mutation APIs. Existing
+roster and board reads remain for compatibility.
+
+Committed Team mutations publish `team.changed` with Team ID, revision, and a
+bounded reason. Main forwards the notification through the existing Desktop
+event path. It contains no prompt or transcript content. The local Desktop
+renderer owns a scoped reader for visible Team surfaces; remote/native sessions
+retain their existing source projections and are not routed through local Team
+IPC. Lower revisions cannot replace newer state. A failed read keeps the last
+good snapshot visibly stale and exposes Retry.
+
+`SessionSummary.team` is a Host-derived relation used to group durable member
+sessions beneath their Lead. Grouping changes presentation only: member IDs,
+transcripts, pin/archive semantics, and individual actions remain intact.
+
+### Activity remains Host-owned
+
+Member phase follows successful turn admission and durable turn settlement,
+atomically with turn state. Aborted/interrupted work returns to idle; a failed
+turn becomes failed; successful settlement completes only the member turn and
+does not complete its tasks. Task readiness remains separate. A late settlement
+cannot overwrite a newer running turn. Lead activity comes from the Lead's
+actual turn projection; task status and pause state do not fabricate a running
+Lead. Unclaimed Team mail prevents a settled Lead from being presented as a
+fully completed collaboration.
+
+Team row creation/configuration is part of the session transaction. Restricted
+legacy bootstrap respects a durable KV dissolution marker, preventing a read
+from recreating removed Team state. Lead deletion checks Plan/Goal gates first,
+then commits Team cleanup and session deletion together before removing files.
+A Lead holding durable Team data cannot switch to the standard profile;
+an empty Team may convert atomically. These repairs preserve member sessions
+and require no database schema change.
+
+The process model, permission ceilings, Team/standard Task tool isolation,
+session persistence ownership, and Plugin SDK contract do not change. The
+additions are local-Host projections and renderer presentation over existing
+Host-owned sessions, KV metadata, and Team tables.

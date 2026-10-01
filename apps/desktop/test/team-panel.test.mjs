@@ -47,22 +47,20 @@ test("work-panel-tabs supports team tab kind", () => {
   assert.ok(isKnownWorkPanelTab(tab));
 });
 
-test("TeamPanel queries board projection and renders header, paused status, and resume action", () => {
-  assert.match(teamPanelSource, /api\.getTeamRoster/);
-  assert.match(teamPanelSource, /api\.getTeamBoard/);
+test("TeamPanel consumes the shared snapshot and renders resume and panorama actions", () => {
+  assert.match(teamPanelSource, /useTeamSnapshot\(teamSessionId\)/);
+  assert.doesNotMatch(teamPanelSource, /api\.getTeamRoster|api\.getTeamBoard/);
   assert.match(teamPanelSource, /api\.teamResume/);
   assert.match(teamPanelSource, /team-panel-header/);
-  assert.match(teamPanelSource, /team-status-paused/);
-  assert.match(teamPanelSource, /team-status-active/);
+  assert.match(teamPanelSource, /<TeamStatusBadge snapshot=\{snapshot\}/);
   assert.match(teamPanelSource, /team\.resumeButton/);
 });
 
-test("TeamPanel commits only the current matching roster and board snapshot", () => {
-  assert.match(teamPanelSource, /requestSequenceRef/);
-  assert.match(teamPanelSource, /requestId/);
+test("TeamPanel relies on one current TeamSnapshot instead of racing independent DTO requests", () => {
+  assert.match(teamPanelSource, /const \{ snapshot, loading, error: snapshotError, refresh, lastSuccessAt \} = useTeamSnapshot/);
+  assert.doesNotMatch(teamPanelSource, /as unknown as Promise/);
+  assert.doesNotMatch(teamPanelSource, /setInterval\(/);
   assert.match(teamPanelSource, /teamSessionId/);
-  assert.match(teamPanelSource, /revision/);
-  assert.match(teamPanelSource, /Promise\.all/);
   assert.match(teamPanelSource, /scopeOverlaps/);
   assert.doesNotMatch(teamPanelSource, /projection\?\.team/);
 });
@@ -74,20 +72,25 @@ test("TeamPanel renders write-scope overlap warnings and member roster", () => {
   assert.match(teamPanelSource, /team-member-card/);
   assert.match(teamPanelSource, /team\.openSession/);
   assert.match(teamPanelSource, /onSelectSession/);
+  assert.match(teamPanelSource, /MemberIdentity/);
+  assert.match(teamPanelSource, /projectMemberIdentities/);
 });
 
-test("TeamPanel renders shared task board with status, owner, dependencies, and scopes", () => {
+test("TeamPanel renders a compact searchable board and opens full task detail", () => {
   assert.match(teamPanelSource, /team\.board/);
-  assert.match(teamPanelSource, /team-task-card/);
-  assert.match(teamPanelSource, /blockedBy/);
-  assert.match(teamPanelSource, /writeScopes/);
-  assert.match(teamPanelSource, /ownerMemberName/);
+  assert.match(teamPanelSource, /CompactTeamBoard/);
+  assert.match(teamPanelSource, /team-task-board/);
+  assert.match(teamPanelSource, /TeamTaskProgress/);
+  assert.match(teamPanelSource, /TeamTaskDetail/);
+  assert.match(teamPanelSource, /initialTaskId\?: string/);
+  assert.match(teamPanelSource, /initialView\?: "aggregate" \| "board" \| "task" \| "panorama"/);
 });
 
 test("TeamPanel localizes DTO values and data consistency errors", () => {
   for (const key of [
-    "snapshotChanged",
-    "overlapTask",
+    "staleData",
+    "scopeOverlapCount",
+    "openOverlapTask",
     "blockedBy",
     "scopes",
     "readiness",
@@ -101,8 +104,8 @@ test("TeamPanel localizes DTO values and data consistency errors", () => {
       assert.match(localeSource, new RegExp(`(?:"${key}"|${key}):`));
     }
   }
-  assert.match(teamPanelSource, /team\.snapshotChanged/);
-  assert.match(teamPanelSource, /team\.overlapTask/);
+  assert.match(teamPanelSource, /team\.staleData/);
+  assert.match(teamPanelSource, /team\.scopeOverlapCount/);
   assert.match(teamPanelSource, /team\.taskStatus/);
   assert.match(teamPanelSource, /team\.readiness/);
   assert.match(teamPanelSource, /team\.phase/);
@@ -116,5 +119,5 @@ test("WorkPanel mounts TeamPanel for team tabs and registers team tool", () => {
   assert.match(workPanelSource, /activeTab\?\.kind === "team"/);
   assert.match(workPanelSource, /team:\s*IconUsers/);
   assert.match(workPanelSource, /teamWorkPanelTab/);
-  assert.match(workPanelSource, /activeSession\?\.executionProfile === "team"/);
+  assert.match(workPanelSource, /localTeamSessionId\(activeSession\)/);
 });

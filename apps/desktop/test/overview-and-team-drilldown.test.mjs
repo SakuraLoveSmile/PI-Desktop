@@ -9,16 +9,14 @@ const [overviewSource, teamPanelSource, englishLocaleSource, chineseLocaleSource
   readFile(new URL("../../../packages/i18n/src/locales/zh-CN/index.ts", import.meta.url), "utf8"),
 ]);
 
-test("OverviewTab renders Expert Team card when session execution profile is team", () => {
+test("OverviewTab shares live Team progress and opens precise board destinations", () => {
   assert.match(overviewSource, /session\?\.executionProfile === "team"/);
-  assert.match(overviewSource, /api\.getTeamRoster/);
-  assert.match(overviewSource, /api\.getTeamBoard/);
-  assert.match(overviewSource, /teamWorkPanelTab/);
-  assert.match(overviewSource, /panel\.overview\.teamSection/);
-  assert.match(overviewSource, /team\.lead/);
-  assert.match(overviewSource, /team\.membersCount/);
-  assert.match(overviewSource, /team\.tasksProgress/);
-  assert.match(overviewSource, /team\.viewTeam/);
+  assert.match(overviewSource, /useTeamSnapshot\(teamSessionId\)/);
+  assert.doesNotMatch(overviewSource, /api\.getTeamRoster|api\.getTeamBoard/);
+  assert.match(overviewSource, /TeamTaskProgress/);
+  assert.match(overviewSource, /kind: "task", taskId/);
+  assert.match(overviewSource, /kind: "board"/);
+  assert.match(overviewSource, /kind: "panorama"/);
 });
 
 test("OverviewTab derives subagent roster and opens subagent tab", () => {

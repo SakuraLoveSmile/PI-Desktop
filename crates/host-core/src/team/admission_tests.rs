@@ -30,6 +30,7 @@ fn propose_reuse_review(
                 description: member.description.clone(),
                 context_kind: Some(member.context_kind.clone()),
                 member_session_id: Some(member.member_session_id.clone()),
+                presentation: None,
                 selection: Some(TeamMemberSelectionPartial {
                     provider_id: selection.provider_id,
                     model_id: selection.model_id,
@@ -75,12 +76,7 @@ fn confirmation_reuse_rejects_a_running_member_then_succeeds_when_idle() {
             .status,
         "pending"
     );
-    db.conn()
-        .execute(
-            "UPDATE turns SET status = 'completed', ended_at = 1 WHERE id = ?1",
-            [&turn_id],
-        )
-        .unwrap();
+    sessions::end_turn(&db, &turn_id, "completed", None, None, false).unwrap();
     let (confirmed, _) =
         confirm_launch_review(&db, &lead_id, &review.review_id, review.revision).unwrap();
     assert_eq!(confirmed.status, "confirmed");
@@ -346,6 +342,7 @@ fn unrelated_fresh_member_review_does_not_block_existing_member_configuration() 
                 description: None,
                 context_kind: Some("fresh".to_string()),
                 member_session_id: None,
+                presentation: None,
                 selection: None,
             }]),
         },

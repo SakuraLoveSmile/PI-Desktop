@@ -2707,6 +2707,27 @@ dependencies, readiness, and advisory overlapping write scopes. Roster and board
 snapshots must describe the same Team revision. Refresh results from a prior
 Team or older request cannot replace a newer snapshot.
 
+For local Desktop sessions, one revisioned Host snapshot also carries the
+queued Team-mail count and the current launch review/execution decision so a
+shared read does not remove the existing approval panel. Failed refreshes keep
+the last good snapshot visibly stale with Retry. Remote and native sessions
+retain their source-specific projections and do not call local Team IPC.
+
+Member display identity is presentation metadata `{ role, displayName }` over
+the immutable Host routing handle and durable Session ID. A Lead's
+`declare_team_strategy` proposal may carry optional presentation into its
+pending launch review. The review remains editable and creates no member until
+trusted confirmation; only confirmation stores the bounded presentation in
+Host KV. Legacy handles receive a stable renderer projection without renaming
+the Host record. Local pixel portraits are deterministic and decorative.
+
+The Team Overview shows compact task progress with a five-row limit and direct
+task, board, and panorama navigation. The board uses a compact filter/search
+list; descriptions, dependencies, write scopes, diagnostics, results, and
+transcripts remain in the existing detail views. Only pending tasks with
+unresolved prerequisites display as waiting for dependencies. Task status does
+not stand in for member activity.
+
 A paused Team exposes Resume; successful resume releases held Team messages.
 Each member row can open that member's durable session. Loading, empty, refresh,
 and error states remain visible and localized. The panel does not claim a

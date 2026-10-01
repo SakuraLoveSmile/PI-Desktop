@@ -228,6 +228,7 @@ export function createProjectSlice({
   | "clearProject"
   | "deleteProject"
   | "toggleSessionPinned"
+  | "setTeamExpanded"
   | "toggleSessionArchived"
   | "archiveSession"
   | "restoreSession"
@@ -456,6 +457,16 @@ export function createProjectSlice({
       await get().refreshSessions();
     },
 
+    setTeamExpanded: (id, expanded) => {
+      if (!id) return;
+      set((state) => ({
+        sessionMeta: {
+          ...state.sessionMeta,
+          [id]: { ...state.sessionMeta[id], teamExpanded: expanded },
+        },
+      }));
+      persistCurrentSidebar(get);
+    },
     toggleSessionPinned: (id) => {
       if (!id) return;
       set((state) => {

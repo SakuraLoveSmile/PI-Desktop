@@ -132,6 +132,9 @@ import type {
   TeamLaunchReview,
   TeamExecutionDecision,
   TeamLaunchReviewSelectionUpdate,
+  TeamSnapshot,
+  TeamChangedEvent,
+  SessionRenameGuard,
 } from "@pi-desktop/shared";
 import {
   defaultCommandShellForPlatform,
@@ -606,6 +609,8 @@ export const api = {
     }>(IPC.invoke.teamGetRoster, { teamSessionId }),
   getTeamBoard: (teamSessionId: string) =>
     invoke<TeamProjection>(IPC.invoke.teamGetBoard, { teamSessionId }),
+  getTeamSnapshot: (teamSessionId: string) =>
+    invoke<TeamSnapshot>(IPC.invoke.teamGetSnapshot, { teamSessionId }),
   teamPause: (teamSessionId: string) =>
     invoke<{ team: { teamSessionId: string; paused: boolean } }>(
       IPC.invoke.teamPause,
@@ -660,8 +665,12 @@ export const api = {
     }),
   openProjectFolder: (path: string) =>
     invoke<{ ok: boolean; path: string }>(IPC.invoke.projectOpenFolder, path),
-  renameSession: (id: string, title: string) =>
-    invoke<{ ok: boolean }>(IPC.invoke.sessionRename, id, title),
+  renameSession: (id: string, title: string, guard?: SessionRenameGuard) => {
+    if (guard && (id.startsWith("remote:") || id.startsWith("native-pi:"))) {
+      return Promise.reject(new Error("Guarded titles require a local desktop session"));
+    }
+    return invoke<{ ok: boolean }>(IPC.invoke.sessionRename, id, title, ...(guard ? [guard] : []));
+  },
   moveSessionProject: (sessionId: string, projectPath: string) =>
     invoke<{ session: SessionSummary }>(IPC.invoke.sessionMoveProject, {
       sessionId,
@@ -1587,6 +1596,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.plansChanged, (payload) =>
       listener(normalizePlansChangedEvent(payload)),
+    );
+  },
+  onTeamChanged: (listener: (event: TeamChangedEvent) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.teamChanged, (payload) =>
+      listener(payload as TeamChangedEvent),
     );
   },
   onGoalReportChanged: (listener: (event: any) => void) => {

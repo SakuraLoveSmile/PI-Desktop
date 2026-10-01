@@ -1,14 +1,14 @@
 # Expert Team UX and Live-State Repair Plan
 
-Status: planning delivered; product tasks T1-T9 are **未开始**. Revision: `team-ux-v1`, 2026-10-01, Asia/Taipei.
+Status: implementation in progress; T1-T9 are **实现中** pending integrated candidate validation. Revision: `team-ux-v2`, 2026-10-02, Asia/Taipei.
 
 ## Integration baseline — 2026-10-01
 
-- Historical planning baseline: `aef7aad669bb12357d58d899516aeec5473e40e4`. The original source inspection and defect classifications below describe that snapshot; they are not a claim that every finding remains current after later merges.
-- Current main at integration: `12cfb84134fdfac58ba148c023e81f864a2f1e19` (PR #22). Recheck each implementation task against this source before execution. Some adjacent Team and workpanel changes are now present, but this plan's T1-T9 have not thereby been implemented or accepted.
-- The plan and its 27 files under `assets/expert-team-ux/` are planning/reference artifacts only. The previews are disconnected sample UI and the artwork is not product integration. No T1-T9 runtime, native UI, or user-path acceptance is claimed here.
+- Implementation worktree base: `a395c6067` on `codex/expert-team-ux-review`. This is the request's integration baseline, not a claim about the latest `origin/main`; refresh against remote `main` before candidate validation.
+- The source findings and previews below began as planning artifacts. Implementation is now in progress across the request worktree, but no integrated candidate, native user path, or release artifact is accepted by this document. Recheck current source and tests before each dependent change; do not infer acceptance from files being present.
+- The design preview and its nine original SVGs remain reference material. Preview behavior is isolated sample state and does not prove Host, provider, or Desktop behavior.
 
-This is the execution handoff for the user's eleven screenshots and follow-up issues. Repository documentation is English under root `AGENTS.md` section 0; user communication and the preview's example UI are Chinese. This round saves planning documents, UI reference code, original SVG artwork, and a design preview only. It does not implement product behavior, migrate user data, publish, or call a real provider. After explicit implementation authorization, execute this plan continuously within that authorization; the planning-only boundary does not persist as a refusal to implement.
+This is the execution handoff for the user's eleven screenshots and follow-up issues. Repository documentation is English under root `AGENTS.md` section 0; user communication and the preview's example UI are Chinese. The user has authorized implementation, review, integration, and a macOS DMG build. The implementation request is active; this revision corrects the handoff against its current Host approval and snapshot contracts. Do not describe the requested merge or DMG as complete until the root integrator records candidate checks and artifact evidence.
 
 ## Review the intended experience
 
@@ -22,16 +22,20 @@ The original artwork is already available: [Lead](assets/expert-team-ux/lead.svg
 
 ## Baseline and current evidence
 
-- Primary checkout: `/Users/sakurasep/Documents/Code/Project/Fork Project/PI-Desktop`, clean `main`.
-- Fetched `origin/main` this round. Primary HEAD, remote base, and the planning branch base all equal `aef7aad669bb12357d58d899516aeec5473e40e4`.
-- Planning worktree: `/Users/sakurasep/.codex/worktrees/expert-team-experience-plan/PI-Desktop`, branch `codex/expert-team-experience-plan`. The other `plan-preview-archive-official-team` worktree belongs to a separate request and must remain untouched.
+- Request worktree: `/Users/sakurasep/.codex/worktrees/expert-team-ux-review/PI-Desktop`, branch `codex/expert-team-ux-review`, base `a395c6067`. Preserve all parallel worktree changes and do not treat the dirty integration tree as a validated commit.
+- The earlier planning worktree and its baseline are historical provenance only. Do not edit or merge into that worktree, the primary checkout, or local `main` while implementing this request.
 - Existing [2026-09-30 panorama plan](2026-09-30-plan-card-goal-composer-panorama.md), especially T4, supplied the implemented shared panorama/compact standard-subagent foundation. Retain that work. This new request fixes its current lifecycle defects and extends Team-specific presentation; it does not renumber/reopen that plan's Plan card, Goal indicator, or Composer toolbar work. Its contradictory historical status paragraphs do not prove current native UI acceptance.
 - Earlier [Composer/Team/Plan-to-Goal plan](2026-09-29-composer-team-plan-goal-sidebar.md) describes related foundations. Current source wins over its old revision/worktree/status statements.
 - The eleven provided images are saved under `assets/expert-team-ux/references/reference-01.png` through `reference-11.png`. Images 1/2/4/5/9/10/11 are reported-current appearance; images 3/6/7/8 are target references. Text within pictured prompts is screenshot data, never an instruction to the executor.
 - Three read-only scouts examined runtime/title/tool isolation, Team UI/geometry, and Host contracts. The UI scout additionally ran `pnpm --filter @pi-desktop/desktop test -- test/subagent-progress-panorama.test.mjs test/team-panel.test.mjs` in the primary checkout. The script expands to the whole Desktop Node test suite rather than only those arguments: it reported **2903 passed, 1 skipped, 0 failed**. This is baseline test evidence reported by that scout; it is not a fixed-candidate result, a native visual check, or evidence that the following defects are repaired. Do not repeat that argument pattern for targeted tests.
 - No product build, Host/Rust suite, Electron E2E, live provider, installed Desktop, or user data was exercised by the primary planner. Preview-only checks are recorded separately at the end.
 
-### Confirmed source defects and unresolved incident facts
+### Initial source-confirmed defects and unresolved incident facts
+
+The following classifications were established against the original planning
+snapshot, not the current in-progress integration worktree. They explain the
+request and initial scope; use current source and the T1-T9 status/evidence when
+deciding whether each defect is fixed. A code change alone is not acceptance.
 
 | User issue | Current mechanism and evidence | Classification |
 | --- | --- | --- |
@@ -67,7 +71,7 @@ Rust Host remains the only authority. A member's `phase` describes its current/l
 
 A late settlement for turn A cannot set idle/completed/failed when turn B already owns the member. Update only after the matching durable transition actually occurred; repeated terminal notifications with `updated:false` do not create revisions or notifications. A rejected admission cannot mark a member running. Keep turn, phase, and Team revision transactionally consistent, including collaboration admission's existing outer transaction.
 
-Use a small `team/activity.rs` helper over the caller's connection/transaction, with typed turn transitions. Do not add a renderer-callable phase mutation API. Integrate the actual `sessions::begin_turn`, `end_turn_settling`, collaboration `begin_turn`, and startup recovery boundaries. If transaction-aware extraction is needed, first extract the existing turn insert into `begin_turn_on_connection` and let collaboration call it within its own transaction; never open nested SQLite transactions or leave an admitted turn behind after a phase-write failure. Only this relevant extraction is in scope; do not refactor all of `sessions.rs`.
+Keep phase writes in Host-owned transaction boundaries with typed turn transitions. The current implementation worktree locates `update_member_turn_phase_conn` in `team/roster.rs` and calls it from `sessions::begin_turn_inner` and `end_turn_settling`; do not require a separate `team/activity.rs` module. Preserve the required atomicity and scope: admission must not persist a running phase unless the turn insert succeeds, and terminal status plus phase must commit together. Startup recovery and collaboration admission must use the same guarded lifecycle. Never expose a renderer-callable phase mutation API or refactor unrelated `sessions.rs` responsibilities.
 
 Task rendering rule, shared by progress/list/detail:
 
@@ -87,15 +91,28 @@ The Lead node reads Host turn activity too. Replace `paused ? paused : running`.
 Add the following additive shared read contracts in `packages/shared/src/team.ts`; retain the existing roster/board methods and their contracts for old consumers:
 
 ```ts
-export type TeamMemberRole = "researcher" | "executor" | "reviewer" | "planner" | "collaborator";
-export type TeamMemberPresentation = { role: TeamMemberRole; displayName: string };
+export type TeamMemberPresentation = {
+  role: "researcher" | "executor" | "reviewer" | "planner" | "collaborator";
+  displayName: string;
+};
 // Optional addition to TeamMemberRecord:
 // presentation?: TeamMemberPresentation;
-// Optional addition to SpawnTeammateArgs: presentation?: TeamMemberPresentation;
+// Optional addition to TeamProposedMember and TeamLaunchReviewMember:
+// presentation?: TeamMemberPresentation;
 
-export type TeamSnapshot = TeamRosterProjection
-  & Pick<TeamBoardProjection, "tasks" | "readiness" | "scopeOverlaps">
-  & { leadPhase: TeamMemberPhase; queuedMessageCount: number };
+export type TeamSnapshot = {
+  teamSessionId: string;
+  revision: number;
+  paused: boolean;
+  members: TeamMemberRecord[];
+  tasks: TeamTaskRecord[];
+  readiness: TeamBoardProjection["readiness"];
+  scopeOverlaps: TeamBoardProjection["scopeOverlaps"];
+  leadPhase: TeamMemberPhase;
+  queuedMessageCount: number;
+  review: TeamLaunchReview | null;
+  decision: TeamExecutionDecision | null;
+};
 
 export type TeamChangedEvent = {
   teamSessionId: string;
@@ -111,23 +128,24 @@ export type SessionTeamRelation = {
 // Optional addition to SessionSummary: team?: SessionTeamRelation;
 ```
 
-- New Host `team.getSnapshot({teamSessionId, callerSessionId}) -> TeamSnapshot` reads roster, board, pause, Lead phase, presentation, and the real unclaimed queued Team-mailbox count under one Host state lock/database read boundary. Reuse the existing Team mailbox selector for `queuedMessageCount` (queued ledger records for this Team, excluding settled/deleted records); never count ordinary Composer prompts or infer it from task status. The one `revision` covers that complete snapshot, including activity transitions. Reuse existing authorization and projection helpers. Error: invalid input -> existing invalid-argument semantics; missing Team -> `TEAM_NOT_FOUND`; foreign caller -> `TEAM_UNAUTHORIZED`; read/transport failures are errors, not an empty successful Team.
+- Host `team.getSnapshot({teamSessionId, callerSessionId}) -> TeamSnapshot` reads roster, board, pause, Lead phase, presentation, unclaimed Team-mailbox count, current launch review, and latest execution decision. The flat snapshot preserves review and decision state consumed by the existing approval panel; it does not replace the separate review mutation/read APIs. Reuse the existing Team-mailbox selector for `queuedMessageCount`; never count ordinary Composer prompts or infer it from task status. One revision identifies the full view. Keep Host participant validation and local-Host IPC behavior. Missing Team, unauthorized caller, invalid input, and read/transport errors stay explicit errors, never an empty successful Team.
 - Add `IPC.invoke.teamGetSnapshot = "pi-desktop/team/getSnapshot"` and a typed `api.getTeamSnapshot`. Keep Main thin, validate the IPC input as the other Team handlers do, and retain Host participant validation. Update actual preload allowlists and shared schema/exports. The current Team IPC is local-Host-only; do not silently enable remote Team control. Old roster/board clients continue working. Bundled Main/Host must advance together; do not conceal unsupported Host methods with an empty snapshot.
 - Publish Host `team.changed` **after** committed relevant mutations and forward to existing `IPC.event.teamChanged`. Add typed `api.onTeamChanged(listener) -> unsubscribe`. Notifications contain IDs/revision/reason, not prompts or transcripts. Emit after create/update/pause/resume/current-turn transitions, committed mailbox enqueue/claim/settle/cancel changes that affect `queuedMessageCount`, and dissolution; no event for rolled-back/no-op changes. Dissolution may carry the final known revision; invalidate the cache/relationships and refresh sessions rather than fabricate an empty active Team.
 - Resolve the canonical Team identity before reading: for a Host-projected member session use `session.team.teamSessionId`; for a projected Lead use its own ID. A newly configured Team Lead without members uses its validated Lead context. Do not pass a selected member's Session ID as the Team ID simply because its profile is `team`. Overview header remains about the selected session while the Team section explicitly identifies its parent Team.
+- This new snapshot/event/IPC reader is for local `desktop` Teams. Preserve the existing source-specific projections and supported navigation for `remote` and `pi-native` sessions; do not route those sessions through the local Team IPC or make them appear empty because the local Host cannot read them.
 - One renderer Team runtime module, `stores/runtime/team-runtime.ts`, owns read requests, per-Host/Team snapshots, loading/error/last-success timestamps, event subscriptions and the existing three-second recovery cadence. A small `hooks/useTeamSnapshot.ts` exposes it. Overview, TeamPanel, and panorama adapters consume this same state. Do not copy the polling workflow into `app-store.ts` or leave the old independent Overview fetch and TeamPanel timer active.
 - Acquire a scoped reader only for mounted visible Team surfaces; subscribe **before** the initial fetch. Coalesce an event burst into one refresh within 200ms of its first event. If a read is in flight, mark it dirty and run one following read. Recover from missed events every three seconds while the surface is visible; window focus and Host-ready/reconnect trigger one immediate refresh. Hidden surfaces release the timer/listeners; no background title/provider request is involved in read refreshes.
 - Scope every request by Host identity and Team ID; use request generation to ignore obsolete results. A prior Team/Host's response cannot overwrite the current scope. Ignore lower-revision results. Keep the last good snapshot on failure, visibly mark it stale, and provide Retry. Never swallow errors or label failed refreshes current. On Team/session switch, select only the new scope's snapshot or loading state immediately; do not briefly show the former roster.
 - Session title/project/model/mode/count continue to come from renderer/Host session and planning state. `api.getSession(sessionId,{messageLimit:1})` is a bounded metadata refresh source for a visible Overview when `sessionsChanged`, planning changes, persisted agent events, focus, or the shared three-second recovery tick invalidate metadata. Update summary metadata only; do not replace the active transcript with that one-message page. Stream text comes from existing events, not a second transcript polling loop. `messageCount` is the canonical total, never `messages.length` from a paginated page.
 - Artifacts/references continue to derive from the real Plan/Goal checkpoints, Goal report events, and explicit message attachments. Do not invent artifacts merely to populate the preview. Effective Goal/Plan display reuses the current active checkpoint's `executionKind ?? kind` while running; the actual runtime/configured mode remains unchanged.
 
-The new DTO/notification boundary needs a short ADR amending 0307 and matching runtime/UX/E2E specs when implemented. No process/data ownership/security boundary changes are proposed. Database schema remains unchanged for relationship projection and snapshot reads.
+The additive DTO/notification boundary is recorded in the 2026-10-02 amendment to ADR 0307 and matching runtime/UX/E2E specs. It does not change process/data ownership or security boundaries. No SQLite schema migration is part of this work.
 
 ### C3. Display identity and original pixel artwork
 
 - Preserve the existing immutable ASCII `member.name`, message targets, member Session IDs, model bindings and transcripts. Display identity is `{localized role} {displayName}`; examples: `调研员 Alex`, `执行者 Sam`, `审查员 Tina`. Lead is localized `主导 Agent`, with the task line `协调专家任务`.
-- Extend `spawn_teammate` with optional `presentation:{role,displayName}`. The Team prompt tells Lead to choose the real role and a short readable alias when it creates a member. This is metadata on the existing call, **not** a separate model-generated avatar/name request. Validate enum and `displayName` at the Host boundary: trim, 1-32 Unicode code points, no control characters/newlines. Treat text as plain text. Only authorized Lead creation sets it.
-- Store optional presentation in existing Host `kv`, namespace `team-member-presentation`, key `memberSessionId`, through verified `Database::kv_get/kv_set/kv_delete` in `db/repositories.rs`. Include creation/presentation persistence in the creation transaction and increment Team revision once. Hydrate in snapshot/roster reads; no schema/version change, no SQL mutation of old names or titles. Clean only this metadata when its Team is actually dissolved under the existing authorized deletion workflow.
+- Carry optional `presentation:{role,displayName}` on `declare_team_strategy.members` (`TeamProposedMember`) and persist it in the pending `TeamLaunchReviewMember`. Do not add it to `SpawnTeammateArgs` or create a member through a direct spawn path: this feature follows the existing review-before-dispatch flow. The review UI keeps metadata while provider/model/thinking selections change. Validate enum and `displayName` at the Host boundary: trim, 1-32 Unicode code points, no control characters/newlines. Treat text as plain text. Only confirmed review data may create/update member presentation.
+- On confirmation, store optional presentation in existing Host KV namespace `team-member-presentation-v1`, keyed by `memberSessionId`, in the same transaction as approved member creation/review confirmation. Hydrate it in roster/snapshot reads. Older review JSON without `presentation` remains readable; no schema/version change, no SQL mutation of old names or titles. Delete this metadata only when the existing authorized Team dissolution path removes its member relationship.
 - Legacy members receive a display projection without changing stored records. Exact legacy machine patterns `V<number>_*_scout` map to researcher; exact `researcher`/`executor`/`reviewer`/`planner` handles map to that explicit role. Do not infer roles from arbitrary prompt prose. Unknown handles use collaborator (`成员`). Keep a readable custom handle as its display alias. For the legacy `V<number>_*_scout` handles, use roster creation-order aliases `Alex, Sam, Tina, Noah, Maya, Leo, Iris, Kai` (maximum eight existing members); expose the original handle in member detail. Creation order is the existing `created_at ASC, name ASC` roster order and stays stable across refresh/restart; members are not renumbered by task status.
 - Portrait choice is a deterministic hash of the real member Session ID among the eight local originals; Lead uses `lead.svg`. Same member keeps its portrait across refresh, tab/session switch, and restart. No remote URLs, random-on-render images, hard-coded fake experts, or data URLs containing private prompts. Names/role labels identify the member, so the adjacent decorative image has `alt=""`, `aria-hidden`, and `draggable={false}`.
 - Use the same identity/portrait in task progress, member roster, panorama, task owner, and expanded sidebar member row. The raw handle remains visible/copyable in read-only member detail.
@@ -151,7 +169,7 @@ Use `Button`, `TooltipButton`, `Badge`, `Input` and the existing icons as requir
 
 ### C5. Viewport ownership
 
-Add a scope key `team:<hostBinding>:<leadSessionId>` or `subagents:<hostBinding>:<sessionId>` to the shared panorama adapter. Scope is real identity, never task title/revision.
+Add a scope key `team:desktop:<leadSessionId>` or `subagents:<sessionSource>:<sessionId>` to the shared panorama adapter (`sessionSource` falls back to `desktop` for older summaries). Scope is canonical session identity, never task title/revision. The Team key uses the resolved Lead ID, never a selected member ID.
 
 1. First entry without saved viewport fits once after the canvas has nonzero size. Store the viewport in the owning Work Panel/TeamPanel runtime context so detail/back and switching to another session do not share/reset the active view. This is UI memory only; no database migration or permanent localStorage cache is required.
 2. Manual `+/-`, pan, or Reset sets viewport mode to manual. State/name/task refresh, a new array identity, container resizing/maximization, new members, or partial data updates cannot overwrite it. New nodes outside the chosen view are reachable by pan or the existing Fit button.
@@ -190,17 +208,18 @@ Keep the Work Panel tab strip's deliberate horizontal scroll (`work-panel.css:42
 
 ## Execution tasks and ownership
 
-Each task is 未开始. Within the one authorized implementation request, use one dedicated request branch/worktree, refresh against current `origin/main`, and actually launch independently executable workers in parallel. All planning scouts stay read-only; implementation workers write only their assigned files. Shared files have one owner, even when multiple tasks consume them.
+T1-T9 are all **实现中**. Within the authorized implementation request, use the dedicated request branch/worktree and refresh against current `origin/main` before candidate validation. Keep file ownership exclusive. Subagents may use only `gpt-6-luna` and `gpt-6-sol`: assign `gpt-6-luna` to read-only scouts, implementation and test work; assign `gpt-6-sol` only to an independent read-only review after integration. The root integrator owns coordination, documentation synchronization, final evidence and user-visible acceptance; subagent model choices do not replace that responsibility.
 
-| Worker | Independent goal and exclusive write ownership | Inputs, dependencies, delivery and acceptance |
-| --- | --- | --- |
-| A — Host/contracts | T2 authoritative activity, snapshot/events; C3 optional metadata storage; T5 relationship projection. Own `packages/shared/src/team.ts`, `types/sessions.ts`, `protocol.ts`, relevant shared schemas/exports/tests; runtime `packages/agent-runtime/src/team/team-tools.ts`, `team-prompt.ts`, and their metadata/schema tests; `crates/host-core/src/team/*`, relevant `sessions.rs` transition/summary changes, collaboration admission/recovery changes, Host RPC handlers/tests | Read C1-C3/C6 and Host rules. First deliver exact DTO/schema fixtures to root/C/D/E/F. Then transaction/lifecycle tests, snapshot authorization tests and old-data grouping fixtures. No Electron/renderer/i18n edits. Completion: real admitted member turn changes phase, stale settlement cannot reset a new turn, snapshot is atomic, old handles/transcripts survive |
-| B — Queue | T1. Own `features/chat/composer/ComposerStatus.tsx`, new queue-disclosure helper/component and its interaction tests, **queue-only section** of `styles/composer.css` | Can start immediately; C4 queue contract. Keep five existing actions and pending/promoted/approval locks. Root owns the single `Composer.tsx` scope-prop wiring edit; B does not edit that file or queue dispatch/slice. Deliver normal/large/empty/session-switch/focus checks and no-logic-changing diff |
-| C — Team presentation/board | T3 leaf progress/identity/pixel artwork; T7 compact aggregate board. Own new `components/workpanel/team/*`, `lib/team-presentation.ts`, TeamPanel, `styles/team-panel.css`, new `src/assets/team-avatars/*.svg`, relevant Team presentation/interaction tests | Can build pure view-model/primitives against C2 fixtures in parallel; integrate only after A's DTO and root's shared read hook are ready. Does not edit Overview, panorama, sidebar, globals, locales or API. Deliver exact reference hierarchy, click-through detail, zero completed+blocked badges, owner identity and error states |
-| D — Panorama | T4. Own `AgentPanorama.tsx`, `styles/agent-panorama.css`, viewport geometry/controller helper and its behavior tests | Can implement view ownership/drag against current geometry immediately; final persona cards use C's shared `PixelAvatar`/card exports and frozen 304x140 geometry. Inputs C4/C5 and Appendix B. Do not edit TeamPanel/Overview or shared global styles. Completion: real snapshot refresh during drag keeps zoom/pan; Fit/Reset work; node/toolbar clicking does not start pan |
-| E — Sidebar | T5 renderer aggregation. Own `Sidebar.tsx`, new `features/sessions/TeamSessionGroup.tsx` and pure grouping helper, `styles/sessions.css` Team-group block and its grouping/interaction tests | Pure grouping fixtures can start before A; integration needs optional `SessionSummary.team` and root-owned metadata persistence API. Keep existing session row handlers/actions. Do not edit Host, title runtime, sidebar-preferences or event slice. Deliver flat legacy/archived-parent/pinned-child/search/reveal/dissolution coverage |
-| F — Titles | T6. Own `stores/runtime/session-title-runtime.ts`, title helper/tests, Main `apps/desktop/electron/main/ipc/agent-ipc.ts` title-summary integration and `apps/desktop/electron/main/ipc/session-ipc.ts` guarded rename handler and related tests; runtime `session-title-summarize` only if the existing helper actually needs input changes | Read C6; ordinary Team first-title repro before changing it. A provides Host optional expectedTitle/expectedExecutionId and types; root supplies event hook/meta fields. No Team tools/runtime.ts edits unless required by verified behavior. Deliver one approved Lead request, zero member/disabled/duplicate requests, guarded manual/stale-title scenarios, failure fallback |
-| Root integrator | T2 renderer coordinator/API wiring, T3 Overview integration, T8 containment, T9 shared acceptance. Sole owner of `stores/runtime/team-runtime.ts`, `hooks/useTeamSnapshot.ts`, `lib/api.ts`, preload/event wiring, `stores/app-state.ts`, `app-store.ts` minimal registration, `slices/events-slice.ts`, `lib/sidebar-preferences.ts` for **all** new preference fields, `OverviewTab.tsx`, the one `Composer.tsx` queue-scope prop wiring edit, `styles/work-panel.css`, locales, docs/spec/ADRs, shared E2E harness `scripts/e2e-team.mjs` | Freeze/share C1-C7 before workers edit; do independent integration, not only coordination. Add local `teamExpanded`, `autoTitleExecutionId`, `lastAutoTitle` persistence/cleaning and API once, then expose helpers to E/F. Coordinate no simultaneous writers of sessions/IPC/protocol/locale/harness files. Review all diffs and personally run native candidate/user-path verification |
+| Worker | Model | Independent goal and exclusive write ownership | Inputs, dependencies, delivery and acceptance |
+| --- | --- | --- | --- |
+| A — Host/contracts | `gpt-6-luna` | T2 authoritative activity, snapshot/events; C3 proposal/review metadata persistence; T5 relationship projection. Own `packages/shared/src/team.ts`, `types/sessions.ts`, `protocol.ts`, relevant shared schemas/exports/tests; `packages/agent-runtime/src/team/team-tools.ts`, `team-prompt.ts` and metadata/schema tests; `crates/host-core/src/team/*`, relevant `sessions.rs` transition/summary changes, collaboration admission/recovery, Host RPC handlers/tests | Read C1-C3/C6 and Host rules. Freeze DTO/schema fixtures for root/C/D/E/F. Carry `presentation` through `declare_team_strategy` -> persisted `TeamLaunchReview` -> confirmation; preserve approval-before-dispatch and old review compatibility. Snapshot includes `review` and `decision` so the existing approval UI remains complete on the shared read path. Then cover turn lifecycle, snapshot authorization/revision, and old-data grouping. No Electron/renderer/i18n edits. |
+| B — Queue | `gpt-6-luna` | T1. Own `features/chat/composer/ComposerStatus.tsx`, queue-disclosure helper/component and interaction tests, **queue-only section** of `styles/composer.css` | Keep five existing actions and pending/promoted/approval locks. Root owns the single `Composer.tsx` scope-prop wiring edit; B does not edit it or queue dispatch/slice. Cover normal/large/empty/session-switch/focus behavior. |
+| C — Team presentation/board | `gpt-6-luna` | T3 leaf progress/identity/pixel artwork; T7 compact aggregate board. Own new `components/workpanel/team/*`, `lib/team-presentation.ts`, `TeamPanel.tsx`, `styles/team-panel.css`, new `src/assets/team-avatars/*.svg`, and focused tests | Build pure view-model/primitives against frozen C2 data. Consume presentation only from confirmed Host snapshot/review data; do not invent or directly spawn a member. Do not edit Overview, panorama, sidebar, globals, locales or API. Cover reference hierarchy, task/member drill-down, truthful role/status, filters, and no complete+blocked badge. |
+| D — Panorama | `gpt-6-luna` | T4. Own `AgentPanorama.tsx`, `styles/agent-panorama.css`, viewport geometry/controller helper and behavior tests | Use C's `PixelAvatar` and frozen 304x140 geometry. Preserve actual Lead/member phase and use a separate `statusLabel` for waiting. Do not edit TeamPanel/Overview or shared global styles. Cover refresh during drag, Fit/Reset, scope changes and node/toolbar pointer behavior. |
+| E — Sidebar | `gpt-6-luna` | T5 renderer aggregation. Own `Sidebar.tsx`, `TeamSessionGroup.tsx`, pure grouping helper, Team-group CSS block and grouping/interaction tests | Integrate `SessionSummary.team` and root-owned preference persistence/shared snapshot hook. Keep existing session-row handlers/actions. Do not edit Host, title runtime, sidebar-preferences or event slice. Cover archive/pin/search/reveal/dissolution and flat legacy input. |
+| F — Titles | `gpt-6-luna` | T6. Own `session-title-runtime.ts`, title helpers/tests and approved-title IPC/guard files assigned by root | Reproduce ordinary first-title and approved execution separately. Use the existing main-owned summary request, Host `expectedTitle`/`expectedExecutionId` CAS and root-owned execution event/metadata wiring. Do not edit Team tools/runtime. Cover execution-once, member skip, manual/newer title races and failure fallback. |
+| Root integrator | Primary-agent model | T2 renderer coordinator/API wiring, T3 Overview integration, T8 containment, T9 acceptance. Sole owner of `team-runtime.ts`, `useTeamSnapshot.ts`, `api.ts`, preload/event wiring, app-store registration, event slice, sidebar preferences, OverviewTab, Composer scope wiring, `work-panel.css`, locales, docs/ADRs and shared E2E harness | Integrate independently, preserve one writer per file, review all diffs, and run final task-candidate checks plus isolated native user-path verification. |
+| Independent reviewer | `gpt-6-sol` | Read-only review of the integrated implementation and plan/spec consistency | Review root-selected candidate after implementation; report defects and missing evidence. Do not modify files or replace root's verification/acceptance. |
 
 T1 can finish independently. T2 contract/state delivery gates integrated T3/T5. T4 state controller and T7 compact view can progress from frozen fixtures before T2, but their final validation uses the real snapshot. T6 never blocks unrelated queue/canvas/board work. T8/T9 integrate the resulting candidate. Reuse compatible primary node_modules/toolchains/Cargo targets by link/reference; no reinstall solely for E2E and no shared mutable profiles/build output races.
 
@@ -210,11 +229,11 @@ Read ComposerStatus, `lib/queued-prompts.ts`, queue-pending/priority tests and A
 
 ### T2 — Repair truthful activity and live snapshot delivery
 
-A establishes a failing lifecycle/readiness baseline in real Host fixtures, implements C1/C2, then covers accepted/failed admission, successful/error/aborted turn, queued/paused mailbox, startup recovery, stale A-settlement while B runs, and revision/no-op semantics. Root implements one shared reader with subscription-before-load, bounded event coalescing, current Host/Team generation guards and visible stale recovery, and removes replaced duplicated fetch/timer paths. Tests must enter through the real Host/RPC lifecycle and renderer coordinator, mocking only transport/time boundaries. One atomic response eliminates current mixed roster/board revisions; retain old methods/tests for compatibility. Render pending and completed/in-progress readiness correctly without changing Host `isReady` meaning.
+A establishes a failing lifecycle/readiness baseline in real Host fixtures, implements C1/C2, then covers accepted/failed admission, successful/error/aborted turn, queued/paused mailbox, startup recovery, stale A-settlement while B runs, and revision/no-op semantics. Root implements one shared reader with subscription-before-load, bounded event coalescing, current Host/Team generation guards and visible stale recovery, and removes replaced duplicate fetch/timer paths. The flat snapshot includes roster/activity, task readiness, mailbox count, current launch review, and latest execution decision; separate review mutation APIs remain authoritative. Tests enter through the Host/RPC lifecycle and renderer coordinator, mocking only transport/time boundaries. Preserve the old roster/board/review APIs for compatibility. Render pending and completed/in-progress readiness correctly without changing Host `isReady` meaning. Remote/native source projections remain on their existing path.
 
 ### T3 — Reproduce task progress and shared member identity
 
-C implements the literal Appendix A leaf components and copied original assets and the explicit legacy projection from C3. A alone adds optional spawn presentation/schema/Team prompt and its Host metadata persistence; C consumes those frozen fields. Root replaces only Overview's generic Team card with progress rows and panorama/board/task routes, uses the shared snapshot, and derives truthful metadata/effective mode per C2. Retain actual artifact/reference opening and standard Task detail; omit meaningless empty subagent block for Team. Clicking a Team progress row opens the existing in-panel task detail without changing the main session. Clicking its owner inside detail opens member detail; only explicit Open-in-main changes the main session. Test the row-to-task-to-member-to-back user sequence and the five-row overflow case. All added labels, statuses, accessible names and tooltips go through i18n in every shipped locale.
+C implements the literal Appendix A leaf components and copied original assets and the explicit legacy projection from C3. A carries optional `presentation` on `TeamProposedMember` through the saved `TeamLaunchReviewMember`, validates it at the Host boundary, and persists it only in the confirmed review transaction; `spawn_teammate` remains approval-gated and gains no presentation argument. C consumes these frozen snapshot fields. Root replaces only Overview's generic Team card with progress rows and panorama/board/task routes, uses the shared snapshot, and derives truthful metadata/effective mode per C2. Retain actual artifact/reference opening and standard Task detail; omit meaningless empty subagent block for Team. Clicking a Team progress row opens existing in-panel task detail without changing the main session. Clicking its owner inside detail opens member detail; only explicit Open-in-main changes the main session. Test the row-to-task-to-member-to-back user sequence and five-row overflow. All labels, statuses, accessible names and tooltips go through i18n in every shipped locale.
 
 ### T4 — Reproduce panorama cards and preserve user zoom
 
@@ -241,7 +260,7 @@ Root measures Overview/Team aggregate/details and the three-column shell in the 
 Root preserves the existing runtime profile isolation and documents the result, rather than adding arbitrary prohibition switches. Extend existing Team fake-provider E2E and relevant Subagent/Plan checks:
 
 - Standard `agent/plan/goal` runs expose only the existing standard delegate path where allowed; Task/TaskWait/TaskList/TaskStop lifecycle does not create Team session rows.
-- Team Lead `agent/plan/goal`, including approved Plan-as-Goal execution, exposes the nine authorized Team tools, not `Task*` or plugin `SessionTask`. Team members cannot spawn further members; same Team messaging/permissions/model ceilings remain enforced.
+- Standard `Task*` and plugin `SessionTask` remain excluded from Team profile execution; the exact allowed catalog is asserted against `TEAM_TOOL_NAMES` plus the separate Lead-only `TEAM_LEAD_TOOL_NAMES` declaration, not a hard-coded tool count. Team members cannot spawn further members. Team strategy declarations create review data only; direct Host mutation paths cannot create or dispatch an unconfirmed proposal. Existing messaging, permissions, model ceilings and approval checks remain enforced.
 - Scope changes/reload/Stop/pause/Resume/restart do not mix Team and standard histories, counters, cache entries or pending operations. A Session that previously used Task may show historical delegates in a distinct collapsed history; they are not current Team members/tasks.
 - Real user sequence in isolated Electron: create Team Lead, approve a Plan, generate one title, start several owned tasks, see live member activity, fold queue, inspect Overview progress, open panorama, zoom/pan while a controlled member update arrives, open task/member detail and return, see compact board/filter, expand member sidebar, Stop/Resume and restart. Assert durable IDs/transcripts remain intact and ordinary queue/mailbox/Plan/Goal semantics unchanged.
 
@@ -270,7 +289,7 @@ pnpm --filter @pi-desktop/agent-host test
 
 # Target existing Desktop boundaries. Add new behavior-test file paths here
 # once created; use node directly rather than passing filenames to pnpm test.
-node --test apps/desktop/test/team-panel.test.mjs apps/desktop/test/overview-and-team-drilldown.test.mjs apps/desktop/test/subagent-progress-panorama.test.mjs apps/desktop/test/session-auto-title.test.mjs apps/desktop/test/queue-pending-actions.test.mjs
+node --test apps/desktop/test/team-panel.test.mjs apps/desktop/test/team-presentation.test.mjs apps/desktop/test/team-runtime.test.mjs apps/desktop/test/overview-and-team-drilldown.test.mjs apps/desktop/test/subagent-progress-panorama.test.mjs apps/desktop/test/agent-panorama-viewport.test.mjs apps/desktop/test/session-auto-title.test.mjs apps/desktop/test/session-title-runtime.test.mjs apps/desktop/test/session-rename-guard.test.mjs apps/desktop/test/queue-disclosure.test.mjs apps/desktop/test/queue-pending-actions.test.mjs apps/desktop/test/sidebar-session-groups.test.mjs apps/desktop/test/sidebar-team-session-rendering.test.mjs
 
 cargo fmt --check
 cargo test -p host-core --locked
@@ -306,17 +325,19 @@ Commit only when asked. If no commit is authorized, record HEAD plus the reviewe
 
 ### Observable acceptance checklist
 
-| Task | Required result |
-| --- | --- |
-| T1 | Eight queued messages occupy one folded header; count/next update; expand yields original working actions and bounded scroll; queuing/sending/order unaffected |
-| T2 | Controlled running member displays running in roster/overview/panorama; success/error/abort/restart are truthful; completed tasks do not show blocked; paused queued mail does not start |
-| T3 | Reference's two-line task/role/portrait list replaces generic card; shared identity stable; task/member drill-down keeps main Lead selected; all labels localized |
-| T4 | At 80%, repeated Host updates during/after drag leave zoom 80%; pan delta matches drag; manual viewport survives resize/detail/back; only explicit Fit/Reset changes its mode/scale |
-| T5 | One parent with five foldable member sessions, no duplicate ordinary rows; pin/archive/search/navigation preserved; exact IDs/transcripts still exist after grouping/restart |
-| T6 | One actual fake-model title request for approved Lead execution, zero per-member/disabled/duplicate requests; manual/newer-task title wins; failure does not affect execution |
-| T7 | Aggregate rows omit long instructions; filtering/search and full detail remain usable; all tasks reachable; no complete+blocked contradiction |
-| T8 | No whole-page horizontal scrolling at supported shell/panel/font conditions; long content remains accessible in detail; intended local scroll/pan still works |
-| T9 | Standard and Team tools/delegates/members/counts/lifecycles stay distinct through modes and approval/reload/recovery; isolated native user sequence passes |
+All rows remain **实现中** until the integrated task candidate passes the applicable automated and native UI gates. Worker-local tests do not establish the integrated user path.
+
+| Task | Status | Required result |
+| --- | --- | --- |
+| T1 | 实现中 | Eight queued messages occupy one folded header; count/next update; expand yields original working actions and bounded scroll; queuing/sending/order unaffected |
+| T2 | 实现中 | Controlled running member displays running in roster/overview/panorama; success/error/abort/restart are truthful; completed tasks do not show blocked; paused queued mail does not start; snapshot also retains current review/decision |
+| T3 | 实现中 | Reference's two-line task/role/portrait list replaces generic card; metadata stays behind strategy review until confirmation; identity remains stable; task/member drill-down keeps main Lead selected; all labels localized |
+| T4 | 实现中 | At 80%, repeated Host updates during/after drag leave zoom 80%; pan delta matches drag; manual viewport survives resize/detail/back; only explicit Fit/Reset changes its mode/scale |
+| T5 | 实现中 | One parent with five foldable member sessions, no duplicate ordinary rows; pin/archive/search/navigation preserved; exact IDs/transcripts still exist after grouping/restart |
+| T6 | 实现中 | One actual fake-model title request for approved Lead execution, zero per-member/disabled/duplicate requests; manual/newer-task title wins; failure does not affect execution |
+| T7 | 实现中 | Aggregate rows omit long instructions; filtering/search and full detail remain usable; all tasks reachable; no complete+blocked contradiction |
+| T8 | 实现中 | No whole-page horizontal scrolling at supported shell/panel/font conditions; long content remains accessible in detail; intended local scroll/pan still works |
+| T9 | 实现中 | Standard and Team tools/delegates/members/counts/lifecycles stay distinct through modes and approval/reload/recovery; isolated native user sequence passes |
 
 Implementation with a required gate unrun or blocked is **实现中**. After all applicable checks/native paths pass it is **待体验**. Only explicit user confirmation establishes **已验收**. Do not turn a design preview or this planning delivery into product acceptance.
 
@@ -324,11 +345,12 @@ Implementation with a required gate unrun or blocked is **实现中**. After all
 
 Root synchronizes existing related sections, not a new duplicate specification set:
 
-- ADR 0307: presentation metadata, atomic snapshot/notification, derived session relationships, truthful activity. Record the additive boundary decision with context/tradeoffs; retain durable sessions/tool isolation/security.
-- ADR 0186: approved-execution source, once-per-execution guard and optional compare-and-set rename. Keep existing settings/fallback/manual-title policy.
-- `03-runtime/02-agent-runtime`: title inputs and Team vs Task tool/mode invariants; `03-tools-and-permissions`: optional spawn metadata validation; `04-data-storage`: kv metadata and relationship projections, no schema bump; `06-host-rpc-protocol`: new snapshot/notification, optional summary fields and rename guard; `10-session-state-machine`: real turn/phase/paused semantics.
+- ADR 0307: review-carried presentation metadata, snapshot including review/decision, changed events, derived session relationships and truthful activity. Retain durable sessions/tool isolation/security and record no schema migration.
+- ADR 0186: approved-execution title source, once-per-execution guard, persisted automatic-title marker and Host compare-and-set rename. Keep existing settings/fallback/manual-title policy.
+- `03-runtime/02-agent-runtime`: approved-title inputs and Team vs Task tool/mode invariants; `03-tools-and-permissions`: proposal presentation validation and review-before-dispatch; `04-data-storage`: KV metadata and relationship projection, no schema bump; `06-host-rpc-protocol`: snapshot/review fields, changed event and rename guard; `10-session-state-machine`: real turn/phase/paused semantics.
 - `04-ux/01-ui-ia` and `08-component-spec`: queue disclosure, task progress, compact board/detail, group row behaviors, viewport/overflow. Update `07-ui-design-system` only if documenting the new domain-specific pixel avatar is useful; do not reclassify every Team leaf as a new global primitive.
-- `06-delivery/04-e2e-test-plan`: extend existing Team runtime/mailbox/panel, queue row, sidebar, title, panorama and approved execution scenarios with exact fixtures/expected outcomes. Specs and code remain English; all shipped UI locales receive new keys. Changelog updates for the released user-facing surface follow repository convention, without a version bump/release unless requested.
+- `04-ux/08-component-spec` and `06-delivery/04-e2e-test-plan`: specify the shared local-Desktop snapshot, review retention, queue, Overview, board, sidebar, title, panorama, overflow, and Team/Subagent user paths. Preserve source-specific native/remote projections.
+- `docs/project/unreleased.md`: add a concise user-facing summary for the queue, Team progress/identity/board, live status, panorama and title improvements. Do not bump a version or publish release notes in this task.
 - Where execution touches conflicting automatic-commit/local-main delivery paragraphs, root follows AGENTS and corrects that relevant workflow prose within authorized implementation documentation scope. Do not rewrite unrelated policy files or claim an ADR alone changes runtime behavior.
 
 ## Boundaries and remaining evidence gaps
@@ -348,11 +370,11 @@ The following is a complete component reference, split by the ownership table du
 // Import paths below assume apps/desktop/src/components/workpanel/team/.
 import { useId, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { TeamMemberPhase, TeamMemberRole, TeamTaskRecord, TeamBoardProjection } from "@pi-desktop/shared";
+import type { TeamMemberPhase, TeamMemberPresentation, TeamTaskRecord, TeamBoardProjection } from "@pi-desktop/shared";
 import { Button, Badge, Input, TooltipButton } from "../../ui";
 import { IconCheck, IconChevronDown, IconChevronRight, IconExternal, IconRefresh } from "../../icons";
 
-export type TeamRole = TeamMemberRole;
+export type TeamRole = TeamMemberPresentation["role"];
 export type MemberView = {
   sessionId: string;
   handle: string;
@@ -452,7 +474,7 @@ export function TeamTaskProgress({ rows, completed, total, expanded, onToggle,
     <ol id={rowsId} className="team-progress-rows" hidden={!expanded}>
       {rows.map(({ task, ordinal, state, owner }) => <li key={task.taskId}>
         <Button variant="ghost" className="team-progress-row"
-          aria-label={t("team.openTaskWithStatus", { subject: task.subject, status: t(`team.taskStatus.${state}`) })}
+          aria-label={t("team.openTaskWithStatus", { subject: task.subject, status: state === "blocked" ? t("team.waitingForDependencies") : t(`team.taskStatus.${state}`) })}
           onClick={() => onOpenTask(task.taskId)}>
           <TaskStateIcon state={state} />
           <span className="team-progress-copy">
@@ -531,7 +553,7 @@ export function CompactTeamBoard({ rows, filter, query, onFilter, onQuery,
         <Button variant="ghost" className="team-board-row" onClick={() => onOpenTask(task.taskId)}>
           <TaskStateIcon state={state} />
           <span className="team-board-task" title={task.subject}>{task.subject}</span>
-          <Badge tone={statusTone(state)}>{t(`team.taskStatus.${state}`)}</Badge>
+          <Badge tone={statusTone(state)}>{state === "blocked" ? t("team.waitingForDependencies") : t(`team.taskStatus.${state}`)}</Badge>
           <span className="team-board-owner">{owner ? <MemberIdentity member={owner} /> : t("team.unassigned")}</span>
         </Button>
       </li>)}
@@ -791,7 +813,7 @@ export function usePanoramaViewport({ scopeKey, geometryKey, geometry, container
 
 ## Planning-artifact verification record
 
-Completed this round, on planning base `aef7aad669bb12357d58d899516aeec5473e40e4`:
+Historical preview-only evidence from the 2026-10-01 planning revision (base `aef7aad669bb12357d58d899516aeec5473e40e4`):
 
 - Saved and reread this complete plan; preserved the earlier plan and the clean primary checkout. An independent read-only reviewer found and root corrected the viewport observer/drag cleanup, the execution/title rename race, and exclusive runtime/Main file ownership. Recheck found those three points resolved; this was static review, not product execution.
 - Parsed `ui-reference.tsx` and `viewport-reference.ts` with the primary checkout's TypeScript compiler using `transpileModule`; parsed the HTML script with Node `vm.Script`. All syntax checks passed. Imports, proposed shared types, production styles and React integration are **not** typechecked/built product code.
@@ -799,6 +821,6 @@ Completed this round, on planning base `aef7aad669bb12357d58d899516aeec5473e40e4
 - Set preview zoom to 85%, dragged background by (-40,+30), and triggered the sample status refresh: zoom stayed 0.85, pan stayed (-79,27.036435331230336), all five Overview tasks updated to completed, and the execution indicator updated. This verifies the **preview's** behavior, not the future React/Host implementation.
 - Preview-only light-theme checks at 450x850 and 320x850 produced zero page/board horizontal overflow. Temporary viewport override was reset to the browser's 1280x720 default; the dark panorama preview remains open for review. These reduced-shell checks do not prove the actual Electron shell's supported panel widths/font-scale behavior.
 - Saved [panorama preview](assets/expert-team-ux/preview-panorama-dark.png), [compact board preview](assets/expert-team-ux/preview-board-dark.png), and [narrow light preview](assets/expert-team-ux/preview-board-light-narrow.png). They are design-preview screenshots, not installed-app acceptance images.
-- Checked local document links/artwork, all referenced existing test commands/files, code-block parity, defined CSS tokens, new-file whitespace and `git diff --check`.
+- Those checks apply only to the original planning revision. Recheck links, code-reference parity, command paths, and whitespace after this 2026-10-02 revision; they do not validate current product code.
 
-Product T1-T9 remain **未开始**. Rust/build/typecheck/process E2E/live model and real installed-app visual acceptance were not run because this request is planning; they remain the specified implementation gates. No user data or business source was changed, and nothing was committed/pushed/released.
+Implementation status on 2026-10-02: T1-T9 are **实现中**. Individual worker checks are not the integrated candidate result. Root still needs to record current task-candidate build/typecheck/tests, Host/Rust checks, isolated E2E, actual-app visual evidence, skipped gates, and the reviewed diff before merge/build acceptance. No real provider or user profile is part of the planned fixture.

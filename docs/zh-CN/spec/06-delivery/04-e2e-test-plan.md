@@ -9138,3 +9138,19 @@ the latest destination. These assertions measure work counts, not device FPS.
   and fake provider); `node scripts/e2e-team-review-ui.mjs` (component interaction
   at the API boundary); `cargo test -p host-core --locked team` and the
   `team_rpc_full_journey` contract test. Real-model quality is outside this gate.
+
+### E2E-TEAM-live-overview-board-panorama-and-coexistence
+
+- **Status:** Planned for the current repair; no integrated candidate result is recorded yet.
+- **Preconditions:** Isolated Desktop profile and temporary Host data, local fake provider that records title-summary calls, controlled Team turns/task revisions; no user profile, production service, or paid model.
+- **Steps:** 1) Create a Lead and propose members with optional role/displayName through `declare_team_strategy`; verify pending review creates no member/work, edit model choice, then confirm. 2) Verify stable display identity over unchanged routing handles; run a member while Lead is idle and assert each status reflects Host turn phase. 3) Start an approved Plan/Goal, replay its event and reload; verify one title request, no member request, and that manual/newer title wins over a delayed response. 4) Fold/expand five Composer prompts and run an existing queue action; mailbox and Composer queue remain separate. 5) Open progress/task/member detail and return without switching the main Lead; filter/search the compact board and preserve state when returning. 6) Zoom/pan to 80%, deliver a Host revision, and verify viewport remains continuous; Fit/Reset still work. 7) Expand/select/collapse/reload the sidebar group and preserve all real IDs/transcripts. 8) Run a standard Task delegate in a separate Agent session, compare histories/counts, then pause, queue Team mail, reload and Resume.
+- **Expected:** All local Desktop Team surfaces use the same current snapshot including review/decision. Only confirmed proposals dispatch. Member activity is independent from task state. Identity, navigation and manual viewport survive refresh; standard subagents, Team members, Composer prompts and Team mail stay distinct. Title failure does not affect execution.
+- **Automation:** Extend `node scripts/e2e-team.mjs` and `node scripts/e2e-team-review-ui.mjs`; run `pnpm test:e2e:subagent-models` and `pnpm test:e2e:subagents`. The isolated native user path is still required; the HTML preview and source-regex checks cannot replace it.
+
+### E2E-TEAM-horizontal-overflow
+
+- **Status:** Planned for the current repair; the actual overflow offender has not yet been recorded in the integrated app.
+- **Preconditions:** Isolated Desktop candidate, long task text and unbroken scope/path fixtures, existing minimum chat width, no user data.
+- **Steps:** Inspect Overview, Team aggregate/board/details and the three-column shell at panel widths 320/450/620px and font scales 100%/150% in light/dark themes and English/Chinese. Record the offending element's `clientWidth`/`scrollWidth`, apply a local fix, then exercise tab-strip, Markdown table/code and panorama scrolling/panning.
+- **Expected:** The page has no horizontal scrollbar or displaced shell content; long content remains reachable in detail, and intentional local scrolling/panning remains usable.
+- **Automation:** Extend the isolated Team/three-column Electron harness after confirming it measures the production shell; record commit, width, scale, theme, locale and offender evidence.

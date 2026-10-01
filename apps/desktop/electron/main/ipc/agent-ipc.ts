@@ -226,6 +226,9 @@ export function registerAgentIpc({
       settings,
       {
         mode: "agent",
+        // This synthetic namespace only resolves a tool-free one-shot provider.
+        // It is not a durable Team participant and never launches an agent.
+        executionProfile: "standard",
         providerId: typeof req.providerId === "string" ? req.providerId.trim() : undefined,
         modelId: typeof req.modelId === "string" ? req.modelId.trim() : undefined,
         thinkingLevel: "off",

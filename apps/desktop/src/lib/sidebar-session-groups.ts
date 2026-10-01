@@ -85,6 +85,120 @@ export function getGlobalPinnedSessions(
 
 type TimeGroup = "today" | "yesterday" | "thisWeek" | "older14d" | "archived";
 
+export type SidebarSessionGroup =
+  | { kind: "team"; lead: SessionSummary; members: SessionSummary[] }
+  | { kind: "session"; session: SessionSummary; parentSessionId?: string };
+
+function stableCreatedOrder(a: SessionSummary, b: SessionSummary): number {
+  const created = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+  return (Number.isFinite(created) ? created : 0) || a.id.localeCompare(b.id);
+}
+
+/** Collapse host-linked member sessions under their lead without losing or reparenting rows. */
+export function groupTeamSessions(sessions: readonly SessionSummary[]): SidebarSessionGroup[] {
+  const leads = new Map(
+    sessions.filter((session) => session.team?.role === "lead").map((session) => [session.id, session]),
+  );
+  const members = new Map<string, SessionSummary[]>();
+  const standalone: SidebarSessionGroup[] = [];
+
+  for (const session of sessions) {
+    if (session.team?.role === "lead") continue;
+    const parentId = session.team?.role === "member" ? session.team.teamSessionId : undefined;
+    if (!parentId || !leads.has(parentId)) {
+      standalone.push({ kind: "session", session, ...(parentId ? { parentSessionId: parentId } : {}) });
+      continue;
+    }
+    const children = members.get(parentId) ?? [];
+    children.push(session);
+    members.set(parentId, children);
+  }
+
+  const teams = [...leads.values()].map((lead): SidebarSessionGroup => ({
+    kind: "team",
+    lead,
+    members: (members.get(lead.id) ?? []).sort(stableCreatedOrder),
+  }));
+  const consumed = new Set<string>([
+    ...leads.keys(),
+    ...[...members.values()].flatMap((items) => items.map((item) => item.id)),
+  ]);
+  return [...teams, ...standalone.filter((item) => item.kind !== "session" || !consumed.has(item.session.id))];
+}
+
+export function sidebarSessionGroupIds(group: SidebarSessionGroup): string[] {
+  return group.kind === "team"
+    ? [group.lead.id, ...group.members.map((member) => member.id)]
+    : [group.session.id];
+}
+
+export function sidebarSessionGroupUpdatedAt(group: SidebarSessionGroup): string {
+  if (group.kind !== "team") return group.session.updatedAt;
+  return [group.lead, ...group.members].reduce((latest, session) =>
+    Date.parse(session.updatedAt) > Date.parse(latest) ? session.updatedAt : latest,
+  group.lead.updatedAt);
+}
+
+/** Recent order follows the latest activity in any visible member; other sort modes keep lead order. */
+export function sortSidebarSessionGroups(
+  groups: readonly SidebarSessionGroup[],
+  compareSessions: (a: SessionSummary, b: SessionSummary) => number,
+  recent: boolean,
+): SidebarSessionGroup[] {
+  return [...groups].sort((a, b) => {
+    const aParent = a.kind === "team" ? a.lead : a.session;
+    const bParent = b.kind === "team" ? b.lead : b.session;
+    if (recent) {
+      return compareSessions(
+        { ...aParent, updatedAt: sidebarSessionGroupUpdatedAt(a) },
+        { ...bParent, updatedAt: sidebarSessionGroupUpdatedAt(b) },
+      );
+    }
+    return compareSessions(aParent, bParent);
+  });
+}
+
+export function visibleSidebarSessionGroups(
+  groups: readonly SidebarSessionGroup[],
+  expanded: boolean,
+  limit: number,
+): { visible: SidebarSessionGroup[]; hiddenCount: number } {
+  const visible = expanded ? [...groups] : groups.slice(0, Math.max(0, limit));
+  return { visible, hiddenCount: groups.length - visible.length };
+}
+
+export function partitionPinnedSidebarSessionGroups(
+  groups: readonly SidebarSessionGroup[],
+  pinnedIds: ReadonlySet<string>,
+): { pinned: SidebarSessionGroup[]; history: SidebarSessionGroup[]; pinnedSessionIds: Set<string> } {
+  const pinned: SidebarSessionGroup[] = [];
+  const history: SidebarSessionGroup[] = [];
+  const pinnedSessionIds = new Set<string>();
+  for (const group of groups) {
+    if (group.kind === "team") {
+      if (pinnedIds.has(group.lead.id)) {
+        pinned.push(group);
+        for (const id of sidebarSessionGroupIds(group)) pinnedSessionIds.add(id);
+        continue;
+      }
+      history.push(group);
+      for (const member of group.members) {
+        if (!pinnedIds.has(member.id)) continue;
+        pinned.push({ kind: "session", session: member, parentSessionId: group.lead.id });
+        pinnedSessionIds.add(member.id);
+      }
+      continue;
+    }
+    if (pinnedIds.has(group.session.id)) {
+      pinned.push(group);
+      pinnedSessionIds.add(group.session.id);
+    } else {
+      history.push(group);
+    }
+  }
+  return { pinned, history, pinnedSessionIds };
+}
+
 function getTimeGroup(dateStr: string | undefined, now: Date): TimeGroup {
   if (!dateStr) return "older14d";
   const ts = Date.parse(dateStr);
@@ -101,6 +215,22 @@ function getTimeGroup(dateStr: string | undefined, now: Date): TimeGroup {
 }
 
 const TIME_GROUP_ORDER: TimeGroup[] = ["today", "yesterday", "thisWeek", "older14d", "archived"];
+
+export function groupSidebarSessionGroupsByTime(
+  groups: readonly SidebarSessionGroup[],
+  now = new Date(),
+) {
+  const grouped = new Map<TimeGroup, SidebarSessionGroup[]>();
+  for (const item of groups) {
+    const group = getTimeGroup(sidebarSessionGroupUpdatedAt(item), now);
+    if (!grouped.has(group)) grouped.set(group, []);
+    grouped.get(group)!.push(item);
+  }
+  return TIME_GROUP_ORDER.flatMap((group) => {
+    const items = grouped.get(group);
+    return items?.length ? [{ group, sessions: items }] : [];
+  });
+}
 /** Group only normal history; callers remove global pins before any row limit. */
 export function groupSidebarSessionsByTime(sessions: SessionSummary[], now = new Date()) {
   const grouped = new Map<TimeGroup, SessionSummary[]>();

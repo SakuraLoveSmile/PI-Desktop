@@ -118,7 +118,12 @@ test("app chrome uses the shared brand asset without branding the composer input
   );
   assert.match(appLanguage, /document\.documentElement\.lang\s*=\s*target/);
   assert.doesNotMatch(styles, /@keyframes home-mascot-orbit|@keyframes home-mascot-breathe|@keyframes home-mascot-blink/);
-  assert.doesNotMatch(styles, /background-size:\s*5000px 100px|image-rendering:\s*pixelated/);
+  assert.doesNotMatch(styles, /background-size:\s*5000px 100px/);
+  // Expert Team portraits intentionally retain crisp pixel edges. App branding
+  // and the composer must continue using their smooth raster artwork.
+  for (const block of styles.matchAll(/([^{}]+)\{([^{}]*image-rendering:\s*pixelated[^{}]*)\}/g)) {
+    assert.match(block[1].trim(), /^(\.team-pixel-avatar|\.agent-panorama-node-avatar img)$/);
+  }
   assert.doesNotMatch(composer, /<BrandLogo/);
   assert.doesNotMatch(composer, /composer-thread-mark/);
   assert.doesNotMatch(styles, /\.composer-thread-mark/);

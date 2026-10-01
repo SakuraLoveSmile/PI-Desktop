@@ -1,5 +1,11 @@
 # Unreleased changes
 
+- Expert Team work is easier to follow: queued prompts can be folded, team
+  progress and a searchable compact task board show stable member identities,
+  live activity refreshes from Host state, and panorama zoom survives updates.
+  Member sessions are grouped under their Lead, and approved Plan/Goal runs can
+  receive one concise automatic title without changing execution on failure.
+
 - Skills now discovers installed pi CLI npm skill packages and offers explicit
   import with a source and executable-extension confirmation. Imported packages
   remain managed in Plugins; discovery never enables code automatically.

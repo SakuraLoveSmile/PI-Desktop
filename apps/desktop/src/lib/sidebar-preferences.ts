@@ -25,6 +25,9 @@ export type SessionMeta = {
   manualTitle?: boolean;
   /** Survives renderer restarts so an attempted automatic summarization does not recur. */
   autoTitleAttempted?: boolean;
+  autoTitleExecutionId?: string;
+  lastAutoTitle?: string;
+  teamExpanded?: boolean;
 };
 export const MAX_PROJECT_NAME_CHARS = 80;
 export type ProjectMeta = {
@@ -122,6 +125,14 @@ function cleanSessionMeta(value: unknown): Record<string, SessionMeta> {
     if (manualTitle !== undefined) item.manualTitle = manualTitle;
     const autoTitleAttempted = bool(raw.autoTitleAttempted);
     if (autoTitleAttempted !== undefined) item.autoTitleAttempted = autoTitleAttempted;
+    if (typeof raw.autoTitleExecutionId === "string" && raw.autoTitleExecutionId.trim()) {
+      item.autoTitleExecutionId = raw.autoTitleExecutionId.trim();
+    }
+    if (typeof raw.lastAutoTitle === "string" && raw.lastAutoTitle.trim()) {
+      item.lastAutoTitle = raw.lastAutoTitle.trim();
+    }
+    const teamExpanded = bool(raw.teamExpanded);
+    if (teamExpanded !== undefined) item.teamExpanded = teamExpanded;
     if (Object.keys(item).length) output[id] = item;
   }
   return output;
