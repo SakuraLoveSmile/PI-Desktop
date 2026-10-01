@@ -115,7 +115,10 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
   const handlers = new Map();
   const calls = [];
   let releasePrompt;
-  let promptOperation;
+  let releaseSessionOperation;
+  let firstSessionOperation = true;
+  const promptGate = new Promise((resolve) => { releasePrompt = resolve; });
+  const sessionGate = new Promise((resolve) => { releaseSessionOperation = resolve; });
   const host = {
     async call(method) {
       calls.push(method);
@@ -136,7 +139,10 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
       setProjectInstructionRoot() {},
       async call(method) {
         sidecarCalls.push(method);
-        if (method === "agent.prompt") return { accepted: true, turnId: "turn-1" };
+        if (method === "agent.prompt") {
+          await promptGate;
+          return { accepted: true, turnId: "turn-1" };
+        }
         if (method === "agent.abort") return { ok: true, aborted: true };
         assert.fail(`unexpected sidecar RPC ${method}`);
       },
@@ -150,10 +156,11 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
       sidecarParams: { sessionId: "target", provider: { modelConfig: { input: ["text"] } } },
     }),
     acquireSessionOperation: async () => {
-      if (!promptOperation) {
-        promptOperation = new Promise((resolve) => { releasePrompt = resolve; });
+      if (firstSessionOperation) {
+        firstSessionOperation = false;
+        return () => releaseSessionOperation();
       }
-      await promptOperation;
+      await sessionGate;
       return () => {};
     },
     finishTurn: async (...args) => { finishedTurns.push(args); },
@@ -168,7 +175,7 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
   await Promise.resolve();
   const abort = handlers.get(IPC.invoke.agentAbort)({ sessionId: "target" });
   await Promise.resolve();
-  assert.deepEqual(sidecarCalls, [], "abort must not bypass prompt admission");
+  assert.deepEqual(sidecarCalls, ["agent.prompt"], "abort must not bypass prompt admission");
 
   releasePrompt();
   await prompt;
