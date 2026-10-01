@@ -152,16 +152,30 @@ if (process.platform !== "darwin") {
 }
 
 const electronDist = resolveElectronDist();
-const electronDistFlag = `-c.electronDist=${electronDist}`;
-const afterPackFlag = `-c.afterPack=${gate}`;
-console.error(`[package-macos] packaging with ${electronDistFlag} and the pre-sign identity gate`);
-const status = run("pnpm", [
-  "exec",
-  "electron-builder",
-  electronDistFlag,
-  afterPackFlag,
-  ...forwarded,
-]);
+const flags = [`-c.electronDist=${electronDist}`, `-c.afterPack=${gate}`];
+
+/*
+  Local macOS builds sign without a secure timestamp by default. Asking for one
+  makes codesign request a token from Apple's timestamp authority for every signed
+  file, and on this host that token is reproducibly lost partway through a build —
+  measured as one failure in every ~24 requests, with the failing file differing
+  per run — which aborts packaging with "A timestamp was expected but was not
+  found". A secure timestamp is required for notarization, so the release lane
+  keeps it; set PI_MAC_SECURE_TIMESTAMP=1 to request one here as well when a
+  locally built DMG has to be notarized.
+*/
+if (process.env.PI_MAC_SECURE_TIMESTAMP === "1") {
+  console.error("[package-macos] requesting a secure timestamp (PI_MAC_SECURE_TIMESTAMP=1)");
+} else {
+  flags.push("-c.mac.timestamp=none");
+  console.error(
+    "[package-macos] signing without a secure timestamp: this is a local artifact, not a " +
+      "notarization candidate",
+  );
+}
+
+console.error(`[package-macos] packaging with ${flags.join(" ")}`);
+const status = run("pnpm", ["exec", "electron-builder", ...flags, ...forwarded]);
 if (status !== 0) process.exit(status);
 
 /*

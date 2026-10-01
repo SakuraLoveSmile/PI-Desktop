@@ -338,3 +338,39 @@ signing with `A timestamp was expected but was not found` at a different nested 
 while signing that same file in isolation succeeds and carries a timestamp — a timestamp-authority
 throttling condition of this machine, not of the change. One signed build did complete, and it is
 the one that exposed the silent `--` fallback; the corrected lane was therefore validated unsigned.
+
+### Signing unblocked (2026-10-01, same day)
+
+The Apple Development lane had been unusable here (four of five builds aborted inside code signing).
+Two independent causes were found and fixed; both are recorded in ADR 0308.
+
+1. `codesign --timestamp` loses its token mid-build on this host. Measured directly: twenty-five
+   consecutive signings of the same file with the same flags produced one failure, at request 24,
+   while isolated signings always succeed and carry a real timestamp. Local lanes now pass
+   `-c.mac.timestamp=none`; the release lane keeps the secure timestamp because notarization
+   requires it, and `PI_MAC_SECURE_TIMESTAMP=1` restores it on demand.
+2. The assembler copied the official distribution with `fs.cpSync`, which rewrote the framework's
+   relative symlinks (`Electron Framework -> Versions/Current/Electron Framework`) into absolute
+   links pointing back into the package store. codesign then refused the bundle with
+   `unsealed contents present in the bundle root`. The copy now uses `ditto` and asserts that the
+   root links stay relative.
+
+With both fixed the signed lane completes in about 46 seconds and the candidate passes the identity
+gate outright:
+
+```text
+candidate  qualified-independent  cn.sakura.pi-desktop  AFD9AFCA-8E20-4B0E-837B-6B9A54A02EF6  apple-development (verified)
+qualified independent identity: yes        (verifier exit 0)
+```
+
+Artifact: `apps/desktop/release/Pi-Desktop-Plus-0.15.6-arm64.dmg`, checksum verified, host sidecar
+present, sha256 `737f281831ce22ad447c7293923db2106c90d56d8cd9a3ccb5deff60dd103ef6`. It is signed
+Apple Development **without** a secure timestamp, so it is not a notarization candidate; the release
+lane and CI own notarized publication.
+
+Validation in this turn: the new `macos-identity-packaging.test.mjs` (7 pass), the whole desktop
+suite (2966 tests, 2965 pass, 1 skipped, 0 fail), `pnpm lint`, and `check-docs` (528 pages).
+
+Note for a future build: each assembly links a new main executable, so every build carries a fresh
+UUID. macOS therefore treats each successive build as a new identity and asks for Local Network
+access again — expected behaviour, not a regression.
