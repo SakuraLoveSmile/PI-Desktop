@@ -94,7 +94,10 @@
   4. Open Details, inspect transcript/provider/work state, and dismiss it with
      Close, outside press, and Escape. Keep the call connected; use the bar to
      resume blocked sound, observe a rejected resume, and recover explicitly.
-  5. Navigate between chat, Settings, Plugins, and sessions. End or disable the
+  5. Navigate between chat, Settings, Plugins, and sessions. The call chrome is
+     a docked desktop widget window, so drag it by its own bar, verify the
+     position survives that navigation and is clamped back inside the work area,
+     and verify the main window draws no call bar. End or disable the
      feature with delayed Main termination and renderer cleanup, in either
      completion order. Keep Ending visible and prevent another Start until both
      settle. Exercise unconfirmed release and verify visible blocked recovery.
