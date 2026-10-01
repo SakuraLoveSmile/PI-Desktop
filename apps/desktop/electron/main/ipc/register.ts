@@ -1,6 +1,6 @@
 import { registerGoalReportIpc } from "./goal-report-ipc.js";
 import { join } from "node:path";
-import { dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
+import { app, dialog, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
 import { err, ErrorCodes, IPC, ok, type Result } from "@pi-desktop/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { AgentSidecar } from "../agent-sidecar";
@@ -8,6 +8,7 @@ import type { HostProcess } from "../host-process";
 import { ROUTE_LOCAL, type BackendRouter } from "../remote/backend-router";
 import { registerAgentExtensionIpc } from "../agent-extensions-ipc";
 import { readNpmPath, writeNpmPath } from "../npm-preferences";
+import { createLocalNetworkPermissionController } from "../local-network-permission";
 import { registerAgentIpc } from "./agent-ipc";
 import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
@@ -282,6 +283,13 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getHost,
     sendToRenderer,
   });
+  /*
+    The supplemental Local Network trigger owns a UDP socket and a deadline
+    timer, so exactly one instance lives for the process: the provider handler
+    receives its `trigger`, and the controller registers the shutdown disposal
+    that removes it again. `main/index.ts` stays free of network logic.
+  */
+  const localNetworkPermission = createLocalNetworkPermissionController({ lifecycle: app });
   registerProviderIpc({
     registrar,
     getHost,
@@ -292,6 +300,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     listRuntimeProviders,
     enrichProviderList,
     bindingForModel,
+    localNetworkPermission,
   });
   const loadComposerTemplatesCached = createComposerTemplateLoader(logger);
   const composerCommandService = registerComposerIpc({

@@ -763,6 +763,11 @@ export const api = {
    * answer, `catalog` means the endpoint published nothing and models.dev was
    * used instead, `cache` is the local table, `fallback` is just the configured
    * model id.
+   *
+   * `intent` marks the one explicit manual action (the Fetch list control). It
+   * is the only thing that may enable macOS's supplemental Local Network alert
+   * trigger, it changes nothing about the request the endpoint sees, and it is
+   * never persisted, forwarded to the host or passed by any other caller.
    */
   listProviderModels: (input: {
     providerId?: string;
@@ -771,6 +776,7 @@ export const api = {
     apiStyle?: string;
     headers?: Record<string, string>;
     source?: "cache" | "refresh";
+    intent?: "manual-fetch-list";
   }) =>
     invoke<{
       models: ModelInfo[];
