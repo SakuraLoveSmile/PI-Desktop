@@ -32,6 +32,14 @@ fn kv_set_tx(tx: &Transaction<'_>, ns: &str, key: &str, value: &serde_json::Valu
     Ok(())
 }
 
+fn bump_team_revision_tx(tx: &Transaction<'_>, team_session_id: &str) -> Result<()> {
+    tx.execute(
+        "UPDATE teams SET revision=revision+1, updated_at=?2 WHERE team_session_id=?1",
+        params![team_session_id, now_ms()],
+    )?;
+    Ok(())
+}
+
 pub(super) use super::review_selection::{
     default_member_route, has_pending_review_for_member, is_live_team_mail_turn,
     require_approved_member, validate_reused_member_for_confirmation,
@@ -166,6 +174,7 @@ pub fn declare_team_strategy(
             &format!("{team_session_id}:latest"),
             &json!(lead_turn_id),
         )?;
+        bump_team_revision_tx(&tx, team_session_id)?;
         tx.commit()?;
 
         return Ok((decision, None));
@@ -249,6 +258,10 @@ pub fn declare_team_strategy(
             description: proposed.description,
             context_kind,
             member_session_id: proposed.member_session_id,
+            presentation: proposed
+                .presentation
+                .map(validate_presentation)
+                .transpose()?,
             selection: TeamMemberSelection {
                 provider_id,
                 model_id,
@@ -316,6 +329,7 @@ pub fn declare_team_strategy(
         &format!("{team_session_id}:latest"),
         &json!(lead_turn_id),
     )?;
+    bump_team_revision_tx(&tx, team_session_id)?;
     tx.commit()?;
 
     Ok((decision, Some(review)))
@@ -471,6 +485,7 @@ pub fn update_launch_review(
         &review_val,
     )?;
     kv_set_tx(&tx, TEAM_LAUNCH_REVIEW_NS, review_id, &review_val)?;
+    bump_team_revision_tx(&tx, team_session_id)?;
     tx.commit()?;
 
     Ok(next_review)
@@ -620,6 +635,14 @@ pub fn confirm_launch_review(
                 &member.selection.model_id,
                 &member.selection.thinking_level,
             )?;
+            if let Some(presentation) = &member.presentation {
+                kv_set_tx(
+                    &tx,
+                    "team-member-presentation-v1",
+                    &session_id,
+                    &serde_json::to_value(presentation)?,
+                )?;
+            }
             member_session_ids.push(session_id);
         }
 
@@ -675,6 +698,7 @@ pub fn confirm_launch_review(
             &decision_key,
             &serde_json::to_value(&decision)?,
         )?;
+        bump_team_revision_tx(&tx, team_session_id)?;
         tx.commit()?;
         Ok((confirmed_review, decision))
     })();
@@ -704,6 +728,29 @@ pub fn confirm_launch_review(
             Err(error)
         }
     }
+}
+
+fn validate_presentation(
+    presentation: super::model::TeamMemberPresentation,
+) -> Result<super::model::TeamMemberPresentation> {
+    const ROLES: [&str; 5] = [
+        "researcher",
+        "executor",
+        "reviewer",
+        "planner",
+        "collaborator",
+    ];
+    let display_name = presentation.display_name.trim();
+    if !ROLES.contains(&presentation.role.as_str())
+        || display_name.is_empty()
+        || display_name.chars().count() > 64
+    {
+        return Err(anyhow!("INVALID_PARAMS: invalid team member presentation"));
+    }
+    Ok(super::model::TeamMemberPresentation {
+        role: presentation.role,
+        display_name: display_name.to_string(),
+    })
 }
 
 pub fn cancel_launch_review(
@@ -746,6 +793,7 @@ pub fn cancel_launch_review(
         &review_val,
     )?;
     kv_set_tx(&tx, TEAM_LAUNCH_REVIEW_NS, review_id, &review_val)?;
+    bump_team_revision_tx(&tx, team_session_id)?;
     tx.commit()?;
 
     Ok(cancelled_review)
@@ -760,6 +808,7 @@ pub fn interrupt_pending_reviews_on_boot(db: &Database) -> Result<()> {
     })?;
 
     let mut updates = Vec::new();
+    let mut changed_teams = HashSet::new();
     for row in rows {
         let (key, val_json) = row?;
         let value: serde_json::Value = serde_json::from_str(&val_json)?;
@@ -770,6 +819,7 @@ pub fn interrupt_pending_reviews_on_boot(db: &Database) -> Result<()> {
         if review.status == "pending" {
             review.status = "interrupted".to_string();
             review.revision += 1;
+            changed_teams.insert(review.team_session_id.clone());
             updates.push((key, serde_json::to_value(&review)?));
         }
     }
@@ -777,6 +827,9 @@ pub fn interrupt_pending_reviews_on_boot(db: &Database) -> Result<()> {
     let tx = db.conn().unchecked_transaction()?;
     for (key, val) in updates {
         kv_set_tx(&tx, TEAM_LAUNCH_REVIEW_NS, &key, &val)?;
+    }
+    for team_session_id in changed_teams {
+        bump_team_revision_tx(&tx, &team_session_id)?;
     }
     tx.commit()?;
 

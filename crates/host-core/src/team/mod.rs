@@ -3,6 +3,8 @@
 mod admission_tests;
 pub mod board;
 pub mod lifecycle;
+#[cfg(test)]
+mod lifecycle_tests;
 pub mod mailbox;
 pub mod model;
 pub mod review;
@@ -20,7 +22,7 @@ pub use board::{
     CreateTaskParams, UpdateTaskParams,
 };
 pub use lifecycle::{
-    can_delete_session, cleanup_team_on_lead_delete, ensure_team, get_team, pause_team, resume_team,
+    can_delete_session, ensure_team, get_team, get_team_snapshot, pause_team, resume_team,
 };
 pub use mailbox::{
     ack_team_message, get_team_message, list_member_messages, list_pending_team_messages,
@@ -33,9 +35,9 @@ pub use model::{
 };
 pub use model::{
     TeamCoordinationError, TeamExecutionDecision, TeamLaunchReview, TeamLaunchReviewMember,
-    TeamLaunchReviewSelectionUpdate, TeamMemberSelection, TeamMemberSelectionPartial,
-    TeamProposedMember, MAX_TEAM_STRATEGY_REASON_CHARS, TEAM_EXECUTION_DECISION_SCHEMA_VERSION,
-    TEAM_LAUNCH_REVIEW_SCHEMA_VERSION,
+    TeamLaunchReviewSelectionUpdate, TeamMemberPresentation, TeamMemberSelection,
+    TeamMemberSelectionPartial, TeamProposedMember, TeamSnapshot, MAX_TEAM_STRATEGY_REASON_CHARS,
+    TEAM_EXECUTION_DECISION_SCHEMA_VERSION, TEAM_LAUNCH_REVIEW_SCHEMA_VERSION,
 };
 pub use review::{
     cancel_launch_review, confirm_launch_review, declare_team_strategy, get_execution_decision,
@@ -47,3 +49,13 @@ pub use roster::{
     get_team_member_by_session_id, list_team_members, update_member_phase, validate_member_name,
     validate_team_lead, validate_team_participant, CreateMemberParams,
 };
+
+pub fn get_member_presentation(
+    db: &crate::db::Database,
+    member_session_id: &str,
+) -> anyhow::Result<Option<TeamMemberPresentation>> {
+    Ok(db
+        .kv_get("team-member-presentation-v1", member_session_id)?
+        .map(serde_json::from_value)
+        .transpose()?)
+}

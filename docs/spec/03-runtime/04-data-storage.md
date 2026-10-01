@@ -814,9 +814,38 @@ Expert Team state is stored in three Host-owned tables (ADR 0307):
 - `team_tasks` stores the revisioned shared task board, owner, dependencies,
   advisory write scopes, status, and soft-delete marker.
 
+Optional role/display-name presentation is stored in the existing Host KV
+store under namespace `team-member-presentation-v1`, keyed by durable member
+Session ID. It is copied from a `TeamLaunchReviewMember` only in the confirmed
+review transaction. Old reviews without this field remain valid. Session list
+and search projections derive the optional `SessionSummary.team` relation by
+joining existing Team tables; this is not a new SQL column. These additions do
+not change schema version 21 or the existing ownership of Team/Session data.
+
 Deleting a member session while it belongs to a Team is rejected. Deleting the
 Lead atomically resets member sessions to `standard` and removes Team state;
 member sessions and their transcripts remain ordinary independent sessions.
+
+Lead creation and explicit configuration to the Team profile create the Team
+row in the session transaction. Legacy snapshot bootstrap is restricted to a
+live Team Lead that is not any other Team's member. The existing KV namespace
+`team-lifecycle-v1` stores `{ "dissolved": true }` by Lead ID after dissolution
+or an empty Team's conversion to `standard`; a read cannot revive that Team.
+Explicit conversion back to Team clears this marker in the same transaction.
+The marker is additive KV state and requires no schema migration.
+
+Deletion checks live Plan/Goal gates before any Team mutation. Team cleanup
+and Lead deletion commit together; transcript files are removed only after
+commit. A failed deletion preserves Team members, tasks, review and mail.
+Conversion to `standard` is refused with `TEAM_LEAD_CONFIGURATION_BLOCKED`
+while member, task, mailbox, review or decision data exists. Empty Teams can
+convert atomically without losing another session's data.
+
+Project removal preflights running turns, live Goal restrictions and Team
+membership before mutating project records. Leads are removed before members
+in the same deletion set. Members outside the removed project survive as
+standard sessions; removing a member whose Lead is outside the deletion set
+is blocked by the existing member deletion gate.
 
 ### 4.7 messages — transcript index
 

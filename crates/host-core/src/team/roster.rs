@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use rusqlite::params;
+use rusqlite::{params, Connection, OptionalExtension};
 
 use super::model::{TeamMember, MAX_TEAM_MEMBERS};
 use crate::db::{now_ms, Database};
@@ -64,6 +64,14 @@ pub fn validate_member_name(name: &str) -> Result<()> {
     Ok(())
 }
 
+fn is_valid_member_error(error: &str) -> bool {
+    !error.is_empty()
+        && error.len() <= 64
+        && error
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"_-".contains(&byte))
+}
+
 pub fn list_team_members(db: &Database, team_session_id: &str) -> Result<Vec<TeamMember>> {
     let mut stmt = db.conn().prepare_cached(
         "SELECT team_session_id, member_session_id, name, description, context_kind,
@@ -83,6 +91,7 @@ pub fn list_team_members(db: &Database, team_session_id: &str) -> Result<Vec<Tea
                 phase: row.get(5)?,
                 model_id: row.get(6)?,
                 provider_id: row.get(7)?,
+                presentation: None,
                 error: row.get(8)?,
                 created_at: row.get::<_, i64>(9)?.to_string(),
                 updated_at: row.get::<_, i64>(10)?.to_string(),
@@ -114,6 +123,7 @@ pub fn get_team_member_by_name(
             phase: row.get(5)?,
             model_id: row.get(6)?,
             provider_id: row.get(7)?,
+            presentation: None,
             error: row.get(8)?,
             created_at: row.get::<_, i64>(9)?.to_string(),
             updated_at: row.get::<_, i64>(10)?.to_string(),
@@ -144,6 +154,7 @@ pub fn get_team_member_by_session_id(
             phase: row.get(5)?,
             model_id: row.get(6)?,
             provider_id: row.get(7)?,
+            presentation: None,
             error: row.get(8)?,
             created_at: row.get::<_, i64>(9)?.to_string(),
             updated_at: row.get::<_, i64>(10)?.to_string(),
@@ -329,6 +340,7 @@ fn create_team_member_impl(
         phase: "idle".to_string(),
         model_id: model_id.map(Into::into),
         provider_id: provider_id.map(Into::into),
+        presentation: None,
         error: None,
         created_at: now.to_string(),
         updated_at: now.to_string(),
@@ -346,6 +358,9 @@ pub fn update_member_phase(
     let valid_phases = ["provisioning", "idle", "running", "failed", "completed"];
     if !valid_phases.contains(&phase) {
         return Err(anyhow!("INVALID_PARAMS: unknown member phase '{phase}'"));
+    }
+    if error.is_some_and(|value| !is_valid_member_error(value)) {
+        return Err(anyhow!("INVALID_PARAMS: invalid member error code"));
     }
     let now = now_ms();
     let rows = db.conn().execute(
@@ -365,6 +380,52 @@ pub fn update_member_phase(
     }
 }
 
+pub(crate) fn update_member_turn_phase_conn(
+    conn: &Connection,
+    member_session_id: &str,
+    phase: &str,
+    error: Option<&str>,
+) -> Result<bool> {
+    let valid_phases = ["running", "idle", "failed", "completed"];
+    if !valid_phases.contains(&phase) {
+        return Err(anyhow!("INVALID_PARAMS: unknown member phase '{phase}'"));
+    }
+    let error = error.map(|code| {
+        if is_valid_member_error(code) {
+            code
+        } else {
+            "TURN_FAILED"
+        }
+    });
+    let now = now_ms();
+    let team_session_id: Option<String> = conn
+        .query_row(
+            "SELECT team_session_id FROM team_members WHERE member_session_id=?1",
+            params![member_session_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(team_session_id) = team_session_id else {
+        let changed = conn.execute(
+            "UPDATE teams SET revision=revision+1, updated_at=?2 WHERE team_session_id=?1",
+            params![member_session_id, now],
+        )?;
+        return Ok(changed > 0);
+    };
+    let changed = conn.execute(
+        "UPDATE team_members SET phase=?1, error=?2, updated_at=?3
+         WHERE member_session_id=?4 AND (phase IS NOT ?1 OR error IS NOT ?2)",
+        params![phase, error, now, member_session_id],
+    )?;
+    if changed > 0 {
+        conn.execute(
+            "UPDATE teams SET revision=revision+1, updated_at=?2 WHERE team_session_id=?1",
+            params![team_session_id, now],
+        )?;
+    }
+    Ok(changed > 0)
+}
+
 pub fn gate_session_configure(
     db: &Database,
     session_id: &str,
@@ -375,7 +436,40 @@ pub fn gate_session_configure(
     target_permission_mode: Option<&str>,
     target_execution_profile: Option<&str>,
 ) -> Result<()> {
-    if let Some(member) = get_team_member_by_session_id(db, session_id)? {
+    let member = get_team_member_by_session_id(db, session_id)?;
+    if member.is_none()
+        && target_execution_profile == Some("standard")
+        && sessions::session_execution_profile(db, session_id)?.as_deref() == Some("team")
+    {
+        let has_members_or_tasks: bool = db.conn().query_row(
+            "SELECT EXISTS(SELECT 1 FROM team_members WHERE team_session_id=?1)
+                OR EXISTS(SELECT 1 FROM team_tasks WHERE team_session_id=?1)",
+            [session_id],
+            |row| row.get(0),
+        )?;
+        let has_mail: bool = db.conn().query_row(
+            "SELECT EXISTS(SELECT 1 FROM session_collaboration_messages
+                 WHERE plugin_id=?1)",
+            [super::mailbox::team_plugin_origin(session_id)],
+            |row| row.get(0),
+        )?;
+        let has_review_data: bool = db.conn().query_row(
+            "SELECT EXISTS(
+                 SELECT 1 FROM kv
+                 WHERE ns IN ('team-launch-review-v1','team-execution-decision-v1')
+                   AND (key=?1 OR key LIKE ?2)
+             )",
+            params![session_id, format!("{session_id}:%")],
+            |row| row.get(0),
+        )?;
+        if has_members_or_tasks || has_mail || has_review_data {
+            return Err(anyhow!(
+                "TEAM_LEAD_CONFIGURATION_BLOCKED: cannot change execution profile while Team data exists"
+            ));
+        }
+    }
+
+    if let Some(member) = member {
         if target_mode != "agent" {
             return Err(anyhow!(
                 "TEAM_MEMBER_MODEL_CHANGE_BLOCKED: cannot change mode of active team member"

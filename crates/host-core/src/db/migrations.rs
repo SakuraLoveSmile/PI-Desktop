@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::HashSet;
 
 const AUDIT_RETENTION_MS: i64 = 90 * 24 * 3600 * 1000;
 const TASK_RUNS_KEEP: i64 = 100;
@@ -11,6 +12,29 @@ impl Database {
             [],
         );
         let tx = self.conn.unchecked_transaction()?;
+        let mut running_team_sessions: HashSet<String> = {
+            let mut stmt = tx.prepare_cached(
+                "SELECT team_session_id FROM teams
+                 WHERE team_session_id IN (
+                   SELECT session_id FROM turns WHERE status='running'
+                 )",
+            )?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            rows.collect::<rusqlite::Result<HashSet<_>>>()?
+        };
+        let running_members: Vec<(String, String)> = {
+            let mut stmt = tx.prepare_cached(
+                "SELECT team_session_id, member_session_id FROM team_members
+                 WHERE phase='running' AND member_session_id IN (
+                   SELECT session_id FROM turns WHERE status='running'
+                 )",
+            )?;
+            let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        for (team_session_id, _) in &running_members {
+            running_team_sessions.insert(team_session_id.clone());
+        }
         tx.execute(
             "UPDATE turns
          SET status = 'aborted', error_code = COALESCE(error_code, 'TURN_ABORTED'),
@@ -18,6 +42,19 @@ impl Database {
          WHERE status = 'running'",
             params![now],
         )?;
+        for (_, member_session_id) in running_members {
+            tx.execute(
+                "UPDATE team_members SET phase='idle', error=NULL, updated_at=?2
+                 WHERE member_session_id=?1 AND phase='running'",
+                params![member_session_id, now],
+            )?;
+        }
+        for team_session_id in running_team_sessions {
+            tx.execute(
+                "UPDATE teams SET revision=revision+1, updated_at=?2 WHERE team_session_id=?1",
+                params![team_session_id, now],
+            )?;
+        }
         tx.execute(
             "UPDATE task_runs SET status = 'aborted', ended_at = ?1 WHERE status = 'running'",
             params![now],

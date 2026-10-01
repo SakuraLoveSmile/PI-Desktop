@@ -290,6 +290,7 @@ export type AppState = {
    */
   deleteProject: (path: string) => Promise<void>;
   toggleSessionPinned: (id: string) => void;
+  setTeamExpanded: (id: string, expanded: boolean) => void;
   toggleSessionArchived: (id: string) => void;
   archiveSession: (id: string) => void;
   restoreSession: (id: string) => void;

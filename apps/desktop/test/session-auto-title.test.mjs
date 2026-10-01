@@ -33,7 +33,8 @@ test("session title summarization is wired through the full desktop path", () =>
 test("automatic title generation runs after the first turn and respects restart-safe custom titles", () => {
   assert.match(store, /event\.type === "agent_end"[\s\S]*triggerAutoTitleSummarization/);
   assert.match(store, /manualTitle/);
-  assert.match(store, /!isDefaultSessionTitle\(session\.title\)/);
+  assert.match(titleRuntime, /canReplaceAutomaticSessionTitle\(/);
+  assert.match(titleRuntime, /session\.team\?\.role === "member"/);
   assert.match(store, /promptFallbackSessionTitle\(firstUser\.content, ""\)/);
   assert.match(store, /initialSidebarPreferences\.sessionMeta/);
   assert.match(store, /manualTitle: true/);
@@ -54,6 +55,8 @@ test("automatic title generation setting and validation tightening contracts", (
   // Sidebar preferences persistence
   assert.match(sidebarPreferences, /autoTitleAttempted\?: boolean/);
   assert.match(sidebarPreferences, /raw\.autoTitleAttempted/);
+  assert.match(sidebarPreferences, /autoTitleExecutionId\?: string/);
+  assert.match(sidebarPreferences, /lastAutoTitle\?: string/);
   assert.match(sidebarPreferences, /export function markSessionAutoTitleAttempted/);
 
   // API validation and Settings UI toggle
@@ -65,7 +68,7 @@ test("automatic title generation setting and validation tightening contracts", (
   assert.match(titleRuntime, /state\.settings\?\.autoGenerateSessionTitles === false/);
   assert.match(titleRuntime, /meta\.autoTitleAttempted/);
   assert.match(titleRuntime, /state\.sessionMeta\[sessionId\]\?\.autoTitleAttempted/);
-  assert.match(titleRuntime, /markSessionAutoTitleAttempted/);
+  assert.match(titleRuntime, /saveSidebarPreferences/);
   assert.match(titleRuntime, /persistSessionMeta/);
   assert.match(titleRuntime, /latestState\.settings\?\.autoGenerateSessionTitles === false/);
   assert.match(titleRuntime, /manualSessionTitles\.has\(sessionId\)/);

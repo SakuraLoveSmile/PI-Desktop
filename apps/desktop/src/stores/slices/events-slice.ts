@@ -28,6 +28,7 @@ import {
 import { formatToolValue } from "../../lib/tool-display";
 import type { AppState } from "../app-state";
 import type { SessionRuntime } from "../runtime/session-runtime";
+import type { SessionTitleRuntime } from "../runtime/session-title-runtime";
 import type { StoreAccess } from "./types";
 
 export type EventsSliceDependencies = StoreAccess & {
@@ -42,7 +43,7 @@ export type EventsSliceDependencies = StoreAccess & {
     kind: "ask" | "permission" | "plan",
     payload?: { question?: string; toolName?: string },
   ) => void;
-  triggerAutoTitleSummarization: (sessionId: string) => Promise<void>;
+  triggerAutoTitleSummarization: SessionTitleRuntime["triggerAutoTitleSummarization"];
   flushPendingSessionConfiguration: (sessionId: string) => Promise<void>;
   assistantErrorMessage: (error: {
     code: string;
@@ -147,6 +148,14 @@ export function createEventsSlice({
         };
       });
       const checkpoint = get().planCheckpoints[event.sessionId];
+      if (event.executionState === "running" && event.executionId &&
+        checkpoint?.executionId === event.executionId) {
+        void triggerAutoTitleSummarization(event.sessionId, {
+          executionId: event.executionId,
+          proposalTitle: checkpoint.title,
+          proposalQuestion: checkpoint.question,
+        });
+      }
       if (event.state === "awaiting_approval" && !event.proposal) {
         void get().restorePendingPlan(event.sessionId);
       }

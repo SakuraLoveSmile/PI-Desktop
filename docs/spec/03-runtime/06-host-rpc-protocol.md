@@ -373,6 +373,27 @@ to later refresh and inference; the vendor picker does not collect them.
 - `team.getRoster({ teamSessionId, callerSessionId })` and
   `team.getBoard({ teamSessionId, callerSessionId })` return separate roster
   and revisioned task-board projections after Host membership validation.
+- `team.getSnapshot({ teamSessionId, callerSessionId })` is the additive local
+  Desktop read used by Overview, TeamPanel, and the panorama. It returns one
+  flat, revisioned view with members/presentation, Lead phase, tasks/readiness,
+  overlaps, queued Team-mail count, current launch review, and latest execution
+  decision. Review edit/confirm/cancel remain separate trusted operations; the
+  read does not grant mutation authority. Existing roster and board methods
+  remain available to older clients. Remote/native source projections do not
+  call this local IPC surface.
+  Missing legacy Team rows may bootstrap only for an existing local Team Lead;
+  dissolved, standard, deleted and member sessions cannot bootstrap a Team.
+  Lead configuration to `standard` returns `TEAM_LEAD_CONFIGURATION_BLOCKED`
+  while durable Team work exists; deletion failures do not dissolve the Team.
+- After committed Team state changes, `team.changed` carries only
+  `{ teamSessionId, revision, reason }`. Desktop Main forwards it on the typed
+  Team event. A renderer can ignore an older revision and refresh its scoped
+  snapshot; prompts, task descriptions, and transcripts are not event payload.
+- `team.declareStrategy` accepts optional member presentation on proposed
+  review data. It creates or updates a pending review, never a member session.
+  The trusted Desktop review path selects effective member bindings and
+  confirms the revision before Host creation/dispatch. Direct mutation entry
+  points reject unconfirmed work; `spawn_teammate` does not accept presentation.
 - `team.getMessage({ teamSessionId, callerSessionId, messageId })` reads one
   durable Team mailbox row. The Lead can read every row; a member can read only
   a row it sent or received. Unknown and cross-Team ids return `null`.

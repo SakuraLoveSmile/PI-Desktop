@@ -88,6 +88,17 @@ A steering input is judged by the same identity: one that names a turn which was
 cancelled, has started finalizing, or no longer owns the session is refused as a
 turn that has ended.
 
+For Expert Team members, Host `phase` is a projection of the durable turn
+lifecycle, not task-board status. Successful turn admission sets `running` in
+the same transaction/savepoint as the turn row. Durable completion sets
+`completed`, error sets `failed`, and abort/interruption sets `idle` in the same
+terminal transaction. A rejected admission cannot leave a running phase, and a
+late/non-updating terminal event cannot overwrite a newer active turn. Recovery
+settles interrupted running turns before exposing the Team snapshot. A member
+turn completion does not complete its owned tasks. The Lead snapshot reports
+real current activity; Team-level waiting/completion also considers member
+phases, task states and queued Team mail, never the pause flag alone.
+
 ## 3. Transition rules
 
 1. Only one active turn per session
