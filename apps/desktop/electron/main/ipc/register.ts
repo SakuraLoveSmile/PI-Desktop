@@ -14,6 +14,7 @@ import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
 import { registerMarketIpc } from "./market-ipc";
 import { registerMcpIpc } from "./mcp-ipc";
+import { registerMcpControlIpc } from "./mcp-control-ipc";
 import type { McpOAuthManager } from "../mcp-oauth";
 import { searchMcpMarket } from "../mcp-registry-catalog";
 import { registerNotificationIpc } from "./notification-ipc";
@@ -446,6 +447,10 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     sendToRenderer,
     searchMcpMarket,
   });
+  // The local control plane's own on/off channel pair: registered for the
+  // renderer, absent from the reviewed catalog so an external MCP client
+  // cannot switch off the plane that serves it.
+  registerMcpControlIpc({ registrar });
 
 
   registerSkillsIpc({

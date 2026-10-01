@@ -88,10 +88,13 @@ Electron Main 独家拥有更新客户端和修复的 GitHub 版本
 
 ### 3. 6 本地 MCP 控制面
 
-设置 `PI_DESKTOP_MCP_CONTROL=1` 时，Electron Main 会在 `127.0.0.1` 启动可选的
-Streamable HTTP MCP 服务。服务提供项目/会话/Agent/工作区常用命名工具，以及经过
-审查的通用桌面操作目录。每次调用都委托给渲染器使用的同一主进程 IPC 处理器，不会
-创建第二套权限或持久化实现。
+启动环境设置 `PI_DESKTOP_MCP_CONTROL=1` 时，或桌面设置界面保存的本机偏好要求启用
+时，Electron Main 会在 `127.0.0.1` 启动可选的 Streamable HTTP MCP 服务。生效值依次
+取明确的环境值、已保存偏好，最后是 `false`。服务提供项目/会话/Agent/工作区常用
+命名工具，以及经过审查的通用桌面操作目录。每次调用都委托给渲染器使用的同一主进程
+IPC 处理器，不会创建第二套权限或持久化实现。设置界面通过 `mcpControlGet` /
+`mcpControlSet` 读取状态并开关该控制面，二者返回不含 token 的状态，且不进入外部
+操作目录。
 
 服务在 Electron 用户数据目录创建 bearer token 和连接清单，只绑定回环地址，不暴露
 密钥通道、provider/OAuth/MCP 密钥写入路径，或渲染器专属原生选择器。危险通用操作和

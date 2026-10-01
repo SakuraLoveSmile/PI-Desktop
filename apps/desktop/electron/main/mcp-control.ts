@@ -568,6 +568,10 @@ export const MCP_CONTROL_BLOCKED_CHANNEL_KEYS = [
   "settingsSet",
   "mcpUpsert",
   "mcpImport",
+  // The control plane's own switch is renderer-only: an external MCP client
+  // that could disable it would silently cut off the automation it is driving.
+  "mcpControlGet",
+  "mcpControlSet",
   // Importing a pi extension opens a native picker and grants agent.extension.
   "pluginImportExtension",
 ] as const;

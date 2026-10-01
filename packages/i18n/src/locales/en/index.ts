@@ -898,6 +898,26 @@ sklm: {
     mcpDuplicate: "An MCP server with this ID or name already exists at this level.",
     mcpProjectSubtitle: "Active only in {{project}}.",
     mcpEmpty: "No MCP servers in this folder",
+    mcpControl: {
+      title: "Local control endpoint",
+      thisMachine: "This machine",
+      toggle: "Toggle local control endpoint",
+      reading: "Reading state…",
+      on: "On",
+      off: "Off",
+      failed: "Failed to start",
+      unavailable: "State unavailable",
+      unreachable: "Could not read the local control endpoint state: {{message}}",
+      onHint:
+        "External local agents can drive this desktop over MCP. It listens on 127.0.0.1 only.",
+      offHint:
+        "Turning it off disconnects the control plane; sessions that are already running continue.",
+      envControlled: "Controlled by a launch argument",
+      connectionFile: "Connection file",
+      retry: "Retry start",
+      turnedOn: "Local control endpoint is on",
+      turnedOff: "Local control endpoint is off",
+    },
     mcpMarket: {
       browse: "Market",
       back: "My servers",

@@ -9,6 +9,7 @@ export * from "./keyboard-shortcuts.js";
 export * from "./changelog.js";
 export * from "./composer-trigger.js";
 export * from "./fuzzy.js";
+export * from "./mcp-control-settings.js";
 export * from "./mcp-import.js";
 export * from "./mcp-catalog.js";
 export * from "./mcp-catalog-builtin.js";
