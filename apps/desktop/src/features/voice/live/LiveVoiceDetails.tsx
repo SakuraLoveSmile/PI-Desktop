@@ -16,7 +16,7 @@ export function LiveVoiceDetails({ t, call, status, transcripts, open, onClose, 
   transcripts: LiveTranscriptSegment[];
   open: boolean;
   onClose: () => void;
-  anchorRef: RefObject<HTMLButtonElement | null>;
+  anchorRef: RefObject<HTMLElement | null>;
 }) {
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const sessions = useAppStore((state) => state.sessions);

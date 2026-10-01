@@ -351,3 +351,4 @@ Each ADR includes:
 | provider-system-certificates | [Desktop sidecar uses OS-trusted certificates](provider-system-certificates.md) | Accepted |
 | image-generation-capability | [Image generation as a configured Agent capability](image-generation-capability.md) | Accepted |
 | retained-browser-pages-per-tab | [Retain a host-owned browser page per resource tab](retained-browser-pages-per-tab.md) | Accepted |
+| 0314 | [The Live Voice call bar is a docked desktop widget window](0314-live-voice-docked-widget.md) | Accepted |
