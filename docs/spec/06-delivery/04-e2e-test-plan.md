@@ -150,7 +150,15 @@
   terminal event arriving before submit resolves. Query an exact terminal
   result without creating another Host turn. Request project/session lists,
   verify labels and opaque call-scoped references, then test opening and
-  creating only through their existing panel actions. Exercise feedback while
+  creating only through their existing panel actions. With a submission
+  waiting on the user, confirm the compact bar keeps a waiting line and
+  Details shows the pending ask question with an action that opens that exact
+  session; verify another session's pending request stays unattributed. Then
+  answer the open asktool question by voice and confirm the session's card
+  resolves through the Host input path; retry with a label the question never
+  offered, with a partial answer, and with two open questions, and confirm each
+  is refused without a write and without being retried.
+  Exercise feedback while
   generation, user speech, and playback are active; finish by ending Live after
   Host admission.
 - **Expected:** The initial target is the current Composer session when present;
@@ -185,6 +193,13 @@
   cover provider/user/local playback gating and separate delivery status.
   `apps/desktop/test/live-work-scope.test.mjs` covers selection reference
   scope/expiry, and `live-work-operations.test.mjs` covers the panel actions.
+  `apps/desktop/test/live-work-decision.test.mjs` covers the waiting-decision
+  projection, its session scoping, bounded plain-text rendering and the panel
+  action that opens the bound session.
+  `packages/host-runtime/src/live-work/ask-answer.test.ts` covers the spoken
+  answer intent and its routing (resolved, refused, unknown and never resent),
+  and `apps/desktop/test/spoken-answer.test.mjs` covers the option-only
+  matching, the bounded read-out and the delivery budget.
   `voice-runtime/src/live/playback-monitor.test.ts` covers local audio signal
   detection. This is targeted automated coverage, not the complete
   W2-001—W2-096 matrix or real-provider E2E.

@@ -309,6 +309,22 @@
   min-width: 0;
 }
 
+/* The bound work session is blocked on a decision the call bar cannot take. */
+.live-voice-decision {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in oklab, var(--ds-warning) 35%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-warning) 12%, transparent);
+}
+
+.live-voice-decision-title {
+  color: var(--ds-warning);
+  font-size: var(--text-sm);
+}
+
 .live-voice-work-selections {
   display: grid;
   gap: 8px;

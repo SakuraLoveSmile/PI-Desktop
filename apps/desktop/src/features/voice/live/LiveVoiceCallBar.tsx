@@ -1,10 +1,11 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
 import type { TFunction } from "i18next";
 import { IconClose, IconInfo, IconMic, IconMicOff, IconPhoneOff, IconSettings, IconVolume, IconWaveform } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
 import type { LiveVoiceSnapshot } from "./live-call-controller";
 import { useAppStore } from "../../../stores/app-store";
 import { liveVoiceMode, type liveVoiceIssue } from "./live-voice-presentation";
+import { liveWorkDecision, operationAwaitsDecision } from "./live-work-decision";
 
 type CallBarProps = {
   t: TFunction;
@@ -64,6 +65,23 @@ export function LiveVoiceCallBar({
                 : "liveVoice.phase.connected";
   const unmute = call?.muted !== false;
   const speaking = mode === "connected" && (call?.assistantSpeaking || (call?.userSpeaking && !call.muted));
+  // A waiting work session outlives a spoken announcement: the user may be
+  // reading another session when the decision appears, and the card that
+  // answers it lives in the bound session, not in this bar.
+  const boundSessionId = call?.workBinding?.workSessionId;
+  const planCheckpoints = useAppStore((state) => state.planCheckpoints);
+  const pendingPermissions = useAppStore((state) => state.pendingPermissions);
+  const pendingAsks = useAppStore((state) => state.pendingAsks);
+  const decisionWaiting = useMemo(
+    () => Boolean(liveWorkDecision({
+      sessionId: boundSessionId,
+      awaiting: operationAwaitsDecision(call?.workOperations, boundSessionId),
+      asks: pendingAsks,
+      permissions: pendingPermissions,
+      planCheckpoints,
+    })),
+    [boundSessionId, call?.workOperations, pendingAsks, pendingPermissions, planCheckpoints],
+  );
 
   return (
     <div className="live-voice-call-bar" data-state={mode}>
@@ -132,6 +150,9 @@ export function LiveVoiceCallBar({
               never reaches this bar (live-voice spec). */}
           <code className="live-voice-error-code">{issue.code}</code>
         </p>
+      ) : null}
+      {decisionWaiting && (mode === "connected" || mode === "reconnecting") ? (
+        <p className="live-voice-feedback live-voice-hint" role="status">{t("liveVoice.decisionWaiting")}</p>
       ) : null}
     </div>
   );
