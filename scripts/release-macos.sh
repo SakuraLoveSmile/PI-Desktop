@@ -76,6 +76,19 @@ pnpm --filter @pi-desktop/agent-runtime bundle
 echo "==> Building the desktop bundles"
 pnpm --filter @pi-desktop/desktop exec electron-vite build
 
+# The packaged candidate must carry an independently linked Electron main
+# executable: without it the app keeps the official application's main executable
+# UUID and loses its own Local Network identity (ADR 0308). A caller may point
+# PI_ELECTRON_DIST at a distribution assembled earlier; otherwise assemble one
+# here, offline, from the pinned official distribution.
+if [[ -z "${PI_ELECTRON_DIST:-}" ]]; then
+  PI_ELECTRON_DIST="$(node scripts/assemble-electron-dist.mjs --arch "${MAC_ARCH}" | tail -n 1)"
+fi
+if [[ -z "${PI_ELECTRON_DIST}" || ! -d "${PI_ELECTRON_DIST}/Electron.app" ]]; then
+  echo "error: no independent Electron distribution is available at '${PI_ELECTRON_DIST}'." >&2
+  exit 1
+fi
+
 echo "==> Packaging the desktop (Developer ID signed + notarized, $MAC_ARCH)"
 # `--publish never` keeps a local checkout from publishing to GitHub; the
 # Release workflow owns publication. The watchdog is transparent: it forwards
@@ -90,7 +103,9 @@ DEBUG="${DEBUG:-electron-osx-sign*,electron-notarize*}" \
     --publish never \
     -c.mac.identity="${MAC_SIGNING_IDENTITY}" \
     -c.mac.forceCodeSigning=true \
-    -c.mac.notarize=true
+    -c.mac.notarize=true \
+    -c.electronDist="${PI_ELECTRON_DIST}" \
+    -c.afterPack="$(pwd)/scripts/macos-identity-gate.mjs"
 
 echo "==> Analyzing the packaged app bundle"
 node scripts/macos-bundle-inventory.mjs apps/desktop/release
