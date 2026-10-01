@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { SessionTodo, TodoStatus } from "@pi-desktop/shared";
 import { Button } from "./ui";
 import { IconCheck, IconChevronDown, IconChevronUp } from "./icons";
-import { api } from "../lib/api";
+import { useSessionTodosRecovery } from "../features/chat/todos/useSessionTodosRecovery";
 import { useAppStore } from "../stores/app-store";
 
 const VISIBLE_LIMIT = 8;
@@ -28,11 +28,7 @@ export function TodoDock({ sessionId }: { sessionId: string }) {
     setExpanded(false);
   }, [sessionId]);
 
-  useEffect(() => {
-    if (sessionId.startsWith("remote:")) return;
-    if (snapshot) return;
-    void api.getTodos(sessionId).then(useAppStore.getState().applyTodosChanged).catch(() => undefined);
-  }, [sessionId, snapshot]);
+  useSessionTodosRecovery(sessionId);
   if (!snapshot || snapshot.todos.length === 0) return null;
   const completed = snapshot.todos.filter((todo) => todo.status === "completed").length;
   const cancelled = snapshot.todos.filter((todo) => todo.status === "cancelled").length;

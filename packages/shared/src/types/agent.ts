@@ -183,6 +183,8 @@ export type ToolPermissionRequest = {
   agentName?: string;
   /** `Task` call that spawned the asking delegate. */
   parentToolCallId?: string;
+  /** Immediate tool parent when this request came from nested execution. */
+  nestedParentToolCallId?: string;
 };
 
 export type ToolPermissionResolution = {
@@ -239,6 +241,17 @@ export type AskToolRequest = {
   questions: AskToolQuestion[];
 };
 
+/**
+ * Every interactive request one session is currently waiting on. Host state,
+ * not connection state: a renderer that reloaded reads this instead of holding
+ * a card that no longer exists, and it stays empty for a session with nothing
+ * pending.
+ */
+export type PendingInteractiveRequests = {
+  asks: AskToolRequest[];
+  permissions: ToolPermissionRequest[];
+};
+
 /** `null` means the user skipped that question or declined the whole prompt. */
 export type AskToolResolution = {
   requestId: string;
@@ -263,6 +276,7 @@ export type AgentEvent =
   | { type: "agent_start" }
   | { type: "agent_end"; messageIds: string[] }
   | { type: "turn_start" }
+  | { type: "usage"; usage: MessageUsage }
   | { type: "turn_end"; subagentUsage?: MessageUsage }
   | { type: "message_start"; message: UiMessage }
   | {
@@ -324,6 +338,8 @@ export type AgentEventEnvelope = {
    * skips the turn-lifecycle handling that belongs to the parent alone.
    */
   parentToolCallId?: string;
+  /** Immediate nested-tool parent; never identifies subagent ownership. */
+  nestedParentToolCallId?: string;
   /** Definition name of the emitting subagent. */
   agentName?: string;
 };

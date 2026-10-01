@@ -53,6 +53,8 @@ import { registerIpcHandlers } from "./ipc/register";
 import { createVoiceService } from "./voice-service";
 import { MicrophoneLeaseRegistry } from "./live-voice/microphone-lease";
 import { createLiveCallService } from "./live-voice/runtime";
+import { createLiveVoiceWidget } from "./live-voice/widget-window";
+import { getActiveRemoteHostsBoot } from "./bootstrap/remote-hosts";
 import { installLiveMicrophonePermissionHandlers } from "./live-voice/microphone-permissions";
 import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
@@ -299,11 +301,7 @@ const updater = new AppUpdaterController({
  * this process; the renderer sees progress events and the sidecar sees only
  * resolved request auth.
  */
-const modelsDevCatalog = new ModelsDevCatalog({
-  catalogPath: app.isPackaged
-    ? join(process.resourcesPath, "models.dev", "api.json")
-    : join(app.getAppPath(), "resources", "models.dev", "api.json"),
-});
+const modelsDevCatalog = new ModelsDevCatalog();
 
 const vendorOAuth = new VendorOAuth({
   call: <T,>(method: string, params?: unknown): Promise<T> => {
@@ -316,9 +314,12 @@ const vendorOAuth = new VendorOAuth({
     await safeOpenExternal(url);
   },
   log: (level, message, data) => logger.app("provider", level, message, { data }),
-  modelConfigFor: async ({ vendorKey, option }) => {
+  onAccountModels: (id, models) => modelsDevCatalog.setAccountModels(id, models),
+  onAccountRemoved: (id) => modelsDevCatalog.deleteAccount(id),
+  modelConfigFor: async ({ providerId, vendorKey, option }) => {
     await modelsDevCatalog.ensureLoaded();
     return catalogModelConfigFor(modelsDevCatalog, {
+      providerId,
       vendorKey,
       baseUrl: option.baseUrl,
       apiStyle: option.apiStyle,
@@ -835,10 +836,23 @@ const voiceService = createVoiceService(
   (token) => microphoneLeases.acquire("dictation", token),
 );
 voiceServiceReference = voiceService;
+// The docked call widget: a desktop-level window that shows the call chrome
+// wherever the user put it and sends every action back to this window, which
+// stays the Live Voice owner (media, microphone lease, work scope).
+const liveVoiceWidget = createLiveVoiceWidget({
+  getMainWindow,
+  dataDir,
+  safeOpenExternal,
+  log: (message, data) => logger.app("diagnostics", "warn", message, data ? { data } : undefined),
+});
+
 const liveCallService = createLiveCallService({
   getHost,
   getMainWindow,
   getAgentHostBridge: () => mainState.agentHostBridge,
+  getSidecar,
+  getBackendRouter: () => startupState.backendRouter,
+  getRemoteHosts: () => getActiveRemoteHostsBoot(),
   vendorOAuth,
   microphoneLeases,
   resolveAgentRuntimeLaunch: (sessionId, session, settings, overrides) => {
@@ -848,6 +862,8 @@ const liveCallService = createLiveCallService({
       mode: "agent",
     });
   },
+  log: (level, message, data) => logger.app("provider", level, message, { data }),
+  onCallView: (view) => liveVoiceWidget.publish(view),
 });
 
 function registerIpc() {
@@ -946,6 +962,7 @@ function registerIpc() {
     sendToRenderer,
     voiceService,
     liveCallService,
+    liveVoiceWidget,
   });
 }
 
@@ -989,6 +1006,9 @@ app.once("ready", () => {
   powerMonitor.on("suspend", () => void liveCallService.endForLifecycle("app-suspended"));
   powerMonitor.on("lock-screen", () => void liveCallService.endForLifecycle("app-suspended"));
 });
+
+// The widget is chrome for a call this window owns; it must never outlive the app.
+app.once("will-quit", () => liveVoiceWidget.close());
 
 registerApplicationStartup({
   hasSingleInstanceLock,

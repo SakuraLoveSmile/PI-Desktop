@@ -9,12 +9,20 @@
 
 ---
 
+### E2E-LIVE-VOICE-public-settings-and-reconnect
+
+- **前提：** 生产 Renderer 构建、真实 Electron/Main/Host、隔离数据和测试项目、关闭开发者模式、本地 TLS Realtime fixture 及合成麦克风。仅在测试子进程中信任 fixture CA，不关闭 TLS、sender、沙盒或麦克风权限校验。
+- **步骤：** 在功能关闭时从 Composer 打开 Live，点击“打开设置”。通过设置搜索找到 Voice，绑定测试账号并启用；连接、取消静音、接收音频和字幕、静音并挂断。取消延迟启动，断开服务后显式重连；使用同一隔离配置重启，检查持久化设置并关闭功能。
+- **预期：** 普通用户可以到达入口；启用设置不会开始采集。真实构建中的 Renderer 通过精确主 frame 所有者校验。只使用所选账号，静音停止输入，每次结束释放媒体/socket，失败不会自动发起新通话。重启保留设置但不重连；旧 Dictation 设置不变，纯通话不创建 Agent 会话。
+- **覆盖：** `pnpm test:e2e:live-voice` 驱动真实构建及具体 Realtime GA adapter，连接本地 WSS；`live-voice-owner.test.mjs` 打包生产 owner 模块并验证其他文件/frame 被拒绝。合成音频不代表物理设备或真实 Provider 验收；命令和结果见 `docs/implementation/live-voice-public-readiness.md`。
+- **规格：** [实时语音](../03-runtime/live-voice.md)。
+
 ### E2E-LIVE-WORK-session-admission
 
 - **前提：** 使用隔离的 Live Provider fixture、本地 AgentHost 会话和确定性意图分类器；候选请求须从现有 Live adapter 回调进入，不使用真实账号或付费端点。
-- **步骤：** 验证纯通话没有工作作用域时会拒绝任务候选；再以明确选择的本地会话和关闭的上下文共享启动工作通话。提交一个已声明工具请求并检查回执、Host admission 和 `voiceOrigin`。覆盖忙时独立排队、过期 steer、精确回合 stop、submit 返回前到达的终态事件，以及基于已记录结果的只读查询。请求项目／会话列表，确认只返回标签和本次 call 的 opaque 引用；通过面板动作打开已列会话、在已列项目中新建会话，并确认工作绑定仍固定。分别保持 Provider 生成、用户讲话和本地播放活跃，确认反馈须待三者空闲和静默窗口结束后才发送。覆盖 silent、静默时的显式查询、过期反馈降级；结束通话时确认已受理工作仍保留。
+- **步骤：** 验证纯通话没有工作作用域时会拒绝任务候选；再以明确选择的本地会话和关闭的上下文共享启动工作通话。提交一个已声明工具请求并检查回执、Host admission 和 `voiceOrigin`。覆盖忙时独立排队、过期 steer、精确回合 stop、submit 返回前到达的终态事件，以及基于已记录结果的只读查询。请求项目／会话列表，确认只返回标签和本次 call 的 opaque 引用；通过面板动作打开已列会话、在已列项目中新建会话，并确认工作绑定仍固定。分别保持 Provider 生成、用户讲话和本地播放活跃，确认反馈须待三者空闲和静默窗口结束后才发送。覆盖 silent、静默时的显式查询、过期反馈降级；当提交处于等待用户决策状态时，确认紧凑栏保留等待提示、详情显示待决请求并提供打开该精确会话的操作，且其他会话的待决请求不会被归到绑定会话；当提交处于等待用户决策状态时，确认紧凑栏保留等待提示、详情显示待决请求并提供打开该精确会话的操作，且其他会话的待决请求不会被归到绑定会话。随后用语音回答该 AskTool 提问，确认会话卡片经由 Host 输入路径解决；再分别用提问从未提供的标签、只回答一部分、以及同时存在两个待答提问重试，确认每次都被拒绝、不产生写操作且不重试。结束通话时确认已受理工作仍保留。
 - **预期：** 工作始终绑定到通话开始时选定的会话；关闭上下文共享时不读取历史；现有 AgentHost 执行 prompt、steer、queue 和 stop；重复 Provider ID 不重复派发；结果查询只投影准确操作摘要且不会创建新回合。项目／会话选项不暴露原始路径或 ID，引用按 call 隔离并过期；打开只导航，创建必须先列出注册项目并由用户点击确认。自动反馈同时观察 Provider 生成状态和本地播放活动，任务执行与反馈投递状态分开。结束 Live 不取消已受理任务；Renderer 信号不代表用户已经听到结果。
-- **覆盖：** `apps/desktop/test/live-voice-service.test.mjs` 覆盖纯通话拒绝、显式工作作用域和 Provider／用户／本地播放的反馈门控及独立投递状态；`packages/host-runtime/src/live-work/coordinator.test.ts` 覆盖回执顺序、路由、过期 steer、去重、关闭通话、早到终态和选择流程；`packages/host-runtime/src/live-work/feedback-scheduler.test.ts` 覆盖防抖、播报间隔、silent、过期降级、去重与溢出；`packages/host-runtime/src/live-work/context.test.ts` 覆盖上下文投影与 opaque 引用；`packages/host-runtime/src/live-work/result-summary.test.ts` 覆盖精确回合摘要和诚实回退；`packages/agent-host/src/agent-host.test.ts` 覆盖无历史快照、队列和语音来源；`packages/voice-runtime/src/live/protocol.test.ts` 覆盖 Provider 工具及反馈编码；`apps/desktop/test/live-work-scope.test.mjs` 覆盖引用作用域／过期，`live-work-operations.test.mjs` 覆盖面板动作，`voice-runtime/src/live/playback-monitor.test.ts` 覆盖本地音频信号检测。该自动化覆盖仍不等于 W2-001—W2-096 全矩阵，也不代表真实 Provider／设备验收。
+- **覆盖：** `apps/desktop/test/live-voice-service.test.mjs` 覆盖纯通话拒绝、显式工作作用域和 Provider／用户／本地播放的反馈门控及独立投递状态；`packages/host-runtime/src/live-work/coordinator.test.ts` 覆盖回执顺序、路由、过期 steer、去重、关闭通话、早到终态和选择流程；`packages/host-runtime/src/live-work/feedback-scheduler.test.ts` 覆盖防抖、播报间隔、silent、过期降级、去重与溢出；`packages/host-runtime/src/live-work/context.test.ts` 覆盖上下文投影与 opaque 引用；`packages/host-runtime/src/live-work/result-summary.test.ts` 覆盖精确回合摘要和诚实回退；`packages/agent-host/src/agent-host.test.ts` 覆盖无历史快照、队列和语音来源；`packages/voice-runtime/src/live/protocol.test.ts` 覆盖 Provider 工具及反馈编码；`apps/desktop/test/live-work-scope.test.mjs` 覆盖引用作用域／过期，`live-work-operations.test.mjs` 覆盖面板动作，`live-work-decision.test.mjs` 覆盖等待决策投影、会话作用域、有界纯文本渲染与打开绑定会话的面板操作，`voice-runtime/src/live/playback-monitor.test.ts` 覆盖本地音频信号检测；`packages/host-runtime/src/live-work/ask-answer.test.ts` 覆盖语音回答意图与路由（解决、拒绝、unknown 且绝不重发），`apps/desktop/test/spoken-answer.test.mjs` 覆盖只选既有选项的匹配、有界朗读内容与投递预算。该自动化覆盖仍不等于 W2-001—W2-096 全矩阵，也不代表真实 Provider／设备验收。
 - **状态：** 部分完成；其余场景和实机矩阵见 `docs/implementation/live-work-evidence.md`。
 
 ### E2E-LIVE-WORK-v2.1-reliability
@@ -64,6 +72,55 @@
 - 作为可追溯性主干：场景 ID ↔ 验收标准 ↔ 规范。
 - 定义代码 pull request 的相关 E2E 合入门。
 - 让验证证据与准备合入的可执行提交保持关联。
+
+### E2E-LIVE-VOICE-four-stage-ui
+
+- **标题：** 已禁用、准备、紧凑通话栏和主动打开的详情。
+- **前提：** 使用隔离的开发构建 Electron 配置，开启开发者模式，Live Voice
+  初始为禁用状态，并使用确定性的本地服务商/媒体 fixture 和本地工作会话
+  fixture。不使用真实账号、麦克风、扬声器、付费端点或用户正在运行的 Desktop。
+- **步骤：**
+  1. 确认禁用时 Composer 中既没有 Live Voice 图标，也没有 Work 图标。仅从
+     「设置 → 语音」启用 Live Voice，并确认空闲时恰好显示一个语音图标。
+  2. 打开准备界面，展开并折叠工作选项，但不开始通话。确认没有准备请求、
+     麦克风获取、媒体初始化、服务商连接或工作派发。让选中的绑定不可用，
+     同时保持另一个绑定就绪：界面显示确切的选中身份和原因、禁用开始操作，
+     且不会隐式切换服务商。
+  3. 绑定就绪后，明确开始并观察紧凑栏显示「连接中」和「取消」，确认不会
+     自动打开详情。在准备或媒体获取仍未完成时取消，再送达延迟的完成事件。
+     再次开始并连接，确认默认静音，然后取消静音/静音并检查状态。
+  4. 打开详情，检查转录、服务商和工作状态，然后分别通过关闭、点击外部和
+     Escape 关闭详情。通话保持连接；通过通话栏恢复暂停的声音，观察恢复失败，
+     再明确重试并恢复。
+  5. 在聊天、设置、插件和会话间导航。通话控件是停靠的桌面挂件窗口：拖动它自身的
+     通话栏，确认位置在这些导航后仍然保留、并会被夹取回工作区内，同时确认主窗口
+     不再绘制任何通话栏。在 Main 延迟终止和 Renderer 延迟清理的
+     情况下结束通话或禁用功能，并分别测试两种清理完成顺序。在两者完成前，
+     始终显示「结束中」，且不允许再次开始。模拟释放未确认，确认阻止状态可见。
+  6. 重新打开准备界面，确认工作授权和上下文确认均未勾选。仅展开区域或选择
+     会话不会开始通话；未授权工作时开始只启用语音。明确授权工作请求、选择
+     有效的本地目标并开始；在详情中检查固定绑定和工作结果。结束后重新打开
+     准备界面，再分别变更/创建目标、取消工作授权或取消通话，并确认上下文
+     确认被重置。结束 Live 不会停止已受理的工作。
+  7. 使用已配置的切换快捷键直接开始纯语音通话并结束。启动期间，如果弹窗
+     消费了 Escape，则它只会关闭弹窗，不会取消启动；没有弹窗消费时，启动取消
+     快捷键才生效。Escape 不会结束已连接的通话。用英文和简体中文分别检查
+     可见控件，并确认所有已发布语言目录都齐全。
+- **预期：** 四种明确的界面状态、主动启动和工作授权、确切绑定的就绪状态、
+  默认静音、全局清理状态可见、控件无障碍属性和焦点返回正确，且 IPC、持久化或
+  权限边界没有变化。恢复播放和错误处理不需要打开详情。
+- **规格：** [Live Voice](../03-runtime/live-voice.md)、
+  [Live Work](../03-runtime/live-work-session.md)、
+  [组件规格](../04-ux/08-component-spec.md#1171-live-voice-准备-紧凑通话栏和详情)、
+  [设置 IA](../04-ux/06-settings-ia.md#voice-experimental)。
+- **验收：** C / E / Security / Quality。
+- **里程碑：** MVP 后实验性交互维护。
+- **覆盖：** 定向控制器/展示回归测试和 `pnpm test:e2e:live-voice-interaction`
+  覆盖已挂载的生产控件、控制器、store、快捷键、i18n、清理顺序、工作授权，
+  以及使用模拟 shell 导航和伪造外部边界的错误恢复。该测试不会挂载完整的
+  AppShell/设置/插件路由，也不会实际使用服务商、设备、权限提示或音频输出。
+- **状态：** 请求候选 fixture 的 48/48 项交互检查通过。完整 AppShell、真实服务商
+  和设备兼容性尚未验证。
 
 ## 2. 非目标
 
@@ -347,7 +404,7 @@ task-candidate E2E 从请求工作树运行，但使用主工作区已经准备�
 #### E2E-005I：从选择器标题重新获取服务模型列表
 
 - **前提条件**：添加或编辑服务（或厂商账户）对话框已打开，且该服务可访问并提供 `/models` 列表。
-- **步骤**：1) 确认左侧标题旁有「获取列表」，在有效端点就绪前为禁用。2) 填入有效端点。确认在 600 ms 防抖等待期间「获取列表」已可用。立刻点击；确认它不等待该窗口，探测时显示加载文案，然后列出模型。3) 再次点击「获取列表」。确认加载期间保留当前行，并以实时结果替换。4) 让服务离线后再点「获取列表」；确认出现分类错误且先前的行仍在。5) 恢复服务，再点「获取列表」，确认实时列表回来。6) 在厂商账户编辑对话框重复上述步骤。
+- **步骤**：1) 确认左侧标题旁有「获取列表」，在有效端点就绪前为禁用。2) 填入有效端点。确认在 600 ms 防抖等待期间「获取列表」已可用。立刻点击；确认它不等待该窗口，探测时显示加载文案，然后列出模型。3) 再次点击「获取列表」。确认加载期间保留当前行，并以实时结果替换。4) 让服务离线后再点「获取列表」；确认分类错误以 toast 出现且先前的行仍在。5) 恢复服务，再点「获取列表」，确认实时列表回来。6) 在厂商账户编辑对话框重复上述步骤。
 - **预期**：标题上的操作会立刻向服务探测，包括端点刚变为有效后的防抖等待期间。凭据变更触发的自动发现不变。两种凭据都有同一控件，因为两个对话框共用该选择器。
 - **链接规格**：`03-runtime/13-model-catalog-and-selection.md`、
   `04-ux/06-settings-ia.md`、`04-ux/08-component-spec.md`
@@ -5405,15 +5462,17 @@ eleven-tool-round desktop paths are verified by
 - **前提：** 隔离的本地 Electron 配置、确定性的 Agent/Host fixture、两个 Desktop 会话，不使用真实 Provider 或付费 API。
 - **步骤：** 启动调用 `TodoWrite` 的多步骤 Agent 回合，观察 Composer 上方的 TodoDock，展开后切换会话并确认清单隔离。完成和取消条目，确认最多显示八条以及全部取消状态；清空清单后重载/重启 Host。发送乱序旧 `todos.changed` 事件，确认它不能覆盖新快照；再覆盖非法参数、Plan/Goal、委托和远程会话路径。
 - **预期：** Host SQLite 是权威状态；每次成功全量替换（包括清空）都会推进 revision 并只发出一次已提交的 `todos.changed`。非法或未授权写入既不修改也不发事件。TodoDock 渲染纯文本、不抢焦点、切换会话时收起、拒绝旧事件，并对 `remote:` 会话跳过本地恢复，因为 RACP v1 没有 Todo 快照操作。
-- **链接规格：** `03-runtime/03-tools-and-permissions.md`、`03-runtime/04-data-storage.md`、`03-runtime/06-host-rpc-protocol.md`、`04-ux/08-component-spec.md`、ADR 0310。
+- **链接规格：** `03-runtime/03-tools-and-permissions.md`、`03-runtime/04-data-storage.md`、`03-runtime/06-host-rpc-protocol.md`、`04-ux/08-component-spec.md`、ADR 0312。
 - **验收：** C / E / F / Quality / Security。
 - **里程碑：** M6+。
-- **状态：** Host-core、`apps/desktop/test/todo-dock-rendering.test.mjs` 和 `todo-events.test.mjs` 已有定向自动化覆盖；完整 Electron 进程/重启旅程仍是候选验证门。
+- **自动化：** `pnpm test:e2e:todos` 从生产 Agent 的 ToolSearch/TodoWrite 路径进入，使用生产渲染器、真实 Host/SQLite 和隔离 Electron 配置验证清单旅程；仅替换外部模型流和 preload 传输，不使用真实 Provider 或用户配置。覆盖 Unicode 截断及警告重放、单一活动项归一化、首次读取失败后不切换会话的主机恢复、已缓存快照重新同步及旧事件拒绝。运行时 `runtime-todos.test.ts` 使用确定性 Provider 验证 Agent 工具校验、超长内容归一化和续跑。
+- **状态：** 构建 Desktop 和 Host 后，在确切的请求候选中执行。Host-core 和渲染器定向测试是辅助检查，不能替代 Electron 用户旅程。
 
 ## 8. 可追溯性矩阵
 | 验收 | 应用场景 |
 |---|---|
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
+| C / E / Security / Quality — Live Voice 四阶段交互 | E2E-LIVE-VOICE-four-stage-ui |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — 桌面定时任务 | E2E-SCHEDULED-desktop-automation-lifecycle |
@@ -5483,6 +5542,7 @@ eleven-tool-round desktop paths are verified by
 
 | 里程碑 | 应用场景 |
 |---|---|
+| MVP 后实验性交互维护 | E2E-LIVE-VOICE-four-stage-ui |
 | M1 | E2E-001、E2E-002、E2E-003、E2E-028、E2E-029 |
 | M2 | E2E-004、E2E-005、E2E-006、E2E-007、E2E-008、E2E-008d、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-020、E2E-021、E2E-027、E2E-031、 E2E-036、E2E-037、E2E-042、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-144、E2E-005J、E2E-201 |
 | M3 | E2E-012、E2E-013、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-040 |

@@ -239,6 +239,7 @@ export class AgentHost {
     const meta2 = {
       turnId,
       parentToolCallId: envelope.parentToolCallId,
+      nestedParentToolCallId: envelope.nestedParentToolCallId,
       agentName: envelope.agentName,
     };
 
@@ -359,6 +360,7 @@ export class AgentHost {
         this.emit(state, "turn.activity", { event }, meta2);
         return;
       }
+      case "usage":
       case "turn_start":
       case "turn_end":
         this.emit(state, "turn.activity", { event }, meta2);
@@ -829,6 +831,19 @@ export class AgentHost {
     return this.approvals.list(sessionId);
   }
 
+  /**
+   * Open interactive inputs of one session, oldest first: the same entries a
+   * late-attaching client reads as `snapshot().pendingInputs`, without a
+   * history read. The paired original request carries the runtime request id
+   * and tool call the answer has to be resolved against.
+   */
+  pendingInputRequests(sessionId: string): Array<{ input: RacpInputRequest; original: AskToolRequest }> {
+    return [...this.state(sessionId).pendingInputs.values()].map((entry) => ({
+      input: entry.request,
+      original: entry.original,
+    }));
+  }
+
   /** The RACP view of a session the caller already fetched: its durable summary plus live state. */
   describeSession(summary: SessionSummary): RacpSession {
     const state = this.state(summary.id);
@@ -909,7 +924,7 @@ export class AgentHost {
       error?: NonNullable<TurnRecord["error"]>;
       kind: Parameters<EventHub["publish"]>[0]["kind"];
       payload: Record<string, unknown>;
-      meta: { turnId?: string; parentToolCallId?: string; agentName?: string };
+      meta: { turnId?: string; parentToolCallId?: string; nestedParentToolCallId?: string; agentName?: string };
     },
   ): void {
     if (turn) {
@@ -1192,7 +1207,7 @@ export class AgentHost {
     state: SessionState,
     kind: Parameters<EventHub["publish"]>[0]["kind"],
     payload: unknown,
-    meta: { turnId?: string; parentToolCallId?: string; agentName?: string },
+    meta: { turnId?: string; parentToolCallId?: string; nestedParentToolCallId?: string; agentName?: string },
   ): void {
     const durable = racpDurable(kind);
     if (durable) state.revision += 1;
@@ -1203,6 +1218,7 @@ export class AgentHost {
       revision: state.revision,
       kind,
       ...(meta.parentToolCallId ? { parentToolCallId: meta.parentToolCallId } : {}),
+      ...(meta.nestedParentToolCallId ? { nestedParentToolCallId: meta.nestedParentToolCallId } : {}),
       ...(meta.agentName ? { agentName: meta.agentName } : {}),
       payload: this.boundPayload(payload),
     });
@@ -1279,6 +1295,7 @@ export class AgentHost {
       status,
       createdAt: new Date(envelope.ts).toISOString(),
       ...(envelope.parentToolCallId ? { parentToolCallId: envelope.parentToolCallId } : {}),
+      ...(envelope.nestedParentToolCallId ? { nestedParentToolCallId: envelope.nestedParentToolCallId } : {}),
       ...(envelope.agentName ? { agentName: envelope.agentName } : {}),
       content,
     };
@@ -1297,6 +1314,7 @@ export class AgentHost {
       expiresAt: new Date(this.clock.now() + this.approvalLifetime(state)).toISOString(),
       ...(envelope.agentName ? { agentName: envelope.agentName } : {}),
       ...(envelope.parentToolCallId ? { parentToolCallId: envelope.parentToolCallId } : {}),
+      ...(envelope.nestedParentToolCallId ? { nestedParentToolCallId: envelope.nestedParentToolCallId } : {}),
       questions: request.questions.map((question, index) => ({
         id: `${request.requestId}:${index}`,
         question: question.question,
