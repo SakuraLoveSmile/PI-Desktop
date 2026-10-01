@@ -2495,3 +2495,20 @@ done and total for that phase, and the bytes when they are known. A long upload
 of many resource objects is therefore not an interface with nothing to show.
 Background polls report nothing, since only the manual path has a caller
 watching.
+
+
+### Goal report asset reads and check observations
+
+`goalReports/getAsset` accepts the session/execution pair plus an asset id and
+a bounded chunk range. Host verifies that the execution belongs to the session,
+then serves only assets in that execution's report directory; manifest paths,
+absolute source references, parent traversal, symlink escapes and cross-session
+attachment references do not grant filesystem access. Unsupported or oversized
+images remain unavailable, and reads are bounded before loading bytes. The
+response carries MIME type, total bytes, hash, offset, base64 data and EOF.
+
+Check observations use persisted tool results from the same session up to the
+report's durable sequence. A model-supplied exit code is only a claim; missing
+or unverifiable references produce `inconclusive`, and a recorded failure must
+not be overwritten by a claimed success. These additive report fields do not
+change the database schema or grant renderer filesystem access.

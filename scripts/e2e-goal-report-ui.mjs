@@ -68,8 +68,8 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
       // Bind execution turn
       await ctx.host.call("goalReports.bindExecutionTurn", { executionId, turnId });
 
-      // Place a valid PNG screenshot in dataDir/attachments
-      const attDir = join(ctx.dataDir, "attachments");
+      // Place a screenshot in this session's owned scratch directory
+      const attDir = join(ctx.dataDir, "scratch", session.id);
       mkdirSync(attDir, { recursive: true });
       const rawPng = Buffer.concat([
         Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -78,6 +78,22 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
       const pngSha256 = createHash("sha256").update(rawPng).digest("hex");
       const imgFileName = "screenshot-sample.png";
       writeFileSync(join(attDir, imgFileName), rawPng);
+
+      for (const [id, command, exitCode] of [
+        ["recorded-check-1", "cargo test", 0],
+        ["recorded-check-2", "npm run lint", 1],
+      ]) {
+        await ctx.host.call("session.appendMessage", {
+          sessionId: session.id,
+          turnId,
+          message: {
+            id, role: "tool", content: "Fixture command output",
+            createdAt: new Date().toISOString(), toolName: "Bash",
+            toolCallId: id, toolStatus: "success", toolArgs: { command },
+            toolResult: { exitCode },
+          },
+        });
+      }
 
       const draft = {
         verdict: "met",
@@ -100,13 +116,15 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
           { path: "apps/desktop/src/components/workpanel/GoalReportTab.tsx", changeType: "modified", attribution: "direct" },
         ],
         checks: [
-          { id: "chk-1", command: "cargo test", result: "passed", exitCode: 0 },
-          { id: "chk-2", command: "npm run lint", result: "passed", exitCode: 1 },
+          { id: "chk-1", command: "cargo test", result: "passed", exitCode: 0, evidenceRefs: ["ev-check-1"] },
+          { id: "chk-2", command: "npm run lint", result: "passed", exitCode: 0, evidenceRefs: ["ev-check-2"] },
         ],
         screenshots: [
           { id: "sc-main", evidenceRef: "ev-img", caption: "Main dashboard visual" },
         ],
         evidences: [
+          { id: "ev-check-1", kind: "tool_result", refId: "recorded-check-1", summary: "Recorded test result" },
+          { id: "ev-check-2", kind: "tool_result", refId: "recorded-check-2", summary: "Recorded lint failure" },
           { id: "ev-img", kind: "file", refId: imgFileName, summary: "Captured dashboard image" },
           { id: "ev-turn", kind: "message", refId: turnId, summary: "Recorded turn execution" },
           { id: "ev-unrecorded", kind: "tool_call", refId: "tc-never-ran", summary: "Ghost tool call" },
@@ -147,8 +165,8 @@ async function scenarioStructuredWithAssets(binary, tempRoot) {
       assert(obs2?.result === "failed", `chk-2 observation not failed: ${shortJson(obs2)}`);
 
       // Verify evidence resolutions
-      const evRes1 = rep.evidenceResolutions?.find((e) => e.evidenceId === "ev-img");
-      const evRes2 = rep.evidenceResolutions?.find((e) => e.evidenceId === "ev-unrecorded");
+      const evRes1 = rep.evidenceResolution?.find((e) => e.evidenceId === "ev-img");
+      const evRes2 = rep.evidenceResolution?.find((e) => e.evidenceId === "ev-unrecorded");
       assert(evRes2?.state === "unresolved", `unrecorded evidence should be unresolved: ${shortJson(evRes2)}`);
 
       // Chunk streaming of asset

@@ -1936,3 +1936,20 @@ unchanged. See [provider configuration](12-provider-config-schema.md).
 输入密码只会被传给需要它的操作。原始秘密、vault key、解密资源或远端 archive 不会返回到 Renderer。`configSync.changed` 事件携带相同的脱敏状态，并由 Host 发起的变更（包括 Host scheduler）触发。Main 只是传输/生命周期协调器，不负责调度、合并、加密或应用配置。
 
 手动同步会在运行期间报告 `configSync.progress`：当前阶段（`capture`、`download`、`merge`、`upload`、`apply` 或 `cleanup`）、该阶段已完成与总量，以及已知时的字节数。因此上传大量资源对象时，界面不会无内容可显示。后台轮询不报告进度，因为只有手动路径有调用方在等待。
+
+
+### Goal report asset reads and check observations
+
+`goalReports/getAsset` accepts the session/execution pair plus an asset id and
+a bounded chunk range. Host verifies that the execution belongs to the session,
+then serves only assets in that execution's report directory; manifest paths,
+absolute source references, parent traversal, symlink escapes and cross-session
+attachment references do not grant filesystem access. Unsupported or oversized
+images remain unavailable, and reads are bounded before loading bytes. The
+response carries MIME type, total bytes, hash, offset, base64 data and EOF.
+
+Check observations use persisted tool results from the same session up to the
+report's durable sequence. A model-supplied exit code is only a claim; missing
+or unverifiable references produce `inconclusive`, and a recorded failure must
+not be overwritten by a claimed success. These additive report fields do not
+change the database schema or grant renderer filesystem access.

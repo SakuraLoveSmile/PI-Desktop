@@ -685,7 +685,13 @@ pub fn finalize_report(
                 durable_seq,
                 &draft,
             );
-            let check_observations = evidence::generate_check_observations(&draft);
+            let check_observations = evidence::generate_check_observations(
+                db.data_dir(),
+                db.conn(),
+                &facts.session_id,
+                durable_seq,
+                &draft,
+            );
 
             let mut limitations: Vec<Value> = draft
                 .get("limitations")
@@ -732,7 +738,7 @@ pub fn finalize_report(
                 "evidences": draft.get("evidences").cloned().unwrap_or_else(|| json!([])),
                 "assets": assets,
                 "screenshots": draft.get("screenshots").cloned().unwrap_or_else(|| json!([])),
-                "evidenceResolutions": evidence_resolutions,
+                "evidenceResolution": evidence_resolutions,
                 "checkObservations": check_observations,
             });
             ("structured".to_string(), verdict, summary, report_obj)
@@ -788,7 +794,7 @@ pub fn finalize_report(
                 "evidences": [],
                 "assets": [],
                 "screenshots": [],
-                "evidenceResolutions": [],
+                "evidenceResolution": [],
                 "checkObservations": [],
             });
             (
