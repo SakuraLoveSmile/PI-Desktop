@@ -12,15 +12,18 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { describeComparisonFailures } from "../../../scripts/macos-identity-gate.mjs";
+import { shouldUseSecureTimestamp } from "../../../scripts/macos-signing-policy.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [wrapper, assembler, gate, releaseLane, releaseBuilder, packageSource] = await Promise.all([
+const [wrapper, assembler, gate, releaseLane, releaseBuilder, releaseWorkflow, packageSource] = await Promise.all([
   read("../../../scripts/package-macos-identity.mjs"),
   read("../../../scripts/assemble-electron-dist.mjs"),
   read("../../../scripts/macos-identity-gate.mjs"),
   read("../../../scripts/release-macos.sh"),
   read("../../../scripts/build-desktop-release.mjs"),
+  read("../../../.github/workflows/release.yml"),
   read("../package.json"),
 ]);
 const pkg = JSON.parse(packageSource);
@@ -58,7 +61,39 @@ test("the wrapper always supplies the distribution, the gate and a post-check", 
 test("local lanes sign without a secure timestamp and the release lane keeps it", () => {
   assert.match(wrapper, /-c\.mac\.timestamp=none/);
   assert.match(wrapper, /PI_MAC_SECURE_TIMESTAMP/);
+  assert.match(wrapper, /shouldUseSecureTimestamp\(forwarded, process\.env\)/);
   assert.doesNotMatch(releaseLane, /timestamp=none/);
+});
+
+test("the signed CI invocation keeps a secure timestamp for notarization", () => {
+  const signedBlock = releaseWorkflow.match(
+    /- name: Package signed and notarized macOS installer[\s\S]*?(?=\n      - name:)/,
+  )?.[0];
+  assert.ok(signedBlock, "signed macOS package step is missing");
+  const invocation = signedBlock.match(
+    /run dist:mac -- --\$\{\{ matrix\.arch \}\} \\\n\s+(-c\.mac\.forceCodeSigning=true) \\\n\s+(-c\.mac\.notarize=true)/,
+  );
+  assert.ok(invocation, "signed CI dist:mac invocation is missing");
+  assert.equal(
+    shouldUseSecureTimestamp(invocation.slice(1), {}),
+    true,
+    "CI notarization arguments must retain secure timestamps",
+  );
+  assert.equal(shouldUseSecureTimestamp([], {}), false, "local lane defaults to no timestamp");
+  assert.equal(
+    shouldUseSecureTimestamp([], { PI_MAC_SECURE_TIMESTAMP: "1" }),
+    true,
+    "explicit local override requests a secure timestamp",
+  );
+  assert.equal(
+    shouldUseSecureTimestamp(["-c.mac.notarize=false"], {}),
+    false,
+    "notarize=false keeps the local no-timestamp policy",
+  );
+  assert.match(
+    signedBlock,
+    /run dist:mac -- --\$\{\{ matrix\.arch \}\} \\\n\s+-c\.mac\.forceCodeSigning=true \\\n\s+-c\.mac\.notarize=true/,
+  );
 });
 
 test("the signed release lane packages the independent distribution and the gate", () => {
@@ -81,4 +116,14 @@ test("the pre-sign gate enforces the identity and the host sidecar", () => {
   assert.match(gate, /host sidecar is missing from the bundle/);
   // Signing happens after this hook, so a candidate is legitimately unsigned here.
   assert.match(gate, /DEFERRED_TO_SIGNING/);
+});
+
+test("the pre-sign gate fails closed when a source UUID is unverifiable", () => {
+  assert.match(
+    describeComparisonFailures({
+      unverifiableSources: [{ role: "input", path: "/missing/Electron.app" }],
+    }),
+    /source-identities-readable: main executable UUID unavailable for input \/missing\/Electron\.app/,
+  );
+  assert.equal(describeComparisonFailures({ unverifiableSources: [] }), null);
 });
