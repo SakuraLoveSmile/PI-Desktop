@@ -23,6 +23,14 @@ type CallBarProps = {
   onDismiss: () => void;
 };
 
+/**
+ * The compact call bar, drawn by the docked widget window from the state main
+ * pushes. It is presentation only — the widget owns no media and is not the
+ * call owner, so every button forwards an action instead of reaching a
+ * controller — and it is the only call chrome the user sees. A failure that
+ * outlives a toast is therefore drawn in place next to its verbatim `LIVE_*`
+ * code, because nothing else on screen could name it.
+ */
 export function LiveVoiceCallBar({
   t, snapshot, issue, detailsOpen, detailsRef, actionPending,
   onCancel, onMute, onEnd, onDetails, onResume, onSettings, onDismiss,
@@ -34,10 +42,6 @@ export function LiveVoiceCallBar({
   const issueStaysInline = !issue || issue.warning || issue.code === "LIVE_MEDIA_RELEASE_UNCONFIRMED";
   const showToast = useAppStore((state) => state.showToast);
   const reportedIssue = useRef<string | null>(null);
-  // Starting an action clears the mark: a retry that fails the same way is a new
-  // failure and has to speak up again, not be swallowed as a repeat of the last
-  // one. The call itself is preserved across a reconnect, so the key alone
-  // cannot tell the two apart.
   const previousActionPending = useRef(actionPending);
   useEffect(() => {
     const startedAttempt =
