@@ -346,6 +346,7 @@ with teammates, shared task boards, and peer mailboxes.
 | `TEAM_REVIEW_REVISION_CONFLICT` | yes | the launch review revision changed after the caller read it |
 | `TEAM_MODEL_SELECTION_INVALID` | no | a proposed provider/model/thinking route cannot be launched |
 | `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | no | the member holds an active turn or queued work on its route |
+| `TEAM_LEAD_CONFIGURATION_BLOCKED` | no | a Lead with durable Team data cannot change to the standard profile |
 
 ## 4. Mapping rules
 

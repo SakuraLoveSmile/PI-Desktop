@@ -18,6 +18,8 @@ export type WorkPanelTab = {
   location?: string;
   /** Stored attachment mimeType for extension-less `attachments/<sha256>` images. */
   mimeType?: string;
+  teamTarget?: { kind: "aggregate" | "board" | "panorama" | "task"; taskId?: string };
+  teamNavigationSeq?: number;
 };
 
 export type WorkPanelTabsState = {
@@ -31,6 +33,7 @@ export type WorkPanelContext = WorkPanelTabsState & {
 };
 
 let newWorkPanelTabSequence = 0;
+let teamNavigationSequence = 0;
 
 export function emptyWorkPanelContext(): WorkPanelContext {
   return { open: false, tabs: [], activeTabId: null, fileRequest: null };
@@ -72,8 +75,8 @@ export function switchWorkPanelContextState(
 }
 
 
-export function teamWorkPanelTab(teamSessionId: string): WorkPanelTab {
-  return { id: `team:${teamSessionId}`, kind: "team", resource: teamSessionId };
+export function teamWorkPanelTab(teamSessionId: string, teamTarget?: WorkPanelTab["teamTarget"]): WorkPanelTab {
+  return { id: `team:${teamSessionId}`, kind: "team", resource: teamSessionId, ...(teamTarget ? { teamTarget, teamNavigationSeq: ++teamNavigationSequence } : {}) };
 }
 
 export function toolWorkPanelTab(

@@ -30,9 +30,18 @@ pub struct TeamMember {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<TeamMemberPresentation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamMemberPresentation {
+    pub role: String,
+    pub display_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -144,6 +153,8 @@ pub struct TeamProposedMember {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub member_session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<TeamMemberPresentation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub selection: Option<TeamMemberSelectionPartial>,
 }
 
@@ -156,7 +167,25 @@ pub struct TeamLaunchReviewMember {
     pub context_kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub member_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<TeamMemberPresentation>,
     pub selection: TeamMemberSelection,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamSnapshot {
+    pub team_session_id: String,
+    pub revision: i64,
+    pub paused: bool,
+    pub members: Vec<TeamMember>,
+    pub tasks: Vec<TeamTask>,
+    pub readiness: Vec<TeamTaskReadiness>,
+    pub scope_overlaps: Vec<WriteScopeOverlap>,
+    pub lead_phase: String,
+    pub queued_message_count: i64,
+    pub review: Option<TeamLaunchReview>,
+    pub decision: Option<TeamExecutionDecision>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

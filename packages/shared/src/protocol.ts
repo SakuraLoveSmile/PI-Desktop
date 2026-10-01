@@ -130,6 +130,7 @@ export const IPC = {
     sessionOpenScratchPath: "pi-desktop/session/openScratchPath",
     teamGetRoster: "pi-desktop/team/getRoster",
     teamGetBoard: "pi-desktop/team/getBoard",
+    teamGetSnapshot: "pi-desktop/team/getSnapshot",
     teamPause: "pi-desktop/team/pause",
     teamResume: "pi-desktop/team/resume",
     teamGetExecutionDecision: "pi-desktop/team/getExecutionDecision",

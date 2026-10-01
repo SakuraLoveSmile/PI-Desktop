@@ -69,6 +69,7 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
           members: params.members?.map((m: any) => ({
             name: m.name,
             contextKind: m.contextKind ?? "fresh",
+            presentation: m.presentation,
             selection: {
               providerId: m.selection?.providerId ?? "default",
               modelId: m.selection?.modelId ?? "default",
@@ -92,7 +93,11 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
       strategy: "delegate",
       reason: "Needs specialists",
       members: [
-        { name: "coder", description: "Write code" },
+        {
+          name: "coder",
+          description: "Write code",
+          presentation: { role: "executor", displayName: "Alex" },
+        },
       ],
     });
 
@@ -108,6 +113,9 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
       teamSessionId: "team-1",
       leadTurnId: "turn-100",
       strategy: "delegate",
+      members: [expect.objectContaining({
+        presentation: { role: "executor", displayName: "Alex" },
+      })],
     }));
   });
 

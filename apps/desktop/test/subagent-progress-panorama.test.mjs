@@ -5,6 +5,7 @@ import test from "node:test";
 const [
   subagentDetailSource,
   agentPanoramaSource,
+  viewportSource,
   overviewTabSource,
   teamPanelSource,
   messagesCssSource,
@@ -15,6 +16,7 @@ const [
 ] = await Promise.all([
   readFile(new URL("../src/features/chat/transcript/SubagentDetail.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/AgentPanorama.tsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/workpanel/agent-panorama-viewport.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/OverviewTab.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/workpanel/TeamPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/styles/messages.css", import.meta.url), "utf8"),
@@ -44,22 +46,22 @@ test("SubagentDetail renders compact Task progress card with panorama button and
 
 test("AgentPanorama implements zoom, fit, reset, pan, and coordinate geometry", () => {
   // Bounded zoom 50% to 150% in 0.1 steps
-  assert.match(agentPanoramaSource, /MIN_ZOOM = 0\.5/);
-  assert.match(agentPanoramaSource, /MAX_ZOOM = 1\.5/);
-  assert.match(agentPanoramaSource, /ZOOM_STEP = 0\.1/);
+  assert.match(viewportSource, /MIN_ZOOM = 0\.5/);
+  assert.match(viewportSource, /MAX_ZOOM = 1\.5/);
+  assert.match(agentPanoramaSource, /zoomBy\(0\.1\)/);
 
   // Layout math: root centered at top, children rows of at most 3
-  assert.match(agentPanoramaSource, /Math\.min\(childNodes\.length, 3\)/);
-  assert.match(agentPanoramaSource, /NODE_WIDTH = 260/);
-  assert.match(agentPanoramaSource, /VERTICAL_SEPARATION = 80/);
+  assert.match(viewportSource, /Math\.min\(childIds\.length, 3\)/);
+  assert.match(viewportSource, /PANORAMA_NODE_WIDTH = 304/);
+  assert.match(viewportSource, /PANORAMA_ROOT_CHILD_GAP = 80/);
 
   // SVG Bezier connectors
   assert.match(agentPanoramaSource, /M \$\{rootCenterX\} \$\{rootBottomY\} C/);
   assert.match(agentPanoramaSource, /agent-panorama-edges-layer/);
 
   // Key controls and actions
-  assert.match(agentPanoramaSource, /handleFit/);
-  assert.match(agentPanoramaSource, /handleReset/);
+  assert.match(agentPanoramaSource, /onClick={fit}/);
+  assert.match(agentPanoramaSource, /onClick={reset}/);
   assert.match(agentPanoramaSource, /onBack/);
   assert.match(agentPanoramaSource, /onSelectNode/);
   assert.match(agentPanoramaSource, /is-panning/);
@@ -78,8 +80,8 @@ test("TeamPanel integrates AgentPanorama with lead root and member children", ()
   assert.match(teamPanelSource, /view\.kind === "panorama"/);
   assert.match(teamPanelSource, /team\.lead/);
   assert.match(teamPanelSource, /roster\.map/);
-  assert.match(teamPanelSource, /setView\(\{ kind: "member", memberSessionId \}\)/);
-  assert.match(teamPanelSource, /setView\(\{ kind: "aggregate" \}\)/);
+  assert.match(teamPanelSource, /navigate\(\{ kind: "member", memberSessionId \}\)/);
+  assert.match(teamPanelSource, /setView\(next \?\? \{ kind: "aggregate" \}\)/);
 });
 
 test("CSS rules include agent-panorama import and compact task progress styles", () => {
@@ -88,7 +90,7 @@ test("CSS rules include agent-panorama import and compact task progress styles",
   assert.match(messagesCssSource, /\.subagent-tasks-header/);
   assert.match(messagesCssSource, /\.subagent-tasks-row/);
   assert.match(agentPanoramaCssSource, /\.agent-panorama/);
-  assert.match(agentPanoramaCssSource, /width:\s*260px;/);
+  assert.match(agentPanoramaCssSource, /width:\s*304px;/);
   assert.match(agentPanoramaCssSource, /\.agent-panorama-edge/);
 });
 

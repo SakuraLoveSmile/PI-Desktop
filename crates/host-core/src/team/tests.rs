@@ -117,6 +117,7 @@ pub(super) fn create_team_member(
                 description: description.map(str::to_string),
                 context_kind: context_kind.map(str::to_string),
                 member_session_id: None,
+                presentation: None,
                 selection: Some(TeamMemberSelectionPartial {
                     provider_id: Some(provider_id.to_string()),
                     model_id: Some(model_id.to_string()),
@@ -301,6 +302,78 @@ fn lead_deletion_cleanup_rolls_back_when_member_reset_fails() {
         )
         .unwrap();
     assert_eq!(profile, "standard");
+}
+
+#[test]
+fn legacy_team_snapshot_bootstraps_but_dissolved_team_stays_dissolved() {
+    let db = test_db();
+    let lead_id = create_test_lead(&db);
+
+    assert!(get_team(&db, &lead_id).unwrap().is_none());
+    let snapshot = get_team_snapshot(&db, &lead_id).unwrap();
+    assert_eq!(snapshot.revision, 1);
+    assert!(get_team(&db, &lead_id).unwrap().is_some());
+
+    cleanup_team_on_lead_delete(&db, &lead_id).unwrap();
+    assert!(get_team(&db, &lead_id).unwrap().is_none());
+    assert!(get_team_snapshot(&db, &lead_id).is_err());
+    assert!(ensure_team(&db, &lead_id).is_err());
+    assert!(get_team(&db, &lead_id).unwrap().is_none());
+}
+
+#[test]
+fn host_restart_settles_running_team_member_and_advances_revision() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pi.sqlite");
+    let db = Database::open(&path).unwrap();
+    let lead_id = create_test_lead(&db);
+    let member = create_team_member(
+        &db,
+        CreateMemberParams {
+            team_session_id: &lead_id,
+            caller_session_id: &lead_id,
+            name: "restart-worker",
+            description: None,
+            context_kind: Some("fresh"),
+            model_id: None,
+            provider_id: None,
+        },
+    )
+    .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO turns (id, session_id, status, started_at)
+             VALUES ('restart-member-turn', ?1, 'running', 1)",
+            [&member.member_session_id],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "UPDATE team_members SET phase='running' WHERE member_session_id=?1",
+            [&member.member_session_id],
+        )
+        .unwrap();
+    let revision_before_restart = get_team(&db, &lead_id).unwrap().unwrap().revision;
+    drop(db);
+
+    let reopened = Database::open(&path).unwrap();
+    let recovered = get_team_member_by_session_id(&reopened, &member.member_session_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(recovered.phase, "idle");
+    let turn_status: String = reopened
+        .conn()
+        .query_row(
+            "SELECT status FROM turns WHERE id='restart-member-turn'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(turn_status, "aborted");
+    assert_eq!(
+        get_team(&reopened, &lead_id).unwrap().unwrap().revision,
+        revision_before_restart + 1
+    );
 }
 
 #[test]
@@ -499,6 +572,7 @@ fn test_team_mailbox_and_pause() {
     )
     .unwrap();
 
+    let before_send = get_team(&db, &lead_id).unwrap().unwrap().revision;
     // 1. Alice can send Bob a message
     let msg = send_team_message(
         &db,
@@ -514,6 +588,10 @@ fn test_team_mailbox_and_pause() {
     assert_eq!(msg.status, "queued");
     assert_eq!(msg.source_member_name, "alice");
     assert_eq!(msg.target_member_name, "bob");
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        before_send + 1
+    );
 
     // Replaying the same Host idempotency tuple returns the durable message.
     let replay = send_team_message(
@@ -528,6 +606,10 @@ fn test_team_mailbox_and_pause() {
     )
     .unwrap();
     assert_eq!(replay.id, msg.id);
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        before_send + 1
+    );
     let conflict = send_team_message(
         &db,
         SendMessageParams {
@@ -579,6 +661,7 @@ fn test_team_mailbox_and_pause() {
             ],
         )
         .unwrap();
+    let before_ack = get_team(&db, &lead_id).unwrap().unwrap().revision;
     assert!(ack_team_message(
         &db,
         &lead_id,
@@ -587,6 +670,22 @@ fn test_team_mailbox_and_pause() {
         Some("received"),
     )
     .unwrap());
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        before_ack + 1
+    );
+    assert!(ack_team_message(
+        &db,
+        &lead_id,
+        &m2.member_session_id,
+        &msg.id,
+        Some("received"),
+    )
+    .unwrap());
+    assert_eq!(
+        get_team(&db, &lead_id).unwrap().unwrap().revision,
+        before_ack + 1
+    );
     let acknowledged = list_member_messages(&db, &lead_id, &m1.member_session_id).unwrap();
     assert_eq!(
         acknowledged

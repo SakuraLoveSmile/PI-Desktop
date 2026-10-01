@@ -24,7 +24,17 @@ const {
   subagentWorkPanelTab,
   switchWorkPanelContextState,
   toolWorkPanelTab,
+  teamWorkPanelTab,
 } = await import("../src/lib/work-panel-tabs.ts");
+
+test("Team task links reuse one tab but each explicit navigation gets a fresh request", () => {
+  const first = teamWorkPanelTab("team-1", { kind: "task", taskId: "task-1" });
+  const reopened = teamWorkPanelTab("team-1", { kind: "task", taskId: "task-1" });
+  const state = openWorkPanelTabState({ tabs: [first], activeTabId: first.id }, reopened);
+  assert.equal(state.tabs.length, 1);
+  assert.deepEqual(state.tabs[0].teamTarget, { kind: "task", taskId: "task-1" });
+  assert.ok(reopened.teamNavigationSeq > first.teamNavigationSeq);
+});
 
 test("work panel tabs open on demand and deduplicate by resource", () => {
   const empty = { tabs: [], activeTabId: null };

@@ -623,6 +623,7 @@ export function Composer({
         ) : null}
         <ComposerStatus
           t={t}
+          queueScopeKey={activeSessionId ?? "home"}
           queuedPrompts={queuedPrompts}
           removeQueuedPrompt={removeQueuedPrompt}
           moveQueuedPrompt={moveQueuedPrompt}

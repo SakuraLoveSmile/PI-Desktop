@@ -102,6 +102,17 @@ that is neither a recognized default nor the deterministic first-prompt
 fallback, which protects manual and already-summarized titles after restart.
 No host RPC or storage schema change is required.
 
+An approved Plan/Goal execution that starts without a new visible user turn may
+use the same main-owned one-shot once for its Lead session. The trigger is the
+committed execution-running event and its current execution ID. The approved
+proposal title/question are the bounded title input; an earlier ordinary
+first-turn attempt does not suppress this distinct source. Persist an
+execution-scoped attempt marker before calling the provider and recheck the
+execution/session/title before applying a result. Never request titles for
+Team member sessions. Provider failure remains independent of execution. The
+approved path uses optional Host rename guards for current title and execution
+ID; calls without guards retain the legacy rename behavior. See ADR 0186.
+
 ## 5. Prompt flow
 
 1. load the durable session and reject a missing session

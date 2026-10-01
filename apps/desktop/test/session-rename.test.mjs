@@ -54,7 +54,7 @@ test("rename dialog is modal, localized, and caps input by Unicode code points",
 });
 
 test("rename uses the existing IPC bridge and updates only the local session title", () => {
-  assert.match(apiSource, /invoke<\{ ok: boolean \}>\(IPC\.invoke\.sessionRename, id, title\)/);
+  assert.match(apiSource, /renameSession: \(id: string, title: string, guard\?: SessionRenameGuard\)/);
   assert.match(storeSource, /renameSession: \(id: string, title: string\) => Promise<void>/);
   assert.match(storeSource, /const nextTitle = title\.trim\(\)/);
   assert.match(storeSource, /sessions: state\.sessions\.map\(/);

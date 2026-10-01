@@ -22,7 +22,12 @@ pub(crate) fn with_savepoint<T>(
 ) -> Result<T> {
     if !matches!(
         name,
-        "create_session" | "fork_session" | "team_roster" | "team_selection"
+        "create_session"
+            | "fork_session"
+            | "team_roster"
+            | "team_selection"
+            | "team_activity"
+            | "team_mailbox"
     ) {
         return Err(anyhow!("invalid internal savepoint name"));
     }
@@ -303,8 +308,19 @@ pub struct SessionSummary {
     pub permission_mode: String,
     #[serde(default = "default_execution_profile")]
     pub execution_profile: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<SessionTeamRelation>,
     pub updated_at: String,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTeamRelation {
+    pub team_session_id: String,
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub member_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1352,8 +1368,13 @@ fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
 const SUMMARY_SELECT: &str =
     "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
             s.thinking_level, s.permission_mode, s.execution_profile, s.updated_at, s.created_at,
-            p.name
+            p.name,
+            CASE WHEN lead.team_session_id IS NOT NULL THEN 'lead'
+                 WHEN member.team_session_id IS NOT NULL THEN 'member' END,
+            COALESCE(member.team_session_id, lead.team_session_id), member.name
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id
+     LEFT JOIN teams lead ON lead.team_session_id = s.id
+     LEFT JOIN team_members member ON member.member_session_id = s.id
      WHERE s.deleted_at IS NULL";
 
 pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionSummary> {
@@ -1373,6 +1394,16 @@ pub(crate) fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Sess
         updated_at: ms_to_ts(row.get(10)?),
         created_at: ms_to_ts(row.get(11)?),
         project_name: row.get(12)?,
+        team: row
+            .get::<_, Option<String>>(13)?
+            .map(|role| {
+                Ok::<SessionTeamRelation, rusqlite::Error>(SessionTeamRelation {
+                    role,
+                    team_session_id: row.get(14)?,
+                    member_name: row.get(15)?,
+                })
+            })
+            .transpose()?,
     })
 }
 
@@ -1495,6 +1526,21 @@ pub fn create_session_with_options(
     db: &Database,
     options: SessionCreateOptions,
 ) -> Result<SessionSummary> {
+    create_session_with_options_inner(db, options, false)
+}
+
+pub(crate) fn create_team_lead_session_with_options(
+    db: &Database,
+    options: SessionCreateOptions,
+) -> Result<SessionSummary> {
+    create_session_with_options_inner(db, options, true)
+}
+
+fn create_session_with_options_inner(
+    db: &Database,
+    options: SessionCreateOptions,
+    create_team_record: bool,
+) -> Result<SessionSummary> {
     let SessionCreateOptions {
         title,
         mode,
@@ -1580,6 +1626,13 @@ pub fn create_session_with_options(
             execution_profile,
             now
         ])?;
+        if create_team_record {
+            conn.execute(
+                "INSERT INTO teams (team_session_id, revision, paused, created_at, updated_at)
+                 VALUES (?1, 1, 0, ?2, ?2)",
+                params![id, now],
+            )?;
+        }
         if let (Some(name), Some(path)) = (effective_name.as_deref(), canonical_path.as_deref()) {
             conn.prepare_cached("UPDATE projects SET name = ?1 WHERE path = ?2")?
                 .execute(params![name, path])?;
@@ -1599,6 +1652,7 @@ pub fn create_session_with_options(
         permission_mode,
         execution_profile,
         project_name: effective_name,
+        team: None,
         updated_at: ms_to_ts(now),
         created_at: ms_to_ts(now),
     })
@@ -2021,6 +2075,7 @@ pub fn fork_session_through(
         permission_mode: source.summary.permission_mode,
         execution_profile: source.summary.execution_profile,
         project_name: source.summary.project_name,
+        team: None,
         updated_at: created_at.clone(),
         created_at,
     };
@@ -2117,6 +2172,11 @@ pub fn configure_session_with_profile(
         permission_mode,
     )?;
     let changed = with_savepoint(db.conn(), "team_selection", |conn| {
+        let had_team_record: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM teams WHERE team_session_id=?1)",
+            [id],
+            |row| row.get(0),
+        )?;
         let changed = conn
             .prepare_cached(
                 "UPDATE sessions
@@ -2147,6 +2207,44 @@ pub fn configure_session_with_profile(
                  WHERE member_session_id = ?1",
                 params![id, now_ms()],
             )?;
+            if execution_profile == Some("team") {
+                let is_member: bool = conn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM team_members WHERE member_session_id=?1)",
+                    [id],
+                    |row| row.get(0),
+                )?;
+                if !is_member {
+                    let now = now_ms();
+                    conn.execute(
+                        "DELETE FROM kv WHERE ns='team-lifecycle-v1' AND key=?1",
+                        [id],
+                    )?;
+                    conn.execute(
+                        "INSERT INTO teams (team_session_id, revision, paused, created_at, updated_at)
+                         VALUES (?1, 1, 0, ?2, ?2)
+                         ON CONFLICT(team_session_id) DO NOTHING",
+                        params![id, now],
+                    )?;
+                }
+            }
+            if execution_profile == Some("standard") && had_team_record {
+                let is_member: bool = conn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM team_members WHERE member_session_id=?1)",
+                    [id],
+                    |row| row.get(0),
+                )?;
+                if !is_member {
+                    let now = now_ms();
+                    conn.execute("DELETE FROM teams WHERE team_session_id=?1", [id])?;
+                    conn.execute(
+                        "INSERT INTO kv (ns, key, value_json, updated_at)
+                         VALUES ('team-lifecycle-v1', ?1, '{\"dissolved\":true}', ?2)
+                         ON CONFLICT(ns, key) DO UPDATE SET
+                           value_json=excluded.value_json, updated_at=excluded.updated_at",
+                        params![id, now],
+                    )?;
+                }
+            }
         }
         Ok(changed)
     })?;
@@ -2204,6 +2302,24 @@ pub fn delete_session(db: &Database, id: &str) -> Result<bool> {
     Ok(n > 0)
 }
 
+/// Delete a session and detach its Team relationships in one database
+/// transaction. Transcript files are removed only after the commit succeeds.
+pub fn delete_session_with_team_cleanup(db: &Database, id: &str) -> Result<bool> {
+    if crate::plans::has_live_scratch_goal(db, id)? {
+        return Err(anyhow!("PLAN_CONFIGURATION_BLOCKED"));
+    }
+    let tx = db.conn().unchecked_transaction()?;
+    crate::team::lifecycle::cleanup_team_on_lead_delete_conn(&tx, id)?;
+    let deleted = tx.execute("DELETE FROM sessions WHERE id=?1", [id])? > 0;
+    tx.commit()?;
+    if deleted {
+        invalidate_transcript_layout(id);
+        transcripts::remove_session_files(db.data_dir(), id);
+        crate::goal_reports::remove_session_files(db.data_dir(), id);
+    }
+    Ok(deleted)
+}
+
 pub fn normalize_session_title(title: &str) -> Result<String> {
     let title = title.trim();
     if title.is_empty() {
@@ -2224,6 +2340,53 @@ pub fn rename_session(db: &Database, id: &str, title: &str) -> Result<bool> {
         .prepare_cached("UPDATE sessions SET title = ?1 WHERE id = ?2")?
         .execute(params![title, id])?;
     Ok(n > 0)
+}
+
+pub fn rename_session_guarded(
+    db: &Database,
+    id: &str,
+    title: &str,
+    expected_title: &str,
+    expected_execution_id: Option<Option<&str>>,
+) -> Result<bool> {
+    let title = normalize_session_title(title)?;
+    let tx = db.conn().unchecked_transaction()?;
+    let Some(current_title) = tx
+        .query_row("SELECT title FROM sessions WHERE id=?1", [id], |row| {
+            row.get::<_, String>(0)
+        })
+        .optional()?
+    else {
+        return Ok(false);
+    };
+    if current_title != expected_title {
+        return Err(anyhow!("CONFLICT: session title changed before rename"));
+    }
+    if let Some(expected) = expected_execution_id {
+        let latest: Option<String> = tx
+            .query_row(
+                "SELECT execution_id FROM plan_approvals
+                 WHERE session_id=?1 AND execution_id IS NOT NULL
+                 ORDER BY rowid DESC LIMIT 1",
+                [id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if latest.as_deref() != expected {
+            return Err(anyhow!(
+                "CONFLICT: approved execution changed before rename"
+            ));
+        }
+    }
+    let updated = tx.execute(
+        "UPDATE sessions SET title=?1 WHERE id=?2 AND title=?3",
+        params![title, id, expected_title],
+    )?;
+    if updated == 0 {
+        return Err(anyhow!("CONFLICT: session title changed before rename"));
+    }
+    tx.commit()?;
+    Ok(true)
 }
 
 /// Outcome of moving a session to a different project.
@@ -3892,38 +4055,41 @@ fn begin_turn_inner(
     model_id: Option<&str>,
 ) -> Result<String> {
     let id = Uuid::new_v4().to_string();
-    let inserted = db
-        .conn()
-        .prepare_cached(
-            "INSERT INTO turns (id, session_id, provider_id, model_id, started_at)
+    with_savepoint(db.conn(), "team_activity", |conn| {
+        let inserted = conn
+            .prepare_cached(
+                "INSERT INTO turns (id, session_id, provider_id, model_id, started_at)
              SELECT ?1, ?2, ?3, ?4, ?5
              WHERE EXISTS (SELECT 1 FROM sessions WHERE id = ?2)
                AND NOT EXISTS (
                  SELECT 1 FROM turns WHERE session_id = ?2 AND status = 'running'
                )",
-        )?
-        .execute(params![id, session_id, provider_id, model_id, now_ms()])
-        .map_err(|error| {
-            let message = error.to_string();
-            if message.contains("turns.session_id")
-                || message.contains("idx_turns_one_running_session")
-            {
-                anyhow!("AGENT_BUSY")
-            } else {
-                error.into()
+            )?
+            .execute(params![id, session_id, provider_id, model_id, now_ms()])
+            .map_err(|error| {
+                let message = error.to_string();
+                if message.contains("turns.session_id")
+                    || message.contains("idx_turns_one_running_session")
+                {
+                    anyhow!("AGENT_BUSY")
+                } else {
+                    error.into()
+                }
+            })?;
+        if inserted == 0 {
+            let session_exists: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?1)",
+                params![session_id],
+                |row| row.get(0),
+            )?;
+            if !session_exists {
+                return Err(anyhow!("session not found: {session_id}"));
             }
-        })?;
-    if inserted == 0 {
-        let session_exists: bool = db.conn().query_row(
-            "SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?1)",
-            params![session_id],
-            |row| row.get(0),
-        )?;
-        if !session_exists {
-            return Err(anyhow!("session not found: {session_id}"));
+            return Err(anyhow!("AGENT_BUSY"));
         }
-        return Err(anyhow!("AGENT_BUSY"));
-    }
+        crate::team::roster::update_member_turn_phase_conn(conn, session_id, "running", None)?;
+        Ok(())
+    })?;
     Ok(id)
 }
 
@@ -4000,6 +4166,21 @@ pub fn end_turn_settling(
             usage.map(|u| u.to_string()),
             turn_id,
         ])?;
+    if n > 0 {
+        let phase = match status {
+            "completed" => "completed",
+            "error" => "failed",
+            _ => "idle",
+        };
+        if let Some(session_id) = session_id.as_deref() {
+            crate::team::roster::update_member_turn_phase_conn(
+                &tx,
+                session_id,
+                phase,
+                (status == "error").then_some(error_code.unwrap_or("TURN_FAILED")),
+            )?;
+        }
+    }
     let notification = if n > 0 && create_notification {
         notifications::insert_for_terminal_turn(&tx, turn_id, status, error_code)?
     } else {
@@ -4948,6 +5129,235 @@ mod tests {
     }
 
     #[test]
+    fn guarded_rename_compares_title_and_approved_plan_execution() {
+        let db = test_db();
+        let session = create_session(&db, Some("Original".into()), None, None, None, None).unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO kv (ns,key,value_json,updated_at) VALUES ('team-execution-decision-v1',?1,'\"team-turn\"',?2)",
+                params![format!("{}:latest", session.id), now_ms()],
+            )
+            .unwrap();
+
+        assert!(
+            rename_session_guarded(&db, &session.id, "Lead task", "Original", Some(None),).unwrap()
+        );
+
+        let now = now_ms();
+        db.conn()
+            .execute(
+                "INSERT INTO plan_approvals (
+                    request_id, session_id, turn_id, tool_call_id, plan_json, status,
+                    created_at, updated_at, resolved_at, execution_id, execution_state
+                 ) VALUES ('request-a',?1,'turn-a','tool-a','{}','approved',?2,?2,?2,'execution-a','running')",
+                params![session.id, now],
+            )
+            .unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO plan_approvals (
+                    request_id, session_id, turn_id, tool_call_id, plan_json, status,
+                    created_at, updated_at, resolved_at, execution_id, execution_state
+                 ) VALUES ('request-b',?1,'turn-b','tool-b','{}','approved',?2,?2,?2,'execution-b','running')",
+                params![session.id, now + 1],
+            )
+            .unwrap();
+        db.conn()
+            .execute(
+                "UPDATE plan_approvals SET updated_at=?1 WHERE request_id='request-a'",
+                [now + 10_000],
+            )
+            .unwrap();
+        assert!(rename_session_guarded(
+            &db,
+            &session.id,
+            "Approved title",
+            "Lead task",
+            Some(Some("execution-b")),
+        )
+        .unwrap());
+        assert!(rename_session_guarded(
+            &db,
+            &session.id,
+            "Stale title",
+            "Approved title",
+            Some(Some("execution-a")),
+        )
+        .is_err());
+        assert!(rename_session_guarded(
+            &db,
+            &session.id,
+            "Stale title",
+            "manual title",
+            Some(Some("execution-b")),
+        )
+        .is_err());
+        assert_eq!(
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .summary
+                .title,
+            "Approved title"
+        );
+    }
+
+    #[test]
+    fn team_turn_phase_tracks_real_turns_and_ignores_stale_settlements() {
+        let db = test_db();
+        let lead = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                title: Some("Activity lead".into()),
+                execution_profile: Some("team".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        crate::team::ensure_team(&db, &lead.id).unwrap();
+        let member = create_session_with_options(
+            &db,
+            SessionCreateOptions {
+                title: Some("teammember-special-search".into()),
+                execution_profile: Some("team".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO team_members (
+                    team_session_id, member_session_id, name, context_kind, phase,
+                    created_at, updated_at
+                 ) VALUES (?1,?2,'worker','fresh','idle',?3,?3)",
+                params![lead.id, member.id, now_ms()],
+            )
+            .unwrap();
+
+        let lead_summary = list_sessions(&db)
+            .unwrap()
+            .into_iter()
+            .find(|summary| summary.id == lead.id)
+            .unwrap();
+        assert_eq!(lead_summary.team.as_ref().unwrap().role, "lead");
+        let member_summary = list_sessions(&db)
+            .unwrap()
+            .into_iter()
+            .find(|summary| summary.id == member.id)
+            .unwrap();
+        assert_eq!(member_summary.team.as_ref().unwrap().role, "member");
+        assert_eq!(
+            member_summary.team.as_ref().unwrap().team_session_id,
+            lead.id
+        );
+        assert_eq!(
+            member_summary.team.as_ref().unwrap().member_name.as_deref(),
+            Some("worker")
+        );
+        let search = crate::session_search::search(&db, "teammember-special", 0).unwrap();
+        let search_member = search
+            .hits
+            .iter()
+            .find(|hit| hit.session.id == member.id)
+            .unwrap();
+        assert_eq!(search_member.session.team.as_ref().unwrap().role, "member");
+
+        let first = begin_turn_inner(&db, &member.id, None, None).unwrap();
+        assert_eq!(
+            crate::team::get_team_member_by_session_id(&db, &member.id)
+                .unwrap()
+                .unwrap()
+                .phase,
+            "running"
+        );
+        assert!(
+            end_turn(&db, &first, "completed", None, None, false)
+                .unwrap()
+                .updated
+        );
+        assert_eq!(
+            crate::team::get_team_member_by_session_id(&db, &member.id)
+                .unwrap()
+                .unwrap()
+                .phase,
+            "completed"
+        );
+
+        let second = begin_turn_inner(&db, &member.id, None, None).unwrap();
+        let before_duplicate = crate::team::get_team(&db, &lead.id)
+            .unwrap()
+            .unwrap()
+            .revision;
+        assert!(
+            !end_turn(&db, &first, "error", Some("late"), None, false)
+                .unwrap()
+                .updated
+        );
+        assert_eq!(
+            crate::team::get_team_member_by_session_id(&db, &member.id)
+                .unwrap()
+                .unwrap()
+                .phase,
+            "running"
+        );
+        assert_eq!(
+            crate::team::get_team(&db, &lead.id)
+                .unwrap()
+                .unwrap()
+                .revision,
+            before_duplicate
+        );
+        assert!(
+            end_turn(&db, &second, "aborted", None, None, false)
+                .unwrap()
+                .updated
+        );
+        assert_eq!(
+            crate::team::get_team_member_by_session_id(&db, &member.id)
+                .unwrap()
+                .unwrap()
+                .phase,
+            "idle"
+        );
+
+        let third = begin_turn_inner(&db, &member.id, None, None).unwrap();
+        assert!(
+            end_turn(&db, &third, "error", Some("PROVIDER_FAILED"), None, false)
+                .unwrap()
+                .updated
+        );
+        assert_eq!(
+            crate::team::get_team_member_by_session_id(&db, &member.id)
+                .unwrap()
+                .unwrap()
+                .phase,
+            "failed"
+        );
+        let fourth = begin_turn_inner(&db, &member.id, None, None).unwrap();
+        let untrusted_error_code = format!("TOKEN_{}", "x".repeat(80));
+        assert!(
+            end_turn(
+                &db,
+                &fourth,
+                "error",
+                Some(&untrusted_error_code),
+                None,
+                false,
+            )
+            .unwrap()
+            .updated
+        );
+        assert_eq!(
+            crate::team::get_team_member_by_session_id(&db, &member.id)
+                .unwrap()
+                .unwrap()
+                .error
+                .as_deref(),
+            Some("TURN_FAILED")
+        );
+    }
+
+    #[test]
     fn create_session_returns_canonical_project_path() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("project");
@@ -5185,6 +5595,7 @@ mod tests {
             permission_mode: "inherit".into(),
             execution_profile: "standard".into(),
             project_name: None,
+            team: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-02T00:00:00Z".into(),
         };
@@ -5237,6 +5648,7 @@ mod tests {
             permission_mode: "inherit".into(),
             execution_profile: "standard".into(),
             project_name: None,
+            team: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
@@ -5984,6 +6396,7 @@ mod tests {
             permission_mode: "inherit".into(),
             execution_profile: "standard".into(),
             project_name: None,
+            team: None,
             created_at: "2025-01-01T00:00:00Z".into(),
             updated_at: "2025-01-01T00:00:00Z".into(),
         };
