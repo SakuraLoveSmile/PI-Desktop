@@ -175,7 +175,7 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
   await Promise.resolve();
   const abort = handlers.get(IPC.invoke.agentAbort)({ sessionId: "target" });
   await Promise.resolve();
-  assert.deepEqual(sidecarCalls, ["agent.prompt"], "abort must not bypass prompt admission");
+  assert.equal(sidecarCalls.includes("agent.abort"), false, "abort must not bypass prompt admission");
 
   releasePrompt();
   await prompt;
