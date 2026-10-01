@@ -961,6 +961,12 @@ fn package_url_host(url: &str) -> Result<(String, bool)> {
 /// allowlist for third-party hosts. Plain `http` is refused outside loopback,
 /// which keeps local development catalogs working.
 pub(crate) fn package_host_allowed(package_url: &str, catalog_url: &str) -> Result<()> {
+    if package_url.starts_with("file://") {
+        if is_valid_fixture_file_url(package_url) {
+            return Ok(());
+        }
+        bail!("PLUGIN_MARKET_UNTRUSTED_HOST: file:// package urls are not permitted");
+    }
     let (host, plain_http) = package_url_host(package_url)?;
     if plain_http && !is_loopback_host(&host) {
         bail!("PLUGIN_MARKET_UNTRUSTED_HOST: {host} must be reached over https");
@@ -985,5 +991,10 @@ pub(crate) fn package_host_allowed(package_url: &str, catalog_url: &str) -> Resu
 /// development catalogs. They cannot reach another host, so the allowlist does
 /// not apply to them.
 pub(crate) fn is_local_package_url(url: &str) -> bool {
+    if url.starts_with("file://") {
+        return is_valid_fixture_file_url(url);
+    }
     !url.starts_with("http://") && !url.starts_with("https://")
 }
+
+pub(crate) use super::fixture::{is_plus_curated_fixture_enabled, is_valid_fixture_file_url};

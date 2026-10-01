@@ -18,6 +18,7 @@ pub(crate) const MAX_PACKAGE_BYTES: u64 = 50 * 1024 * 1024;
 pub(crate) const MAX_PACKAGE_FILES: usize = 2000;
 
 mod device;
+mod fixture;
 mod install;
 mod manifest;
 pub mod marketplace;
@@ -32,13 +33,13 @@ mod validation;
 pub use manifest::PluginManifest;
 pub use marketplace::{
     market_channel_from_settings, MarketChannel, GITHUB_BACKUP_CHANNEL_CATALOG_URL,
-    MIRROR_MARKET_CATALOG_URL, OFFICIAL_CHANNEL_CATALOG_URL,
+    MIRROR_MARKET_CATALOG_URL, OFFICIAL_CHANNEL_CATALOG_URL, PLUS_CURATED_CHANNEL_CATALOG_URL,
 };
 pub use model::{
-    InstallOptions, InstallResult, MarketDownloadInfo, MarketPluginDetail, MarketPluginSummary,
-    MarketProvenance, MarketReview, MarketVersion, PluginDisplayI18n, PluginI18nMap,
-    PluginMarketplaceMeta, PluginSettingDefinition, PluginSettingOption, PluginSummary,
-    PluginUiMeta, PluginUpdateInfo, PluginYankNotice,
+    ExpectedMarketplace, InstallOptions, InstallResult, MarketDownloadInfo, MarketPluginDetail,
+    MarketPluginSummary, MarketProvenance, MarketReview, MarketVersion, PluginDisplayI18n,
+    PluginI18nMap, PluginMarketplaceMeta, PluginSettingDefinition, PluginSettingOption,
+    PluginSummary, PluginUiMeta, PluginUpdateInfo, PluginYankNotice,
 };
 pub(crate) use model::{MarketCatalogEntry, MarketCatalogFile};
 pub(crate) use progress::{

@@ -233,6 +233,8 @@ export const ErrorCodes = {
   PLUGIN_MARKET_RATE_LIMITED: "PLUGIN_MARKET_RATE_LIMITED",
   /** No distribution target can serve the package. */
   PLUGIN_MARKET_NO_SOURCE: "PLUGIN_MARKET_NO_SOURCE",
+  /** The offered bytes no longer match the reviewed source/version/hash. */
+  PLUGIN_MARKET_CHANGED: "PLUGIN_MARKET_CHANGED",
   /** The user cancelled an install while it was downloading. */
   PLUGIN_CANCELLED: "PLUGIN_CANCELLED",
   MCP_INVALID: "MCP_INVALID",
@@ -273,4 +275,12 @@ export const ErrorCodes = {
   TEAM_MAILBOX_FULL: "TEAM_MAILBOX_FULL",
   TEAM_MESSAGE_PAYLOAD_TOO_LARGE: "TEAM_MESSAGE_PAYLOAD_TOO_LARGE",
   TEAM_DELIVERY_PENDING: "TEAM_DELIVERY_PENDING",
+  /** A reviewed dispatch review must be confirmed before experts start. */
+  TEAM_APPROVAL_REQUIRED: "TEAM_APPROVAL_REQUIRED",
+  /** The review revision changed after the caller read it. */
+  TEAM_REVIEW_REVISION_CONFLICT: "TEAM_REVIEW_REVISION_CONFLICT",
+  /** A proposed provider/model/thinking route cannot be launched. */
+  TEAM_MODEL_SELECTION_INVALID: "TEAM_MODEL_SELECTION_INVALID",
+  /** The member holds a running turn or reserved queued work on its route. */
+  TEAM_MEMBER_MODEL_CHANGE_BLOCKED: "TEAM_MEMBER_MODEL_CHANGE_BLOCKED",
 } as const;

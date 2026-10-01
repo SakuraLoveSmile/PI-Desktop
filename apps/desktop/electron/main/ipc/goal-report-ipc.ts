@@ -44,4 +44,30 @@ export function registerGoalReportIpc({
     if (!executionId) throw new Error("executionId required");
     return host.call("goalReports.retry", { sessionId, executionId });
   });
+  handle(
+    IPC.invoke.goalReportGetAsset,
+    async (params: {
+      sessionId: string;
+      executionId: string;
+      screenshotId: string;
+      offset?: number;
+      length?: number;
+    }) => {
+      const host = getHost();
+      if (!host) throw new Error("host unavailable");
+      const sessionId = String(params?.sessionId ?? "").trim();
+      if (!sessionId) throw new Error("sessionId required");
+      const executionId = String(params?.executionId ?? "").trim();
+      if (!executionId) throw new Error("executionId required");
+      const screenshotId = String(params?.screenshotId ?? "").trim();
+      if (!screenshotId) throw new Error("screenshotId required");
+      return host.call("goalReports.getAsset", {
+        sessionId,
+        executionId,
+        screenshotId,
+        ...(typeof params?.offset === "number" ? { offset: params.offset } : {}),
+        ...(typeof params?.length === "number" ? { length: params.length } : {}),
+      });
+    },
+  );
 }

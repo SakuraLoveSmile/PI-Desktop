@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   GLOBAL_SCOPE,
   type AgentCapabilityLevel,
+  type McpControlStatus,
   type McpServerRecord,
   type McpServerStatus,
 } from "@pi-desktop/shared";
@@ -39,8 +40,10 @@ import {
   IconArrowUpDown,
   IconKey,
   IconPencil,
+  IconPlug,
   IconPlay,
   IconPlus,
+  IconRefresh,
   IconServer,
   IconTerminal,
   IconTrash,
@@ -108,6 +111,70 @@ export function AgentMcpPage() {
   );
   const setStatuses = (update: (current: McpServerStatus[]) => McpServerStatus[]) =>
     setServers((current) => ({ ...current, statuses: update(current.statuses) }));
+
+  /**
+   * The desktop's own local control endpoint (ADR 0203) is one machine setting,
+   * not a row: it has no level, no project, and no document behind it, and the
+   * host owns both its stored value and whether it is actually listening. `null`
+   * means "not read yet", so the block never guesses "off" while it loads.
+   */
+  const [control, setControl] = useState<McpControlStatus | null>(null);
+  const [controlReadError, setControlReadError] = useState<string | null>(null);
+  const [controlLoading, setControlLoading] = useState(true);
+  const [controlBusy, setControlBusy] = useState(false);
+
+  const readControl = useCallback(async () => {
+    setControlLoading(true);
+    try {
+      setControl(await api.mcpControlGet());
+      setControlReadError(null);
+    } catch (error) {
+      setControlReadError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setControlLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void readControl();
+  }, [readControl]);
+
+  /**
+   * Start or stop the endpoint. The host answers with the state it actually
+   * reached — including a start that failed because the port is taken — so this
+   * never flips the switch optimistically: the reason a start failed is the
+   * whole point of the control.
+   */
+  const toggleControl = async (enabled: boolean) => {
+    if (controlBusy || controlLoading) return;
+    setControlBusy(true);
+    try {
+      const next = await api.mcpControlSet(enabled);
+      setControl(next);
+      setControlReadError(null);
+      if (next.error) {
+        showToast(next.error, { variant: "error" });
+      } else {
+        showToast(
+          t(
+            next.enabled && next.running
+              ? "settings.mcpControl.turnedOn"
+              : "settings.mcpControl.turnedOff",
+          ),
+          { variant: "success" },
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setControlReadError(message);
+      showToast(message, { variant: "error" });
+      // A rejected call proves nothing about the host, so re-read it instead of
+      // leaving the switch on a value only this window believes.
+      await readControl();
+    } finally {
+      setControlBusy(false);
+    }
+  };
   const [filter, setFilter] = useState<CapabilityFilter>("all");
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -586,6 +653,139 @@ export function AgentMcpPage() {
     );
   };
 
+  /**
+   * The one block on this page that is not an installed server: the desktop's own
+   * loopback control endpoint (ADR 0203). It sits above the level groups because
+   * it belongs to this machine rather than to `~/.agents/servers` or a project,
+   * so it never follows the level filter, the search, or the project picker, and
+   * it carries no level or transport badge, no row menu, and no OAuth action.
+   *
+   * It is a strip rather than a row tile for the same reason: the setting is one
+   * switch the host owns, not a document this page can move, rename, or delete.
+   */
+  const renderControlEndpoint = () => {
+    /** A launch argument owns the value; the strip reports it, cannot change it. */
+    const override = control?.source === "environment";
+    const running = Boolean(control?.running);
+    const enabled = Boolean(control?.enabled);
+    /**
+     * The host's own reason for a start, stop, or persist it could not apply. It
+     * reports a request it refused — one that contradicts a launch argument, for
+     * instance — in the same field, so this is a reason, not always a failure.
+     */
+    const hostError = control?.error ?? null;
+    /** This window could not reach the host at all, which is a different failure. */
+    const unreachable = controlReadError;
+    /** Nothing listening while the value says it should be is the real failure. */
+    const failed = !running && hostError !== null && (enabled || !override);
+    /** No value and a host that did not answer: the state is simply unknown. */
+    const unknown = !control && unreachable !== null;
+    /**
+     * "Retry start" belongs to a start that failed while the value still says
+     * on. A refused or rolled-back request is not a broken endpoint — the
+     * switch itself is that retry — so it shows its reason without a button
+     * that cannot fix it. An explicit launch argument does not block this:
+     * only a request opposite to its value is refused.
+     */
+    const canRetry = enabled && !running && hostError !== null;
+    /** The only color on the strip, and only while it means something. */
+    const status = failed
+      ? {
+          label: t("settings.mcpControl.failed"),
+          className: "agent-capability-badge is-status is-failed",
+          dot: true,
+        }
+      : running
+        ? {
+            label: t("settings.mcpControl.on"),
+            className: "agent-capability-badge is-status is-ready",
+            dot: true,
+          }
+        : {
+            label: unknown
+              ? t("settings.mcpControl.unavailable")
+              : controlLoading && !control
+                ? t("settings.mcpControl.reading")
+                : t("settings.mcpControl.off"),
+            className: "agent-capability-badge",
+            dot: false,
+          };
+    const connectionFile = control?.connectionFile ?? null;
+    return (
+      <div className="agent-mcp-scope" role="presentation">
+        <div className="agent-mcp-scope-copy">
+          <div className="agent-capability-row-title">
+            <span className="agent-mcp-scope-label">{t("settings.mcpControl.title")}</span>
+            <span className="agent-capability-badge">
+              {t("settings.mcpControl.thisMachine")}
+            </span>
+            {override ? (
+              <span className="agent-capability-badge">
+                {t("settings.mcpControl.envControlled")}
+              </span>
+            ) : null}
+          </div>
+          <div className="agent-capability-meta">
+            <span className={status.className}>
+              {status.dot ? (
+                <span className="agent-capability-status-dot" aria-hidden="true" />
+              ) : null}
+              {status.label}
+            </span>
+            {running ? (
+              <span className="agent-mcp-scope-hint">
+                {t("settings.mcpControl.onHint")}
+              </span>
+            ) : failed || unknown ? null : (
+              <span className="agent-mcp-scope-hint">
+                {t("settings.mcpControl.offHint")}
+              </span>
+            )}
+          </div>
+          {failed ? (
+            <span className="agent-mcp-scope-hint" role="alert">
+              {hostError}
+            </span>
+          ) : unreachable ? (
+            <span className="agent-mcp-scope-hint">
+              {t("settings.mcpControl.unreachable", { message: unreachable })}
+            </span>
+          ) : hostError ? (
+            <span className="agent-mcp-scope-hint">{hostError}</span>
+          ) : null}
+          {connectionFile ? (
+            <div className="agent-capability-meta">
+              <span className="agent-mcp-scope-hint">
+                {t("settings.mcpControl.connectionFile")}
+              </span>
+              {/* Selectable on purpose: this path is the hand-off to a client. */}
+              <code title={connectionFile}>{connectionFile}</code>
+            </div>
+          ) : null}
+        </div>
+        <div className="agent-capability-row-actions">
+          {canRetry ? (
+            <CapabilityButton
+              onClick={() => void toggleControl(true)}
+              busy={controlBusy}
+            >
+              <IconRefresh size={14} />
+              {t("settings.mcpControl.retry")}
+            </CapabilityButton>
+          ) : null}
+          {/* Effective value, so a saved "on" whose start failed stays on. */}
+          <CapabilityToggle
+            checked={enabled}
+            busy={controlBusy || controlLoading}
+            disabled={override}
+            label={t("settings.mcpControl.toggle")}
+            onChange={() => void toggleControl(!enabled)}
+          />
+        </div>
+      </div>
+    );
+  };
+
   const showGlobal = filter !== "project";
   const showProject = filter !== "global";
   const addButton = (
@@ -660,6 +860,7 @@ export function AgentMcpPage() {
         refreshing={refreshing}
         loadingLabel={t("settings.loadingCapabilities")}
       >
+        {renderControlEndpoint()}
         {counts.all === 0 && search.trim() ? (
           <CapabilityEmpty
             message={t("settings.capabilityNoMatches")}

@@ -132,6 +132,11 @@ export const IPC = {
     teamGetBoard: "pi-desktop/team/getBoard",
     teamPause: "pi-desktop/team/pause",
     teamResume: "pi-desktop/team/resume",
+    teamGetExecutionDecision: "pi-desktop/team/getExecutionDecision",
+    teamGetLaunchReview: "pi-desktop/team/getLaunchReview",
+    teamUpdateLaunchReview: "pi-desktop/team/updateLaunchReview",
+    teamConfirmLaunchReview: "pi-desktop/team/confirmLaunchReview",
+    teamCancelLaunchReview: "pi-desktop/team/cancelLaunchReview",
     projectOpenFolder: "pi-desktop/project/openFolder",
     settingsGet: "pi-desktop/settings/get",
     settingsSet: "pi-desktop/settings/set",
@@ -190,6 +195,7 @@ export const IPC = {
     goalReportGet: "pi-desktop/goalReport/get",
     goalReportList: "pi-desktop/goalReport/list",
     goalReportRetry: "pi-desktop/goalReport/retry",
+    goalReportGetAsset: "pi-desktop/goalReport/getAsset",
     /**
      * List every paired remote `pi-host` this desktop knows, redacted so no
      * device token reaches the renderer. See ADR 0286 (R2b pairing UX).
@@ -293,6 +299,18 @@ export const IPC = {
     mcpImportScan: "pi-desktop/mcp/importScan",
     mcpImportRun: "pi-desktop/mcp/importRun",
     mcpMarketSearch: "pi-desktop/mcp/market/search",
+    /**
+     * Local MCP control plane status for this launch: effective enabled state,
+     * live listener state, the path of the connection manifest, and the last
+     * failure reason. Never contains the bearer token or the manifest itself.
+     */
+    mcpControlGet: "pi-desktop/mcp/control/get",
+    /**
+     * Enable or disable the local MCP control plane and persist the choice in
+     * the machine-local preference file. The startup environment wins while it
+     * is explicit, in which case the request is reported instead of applied.
+     */
+    mcpControlSet: "pi-desktop/mcp/control/set",
     skillList: "pi-desktop/skill/list",
     skillCreate: "pi-desktop/skill/create",
     skillImport: "pi-desktop/skill/import",

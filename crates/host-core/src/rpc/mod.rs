@@ -4477,6 +4477,58 @@ async fn handle_request(
             .await;
             Ok(json!({ "report": summary }))
         }
+        "goalReports.getAsset" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let screenshot_id = params
+                .get("screenshotId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "screenshotId required", "INVALID_PARAMS"))?;
+            let offset = params.get("offset").and_then(|v| v.as_u64()).unwrap_or(0);
+            let length = params
+                .get("length")
+                .and_then(|v| v.as_u64())
+                .map(|n| n as usize);
+            let st = state.lock().await;
+            let owned: bool = st
+                .db
+                .conn()
+                .query_row(
+                    "SELECT EXISTS(
+                        SELECT 1 FROM goal_reports
+                        WHERE session_id = ?1 AND execution_id = ?2
+                    )",
+                    rusqlite::params![session_id, execution_id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            if !owned {
+                return Ok(json!({
+                    "state": "not_found",
+                    "sessionId": session_id,
+                    "offset": offset,
+                    "detail": "REPORT_NOT_FOUND: goal report does not exist"
+                }));
+            }
+            let chunk = crate::goal_reports::assets::read_asset_chunk(
+                st.db.data_dir(),
+                session_id,
+                execution_id,
+                screenshot_id,
+                offset,
+                length,
+            );
+            Ok(json!(chunk))
+        }
 
         method if method.starts_with("scheduled.") => {
             let st = state.lock().await;
@@ -5390,6 +5442,9 @@ async fn handle_request(
                         enable,
                         marketplace: None,
                         expected_shasum: None,
+                        expected_plugin_id: None,
+                        expected_version: None,
+                        expected_marketplace: None,
                         auto_update: false,
                         granted_permissions: granted,
                     },
@@ -5424,6 +5479,9 @@ async fn handle_request(
                         enable,
                         marketplace: None,
                         expected_shasum,
+                        expected_plugin_id: None,
+                        expected_version: None,
+                        expected_marketplace: None,
                         auto_update: false,
                         granted_permissions: granted,
                     },
@@ -5797,6 +5855,9 @@ async fn handle_request(
                 .get("grantedPermissions")
                 .cloned()
                 .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok());
+            let expected_marketplace = params.get("expectedMarketplace").cloned().and_then(|v| {
+                serde_json::from_value::<crate::plugins::ExpectedMarketplace>(v).ok()
+            });
             // An install outlives one request from the interface's point of
             // view: it resolves where the package is, downloads it from one
             // mirror after another, verifies it and registers it. Every one of
@@ -5820,6 +5881,7 @@ async fn handle_request(
                 enable,
                 auto_update,
                 granted,
+                expected_marketplace.as_ref(),
                 &mut observer,
             );
             // Whatever happened, nothing is cancellable any more: a token left

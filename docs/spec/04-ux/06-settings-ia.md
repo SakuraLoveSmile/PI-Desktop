@@ -503,6 +503,17 @@ system while preserving their different data ownership:
   the primary action's tooltip names that destination so the choice is never
   implicit. Choosing Project without a selected project reports that instead
   of failing silently.
+- The MCP page carries one extra machine-local strip inside its single panel,
+  above the Global group: a title with a **Local** badge (plus a *Controlled by
+  a launch argument* badge when the launch environment overrides the saved
+  preference), a status badge (`Off` / `On` / `Failed to start`) using the shared
+  semantic colors, a one-line explanation, the optional selectable manifest
+  path, and a **Retry start** action after a failed start. It is not an
+  installed server: it has no level or transport badge, no row menu, and no
+  move / delete / OAuth action, and it stays outside the level filter, search
+  counts, and project switching. Its switch is never optimistic — the host's
+  returned state is authoritative, and the connection file path is the only
+  thing it displays: no token is read, rendered, or offered for copying.
 - Inside the panel, each level is a group header row — level name, resolved
   `.agents` path in mono, localized count — followed by its rows. Lists flow
   at natural page height like every other Settings surface; the page scrolls

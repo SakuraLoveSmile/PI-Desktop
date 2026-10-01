@@ -1,4 +1,4 @@
-import { IPC, ErrorCodes, trustedExtensionCommandId, trustedExtensionCommandName } from "@pi-desktop/shared";
+import { IPC, ErrorCodes, trustedExtensionCommandId, trustedExtensionCommandName, type ExpectedMarketplace } from "@pi-desktop/shared";
 import { builtinPaletteItems } from "../builtin-commands";
 import type { AgentExtensionBridge } from "../agent-extensions";
 import type { HostProcess } from "../host-process";
@@ -56,6 +56,7 @@ export function registerMarketIpc({
     enable?: boolean;
     autoUpdate?: boolean;
     grantedPermissions?: string[];
+    expectedMarketplace?: ExpectedMarketplace;
   }) => {
     if (!host) throw new Error("host unavailable");
     const installed = await host.call<{ result: any }>("market.install", payload);

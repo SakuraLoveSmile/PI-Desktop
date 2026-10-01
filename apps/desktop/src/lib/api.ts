@@ -28,6 +28,7 @@ import type {
   AskToolResolution,
   AgentInstructionFile,
   AppSettings,
+  ExpectedMarketplace,
   CommandShellCatalog,
   AppVersionInfo,
   BrowserAction,
@@ -45,6 +46,7 @@ import type {
   HostStatusEvent,
   MarketSource,
   McpCatalogEntry,
+  McpControlStatus,
   SkillCatalogEntry,
   ModelInfo,
   McpServerInput,
@@ -123,6 +125,8 @@ import type {
   TrustedExtensionStatusEvent,
   TrustedExtensionUiPrompt,
   TrustedExtensionUiPromptResponse,
+  GoalReportAssetChunk,
+  GoalReportSummary,
   TeamMemberRecord,
   TeamProjection,
 } from "@pi-desktop/shared";
@@ -719,6 +723,11 @@ export const api = {
    * answer, `catalog` means the endpoint published nothing and models.dev was
    * used instead, `cache` is the local table, `fallback` is just the configured
    * model id.
+   *
+   * `intent` marks the one explicit manual action (the Fetch list control). It
+   * is the only thing that may enable macOS's supplemental Local Network alert
+   * trigger, it changes nothing about the request the endpoint sees, and it is
+   * never persisted, forwarded to the host or passed by any other caller.
    */
   listProviderModels: (input: {
     providerId?: string;
@@ -727,6 +736,7 @@ export const api = {
     apiStyle?: string;
     headers?: Record<string, string>;
     source?: "cache" | "refresh";
+    intent?: "manual-fetch-list";
   }) =>
     invoke<{
       models: ModelInfo[];
@@ -980,11 +990,28 @@ export const api = {
   markRevisionFailed: (proposalId: string, sessionId: string, errorCode?: string) =>
     invoke<{ changed: boolean; proposal?: PlanProposal }>(IPC.invoke.plansMarkRevisionFailed, { proposalId, sessionId, errorCode }),
   getGoalReport: (params: { sessionId: string; reportId?: string; executionId?: string }) =>
-    invoke<{ report: any }>(IPC.invoke.goalReportGet, params),
+    invoke<{
+      report: any;
+      state: string;
+      reportSha256?: string;
+      fileBytes?: number;
+      maxBytes?: number;
+      integrity?: string;
+      verdict?: string;
+      detail?: string;
+    }>(IPC.invoke.goalReportGet, params),
   listGoalReports: (params: { sessionId: string }) =>
-    invoke<{ reports: any[] }>(IPC.invoke.goalReportList, params),
+    invoke<{ reports: GoalReportSummary[] }>(IPC.invoke.goalReportList, params),
   retryGoalReport: (params: { sessionId: string; executionId: string }) =>
-    invoke<{ report: any }>(IPC.invoke.goalReportRetry, params),
+    invoke<{ report: GoalReportSummary }>(IPC.invoke.goalReportRetry, params),
+  getGoalReportAsset: (params: {
+    sessionId: string;
+    executionId: string;
+    screenshotId: string;
+    offset?: number;
+    length?: number;
+  }) =>
+    invoke<GoalReportAssetChunk>(IPC.invoke.goalReportGetAsset, params),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   /**
@@ -1096,6 +1123,19 @@ export const api = {
       IPC.invoke.mcpMarketSearch,
       { query, sources, ...options },
     ),
+
+  /**
+   * The desktop's own local MCP control endpoint (ADR 0203, gate `PI_DESKTOP_MCP_CONTROL`).
+   *
+   * It is a machine setting rather than a server definition, so it has its own
+   * pair of channels instead of `mcpList`/`mcpSetEnabled`, and the response never
+   * carries the bearer token or the whole connection manifest — only the
+   * manifest path, which is what the user needs for a client of their own.
+   */
+  mcpControlGet: () => invoke<McpControlStatus>(IPC.invoke.mcpControlGet),
+  /** Start or stop the local endpoint; the response is the state it reached. */
+  mcpControlSet: (enabled: boolean) =>
+    invoke<McpControlStatus>(IPC.invoke.mcpControlSet, { enabled }),
 
   // --- Skill market ----------------------------------------------------------
   searchSkillMarket: (query: string, sources: { id: string; name: string; url: string }[]) =>
@@ -1293,6 +1333,7 @@ export const api = {
     enable?: boolean;
     autoUpdate?: boolean;
     grantedPermissions?: string[];
+    expectedMarketplace?: ExpectedMarketplace;
   }) =>
     invoke<{ result: PluginInstallResult }>(IPC.invoke.marketInstall, input),
   marketCheckUpdates: (refreshRemote = true) =>

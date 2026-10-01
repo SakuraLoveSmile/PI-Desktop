@@ -23,11 +23,15 @@ import { createBackendRouter, type BackendRouter } from "../remote/backend-route
 import { createRemoteHostsBoot, setActiveRemoteHostsBoot } from "./remote-hosts";
 import {
   createMcpControlController,
-  McpControlServer,
   mcpControlRendererEvent,
   type McpControlController,
   type McpControlInvokeInput,
+  type McpControlServer,
 } from "../mcp-control";
+import {
+  createMcpControlLifecycle,
+  setActiveMcpControlLifecycle,
+} from "../mcp-control-lifecycle";
 import type { ModelsDevCatalog } from "../models-dev-catalog";
 import type { AppUpdaterController } from "../updater";
 import type { HostProcess } from "../host-process";
@@ -178,6 +182,20 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
     // create a window, a tray, or a child process on top of the running app.
     if (!hasSingleInstanceLock) return;
     applyDevelopmentBranding();
+
+    // The optional local MCP control plane has exactly one lifecycle for both
+    // the startup preference and the settings IPC: one server slot, one
+    // start/stop path. Bound before IPC registration so a renderer that calls
+    // the settings channel during boot can never observe an unbound plane.
+    const mcpControl = createMcpControlLifecycle({
+      dataDir,
+      getServer: () => state.mcpControl,
+      setServer: (server) => {
+        state.mcpControl = server;
+      },
+      log: (level, message, data) => logger.app("runtime", level, message, { data }),
+    });
+    setActiveMcpControlLifecycle(mcpControl);
 
     // A Chromium-process crash from a previous run left a minidump, and nothing
     // else would ever mention it. Report one durable line per new dump set,
@@ -342,27 +360,15 @@ export function registerApplicationStartup(deps: StartupDependencies): void {
       applyToggleWindowShortcut();
     }
     await ensureWindow();
-    if (process.env.PI_DESKTOP_MCP_CONTROL === "1") {
-      try {
-        state.mcpControl = new McpControlServer({
-          dataDir,
-          invoke: invokeIpc,
-          channels: IPC.invoke,
-          version: APP_VERSION,
-          port: process.env.PI_DESKTOP_MCP_PORT
-            ? Number(process.env.PI_DESKTOP_MCP_PORT)
-            : undefined,
-          controller: state.desktopControl ?? undefined,
-          log: (level, message, data) => logger.app("runtime", level, message, { data }),
-        });
-        await state.mcpControl.start();
-      } catch (error) {
-        logger.app("runtime", "warn", "MCP control server failed to start", {
-          data: String(error),
-        });
-        state.mcpControl = null;
-      }
-    }
+    // Start the control plane from the effective preference: an explicit
+    // PI_DESKTOP_MCP_CONTROL wins over the saved value, and a failed start is
+    // reported to the settings surface instead of holding up the desktop.
+    await mcpControl.startFromPreference({
+      invoke: invokeIpc,
+      channels: IPC.invoke,
+      controller: state.desktopControl ?? undefined,
+      version: APP_VERSION,
+    });
     // GitHub discovery is delayed and time-bounded. Never start it before the
     // first window exists: a hung feed used to sit in "checking" for ~60s and
     // compete with boot for the net stack.

@@ -247,6 +247,7 @@ reveal 不并入任何行，必须重新读取。
 | `PLUGIN_MARKET_NOT_FOUND` | 不 | 平台没有该插件或该版本 |
 | `PLUGIN_MARKET_RATE_LIMITED` | 是 | 下载接口要求客户端等待后重试 |
 | `PLUGIN_MARKET_NO_SOURCE` | 也许 | 没有任何分发目标能提供该包 |
+| `PLUGIN_MARKET_CHANGED` | 否 | 提供的安装包与已审核的源、版本或 sha256 校验和不一致 |
 | `PLUGIN_CANCELLED` | 不 | 用户在下载过程中取消了安装 |
 | `MCP_INVALID` | 不 | 用户的 MCP 服务器定义校验失败 |
 | `SKILL_INVALID` | 不 | 用户的技能文档校验失败 |
@@ -336,6 +337,10 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `TEAM_MAILBOX_FULL` | 是 | 收件人的待处理团队消息已达到上限 |
 | `TEAM_MESSAGE_PAYLOAD_TOO_LARGE` | 否 | 团队消息超过 64 KiB 载荷上限 |
 | `TEAM_DELIVERY_PENDING` | 是 | Host 尚未持久化收件人的队列或 turn 回执 |
+| `TEAM_APPROVAL_REQUIRED` | 否 | 专家队友启动前必须确认启动审查确认 |
+| `TEAM_REVIEW_REVISION_CONFLICT` | 是 | 启动审查版本在调用方读取后已发生变化 |
+| `TEAM_MODEL_SELECTION_INVALID` | 否 | 提议的模型/提供商/思考路线无法启动 |
+| `TEAM_MEMBER_MODEL_CHANGE_BLOCKED` | 否 | 该成员在其路线上持有活跃 turn 或排队任务 |
 
 ## 4. 映射规则
 

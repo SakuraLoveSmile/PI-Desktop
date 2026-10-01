@@ -613,3 +613,295 @@ fn read_report_is_not_found_across_sessions_and_survives_a_reopen() {
     assert_eq!(after.report_sha256, before_hash);
     assert_eq!(after.integrity.as_deref(), Some("structured"));
 }
+#[test]
+fn test_assets_save_and_chunk_read() {
+    let (dir, db) = create_test_db();
+    let session_id = "sess-assets";
+    let execution_id = "exec-assets-1";
+    seed_goal_execution(&db, session_id, execution_id);
+
+    // Create a dummy attachment file in data_dir/attachments/test-sc.png
+    let att_dir = dir.path().join("attachments");
+    fs::create_dir_all(&att_dir).unwrap();
+    // Valid PNG signature: \x89PNG\r\n\x1a\n plus some bytes
+    let mut png_bytes = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    png_bytes.extend_from_slice(b"TEST_IMAGE_DATA_1234567890");
+    let test_img_path = att_dir.join("test-img-hash.png");
+    fs::write(&test_img_path, &png_bytes).unwrap();
+    crate::transcripts::append_message(
+        db.data_dir(),
+        session_id,
+        "2025-01-01T00:00:00Z",
+        &crate::transcripts::MessageRecord {
+            id: "attachment-message".to_string(),
+            role: "user".to_string(),
+            tool_name: None,
+            is_error: false,
+            blocks: json!([{
+                "type": "attachment",
+                "kind": "image",
+                "name": "test-img-hash.png",
+                "ref": "attachments/test-img-hash.png"
+            }]),
+            meta: None,
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+        },
+    )
+    .unwrap();
+
+    let draft = json!({
+        "summary": "Report with screenshot asset",
+        "verdict": "met",
+        "screenshots": [
+            {
+                "id": "sc-1",
+                "evidenceRef": "ev-1",
+                "title": "Main Screenshot"
+            }
+        ],
+        "evidences": [
+            {
+                "id": "ev-1",
+                "kind": "file",
+                "refId": "attachments/test-img-hash.png",
+                "summary": "Screenshot evidence"
+            }
+        ]
+    });
+
+    submit_draft(&db, execution_id, &draft).unwrap();
+    let summary = finalize_report(&db, execution_id, 10, Some("completed"), None).unwrap();
+    assert_eq!(summary.status, "ready");
+
+    let read = read_report(&db, session_id, execution_id).unwrap();
+    assert_eq!(read.state, "ready");
+    let rep = read.report.unwrap();
+    let assets = rep.get("assets").and_then(Value::as_array).unwrap();
+    assert_eq!(assets.len(), 1);
+    assert_eq!(
+        assets[0].get("screenshotId").and_then(Value::as_str),
+        Some("sc-1")
+    );
+    assert_eq!(
+        assets[0].get("mimeType").and_then(Value::as_str),
+        Some("image/png")
+    );
+
+    // Read asset chunk
+    let chunk =
+        assets::read_asset_chunk(db.data_dir(), session_id, execution_id, "sc-1", 0, Some(10));
+    assert_eq!(chunk.state, "ready");
+    assert_eq!(chunk.length, Some(10));
+    assert_eq!(chunk.eof, Some(false));
+    assert_eq!(chunk.total_bytes, Some(png_bytes.len() as u64));
+    assert!(chunk.data_base64.is_some());
+
+    // Read remaining chunk
+    let chunk_end =
+        assets::read_asset_chunk(db.data_dir(), session_id, execution_id, "sc-1", 10, None);
+    assert_eq!(chunk_end.state, "ready");
+    assert_eq!(chunk_end.length, Some(png_bytes.len() - 10));
+    assert_eq!(chunk_end.eof, Some(true));
+
+    // Non-existent screenshot
+    let missing_chunk = assets::read_asset_chunk(
+        db.data_dir(),
+        session_id,
+        execution_id,
+        "non-existent",
+        0,
+        None,
+    );
+    assert_eq!(missing_chunk.state, "unavailable");
+
+    let outside = dir.path().join("outside.png");
+    fs::write(&outside, &png_bytes).unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&outside, att_dir.join("escape.png")).unwrap();
+    let unsafe_draft = json!({
+        "screenshots": [
+            { "id": "sc-escape", "evidenceRef": "ev-escape" },
+            { "id": "sc-absolute", "evidenceRef": "ev-absolute" }
+        ],
+        "evidences": [
+            { "id": "ev-escape", "kind": "file", "refId": "attachments/escape.png" },
+            { "id": "ev-absolute", "kind": "file", "refId": outside.to_string_lossy() }
+        ]
+    });
+    let (unsafe_assets, warnings) = assets::resolve_and_save_assets(
+        db.data_dir(),
+        session_id,
+        "exec-unsafe-assets",
+        &unsafe_draft,
+    );
+    assert!(unsafe_assets.is_empty());
+    assert_eq!(warnings.len(), 2);
+}
+
+#[test]
+fn test_evidence_resolution_and_check_observations() {
+    let (_dir, db) = create_test_db();
+    let session_id = "sess-ev";
+    let execution_id = "exec-ev-1";
+    seed_goal_execution(&db, session_id, execution_id);
+
+    // Insert a message in this session with seq = 5
+    db.conn()
+        .execute(
+            "INSERT INTO messages (id, session_id, seq, role, text, created_at)
+         VALUES ('msg-recorded-1', 'sess-ev', 5, 'assistant', 'output evidence text', 1000)",
+            params![],
+        )
+        .unwrap();
+    let tool_record = crate::transcripts::MessageRecord {
+        id: "tool-recorded-1".to_string(),
+        role: "tool".to_string(),
+        tool_name: Some("Bash".to_string()),
+        is_error: false,
+        blocks: json!([{
+            "type": "tool_call",
+            "callId": "tc-recorded",
+            "name": "Bash",
+            "args": { "command": "cargo check" },
+            "result": { "exitCode": 0 },
+            "status": "success"
+        }]),
+        meta: None,
+        created_at: "2025-01-01T00:00:00Z".to_string(),
+    };
+    crate::transcripts::append_message(
+        db.data_dir(),
+        session_id,
+        "2025-01-01T00:00:00Z",
+        &tool_record,
+    )
+    .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO messages (id, session_id, seq, role, tool_name, created_at)
+             VALUES ('tool-recorded-1', 'sess-ev', 6, 'tool', 'Bash', 1001)",
+            params![],
+        )
+        .unwrap();
+    db.conn()
+        .execute(
+            "INSERT INTO messages (id, session_id, seq, role, text, created_at)
+             VALUES ('future-message', 'sess-ev', 11, 'assistant', 'future-message', 1002)",
+            params![],
+        )
+        .unwrap();
+
+    let draft = json!({
+        "summary": "Check observations and evidence",
+        "verdict": "met",
+        "evidences": [
+            {
+                "id": "ev-recorded",
+                "kind": "message",
+                "refId": "msg-recorded-1",
+                "summary": "Found in message"
+            },
+            {
+                "id": "ev-missing",
+                "kind": "tool_call",
+                "refId": "tc-not-found",
+                "summary": "Missing ref"
+            },
+            {
+                "id": "ev-tool",
+                "kind": "tool_result",
+                "refId": "tc-recorded",
+                "summary": "Recorded command result"
+            },
+            {
+                "id": "ev-wildcard",
+                "kind": "message",
+                "refId": "%",
+                "summary": "Must not match text"
+            },
+            {
+                "id": "ev-future",
+                "kind": "message",
+                "refId": "future-message",
+                "summary": "Outside durable boundary"
+            }
+        ],
+        "checks": [
+            {
+                "id": "chk-passed",
+                "command": "cargo check",
+                "exitCode": 17,
+                "evidenceRefs": ["ev-tool"],
+                "result": "passed"
+            },
+            {
+                "id": "chk-failed",
+                "command": "npm test",
+                "exitCode": 1,
+                "result": "passed" // Model claimed passed, but exitCode 1 -> observation failed
+            },
+            {
+                "id": "chk-blocked",
+                "command": "deploy.sh",
+                "disposition": "blocked",
+                "result": "inconclusive"
+            }
+        ]
+    });
+
+    submit_draft(&db, execution_id, &draft).unwrap();
+    let summary = finalize_report(&db, execution_id, 10, Some("completed"), None).unwrap();
+    assert_eq!(summary.status, "ready");
+
+    let read = read_report(&db, session_id, execution_id).unwrap();
+    let rep = read.report.unwrap();
+
+    let ev_res = rep
+        .get("evidenceResolution")
+        .and_then(Value::as_array)
+        .unwrap();
+    assert_eq!(ev_res.len(), 5);
+    assert_eq!(
+        ev_res[0].get("state").and_then(Value::as_str),
+        Some("recorded")
+    );
+    assert_eq!(
+        ev_res[1].get("state").and_then(Value::as_str),
+        Some("unresolved")
+    );
+    assert_eq!(
+        ev_res[2].get("state").and_then(Value::as_str),
+        Some("unresolved")
+    );
+    assert_eq!(
+        ev_res[3].get("state").and_then(Value::as_str),
+        Some("unresolved")
+    );
+    assert_eq!(
+        ev_res[4].get("state").and_then(Value::as_str),
+        Some("unresolved")
+    );
+
+    let chk_obs = rep
+        .get("checkObservations")
+        .and_then(Value::as_array)
+        .unwrap();
+    assert_eq!(chk_obs.len(), 3);
+    assert_eq!(
+        chk_obs[0].get("result").and_then(Value::as_str),
+        Some("passed")
+    );
+    assert_eq!(
+        chk_obs[1].get("result").and_then(Value::as_str),
+        Some("inconclusive")
+    );
+    assert_eq!(
+        chk_obs[2].get("result").and_then(Value::as_str),
+        Some("inconclusive")
+    );
+    assert_eq!(
+        chk_obs[0].get("result").and_then(Value::as_str),
+        Some("passed")
+    );
+    assert_eq!(chk_obs[0].get("exitCode").and_then(Value::as_i64), Some(0));
+}

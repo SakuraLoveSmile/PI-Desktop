@@ -9,6 +9,9 @@ import {
   validateTaskDependencies,
   detectWriteScopeOverlaps,
   type TeamTaskRecord,
+  DECLARE_TEAM_STRATEGY_TOOL_NAME,
+  TEAM_LEAD_TOOL_NAMES,
+  MAX_TEAM_STRATEGY_REASON_CHARS,
 } from "./team.js";
 import {
   isExecutionProfile,
@@ -22,6 +25,15 @@ describe("team contracts and limits", () => {
     expect(MAX_TEAM_TASKS).toBe(256);
     expect(MAX_TEAM_MAILBOX_MESSAGES).toBe(64);
     expect(MAX_TEAM_MESSAGE_BYTES).toBe(65536);
+  });
+  it("keeps the Lead declaration out of the nine dispatch tools", () => {
+    expect(DECLARE_TEAM_STRATEGY_TOOL_NAME).toBe("declare_team_strategy");
+    expect(TEAM_LEAD_TOOL_NAMES).toHaveLength(10);
+    expect(TEAM_LEAD_TOOL_NAMES).toContain(DECLARE_TEAM_STRATEGY_TOOL_NAME);
+    // The dispatch list and its guard stay at nine: the declaration tool is
+    // not built by createTeamTools.
+    expect(isTeamTool(DECLARE_TEAM_STRATEGY_TOOL_NAME)).toBe(false);
+    expect(MAX_TEAM_STRATEGY_REASON_CHARS).toBe(1000);
   });
 
   it("identifies exactly the 9 DSH team tools", () => {
