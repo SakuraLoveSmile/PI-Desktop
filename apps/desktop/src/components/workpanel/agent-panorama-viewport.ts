@@ -258,7 +258,7 @@ export function usePanoramaViewport({
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target instanceof Element &&
-      event.target.closest("[data-panorama-node], [data-panorama-toolbar]"))) return;
+      event.target.closest("[data-panorama-node], [data-panorama-tool]"))) return;
     const start = { ...current.current, mode: "manual" as const };
     commit(start);
     drag.current = {
