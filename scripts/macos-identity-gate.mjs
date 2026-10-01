@@ -53,6 +53,16 @@ function describeFailures(checks) {
     .join("; ");
 }
 
+/** A missing source UUID makes independence unverifiable, so fail closed. */
+export function describeComparisonFailures(comparison) {
+  const sources = comparison?.unverifiableSources ?? [];
+  if (sources.length === 0) return null;
+  const list = sources
+    .map((entry) => `${entry.role} ${entry.path ?? "unknown path"}`)
+    .join(", ");
+  return `source-identities-readable: main executable UUID unavailable for ${list}`;
+}
+
 export default async function macosIdentityGate(context) {
   if (context.electronPlatformName !== "darwin") return;
 
@@ -99,7 +109,9 @@ export default async function macosIdentityGate(context) {
     duplicates: comparison.duplicateMainExecutable,
   });
   const enforced = evaluated.checks.filter((entry) => !DEFERRED_TO_SIGNING.has(entry.id));
-  const failures = describeFailures(enforced);
+  const failures = [describeComparisonFailures(comparison), describeFailures(enforced)]
+    .filter(Boolean)
+    .join("; ");
 
   if (failures) {
     throw new Error(

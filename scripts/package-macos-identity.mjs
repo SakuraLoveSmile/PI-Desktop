@@ -31,6 +31,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { shouldUseSecureTimestamp } from "./macos-signing-policy.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const desktopRoot = join(repoRoot, "apps", "desktop");
@@ -164,8 +165,14 @@ const flags = [`-c.electronDist=${electronDist}`, `-c.afterPack=${gate}`];
   keeps it; set PI_MAC_SECURE_TIMESTAMP=1 to request one here as well when a
   locally built DMG has to be notarized.
 */
-if (process.env.PI_MAC_SECURE_TIMESTAMP === "1") {
-  console.error("[package-macos] requesting a secure timestamp (PI_MAC_SECURE_TIMESTAMP=1)");
+const secureTimestampRequested =
+  shouldUseSecureTimestamp(forwarded, process.env);
+if (secureTimestampRequested) {
+  const reason =
+    process.env.PI_MAC_SECURE_TIMESTAMP === "1"
+      ? "PI_MAC_SECURE_TIMESTAMP=1"
+      : "mac.notarize=true";
+  console.error(`[package-macos] requesting a secure timestamp (${reason})`);
 } else {
   flags.push("-c.mac.timestamp=none");
   console.error(
