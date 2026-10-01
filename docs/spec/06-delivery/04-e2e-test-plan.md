@@ -15576,3 +15576,30 @@ renderer's durable transcript reads. No real model or provider is contacted.
 - **Status:** Automated layer implemented and passing. Native layer **not run**:
   it needs authorization to create a clean macOS account or VM snapshot, which
   this task does not have.
+
+
+### E2E-GOAL-report-asset-boundary
+
+- **Preconditions:** Isolated Host profile and session; an approved Goal
+  execution and local screenshot fixture; no live model or production data.
+- **Steps:** Publish a report with a valid owned screenshot and read its chunks;
+  try absolute, parent-traversal, symlink and another-session references. Submit
+  a claimed zero exit code without durable evidence and against a recorded
+  nonzero tool result.
+- **Expected:** Valid chunks reconstruct the published hash. Unsafe sources and
+  cross-session reads are unavailable. Model claims never become Host-verified
+  success; absent evidence is inconclusive and recorded failures stay failed.
+- **Automation:** `cargo test -p host-core --locked goal_reports` and
+  `node scripts/e2e-goal-report-ui.mjs` (Host transport, not visual QA).
+
+### E2E-MCP-control-settings-user-path
+
+- **Preconditions:** Isolated Electron/Chromium with the real MCP Settings page
+  and a controlled API boundary; no real app profile or provider.
+- **Steps:** Recover from an initial status-read failure; enable while the Host
+  response is delayed; observe start failure, retry, disable and environment
+  override.
+- **Expected:** The toggle follows the answered Host state, failed starts show
+  the cause and allow retry, and environment-controlled choices are disabled.
+- **Automation:** `node scripts/e2e-mcp-control-settings.mjs`; the real listener,
+  persistence and restart contracts are covered by `mcp-control-settings.test.mjs`.
