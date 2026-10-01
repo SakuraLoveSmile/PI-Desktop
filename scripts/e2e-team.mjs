@@ -605,6 +605,26 @@ async function saveScreenshot(sendCdp, name) {
   return path;
 }
 
+async function verifyStalePanoramaRetry(sendCdp, evaluate) {
+  // Only this harness's temporary database is changed, and always restored.
+  const fixtureDatabase = join(dataDir, "pi.sqlite");
+  execFileSync("sqlite3", [fixtureDatabase, "PRAGMA busy_timeout=5000; ALTER TABLE team_tasks RENAME TO team_tasks_fixture_failure;"]);
+  try {
+    await evaluate(`window.dispatchEvent(new Event('focus'))`);
+    await waitFor(() => evaluate(`!!document.querySelector('.agent-panorama-refresh-error button')`), "last-good panorama remains visible with a failed-read banner");
+    assert.ok(await evaluate(`!!document.querySelector('[data-panorama-canvas]')`));
+    await saveScreenshot(sendCdp, "team-panorama-stale.png");
+  } finally {
+    execFileSync("sqlite3", [fixtureDatabase, "PRAGMA busy_timeout=5000; ALTER TABLE team_tasks_fixture_failure RENAME TO team_tasks;"]);
+  }
+  const point = await evaluate(`(() => { const r=document.querySelector('.agent-panorama-refresh-error button').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+  await sendCdp("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", clickCount: 1 });
+  assert.equal(await evaluate(`document.querySelector('[data-panorama-canvas]').classList.contains('is-panning')`), false, "Retry must not begin or capture a canvas drag");
+  await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", ...point, button: "left", clickCount: 1 });
+  await waitFor(() => evaluate(`!document.querySelector('.agent-panorama-refresh-error')`), "Retry restores the current snapshot");
+  console.log("PASS Panorama stale recovery: failed read retains canvas, Retry remains clickable and restores the snapshot");
+}
+
 async function resizePanel(sendCdp, evaluate, width) {
   const bounds = await evaluate(`(() => {
     const panel = document.querySelector('[data-testid="work-panel"]');
@@ -803,6 +823,7 @@ try {
   await assertNoPageHorizontalOverflow(sendCdp, evaluate);
   assert.deepEqual(await panoramaViewport(sendCdp, evaluate), manualViewport, "manual viewport changed after resizing");
   console.log("PASS Panorama: 80% zoom, in-flight refresh retains canvas, continuous drag, detail/back and resize preserve viewport");
+  await verifyStalePanoramaRetry(sendCdp, evaluate);
   const waitingImage = await saveScreenshot(sendCdp, "team-panorama-waiting-members.png");
 
   releaseModelRequest("member");
