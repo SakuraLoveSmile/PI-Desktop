@@ -3200,6 +3200,17 @@ has four presentation states:
   changes do not retarget existing operations. Close, outside press and Escape
   dismiss the surface only and restore focus to an available trigger. The bar
   remains usable, and dismissing Details never submits or stops work.
+- When the bound work session is waiting on the user, the bar keeps a
+  persistent waiting line and Details shows the pending request (the asktool
+  question as bounded plain text, the tool awaiting permission, or the plan
+  awaiting approval) with an action that opens the exact bound session and
+  closes Details. Another session's request is never attributed to the bound
+  session, and with no backend waiting evidence nothing is shown. These
+  surfaces carry no decision: nothing in the bar or Details can answer or
+  approve a permission, Plan, or AskTool request. The voice path may resolve
+  the bound session's single open AskTool question by selecting among that
+  question's own option labels; a permission or Plan/Goal approval is still
+  only ever made here, in the desktop UI.
 - The configurable toggle shortcut retains deliberate direct start from idle
   and end during a call. Direct start also defaults to the current Composer
   session and leaves bounded-context consent off. The startup-cancel shortcut

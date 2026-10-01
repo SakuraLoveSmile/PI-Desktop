@@ -85,7 +85,7 @@ export function createLiveCallService(input: {
         ...(operation.resultSummary ? { resultSummary: operation.resultSummary } : {}),
         ...(operation.resultState ? { resultState: operation.resultState } : {}),
         ...(operation.selections ? { selections: operation.selections } : {}),
-      }, operation.providerRequestId, operation.resultSummary, update.intent);
+      }, operation.providerRequestId, operation.resultSummary, update.intent, update.pendingQuestion);
     },
     getWorkContextConsent: (callId) => liveCallService?.getWorkContextConsent(callId) ?? false,
     onTargetSelected: (callId, binding) => liveCallService?.setWorkTarget(callId, binding),

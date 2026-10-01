@@ -1,4 +1,4 @@
-import { useState, type RefObject } from "react";
+import { useMemo, useState, type RefObject } from "react";
 import type { TFunction } from "i18next";
 import type { LiveCallView, LiveStatus, LiveTranscriptSegment } from "@pi-desktop/shared";
 import { IconClose, IconExternal } from "../../../components/icons";
@@ -7,6 +7,8 @@ import { Panel, TooltipButton } from "../../../components/ui";
 import { useAppStore } from "../../../stores/app-store";
 import { liveVoiceApi } from "./live-voice-api";
 import { formatWorkSessionLabel } from "./live-voice-presentation";
+import { liveWorkDecision, operationAwaitsDecision } from "./live-work-decision";
+import { LiveWorkDecisionNotice } from "./LiveWorkDecisionNotice";
 import { LiveWorkOperations } from "./LiveWorkOperations";
 
 export function LiveVoiceDetails({ t, call, status, transcripts, open, onClose, anchorRef }: {
@@ -22,11 +24,40 @@ export function LiveVoiceDetails({ t, call, status, transcripts, open, onClose, 
   const sessions = useAppStore((state) => state.sessions);
   const selectSession = useAppStore((state) => state.selectSession);
   const createSession = useAppStore((state) => state.newSession);
+  const planCheckpoints = useAppStore((state) => state.planCheckpoints);
+  const pendingPermissions = useAppStore((state) => state.pendingPermissions);
+  const pendingAsks = useAppStore((state) => state.pendingAsks);
   const [message, setMessage] = useState<string | null>(null);
   const [busyOperationId, setBusyOperationId] = useState<string | null>(null);
+  const [decisionPending, setDecisionPending] = useState(false);
   const provider = status?.bindings.find((binding) => binding.bindingId === call.bindingId);
   const viewingSession = sessions.find((session) => session.id === activeSessionId);
   const workBinding = call.workBinding;
+  const boundSessionId = workBinding?.workSessionId;
+  // The work session can wait on the user while the call is connected and the
+  // user is looking at another session entirely. Live Voice cannot answer for
+  // them, so the panel has to name the pending request and open that session.
+  const decision = useMemo(
+    () => liveWorkDecision({
+      sessionId: boundSessionId,
+      awaiting: operationAwaitsDecision(call.workOperations, boundSessionId),
+      asks: pendingAsks,
+      permissions: pendingPermissions,
+      planCheckpoints,
+    }),
+    [boundSessionId, call.workOperations, pendingAsks, pendingPermissions, planCheckpoints],
+  );
+
+  const openDecision = (sessionId: string) => {
+    setMessage(null);
+    setDecisionPending(true);
+    void selectSession(sessionId).then(
+      // The card lives in that session's Composer dock: close the popup so the
+      // decision is visible and focusable instead of covered by this panel.
+      () => onClose(),
+      () => setMessage(t("liveVoice.sessionOpenFailed")),
+    ).finally(() => setDecisionPending(false));
+  };
 
   const openSelection = async (callId: string, selectionRef: string) => {
     const target = await liveVoiceApi.resolveWorkSelection({ callId, selectionRef });
@@ -86,6 +117,14 @@ export function LiveVoiceDetails({ t, call, status, transcripts, open, onClose, 
                     ? formatWorkSessionLabel(viewingSession.projectPath, viewingSession.title, t("liveVoice.untitledWorkSession"))
                     : t("liveVoice.unknownSession"),
                 })}</p>
+              ) : null}
+              {decision ? (
+                <LiveWorkDecisionNotice
+                  decision={decision}
+                  t={t}
+                  busy={decisionPending}
+                  onOpen={() => openDecision(decision.sessionId)}
+                />
               ) : null}
             </>
           ) : <p className="live-voice-hint" role="status">{t("liveVoice.noWorkTarget")}</p>}
