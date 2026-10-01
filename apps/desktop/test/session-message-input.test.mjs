@@ -110,3 +110,69 @@ test("prompt IPC persists original session text, skips slash expansion and binds
   assert.equal(events.length, 2);
   assert.equal(released, true);
 });
+
+test("abort waits for prompt admission before dispatching to the sidecar", async () => {
+  const handlers = new Map();
+  const calls = [];
+  let releasePrompt;
+  let promptOperation;
+  const host = {
+    async call(method) {
+      calls.push(method);
+      if (method === "settings.get") return {};
+      if (method === "session.get") return { session: { id: "target", messages: [] } };
+      if (method === "session.beginTurn") return { turnId: "turn-1" };
+      if (method === "session.appendMessage") return {};
+      assert.fail(`unexpected RPC ${method}`);
+    },
+  };
+  const activeTurns = new Map();
+  const sidecarCalls = [];
+  registerAgentIpc({
+    registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
+    getHost: () => host,
+    getSidecar: () => ({
+      setProjectInstructionRoot() {},
+      async call(method) {
+        sidecarCalls.push(method);
+        if (method === "agent.prompt") return { accepted: true, turnId: "turn-1" };
+        if (method === "agent.abort") return { ok: true, aborted: true };
+        assert.fail(`unexpected sidecar RPC ${method}`);
+      },
+    }),
+    getAgentHostBridge: () => null,
+    logger: { app() {} }, vendorOAuth: {}, agentExtensions: {}, cancelSessionTools() {},
+    persistenceOutbox: {}, dataDir: "/unused-for-no-attachments",
+    activeTurns, activeTurnUsages: new Map(), approvedExecutionIdsBySession: new Map(), claimedExecutionSessions: new Map(),
+    resolveAgentRuntimeLaunch: async () => ({
+      providerId: "provider", modelId: "model",
+      sidecarParams: { sessionId: "target", provider: { modelConfig: { input: ["text"] } } },
+    }),
+    acquireSessionOperation: async () => {
+      if (!promptOperation) {
+        promptOperation = new Promise((resolve) => { releasePrompt = resolve; });
+      }
+      await promptOperation;
+      return () => {};
+    },
+    finishTurn: async () => { assert.fail("the prompt should not be finalized by this test"); },
+    lockAbortReason() {}, async finishApprovedExecution() {}, async dispatchApprovedPlan() {},
+    async dispatchExecutionForProposal() {}, emitAgentEvent() {}, setNotificationViewingSessionId() {},
+    optionalWorkspaceRoot: async () => null,
+    composerCommandService: { buildComposerCommands: async () => [] },
+    loadComposerTemplatesCached: async () => [],
+  });
+
+  const prompt = handlers.get(IPC.invoke.agentPrompt)({ sessionId: "target", content: "hello" });
+  await Promise.resolve();
+  const abort = handlers.get(IPC.invoke.agentAbort)({ sessionId: "target" });
+  await Promise.resolve();
+  assert.deepEqual(sidecarCalls, [], "abort must not bypass prompt admission");
+
+  releasePrompt();
+  await prompt;
+  await abort;
+  assert.deepEqual(sidecarCalls, ["agent.prompt", "agent.abort"]);
+  assert.equal(activeTurns.get("target"), "turn-1");
+  assert.deepEqual(calls.slice(0, 2), ["settings.get", "session.get"]);
+});
