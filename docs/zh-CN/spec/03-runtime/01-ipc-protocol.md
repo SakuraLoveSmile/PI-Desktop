@@ -1953,3 +1953,31 @@ report's durable sequence. A model-supplied exit code is only a claim; missing
 or unverifiable references produce `inconclusive`, and a recorded failure must
 not be overwritten by a claimed success. These additive report fields do not
 change the database schema or grant renderer filesystem access.
+
+
+### Expert Team launch approval
+
+`team.declareStrategy` binds its caller and `leadTurnId` from the running Team
+Lead Agent runtime, never model parameters. `lead_only` records a reason;
+`delegate` creates a versioned pending review and no expert work. The strategy
+declaration and reviewed reads are sidecar-accessible; review update, confirm
+and cancel remain trusted Desktop operations. Plan/Goal omit Team mutations.
+
+`team.getExecutionDecision` retains explicit-turn reads; omitting `leadTurnId`
+returns the latest stored decision for that team, or null. It creates no
+approval or historical decision. `team.getLaunchReview` returns the latest or
+requested review without disclosing another team's body. Update/confirm/cancel
+use `expectedRevision`; conflicts have no side effects.
+
+Confirmation revalidates every selected provider/model/thinking binding and
+atomically persists the approved members, effective session/roster bindings,
+review/decision and one continuation keyed by review id. Retrying the accepted
+revision returns the same identities. Legacy creation, expert task execution
+and dispatch entry points reject missing approval with `TEAM_APPROVAL_REQUIRED`.
+Persisted historical queued messages retain existing recovery; paused Teams
+hold the continuation until explicit Resume. Pending reviews become interrupted
+on startup, while confirmed history is not automatically executed again.
+
+The review UI uses answered Host revisions, retains actual routes after failed
+updates, and discards stale results when the team or review changes. A Lead-only
+decision displays its reason without implying that experts were called.

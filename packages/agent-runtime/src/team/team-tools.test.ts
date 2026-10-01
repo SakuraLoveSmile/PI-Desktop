@@ -16,21 +16,150 @@ describe("Expert Team tools and prompt (ADR 0304)", () => {
     } as unknown as RuntimeHost;
   };
 
-  it("registers all 9 DSH team tools", () => {
+  it("registers team tools and lead-only declare_team_strategy", () => {
     const host = createMockHost({});
+    const leadTools = createTeamTools({
+      teamSessionId: "team-1",
+      callerSessionId: "team-1",
+      isLead: true,
+      host,
+      getTurnId: () => "turn-100",
+    });
+
+    expect(leadTools.length).toBe(10);
+    const leadNames = leadTools.map((t) => t.name);
+    expect(leadNames).toContain("declare_team_strategy");
+    for (const expected of TEAM_TOOL_NAMES) {
+      expect(leadNames).toContain(expected);
+      expect(isTeamTool(expected)).toBe(true);
+    }
+
+    const nonLeadTools = createTeamTools({
+      teamSessionId: "team-1",
+      callerSessionId: "member-1",
+      isLead: false,
+      host,
+      getTurnId: () => "turn-100",
+    });
+    expect(nonLeadTools.length).toBe(9);
+    expect(nonLeadTools.map((t) => t.name)).not.toContain("declare_team_strategy");
+  });
+
+  it("declare_team_strategy executes through host.call", async () => {
+    const host = createMockHost({
+      "team.declareStrategy": async (params) => ({
+        decision: {
+          schemaVersion: 1,
+          teamSessionId: params.teamSessionId,
+          leadTurnId: params.leadTurnId,
+          strategy: params.strategy,
+          reason: params.reason,
+          updatedAt: "2026-10-01T00:00:00.000Z",
+          taskIds: [],
+          memberSessionIds: [],
+          messageIds: [],
+        },
+        review: params.strategy === "delegate" ? {
+          schemaVersion: 1,
+          reviewId: "tlr_test",
+          teamSessionId: params.teamSessionId,
+          leadTurnId: params.leadTurnId,
+          revision: 1,
+          status: "pending",
+          members: params.members?.map((m: any) => ({
+            name: m.name,
+            contextKind: m.contextKind ?? "fresh",
+            selection: {
+              providerId: m.selection?.providerId ?? "default",
+              modelId: m.selection?.modelId ?? "default",
+              thinkingLevel: m.selection?.thinkingLevel ?? "low",
+            },
+          })),
+        } : null,
+      }),
+    });
+
+    const leadTools = createTeamTools({
+      teamSessionId: "team-1",
+      callerSessionId: "team-1",
+      isLead: true,
+      host,
+      getTurnId: () => "turn-100",
+    });
+
+    const declareTool = leadTools.find((t) => t.name === "declare_team_strategy")!;
+    const res = await declareTool.execute("call-dec", {
+      strategy: "delegate",
+      reason: "Needs specialists",
+      members: [
+        { name: "coder", description: "Write code" },
+      ],
+    });
+
+    expect(res.content[0].type).toBe("text");
+    if (res.content[0].type === "text") {
+      const data = JSON.parse(res.content[0].text);
+      expect(data.strategy).toBe("delegate");
+      expect(data.reviewId).toBe("tlr_test");
+      expect(data.status).toBe("pending");
+      expect(data.members[0].name).toBe("coder");
+    }
+    expect(host.call).toHaveBeenCalledWith("team.declareStrategy", expect.objectContaining({
+      teamSessionId: "team-1",
+      leadTurnId: "turn-100",
+      strategy: "delegate",
+    }));
+  });
+
+  it("reads the active durable turn on each call and reports a missing turn", async () => {
+    const host = createMockHost({
+      "team.declareStrategy": async (params) => ({
+        decision: {
+          schemaVersion: 1,
+          teamSessionId: params.teamSessionId,
+          leadTurnId: params.leadTurnId,
+          strategy: params.strategy,
+          reason: params.reason,
+          updatedAt: "2026-10-01T00:00:00.000Z",
+          taskIds: [],
+          memberSessionIds: [],
+          messageIds: [],
+        },
+        review: null,
+      }),
+    });
+    let activeTurnId: string | undefined;
     const tools = createTeamTools({
       teamSessionId: "team-1",
       callerSessionId: "team-1",
       isLead: true,
       host,
+      getTurnId: () => activeTurnId,
     });
+    const declaration = tools.find((tool) => tool.name === "declare_team_strategy")!;
 
-    expect(tools.length).toBe(9);
-    const names = tools.map((t) => t.name);
-    for (const expected of TEAM_TOOL_NAMES) {
-      expect(names).toContain(expected);
-      expect(isTeamTool(expected)).toBe(true);
-    }
+    const missingTurn = await declaration.execute("call-missing", {
+      strategy: "lead_only",
+      reason: "One indivisible task",
+    });
+    expect(missingTurn.details).toEqual({ error: "TURN_NOT_FOUND" });
+    expect(host.call).not.toHaveBeenCalled();
+
+    activeTurnId = "durable-turn-1";
+    await declaration.execute("call-1", { strategy: "lead_only", reason: "One task" });
+    await declaration.execute("call-1-retry", { strategy: "lead_only", reason: "One task" });
+    activeTurnId = "durable-turn-2";
+    await declaration.execute("call-2", { strategy: "lead_only", reason: "Another task" });
+
+    expect(host.call).toHaveBeenNthCalledWith(1, "team.declareStrategy", expect.objectContaining({
+      leadTurnId: "durable-turn-1",
+    }));
+    expect(host.call).toHaveBeenNthCalledWith(2, "team.declareStrategy", expect.objectContaining({
+      leadTurnId: "durable-turn-1",
+    }));
+    expect(host.call).toHaveBeenNthCalledWith(3, "team.declareStrategy", expect.objectContaining({
+      leadTurnId: "durable-turn-2",
+    }));
   });
 
   it("spawn_teammate rejects non-lead and succeeds for lead", async () => {

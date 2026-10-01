@@ -26,6 +26,14 @@ fn team_rpc_err(e: anyhow::Error) -> JsonRpcError {
         "TEAM_MAILBOX_FULL"
     } else if msg.contains("TEAM_MESSAGE_PAYLOAD_TOO_LARGE") {
         "TEAM_MESSAGE_PAYLOAD_TOO_LARGE"
+    } else if msg.contains("TEAM_APPROVAL_REQUIRED") {
+        "TEAM_APPROVAL_REQUIRED"
+    } else if msg.contains("TEAM_REVIEW_REVISION_CONFLICT") {
+        "TEAM_REVIEW_REVISION_CONFLICT"
+    } else if msg.contains("TEAM_MODEL_SELECTION_INVALID") {
+        "TEAM_MODEL_SELECTION_INVALID"
+    } else if msg.contains("TEAM_MEMBER_MODEL_CHANGE_BLOCKED") {
+        "TEAM_MEMBER_MODEL_CHANGE_BLOCKED"
     } else if msg.contains("INVALID_PARAMS") {
         "INVALID_PARAMS"
     } else {
@@ -2084,6 +2092,193 @@ async fn handle_request(
                     );
                     Ok(json!({ "team": team }))
                 }
+                "team.declareStrategy" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let caller_id = params
+                        .get("callerSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "callerSessionId required", "INVALID_PARAMS")
+                        })?;
+                    let lead_turn_id = params
+                        .get("leadTurnId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "leadTurnId required", "INVALID_PARAMS"))?;
+                    let strategy = params
+                        .get("strategy")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "strategy required", "INVALID_PARAMS"))?;
+                    let reason = params.get("reason").and_then(|v| v.as_str()).unwrap_or("");
+                    let members: Option<Vec<crate::team::TeamProposedMember>> = params
+                        .get("members")
+                        .map(|value| serde_json::from_value(value.clone()))
+                        .transpose()
+                        .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+
+                    let (decision, review) = crate::team::declare_team_strategy(
+                        &st.db,
+                        crate::team::DeclareStrategyParams {
+                            team_session_id: team_id,
+                            caller_session_id: caller_id,
+                            lead_turn_id,
+                            strategy,
+                            reason,
+                            members,
+                        },
+                    )
+                    .map_err(team_rpc_err)?;
+
+                    if let Some(ref r) = review {
+                        send_notification(
+                            &tx,
+                            "team.launchReviewChanged",
+                            json!({ "teamSessionId": team_id, "reviewId": r.review_id }),
+                        );
+                    }
+
+                    Ok(json!({ "decision": decision, "review": review }))
+                }
+                "team.getExecutionDecision" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let lead_turn_id = params.get("leadTurnId").and_then(|v| v.as_str());
+
+                    let decision = if let Some(turn_id) = lead_turn_id {
+                        crate::team::get_execution_decision(&st.db, team_id, turn_id)
+                    } else {
+                        crate::team::get_latest_execution_decision(&st.db, team_id)
+                    }
+                    .map_err(team_rpc_err)?;
+                    Ok(json!({ "decision": decision }))
+                }
+                "team.getLaunchReview" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let review_id = params.get("reviewId").and_then(|v| v.as_str());
+
+                    let review = crate::team::get_launch_review(&st.db, team_id, review_id)
+                        .map_err(team_rpc_err)?;
+                    Ok(json!({ "review": review }))
+                }
+                "team.updateLaunchReview" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let review_id = params
+                        .get("reviewId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "reviewId required", "INVALID_PARAMS"))?;
+                    let expected_revision = params
+                        .get("expectedRevision")
+                        .and_then(|v| v.as_i64())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "expectedRevision required", "INVALID_PARAMS")
+                        })?;
+                    let selections: Vec<crate::team::TeamLaunchReviewSelectionUpdate> =
+                        serde_json::from_value(params.get("selections").cloned().ok_or_else(
+                            || rpc_err(1002, "selections required", "INVALID_PARAMS"),
+                        )?)
+                        .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+
+                    let review = crate::team::update_launch_review(
+                        &st.db,
+                        team_id,
+                        review_id,
+                        expected_revision,
+                        selections,
+                    )
+                    .map_err(team_rpc_err)?;
+
+                    send_notification(
+                        &tx,
+                        "team.launchReviewChanged",
+                        json!({ "teamSessionId": team_id, "reviewId": review_id }),
+                    );
+
+                    Ok(json!({ "review": review }))
+                }
+                "team.confirmLaunchReview" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let review_id = params
+                        .get("reviewId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "reviewId required", "INVALID_PARAMS"))?;
+                    let expected_revision = params
+                        .get("expectedRevision")
+                        .and_then(|v| v.as_i64())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "expectedRevision required", "INVALID_PARAMS")
+                        })?;
+
+                    let (review, decision) = crate::team::confirm_launch_review(
+                        &st.db,
+                        team_id,
+                        review_id,
+                        expected_revision,
+                    )
+                    .map_err(team_rpc_err)?;
+
+                    send_notification(
+                        &tx,
+                        "team.launchReviewChanged",
+                        json!({ "teamSessionId": team_id, "reviewId": review_id }),
+                    );
+                    send_notification(
+                        &tx,
+                        "team.rosterChanged",
+                        json!({ "teamSessionId": team_id }),
+                    );
+                    send_notification(
+                        &tx,
+                        "team.queueChanged",
+                        json!({ "teamSessionId": team_id }),
+                    );
+
+                    Ok(json!({ "review": review, "decision": decision }))
+                }
+                "team.cancelLaunchReview" => {
+                    let team_id = params
+                        .get("teamSessionId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "teamSessionId required", "INVALID_PARAMS"))?;
+                    let review_id = params
+                        .get("reviewId")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| rpc_err(1002, "reviewId required", "INVALID_PARAMS"))?;
+                    let expected_revision = params
+                        .get("expectedRevision")
+                        .and_then(|v| v.as_i64())
+                        .ok_or_else(|| {
+                            rpc_err(1002, "expectedRevision required", "INVALID_PARAMS")
+                        })?;
+
+                    let review = crate::team::cancel_launch_review(
+                        &st.db,
+                        team_id,
+                        review_id,
+                        expected_revision,
+                    )
+                    .map_err(team_rpc_err)?;
+
+                    send_notification(
+                        &tx,
+                        "team.launchReviewChanged",
+                        json!({ "teamSessionId": team_id, "reviewId": review_id }),
+                    );
+
+                    Ok(json!({ "review": review }))
+                }
                 _ => Err(rpc_err(
                     1004,
                     format!("unknown method: {method}"),
@@ -2982,6 +3177,8 @@ async fn handle_request(
                 let message = e.to_string();
                 if message.starts_with("PLAN_") {
                     plan_rpc_err(message)
+                } else if message.starts_with("TEAM_") {
+                    team_rpc_err(e)
                 } else {
                     rpc_err(1002, message, "INVALID_PARAMS")
                 }
@@ -3378,6 +3575,8 @@ async fn handle_request(
                         "INVALID_PARAMS",
                     ));
                 }
+                crate::team::review::gate_team_member_turn(&st.db, session_id, provider, model)
+                    .map_err(team_rpc_err)?;
                 let content = params
                     .get("revisionContent")
                     .and_then(Value::as_str)
@@ -3405,7 +3604,13 @@ async fn handle_request(
                 ),
                 None => sessions::begin_turn(&st.db, session_id, provider, model),
             }
-            .map_err(session_collaboration_rpc_err)?;
+            .map_err(|error| {
+                if error.to_string().starts_with("TEAM_") {
+                    team_rpc_err(error)
+                } else {
+                    session_collaboration_rpc_err(error)
+                }
+            })?;
             Ok(json!({ "turnId": turn_id }))
         }
         "session.endTurn" => {
@@ -10621,6 +10826,83 @@ mod image_generation_settings_tests {
     }
 
     #[tokio::test]
+    async fn team_member_direct_turn_and_new_mail_require_approval() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let lead = handle_request(
+            state.clone(),
+            "session.create",
+            json!({"executionProfile": "team"}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let member = handle_request(
+            state.clone(),
+            "session.create",
+            json!({"executionProfile": "team"}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let lead_id = lead["session"]["id"].as_str().unwrap();
+        let member_id = member["session"]["id"].as_str().unwrap();
+        {
+            let st = state.lock().await;
+            // Model an upgraded pre-approval roster without inventing approval.
+            st.db.conn().execute("INSERT OR IGNORE INTO teams (team_session_id, revision, paused, created_at, updated_at) VALUES (?1,1,0,1,1)", rusqlite::params![lead_id]).unwrap();
+            st.db.conn().execute("INSERT INTO team_members (team_session_id, member_session_id, name, context_kind, phase, created_at, updated_at) VALUES (?1,?2,'legacy','fresh','idle',1,1)", rusqlite::params![lead_id,member_id]).unwrap();
+        }
+        let denied = handle_request(
+            state.clone(),
+            "session.beginTurn",
+            json!({"sessionId": member_id}),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(denied.data.unwrap()["errorCode"], "TEAM_APPROVAL_REQUIRED");
+        let denied_mail = handle_request(
+            state.clone(),
+            "team.sendMessage",
+            json!({
+                "teamSessionId": lead_id, "callerSessionId": member_id,
+                "target": "Lead", "content": "Unapproved new work"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            denied_mail.data.unwrap()["errorCode"],
+            "TEAM_APPROVAL_REQUIRED"
+        );
+        let st = state.lock().await;
+        let turns: i64 = st
+            .db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM turns WHERE session_id=?1",
+                rusqlite::params![member_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let mail: i64 = st
+            .db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM session_collaboration_messages WHERE source_session_id=?1",
+                rusqlite::params![member_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!((turns, mail), (0, 0));
+    }
+
+    #[tokio::test]
     async fn team_rpc_full_journey() {
         let data_dir = tempfile::tempdir().unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();
@@ -10628,34 +10910,154 @@ mod image_generation_settings_tests {
         let state = Arc::new(Mutex::new(app_state));
         let (tx, _rx) = mpsc::unbounded_channel();
 
+        let configured_provider = handle_request(
+            state.clone(), "providers.create",
+            json!({ "name": "Review fixture", "vendorKey": "custom",
+                "apiStyle": "chat_completions", "authKind": "none", "baseUrl": "http://127.0.0.1:9/v1",
+                "defaultModelId": "review-fixture", "models": [{ "id": "review-fixture",
+                    "contextWindow": 128000, "maxTokens": 2048 }] }), tx.clone(),
+        ).await.unwrap();
+        let provider_id = configured_provider["provider"]["id"].as_str().unwrap();
         // 1. Create team session
         let created = handle_request(
             state.clone(),
             "session.create",
-            json!({ "mode": "agent", "executionProfile": "team" }),
+            json!({ "mode": "agent", "executionProfile": "team", "providerId": provider_id, "modelId": "review-fixture" }),
             tx.clone(),
         )
         .await
         .unwrap();
         let team_id = created["session"]["id"].as_str().unwrap();
 
-        // 2. Spawn teammate via RPC
-        let spawned = handle_request(
+        // 2. Legacy mutation is rejected before approval, with no roster effects.
+        let spawn_request = json!({ "teamSessionId": team_id, "callerSessionId": team_id,
+            "name": "explorer", "description": "Finds files", "contextKind": "fresh" });
+        let rejected = handle_request(
             state.clone(),
             "team.createMember",
-            json!({
-                "teamSessionId": team_id,
-                "callerSessionId": team_id,
-                "name": "explorer",
-                "description": "Finds files",
-                "contextKind": "fresh"
-            }),
+            spawn_request.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            rejected.data.unwrap()["errorCode"],
+            "TEAM_APPROVAL_REQUIRED"
+        );
+        let turn = handle_request(
+            state.clone(),
+            "session.beginTurn",
+            json!({"sessionId": team_id}),
             tx.clone(),
         )
         .await
         .unwrap();
-        assert_eq!(spawned["member"]["name"], "explorer");
-        let member_session_id = spawned["member"]["memberSessionId"].as_str().unwrap();
+        let turn_id = turn["turnId"].as_str().unwrap();
+        let declaration = handle_request(state.clone(), "team.declareStrategy", json!({
+            "teamSessionId": team_id, "callerSessionId": team_id, "leadTurnId": turn_id,
+            "strategy": "delegate", "reason": "A specialist can inspect the repository.",
+            "members": [{"name": "explorer", "description": "Finds files", "contextKind": "fresh"}]
+        }), tx.clone()).await.unwrap();
+        let review_id = declaration["review"]["reviewId"].as_str().unwrap();
+        let revision = declaration["review"]["revision"].as_i64().unwrap();
+        assert_eq!(declaration["decision"]["leadTurnId"], turn_id);
+        let pending_roster = handle_request(
+            state.clone(),
+            "team.getRoster",
+            json!({"teamSessionId": team_id, "callerSessionId": team_id}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert!(pending_roster["members"].as_array().unwrap().is_empty());
+        let malformed = handle_request(
+            state.clone(),
+            "team.declareStrategy",
+            json!({
+                "teamSessionId": team_id, "callerSessionId": team_id, "leadTurnId": turn_id,
+                "strategy": "delegate", "members": [{"name": 123}]
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(malformed.data.unwrap()["errorCode"], "INVALID_PARAMS");
+        for selections in [
+            json!({"name": "explorer"}),
+            json!([{"name": "explorer", "providerId": 7}]),
+        ] {
+            let malformed_update = handle_request(
+                state.clone(),
+                "team.updateLaunchReview",
+                json!({
+                    "teamSessionId": team_id, "reviewId": review_id, "expectedRevision": revision,
+                    "selections": selections
+                }),
+                tx.clone(),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                malformed_update.data.unwrap()["errorCode"],
+                "INVALID_PARAMS"
+            );
+        }
+        let unchanged = handle_request(
+            state.clone(),
+            "team.getLaunchReview",
+            json!({"teamSessionId": team_id, "reviewId": review_id}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(unchanged["review"]["revision"], revision);
+        handle_request(
+            state.clone(),
+            "session.endTurn",
+            json!({"turnId": turn_id, "status": "completed"}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let confirm_request =
+            json!({"teamSessionId": team_id, "reviewId": review_id, "expectedRevision": revision});
+        let approved = handle_request(
+            state.clone(),
+            "team.confirmLaunchReview",
+            confirm_request.clone(),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let duplicate = handle_request(
+            state.clone(),
+            "team.confirmLaunchReview",
+            confirm_request,
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            approved["decision"]["memberSessionIds"],
+            duplicate["decision"]["memberSessionIds"]
+        );
+        assert_eq!(
+            approved["decision"]["messageIds"],
+            duplicate["decision"]["messageIds"]
+        );
+        let member_session_id = approved["decision"]["memberSessionIds"][0]
+            .as_str()
+            .unwrap();
+        let configured_member = handle_request(
+            state.clone(),
+            "session.get",
+            json!({"id": member_session_id}),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(configured_member["session"]["providerId"], provider_id);
+        assert_eq!(configured_member["session"]["modelId"], "review-fixture");
 
         // 3. Get roster
         let roster = handle_request(

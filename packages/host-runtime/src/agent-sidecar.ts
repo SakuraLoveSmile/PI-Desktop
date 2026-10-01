@@ -84,7 +84,10 @@ const HOST_PROXY_ALLOWED = new Set([
   // Team data is Host-authorized by the session context carried on each call.
   "team.createMember",
   "team.createTask",
+  "team.declareStrategy",
   "team.getBoard",
+  "team.getExecutionDecision",
+  "team.getLaunchReview",
   "team.getRoster",
   "team.interruptMember",
   "team.listMessages",

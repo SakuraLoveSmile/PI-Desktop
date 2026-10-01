@@ -173,6 +173,13 @@ function createRuntime(
     pluginSkills: import("./plugin-skills-prompt.js").PluginSkillDef[];
     commandShell: CommandShellOption;
     turnId: string;
+    executionProfile: "standard" | "team";
+    teamContext: {
+      teamSessionId: string;
+      callerSessionId: string;
+      isLead: boolean;
+      memberName?: string;
+    };
     host: { call: ReturnType<typeof vi.fn>; onNotification?: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
@@ -182,6 +189,8 @@ function createRuntime(
     sessionId: "session-1",
     mode: overrides.mode === "chat" ? "plan" : overrides.mode ?? "agent",
     turnId: overrides.turnId,
+    executionProfile: overrides.executionProfile,
+    teamContext: overrides.teamContext,
     provider: overrides.provider ?? provider,
     commandShell: overrides.commandShell ?? commandShell,
     thinkingLevel: overrides.thinkingLevel ?? "medium",
@@ -202,6 +211,132 @@ function createRuntime(
     onEvent: overrides.onEvent ?? vi.fn(),
   });
 }
+
+describe("DesktopAgentRuntime Team strategy wiring", () => {
+  it("binds each declaration and same-turn retry to the durable active turn", async () => {
+    const host = {
+      call: vi.fn(async (method: string, params?: Record<string, any>) => {
+        if (method !== "team.declareStrategy") return undefined;
+        return {
+          decision: {
+            schemaVersion: 1,
+            teamSessionId: params?.teamSessionId,
+            leadTurnId: params?.leadTurnId,
+            strategy: params?.strategy,
+            reason: params?.reason,
+            updatedAt: "2026-10-01T00:00:00.000Z",
+            taskIds: [],
+            memberSessionIds: [],
+            messageIds: [],
+          },
+          review: null,
+        };
+      }),
+    };
+    const runtime = createRuntime({
+      executionProfile: "team",
+      teamContext: {
+        teamSessionId: "team-1",
+        callerSessionId: "lead-session",
+        isLead: true,
+      },
+      host: host as never,
+    });
+
+    let request = 0;
+    (runtime as any).models = {
+      streamSimple: () => {
+        request += 1;
+        const declaration = request === 1 || request === 2 || request === 4;
+        const stopReason = declaration ? "toolUse" : "stop";
+        const message = assistantMessage({
+          content: declaration
+            ? [{
+                type: "toolCall",
+                id: `declare-${request}`,
+                name: "declare_team_strategy",
+                arguments: {
+                  strategy: "lead_only",
+                  reason: "One indivisible task",
+                },
+              }]
+            : [{ type: "text", text: "done" }],
+          stopReason,
+        }) as unknown as AssistantMessage;
+        const stream = createAssistantMessageEventStream();
+        queueMicrotask(() => {
+          stream.push({ type: "start", partial: message });
+          stream.push({ type: "done", reason: stopReason, message });
+          stream.end(message);
+        });
+        return stream;
+      },
+    };
+
+    try {
+      await runtime.prompt("First turn", "user-1", "durable-turn-1");
+      await runtime.prompt("Second turn", "user-2", "durable-turn-2");
+      const declarationCalls = host.call.mock.calls.filter(
+        ([method]) => method === "team.declareStrategy",
+      );
+      expect(declarationCalls.map(([, args]) => args?.leadTurnId)).toEqual([
+        "durable-turn-1",
+        "durable-turn-1",
+        "durable-turn-2",
+      ]);
+      expect(declarationCalls.every(([, args]) => args?.callerSessionId === "lead-session"))
+        .toBe(true);
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
+  it("exposes Team tools and guidance only in Agent mode", async () => {
+    const runtime = createRuntime({
+      mode: "plan",
+      executionProfile: "team",
+      teamContext: {
+        teamSessionId: "team-1",
+        callerSessionId: "lead-session",
+        isLead: true,
+      },
+    });
+    const teamNames = [
+      "spawn_teammate",
+      "send_message",
+      "wait_for_updates",
+      "interrupt_agent",
+      "task_create",
+      "task_update",
+      "task_list",
+      "task_get",
+      "team_status",
+    ];
+
+    try {
+      expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
+        .not.toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
+      expect((runtime as any).agent.state.systemPrompt).not.toContain("declare_team_strategy");
+
+      runtime.setMode("agent");
+      expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
+        .toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
+      const declaration = (runtime as any).agent.state.tools.find(
+        (tool: { name: string }) => tool.name === "declare_team_strategy",
+      );
+      expect(declaration.parameters.properties).not.toHaveProperty("callerSessionId");
+      expect(declaration.parameters.properties).not.toHaveProperty("turnId");
+      expect((runtime as any).agent.state.systemPrompt).toContain("declare_team_strategy");
+
+      runtime.setMode("plan");
+      expect((runtime as any).agent.state.tools.map((tool: { name: string }) => tool.name))
+        .not.toEqual(expect.arrayContaining([...teamNames, "declare_team_strategy"]));
+      expect((runtime as any).agent.state.systemPrompt).not.toContain("declare_team_strategy");
+    } finally {
+      await runtime.dispose();
+    }
+  });
+});
 
 /** Minimal pi-ai assistant message; overrides carry the shape under test. */
 function assistantMessage(overrides: {
