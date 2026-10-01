@@ -128,6 +128,7 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
   };
   const activeTurns = new Map();
   const sidecarCalls = [];
+  const finishedTurns = [];
   registerAgentIpc({
     registrar: { handle: (channel, handler) => handlers.set(channel, handler) },
     getHost: () => host,
@@ -141,7 +142,7 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
       },
     }),
     getAgentHostBridge: () => null,
-    logger: { app() {} }, vendorOAuth: {}, agentExtensions: {}, cancelSessionTools() {},
+    logger: { app() {} }, vendorOAuth: {}, agentExtensions: { cancelPrompts() {} }, cancelSessionTools() {},
     persistenceOutbox: {}, dataDir: "/unused-for-no-attachments",
     activeTurns, activeTurnUsages: new Map(), approvedExecutionIdsBySession: new Map(), claimedExecutionSessions: new Map(),
     resolveAgentRuntimeLaunch: async () => ({
@@ -155,7 +156,7 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
       await promptOperation;
       return () => {};
     },
-    finishTurn: async () => { assert.fail("the prompt should not be finalized by this test"); },
+    finishTurn: async (...args) => { finishedTurns.push(args); },
     lockAbortReason() {}, async finishApprovedExecution() {}, async dispatchApprovedPlan() {},
     async dispatchExecutionForProposal() {}, emitAgentEvent() {}, setNotificationViewingSessionId() {},
     optionalWorkspaceRoot: async () => null,
@@ -174,5 +175,6 @@ test("abort waits for prompt admission before dispatching to the sidecar", async
   await abort;
   assert.deepEqual(sidecarCalls, ["agent.prompt", "agent.abort"]);
   assert.equal(activeTurns.get("target"), "turn-1");
+  assert.deepEqual(finishedTurns, [["target", "aborted", "TURN_ABORTED", { turnId: "turn-1" }]]);
   assert.deepEqual(calls.slice(0, 2), ["settings.get", "session.get"]);
 });
