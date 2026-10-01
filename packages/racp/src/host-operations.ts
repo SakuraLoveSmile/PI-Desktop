@@ -3,6 +3,7 @@ import type {
   FsEntry,
   FsReadResult,
   GoalReport,
+  GoalReportAssetChunk,
   GoalReportSummary,
   RacpProjectSummary,
   WorkspaceDiff,
@@ -63,6 +64,7 @@ export interface RacpGoalReportAccess {
   get(input: { sessionId: string; reportId?: string; executionId?: string }): Promise<{ report: GoalReport }>;
   list(sessionId: string): Promise<{ reports: GoalReportSummary[] }>;
   retry(sessionId: string, executionId: string): Promise<{ report: GoalReportSummary }>;
+  getAsset?(input: { sessionId: string; executionId: string; screenshotId: string; offset?: number; length?: number }): Promise<GoalReportAssetChunk>;
 }
 
 export type TerminalOpenResult = {

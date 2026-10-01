@@ -124,6 +124,8 @@ import type {
   TrustedExtensionStatusEvent,
   TrustedExtensionUiPrompt,
   TrustedExtensionUiPromptResponse,
+  GoalReportAssetChunk,
+  GoalReportSummary,
   TeamMemberRecord,
   TeamProjection,
   TeamLaunchReview,
@@ -1022,11 +1024,28 @@ export const api = {
   markRevisionFailed: (proposalId: string, sessionId: string, errorCode?: string) =>
     invoke<{ changed: boolean; proposal?: PlanProposal }>(IPC.invoke.plansMarkRevisionFailed, { proposalId, sessionId, errorCode }),
   getGoalReport: (params: { sessionId: string; reportId?: string; executionId?: string }) =>
-    invoke<{ report: any }>(IPC.invoke.goalReportGet, params),
+    invoke<{
+      report: any;
+      state: string;
+      reportSha256?: string;
+      fileBytes?: number;
+      maxBytes?: number;
+      integrity?: string;
+      verdict?: string;
+      detail?: string;
+    }>(IPC.invoke.goalReportGet, params),
   listGoalReports: (params: { sessionId: string }) =>
-    invoke<{ reports: any[] }>(IPC.invoke.goalReportList, params),
+    invoke<{ reports: GoalReportSummary[] }>(IPC.invoke.goalReportList, params),
   retryGoalReport: (params: { sessionId: string; executionId: string }) =>
-    invoke<{ report: any }>(IPC.invoke.goalReportRetry, params),
+    invoke<{ report: GoalReportSummary }>(IPC.invoke.goalReportRetry, params),
+  getGoalReportAsset: (params: {
+    sessionId: string;
+    executionId: string;
+    screenshotId: string;
+    offset?: number;
+    length?: number;
+  }) =>
+    invoke<GoalReportAssetChunk>(IPC.invoke.goalReportGetAsset, params),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   /**

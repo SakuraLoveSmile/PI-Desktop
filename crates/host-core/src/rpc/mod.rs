@@ -4667,6 +4667,38 @@ async fn handle_request(
             .await;
             Ok(json!({ "report": summary }))
         }
+        "goalReports.getAsset" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let execution_id = params
+                .get("executionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "executionId required", "INVALID_PARAMS"))?;
+            let screenshot_id = params
+                .get("screenshotId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "screenshotId required", "INVALID_PARAMS"))?;
+            let offset = params.get("offset").and_then(|v| v.as_u64()).unwrap_or(0);
+            let length = params
+                .get("length")
+                .and_then(|v| v.as_u64())
+                .map(|n| n as usize);
+            let st = state.lock().await;
+            let chunk = crate::goal_reports::assets::read_asset_chunk(
+                st.db.data_dir(),
+                session_id,
+                execution_id,
+                screenshot_id,
+                offset,
+                length,
+            );
+            Ok(json!(chunk))
+        }
 
         method if method.starts_with("scheduled.") => {
             let st = state.lock().await;
