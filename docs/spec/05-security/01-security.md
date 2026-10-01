@@ -257,8 +257,10 @@ claim availability or freshness against a malicious server.
 The local MCP control server is an explicit automation boundary, not a general
 remote-control listener:
 
-- It is disabled by default and only starts with
-  `PI_DESKTOP_MCP_CONTROL=1`.
+- It is disabled by default. It starts when the launch environment sets
+  `PI_DESKTOP_MCP_CONTROL=1`, or when the machine-local preference
+  `<user-data>/mcp-control-settings.json` saved an enabled state. An explicit
+  `PI_DESKTOP_MCP_CONTROL=0` wins over that saved value.
 - It binds `127.0.0.1` only and refuses to start if the listen address is not
   loopback. There is no configuration path for a LAN or public interface, and
   the feature does not revive the deferred remote Gateway / WebUI scope.
@@ -273,6 +275,11 @@ remote-control listener:
   `plugin/loadDev`) are excluded. Secret-shaped argument fields are stripped
   before dispatch. The reviewed catalog is explicit; newly added IPC handlers
   are not exposed automatically.
+- The on/off channel pair (`mcpControlGet`, `mcpControlSet`) is renderer-only:
+  it stays out of the reviewed MCP catalog, so an external client cannot switch
+  off the plane that serves it, and the status it returns carries no bearer
+  token and no connection record. The preference file is written atomically
+  with mode `0600`, holds neither of those either, and is never synced.
 - Calls delegate to the existing main-process IPC handlers, so host
   availability, workspace boundaries, permission checks, input validation, and
   redacted logging remain authoritative. Dangerous generic operations,

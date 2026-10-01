@@ -13,6 +13,10 @@ import { genericModelConfig, modelConfigWithBinding, mergeProviderHeaders } from
 import { modelConfigFromModelsDev, modelInfoFromModelsDev, type ModelsDevCatalog } from "../models-dev-catalog";
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
+import type {
+  LocalNetworkPermissionController,
+  LocalNetworkTriggerResult,
+} from "../local-network-permission";
 import type { IpcRegistrar } from "./types";
 
 type RuntimeProvider = {
@@ -44,7 +48,36 @@ export type ProviderIpcDependencies = {
   listRuntimeProviders: () => Promise<RuntimeProvider[]>;
   enrichProviderList: (result: { providers: RuntimeProvider[] }) => Promise<unknown>;
   bindingForModel: (provider: Pick<RuntimeProvider, "models">, modelId: string) => ModelBinding | undefined;
+  /**
+   * Supplemental macOS Local Network alert trigger. Owned by the caller so its
+   * lifetime follows app shutdown; only the manual model-list intent may use it.
+   */
+  localNetworkPermission: Pick<LocalNetworkPermissionController, "trigger">;
 };
+
+/**
+ * Record one trigger verdict. Diagnostics carry the stage, the reason and a
+ * node error code only: an endpoint, a header, a query or a credential must
+ * never reach a log line, and no verdict means permission was granted
+ * (ADR 0308 / Apple TN3179).
+ */
+function logLocalNetworkTrigger(
+  logger: Pick<Logger, "app">,
+  verdict: LocalNetworkTriggerResult,
+): void {
+  logger.app(
+    "provider",
+    verdict.status === "failed" ? "warn" : "debug",
+    `local network trigger ${verdict.status}`,
+    {
+      data: {
+        stage: verdict.stage,
+        reason: verdict.reason,
+        ...(verdict.code ? { code: verdict.code } : {}),
+      },
+    },
+  );
+}
 
 /** Register provider catalog, model discovery, OAuth and secret channels. */
 export function registerProviderIpc({
@@ -57,6 +90,7 @@ export function registerProviderIpc({
   listRuntimeProviders,
   enrichProviderList,
   bindingForModel,
+  localNetworkPermission,
 }: ProviderIpcDependencies): void {
   let host: HostProcess | null = null;
   const handle = (channel: string, fn: (...args: any[]) => Promise<any>) => {
@@ -260,12 +294,21 @@ export function registerProviderIpc({
             apiStyle?: string;
             headers?: Record<string, string>;
             source?: "cache" | "refresh";
+            /**
+             * Marks the user's explicit Fetch list action. A transient request
+             * field: it is never persisted, never forwarded to the host, and a
+             * non-matching value must not enable the Local Network trigger.
+             */
+            intent?: "manual-fetch-list";
           },
     ) => {
       if (!host) throw new Error("host unavailable");
+      // One IPC call must keep talking to the host it started with: the trigger
+      // below awaits, and this module-level reference can move meanwhile.
+      const requestHost = host;
       const req = typeof input === "string" ? { providerId: input } : input ?? {};
       const providers = req.source === "cache"
-        ? (await host.call<{ providers: RuntimeProvider[] }>("providers.list", {
+        ? (await requestHost.call<{ providers: RuntimeProvider[] }>("providers.list", {
             includeDisabled: true,
           })).providers
         : await listRuntimeProviders();
@@ -383,7 +426,7 @@ export function registerProviderIpc({
               requestBaseUrl &&
             (latestProvider?.apiStyle ?? "chat_completions") === apiStyle;
           if (endpointStillCurrent) {
-            await host!.call("providers.cacheModels", {
+            await requestHost.call("providers.cacheModels", {
               providerId: provider.id,
               models,
             });
@@ -430,7 +473,7 @@ export function registerProviderIpc({
       }
 
       if (req.source === "cache" && provider) {
-        const cached = await host.call<{
+        const cached = await requestHost.call<{
           models: Array<{
             modelId: string;
             displayName: string;
@@ -473,7 +516,7 @@ export function registerProviderIpc({
       // never travels back to the renderer either way.
       let apiKey = req.apiKey ?? "";
       if (!apiKey && provider) {
-        const secret = await host.call<{ value?: string }>("providers.getSecret", {
+        const secret = await requestHost.call<{ value?: string }>("providers.getSecret", {
           id: provider.id,
         });
         apiKey = secret.value ?? "";
@@ -488,6 +531,17 @@ export function registerProviderIpc({
       */
       let discoveryError: string | undefined;
       if (baseUrl) {
+        /*
+          The manual Fetch list action is the only path that may ask macOS for
+          its Local Network alert. It runs before the discovery request so the
+          user can answer the alert while that request is in flight, and its
+          verdict is supplemental: a skip, a failure or an unanswered alert never
+          replaces the discovery result, its error or the catalog fallback.
+          Cache hydration and vendor accounts never reach this branch.
+        */
+        if (req.intent === "manual-fetch-list" && provider?.authKind !== OAUTH_AUTH_KIND) {
+          logLocalNetworkTrigger(logger, await localNetworkPermission.trigger(baseUrl));
+        }
         try {
           const discovered = await discoverProviderModels({
             baseUrl,

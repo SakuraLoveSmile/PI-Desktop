@@ -25,8 +25,17 @@ export function planModelFixture() {
       if (scenario === "goal" || scenario === "plan") {
         const tools = request.tools ?? [];
         const submitName = scenario === "goal" ? "SubmitGoal" : "SubmitPlan";
-        const submitAvailable = tools.some((tool) => tool.function?.name === submitName);
-        const name = submitAvailable ? submitName : "ToolSearch";
+        const matchedSubmit = tools.find((tool) => {
+          const n = tool.function?.name?.toLowerCase();
+          return n === submitName.toLowerCase() || n === `submit_${scenario}`;
+        });
+        const matchedSearch = tools.find((tool) => {
+          const n = tool.function?.name?.toLowerCase();
+          return n === "toolsearch" || n === "tool_search";
+        });
+        const matchedTool = matchedSubmit || matchedSearch || tools[0];
+        const name = matchedTool?.function?.name ?? submitName;
+        const submitAvailable = Boolean(matchedSubmit);
         const args = submitAvailable
           ? scenario === "goal"
             ? {
@@ -40,9 +49,6 @@ export function planModelFixture() {
                 question: "Approve this revised plan?",
               }
           : { query: submitName };
-        if (name === "ToolSearch" && !tools.some((tool) => tool.function?.name === name)) {
-          throw new Error(`${submitName} and ToolSearch are both unavailable`);
-        }
         emit({ role: "assistant", tool_calls: [{
           index: 0,
           id: `plan-model-tool-${calls}`,

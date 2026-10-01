@@ -16,6 +16,7 @@ export function MarketplacePanel({
   t,
   locale,
   settings,
+  marketSource,
   query,
   setQuery,
   refreshMarket,
@@ -203,6 +204,14 @@ export function MarketplacePanel({
                                 name: item.name,
                                 permissions: item.permissionSummary ?? [],
                                 version: item.latestVersion,
+                                expectedMarketplace: item.latestShasum
+                                  ? {
+                                      source: settings?.pluginMarketSource ?? "official",
+                                      catalogUrl: marketSource,
+                                      version: item.latestVersion,
+                                      shasum: item.latestShasum,
+                                    }
+                                  : undefined,
                               })
                             }
                           >

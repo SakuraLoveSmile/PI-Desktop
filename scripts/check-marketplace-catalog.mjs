@@ -23,17 +23,18 @@ const PACKAGE_HOST_ALLOWLIST = ["github.com", "githubusercontent.com", "cnb.cool
 
 function usage() {
   console.error(
-    "Usage: node scripts/check-marketplace-catalog.mjs [--url <url-or-file>] [--plugin <id>]",
+    "Usage: node scripts/check-marketplace-catalog.mjs [--url <url-or-file>] [--plugin <id>] [--allow-empty-curated]",
   );
 }
 
 function parseArgs(argv) {
-  const options = { url: DEFAULT_URL, plugin: "" };
+  const options = { url: DEFAULT_URL, plugin: "", allowEmptyCurated: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--") continue;
     if (arg === "--url") options.url = argv[++index] || "";
     else if (arg === "--plugin") options.plugin = argv[++index] || "";
+    else if (arg === "--allow-empty-curated") options.allowEmptyCurated = true;
     else if (arg === "--help" || arg === "-h") {
       usage();
       process.exit(0);
@@ -186,9 +187,16 @@ function v2VersionErrors(label, version) {
   return errors;
 }
 
-function validateCatalog(catalog, pluginFilter, catalogSource) {
+function validateCatalog(catalog, pluginFilter, catalogSource, allowEmptyCurated = false) {
   const errors = [];
   if (!catalog || !Array.isArray(catalog.plugins) || catalog.plugins.length === 0) {
+    if (
+      allowEmptyCurated &&
+      catalog?.providerId === "pi-desktop-plus-curated" &&
+      Number(catalog?.schemaVersion) === 2
+    ) {
+      return [];
+    }
     return ["catalog.plugins must be a non-empty array"];
   }
   const schemaVersion = Number(catalog.schemaVersion ?? 1);
@@ -261,7 +269,7 @@ if (invokedDirectly) {
     const options = parseArgs(process.argv.slice(2));
     if (!options.url) throw new Error("--url requires a value");
     const catalog = await readCatalog(options.url);
-    const errors = validateCatalog(catalog, options.plugin, options.url);
+    const errors = validateCatalog(catalog, options.plugin, options.url, options.allowEmptyCurated);
     if (errors.length) {
       console.error(`Marketplace catalog failed preflight: ${options.url}`);
       for (const error of errors) console.error(`- ${error}`);

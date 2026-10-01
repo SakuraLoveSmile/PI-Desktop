@@ -8658,6 +8658,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | Quality (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 | M6 (opaque floating surfaces) | E2E-CHAT-opaque-floating-decision-and-retry-surfaces |
 | B — Model config (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
+| B / F / Quality / Security — Manual model-list intent and the macOS Local Network trigger | E2E-MAC-local-network-manual-discovery |
 | F — Persistence (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 | Quality (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
 | M6+ (catalog window provenance) | E2E-MODEL-catalog-window-correction-reaches-saved-bindings |
@@ -12496,7 +12497,9 @@ are withdrawn with ADR 0165.
 - **Status**: MCP protocol/unit-covered by `apps/desktop/test/mcp-control.test.mjs`;
   `pnpm test:e2e:turn-get` covers the real Host/SQLite, registered session IPC,
   and local MCP path including terminal-state recovery after Host restart. The
-  full Electron UI journey remains deferred.
+  full Electron UI journey remains deferred. The persisted on/off preference and
+  its settings IPC are Main-covered by
+  `apps/desktop/test/mcp-control-settings.test.mjs`.
 
 - **Durable-turn extension (2026-09-26)**: Discover `pi_turn_get`; poll it
   with the session/turn returned by prompt. Verify running, completed, error,
@@ -15519,3 +15522,84 @@ renderer's durable transcript reads. No real model or provider is contacted.
   preference remains synchronized with Settings.
 - **Specs:** 03-runtime/02, 03-runtime/04, 04-ux/01, 04-ux/08.
 - **Status:** Required for the transcript/UI candidate.
+
+### E2E-MAC-local-network-manual-discovery
+
+- **Preconditions:** macOS host. Isolated Electron/Chromium with the production
+  provider form and the real registered provider IPC handler; a loopback HTTP
+  fixture answering `GET /v1/models` with `{"data":[{"id":"lan-fixture"}]}`;
+  injected UDP-socket and address-lookup edges. No real provider, no API key, no
+  user profile, no OS permission prompt. Native layer only: a clean macOS user or
+  VM snapshot with no prior Local Network choice for this application, the
+  independently identified signed Plus candidate, an isolated Plus profile, a
+  Finder/LaunchServices launch, an operator-authorized LAN fixture, and a human
+  answering Allow/Deny.
+- **Steps (automated layer):** Render the provider form and let the edit debounce
+  and the saved-provider refresh run; click **Fetch list**; and, at the
+  main-process layer, invoke the registered provider IPC channel with the manual
+  intent, with an automatic shape, with a legacy string argument, with
+  `source: "cache"`, and once more after controller disposal.
+- **Expected (automated layer):** Only the Fetch list request carries
+  `intent: "manual-fetch-list"`, exactly once; debounced, saved-provider and
+  `refresh` requests omit it and never query a proxy route or open a socket. On a
+  manual request the trigger settles before the HTTP discovery request and its
+  verdict (`skipped`, `attempted` or `failed`) never replaces the discovery
+  result, its error or the catalog fallback; the response shape stays
+  `{ models, source, error? }`. A loopback target skips as `address-not-local`, a
+  proxied or unreadable route skips without opening a socket, and a direct route
+  connects once, removes its listener and closes its socket. Diagnostics carry a
+  stage, a reason and an error code only. A disposed controller starts no further
+  operation, and the fixture's `lan-fixture` rows render for the answered list.
+- **Steps (native layer):** Launch the signed candidate through
+  Finder/LaunchServices in a GUI session with no prior Local Network choice for
+  it, foreground it, click **Fetch list** against the authorized LAN fixture's
+  `/v1` endpoint, and answer the alert. Repeat on a clean snapshot to observe Deny
+  and restart persistence.
+- **Expected (native layer):** A native alert naming Pi-Desktop-Plus, its own
+  System Settings → Privacy & Security → Local Network entry, a real HTTP
+  `/v1/models` response and rendered `lan-fixture` rows after Allow, no automatic
+  re-prompt loop after Deny, and a retained choice across restart — with the
+  official application's identity, choice, profile and data untouched.
+- **Specs:** 03-runtime/12 §12 manual intent and trigger; ADR 0308 independent
+  Plus application identity; ADR 0278 canonical application id.
+- **Acceptance:** The automated layer is required and runs offline. The native
+  layer is required for the repair's final acceptance and cannot be replaced by
+  it: a loopback fixture proves request/response wiring only and an injected UDP
+  edge proves trigger order and cleanup only, so neither proves a macOS Local
+  Network authorization, and no UDP callback, terminal `curl`, historical log or
+  older build may be substituted for the native observation.
+- **Automation:** `pnpm test:e2e:provider-api-style`,
+  `pnpm test:e2e:local-network-manual-discovery`,
+  `node --test apps/desktop/test/local-network-permission.test.mjs`,
+  `node --test apps/desktop/test/provider-manual-intent-handler.test.mjs`.
+- **Milestone:** macOS Local Network repair (2026-09-30 plan, T2/T3).
+- **Status:** Automated layer implemented and passing. Native layer **not run**:
+  it needs authorization to create a clean macOS account or VM snapshot, which
+  this task does not have.
+
+
+### E2E-GOAL-report-asset-boundary
+
+- **Preconditions:** Isolated Host profile and session; an approved Goal
+  execution and local screenshot fixture; no live model or production data.
+- **Steps:** Publish a report with a valid owned screenshot and read its chunks;
+  try absolute, parent-traversal, symlink and another-session references. Submit
+  a claimed zero exit code without durable evidence and against a recorded
+  nonzero tool result.
+- **Expected:** Valid chunks reconstruct the published hash. Unsafe sources and
+  cross-session reads are unavailable. Model claims never become Host-verified
+  success; absent evidence is inconclusive and recorded failures stay failed.
+- **Automation:** `cargo test -p host-core --locked goal_reports` and
+  `node scripts/e2e-goal-report-ui.mjs` (Host transport, not visual QA).
+
+### E2E-MCP-control-settings-user-path
+
+- **Preconditions:** Isolated Electron/Chromium with the real MCP Settings page
+  and a controlled API boundary; no real app profile or provider.
+- **Steps:** Recover from an initial status-read failure; enable while the Host
+  response is delayed; observe start failure, retry, disable and environment
+  override.
+- **Expected:** The toggle follows the answered Host state, failed starts show
+  the cause and allow retry, and environment-controlled choices are disabled.
+- **Automation:** `node scripts/e2e-mcp-control-settings.mjs`; the real listener,
+  persistence and restart contracts are covered by `mcp-control-settings.test.mjs`.

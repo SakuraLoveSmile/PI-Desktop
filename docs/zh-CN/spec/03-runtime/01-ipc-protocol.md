@@ -1846,6 +1846,52 @@ MCP 调用方无法调用它们。
 项目或提交提示词时，可见桌面会跟随相同状态。控制服务启动失败会记录日志，但不会阻止
 桌面启动。
 
+### 本机开关偏好与状态 IPC
+
+控制面也可以由桌面自身开关，无需环境变量。一次启动的生效值由唯一规则决定：
+
+```text
+明确的 PI_DESKTOP_MCP_CONTROL（0 或 1） > 已保存偏好 > false
+```
+
+只有精确的 `0` 与 `1` 视为明确值；其他取值一律视为未设置。已保存偏好是本机文件
+`<electron user-data>/mcp-control-settings.json`，形状为
+`{"enabled": true|false}`，以 `0600` 权限通过临时文件加 rename 写入，因此写入
+失败会保留原值。该文件不含 token，也不含连接记录 —— 凭据仍保留在
+`mcp-control.token` 与 `mcp-control.json` —— 且不会同步到任何账号，也不会写入
+host SQLite。
+
+两个渲染器通道通过现有 preload `invoke` 桥与共享白名单暴露状态，因此没有新增
+preload 暴露面：
+
+```ts
+mcpControlGet() -> McpControlStatus
+mcpControlSet({ enabled: boolean }) -> McpControlStatus
+
+type McpControlStatus = {
+  enabled: boolean;                      // 本次启动的生效值
+  running: boolean;                      // 是否正在监听 loopback 端口
+  source: "preference" | "environment";  // 决定 `enabled` 的输入
+  connectionFile: string;                // mcp-control.json 的绝对路径
+  error: string | null;                  // 上次失败原因，否则 null
+};
+```
+
+两个响应都不含 bearer token，也不含渲染后的连接记录。`mcpControlSet` 驱动与启动
+环境相同的那个 `McpControlServer`：先启动并确认监听（清单 `active: true`），再
+保存偏好；或先关闭监听、把清单标记为 `active: false`，再保存偏好。变更操作串行
+执行，因此重复或并发点击不会打开第二个监听。启动失败不会覆盖已保存偏好，并给出
+真实原因（例如端口被占用）；偏好保存失败会停止本次新开的服务。关闭只停控制面：
+不会停止、中止或取消任何 Agent 回合。当 `PI_DESKTOP_MCP_CONTROL` 明确设置时，由
+环境决定本次启动：状态报告 `source: "environment"`，相反请求以 `error` 说明而不
+执行，运行状态与已保存偏好都不改变。与生效环境值一致的请求（包括启动失败后的重试）
+照常执行。已保存 `true` 但启动失败时，桌面照常运行，
+返回 `enabled: true`、`running: false` 与 `error` 中的原因；重试就是再次调用
+`mcpControlSet({ enabled: true })`。
+
+这两个通道不进入经过审查的 MCP 操作目录：外部 MCP 客户端可以调用桌面操作，但
+不能关闭为自己提供服务的控制面。
+
 ## 14. 错误代码 — 初始注册表（可扩展）
 
 | 代码 | 含义 |
@@ -1890,3 +1936,20 @@ unchanged. See [provider configuration](12-provider-config-schema.md).
 输入密码只会被传给需要它的操作。原始秘密、vault key、解密资源或远端 archive 不会返回到 Renderer。`configSync.changed` 事件携带相同的脱敏状态，并由 Host 发起的变更（包括 Host scheduler）触发。Main 只是传输/生命周期协调器，不负责调度、合并、加密或应用配置。
 
 手动同步会在运行期间报告 `configSync.progress`：当前阶段（`capture`、`download`、`merge`、`upload`、`apply` 或 `cleanup`）、该阶段已完成与总量，以及已知时的字节数。因此上传大量资源对象时，界面不会无内容可显示。后台轮询不报告进度，因为只有手动路径有调用方在等待。
+
+
+### Goal report asset reads and check observations
+
+`goalReports/getAsset` accepts the session/execution pair plus an asset id and
+a bounded chunk range. Host verifies that the execution belongs to the session,
+then serves only assets in that execution's report directory; manifest paths,
+absolute source references, parent traversal, symlink escapes and cross-session
+attachment references do not grant filesystem access. Unsupported or oversized
+images remain unavailable, and reads are bounded before loading bytes. The
+response carries MIME type, total bytes, hash, offset, base64 data and EOF.
+
+Check observations use persisted tool results from the same session up to the
+report's durable sequence. A model-supplied exit code is only a claim; missing
+or unverifiable references produce `inconclusive`, and a recorded failure must
+not be overwritten by a claimed success. These additive report fields do not
+change the database schema or grant renderer filesystem access.

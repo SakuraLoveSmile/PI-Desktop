@@ -533,6 +533,7 @@ export const RACP_OPERATIONS = {
   "goalReports/get": { role: "viewer", profile: "remote-host", mutation: false },
   "goalReports/list": { role: "viewer", profile: "remote-host", mutation: false },
   "goalReports/retry": { role: "controller", profile: "remote-host", mutation: true },
+  "goalReports/getAsset": { role: "viewer", profile: "remote-host", mutation: false },
   "session/create": { role: "controller", profile: "v1", mutation: true },
   "session/attach": { role: "viewer", profile: "v1", mutation: false },
   "session/history": { role: "viewer", profile: "v1", mutation: false },

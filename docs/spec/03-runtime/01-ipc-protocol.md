@@ -2346,6 +2346,61 @@ event, so an external Agent can create a session, open a project, or submit a
 prompt while the visible desktop follows the same state. A control-server
 startup failure is logged and does not prevent the desktop from launching.
 
+### Local on/off preference and status IPC
+
+The control plane can also be switched from the desktop itself, without an
+environment variable. One rule decides the effective value of a launch:
+
+```text
+explicit PI_DESKTOP_MCP_CONTROL (0 or 1) > saved preference > false
+```
+
+Only the exact values `0` and `1` are explicit; any other value is treated as
+unset. The saved preference is the machine-local file
+`<electron user-data>/mcp-control-settings.json`, shaped `{"enabled": true|false}`,
+written with mode `0600` through a temporary file plus a rename, so a failed
+write leaves the previous value intact. It holds no token and no connection
+record — credentials remain in `mcp-control.token` and `mcp-control.json` — and
+it is never synced to an account or written to host SQLite.
+
+Two renderer channels expose the state through the existing preload `invoke`
+bridge and the shared whitelist, so no new preload surface exists:
+
+```ts
+mcpControlGet() -> McpControlStatus
+mcpControlSet({ enabled: boolean }) -> McpControlStatus
+
+type McpControlStatus = {
+  enabled: boolean;                      // effective value for this launch
+  running: boolean;                      // listening on the loopback port
+  source: "preference" | "environment";  // which input decided `enabled`
+  connectionFile: string;                // absolute path of mcp-control.json
+  error: string | null;                  // last failure reason, else null
+};
+```
+
+Neither response carries the bearer token or the rendered connection record.
+`mcpControlSet` drives the same `McpControlServer` the startup environment
+drives: start, confirm the listener (and `active: true` in the manifest), then
+save the preference; or close the listener, mark the manifest `active: false`,
+then save the preference. Mutations are serialized, so repeated or concurrent
+clicks never open a second listener. A failed start leaves the saved preference
+untouched and reports the real reason (for example a busy port), and a failed
+preference write stops the server that call opened. Disabling stops only the
+control plane: no Agent turn is stopped, aborted, or cancelled. When
+`PI_DESKTOP_MCP_CONTROL` is explicit, the environment decides the launch: the
+status reports `source: "environment"`, a contradicting request is reported in
+`error` instead of being applied, and neither the running state nor the saved
+preference changes. A request that agrees with the effective environment value,
+including a retry after a failed start, is applied as usual. A saved `true` whose
+startup start fails leaves the desktop
+running with `enabled: true`, `running: false`, and the reason in `error`; the
+retry is another `mcpControlSet({ enabled: true })`.
+
+Both channels stay outside the reviewed MCP operation catalog: an external MCP
+client can invoke desktop operations, but it cannot switch off the plane that
+serves it.
+
 ## 14. Error Codes — Initial registry (extensible)
 
 | code | Meaning |
@@ -2440,3 +2495,20 @@ done and total for that phase, and the bytes when they are known. A long upload
 of many resource objects is therefore not an interface with nothing to show.
 Background polls report nothing, since only the manual path has a caller
 watching.
+
+
+### Goal report asset reads and check observations
+
+`goalReports/getAsset` accepts the session/execution pair plus an asset id and
+a bounded chunk range. Host verifies that the execution belongs to the session,
+then serves only assets in that execution's report directory; manifest paths,
+absolute source references, parent traversal, symlink escapes and cross-session
+attachment references do not grant filesystem access. Unsupported or oversized
+images remain unavailable, and reads are bounded before loading bytes. The
+response carries MIME type, total bytes, hash, offset, base64 data and EOF.
+
+Check observations use persisted tool results from the same session up to the
+report's durable sequence. A model-supplied exit code is only a claim; missing
+or unverifiable references produce `inconclusive`, and a recorded failure must
+not be overwritten by a claimed success. These additive report fields do not
+change the database schema or grant renderer filesystem access.

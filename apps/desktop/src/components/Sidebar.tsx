@@ -25,6 +25,7 @@ import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import {
   getGlobalPinnedSessions,
   groupSidebarSessionsByTime,
+  nextVisibleSessionId,
   normalizeProjectPath,
   sessionArchived,
   sessionPinned,
@@ -1214,6 +1215,95 @@ export function Sidebar({
     });
   };
 
+  // Quick archive/restore on the row itself. It calls the same local
+  // orchestration as the row menu, so there is exactly one archive path.
+  const quickArchivePendingRef = useRef<Set<string>>(new Set());
+  const [quickArchivePending, setQuickArchivePending] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+
+  useEffect(() => {
+    return () => {
+      quickArchivePendingRef.current.clear();
+    };
+  }, []);
+
+  const sessionRowSelector = (sessionId: string) =>
+    `[data-sidebar-session-row="${CSS.escape(sessionId)}"]`;
+
+  const renderedSessionRowIds = (): string[] =>
+    Array.from(document.querySelectorAll<HTMLElement>("[data-sidebar-session-row]"))
+      .filter((row) => !row.closest('[aria-hidden="true"]'))
+      .map((row) => row.dataset.sidebarSessionRow ?? "")
+      .filter((id) => id.length > 0);
+
+  const focusSessionRowMain = (sessionId: string): boolean => {
+    const main = document
+      .querySelector<HTMLElement>(sessionRowSelector(sessionId))
+      ?.querySelector<HTMLElement>(".thread-item-main");
+    if (!main || main.closest('[aria-hidden="true"]')) return false;
+    main.focus();
+    return true;
+  };
+
+  const focusSidebarAnchor = () => {
+    document.querySelector<HTMLElement>('[data-action="session-sort"]')?.focus();
+  };
+
+  const quickToggleSessionArchive = async (session: SessionSummary) => {
+    // A second click while the first operation is in flight would archive,
+    // restore and archive again.
+    if (quickArchivePendingRef.current.has(session.id) || quickArchivePending.has(session.id)) return;
+    quickArchivePendingRef.current.add(session.id);
+    const archived = sessionArchived(session, sessionMeta[session.id]);
+    const wasActive = activeSessionId === session.id;
+    const actedRow = document.querySelector<HTMLElement>(sessionRowSelector(session.id));
+    const renderedIds = renderedSessionRowIds();
+    // Resolved before the mutation, because archiving removes the acted-on row.
+    const fallbackId =
+      nextVisibleSessionId(renderedIds, session.id, 1) ??
+      nextVisibleSessionId(renderedIds, session.id, -1);
+
+    setQuickArchivePending((prev) => new Set(prev).add(session.id));
+    try {
+      if (archived) {
+        restoreSession(session.id);
+      } else {
+        await archiveSession(session);
+      }
+    } finally {
+      quickArchivePendingRef.current.delete(session.id);
+      setQuickArchivePending((prev) => {
+        const next = new Set(prev);
+        next.delete(session.id);
+        return next;
+      });
+    }
+
+    requestAnimationFrame(() => {
+      // Recover focus only when it was inside the acted-on row, or was dropped
+      // to the body because that row disappeared. A newer user focus wins.
+      const focused = document.activeElement;
+      if (focused !== null && focused !== document.body && !actedRow?.contains(focused)) return;
+      if (archived) {
+        if (focusSessionRowMain(session.id)) return;
+        focusSidebarAnchor();
+        return;
+      }
+      if (wasActive) {
+        const activeMain = document.querySelector<HTMLElement>(
+          '[data-sidebar-session-row] .thread-item-main[aria-current="page"]',
+        );
+        if (activeMain && !activeMain.closest('[aria-hidden="true"]')) {
+          activeMain.focus();
+          return;
+        }
+      }
+      if (fallbackId && focusSessionRowMain(fallbackId)) return;
+      focusSidebarAnchor();
+    });
+  };
+
   const archiveSession = async (session: SessionSummary) => {
     const archived = sessionArchived(session, sessionMeta[session.id]);
     const wasActive = activeSessionId === session.id;
@@ -1775,6 +1865,20 @@ export function Sidebar({
           ) : null}
         </button>
         <div className="sidebar-row-actions">
+          <TooltipButton
+            type="button"
+            className="thread-item-more thread-item-quick-archive"
+            data-action="quick-session-archive"
+            tooltip={archived ? t("nav.restoreTask") : t("nav.archiveTask")}
+            ariaLabel={archived ? t("nav.restoreTask") : t("nav.archiveTask")}
+            disabled={quickArchivePending.has(session.id)}
+            onClick={(event) => {
+              event.stopPropagation();
+              void quickToggleSessionArchive(session);
+            }}
+          >
+            {archived ? <IconArchiveRestore size={14} /> : <IconArchive size={14} />}
+          </TooltipButton>
           <TooltipButton
             type="button"
             className="thread-item-more"

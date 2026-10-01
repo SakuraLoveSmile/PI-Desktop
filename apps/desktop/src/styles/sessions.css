@@ -436,6 +436,13 @@
   flex: 0 0 auto;
 }
 
+/* A second row control shares the reveal rules above. Both stay 24px squares
+ * with their layout box reserved while hidden, so revealing them cannot shift
+ * the session title. */
+.sidebar-row-actions {
+  gap: 2px;
+}
+
 .thread-item-more {
   display: inline-flex;
   width: 24px;
