@@ -39,8 +39,8 @@ on a later renderer restart. No host RPC or storage schema version changes.
 ## Approved Plan/Goal execution amendment (2026-10-02)
 
 This additive path addresses approved execution that starts without a new
-visible user turn. Implementation and integrated acceptance remain in progress;
-the amendment does not claim that the current worktree has passed its gates.
+visible user turn. The implementation is covered by isolated candidate validation in the UX
+repair plan; this amendment does not establish user acceptance or release status.
 
 When the Host reports a committed Plan/Goal execution transition to `running`,
 the renderer may request one title summary for that exact Lead session and

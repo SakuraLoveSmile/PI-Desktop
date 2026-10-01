@@ -1,6 +1,6 @@
 # Expert Team UX and Live-State Repair Plan
 
-Status: implementation in progress; T1-T9 are **实现中** pending integrated candidate validation. Revision: `team-ux-v2`, 2026-10-02, Asia/Taipei.
+Status: T1-T9 are **待体验** after isolated local candidate validation. Remote PR integration and local DMG delivery remain separate delivery gates. Revision: `team-ux-v3`, 2026-10-02, Asia/Taipei.
 
 ## Integration baseline — 2026-10-01
 
@@ -321,23 +321,23 @@ Observed user path and screenshots:
 NOT RUN items, exact reason, alternative evidence and residual risk:
 ```
 
-Commit only when asked. If no commit is authorized, record HEAD plus the reviewed working-diff fingerprint for local checks and leave them as an uncommitted local-candidate result. Commit-based task/PR validation remains pending until an authorized commit exists. A later requested PR/push must use the exact tested commit/latest-main candidate and actual PR integration gate; never merge code into local main just to run E2E. No automatic push, release, main merge, worktree removal, or paid provider call is authorized by this planning request.
+The active implementation request explicitly authorizes necessary commits, task-branch push, a PR merged through its integration gates, and a local macOS ARM64 DMG from the landed commit. Never merge task code into local main for E2E or directly push main. Preserve the dirty primary checkout and its old release directories. Release/tag creation, artifact upload, notarization, paid providers, and user-instance/data testing remain outside this authorization.
 
 ### Observable acceptance checklist
 
-All rows remain **实现中** until the integrated task candidate passes the applicable automated and native UI gates. Worker-local tests do not establish the integrated user path.
+The local integrated candidate passed the applicable automated and isolated native UI gates below. All rows are **待体验**, not user acceptance; remote landing and packaging are recorded separately.
 
 | Task | Status | Required result |
 | --- | --- | --- |
-| T1 | 实现中 | Eight queued messages occupy one folded header; count/next update; expand yields original working actions and bounded scroll; queuing/sending/order unaffected |
-| T2 | 实现中 | Controlled running member displays running in roster/overview/panorama; success/error/abort/restart are truthful; completed tasks do not show blocked; paused queued mail does not start; snapshot also retains current review/decision |
-| T3 | 实现中 | Reference's two-line task/role/portrait list replaces generic card; metadata stays behind strategy review until confirmation; identity remains stable; task/member drill-down keeps main Lead selected; all labels localized |
-| T4 | 实现中 | At 80%, repeated Host updates during/after drag leave zoom 80%; pan delta matches drag; manual viewport survives resize/detail/back; only explicit Fit/Reset changes its mode/scale |
-| T5 | 实现中 | One parent with five foldable member sessions, no duplicate ordinary rows; pin/archive/search/navigation preserved; exact IDs/transcripts still exist after grouping/restart |
-| T6 | 实现中 | One actual fake-model title request for approved Lead execution, zero per-member/disabled/duplicate requests; manual/newer-task title wins; failure does not affect execution |
-| T7 | 实现中 | Aggregate rows omit long instructions; filtering/search and full detail remain usable; all tasks reachable; no complete+blocked contradiction |
-| T8 | 实现中 | No whole-page horizontal scrolling at supported shell/panel/font conditions; long content remains accessible in detail; intended local scroll/pan still works |
-| T9 | 实现中 | Standard and Team tools/delegates/members/counts/lifecycles stay distinct through modes and approval/reload/recovery; isolated native user sequence passes |
+| T1 | 待体验 | Eight queued messages occupy one folded header; count/next update; expand yields original working actions and bounded scroll; queuing/sending/order unaffected |
+| T2 | 待体验 | Controlled running member displays running in roster/overview/panorama; success/error/abort/restart are truthful; completed tasks do not show blocked; paused queued mail does not start; snapshot also retains current review/decision |
+| T3 | 待体验 | Reference's two-line task/role/portrait list replaces generic card; metadata stays behind strategy review until confirmation; identity remains stable; task/member drill-down keeps main Lead selected; all labels localized |
+| T4 | 待体验 | At 80%, repeated Host updates during/after drag leave zoom 80%; pan delta matches drag; manual viewport survives resize/detail/back; only explicit Fit/Reset changes its mode/scale |
+| T5 | 待体验 | One parent with five foldable member sessions, no duplicate ordinary rows; pin/archive/search/navigation preserved; exact IDs/transcripts still exist after grouping/restart |
+| T6 | 待体验 | One actual fake-model title request for approved Lead execution, zero per-member/disabled/duplicate requests; manual/newer-task title wins; failure does not affect execution |
+| T7 | 待体验 | Aggregate rows omit long instructions; filtering/search and full detail remain usable; all tasks reachable; no complete+blocked contradiction |
+| T8 | 待体验 | No whole-page horizontal scrolling at supported shell/panel/font conditions; long content remains accessible in detail; intended local scroll/pan still works |
+| T9 | 待体验 | Standard and Team tools/delegates/members/counts/lifecycles stay distinct through modes and approval/reload/recovery; isolated native user sequence passes |
 
 Implementation with a required gate unrun or blocked is **实现中**. After all applicable checks/native paths pass it is **待体验**. Only explicit user confirmation establishes **已验收**. Do not turn a design preview or this planning delivery into product acceptance.
 
@@ -823,4 +823,13 @@ Historical preview-only evidence from the 2026-10-01 planning revision (base `ae
 - Saved [panorama preview](assets/expert-team-ux/preview-panorama-dark.png), [compact board preview](assets/expert-team-ux/preview-board-dark.png), and [narrow light preview](assets/expert-team-ux/preview-board-light-narrow.png). They are design-preview screenshots, not installed-app acceptance images.
 - Those checks apply only to the original planning revision. Recheck links, code-reference parity, command paths, and whitespace after this 2026-10-02 revision; they do not validate current product code.
 
-Implementation status on 2026-10-02: T1-T9 are **实现中**. Individual worker checks are not the integrated candidate result. Root still needs to record current task-candidate build/typecheck/tests, Host/Rust checks, isolated E2E, actual-app visual evidence, skipped gates, and the reviewed diff before merge/build acceptance. No real provider or user profile is part of the planned fixture.
+## Integrated local candidate evidence — 2026-10-02
+
+T1-T9 are **待体验**. The runtime candidate is `5f364a8827a5c88f6c595f3195522e6ad4f2e00f`, based on `a395c6067d2d87492079840ce81d199b0abedb6e`. Subsequent evidence recording and the early Windows fixture-isolation guard do not change product runtime code; final request HEAD is checked against this tested executable tree. Final request HEAD and the actual PR merge-ref tree must still be recorded before landing; this section does not claim a remote merge, publication or DMG.
+
+- Root and independent reviewers fixed the remaining lifecycle/bootstrap/recovery/revision, deletion/conversion, reader eviction/restart, and title-CAS problems. Native execution additionally reproduced and fixed browser timer receiver failures in reader/Overview cleanup and the synthetic Team-context lookup that prevented title one-shots. Generated member labels now show role/display name without replacing a custom persisted title.
+- JS workspace build, Desktop build/typecheck, lint, agent-policy synchronization and committed architecture checks passed. The lifecycle tests were split by responsibility rather than waiving the architecture budget. Full workspace suites passed, including shared 1086, runtime 1102, i18n 28, agent-host 50 and host-runtime 57. Final Desktop suite: 3058 tests, 3057 pass, zero fail, one existing skip. Latest full Rust suite: 736 pass; fmt, debug build and clippy passed, with five existing warnings. The subsequent test-module move also passed its three lifecycle regressions and build.
+- Root ran isolated native Electron with a loopback fake provider and temporary data/profile/HOME. `e2e-team.mjs` passed review-before-dispatch, five grouped members, actual member turn phase, one approved Plan execution title, no member/duplicate title requests, a mounted Overview refresh before the turn settled, six-task board filtering/search/detail/back, all five queue actions on eight waiting prompts, ordinary Task parent/delegate coexistence, member-to-parent navigation, Lead-only work, pause/restart/Resume exactly-once delivery and Chinese renderer reload.
+- At manual 80% zoom, the harness paused only its own Host to keep refresh in flight; the same canvas survived, dragging continued, and detail/back plus resize preserved transform. A reversible read failure in the harness-owned database also reproduced Retry being captured as a drag; excluding every canvas tool from pointer capture fixed native Retry interaction and stale recovery. Supported 1024px shell checks with 150% font scale retained board/queue/Send controls. Long description/write-scope fixtures reproduced detail overflow at 320px (content scrollWidth 5600px); targeted text wrapping fixed the offender. All 96 combinations of Overview/aggregate/board/detail, 320/450/620px panels, 100%/150% font scale, dark/light theme and English/Chinese passed without page or surface overflow. Root inspected actual English/Chinese screenshots against the supplied reference; preview screenshots were not used as product evidence.
+- Candidate `plan-ui` passed its fake-provider approval/revision/Goal-conversion/work-panel paths with zero console diagnostics; its paid/live case was skipped after removing all three `PI_DESKTOP_TEST_*` variables. Candidate layout passed 207/207 checks; isolated subagent registry passed 34/34; model selection/fallback sidecar E2E and review edit/confirm/cancel component interaction passed.
+- Logs are under `/tmp/pi-team-*`. Candidate screenshots are retained in the harness paths printed by `/tmp/pi-team-final-complete-e2e.log`. These are synthetic fixture data only. No installed user instance, user profile, real model, `verify:ui:*`, release/tag/upload or notarization was exercised. Windows behavior and real-model quality are outside this macOS local gate; explicit user confirmation is still required for **已验收**.

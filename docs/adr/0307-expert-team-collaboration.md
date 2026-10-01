@@ -125,8 +125,8 @@ Plugin SDK contract changes are introduced.
 ## Presentation and live-snapshot amendment (2026-10-02)
 
 This amendment records the additive contracts used by the Expert Team UX
-repair. Implementation and integrated acceptance remain in progress; this
-entry does not claim that the current worktree has passed its required gates.
+repair. The implementation is covered by isolated candidate validation in the UX
+repair plan; this ADR does not establish user acceptance or release status.
 
 ### Presentation metadata follows review-before-dispatch
 

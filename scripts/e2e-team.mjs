@@ -11,6 +11,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { resolveElectronBinary } from "./e2e/boot.mjs";
 import { Host, resolveHostBinary } from "./e2e/host.mjs";
 
+if (process.platform === "win32") {
+  throw new Error("Team UI E2E requires macOS/Linux HOME isolation and controlled Host signals; no Windows profile was accessed.");
+}
+
 const tempRoot = await mkdtemp(join(tmpdir(), "pi-desktop-team-e2e-"));
 const dataDir = join(tempRoot, "data");
 const projectPath = join(tempRoot, "workspace");
