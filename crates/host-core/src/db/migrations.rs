@@ -142,6 +142,7 @@ impl Database {
         // One-time repair: strip the Windows extended-length path prefix
         // (`//?/X:/...` → `X:/...`) from project paths stored by older versions.
         self.fix_extended_length_project_paths()?;
+        let _ = crate::team::interrupt_pending_reviews_on_boot(self);
         Ok(())
     }
 

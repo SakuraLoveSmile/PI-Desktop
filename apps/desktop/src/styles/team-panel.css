@@ -404,3 +404,219 @@
   flex-direction: column;
   gap: 4px;
 }
+
+/* Launch Review Section */
+.team-launch-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: color-mix(in oklab, var(--ds-accent) 6%, var(--ds-bg-sunken));
+  border: 1px solid color-mix(in oklab, var(--ds-accent) 30%, var(--ds-border-subtle));
+  border-radius: var(--radius-lg);
+}
+
+.team-launch-review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.team-launch-review-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--ds-text-primary);
+}
+
+.team-review-status-badge {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.team-review-status-badge.status-pending {
+  background: color-mix(in oklab, var(--ds-amber, #f59e0b) 15%, transparent);
+  color: var(--ds-amber, #d97706);
+  border: 1px solid color-mix(in oklab, var(--ds-amber, #f59e0b) 40%, transparent);
+}
+
+.team-review-status-badge.status-confirmed {
+  background: color-mix(in oklab, var(--ds-emerald, #10b981) 15%, transparent);
+  color: var(--ds-emerald, #059669);
+  border: 1px solid color-mix(in oklab, var(--ds-emerald, #10b981) 40%, transparent);
+}
+
+.team-review-status-badge.status-cancelled,
+.team-review-status-badge.status-interrupted {
+  background: color-mix(in oklab, var(--ds-rose, #f43f5e) 15%, transparent);
+  color: var(--ds-rose, #e11d48);
+  border: 1px solid color-mix(in oklab, var(--ds-rose, #f43f5e) 40%, transparent);
+}
+
+.team-review-saving-tag {
+  font-size: var(--text-xs);
+  color: var(--ds-text-muted);
+  font-style: italic;
+}
+
+.team-launch-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-launch-review-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--ds-bg-sunken);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.team-launch-review-reason-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--ds-text-secondary);
+}
+
+.team-launch-review-reason-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ds-text-primary);
+  line-height: var(--leading-normal);
+}
+
+.team-launch-review-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: color-mix(in oklab, var(--ds-rose, #f43f5e) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--ds-rose, #f43f5e) 30%, transparent);
+  border-radius: var(--radius-md);
+  color: var(--ds-rose, #e11d48);
+  font-size: var(--text-xs);
+}
+
+.team-launch-review-members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-launch-review-members-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-medium);
+  color: var(--ds-text-secondary);
+}
+
+.team-launch-review-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-launch-review-member-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--ds-bg-sunken);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.team-launch-review-member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.team-launch-review-member-name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--ds-text-primary);
+}
+
+.team-launch-review-member-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.team-badge-reused {
+  background: color-mix(in oklab, var(--ds-accent) 15%, transparent);
+  color: var(--ds-accent);
+}
+
+.team-badge-new {
+  background: color-mix(in oklab, var(--ds-emerald, #10b981) 15%, transparent);
+  color: var(--ds-emerald, #059669);
+}
+
+.team-launch-review-member-desc {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ds-text-muted);
+}
+
+.team-launch-review-member-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.team-review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.team-review-field-label {
+  font-size: var(--text-2xs, 10px);
+  color: var(--ds-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+}
+
+.team-review-select {
+  font-size: var(--text-xs);
+  padding: 4px 8px;
+  min-width: 110px;
+  max-width: 160px;
+}
+
+@media (max-width: 480px) {
+  .team-launch-review-member-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .team-launch-review-member-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .team-review-select {
+    max-width: 100%;
+  }
+}
