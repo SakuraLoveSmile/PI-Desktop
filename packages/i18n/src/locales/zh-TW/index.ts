@@ -1837,6 +1837,7 @@ sklm: {
     openInMain: "Open in main window",
     taskOwner: "Owner",
     taskReadiness: "Readiness",
+    taskScopes: "寫入範圍",
     teamOverview: "Team Overview",
     lead: "Lead",
     membersCount: "{{count}} members",

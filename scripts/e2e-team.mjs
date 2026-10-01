@@ -136,9 +136,10 @@ const providerServer = createServer(async (req, res) => {
       if (createdTasks < 6) {
         assert.ok(toolNames.includes("task_create"), "Lead runtime lacks task_create");
         toolCall = { name: "task_create", args: {
-          subject: `E2E board fixture task ${createdTasks + 1}`,
-          description: `Detail for E2E board fixture task ${createdTasks + 1}.`,
+          subject: `E2E board fixture task ${createdTasks + 1} ${"long-task-".repeat(16)}`,
+          description: `Detail for E2E board fixture task ${createdTasks + 1}. https://example.invalid/${"longsegment".repeat(80)}`,
           ownerMemberName: "researcher",
+          writeScopes: [`${"long-directory-".repeat(50)}/output-${createdTasks + 1}.ts`],
         }};
       } else if (!priorToolNames.includes("send_message")) {
         toolCall = { name: "send_message", args: {
@@ -604,6 +605,58 @@ async function saveScreenshot(sendCdp, name) {
   return path;
 }
 
+async function resizePanel(sendCdp, evaluate, width) {
+  const bounds = await evaluate(`(() => {
+    const panel = document.querySelector('[data-testid="work-panel"]');
+    const handle = panel.querySelector('.work-panel-resize').getBoundingClientRect();
+    return { width: panel.getBoundingClientRect().width, x: handle.left + handle.width / 2, y: handle.top + 120 };
+  })()`);
+  await sendCdp("Input.dispatchMouseEvent", { type: "mousePressed", x: bounds.x, y: bounds.y, button: "left", clickCount: 1 });
+  await sendCdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", buttons: 1 });
+  await sendCdp("Input.dispatchMouseEvent", { type: "mouseReleased", x: bounds.x + bounds.width - width, y: bounds.y, button: "left", clickCount: 1 });
+  await waitFor(() => evaluate(`Math.abs(document.querySelector('[data-testid="work-panel"]').getBoundingClientRect().width - ${width}) < 2`), `panel resized to ${width}px`);
+}
+
+async function verifyTeamLayoutMatrix(sendCdp, evaluate, locale) {
+  await sendCdp("Emulation.setDeviceMetricsOverride", { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
+  try {
+    for (const surface of ["overview", "aggregate", "board", "detail"]) {
+      await openTeamPanel(sendCdp, evaluate);
+      if (surface !== "aggregate") {
+        await activateOverviewTab(sendCdp, evaluate);
+        await waitFor(() => evaluate(`document.querySelectorAll('.team-progress-row').length > 0`), "live task rows for layout matrix");
+        if (surface !== "overview") {
+          await evaluate(`Array.from(document.querySelectorAll('.team-progress button')).find(button => /view all|查看全部/i.test(button.innerText))?.click()`);
+          await waitFor(() => evaluate(`!!document.querySelector('.team-board-row')`), "board for layout matrix");
+          if (surface === "detail") {
+            await evaluate(`document.querySelector('.team-board-row')?.click()`);
+            await waitFor(() => evaluate(`!!document.querySelector('[data-testid="team-task-detail"]')`), "long task detail for layout matrix");
+          }
+        }
+      }
+      for (const width of [320, 450, 620]) {
+        await resizePanel(sendCdp, evaluate, width);
+        for (const scale of [1, 1.5]) for (const theme of ["dark", "light"]) {
+          await evaluate(`document.documentElement.style.setProperty('--font-scale', '${scale}'); document.documentElement.setAttribute('data-theme', '${theme}'); true`);
+          await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+          const metrics = await evaluate(`(() => {
+            const root=document.documentElement;
+            const surface=document.querySelector('.team-panel, .work-panel-overview');
+            return { page: [root.clientWidth, root.scrollWidth], surface: [surface.clientWidth, surface.scrollWidth] };
+          })()`);
+          assert.ok(metrics.page[1] <= metrics.page[0] && metrics.surface[1] <= metrics.surface[0], `${locale}/${surface}/${width}/${scale}/${theme} overflows: ${JSON.stringify(metrics)}`);
+          if (scale === 1.5 && width === 320) await saveScreenshot(sendCdp, `team-${surface}-${locale}-${theme}-320-150.png`);
+        }
+      }
+    }
+  } finally {
+    await evaluate(`document.documentElement.style.removeProperty('--font-scale'); document.documentElement.setAttribute('data-theme', 'dark'); true`);
+    await resizePanel(sendCdp, evaluate, 360);
+    await sendCdp("Emulation.clearDeviceMetricsOverride");
+  }
+  console.log(`PASS Team layout matrix ${locale}: Overview/aggregate/board/long detail, 320/450/620px, 100%/150%, dark/light`);
+}
+
 try {
   await host.start();
   await host.call("workspace.set", { path: projectPath });
@@ -916,6 +969,7 @@ try {
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"]') && !document.querySelector('.startup-splash')`), "Lead after paused restart");
   await evaluate(`document.querySelector('[data-sidebar-session-row="${lead.id}"] button.thread-item-main')?.click()`);
   await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"].active')`), "Lead reselected after paused restart");
+  await waitFor(() => evaluate(`!!document.querySelector('[data-session-pane="${lead.id}"][data-visible="true"]')`), "Lead transcript restored after paused restart");
   await openTeamPanel(sendCdp, evaluate);
   await waitFor(async () => (await invoke("teamGetRoster", { teamSessionId: lead.id })).paused, "paused Team panel after restart");
   const memberBeforeResume = await invoke("sessionGet", { id: member.memberSessionId });
@@ -946,6 +1000,19 @@ try {
   const resumedScreenshot = await sendCdp("Page.captureScreenshot", { format: "png" });
   await writeFile(join(tempRoot, "team-panel-resumed.png"), Buffer.from(resumedScreenshot.data, "base64"));
   console.log("PASS Team lifecycle: queued mail stayed idle through restart while paused, then delivered once after Resume");
+  await verifyTeamLayoutMatrix(sendCdp, evaluate, "en");
+  await invoke("settingsSet", { language: "zh-CN" });
+  await sendCdp("Page.reload");
+  await waitFor(() => evaluate(`!!document.querySelector('[data-sidebar-session-row="${lead.id}"]') && document.body.innerText.includes('新建任务')`), "Chinese shell after renderer reload");
+  await evaluate(`document.querySelector('[data-sidebar-session-row="${lead.id}"] button.thread-item-main')?.click()`);
+  await waitFor(() => evaluate(`!!document.querySelector('[data-session-pane="${lead.id}"][data-visible="true"]')`), "Lead reopened after Chinese reload");
+  await openTeamPanel(sendCdp, evaluate);
+  await activateOverviewTab(sendCdp, evaluate);
+  await waitFor(() => evaluate(`document.querySelector('[data-testid="overview-team-progress"]')?.innerText.includes('任务进度')`), "Chinese compact Team progress");
+  await saveScreenshot(sendCdp, "team-overview-zh-CN.png");
+  await verifyTeamLayoutMatrix(sendCdp, evaluate, "zh-CN");
+  assert.equal(titleRequests.length, 3, "renderer reload must not duplicate title requests");
+  console.log("PASS Chinese Team presentation: compact progress and identities survive renderer reload without another title request");
 } catch (error) {
   if (socket?.readyState === 1 && lastSendCdp) {
     try { console.error(`Failure image: ${await saveScreenshot(lastSendCdp, "team-failure.png")}`); } catch {}

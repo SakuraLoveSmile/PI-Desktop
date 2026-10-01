@@ -1832,6 +1832,7 @@ sklm: {
     openInMain: "Open in main window",
     taskOwner: "Owner",
     taskReadiness: "Readiness",
+    taskScopes: "Périmètres d’écriture",
     teamOverview: "Team Overview",
     lead: "Lead",
     membersCount: "{{count}} members",
