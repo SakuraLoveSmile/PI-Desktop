@@ -254,6 +254,10 @@ export function createLiveVoiceWidget(input: {
           savePosition();
           current.hide();
         }
+        // The renderer reports its presentation after installing its event
+        // subscription. Replay here so a state sent during page load cannot be
+        // lost before React is ready to receive it.
+        sendView();
         return;
       }
       void ensureWindow().then((created) => {
@@ -280,7 +284,7 @@ export function createLiveVoiceWidget(input: {
     requestAction(action) {
       const main = input.getMainWindow();
       if (!main || main.isDestroyed()) return;
-      if (action === "details" || action === "settings") {
+      if (action === "details" || action === "settings" || action === "resume") {
         // The details surface and the Settings route live in the main window,
         // so the action has to hand the user over to it.
         if (main.isMinimized()) main.restore();

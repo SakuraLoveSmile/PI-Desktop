@@ -76,7 +76,11 @@ export function LiveVoiceStatusHost() {
         runAction(() => controller.toggleMute(), "mute");
         break;
       case "resume":
-        runAction(() => controller.resumePlayback(), "playback");
+        // IPC cannot transfer transient user activation from the widget
+        // renderer. Main focuses this window for the widget press; the user
+        // must click the owner-frame control below so AudioContext/media play
+        // runs in a real gesture handler.
+        setDetailsOpen(true);
         break;
       case "end":
         runAction(() => controller.end());
@@ -105,6 +109,7 @@ export function LiveVoiceStatusHost() {
           transcripts={snapshot.transcripts}
           open={detailsOpen}
           onClose={() => setDetailsOpen(false)}
+          onResumePlayback={() => runAction(() => controller.resumePlayback(), "playback")}
           anchorRef={anchorRef}
         />
       ) : null}

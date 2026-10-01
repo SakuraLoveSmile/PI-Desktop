@@ -98,3 +98,43 @@ test("only the widget's own actions and box are accepted on its channels", async
     "the widget cannot move itself: the window layer owns the position",
   );
 });
+
+test("widget IPC handlers enforce renderer ownership", async (t) => {
+  const server = await createServer({
+    root: fileURLToPath(new URL("..", import.meta.url)),
+    configFile: false,
+    server: { middlewareMode: true, hmr: false, ws: false },
+    appType: "custom",
+    optimizeDeps: { noDiscovery: true, include: [] },
+  });
+  t.after(() => server.close());
+  const { registerLiveVoiceIpc } = await server.ssrLoadModule("/electron/main/ipc/live-voice-ipc.ts");
+  const handlers = new Map();
+  const mainId = 11;
+  const widgetId = 22;
+  const registrar = {
+    ipcMain: {},
+    handle() {},
+    handleWithEvent(channel, handler) { handlers.set(channel, handler); },
+    assertMainWindowSender(event) {
+      if (event.sender.id !== mainId) throw Object.assign(new Error("wrong sender"), { errorCode: "PERMISSION_DENIED" });
+    },
+  };
+  const actions = [];
+  const widget = {
+    owns: (id) => id === widgetId,
+    setPresentation() {},
+    requestAction: (action) => actions.push(action),
+    setIssue() {},
+  };
+  const service = new Proxy({}, { get: () => async () => ({}) });
+  registerLiveVoiceIpc({ registrar, service, getMainWindow: () => ({ webContents: { id: mainId } }), widget });
+  const invoke = (channel, senderId, value) => handlers.get(channel)({ sender: { id: senderId } }, value);
+  await invoke("pi-desktop/voice/live/widget/action", widgetId, { action: "mute" });
+  assert.deepEqual(actions, ["mute"]);
+  await assert.rejects(() => invoke("pi-desktop/voice/live/widget/action", mainId, { action: "mute" }), { errorCode: "PERMISSION_DENIED" });
+  await assert.rejects(() => invoke("pi-desktop/voice/live/widget/visibility", mainId, { visible: true, width: 380, height: 60 }), { errorCode: "PERMISSION_DENIED" });
+  await assert.rejects(() => invoke("pi-desktop/voice/live/widget/action", 33, { action: "end" }), { errorCode: "PERMISSION_DENIED" });
+  await invoke("pi-desktop/voice/live/widget/issue", mainId, { callId: "call-a", code: null });
+  await assert.rejects(() => invoke("pi-desktop/voice/live/widget/issue", widgetId, { callId: "call-a", code: null }), { errorCode: "PERMISSION_DENIED" });
+});

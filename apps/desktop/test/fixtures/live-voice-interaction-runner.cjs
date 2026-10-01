@@ -263,17 +263,17 @@ async function playbackScenario() {
   await check("blocked output exposes Resume sound with details closed",
     `s.snapshot.call.playbackBlocked && ${button("Resume sound")} && ${noDialog}`);
   await click(button("Resume sound"));
-  // The retry is refused in the owner frame, which is the only place that knows
-  // it: it reports the code and the widget names it in place, so the failure is
-  // visible without the details surface.
-  await check("failed playback retry is visible without opening details",
-    `s.snapshot.errorCode === 'LIVE_PLAYBACK_FAILED' && document.body.textContent.includes('LIVE_PLAYBACK_FAILED') && ui.all('[role=status]').length > 0 && ${button("Resume sound")} && ${noDialog} && s.counts.play >= 2`);
-  await check("failed playback retry is visible without opening details",
-    `s.snapshot.errorCode === 'LIVE_PLAYBACK_FAILED' && document.body.textContent.includes('LIVE_PLAYBACK_FAILED') && ui.all('[role=status]').length > 0 && ${button("Resume sound")} && ${noDialog} && s.counts.play >= 2`);
+  // Widget IPC cannot carry transient user activation. The owner window is
+  // focused and exposes a real owner-frame control for the retry.
+  await check("widget playback recovery hands off to the owner frame",
+    `ui.dialog(${JSON.stringify(details)}) && ${button("Resume sound", details)} && s.counts.play === 1`);
+  await click(button("Resume sound", details));
+  await check("failed playback retry is visible after owner-frame activation",
+    `s.snapshot.errorCode === 'LIVE_PLAYBACK_FAILED' && document.body.textContent.includes('LIVE_PLAYBACK_FAILED') && ${button("Resume sound", details)} && s.counts.play >= 2`);
   await evaluate("window.liveVoiceFixture.blockPlayback(false)");
-  await click(button("Resume sound"));
-  await check("successful user retry clears playback blockage and error",
-    `!s.snapshot.call.playbackBlocked && !s.snapshot.errorCode && !${button("Resume sound")} && ${noDialog}`);
+  await click(button("Resume sound", details));
+  await check("successful owner-frame retry clears playback blockage and error",
+    `!s.snapshot.call.playbackBlocked && !s.snapshot.errorCode && !${button("Resume sound", details)}`);
   await click(button("End call", bar));
   await wait("playback call ended", "!s.snapshot.stopping && s.snapshot.call?.phase === 'ended'");
   await clean();

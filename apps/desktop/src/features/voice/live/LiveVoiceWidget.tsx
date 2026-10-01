@@ -52,7 +52,10 @@ export function LiveVoiceWidget() {
 
   const callId = state.call?.callId;
 
-  useEffect(() => liveVoiceApi.onWidgetState((next) => setState(next)), []);
+  // Subscribe in a layout effect before reporting the presentation below. The
+  // main process replays its latest state in response to that report, closing
+  // the did-finish-load/passive-effect race for the first call snapshot.
+  useLayoutEffect(() => liveVoiceApi.onWidgetState((next) => setState(next)), []);
 
   // Every call starts with a clean presentation: a failure the user dismissed
   // during the last call must not stay silent during the next one.
