@@ -12,11 +12,6 @@ import {
   type TeamRosterProjection,
   type TeamTaskStatus,
   type TeamContextKind,
-  type DeclareTeamStrategyArgs,
-  type TeamExecutionDecision,
-  type TeamLaunchReview,
-  DECLARE_TEAM_STRATEGY_TOOL_NAME,
-  MAX_TEAM_STRATEGY_REASON_CHARS,
 } from "@pi-desktop/shared";
 
 export interface TeamToolsOptions {
@@ -24,116 +19,11 @@ export interface TeamToolsOptions {
   callerSessionId: string;
   isLead: boolean;
   host: RuntimeHost;
-  turnId?: string;
   abortActiveTurn?: (memberSessionId: string) => Promise<boolean>;
 }
 
 export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
   const { teamSessionId, callerSessionId, isLead, host } = opts;
-  const declareTeamStrategyTool: AgentTool = {
-    name: DECLARE_TEAM_STRATEGY_TOOL_NAME,
-    label: "Declare Team Strategy",
-    description:
-      "Declare the coordination strategy for this turn: either 'lead_only' for indivisible work, or 'delegate' to propose expert teammates. Only available to the Team Lead.",
-    parameters: Type.Object({
-      strategy: Type.Union([Type.Literal("lead_only"), Type.Literal("delegate")], {
-        description: "Whether the Lead handles this turn alone ('lead_only') or delegates to expert teammates ('delegate').",
-      }),
-      reason: Type.String({
-        description: "Reasoning for the strategy choice (up to 1000 chars).",
-        minLength: 1,
-        maxLength: MAX_TEAM_STRATEGY_REASON_CHARS,
-      }),
-      members: Type.Optional(
-        Type.Array(
-          Type.Object({
-            name: Type.String({
-              description: "Permanent alphanumeric/underscore name for this proposed expert.",
-              minLength: 1,
-              maxLength: 64,
-            }),
-            description: Type.Optional(Type.String({ description: "Expert role or specialty description." })),
-            contextKind: Type.Optional(
-              Type.Union([Type.Literal("fresh"), Type.Literal("fork")], {
-                description: "Context initialization: 'fresh' (default) or 'fork'.",
-              }),
-            ),
-            memberSessionId: Type.Optional(Type.String({ description: "Existing member session ID to reuse." })),
-            selection: Type.Optional(
-              Type.Object({
-                providerId: Type.Optional(Type.String()),
-                modelId: Type.Optional(Type.String()),
-                thinkingLevel: Type.Optional(Type.String()),
-              }),
-            ),
-          }),
-          { description: "Proposed expert members (required for 'delegate' strategy)." },
-        ),
-      ),
-    }),
-    execute: async (_toolCallId, params): Promise<AgentToolResult> => {
-      if (!isLead) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Error: TEAM_UNAUTHORIZED: Only the Team Lead may declare team strategy",
-            },
-          ],
-          details: { error: "TEAM_UNAUTHORIZED" },
-        };
-      }
-      try {
-        const p = params as DeclareTeamStrategyArgs;
-        const leadTurnId = opts.turnId ?? `turn-${Date.now()}`;
-        const result = await host.call<{
-          decision: TeamExecutionDecision;
-          review: TeamLaunchReview | null;
-        }>("team.declareStrategy", {
-          teamSessionId,
-          callerSessionId,
-          leadTurnId,
-          strategy: p.strategy,
-          reason: p.reason,
-          members: (p as any).members,
-        });
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                strategy: result.decision.strategy,
-                reason: result.decision.reason,
-                reviewId: result.review?.reviewId,
-                status: result.review?.status ?? "none",
-                members: result.review?.members?.map(
-                  (m: { name: string; selection: { modelId: string; providerId: string } }) => ({
-                    name: m.name,
-                    modelId: m.selection.modelId,
-                    providerId: m.selection.providerId,
-                  }),
-                ),
-              }),
-            },
-          ],
-          details: result,
-        };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Error: " + message,
-            },
-          ],
-          details: { error: message },
-        };
-      }
-    },
-  };
-
 
   const spawnTeammateTool: AgentTool = {
     name: "spawn_teammate",
@@ -811,8 +701,7 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     },
   };
 
-  const tools = [
-    ...(isLead ? [declareTeamStrategyTool] : []),
+  return [
     spawnTeammateTool,
     sendMessageTool,
     waitForUpdatesTool,
@@ -823,5 +712,4 @@ export function createTeamTools(opts: TeamToolsOptions): AgentTool[] {
     taskGetTool,
     teamStatusTool,
   ];
-  return tools;
 }
