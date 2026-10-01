@@ -1,14 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type {
-  TeamExecutionDecision,
-  TeamLaunchReview,
-  TeamMemberRecord,
-  TeamTaskRecord,
-  UiMessage,
-} from "@pi-desktop/shared";
+import type { TeamMemberRecord, TeamTaskRecord, UiMessage } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
-import { TeamLaunchReviewPanel } from "./TeamLaunchReviewPanel";
 import {
   IconChevronLeft,
   IconCircleAlert,
@@ -49,12 +42,8 @@ type TeamBoardSnapshot = {
   scopeOverlaps: TeamScopeOverlap[];
 };
 
-type TeamPanelSnapshot = {
-  roster: TeamRosterSnapshot;
-  board: TeamBoardSnapshot;
-  review?: TeamLaunchReview | null;
-  decision?: TeamExecutionDecision | null;
-};
+type TeamPanelSnapshot = { roster: TeamRosterSnapshot; board: TeamBoardSnapshot };
+
 type TeamDetailView =
   | { kind: "aggregate" }
   | { kind: "member"; memberSessionId: string }
@@ -79,19 +68,11 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
     if (!teamSessionId) return;
     const requestId = ++requestSequenceRef.current;
     try {
-      const [roster, board, reviewRes] = await Promise.all([
+      const [roster, board] = await Promise.all([
         api.getTeamRoster(teamSessionId) as unknown as Promise<TeamRosterSnapshot>,
         api.getTeamBoard(teamSessionId) as unknown as Promise<TeamBoardSnapshot>,
-        api.getTeamLaunchReview(teamSessionId).catch(() => ({ review: null })),
       ]);
-      const review = reviewRes?.review ?? null;
-      let decision: TeamExecutionDecision | null = null;
-      if (review?.leadTurnId) {
-        const decRes = await api
-          .getTeamExecutionDecision(teamSessionId, review.leadTurnId)
-          .catch(() => ({ decision: null }));
-        decision = decRes?.decision ?? null;
-      }
+      // A refresh can finish after Resume or after a newer poll. Only commit a
       // complete pair from the current team and revision.
       if (
         requestId !== requestSequenceRef.current ||
@@ -101,7 +82,8 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
       if (roster.revision !== board.revision) {
         throw new Error(t("team.snapshotChanged"));
       }
-      setSnapshot({ roster, board, review, decision });
+      setSnapshot({ roster, board });
+      setError(null);
     } catch (err) {
       if (requestId === requestSequenceRef.current) {
         setError(err instanceof Error ? err.message : String(err));
@@ -307,14 +289,6 @@ export function TeamPanel({ teamSessionId, onSelectSession }: TeamPanelProps) {
             </div>
           ))}
         </aside>
-      )}
-      {snapshot?.review && (
-        <TeamLaunchReviewPanel
-          teamSessionId={teamSessionId}
-          review={snapshot.review}
-          decision={snapshot.decision}
-          onReviewChanged={() => void loadData()}
-        />
       )}
 
       <section className="team-section">
