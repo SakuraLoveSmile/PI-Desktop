@@ -18,6 +18,8 @@ use uuid::Uuid;
 
 use crate::db::{now_ms, Database};
 
+pub mod assets;
+pub mod evidence;
 mod read;
 
 #[allow(unused_imports)]
@@ -373,6 +375,19 @@ fn validate_structured_draft(draft: &Value) -> Result<()> {
                 return Err(anyhow!("LIMIT_EXCEEDED: evidence summary too large"));
             }
         }
+        if let Some(items) = validate_array(draft, "screenshots")? {
+            if items.len() > assets::MAX_SCREENSHOTS_PER_REPORT {
+                return Err(anyhow!("LIMIT_EXCEEDED: too many screenshots"));
+            }
+            for (index, item) in items.iter().enumerate() {
+                let object = item.as_object().ok_or_else(|| {
+                    anyhow!("INVALID_ARGUMENT: screenshots[{index}] must be an object")
+                })?;
+                let context = format!("screenshots[{index}]");
+                validate_string_field(object, "id", &context)?;
+                validate_string_field(object, "evidenceRef", &context)?;
+            }
+        }
     }
     Ok(())
 }
@@ -565,7 +580,7 @@ fn write_atomic(target_path: &Path, content: &[u8]) -> Result<(String, u64)> {
 pub fn finalize_report(
     db: &Database,
     execution_id: &str,
-    durable_seq: i64,
+    durable_seq_override: i64,
     status_override: Option<&str>,
     error_code_override: Option<&str>,
 ) -> Result<GoalReportSummary> {
@@ -602,6 +617,33 @@ pub fn finalize_report(
     };
 
     let now = now_ms();
+    let durable_seq = if durable_seq_override > 0 {
+        durable_seq_override
+    } else {
+        db.conn()
+            .prepare_cached("SELECT COALESCE(MAX(seq), 0) FROM messages WHERE session_id = ?1")?
+            .query_row(params![facts.session_id], |r| r.get(0))
+            .unwrap_or(0)
+    };
+
+    let (started_at, completed_at, timing_source) = if let Some(ref tid) = turn_id {
+        let turn_timing: Option<(i64, Option<i64>)> = db
+            .conn()
+            .prepare_cached(
+                "SELECT started_at, ended_at FROM turns WHERE session_id = ?1 AND id = ?2",
+            )?
+            .query_row(params![facts.session_id, tid], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .optional()?;
+        if let Some((st, et)) = turn_timing {
+            (st, et.unwrap_or(now), "turn")
+        } else {
+            (facts.created_at, now, "unavailable")
+        }
+    } else {
+        (facts.created_at, now, "unavailable")
+    };
     let draft_path = draft_file_path(db.data_dir(), &facts.session_id, execution_id);
     let maybe_draft = if draft_path.exists() {
         fs::read_to_string(&draft_path)
@@ -612,9 +654,10 @@ pub fn finalize_report(
         None
     };
 
-    let execution_status = status_override
-        .or(facts.execution_state.as_deref())
-        .unwrap_or("completed");
+    let execution_status = match status_override.or(facts.execution_state.as_deref()) {
+        Some("interrupted") => "interrupted",
+        _ => "completed",
+    };
     let error_code = error_code_override.or(facts.error_code.as_deref());
 
     let (integrity_kind, verdict, summary, full_report) = match maybe_draft {
@@ -630,6 +673,29 @@ pub fn finalize_report(
                 .unwrap_or("")
                 .to_string();
 
+            let (assets, asset_warnings) = assets::resolve_and_save_assets(
+                db.data_dir(),
+                &facts.session_id,
+                execution_id,
+                &draft,
+            );
+            let evidence_resolutions = evidence::resolve_evidence_records(
+                db.conn(),
+                &facts.session_id,
+                durable_seq,
+                &draft,
+            );
+            let check_observations = evidence::generate_check_observations(&draft);
+
+            let mut limitations: Vec<Value> = draft
+                .get("limitations")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            for warning in asset_warnings {
+                limitations.push(json!(warning));
+            }
+
             let report_obj = json!({
                 "schemaVersion": GOAL_REPORT_SCHEMA_VERSION,
                 "reportId": report_id,
@@ -644,11 +710,12 @@ pub fn finalize_report(
                     "contractHash": facts.artifact_sha256,
                 },
                 "execution": {
-                    "startedAt": facts.created_at,
-                    "completedAt": now,
+                    "startedAt": started_at,
+                    "completedAt": completed_at,
                     "status": execution_status,
                     "errorCode": error_code,
                     "durableSeq": durable_seq,
+                    "timingSource": timing_source,
                 },
                 "integrity": {
                     "kind": "structured",
@@ -660,9 +727,13 @@ pub fn finalize_report(
                 "steps": draft.get("steps").cloned().unwrap_or_else(|| json!([])),
                 "files": draft.get("files").cloned().unwrap_or_else(|| json!([])),
                 "checks": draft.get("checks").cloned().unwrap_or_else(|| json!([])),
-                "limitations": draft.get("limitations").cloned().unwrap_or_else(|| json!([])),
+                "limitations": limitations,
                 "nextSteps": draft.get("nextSteps").cloned().unwrap_or_else(|| json!([])),
                 "evidences": draft.get("evidences").cloned().unwrap_or_else(|| json!([])),
+                "assets": assets,
+                "screenshots": draft.get("screenshots").cloned().unwrap_or_else(|| json!([])),
+                "evidenceResolutions": evidence_resolutions,
+                "checkObservations": check_observations,
             });
             ("structured".to_string(), verdict, summary, report_obj)
         }
@@ -693,11 +764,12 @@ pub fn finalize_report(
                     "contractHash": facts.artifact_sha256,
                 },
                 "execution": {
-                    "startedAt": facts.created_at,
-                    "completedAt": now,
+                    "startedAt": started_at,
+                    "completedAt": completed_at,
                     "status": execution_status,
                     "errorCode": error_code,
                     "durableSeq": durable_seq,
+                    "timingSource": timing_source,
                 },
                 "integrity": {
                     "kind": "fallback",
@@ -714,6 +786,10 @@ pub fn finalize_report(
                 "limitations": [],
                 "nextSteps": [],
                 "evidences": [],
+                "assets": [],
+                "screenshots": [],
+                "evidenceResolutions": [],
+                "checkObservations": [],
             });
             (
                 "fallback".to_string(),

@@ -9,7 +9,7 @@
  * — is pure transformation, so it lives here rather than in the page hook that
  * owns the subscription.
  */
-import type { PluginInstallMirror, PluginInstallProgress } from "@pi-desktop/shared";
+import type { ExpectedMarketplace, PluginInstallMirror, PluginInstallProgress } from "@pi-desktop/shared";
 
 /** What the dialog asks the host for, and what a retry asks for again. */
 export type PluginInstallRequest = {
@@ -18,6 +18,7 @@ export type PluginInstallRequest = {
   version?: string;
   autoUpdate: boolean;
   grantedPermissions: string[];
+  expectedMarketplace?: ExpectedMarketplace;
 };
 
 /** One install the dialog follows, from the confirmed click to its outcome. */

@@ -132,6 +132,11 @@ export const IPC = {
     teamGetBoard: "pi-desktop/team/getBoard",
     teamPause: "pi-desktop/team/pause",
     teamResume: "pi-desktop/team/resume",
+    teamGetExecutionDecision: "pi-desktop/team/getExecutionDecision",
+    teamGetLaunchReview: "pi-desktop/team/getLaunchReview",
+    teamUpdateLaunchReview: "pi-desktop/team/updateLaunchReview",
+    teamConfirmLaunchReview: "pi-desktop/team/confirmLaunchReview",
+    teamCancelLaunchReview: "pi-desktop/team/cancelLaunchReview",
     projectOpenFolder: "pi-desktop/project/openFolder",
     settingsGet: "pi-desktop/settings/get",
     settingsSet: "pi-desktop/settings/set",
@@ -190,6 +195,7 @@ export const IPC = {
     goalReportGet: "pi-desktop/goalReport/get",
     goalReportList: "pi-desktop/goalReport/list",
     goalReportRetry: "pi-desktop/goalReport/retry",
+    goalReportGetAsset: "pi-desktop/goalReport/getAsset",
     /**
      * List every paired remote `pi-host` this desktop knows, redacted so no
      * device token reaches the renderer. See ADR 0286 (R2b pairing UX).

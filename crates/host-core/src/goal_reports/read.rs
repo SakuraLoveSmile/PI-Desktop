@@ -189,10 +189,20 @@ pub fn read_report(
     session_id: &str,
     report_id_or_execution_id: &str,
 ) -> Result<GoalReportRead> {
-    let row: Option<(String, String, String, String, String, String)> = db
+    #[allow(clippy::type_complexity)]
+    let row: Option<(
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        Option<i64>,
+    )> = db
         .conn()
         .prepare_cached(
-            "SELECT session_id, execution_id, report_id, proposal_id, status, integrity
+            "SELECT session_id, execution_id, report_id, proposal_id, status, integrity, file_hash, file_size
              FROM goal_reports
              WHERE session_id = ?1 AND (report_id = ?2 OR execution_id = ?2)",
         )?
@@ -204,11 +214,23 @@ pub fn read_report(
                 r.get(3)?,
                 r.get(4)?,
                 r.get(5)?,
+                r.get(6)?,
+                r.get(7)?,
             ))
         })
         .optional()?;
 
-    let Some((sess_id, exec_id, report_id, proposal_id, status, db_integrity)) = row else {
+    let Some((
+        sess_id,
+        exec_id,
+        report_id,
+        proposal_id,
+        status,
+        db_integrity,
+        db_file_hash,
+        db_file_size,
+    )) = row
+    else {
         return Ok(GoalReportRead::state_only(
             REPORT_STATE_NOT_FOUND,
             session_id,
@@ -283,8 +305,28 @@ pub fn read_report(
         return Ok(read);
     }
 
-    read.report_sha256 = Some(sha256_hex(&bytes));
+    let recomputed_hash = sha256_hex(&bytes);
+    read.report_sha256 = Some(recomputed_hash.clone());
 
+    if let Some(stored_hash) = db_file_hash {
+        if !stored_hash.is_empty() && stored_hash != recomputed_hash {
+            read.state = REPORT_STATE_CORRUPT.to_string();
+            read.detail = Some(
+                "REPORT_CORRUPT: file hash does not match recorded publication hash".to_string(),
+            );
+            return Ok(read);
+        }
+    }
+
+    if let Some(stored_size) = db_file_size {
+        if stored_size > 0 && (stored_size as usize) != bytes.len() {
+            read.state = REPORT_STATE_CORRUPT.to_string();
+            read.detail = Some(
+                "REPORT_CORRUPT: file size does not match recorded publication size".to_string(),
+            );
+            return Ok(read);
+        }
+    }
     let parsed: Value = match serde_json::from_slice(&bytes) {
         Ok(value) => value,
         Err(_) => {

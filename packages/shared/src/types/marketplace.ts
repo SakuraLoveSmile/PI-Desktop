@@ -13,6 +13,7 @@ export type MarketPluginSummary = {
   author: string;
   iconUrl?: string;
   latestVersion: string;
+  latestShasum?: string;
   downloads?: number;
   updatedAt: string;
   categories?: string[];

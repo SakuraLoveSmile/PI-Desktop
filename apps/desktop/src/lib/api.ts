@@ -28,6 +28,7 @@ import type {
   AskToolResolution,
   AgentInstructionFile,
   AppSettings,
+  ExpectedMarketplace,
   CommandShellCatalog,
   AppVersionInfo,
   BrowserAction,
@@ -123,8 +124,13 @@ import type {
   TrustedExtensionStatusEvent,
   TrustedExtensionUiPrompt,
   TrustedExtensionUiPromptResponse,
+  GoalReportAssetChunk,
+  GoalReportSummary,
   TeamMemberRecord,
   TeamProjection,
+  TeamLaunchReview,
+  TeamExecutionDecision,
+  TeamLaunchReviewSelectionUpdate,
 } from "@pi-desktop/shared";
 import {
   defaultCommandShellForPlatform,
@@ -609,6 +615,44 @@ export const api = {
       IPC.invoke.teamResume,
       { teamSessionId },
     ),
+  getTeamExecutionDecision: (teamSessionId: string, leadTurnId: string) =>
+    invoke<{ decision: TeamExecutionDecision | null }>(
+      IPC.invoke.teamGetExecutionDecision,
+      { teamSessionId, leadTurnId },
+    ),
+  getTeamLaunchReview: (teamSessionId: string, reviewId?: string) =>
+    invoke<{ review: TeamLaunchReview | null }>(
+      IPC.invoke.teamGetLaunchReview,
+      { teamSessionId, reviewId },
+    ),
+  updateTeamLaunchReview: (
+    teamSessionId: string,
+    reviewId: string,
+    expectedRevision: number,
+    selections: TeamLaunchReviewSelectionUpdate[],
+  ) =>
+    invoke<{ review: TeamLaunchReview }>(
+      IPC.invoke.teamUpdateLaunchReview,
+      { teamSessionId, reviewId, expectedRevision, selections },
+    ),
+  confirmTeamLaunchReview: (
+    teamSessionId: string,
+    reviewId: string,
+    expectedRevision: number,
+  ) =>
+    invoke<{ review: TeamLaunchReview; decision: TeamExecutionDecision }>(
+      IPC.invoke.teamConfirmLaunchReview,
+      { teamSessionId, reviewId, expectedRevision },
+    ),
+  cancelTeamLaunchReview: (
+    teamSessionId: string,
+    reviewId: string,
+    expectedRevision: number,
+  ) =>
+    invoke<{ review: TeamLaunchReview }>(
+      IPC.invoke.teamCancelLaunchReview,
+      { teamSessionId, reviewId, expectedRevision },
+    ),
   openSessionScratchPath: (sessionId: string) =>
     invoke<{ ok: boolean; path: string }>(IPC.invoke.sessionOpenScratchPath, {
       sessionId,
@@ -980,11 +1024,28 @@ export const api = {
   markRevisionFailed: (proposalId: string, sessionId: string, errorCode?: string) =>
     invoke<{ changed: boolean; proposal?: PlanProposal }>(IPC.invoke.plansMarkRevisionFailed, { proposalId, sessionId, errorCode }),
   getGoalReport: (params: { sessionId: string; reportId?: string; executionId?: string }) =>
-    invoke<{ report: any }>(IPC.invoke.goalReportGet, params),
+    invoke<{
+      report: any;
+      state: string;
+      reportSha256?: string;
+      fileBytes?: number;
+      maxBytes?: number;
+      integrity?: string;
+      verdict?: string;
+      detail?: string;
+    }>(IPC.invoke.goalReportGet, params),
   listGoalReports: (params: { sessionId: string }) =>
-    invoke<{ reports: any[] }>(IPC.invoke.goalReportList, params),
+    invoke<{ reports: GoalReportSummary[] }>(IPC.invoke.goalReportList, params),
   retryGoalReport: (params: { sessionId: string; executionId: string }) =>
-    invoke<{ report: any }>(IPC.invoke.goalReportRetry, params),
+    invoke<{ report: GoalReportSummary }>(IPC.invoke.goalReportRetry, params),
+  getGoalReportAsset: (params: {
+    sessionId: string;
+    executionId: string;
+    screenshotId: string;
+    offset?: number;
+    length?: number;
+  }) =>
+    invoke<GoalReportAssetChunk>(IPC.invoke.goalReportGetAsset, params),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   /**
@@ -1293,6 +1354,7 @@ export const api = {
     enable?: boolean;
     autoUpdate?: boolean;
     grantedPermissions?: string[];
+    expectedMarketplace?: ExpectedMarketplace;
   }) =>
     invoke<{ result: PluginInstallResult }>(IPC.invoke.marketInstall, input),
   marketCheckUpdates: (refreshRemote = true) =>

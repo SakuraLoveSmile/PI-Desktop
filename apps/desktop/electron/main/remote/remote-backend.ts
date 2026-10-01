@@ -344,6 +344,23 @@ export function createRemoteBackend(options: RemoteBackendOptions): RemoteBacken
           executionId: req.executionId,
         });
       }
+      case IPC.invoke.goalReportGetAsset: {
+        const req = args[0] as {
+          sessionId: string;
+          executionId: string;
+          screenshotId: string;
+          offset?: number;
+          length?: number;
+        };
+        const hostSessionId = parseRemoteSessionId(req.sessionId)?.hostSessionId ?? hostIdFor(args);
+        return client.request("goalReports/getAsset", {
+          sessionId: hostSessionId,
+          executionId: req.executionId,
+          screenshotId: req.screenshotId,
+          ...(typeof req.offset === "number" ? { offset: req.offset } : {}),
+          ...(typeof req.length === "number" ? { length: req.length } : {}),
+        });
+      }
       case IPC.invoke.plansResolve: {
         const resolution = args[0] as PlanResolveRequest;
         if (resolution.action !== "approve" && resolution.action !== "reject") {
