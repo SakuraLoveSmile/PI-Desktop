@@ -4512,11 +4512,12 @@ async fn handle_request(
                 )
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             if !owned {
-                return Err(rpc_err(
-                    1007,
-                    "goal report was not found for this session",
-                    "NOT_FOUND",
-                ));
+                return Ok(json!({
+                    "state": "not_found",
+                    "sessionId": session_id,
+                    "offset": offset,
+                    "detail": "REPORT_NOT_FOUND: goal report does not exist"
+                }));
             }
             let chunk = crate::goal_reports::assets::read_asset_chunk(
                 st.db.data_dir(),
