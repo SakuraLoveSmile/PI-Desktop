@@ -70,6 +70,16 @@ Electron readiness, preventing the stock host identity from owning native
 notifications or taskbar groups. The Windows package additionally pins the
 `Pi-Desktop-Plus` executable and Start menu shortcut names. The launcher sets
 `PI_DESKTOP_DEV=1` so runtime packaging checks keep update delivery disabled
+
+Signing policy for these lanes: they sign **without a secure timestamp**
+(`-c.mac.timestamp=none`). Requesting one makes `codesign` ask Apple's timestamp
+authority for a token per signed file, and on this project's development host that
+token is reproducibly lost partway through a build — measured as one failure in
+every ~24 requests, with the failing file differing per run — which aborts
+packaging with `A timestamp was expected but was not found`. A secure timestamp is
+required for notarization, so the release lane keeps it; set
+`PI_MAC_SECURE_TIMESTAMP=1` to request one from a local lane as well when a DMG
+built here has to be notarized.
 and preserve developer workspace defaults despite the branded executable name.
 The first `pnpm dev` on Electron 43+ downloads the Electron binary on demand
 (the package no longer installs it during `pnpm install`).

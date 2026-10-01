@@ -138,3 +138,19 @@ fuses change, and a macOS build now needs a working `clang` toolchain in additio
 to the packaged sidecar. The pre-sign gate also fails a candidate whose host
 sidecar is missing, because electron-builder only warns when an `extraResources`
 source does not exist and otherwise ships a `host unavailable` application.
+
+Two packaging hazards surfaced while making this route work, both now guarded:
+
+- Copying the official distribution with Node's `fs.cpSync` rewrote the
+  framework's relative symlinks into absolute links pointing back into the package
+  store. The framework's root contents then lay outside the bundle and codesign
+  refused it with `unsealed contents present in the bundle root`. The assembler
+  copies with `ditto` and asserts that the root links stay relative.
+- Local lanes sign without a secure timestamp (`-c.mac.timestamp=none`). Asking for
+  one makes codesign request a token from Apple's timestamp authority for every
+  signed file, and on the development host that token is reproducibly lost partway
+  through a build — one failure in roughly every 24 requests, with the failing file
+  differing per run — which aborts packaging with `A timestamp was expected but was
+  not found`. The release lane keeps the timestamp, because notarization requires
+  it, and `PI_MAC_SECURE_TIMESTAMP=1` restores it for a local build that must be
+  notarized.

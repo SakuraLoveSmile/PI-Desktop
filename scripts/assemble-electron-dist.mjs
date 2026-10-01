@@ -30,9 +30,39 @@
  * Prints the distribution directory as its last line of output.
  */
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, copyFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readlinkSync, rmSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+/**
+ * The framework's root entries must stay bundle-relative symlinks. An absolute
+ * link (or one copied as a regular file) points outside the bundle, which makes
+ * codesign reject it as unsealed — exactly the failure that motivated this check.
+ */
+function assertFrameworkLinksAreRelative(distDir) {
+  const frameworkRoot = join(
+    distDir,
+    "Electron.app",
+    "Contents",
+    "Frameworks",
+    "Electron Framework.framework",
+  );
+  for (const name of ["Electron Framework", "Helpers", "Libraries", "Resources"]) {
+    const entry = join(frameworkRoot, name);
+    let target;
+    try {
+      target = readlinkSync(entry);
+    } catch {
+      fail(`the assembled framework's '${name}' is not a symlink: ${entry}`);
+    }
+    if (target.startsWith("/")) {
+      fail(
+        `the assembled framework's '${name}' points outside the bundle (${target}); copying must ` +
+          "preserve relative symlinks or codesign will reject the bundle as unsealed.",
+      );
+    }
+  }
+}
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const desktopRoot = join(repoRoot, "apps", "desktop");
@@ -126,7 +156,16 @@ function main() {
     );
   }
 
-  cpSync(officialDist, out, { recursive: true });
+  /*
+    Copy with `ditto`, not `fs.cpSync`: Node's copy rewrites the framework's
+    relative symlinks (`Electron Framework -> Versions/Current/Electron Framework`)
+    into absolute links pointing back at the pnpm store, which leaves the
+    framework's root contents unsealed and makes codesign reject the bundle
+    ("unsealed contents present in the bundle root"). `ditto` is the macOS tool
+    that preserves links and metadata verbatim.
+  */
+  run("ditto", [officialDist, out]);
+  assertFrameworkLinksAreRelative(out);
   const targetMain = join(out, "Electron.app", "Contents", "MacOS", "Electron");
   copyFileSync(linkedBinary, targetMain);
   rmSync(linkedBinary, { force: true });
