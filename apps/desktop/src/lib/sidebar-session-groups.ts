@@ -1,6 +1,13 @@
 import type { SessionSummary } from "@pi-desktop/shared";
 import type { ProjectMeta, SessionMeta } from "./sidebar-preferences";
 
+/** Replace only the Host's generated member label, preserving custom titles. */
+export function teamMemberRowTitle(session: SessionSummary, identity?: string): string {
+  return identity && session.team?.role === "member" &&
+    session.title === `Teammate: ${session.team.memberName}`
+    ? identity : session.title;
+}
+
 export function normalizeProjectPath(projectPath?: string | null): string | null {
   const value = projectPath?.trim();
   if (!value) return null;

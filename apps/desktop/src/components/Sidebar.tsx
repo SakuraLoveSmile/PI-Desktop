@@ -34,6 +34,7 @@ import {
   sessionPinned,
   sidebarSessionGroupIds,
   sortSidebarSessionGroups,
+  teamMemberRowTitle,
   visibleSidebarSessionGroups,
 } from "../lib/sidebar-session-groups";
 import {
@@ -1834,6 +1835,8 @@ export function Sidebar({
     const parentContext = !options?.teamChild && session.team?.role === "member"
       ? sessions.find((candidate) => candidate.id === session.team?.teamSessionId)
       : undefined;
+    const rowTitle = options?.teamChild
+      ? teamMemberRowTitle(session, options.teamIdentity) : session.title;
     const status = sidebarSessionStatus({
       running,
       selected: active,
@@ -1913,13 +1916,13 @@ export function Sidebar({
           {session.source === "pi-native" ? (
             <span className="thread-item-source" title="Native Pi session">Pi</span>
           ) : null}
-          <span className="thread-item-title">{taskTitle(session.title)}</span>
+          <span className="thread-item-title">{taskTitle(rowTitle)}</span>
           {options?.global ? (
             <span className="thread-item-project">
               {owningProject}
             </span>
           ) : null}
-          {options?.teamIdentity ? (
+          {options?.teamIdentity && rowTitle !== options.teamIdentity ? (
             <span className="thread-item-context">{options.teamIdentity}</span>
           ) : session.team?.role === "member" && !options?.teamChild ? (
             <span className="thread-item-context">

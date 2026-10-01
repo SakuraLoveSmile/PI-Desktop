@@ -3,6 +3,8 @@
 mod admission_tests;
 pub mod board;
 pub mod lifecycle;
+#[cfg(test)]
+mod lifecycle_tests;
 pub mod mailbox;
 pub mod model;
 pub mod review;
