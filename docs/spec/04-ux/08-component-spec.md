@@ -3199,7 +3199,9 @@ has four presentation states:
   work, and the resulting state returns through the same authoritative view the
   owner receives. A failure only the owner frame can observe — a refused mute, a
   playback retry that failed — is reported so the bar names it in place next to
-  its verbatim `LIVE_*` code; the bar is the only call chrome the user sees.
+  its verbatim `LIVE_*` code; the bar is the only call chrome the user sees. The
+  same report carries whether the bound work session waits on a decision the user
+  has to make in that session's own card, which the widget window cannot see.
 - The main window draws no call bar. It keeps the details surface, which the
   widget's Details action opens after bringing that window forward, and it stays
   the frame that runs the actions. Feature disable hides the idle icon; the

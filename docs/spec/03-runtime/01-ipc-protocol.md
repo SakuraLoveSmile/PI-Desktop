@@ -2413,8 +2413,8 @@ owner derivation.
 | `pi-desktop/voice/live/event/transcript` | Main → Renderer | transient bounded transcript event for the current call |
 | `pi-desktop/voice/live/widget/visibility` | Widget → Main | the docked widget's own presentation decision and the content box it needs; Main shows or hides that window accordingly |
 | `pi-desktop/voice/live/widget/action` | Widget → Main | a call action pressed in the docked widget; Main validates the sender and forwards it to the owner frame, which runs it |
-| `pi-desktop/voice/live/widget/issue` | Main window → Main | the owner frame's own failure code for its call (for example a refused mute), which the call view never carries |
-| `pi-desktop/voice/live/event/widgetState` | Main → Widget | the authoritative call view plus the owner's failure code, pushed to the docked widget window |
+| `pi-desktop/voice/live/widget/ownerState` | Main window → Main | what only the owner frame knows: its own failure code (for example a refused mute) and whether the bound work session waits on a decision; neither is in the call view |
+| `pi-desktop/voice/live/event/widgetState` | Main → Widget | the authoritative call view plus the owner's own failure code and waiting-decision flag, pushed to the docked widget window |
 | `pi-desktop/voice/live/event/widgetAction` | Main → Main window | the forwarded widget action the owner frame has to run |
 
 The `MessagePort` is provisioned only after successful owner validation, then

@@ -105,7 +105,7 @@ export const IPC = {
     liveVoiceStopWorkOperation: "pi-desktop/voice/live/work/stopOperation",
     liveVoiceCancelQueuedOperation: "pi-desktop/voice/live/work/cancelQueuedOperation",
     liveVoiceWidgetAction: "pi-desktop/voice/live/widget/action",
-    liveVoiceWidgetIssue: "pi-desktop/voice/live/widget/issue",
+    liveVoiceWidgetOwnerState: "pi-desktop/voice/live/widget/ownerState",
     liveVoiceWidgetVisibility: "pi-desktop/voice/live/widget/visibility",
     agentCompact: "pi-desktop/agent/compact",
     agentAbort: "pi-desktop/agent/abort",
