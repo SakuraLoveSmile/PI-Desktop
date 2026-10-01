@@ -9,7 +9,6 @@ import { liveWorkDecision, operationAwaitsDecision } from "./live-work-decision"
 import { liveVoiceIssue, liveVoiceMode } from "./live-voice-presentation";
 import { LiveVoiceDetails } from "./LiveVoiceDetails";
 import "../../../styles/voice.css";
-import "../../../styles/voice.css";
 
 /**
  * The main window's half of the call chrome.
