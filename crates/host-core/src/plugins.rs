@@ -18,6 +18,7 @@ pub(crate) const MAX_PACKAGE_BYTES: u64 = 50 * 1024 * 1024;
 pub(crate) const MAX_PACKAGE_FILES: usize = 2000;
 
 mod device;
+mod fixture;
 mod install;
 mod manifest;
 pub mod marketplace;
