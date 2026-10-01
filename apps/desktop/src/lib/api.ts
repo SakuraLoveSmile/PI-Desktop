@@ -46,6 +46,7 @@ import type {
   HostStatusEvent,
   MarketSource,
   McpCatalogEntry,
+  McpControlStatus,
   SkillCatalogEntry,
   ModelInfo,
   McpServerInput,
@@ -1163,6 +1164,19 @@ export const api = {
       IPC.invoke.mcpMarketSearch,
       { query, sources, ...options },
     ),
+
+  /**
+   * The desktop's own local MCP control endpoint (ADR 0203, gate `PI_DESKTOP_MCP_CONTROL`).
+   *
+   * It is a machine setting rather than a server definition, so it has its own
+   * pair of channels instead of `mcpList`/`mcpSetEnabled`, and the response never
+   * carries the bearer token or the whole connection manifest — only the
+   * manifest path, which is what the user needs for a client of their own.
+   */
+  mcpControlGet: () => invoke<McpControlStatus>(IPC.invoke.mcpControlGet),
+  /** Start or stop the local endpoint; the response is the state it reached. */
+  mcpControlSet: (enabled: boolean) =>
+    invoke<McpControlStatus>(IPC.invoke.mcpControlSet, { enabled }),
 
   // --- Skill market ----------------------------------------------------------
   searchSkillMarket: (query: string, sources: { id: string; name: string; url: string }[]) =>

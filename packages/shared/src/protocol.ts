@@ -299,6 +299,18 @@ export const IPC = {
     mcpImportScan: "pi-desktop/mcp/importScan",
     mcpImportRun: "pi-desktop/mcp/importRun",
     mcpMarketSearch: "pi-desktop/mcp/market/search",
+    /**
+     * Local MCP control plane status for this launch: effective enabled state,
+     * live listener state, the path of the connection manifest, and the last
+     * failure reason. Never contains the bearer token or the manifest itself.
+     */
+    mcpControlGet: "pi-desktop/mcp/control/get",
+    /**
+     * Enable or disable the local MCP control plane and persist the choice in
+     * the machine-local preference file. The startup environment wins while it
+     * is explicit, in which case the request is reported instead of applied.
+     */
+    mcpControlSet: "pi-desktop/mcp/control/set",
     skillList: "pi-desktop/skill/list",
     skillCreate: "pi-desktop/skill/create",
     skillImport: "pi-desktop/skill/import",

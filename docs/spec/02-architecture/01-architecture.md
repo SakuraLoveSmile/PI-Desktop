@@ -86,12 +86,17 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 
 ### 3.6 Local MCP control plane
 
-When `PI_DESKTOP_MCP_CONTROL=1` is set, Electron Main starts an optional
-Streamable HTTP MCP server on `127.0.0.1`. The server exposes named tools for
-the common project/session/Agent/workspace flows and a reviewed catalog of
-generic desktop operations. Each call delegates to the same registered main
-process IPC handler used by the renderer; it does not create a second
-permission or persistence implementation.
+Electron Main starts an optional Streamable HTTP MCP server on `127.0.0.1` when
+the launch environment sets `PI_DESKTOP_MCP_CONTROL=1`, or when the
+machine-local preference saved by the desktop's settings surface asks for it.
+The effective value is the explicit environment value, then the saved
+preference, then `false`. The server exposes named tools for the common
+project/session/Agent/workspace flows and a reviewed catalog of generic desktop
+operations. Each call delegates to the same registered main process IPC handler
+used by the renderer; it does not create a second permission or persistence
+implementation. The settings surface reads status and toggles the plane through
+`mcpControlGet` / `mcpControlSet`, which report a token-free status and stay out
+of the external operation catalog.
 
 The server creates a persistent bearer token and a connection manifest in the
 Electron user-data directory. It never binds a non-loopback address, exposes

@@ -211,6 +211,8 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.capabilityFilterProject",
       "extensions.mcp.test",
       "extensions.mcp.remove",
+      // T6.6：本机控制接口条带（设置搜索可直接命中 MCP 页）。
+      "settings.mcpControl.title",
     ],
   },
   {

@@ -12497,7 +12497,9 @@ are withdrawn with ADR 0165.
 - **Status**: MCP protocol/unit-covered by `apps/desktop/test/mcp-control.test.mjs`;
   `pnpm test:e2e:turn-get` covers the real Host/SQLite, registered session IPC,
   and local MCP path including terminal-state recovery after Host restart. The
-  full Electron UI journey remains deferred.
+  full Electron UI journey remains deferred. The persisted on/off preference and
+  its settings IPC are Main-covered by
+  `apps/desktop/test/mcp-control-settings.test.mjs`.
 
 - **Durable-turn extension (2026-09-26)**: Discover `pi_turn_get`; poll it
   with the session/turn returned by prompt. Verify running, completed, error,

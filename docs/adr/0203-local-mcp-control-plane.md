@@ -90,3 +90,36 @@ The bearer boundary, default-off startup, and persistence schema are unchanged.
 The IPC/host protocol specs define the response; targeted host and MCP tests
 cover state, identity, and authentication. This does not itself prove an
 external scheduler has collected the complete transcript.
+
+## Local on/off preference amendment (2026-09-30)
+
+The control plane no longer needs a launch environment variable to be useful.
+The effective value of a launch is the explicit `PI_DESKTOP_MCP_CONTROL` (`0`
+or `1`), then the machine-local preference
+`<user-data>/mcp-control-settings.json`, then `false`. Only `0` and `1` count as
+explicit; any other value is treated as unset.
+
+The preference is a per-machine runtime choice, written through a `0600`
+temporary file plus a rename and shaped `{"enabled": boolean}`. It is
+deliberately neither synced configuration nor host-core SQLite state — the same
+standing as the npm-path preference — and it holds no credential material. The
+bearer token and the connection manifest keep their own `0600` files.
+
+`mcpControlGet` and `mcpControlSet({enabled})` expose that state to the
+settings surface over the existing preload invoke bridge and the shared
+whitelist. They return `{enabled, running, source, connectionFile, error}` and
+never the token or the manifest, they drive the same single `McpControlServer`
+the environment drives (serialized start/stop, preference saved only after the
+listener is confirmed), and they stay outside the reviewed MCP operation
+catalog so an external client cannot switch off the plane that serves it.
+Enabling or disabling never stops, aborts, or cancels an Agent turn, and the
+loopback bind, authentication, discovery, and shutdown behavior of the server
+are unchanged.
+
+`apps/desktop/test/mcp-control-settings.test.mjs` covers the default-off
+preference, immediate discovery on enable, `active: false` on disable,
+idempotent repeated and concurrent clicks, environment precedence, a busy port,
+a failed preference write, restart persistence, and token-free status and logs;
+`apps/desktop/test/mcp-control-wiring.test.mjs` covers the single shared
+lifecycle, the renderer-only channel pair, and its absence from the external
+catalog.

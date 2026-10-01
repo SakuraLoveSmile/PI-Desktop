@@ -7360,7 +7360,8 @@ eleven-tool-round desktop paths are verified by
 - **里程碑**：M6+
 - **状态**：`apps/desktop/test/mcp-control.test.mjs` 覆盖 MCP 协议/单元；
   `pnpm test:e2e:turn-get` 覆盖真实 Host/SQLite、已注册的 session IPC 和本地 MCP
-  路径，包括 Host 重启后的终态恢复。完整 Electron UI 旅程仍延后。
+  路径，包括 Host 重启后的终态恢复。完整 Electron UI 旅程仍延后。已持久化的开关偏好
+  及其设置 IPC 由 `apps/desktop/test/mcp-control-settings.test.mjs` 覆盖（Main 层）。
 
 ## 受信任扩展场景（R7 v1）
 
